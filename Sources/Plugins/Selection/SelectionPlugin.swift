@@ -69,7 +69,7 @@ public final class SelectionPlugin: Plugin {
 
         // Select all, Unselect all. `.index` n takes every n-th line from the cursor.
         // Unselecting everything is always safe, also while a directory is still arriving.
-        let alls: [(CommandID, String, [Shortcut], Bool, EditingRole?, () -> SelectionScope)] = [
+        let wholeListCommands: [(CommandID, String, [Shortcut], Bool, EditingRole?, () -> SelectionScope)] = [
             (
                 .selectAll, "Select All", [.cmd("a"), Shortcut(.keypadPlus, .control)], true, .selectAll,
                 { selections.configured }
@@ -89,7 +89,7 @@ public final class SelectionPlugin: Plugin {
             (Ids.clearAllFolders, "Unselect All Folders", [], false, nil, { .folders }),
             (Ids.clearAllAsConfigured, "Unselect All: As Configured", [], false, nil, { selections.configured })
         ]
-        for (id, title, shortcuts, select, role, scope) in alls {
+        for (id, title, shortcuts, select, role, scope) in wholeListCommands {
             commands.register(
                 Command(id, title, shortcuts, editingRole: role), enabled: { !select || isComplete() },
                 parameterized: { argument in

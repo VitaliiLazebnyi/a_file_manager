@@ -30,7 +30,7 @@ import Testing
         #expect(!a.isSameLocation(as: MemoryFileSystem().url("/tmp/a")))
     }
 
-    @Test func buildingAnEntrysLocationNeverAsksTheDisk() {
+    @Test func buildingTheLocationOfAnEntryNeverAsksTheDisk() {
         // The plain Foundation call looks at the disk to decide about a trailing slash, which on
         // a network share is a trip to the server per file. This one works on the text alone:
         // the result is the same whether or not the name exists or is a folder.

@@ -1,0 +1,36 @@
+# Spell check (typos). Words below are correct here: file extensions, foreign-language UI text quoted
+# from Total Commander, protocol words, and deliberate test strings.
+[files]
+extend-exclude = [
+    "Tests/Stress/results/",  # captured logs and samples (mangled symbols)
+    "Tests/Stress/logs/",
+    "Tests/Fuzz/results/",
+    "Tests/Fuzz/out/",
+    "documentation/review-*/extracted/",
+    "*.jsonl",
+]
+
+[default.extend-words]
+caf = "caf"              # Core Audio Format extension; "café" without the accent in tests
+numer = "numer"          # mach_timebase_info field
+ue = "ue"                # German transliteration (ü → ue) in rename tests
+ond = "ond"              # a cut-off "second" in a clipboard test
+abd = "abd"              # fuzz input
+unter = "unter"          # German folder name in a test
+ba = "ba"                # base-26 counter in rename masks: aa, ab, … ba
+Ded = "Ded"              # "ANDed"
+iy = "iy"                # regex example M[ae][iy]er
+assotiate = "assotiate"  # Total Commander's own help-topic name
+
+[default.extend-identifiers]
+NOOPs = "NOOPs"          # FTP NOOP command
+Secur32 = "Secur32"
+
+[type.md.extend-words]
+Alle = "Alle"
+Sie = "Sie"
+Wil = "Wil"
+mapp = "mapp"
+Ordner = "Ordner"
+tradicional = "tradicional"
+onfiguration = "onfiguration"  # menu accelerator C&onfiguration

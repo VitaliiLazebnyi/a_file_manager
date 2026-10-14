@@ -773,7 +773,7 @@ private final class Collected<Value> {
             try FileManager.default.contentsOfDirectory(atPath: spool.path).isEmpty && !bench.store.hasPendingChanges)
     }
 
-    @Test func aChangeAsksTheDiskBeforeItTakesTheDirectorysLock() throws {
+    @Test func aChangeAsksTheDiskBeforeItTakesTheLockOfTheDirectory() throws {
         // An archive that cannot be written says so, as before…
         let archive = try makeZip()
         #expect(chmod(archive.path, 0o444) == 0)
