@@ -1,0 +1,21 @@
+import AFMKernel
+import AppKit
+
+/// A secondary window for plugins (viewer, Find Files): Esc and Cmd+W close it.
+open class ToolWindow: NSWindow {
+    /// Called for Esc before the window closes; return true when Esc was used up.
+    public var onEscape: (() -> Bool)?
+
+    open override func cancelOperation(_ sender: Any?) {
+        if onEscape?() == true { return }
+        performClose(sender)
+    }
+
+    open override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if Shortcut.cmd("w").matches(event) {
+            performClose(nil)
+            return true
+        }
+        return super.performKeyEquivalent(with: event)
+    }
+}
