@@ -133,6 +133,23 @@ import Testing
         #expect(answers.progress.first?.lines == ["From: \(box.url("A/docs").path)", "To: \(box.url("B/docs").path)"])
     }
 
+    @Test func aFinishedJobIsLetGo() throws {
+        let box = try Sandbox()
+        try box.file("A/docs/one.txt", "1")
+        try box.folder("B")
+        let (fileSystems, _) = makeFileSystems()
+        weak var finished: FileJob?
+        do {
+            // Without a delegate, the lines of the last item are never shown.
+            let job = FileJob(
+                kind: .copy, sources: [box.url("A/docs")], target: TargetSpec(directory: box.url("B")),
+                fileSystems: fileSystems)
+            #expect(job.run().completed.count == 1)
+            finished = job
+        }
+        #expect(finished == nil)
+    }
+
     @Test func noTemporaryNamesAreLeftBehind() throws {
         let box = try Sandbox()
         try box.file("A/one.txt", "1")
