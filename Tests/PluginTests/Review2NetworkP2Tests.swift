@@ -253,7 +253,7 @@ private final class Record<Value>: @unchecked Sendable {
 }
 
 /// An address the user typed is not asked about (N071; `ServerConsentService` of the kernel).
-@Suite struct Review2NetworkP2Consent {
+@MainActor @Suite struct Review2NetworkP2Consent {
     @Test func aServerTheUserNamedInPersonIsNotAskedAbout() throws {
         let fixture = try FTPFixture()
         try fixture.box.file("srv/a.txt", "a")

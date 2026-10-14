@@ -541,7 +541,7 @@ final class GatedFileSystem: FileSystemProvider {
     }
 }
 
-@Suite struct Review2FileopsAttributes {
+@MainActor @Suite struct Review2FileopsAttributes {
     // F028, F076
     @Test func anOctalModeIsTheWholeModeAsForChmod() {
         #expect(PermissionChange("755") == .absolute(0o755, keepingSpecialBits: false))

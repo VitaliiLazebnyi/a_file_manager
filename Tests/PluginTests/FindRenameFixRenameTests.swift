@@ -9,7 +9,7 @@ import Testing
 
 /// Fixes found in review: names by path, case folding per folder, numbers that used to trap,
 /// the planner's cost, Undo and the store.
-@Suite struct MultiRenameFixes {
+@MainActor @Suite struct MultiRenameFixes {
     var context: RenameContext = {
         var context = RenameContext()
         context.count = 3

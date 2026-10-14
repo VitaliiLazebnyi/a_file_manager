@@ -75,7 +75,7 @@ final class WatchedFileSystem: FileSystemProvider {
         handler?([url(path)])
     }
 
-    func watch(_ directories: [URL], onChange: @escaping ([URL]) -> Void) -> AnyObject? {
+    func watch(_ directories: [URL], onChange: @escaping @MainActor @Sendable ([URL]) -> Void) -> (any WatchToken)? {
         condition.lock()
         for directory in directories { watchCalls.append((directory.path, Thread.isMainThread)) }
         while holds { condition.wait() }

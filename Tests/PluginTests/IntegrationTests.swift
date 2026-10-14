@@ -259,7 +259,7 @@ private final class BreakingAnswers: FileJobDelegate {
 
 /// A branch view that names two files by their paths: the names of what a job processed are
 /// found by location.
-@Suite struct NamesInBranchViews {
+@MainActor @Suite struct NamesInBranchViews {
     @Test func processedItemsAreFoundByLocationWhereNamesArePaths() throws {
         let registry = FileSystemRegistry()
         let memory = MemoryFileSystem()

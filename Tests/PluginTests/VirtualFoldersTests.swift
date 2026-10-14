@@ -396,7 +396,7 @@ private final class WatchableFileSystem: FileSystemProvider {
         throw FileSystemError.notSupported("Writing")
     }
 
-    func watch(_ directories: [URL], onChange: @escaping ([URL]) -> Void) -> AnyObject? {
+    func watch(_ directories: [URL], onChange: @escaping @MainActor @Sendable ([URL]) -> Void) -> (any WatchToken)? {
         watched = directories
         self.onChange = onChange
         return self

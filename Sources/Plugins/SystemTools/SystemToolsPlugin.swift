@@ -305,7 +305,7 @@ final class SystemTools {
             })
     }
 
-    static func isHarmless(_ typed: TypedCommand) -> Bool {
+    nonisolated static func isHarmless(_ typed: TypedCommand) -> Bool {
         harmlessCommands.contains(typed.firstWord) && !typed.isDetached
             && typed.command.rangeOfCharacter(from: shellOperators) == nil
     }

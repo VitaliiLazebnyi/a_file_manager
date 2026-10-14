@@ -172,7 +172,7 @@ private final class WatchedSystem: FileSystemProvider {
     func copy(_: URL, to _: URL, progress _: (Int64) -> Bool) throws {
         throw FileSystemError.notSupported("Writing")
     }
-    func watch(_: [URL], onChange: @escaping ([URL]) -> Void) -> AnyObject? {
+    func watch(_: [URL], onChange: @escaping @MainActor @Sendable ([URL]) -> Void) -> (any WatchToken)? {
         self.onChange = onChange
         return self
     }

@@ -6,8 +6,9 @@ import Testing
 
 @testable import ArchivesPlugin
 
-/// A monitor for packing and unpacking outside a job service.
-final class QuietMonitor: JobMonitor {
+/// A monitor for packing and unpacking outside a job service. Unchecked: the reports are
+/// guarded by `lock`.
+final class QuietMonitor: JobMonitor, @unchecked Sendable {
     let cancellation = CancellationFlag()
     private let lock = NSLock()
     private var all: [JobProgress] = []
@@ -24,7 +25,9 @@ final class QuietMonitor: JobMonitor {
         lock.unlock()
     }
 
-    func ask<Answer>(_ question: () -> Answer) -> Answer { question() }
+    func ask<Answer: Sendable>(_ question: @MainActor @Sendable () -> Answer) -> Answer {
+        Thread.isMainThread ? MainActor.assumeIsolated(question) : DispatchQueue.main.sync { question() }
+    }
 }
 
 /// The archive file systems on top of the local disk and a memory file system, without a kernel.

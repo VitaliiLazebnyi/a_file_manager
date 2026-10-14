@@ -744,7 +744,7 @@ private func created(_ url: URL) -> Date? {
 
 // MARK: - Selection and capabilities in the commands
 
-@Suite struct FileOpsAdoptSelection {
+@MainActor @Suite struct FileOpsAdoptSelection {
     @Test func processedItemsAreFoundByLocationWhoseNamesArePaths() {
         let inFolder = FileItem(url: URL(fileURLWithPath: "/x/sub/a.txt"), name: "sub/a.txt", isDirectory: false)
         let alsoNamedA = FileItem(url: URL(fileURLWithPath: "/x/a.txt"), name: "a.txt", isDirectory: false)

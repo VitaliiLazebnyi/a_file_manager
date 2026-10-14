@@ -85,7 +85,7 @@ private final class Collected<Value> {
 /// the kernel's hooks for quitting, for bringing a file up to date and for the read order,
 /// and the paths the first pass left without a test (the clock of the delayed writes, the
 /// branches of the quit, members that wait next to an archive on another volume).
-@Suite struct Review2ArchivesP2 {
+@MainActor @Suite struct Review2ArchivesP2 {
     let bench: ArchiveBench
     var box: Sandbox { bench.box }
 

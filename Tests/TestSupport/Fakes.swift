@@ -153,13 +153,21 @@ public final class ImmediateJobService: JobService {
         func cancel() {}
     }
 
-    /// Unchecked: the job runs on the main thread, the only one that touches the monitor.
+    /// Unchecked: the reports are guarded by `lock`.
     private final class Monitor: JobMonitor, @unchecked Sendable {
         let cancellation = CancellationFlag()
-        var reports: [JobProgress] = []
-        func report(_ progress: JobProgress) { reports.append(progress) }
+        private let lock = NSLock()
+        private var all: [JobProgress] = []
+        var reports: [JobProgress] { lock.withLock { all } }
+        func report(_ progress: JobProgress) { lock.withLock { all.append(progress) } }
+
+        /// The job runs inside `run` on the main thread, which waits there until the job is done.
+        /// A job may spread its work over threads of its own; a question from one of them is
+        /// asked on that thread, as the waiting main thread would ask it (jobs ask one question
+        /// at a time). Hopping to the main thread would wait for ever.
         func ask<Answer: Sendable>(_ question: @MainActor @Sendable () -> Answer) -> Answer {
-            MainActor.assumeIsolated { question() }
+            if Thread.isMainThread { return MainActor.assumeIsolated(question) }
+            return withoutActuallyEscaping(question) { unsafeBitCast($0, to: (@Sendable () -> Answer).self)() }
         }
     }
 

@@ -9,7 +9,7 @@ import Testing
 /// The parts of the file panel that can be checked without a window: where the cells of the
 /// Brief and Thumbnails views are, finding by typing, the quick filter's matching, colours,
 /// the path bar's parts, tab dragging, and the rules of drag and drop.
-@Suite struct PanelParts {
+@MainActor @Suite struct PanelParts {
     func item(_ name: String, folder: Bool = false, size: Int64 = 0) -> FileItem {
         FileItem(url: URL(fileURLWithPath: "/x/" + name), name: name, isDirectory: folder, size: size)
     }

@@ -58,7 +58,7 @@ import Testing
     }
 }
 
-@Suite struct KeysAndMenus {
+@MainActor @Suite struct KeysAndMenus {
     func keyEvent(_ keyCode: UInt16, _ characters: String = "", _ flags: NSEvent.ModifierFlags = []) -> NSEvent {
         NSEvent.keyEvent(
             with: .keyDown, location: .zero, modifierFlags: flags, timestamp: 0, windowNumber: 0, context: nil,

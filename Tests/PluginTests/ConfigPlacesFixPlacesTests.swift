@@ -7,7 +7,7 @@ import Testing
 @testable import PlacesPlugin
 
 /// Stored hotlists and histories survive missing keys, unknown keys and bad elements.
-@Suite struct ConfigPlacesFixStoredData {
+@MainActor @Suite struct ConfigPlacesFixStoredData {
     @Test func aHotlistReadsLeniently() {
         let settings = MemorySettings()
         let json = """

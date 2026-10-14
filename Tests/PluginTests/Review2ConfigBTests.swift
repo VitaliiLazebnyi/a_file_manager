@@ -53,7 +53,7 @@ private final class Review2WatchFileSystem: FileSystemProvider {
         throw FileSystemError.notSupported("Writing")
     }
 
-    func watch(_ directories: [URL], onChange: @escaping ([URL]) -> Void) -> AnyObject? {
+    func watch(_ directories: [URL], onChange: @escaping @MainActor @Sendable ([URL]) -> Void) -> (any WatchToken)? {
         lock.lock()
         watches.append((directories, onChange))
         lock.unlock()

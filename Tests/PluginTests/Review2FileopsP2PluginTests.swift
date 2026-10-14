@@ -72,16 +72,20 @@ final class P2DeferredJobs: JobService {
         func cancel() {}
     }
 
-    final class Monitor: JobMonitor {
+    final class Monitor: JobMonitor, Sendable {
         let cancellation = CancellationFlag()
         func report(_: JobProgress) {}
-        func ask<Answer>(_ question: () -> Answer) -> Answer { question() }
+        func ask<Answer: Sendable>(_ question: @MainActor @Sendable () -> Answer) -> Answer {
+            // The work runs on the calling thread, the main one.
+            MainActor.assumeIsolated(question)
+        }
     }
 
     @discardableResult
-    func run<Result>(title: String, work: @escaping (any JobMonitor) -> Result, completion: @escaping (Result) -> Void)
-        -> any JobHandle
-    {
+    func run<Result: Sendable>(
+        title: String, work: @escaping @Sendable (any JobMonitor) -> Result,
+        completion: @escaping @MainActor (Result) -> Void
+    ) -> any JobHandle {
         titles.append(title)
         let result = work(Monitor())
         afterWork?()

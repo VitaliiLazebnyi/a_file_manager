@@ -43,7 +43,7 @@ import Testing
     }
 
     /// A started program, and what the tests reach into.
-    final class Running {
+    @MainActor final class Running {
         let kernel: Kernel
         let shell: Shell
         var left: PanelViewController { shell.panelCoordinator.leftPanel }
