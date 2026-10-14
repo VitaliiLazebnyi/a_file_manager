@@ -606,6 +606,8 @@ public final class FileJob: @unchecked Sendable {
         }
         // The last word, so that a finished job shows as finished.
         if !result.cancelled { emit(force: true) }
+        // The lines of the last item hold the job; they are not wanted any more.
+        counters.withLock { pendingLines = nil }
         return result
     }
 
