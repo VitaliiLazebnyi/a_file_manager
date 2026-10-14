@@ -47,8 +47,13 @@ public final class ViewOptionsPlugin: Plugin {
 
     /// Where long lists are worked through, and how the result comes back to the main
     /// thread. Tests put their own in, to say when each happens.
-    var background: (@escaping () -> Void) -> Void = { DispatchQueue.global(qos: .userInitiated).async(execute: $0) }
-    var onMain: (@escaping () -> Void) -> Void = { DispatchQueue.main.async(execute: $0) }
+    var background: @Sendable (@escaping @Sendable () -> Void) -> Void = {
+        DispatchQueue.global(qos: .userInitiated).async(execute: $0)
+    }
+    var onMain: @Sendable (@escaping @MainActor @Sendable () -> Void) -> Void = { work in
+        // The main queue runs its blocks on the main thread.
+        DispatchQueue.main.async { MainActor.assumeIsolated { work() } }
+    }
 
     public init() {}
 
@@ -220,7 +225,7 @@ public final class ViewOptionsPlugin: Plugin {
     /// background. `make` builds the filter (in the background too, for a long list);
     /// `matches` of it is then called from several threads and looks at the entry alone.
     private func apply(
-        _ title: String?, as kind: FilterKind?, to model: PanelModel, make: @escaping () -> PanelFilter?
+        _ title: String?, as kind: FilterKind?, to model: PanelModel, make: @escaping @Sendable () -> PanelFilter?
     ) {
         applied = applied.filter { $0.value.model != nil }
         filterTickets = filterTickets.filter { applied[$0.key] != nil }
@@ -241,10 +246,13 @@ public final class ViewOptionsPlugin: Plugin {
         filterInBackground(model, make, ticket: ticket, tries: 1)
     }
 
-    private func filterInBackground(_ model: PanelModel, _ make: @escaping () -> PanelFilter?, ticket: Int, tries: Int)
-    {
+    private func filterInBackground(
+        _ model: PanelModel, _ make: @escaping @Sendable () -> PanelFilter?, ticket: Int, tries: Int
+    ) {
         let id = ObjectIdentifier(model)
         let basis = model.basis
+        // Taken on the main thread: the background thread does not read the plugin.
+        let onMain = onMain
         background { [self] in
             let prepared = PanelModel.prepare(basis, filter: make())
             onMain { [self] in
@@ -272,7 +280,7 @@ public final class ViewOptionsPlugin: Plugin {
 
     /// What Show › Programs lists on a Mac: applications, files that may be executed, and the
     /// files the user's masks name (the Windows list is `*.exe *.com *.bat`). Folders stay.
-    static func isProgram(_ item: FileItem, masks: FileMask) -> Bool {
+    nonisolated static func isProgram(_ item: FileItem, masks: FileMask) -> Bool {
         if item.isFolder { return true }
         if masks.matches(item.name) { return true }
         return !item.isDirectory && item.permissions & 0o111 != 0
@@ -322,6 +330,8 @@ public final class ViewOptionsPlugin: Plugin {
     private func sortInBackground(_ model: PanelModel, to order: ListOrder) {
         let id = ObjectIdentifier(model)
         let basis = model.basis
+        // Taken on the main thread: the background thread does not read the plugin.
+        let onMain = onMain
         background { [self] in
             let prepared = PanelModel.prepare(basis, sort: order)
             onMain { [self] in
