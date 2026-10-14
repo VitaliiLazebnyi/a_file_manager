@@ -1,0 +1,56 @@
+# Builds the package, runs the tests and makes "A File Manager.app" (ad-hoc signed) on every
+# push and pull request. The fuzz and stress harnesses are not run here.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select the newest stable Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Show the toolchain
+        run: |
+          sw_vers
+          xcodebuild -version
+          swift --version
+
+      - name: Cache the build folder
+        uses: actions/cache@v4
+        with:
+          path: .build
+          key: spm-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Package.swift', 'Sources/**', 'Tests/**') }}
+          restore-keys: spm-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Build
+        run: swift build
+
+      - name: Test
+        run: swift test
+
+      - name: Build the app
+        run: Scripts/build-app.sh
+
+      - name: Zip the app
+        run: ditto -c -k --keepParent "build/A File Manager.app" "build/A-File-Manager.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: A-File-Manager-${{ github.sha }}
+          path: build/A-File-Manager.zip
+          retention-days: 14
