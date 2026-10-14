@@ -91,7 +91,7 @@ internal struct PlacesSettingsMigration {
         #expect(hotlist.hideCharacter == "?" && hotlist.hidesMarked)
         #expect(hotlist.isHidden(hotlist.entries[2].children[0]) && !hotlist.isHidden(projects))
         // Nothing was left out, so nothing was kept aside and nobody was told.
-        #expect(settings.data(forKey: "places.hotlist.unreadable") == nil && bench.ui.log.isEmpty)
+        #expect(settings.data(forKey: "places.hotlist.unreadable") == nil && bench.interaction.log.isEmpty)
     }
 
     /// Missing fields take their defaults and unknown ones are ignored, without a complaint.
@@ -105,7 +105,7 @@ internal struct PlacesSettingsMigration {
         #expect(hotlist.entries.allSatisfy { $0.kind == .item && $0.target.isEmpty && $0.children.isEmpty })
         #expect(hotlist.entries[1].command == "cd ~/Downloads")
         #expect(hotlist.hideCharacter == "?" && !hotlist.hidesMarked)
-        #expect(settings.data(forKey: "places.hotlist.unreadable") == nil && bench.ui.log.isEmpty)
+        #expect(settings.data(forKey: "places.hotlist.unreadable") == nil && bench.interaction.log.isEmpty)
     }
 
     /// The hotlist is stored again in the same shape when the editor hands it back unchanged.

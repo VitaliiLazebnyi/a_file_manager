@@ -100,6 +100,14 @@ private let kTestTargets: [Target] = [
         name: "ShellTests",
         dependencies: ["AFMKernel", "AFMContracts", "AFMShell", "StandardPlugins", "TestSupport"],
         swiftSettings: kTestSettings
+    ),
+    // The benchmarks of the hot paths with their limits; run by Scripts/benchmarks.sh, in release.
+    .executableTarget(
+        name: "Benchmarks",
+        dependencies: ["AFMKernel", "TestSupport", "LocalFileSystemPlugin", "FileOperationsPlugin", "ArchivesPlugin"],
+        path: "Tests/Benchmarks",
+        exclude: ["limits.json"],
+        swiftSettings: kStrict
     )
 ]
 

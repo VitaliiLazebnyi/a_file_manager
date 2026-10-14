@@ -418,13 +418,13 @@ let settingsImport = FuzzTarget(
             "connections": .flag(true), "hotlist": .flag(true), "tabs": .flag(true)
         ]
         switch bytes.count % 8 {
-        case 0: b.bench.ui.formAnswers = [.accept]
-        case 1: b.bench.ui.formAnswers = []
-        default: b.bench.ui.formAnswers = [.values(ticked)]
+        case 0: b.bench.interaction.formAnswers = [.accept]
+        case 1: b.bench.interaction.formAnswers = []
+        default: b.bench.interaction.formAnswers = [.values(ticked)]
         }
         center.importSettings(from: url)
         // A second import of the same file, everything ticked: nothing may be left half done by the first.
-        b.bench.ui.formAnswers = [.values(ticked)]
+        b.bench.interaction.formAnswers = [.values(ticked)]
         center.importSettings(from: url)
         if ProcessInfo.processInfo.environment["FZ_VERBOSE"] != nil {
             do {
@@ -433,7 +433,7 @@ let settingsImport = FuzzTarget(
             } catch { print("refused: \(error)") }
             // To see how far an input gets: what the program said, and what was stored.
             print(
-                "ui: \(b.bench.ui.log)\nforms shown: \(b.bench.ui.forms.count); user commands \(center.store.userCommands.count), start menu \(center.store.startMenu.count), "
+                "ui: \(b.bench.interaction.log)\nforms shown: \(b.bench.interaction.forms.count); user commands \(center.store.userCommands.count), start menu \(center.store.startMenu.count), "
                     + "key bindings stored \(b.settings.data(forKey: KeyBindings.settingsKey) != nil), frequent \(b.settings.data(forKey: "places.history.frequent") != nil)"
             )
         }

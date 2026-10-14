@@ -36,7 +36,8 @@ internal struct PreparedChangeTests {
             }
             let basis = two.basis
             // Marks, the cursor and sizes that change while the work is under way are kept.
-            let made = try #require(OtherThread.result { change.prepare(basis) })
+            let prepare = change.prepare
+            let made = try #require(OtherThread.result { prepare(basis) })
             #expect(two.apply(made) == .changed, "\(change.name)")
             #expect(announced == 1, "\(change.name)")
             #expect(PanelFigures.state(one) == PanelFigures.state(two), "\(change.name)")

@@ -266,7 +266,7 @@ func million() {
     }
     say("   marked=\(left.model.selectionCount)")
     step("4c select group by mask (4 of 12 extensions)", limit: 120) {
-        app.ui.promptAnswers = [.text("*.txt;*.swift;*.jpg;*.png")]
+        app.interaction.promptAnswers = [.text("*.txt;*.swift;*.jpg;*.png")]
         let asked = now()
         app.commands.perform(.selectGroup)
         // On a long list the Selection plugin works the mask out in the background and marks when it is done.
