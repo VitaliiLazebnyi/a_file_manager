@@ -12,9 +12,9 @@ import Testing
 
 /// Long loops of what a user does all day, which must not make the program hold more memory.
 ///
-/// The longer the program runs, the more often it does these: panels and folders opened and closed, jobs run, viewers and archives opened and
-/// closed, a server connected and disconnected. See `MemoryGrowth` for how growth is measured;
-/// run with `Scripts/check.sh memory`.
+/// The longer the program runs, the more often it does these: panels and folders opened and
+/// closed, jobs run, viewers and archives opened and closed, a server connected and disconnected.
+/// See `MemoryGrowth` for how growth is measured; run with `Scripts/check.sh memory`.
 @MainActor
 @Suite(.serialized, .enabled(if: MemoryGrowth.isEnabled))
 internal struct MemoryGrowthTests {
