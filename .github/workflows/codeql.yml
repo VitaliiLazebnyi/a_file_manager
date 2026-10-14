@@ -41,8 +41,11 @@ jobs:
           build-mode: manual
           queries: security-and-quality
 
+      # The same build as the `codeql` gate of Scripts/check.sh: CodeQL's tracer does not follow the
+      # default build system's build service, and SwiftPM's sandbox (sandbox-exec) has no Intel
+      # slice for the Intel-only extractor to start.
       - name: Build
-        run: swift build --build-tests
+        run: swift build --build-tests --build-system native --disable-sandbox
 
       - uses: github/codeql-action/analyze@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
         with:

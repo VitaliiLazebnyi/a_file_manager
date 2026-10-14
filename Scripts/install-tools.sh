@@ -11,6 +11,8 @@ missing=()
 for f in "${formulae[@]}"; do brew list --formula "$f" >/dev/null 2>&1 || missing+=("$f"); done
 [[ ${#missing[@]} -gt 0 ]] && brew install --quiet "${missing[@]}"
 brew list --cask codeql >/dev/null 2>&1 || brew install --quiet --cask codeql
+# CodeQL's Swift extractor is built for Intel only: it runs under Rosetta (needs administrator rights).
+arch -x86_64 /usr/bin/true 2>/dev/null || sudo softwareupdate --install-rosetta --agree-to-license
 
 # Muter comes from its own tap, which Homebrew asks to trust by name.
 if ! command -v muter >/dev/null; then
