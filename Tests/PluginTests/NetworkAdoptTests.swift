@@ -14,7 +14,7 @@ final class AdoptOutcome: @unchecked Sendable {
     private var error: (any Error)?
     private var finished = false
 
-    init(_ work: @escaping () throws -> Void) {
+    init(_ work: @escaping @Sendable () throws -> Void) {
         Thread { [self] in
             do { try work() } catch {
                 lock.lock()
@@ -347,7 +347,8 @@ func adoptCancel(_ flag: CancellationFlag, after delay: TimeInterval = 0.3) {
 
         // A question that is never answered ends with the flag as well.
         let second = CancellationFlag()
-        var found: FileItem? = FileItem(url: suite.url("/x"), name: "x", isDirectory: false)
+        // Written by the other thread before the wait ends, read here after it.
+        nonisolated(unsafe) var found: FileItem? = FileItem(url: suite.url("/x"), name: "x", isDirectory: false)
         let asking = AdoptOutcome { found = suite.fileSystem.item(at: suite.url("/hang"), cancellation: second) }
         Thread.sleep(forTimeInterval: 0.3)
         adoptCancel(second, after: 0)

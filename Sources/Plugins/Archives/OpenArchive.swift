@@ -242,7 +242,7 @@ enum Volume {
                     var buffer = [CChar](repeating: 0, count: Int(PATH_MAX) + 1)
                     let length = readlink(prefix, &buffer, Int(PATH_MAX))
                     guard length > 0 else { return .missing }
-                    let target = String(cString: buffer)
+                    let target = buffer.withUnsafeBufferPointer { String(cString: $0.baseAddress!) }
                     let base =
                         target.hasPrefix("/") ? target : (prefix as NSString).deletingLastPathComponent + "/" + target
                     let rest = names[(index + 1)...].joined(separator: "/")

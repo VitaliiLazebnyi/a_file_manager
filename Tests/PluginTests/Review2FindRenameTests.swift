@@ -18,7 +18,7 @@ import Testing
         return context
     }()
 
-    func finishes(within seconds: Double = 60, _ work: @escaping () -> Void) -> Bool {
+    func finishes(within seconds: Double = 60, _ work: @escaping @Sendable () -> Void) -> Bool {
         let done = DispatchSemaphore(value: 0)
         Thread {
             work()
@@ -65,7 +65,8 @@ import Testing
         settings.replacement = "X"
         let replace = try SearchReplace(settings)
         let name = String(repeating: "a", count: 250)
-        var result: String?
+        // Used by the work on its own thread only while the test waits for it to finish.
+        nonisolated(unsafe) var result: String?
         #expect(finishes { result = replace.replacing(in: name, cancelled: { false }) })
         #expect(result == name)
         // And it still replaces.
@@ -76,18 +77,20 @@ import Testing
     }
 
     @Test func aRegexOfTheUserThatBacktracksGivesNoNameInsteadOfHanging() throws {
-        var settings = RenameSettings()
+        // Used by the work on its own thread only while the test waits for it to finish.
+        nonisolated(unsafe) var settings = RenameSettings()
         settings.regularExpression = true
         settings.search = "(a*)*b"
         settings.replacement = "x"
         let replace = try SearchReplace(settings)
         let name = String(repeating: "a", count: 32)
-        var result: String? = "not run"
+        // Used by the work on its own thread only while the test waits for it to finish.
+        nonisolated(unsafe) var result: String? = "not run"
         #expect(finishes { result = replace.replacing(in: name, cancelled: { false }) })
         #expect(result == nil && replace.timedOut)
         // In the engine that is the error marker, and the preview says why.
-        var names: [String?] = []
-        var problem: (any Error)?
+        nonisolated(unsafe) var names: [String?] = []
+        nonisolated(unsafe) var problem: (any Error)?
         let subjects = (0..<5).map { _ in
             RenameEntry(FileItem(url: URL(string: "mem:///d/" + name)!, name: name, isDirectory: false))
         }
@@ -110,7 +113,8 @@ import Testing
             Thread.sleep(forTimeInterval: 0.03)
             flag.cancel()
         }.start()
-        var result: String? = "not run"
+        // Used by the work on its own thread only while the test waits for it to finish.
+        nonisolated(unsafe) var result: String? = "not run"
         #expect(
             finishes {
                 result = replace.replacing(
@@ -221,7 +225,7 @@ import Testing
             settings: settings)
     }
 
-    func session(clipboard: @escaping () -> String?, changes: (() -> Int)?, background: Bool = false)
+    func session(clipboard: @escaping @Sendable () -> String?, changes: (() -> Int)?, background: Bool = false)
         -> MultiRenameSession
     {
         MultiRenameSession(
@@ -232,8 +236,9 @@ import Testing
     }
 
     @Test func theClipboardIsReadOnlyWhenAMaskUsesItAndOnlyWhenItChanged() {
-        var reads = 0
-        var count = 1
+        // Used by the session's callbacks, which run one at a time while the test waits for them.
+        nonisolated(unsafe) var reads = 0
+        nonisolated(unsafe) var count = 1
         let session = session(
             clipboard: {
                 reads += 1

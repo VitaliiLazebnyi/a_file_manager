@@ -11,7 +11,8 @@ import ViewOptionsPlugin
 @testable import NetworkPlugin
 
 /// Stands in for the system when volumes are mounted.
-private final class RefusingMounter: VolumeMounter {
+/// Unchecked: its switches are set by the test before use, and it is used from one thread at a time.
+private final class RefusingMounter: VolumeMounter, @unchecked Sendable {
     var cancelled = false
     func mount(_ url: URL) throws -> [URL] {
         throw VolumeError(

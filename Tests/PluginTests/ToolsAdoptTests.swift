@@ -52,7 +52,7 @@ private final class ProbingFileSystem: FileSystemProvider {
         reading.signal()
         return reader
     }
-    func createDirectory(at url: URL) throws { try memory.createDirectory(at: url) }
+    func createDirectory(at url: URL) throws { memory.createDirectory(at: url) }
     func write(_ url: URL) throws -> any FileWriter { try memory.write(url) }
     func write(_ url: URL, cancellation: CancellationFlag) throws -> any FileWriter {
         let writer = try memory.write(url, cancellation: cancellation)
@@ -69,7 +69,8 @@ private final class ProbingFileSystem: FileSystemProvider {
 }
 
 /// What a background thread produced.
-private final class Outcome<Value> {
+/// Unchecked: the value is guarded by `lock`.
+private final class Outcome<Value>: @unchecked Sendable {
     private let lock = NSLock()
     private var stored: Value?
     var value: Value? {
@@ -87,7 +88,7 @@ private final class Outcome<Value> {
 }
 
 /// Runs `work` on its own thread; the semaphore is signalled when it ends.
-private func background(_ work: @escaping () -> Void) -> DispatchSemaphore {
+private func background(_ work: @escaping @Sendable () -> Void) -> DispatchSemaphore {
     let done = DispatchSemaphore(value: 0)
     Thread {
         work()

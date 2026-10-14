@@ -16,11 +16,12 @@ private func waitUntil(seconds: TimeInterval = 60, _ condition: () -> Bool) -> B
 }
 
 /// Runs `body` on a thread of its own and hands back what it returned or threw, when it is over.
-private final class Running<Value> {
+/// Unchecked: the result is guarded by `condition`.
+private final class Running<Value>: @unchecked Sendable {
     private let condition = NSCondition()
     private var result: Result<Value, any Error>?
 
-    init(_ body: @escaping () throws -> Value) {
+    init(_ body: @escaping @Sendable () throws -> Value) {
         Thread.detachNewThread { [self] in
             let result = Result { try body() }
             condition.lock()
@@ -54,7 +55,8 @@ private func wasCancelled<Value>(_ result: Result<Value, any Error>?) -> Bool {
 /// A folder that stands for a share whose server has gone: every question the file system
 /// puts to the system about a path in it waits here until the "server" answers again. The
 /// folder itself is an ordinary one on the local disk.
-private final class DeadVolume {
+/// Unchecked: the state is guarded by `condition`.
+private final class DeadVolume: @unchecked Sendable {
     let root: String
     private let condition = NSCondition()
     private var answers = false
@@ -429,7 +431,8 @@ private final class DeadVolume {
         // (the first step that waits on the volume) and before the date is set.
         let flag = CancellationFlag()
         let stopping = LocalFileSystem()
-        var steps = 0
+        // Used by the callbacks, which run one at a time while the calls below wait for them.
+        nonisolated(unsafe) var steps = 0
         stopping.probes.willAsk = { path in
             guard path == file.path else { return }
             steps += 1

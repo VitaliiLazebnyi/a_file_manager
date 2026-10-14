@@ -254,13 +254,15 @@ import Testing
         let listings = (0..<16).map { listing("/dir\($0)", files(50 + $0 * 20)) }
         // Counted under a lock: the checks run on many threads.
         let lock = NSLock()
-        var mistakes = 0
-        func check(_ condition: Bool) {
+        // Guarded by `lock`.
+        nonisolated(unsafe) var mistakes = 0
+        @Sendable func check(_ condition: Bool) {
             guard !condition else { return }
             lock.lock()
             mistakes += 1
             lock.unlock()
         }
+        let name = name
         DispatchQueue.concurrentPerform(iterations: 2_000) { index in
             let listing = listings[index % listings.count]
             let order = orders[index % orders.count]

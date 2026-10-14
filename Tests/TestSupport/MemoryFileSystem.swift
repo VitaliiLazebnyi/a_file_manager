@@ -176,7 +176,7 @@ public final class MemoryFileSystem: FileSystemProvider, @unchecked Sendable {
         permissions: UInt16 = 0o644
     ) -> URL {
         let url = url(path)
-        try? createDirectory(at: url.deletingLastPathComponent())
+        createDirectory(at: url.deletingLastPathComponent())
         synchronized { nodes[key(url)] = .file(Data(content.utf8), modified, permissions) }
         return url
     }
@@ -184,7 +184,7 @@ public final class MemoryFileSystem: FileSystemProvider, @unchecked Sendable {
     @discardableResult
     public func addDirectory(_ path: String) -> URL {
         let url = url(path)
-        try? createDirectory(at: url)
+        createDirectory(at: url)
         return url
     }
 
@@ -677,7 +677,7 @@ public final class MemoryFileSystem: FileSystemProvider, @unchecked Sendable {
 
     public func createDirectory(at url: URL, cancellation: CancellationFlag) throws {
         try flaggedChange("createDirectory", url, cancellation)
-        try createDirectory(at: url)
+        createDirectory(at: url)
     }
 
     public func remove(_ url: URL, cancellation: CancellationFlag) throws {

@@ -473,7 +473,7 @@ public final class ClipboardPlugin: Plugin {
     /// panel shows may block on the file system, and hands the text over on the main thread.
     private func details(
         _ style: NameList.Style, headers: Bool, mask: Int?, in kernel: Kernel,
-        then completion: @escaping (String) -> Void
+        then completion: @escaping @MainActor (String) -> Void
     ) {
         let (operands, extra) = detailsInput(in: kernel)
         let fileSystems = kernel.fileSystems

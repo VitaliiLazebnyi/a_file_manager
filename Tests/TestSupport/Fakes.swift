@@ -2,17 +2,18 @@ public import AFMKernel
 public import Foundation
 
 /// Answers the program's questions from a script and records what was asked.
-public final class ScriptedInteraction: UserInteraction {
-    public enum PromptAnswer {
+///
+/// Not tied to the main thread, unlike a real interaction: a test's job may ask from a thread of
+/// its own while the main thread waits for the job (`ImmediateJobService`). Unchecked: the
+/// script and the records are guarded by `lock`.
+public nonisolated final class ScriptedInteraction: UserInteraction, @unchecked Sendable {
+    public enum PromptAnswer: Sendable {
         case accept  // OK with the proposed text
         case text(String)
         case cancel
     }
 
-    public var promptAnswers: [PromptAnswer] = []
-    public var choiceAnswers: [Int] = []
-
-    public enum FormAnswer {
+    public enum FormAnswer: Sendable {
         /// The first button, with the fields as proposed.
         case accept
         /// A button, with these values in place of the proposed ones.
@@ -20,17 +21,37 @@ public final class ScriptedInteraction: UserInteraction {
         case cancel
     }
 
+    private let lock = NSLock()
+    private var script = (prompts: [PromptAnswer](), choices: [Int](), forms: [FormAnswer]())
+    private var records = (forms: [[FormField]](), log: [String]())
+
+    public var promptAnswers: [PromptAnswer] {
+        get { lock.withLock { script.prompts } }
+        set { lock.withLock { script.prompts = newValue } }
+    }
+    public var choiceAnswers: [Int] {
+        get { lock.withLock { script.choices } }
+        set { lock.withLock { script.choices = newValue } }
+    }
     /// Without an answer a form is cancelled.
-    public var formAnswers: [FormAnswer] = []
+    public var formAnswers: [FormAnswer] {
+        get { lock.withLock { script.forms } }
+        set { lock.withLock { script.forms = newValue } }
+    }
     /// The fields of every form that was shown.
-    public private(set) var forms: [[FormField]] = []
-    public private(set) var log: [String] = []
+    public var forms: [[FormField]] { lock.withLock { records.forms } }
+    public var log: [String] { lock.withLock { records.log } }
 
     public init() {}
 
+    private func record(_ line: String) {
+        lock.withLock { records.log.append(line) }
+    }
+
     public func prompt(_ message: String, value: String, detail _: String) -> String? {
-        log.append("prompt: \(message) [\(value)]")
-        switch promptAnswers.isEmpty ? .cancel : promptAnswers.removeFirst() {
+        record("prompt: \(message) [\(value)]")
+        let answer = lock.withLock { script.prompts.isEmpty ? .cancel : script.prompts.removeFirst() }
+        switch answer {
         case .accept: return value
         case .text(let text): return text
         case .cancel: return nil
@@ -38,22 +59,25 @@ public final class ScriptedInteraction: UserInteraction {
     }
 
     public func choose(_ message: String, detail: String, buttons: [String], style _: QuestionStyle) -> Int {
-        log.append("choose: \(message) / \(detail)")
-        return choiceAnswers.isEmpty ? buttons.count - 1 : choiceAnswers.removeFirst()
+        record("choose: \(message) / \(detail)")
+        return lock.withLock { script.choices.isEmpty ? buttons.count - 1 : script.choices.removeFirst() }
     }
 
     public func inform(_ message: String, detail _: String, style _: QuestionStyle) {
-        log.append("inform: \(message)")
+        record("inform: \(message)")
     }
 
     public func notice(_ message: String) {
-        log.append("notice: \(message)")
+        record("notice: \(message)")
     }
 
     public func form(_ title: String, detail _: String, fields: [FormField], buttons _: [String]) -> FormValues? {
-        log.append("form: \(title)")
-        forms.append(fields)
-        switch formAnswers.isEmpty ? .cancel : formAnswers.removeFirst() {
+        record("form: \(title)")
+        let answer = lock.withLock {
+            records.forms.append(fields)
+            return script.forms.isEmpty ? .cancel : script.forms.removeFirst()
+        }
+        switch answer {
         case .accept: return FormValues(defaultsOf: fields)
 
         case .values(let values, let button):
@@ -88,8 +112,9 @@ public final class FakePanel: PanelHandle {
         show(directory, focus: nil, history: .keep, completion: nil)
     }
 
-    public func show(_ location: URL, focus: String?, history: PanelModel.HistoryEffect, completion: ((Bool) -> Void)?)
-    {
+    public func show(
+        _ location: URL, focus: String?, history: PanelModel.HistoryEffect, completion: (@MainActor (Bool) -> Void)?
+    ) {
         do {
             let result = try PanelLoader.load(location, showHidden: model.showHidden, fileSystems: fileSystems)
             model.show(result.listing, focus: focus ?? result.focus, history: history)
@@ -100,7 +125,7 @@ public final class FakePanel: PanelHandle {
         }
     }
 
-    public func reload(focus: String?, quietly _: Bool, completion: (() -> Void)?) {
+    public func reload(focus: String?, quietly _: Bool, completion: (@MainActor () -> Void)?) {
         if let result = try? PanelLoader.load(
             model.directory, showHidden: model.showHidden, fileSystems: fileSystems, climbing: true)
         {

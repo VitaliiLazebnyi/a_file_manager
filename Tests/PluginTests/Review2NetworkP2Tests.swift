@@ -114,7 +114,7 @@ private final class Record<Value>: @unchecked Sendable {
     @Test func everyChangingCallOfAnFTPServerLeavesAWaitWhenItsFlagIsSet() throws {
         let (fixture, answer, first) = try heldAtLogin()
         let fs = fixture.fileSystem
-        let calls: [(String, (CancellationFlag) throws -> Void)] = [
+        let calls: [(String, @Sendable (CancellationFlag) throws -> Void)] = [
             ("createDirectory", { try fs.createDirectory(at: fixture.url("/made"), cancellation: $0) }),
             ("remove", { try fs.remove(fixture.url("/a.txt"), cancellation: $0) }),
             (
@@ -181,7 +181,7 @@ private final class Record<Value>: @unchecked Sendable {
         center.noteChosen(key)
         defer { center.disconnectAll() }
         let fs = RemoteFileSystem(scheme: "sftp", center: center)
-        let calls: [(String, (CancellationFlag) throws -> Void)] = [
+        let calls: [(String, @Sendable (CancellationFlag) throws -> Void)] = [
             ("createDirectory", { try fs.createDirectory(at: key.url(path: "/made"), cancellation: $0) }),
             ("remove", { try fs.remove(key.url(path: "/a.txt"), cancellation: $0) }),
             (
@@ -454,7 +454,7 @@ private final class Record<Value>: @unchecked Sendable {
 /// a mount that is never answered is taken back on Cancel, and an eject that is never
 /// answered is given up after its time.
 @Suite struct Review2NetworkP2Mounting {
-    private final class Token {}
+    private final class Token: Sendable {}
 
     @Test func aMountThatIsNeverAnsweredIsTakenBackWhenItIsCancelled() {
         let token = Token()

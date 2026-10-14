@@ -566,7 +566,8 @@ import Testing
         #expect(answer == 1 && ui.log == ["choose: Really? / "])
         // The same from a plugin that has no job at hand.
         ui.choiceAnswers = [0]
-        var viaKernel = -1
+        // Changed on the main thread, where the test reads it.
+        nonisolated(unsafe) var viaKernel = -1
         DispatchQueue.global().async {
             let result = app.kernel.askUser {
                 $0.choose("Password?", detail: "", buttons: ["OK", "Cancel"], style: .information)

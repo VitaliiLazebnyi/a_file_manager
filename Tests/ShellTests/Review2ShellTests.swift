@@ -10,7 +10,8 @@ import Testing
 /// A file system whose `watch` and `places` say on which thread they were called, and whose
 /// `watch` can be made to wait like a share that has stopped answering. Everything else is a
 /// memory file system's.
-final class WatchedFileSystem: FileSystemProvider {
+/// Unchecked: what it records is guarded by `condition`; its switches are set by the test before use.
+final class WatchedFileSystem: FileSystemProvider, @unchecked Sendable {
     let inner: MemoryFileSystem
     private let condition = NSCondition()
     private var holds = false
@@ -18,15 +19,15 @@ final class WatchedFileSystem: FileSystemProvider {
     private var placeCalls: [Bool] = []
     private var living = 0
     private var ended = 0
-    private var handlers: [String: ([URL]) -> Void] = [:]
+    private var handlers: [String: @MainActor @Sendable ([URL]) -> Void] = [:]
 
     init(scheme: String = "watched") { inner = MemoryFileSystem(scheme: scheme) }
 
     func url(_ path: String) -> URL { inner.url(path) }
 
-    private final class Token {
-        let onEnd: () -> Void
-        init(onEnd: @escaping () -> Void) { self.onEnd = onEnd }
+    private final class Token: Sendable {
+        let onEnd: @Sendable () -> Void
+        init(onEnd: @escaping @Sendable () -> Void) { self.onEnd = onEnd }
         deinit { onEnd() }
     }
 
@@ -68,7 +69,7 @@ final class WatchedFileSystem: FileSystemProvider {
     }
 
     /// Reports a change of a watched folder, as the file system would: on the main thread.
-    func reportChange(of path: String) {
+    @MainActor func reportChange(of path: String) {
         condition.lock()
         let handler = handlers[path]
         condition.unlock()
@@ -111,7 +112,7 @@ final class WatchedFileSystem: FileSystemProvider {
     func item(at url: URL) -> FileItem? { inner.item(at: url) }
     func parent(of directory: URL) -> URL? { inner.parent(of: directory) }
     func read(_ url: URL) throws -> any FileReader { try inner.read(url) }
-    func createDirectory(at url: URL) throws { try inner.createDirectory(at: url) }
+    func createDirectory(at url: URL) throws { inner.createDirectory(at: url) }
     func write(_ url: URL) throws -> any FileWriter { try inner.write(url) }
     func remove(_ url: URL) throws { try inner.remove(url) }
     func move(_ source: URL, to destination: URL, replacing: Bool) throws {
@@ -746,7 +747,8 @@ extension Application {
             asked.change { $0.append("\(path) on main: \(Thread.isMainThread)") }
             return image
         }
-        var arrived: Set<String> = []
+        // Changed by the observer on the main thread, where the test reads it.
+        nonisolated(unsafe) var arrived: Set<String> = []
         let observer = NotificationCenter.default.addObserver(
             forName: IconStore.didArrive, object: store, queue: .main
         ) { note in

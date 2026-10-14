@@ -212,7 +212,8 @@ private func reproducer(_ name: String) throws -> Data {
 
     @Test func theFileSystemRefusesAPathWithSuchAName() throws {
         let center = ConnectionCenter()
-        var made = 0
+        // Used by the callbacks, which run one at a time while the calls below wait for them.
+        nonisolated(unsafe) var made = 0
         center.makeSession = { _, _ in
             made += 1
             return nil

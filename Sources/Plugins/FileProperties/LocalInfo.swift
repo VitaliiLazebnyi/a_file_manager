@@ -139,7 +139,7 @@ enum LocalInfo {
         let length = readlink(url.path, &buffer, Int(PATH_MAX))
         guard length >= 0 else { return nil }
         buffer[length] = 0
-        return String(cString: buffer)
+        return buffer.withUnsafeBufferPointer { String(cString: $0.baseAddress!) }
     }
 
     /// The item a link leads to: the target of a symbolic link (relative targets count from
@@ -166,7 +166,9 @@ enum LocalInfo {
         var buffer = [CChar](repeating: 0, count: length)
         let filled = listxattr(url.path, &buffer, length, XATTR_NOFOLLOW)
         guard filled > 0 else { return [] }
-        return buffer.prefix(filled).split(separator: 0).map { String(cString: Array($0) + [0]) }
+        return buffer.prefix(filled).split(separator: 0).map {
+            (Array($0) + [0]).withUnsafeBufferPointer { String(cString: $0.baseAddress!) }
+        }
     }
 
     static func tags(_ url: URL) -> [String] {

@@ -373,7 +373,8 @@ import VirtualFoldersPlugin
 }
 
 /// A file system over memory whose reads wait until they are let go.
-final class GatedFileSystem: FileSystemProvider {
+/// Unchecked: what it records is guarded by `lock`; its switches are set by the test before use.
+final class GatedFileSystem: FileSystemProvider, @unchecked Sendable {
     let base = MemoryFileSystem(scheme: "gated")
     var scheme: String { base.scheme }
     var capabilities: FileSystemCapabilities { [.write] }
@@ -405,7 +406,7 @@ final class GatedFileSystem: FileSystemProvider {
         }
         return reader
     }
-    func createDirectory(at url: URL) throws { try base.createDirectory(at: url) }
+    func createDirectory(at url: URL) throws { base.createDirectory(at: url) }
     func write(_ url: URL) throws -> any FileWriter { try base.write(url) }
     func remove(_ url: URL) throws { try base.remove(url) }
     func move(_ source: URL, to destination: URL, replacing: Bool) throws {
@@ -481,7 +482,8 @@ final class GatedFileSystem: FileSystemProvider {
         let folder = gated.base.url("/A")
         gated.holdNextRead()
         let first = DispatchSemaphore(value: 0)
-        var stale: [String: String] = [:]
+        // Written by the other thread before it signals, read here after the wait.
+        nonisolated(unsafe) var stale: [String: String] = [:]
         Thread.detachNewThread {
             stale = store.comments(in: folder)
             first.signal()
@@ -506,7 +508,8 @@ final class GatedFileSystem: FileSystemProvider {
         #expect(mkfifo(pipe.path, 0o644) == 0)
         let store = CommentStore(fileSystems: fileSystems)
         let done = DispatchSemaphore(value: 0)
-        var refused = false
+        // Written by the other thread before it signals, read here after the wait.
+        nonisolated(unsafe) var refused = false
         Thread.detachNewThread {
             _ = store.comments(in: box.url("d"))
             refused = (try? store.setComment("x", for: "a.txt", in: box.url("d"), hidden: false)) == nil

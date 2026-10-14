@@ -11,9 +11,11 @@ import Testing
 /// the main thread. The test says when the background work and its return happen.
 @MainActor @Suite struct Review2ConfigAViewOptions {
     /// Holds what the plugin hands to the background and back, until the test runs it.
-    final class Steps {
-        var background: [() -> Void] = []
-        var main: [() -> Void] = []
+    /// Unchecked: used on the main thread only; the plugin hands its steps over there and the
+    /// test runs them there.
+    final class Steps: @unchecked Sendable {
+        var background: [@Sendable () -> Void] = []
+        var main: [@MainActor @Sendable () -> Void] = []
 
         func runBackground() {
             let work = background
@@ -21,7 +23,7 @@ import Testing
             work.forEach { $0() }
         }
 
-        func runMain() {
+        @MainActor func runMain() {
             let work = main
             main = []
             work.forEach { $0() }

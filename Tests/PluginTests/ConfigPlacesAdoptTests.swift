@@ -233,8 +233,10 @@ private final class MountedImage {
         for path in ["a/b/c", "a/d", "e", "f/g", "a/b/h"] { try box.folder(path) }
         try box.file("a/file.txt")
         let scanner = TreeScanner(root: box.root, provider: LocalFileSystem(), batchSize: 2)
-        var levels: [TreeScanner.Level] = []
-        var offMain = true
+        // Written by the other thread before it signals, read here after the wait.
+        nonisolated(unsafe) var levels: [TreeScanner.Level] = []
+        // Written by the other thread before it signals, read here after the wait.
+        nonisolated(unsafe) var offMain = true
         let done = DispatchSemaphore(value: 0)
         Thread.detachNewThread {
             scanner.run { batch in

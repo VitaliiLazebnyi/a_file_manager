@@ -11,7 +11,8 @@ import UniformTypeIdentifiers
 
 /// A file system of a few made-up files, for what the memory file system cannot do: readers that
 /// are slow to close, and files that do not end.
-final class Review2HookProvider: FileSystemProvider {
+/// Unchecked: what it records is guarded by `lock`; its switches are set by the test before use.
+final class Review2HookProvider: FileSystemProvider, @unchecked Sendable {
     let scheme = "hook"
     let capabilities: FileSystemCapabilities = []
     var sizes: [String: Int64] = [:]
@@ -43,7 +44,8 @@ final class Review2HookProvider: FileSystemProvider {
             isSpecial: special.contains(url.path))
     }
 
-    private final class Reader: FileReader {
+    /// Unchecked: used by one thread at a time, as the protocol allows.
+    private final class Reader: FileReader, @unchecked Sendable {
         let owner: Review2HookProvider
         let data: Data?
         var position = 0
@@ -214,7 +216,8 @@ final class Review2HookProvider: FileSystemProvider {
     // MARK: The block cache
 
     @Test func aShortBlockIsNotKeptInMemory() throws {
-        final class Flaky: ByteSource {
+        /// Unchecked: its switches are set by the test before use, and it is used from one thread at a time.
+        final class Flaky: ByteSource, @unchecked Sendable {
             let length: Int64 = 40_000
             var short = true
             func read(at offset: Int64, count: Int) -> Data {

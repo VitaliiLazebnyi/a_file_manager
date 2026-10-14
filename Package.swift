@@ -18,10 +18,10 @@ import PackageDescription
 /// Every target is compiled in the Swift 6 language mode (data races are errors), with every
 /// warning an error and the upcoming features that make code more explicit.
 let strict: [SwiftSetting] = [
+    .treatAllWarnings(as: .error),
     .enableUpcomingFeature("ExistentialAny"),
     .enableUpcomingFeature("MemberImportVisibility"),
-    .enableUpcomingFeature("InternalImportsByDefault"),
-    .enableUpcomingFeature("StrictConcurrency")
+    .enableUpcomingFeature("InternalImportsByDefault")
 ]
 
 /// With the Command Line Tools alone (no Xcode), incremental test builds lose the path to the
@@ -102,6 +102,5 @@ let package = Package(
         // `swift package generate-documentation`, used by the docs gate of Scripts/check.sh.
         .package(url: "https://github.com/swiftlang/swift-docc-plugin", from: "1.4.0")
     ],
-    targets: coreTargets + testTargets + plugins,
-    swiftLanguageModes: [.v5]
+    targets: coreTargets + testTargets + plugins
 )

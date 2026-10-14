@@ -176,7 +176,8 @@ func patternData(_ count: Int) -> Data {
         let files = (0..<300).map {
             (url: memory.addFile("/h/f\($0)", "content \($0)"), methods: [ChecksumMethod.md5, .crc32])
         }
-        var reports: [JobProgress] = []
+        // Guarded by `lock`.
+        nonisolated(unsafe) var reports: [JobProgress] = []
         let lock = NSLock()
         let run = ToolRun(
             fileSystems: fileSystems,

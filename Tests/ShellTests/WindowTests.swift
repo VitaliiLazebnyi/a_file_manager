@@ -701,7 +701,7 @@ private final class WindowTestPlugin: Plugin {
         let service = app.shell.jobService
         let reporter = Reporter()
         var result = ""
-        service.run(title: "Long", work: reporter.work, completion: { result = $0 })
+        service.run(title: "Long", work: { reporter.work($0) }, completion: { result = $0 })
         await wait { reporter.count > 5 }
         #expect(!service.isPaused)
         service.setPaused(true)
@@ -731,8 +731,8 @@ private final class WindowTestPlugin: Plugin {
         let service = app.shell.jobService
         let reporter = Reporter()
         var results: [String] = []
-        service.run(title: "First", work: reporter.work, completion: { results.append($0) })
-        service.run(title: "Second", work: reporter.work, completion: { results.append($0) })
+        service.run(title: "First", work: { reporter.work($0) }, completion: { results.append($0) })
+        service.run(title: "Second", work: { reporter.work($0) }, completion: { results.append($0) })
         await wait { reporter.count > 2 }
         service.setPaused(true)
         var idle = false
@@ -752,8 +752,8 @@ private final class WindowTestPlugin: Plugin {
         let first = Reporter()
         let second = Reporter()
         var results: [String] = []
-        service.run(title: "First", work: first.work, completion: { results.append($0) })
-        service.run(title: "Second", work: second.work, completion: { results.append($0) })
+        service.run(title: "First", work: { first.work($0) }, completion: { results.append($0) })
+        service.run(title: "Second", work: { second.work($0) }, completion: { results.append($0) })
         service.run(title: "Third", work: { _ in "third" }, completion: { results.append($0) })
         #expect(service.queueLength == 2 && service.current?.title == "First")
         service.setRunsInBackground(true)

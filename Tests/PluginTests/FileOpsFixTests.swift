@@ -16,7 +16,8 @@ import Testing
 
 /// A file system over memory that can be told to misbehave the way servers and shares do:
 /// list names that lead out of their folder, refuse the Trash in different ways, fail a removal.
-final class OddFileSystem: FileSystemProvider {
+/// Unchecked: what it records is guarded by `lock`; its switches are set by the test before use.
+final class OddFileSystem: FileSystemProvider, @unchecked Sendable {
     let base = MemoryFileSystem(scheme: "odd")
     var scheme: String { base.scheme }
     var capabilities: FileSystemCapabilities { [.write, .trash] }
@@ -54,7 +55,7 @@ final class OddFileSystem: FileSystemProvider {
         if url.lastPathComponent.hasPrefix("hostile") { return try base.read(base.addFile("/hostile-data", "evil")) }
         return try base.read(url)
     }
-    func createDirectory(at url: URL) throws { try base.createDirectory(at: url) }
+    func createDirectory(at url: URL) throws { base.createDirectory(at: url) }
     func write(_ url: URL) throws -> any FileWriter { try base.write(url) }
     func remove(_ url: URL) throws {
         let fails: Bool = lock.withLock {

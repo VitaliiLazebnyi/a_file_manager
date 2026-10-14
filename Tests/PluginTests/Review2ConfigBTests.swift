@@ -19,12 +19,13 @@ private func drainMainQueue() async {
 }
 
 /// A folder tree on a made-up scheme, with watchers that can be fired from any thread.
-private final class Review2WatchFileSystem: FileSystemProvider {
+/// Unchecked: what it records is guarded by `lock`; its switches are set by the test before use.
+private final class Review2WatchFileSystem: FileSystemProvider, @unchecked Sendable {
     let scheme: String
     init(scheme: String = "r2watch") { self.scheme = scheme }
     let capabilities: FileSystemCapabilities = []
     private let lock = NSLock()
-    private var watches: [([URL], ([URL]) -> Void)] = []
+    private var watches: [([URL], @Sendable ([URL]) -> Void)] = []
     var watchedCount: Int {
         lock.lock()
         defer { lock.unlock() }
@@ -55,7 +56,9 @@ private final class Review2WatchFileSystem: FileSystemProvider {
 
     func watch(_ directories: [URL], onChange: @escaping @MainActor @Sendable ([URL]) -> Void) -> (any WatchToken)? {
         lock.lock()
-        watches.append((directories, onChange))
+        // Fired from any thread on purpose, against the rule that reports come on the main
+        // thread: the tests show that whoever watches through a virtual folder still hears on it.
+        watches.append((directories, unsafeBitCast(onChange, to: (@Sendable ([URL]) -> Void).self)))
         lock.unlock()
         return self
     }
@@ -542,7 +545,8 @@ private final class Review2WatchFileSystem: FileSystemProvider {
 }
 
 /// A small lock around a value, for results written by callbacks on other threads.
-private final class Mutex<Value> {
+/// Unchecked: the state is guarded by `lock`.
+private final class Mutex<Value>: @unchecked Sendable {
     private let lock = NSLock()
     private var stored: Value
     init(_ value: Value) { stored = value }

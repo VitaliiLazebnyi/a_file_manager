@@ -62,7 +62,7 @@ public struct TextSearchOptions: Codable, Equatable, Sendable {
 ///
 /// **Threading.** A pattern is immutable; `isFound` may run on any number of threads at once,
 /// each with its own reader. Files are read in blocks and never held in memory as a whole.
-public struct TextPattern {
+public struct TextPattern: Sendable {
     public enum Problem: LocalizedError, Equatable {
         case emptyText
         case badHex(String)

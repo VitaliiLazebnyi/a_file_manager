@@ -15,7 +15,8 @@ import Testing
 
 /// A `MemoryFileSystem` behind a layer that tells a test what a job is doing to it: it signals
 /// when a read, write, listing or commit begins, and counts the calls that matter.
-final class ProbeFileSystem: FileSystemProvider {
+/// Unchecked: what it records is guarded by `lock`; its switches are set by the test before use.
+final class ProbeFileSystem: FileSystemProvider, @unchecked Sendable {
     let base: MemoryFileSystem
     var scheme: String { base.scheme }
     var capabilities: FileSystemCapabilities { base.capabilities }
@@ -76,7 +77,7 @@ final class ProbeFileSystem: FileSystemProvider {
     func read(_ url: URL, cancellation: CancellationFlag) throws -> any FileReader {
         Reader(try base.read(url, cancellation: cancellation), self)
     }
-    func createDirectory(at url: URL) throws { try base.createDirectory(at: url) }
+    func createDirectory(at url: URL) throws { base.createDirectory(at: url) }
     func write(_ url: URL) throws -> any FileWriter {
         count("write")
         return Writer(try base.write(url), self)
@@ -124,7 +125,8 @@ private func registry(_ providers: any FileSystemProvider...) -> FileSystemRegis
 /// Runs the job on a thread of its own and gives up waiting after `seconds`.
 private func run(_ job: FileJob, within seconds: Double = 60) -> JobResult? {
     let finished = DispatchSemaphore(value: 0)
-    var result: JobResult?
+    // Guarded by `lock`.
+    nonisolated(unsafe) var result: JobResult?
     let thread = Thread {
         result = job.run()
         finished.signal()
@@ -143,7 +145,8 @@ private func cancel(_ job: FileJob, when gate: DispatchSemaphore) {
 }
 
 /// A value several threads change.
-private final class Locked<Value> {
+/// Unchecked: the state is guarded by `lock`.
+private final class Locked<Value>: @unchecked Sendable {
     private let lock = NSLock()
     private var stored: Value
     init(_ value: Value) { stored = value }
@@ -152,7 +155,8 @@ private final class Locked<Value> {
 }
 
 /// Counts calls made from several threads.
-private final class CallCounter {
+/// Unchecked: the state is guarded by `lock`.
+private final class CallCounter: @unchecked Sendable {
     private let lock = NSLock()
     private var calls = 0
     func next() -> Int {

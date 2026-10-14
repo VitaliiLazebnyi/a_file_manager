@@ -4,7 +4,8 @@ import Foundation
 /// serves a folder of the test's sandbox. One thread per control connection, plain BSD
 /// sockets. It speaks enough of the protocol to be a believable server, and can be made to
 /// behave like the awkward ones (no MLSD, DOS listings, no EPSV, a password, dropped connections).
-final class TestFTPServer {
+/// Unchecked: what changes is guarded by `lock`; the rest is set in `init`.
+final class TestFTPServer: @unchecked Sendable {
     struct Options {
         var offersMLSD = true
         var offersFeatures = true
@@ -59,7 +60,8 @@ final class TestFTPServer {
     /// that is closed under a thread which is about to call `accept` on it may by then be the
     /// number of another server's socket in this process (the tests run side by side), and that
     /// thread would take the other server's connections.
-    private final class Acceptor {
+    /// Unchecked: `stopped` is guarded by `lock`; the rest is set in `init`.
+    private final class Acceptor: @unchecked Sendable {
         let listener: Int32
         private let lock = NSLock()
         private var stopped = false
@@ -83,7 +85,7 @@ final class TestFTPServer {
             ended.wait()
         }
 
-        func run(_ take: @escaping (Int32) -> Bool) {
+        func run(_ take: @escaping @Sendable (Int32) -> Bool) {
             let thread = Thread { [self] in
                 while !isStopped {
                     var descriptor = pollfd(fd: listener, events: Int16(POLLIN), revents: 0)

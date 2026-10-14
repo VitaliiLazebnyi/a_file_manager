@@ -20,7 +20,7 @@ extension LocalFileSystem {
 
 /// Runs `body` on a thread of its own and waits for it for a long time; false when it does not
 /// come back (a call that blocks must fail the test, not hang the run).
-private func finishes(within seconds: TimeInterval = 20, _ body: @escaping () -> Void) -> Bool {
+private func finishes(within seconds: TimeInterval = 20, _ body: @escaping @Sendable () -> Void) -> Bool {
     let done = DispatchSemaphore(value: 0)
     Thread.detachNewThread {
         body()
@@ -49,9 +49,10 @@ private func status(_ url: URL) -> stat {
 
     @Test func readingAPipeOrADeviceIsRefusedAtOnce() throws {
         let box = try Sandbox()
-        let pipe = try fifo(box)
+        let pipe = fifo(box)
         try FileManager.default.createSymbolicLink(at: box.url("link"), withDestinationURL: pipe)
-        var results: [String: Bool] = [:]
+        // Guarded by `lock`.
+        nonisolated(unsafe) var results: [String: Bool] = [:]
         let lock = NSLock()
         for (name, url) in [
             ("pipe", pipe), ("link", box.url("link")), ("null", URL(fileURLWithPath: "/dev/null")),
@@ -75,11 +76,12 @@ private func status(_ url: URL) -> stat {
 
     @Test func appendingToAPipeIsRefusedAtOnceAndALinkIsNotFollowed() throws {
         let box = try Sandbox()
-        let pipe = try fifo(box)
+        let pipe = fifo(box)
         try FileManager.default.createSymbolicLink(at: box.url("pipelink"), withDestinationURL: pipe)
         let target = try box.file("target.txt", "0123456789")
         try FileManager.default.createSymbolicLink(at: box.url("filelink"), withDestinationURL: target)
-        var threw: [Bool] = []
+        // Guarded by `lock`.
+        nonisolated(unsafe) var threw: [Bool] = []
         let lock = NSLock()
         for url in [pipe, box.url("pipelink"), box.url("filelink")] {
             let returned = finishes {
@@ -101,9 +103,10 @@ private func status(_ url: URL) -> stat {
 
     @Test func copyingMetadataToOrFromAPipeIsRefusedAndCopyTakesOnlyFilesAndLinks() throws {
         let box = try Sandbox()
-        let pipe = try fifo(box)
+        let pipe = fifo(box)
         let file = try box.file("f.txt", "data")
-        var threw = false
+        // Written by the other thread before it signals, read here after the wait.
+        nonisolated(unsafe) var threw = false
         #expect(finishes { threw = (try? local.copyMetadata(from: file, to: pipe)) == nil })
         #expect(threw)
         #expect(finishes { threw = (try? local.copyMetadata(from: pipe, to: file)) == nil })
@@ -252,13 +255,14 @@ private func status(_ url: URL) -> stat {
 
     @Test func aLinkIntoNowhereAndALinkToAPipeAreListedWithoutBlocking() throws {
         let box = try Sandbox()
-        let pipe = try fifo(box)
+        let pipe = fifo(box)
         try FileManager.default.createSymbolicLink(at: box.url("dangling"), withDestinationURL: box.url("nowhere"))
         try FileManager.default.createSymbolicLink(at: box.url("topipe"), withDestinationURL: pipe)
         try box.folder("dir")
         try FileManager.default.createSymbolicLink(at: box.url("todir"), withDestinationURL: box.url("dir"))
         try FileManager.default.createSymbolicLink(at: box.url("rel"), withDestinationURL: URL(string: "dir/../dir")!)
-        var items: [FileItem] = []
+        // Used by the work on its own thread only while the test waits for it to finish.
+        nonisolated(unsafe) var items: [FileItem] = []
         #expect(finishes { items = (try? local.list(box.root, showHidden: true)) ?? [] })
         let byName = Dictionary(uniqueKeysWithValues: items.map { ($0.name, $0) })
         #expect(byName["dangling"]?.isSymlink == true && byName["dangling"]?.isDirectory == false)

@@ -6,7 +6,8 @@ public import Foundation
 /// name; a name with a dot must match exactly. A name with spaces is written in quotes, or as
 /// it is when nothing else is in the field. With `regex`, the whole field is one regular
 /// expression for the name, without regard to case.
-public struct SearchMask {
+/// Unchecked: immutable, and `NSRegularExpression` may match on several threads at once.
+public struct SearchMask: @unchecked Sendable {
     /// The masks in wildcard form (`*` and `?` only), lowercased.
     let include: [String]
     let exclude: [String]

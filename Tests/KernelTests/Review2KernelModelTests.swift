@@ -119,7 +119,7 @@ private func elsewhere<Value>(_ work: @escaping @Sendable () -> Value) -> Value 
         }
         let fresh = listing(Array(items.dropFirst(4)) + [file("new3.txt", size: 9), dir("newdir")])
         let grown = Sorter.sort(items + [file("zz3.txt"), file("aa.md")], by: ListOrder(key: .ext))
-        let changes: [(String, (PanelModel) -> Void, (PanelModel.Basis) -> PanelModel.Prepared)] = [
+        let changes: [(String, (PanelModel) -> Void, @Sendable (PanelModel.Basis) -> PanelModel.Prepared)] = [
             (
                 "sort", { $0.setSort(ListOrder(key: .size, descending: true)) },
                 { PanelModel.prepare($0, sort: ListOrder(key: .size, descending: true)) }

@@ -8,7 +8,8 @@ import Testing
 @testable import SystemToolsPlugin
 
 /// A drive that is a folder of the sandbox: what it answers and how its ejects go is up to the test.
-private final class StandInDrive: VolumeAccess {
+/// Unchecked: what it records is guarded by `lock`; its switches are set by the test before use.
+private final class StandInDrive: VolumeAccess, @unchecked Sendable {
     let volume: URL
     private let lock = NSLock()
     private var refusals: [EjectRefusal?]

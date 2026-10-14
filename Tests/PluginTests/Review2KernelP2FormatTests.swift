@@ -40,7 +40,8 @@ import Testing
         let expected = Format.date(date)
         #expect(!expected.isEmpty)
         let mismatches = NSLock()
-        var wrong = 0
+        // Guarded by `mismatches`.
+        nonisolated(unsafe) var wrong = 0
         DispatchQueue.concurrentPerform(iterations: 16) { thread in
             for round in 0..<2_000 {
                 if thread == 0, round % 50 == 0 {

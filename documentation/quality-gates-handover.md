@@ -46,34 +46,49 @@ from the host Mac into the test VM. Branch: `quality-gates`.
 6. Gate scripts: `Scripts/check.sh` (all gates), `coverage-gate.py`, `leak-check.sh`, `mutation.sh`, `vm-check.sh`,
    `install-tools.sh`; workflows `quality.yml` and `codeql.yml`; `.githooks/pre-commit` (not switched on yet).
 7. `Package.swift` for Swift 6: tools 6.2, Swift 6 language mode, warnings as errors, upcoming features
-   `ExistentialAny`, `MemberImportVisibility`, `InternalImportsByDefault`, and the DocC plugin. **The package does not
-   build with it yet**; that is the next step.
+   `ExistentialAny`, `MemberImportVisibility`, `InternalImportsByDefault`, and the DocC plugin.
+8. **Swift 6 migration (done 2026-10-14).** Swift 6 language mode, every warning an error, `ExistentialAny`,
+   `MemberImportVisibility`, `InternalImportsByDefault`; zero diagnostics in sources and tests. The isolation model:
+   - `@MainActor`: the kernel (except `nonisolated` members documented "any thread": `fileSystems`, `listingCache`,
+     `settings`, `ui`, `columns`, `askUser`, `productName`), every registry, `PanelModel` (its `static` work is
+     `nonisolated`), the plugin, shell and service protocols, every UI class.
+   - `Sendable`: file systems, readers, writers, settings stores, job monitors, `CancellationFlag`, value types.
+     Lock-guarded classes are `@unchecked Sendable` with a doc line naming the lock or the rule that makes them safe.
+   - Closures that cross threads are `@Sendable`; those run on the main thread `@MainActor`. `JobMonitor.ask` and
+     `Kernel.askUser` take `@MainActor @Sendable` questions; `Plugin.prepareToQuit` a `@Sendable` completion.
+   - Kernel `Handover<Value>`: a documented box for values safe to hand over but not marked `Sendable` on macOS 13
+     (`NSImage`, `NWConnection`). Raising the deployment target to macOS 14 would remove most uses.
+   - Shell `MainLoop.queue`: a main-thread block run later from the run loop; `MainLoop`/`MainOwned` are internal
+     to the shell (Places and Selection keep a small `performOnMainLoop` of their own).
 
 ## Next steps, in order
 
-1. **Swift 6 migration.** `swift package migrate --to-feature ExistentialAny,MemberImportVisibility` must run with the
-   Swift 5 language mode and without the `strict` settings (it stops on Swift 6 errors otherwise; put
-   `swiftLanguageModes: [.v5]` last in `Package(...)`). `InternalImportsByDefault` cannot be migrated automatically:
-   imports used in public API need `public import`. Then switch to Swift 6 and fix the concurrency errors by hand (a
-   first build showed about 30, e.g. non-Sendable `static let shared` and `KernelThreads` captured in a `@Sendable`
-   closure). Keep the tests green.
-2. **SwiftLint by hand.** Rules whose automatic fix broke the build: `empty_count`, `prefer_key_path`,
+1. **SwiftLint by hand.** Rules whose automatic fix broke the build: `empty_count`, `prefer_key_path`,
    `redundant_nil_coalescing`, `trailing_closure`, `unneeded_escaping`, `untyped_error_in_catch`. Then every other
    remaining finding (`swiftlint lint --strict`), including the analyzer rules (`swiftlint analyze`).
-3. **Documentation:** about 8,160 non-private declarations lack doc comments; swift-format also wants a one-line summary
+2. **Documentation:** about 8,160 non-private declarations lack doc comments; swift-format also wants a one-line summary
    first. Split by module; DocC with `--warnings-as-errors`.
-4. **Dead code (Periphery, 886 incl. public), complexity (lizard, 379 functions), duplicates (jscpd).**
-5. **Leaks** found by `leaks` on the test suites: Kernel ↔ CommandRegistry retain cycle (command closures capture the
+3. **Dead code (Periphery, 886 incl. public), complexity (lizard, 379 functions), duplicates (jscpd).**
+4. **Leaks** found by `leaks` on the test suites: Kernel ↔ CommandRegistry retain cycle (command closures capture the
    kernel strongly), FileJob cycle, Places `TreeScanner` subfolder arrays, QuitProgress, FileSystemRegistry, ToolRun,
    VirtualFileSystem, ViewerPlugin cycles; NSPasteboard, SyncComparison, SessionEnvironment leaks.
-6. **Coverage to 100%** (89.4% lines at the start; lowest: Places 62%, MacIntegration 78%, DirectorySync 82%, SystemTools
+5. **Coverage to 100%** (89.4% lines at the start; lowest: Places 62%, MacIntegration 78%, DirectorySync 82%, SystemTools
    82%, AFMShell 84%). UI tests for the AppKit code need an Xcode project (SwiftPM cannot host UI tests); generate it.
-7. **Mutation testing.** `Scripts/mutation-gate.py` is still to be written (parse Muter's JSON report, fail on survivors
+6. **Mutation testing.** `Scripts/mutation-gate.py` is still to be written (parse Muter's JSON report, fail on survivors
    not listed as equivalent). A first run on `KeyBindings.swift` scored 50% (survivors at lines 33 and 52). A full run
    takes days: split the files over VM clones.
-8. **Extras** listed above; then switch every gate on (CI, `git config core.hooksPath .githooks`).
+7. **Extras** listed above; then switch every gate on (CI, `git config core.hooksPath .githooks`).
 
 ## Gotchas met so far
+
+- Changing a protocol requirement that has a default implementation (`watch`, `prepareToQuit`) silently leaves
+  implementations with the old signature behind: they stop implementing it and the default takes over. Grep for the
+  old signature after such a change.
+- The build cache goes by file content: `touch` does not force a recompile. Use `swift package clean` (or delete the
+  target's folder under `.build/out/Intermediates.noindex`) to see every diagnostic; an incremental build reports only
+  the files it compiled, and errors stop the build at the first module.
+- Swift 6 mode checks main-actor isolation at run time inside main-actor code: a test double that is reached from a
+  job's helper thread must not be main-actor-isolated (`ScriptedInteraction` is `nonisolated` and lock-guarded).
 
 - Running all SwiftLint autocorrections at once produced code that does not compile; apply them one rule at a time.
 - `MallocStackLogging` is inherited by the tools the tests start and breaks their output checks; `leak-check.sh` leaves

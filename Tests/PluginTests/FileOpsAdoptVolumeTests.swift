@@ -28,7 +28,8 @@ private func volume(_ key: String) -> URL {
 
 /// The local disk behind a layer that makes copies take a moment, counts how many run at once
 /// and per file, and lets chosen removals fail once.
-final class LocalProbe: FileSystemProvider {
+/// Unchecked: what it records is guarded by `lock`; its switches are set by the test before use.
+final class LocalProbe: FileSystemProvider, @unchecked Sendable {
     private let local = LocalFileSystem()
     var scheme: String { local.scheme }
     var capabilities: FileSystemCapabilities { local.capabilities }

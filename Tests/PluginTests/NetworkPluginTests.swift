@@ -10,7 +10,8 @@ import Testing
 import ViewOptionsPlugin
 
 /// Settings that remember every value ever stored, to prove what never went through them.
-private final class RecordingSettings: SettingsStore {
+/// Unchecked: its switches are set by the test before use, and it is used from one thread at a time.
+private final class RecordingSettings: SettingsStore, @unchecked Sendable {
     private var values: [String: Data] = [:]
     private(set) var everything = Data()
 
@@ -24,7 +25,8 @@ private final class RecordingSettings: SettingsStore {
 }
 
 /// Stands in for the system when volumes are mounted and ejected.
-private final class FakeMounter: VolumeMounter {
+/// Unchecked: its switches are set by the test before use, and it is used from one thread at a time.
+private final class FakeMounter: VolumeMounter, @unchecked Sendable {
     var mounted: [URL] = []
     var ejected: [URL] = []
     var mountPoint = URL(fileURLWithPath: "/")
@@ -244,7 +246,7 @@ private final class FakeMounter: VolumeMounter {
         // Nobody chose this server in a dialog of the program, so the user is asked first. (Answered
         // here without the dialog: the test's panel reads on the main thread, where the dialog
         // would be shown. The dialog itself is tested below.)
-        var asked: [ServerKey] = []
+        nonisolated(unsafe) var asked: [ServerKey] = []
         plugin.center.environment.askToConnect = { profile in
             asked.append(profile.key)
             return true
@@ -258,7 +260,8 @@ private final class FakeMounter: VolumeMounter {
     }
 
     @Test func anAddressTheUserTypedInPersonIsNotAskedAbout() throws {
-        var asked: [ServerKey] = []
+        // Used by the callbacks, which run one at a time while the calls below wait for them.
+        nonisolated(unsafe) var asked: [ServerKey] = []
         plugin.center.environment.askToConnect = { profile in
             asked.append(profile.key)
             return true

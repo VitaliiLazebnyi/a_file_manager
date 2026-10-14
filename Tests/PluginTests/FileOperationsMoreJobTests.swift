@@ -66,7 +66,8 @@ final class Replies: FileJobDelegate {
 
 /// A file system that passes everything on to a `MemoryFileSystem` and can misbehave on the
 /// way: damage what is written, take its time, and count how many copies run at once.
-final class WrappedFileSystem: FileSystemProvider {
+/// Unchecked: what it records is guarded by `lock`; its switches are set by the test before use.
+final class WrappedFileSystem: FileSystemProvider, @unchecked Sendable {
     let base: MemoryFileSystem
     let scheme: String
     var capabilities: FileSystemCapabilities { base.capabilities }
@@ -94,7 +95,8 @@ final class WrappedFileSystem: FileSystemProvider {
     }
     private func ended() { lock.withLock { running -= 1 } }
 
-    private final class Writer: FileWriter {
+    /// Unchecked: used by one thread at a time, as the protocol allows.
+    private final class Writer: FileWriter, @unchecked Sendable {
         let inner: any FileWriter
         let owner: WrappedFileSystem
         var first = true
@@ -124,7 +126,7 @@ final class WrappedFileSystem: FileSystemProvider {
     func item(at url: URL) -> FileItem? { base.item(at: url) }
     func parent(of directory: URL) -> URL? { base.parent(of: directory) }
     func read(_ url: URL) throws -> any FileReader { try base.read(url) }
-    func createDirectory(at url: URL) throws { try base.createDirectory(at: url) }
+    func createDirectory(at url: URL) throws { base.createDirectory(at: url) }
     func write(_ url: URL) throws -> any FileWriter {
         let writer = Writer(try base.write(url), self)
         began()
@@ -454,7 +456,7 @@ func runJob(
         let sources = [box.url("A/report.txt"), box.url("A/notes.md")]
         let spec = TargetSpec.parse(
             "mem:/backup/*.bak", sourceDirectory: box.url("A"), operandCount: 2, fileSystems: fileSystems)
-        try memory.createDirectory(at: spec.directory)
+        memory.createDirectory(at: spec.directory)
         runJob(.copy, sources, to: spec, replies: Replies(), fileSystems: fileSystems)
         #expect(memory.allPaths == ["/backup", "/backup/notes.bak", "/backup/report.bak"])
         // Relative to the source folder, with a prefix mask.
@@ -618,8 +620,9 @@ func runJob(
         memory.addFile("/a/one.txt", "new")
         memory.addFile("/b/one.txt", "old")
         let lock = NSLock()
-        var lines: [String] = []
-        let collect = { (record: OperationRecord) in
+        // Guarded by `lock`.
+        nonisolated(unsafe) var lines: [String] = []
+        let collect = { @Sendable (record: OperationRecord) in
             lock.withLock { lines.append(OperationLog.line(for: record, at: "T")) }
         }
         let sources = [memory.url("/a/docs"), memory.url("/a/one.txt"), memory.url("/a/gone.txt")]

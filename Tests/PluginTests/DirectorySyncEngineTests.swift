@@ -309,7 +309,8 @@ private func describe(_ rows: [SyncRow]) -> [String] {
         options.byContent = true
         let comparison = SyncComparison(options: options, fileSystems: fileSystems)
         let lock = NSLock()
-        var last = SyncProgress()
+        // Guarded by `lock`.
+        nonisolated(unsafe) var last = SyncProgress()
         let result = comparison.run(left: memory.url("/L"), right: memory.url("/R")) { progress in
             lock.lock()
             last = progress

@@ -126,8 +126,6 @@ final class CompareSession {
             finish(work(cancellation), cancellation.isCancelled)
             return
         }
-        /// Made on the main thread and called there only; the worker only carries it.
-        nonisolated(unsafe) let finish = finish
         // A thread of its own, not a worker of the shared pool: loading from a share that does not
         // answer can block for a long time, and a few such loads must not use up the pool.
         CompareWorker.run("Compare") { [weak self] in

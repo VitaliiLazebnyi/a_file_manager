@@ -34,7 +34,7 @@ import Testing
     /// Puts a file of the disk onto the memory file system ("a server").
     func upload(_ local: URL, to path: String) throws -> URL {
         let url = bench.memory.url(path)
-        try bench.memory.createDirectory(at: url.deletingLastPathComponent())
+        bench.memory.createDirectory(at: url.deletingLastPathComponent())
         let writer = try bench.memory.write(url)
         try writer.write(try Data(contentsOf: local))
         try writer.close(attributes: FileAttributes())
@@ -87,7 +87,8 @@ import Testing
         let tree = bench.inside(archive, "tree")
         try write("short-lived", to: tree.appending(name: "new.txt"))
         try write("stays", to: tree.appending(name: "other.txt"))
-        var fired = false
+        // Used by the callbacks, which run one at a time while the calls below wait for them.
+        nonisolated(unsafe) var fired = false
         bench.environment.whileWriting = { [bench] in
             guard !fired else { return }
             fired = true
@@ -106,7 +107,8 @@ import Testing
         let archive = try makeZip()
         let member = bench.inside(archive, "tree/twice.txt")
         try write("first version", to: member)
-        var fired = false
+        // Used by the callbacks, which run one at a time while the calls below wait for them.
+        nonisolated(unsafe) var fired = false
         bench.environment.whileWriting = { [bench] in
             guard !fired else { return }
             fired = true
@@ -202,8 +204,10 @@ import Testing
         // recently used go. Whatever a write returned without an error must be in the file
         // after the changes were written.
         let lock = NSLock()
-        var written: [(archive: URL, name: String)] = []
-        var failures: [String] = []
+        // Guarded by `lock`.
+        nonisolated(unsafe) var written: [(archive: URL, name: String)] = []
+        // Guarded by `lock`.
+        nonisolated(unsafe) var failures: [String] = []
         let (bench, total) = (self.bench, 240)
         DispatchQueue.concurrentPerform(iterations: total) { index in
             let archive = archives[index % archives.count]

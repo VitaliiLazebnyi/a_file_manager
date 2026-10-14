@@ -7,7 +7,8 @@ import Testing
 
 /// Stored deflate blocks of zeros without end: a stream that decompresses for as long as it
 /// is read from, which no real archive does.
-private final class EndlessDeflate: ByteStream {
+/// Unchecked: read by one thread at a time, as a stream is.
+private final class EndlessDeflate: ByteStream, @unchecked Sendable {
     private var block = Data()
     let reads = SharedCounter()
 
@@ -25,7 +26,7 @@ private final class EndlessDeflate: ByteStream {
 
 /// Runs `body` on a thread of its own once `condition` holds, or after a long wait: the request
 /// to stop comes from outside the thread that is stuck, and not from a queue that may stall.
-private func signal(when condition: @escaping () -> Bool, _ body: @escaping () -> Void) {
+private func signal(when condition: @escaping @Sendable () -> Bool, _ body: @escaping @Sendable () -> Void) {
     let thread = Thread {
         let deadline = Date().addingTimeInterval(60)
         while !condition(), Date() < deadline { Thread.sleep(forTimeInterval: 0.001) }

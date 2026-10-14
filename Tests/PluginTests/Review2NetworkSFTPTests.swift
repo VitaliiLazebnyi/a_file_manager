@@ -315,13 +315,15 @@ struct Review2NetworkSFTPSystemServer {
             profile: profile, environment: environment,
             transport: try fakeShell(box, prompt: "anna@files.example's password: ", password: "right"))
         defer { session.disconnect() }
-        var questions: [String] = []
-        var answers = ["right"]
+        // Used by the callbacks, which run one at a time while the calls below wait for them.
+        nonisolated(unsafe) var questions: [String] = []
+        nonisolated(unsafe) var answers = ["right"]
         environment.askSecret = { _, question, _ in
             questions.append(question)
             return answers.isEmpty ? nil : answers.removeFirst()
         }
-        var remembered: [String] = []
+        // Used by the callbacks, which run one at a time while the calls below wait for them.
+        nonisolated(unsafe) var remembered: [String] = []
         environment.rememberPassword = { _, password in remembered.append(password) }
         // The stored password is tried without a question; when it fails the user is asked, and
         // what works takes its place.
@@ -358,7 +360,8 @@ struct Review2NetworkSFTPSystemServer {
         environment.declineMemory = 0
         let profile = ConnectionProfile(
             key: ServerKey(scheme: "sftp", host: "files.example"), user: "anna", password: "stored")
-        var shown: [String] = []
+        // Used by the callbacks, which run one at a time while the calls below wait for them.
+        nonisolated(unsafe) var shown: [String] = []
         environment.askSecret = { _, question, _ in
             shown.append(question)
             return "typed"
@@ -410,8 +413,9 @@ struct Review2NetworkSFTPSystemServer {
         let environment = SessionEnvironment()
         environment.options.values = values
         environment.declineMemory = 0
-        var passphrase = "wrong"
-        environment.askSecret = { _, _, isSecret in isSecret ? passphrase : "yes" }
+        // Used by the callbacks, which run one at a time while the calls below wait for them.
+        let passphrase = Shared("wrong")
+        environment.askSecret = { _, _, isSecret in isSecret ? passphrase.value : "yes" }
         func session() -> SFTPSession {
             SFTPSession(
                 profile: ConnectionProfile(key: key, user: NSUserName()), environment: environment,
@@ -429,8 +433,8 @@ struct Review2NetworkSFTPSystemServer {
             )
         }
         failing.disconnect()
-        // With the right passphrase ssh accepts every option it was given and the files are there.
-        passphrase = "open sesame"
+        // With the right passphrase.value ssh accepts every option it was given and the files are there.
+        passphrase.value = "open sesame"
         let working = session()
         defer { working.disconnect() }
         _ = try working.connect(cancellation: nil)

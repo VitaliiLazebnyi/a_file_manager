@@ -16,7 +16,7 @@ import Testing
     }
 
     /// Runs `work` on another thread and fails instead of hanging if it does not end.
-    func finishes(within seconds: Double = 60, _ work: @escaping () -> Void) -> Bool {
+    func finishes(within seconds: Double = 60, _ work: @escaping @Sendable () -> Void) -> Bool {
         let done = DispatchSemaphore(value: 0)
         Thread {
             work()
@@ -30,7 +30,8 @@ import Testing
     @Test func aNameRegexThatBacktracksEndsAndFindsNothing() {
         let mask = SearchMask(#"^(\w+[ _-]?)+\.jpg$"#, regex: true)
         let name = String(repeating: "a", count: 40) + ".png"
-        var matched = true
+        // Used by the work on its own thread only while the test waits for it to finish.
+        nonisolated(unsafe) var matched = true
         #expect(finishes { matched = mask.matches(name) })
         #expect(!matched)
         // The expression still does what it says on names it can judge quickly.
@@ -42,7 +43,8 @@ import Testing
         options.regex = true
         let pattern = try TextPattern("(a+)+$", caseSensitive: true, options: options)
         let data = Data((String(repeating: "a", count: 60) + "!").utf8)
-        var found = true
+        // Used by the work on its own thread only while the test waits for it to finish.
+        nonisolated(unsafe) var found = true
         #expect(finishes { found = pattern.isFound(in: data) })
         #expect(!found)
         #expect(pattern.trip.hasTimedOut)
@@ -54,7 +56,8 @@ import Testing
             Thread.sleep(forTimeInterval: 0.1)
             cancellation.cancel()
         }.start()
-        var cancelled: Bool?
+        // Written by the other thread before it signals, read here after the wait.
+        nonisolated(unsafe) var cancelled: Bool?
         #expect(finishes { cancelled = second.accepts(MemoryReader(data), cancellation: cancellation) })
         #expect(cancelled == false)
     }
@@ -68,9 +71,11 @@ import Testing
         #expect(!FieldRule("tc.name", .regex, "(").matches("x") && FieldRule("tc.name", .notRegex, "(").matches("x"))
 
         memory.addFile("/slow/" + String(repeating: "a", count: 50) + "!.txt")
-        var slow = SearchQuery(directory: memory.url("/slow"))
+        // Written by the other thread before it signals, read here after the wait.
+        nonisolated(unsafe) var slow = SearchQuery(directory: memory.url("/slow"))
         slow.fieldRules = FieldRules(isEnabled: true, rules: [FieldRule("tc.name", .regex, "^(a+)+$")])
-        var found = ["not run"]
+        // Written by the other thread before it signals, read here after the wait.
+        nonisolated(unsafe) var found = ["not run"]
         #expect(finishes { found = names(of: slow) })
         #expect(found.isEmpty)
     }
@@ -86,7 +91,8 @@ import Testing
         let text = String(repeating: "ab", count: 10_000)
         for options in [TextSearchOptions(), TextSearchOptions(wholeWords: true)] {
             let pattern = try TextPattern(text, caseSensitive: false, options: options)
-            var found = false
+            // Written by the other thread before it signals, read here after the wait.
+            nonisolated(unsafe) var found = false
             let done = DispatchSemaphore(value: 0)
             let thread = Thread {
                 found = pattern.isFound(in: Data(("x " + text.uppercased() + " y").utf8))
@@ -136,7 +142,8 @@ import Testing
         let first = DispatchSemaphore(value: 0)
         // Counted by the thread that searches and read by the one that waits: under a lock.
         let lock = NSLock()
-        var hits = 0
+        // Guarded by `lock`.
+        nonisolated(unsafe) var hits = 0
         let thread = Thread {
             search.run { _ in
                 let isFirst = lock.withLock { () -> Bool in
@@ -169,7 +176,8 @@ import Testing
         query.fieldRules = FieldRules(isEnabled: true, rules: [FieldRule("gate", .equals, "open")])
         let search = FileSearch(query, fileSystems: fileSystems, columns: columns)
         search.budget = 30
-        var count = 0
+        // Written by the other thread before it signals, read here after the wait.
+        nonisolated(unsafe) var count = 0
         let done = DispatchSemaphore(value: 0)
         Thread {
             search.run { _ in count += 1 }
@@ -207,7 +215,8 @@ import Testing
         var query = SearchQuery(directory: memory.url("/deep"))
         query.resultLimit = 5
         let search = FileSearch(query, fileSystems: fileSystems)
-        var found = 0
+        // Used by the work on its own thread only while the test waits for it to finish.
+        nonisolated(unsafe) var found = 0
         #expect(finishes { search.run { _ in found += 1 } })
         #expect(found == 5 && search.reachedResultLimit)
         var all = SearchQuery(directory: memory.url("/deep"))
@@ -225,9 +234,11 @@ import Testing
             items.append(memory.url("/found/d\(folder)"))
             for file in 0..<10 { items.append(memory.url("/found/d\(folder)/n\(file).txt")) }
         }
-        var query = SearchQuery(directory: memory.url("/found"), names: "n1.txt")
+        // Used by the work on its own thread only while the test waits for it to finish.
+        nonisolated(unsafe) var query = SearchQuery(directory: memory.url("/found"), names: "n1.txt")
         query.onlyItems = items
-        var hits: [String] = []
+        // Used by the work on its own thread only while the test waits for it to finish.
+        nonisolated(unsafe) var hits: [String] = []
         #expect(finishes { hits = names(of: query) })
         // A file listed beside the folder that holds it is found once, by the folder.
         #expect(hits.count == 300)
@@ -272,7 +283,8 @@ import Testing
         #expect(try reader.read(upToCount: 100) == Data("needle".utf8))
         #expect(try reader.read(upToCount: 100) == nil)
         reader.close()
-        var opened: (any FileReader)?
+        // Used by the work on its own thread only while the test waits for it to finish.
+        nonisolated(unsafe) var opened: (any FileReader)?
         #expect(finishes { opened = LocalFileReader.open(box.url("pipe")) })
         #expect(opened == nil)
         #expect(LocalFileReader.open(box.url("missing")) == nil)
@@ -318,7 +330,8 @@ import Testing
 }
 
 /// A reader over bytes in memory.
-private final class MemoryReader: FileReader {
+/// Unchecked: used by one thread at a time, as the protocol allows.
+private final class MemoryReader: FileReader, @unchecked Sendable {
     private let data: Data
     private var position = 0
 

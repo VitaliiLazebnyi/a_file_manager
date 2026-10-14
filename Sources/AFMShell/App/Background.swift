@@ -32,7 +32,6 @@ enum MainLoop {
     @MainActor @discardableResult
     static func after(_ delay: TimeInterval, _ block: @escaping @MainActor () -> Void) -> () -> Void {
         // The timer is on the main run loop, so it fires on the main thread.
-        nonisolated(unsafe) let block = block
         let timer = Timer(timeInterval: max(0, delay), repeats: false) { _ in MainActor.assumeIsolated(block) }
         RunLoop.main.add(timer, forMode: .common)
         return { timer.invalidate() }

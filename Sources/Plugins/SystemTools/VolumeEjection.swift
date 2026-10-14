@@ -85,7 +85,7 @@ final class SystemVolumes: VolumeAccess {
         if let name = NSRunningApplication(processIdentifier: pid)?.localizedName { return name }
         var buffer = [CChar](repeating: 0, count: 256)
         guard proc_name(pid, &buffer, UInt32(buffer.count)) > 0 else { return nil }
-        return String(cString: buffer)
+        return buffer.withUnsafeBufferPointer { String(cString: $0.baseAddress!) }
     }
 }
 

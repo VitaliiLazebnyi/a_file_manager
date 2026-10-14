@@ -553,7 +553,7 @@ private final class HugeSizes: FileSystemProvider {
     func item(at url: URL) -> FileItem? { inner.item(at: url) }
     func parent(of directory: URL) -> URL? { inner.parent(of: directory) }
     func read(_ url: URL) throws -> any FileReader { try inner.read(url) }
-    func createDirectory(at url: URL) throws { try inner.createDirectory(at: url) }
+    func createDirectory(at url: URL) throws { inner.createDirectory(at: url) }
     func write(_ url: URL) throws -> any FileWriter { try inner.write(url) }
     func remove(_ url: URL) throws { try inner.remove(url) }
     func move(_ source: URL, to destination: URL, replacing: Bool) throws {

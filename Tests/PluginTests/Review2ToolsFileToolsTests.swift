@@ -25,7 +25,8 @@ import Testing
         asking answer: ExistingFileChoice = .overwrite, cancel: CancellationFlag = CancellationFlag(),
         cancelOnAsk: Int? = nil
     ) -> ToolRun {
-        var asked = 0
+        // Used by the callbacks, which run one at a time while the calls below wait for them.
+        nonisolated(unsafe) var asked = 0
         return ToolRun(
             fileSystems: registry, cancellation: cancel, report: { _ in },
             askExisting: { _ in

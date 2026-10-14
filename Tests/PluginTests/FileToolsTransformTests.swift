@@ -467,7 +467,7 @@ import Testing
         }
         #expect(namesOnDisk(box.url("B")).isEmpty)
         // Cancelled in the middle: the cancel flag is set when half of the bytes are through.
-        var half: ToolRun?
+        nonisolated(unsafe) var half: ToolRun?
         half = ToolRun(
             fileSystems: bench.kernel.fileSystems,
             report: { progress in

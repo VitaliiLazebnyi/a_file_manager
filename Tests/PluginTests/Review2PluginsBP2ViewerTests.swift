@@ -117,7 +117,8 @@ import UniformTypeIdentifiers
 
     // MARK: A sequential scan reads a giant line once (V069)
 
-    private final class CountingSource: ByteSource {
+    /// Unchecked: what it records is guarded by `lock`; its switches are set by the test before use.
+    private final class CountingSource: ByteSource, @unchecked Sendable {
         let base: any ByteSource
         private let lock = NSLock()
         private var total: Int64 = 0
@@ -187,7 +188,8 @@ import UniformTypeIdentifiers
 
     // MARK: At most so many index builds in flight (V024)
 
-    private final class Latch {
+    /// Unchecked: the state is guarded by `condition`.
+    private final class Latch: @unchecked Sendable {
         private let condition = NSCondition()
         private var open = false
         private var started: [Int] = []
@@ -690,7 +692,8 @@ import UniformTypeIdentifiers
 }
 
 /// A value that several threads look at.
-private final class Locked<Value> {
+/// Unchecked: the state is guarded by `lock`.
+private final class Locked<Value>: @unchecked Sendable {
     private let lock = NSLock()
     private var value: Value
 

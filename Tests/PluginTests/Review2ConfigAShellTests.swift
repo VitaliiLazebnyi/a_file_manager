@@ -90,7 +90,7 @@ import Testing
     func protected(_ name: String) -> String { name.unicodeScalars.first == "-" ? "./" + name : name }
 
     /// Every template in which a placeholder may stand, with what the shell must make of it.
-    static let templates: [(template: String, expected: (String, String) -> [String])] = [
+    static let templates: [(template: String, expected: @Sendable (String, String) -> [String])] = [
         ("%N", { _, guarded in [guarded] }),
         ("x%Ny", { name, _ in ["x" + name + "y"] }),
         ("--out=%N", { name, _ in ["--out=" + name] }),

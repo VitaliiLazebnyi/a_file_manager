@@ -13,7 +13,8 @@ import VirtualFoldersPlugin
 
 /// A file system over memory whose reads can be made to fail or to cancel half-way, the way a
 /// connection that breaks does.
-final class FlakyFileSystem: FileSystemProvider {
+/// Unchecked: what it records is guarded by `lock`; its switches are set by the test before use.
+final class FlakyFileSystem: FileSystemProvider, @unchecked Sendable {
     let base = MemoryFileSystem(scheme: "flaky")
     var scheme: String { base.scheme }
     var capabilities: FileSystemCapabilities { [.write] }
@@ -29,7 +30,8 @@ final class FlakyFileSystem: FileSystemProvider {
     /// The next `count` readers fail after their first block.
     func failNextReads(_ count: Int) { lock.withLock { failures = count } }
 
-    private final class Reader: FileReader {
+    /// Unchecked: used by one thread at a time, as the protocol allows.
+    private final class Reader: FileReader, @unchecked Sendable {
         let inner: any FileReader
         let fails: Bool
         let hook: (() -> Void)?
@@ -66,7 +68,7 @@ final class FlakyFileSystem: FileSystemProvider {
         }
         return Reader(try base.read(url), fails: fails, hook: hook)
     }
-    func createDirectory(at url: URL) throws { try base.createDirectory(at: url) }
+    func createDirectory(at url: URL) throws { base.createDirectory(at: url) }
     func write(_ url: URL) throws -> any FileWriter { try base.write(url) }
     func remove(_ url: URL) throws { try base.remove(url) }
     func move(_ source: URL, to destination: URL, replacing: Bool) throws {
@@ -81,7 +83,8 @@ final class FlakyFileSystem: FileSystemProvider {
 }
 
 /// Answers a job's questions with fixed choices, from whatever thread they come.
-final class Review2Replies: FileJobDelegate {
+/// Unchecked: what it records is guarded by `lock`; the choices are set by the test before use.
+final class Review2Replies: FileJobDelegate, @unchecked Sendable {
     private let lock = NSLock()
     private var failureAnswers: [ErrorChoice]
     private(set) var errors: [String] = []
@@ -131,7 +134,9 @@ private func mode(_ url: URL) -> UInt16? {
 /// Runs `work` on another thread and waits for it; if it does not end in `seconds`, `rescue`
 /// is called (to free whatever it hangs on) and false comes back. The time only matters when
 /// the code under test hangs, which is the failure the test is there to catch.
-private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ work: @escaping () -> Void) -> Bool {
+private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ work: @escaping @Sendable () -> Void)
+    -> Bool
+{
     let done = DispatchSemaphore(value: 0)
     Thread.detachNewThread {
         work()
@@ -649,7 +654,8 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
         try box.file("s/sub/b.txt")
         try box.folder("t")
         let lock = NSLock()
-        var verbs: [OperationRecord.Verb] = []
+        // Guarded by `lock`.
+        nonisolated(unsafe) var verbs: [OperationRecord.Verb] = []
         let job = FileJob(
             kind: .copy, sources: [box.url("s")], target: TargetSpec(directory: box.url("t")), fileSystems: fileSystems
         )
@@ -739,7 +745,8 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
 
     // F048
     @Test func aSourceOnAServerIsAskedAboutOnceNotThreeTimes() throws {
-        final class Counting: FileSystemProvider {
+        /// Unchecked: what it records is guarded by `lock`; its switches are set by the test before use.
+        final class Counting: FileSystemProvider, @unchecked Sendable {
             let base = MemoryFileSystem(scheme: "counted")
             var scheme: String { base.scheme }
             var capabilities: FileSystemCapabilities { [.write] }
@@ -755,7 +762,7 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
             }
             func parent(of directory: URL) -> URL? { base.parent(of: directory) }
             func read(_ url: URL) throws -> any FileReader { try base.read(url) }
-            func createDirectory(at url: URL) throws { try base.createDirectory(at: url) }
+            func createDirectory(at url: URL) throws { base.createDirectory(at: url) }
             func write(_ url: URL) throws -> any FileWriter { try base.write(url) }
             func remove(_ url: URL) throws { try base.remove(url) }
             func move(_ source: URL, to destination: URL, replacing: Bool) throws {

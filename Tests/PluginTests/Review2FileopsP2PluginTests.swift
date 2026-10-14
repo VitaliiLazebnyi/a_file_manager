@@ -310,7 +310,8 @@ final class P2Bench: ShellServices {
         }
         #expect(box.read("logs/operations.log")?.contains("Copy: mem:/A/one.txt -> mem:/B/one.txt") == true)
         // A plugin that has no log to write says so at once.
-        var answered = false
+        // Guarded by `lock`.
+        nonisolated(unsafe) var answered = false
         FileOperationsPlugin().prepareToQuit(cancellation: CancellationFlag()) { answered = true }
         #expect(answered)
         plugin.stop()
@@ -330,7 +331,8 @@ final class P2Bench: ShellServices {
         #expect(log.flush(timeout: 0.05) == false)
         // The flush before the quit ends as soon as the user does not want to wait.
         let flag = CancellationFlag()
-        var calls = 0
+        // Guarded by `lock`.
+        nonisolated(unsafe) var calls = 0
         let lock = NSLock()
         await withCheckedContinuation { (done: CheckedContinuation<Void, Never>) in
             log.flush(cancellation: flag) {
@@ -345,7 +347,7 @@ final class P2Bench: ShellServices {
         log.flush()
         #expect(box.read("logs/operations.log")?.hasSuffix("Copy: /a -> /b\n") == true && lock.withLock { calls } == 1)
         // A flag that is set before the flush is asked for answers at once, too.
-        var early = false
+        nonisolated(unsafe) var early = false
         log.flush(cancellation: flag) { early = true }
         #expect(early)
     }
@@ -561,7 +563,8 @@ final class P2Bench: ShellServices {
         let calculator = SpaceCalculator(fileSystems: fileSystems, cancellation: flag)
         #expect(calculator.measure(items).reduce(SpaceTotals(), +).bytes == 8)
         memory.stallsListings = true
-        var totals: [SpaceTotals] = []
+        // Written by the other thread before the wait ends, read here after it.
+        nonisolated(unsafe) var totals: [SpaceTotals] = []
         p2CancelSoon(flag)
         let ended = p2Finishes(rescue: { memory.releaseStalls() }) { totals = calculator.measure(items) }
         #expect(ended)
@@ -579,7 +582,8 @@ final class P2Bench: ShellServices {
         change.recurse = true
         change.timestamp = .current
         let job = AttributeJob(change: change, fileSystems: fileSystems, cancellation: flag)
-        var outcome = AttributeJob.Outcome()
+        // Written by the other thread before the wait ends, read here after it.
+        nonisolated(unsafe) var outcome = AttributeJob.Outcome()
         p2CancelSoon(flag)
         let ended = p2Finishes(rescue: { memory.releaseStalls() }) { outcome = job.run(items) }
         #expect(ended && outcome.cancelled)
@@ -626,7 +630,8 @@ final class P2Bench: ShellServices {
         // From now on the file does not arrive: its reads wait until they are interrupted.
         probe.base.stallsReads = true
         let (first, second) = (CancellationFlag(), CancellationFlag())
-        var answers: [[String: String]] = [[:], [:], [:]]
+        // Guarded by `lock`.
+        nonisolated(unsafe) var answers: [[String: String]] = [[:], [:], [:]]
         let lock = NSLock()
         let reader = DispatchSemaphore(value: 0)
         Thread.detachNewThread {

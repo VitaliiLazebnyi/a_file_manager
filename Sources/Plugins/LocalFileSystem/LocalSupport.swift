@@ -255,7 +255,7 @@ final class LinkResolver: @unchecked Sendable {
             let length = readlink(path, buffer.baseAddress, Int(PATH_MAX))
             guard length > 0 else { return nil }
             buffer[length] = 0
-            return String(validatingUTF8: buffer.baseAddress!)
+            return String(validatingCString: buffer.baseAddress!)
         }
         guard let text else { return nil }
         var absolute = text

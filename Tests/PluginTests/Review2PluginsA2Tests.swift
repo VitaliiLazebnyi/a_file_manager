@@ -219,9 +219,11 @@ import Testing
 // MARK: ViewOptions
 
 @MainActor @Suite struct Review2PluginsA2ViewOptions {
-    final class Steps {
-        var background: [() -> Void] = []
-        var main: [() -> Void] = []
+    /// Unchecked: used on the main thread only; the plugin hands its steps over there and the
+    /// test runs them there.
+    final class Steps: @unchecked Sendable {
+        var background: [@Sendable () -> Void] = []
+        var main: [@MainActor @Sendable () -> Void] = []
 
         func runBackground() {
             let work = background
@@ -229,7 +231,7 @@ import Testing
             work.forEach { $0() }
         }
 
-        func runMain() {
+        @MainActor func runMain() {
             let work = main
             main = []
             work.forEach { $0() }
@@ -557,8 +559,10 @@ extension TreeNode {
         let search = FileSearch(SearchQuery(directory: memory.url("/huge")), fileSystems: fileSystems)
         search.partialListingAfter = 10
         let began = Date()
-        var firstAt: TimeInterval?
-        var found: [String] = []
+        // Written by the other thread before it signals, read here after the wait.
+        nonisolated(unsafe) var firstAt: TimeInterval?
+        // Written by the other thread before it signals, read here after the wait.
+        nonisolated(unsafe) var found: [String] = []
         let done = DispatchSemaphore(value: 0)
         Thread {
             search.run {

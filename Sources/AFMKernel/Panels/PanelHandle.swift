@@ -12,10 +12,11 @@ public protocol PanelHandle: AnyObject {
     /// Shows a location in the active tab. The location of a file leads to its folder, with
     /// the cursor on the file; otherwise the cursor goes to `focus`. A failure is reported to
     /// the user and leaves the panel where it was. `completion` tells whether it worked.
-    func show(_ location: URL, focus: String?, history: PanelModel.HistoryEffect, completion: ((Bool) -> Void)?)
+    func show(
+        _ location: URL, focus: String?, history: PanelModel.HistoryEffect, completion: (@MainActor (Bool) -> Void)?)
     /// Reads the active tab's directory again. With `quietly`, nothing is redrawn unless
     /// something changed (for changes made by other programs).
-    func reload(focus: String?, quietly: Bool, completion: (() -> Void)?)
+    func reload(focus: String?, quietly: Bool, completion: (@MainActor () -> Void)?)
     /// Gives the panel the keyboard, which makes it the source.
     func focus()
     /// How the list is laid out (spec 03 › View types).

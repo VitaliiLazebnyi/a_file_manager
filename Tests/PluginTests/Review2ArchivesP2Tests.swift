@@ -37,17 +37,18 @@ private func tarBody(_ text: String) -> Data {
 }
 
 /// A clock for the delayed writes that the test turns by hand.
-private final class HandClock {
+/// Unchecked: what is due is guarded by `lock`.
+private final class HandClock: @unchecked Sendable {
     struct Due {
         let delay: TimeInterval
         let priority: QualityOfService
-        let work: () -> Void
+        let work: @Sendable () -> Void
     }
 
     private let lock = NSLock()
     private var waiting: [Due] = []
 
-    func schedule(_ delay: TimeInterval, _ priority: QualityOfService, _ work: @escaping () -> Void) {
+    func schedule(_ delay: TimeInterval, _ priority: QualityOfService, _ work: @escaping @Sendable () -> Void) {
         lock.lock()
         waiting.append(Due(delay: delay, priority: priority, work: work))
         lock.unlock()
@@ -64,7 +65,8 @@ private final class HandClock {
 }
 
 /// What a test collects from other threads.
-private final class Collected<Value> {
+/// Unchecked: the state is guarded by `lock`.
+private final class Collected<Value>: @unchecked Sendable {
     private let lock = NSLock()
     private var values: [Value] = []
 
@@ -272,7 +274,7 @@ private final class Collected<Value> {
             guard entry.path == "dir/sub/planted.txt", swapped.all.isEmpty else { return }
             swapped.add(entry.path)
             if renamex_np(target.appendingPathComponent("dir").path, link.path, UInt32(RENAME_SWAP)) == 0 {
-                try? fm.moveItem(at: link, to: target.appendingPathComponent("taken"))
+                try? FileManager.default.moveItem(at: link, to: target.appendingPathComponent("taken"))
             }
         }
         let result = unpacker.run([Unpacker.Source(archive: try bench.store.archive(at: archive))], into: target)
@@ -493,7 +495,8 @@ private final class Collected<Value> {
         let plugin = ArchivesPlugin(flushDelay: nil, launchesApplications: false)
         defer { plugin.store.close() }
         // Nothing to do: done at once, on the calling thread.
-        var done = false
+        // Written by the other thread before it signals, read here after the wait.
+        nonisolated(unsafe) var done = false
         plugin.prepareToQuit(cancellation: CancellationFlag()) { done = true }
         #expect(done && plugin.shouldTerminate())
 
@@ -576,7 +579,7 @@ private final class Collected<Value> {
             let (holding, release, released) = (
                 DispatchSemaphore(value: 0), DispatchSemaphore(value: 0), DispatchSemaphore(value: 0)
             )
-            func add(_ path: String) {
+            @Sendable func add(_ path: String) {
                 guard let writer = try? opened.write(path) else { return }
                 try? writer.write(Data("added".utf8))
                 try? writer.close(attributes: FileAttributes())
@@ -633,7 +636,7 @@ private final class Collected<Value> {
     @Test func aWriteThatIsDueIsDoneByWhicheverOfItsTwoTimersComesFirst() throws {
         let archive = try makeZip()
         let clock = HandClock()
-        bench.environment.schedule = clock.schedule
+        bench.environment.schedule = { clock.schedule($0, $1, $2) }
         bench.environment.flushDelay = 3
         bench.environment.escalationDelay = 7
         try write("first", to: bench.inside(archive, "tree/first.txt"))
@@ -676,7 +679,7 @@ private final class Collected<Value> {
         let archive = box.url("locked/tree.zip")
         let clock = HandClock()
         let reports = Collected<String>()
-        bench.environment.schedule = clock.schedule
+        bench.environment.schedule = { clock.schedule($0, $1, $2) }
         bench.environment.reportFailure = { error, _ in reports.add(error.localizedDescription) }
         (bench.environment.flushDelay, bench.environment.escalationDelay) = (0, 1)
         (bench.environment.retryDelay, bench.environment.maxRetryDelay) = (30, 100)

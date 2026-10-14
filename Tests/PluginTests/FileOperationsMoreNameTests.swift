@@ -188,8 +188,8 @@ import Testing
         configuration.file = box.url("logs/operations.log")
     }
 
-    /// A clock the test moves.
-    final class Clock {
+    /// A clock the test moves. Unchecked: the test moves it only while no line is being written.
+    final class Clock: @unchecked Sendable {
         var now = Date(timeIntervalSince1970: 1_791_813_787)
     }
 

@@ -35,7 +35,8 @@ import Testing
         nonisolated(unsafe) private static var table: UnsafeMutablePointer<UInt>?
         nonisolated(unsafe) private static var thread: pthread_t?
         nonisolated(unsafe) private static var (entries, overflowed, calls) = (0, false, 0)
-        private static let slot: UnsafeMutablePointer<Logger?>? = dlsym(
+        /// The system's hook, set and cleared by the measuring thread only.
+        nonisolated(unsafe) private static let slot: UnsafeMutablePointer<Logger?>? = dlsym(
             UnsafeMutableRawPointer(bitPattern: -2), "malloc_logger")?
             .assumingMemoryBound(to: Logger?.self)
 

@@ -287,7 +287,7 @@ final class HotlistEditorWindowController: NSWindowController, NSWindowDelegate,
     }
 
     /// A line of the editor's list: indented by its depth, submenus with a mark of their own.
-    static func title(of row: Hotlist.Row) -> String {
+    nonisolated static func title(of row: Hotlist.Row) -> String {
         let indent = String(repeating: "      ", count: row.depth)
         switch row.entry.kind {
         case .separator: return indent + HotlistMenu.separatorTitle

@@ -61,7 +61,7 @@ struct SystemInformation: Equatable {
         guard sysctlbyname(name, nil, &size, nil, 0) == 0, size > 0 else { return nil }
         var bytes = [CChar](repeating: 0, count: size)
         guard sysctlbyname(name, &bytes, &size, nil, 0) == 0 else { return nil }
-        return String(cString: bytes)
+        return bytes.withUnsafeBufferPointer { String(cString: $0.baseAddress!) }
     }
 
     static func systemNumber(_ name: String) -> Int? {

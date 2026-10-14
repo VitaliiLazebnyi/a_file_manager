@@ -21,7 +21,7 @@ import Testing
     }
 
     /// Runs `work` on another thread and fails instead of hanging if it does not end.
-    func finishes(within seconds: Double = 30, _ work: @escaping () -> Void) -> Bool {
+    func finishes(within seconds: Double = 30, _ work: @escaping @Sendable () -> Void) -> Bool {
         let done = DispatchSemaphore(value: 0)
         Thread {
             work()
@@ -52,7 +52,8 @@ import Testing
         let box = try Sandbox()
         try box.file("real.txt", "needle")
         #expect(mkfifo(box.url("pipe.txt").path, 0o644) == 0)
-        var found: [String] = []
+        // Written by the other thread before the wait ends, read here after it.
+        nonisolated(unsafe) var found: [String] = []
         let ended = finishes {
             FileSearch(SearchQuery(directory: box.root, text: "needle"), fileSystems: fileSystems).run {
                 found.append($0.name)
@@ -71,11 +72,13 @@ import Testing
         try box.file("c/other.txt", "different")
         #expect(mkfifo(box.url("c/p1").path, 0o644) == 0 && mkfifo(box.url("c/p2").path, 0o644) == 0)
         try FileManager.default.linkItem(at: box.url("a/one.txt"), to: box.url("a/link.txt"))
-        var query = SearchQuery(directory: box.root)
+        // Used by the work on its own thread only while the test waits for it to finish.
+        nonisolated(unsafe) var query = SearchQuery(directory: box.root)
         query.duplicates = DuplicateOptions(isEnabled: true, sameName: false, sameSize: true, sameContents: true)
         // The root twice, and a folder inside it: still every file once.
         query.moreDirectories = [box.root, box.url("a")]
-        var groups: [[FileItem]] = []
+        // Used by the work on its own thread only while the test waits for it to finish.
+        nonisolated(unsafe) var groups: [[FileItem]] = []
         #expect(finishes { groups = FileSearch(query, fileSystems: fileSystems).runForDuplicates() })
         #expect(groups.count == 1)
         // The hard link is the same file as one.txt, not a duplicate of it.
@@ -124,8 +127,9 @@ import Testing
                 if file % 2 == 0 { expected.append(box.url(path).path) }
             }
         }
-        var found: [String] = []
-        var folders: [String] = []
+        // Used by the work on its own thread only while the test waits for it to finish.
+        nonisolated(unsafe) var found: [String] = []
+        nonisolated(unsafe) var folders: [String] = []
         let search = FileSearch(SearchQuery(directory: box.root, text: "needle"), fileSystems: fileSystems)
         #expect(
             finishes {
@@ -141,7 +145,8 @@ import Testing
         for folder in 0..<20 { try box.file("d\(folder)/f.txt", "needle") }
         let search = FileSearch(SearchQuery(directory: box.root, text: "needle"), fileSystems: fileSystems)
         search.cancel()
-        var count = 0
+        // Used by the work on its own thread only while the test waits for it to finish.
+        nonisolated(unsafe) var count = 0
         #expect(finishes { search.run { _ in count += 1 } })
         #expect(count == 0)
     }

@@ -417,7 +417,8 @@ private final class Notes: @unchecked Sendable {
         (secured.user, secured.password) = ("anna", "pw")
         let other = try FTPFixture(secured)
         other.environment.declineMemory = 600
-        var questions = 0
+        // Used by the callbacks, which run one at a time while the calls below wait for them.
+        nonisolated(unsafe) var questions = 0
         other.environment.askCredentials = { _, _ in
             questions += 1
             return nil
@@ -558,17 +559,19 @@ private final class Notes: @unchecked Sendable {
     @Test func aServerNobodyChoseIsAskedAbout() throws {
         let fixture = try FTPFixture()
         try fixture.box.file("srv/a.txt", "a")
-        var asked: [ConnectionProfile] = []
-        var allows = false
+        // Used by the callbacks, which run one at a time while the calls below wait for them.
+        nonisolated(unsafe) var asked: [ConnectionProfile] = []
+        // Written by the other thread before it signals, read here after the wait.
+        let allows = Shared(false)
         fixture.environment.askToConnect = { profile in
             asked.append(profile)
-            return allows
+            return allows.value
         }
         // A location from a tab file or a list: no login is made without the user's yes.
         #expect(throws: (any Error).self) { _ = try fixture.names("/") }
         #expect(asked.count == 1 && asked[0].key == fixture.key && asked[0].asksBeforeConnecting)
         #expect(!fixture.server.commands.contains { $0.hasPrefix("USER") })
-        allows = true
+        allows.value = true
         #expect(try fixture.names("/") == ["a.txt"])
         // Once for the session, not for every connection of it.
         DispatchQueue.concurrentPerform(iterations: 4) { _ in _ = try? fixture.names("/") }
@@ -625,17 +628,20 @@ private final class Notes: @unchecked Sendable {
         fixture.environment.asksAboutUnprotectedLoopback = true
         let id = UUID()
         fixture.center.setSaved([ConnectionProfile(key: fixture.key, savedID: id, user: "anna")])
-        var warnings = 0
-        var allows = false
+        // Used by the callbacks, which run one at a time while the calls below wait for them.
+        nonisolated(unsafe) var warnings = 0
+        let allows = Shared(false)
         fixture.environment.askToSendPasswordUnprotected = { _ in
             warnings += 1
-            return allows
+            return allows.value
         }
-        var answers = ["wrong", "right"]
+        // Used by the callbacks, which run one at a time while the calls below wait for them.
+        nonisolated(unsafe) var answers = ["wrong", "right"]
         fixture.environment.askCredentials = { _, _ in
             Credentials(user: "anna", password: answers.removeFirst(), remember: true)
         }
-        var remembered: [String] = []
+        // Used by the callbacks, which run one at a time while the calls below wait for them.
+        nonisolated(unsafe) var remembered: [String] = []
         fixture.environment.rememberPassword = { profile, password in
             if profile.savedID == id { remembered.append(password) }
         }
@@ -643,7 +649,7 @@ private final class Notes: @unchecked Sendable {
         #expect(throws: (any Error).self) { _ = try fixture.names("/") }
         #expect(warnings == 1 && !fixture.server.commands.contains { $0.hasPrefix("PASS") })
         answers = ["wrong", "right"]
-        allows = true
+        allows.value = true
         #expect(try fixture.names("/") == ["a.txt"])
         // Asked once, not for each attempt; and only the password the server took is kept.
         #expect(warnings == 2 && remembered == ["right"])
@@ -655,7 +661,8 @@ private final class Notes: @unchecked Sendable {
 
     @Test func certificatesAcceptedForGoodAreNotReadFromTheSettings() {
         let trust = CertificateTrust()
-        var loads = 0
+        // Used by the callbacks, which run one at a time while the calls below wait for them.
+        nonisolated(unsafe) var loads = 0
         trust.load = {
             loads += 1
             return ["Files.Example.com": ["AA:BB"]]
@@ -704,9 +711,10 @@ private final class Notes: @unchecked Sendable {
             center.announce(ConnectionProfile(key: key(server), tls: .implicit, anonymous: true), chosen: true)
         }
 
-        var firstUse: [String] = []
-        var changed: [(new: String, known: [String])] = []
-        var acceptsChange = false
+        // Used by the callbacks, which run one at a time while the calls below wait for them.
+        nonisolated(unsafe) var firstUse: [String] = []
+        nonisolated(unsafe) var changed: [(new: String, known: [String])] = []
+        let acceptsChange = Shared(false)
         environment.askToTrust = { profile, certificate in
             firstUse.append(certificate.fingerprint)
             environment.trust.accept(certificate.fingerprint, for: profile.key.host)
@@ -714,8 +722,8 @@ private final class Notes: @unchecked Sendable {
         }
         environment.askToTrustChanged = { profile, certificate, known in
             changed.append((certificate.fingerprint, known))
-            if acceptsChange { environment.trust.replace(with: certificate.fingerprint, for: profile.key.host) }
-            return acceptsChange
+            if acceptsChange.value { environment.trust.replace(with: certificate.fingerprint, for: profile.key.host) }
+            return acceptsChange.value
         }
         #expect(try fileSystem.list(key(first).url(), showHidden: true).map(\.name) == ["first.txt"])
         #expect(firstUse.count == 1 && changed.isEmpty)
@@ -727,7 +735,7 @@ private final class Notes: @unchecked Sendable {
         #expect(environment.trust.fingerprints(for: "127.0.0.1") == [firstUse[0]])
 
         // Accepted knowingly, it takes the old one's place.
-        acceptsChange = true
+        acceptsChange.value = true
         #expect(try fileSystem.list(key(second).url(), showHidden: true).map(\.name) == ["second.txt"])
         #expect(environment.trust.fingerprints(for: "127.0.0.1") == [changed[1].new])
     }

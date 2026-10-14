@@ -194,7 +194,8 @@ import Testing
         commands.perform("afm_ImportSettings", .location(numbers))
         #expect(stored("places.history.frequent") == #"{"counts":{"a":1000000,"b":0,"c":7}}"#)
         #expect(stored("extra.key") == "[1000000000000,-1000000000000,12,2.5,true]")
-        #expect((ui.forms.last?.first?.label ?? "").contains("numbers were out of range"))
+        let label = ui.forms.last?.first?.label ?? ""
+        #expect(label.contains("numbers were out of range"))
     }
 
     @Test func aFileThatIsTooLargeOrNoSettingsFileIsRefused() throws {

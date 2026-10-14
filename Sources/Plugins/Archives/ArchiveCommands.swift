@@ -372,10 +372,10 @@ final class ArchiveCommands {
         return operands.filter { packed.contains($0.url) }.map(\.name)
     }
 
-    static let encryptionNote =
+    nonisolated static let encryptionNote =
         "The archive is encrypted with AES-256. 7-Zip, WinZip, Keka and The Unarchiver open it; "
         + "the old unzip program and the Finder do not."
-    static let legacyLabel =
+    nonisolated static let legacyLabel =
         "Use the old ZIP encryption instead (weak: it can be broken within minutes; "
         + "only for programs that cannot open AES)"
 

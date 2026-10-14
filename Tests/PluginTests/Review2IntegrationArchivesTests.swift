@@ -11,7 +11,8 @@ import Testing
 
 /// A file system over memory with a moment to interfere right before a folder is made
 /// exclusively. Every call is forwarded to `base`.
-final class IntegrationHookedMemory: FileSystemProvider {
+/// Unchecked: what it records is guarded by `lock`; its switches are set by the test before use.
+final class IntegrationHookedMemory: FileSystemProvider, @unchecked Sendable {
     let base = MemoryFileSystem(scheme: "hooked")
     var scheme: String { base.scheme }
     var capabilities: FileSystemCapabilities { base.capabilities }
@@ -44,7 +45,7 @@ final class IntegrationHookedMemory: FileSystemProvider {
     func displayPath(_ url: URL) -> String { base.displayPath(url) }
     func location(from text: String) -> URL? { base.location(from: text) }
     func volume(of url: URL) -> VolumeInfo? { base.volume(of: url) }
-    func createDirectory(at url: URL) throws { try base.createDirectory(at: url) }
+    func createDirectory(at url: URL) throws { base.createDirectory(at: url) }
     func createDirectory(at url: URL, exclusive: Bool) throws {
         if exclusive {
             beforeMaking?(url)

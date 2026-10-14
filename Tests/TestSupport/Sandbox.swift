@@ -1,7 +1,8 @@
 public import Foundation
 
 /// A scratch folder on the local disk that is removed when the test ends.
-public final class Sandbox {
+/// Unchecked: it holds constants only, and `FileManager.default` may be used from any thread.
+public final class Sandbox: @unchecked Sendable {
     public let root: URL
     private let fm = FileManager.default
 
@@ -32,4 +33,18 @@ public final class Sandbox {
 
     public func exists(_ path: String) -> Bool { fm.fileExists(atPath: url(path).path) }
     public func read(_ path: String) -> String? { try? String(contentsOf: url(path), encoding: .utf8) }
+}
+
+/// A value the test and the code under test share across threads. Unchecked: the value is
+/// guarded by `lock`.
+public final class Shared<Value>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: Value
+
+    public init(_ value: Value) { stored = value }
+
+    public var value: Value {
+        get { lock.withLock { stored } }
+        set { lock.withLock { stored = newValue } }
+    }
 }

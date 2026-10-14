@@ -521,11 +521,13 @@ import Testing
 
     /// A thumbnail source that answers when the test says so.
     final class ScriptedThumbnails: ThumbnailSource {
-        var pending: [String: (NSImage?) -> Void] = [:]
+        var pending: [String: @Sendable (NSImage?) -> Void] = [:]
         var requested: [String] = []
         var cancelled: [String] = []
 
-        func thumbnail(for url: URL, side _: CGFloat, scale _: CGFloat, completion: @escaping (NSImage?) -> Void) -> ()
+        func thumbnail(
+            for url: URL, side _: CGFloat, scale _: CGFloat, completion: @escaping @Sendable (NSImage?) -> Void
+        ) -> ()
             ->
             Void
         {

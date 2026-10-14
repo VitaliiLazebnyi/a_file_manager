@@ -670,7 +670,9 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
         host?.panelDidBecomeActive(self)
     }
 
-    func show(_ location: URL, focus: String?, history: PanelModel.HistoryEffect, completion: ((Bool) -> Void)?) {
+    func show(
+        _ location: URL, focus: String?, history: PanelModel.HistoryEffect, completion: (@MainActor (Bool) -> Void)?
+    ) {
         load(location, in: model, focus: focus, history: history, reportFailure: true, completion: completion)
     }
 
@@ -1201,7 +1203,7 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
         return true
     }
 
-    func reload(focus: String?, quietly: Bool, completion: (() -> Void)?) {
+    func reload(focus: String?, quietly: Bool, completion: (@MainActor () -> Void)?) {
         reload(model, focus: focus, quietly: quietly, completion: completion)
     }
 
@@ -1252,7 +1254,7 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
     /// happens later or is another reading's doing.
     private func reload(
         _ tab: PanelModel, focus: String?, quietly: Bool, markDirty: Bool = true, changedAt: TimeInterval? = nil,
-        completion: (() -> Void)?
+        completion: (@MainActor () -> Void)?
     ) {
         MainThread.assert("A panel")
         guard !isShutDown else {

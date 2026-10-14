@@ -9,7 +9,8 @@ import Testing
 /// tools. Unlike the system's `sftp-server` it can be made to behave badly: every answer comes
 /// after a random delay (so answers arrive out of order), reads are cut short, reads fail from
 /// some position on, a request is never answered, or nothing is read from the pipe at all.
-final class FakeSFTPServer {
+/// Unchecked: set up in `init` and not changed afterwards.
+final class FakeSFTPServer: @unchecked Sendable {
     static let python = "/usr/bin/python3"
     static var isAvailable: Bool { FileManager.default.isExecutableFile(atPath: python) }
 

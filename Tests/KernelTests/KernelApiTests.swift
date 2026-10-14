@@ -15,7 +15,7 @@ private final class PlainFileSystem: FileSystemProvider {
     func item(at url: URL) -> FileItem? { inner.item(at: url) }
     func parent(of directory: URL) -> URL? { inner.parent(of: directory) }
     func read(_ url: URL) throws -> any FileReader { PlainReader(try inner.read(url)) }
-    func createDirectory(at url: URL) throws { try inner.createDirectory(at: url) }
+    func createDirectory(at url: URL) throws { inner.createDirectory(at: url) }
     func write(_ url: URL) throws -> any FileWriter { PlainWriter(try inner.write(url)) }
     func remove(_ url: URL) throws { try inner.remove(url) }
     func move(_ source: URL, to destination: URL, replacing: Bool) throws {
@@ -185,7 +185,7 @@ private func onThread(_ work: @escaping @Sendable () -> Void) {
         #expect(throws: FileSystemError.self) { try plain.copyMetadata(from: directory, to: file) }
         try plain.commit(directory)
         #expect(plain.quarantine(of: file) == nil)
-        try plain.setQuarantine(Data("0081;x".utf8), of: file)
+        plain.setQuarantine(Data("0081;x".utf8), of: file)
     }
 
     @Test func aFlagThatIsSetEndsTheDefaultsEarly() throws {

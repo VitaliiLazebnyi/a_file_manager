@@ -31,7 +31,9 @@ final class QuietMonitor: JobMonitor, @unchecked Sendable {
 }
 
 /// The archive file systems on top of the local disk and a memory file system, without a kernel.
-final class ArchiveBench {
+/// Unchecked: its parts are file systems and stores, which are safe from any thread; the
+/// environment is set up before use.
+final class ArchiveBench: @unchecked Sendable {
     let box: Sandbox
     let environment = ArchiveEnvironment()
     let store: ArchiveStore
@@ -42,8 +44,9 @@ final class ArchiveBench {
     let monitor = QuietMonitor()
     let passwords = Passwords()
 
-    /// The answers to password questions, and how often one was asked.
-    final class Passwords {
+    /// The answers to password questions, and how often one was asked. Unchecked: the state is
+    /// guarded by `lock`.
+    final class Passwords: @unchecked Sendable {
         private let lock = NSLock()
         private var answers: [String?] = []
         private var count = 0

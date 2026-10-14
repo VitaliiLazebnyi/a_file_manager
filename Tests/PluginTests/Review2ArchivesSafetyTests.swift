@@ -470,7 +470,7 @@ private func tarBody(_ text: String) -> Data {
         #expect(try bench.read(inner.appending(name: "readme.txt")) == Data(contentsOf: box.url("tree/readme.txt")))
         // An archive that would have to be fetched is refused with a message that says why.
         let onServer = bench.memory.url("/store/tree.zip")
-        try bench.memory.createDirectory(at: bench.memory.url("/store"))
+        bench.memory.createDirectory(at: bench.memory.url("/store"))
         let writer = try bench.memory.write(onServer)
         try writer.write(try Data(contentsOf: box.url("tree.zip")))
         try writer.close(attributes: FileAttributes())

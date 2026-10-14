@@ -192,19 +192,20 @@ let systemSFTPServer = "/usr/libexec/sftp-server"
         center.makeSession = { profile, environment in
             SFTPSession(profile: profile, environment: environment, transport: transport)
         }
-        var questions: [(String, Bool)] = []
-        var passphrase = "wrong"
+        // Used by the callbacks, which run one at a time while the calls below wait for them.
+        nonisolated(unsafe) var questions: [(String, Bool)] = []
+        let passphrase = Shared("wrong")
         center.environment.declineMemory = 0
         center.environment.askSecret = { _, question, isSecret in
             questions.append((question, isSecret))
-            return isSecret ? passphrase : "yes"
+            return isSecret ? passphrase.value : "yes"
         }
         // A wrong passphrase: ssh gives up and says why.
         #expect(throws: NetworkError.self) { try fileSystem.list(url("srv"), showHidden: true) }
         #expect(questions.first?.0.contains("(yes/no") == true && questions.first?.1 == false)
         #expect(questions.contains { $0.1 && $0.0.lowercased().contains("passphrase") })
 
-        passphrase = "open sesame"
+        passphrase.value = "open sesame"
         questions = []
         #expect(try fileSystem.list(url("srv"), showHidden: true).map(\.name) == ["hello.txt"])
         // The host key was accepted the first time and is known now.

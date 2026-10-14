@@ -469,7 +469,7 @@ final class WebContentView: NSView, WKNavigationDelegate {
         case allow, cancel, followLink
     }
 
-    static func decide(isMainFrame: Bool, isLinkClick: Bool, url: URL?, expectsPage: Bool) -> Decision {
+    nonisolated static func decide(isMainFrame: Bool, isLinkClick: Bool, url: URL?, expectsPage: Bool) -> Decision {
         let isBlank =
             url.map {
                 $0.scheme == "about"

@@ -7,8 +7,9 @@ import Testing
 
 @testable import NetworkPlugin
 
-/// A test server on a sandbox folder with the FTP file system connected to it.
-final class FTPFixture {
+/// A test server on a sandbox folder with the FTP file system connected to it. Unchecked: set up
+/// in `init` and not changed afterwards; the server and the connections are safe from any thread.
+final class FTPFixture: @unchecked Sendable {
     let box: Sandbox
     let server: TestFTPServer
     let center: ConnectionCenter
@@ -280,8 +281,9 @@ final class FTPFixture {
         (options.user, options.password) = ("anna", "s3cret")
         let fixture = try FTPFixture(options)
         try fixture.box.file("srv/a.txt", "a")
-        var questions: [String] = []
-        var answers: [Credentials?] = [
+        // Used by the callbacks, which run one at a time while the calls below wait for them.
+        nonisolated(unsafe) var questions: [String] = []
+        nonisolated(unsafe) var answers: [Credentials?] = [
             Credentials(user: "anna", password: "wrong"), Credentials(user: "anna", password: "s3cret")
         ]
         fixture.environment.askCredentials = { _, message in

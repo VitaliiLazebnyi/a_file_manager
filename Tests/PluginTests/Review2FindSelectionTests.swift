@@ -11,7 +11,7 @@ import Testing
 /// exponential, work off the main thread with a list-version guard, numbers that used to trap,
 /// the ANSI file that used to raise.
 @Suite struct Review2FindSelectionRules {
-    func finishes(within seconds: Double = 60, _ work: @escaping () -> Void) -> Bool {
+    func finishes(within seconds: Double = 60, _ work: @escaping @Sendable () -> Void) -> Bool {
         let done = DispatchSemaphore(value: 0)
         Thread {
             work()
@@ -23,7 +23,8 @@ import Testing
     @Test func aRegexMaskThatBacktracksEndsAndSaysSo() {
         let mask = SelectionMask("<(a+)+$")
         let name = String(repeating: "a", count: 45) + "!"
-        var selected = [true]
+        // Used by the work on its own thread only while the test waits for it to finish.
+        nonisolated(unsafe) var selected = [true]
         #expect(finishes { selected = mask.selected([MaskEntry(name: name)]) })
         #expect(selected == [false] && mask.timedOut)
         // The same mask judges a name it is quick on.
@@ -39,7 +40,8 @@ import Testing
             flag.cancel()
         }.start()
         let entries = (0..<5).map { MaskEntry(name: String(repeating: "a", count: 40 + $0) + ".png") }
-        var result: [Bool] = []
+        // Used by the work on its own thread only while the test waits for it to finish.
+        nonisolated(unsafe) var result: [Bool] = []
         #expect(finishes { result = mask.selected(entries, cancelled: { flag.isCancelled }) })
         #expect(result.allSatisfy { !$0 })
     }
@@ -47,7 +49,8 @@ import Testing
     @Test func manyAnyLevelsInAPathMaskAreNotExponential() {
         let mask = SelectionMask("**/**/**/**/**/**/**/**/**/**/**/**/**/x.txt")
         let directory = (0..<30).map { "d\($0)" }
-        var result = [true]
+        // Used by the work on its own thread only while the test waits for it to finish.
+        nonisolated(unsafe) var result = [true]
         #expect(finishes { result = mask.selected([MaskEntry(name: "y.txt", directory: directory)]) })
         #expect(result == [false])
         #expect(mask.selected([MaskEntry(name: "x.txt", directory: directory)]) == [true])

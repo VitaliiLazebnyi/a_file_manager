@@ -9,13 +9,15 @@ import Testing
 /// A function that runs on a thread of its own, for work that is meant to block: it says when
 /// the thread waits (in a read that never answers), so a test sets the flag then and not "after a
 /// moment".
-final class ViewerAdoptWorker {
+/// Unchecked: `port` is written by the worker before it signals `started`, and read after
+/// that; `thread` is set in `init`.
+final class ViewerAdoptWorker: @unchecked Sendable {
     private var port: mach_port_t = 0
     private let started = DispatchSemaphore(value: 0)
     private let finished = DispatchSemaphore(value: 0)
     private var thread: Thread?
 
-    init(_ body: @escaping () -> Void) {
+    init(_ body: @escaping @Sendable () -> Void) {
         thread = Thread { [self] in
             port = mach_thread_self()
             started.signal()
@@ -62,7 +64,8 @@ func viewerAdoptWait(_ seconds: TimeInterval = 30, until condition: () -> Bool) 
 }
 
 /// A guarded value, for results that come from threads.
-final class ViewerAdoptBox<Value> {
+/// Unchecked: the value is guarded by `lock`.
+final class ViewerAdoptBox<Value>: @unchecked Sendable {
     private let lock = NSLock()
     private var stored: Value
 
@@ -262,7 +265,7 @@ final class ViewerRemoteLike: ByteSource {
 
     @Test func aReadThatWaitsForTheServerEndsWhenItsFlagIsSet() throws {
         let memory = MemoryFileSystem()
-        let (registry, url) = try stalledFile(memory, size: 100_000)
+        let (registry, url) = stalledFile(memory, size: 100_000)
         let source = try ProviderByteSource.open(url, fileSystems: registry)
         memory.stallsReads = true
         for attempt in 1...5 {
@@ -288,7 +291,7 @@ final class ViewerRemoteLike: ByteSource {
 
     @Test func aFlagOnlyEndsTheReadsItWasGiven() throws {
         let memory = MemoryFileSystem()
-        let (registry, url) = try stalledFile(memory, size: 50_000)
+        let (registry, url) = stalledFile(memory, size: 50_000)
         let source = CachedByteSource(
             try ProviderByteSource.open(url, fileSystems: registry), blockSize: 4_096, capacity: 4)
         let other = CancellationFlag()
@@ -302,7 +305,7 @@ final class ViewerRemoteLike: ByteSource {
 
     @Test func indexingAFileThatNeverAnswersStopsWhenTheDocumentIsDropped() throws {
         let memory = MemoryFileSystem()
-        let (registry, url) = try stalledFile(memory, size: 400_000)
+        let (registry, url) = stalledFile(memory, size: 400_000)
         let source = CachedByteSource(try ProviderByteSource.open(url, fileSystems: registry))
         memory.stallsReads = true
         let document = TextDocument(
@@ -317,7 +320,7 @@ final class ViewerRemoteLike: ByteSource {
 
     @Test func fetchingRowsFromAFileThatNeverAnswersEndsWhenTheFetchIsOvertaken() throws {
         let memory = MemoryFileSystem()
-        let (registry, url) = try stalledFile(memory, size: 100_000)
+        let (registry, url) = stalledFile(memory, size: 100_000)
         let source = try ProviderByteSource.open(url, fileSystems: registry)
         let document = TextDocument(
             source: source, encoding: .utf8, layout: .text(TextLayoutOptions(columns: 80, wordWrap: true)))
@@ -351,7 +354,7 @@ final class ViewerRemoteLike: ByteSource {
 
     @Test func aSearchThroughAFileThatNeverAnswersEndsWithItsFlag() throws {
         let memory = MemoryFileSystem()
-        let (registry, url) = try stalledFile(memory, size: 300_000)
+        let (registry, url) = stalledFile(memory, size: 300_000)
         let source = CachedByteSource(try ProviderByteSource.open(url, fileSystems: registry))
         memory.stallsReads = true
         let flag = CancellationFlag()
@@ -379,7 +382,7 @@ final class ViewerRemoteLike: ByteSource {
 
     @Test func aCopyOfAFileThatNeverAnswersEndsWithItsFlagAndLeavesNothingBehind() throws {
         let memory = MemoryFileSystem()
-        let (registry, url) = try stalledFile(memory, size: 200_000)
+        let (registry, url) = stalledFile(memory, size: 200_000)
         memory.stallsReads = true
         let copies = TemporaryCopies()
         defer { copies.removeAll() }

@@ -232,13 +232,17 @@ public final class ShellApplication: NSObject, NSApplicationDelegate, NSMenuItem
     public func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         guard let shell else { return .terminateNow }
         guard shell.mayQuit() else { return .terminateCancel }
-        var answer: Bool?
-        var repliesLater = false
-        shell.finishToQuit { quits in
-            if repliesLater { sender.reply(toApplicationShouldTerminate: quits) } else { answer = quits }
+        // The answer comes on the main thread: at once, or later from the run loop.
+        final class Reply {
+            var answer: Bool?
+            var isLater = false
         }
-        if let answer { return answer ? .terminateNow : .terminateCancel }
-        repliesLater = true
+        let reply = Reply()
+        shell.finishToQuit { quits in
+            if reply.isLater { sender.reply(toApplicationShouldTerminate: quits) } else { reply.answer = quits }
+        }
+        if let answer = reply.answer { return answer ? .terminateNow : .terminateCancel }
+        reply.isLater = true
         return .terminateLater
     }
 

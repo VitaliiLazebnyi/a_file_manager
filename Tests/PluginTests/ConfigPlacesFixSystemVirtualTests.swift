@@ -89,7 +89,7 @@ import Testing
         _ = watcher
     }
 
-    @Test func manyReportsBecomeFewWalks() async throws {
+    @MainActor @Test func manyReportsBecomeFewWalks() async throws {
         let watchable = WatchedSystem()
         let registry = FileSystemRegistry()
         registry.register(watchable)
@@ -151,13 +151,14 @@ private final class Counter: @unchecked Sendable {
 }
 
 /// A file system whose watchers can be fired by hand.
-private final class WatchedSystem: FileSystemProvider {
+/// Unchecked: its switches are set by the test before use, and it is used from one thread at a time.
+private final class WatchedSystem: FileSystemProvider, @unchecked Sendable {
     let scheme = "watched"
     let capabilities: FileSystemCapabilities = []
-    private var onChange: (([URL]) -> Void)?
+    private var onChange: (@MainActor @Sendable ([URL]) -> Void)?
 
     func url(_ path: String) -> URL { URL(string: "watched://" + path)! }
-    func fire() { onChange?([]) }
+    @MainActor func fire() { onChange?([]) }
 
     func list(_: URL, showHidden _: Bool) -> [FileItem] { [] }
     func item(at url: URL) -> FileItem? { FileItem(url: url, name: url.lastPathComponent, isDirectory: false) }

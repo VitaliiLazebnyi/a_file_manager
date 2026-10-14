@@ -364,14 +364,15 @@ import Testing
 }
 
 /// A two-level tree that records what it was asked to watch.
-private final class WatchableFileSystem: FileSystemProvider {
+/// Unchecked: its switches are set by the test before use, and it is used from one thread at a time.
+private final class WatchableFileSystem: FileSystemProvider, @unchecked Sendable {
     let scheme = "watched"
     let capabilities: FileSystemCapabilities = []
     private(set) var watched: [URL] = []
-    private var onChange: (([URL]) -> Void)?
+    private var onChange: (@MainActor @Sendable ([URL]) -> Void)?
 
     func url(_ path: String) -> URL { URL(string: "watched://" + path)! }
-    func fire() { onChange?(watched) }
+    @MainActor func fire() { onChange?(watched) }
 
     func list(_ directory: URL, showHidden _: Bool) throws -> [FileItem] {
         switch directory.path {

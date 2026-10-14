@@ -178,9 +178,9 @@ final class SystemTools {
     static let backgroundSelectionThreshold = 5_000
 
     /// What tests may really run: programs that only write text.
-    static let harmlessCommands: Set<String> = ["echo", "printf", "true", "false", "pwd"]
+    nonisolated static let harmlessCommands: Set<String> = ["echo", "printf", "true", "false", "pwd"]
     /// Characters with which a harmless first word could still start something else.
-    private static let shellOperators = CharacterSet(charactersIn: ";|&$`<>(){}\n\\")
+    private nonisolated static let shellOperators = CharacterSet(charactersIn: ";|&$`<>(){}\n\\")
 
     private let kernel: Kernel
     private let launchesApplications: Bool

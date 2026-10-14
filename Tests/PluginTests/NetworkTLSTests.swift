@@ -29,18 +29,18 @@ import Testing
         defer { center.disconnectAll() }
 
         // The certificate is signed by nobody the system knows: the user is asked, and No ends it.
-        var shown: [CertificateInfo] = []
-        var accepts = false
+        nonisolated(unsafe) var shown: [CertificateInfo] = []
+        let accepts = Shared(false)
         environment.askToTrust = { profile, certificate in
             shown.append(certificate)
-            if accepts { environment.trust.accept(certificate.fingerprint, for: profile.key.host) }
-            return accepts
+            if accepts.value { environment.trust.accept(certificate.fingerprint, for: profile.key.host) }
+            return accepts.value
         }
         #expect(throws: NetworkError.self) { try fileSystem.list(key.url(), showHidden: true) }
         #expect(shown.count == 1 && shown[0].subject.contains("localhost") && shown[0].fingerprint.count == 95)
         #expect(!center.isConnected(key))
 
-        accepts = true
+        accepts.value = true
         #expect(try fileSystem.list(key.url(), showHidden: true).map(\.name) == ["hello.txt"])
         #expect(shown.count == 2)
         // Data connections are encrypted as well (PROT P), in both directions.

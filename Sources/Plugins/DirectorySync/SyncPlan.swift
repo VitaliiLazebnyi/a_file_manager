@@ -140,7 +140,10 @@ public struct SyncOutcome: Sendable {
 /// on that thread and may block while the user decides. `cancellation` may be set from any
 /// thread. A file that replaces another is written next to it under a temporary name and
 /// moved over it, so an interrupted copy never leaves a half-written target.
-public final class SyncExecutor {
+///
+/// Unchecked: it is handed to the job's thread before `run` and used there alone; only
+/// `cancellation`, which is safe from any thread, is touched from elsewhere.
+public final class SyncExecutor: @unchecked Sendable {
     private let plan: SyncPlan
     private let options: SyncRunOptions
     private let fileSystems: FileSystemRegistry

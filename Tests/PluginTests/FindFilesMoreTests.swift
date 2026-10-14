@@ -534,7 +534,8 @@ private final class ArchiveFake: FileSystemProvider {
         }
         var query = SearchQuery(directory: box.root)
         query.duplicates = DuplicateOptions(isEnabled: true, sameName: false, sameSize: true, sameContents: true)
-        var steps: [Int] = []
+        // Used by the callbacks, which run one at a time while the calls below wait for them.
+        nonisolated(unsafe) var steps: [Int] = []
         let found = FileSearch(query, fileSystems: fileSystems).runForDuplicates(onHashing: { done, total in
             steps.append(done)
             #expect(total == 240)

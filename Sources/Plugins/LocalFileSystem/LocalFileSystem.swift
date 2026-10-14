@@ -180,7 +180,7 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
             if returned.commonattr & wantName != 0 {
                 let reference = field.loadUnaligned(as: attrreference_t.self)
                 let bytes = (field + Int(reference.attr_dataoffset)).assumingMemoryBound(to: CChar.self)
-                if let name = String(validatingUTF8: bytes) {
+                if let name = String(validatingCString: bytes) {
                     read.name = name
                 } else {
                     read.name = String(cString: bytes)
@@ -294,7 +294,8 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
         // gives for an open folder.
         var path = [CChar](repeating: 0, count: Int(MAXPATHLEN) + 1)
         if fcntl(descriptor, F_GETPATH, &path) == 0 {
-            devices.mounted = MountTable.shared.mounts(directlyIn: String(cString: path))
+            devices.mounted = MountTable.shared.mounts(
+                directlyIn: path.withUnsafeBufferPointer { String(cString: $0.baseAddress!) })
         }
         return devices
     }

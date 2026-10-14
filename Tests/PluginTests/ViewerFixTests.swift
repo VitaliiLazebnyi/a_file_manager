@@ -260,7 +260,8 @@ import Testing
     // MARK: Cached remote reads
 
     @Test func aSmallRemoteFileIsFetchedOnceForAnyNumberOfLongReads() throws {
-        final class Counting: ByteSource {
+        /// Unchecked: what it records is guarded by `lock`; its switches are set by the test before use.
+        final class Counting: ByteSource, @unchecked Sendable {
             let data = Data((0..<300_000).map { UInt8($0 % 251) })
             var length: Int64 { Int64(data.count) }
             private let lock = NSLock()
@@ -359,7 +360,8 @@ import Testing
 }
 
 /// A value guarded by a lock, for collecting results from several threads.
-private final class Locked<Value> {
+/// Unchecked: the state is guarded by `lock`.
+private final class Locked<Value>: @unchecked Sendable {
     private let lock = NSLock()
     private var stored: Value
 

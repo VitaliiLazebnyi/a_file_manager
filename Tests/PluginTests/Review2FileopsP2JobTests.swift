@@ -13,7 +13,8 @@ import Testing
 
 /// A file system over memory that notes how it is called, and can be made to misbehave the
 /// way a server does. Every call is forwarded to `base`.
-final class P2ProbeFileSystem: FileSystemProvider {
+/// Unchecked: what it records is guarded by `lock`; its switches are set by the test before use.
+final class P2ProbeFileSystem: FileSystemProvider, @unchecked Sendable {
     let base: MemoryFileSystem
     var scheme: String { base.scheme }
     var capabilities: FileSystemCapabilities { base.capabilities }
@@ -73,7 +74,8 @@ final class P2ProbeFileSystem: FileSystemProvider {
         return try base.read(url, cancellation: cancellation)
     }
 
-    private final class FailingWriter: FileWriter {
+    /// Unchecked: used by one thread at a time, as the protocol allows.
+    private final class FailingWriter: FileWriter, @unchecked Sendable {
         let inner: any FileWriter
         let failure: any Error
         var wrote = false
@@ -114,16 +116,16 @@ final class P2ProbeFileSystem: FileSystemProvider {
     // The calls that change something, with a flag and without.
     func createDirectory(at url: URL) throws {
         try note("createDirectory", flag: nil)
-        try base.createDirectory(at: url)
+        base.createDirectory(at: url)
     }
     func createDirectory(at url: URL, cancellation: CancellationFlag) throws {
         try note("createDirectory", flag: cancellation)
-        try base.createDirectory(at: url)
+        base.createDirectory(at: url)
     }
     func createDirectory(at url: URL, exclusive: Bool, cancellation: CancellationFlag) throws {
         try note("createDirectory", flag: cancellation)
         if exclusive, base.item(at: url) != nil { throw FileSystemError.alreadyExists(base.displayPath(url)) }
-        try base.createDirectory(at: url)
+        base.createDirectory(at: url)
     }
     func remove(_ url: URL) throws {
         try note("remove", flag: nil)
@@ -170,7 +172,8 @@ final class P2ProbeFileSystem: FileSystemProvider {
 
 /// The local disk, with a moment to step in right before a folder is made: what somebody
 /// else does between a job's look at a name and its use of it.
-final class P2RacingLocalFileSystem: FileSystemProvider {
+/// Unchecked: its switches are set by the test before use, and it is used from one thread at a time.
+final class P2RacingLocalFileSystem: FileSystemProvider, @unchecked Sendable {
     let local = LocalFileSystem()
     var scheme: String { local.scheme }
     var capabilities: FileSystemCapabilities { local.capabilities }
@@ -274,7 +277,9 @@ final class P2Replies: FileJobDelegate {
 /// Runs `work` on another thread and waits for it; if it does not end in `seconds`, `rescue`
 /// is called (to free whatever it hangs on) and false comes back. The time only matters when
 /// the code under test hangs, which is the failure the test is there to catch.
-func p2Finishes(within seconds: TimeInterval = 60, rescue: () -> Void = {}, _ work: @escaping () -> Void) -> Bool {
+func p2Finishes(within seconds: TimeInterval = 60, rescue: () -> Void = {}, _ work: @escaping @Sendable () -> Void)
+    -> Bool
+{
     let done = DispatchSemaphore(value: 0)
     Thread.detachNewThread {
         work()
@@ -364,7 +369,8 @@ func p2Quarantine(_ url: URL) -> String? {
         probe.onStalledRemoval = { Thread.detachNewThread { flag.cancel() } }
         let replies = P2Replies()
         let job = job(.delete(toTrash: false), [probe.base.url("/gone")], replies: replies, cancellation: flag)
-        var result = JobResult()
+        // Written by the other thread before the wait ends, read here after it.
+        nonisolated(unsafe) var result = JobResult()
         let ended = p2Finishes(rescue: { flag.cancel() }) { result = job.run() }
         #expect(ended && result.cancelled && replies.errors.isEmpty)
         // Nothing was removed: the one removal that had begun was ended, not carried out.
@@ -405,7 +411,8 @@ func p2Quarantine(_ url: URL) -> String? {
         let job = job(
             .copy, [flaky.base.url("/s/big.bin")], to: probe.base.url("/t"), replies: replies, cancellation: flag)
         job.cleanupPatience = 0.2
-        var result = JobResult()
+        // Guarded by `lock`.
+        nonisolated(unsafe) var result = JobResult()
         // The patience is short so that the test is; the test does not depend on how short.
         #expect(p2Finishes { result = job.run() })
         #expect(result.cancelled)
@@ -440,7 +447,8 @@ func p2Quarantine(_ url: URL) -> String? {
 
     @Test func aFileIsBroughtUpToDateBeforeItIsCopiedMovedOrDeleted() {
         let lock = NSLock()
-        var flushed: [String] = []
+        // Guarded by `lock`.
+        nonisolated(unsafe) var flushed: [String] = []
         let memory = self.memory
         fileSystems.addFlusher { url, _ in
             lock.withLock { flushed.append(url.path) }
@@ -581,7 +589,8 @@ func p2Quarantine(_ url: URL) -> String? {
         probe.base.addDirectory("/t")
         probe.quarantineFailure = Refused()
         let replies = P2Replies()
-        var records: [OperationRecord] = []
+        // Guarded by `lock`.
+        nonisolated(unsafe) var records: [OperationRecord] = []
         let lock = NSLock()
         let job = job(.copy, [memory.url("/s/tool.command")], to: probe.base.url("/t"), replies: replies)
         job.onRecord = { record in lock.withLock { records.append(record) } }

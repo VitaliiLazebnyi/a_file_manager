@@ -12,7 +12,8 @@ import Testing
 // and a commit that asks while it runs (F046).
 
 /// The local file system with a moment to interfere right before an entry is removed.
-final class IntegrationRacingLocalFileSystem: FileSystemProvider {
+/// Unchecked: what it records is guarded by `lock`; its switches are set by the test before use.
+final class IntegrationRacingLocalFileSystem: FileSystemProvider, @unchecked Sendable {
     let local = LocalFileSystem()
     var scheme: String { local.scheme }
     var capabilities: FileSystemCapabilities { local.capabilities }

@@ -555,7 +555,7 @@ import Testing
         registry.register(memory)
         let data = Data((0..<count).map { UInt8($0 % 251) })
         let url = memory.url("/dir/blob.bin")
-        try memory.createDirectory(at: memory.url("/dir"))
+        memory.createDirectory(at: memory.url("/dir"))
         let writer = try memory.write(url)
         try writer.write(data)
         try writer.close(attributes: FileAttributes())
