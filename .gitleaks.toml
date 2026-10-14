@@ -1,0 +1,13 @@
+# Secret scanning (gitleaks): the default rules, minus known non-secrets.
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Throw-away credentials the tests use against servers they start themselves"
+regexTarget = "match"
+regexes = ['''curl -u me:secret''']
+
+[[allowlists]]
+description = "Total Commander settings keys quoted in the reference spec, not API keys"
+paths = ['''^documentation/tc-spec/''']
+regexes = ['''ThumbnailFrame=''']
