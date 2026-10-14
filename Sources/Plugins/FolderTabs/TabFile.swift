@@ -28,7 +28,7 @@ public import Foundation
 /// included). At most `tabLimit` tabs are read for a side, paths longer than `pathLimit` and
 /// captions longer than `captionLimit` characters are dropped, and a byte-order mark at the
 /// start of the file is ignored.
-public struct TabFile: Equatable {
+public struct TabFile: Equatable, Sendable {
     public static let tabLimit = 256
     public static let pathLimit = 4_096
     public static let captionLimit = 256

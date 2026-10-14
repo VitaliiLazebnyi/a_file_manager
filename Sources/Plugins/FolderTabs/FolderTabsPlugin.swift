@@ -466,7 +466,7 @@ public final class FolderTabsPlugin: Plugin {
     }
 
     /// The most a tab file may hold.
-    static let tabFileLimit = 1 << 20
+    nonisolated static let tabFileLimit = 1 << 20
 
     private enum TabFileError: LocalizedError {
         case notAFile(String)
@@ -502,7 +502,8 @@ public final class FolderTabsPlugin: Plugin {
                         guard !existing.isDirectory, !existing.isSpecial else {
                             throw TabFileError.notAFile(fileSystems.displayPath(file))
                         }
-                        let overwrite = monitor.ask {
+                        // `@Sendable`, so that it may be sent from this thread to the main thread.
+                        let overwrite = monitor.ask { @Sendable in
                             ui.choose(
                                 "Overwrite the tab file?", detail: fileSystems.displayPath(file),
                                 buttons: ["Overwrite", "Cancel"], style: .warning) == 0
