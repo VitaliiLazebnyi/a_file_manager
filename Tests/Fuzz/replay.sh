@@ -17,7 +17,8 @@ one() {  # file group target env args note
   local file=$1 group=$2 target=$3 env=$4 args=$5 note=$6
   [ -n "$filter" ] && [[ "$file" != *$filter* ]] && return
   total=$((total + 1))
-  local log="$LOGS/$(echo "$file" | tr '/ ' '__').log"
+  local log
+  log="$LOGS/$(echo "$file" | tr '/ ' '__').log"
   [ "$env" = - ] && env=""; [ "$args" = - ] && args=""
   # shellcheck disable=SC2086
   env FZ_WORK="$WORK" $env "$BIN/fuzz-$group" run "$target" "$HERE/repro/$file" $args > "$log" 2>&1

@@ -17,7 +17,7 @@ if [ -f "$reference" ]; then
 fi
 cd "$HERE/pkg" || exit 1
 case $kind in
-  asan) flags=(--scratch-path "$HERE/out/build-asan" -c release --sanitize=address -Xswiftc -sanitize-coverage=edge,inline-8bit-counters) ;;
+  asan) flags=(--scratch-path "$HERE/out/build-asan" -c release --sanitize=address -Xswiftc "-sanitize-coverage=edge,inline-8bit-counters") ;;
   rel)  flags=(--scratch-path "$HERE/out/build-rel" -c release) ;;
   *) echo "usage: build.sh rel|asan [product...]" >&2; exit 2 ;;
 esac

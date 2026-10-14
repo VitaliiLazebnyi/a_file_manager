@@ -3,26 +3,26 @@
 set -u
 # Run from anywhere: the seeds are written next to this script. The program's own packer adds its
 # seeds afterwards:  ../build.sh rel fuzz-arch && ../out/build-rel/release/fuzz-arch mkseeds "$PWD"
-S=$(cd "$(dirname "$0")" && pwd); T=$S/tree.tmp
-rm -rf $S/zip $S/tar $S/tgz $S/txz $S/bz $T; mkdir -p $S/zip $S/tar $S/tgz $S/txz $S/bz $T/t/sub/deep $T/t/hollow
-cd $T
+S=$(cd "$(dirname "$0")" && pwd); T="$S/tree.tmp"
+rm -rf "$S/zip" "$S/tar" "$S/tgz" "$S/txz" "$S/bz" "$T"; mkdir -p "$S/zip" "$S/tar" "$S/tgz" "$S/txz" "$S/bz" "$T/t/sub/deep" "$T/t/hollow"
+cd "$T" || exit 1
 printf 'hello world\n' > t/a.txt; : > t/empty.txt; printf 'unicode' > "t/sub/deep/übung – ñ 日本.txt"; printf 'hidden' > t/sub/.hidden
 head -c 300 /dev/urandom > t/sub/r.bin; yes 'All work and no play' | head -40 > t/sub/jack.txt
 ln -s a.txt t/link; ln -s ../a.txt t/sub/uplink; ln t/a.txt t/hard.txt
 L=$(printf 'n%.0s' $(seq 1 120)); printf 'long' > "t/$L.txt"; mkdir -p "t/$L/$L"; printf x > "t/$L/$L/deep.txt"
-(cd t && zip -q -r $T/inner.zip a.txt sub/jack.txt) && cp inner.zip t/nested.zip
-zip -q -r -y $S/zip/tool.zip t; zip -q -r -0 $S/zip/stored.zip t/a.txt t/sub/jack.txt; zip -q -r -P secret $S/zip/crypt.zip t/a.txt t/sub/jack.txt
-zip -q -j $S/zip/flat.zip t/a.txt; printf 'x' | zip -q $S/zip/stream.zip -; zip -q -r -fz $S/zip/zip64.zip t/a.txt t/sub 2>/dev/null
-echo comment | zip -q -z $S/zip/comment.zip t/a.txt >/dev/null; (printf '#!/bin/sh\nexit 0\n'; cat $S/zip/flat.zip) > $S/zip/sfx.zip
-bsdtar -cf $S/zip/bsd.zip --format zip t/a.txt t/sub/jack.txt t/link; ditto -c -k --sequesterRsrc t/sub $S/zip/ditto.zip
-tar -cf $S/tar/bsd.tar t; bsdtar -cf $S/tar/ustar.tar --format ustar t/a.txt t/sub t/link t/hard.txt 2>/dev/null; bsdtar -cf $S/tar/pax.tar --format pax t
-bsdtar -cf $S/tar/gnu.tar --format gnutar t; bsdtar -cf $S/tar/v7.tar --format v7 t/a.txt t/sub/jack.txt 2>/dev/null; bsdtar -cf $S/tar/small.tar t/a.txt
-tar -czf $S/tgz/t.tar.gz t/a.txt t/sub t/link; tar -cJf $S/txz/t.tar.xz t/a.txt t/sub t/link; tar -cjf $S/bz/t.tar.bz2 t/a.txt t/sub/jack.txt t/link
-bsdtar -czf $S/tgz/pax.tar.gz --format pax t; bsdtar -cJf $S/txz/pax.tar.xz --format pax t; bsdtar -czf $S/tgz/gnu.tar.gz --format gnutar t
-gzip -c t/sub/jack.txt > $S/tgz/jack.txt.gz; gzip -c -N t/a.txt > $S/tgz/named.gz; (gzip -c t/a.txt; gzip -c t/sub/jack.txt) > $S/tgz/multi.gz; : | gzip -c > $S/tgz/empty.gz
-xz -c t/sub/jack.txt > $S/txz/jack.txt.xz; (xz -c t/a.txt; xz -c t/sub/jack.txt) > $S/txz/multi.xz; : | xz -c > $S/txz/empty.xz; xz -c --block-size=100 t/sub/jack.txt > $S/txz/blocks.xz
-(xz -c t/a.txt; head -c 8 /dev/zero; xz -c t/a.txt) > $S/txz/padded.xz; xz -c --check=sha256 t/a.txt > $S/txz/sha.xz; xz -c --check=none t/a.txt > $S/txz/nocheck.xz
-bzip2 -c t/sub/jack.txt > $S/bz/jack.txt.bz2; : | bzip2 -c > $S/bz/empty.bz2
+(cd t && zip -q -r "$T/inner.zip" a.txt sub/jack.txt) && cp inner.zip t/nested.zip
+zip -q -r -y "$S/zip/tool.zip" t; zip -q -r -0 "$S/zip/stored.zip" t/a.txt t/sub/jack.txt; zip -q -r -P secret "$S/zip/crypt.zip" t/a.txt t/sub/jack.txt
+zip -q -j "$S/zip/flat.zip" t/a.txt; printf 'x' | zip -q "$S/zip/stream.zip" -; zip -q -r -fz "$S/zip/zip64.zip" t/a.txt t/sub 2>/dev/null
+echo comment | zip -q -z "$S/zip/comment.zip" t/a.txt >/dev/null; (printf '#!/bin/sh\nexit 0\n'; cat "$S/zip/flat.zip") > "$S/zip/sfx.zip"
+bsdtar -cf "$S/zip/bsd.zip" --format zip t/a.txt t/sub/jack.txt t/link; ditto -c -k --sequesterRsrc t/sub "$S/zip/ditto.zip"
+tar -cf "$S/tar/bsd.tar" t; bsdtar -cf "$S/tar/ustar.tar" --format ustar t/a.txt t/sub t/link t/hard.txt 2>/dev/null; bsdtar -cf "$S/tar/pax.tar" --format pax t
+bsdtar -cf "$S/tar/gnu.tar" --format gnutar t; bsdtar -cf "$S/tar/v7.tar" --format v7 t/a.txt t/sub/jack.txt 2>/dev/null; bsdtar -cf "$S/tar/small.tar" t/a.txt
+tar -czf "$S/tgz/t.tar.gz" t/a.txt t/sub t/link; tar -cJf "$S/txz/t.tar.xz" t/a.txt t/sub t/link; tar -cjf "$S/bz/t.tar.bz2" t/a.txt t/sub/jack.txt t/link
+bsdtar -czf "$S/tgz/pax.tar.gz" --format pax t; bsdtar -cJf "$S/txz/pax.tar.xz" --format pax t; bsdtar -czf "$S/tgz/gnu.tar.gz" --format gnutar t
+gzip -c t/sub/jack.txt > "$S/tgz/jack.txt.gz"; gzip -c -N t/a.txt > "$S/tgz/named.gz"; (gzip -c t/a.txt; gzip -c t/sub/jack.txt) > "$S/tgz/multi.gz"; : | gzip -c > "$S/tgz/empty.gz"
+xz -c t/sub/jack.txt > "$S/txz/jack.txt.xz"; (xz -c t/a.txt; xz -c t/sub/jack.txt) > "$S/txz/multi.xz"; : | xz -c > "$S/txz/empty.xz"; xz -c --block-size=100 t/sub/jack.txt > "$S/txz/blocks.xz"
+(xz -c t/a.txt; head -c 8 /dev/zero; xz -c t/a.txt) > "$S/txz/padded.xz"; xz -c --check=sha256 t/a.txt > "$S/txz/sha.xz"; xz -c --check=none t/a.txt > "$S/txz/nocheck.xz"
+bzip2 -c t/sub/jack.txt > "$S/bz/jack.txt.bz2"; : | bzip2 -c > "$S/bz/empty.bz2"
 python3 - "$S" <<'P'
 import sys, io, zipfile, tarfile, struct, os, stat, gzip, lzma
 S = sys.argv[1]
@@ -103,4 +103,4 @@ sp = bytearray(raw_header(b'sparse.bin', b'00000000005\x00', b'S')); sp[257:265]
 sp[148:156] = b' ' * 8; s = sum(sp); sp[148:155] = ('%06o' % s).encode() + b'\x00'; sp[155] = 32
 open(S+'/tar/sparse.tar', 'wb').write(bytes(sp) + pad(b'12345') + raw_header(b'after.txt', b'00000000002\x00') + pad(b'ok') + bytes(1024))
 P
-rm -rf $T; ls -la $S/*/ | awk '{print $5, $9}' | grep -v '^ *$' | tr '\n' ';'
+rm -rf "$T"; find "$S" -mindepth 2 -maxdepth 2 -type f -exec stat -f '%z %N' {} + | sed "s#^\([0-9]*\) $S/#\1 #" | tr '\n' ';'
