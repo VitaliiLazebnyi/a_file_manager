@@ -28,10 +28,9 @@ public enum ClipboardCommands {
 /// clipboard is pasted as a new file.
 ///
 /// **Threading.** The panels are used on the main thread only, and so is the pasteboard for
-/// everything that is quick. What writes a file or asks plugin columns for their values runs
-/// inside a job, with everything it needs read beforehand; the data of a text or picture is
-/// read from the pasteboard there too, because another program may hand it over slowly. The
-/// name lists of very large selections are put together on a background queue.
+/// everything else: `NSPasteboard` is not safe to use from another thread, so even the data of
+/// a text or picture is read there. What writes a file or asks plugin columns for their values
+/// runs inside a job, with everything it needs read beforehand. The name lists of very large selections are put together on a background queue.
 ///
 /// **Large selections.** Putting files on the pasteboard costs the system a tenth of a
 /// millisecond or more per file, on the main thread, and there is no way around it: a file is
@@ -339,7 +338,7 @@ public final class ClipboardPlugin: Plugin {
 
     // MARK: Text and pictures
 
-    nonisolated private static let imageTypes: [NSPasteboard.PasteboardType] = [.png, .tiff]
+    private static let imageTypes: [NSPasteboard.PasteboardType] = [.png, .tiff]
 
     /// Whether a picture or text is there to paste; looks at the kinds only, so menus can ask often.
     /// A yes is remembered for the state of the pasteboard it was found in, so that a menu
@@ -355,8 +354,8 @@ public final class ClipboardPlugin: Plugin {
 
     /// The picture or text on the clipboard. A picture wins over a text, because programs that
     /// copy a picture often add its name. Reads the data, which the program that owns it may
-    /// make only now: for a job's thread.
-    nonisolated private static func content(of pasteboard: NSPasteboard) -> PastedContent? {
+    /// make only now. Main thread.
+    private static func content(of pasteboard: NSPasteboard) -> PastedContent? {
         if let type = pasteboard.availableType(from: imageTypes), let data = pasteboard.data(forType: type),
             !data.isEmpty
         {
@@ -374,15 +373,13 @@ public final class ClipboardPlugin: Plugin {
     /// write that fails leaves no half of it behind.
     private func pasteContent(into directory: URL, in kernel: Kernel) {
         let fileSystems = kernel.fileSystems
-        // Read on the job's thread while the main thread leaves it alone (see Threading above):
-        // only the data of its contents is asked for there.
-        nonisolated(unsafe) let pasteboard = self.pasteboard
+        // Read here, on the main thread (see Threading above); the job gets the data only.
+        guard let content = Self.content(of: pasteboard) else { return }
         kernel.jobs.run(
             title: "Paste:",
             work: { monitor -> Result<URL, any Error> in
                 let cancellation = monitor.cancellation
                 return Result {
-                    guard let content = Self.content(of: pasteboard) else { throw NothingToPaste() }
                     let provider = try fileSystems.provider(for: directory)
                     let data: Data
                     switch content {
@@ -605,8 +602,9 @@ final class FileListReading: @unchecked Sendable {
     private var urls: [URL] = []
     private var outcome: Outcome?
     private let finished = DispatchSemaphore(value: 0)
+    private var sliceCount = 0
     /// How many slices the reading took; for tests.
-    private(set) var slices = 0
+    var slices: Int { lock.withLock { sliceCount } }
 
     /// Main thread: the pasteboard's state is noted here.
     init(_ items: [NSPasteboardItem], on pasteboard: NSPasteboard) {
@@ -646,7 +644,7 @@ final class FileListReading: @unchecked Sendable {
         lock.withLock {
             next = index
             urls += found
-            slices += 1
+            sliceCount += 1
         }
         if isDone {
             // Changed while the last slice was read: what was read may be half of each.
