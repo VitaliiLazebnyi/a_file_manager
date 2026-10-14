@@ -1,0 +1,10 @@
+# Keeps the pinned GitHub Actions current: each update is a pull request that moves the commit hash.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
