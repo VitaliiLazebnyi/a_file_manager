@@ -1,0 +1,11 @@
+# Breaking changes of the public plugin API (AFMKernel, AFMContracts) that were made on purpose.
+# Read by Scripts/api-check.sh (the `api` gate of Scripts/check.sh), which fails on every break
+# that is not listed here and on every line here that matches no break.
+#
+# Each acknowledged break is the digester's line exactly as the gate printed it, under a
+# `# reason:` comment saying why the break is worth what it costs plugins; a blank line ends the
+# reason. Once the change is on main, the line matches no break any more: delete it then.
+#
+# Example:
+#   # reason: the old name said "path" for what is a URL; renamed before any outside plugin exists
+#   AFMKernel: Func FileSystemProvider.list(path:) has been renamed to Func list(at:)
