@@ -4,6 +4,7 @@
 # repro/MANIFEST.tsv and every file under repro/new/ (named <group>-<target>-<anything>).
 # Prints one line per reproducer: PASS (the input no longer fails) or FAIL with the signature.
 # Exit status 0 when nothing fails. Output: out/replay-<kind>/ (one log per input).
+# FZ_REPLAY_SKIP_NEW=1 leaves out repro/new/ (open defects, expected to fail until fixed).
 HERE=$(cd "$(dirname "$0")" && pwd)
 kind=${1:-rel}; filter=${2:-}
 "$HERE/build.sh" "$kind" || exit 2
@@ -35,7 +36,7 @@ while IFS=$'\t' read -r file group target env args note; do
   case $file in ''|\#*) continue ;; esac
   one "$file" "$group" "$target" "$env" "$args" "$note"
 done < "$HERE/repro/MANIFEST.tsv"
-if [ -d "$HERE/repro/new" ]; then
+if [ -d "$HERE/repro/new" ] && [ -z "${FZ_REPLAY_SKIP_NEW:-}" ]; then
   for path in "$HERE"/repro/new/*.bin; do
     [ -e "$path" ] || continue
     name=$(basename "$path"); group=${name%%-*}; rest=${name#*-}; target=${rest%%--*}
