@@ -37,7 +37,7 @@ public final class NavigationPlugin: Plugin {
     /// The place a directory belongs to, and the one `delta` steps further in the volume list
     /// (wrapping around): the disks when there are several, otherwise every place. Nil when
     /// there is nowhere else to go. Works on the locations alone.
-    static func neighbourPlace(of directory: URL, in places: [Place], delta: Int) -> Place? {
+    nonisolated static func neighbourPlace(of directory: URL, in places: [Place], delta: Int) -> Place? {
         let disks = places.filter { $0.kind == .internalDisk || $0.kind == .externalDisk }
         let candidates = disks.count > 1 ? disks : places
         guard candidates.count > 1 else { return candidates.first { !$0.url.isSameLocation(as: directory) } }
@@ -53,7 +53,7 @@ public final class NavigationPlugin: Plugin {
 
     /// The first line of a text from the clipboard as a path: without the quotes and spaces a
     /// path copied from a terminal or a document tends to come with. Nil when nothing is left.
-    static func path(fromClipboard text: String) -> String? {
+    nonisolated static func path(fromClipboard text: String) -> String? {
         // Only the first line that has anything on it is looked at, however long the text is: the
         // first 8 KB of it (a path is not longer), cut at a byte, which only touches the last character.
         let head = text.utf8.count > 8_192 ? String(decoding: text.utf8.prefix(8_192), as: UTF8.self) : text
@@ -70,7 +70,7 @@ public final class NavigationPlugin: Plugin {
     /// change count stays, a no is asked again each time, since a program that fills the
     /// clipboard may add the text after the count was changed. Main thread only (`NSPasteboard`
     /// is not safe to use from two threads at once).
-    private final class ClipboardText {
+    @MainActor private final class ClipboardText {
         private let pasteboard: NSPasteboard
         private var textCount: Int?
         private var pathRead: (count: Int, path: String?)?
