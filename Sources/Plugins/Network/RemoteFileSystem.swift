@@ -10,8 +10,8 @@ public import Foundation
 /// **Threading.** Safe from any thread; the state is guarded by a lock. `onChange` is called on
 /// the thread that connected or disconnected.
 ///
-/// `makeSession`, `storedPassword` and `agentName` are set while the plugin starts and only read
-/// afterwards; everything else is guarded by `lock`.
+/// All mutable state is guarded by `lock`, `makeSession`, `storedPassword` and `agentName` too
+/// (they are set while the plugin starts, and by tests).
 public final class ConnectionCenter: @unchecked Sendable {
     public let environment: SessionEnvironment
     private let lock = NSLock()
@@ -20,16 +20,30 @@ public final class ConnectionCenter: @unchecked Sendable {
     private var saved: [ConnectionProfile] = []
     private var lastPaths: [ServerKey: String] = [:]
     /// Builds the session for a profile; the plugin sets it for the protocols it speaks.
-    var makeSession: @Sendable (ConnectionProfile, SessionEnvironment) -> (any RemoteSession)? = { _, _ in nil }
+    var makeSession: @Sendable (ConnectionProfile, SessionEnvironment) -> (any RemoteSession)? {
+        get { lock.withLock { sessionMaker } }
+        set { lock.withLock { sessionMaker = newValue } }
+    }
+    private var sessionMaker: @Sendable (ConnectionProfile, SessionEnvironment) -> (any RemoteSession)? = { _, _ in
+        nil
+    }
     /// The stored password of a saved connection: of this very server and login, not of
     /// whatever connection carries the same identifier. Called on the thread that connects.
-    public var storedPassword: @Sendable (ConnectionProfile) -> String? = { _ in nil }
+    public var storedPassword: @Sendable (ConnectionProfile) -> String? {
+        get { lock.withLock { passwordSource } }
+        set { lock.withLock { passwordSource = newValue } }
+    }
+    private var passwordSource: @Sendable (ConnectionProfile) -> String? = { _ in nil }
     /// The servers the user chose to connect to (a saved connection, the connection dialogs, an
     /// earlier yes). A server that is none of these is asked about before the first login.
     private var chosen: Set<ServerKey> = []
 
     /// The name of this program, for the mark on what it downloads (`RemoteFileSystem.quarantine`).
-    public var agentName = "A File Manager"
+    public var agentName: String {
+        get { lock.withLock { programName } }
+        set { lock.withLock { programName = newValue } }
+    }
+    private var programName = "A File Manager"
 
     public init(environment: SessionEnvironment = SessionEnvironment()) {
         self.environment = environment

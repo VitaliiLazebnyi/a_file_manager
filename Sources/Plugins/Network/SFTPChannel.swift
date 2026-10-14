@@ -357,9 +357,8 @@ final class AskpassHelper {
 /// may have requests under way at once: each sends under `writeLock` and waits for its own
 /// answer, which the reading thread hands over. No pool of connections is needed.
 ///
-/// The state is guarded by `lock` (the error text also by `errorReading`); `writeTimeout` and
-/// `names` are set before the channel starts, and `extensions` is written by `start` before
-/// anyone else uses the channel.
+/// The state, `extensions` included, is guarded by `lock` (the error text also by `errorReading`);
+/// `writeTimeout` and `names` do not change after `init`.
 final class SFTPChannel: @unchecked Sendable {
     private let process = Process()
     private let toServer = Pipe()
@@ -370,7 +369,7 @@ final class SFTPChannel: @unchecked Sendable {
     private let writeLock = NSLock()
     /// How long writing a packet may make no progress before the channel is given up: ssh
     /// that does not read its input is stuck, and everything waiting behind it with it.
-    var writeTimeout: TimeInterval = 60
+    let writeTimeout: TimeInterval
     private var waiting: [UInt32: Pending<SFTPPacket>] = [:]
     private var nextID: UInt32 = 1
     private var closed = false
@@ -380,17 +379,22 @@ final class SFTPChannel: @unchecked Sendable {
     private var deferred: [Data] = []
     /// When the server was last heard from.
     private var lastReceived = Date()
-    /// The names of the server that are written back as they came. Set before the channel is used.
-    var names: NameMemory?
+    /// The names of the server that are written back as they came.
+    let names: NameMemory?
     private var errorText = Data()
     /// Held while a piece of the error output is read and kept (see `start`).
     private let errorReading = NSLock()
     /// Signalled by the reading thread when the stream has ended and the last words are read.
     private let lastWords = DispatchSemaphore(value: 0)
     private let version = Pending<SFTPPacket>()
-    private(set) var extensions: [String: String] = [:]
+    private var serverExtensions: [String: String] = [:]
 
-    init(executable: String, arguments: [String], environment: [String: String]) {
+    init(
+        executable: String, arguments: [String], environment: [String: String], writeTimeout: TimeInterval = 60,
+        names: NameMemory? = nil
+    ) {
+        self.writeTimeout = writeTimeout
+        self.names = names
         process.executableURL = URL(fileURLWithPath: executable)
         process.arguments = arguments
         process.environment = ProcessInfo.processInfo.environment.merging(environment) { _, new in new }
@@ -400,6 +404,9 @@ final class SFTPChannel: @unchecked Sendable {
     }
 
     deinit { close() }
+
+    /// The extensions the server named in its first answer; known once `start` has returned.
+    var extensions: [String: String] { lock.withLock { serverExtensions } }
 
     var isClosed: Bool {
         lock.lock()
@@ -483,9 +490,11 @@ final class SFTPChannel: @unchecked Sendable {
             if let packet = try version.wait(timeout: 0.1, cancellation: cancellation) {
                 var decoder = try packet.expect(.version)
                 _ = try decoder.u32()
+                var named: [String: String] = [:]
                 while !decoder.isAtEnd, let name = try? decoder.string(), let value = try? decoder.string() {
-                    extensions[name] = value
+                    named[name] = value
                 }
+                lock.withLock { serverExtensions = named }
                 return
             }
             let asked = Date()

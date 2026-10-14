@@ -540,8 +540,7 @@ private final class Record<Value>: @unchecked Sendable {
 
         // The first connection's certificate check is held until the test lets go.
         let (entered, release) = (DispatchSemaphore(value: 0), DispatchSemaphore(value: 0))
-        let slow = TLSSettings(host: "127.0.0.1", trust: CertificateTrust())
-        slow.beforeEvaluating = {
+        let slow = TLSSettings(host: "127.0.0.1", trust: CertificateTrust()) {
             entered.signal()
             release.wait()
         }

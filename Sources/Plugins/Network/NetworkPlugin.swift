@@ -121,8 +121,7 @@ public final class NetworkPlugin: Plugin {
         // thread; the ones an earlier version kept in the settings are not believed (see
         // `ConnectionStore.trustedCertificates`).
         let vault = store.vault
-        let trust = CertificateTrust()
-        trust.load = { vault.trustedCertificates() }
+        let trust = CertificateTrust(load: { vault.trustedCertificates() })
         store.forgetTrustedCertificatesInSettings()
         let environment = SessionEnvironment(options: options, trust: trust)
         let center = ConnectionCenter(environment: environment)

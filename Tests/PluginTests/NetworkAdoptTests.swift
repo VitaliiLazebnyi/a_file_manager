@@ -424,8 +424,8 @@ func adoptCancel(_ flag: CancellationFlag, after delay: TimeInterval = 0.3) {
         let box = try Sandbox()
         let server = try FakeSFTPServer(root: box.url("."), box: box, mode: .stalled)
         let channel = SFTPChannel(
-            executable: server.transport.executable, arguments: server.transport.arguments, environment: [:])
-        channel.writeTimeout = 600
+            executable: server.transport.executable, arguments: server.transport.arguments, environment: [:],
+            writeTimeout: 600)
         try channel.start(timeout: 10, cancellation: nil) { true }
         defer { channel.close() }
         let flag = CancellationFlag()

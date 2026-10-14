@@ -111,17 +111,17 @@ public struct CertificateInfo: Equatable, Sendable {
 /// somebody else can replace: `load` fetches them, on first use, from where only the user's
 /// own answers are kept (the Keychain).
 ///
-/// `load` is set while the plugin starts and only read afterwards; everything else is guarded by
-/// `lock`.
+/// `load` does not change after `init`; everything else is guarded by `lock`.
 public final class CertificateTrust: @unchecked Sendable {
     private let lock = NSLock()
     private var accepted: [String: Set<String>]
     private var isLoaded = false
     /// Reads the certificates that were accepted for good. Called once, on the thread that
     /// first connects with TLS, never on the main thread by this module.
-    public var load: (@Sendable () -> [String: [String]])?
+    public let load: (@Sendable () -> [String: [String]])?
 
-    public init(accepted: [String: [String]] = [:]) {
+    public init(accepted: [String: [String]] = [:], load: (@Sendable () -> [String: [String]])? = nil) {
+        self.load = load
         self.accepted = [:]
         for (host, fingerprints) in accepted { self.accepted[host.lowercased(), default: []].formUnion(fingerprints) }
     }
@@ -170,19 +170,19 @@ public final class CertificateTrust: @unchecked Sendable {
 /// user made. `rejected` receives the certificate when the handshake fails because of it, so
 /// the thread that connects can ask the user and try again.
 ///
-/// `beforeEvaluating` is set before the connection starts and only read afterwards; the rest is
-/// guarded by `lock` or does not change.
+/// `rejected` is guarded by `lock`; nothing else changes after `init`.
 final class TLSSettings: @unchecked Sendable {
     let host: String
     let trust: CertificateTrust
     private let lock = NSLock()
     private var rejectedCertificate: CertificateInfo?
     /// Called where a certificate is checked, before the check; tests make a check slow with it.
-    var beforeEvaluating: @Sendable () -> Void = {}
+    let beforeEvaluating: @Sendable () -> Void
 
-    init(host: String, trust: CertificateTrust) {
+    init(host: String, trust: CertificateTrust, beforeEvaluating: @escaping @Sendable () -> Void = {}) {
         self.host = host
         self.trust = trust
+        self.beforeEvaluating = beforeEvaluating
     }
 
     var rejected: CertificateInfo? {
