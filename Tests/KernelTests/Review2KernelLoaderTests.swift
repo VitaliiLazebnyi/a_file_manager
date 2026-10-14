@@ -29,6 +29,9 @@ private final class StalledFileSystem: FileSystemProvider, @unchecked Sendable {
     /// What blocks at the dead folder.
     var stallsVolume = true, stallsListing = false
 
+    /// Questions that are waiting at the dead folder right now.
+    var stuck: Int { count("stuck") }
+
     func count(_ what: String) -> Int {
         lock.lock()
         defer { lock.unlock() }
@@ -42,7 +45,13 @@ private final class StalledFileSystem: FileSystemProvider, @unchecked Sendable {
     private func note(_ what: String, _ flag: CancellationFlag? = nil) {
         lock.lock()
         counts[what, default: 0] += 1
+        counts["stuck", default: 0] += 1
         if let flag { flags.append(flag) }
+        lock.unlock()
+    }
+    private func back() {
+        lock.lock()
+        counts["stuck", default: 0] -= 1
         lock.unlock()
     }
 
@@ -53,6 +62,7 @@ private final class StalledFileSystem: FileSystemProvider, @unchecked Sendable {
         guard isDead(url), stallsVolume else { return VolumeInfo(name: "alive") }
         note("volume", cancellation)
         release.wait()
+        back()
         return VolumeInfo(name: "back")
     }
 
@@ -64,6 +74,7 @@ private final class StalledFileSystem: FileSystemProvider, @unchecked Sendable {
         if isDead(directory), stallsListing {
             note("list", cancellation)
             release.wait()
+            back()
         }
         _ = receive(try inner.list(directory, showHidden: showHidden))
     }
@@ -95,13 +106,20 @@ private final class StalledFileSystem: FileSystemProvider, @unchecked Sendable {
 
     /// One try at reading a location, on a thread of its own; `ended` is signalled when it returns.
     private func load(
-        _ path: String, _ stalled: StalledFileSystem, _ registry: FileSystemRegistry, cancellation: CancellationFlag,
-        ended: DispatchSemaphore, names: @escaping @Sendable ([String]) -> Void = { _ in }
+        _ path: String,
+        _ stalled: StalledFileSystem,
+        _ registry: FileSystemRegistry,
+        cancellation: CancellationFlag,
+        ended: DispatchSemaphore,
+        names: @escaping @Sendable ([String]) -> Void = { _ in }
     ) {
         Thread.detachNewThread {
             var seen: [String] = []
             try? PanelLoader.stream(
-                stalled.inner.url(path), showHidden: true, fileSystems: registry, cancellation: cancellation
+                stalled.inner.url(path),
+                showHidden: true,
+                fileSystems: registry,
+                cancellation: cancellation
             ) { batch in
                 seen += batch.listing.items.map(\.name)
                 return true
@@ -123,7 +141,7 @@ private final class StalledFileSystem: FileSystemProvider, @unchecked Sendable {
             #expect(ended.wait(timeout: .now() + 60) == .success)
         }
         #expect(stalled.count("volume") == 1)
-        #expect(BlockingCalls.unanswered(for: stalled) == 1)
+        #expect(stalled.stuck == 1)
         // The question was told that nobody waits for it.
         #expect(stalled.handedFlags.first?.isCancelled == true)
         // A healthy folder of the same file system still loads.
@@ -138,7 +156,7 @@ private final class StalledFileSystem: FileSystemProvider, @unchecked Sendable {
         #expect(names.sorted() == ["b.txt", "c.txt"])
         // The share comes back: the stuck question ends, and the folder can be read.
         for _ in 0..<4 { stalled.release.signal() }
-        #expect(waitUntil { BlockingCalls.unanswered(for: stalled) == 0 })
+        #expect(waitUntil { stalled.stuck == 0 })
         stalled.stallsVolume = false
         let result = try? PanelLoader.load(stalled.inner.url("/dead"), showHidden: true, fileSystems: registry)
         #expect(result?.listing.items.map(\.name) == ["a.txt"] && result?.listing.volume?.name == "alive")
@@ -154,7 +172,7 @@ private final class StalledFileSystem: FileSystemProvider, @unchecked Sendable {
             cancellation.cancel()
             #expect(ended.wait(timeout: .now() + 60) == .success)
         }
-        #expect(stalled.count("list") == 1 && BlockingCalls.unanswered(for: stalled) == 1)
+        #expect(stalled.count("list") == 1 && stalled.stuck == 1)
         // Whoever still wants the folder waits, without a thread of the kernel's, until the
         // old listing has come back, and then reads it afresh.
         let (ended, got) = (DispatchSemaphore(value: 0), DispatchSemaphore(value: 0))
@@ -170,7 +188,7 @@ private final class StalledFileSystem: FileSystemProvider, @unchecked Sendable {
         stalled.release.signal()
         #expect(got.wait(timeout: .now() + 60) == .success)
         #expect(names == ["a.txt"])
-        #expect(waitUntil { BlockingCalls.unanswered(for: stalled) == 0 })
+        #expect(waitUntil { stalled.stuck == 0 })
     }
 
     @Test func batchesArriveOnTheThreadThatAskedAndErrorsAreThrownThere() throws {
@@ -205,11 +223,11 @@ private final class StalledFileSystem: FileSystemProvider, @unchecked Sendable {
         }
         #expect(
             try PanelLoader.load(memory.url("/big/none"), showHidden: true, fileSystems: registry, climbing: true)
-                .listing.items.count == 50)
+                .listing.items.count == 50
+        )
         // The location of a file leads to its folder.
         let atFile = try PanelLoader.load(memory.url("/big/file3.txt"), showHidden: true, fileSystems: registry)
         #expect(atFile.focus == "file3.txt" && atFile.listing.items.count == 50)
-        #expect(BlockingCalls.unanswered(for: memory) == 0)
     }
 }
 
@@ -277,20 +295,21 @@ private final class DeepFileSystem: FileSystemProvider, @unchecked Sendable {
         let top = URL(string: "deep:///")!
         // Shallow: every level counted, by calls that nest.
         let shallow = DeepFileSystem(depth: 20)
-        #expect(onSmallStack { shallow.totalSize(of: top) } == Int64(3 * 21))
+        #expect(onSmallStack { shallow.totalSize(of: top, cancellation: CancellationFlag()) } == Int64(3 * 21))
         // Deeper than the nesting allows, and still a real tree: every level counted.
         let deeper = DeepFileSystem(depth: 600)
-        #expect(onSmallStack { deeper.totalSize(of: top) } == Int64(3 * 601))
+        #expect(onSmallStack { deeper.totalSize(of: top, cancellation: CancellationFlag()) } == Int64(3 * 601))
         // Twenty thousand levels crashed the program; now the walk ends at its limit.
         let hostile = DeepFileSystem(depth: 20_000)
-        let size = onSmallStack { hostile.totalSize(of: top) }
+        let size = onSmallStack { hostile.totalSize(of: top, cancellation: CancellationFlag()) }
         #expect(
             size != nil && size! >= 3 * Int64(TreeWalk.deepestTree)
-                && size! <= 3 * Int64(TreeWalk.deepestTree + TreeWalk.deepestNesting * 80))
+                && size! <= 3 * Int64(TreeWalk.deepestTree + TreeWalk.deepestNesting * 80)
+        )
         // A folder inside itself is listed once.
         let endless = DeepFileSystem(depth: 0)
         endless.isEndless = true
-        #expect(onSmallStack { endless.totalSize(of: top) } != nil)
+        #expect(onSmallStack { endless.totalSize(of: top, cancellation: CancellationFlag()) } != nil)
         #expect(endless.listings < 200)
     }
 
@@ -321,7 +340,8 @@ private final class DeepFileSystem: FileSystemProvider, @unchecked Sendable {
         #expect(root.appending(safeName: "x.txt")?.path == "/tmp/review2-root/x.txt")
         #expect(
             root.appending(safeName: "../x") == nil && root.appending(safeName: "a/b") == nil
-                && root.appending(safeName: "..") == nil)
+                && root.appending(safeName: "..") == nil
+        )
     }
 
     @Test func aPathIsCutAtTheByteAndEveryPartChecked() {
@@ -337,10 +357,6 @@ private final class DeepFileSystem: FileSystemProvider, @unchecked Sendable {
             #expect(PathSafety.components(ofRelativePath: path) == nil, "\(path.debugDescription)")
         }
         #expect(PathSafety.components(ofRelativePath: "a/b//", allowingTrailingSeparator: true) == nil)
-        let root = URL(fileURLWithPath: "/tmp/review2-root")
-        #expect(PathSafety.location(ofRelativePath: "a/b.txt", below: root)?.path == "/tmp/review2-root/a/b.txt")
-        #expect(PathSafety.location(ofRelativePath: "..\u{2F}\u{301}x", below: root) == nil)
-        #expect(PathSafety.location(ofRelativePath: "../review2-root-other/x", below: root) == nil)
     }
 
     @Test func aLocationIsBelowItsRootByBytesNotByLooks() throws {
@@ -362,7 +378,8 @@ private final class DeepFileSystem: FileSystemProvider, @unchecked Sendable {
         #expect(!PathSafety.isContained(decomposed, in: composed) && !decomposed.isInside(composed))
         #expect(
             URL(string: "ftp://host/caf%C3%A9/x")!.isInside(composed)
-                && PathSafety.isContained(URL(string: "ftp://host/caf%C3%A9/x")!, in: composed))
+                && PathSafety.isContained(URL(string: "ftp://host/caf%C3%A9/x")!, in: composed)
+        )
         #expect(!URL(fileURLWithPath: "/tmp/review2-root\u{301}/a").isInside(root))
         // A link inside the folder that points out of it.
         let sandbox = try Sandbox()
@@ -371,7 +388,9 @@ private final class DeepFileSystem: FileSystemProvider, @unchecked Sendable {
         try FileManager.default.createDirectory(at: inside, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
         try FileManager.default.createSymbolicLink(
-            at: inside.appendingPathComponent("link"), withDestinationURL: outside)
+            at: inside.appendingPathComponent("link"),
+            withDestinationURL: outside
+        )
         let through = inside.appendingPathComponent("link/file.txt")
         #expect(PathSafety.isContained(through, in: inside))
         #expect(!PathSafety.isContained(through, in: inside, resolvingLinks: true))
@@ -392,7 +411,8 @@ private final class DeepFileSystem: FileSystemProvider, @unchecked Sendable {
     @Test func aQuestionMarkIsOneCharacterOfAnySize() {
         #expect(
             FileMask("?.txt").matches("😀.txt") && FileMask("?.txt").matches("写.txt")
-                && FileMask("?.txt").matches("a.txt"))
+                && FileMask("?.txt").matches("a.txt")
+        )
         #expect(!FileMask("?.txt").matches("ab.txt") && !FileMask("??.txt").matches("😀.txt"))
         #expect(FileMask("写?.jpg").matches("写真.jpg") && FileMask("*?真.JPG").matches("写真.jpg"))
     }
@@ -402,16 +422,19 @@ private final class DeepFileSystem: FileSystemProvider, @unchecked Sendable {
         #expect(FileMask("[a-c]*").matches("[a-c] notes.md") && !FileMask("[a-c]*").matches("b.md"))
         #expect(
             FileMask("a\\b*").matches("a\\b.txt") && FileMask("*[*").matches("x[y")
-                && FileMask("\\*").matches("\\anything"))
+                && FileMask("\\*").matches("\\anything")
+        )
     }
 
     @Test func caseDoesNotCountInAnyScript() {
         #expect(FileMask("STRASSE*").matches("straße.txt") && FileMask("straße*").matches("STRASSE.TXT"))
         #expect(
             FileMask("*ФАЙЛ*").matches("мой файл.txt") && FileMask("*.TXT").matches("отчёт.txt")
-                && FileMask("É*").matches("été"))
+                && FileMask("É*").matches("été")
+        )
         #expect(
-            FileMask("*.").matches("noext") && !FileMask("*.").matches("has.ext") && FileMask("name.").matches("NAME"))
+            FileMask("*.").matches("noext") && !FileMask("*.").matches("has.ext") && FileMask("name.").matches("NAME")
+        )
     }
 
     @Test func noMaskTakesLongOnAnyName() {

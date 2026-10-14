@@ -59,7 +59,8 @@ private final class ConsentPlugin: Plugin, ServerConsentService {
     func start(in kernel: Kernel) {
         kernel.services.register((any ServerConsentService).self, self)
         kernel.commands.register(
-            Command(.runCommandLine, "Run Command Line"), parameterized: { [self] in ranLines.append($0.text ?? "?") }
+            Command(.runCommandLine, "Run Command Line"),
+            parameterized: { [self] in ranLines.append($0.text ?? "?") }
         )
     }
 
@@ -140,9 +141,10 @@ extension Application {
     private func startInALongFolder(_ script: ScriptedFileSystem, count: Int) async -> Running {
         script.inner.addDirectory("/long")
         script.batches = [
-            (0..<count).map {
-                script.item(named: String(format: "f%06d.%@", $0, $0 % 2 == 0 ? "txt" : "dat"), in: "/long")
-            }
+            (0..<count)
+                .map {
+                    script.item(named: String(format: "f%06d.%@", $0, $0 % 2 == 0 ? "txt" : "dat"), in: "/long")
+                }
         ]
         let app = await start(with: script)
         app.left.show(script.url("/long"))
@@ -166,7 +168,8 @@ extension Application {
         // The list is in order, as the reader sorted it.
         #expect(
             model.items.first?.name == "f000000.txt"
-                && model.items.last?.name == String(format: "f%06d.dat", count - 1))
+                && model.items.last?.name == String(format: "f%06d.dat", count - 1)
+        )
     }
 
     @Test func filteringAndReadingALongListAgainNeverAsksTheFilterOnTheMainThread() async {
@@ -223,9 +226,10 @@ extension Application {
         script.inner.addDirectory("/long")
         script.inner.addDirectory("/small")
         let count = PanelViewController.backgroundSortThreshold + 4_000
-        let all = (0..<count).map {
-            script.item(named: String(format: "f%06d.%@", $0, $0 % 2 == 0 ? "txt" : "dat"), in: "/long")
-        }
+        let all = (0..<count)
+            .map {
+                script.item(named: String(format: "f%06d.%@", $0, $0 % 2 == 0 ? "txt" : "dat"), in: "/long")
+            }
         // A first piece of two batches, then the rest only when the test lets it come.
         script.batches = [Array(all[..<600]), Array(all[600..<1_000]), Array(all[1_000...])]
         script.batchesAt = ["/small": [[script.item(named: "s.txt", in: "/small")]]]
@@ -241,7 +245,8 @@ extension Application {
             PanelFilter(title: "*.txt") { item in
                 probe.note()
                 return item.name.hasSuffix(".txt")
-            })
+            }
+        )
         probe.reset()
         app.left.show(script.url("/long"))
         let first = await wait(upTo: 60) { model.directory.path == "/long" && model.items.count == 500 }
@@ -331,10 +336,12 @@ extension Application {
         #expect(ready && session.sources.count == count - 1)
         #expect(
             session.sources.first?.lastPathComponent == "f000000.txt"
-                && !session.sources.contains { $0.lastPathComponent == "f000001.dat" })
+                && !session.sources.contains { $0.lastPathComponent == "f000001.dat" }
+        )
         #expect(
             session.isPointless(.move, into: script.url("/long"))
-                && !session.isPointless(.copy, into: script.url("/elsewhere")))
+                && !session.isPointless(.copy, into: script.url("/elsewhere"))
+        )
 
         // A drop that comes before the background has got there is not turned away.
         PanelDrop.endDrag()
@@ -348,7 +355,8 @@ extension Application {
         let few = app.left.dragPayload(fromRow: 2)
         #expect(
             few?.isReady == true && few?.isWrittenLazily == false
-                && few?.items.map(\.name) == ["f000000.txt", "f000001.dat", "f000002.txt"])
+                && few?.items.map(\.name) == ["f000000.txt", "f000001.dat", "f000002.txt"]
+        )
     }
 
     // MARK: Quitting (tools 1, archives 1, fileops 6, shell 6)
@@ -455,7 +463,9 @@ extension Application {
             work: { monitor in
                 while !monitor.cancellation.isCancelled { Thread.sleep(forTimeInterval: 0.005) }
                 stopped.value = true
-            }, completion: { _ in })
+            },
+            completion: { _ in }
+        )
         var order: [String] = []
         app.shell.finishToQuit(patience: 30, progressDelay: 5) { order.append("reply \($0)") }
         let prepared = await wait { plugin.pending != nil }
@@ -480,10 +490,12 @@ extension Application {
         defer { app.stop() }
         #expect(
             app.left.tabs.count == 2 && app.left.tabs.activeIndex == 1
-                && app.left.model.directory.lastPathComponent == "A")
+                && app.left.model.directory.lastPathComponent == "A"
+        )
         #expect(
             app.right.tabs.count == 2 && app.right.tabs.activeIndex == 0
-                && app.right.model.directory.lastPathComponent == "home")
+                && app.right.model.directory.lastPathComponent == "home"
+        )
         #expect(app.names(app.right) == ["welcome.txt"])
         // Nobody asked the server anything, and the tabs kept their places.
         #expect(server.listings.isEmpty && app.right.tabs.tabs[1].directory.path == "/pub")
@@ -494,7 +506,8 @@ extension Application {
         // (Once at least: a folder whose watch took long to set up is read once more.)
         #expect(
             read && app.names(app.right) == ["a.txt"] && !server.listings.isEmpty
-                && server.listings.allSatisfy { $0 == "/pub" })
+                && server.listings.allSatisfy { $0 == "/pub" }
+        )
     }
 
     @Test func aLongListTakesCalculatedSizesFromTheBackground() async {
@@ -587,45 +600,73 @@ extension Application {
         // An ordinary question: Return is the first button, Esc the last.
         #expect(AlertInteraction.defaultButton(for: .warning, of: ["Replace", "Skip", "Cancel"]) == 0)
         let ordinary = ui.makeQuestion(
-            "Replace?", detail: "", buttons: ["Replace", "Skip", "Cancel"], style: .warning,
-            defaultButton: AlertInteraction.defaultButton(for: .warning, of: ["Replace", "Skip", "Cancel"]))
+            "Replace?",
+            detail: "",
+            buttons: ["Replace", "Skip", "Cancel"],
+            style: .warning,
+            defaultButton: AlertInteraction.defaultButton(for: .warning, of: ["Replace", "Skip", "Cancel"])
+        )
         #expect(keys(ordinary) == ["\r", "", "\u{1b}"])
         // A critical one: Return is the last button, the one that changes nothing.
         #expect(AlertInteraction.defaultButton(for: .critical, of: ["Yes", "No"]) == 1)
         let critical = ui.makeQuestion(
-            "Permanently delete?", detail: "", buttons: ["Yes", "No"], style: .critical,
-            defaultButton: AlertInteraction.defaultButton(for: .critical, of: ["Yes", "No"]))
+            "Permanently delete?",
+            detail: "",
+            buttons: ["Yes", "No"],
+            style: .critical,
+            defaultButton: AlertInteraction.defaultButton(for: .critical, of: ["Yes", "No"])
+        )
         #expect(keys(critical) == ["", "\r"] && critical.alertStyle == .critical)
         // A critical message with one button is still answered with Return.
         #expect(
             AlertInteraction.defaultButton(for: .critical, of: ["OK"]) == 0
-                && AlertInteraction.defaultButton(for: .critical, of: []) == nil)
+                && AlertInteraction.defaultButton(for: .critical, of: []) == nil
+        )
     }
 
     @Test func theCallerSaysWhichButtonReturnPressesOrThatNoneDoes() {
         let ui = AlertInteraction()
         let middle = ui.makeQuestion(
-            "Overwrite?", detail: "", buttons: ["Overwrite", "Skip", "Cancel"], style: .warning, defaultButton: 1)
+            "Overwrite?",
+            detail: "",
+            buttons: ["Overwrite", "Skip", "Cancel"],
+            style: .warning,
+            defaultButton: 1
+        )
         #expect(keys(middle) == ["", "\r", "\u{1b}"])
         // No default at all: Return presses nothing, Esc still the last, and the keyboard
         // starts on the button that changes nothing.
         let none = ui.makeQuestion(
-            "Trust the new certificate?", detail: "", buttons: ["Trust", "Cancel"], style: .critical,
-            defaultButton: nil)
+            "Trust the new certificate?",
+            detail: "",
+            buttons: ["Trust", "Cancel"],
+            style: .critical,
+            defaultButton: nil
+        )
         #expect(keys(none) == ["", "\u{1b}"] && none.window.initialFirstResponder === none.buttons.last)
         // A button titled like one the system gives a key of its own gets none here.
         let titled = ui.makeQuestion(
-            "Close?", detail: "", buttons: ["Cancel", "Don't Save", "Save"], style: .warning, defaultButton: 2)
+            "Close?",
+            detail: "",
+            buttons: ["Cancel", "Don't Save", "Save"],
+            style: .warning,
+            defaultButton: 2
+        )
         #expect(keys(titled) == ["", "", "\r"] && titled.buttons.allSatisfy { $0.keyEquivalentModifierMask.isEmpty })
         // An index that is no button is no default.
         #expect(
             keys(ui.makeQuestion("?", detail: "", buttons: ["A", "B"], style: .information, defaultButton: 7)) == [
                 "", "\u{1b}"
-            ])
+            ]
+        )
         // Names in a question cannot write lines of their own, in the buttons either.
         let named = ui.makeQuestion(
-            "Delete a\u{202E}txt.exe?", detail: "", buttons: ["Delete\u{0007}", "Keep"], style: .warning,
-            defaultButton: 1)
+            "Delete a\u{202E}txt.exe?",
+            detail: "",
+            buttons: ["Delete\u{0007}", "Keep"],
+            style: .warning,
+            defaultButton: 1
+        )
         #expect(named.messageText == "Delete a\u{FFFD}txt.exe?" && named.buttons[0].title == "Delete\u{2407}")
     }
 
@@ -658,9 +699,10 @@ extension Application {
         // Another store (the next start) finds it; small values are where they were.
         let next = UserDefaultsSettings(defaults: defaults, largeFolder: folder)
         #expect(next.largeData(forKey: "multiRename.undo") == big && next.data(forKey: "multiRename.undo") == nil)
-        store.set(Data("small".utf8), forKey: "plain")
+        store.set(Data("small".utf8) as Data?, forKey: "plain")
         #expect(
-            store.data(forKey: "plain") == Data("small".utf8) && store.largeData(forKey: "plain") == Data("small".utf8))
+            store.data(forKey: "plain") == Data("small".utf8) && store.largeData(forKey: "plain") == Data("small".utf8)
+        )
         // Set many times in a row, the last value is the one in the file.
         for index in 0..<50 { store.setLarge(Data("v\(index)".utf8), forKey: "multiRename.undo") }
         #expect(store.waitForWrites(atMost: 60) && (try? Data(contentsOf: file)) == Data("v49".utf8))
@@ -682,7 +724,8 @@ extension Application {
         #expect(store.waitForWrites(atMost: 60) && defaults.object(forKey: "history") == nil)
         #expect(
             UserDefaultsSettings(defaults: defaults, largeFolder: folder).largeData(forKey: "history")
-                == Data("new".utf8))
+                == Data("new".utf8)
+        )
     }
 
     @Test func noKeyNamesAFileOutsideTheFolder() throws {
@@ -718,7 +761,8 @@ extension Application {
         history.add("\tmysql -psecret")
         history.add("ls -l  ")
         #expect(
-            history.entries == ["ls -l"] && CommandLineHistory.isPrivate(" x") && !CommandLineHistory.isPrivate("x "))
+            history.entries == ["ls -l"] && CommandLineHistory.isPrivate(" x") && !CommandLineHistory.isPrivate("x ")
+        )
         #expect(history.isRecording)
         settings.set(false, forKey: CommandLineHistory.recordKey)
         history.add("pwd")
@@ -727,7 +771,8 @@ extension Application {
         settings.set(["old line"], forKey: CommandLineHistory.settingsKey)
         #expect(
             CommandLineHistory(settings: settings).entries.isEmpty
-                && settings.data(forKey: CommandLineHistory.settingsKey) == nil)
+                && settings.data(forKey: CommandLineHistory.settingsKey) == nil
+        )
     }
 
     // MARK: Threads (kernel request 1)
@@ -755,12 +800,14 @@ extension Application {
         let flags = Shared<[CancellationFlag]>([])
         let gate = DispatchSemaphore(value: 0)
         let column = ContentColumn(
-            id: "slow", title: "Slow",
+            id: "slow",
+            title: "Slow",
             cancellableValue: { item, flag in
                 flags.change { $0.append(flag) }
                 gate.wait()
                 return item.name
-            })
+            }
+        )
         let store = ColumnValueStore()
         store.reset(folder: URL(string: "cols://host/a")!)
         _ = store.text(of: column, for: FileItem(url: URL(string: "cols://host/a/x")!, name: "x", isDirectory: false))

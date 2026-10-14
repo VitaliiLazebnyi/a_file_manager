@@ -84,7 +84,8 @@ import Testing
         try FileManager.default.createSymbolicLink(at: box.url("to-file"), withDestinationURL: box.url("plain.txt"))
         try FileManager.default.createSymbolicLink(at: box.url("to-nothing"), withDestinationURL: box.url("missing"))
         let listed = Dictionary(
-            uniqueKeysWithValues: try local.list(box.root, showHidden: true).map { ($0.name, $0) })
+            uniqueKeysWithValues: try local.list(box.root, showHidden: true).map { ($0.name, $0) }
+        )
         #expect(listed.filter(\.value.isSpecial).keys.sorted() == ["pipe", "to-pipe"])
         for name in listed.keys {
             #expect(local.item(at: box.url(name))?.isSpecial == listed[name]?.isSpecial, "\(name)")
@@ -111,7 +112,8 @@ import Testing
             #expect(item == local.item(at: box.root.appending(name: item.name)), "\(item.name)")
             #expect(
                 item.url == box.root.appending(name: item.name)
-                    && item.url.absoluteString == box.root.appending(name: item.name).absoluteString)
+                    && item.url.absoluteString == box.root.appending(name: item.name).absoluteString
+            )
         }
         let packages = Set(items.filter(\.isPackage).map(\.name))
         #expect(packages == ["Some.app", "second.APP", "notes.rtfd"])
@@ -125,19 +127,22 @@ import Testing
         for folder in 0..<12 {
             for file in 0..<20 {
                 try box.file(
-                    "d\(folder)/sub\(file % 3)/f\(file).bin", String(repeating: "x", count: folder * 10 + file))
+                    "d\(folder)/sub\(file % 3)/f\(file).bin",
+                    String(repeating: "x", count: folder * 10 + file)
+                )
             }
         }
         try box.file(".hidden/secret", "12345")
         try FileManager.default.createSymbolicLink(at: box.url("link"), withDestinationURL: box.url("d1"))
         let byListing = local.totalSizeByListing(of: box.root, cancellation: CancellationFlag())
         #expect(byListing == (0..<12).reduce(5) { sum, folder in (0..<20).reduce(sum) { $0 + folder * 10 + $1 } }.int64)
-        #expect(local.totalSize(of: box.root) == byListing)
+        #expect(local.totalSize(of: box.root, cancellation: CancellationFlag()) == byListing)
         let provider: any FileSystemProvider = local
         #expect(
             provider.totalSize(of: box.root, cancellation: CancellationFlag()) == byListing
-                && provider.totalSize(of: box.root) == byListing)
-        #expect(local.totalSize(of: box.url("missing")) == 0)
+                && provider.totalSize(of: box.root, cancellation: CancellationFlag()) == byListing
+        )
+        #expect(local.totalSize(of: box.url("missing"), cancellation: CancellationFlag()) == 0)
         let cancelled = CancellationFlag()
         cancelled.cancel()
         #expect(local.totalSize(of: box.root, cancellation: cancelled) == 0)
@@ -198,7 +203,9 @@ extension Int {
         bench = TestBench(
             plugins: [FolderTabsPlugin(), NavigationPlugin(pasteboard: scratch.pasteboard), ViewOptionsPlugin()],
             fileSystems: [memory],
-            left: memory.url("/A"), right: memory.url("/B"))
+            left: memory.url("/A"),
+            right: memory.url("/B")
+        )
     }
 
     @Test func aTabFileIsReplacedInOneStepAndOnlyIfItIsAFile() {
@@ -213,7 +220,8 @@ extension Int {
         #expect(
             (try? memory.list(memory.url("/A"), showHidden: true).map(\.name).sorted()) == [
                 "docs", "my.tab", "one.txt"
-            ])
+            ]
+        )
         // A folder of that name is not a tab file: it is neither removed nor read.
         memory.addDirectory("/A/folder.tab")
         bench.commands.perform("SAVETABS", .location(memory.url("/A/folder.tab")))
@@ -232,7 +240,9 @@ extension Int {
         #expect(!bench.commands.isEnabled("afm_CdFromClipboard"))
         pasteboard.clearContents()
         pasteboard.setString(
-            "\n\n  mem:/A/docs  \n" + String(repeating: "more lines\n", count: 50_000), forType: .string)
+            "\n\n  mem:/A/docs  \n" + String(repeating: "more lines\n", count: 50_000),
+            forType: .string
+        )
         #expect(bench.commands.isEnabled("afm_CdFromClipboard"))
         bench.commands.perform("afm_CdFromClipboard")
         #expect(bench.left.model.directory.path == "/A/docs")
@@ -244,9 +254,15 @@ extension Int {
         #expect(model.sort == ListOrder(key: .size, descending: true))
 
         let root = URL(fileURLWithPath: "/", isDirectory: true)
-        let long = (0..<(ViewOptionsPlugin.backgroundSortThreshold + 500)).map {
-            FileItem(url: memory.url("/A/f\($0).txt"), name: "f\($0).txt", isDirectory: false, size: Int64($0 % 977))
-        }
+        let long = (0..<(ViewOptionsPlugin.backgroundSortThreshold + 500))
+            .map {
+                FileItem(
+                    url: memory.url("/A/f\($0).txt"),
+                    name: "f\($0).txt",
+                    isDirectory: false,
+                    size: Int64($0 % 977)
+                )
+            }
         model.show(Listing(directory: memory.url("/A"), items: long, parent: root, root: root))
         bench.commands.perform("cm_SrcByName")
         // Two commands in a row: the second starts from the order the first is on its way to.

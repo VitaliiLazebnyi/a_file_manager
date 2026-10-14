@@ -5,35 +5,17 @@ import Foundation
 /// up here, so a key is bound in exactly one place (spec 14 › Redefining hotkeys).
 @MainActor
 public final class KeyBindings {
-    /// Two commands asked for the same key; the first one kept it.
-    public struct Conflict: Equatable, Sendable {
-        public let shortcut: Shortcut
-        public let kept: CommandID
-        public let rejected: CommandID
-
-        public init(shortcut: Shortcut, kept: CommandID, rejected: CommandID) {
-            self.shortcut = shortcut
-            self.kept = kept
-            self.rejected = rejected
-        }
-    }
-
     /// Settings key of the user's bindings: command name → shortcuts in text form.
     public nonisolated static let settingsKey = "keyBindings"
 
     private var commands: [Shortcut: CommandID] = [:]
     private var shortcuts: [CommandID: [Shortcut]] = [:]
-    public private(set) var conflicts: [Conflict] = []
 
     public init() {}
 
-    /// Binds a command's default key. A key that is already taken stays with its command and
-    /// the clash is recorded in `conflicts`.
+    /// Binds a command's default key. A key that is already taken stays with its command.
     public func bindDefault(_ shortcut: Shortcut, to command: CommandID) {
-        if let owner = commands[shortcut] {
-            if owner != command { conflicts.append(Conflict(shortcut: shortcut, kept: owner, rejected: command)) }
-            return
-        }
+        guard commands[shortcut] == nil else { return }
         commands[shortcut] = command
         shortcuts[command, default: []].append(shortcut)
     }

@@ -30,9 +30,12 @@ import Testing
         memory.addFile("/A/folder/inside.txt")
         memory.addFile("/B/folder/inside.txt")
         bench = TestBench(
-            plugins: [plugin], fileSystems: [LocalFileSystem(), memory], left: memory.url("/A"),
+            plugins: [plugin],
+            fileSystems: [LocalFileSystem(), memory],
+            left: memory.url("/A"),
             right: memory.url("/B"),
-            settings: settings)
+            settings: settings
+        )
     }
 
     /// Runs the command and returns the names of the two files it took.
@@ -62,7 +65,7 @@ import Testing
         #expect(!bench.kernel.menus.contextMenu(onItem: false).contains(.compareByContent))
         #expect(bench.kernel.toolbar.defaultLayout.contains { $0?.command == .compareByContent })
         #expect(bench.kernel.preferences.pages.contains { $0.title == "Compare by content" })
-        #expect(bench.kernel.keyBindings.conflicts.isEmpty)
+        #expect(bench.kernel.keyClashes.isEmpty)
     }
 
     // MARK: Which files (spec 09 › Opening and choosing the files)
@@ -135,13 +138,15 @@ import Testing
         #expect((0..<5).map { session.kind(ofRow: $0) } == [.equal, .changed, .equal, .equal, .added])
         #expect(
             session.label(.left, row: 1) == "2" && session.label(.left, row: 4) == ""
-                && session.label(.right, row: 4) == "5")
+                && session.label(.right, row: 4) == "5"
+        )
         #expect(session.highlights(.left, row: 1) == [0..<3] && session.highlights(.right, row: 1) == [0..<1])
         #expect(session.highlights(.left, row: 0).isEmpty && session.highlights(.right, row: 4).isEmpty)
         #expect(session.width == 5 && !session.isBinary)
         #expect(
             session.block(containing: 1) == 1..<2 && session.block(containing: 2) == nil
-                && session.block(containing: 4) == 4..<5)
+                && session.block(containing: 4) == 4..<5
+        )
         #expect(session.status == "2 differences    UTF-8 <-> UTF-8")
 
         // Next and previous difference, and searching in both files.
@@ -151,7 +156,8 @@ import Testing
         #expect(session.find("FIVE", from: 0, forward: true) == 4 && session.find("two", from: 4, forward: true) == 1)
         #expect(
             session.find("three", from: 0, forward: false) == 2
-                && session.find("absent", from: 0, forward: true) == nil)
+                && session.find("absent", from: 0, forward: true) == nil
+        )
     }
 
     @Test func optionsAreAppliedAndRemembered() {
@@ -189,10 +195,12 @@ import Testing
         #expect(session.status == "1 difference, 2 bytes differ    binary")
         #expect(
             session.label(.left, row: 1) == "00000010"
-                && session.text(.left, row: 1) == "51 52 53" + String(repeating: " ", count: 41) + "QRS")
+                && session.text(.left, row: 1) == "51 52 53" + String(repeating: " ", count: 41) + "QRS"
+        )
         #expect(
             session.highlights(.right, row: 1) == [3..<5, 50..<51, 9..<11, 52..<53]
-                && session.highlights(.left, row: 0).isEmpty)
+                && session.highlights(.left, row: 0).isEmpty
+        )
         session.bytesPerLine = 8
         session.optionsChanged()
         #expect(session.rowCount == 3 && session.blocks == [2..<3] && session.label(.right, row: 2) == "00000010")
@@ -224,11 +232,13 @@ import Testing
         session.swap()
         #expect(
             session.leftURL?.path == "/B/r.txt" && rows().contains("right only|left only")
-                || rows().contains("right only|~"))
+                || rows().contains("right only|~")
+        )
         #expect(
             rows().compactMap { $0.split(separator: "|").first }.filter { $0 != "~" } == [
                 "start", "repeat", "right only", "repeat", "end"
-            ])
+            ]
+        )
     }
 
     // MARK: Editing and saving
@@ -245,7 +255,8 @@ import Testing
         #expect(rows() == ["one|one", "two|two", "three|three", "four|four", "~|five"])
         #expect(
             session.modified.right && !session.modified.left && session.label(.right, row: 1) == "0"
-                && session.status.contains("[modified]"))
+                && session.status.contains("[modified]")
+        )
         // The line the left does not have is taken over from the right…
         session.copy(rows: 4..<5, to: .left)
         #expect(rows().last == "five|five" && session.blocks.isEmpty && session.modified.left)
@@ -266,7 +277,8 @@ import Testing
         #expect(bench.jobService.titles == ["Save"])
         #expect(
             memory.contents("/A/notes.txt") == "one\n2\nthree\nFOUR and more\n"
-                && memory.contents("/B/notes.txt") == "one\n2\nthree\nfour\nfive\n")
+                && memory.contents("/B/notes.txt") == "one\n2\nthree\nfour\nfive\n"
+        )
         #expect(!session.hasUnsavedChanges && !memory.allPaths.contains { $0.contains("afm-save") })
         #expect(bench.left.model.items.first { $0.name == "notes.txt" }?.size == 26)
     }
@@ -301,10 +313,14 @@ import Testing
 
     @Test func encodingsSurviveEditing() throws {
         let box = try Sandbox()
-        try (Data([0xFF, 0xFE]) + "erste\r\nzweite\r\n".data(using: .utf16LittleEndian)!).write(
-            to: box.url("utf16.txt"))
-        try Data([0x63, 0x61, 0x66, 0xE9, 0x0A, 0x7A, 0x77, 0x65, 0x69, 0x74, 0x65, 0x0A]).write(
-            to: box.url("latin.txt"))
+        try (Data([0xFF, 0xFE]) + "erste\r\nzweite\r\n".data(using: .utf16LittleEndian)!)
+            .write(
+                to: box.url("utf16.txt")
+            )
+        try Data([0x63, 0x61, 0x66, 0xE9, 0x0A, 0x7A, 0x77, 0x65, 0x69, 0x74, 0x65, 0x0A])
+            .write(
+                to: box.url("latin.txt")
+            )
         _ = operands(.text(box.url("utf16.txt").absoluteString + "\n" + box.url("latin.txt").absoluteString))
         #expect(session.status == "1 difference    UTF-16 LE <-> Latin-1" && rows() == ["erste|café", "zweite|zweite"])
         session.setEditing(true)
@@ -312,11 +328,15 @@ import Testing
         session.setText("dritte", .right, row: 1)
         session.save()
         #expect(
-            try Data(contentsOf: box.url("utf16.txt")) == Data([0xFF, 0xFE]) + "café\r\nzweite\r\n".data(
-                using: .utf16LittleEndian)!)
+            try Data(contentsOf: box.url("utf16.txt")) == Data([0xFF, 0xFE]) + "café\r\nzweite\r\n"
+                .data(
+                    using: .utf16LittleEndian
+                )!
+        )
         #expect(
             try Data(contentsOf: box.url("latin.txt"))
-                == Data([0x63, 0x61, 0x66, 0xE9, 0x0A, 0x64, 0x72, 0x69, 0x74, 0x74, 0x65, 0x0A]))
+                == Data([0x63, 0x61, 0x66, 0xE9, 0x0A, 0x64, 0x72, 0x69, 0x74, 0x74, 0x65, 0x0A])
+        )
     }
 }
 
@@ -331,14 +351,20 @@ import Testing
         let memory = MemoryFileSystem()
         memory.addFile("/A/a.txt", (0..<500).map { "line \($0)" }.joined(separator: "\n"))
         memory.addFile(
-            "/B/a.txt", (0..<500).map { $0 % 50 == 7 ? "changed \($0)" : "line \($0)" }.joined(separator: "\n"))
+            "/B/a.txt",
+            (0..<500).map { $0 % 50 == 7 ? "changed \($0)" : "line \($0)" }.joined(separator: "\n")
+        )
         memory.addFile("/A/same.txt", "same")
         memory.addFile("/B/same.txt", "same")
         memory.addFile("/A/data.bin", "\u{0}\u{1}binary")
         memory.addFile("/B/data.bin", "\u{0}\u{1}BINARY and more")
         let plugin = CompareContentPlugin()
         let bench = TestBench(
-            plugins: [plugin], fileSystems: [memory], left: memory.url("/A"), right: memory.url("/B"))
+            plugins: [plugin],
+            fileSystems: [memory],
+            left: memory.url("/A"),
+            right: memory.url("/B")
+        )
         func windows() -> [NSWindow] {
             NSApplication.shared.windows.filter { $0.title == "Compare contents" && $0.isVisible }
         }

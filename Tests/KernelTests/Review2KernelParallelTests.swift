@@ -26,6 +26,31 @@ private final class Tracked {
 }
 
 /// Unchecked: all state is guarded by `lock`.
+/// The threads of the pool there are now, found by their name.
+private func poolThreads() -> Int {
+    var list: thread_act_array_t?
+    var count: mach_msg_type_number_t = 0
+    guard task_threads(mach_task_self_, &list, &count) == KERN_SUCCESS, let list else { return 0 }
+    defer {
+        vm_deallocate(
+            mach_task_self_,
+            vm_address_t(bitPattern: list),
+            vm_size_t(Int(count) * MemoryLayout<thread_act_t>.stride)
+        )
+    }
+    var found = 0
+    for index in 0..<Int(count) {
+        defer { mach_port_deallocate(mach_task_self_, list[index]) }
+        guard let thread = pthread_from_mach_thread_np(list[index]) else { continue }
+        var name = [CChar](repeating: 0, count: 64)
+        pthread_getname_np(thread, &name, name.count)
+        if String(decoding: name.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self) == "AFM.Parallel" {
+            found += 1
+        }
+    }
+    return found
+}
+
 private final class Counter: @unchecked Sendable {
     private let lock = NSLock()
     private var value = 0
@@ -112,7 +137,7 @@ private func waitUntil(seconds: TimeInterval = 60, _ condition: () -> Bool) -> B
         #expect(finished.wait(timeout: .now() + 60) == .success)
         #expect(stalled.count == pieces)
         // The threads beyond the cores go away again without waiting for all to be idle for long.
-        #expect(waitUntil { ParallelPool.shared.census.threads <= width })
+        #expect(waitUntil { poolThreads() <= width })
     }
 
     @Test func piecesThatWaitAndComeBackGetMoreThreadsThanCores() {
@@ -138,19 +163,18 @@ private func waitUntil(seconds: TimeInterval = 60, _ condition: () -> Bool) -> B
     }
 
     @Test func helpersStillComeAfterManyCallsWithIdleTimesBetween() {
-        let pool = ParallelPool.shared
-        guard pool.width > 1 else { return }
         // Threads that give up waiting just as they are called: with the wait made short,
         // that happens all the time. Calls must not be lost for it, now or later.
-        pool.lingering = 0.002
-        defer { pool.lingering = 2 }
+        let pool = ParallelPool(linger: 0.002)
+        guard pool.width > 1 else { return }
         for round in 0..<600 {
-            #expect(Parallel.map(Array(0..<40)) { $0 * 2 }.reduce(0, +) == 1_560)
+            let sum = Counter()
+            pool.run(count: 40) { _ in sum.add() }
+            #expect(sum.count == 40)
             usleep(UInt32(round % 5) * 1_000)
         }
-        pool.lingering = 2
         let later = Counter()
-        _ = Parallel.map(Array(0..<64)) { _ in
+        pool.run(count: 64) { _ in
             later.note()
             usleep(20_000)
         }
@@ -200,7 +224,7 @@ private func waitUntil(seconds: TimeInterval = 60, _ condition: () -> Bool) -> B
 
     @Test func theSameQuestionIsAskedOnceForAllWhoWait() {
         let owner = Owner()
-        let asked = Counter()
+        let (asked, back) = (Counter(), Counter())
         let release = DispatchSemaphore(value: 0)
         let answers = Counter()
         let done = DispatchSemaphore(value: 0)
@@ -209,6 +233,7 @@ private func waitUntil(seconds: TimeInterval = 60, _ condition: () -> Bool) -> B
                 let answer = BlockingCalls.answer(from: owner, to: "volume /dead") { _ -> Int in
                     asked.add()
                     release.wait()
+                    back.add()
                     return 7
                 }
                 if answer == 7 { answers.add() }
@@ -217,18 +242,18 @@ private func waitUntil(seconds: TimeInterval = 60, _ condition: () -> Bool) -> B
         }
         #expect(waitUntil { asked.count == 1 })
         usleep(50_000)
-        #expect(asked.count == 1 && BlockingCalls.unanswered(for: owner) == 1)
+        #expect(asked.count == 1 && back.count == 0)
         release.signal()
         for _ in 0..<12 { #expect(done.wait(timeout: .now() + 60) == .success) }
         // Whoever came after the answer asked again; nobody asked while it was under way.
         for _ in 0..<12 { release.signal() }
         #expect(waitUntil { answers.count == 12 })
-        #expect(waitUntil { BlockingCalls.unanswered(for: owner) == 0 })
+        #expect(waitUntil { back.count == asked.count })
     }
 
     @Test func aQuestionThatWasGivenUpIsNotAskedAgainUntilItComesBack() {
         let owner = Owner()
-        let asked = Counter()
+        let (asked, back) = (Counter(), Counter())
         let release = DispatchSemaphore(value: 0)
         // Guarded by `lock`.
         nonisolated(unsafe) var flags: [CancellationFlag] = []
@@ -245,6 +270,7 @@ private func waitUntil(seconds: TimeInterval = 60, _ condition: () -> Bool) -> B
                     lock.unlock()
                     asked.add()
                     release.wait()
+                    back.add()
                     return 1
                 }
                 if answer == nil { returned.signal() }
@@ -254,8 +280,7 @@ private func waitUntil(seconds: TimeInterval = 60, _ condition: () -> Bool) -> B
             // Giving up ends the wait at once, though the question itself goes on.
             #expect(returned.wait(timeout: .now() + 60) == .success)
         }
-        #expect(asked.count == 1)
-        #expect(BlockingCalls.unanswered(for: owner) == 1)
+        #expect(asked.count == 1 && back.count == 0)
         lock.lock()
         let told = flags.first?.isCancelled
         lock.unlock()
@@ -266,19 +291,21 @@ private func waitUntil(seconds: TimeInterval = 60, _ condition: () -> Bool) -> B
         #expect(BlockingCalls.answer(from: Owner(), to: "volume /dead") { _ in 3 } == 3)
         // Once it has come back, the question can be asked afresh.
         release.signal()
-        #expect(waitUntil { BlockingCalls.unanswered(for: owner) == 0 })
+        #expect(waitUntil { back.count == 1 })
         release.signal()
         #expect(
             BlockingCalls.answer(from: owner, to: "volume /dead") { _ -> Int in
                 release.wait()
                 return 4
-            } == 4)
+            } == 4
+        )
         #expect(asked.count == 1)
     }
 
     @Test func oneOwnerHasABoundedNumberOfQuestionsUnderWay() {
         let owner = Owner()
-        let limit = BlockingCalls.limit
+        // The kernel's bound.
+        let limit = 64
         let started = Counter()
         let release = DispatchSemaphore(value: 0)
         let done = DispatchSemaphore(value: 0)
@@ -295,7 +322,7 @@ private func waitUntil(seconds: TimeInterval = 60, _ condition: () -> Bool) -> B
         }
         #expect(waitUntil { started.count == limit })
         usleep(50_000)
-        #expect(started.count == limit && BlockingCalls.unanswered(for: owner) == limit)
+        #expect(started.count == limit)
         for _ in 0..<total { release.signal() }
         for _ in 0..<total { #expect(done.wait(timeout: .now() + 60) == .success) }
         #expect(started.count == total)

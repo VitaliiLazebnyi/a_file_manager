@@ -21,8 +21,10 @@ final class StallFS: FileSystemProvider {
     var blockedByMethod: String {
         gate.lock()
         defer { gate.unlock() }
-        return blockedBy.filter { $0.value > 0 }.sorted { $0.key < $1.key }.map { "\($0.key)=\($0.value)" }.joined(
-            separator: ", ")
+        return blockedBy.filter { $0.value > 0 }.sorted { $0.key < $1.key }.map { "\($0.key)=\($0.value)" }
+            .joined(
+                separator: ", "
+            )
     }
     private(set) var mainThreadCalls: [String: (count: Int, stack: [String])] = [:]
     private(set) var calls: [String: Int] = [:]
@@ -84,11 +86,12 @@ final class StallFS: FileSystemProvider {
             return
         }
         gate.unlock()
-        let waiting = cancellation?.onCancel { [gate] in
-            gate.lock()
-            gate.broadcast()
-            gate.unlock()
-        }
+        let waiting = cancellation?
+            .onCancel { [gate] in
+                gate.lock()
+                gate.broadcast()
+                gate.unlock()
+            }
         defer { _ = waiting }
         gate.lock()
         blocked += 1
@@ -124,13 +127,6 @@ final class StallFS: FileSystemProvider {
     {
         wait("list(cancellation:receive:)", cancellation: cancellation)
         try inner.list(directory, showHidden: showHidden, cancellation: cancellation, receive: receive)
-    }
-    func entries(of directory: URL, showHidden: Bool, foldersOnly: Bool, cancellation: CancellationFlag) throws
-        -> [DirectoryEntry]
-    {
-        wait("entries(of:)", cancellation: cancellation)
-        return try inner.entries(
-            of: directory, showHidden: showHidden, foldersOnly: foldersOnly, cancellation: cancellation)
     }
     func item(at url: URL) -> FileItem? {
         wait("item(at:)")

@@ -255,8 +255,6 @@ public final class SettingsKeyRegistry {
         public let key: String
         public let isPrefix: Bool
         public let kind: SettingsKeyKind
-        /// Whether a value read from a file may be stored under the key; nil accepts any.
-        public let check: (@Sendable (Data) -> Bool)?
     }
 
     private var exact: [String: Declaration] = [:]
@@ -265,28 +263,14 @@ public final class SettingsKeyRegistry {
     public init() {}
 
     /// Says what a key of the plugin's is. Declaring a key twice keeps the later word.
-    public func declare(_ key: String, kind: SettingsKeyKind = .ordinary, check: (@Sendable (Data) -> Bool)? = nil) {
-        exact[key] = Declaration(key: key, isPrefix: false, kind: kind, check: check)
+    public func declare(_ key: String, kind: SettingsKeyKind = .ordinary) {
+        exact[key] = Declaration(key: key, isPrefix: false, kind: kind)
     }
 
     /// The same for every key that begins with `prefix` (`findFiles.history.`).
-    public func declare(prefix: String, kind: SettingsKeyKind = .ordinary, check: (@Sendable (Data) -> Bool)? = nil) {
+    public func declare(prefix: String, kind: SettingsKeyKind = .ordinary) {
         families.removeAll { $0.key == prefix }
-        families.append(Declaration(key: prefix, isPrefix: true, kind: kind, check: check))
-    }
-
-    /// What was declared for a key: the key itself, else the longest family it belongs to.
-    public func declaration(for key: String) -> Declaration? {
-        exact[key]
-            ?? families.filter { key.utf8.starts(with: $0.key.utf8) }.max { $0.key.utf8.count < $1.key.utf8.count }
-    }
-
-    public func kind(of key: String) -> SettingsKeyKind? { declaration(for: key)?.kind }
-
-    /// Whether `data` may be stored under `key`: the key is declared and its check, if it has one, passes.
-    public func accepts(_ data: Data, forKey key: String) -> Bool {
-        guard let declaration = declaration(for: key) else { return false }
-        return declaration.check?(data) ?? true
+        families.append(Declaration(key: prefix, isPrefix: true, kind: kind))
     }
 
     /// Everything declared, single keys first.
@@ -327,12 +311,14 @@ extension SettingsStore {
         data(forKey: key).flatMap { try? JSONDecoder().decode(type, from: $0) }
     }
 
+    /// Stores a value as JSON.
     public func set<Value: Encodable>(_ value: Value, forKey key: String) {
         set(try? JSONEncoder().encode(value), forKey: key)
     }
 
-    /// Raw data is stored as it is. (Without this, `Data` would match the generic method above
-    /// better than `Data?` and be stored as JSON text.)
+    /// Raw data is stored as it is, through `set(_:forKey:)` with a `Data?`. Without this,
+    /// `Data` would match the generic method above better and be stored as JSON text.
+    @available(*, unavailable, message: "Pass the data as `Data?`: it is then stored as it is")
     public func set(_ data: Data, forKey key: String) {
         set(data as Data?, forKey: key)
     }
@@ -356,15 +342,4 @@ private final class ScopedSettings: SettingsStore {
     func set(_ data: Data?, forKey key: String) { base.set(data, forKey: prefix + key) }
     func largeData(forKey key: String) -> Data? { base.largeData(forKey: prefix + key) }
     func setLarge(_ data: Data?, forKey key: String) { base.setLarge(data, forKey: prefix + key) }
-}
-
-/// Settings that live only as long as the program runs; used by tests. Unchecked: the values
-/// are guarded by `lock`.
-public final class MemorySettings: SettingsStore, @unchecked Sendable {
-    private let lock = NSLock()
-    private var values: [String: Data] = [:]
-
-    public init() {}
-    public func data(forKey key: String) -> Data? { lock.withLock { values[key] } }
-    public func set(_ data: Data?, forKey key: String) { lock.withLock { values[key] = data } }
 }

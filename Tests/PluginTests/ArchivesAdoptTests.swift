@@ -109,7 +109,8 @@ private func outside(_ root: URL, _ path: String) throws -> URL {
         _ = try bench.store.archive(at: archive)
         #expect(bench.zip.capabilities(for: root.appending(name: "tree")) == [.write, .deferredWrites])
         #expect(
-            bench.readOnly.capabilities(for: bench.inside(archive, "tree", scheme: ArchiveURL.readOnlyScheme)) == [])
+            bench.readOnly.capabilities(for: bench.inside(archive, "tree", scheme: ArchiveURL.readOnlyScheme)) == []
+        )
 
         // A ZIP that lists a name twice is read-only like the formats that cannot be changed.
         let twice = box.url("twice.zip")
@@ -131,7 +132,11 @@ private func outside(_ root: URL, _ path: String) throws -> URL {
             #expect(!provider.capabilities.contains(.append) && !provider.capabilities(for: root).contains(.append))
         }
         #expect(throws: FileSystemError.self) {
-            _ = try bench.zip.append(to: root.appending(name: "tree/readme.txt"), at: nil)
+            _ = try bench.zip.append(
+                to: root.appending(name: "tree/readme.txt"),
+                at: nil,
+                cancellation: CancellationFlag()
+            )
         }
     }
 
@@ -148,7 +153,7 @@ private func outside(_ root: URL, _ path: String) throws -> URL {
         let serverRoot = ArchiveURL.make(scheme: "zip", archive: onServer)
         let place = try outside(serverRoot, "/store/log.txt")
         #expect(bench.zip.capabilities(for: place) == [.write, .append, .deferredWrites])
-        let appender = try bench.zip.append(to: place, at: nil)
+        let appender = try bench.zip.append(to: place, at: nil, cancellation: CancellationFlag())
         try appender.write(Data(" more".utf8))
         try appender.close(attributes: FileAttributes())
         #expect(bench.memory.contents("/store/log.txt") == "start more")
@@ -214,7 +219,8 @@ private func outside(_ root: URL, _ path: String) throws -> URL {
         try bench.store.bringUpToDate(box.root, cancellation: CancellationFlag())
         bench.store.release(on: box.root)
         #expect(
-            bench.store.openArchive(at: archive) == nil && listed(archive).contains("tree/made/") && isSound(archive))
+            bench.store.openArchive(at: archive) == nil && listed(archive).contains("tree/made/") && isSound(archive)
+        )
     }
 
     @Test func aFailedCommitKeepsEverythingForTheNextTry() throws {
@@ -236,7 +242,8 @@ private func outside(_ root: URL, _ path: String) throws -> URL {
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: box.root.path)
         try bench.zip.commit(tree, cancellation: CancellationFlag())
         #expect(
-            isSound(archive) && listed(archive).contains("tree/new.txt") && !listed(archive).contains("tree/empty.txt"))
+            isSound(archive) && listed(archive).contains("tree/new.txt") && !listed(archive).contains("tree/empty.txt")
+        )
         #expect(runTool("/usr/bin/unzip", ["-p", archive.path, "tree/new.txt"]).output == "precious")
     }
 
@@ -304,7 +311,8 @@ private func outside(_ root: URL, _ path: String) throws -> URL {
         try box.file("src/a.txt", "alpha")
         try box.file("src/b.txt", "beta")
         let result = try bench.pack(
-            [box.url("src/a.txt"), box.url("src/b.txt")], to: bench.inside(outer, "tree/packed.tar")
+            [box.url("src/a.txt"), box.url("src/b.txt")],
+            to: bench.inside(outer, "tree/packed.tar")
         ) {
             $0.format = .tar
             $0.movesSources = true
@@ -320,7 +328,11 @@ private func outside(_ root: URL, _ path: String) throws -> URL {
         options.format = .tar
         options.movesSources = true
         let packer = Packer(
-            fileSystems: bench.fileSystems, store: bench.store, monitor: bench.monitor, options: options)
+            fileSystems: bench.fileSystems,
+            store: bench.store,
+            monitor: bench.monitor,
+            options: options
+        )
         let failed = packer.run([try bench.item(box.url("src/c.txt"))], archive: bench.memory.url("/store/c.tar"))
         #expect(failed.failure != nil && failed.completed.isEmpty && box.exists("src/c.txt"))
         #expect(bench.memory.commits == ["/store/c.tar"])
@@ -334,7 +346,8 @@ private func outside(_ root: URL, _ path: String) throws -> URL {
         #expect(
             ArchiveCommands.names(of: [notes, todo, left], packedAs: [notes.url, todo.url]) == [
                 "sub/notes.txt", "other/todo.txt"
-            ])
+            ]
+        )
     }
 
     // MARK: Cancellation
@@ -370,7 +383,8 @@ private func outside(_ root: URL, _ path: String) throws -> URL {
         // for whoever reads, which here is nobody, until it is stopped.
         let zeros = box.url("zeros.bz2")
         #expect(
-            runTool("/bin/sh", ["-c", "head -c 200000000 /dev/zero | /usr/bin/bzip2 -1 > '\(zeros.path)'"]).status == 0)
+            runTool("/bin/sh", ["-c", "head -c 200000000 /dev/zero | /usr/bin/bzip2 -1 > '\(zeros.path)'"]).status == 0
+        )
         let control = StreamInterrupt()
         let stream = try ProcessStream(Tool.bzip2, ["-dc", "--", zeros.path], control: control)
         defer { stream.close() }
@@ -482,10 +496,13 @@ private func outside(_ root: URL, _ path: String) throws -> URL {
         let place = try outside(root, "/store/log.txt")
         #expect(bench.zip.item(at: place, cancellation: CancellationFlag())?.size == 1_000)
         #expect(
-            try bench.zip.list(try outside(root, "/store"), showHidden: true, cancellation: CancellationFlag()).map(
-                \.name
-            ).sorted()
-                == ["log.txt", "tree.zip"])
+            try bench.zip.list(try outside(root, "/store"), showHidden: true, cancellation: CancellationFlag())
+                .map(
+                    \.name
+                )
+                .sorted()
+                == ["log.txt", "tree.zip"]
+        )
         let cancelled = CancellationFlag()
         cancelled.cancel()
         #expect(bench.zip.item(at: place, cancellation: cancelled) == nil)
@@ -525,7 +542,8 @@ private func outside(_ root: URL, _ path: String) throws -> URL {
         #expect(bench.zip.quarantine(of: member) == Data(value.utf8))
         #expect(
             bench.readOnly.quarantine(of: bench.inside(archive, "tree", scheme: ArchiveURL.readOnlyScheme))
-                == Data(value.utf8))
+                == Data(value.utf8)
+        )
         // Read once for the open archive.
         removexattr(archive.path, "com.apple.quarantine", 0)
         #expect(bench.zip.quarantine(of: member) == Data(value.utf8))

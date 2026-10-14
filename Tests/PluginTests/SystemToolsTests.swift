@@ -52,8 +52,11 @@ private func folder(_ output: String?) -> String? {
         memory.addFile("/A/docs/deep/far.txt", "far")
         memory.addDirectory("/B")
         bench = TestBench(
-            plugins: [tools, SelectionPlugin()], fileSystems: [LocalFileSystem(), memory], left: box.url("A"),
-            right: box.url("B"))
+            plugins: [tools, SelectionPlugin()],
+            fileSystems: [LocalFileSystem(), memory],
+            left: box.url("A"),
+            right: box.url("B")
+        )
     }
 
     // MARK: Command line
@@ -115,7 +118,8 @@ private func folder(_ output: String?) -> String? {
         // The last line is proposed again.
         commands.perform(.runCommandLine)
         #expect(
-            ui.log.contains("prompt: Run command: [echo asked]") && tools.log == ["ran: echo asked", "ran: echo asked"])
+            ui.log.contains("prompt: Run command: [echo asked]") && tools.log == ["ran: echo asked", "ran: echo asked"]
+        )
         commands.perform(SystemToolsCommands.runPrompt)
         #expect(tools.log.count == 2)
     }
@@ -124,11 +128,16 @@ private func folder(_ output: String?) -> String? {
         let viewer = RecordingViewer()
         let tools = SystemToolsPlugin(launchesApplications: false)
         let bench = TestBench(
-            plugins: [viewer, tools], fileSystems: [LocalFileSystem()], left: box.url("A"), right: box.url("B"))
+            plugins: [viewer, tools],
+            fileSystems: [LocalFileSystem()],
+            left: box.url("A"),
+            right: box.url("B")
+        )
         bench.commands.perform(.runCommandLine, .text("printf '%s-%s' a b"))
         #expect(
             viewer.texts.map(\.text) == ["a-b"] && viewer.texts.first?.title == "printf '%s-%s' a b"
-                && bench.ui.forms.isEmpty)
+                && bench.ui.forms.isEmpty
+        )
     }
 
     // MARK: Terminal, system, volumes
@@ -143,7 +152,8 @@ private func folder(_ output: String?) -> String? {
             !commands.isEnabled(SystemToolsCommands.openTerminal)
                 && !commands.isEnabled(SystemToolsCommands.renameVolume)
                 && !commands.isEnabled(SystemToolsCommands.ejectVolume)
-                && !commands.isEnabled(SystemToolsCommands.openWith))
+                && !commands.isEnabled(SystemToolsCommands.openWith)
+        )
     }
 
     @Test func systemInformationIsShownAsText() {
@@ -225,7 +235,8 @@ private func folder(_ output: String?) -> String? {
         commands.perform(SystemToolsCommands.printListWithSubfolders)
         #expect(
             memory.contents("/A/list.txt")
-                == "mem:/A\n\ndocs/\ndocs/deep/\ndocs/deep/far.txt\ndocs/in.txt\none.txt\n\n0 k in 3 files, 2 folders")
+                == "mem:/A\n\ndocs/\ndocs/deep/\ndocs/deep/far.txt\ndocs/in.txt\none.txt\n\n0 k in 3 files, 2 folders"
+        )
         #expect(bench.left.model.cursorItem?.name == "list.txt" && tools.log == ["list-file: mem:/A/list.txt"])
 
         // Depth 1 enters the selected folders but not their subfolders; an existing file is asked about.
@@ -236,7 +247,8 @@ private func folder(_ output: String?) -> String? {
         ui.choiceAnswers = [0]
         commands.perform(SystemToolsCommands.printListWithSubfolders)
         #expect(
-            memory.contents("/A/list.txt") == "mem:/A\n\ndocs/\ndocs/deep/\ndocs/in.txt\n\n0 k in 1 files, 2 folders")
+            memory.contents("/A/list.txt") == "mem:/A\n\ndocs/\ndocs/deep/\ndocs/in.txt\n\n0 k in 1 files, 2 folders"
+        )
         ui.promptAnswers = [.text("many")]
         commands.perform(SystemToolsCommands.printListWithSubfolders)
         #expect(ui.log.last == "inform: many is not a number.")
@@ -263,22 +275,25 @@ private func folder(_ output: String?) -> String? {
                 && Set(menus.menus.flatMap(\.items).compactMap { $0 }).count
                     == menus.menus.flatMap(\.items).compactMap { $0 }.count
         )
-        #expect(bench.kernel.keyBindings.conflicts.isEmpty)
+        #expect(bench.kernel.keyClashes.isEmpty)
         #expect(
             menus.menus.first { $0.title == "Commands" }?.items
                 == [
                     SystemToolsCommands.systemInformation, SystemToolsCommands.renameVolume,
                     SystemToolsCommands.ejectVolume,
                     SystemToolsCommands.openTerminal, nil, SystemToolsCommands.runPrompt
-                ])
+                ]
+        )
         let buttons = bench.kernel.toolbar.defaultLayout.compactMap { $0?.command }
         #expect(
             buttons.filter { [SystemToolsCommands.openTerminal, SystemToolsCommands.systemInformation].contains($0) }
-                == [SystemToolsCommands.openTerminal, SystemToolsCommands.systemInformation])
+                == [SystemToolsCommands.openTerminal, SystemToolsCommands.systemInformation]
+        )
         #expect(bench.kernel.preferences.pages.map(\.title).contains("System Tools"))
         #expect(
             bench.kernel.keyBindings.command(for: .f(9, .control)) == SystemToolsCommands.printFile
-                && bench.kernel.keyBindings.command(for: .f(4, .option)) == SystemToolsCommands.quit)
+                && bench.kernel.keyBindings.command(for: .f(4, .option)) == SystemToolsCommands.quit
+        )
         for id in [
             "afm_RunCommandLine", "cm_ExecuteDOS", "cm_SysInfo", "cm_VolumeId", "cm_PrintDir", "cm_PrintDirSub",
             "cm_PrintFile",
@@ -316,17 +331,20 @@ private func folder(_ output: String?) -> String? {
         )
         #expect(
             TypedCommand("Tool.app notes.txt")?.application(relativeTo: box.root, searching: folders)?.lastPathComponent
-                == "Tool.app")
+                == "Tool.app"
+        )
         #expect(
             TypedCommand("Apps/Tool.app")?.application(relativeTo: box.root, searching: [])?.path
-                == box.url("Apps/Tool.app").path)
+                == box.url("Apps/Tool.app").path
+        )
         // A name with arguments is a program for the shell, and a file is not an application.
         #expect(TypedCommand("Tool --help")?.application(relativeTo: box.root, searching: folders) == nil)
         #expect(TypedCommand("script")?.application(relativeTo: box.root, searching: folders) == nil)
         #expect(TypedCommand("ls")?.application(relativeTo: box.root, searching: folders) == nil)
         #expect(
             SystemTools.files(in: "a.txt 'b c.txt' /tmp/d", relativeTo: box.root).map(\.path)
-                == [box.url("a.txt").path, box.url("b c.txt").path, "/tmp/d"])
+                == [box.url("a.txt").path, box.url("b c.txt").path, "/tmp/d"]
+        )
     }
 
     @Test func onlyPlainHarmlessLinesAreHarmless() throws {
@@ -347,22 +365,27 @@ private func folder(_ output: String?) -> String? {
 
     private func sh(_ script: String, collects: Bool = true) -> ProcessRunner {
         ProcessRunner(
-            executable: URL(fileURLWithPath: "/bin/sh"), arguments: ["-c", script], directory: nil,
-            collectsOutput: collects)
+            executable: URL(fileURLWithPath: "/bin/sh"),
+            arguments: ["-c", script],
+            directory: nil,
+            collectsOutput: collects
+        )
     }
 
     @Test func outputAndStatusAreCollected() {
         let outcome = sh("echo out; echo err 1>&2; exit 3").run(cancellation: CancellationFlag())
         #expect(
-            outcome.output == "out\nerr\n" && outcome.status == 3 && outcome.failure == nil && !outcome.wasCancelled)
+            outcome.output == "out\nerr\n" && outcome.status == 3 && outcome.failure == nil && !outcome.wasCancelled
+        )
     }
 
     @Test func aLotOfOutputDoesNotBlockTheChild() {
         // Far more than a pipe holds: the child would wait for ever if nobody read.
         var reported = 0
-        let outcome = sh("head -c 3000000 /dev/zero | tr '\\0' x").run(cancellation: CancellationFlag()) {
-            reported = max(reported, $0)
-        }
+        let outcome = sh("head -c 3000000 /dev/zero | tr '\\0' x")
+            .run(cancellation: CancellationFlag()) {
+                reported = max(reported, $0)
+            }
         #expect(outcome.output.utf8.count == 3_000_000 && outcome.status == 0 && !outcome.isTruncated)
     }
 
@@ -371,7 +394,8 @@ private func folder(_ output: String?) -> String? {
         Thread {
             Thread.sleep(forTimeInterval: 0.2)
             cancellation.cancel()
-        }.start()
+        }
+        .start()
         let started = Date()
         let outcome = sh("echo before; sleep 30").run(cancellation: cancellation)
         #expect(outcome.wasCancelled && Date().timeIntervalSince(started) < 10)
@@ -380,7 +404,10 @@ private func folder(_ output: String?) -> String? {
 
     @Test func aProgramThatDoesNotExistIsAFailure() {
         let runner = ProcessRunner(
-            executable: URL(fileURLWithPath: "/nonexistent/program"), arguments: [], directory: nil)
+            executable: URL(fileURLWithPath: "/nonexistent/program"),
+            arguments: [],
+            directory: nil
+        )
         #expect(runner.run(cancellation: CancellationFlag()).failure != nil)
     }
 
@@ -402,7 +429,8 @@ private func folder(_ output: String?) -> String? {
         let information = SystemInformation(sections: [
             .init(
                 title: "Hardware",
-                rows: [.init(label: "Model", value: "Mac"), .init(label: "CPU cores", value: "8")]),
+                rows: [.init(label: "Model", value: "Mac"), .init(label: "CPU cores", value: "8")]
+            ),
             .init(title: "Volumes", rows: [.init(label: "Disk", value: "/: 1 k of 2 k free")])
         ])
         #expect(
@@ -425,7 +453,8 @@ private func folder(_ output: String?) -> String? {
         #expect(information.sections[0].rows.contains { $0.label == "Display" && $0.value == "1x1" })
         #expect(
             (SystemInformation.systemNumber("hw.ncpu") ?? 0) > 0
-                && SystemInformation.systemText("kern.ostype") == "Darwin")
+                && SystemInformation.systemText("kern.ostype") == "Darwin"
+        )
         #expect(SystemInformation.systemText("no.such.value") == nil && !information.sections[2].rows.isEmpty)
     }
 
@@ -433,10 +462,12 @@ private func folder(_ output: String?) -> String? {
         #expect(VolumeName.problem(with: "Work Disk 2") == nil && VolumeName.problem(with: "Диск") == nil)
         #expect(
             VolumeName.problem(with: "") != nil && VolumeName.problem(with: "a/b") != nil
-                && VolumeName.problem(with: "a:b") != nil)
+                && VolumeName.problem(with: "a:b") != nil
+        )
         #expect(
             VolumeName.problem(with: ".hidden") != nil
-                && VolumeName.problem(with: String(repeating: "x", count: 300)) != nil)
+                && VolumeName.problem(with: String(repeating: "x", count: 300)) != nil
+        )
     }
 
     // MARK: File lists
@@ -446,10 +477,13 @@ private func folder(_ output: String?) -> String? {
     @Test func headerPlaceholdersAreFilledIn() {
         #expect(
             DirectoryListFormatter.expand("%d - Page %p/%t", directory: "/tmp/A", page: 2, pages: 3, now: now)
-                == "/tmp/A - Page 2/3")
+                == "/tmp/A - Page 2/3"
+        )
         #expect(DirectoryListFormatter.expand("100%% %x %", directory: "", page: 1, pages: 1, now: now) == "100% %x %")
-        let stamp = DirectoryListFormatter.expand("%D|%T", directory: "", page: 1, pages: 1, now: now).split(
-            separator: "|")
+        let stamp = DirectoryListFormatter.expand("%D|%T", directory: "", page: 1, pages: 1, now: now)
+            .split(
+                separator: "|"
+            )
         #expect(stamp.count == 2 && stamp.allSatisfy { !$0.isEmpty && !$0.contains("%") })
     }
 
@@ -466,7 +500,8 @@ private func folder(_ output: String?) -> String? {
                 "green.png        782  \(date)  rw-r--r--",
                 "a          1,234,567  \(date)  rw-r--r--",
                 "", "1,206 k in 2 files, 1 folders"
-            ])
+            ]
+        )
         #expect(DirectoryListFormatter.footer([rows[1]]) == "1 k in 1 files")
         var brief = DirectoryListFormatter()
         brief.isDetailed = false
@@ -493,7 +528,8 @@ private func folder(_ output: String?) -> String? {
         #expect(ListMask("*.* | *.bak *.~*").matches("a.txt") && !ListMask("*.* | *.bak *.~*").matches("a.bak"))
         #expect(
             ListMask("|*.exe").matches("a.txt") && !ListMask("|*.exe").matches("a.exe")
-                && ListMask("").matches("anything"))
+                && ListMask("").matches("anything")
+        )
     }
 
     @Test func subfoldersAreCollectedToTheGivenDepth() {
@@ -504,7 +540,10 @@ private func folder(_ output: String?) -> String? {
         func names(depth: Int, mask: String = "*.*", hidden: Bool = false) -> [String] {
             let items = (try? memory.list(memory.url("/A"), showHidden: hidden)) ?? []
             return ListCollector(
-                fileSystems: fileSystems, showHidden: hidden, mask: ListMask(mask), depth: depth,
+                fileSystems: fileSystems,
+                showHidden: hidden,
+                mask: ListMask(mask),
+                depth: depth,
                 cancellation: CancellationFlag()
             )
             .rows(of: items).map(\.name)
@@ -518,8 +557,13 @@ private func folder(_ output: String?) -> String? {
         let items = (try? memory.list(memory.url("/A"), showHidden: false)) ?? []
         #expect(
             ListCollector(
-                fileSystems: fileSystems, showHidden: false, mask: ListMask("*"), depth: -1, cancellation: cancelled
+                fileSystems: fileSystems,
+                showHidden: false,
+                mask: ListMask("*"),
+                depth: -1,
+                cancellation: cancelled
             )
-            .rows(of: items).map(\.name) == ["a.md", "b.txt", "sub"])
+            .rows(of: items).map(\.name) == ["a.md", "b.txt", "sub"]
+        )
     }
 }

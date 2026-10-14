@@ -25,27 +25,26 @@ public struct FileItem: Equatable, Sendable {
         get { targetSize == Self.unknown ? nil : targetSize }
         set { targetSize = newValue ?? Self.unknown }
     }
-    /// The device (volume) the entry itself is on, as the system numbers it (`st_dev`); nil
-    /// where the file system has no such notion. Two entries with different numbers are on
-    /// different volumes: a folder whose number differs from its parent's is a mount point.
-    public var device: Int64? {
-        get { deviceNumber == Self.unknown ? nil : deviceNumber }
-        set { deviceNumber = newValue ?? Self.unknown }
-    }
-    /// The two above, kept as plain numbers so that a list of a million entries does not
-    /// pay for two optionals each.
+    /// The one above, kept as a plain number so that a list of a million entries does not
+    /// pay for an optional each.
     private var targetSize = Self.unknown
-    private var deviceNumber = Self.unknown
     private static let unknown = Int64.min
 
     public init(
-        url: URL, name: String, isDirectory: Bool, isSymlink: Bool = false, isPackage: Bool = false,
-        isHidden: Bool = false, size: Int64 = 0, modified: Date = Date(timeIntervalSince1970: 0),
-        permissions: UInt16 = 0o644, computedSize: Int64? = nil, isSpecial: Bool = false,
-        linkTargetSize: Int64? = nil, device: Int64? = nil
+        url: URL,
+        name: String,
+        isDirectory: Bool,
+        isSymlink: Bool = false,
+        isPackage: Bool = false,
+        isHidden: Bool = false,
+        size: Int64 = 0,
+        modified: Date = Date(timeIntervalSince1970: 0),
+        permissions: UInt16 = 0o644,
+        computedSize: Int64? = nil,
+        isSpecial: Bool = false,
+        linkTargetSize: Int64? = nil
     ) {
         targetSize = linkTargetSize ?? Self.unknown
-        deviceNumber = device ?? Self.unknown
         self.isSpecial = isSpecial
         self.url = url
         self.name = name
@@ -70,14 +69,6 @@ public struct FileItem: Equatable, Sendable {
 
     /// Ext column: the extension without the dot; empty for folders.
     public var ext: String { isFolder ? "" : Self.split(name).ext }
-
-    /// Whether two entries of the same directory look the same in a file list. Cheaper than
-    /// `==`, which also compares the locations.
-    public func isSameEntry(as other: Self) -> Bool {
-        name == other.name && size == other.size && modified == other.modified && isDirectory == other.isDirectory
-            && isSymlink == other.isSymlink && isPackage == other.isPackage && isHidden == other.isHidden
-            && permissions == other.permissions && computedSize == other.computedSize && isSpecial == other.isSpecial
-    }
 
     /// Splits at the last dot. A leading dot (`.zshrc`) does not start an extension.
     public static func split(_ name: String) -> (base: String, ext: String) {
@@ -200,19 +191,6 @@ public enum PathSafety: Sendable {
             names.append(String(decoding: part, as: UTF8.self))
         }
         return names
-    }
-
-    /// The location a relative path from outside names below `root`; nil when the path is
-    /// not made of safe names. Works on the text alone, and the result is checked once more
-    /// to lie below `root` (`isContained`).
-    public static func location(ofRelativePath path: String, below root: URL, allowingTrailingSeparator: Bool = false)
-        -> URL?
-    {
-        guard let names = components(ofRelativePath: path, allowingTrailingSeparator: allowingTrailingSeparator) else {
-            return nil
-        }
-        let url = names.reduce(root) { $0.appendingPathComponent($1, isDirectory: false) }
-        return isContained(url, in: root) ? url : nil
     }
 
     /// Whether `url` lies below `root` once both are written out in full (`.` and `..`

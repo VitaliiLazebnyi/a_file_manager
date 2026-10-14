@@ -15,8 +15,12 @@ private struct Sequence {
 
 private func entry(_ name: String, folder: Bool = false, size: Int64 = 0, time: TimeInterval = 0) -> FileItem {
     FileItem(
-        url: URL(fileURLWithPath: "/tmp/\(name)"), name: name, isDirectory: folder, size: size,
-        modified: Date(timeIntervalSince1970: time))
+        url: URL(fileURLWithPath: "/tmp/\(name)"),
+        name: name,
+        isDirectory: folder,
+        size: size,
+        modified: Date(timeIntervalSince1970: time)
+    )
 }
 
 /// Names of every kind the order has to cope with: case, digits, punctuation, accents written
@@ -31,20 +35,22 @@ private func variedItems(_ count: Int, seed: UInt64) -> [FileItem] {
         "写真", "資料", "ｆｕｌｌ", "full", "한국어", "ﬁle", "file", "e\u{301}", "é", "#tag", "~temp", "100", "20", "3"
     ]
     let extensions = ["txt", "TXT", "Txt", "md", "jpg", "JPG", "tar.gz", "", "", "c", "h", "é", "файл", "x."]
-    return (0..<count).map { _ in
-        var name = words[random.next(words.count)]
-        if random.next(3) > 0 { name += String(random.next(max(count / 3, 4))) }
-        if random.next(5) == 0 { name = "." + name }
-        let folder = random.next(8) == 0
-        let ext = extensions[random.next(extensions.count)]
-        if !ext.isEmpty, random.next(folder ? 4 : 1) == 0 { name += "." + ext }
-        return entry(name, folder: folder, size: Int64(random.next(40)), time: TimeInterval(random.next(60)))
-    }
+    return (0..<count)
+        .map { _ in
+            var name = words[random.next(words.count)]
+            if random.next(3) > 0 { name += String(random.next(max(count / 3, 4))) }
+            if random.next(5) == 0 { name = "." + name }
+            let folder = random.next(8) == 0
+            let ext = extensions[random.next(extensions.count)]
+            if !ext.isEmpty, random.next(folder ? 4 : 1) == 0 { name += "." + ext }
+            return entry(name, folder: folder, size: Int64(random.next(40)), time: TimeInterval(random.next(60)))
+        }
 }
 
-private let everyOrder = [SortKey.name, .ext, .size, .date, .unsorted].flatMap {
-    [ListOrder(key: $0), ListOrder(key: $0, descending: true)]
-}
+private let everyOrder = [SortKey.name, .ext, .size, .date, .unsorted]
+    .flatMap {
+        [ListOrder(key: $0), ListOrder(key: $0, descending: true)]
+    }
 
 @Suite struct SortingByKeys {
     /// The order is defined by `areInOrder`; a stable sort with it is what sorting has to give.
@@ -82,22 +88,32 @@ private let everyOrder = [SortKey.name, .ext, .size, .date, .unsorted].flatMap {
             "aa", "a", "å", "ä", "ae", "æ", "ö", "ø", "o", "z", "y", "ü", "u", "w", "v", "ch", "c", "h", "Aa", "Z",
             "ll", "l", "ñ", "n"
         ]
-        let items = (0..<2_500).map { index -> FileItem in
-            let name =
-                (0..<(1 + random.next(3))).map { _ in syllables[random.next(syllables.count)] }.joined()
-                + String(random.next(50)) + "-\(index)"
-            return entry(index % 3 == 0 ? name + ".txt" : name, folder: index % 11 == 0, size: Int64(random.next(9)))
-        }
+        let items = (0..<2_500)
+            .map { index -> FileItem in
+                let name =
+                    (0..<(1 + random.next(3))).map { _ in syllables[random.next(syllables.count)] }.joined()
+                    + String(random.next(50)) + "-\(index)"
+                return entry(
+                    index % 3 == 0 ? name + ".txt" : name,
+                    folder: index % 11 == 0,
+                    size: Int64(random.next(9))
+                )
+            }
         for order in [ListOrder(key: .name), ListOrder(key: .ext, descending: true), ListOrder(key: .size)] {
-            for collator in ["da", "sv", "de@collation=phonebook", "es@collation=traditional", "cs"].map(
-                NameCollator.init(identifier:)) + [.unavailable]
+            for collator in ["da", "sv", "de@collation=phonebook", "es@collation=traditional", "cs"]
+                .map(
+                    NameCollator.init(identifier:)
+                ) + [.unavailable]
             {
                 let sorted = Sorter.sort(items, by: order, collator: collator)
                 #expect(
-                    sorted == items.sorted { Sorter.areInOrder($0, $1, by: order, collator: collator) }, "by \(order)"
+                    sorted == items.sorted { Sorter.areInOrder($0, $1, by: order, collator: collator) },
+                    "by \(order)"
                 )
                 #expect(
-                    Sorter.sort(items.reversed(), by: order, collator: collator) == sorted, "shuffled, by \(order)")
+                    Sorter.sort(items.reversed(), by: order, collator: collator) == sorted,
+                    "shuffled, by \(order)"
+                )
             }
         }
     }
@@ -138,16 +154,18 @@ private let everyOrder = [SortKey.name, .ext, .size, .date, .unsorted].flatMap {
         // With names that are equal for the order (the same name twice) and without.
         for items in [
             variedItems(800, seed: 8),
-            variedItems(800, seed: 9).enumerated().map {
-                entry("n\($0)-" + $1.name, folder: $1.isFolder, size: $1.size)
-            }
+            variedItems(800, seed: 9).enumerated()
+                .map {
+                    entry("n\($0)-" + $1.name, folder: $1.isFolder, size: $1.size)
+                }
         ] {
             for order in everyOrder {
                 let sorted = Sorter.sort(items, by: order)
                 let turned = ListOrder(key: order.key, descending: !order.descending)
                 #expect(
                     Sorter.resort(sorted, from: order, to: turned) == Sorter.sort(sorted, by: turned),
-                    "\(order) turned round")
+                    "\(order) turned round"
+                )
                 let other = ListOrder(key: order.key == .size ? .name : .size)
                 #expect(Sorter.resort(sorted, from: order, to: other) == Sorter.sort(sorted, by: other))
             }
@@ -200,25 +218,27 @@ private let everyOrder = [SortKey.name, .ext, .size, .date, .unsorted].flatMap {
         let deadline = Date().addingTimeInterval(60)
         _ = Parallel.map(Array(0..<cores)) { outer -> Int in
             guard outer == 0 else { return 0 }
-            return Parallel.map(Array(0..<(cores * 2))) { _ -> Int in
-                lock.lock()
-                running += 1
-                most = max(most, running)
-                lock.unlock()
-                while Date() < deadline {
+            return
+                Parallel.map(Array(0..<(cores * 2))) { _ -> Int in
                     lock.lock()
-                    let isShared = most > 1
+                    running += 1
+                    most = max(most, running)
                     lock.unlock()
-                    if isShared { break }
-                    Thread.sleep(forTimeInterval: 0.002)
+                    while Date() < deadline {
+                        lock.lock()
+                        let isShared = most > 1
+                        lock.unlock()
+                        if isShared { break }
+                        Thread.sleep(forTimeInterval: 0.002)
+                    }
+                    // Long enough for the pieces that run at once to be seen running at once.
+                    Thread.sleep(forTimeInterval: 0.01)
+                    lock.lock()
+                    running -= 1
+                    lock.unlock()
+                    return 1
                 }
-                // Long enough for the pieces that run at once to be seen running at once.
-                Thread.sleep(forTimeInterval: 0.01)
-                lock.lock()
-                running -= 1
-                lock.unlock()
-                return 1
-            }.reduce(0, +)
+                .reduce(0, +)
         }
         #expect(most > 1)
         // Sleeping pieces count as waiting, which earns a job more threads, up to a limit.
@@ -244,7 +264,8 @@ private let everyOrder = [SortKey.name, .ext, .size, .date, .unsorted].flatMap {
                 gate.unlock()
             }
             sleepers.leave()
-        }.start()
+        }
+        .start()
         // Until the waiting job holds threads: a condition, not a length of time.
         gate.lock()
         let end = Date().addingTimeInterval(60)
@@ -280,19 +301,22 @@ private let everyOrder = [SortKey.name, .ext, .size, .date, .unsorted].flatMap {
     }
 
     @Test func manyCallersAtOnceAllFinish() {
-        let results = DispatchQueue.global().sync { () -> [Int] in
-            var sums = [Int](repeating: 0, count: 24)
-            sums.withUnsafeMutableBufferPointer { sums in
-                // Each caller writes its own slot.
-                nonisolated(unsafe) let slots = sums.baseAddress!
-                DispatchQueue.concurrentPerform(iterations: 24) { caller in
-                    slots[caller] = Parallel.map(Array(0..<200)) {
-                        Parallel.map([$0, caller]) { $0 * 2 }.reduce(0, +)
-                    }.reduce(0, +)
+        let results = DispatchQueue.global()
+            .sync { () -> [Int] in
+                var sums = [Int](repeating: 0, count: 24)
+                sums.withUnsafeMutableBufferPointer { sums in
+                    // Each caller writes its own slot.
+                    nonisolated(unsafe) let slots = sums.baseAddress!
+                    DispatchQueue.concurrentPerform(iterations: 24) { caller in
+                        slots[caller] =
+                            Parallel.map(Array(0..<200)) {
+                                Parallel.map([$0, caller]) { $0 * 2 }.reduce(0, +)
+                            }
+                            .reduce(0, +)
+                    }
                 }
+                return sums
             }
-            return sums
-        }
         #expect(results == (0..<24).map { caller in (0..<200).reduce(0) { $0 + ($1 + caller) * 2 } })
     }
 }
@@ -308,8 +332,11 @@ private let everyOrder = [SortKey.name, .ext, .size, .date, .unsorted].flatMap {
 
     private func listing(_ items: [FileItem]) -> Listing {
         Listing(
-            directory: directory, items: items, parent: URL(fileURLWithPath: "/", isDirectory: true),
-            root: URL(fileURLWithPath: "/", isDirectory: true))
+            directory: directory,
+            items: items,
+            parent: URL(fileURLWithPath: "/", isDirectory: true),
+            root: URL(fileURLWithPath: "/", isDirectory: true)
+        )
     }
 
     /// The totals as they are defined, counted from scratch.
@@ -328,10 +355,15 @@ private let everyOrder = [SortKey.name, .ext, .size, .date, .unsorted].flatMap {
     }
 
     private var sample: [FileItem] {
-        (0..<300).map { number -> FileItem in
-            let isFolder = number % 10 == 0
-            return entry(isFolder ? "folder\(number)" : "file\(number).txt", folder: isFolder, size: Int64(number * 3))
-        }
+        (0..<300)
+            .map { number -> FileItem in
+                let isFolder = number % 10 == 0
+                return entry(
+                    isFolder ? "folder\(number)" : "file\(number).txt",
+                    folder: isFolder,
+                    size: Int64(number * 3)
+                )
+            }
     }
 
     @Test func rowsAreFoundByNameHoweverOftenTheyAreAsked() {
@@ -373,7 +405,8 @@ private let everyOrder = [SortKey.name, .ext, .size, .date, .unsorted].flatMap {
         #expect(model.totals == counted(model))
         #expect(
             model.items.first { $0.name == "folder30" }?.computedSize == 12
-                && model.listedItems.first { $0.name == "folder20" }?.computedSize == 11)
+                && model.listedItems.first { $0.name == "folder20" }?.computedSize == 11
+        )
         model.invertSelection()
         #expect(model.totals == counted(model))
         model.deselect(["file1.txt", "file2.txt"])
@@ -447,7 +480,8 @@ private let everyOrder = [SortKey.name, .ext, .size, .date, .unsorted].flatMap {
         #expect(narrowed.items.map(\.name) == whole.items.map(\.name) && narrowed.listedItems.count == 300)
         #expect(
             narrowed.selection == whole.selection && narrowed.cursorItem?.name == "file12.txt"
-                && narrowed.totals == counted(narrowed))
+                && narrowed.totals == counted(narrowed)
+        )
         // Taking the filter off shows everything again.
         narrowed.setFilter(nil)
         #expect(narrowed.items.count == 300)
@@ -456,7 +490,7 @@ private let everyOrder = [SortKey.name, .ext, .size, .date, .unsorted].flatMap {
     @Test func rawDataIsStoredAsItIs() {
         let settings = MemorySettings()
         let data = Data([1, 2, 3])
-        settings.set(data, forKey: "raw")
+        settings.set(data as Data?, forKey: "raw")
         #expect(settings.data(forKey: "raw") == data)
         settings.set(["a"], forKey: "list")
         #expect(settings.value([String].self, forKey: "list") == ["a"])
@@ -481,13 +515,14 @@ private let everyOrder = [SortKey.name, .ext, .size, .date, .unsorted].flatMap {
         #expect(model.totals.selectedBytes == .max && model.totals.totalBytes == .max)
         #expect(
             Int64.max.addingSaturated(1) == .max && Int64.min.addingSaturated(-1) == .min
-                && Int64(2).addingSaturated(3) == 5)
+                && Int64(2).addingSaturated(3) == 5
+        )
 
         let memory = MemoryFileSystem()
         memory.addFile("/big/a/one.bin", "x")
         memory.addFile("/big/b/two.bin", "x")
         let inflated = HugeSizes(memory)
-        #expect(inflated.totalSize(of: memory.url("/big")) == .max)
+        #expect(inflated.totalSize(of: memory.url("/big"), cancellation: CancellationFlag()) == .max)
     }
 
     @Test func aPresortedListIsTakenAsItIs() {
@@ -500,7 +535,8 @@ private let everyOrder = [SortKey.name, .ext, .size, .date, .unsorted].flatMap {
         model.setSort(order, presorted: sorted)
         #expect(
             model.sort == order && model.items == Sorter.sort(sample, by: order)
-                && model.cursorItem?.name == "file7.txt")
+                && model.cursorItem?.name == "file7.txt"
+        )
         #expect(model.listVersion != version)
         // A list of another length cannot be this list in another order.
         model.setSort(ListOrder(key: .name), presorted: Array(sorted.dropLast()))
@@ -546,9 +582,10 @@ private final class HugeSizes: FileSystemProvider {
     var scheme: String { inner.scheme }
     var capabilities: FileSystemCapabilities { inner.capabilities }
     func list(_ directory: URL, showHidden: Bool) throws -> [FileItem] {
-        try inner.list(directory, showHidden: showHidden).map {
-            FileItem(url: $0.url, name: $0.name, isDirectory: $0.isDirectory, size: $0.isDirectory ? 0 : .max - 5)
-        }
+        try inner.list(directory, showHidden: showHidden)
+            .map {
+                FileItem(url: $0.url, name: $0.name, isDirectory: $0.isDirectory, size: $0.isDirectory ? 0 : .max - 5)
+            }
     }
     func item(at url: URL) -> FileItem? { inner.item(at: url) }
     func parent(of directory: URL) -> URL? { inner.parent(of: directory) }
@@ -608,7 +645,8 @@ private final class HugeSizes: FileSystemProvider {
             for name in names {
                 #expect(
                     compiled.matches(name) == reference(mask, name),
-                    "\(mask.debugDescription) on \(name.debugDescription)")
+                    "\(mask.debugDescription) on \(name.debugDescription)"
+                )
             }
         }
     }

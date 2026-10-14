@@ -85,7 +85,7 @@ private func status(_ url: URL) -> stat {
         let lock = NSLock()
         for url in [pipe, box.url("pipelink"), box.url("filelink")] {
             let returned = finishes {
-                let failed = (try? local.append(to: url, at: nil)) == nil
+                let failed = (try? local.append(to: url, at: nil, cancellation: CancellationFlag())) == nil
                 lock.lock()
                 threw.append(failed)
                 lock.unlock()
@@ -95,7 +95,7 @@ private func status(_ url: URL) -> stat {
         #expect(threw.count == 3 && threw.allSatisfy { $0 })
         #expect(box.read("target.txt") == "0123456789")
         // Through the name of the file itself it works, and cuts at the offset.
-        let writer = try local.append(to: target, at: 4)
+        let writer = try local.append(to: target, at: 4, cancellation: CancellationFlag())
         try writer.write(Data("ab".utf8))
         try writer.close(attributes: FileAttributes())
         #expect(box.read("target.txt") == "0123ab")
@@ -224,7 +224,8 @@ private func status(_ url: URL) -> stat {
         unlink(url.path)
         try FileManager.default.createSymbolicLink(at: url, withDestinationURL: victim)
         try writer.close(
-            attributes: FileAttributes(modified: Date(timeIntervalSince1970: 1_000_000_000), permissions: 0o600))
+            attributes: FileAttributes(modified: Date(timeIntervalSince1970: 1_000_000_000), permissions: 0o600)
+        )
         let after = status(victim)
         #expect(after.st_mode == before.st_mode && after.st_mtimespec.tv_sec == before.st_mtimespec.tv_sec)
         #expect(box.read("victim.txt") == "mine")
@@ -268,13 +269,11 @@ private func status(_ url: URL) -> stat {
         #expect(byName["dangling"]?.isSymlink == true && byName["dangling"]?.isDirectory == false)
         #expect(byName["topipe"]?.isSpecial == true && byName["pipe"]?.isSpecial == true)
         #expect(byName["todir"]?.isDirectory == true && byName["rel"]?.isDirectory == true)
-        // The lean listing and the single item agree.
-        let lean = try local.entries(
-            of: box.root, showHidden: true, foldersOnly: true, cancellation: CancellationFlag())
-        #expect(Set(lean.map(\.name)) == ["dir", "todir", "rel"])
+        // The single item agrees.
         #expect(
             local.item(at: box.url("todir"))?.isDirectory == true
-                && local.item(at: box.url("topipe"))?.isSpecial == true)
+                && local.item(at: box.url("topipe"))?.isSpecial == true
+        )
     }
 
     // MARK: Locks
@@ -405,7 +404,9 @@ private func status(_ url: URL) -> stat {
         // made, and may have told the world before a listener that came after it was there.
         let heard = Locked<[(ObjectIdentifier, Bool)]>([])
         let observer = NotificationCenter.default.addObserver(
-            forName: LocalFileSystem.placesDidChange, object: nil, queue: nil
+            forName: LocalFileSystem.placesDidChange,
+            object: nil,
+            queue: nil
         ) { note in
             guard let sender = note.object as AnyObject? else { return }
             heard.withValue { $0.append((ObjectIdentifier(sender), Thread.isMainThread)) }
@@ -485,7 +486,8 @@ private func status(_ url: URL) -> stat {
         // Hundreds of changes; at most one report per half second (plus slack).
         #expect(
             reports >= 1 && Double(reports) <= elapsed / 0.5 + 3,
-            "\(reports) reports in \(elapsed) s for \(number) changes")
+            "\(reports) reports in \(elapsed) s for \(number) changes"
+        )
         watcher.stop()
         try await Task.sleep(nanoseconds: 200_000_000)
         let afterStop = count.withValue { $0 }
@@ -524,7 +526,8 @@ private func status(_ url: URL) -> stat {
         }
         #expect(
             seen.withValue { $0.contains("b") },
-            "no report after \(number) changes in \(Int(Date().timeIntervalSince(started))) s")
+            "no report after \(number) changes in \(Int(Date().timeIntervalSince(started))) s"
+        )
         watcher.stop()
     }
 }

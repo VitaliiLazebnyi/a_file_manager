@@ -1,6 +1,7 @@
 import AFMKernel
 import Foundation
 import FuzzCore
+import TestSupport
 
 @testable import NetworkPlugin
 
@@ -8,11 +9,12 @@ import FuzzCore
 
 func text(_ b: [UInt8]) -> String { String(decoding: b, as: UTF8.self) }
 func lines(_ b: [UInt8]) -> [[UInt8]] {
-    b.split(separator: 0x0A, omittingEmptySubsequences: false).map {
-        var l = Array($0)
-        if l.last == 0x0D { l.removeLast() }
-        return l
-    }
+    b.split(separator: 0x0A, omittingEmptySubsequences: false)
+        .map {
+            var l = Array($0)
+            if l.last == 0x0D { l.removeLast() }
+            return l
+        }
 }
 let base = URL(string: "ftp://example.com/dir/")!
 let fixedNow = Date(timeIntervalSince1970: 1_700_000_000)
@@ -21,18 +23,23 @@ func check(_ entry: RemoteEntry?) {
     guard let entry else { return }
     // What becomes a row of a panel: a name that is one path component.
     fzCheck(
-        RemoteEntry.isSafeName(entry.name) || entry.name.contains("\\"), "ftplist-unsafe-name",
-        entry.name.debugDescription)
+        RemoteEntry.isSafeName(entry.name) || entry.name.contains("\\"),
+        "ftplist-unsafe-name",
+        entry.name.debugDescription
+    )
     // By bytes: a `/` that carries a combining mark is one character with it, and still a separator.
     let raw = Array(entry.name.utf8)
     fzCheck(
         !raw.contains(0x2F) && raw != [0x2E] && raw != [0x2E, 0x2E] && !raw.isEmpty && !raw.contains(0),
-        "ftplist-name-is-a-path", entry.name.debugDescription)
+        "ftplist-name-is-a-path",
+        entry.name.debugDescription
+    )
     _ = entry.item(in: base)
 }
 
 let ftpList = FuzzTarget(
-    "ftplist", maxLen: 2_048,
+    "ftplist",
+    maxLen: 2_048,
     dict: [
         "type=file;", "type=dir;", "type=cdir;", "type=pdir;", "type=OS.unix=slink:/x;", "size=", "sizd=",
         "modify=20240102030405;", "perm=", "unix.mode=0755;", "UNIX.mode=", " -> ", "drwxr-xr-x", "lrwxrwxrwx",
@@ -53,7 +60,8 @@ let ftpList = FuzzTarget(
             "+i8388621.29609,m824255902,/,\tdev", "+i8388621.44468,m839956783,r,s10376,\tRFCEPLF",
             "+up644,s0,m99999999999999999999,\tx", "total 42",
             "-rw-r--r-- 1 u g 5 Jan 2 03:04 a\n-rw-r--r-- 1 u g 5 2 Jan 03:04 b\ntype=file;size=1; c\n+s1,\td\n01-02-24 03:04AM 5 e"
-        ].map { Array($0.utf8) }
+        ]
+        .map { Array($0.utf8) }
     },
     run: { bytes in
         var decoded: [String] = []
@@ -68,10 +76,12 @@ let ftpList = FuzzTarget(
         }
         FTPListParser.entries(of: decoded, asMLSD: true, now: fixedNow).forEach(check)
         FTPListParser.entries(of: decoded, asMLSD: false, now: fixedNow).forEach(check)
-    })
+    }
+)
 
 let ftpReply = FuzzTarget(
-    "ftpreply", maxLen: 2_048,
+    "ftpreply",
+    maxLen: 2_048,
     dict: [
         "227 Entering Passive Mode (192,168,1,2,19,137)", "229 Entering Extended Passive Mode (|||6446|)",
         "211-Features:", "211 End", " MLST type*;size*;modify*;", " UTF8", "257 \"/a \"\"quoted\"\" name\" created",
@@ -83,7 +93,8 @@ let ftpReply = FuzzTarget(
             "220-Welcome\n line two\n220 ready\n227 Entering Passive Mode (192,168,1,2,19,137)\n229 Entering Extended Passive Mode (|||6446|)\n211-Features:\n MLST type*;size*;\n UTF8\n211 End\n257 \"/a \"\"q\"\" n\" created\n213 20240102030405\n",
             "150\n226-x\n226\n", "500 no\n227 =1,2,3,4,5,6\n229 (!!!1!)\n",
             "SITE A;;B; SITE C ;\nsrc -> dst\n+ a/b\n- c\n"
-        ].map { Array($0.utf8) }
+        ]
+        .map { Array($0.utf8) }
     },
     run: { bytes in
         var parser = FTPReplyParser()
@@ -109,7 +120,8 @@ let ftpReply = FuzzTarget(
             _ = FTPServerConfig.initCommands(from: line)
         }
         _ = DownloadList.parse(text(bytes))
-    })
+    }
+)
 
 func exercise(_ c: SavedConnection) {
     _ = c.key.description
@@ -121,7 +133,8 @@ func exercise(_ c: SavedConnection) {
 }
 
 let address = FuzzTarget(
-    "address", maxLen: 1_024,
+    "address",
+    maxLen: 1_024,
     dict: [
         "ftp://", "ftps://", "sftp://", "ftpes://", "://", "@", ":", "/", "[", "]", "[::1]", "%", "%00", "%2F", "%40",
         "%ZZ", "%E0%A4%A", "99999999999999999999", ":0", ":65536", ":-1", ":21", "user:pass@", "//", "?", "#", " ",
@@ -132,7 +145,8 @@ let address = FuzzTarget(
             "ftp://user:p%40ss@host.example.com:2121/pub/dir", "sftp://[2001:db8::1]:22/home", "host", "host:21",
             "ftps://host/", "user@host/path with space/%41", "ftp://a:b:c@d@e:99/", "[::1]", "sftp://u@h/~/../x//y/./z",
             "ftp://host:99999999999999999999/", "://", "ftp://%zz:%@:/"
-        ].map { Array($0.utf8) }
+        ]
+        .map { Array($0.utf8) }
     },
     run: { bytes in
         for raw in lines(bytes).prefix(8) {
@@ -140,8 +154,10 @@ let address = FuzzTarget(
             for scheme in ["ftp", "sftp", "ftps"] {
                 guard let a = ServerAddress(s, defaultScheme: scheme) else { continue }
                 fzCheck(
-                    a.path.hasPrefix("/"), "address-path-not-absolute",
-                    "\(s.debugDescription) -> \(a.path.debugDescription)")
+                    a.path.hasPrefix("/"),
+                    "address-path-not-absolute",
+                    "\(s.debugDescription) -> \(a.path.debugDescription)"
+                )
                 let shown = a.textWithoutPassword
                 // (The user name is shown percent-encoded: its escapes may spell the password by chance.)
                 let shownUser = (a.user ?? "").addingPercentEncoding(withAllowedCharacters: .urlUserAllowed) ?? ""
@@ -149,8 +165,10 @@ let address = FuzzTarget(
                     !a.host.contains(p), !a.path.contains(p), !a.scheme.contains(p), !String(a.port).contains(p)
                 {
                     fzCheck(
-                        !shown.contains(p), "address-password-shown",
-                        "\(s.debugDescription) -> \(shown.debugDescription)")
+                        !shown.contains(p),
+                        "address-password-shown",
+                        "\(s.debugDescription) -> \(shown.debugDescription)"
+                    )
                 }
                 _ = ServerAddress(shown, defaultScheme: scheme)
                 let key = ServerKey(scheme: a.scheme, host: a.host, port: a.port)
@@ -167,7 +185,9 @@ let address = FuzzTarget(
             fzCheck(
                 n.utf8.first == 0x2F && (n.utf8.count == 1 || !parts.dropFirst().contains([]))
                     && !parts.contains([0x2E, 0x2E]) && !parts.contains([0x2E]),
-                "remotepath-normalized", "\(s.debugDescription) -> \(n.debugDescription)")
+                "remotepath-normalized",
+                "\(s.debugDescription) -> \(n.debugDescription)"
+            )
             _ = RemotePath.parent(of: s)
             _ = RemotePath.name(of: s)
             _ = RemotePath.join(s, s)
@@ -178,12 +198,16 @@ let address = FuzzTarget(
             var c = SavedConnection()
             for kind in SavedConnection.Kind.allCases { if c.setHost(s, kind: kind) { exercise(c) } }
             _ = SFTPSession.asksForPassword(
-                s, of: ConnectionProfile(key: ServerKey(scheme: "sftp", host: "host"), user: "u"))
+                s,
+                of: ConnectionProfile(key: ServerKey(scheme: "sftp", host: "host"), user: "u")
+            )
         }
-    })
+    }
+)
 
 let saved = FuzzTarget(
-    "saved", maxLen: 4_096,
+    "saved",
+    maxLen: 4_096,
     dict: [
         "\"id\"", "\"name\"", "\"kind\"", "\"host\"", "\"port\"", "\"user\"", "\"anonymous\"", "\"remoteDirectory\"",
         "\"localDirectory\"", "\"passive\"", "\"encoding\"", "\"listing\"", "\"initCommands\"", "null", "true", "-1",
@@ -229,7 +253,8 @@ let saved = FuzzTarget(
         for h in store.history { if let a = ServerAddress(h) { store.remember(address: a) } }
         _ = store.lastUsed
         _ = store.trustedCertificates
-    })
+    }
+)
 
 /// The body of a packet as the session reads the answers it expects.
 func decodeAs(_ kind: SFTPPacket.Kind, _ body: Data) {
@@ -272,7 +297,8 @@ func decodeAs(_ kind: SFTPPacket.Kind, _ body: Data) {
 }
 
 let sftpDecode = FuzzTarget(
-    "sftpdec", maxLen: 2_048,
+    "sftpdec",
+    maxLen: 2_048,
     seeds: {
         var e = SFTPEncoder()
         e.u32(2)
@@ -313,7 +339,8 @@ let sftpDecode = FuzzTarget(
             decodeAs(kind, body.dropFirst(min(4, body.count)))
         }
         for kind in kinds { decodeAs(kind, body) }
-    })
+    }
+)
 
 /// A whole session against a "server" that says what the input holds: the answers are framed
 /// here (length, type, the request numbers in the order the session asks), their bodies are
@@ -341,7 +368,8 @@ func conversation(_ bytes: [UInt8]) -> Data {
 
 var sftpEnvironment: SessionEnvironment!
 let sftpSession = FuzzTarget(
-    "sftpsession", maxLen: 3_000,
+    "sftpsession",
+    maxLen: 3_000,
     seeds: {
         func be(_ v: UInt32) -> [UInt8] { [UInt8(v >> 24), UInt8(v >> 16 & 255), UInt8(v >> 8 & 255), UInt8(v & 255)] }
         func str(_ s: String) -> [UInt8] { be(UInt32(s.utf8.count)) + Array(s.utf8) }
@@ -374,8 +402,10 @@ let sftpSession = FuzzTarget(
         FileManager.default.createFile(atPath: file, contents: conversation(bytes))
         let profile = ConnectionProfile(key: ServerKey(scheme: "sftp", host: "fuzz.invalid"), user: "u")
         let session = SFTPSession(
-            profile: profile, environment: sftpEnvironment,
-            transport: SFTPTransport(executable: "/bin/cat", arguments: [file]))
+            profile: profile,
+            environment: sftpEnvironment,
+            transport: SFTPTransport(executable: "/bin/cat", arguments: [file])
+        )
         defer { session.disconnect() }
         guard let home = try? session.connect(cancellation: nil) else { return }
         var seen: [RemoteEntry] = []
@@ -390,6 +420,7 @@ let sftpSession = FuzzTarget(
             while let block = try? reader.read(upToCount: 32_768), total < 1 << 20 { total += block.count }
             reader.close()
         }
-    })
+    }
+)
 
 fuzzMain([ftpList, ftpReply, address, saved, sftpDecode, sftpSession])

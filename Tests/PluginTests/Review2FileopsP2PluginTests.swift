@@ -65,13 +65,6 @@ final class P2DeferredJobs: JobService {
     /// Called after each job's work, before its completion is kept.
     var afterWork: (() -> Void)?
 
-    private final class Handle: JobHandle {
-        let title: String
-        let isFinished = true
-        init(_ title: String) { self.title = title }
-        func cancel() {}
-    }
-
     final class Monitor: JobMonitor, Sendable {
         let cancellation = CancellationFlag()
         func report(_: JobProgress) {}
@@ -81,19 +74,16 @@ final class P2DeferredJobs: JobService {
         }
     }
 
-    @discardableResult
     func run<Result: Sendable>(
-        title: String, work: @escaping @Sendable (any JobMonitor) -> Result,
+        title: String,
+        work: @escaping @Sendable (any JobMonitor) -> Result,
         completion: @escaping @MainActor (Result) -> Void
-    ) -> any JobHandle {
+    ) {
         titles.append(title)
         let result = work(Monitor())
         afterWork?()
         pending.append { completion(result) }
-        return Handle(title)
     }
-
-    func cancelAll(then completion: @escaping () -> Void) { completion() }
 
     /// Runs the completions that wait, and those they start.
     func deliver() {
@@ -114,7 +104,11 @@ final class P2Bench: ShellServices {
     var commands: CommandRegistry { kernel.commands }
 
     init(
-        plugins: [any Plugin], fileSystems: [any FileSystemProvider], left: URL, right: URL, ui: any UserInteraction,
+        plugins: [any Plugin],
+        fileSystems: [any FileSystemProvider],
+        left: URL,
+        right: URL,
+        ui: any UserInteraction,
         jobs: any JobService = ImmediateJobService(),
         settings: any SettingsStore = MemorySettings()
     ) {
@@ -123,7 +117,8 @@ final class P2Bench: ShellServices {
         kernel.load(plugins)
         panelSet = FakePanelSet(
             left: FakePanel(showing: left, fileSystems: kernel.fileSystems),
-            right: FakePanel(showing: right, fileSystems: kernel.fileSystems))
+            right: FakePanel(showing: right, fileSystems: kernel.fileSystems)
+        )
         self.jobs = jobs
         kernel.attach(self)
     }
@@ -145,15 +140,20 @@ final class P2Bench: ShellServices {
     }
 
     private func bench(
-        _ plugins: [any Plugin] = [FileOperationsPlugin(), SelectionPlugin()], left: URL? = nil,
+        _ plugins: [any Plugin] = [FileOperationsPlugin(), SelectionPlugin()],
+        left: URL? = nil,
         settings: any SettingsStore = MemorySettings()
     )
         -> P2Bench
     {
         P2Bench(
-            plugins: plugins, fileSystems: [LocalFileSystem(), memory], left: left ?? memory.url("/A"),
-            right: memory.url("/B"), ui: ui,
-            settings: settings)
+            plugins: plugins,
+            fileSystems: [LocalFileSystem(), memory],
+            left: left ?? memory.url("/A"),
+            right: memory.url("/B"),
+            ui: ui,
+            settings: settings
+        )
     }
 
     // F055: Return must not delete for good.
@@ -195,16 +195,20 @@ final class P2Bench: ShellServices {
         #expect(ui.questions.last?.message == "Overwrite:" && ui.questions.last?.defaultButton == 2)
         #expect(bridge.job(job, confirmDeleteNonEmpty: memory.url("/A")) == .skip)
         #expect(
-            ui.questions.last?.buttons == ["Delete", "All", "Skip", "Cancel"] && ui.questions.last?.defaultButton == 2)
+            ui.questions.last?.buttons == ["Delete", "All", "Skip", "Cancel"] && ui.questions.last?.defaultButton == 2
+        )
         for reason in [ProtectionQuestion.Reason.readOnly, .hidden, .locked, .noTrash] {
             #expect(
-                bridge.job(job, confirm: ProtectionQuestion(reason: reason, purpose: .delete, item: old)) == .skip)
+                bridge.job(job, confirm: ProtectionQuestion(reason: reason, purpose: .delete, item: old)) == .skip
+            )
             #expect(ui.questions.last?.defaultButton == 2)
         }
         #expect(
-            bridge.job(job, confirm: ProtectionQuestion(reason: .readOnly, purpose: .overwrite, item: old)) == .skip)
+            bridge.job(job, confirm: ProtectionQuestion(reason: .readOnly, purpose: .overwrite, item: old)) == .skip
+        )
         #expect(
-            bridge.job(job, crossVolumeAt: old, purpose: .delete) == .skip && ui.questions.last?.defaultButton == 0)
+            bridge.job(job, crossVolumeAt: old, purpose: .delete) == .skip && ui.questions.last?.defaultButton == 0
+        )
         // Every question of the bridge that can destroy said which button Return presses.
         #expect(ui.questions.allSatisfy { $0.defaultButton != -1 })
         // A chosen answer is still the answer.
@@ -230,12 +234,14 @@ final class P2Bench: ShellServices {
         #expect(OperationText.targetProposal(count: 2, single: nil, targetPath: "mem:/B") == "mem:/B/*.*")
         #expect(
             OperationText.deleteQuestion(count: 2, single: nil, toTrash: false)
-                == "Do you really want to delete the 2 selected files/directories?")
+                == "Do you really want to delete the 2 selected files/directories?"
+        )
         // The old forms say the same.
         #expect(OperationText.heading("Copy", picked.items()) == "Copy 2 file(s) to")
         #expect(
             OperationText.deleteQuestion(Array(picked.items().prefix(1)), toTrash: true)
-                == OperationText.deleteQuestion(count: 1, single: picked.first, toTrash: true))
+                == OperationText.deleteQuestion(count: 1, single: picked.first, toTrash: true)
+        )
         // On `[..]` with nothing marked there is nothing to do.
         model.clearSelection()
         model.moveCursor(to: 0)
@@ -371,7 +377,8 @@ final class P2Bench: ShellServices {
         #expect(memory.exists("/A/fresh/inner"))
         // The name of a file that is there: said, and nothing made.
         #expect(
-            ui.messages.contains { $0.contains("one.txt cannot be created") } && memory.contents("/A/one.txt") == "1")
+            ui.messages.contains { $0.contains("one.txt cannot be created") } && memory.contents("/A/one.txt") == "1"
+        )
     }
 }
 
@@ -392,7 +399,10 @@ final class P2Bench: ShellServices {
         probe.base.addFile("/A/one.txt")
         bench = TestBench(
             plugins: [FileOperationsPlugin(), ClipboardPlugin(pasteboard: scratch.pasteboard), SelectionPlugin()],
-            fileSystems: [LocalFileSystem(), probe], left: probe.base.url("/A"), right: box.url("t"))
+            fileSystems: [LocalFileSystem(), probe],
+            left: probe.base.url("/A"),
+            right: box.url("t")
+        )
     }
 
     /// Lets the main queue run until `condition` holds. The limit is far beyond what the
@@ -436,7 +446,8 @@ final class P2Bench: ShellServices {
                 let item = NSPasteboardItem()
                 item.setString(url.absoluteString, forType: .fileURL)
                 return item
-            })
+            }
+        )
     }
 
     // F039
@@ -523,7 +534,8 @@ final class P2Bench: ShellServices {
         commands.perform(.pasteFromClipboard)
         #expect(
             probe.base.allPaths == ["/A", "/A/Clipboard.txt", "/A/one.txt"]
-                && probe.base.contents("/A/Clipboard.txt") == "some text")
+                && probe.base.contents("/A/Clipboard.txt") == "some text"
+        )
     }
 
     @Test func whetherThereIsSomethingToPasteIsAskedOncePerStateOfTheClipboard() {
@@ -649,14 +661,16 @@ final class P2Bench: ShellServices {
             p2Finishes(rescue: { probe.base.releaseStalls() }) {
                 let comments = store.comments(in: folder, cancellation: second)
                 lock.withLock { answers[1] = comments }
-            })
+            }
+        )
         // …and one without a flag when its patience runs out.
         store.waitLimit = 0.2
         #expect(
             p2Finishes(rescue: { probe.base.releaseStalls() }) {
                 let comments = store.comments(in: folder)
                 lock.withLock { answers[2] = comments }
-            })
+            }
+        )
         // Nobody opened the file a second time meanwhile.
         #expect(probe.reads.count == alreadyRead + 1)
         // The reader itself ends with its flag, and what it did not read is not remembered.
@@ -752,7 +766,11 @@ final class P2Bench: ShellServices {
         bench = P2Bench(
             plugins: [FilePropertiesPlugin(launchesApplications: false), SelectionPlugin()],
             fileSystems: [LocalFileSystem()],
-            left: box.url("d"), right: box.url("other"), ui: ui, jobs: jobs)
+            left: box.url("d"),
+            right: box.url("other"),
+            ui: ui,
+            jobs: jobs
+        )
     }
 
     // F037: a dialog about what the panel showed when the command was given.
@@ -768,7 +786,9 @@ final class P2Bench: ShellServices {
             bench.left.moveCursor(toName: "a.txt")
         }
         try FileManager.default.createSymbolicLink(
-            at: box.url("d/link"), withDestinationURL: box.url("files/only.txt"))
+            at: box.url("d/link"),
+            withDestinationURL: box.url("files/only.txt")
+        )
         bench.left.reload()
         bench.left.moveCursor(toName: "link")
         #expect(bench.commands.perform(.showLinkTarget))

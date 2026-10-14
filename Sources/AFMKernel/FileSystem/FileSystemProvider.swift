@@ -25,7 +25,11 @@ public struct Place: Sendable {
     /// into the Mac; a USB stick, a card, a disk image, an external disk and a server's share
     /// may. A disk the system does not call external is taken for an internal one.
     public static func isEjectable(
-        path: String, isRootFileSystem: Bool?, isInternal: Bool?, isLocal: Bool?, isRemovable: Bool?,
+        path: String,
+        isRootFileSystem: Bool?,
+        isInternal: Bool?,
+        isLocal: Bool?,
+        isRemovable: Bool?,
         isEjectable: Bool?
     ) -> Bool {
         if isRootFileSystem == true || path == "/" || path.hasPrefix("/System/") { return false }
@@ -156,28 +160,6 @@ extension CancellationFlag {
 /// may happen on any thread.
 public typealias WatchToken = AnyObject & Sendable
 
-/// What a lean listing tells about an entry: enough to walk a tree of folders, and no more.
-public struct DirectoryEntry: Equatable, Sendable {
-    public let name: String
-    /// A directory, or a symbolic link that points to one.
-    public let isDirectory: Bool
-    public let isSymlink: Bool
-    public let isPackage: Bool
-    public let isHidden: Bool
-
-    public init(
-        name: String, isDirectory: Bool, isSymlink: Bool = false, isPackage: Bool = false, isHidden: Bool = false
-    ) {
-        self.name = name
-        self.isDirectory = isDirectory
-        self.isSymlink = isSymlink
-        self.isPackage = isPackage
-        self.isHidden = isHidden
-    }
-
-    public var isRealDirectory: Bool { isDirectory && !isSymlink }
-}
-
 /// Something a panel can show and operations can work on: the local disks, and later
 /// archives or servers (spec 01 › File systems shown in a panel). A provider is chosen by the
 /// scheme of a URL; every URL it is handed has its own scheme.
@@ -218,12 +200,6 @@ public protocol FileSystemProvider: AnyObject, Sendable {
     func list(_ directory: URL, showHidden: Bool, cancellation: CancellationFlag) throws -> [FileItem]
     /// `list(_:showHidden:receive:)`, ended early once `cancellation` is set.
     func list(_ directory: URL, showHidden: Bool, cancellation: CancellationFlag, receive: ([FileItem]) -> Bool) throws
-    /// Names and kinds only, for whoever walks folders and needs neither sizes, dates nor
-    /// locations; with `foldersOnly`, only the entries that are directories (links to
-    /// directories among them). In no particular order. The default lists in full; a file
-    /// system that can read less offers that.
-    func entries(of directory: URL, showHidden: Bool, foldersOnly: Bool, cancellation: CancellationFlag) throws
-        -> [DirectoryEntry]
     /// The entry at `url` itself (a link is not followed); nil when nothing is there.
     func item(at url: URL) -> FileItem?
     /// `item(at:)`, ended early (with nil) once `cancellation` is set.
@@ -352,14 +328,6 @@ public protocol FileSystemProvider: AnyObject, Sendable {
     /// released. `onChange` is called on the main thread with the directories that changed.
     /// Nil when watching is not available.
     func watch(_ directories: [URL], onChange: @escaping @MainActor @Sendable ([URL]) -> Void) -> (any WatchToken)?
-    /// The same for whole trees: with `recursively`, `onChange` names a watched directory
-    /// when anything at or below it changed, however deep. For a view that shows a tree as
-    /// one list, which would otherwise have to watch every folder of it. The default
-    /// watches the directories themselves only, as the call above does: a file system that
-    /// can watch a tree at the cost of one folder offers this.
-    func watch(_ directories: [URL], recursively: Bool, onChange: @escaping @MainActor @Sendable ([URL]) -> Void) -> (
-        any WatchToken
-    )?
 
     // The calls that change something, ended early once `cancellation` is set (see
     // Cancellation above). Each one's default is the call without a flag. A file system whose
@@ -439,27 +407,6 @@ extension FileSystemProvider {
         }
     }
 
-    public func entries(of directory: URL, showHidden: Bool, foldersOnly: Bool, cancellation: CancellationFlag) throws
-        -> [DirectoryEntry]
-    {
-        try entriesByListing(
-            of: directory, showHidden: showHidden, foldersOnly: foldersOnly, cancellation: cancellation)
-    }
-
-    /// The lean listing as any file system can give it: from the full one.
-    public func entriesByListing(
-        of directory: URL, showHidden: Bool, foldersOnly: Bool, cancellation: CancellationFlag
-    ) throws -> [DirectoryEntry] {
-        try list(directory, showHidden: showHidden, cancellation: cancellation).compactMap { item in
-            foldersOnly && !item.isDirectory
-                ? nil
-                : DirectoryEntry(
-                    name: item.name, isDirectory: item.isDirectory, isSymlink: item.isSymlink,
-                    isPackage: item.isPackage,
-                    isHidden: item.isHidden)
-        }
-    }
-
     public func item(at url: URL, cancellation: CancellationFlag) -> FileItem? {
         cancellation.isCancelled ? nil : item(at: url)
     }
@@ -507,11 +454,6 @@ extension FileSystemProvider {
         cancellation.isCancelled ? nil : volume(of: url)
     }
     public func watch(_: [URL], onChange _: @escaping @MainActor @Sendable ([URL]) -> Void) -> (any WatchToken)? { nil }
-    public func watch(
-        _ directories: [URL], recursively _: Bool, onChange: @escaping @MainActor @Sendable ([URL]) -> Void
-    ) -> (any WatchToken)? {
-        watch(directories, onChange: onChange)
-    }
 
     public func createDirectory(at url: URL, cancellation: CancellationFlag) throws {
         if cancellation.isCancelled { throw CocoaError(.userCancelled) }
@@ -579,11 +521,6 @@ extension FileSystemProvider {
 }
 
 extension FileSystemProvider {
-    /// Sum of the file sizes below a directory (spec 01 › Directory sizes during selection).
-    public func totalSize(of directory: URL) -> Int64 {
-        totalSize(of: directory, cancellation: CancellationFlag())
-    }
-
     public func totalSize(of directory: URL, cancellation: CancellationFlag) -> Int64 {
         totalSizeByListing(of: directory, cancellation: cancellation)
     }
@@ -645,15 +582,6 @@ extension FileSystemProvider {
         return cancellation.isCancelled ? 0 : total
     }
 
-    /// Continues a file without a way to stop the opening.
-    public func append(to url: URL, at offset: Int64?) throws -> any FileWriter {
-        try append(to: url, at: offset, cancellation: CancellationFlag())
-    }
-
-    public func commit(_ url: URL) throws {
-        try commit(url, cancellation: CancellationFlag())
-    }
-
     /// The top of the tree `url` belongs to, found by going up (the default of the requirement).
     public func root(of url: URL) -> URL {
         var current = url
@@ -680,7 +608,8 @@ public final class FileSystemRegistry: @unchecked Sendable {
         defer { lock.unlock() }
         precondition(
             !providers.contains { $0.scheme == provider.scheme },
-            "A file system for \(provider.scheme): is registered twice")
+            "A file system for \(provider.scheme): is registered twice"
+        )
         providers.append(provider)
     }
 
@@ -709,11 +638,6 @@ public final class FileSystemRegistry: @unchecked Sendable {
     /// background, and hands the answer to `PanelModel.setVolume`.
     public static let volumeInfoDidChange = Notification.Name("AFMVolumeInfoDidChange")
     public static let volumeRootKey = "volumeRoot"
-
-    /// Posted on the main thread when a file system has learned that what `places()` answers
-    /// is no longer what it last answered (a disk came or went). The object is the file
-    /// system. Whoever shows the places (the drive bar, a volume menu) asks again.
-    public static let placesDidChange = Notification.Name("AFMPlacesDidChange")
 
     /// The real location behind a location, followed to the end: what
     /// `FileSystemProvider.realLocation(of:)` answers, asked again of the file system of the
@@ -833,11 +757,11 @@ public final class FileSystemRegistry: @unchecked Sendable {
 /// How deep the calls of a walk through a tree of folders are nested on the current thread.
 /// For walks that call themselves once per level (`totalSizeByListing`), so that they can
 /// stop nesting before a thread's stack is used up.
-public enum TreeWalk: Sendable {
+enum TreeWalk: Sendable {
     /// Calls nested deeper than this on one thread go on without nesting.
-    public static let deepestNesting = 32
+    static let deepestNesting = 32
     /// Levels below which a walk that no longer nests gives up: no real tree is that deep.
-    public static let deepestTree = 1_000
+    static let deepestTree = 1_000
 
     private static let key: pthread_key_t = {
         var key = pthread_key_t()
@@ -846,7 +770,7 @@ public enum TreeWalk: Sendable {
     }()
 
     /// The number of walk calls under way on this thread, one inside the other.
-    public static var nesting: Int {
+    static var nesting: Int {
         get { Int(bitPattern: pthread_getspecific(key)) }
         set { pthread_setspecific(key, UnsafeRawPointer(bitPattern: newValue)) }
     }

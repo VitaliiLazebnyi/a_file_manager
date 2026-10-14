@@ -55,8 +55,12 @@ import Testing
 @Suite struct Sorting {
     func item(_ name: String, folder: Bool = false, size: Int64 = 0, time: TimeInterval = 0) -> FileItem {
         FileItem(
-            url: URL(fileURLWithPath: "/tmp/\(name)"), name: name, isDirectory: folder, size: size,
-            modified: Date(timeIntervalSince1970: time))
+            url: URL(fileURLWithPath: "/tmp/\(name)"),
+            name: name,
+            isDirectory: folder,
+            size: size,
+            modified: Date(timeIntervalSince1970: time)
+        )
     }
 
     @Test func foldersFirstAndAlwaysByName() {
@@ -101,11 +105,15 @@ import Testing
             var list = SortedFileList(order: order)
             var all: [FileItem] = []
             for batch in 0..<6 {
-                let items = (0..<30).map {
-                    item(
-                        "f\(($0 * 17 + batch * 5) % 97)-\(batch).\(["txt", "md"][$0 % 2])", folder: $0 % 9 == 0,
-                        size: Int64($0 % 4), time: TimeInterval(($0 * 31 + batch) % 13))
-                }
+                let items = (0..<30)
+                    .map {
+                        item(
+                            "f\(($0 * 17 + batch * 5) % 97)-\(batch).\(["txt", "md"][$0 % 2])",
+                            folder: $0 % 9 == 0,
+                            size: Int64($0 % 4),
+                            time: TimeInterval(($0 * 31 + batch) % 13)
+                        )
+                    }
                 list.add(items)
                 all += items
                 #expect(list.items.map(\.name) == Sorter.sort(all, by: order).map(\.name))
@@ -117,12 +125,15 @@ import Testing
     @Test func aLongListSortedOnAllCoresEqualsTheSimpleSort() {
         // Above the threshold the list is sorted in parallel runs and merged.
         let count = 60_000
-        let items = (0..<count).map { index in
-            item(
-                "file\((index &* 7_919) % count)-\(index % 3).\(["txt", "md", "swift"][index % 3])",
-                folder: index % 97 == 0,
-                size: Int64((index &* 31) % 5_000), time: TimeInterval((index &* 17) % 9_000))
-        }
+        let items = (0..<count)
+            .map { index in
+                item(
+                    "file\((index &* 7_919) % count)-\(index % 3).\(["txt", "md", "swift"][index % 3])",
+                    folder: index % 97 == 0,
+                    size: Int64((index &* 31) % 5_000),
+                    time: TimeInterval((index &* 17) % 9_000)
+                )
+            }
         for order in [
             ListOrder(), ListOrder(key: .size, descending: true), ListOrder(key: .date), ListOrder(key: .unsorted)
         ] {
@@ -203,11 +214,18 @@ import Testing
         #expect(
             panel.totals
                 == PanelModel.Totals(
-                    selectedBytes: 0, totalBytes: 3_072, selectedFiles: 0, totalFiles: 2,
-                    selectedFolders: 0, totalFolders: 2))
+                    selectedBytes: 0,
+                    totalBytes: 3_072,
+                    selectedFiles: 0,
+                    totalFiles: 2,
+                    selectedFolders: 0,
+                    totalFolders: 2
+                )
+        )
         panel.selectAll()
         #expect(
-            panel.totals.selectedBytes == 3_072 && panel.totals.selectedFiles == 2 && panel.totals.selectedFolders == 2)
+            panel.totals.selectedBytes == 3_072 && panel.totals.selectedFiles == 2 && panel.totals.selectedFolders == 2
+        )
         panel.select(mask: "*.txt", select: false)
         #expect(panel.selection == ["bin", "docs", "b.md"])
         panel.invertSelection()
@@ -376,7 +394,9 @@ import Testing
         panel.setSort(ListOrder(key: .size, descending: true))
         // The background still delivers by name; the panel puts it into its own order.
         panel.extend(
-            to: Sorter.sort([entry["a.txt"]!, entry["b.md"]!, entry["docs"]!], by: byName), sortedBy: byName)
+            to: Sorter.sort([entry["a.txt"]!, entry["b.md"]!, entry["docs"]!], by: byName),
+            sortedBy: byName
+        )
         #expect(panel.items.map(\.name) == ["docs", "a.txt", "b.md"])
     }
 }
@@ -439,13 +459,16 @@ import Testing
         let settings = MemorySettings()
         settings.set(tabs.state, forKey: "left.tabs")
         let restored = PanelTabs(
-            restoring: settings.value(PanelTabs.State.self, forKey: "left.tabs"), fallback: memory.url("/"))
+            restoring: settings.value(PanelTabs.State.self, forKey: "left.tabs"),
+            fallback: memory.url("/")
+        )
         #expect(restored.count == 2 && restored.activeIndex == 1)
         #expect(restored.active.directory.isSameLocation(as: memory.url("/B")))
         #expect(restored.active.sort == ListOrder(key: .date, descending: true))
         #expect(restored.active.showHidden && !restored.active.isListed)
         #expect(
-            PanelTabs(restoring: nil, fallback: memory.url("/A")).active.directory.isSameLocation(as: memory.url("/A")))
+            PanelTabs(restoring: nil, fallback: memory.url("/A")).active.directory.isSameLocation(as: memory.url("/A"))
+        )
     }
 }
 
@@ -464,7 +487,10 @@ import Testing
 
     @Test func aFileLeadsToItsFolder() throws {
         let result = try PanelLoader.load(
-            memory.url("/work/docs/report.txt"), showHidden: false, fileSystems: fileSystems)
+            memory.url("/work/docs/report.txt"),
+            showHidden: false,
+            fileSystems: fileSystems
+        )
         #expect(result.listing.directory.path == "/work/docs" && result.focus == "report.txt")
         #expect(result.listing.parent?.path == "/work" && result.listing.root.path == "/")
     }
@@ -474,7 +500,11 @@ import Testing
             try PanelLoader.load(memory.url("/work/gone/deeper"), showHidden: false, fileSystems: fileSystems)
         }
         let climbed = try PanelLoader.load(
-            memory.url("/work/gone/deeper"), showHidden: false, fileSystems: fileSystems, climbing: true)
+            memory.url("/work/gone/deeper"),
+            showHidden: false,
+            fileSystems: fileSystems,
+            climbing: true
+        )
         #expect(climbed.listing.directory.path == "/work")
         #expect(throws: FileSystemError.self) {
             try PanelLoader.load(URL(string: "ftp://nowhere/x")!, showHidden: false, fileSystems: fileSystems)
@@ -494,7 +524,8 @@ import Testing
         // The whole listing is the batches put together.
         #expect(
             try PanelLoader.load(memory.url("/work"), showHidden: false, fileSystems: fileSystems).listing.items.count
-                == 4)
+                == 4
+        )
     }
 
     @Test func streamingStopsWhenNoMoreIsWanted() throws {
@@ -522,7 +553,7 @@ import Testing
         memory.addFile("/big/a/deep/two.txt", String(repeating: "b", count: 50))
         memory.addFile("/big/b/three.txt", String(repeating: "c", count: 7))
         memory.addFile("/big/top.txt", String(repeating: "d", count: 3))
-        #expect(memory.totalSize(of: memory.url("/big")) == 160)
+        #expect(memory.totalSize(of: memory.url("/big"), cancellation: CancellationFlag()) == 160)
         let cancelled = CancellationFlag()
         cancelled.cancel()
         #expect(memory.totalSize(of: memory.url("/big"), cancellation: cancelled) == 0)

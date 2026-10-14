@@ -12,16 +12,15 @@ public enum Format: Sendable {
     /// it is thrown away and the next date makes a new one: a formatter keeps the pattern it
     /// worked out for the region it was made in.
     ///
-    /// Unchecked: `formatter` is guarded by `lock`; `observers` is set in `init` only.
+    /// Unchecked: `formatter` is guarded by `lock`. The notification center keeps the
+    /// observers for as long as the program runs, as long as the one `Dates` there is.
     private final class Dates: @unchecked Sendable {
         private let lock = NSLock()
         private var formatter: DateFormatter?
-        private var observers: [any NSObjectProtocol] = []
 
         init() {
-            let names = [NSLocale.currentLocaleDidChangeNotification, .NSSystemTimeZoneDidChange]
-            observers = names.map { name in
-                NotificationCenter.default.addObserver(forName: name, object: nil, queue: nil) { [weak self] _ in
+            for name in [NSLocale.currentLocaleDidChangeNotification, .NSSystemTimeZoneDidChange] {
+                _ = NotificationCenter.default.addObserver(forName: name, object: nil, queue: nil) { [weak self] _ in
                     self?.forget()
                 }
             }
@@ -139,20 +138,6 @@ public enum Format: Sendable {
             }
         }
         return String(shown)
-    }
-
-    /// The same, cut to at most `limit` characters with `…` for the rest: for a log line or
-    /// a message that must stay short whatever the name is.
-    public static func displayName(_ text: String, limit: Int) -> String {
-        let limit = max(limit, 0)
-        var cut = String.UnicodeScalarView()
-        var count = 0
-        for scalar in text.unicodeScalars {
-            guard count < limit else { return displayName(String(cut)) + "…" }
-            cut.append(scalar)
-            count += 1
-        }
-        return displayName(text)
     }
 
     private static func isMisleading(_ scalar: Unicode.Scalar) -> Bool {

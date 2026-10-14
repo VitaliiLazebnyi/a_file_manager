@@ -23,7 +23,8 @@ public enum Parallel: Sendable {
     /// it runs: what a transform leaves to be released later (data read through Foundation)
     /// is gone when the piece ends.
     public static func map<Element, Result>(
-        _ items: [Element], serialBelow threshold: Int = 2,
+        _ items: [Element],
+        serialBelow threshold: Int = 2,
         _ transform: @Sendable (Element) -> Result
     ) -> [Result] where Element: Sendable, Result: Sendable {
         guard items.count >= threshold, items.count > 1, ParallelPool.shared.width > 0 else {
@@ -57,7 +58,9 @@ public enum Parallel: Sendable {
         assert(
             !isHoldingUpMainThread,
             "Work inside a Parallel.map that was called on the main thread must not wait for the main thread",
-            file: file, line: line)
+            file: file,
+            line: line
+        )
     }
 }
 
@@ -131,7 +134,11 @@ final class ParallelPool: @unchecked Sendable {
         var room = 0
 
         init(
-            count: Int, grain: Int, parent: Job?, isForMain: Bool, urgency: qos_class_t,
+            count: Int,
+            grain: Int,
+            parent: Job?,
+            isForMain: Bool,
+            urgency: qos_class_t,
             body: @escaping @Sendable (Int) -> Void
         ) {
             (self.count, self.grain, self.parent, self.body) = (count, grain, parent, body)
@@ -164,20 +171,7 @@ final class ParallelPool: @unchecked Sendable {
     /// that finds nobody waiting is lost, a number is not.
     private var summons = 0
     /// For how long a thread with nothing to do stays, in seconds.
-    private var linger: TimeInterval = 2
-    /// The same for tests, which make it short.
-    var lingering: TimeInterval {
-        get {
-            condition.lock()
-            defer { condition.unlock() }
-            return linger
-        }
-        set {
-            condition.lock()
-            linger = newValue
-            condition.unlock()
-        }
-    }
+    private let linger: TimeInterval
     /// Threads that are to leave when they next look for work: more are ready to run than
     /// there are cores.
     private var retiring = 0
@@ -204,19 +198,14 @@ final class ParallelPool: @unchecked Sendable {
         get { pthread_getspecific(Self.currentJob).map { Unmanaged<Job>.fromOpaque($0).takeUnretainedValue() } }
         set {
             pthread_setspecific(
-                Self.currentJob, newValue.map { UnsafeRawPointer(Unmanaged.passUnretained($0).toOpaque()) })
+                Self.currentJob,
+                newValue.map { UnsafeRawPointer(Unmanaged.passUnretained($0).toOpaque()) }
+            )
         }
     }
 
     /// Whether the calling thread is at a piece of a tree the main thread waits for.
     var isWorkingForMainThread: Bool { current?.root.isForMain ?? false }
-
-    /// The pool's threads as they are now; for tests.
-    var census: (threads: Int, idle: Int) {
-        condition.lock()
-        defer { condition.unlock() }
-        return (threads, idle)
-    }
 
     /// The urgency the pool's threads work with for a caller: the caller's own, but never so
     /// low that the system may leave the work lying for long.
@@ -226,13 +215,21 @@ final class ParallelPool: @unchecked Sendable {
         return own.rawValue < QOS_CLASS_UTILITY.rawValue ? QOS_CLASS_UTILITY : own
     }
 
+    /// A pool whose idle threads stay for `linger` seconds. The program has one, `shared`.
+    init(linger: TimeInterval = 2) {
+        self.linger = linger
+    }
+
     func run(count: Int, body: @escaping @Sendable (Int) -> Void) {
         let parent = current
         let job = Job(
-            count: count, grain: max(1, count / ((width + 1) * 16)), parent: parent,
+            count: count,
+            grain: max(1, count / ((width + 1) * 16)),
+            parent: parent,
             isForMain: parent == nil && Thread.isMainThread,
             urgency: parent == nil ? Self.urgencyOfCaller() : QOS_CLASS_UNSPECIFIED,
-            body: body)
+            body: body
+        )
         let root = job.root
         condition.lock()
         open.append(job)
@@ -531,7 +528,9 @@ final class ParallelPool: @unchecked Sendable {
 /// on screen belong to the main thread; these checks stop a wrong caller in debug builds.
 public enum MainThread: Sendable {
     public static func assert(
-        _ what: @autoclosure () -> String = "This", file: StaticString = #fileID, line: UInt = #line
+        _ what: @autoclosure () -> String = "This",
+        file: StaticString = #fileID,
+        line: UInt = #line
     ) {
         Swift.assert(Thread.isMainThread, "\(what()) must be used on the main thread", file: file, line: line)
     }

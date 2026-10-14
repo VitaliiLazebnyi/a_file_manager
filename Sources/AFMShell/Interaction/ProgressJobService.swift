@@ -66,7 +66,7 @@ final class ProgressJobService: JobService {
     /// The progress of the running job; nil while none runs.
     var current: ProgressSheet? { running?.monitor }
 
-    private final class QueuedJob: JobHandle {
+    @MainActor private final class QueuedJob {
         let title: String
         let cancellation = CancellationFlag()
         let gate = PauseGate()
@@ -90,11 +90,11 @@ final class ProgressJobService: JobService {
         func finish() { isFinished = true }
     }
 
-    @discardableResult
     func run<Result: Sendable>(
-        title: String, work: @escaping @Sendable (any JobMonitor) -> Result,
+        title: String,
+        work: @escaping @Sendable (any JobMonitor) -> Result,
         completion: @escaping @MainActor (Result) -> Void
-    ) -> any JobHandle {
+    ) {
         MainThread.assert("The job service")
         let job = QueuedJob(title: title)
         // What the plugin handed in may hold panels and windows: it is let go of on the main
@@ -102,7 +102,11 @@ final class ProgressJobService: JobService {
         let (work, completion) = (MainOwned(work), MainOwned(completion))
         job.start = { [self, job] in
             let progress = ProgressSheet(
-                title: title, cancellation: job.cancellation, gate: job.gate, display: display)
+                title: title,
+                cancellation: job.cancellation,
+                gate: job.gate,
+                display: display
+            )
             job.monitor = progress
             display.begin(progress)
             Background.start(named: "afm.job", qos: .userInitiated) {
@@ -121,7 +125,6 @@ final class ProgressJobService: JobService {
         waiting.append(job)
         if !wasBusy { onBusyChanged?() }
         if running == nil { startNext() } else { display.refresh() }
-        return job
     }
 
     /// Main thread: the work of `job` has returned; `deliver` calls its completion.

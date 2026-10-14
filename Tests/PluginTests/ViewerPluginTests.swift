@@ -36,22 +36,33 @@ private final class FakeOverlayHost: PanelOverlayHost {
         memory.addFile("/A/short.txt", "Grüße\tfrom a file\nsecond line")
         memory.addFile(
             "/A/page.html",
-            "<html><body><h1>Title</h1><p>See <a href=\"https://example.com\">this</a>.</p></body></html>")
+            "<html><body><h1>Title</h1><p>See <a href=\"https://example.com\">this</a>.</p></body></html>"
+        )
         memory.addFile("/A/docs/inner.txt", "inside")
         memory.addFile("/A/docs/more/deep.txt", "12345")
         memory.addFile("/B/other.txt", "other")
         try Self.write(
-            Data([0x4D, 0x5A, 0x00, 0x01, 0x02, 0x03] + Array(repeating: UInt8(0xFF), count: 300)), to: "/A/tool.bin",
-            in: memory)
+            Data([0x4D, 0x5A, 0x00, 0x01, 0x02, 0x03] + Array(repeating: UInt8(0xFF), count: 300)),
+            to: "/A/tool.bin",
+            in: memory
+        )
         try Self.write(
-            Data([0xFF, 0xFE] + (ViewerEncoding.utf16LE.encode("Wide text\r\nzwei") ?? [])), to: "/A/wide.txt",
-            in: memory)
+            Data([0xFF, 0xFE] + (ViewerEncoding.utf16LE.encode("Wide text\r\nzwei") ?? [])),
+            to: "/A/wide.txt",
+            in: memory
+        )
         try Self.write(
-            Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00]), to: "/A/broken.png", in: memory)
+            Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00]),
+            to: "/A/broken.png",
+            in: memory
+        )
         var hosts: [ObjectIdentifier: FakeOverlayHost] = [:]
         let lookup = HostLookup()
         plugin = ViewerPlugin(
-            overlayHost: { lookup.hosts[ObjectIdentifier($0)] }, quickViewDelay: 0.01, showsWindows: false)
+            overlayHost: { lookup.hosts[ObjectIdentifier($0)] },
+            quickViewDelay: 0.01,
+            showsWindows: false
+        )
         bench = TestBench(plugins: [plugin], fileSystems: [memory], left: memory.url("/A"), right: memory.url("/B"))
         hosts[ObjectIdentifier(bench.left)] = FakeOverlayHost()
         hosts[ObjectIdentifier(bench.right)] = FakeOverlayHost()
@@ -83,9 +94,17 @@ private final class FakeOverlayHost: PanelOverlayHost {
     /// A key press as the window would deliver it.
     func key(_ characters: String, code: UInt16 = 0, _ flags: NSEvent.ModifierFlags = []) -> NSEvent {
         NSEvent.keyEvent(
-            with: .keyDown, location: .zero, modifierFlags: flags, timestamp: 0, windowNumber: 0, context: nil,
+            with: .keyDown,
+            location: .zero,
+            modifierFlags: flags,
+            timestamp: 0,
+            windowNumber: 0,
+            context: nil,
             characters: characters,
-            charactersIgnoringModifiers: characters, isARepeat: false, keyCode: code)!
+            charactersIgnoringModifiers: characters,
+            isARepeat: false,
+            keyCode: code
+        )!
     }
 
     func functionKey(_ number: Int, _ flags: NSEvent.ModifierFlags = []) -> NSEvent {
@@ -126,7 +145,7 @@ private final class FakeOverlayHost: PanelOverlayHost {
         #expect(keys.command(for: .f(3, [.option, .shift])) == .viewInternalSingle)
         #expect(keys.command(for: Shortcut(.character("q"), .control)) == .quickView)
         #expect(keys.command(for: Shortcut(.character("q"), [.control, .shift])) == .separateQuickView)
-        #expect(keys.conflicts.isEmpty)
+        #expect(bench.kernel.keyClashes.isEmpty)
         for id in [
             CommandID.view, .viewSingle, .viewMarked, .viewInternalSingle, .viewInternalMarked, .quickView,
             .quickViewInternalOnly, .hideQuickView,
@@ -137,7 +156,8 @@ private final class FakeOverlayHost: PanelOverlayHost {
         #expect(bench.kernel.menus.menus.map(\.title) == ["Files", "Show"])
         #expect(
             bench.kernel.menus.menus[0].items == [.view]
-                && bench.kernel.menus.menus[1].items == [.quickView, .separateQuickView])
+                && bench.kernel.menus.menus[1].items == [.quickView, .separateQuickView]
+        )
         #expect(bench.kernel.menus.contextMenu(onItem: true) == [.view])
         #expect(bench.kernel.toolbar.defaultLayout.compactMap { $0?.command } == [.view, .quickView])
         #expect(bench.kernel.preferences.pages.map(\.title) == ["Lister"])
@@ -163,13 +183,15 @@ private final class FakeOverlayHost: PanelOverlayHost {
         let file = try #require(plugin.windows.last)
         #expect(
             file.window?.title == "Lister - [mem:///A/short.txt]"
-                || file.window?.title.hasSuffix("/A/short.txt]") == true)
+                || file.window?.title.hasSuffix("/A/short.txt]") == true
+        )
         file.window?.layoutIfNeeded()
         #expect(await rowsShown(file))
         #expect(file.pane.mode == .utf8 && visibleText(file.pane) == ["Grüße   from a file", "second line"])
         #expect(
             file.pane.statusText.contains("UTF-8") && file.pane.statusText.contains("Line 1")
-                && file.pane.statusText.hasSuffix("31 bytes"))
+                && file.pane.statusText.hasSuffix("31 bytes")
+        )
         #expect(file.pane.percentText == "100 %")
 
         service.view(text: "a log\nof three\nlines", title: "Result list")
@@ -180,7 +202,8 @@ private final class FakeOverlayHost: PanelOverlayHost {
         #expect(visibleText(text.pane) == ["a log", "of three", "lines"])
         // A text is no file: the modes that need one are not offered, and nothing can be edited.
         #expect(
-            text.pane.menuEntries("Options").compactMap { $0 }.first { $0.title.hasPrefix("4 ") }?.isEnabled == false)
+            text.pane.menuEntries("Options").compactMap { $0 }.first { $0.title.hasPrefix("4 ") }?.isEnabled == false
+        )
         text.close()
         #expect(plugin.windows.count == 1)
         plugin.stop()
@@ -201,7 +224,8 @@ private final class FakeOverlayHost: PanelOverlayHost {
             await wait {
                 controller.pane.pager.document !== document
                     && controller.pane.pager.document?.layout == controller.pane.layout
-            })
+            }
+        )
         #expect(controller.pane.pager.columnsThatFit < columns)
     }
 
@@ -211,7 +235,8 @@ private final class FakeOverlayHost: PanelOverlayHost {
         #expect(await wait { controller.pane.failure != nil })
         #expect(
             controller.pane.loaded == nil && controller.pane.statusText == controller.pane.failure
-                && controller.pane.pager.document == nil)
+                && controller.pane.pager.document == nil
+        )
     }
 
     @Test func severalMarkedFilesAreSteppedThroughWithNAndP() async throws {
@@ -222,7 +247,8 @@ private final class FakeOverlayHost: PanelOverlayHost {
         #expect(
             controller.items.map(\.title).map { $0.components(separatedBy: "/").last } == [
                 "long.txt", "short.txt", "wide.txt"
-            ])
+            ]
+        )
         #expect(controller.pane.fileCounter == (0, 3))
         #expect(await wait { controller.pane.loaded?.item.url?.lastPathComponent == "long.txt" })
         #expect(controller.pane.handleKey(key("n")))
@@ -256,7 +282,8 @@ private final class FakeOverlayHost: PanelOverlayHost {
         #expect(
             visibleText(pane, rows: 1) == [
                 "00000000: 47 72 C3 BC C3 9F 65 09|66 72 6F 6D 20 61 20 66 | GrÃ¼ÃŸe.from a f"
-            ])
+            ]
+        )
         pane.handleKey(key("2"))
         #expect(pane.mode == .binary && pane.pager.document?.layout == .binary(width: 75))
         pane.handleKey(key("1"))
@@ -278,7 +305,8 @@ private final class FakeOverlayHost: PanelOverlayHost {
         pane.handleKey(key("w"))
         #expect(
             !pane.settings.wrap && pane.pager.document == nil
-                || pane.layout == .text(TextLayoutOptions(columns: 1_024, wordWrap: false)))
+                || pane.layout == .text(TextLayoutOptions(columns: 1_024, wordWrap: false))
+        )
         pane.handleKey(key("w"))
         #expect(pane.settings.wrap && ListerSettings(bench.kernel.settings).wrap)
         pane.handleKey(functionKey(6))
@@ -300,7 +328,8 @@ private final class FakeOverlayHost: PanelOverlayHost {
         #expect(await rowsShown(html))
         #expect(
             visibleText(html.pane) == ["Title", "See this {https://example.com}."]
-                && html.pane.htmlLinks == ["https://example.com"])
+                && html.pane.htmlLinks == ["https://example.com"]
+        )
         // 1 shows the source.
         html.pane.handleKey(key("1"))
         #expect(html.pane.mode == .text && html.pane.htmlLinks.isEmpty)
@@ -314,7 +343,8 @@ private final class FakeOverlayHost: PanelOverlayHost {
         #expect(await wait { plain.pane.loaded != nil })
         #expect(plain.pane.internalOnly && plain.pane.mode == .binary)
         #expect(
-            plain.pane.menuEntries("Options").compactMap { $0 }.first { $0.title.hasPrefix("8 ") }?.isEnabled == false)
+            plain.pane.menuEntries("Options").compactMap { $0 }.first { $0.title.hasPrefix("8 ") }?.isEnabled == false
+        )
     }
 
     @Test func theConfigurationDecidesTheStartupMode() async throws {
@@ -363,7 +393,8 @@ private final class FakeOverlayHost: PanelOverlayHost {
             await wait {
                 pane.pager.selection?.lowerBound == offset(of: "Line 2000 ")
                     + Int64("Line 2000 of the long text, needle ".utf8.count)
-            })
+            }
+        )
         pane.handleKey(functionKey(3, .shift))
         #expect(await wait { pane.pager.selection?.lowerBound == offset(of: "GOLD") })
         pane.handleKey(functionKey(5, .control))
@@ -436,14 +467,16 @@ private final class FakeOverlayHost: PanelOverlayHost {
         #expect(await wait { ui.log.contains("inform: There is no line 99999.") })
         #expect(
             ViewerPane.number(in: "20,7 %") == 20.7 && ViewerPane.offset(in: "$FF") == 255
-                && ViewerPane.offset(in: "1,024") == 1_024)
+                && ViewerPane.offset(in: "1,024") == 1_024
+        )
         // The view draws what it holds.
         let image = try #require(pane.bitmapImageRepForCachingDisplay(in: pane.bounds))
         pane.cacheDisplay(in: pane.bounds, to: image)
         #expect(image.pixelsWide > 0)
         #expect(
             ViewerPane.printableText(of: try #require(pane.pager.document), in: 0..<60).text
-                == "Line 1 of the long text, needle\nLine 2 of the long text, needle\n")
+                == "Line 1 of the long text, needle\nLine 2 of the long text, needle\n"
+        )
     }
 
     // MARK: Quick view
@@ -472,7 +505,8 @@ private final class FakeOverlayHost: PanelOverlayHost {
         #expect(await wait { quick.pane.folderSummary != nil })
         #expect(
             quick.pane.folderSummary == FolderSummary(files: 2, folders: 1, bytes: 11) && quick.headerText == "docs"
-                && quick.pane.item == nil)
+                && quick.pane.item == nil
+        )
         bench.left.show(memory.url("/A/docs"))
         bench.kernel.panelEvents.post(.locationChanged, from: bench.left)
         #expect(await wait { quick.shownItem == nil && quick.headerText.isEmpty && quick.pane.folderSummary == nil })

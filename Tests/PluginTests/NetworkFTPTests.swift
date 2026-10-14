@@ -198,7 +198,9 @@ final class FTPFixture: @unchecked Sendable {
         try fixture.box.file("srv/a.txt", "a")
         let stamp = Date(timeIntervalSince1970: 1_400_000_000)
         try fixture.fileSystem.setAttributes(
-            FileAttributes(modified: stamp, permissions: 0o640), of: fixture.url("/a.txt"))
+            FileAttributes(modified: stamp, permissions: 0o640),
+            of: fixture.url("/a.txt")
+        )
         let item = try #require(fixture.fileSystem.item(at: fixture.url("/a.txt")))
         #expect(item.modified == stamp && item.permissions == 0o640)
     }
@@ -261,7 +263,7 @@ final class FTPFixture: @unchecked Sendable {
         #expect(fixture.server.mostListingsAtOnce >= 1 && fixture.server.mostListingsAtOnce <= 4)
         #expect(fixture.server.connectionsOpened <= 4)
         // Size of a tree: the kernel walks the folders on all cores.
-        #expect(fixture.fileSystem.totalSize(of: fixture.url("/")) == 8)
+        #expect(fixture.fileSystem.totalSize(of: fixture.url("/"), cancellation: CancellationFlag()) == 8)
     }
 
     @Test func aTransferDoesNotBlockCommands() throws {
@@ -300,7 +302,8 @@ final class FTPFixture: @unchecked Sendable {
         #expect(throws: (any Error).self) { try fixture.names("/") }
         // A password in the typed address goes to the connection, not into the URL.
         let typed = try #require(
-            fixture.fileSystem.location(from: "ftp://anna:s3cret@127.0.0.1:\(fixture.server.port)/"))
+            fixture.fileSystem.location(from: "ftp://anna:s3cret@127.0.0.1:\(fixture.server.port)/")
+        )
         #expect(typed == fixture.url("/") && !typed.absoluteString.contains("anna"))
         #expect(try fixture.names("/") == ["a.txt"])
     }
@@ -375,7 +378,9 @@ final class FTPFixture: @unchecked Sendable {
         close(closed)
         #expect(throws: NetworkError.self) {
             try fixture.fileSystem.list(
-                ServerKey(scheme: "ftp", host: "127.0.0.1", port: port).url(), showHidden: true)
+                ServerKey(scheme: "ftp", host: "127.0.0.1", port: port).url(),
+                showHidden: true
+            )
         }
     }
 
@@ -412,8 +417,11 @@ final class FTPFixture: @unchecked Sendable {
         #expect(result.cancelled && namesOnDisk(fixture.box.url("srv")) == ["small.txt"])
         // And the way back, under another name.
         result = runJob(
-            .copy, [fixture.url("/small.txt")], to: TargetSpec(directory: fixture.box.url("srv"), mask: "copy.txt"),
-            fileSystems: fileSystems)
+            .copy,
+            [fixture.url("/small.txt")],
+            to: TargetSpec(directory: fixture.box.url("srv"), mask: "copy.txt"),
+            fileSystems: fileSystems
+        )
         #expect(result.completed.count == 1 && fixture.box.read("srv/copy.txt") == "small")
         #expect(try fixture.names("/") == ["copy.txt", "small.txt"])
     }

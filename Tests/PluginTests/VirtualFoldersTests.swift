@@ -37,7 +37,8 @@ import Testing
         let host = try #require(VirtualLocation.branch(of: long).url.host)
         #expect(host.split(separator: ".").allSatisfy { $0.count <= 63 })
         #expect(
-            VirtualLocation(VirtualLocation.branch(of: long).url)?.realDirectory?.absoluteString == long.absoluteString)
+            VirtualLocation(VirtualLocation.branch(of: long).url)?.realDirectory?.absoluteString == long.absoluteString
+        )
     }
 
     @Test func aListLocationKnowsItsTitleAndWhereItCameFrom() {
@@ -97,15 +98,20 @@ import Testing
         #expect(Set(visited.map(\.path)) == ["/A", "/A/docs", "/A/docs/deep", "/A/docs/deep/er", "/A/empty"])
         #expect(
             try names(
-                [BranchWalker.Start(memory.url("/A"))], BranchWalker(fileSystems: fileSystems, showHidden: true)
-            ).contains(".git/config"))
+                [BranchWalker.Start(memory.url("/A"))],
+                BranchWalker(fileSystems: fileSystems, showHidden: true)
+            )
+            .contains(".git/config")
+        )
         let withFolders = try names(
             [BranchWalker.Start(memory.url("/A"))],
-            BranchWalker(fileSystems: fileSystems, showHidden: false, listsFolders: true))
+            BranchWalker(fileSystems: fileSystems, showHidden: false, listsFolders: true)
+        )
         #expect(
             withFolders == [
                 "docs", "docs/deep", "docs/deep/er", "docs/deep/er/leaf.txt", "docs/in.txt", "empty", "one.txt"
-            ])
+            ]
+        )
     }
 
     @Test func aWideTreeIsReadCompletelyOnAllCores() throws {
@@ -118,12 +124,13 @@ import Testing
         }
         var batches = 0
         var names: [String] = []
-        try BranchWalker(fileSystems: fileSystems, showHidden: false).walk([BranchWalker.Start(memory.url("/wide"))]) {
-            batch in
-            batches += 1
-            names += batch.map(\.name)
-            return true
-        }
+        try BranchWalker(fileSystems: fileSystems, showHidden: false)
+            .walk([BranchWalker.Start(memory.url("/wide"))]) {
+                batch in
+                batches += 1
+                names += batch.map(\.name)
+                return true
+            }
         #expect(names.sorted() == expected.sorted())
         #expect(Set(names).count == names.count && batches > 1)
     }
@@ -131,11 +138,12 @@ import Testing
     @Test func stopsWhenNoMoreIsWantedAndSkipsWhatCannotBeRead() throws {
         for folder in 0..<200 { memory.addFile("/many/d\(folder)/f.txt") }
         var received = 0
-        try BranchWalker(fileSystems: fileSystems, showHidden: false).walk([BranchWalker.Start(memory.url("/many"))]) {
-            batch in
-            received += batch.count
-            return false
-        }
+        try BranchWalker(fileSystems: fileSystems, showHidden: false)
+            .walk([BranchWalker.Start(memory.url("/many"))]) {
+                batch in
+                received += batch.count
+                return false
+            }
         #expect(received > 0 && received <= BranchWalker.directoriesPerBatch)
 
         memory.addFile("/part/ok/a.txt")
@@ -162,7 +170,8 @@ import Testing
         #expect(
             try names([BranchWalker.Start(box.root)], entering) == [
                 "Tool.app/Contents/Info.plist", "loop", "real/a.txt"
-            ])
+            ]
+        )
     }
 
     @Test func manyWalksAtOnceShareTheProvidersSafely() {
@@ -198,7 +207,10 @@ import Testing
             plugins: [
                 plugin, NavigationPlugin(pasteboard: scratch.pasteboard, home: memory.url("/A")), FileOperationsPlugin()
             ],
-            fileSystems: [LocalFileSystem(), memory], left: memory.url("/A"), right: memory.url("/B"))
+            fileSystems: [LocalFileSystem(), memory],
+            left: memory.url("/A"),
+            right: memory.url("/B")
+        )
     }
 
     @Test func registersItsFileSystemServiceCommandsAndOptions() {
@@ -206,8 +218,9 @@ import Testing
         #expect(bench.kernel.services.find((any FileListService).self) != nil)
         #expect(bench.kernel.keyBindings.command(for: Shortcut(.character("b"), .control)) == .branchView)
         #expect(
-            bench.kernel.keyBindings.command(for: Shortcut(.character("b"), [.control, .shift])) == "cm_DirBranchSel")
-        #expect(bench.kernel.keyBindings.conflicts.isEmpty)
+            bench.kernel.keyBindings.command(for: Shortcut(.character("b"), [.control, .shift])) == "cm_DirBranchSel"
+        )
+        #expect(bench.kernel.keyClashes.isEmpty)
         #expect(bench.kernel.menus.menus.first { $0.title == "Commands" }?.items.contains(.branchView) == true)
         #expect(bench.kernel.toolbar.symbol(for: .branchView) != nil)
         #expect(bench.kernel.preferences.pages.contains { $0.title == "Branch View" })
@@ -265,7 +278,8 @@ import Testing
         commands.perform("cm_RightDirBranch")
         #expect(
             right.names == ["other.txt"] && VirtualLocation(right.model.directory) != nil
-                && VirtualLocation(left.model.directory) == nil)
+                && VirtualLocation(left.model.directory) == nil
+        )
         #expect(commands.isChecked("cm_RightDirBranch") && !commands.isChecked("cm_LeftDirBranch"))
         right.model.moveCursor(to: 0)
         commands.perform("cm_RightDirBranch")
@@ -303,7 +317,8 @@ import Testing
         #expect(fileSystem.location(from: "mem:/A (branch)") == fileSystem.branch(of: memory.url("/A")))
         #expect(
             fileSystem.location(from: fileSystem.branch(of: memory.url("/A")).absoluteString)
-                == fileSystem.branch(of: memory.url("/A")))
+                == fileSystem.branch(of: memory.url("/A"))
+        )
         #expect(fileSystem.location(from: "nothing (list 999)") == nil && fileSystem.location(from: "plain") == nil)
         #expect(throws: (any Error).self) { try fileSystem.write(left.model.directory.appending(name: "x")) }
         // The command goes to the folder of the file under the cursor; `[..]` back to where the list was opened.
@@ -339,7 +354,8 @@ import Testing
         bench.kernel.settings.set(true, forKey: VirtualFoldersPlugin.listsFoldersKey)
         bench.kernel.preferences.pages.first { $0.title == "Branch View" }?.onChange()
         #expect(
-            left.names == ["docs", "docs/deep", "pics", "docs/deep/leaf.txt", "docs/in.txt", "one.txt", "pics/cat.jpg"])
+            left.names == ["docs", "docs/deep", "pics", "docs/deep/leaf.txt", "docs/in.txt", "one.txt", "pics/cat.jpg"]
+        )
     }
 
     @Test func watchingIsForwardedToTheRealFileSystem() async throws {

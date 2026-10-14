@@ -39,7 +39,10 @@ import ViewerPlugin
                 ClipboardPlugin(pasteboard: scratch.pasteboard), SelectionPlugin(), ViewOptionsPlugin(),
                 FolderTabsPlugin()
             ],
-            fileSystems: [LocalFileSystem(), memory], left: memory.url("/A"), right: memory.url("/B"))
+            fileSystems: [LocalFileSystem(), memory],
+            left: memory.url("/A"),
+            right: memory.url("/B")
+        )
     }
 
     /// Shows two folders of the local disk in the panels.
@@ -58,7 +61,7 @@ import ViewerPlugin
             + bench.kernel.menus.contextMenu(onItem: true).compactMap { $0 }
         // The names the window shell provides are the only ones without a handler here.
         #expect(inMenus.allSatisfy { commands[$0] != nil })
-        #expect(bench.kernel.keyBindings.conflicts.isEmpty)
+        #expect(bench.kernel.keyClashes.isEmpty)
         #expect(bench.kernel.services.find((any FileTransferService).self) != nil)
         // The Files menu keeps its order: open, transfer, create, delete, tools.
         let files = bench.kernel.menus.menus[0].items
@@ -69,7 +72,8 @@ import ViewerPlugin
         #expect(files.compactMap { $0 }.filter(expected.contains) == expected && files.contains(nil))
         #expect(
             [CommandID.view, .edit, .copy, .renameMove, .makeDirectory, .delete].map { commands[$0]?.barLabel }
-                == ["View", "Edit", "Copy", "Move", "NewFolder", "Delete"])
+                == ["View", "Edit", "Copy", "Move", "NewFolder", "Delete"]
+        )
     }
 
     // MARK: Selection
@@ -97,7 +101,8 @@ import ViewerPlugin
         left.model.show(listing, complete: false)
         #expect(
             !commands.isEnabled(.selectAll) && !commands.isEnabled(.invertSelection)
-                && !commands.isEnabled(.selectGroup))
+                && !commands.isEnabled(.selectGroup)
+        )
         // What is named explicitly can be worked on while the rest is arriving.
         left.moveCursor(toName: "one.txt")
         #expect(commands.isEnabled(.copy) && commands.isEnabled(.unselectAll))
@@ -249,7 +254,8 @@ import ViewerPlugin
         commands.perform(.delete)
         // This file system has no Trash, so F8 deletes for good and says so.
         #expect(
-            ui.log.contains("choose: Permanently delete / Do you really want to delete the selected directory docs?"))
+            ui.log.contains("choose: Permanently delete / Do you really want to delete the selected directory docs?")
+        )
         #expect(ui.log.contains { $0.hasPrefix("choose: The directory mem:/A/docs is not empty!") })
         #expect(!memory.exists("/A/docs") && left.names == ["one.txt", "two.txt"])
 

@@ -31,26 +31,31 @@ import Testing
         bench = TestBench(
             plugins: [NavigationPlugin(pasteboard: scratch.pasteboard, home: memory.url("/home"))],
             fileSystems: [memory, other],
-            left: memory.url("/A"), right: memory.url("/B"))
+            left: memory.url("/A"),
+            right: memory.url("/B")
+        )
     }
 
     @Test func registersTheSpecificationsKeysWithoutConflicts() {
         let keys = bench.kernel.keyBindings
         #expect(
             keys.command(for: Shortcut(.left, .control)) == "cm_TransferLeft"
-                && keys.command(for: Shortcut(.right, .control)) == "cm_TransferRight")
+                && keys.command(for: Shortcut(.right, .control)) == "cm_TransferRight"
+        )
         #expect(keys.command(for: Shortcut(.character("u"), .control)) == .exchangePanels)
         #expect(keys.command(for: Shortcut(.character("r"), .control)) == .reread)
         #expect(keys.command(for: Shortcut(.character("\\"), .control)) == .goToRoot)
-        #expect(keys.conflicts.isEmpty)
+        #expect(bench.kernel.keyClashes.isEmpty)
         let inMenus = bench.kernel.menus.menus.flatMap(\.items).compactMap { $0 }
         #expect(
             inMenus.allSatisfy { commands[$0] != nil } && inMenus.contains("afm_GoDesktop")
-                && inMenus.contains("cm_GoToNextDrive"))
+                && inMenus.contains("cm_GoToNextDrive")
+        )
         #expect(
             bench.kernel.toolbar.defaultLayout.compactMap { $0?.command } == [
                 .goBack, .goForward, .goToParent, .reread
-            ])
+            ]
+        )
     }
 
     @Test func showsTheFolderUnderTheCursorInTheOtherPanel() {
@@ -93,7 +98,8 @@ import Testing
         #expect(left.model.directory.path == "/home" && left.failures.isEmpty)
         #expect(
             commands[CommandID(rawValue: "afm_GoApplications")] != nil
-                && commands[CommandID(rawValue: "afm_GoVolumes")] != nil)
+                && commands[CommandID(rawValue: "afm_GoVolumes")] != nil
+        )
     }
 
     @Test func cyclesThroughTheVolumes() {
@@ -124,10 +130,12 @@ import Testing
         let single = Array(places.prefix(3))
         #expect(
             NavigationPlugin.neighbourPlace(of: URL(fileURLWithPath: "/Users/x/Desktop"), in: single, delta: 1)?.name
-                == "Macintosh HD")
+                == "Macintosh HD"
+        )
         #expect(
             NavigationPlugin.neighbourPlace(of: URL(fileURLWithPath: "/Users/x"), in: single, delta: -1)?.name
-                == "Macintosh HD")
+                == "Macintosh HD"
+        )
         #expect(NavigationPlugin.neighbourPlace(of: URL(fileURLWithPath: "/"), in: [places[2]], delta: 1) == nil)
         #expect(NavigationPlugin.neighbourPlace(of: URL(fileURLWithPath: "/x"), in: [], delta: 1) == nil)
     }
@@ -151,6 +159,7 @@ import Testing
         #expect(left.model.directory.path == "/A/docs")
         #expect(
             NavigationPlugin.path(fromClipboard: " \n") == nil
-                && NavigationPlugin.path(fromClipboard: "'/a b'") == "/a b")
+                && NavigationPlugin.path(fromClipboard: "'/a b'") == "/a b"
+        )
     }
 }

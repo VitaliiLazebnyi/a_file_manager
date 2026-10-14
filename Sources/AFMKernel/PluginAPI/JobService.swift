@@ -41,15 +41,6 @@ public protocol JobMonitor: AnyObject, Sendable {
     func ask<Answer: Sendable>(_ question: @MainActor @Sendable () -> Answer) -> Answer
 }
 
-/// A job that was handed to the job service.
-@MainActor
-public protocol JobHandle: AnyObject {
-    var title: String { get }
-    var isFinished: Bool { get }
-    /// Stops the job, or takes it out of the queue if it has not started.
-    func cancel()
-}
-
 /// Runs long work in the background with a progress window. Jobs run one after another in the
 /// order they were handed in; while any is running or waiting, `isBusy` is true and commands
 /// that change files or panels do not start.
@@ -58,11 +49,9 @@ public protocol JobService: AnyObject {
     var isBusy: Bool { get }
     /// `work` runs on a background thread; `completion` on the main thread with its result,
     /// also when the job was cancelled (the work then returns early with what it has).
-    @discardableResult
     func run<Result: Sendable>(
-        title: String, work: @escaping @Sendable (any JobMonitor) -> Result,
+        title: String,
+        work: @escaping @Sendable (any JobMonitor) -> Result,
         completion: @escaping @MainActor (Result) -> Void
-    ) -> any JobHandle
-    /// Cancels every job; `completion` runs on the main thread once none is left.
-    func cancelAll(then completion: @escaping () -> Void)
+    )
 }

@@ -17,17 +17,11 @@ import Foundation
 ///   shared (a listing delivered piece by piece), waits until the unanswered one is over and
 ///   asks then. Nothing is ever started behind a question that was given up and has still
 ///   not come back.
-/// - One file system has at most `limit` questions under way; further ones wait their turn.
+/// - One file system has at most 64 questions under way; further ones wait their turn.
 /// - Waiting costs no thread of the kernel's, and it ends at once when the asker's
 ///   `CancellationFlag` is set. The question itself may go on (a system call cannot be taken
 ///   back); it is told through the flag it was handed, and its answer is dropped.
 public enum BlockingCalls: Sendable {
-    /// The most questions one file system has under way at a time, answered or not.
-    public static var limit: Int {
-        get { CallBook.shared.limit }
-        set { CallBook.shared.limit = max(1, newValue) }
-    }
-
     /// Runs `work` on a thread of the kernel's own, inside an autorelease pool, and returns at
     /// once. For any thread. The threads are made as they are needed and go away when idle.
     public static func run(_ work: @escaping @Sendable () -> Void) {
@@ -46,7 +40,10 @@ public enum BlockingCalls: Sendable {
     ///
     /// Returns nil when `cancellation` was set before the answer came.
     public static func answer<Answer: Sendable>(
-        from owner: AnyObject, to question: String, sharing: Bool = true, cancellation: CancellationFlag? = nil,
+        from owner: AnyObject,
+        to question: String,
+        sharing: Bool = true,
+        cancellation: CancellationFlag? = nil,
         _ work: @escaping @Sendable (CancellationFlag) -> Answer
     ) -> Answer? {
         if cancellation?.isCancelled == true { return nil }
@@ -57,10 +54,11 @@ public enum BlockingCalls: Sendable {
             slot.set(answer as? Answer)
             done.signal()
         }
-        let registration = cancellation?.onCancel {
-            ticket.cancel()
-            done.signal()
-        }
+        let registration = cancellation?
+            .onCancel {
+                ticket.cancel()
+                done.signal()
+            }
         done.wait()
         return withExtendedLifetime(registration) { cancellation?.isCancelled == true ? nil : slot.value }
     }
@@ -68,7 +66,10 @@ public enum BlockingCalls: Sendable {
     /// The same without waiting: `deliver` is called once, on the main thread, with the
     /// answer, or with nil when `cancellation` was set first. For any thread.
     public static func answer<Answer: Sendable>(
-        from owner: AnyObject, to question: String, sharing: Bool = true, cancellation: CancellationFlag? = nil,
+        from owner: AnyObject,
+        to question: String,
+        sharing: Bool = true,
+        cancellation: CancellationFlag? = nil,
         _ work: @escaping @Sendable (CancellationFlag) -> Answer,
         then deliver: @escaping @MainActor @Sendable (Answer?) -> Void
     ) {
@@ -87,18 +88,13 @@ public enum BlockingCalls: Sendable {
             finish(answer as? Answer)
             slot.keep(nil)
         }
-        let registration = cancellation?.onCancel {
-            ticket.cancel()
-            finish(nil)
-        }
+        let registration = cancellation?
+            .onCancel {
+                ticket.cancel()
+                finish(nil)
+            }
         // Kept until the answer has come; forgotten at once if it has come already.
         slot.keep(registration)
-    }
-
-    /// The questions to `owner` that have been started and have not come back, given up or
-    /// not. For tests and for whoever wants to show that a file system is not answering.
-    public static func unanswered(for owner: AnyObject) -> Int {
-        CallBook.shared.unanswered(for: ObjectIdentifier(owner))
     }
 
     /// Where an answer is put by one thread and taken by another; guarded by `lock`.
@@ -145,9 +141,19 @@ public enum BlockingCalls: Sendable {
 final class CallBook: @unchecked Sendable {
     static let shared = CallBook()
 
+    /// A question to one owner. Equal keys are one question.
     fileprivate struct Key: Hashable {
         let owner: ObjectIdentifier
         let question: String
+
+        static func == (left: Self, right: Self) -> Bool {
+            left.owner == right.owner && left.question == right.question
+        }
+
+        func hash(into hasher: inout Hasher) {
+            hasher.combine(owner)
+            hasher.combine(question)
+        }
     }
 
     fileprivate final class Call: @unchecked Sendable {
@@ -188,31 +194,16 @@ final class CallBook: @unchecked Sendable {
     private var waiting: [Call] = []
     private var underWay: [ObjectIdentifier: Int] = [:]
     private var lastListener = 0
-    private var mostAtOnce = 64
-
-    var limit: Int {
-        get {
-            lock.lock()
-            defer { lock.unlock() }
-            return mostAtOnce
-        }
-        set {
-            lock.lock()
-            mostAtOnce = newValue
-            lock.unlock()
-        }
-    }
-
-    func unanswered(for owner: ObjectIdentifier) -> Int {
-        lock.lock()
-        defer { lock.unlock() }
-        return underWay[owner] ?? 0
-    }
+    /// The most questions one owner has under way at a time, answered or not.
+    private static let mostAtOnce = 64
 
     /// `listener` is called once with the answer, on the thread that worked it out, unless
     /// the ticket is cancelled first.
     func ask(
-        owner: AnyObject, question: String, shares: Bool, work: @escaping @Sendable (CancellationFlag) -> Any,
+        owner: AnyObject,
+        question: String,
+        shares: Bool,
+        work: @escaping @Sendable (CancellationFlag) -> Any,
         listener: @escaping @Sendable (Any?) -> Void
     ) -> Ticket {
         let key = Key(owner: ObjectIdentifier(owner), question: question)
@@ -238,7 +229,7 @@ final class CallBook: @unchecked Sendable {
 
     /// Called with the lock held.
     private func canStart(_ call: Call) -> Bool {
-        (underWay[call.key.owner] ?? 0) < mostAtOnce && !(running[call.key]?.contains { $0.isStranded } ?? false)
+        (underWay[call.key.owner] ?? 0) < Self.mostAtOnce && !(running[call.key]?.contains { $0.isStranded } ?? false)
     }
 
     /// Called with the lock held.
@@ -356,13 +347,13 @@ final class KernelThreads: @unchecked Sendable {
 
 /// Lets go of large lists away from the thread that used them: freeing a million entries
 /// takes a tenth of a second and more, which the main thread does not have.
-public enum Discard: Sendable {
+enum Discard: Sendable {
     /// Lists shorter than this are not worth the trip.
-    public static let threshold = 20_000
+    static let threshold = 20_000
 
     /// Empties `items`; if the list is long, the memory is released on a background thread
     /// (when nobody else holds the list, otherwise whoever lets go last releases it).
-    public static func later<Element>(_ items: inout [Element]) {
+    static func later<Element>(_ items: inout [Element]) {
         guard items.count >= threshold else {
             items = []
             return
@@ -372,21 +363,11 @@ public enum Discard: Sendable {
         KernelThreads.shared.run { box.empty() }
     }
 
-    /// The same for any value that holds much, e.g. a dictionary or an object owning lists:
-    /// `value` is set to nil here and released in the background.
-    public static func later<Value>(_ value: inout Value?) {
-        guard value != nil else { return }
-        // Swapped, not copied: no reference of this thread's is left to be the last one.
-        let box = Box<Value>(nil)
-        swap(&box.value, &value)
-        KernelThreads.shared.run { box.empty() }
-    }
-
-    /// Handed from the thread that lets go to the one that releases, and touched by one of
-    /// them at a time.
-    private final class Box<Value>: @unchecked Sendable {
-        var value: Value?
-        init(_ value: Value?) { self.value = value }
-        func empty() { value = nil }
+    /// Handed from the thread that lets go to the one that releases. Unchecked: the thread
+    /// that made it lets go of it without touching the list, so one thread at a time uses it.
+    private final class Box<Element>: @unchecked Sendable {
+        private var items: [Element]
+        init(_ items: [Element]) { self.items = items }
+        func empty() { items.removeAll() }
     }
 }

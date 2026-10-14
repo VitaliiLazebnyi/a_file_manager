@@ -25,8 +25,10 @@ let systemSFTPServer = "/usr/libexec/sftp-server"
         center = ConnectionCenter(environment: environment)
         center.makeSession = { profile, environment in
             SFTPSession(
-                profile: profile, environment: environment,
-                transport: SFTPTransport(executable: systemSFTPServer, arguments: ["-e"]))
+                profile: profile,
+                environment: environment,
+                transport: SFTPTransport(executable: systemSFTPServer, arguments: ["-e"])
+            )
         }
         fileSystem = RemoteFileSystem(scheme: "sftp", center: center)
     }
@@ -46,7 +48,8 @@ let systemSFTPServer = "/usr/libexec/sftp-server"
         #expect(items.map(\.name) == ["a.txt", "dir", "to-dir", "to-file"])
         #expect(
             items.map(\.isDirectory) == [false, true, true, false]
-                && items.map(\.isSymlink) == [false, false, true, true])
+                && items.map(\.isSymlink) == [false, false, true, true]
+        )
         #expect(items[0].size == 5 && items[0].modified == stamp && items[0].permissions == 0o644)
         #expect(try fileSystem.list(url(""), showHidden: true).count == 5)
         #expect(fileSystem.item(at: url("dir/inner.txt"))?.size == 1)
@@ -70,7 +73,8 @@ let systemSFTPServer = "/usr/libexec/sftp-server"
         #expect(try Data(contentsOf: box.url("big.bin")) == content)
         #expect(
             fileSystem.item(at: url("big.bin"))?.modified == stamp
-                && fileSystem.item(at: url("big.bin"))?.permissions == 0o600)
+                && fileSystem.item(at: url("big.bin"))?.permissions == 0o600
+        )
         #expect(throws: FileSystemError.self) { _ = try fileSystem.write(url("big.bin")) }
 
         let reader = try fileSystem.read(url("big.bin"))
@@ -120,7 +124,10 @@ let systemSFTPServer = "/usr/libexec/sftp-server"
             return count
         }
         #expect(results == (0..<12).map { $0 * 1_000 })
-        #expect(fileSystem.totalSize(of: url("")) == Int64((0..<12).reduce(0) { $0 + $1 * 1_000 }))
+        #expect(
+            fileSystem.totalSize(of: url(""), cancellation: CancellationFlag())
+                == Int64((0..<12).reduce(0) { $0 + $1 * 1_000 })
+        )
     }
 
     @Test func reconnectsAfterDisconnect() throws {
@@ -134,8 +141,10 @@ let systemSFTPServer = "/usr/libexec/sftp-server"
     @Test func aTransportThatIsNotSFTPFails() throws {
         center.makeSession = { profile, environment in
             SFTPSession(
-                profile: profile, environment: environment,
-                transport: SFTPTransport(executable: "/bin/echo", arguments: ["hello"]))
+                profile: profile,
+                environment: environment,
+                transport: SFTPTransport(executable: "/bin/echo", arguments: ["hello"])
+            )
         }
         #expect(throws: (any Error).self) { try fileSystem.list(url(""), showHidden: true) }
         #expect(!center.isConnected(key))
@@ -145,7 +154,9 @@ let systemSFTPServer = "/usr/libexec/sftp-server"
         var values = NetworkOptions.Values()
         (values.timeout, values.keepAliveInterval) = (20, 45)
         let profile = ConnectionProfile(
-            key: ServerKey(scheme: "sftp", host: "-oProxyCommand=evil", port: 2_222), user: "deploy")
+            key: ServerKey(scheme: "sftp", host: "-oProxyCommand=evil", port: 2_222),
+            user: "deploy"
+        )
         let arguments = SFTPSession.sshArguments(for: profile, options: values)
         #expect(arguments.suffix(4) == ["-s", "--", "-oproxycommand=evil", "sftp"])
         #expect(arguments.contains("ConnectTimeout=20") && arguments.contains("ServerAliveInterval=45"))
@@ -177,7 +188,8 @@ let systemSFTPServer = "/usr/libexec/sftp-server"
         #expect(
             try FileManager.default.contentsOfDirectory(atPath: helper.directory.path).sorted() == [
                 "answer", "askpass.sh", "question"
-            ])
+            ]
+        )
     }
 
     /// The whole way through `ssh`: a secure-shell server of the system on 127.0.0.1 with keys
@@ -188,7 +200,10 @@ let systemSFTPServer = "/usr/libexec/sftp-server"
         defer { server.stop() }
         try box.file("srv/hello.txt", "over ssh")
         let transport = SFTPTransport(
-            executable: "/usr/bin/ssh", arguments: server.clientArguments, asksQuestions: true)
+            executable: "/usr/bin/ssh",
+            arguments: server.clientArguments,
+            asksQuestions: true
+        )
         center.makeSession = { profile, environment in
             SFTPSession(profile: profile, environment: environment, transport: transport)
         }
@@ -220,8 +235,10 @@ let systemSFTPServer = "/usr/libexec/sftp-server"
 /// key, a user key and an `authorized_keys` file that exist only in the sandbox.
 final class LocalSSHServer {
     static var isAvailable: Bool {
-        ["/usr/sbin/sshd", "/usr/bin/ssh", "/usr/bin/ssh-keygen", systemSFTPServer].allSatisfy(
-            FileManager.default.isExecutableFile)
+        ["/usr/sbin/sshd", "/usr/bin/ssh", "/usr/bin/ssh-keygen", systemSFTPServer]
+            .allSatisfy(
+                FileManager.default.isExecutableFile
+            )
     }
 
     let port: Int
@@ -267,7 +284,8 @@ final class LocalSSHServer {
         KbdInteractiveAuthentication no
         Subsystem sftp \(systemSFTPServer)
 
-        """.write(to: config, atomically: true, encoding: .utf8)
+        """
+        .write(to: config, atomically: true, encoding: .utf8)
         process.executableURL = URL(fileURLWithPath: "/usr/sbin/sshd")
         process.arguments = ["-D", "-e", "-f", config.path]
         (process.standardOutput, process.standardError) = (FileHandle.nullDevice, FileHandle.nullDevice)
