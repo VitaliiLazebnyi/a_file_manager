@@ -205,8 +205,7 @@ struct DescriptIon: Equatable {
 /// up when its own flag is set or after `waitLimit` (the reader may be held by a server
 /// that has stopped answering, with a flag nobody sets).
 ///
-/// `remembered`, `beingRead` and `generations` are guarded by `condition`; `waitLimit` is set
-/// before the store is used, and only read afterwards.
+/// `remembered`, `beingRead`, `generations` and `waitLimit` are guarded by `condition`.
 final class CommentStore: @unchecked Sendable {
     private struct Remembered {
         let comments: [String: String]
@@ -219,7 +218,11 @@ final class CommentStore: @unchecked Sendable {
     /// for changes other programs make.
     private static let lifetime: TimeInterval = 3
     /// How long a thread waits for another thread's reading of the same folder.
-    var waitLimit: TimeInterval = 10
+    var waitLimit: TimeInterval {
+        get { condition.withLock { patience } }
+        set { condition.withLock { patience = newValue } }
+    }
+    private var patience: TimeInterval = 10
     /// How often a waiting thread looks at its flag.
     private static let waitStep: TimeInterval = 0.1
 
@@ -244,8 +247,8 @@ final class CommentStore: @unchecked Sendable {
     /// set before they were read, or when another thread's reading did not come back in time.
     func comments(in directory: URL, cancellation: CancellationFlag = CancellationFlag()) -> [String: String] {
         let key = directory.locationKey
-        let patience = Date().addingTimeInterval(waitLimit)
         condition.lock()
+        let patience = Date().addingTimeInterval(self.patience)
         while true {
             if let known = remembered[key], -known.read.timeIntervalSinceNow < Self.lifetime {
                 condition.unlock()
