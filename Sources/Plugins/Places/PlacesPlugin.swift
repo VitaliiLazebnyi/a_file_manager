@@ -154,8 +154,6 @@ public final class PlacesPlugin: Plugin {
     /// millions of folders is a file of many megabytes). `stop` then finds nothing left to write.
     public func prepareToQuit(cancellation _: CancellationFlag, completion: @escaping () -> Void) {
         let cache = treeCache
-        /// The kernel lets `completion` be called on any thread (`Plugin.prepareToQuit`).
-        nonisolated(unsafe) let completion = completion
         BlockingCalls.run {
             cache.flush()
             completion()
