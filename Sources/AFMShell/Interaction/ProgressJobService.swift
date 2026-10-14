@@ -317,19 +317,18 @@ private final class AskSlot<Answer>: @unchecked Sendable {
 /// The progress of one job and the job's way to ask the user something: what the work reports
 /// on its own thread is brought to the main thread here, where the progress window reads it.
 ///
-/// Unchecked: what is marked "main thread only" is touched on the main thread alone, the
-/// report counters are guarded by `reportLock`, and the rest does not change.
+/// Unchecked: the main thread's part is isolated to it, the report counters are guarded by
+/// `reportLock`, and the rest does not change (`display` is weak, and so a `var`).
 final class ProgressSheet: JobMonitor, @unchecked Sendable {
     let cancellation: CancellationFlag
     let title: String
     private let gate: PauseGate
     private weak var display: ProgressDisplay?
 
-    // Main thread only.
-    private(set) var latest: JobProgress?
-    private(set) var rate = TransferRate()
+    @MainActor private(set) var latest: JobProgress?
+    @MainActor private(set) var rate = TransferRate()
     /// The number of the report `latest` is.
-    private var shownReport = 0
+    @MainActor private var shownReport = 0
     /// When the last report was passed on and which number it got; behind the lock, because
     /// a job may report from several threads at once.
     private let reportLock = NSLock()
@@ -345,7 +344,7 @@ final class ProgressSheet: JobMonitor, @unchecked Sendable {
     }
 
     /// Forgets the measured speed, after the job stood still for a reason of the user's.
-    func restartMeasuring() {
+    @MainActor func restartMeasuring() {
         rate.reset()
     }
 
