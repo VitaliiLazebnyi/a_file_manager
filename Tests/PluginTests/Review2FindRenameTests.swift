@@ -225,7 +225,9 @@ import Testing
             settings: settings)
     }
 
-    func session(clipboard: @escaping @Sendable () -> String?, changes: (() -> Int)?, background: Bool = false)
+    func session(
+        clipboard: @escaping @Sendable () -> String?, changes: (@MainActor () -> Int)?, background: Bool = false
+    )
         -> MultiRenameSession
     {
         MultiRenameSession(
@@ -238,19 +240,21 @@ import Testing
     @Test func theClipboardIsReadOnlyWhenAMaskUsesItAndOnlyWhenItChanged() {
         // Used by the session's callbacks, which run one at a time while the test waits for them.
         nonisolated(unsafe) var reads = 0
-        nonisolated(unsafe) var count = 1
+        // The change count of the clipboard, asked on the main thread.
+        @MainActor final class ChangeCount { var value = 1 }
+        let count = ChangeCount()
         let session = session(
             clipboard: {
                 reads += 1
                 return "clip"
-            }, changes: { count })
+            }, changes: { count.value })
         for mask in ["[N]a", "[N]b", "[N]c", "[N]d"] { session.settings.nameMask = mask }
         #expect(reads == 0)
         session.settings.nameMask = "[X]_[N]"
         #expect(reads == 1 && session.rows.first?.newName == "clip_a.txt")
         for mask in ["[X]1", "[X]2", "[X]3"] { session.settings.nameMask = mask }
         #expect(reads == 1)
-        count = 2
+        count.value = 2
         session.settings.nameMask = "[X]4"
         #expect(reads == 2)
     }

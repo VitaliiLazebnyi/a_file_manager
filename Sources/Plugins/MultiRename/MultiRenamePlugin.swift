@@ -71,14 +71,17 @@ public final class MultiRenamePlugin: Plugin {
                 "Logs"
             ).appendingPathComponent(product)
             ?? FileManager.default.temporaryDirectory.appendingPathComponent(product)
-        // Read on a queue of the session, off the main thread.
+        // Asked for from a queue of the session, which waits; read on the main thread, as
+        // `NSPasteboard` is not made for other threads.
         var clipboard: @Sendable () -> String? = { nil }
-        if opensWindows { clipboard = { NSPasteboard.general.string(forType: .string) } }
+        var changeCount: (@MainActor () -> Int)?
+        if opensWindows {
+            clipboard = { kernel.askUser { _ in NSPasteboard.general.string(forType: .string) } }
+            changeCount = { NSPasteboard.general.changeCount }
+        }
         let session = MultiRenameSession(
             kernel: kernel, items: items, store: store, settings: settings, logDirectory: log,
-            previewsInBackground: opensWindows,
-            clipboard: clipboard,
-            clipboardChangeCount: opensWindows ? { NSPasteboard.general.changeCount } : nil)
+            previewsInBackground: opensWindows, clipboard: clipboard, clipboardChangeCount: changeCount)
         self.session = session
         guard opensWindows else { return }
         // The tool that is open is closed first, and its closing is not told to anyone: it
