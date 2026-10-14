@@ -153,13 +153,13 @@ struct SelectionRule {
 
     /// Whether the rule selects one entry on its own, for a rule that is not `isPairwise`. A
     /// function of the entry alone, so it may be asked from several threads at once.
-    func probe(base: URL, now: Date = Date()) -> (FileItem) -> Bool {
+    func probe(base: URL, now: Date = Date()) -> @Sendable (FileItem) -> Bool {
         let (mask, type, entry) = (self.mask, self.type, entryMaker(base: base))
         return { item in mask.matches(entry(item)) && (type?.accepts(item, now: now) ?? true) }
     }
 
     /// What a mask is asked about an entry: `base` is the directory the list belongs to.
-    private func entryMaker(base: URL) -> (FileItem) -> MaskEntry {
+    private func entryMaker(base: URL) -> @Sendable (FileItem) -> MaskEntry {
         let needsDirectories = mask.needsDirectories
         let baseParts = needsDirectories ? base.pathComponents.filter { $0 != "/" } : []
         return { item in

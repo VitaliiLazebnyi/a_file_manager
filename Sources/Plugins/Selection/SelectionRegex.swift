@@ -4,7 +4,9 @@ import Foundation
 /// Counts the names a regular expression ran out of time on; shared by the threads that match
 /// one mask. After a few timeouts the expression is given up: the rest of the names answer at
 /// once instead of costing the budget each.
-final class SelectionRegexTrip {
+///
+/// All state is guarded by `lock`.
+final class SelectionRegexTrip: @unchecked Sendable {
     private let lock = NSLock()
     private var timeouts = 0
 

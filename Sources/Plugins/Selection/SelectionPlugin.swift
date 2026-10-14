@@ -245,6 +245,7 @@ enum SelectionScope {
 /// Selection files touch a file system: they are written and read inside a job, on the job's
 /// thread, through the file system's provider, and the job's completion returns to the main
 /// thread to change the selection.
+@MainActor
 final class Selections {
     enum Similarity {
         case ext, name, nameAndExt, path
@@ -306,7 +307,7 @@ final class Selections {
         let shownVersion: Int
         let operands: PanelModel.Operands
 
-        init(_ model: PanelModel) {
+        @MainActor init(_ model: PanelModel) {
             self.model = model
             basis = model.basis
             shownVersion = model.shownVersion
@@ -324,9 +325,9 @@ final class Selections {
     /// command has started. `apply` says whether the result still fitted the lists (the
     /// model refuses a result made for a list it no longer has): if not, and the panels still
     /// show the folders they showed, `work` is done again for the lists as they are now.
-    private func compute<Result>(
-        heavy: Bool, models: [PanelModel], _ work: @escaping ([Frozen], CancellationFlag) -> Result,
-        apply: @escaping ([Frozen], Result) -> Bool
+    private func compute<Result: Sendable>(
+        heavy: Bool, models: [PanelModel], _ work: @escaping @Sendable ([Frozen], CancellationFlag) -> Result,
+        apply: @escaping @MainActor ([Frozen], Result) -> Bool
     ) {
         let flag = CancellationFlag()
         running?.cancel()
@@ -340,23 +341,25 @@ final class Selections {
                 if running === flag { running = nil }
                 return
             }
+            // Made on the main thread and used there only: the background thread only carries them.
+            let onMain = Handover((apply: apply, again: attempt))
             // (Some of this work asks a file system: on a thread of the kernel's own.)
             BlockingCalls.run { [weak self] in
                 let result = autoreleasepool { work(frozen, flag) }
                 // A result can ask the user something (a mask that took too long): from the run loop.
-                performOnMainLoop {
+                performOnMainLoop { [weak self] in
                     guard let self else { return }
-                    func finish() { if self.running === flag { self.running = nil } }
+                    @MainActor func finish() { if self.running === flag { self.running = nil } }
                     // A newer command, or a panel that went to another folder: the result is of no use.
                     guard !flag.isCancelled,
                         zip(models, directories).allSatisfy({ $0.directory.isSameLocation(as: $1) })
                     else { return finish() }
-                    if apply(frozen, result) { return finish() }
+                    if onMain.value.apply(frozen, result) { return finish() }
                     guard number < Self.attempts else {
                         finish()
                         return self.kernel.commands.onRejected()
                     }
-                    attempt(number + 1)
+                    onMain.value.again(number + 1)
                 }
             }
         }
@@ -370,7 +373,7 @@ final class Selections {
     /// changed then, and the user is told.
     private func mark(
         _ model: PanelModel, _ change: PanelModel.SelectionChange, timedOut mask: SelectionMask? = nil,
-        matching matches: @escaping (FileItem) -> Bool
+        matching matches: @escaping @Sendable (FileItem) -> Bool
     ) {
         // A regular expression can take long on any list.
         compute(
@@ -391,7 +394,7 @@ final class Selections {
     /// pairs files, the marks of an inversion): `find` returns indexes of the shown items.
     private func mark(
         _ model: PanelModel, _ change: PanelModel.SelectionChange, timedOut mask: SelectionMask? = nil,
-        indices find: @escaping ([FileItem], PanelModel.Operands, CancellationFlag) -> [Int]
+        indices find: @escaping @Sendable ([FileItem], PanelModel.Operands, CancellationFlag) -> [Int]
     ) {
         compute(
             heavy: model.items.count > Self.longList || mask?.isRegex == true, models: [model],
@@ -582,7 +585,7 @@ final class Selections {
         let change: PanelModel.SelectionChange = select ? .add : .remove
         guard step != 0 else {
             if scope == .both { return select ? model.selectAll() : model.clearSelection() }
-            mark(model, change, matching: scope.contains)
+            mark(model, change, matching: { scope.contains($0) })
             return
         }
         // A step beyond the list is the same as the list's length.
@@ -647,7 +650,9 @@ final class Selections {
     func similar(to similarity: Similarity, select: Bool) {
         let model = source
         guard let cursor = model.cursorItem else { return }
-        func same(_ first: String, _ second: String) -> Bool { first.caseInsensitiveCompare(second) == .orderedSame }
+        @Sendable func same(_ first: String, _ second: String) -> Bool {
+            first.caseInsensitiveCompare(second) == .orderedSame
+        }
         let folder = similarity == .path ? cursor.url.deletingLastPathComponent().locationKey : ""
         mark(
             model, select ? .add : .remove,
@@ -720,7 +725,7 @@ final class Selections {
                     let provider = try fileSystems.provider(for: target)
                     var replaces = false
                     if provider.item(at: target) != nil {
-                        let replace = monitor.ask {
+                        let replace = monitor.ask { @MainActor @Sendable in
                             ui.choose(
                                 "\(fileSystems.displayPath(target)) already exists.",
                                 detail: "Do you want to overwrite it?",
@@ -770,7 +775,7 @@ final class Selections {
     }
 
     /// Selection files are small; a file that is not one is not read to its end.
-    private static let readLimit = 32 << 20
+    nonisolated private static let readLimit = 32 << 20
 
     /// Load Selection From File: selects exactly the listed names that the panel shows. The
     /// file is read and its names picked out in the job, which ends when it is cancelled; the
@@ -831,7 +836,7 @@ final class Selections {
         }
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             let names = autoreleasepool { ListedNames(text, among: items) }
-            DispatchQueue.main.async { self?.select(names, in: model, directory: directory) }
+            DispatchQueue.main.async { [weak self] in self?.select(names, in: model, directory: directory) }
         }
     }
 
@@ -866,7 +871,7 @@ final class Selections {
             model.selectionCount == 0 ? () : model.clearSelection()
             return
         }
-        mark(model, .replace, matching: names.contains)
+        mark(model, .replace, matching: { names.contains($0) })
     }
 
     // MARK: Comparing the panels
@@ -899,7 +904,7 @@ final class Selections {
     /// Whether both folders are on local volumes that treat `A.txt` and `a.txt` as one name.
     /// Asks the volumes on a thread of the kernel's, which is given up when `cancellation`
     /// is set (a stalled mount holds that thread, not this one); not for the main thread.
-    private func foldsCase(_ folders: URL..., cancellation: CancellationFlag) -> Bool {
+    nonisolated private func foldsCase(_ folders: URL..., cancellation: CancellationFlag) -> Bool {
         folders.allSatisfy { folder in
             guard folder.isFileURL else { return false }
             let key = "case " + folder.path
@@ -945,7 +950,8 @@ final class Selections {
                 for index in marks.sameRight { same.insert(NameBytes(rightList[index].name)) }
                 let filters = zip(frozen, titles).map { frozen, title in
                     PanelModel.prepare(
-                        frozen.basis, filter: PanelFilter(title: title) { !same.contains(NameBytes($0.name)) })
+                        frozen.basis, filter: PanelFilter(title: title) { [same] in !same.contains(NameBytes($0.name)) }
+                    )
                 }
                 return Outcome(
                     filters: filters,
@@ -999,7 +1005,8 @@ final class Selections {
 /// Hands a block to the main thread through the run loop (all modes that count), not through the
 /// main dispatch queue: a block that asks the user something runs a modal dialog, and a dialog
 /// started from inside a block of the main queue keeps every later block of the queue waiting.
-func performOnMainLoop(_ block: @escaping () -> Void) {
-    RunLoop.main.perform(inModes: [.common], block: block)
+func performOnMainLoop(_ block: @escaping @MainActor @Sendable () -> Void) {
+    // The main run loop runs its blocks on the main thread.
+    RunLoop.main.perform(inModes: [.common]) { MainActor.assumeIsolated(block) }
     CFRunLoopWakeUp(CFRunLoopGetMain())
 }
