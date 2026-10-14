@@ -69,8 +69,9 @@ internal let kDrivers: [Target] = [
     fuzz("diff", ["CompareContentPlugin", "MultiRenamePlugin", "FileOperationsPlugin"])
 ]
 
-/// The package: the project's modules, the fuzzer and its drivers.
-internal let kPackage = Package(
+// The package: the project's modules, the fuzzer and its drivers. SwiftPM keeps the value that
+// `Package(...)` makes; nothing refers to it by name.
+_ = Package(
     name: "AFMFuzz",
     platforms: [.macOS(.v14)],
     targets: [

@@ -1,4 +1,3 @@
-import Foundation
 import FuzzCore
 
 @testable import ArchivesPlugin
@@ -13,7 +12,6 @@ if CommandLine.arguments.count == 3, CommandLine.arguments[1] == "mkseeds" {
     let dir = CommandLine.arguments[2]
     ArchiveRig.setUpForSeeds(scratch: dir + "/work.tmp")
     makeOwnSeeds(dir)
-    exit(0)
 }
 
 /// The tokens of ZIP records and fields.

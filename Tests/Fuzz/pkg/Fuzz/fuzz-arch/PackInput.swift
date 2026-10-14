@@ -1,4 +1,3 @@
-import Foundation
 import FuzzCore
 
 /// What a `zippack` input asks for: the password, the file's name and contents, and how to pack.

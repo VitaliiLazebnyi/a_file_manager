@@ -1,5 +1,4 @@
 import AppKit
-import Darwin
 import StressKit
 
 // Scenarios 1 (a million files in a panel), 2 (a provider that stops answering) and

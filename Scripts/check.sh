@@ -64,7 +64,7 @@ swiftlint_env() {
 # object ... was already destroyed"; Xcode 27). Through swift-plugin-server, a process per
 # compilation, the same macros expand without a crash. See documentation/quality-gates-handover.md.
 analyzer_log() {
-  local log=$1 package scratch toolchain sdk platform manifest
+  local log=$1 package scratch toolchain sdk platform manifest version program
   : > "$log"
   for package in . Tests/Fuzz/pkg Tests/Stress/harness; do
     scratch="$PWD/.build-tools/analyze/$(basename "$(cd "$package" && pwd)")"
@@ -82,7 +82,10 @@ analyzer_log() {
   sdk=$(xcrun --show-sdk-path)
   platform=$(xcrun --show-sdk-platform-path)
   for manifest in Package.swift Tests/Fuzz/pkg/Package.swift Tests/Stress/harness/Package.swift; do
+    # PackageDescription's API is available by the manifest's tools version, as SwiftPM compiles it.
+    version=$(sed -n '1s/.*swift-tools-version: *\([0-9.]*\).*/\1/p' "$manifest")
     echo "swiftc -module-name main -swift-version 6 -sdk $sdk -target arm64-apple-macosx14.0" \
+      "-Xfrontend -package-description-version -Xfrontend $version" \
       "-I $toolchain/lib/swift/pm/ManifestAPI -I $platform/Developer/usr/lib" \
       "-F $platform/Developer/Library/Frameworks $PWD/$manifest" >> "$log"
   done
@@ -94,16 +97,21 @@ analyzer_log() {
 
 # analyzer_coverage <log>: fails, naming them, when Swift files git knows of have no invocation in the
 # log. `swiftlint analyze` skips such files without a word.
+invocation_files() {  # the source files the invocations in log $1 name, response files read
+  local argument
+  # The lines SwiftLint takes: holding `swiftc ` and ` -module-name `.
+  grep -F 'swiftc ' "$1" | grep -F ' -module-name ' | tr ' ' '\n' | while read -r argument; do
+    if [[ $argument == @* ]]; then
+      cat "${argument#@}"
+      echo
+    elif [[ $argument == *.swift ]]; then
+      echo "$argument"
+    fi
+  done | sort -u
+}
 analyzer_coverage() {
   local missing
-  missing=$(comm -23 \
-    <(swift_files | tr '\0' '\n' | sed "s|^|$PWD/|" | sort -u) \
-    <(grep -E 'swiftc .* -module-name ' "$1" | tr ' ' '\n' | while read -r argument; do
-        case $argument in
-          @*) cat "${argument#@}"; echo ;;
-          *.swift) echo "$argument" ;;
-        esac
-      done | sort -u))
+  missing=$(comm -23 <(swift_files | tr '\0' '\n' | sed "s|^|$PWD/|" | sort -u) <(invocation_files "$1"))
   if [[ -n "$missing" ]]; then
     printf 'no compiler invocation, cannot be analysed:\n%s\n' "$missing" >&2
     return 1

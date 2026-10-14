@@ -1,4 +1,3 @@
-import Foundation
 import FuzzCore
 
 @testable import ViewerPlugin

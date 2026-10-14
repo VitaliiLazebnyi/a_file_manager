@@ -4,6 +4,8 @@ import TestSupport
 
 /// The provider interface: each call is counted and, while stalled, held (see `StallFS`).
 extension StallFS: FileSystemProvider {
+    /// The URL scheme of the provider.
+    internal var scheme: String { "stall" }
     /// What the memory file system can do.
     internal var capabilities: FileSystemCapabilities { inner.capabilities }
     /// The memory file system's own rule for rooted paths.

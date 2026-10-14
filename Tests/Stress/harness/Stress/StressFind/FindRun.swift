@@ -1,5 +1,4 @@
 internal import AFMKernel
-internal import AppKit
 internal import Darwin
 internal import Foundation
 internal import LocalFileSystemPlugin

@@ -1,6 +1,6 @@
 import AFMKernel
-import AppKit
 import Darwin
+import Foundation
 import StressKit
 
 @testable import AFMShell

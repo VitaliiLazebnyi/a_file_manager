@@ -1,4 +1,3 @@
-internal import Darwin
 internal import Foundation
 internal import StressKit
 internal import TestSupport

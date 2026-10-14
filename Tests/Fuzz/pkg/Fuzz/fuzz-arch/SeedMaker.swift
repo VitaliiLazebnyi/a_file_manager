@@ -6,9 +6,9 @@ import Foundation
 // MARK: - seeds made by the program's own Packer
 
 /// Packs a small tree into every format the Packer writes, into the seed folders below `dir`,
-/// and prints one line per archive.
+/// and prints one line per archive; then ends the process.
 @MainActor
-internal func makeOwnSeeds(_ dir: String) {
+internal func makeOwnSeeds(_ dir: String) -> Never {
     let tree = dir + "/work.tmp/tree"
     makeSeedTree(tree)
     let store = ArchiveStore(environment: ArchiveRig.environment)
@@ -19,6 +19,7 @@ internal func makeOwnSeeds(_ dir: String) {
     maker.packNested()
     store.close()
     try? FileManager.default.removeItem(atPath: dir + "/work.tmp")
+    exit(0)
 }
 
 /// A file, an empty file, a long name in a subfolder, an empty folder and a link.
