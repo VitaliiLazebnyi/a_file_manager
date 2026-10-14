@@ -39,7 +39,7 @@ import Testing
     }
 
     /// Runs the command and returns the names of the two files it took.
-    func operands(_ argument: CommandArgument = .none) -> [String?] {
+    func operands(_ argument: CommandArgument = .nothing) -> [String?] {
         bench.commands.perform(.compareByContent, argument)
         return [session.leftURL?.path, session.rightURL?.path]
     }

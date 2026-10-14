@@ -40,9 +40,11 @@ enum ArchiveSettings {
         options.entersAnyFile = settings.flag(entersAnyFile, default: true)
         let list = settings.text(extensions, default: defaultExtensions).lowercased()
         options.extensions = Set(
-            list.split(whereSeparator: { " ,;".contains($0) }).map {
-                String($0.drop(while: { $0 == "*" || $0 == "." }))
-            })
+            list.split(whereSeparator: { " ,;".contains($0) })
+                .map {
+                    String($0.drop(while: { $0 == "*" || $0 == "." }))
+                }
+        )
         options.verifiesAfterPacking = settings.flag(verifies, default: true)
         options.datesArchiveByNewest = settings.flag(datesByNewest, default: false)
         return options
@@ -69,7 +71,7 @@ final class ArchiveCommands {
         self.launchesApplications = launchesApplications
     }
 
-    private var ui: any UserInteraction { kernel.ui }
+    private var ui: any UserInteraction { kernel.interaction }
     private var fileSystems: FileSystemRegistry { kernel.fileSystems }
     private var settings: any SettingsStore { kernel.settings }
     private var source: any PanelHandle { kernel.panels.source }
@@ -99,7 +101,9 @@ final class ArchiveCommands {
 
     func archiveRoot(for file: URL, isZip: Bool? = nil) -> URL {
         ArchiveURL.make(
-            scheme: ArchiveFileSystem.scheme(forArchive: file, fileSystems: fileSystems, isZip: isZip), archive: file)
+            scheme: ArchiveFileSystem.scheme(forArchive: file, fileSystems: fileSystems, isZip: isZip),
+            archive: file
+        )
     }
 
     /// The opener for Enter: archives are entered like folders.
@@ -120,8 +124,10 @@ final class ArchiveCommands {
         kernel.jobs.run(
             title: "Reading:",
             work: { monitor in
-                (try? store.archive(at: location.archive, cancellation: monitor.cancellation))?.entry(
-                    location.innerPath)
+                (try? store.archive(at: location.archive, cancellation: monitor.cancellation))?
+                    .entry(
+                        location.innerPath
+                    )
             },
             completion: { [self] entry in
                 guard let entry else { return }
@@ -144,7 +150,8 @@ final class ArchiveCommands {
                 case "Unpack and Open": unpackAndOpen(file)
                 default: break
                 }
-            })
+            }
+        )
         return true
     }
 
@@ -160,8 +167,11 @@ final class ArchiveCommands {
                     let local = folder.appendingPathComponent(file.name, isDirectory: false)
                     // Cancel ends the opening of the member (which may lie behind a long stretch
                     // of decompression) and a read that hangs, not only the loop.
-                    let reader = try fileSystems.provider(for: file.url).read(
-                        file.url, cancellation: monitor.cancellation)
+                    let reader = try fileSystems.provider(for: file.url)
+                        .read(
+                            file.url,
+                            cancellation: monitor.cancellation
+                        )
                     defer { reader.close() }
                     let tie = monitor.cancellation.interrupting(reader)
                     defer { withExtendedLifetime(tie) {} }
@@ -175,7 +185,8 @@ final class ArchiveCommands {
                     if let location = ArchiveURL.location(of: file.url) {
                         Quarantine.apply(
                             (try? store.archive(at: location.archive, cancellation: monitor.cancellation))?.quarantine,
-                            to: local)
+                            to: local
+                        )
                     }
                     return local
                 }
@@ -186,7 +197,8 @@ final class ArchiveCommands {
                 case .failure(ArchiveError.cancelled): break
                 case .failure(let error): ui.report(error, title: "\(file.name) cannot be unpacked!")
                 }
-            })
+            }
+        )
     }
 
     /// Enters the file under the cursor as an archive, whatever it is called. The first bytes
@@ -199,8 +211,11 @@ final class ArchiveCommands {
             title: "Opening:",
             work: { monitor -> Bool in
                 guard
-                    let reader = try? fileSystems.provider(for: file.url).read(
-                        file.url, cancellation: monitor.cancellation)
+                    let reader = try? fileSystems.provider(for: file.url)
+                        .read(
+                            file.url,
+                            cancellation: monitor.cancellation
+                        )
                 else { return false }
                 defer { reader.close() }
                 let tie = monitor.cancellation.interrupting(reader)
@@ -210,7 +225,8 @@ final class ArchiveCommands {
             },
             completion: { [self] isZip in
                 panel.show(archiveRoot(for: file.url, isZip: isZip ? true : nil))
-            })
+            }
+        )
     }
 
     // MARK: Pack
@@ -267,12 +283,21 @@ final class ArchiveCommands {
             .text("archive", "Pack \(items.count) file(s) to the archive", proposal),
             .choice("format", "Packer", formats.map(\.title), selected: intoOpenArchive ? 0 : defaultFormat),
             .choice(
-                "level", "Compression rate", ArchiveSettings.levels, selected: environment.options.compressionLevel),
+                "level",
+                "Compression rate",
+                ArchiveSettings.levels,
+                selected: environment.options.compressionLevel
+            ),
             .checkbox(
-                "paths", "Also pack path names (only recursed)",
-                settings.flag(ArchiveSettings.storesPaths, default: true)),
+                "paths",
+                "Also pack path names (only recursed)",
+                settings.flag(ArchiveSettings.storesPaths, default: true)
+            ),
             .checkbox(
-                "recurse", "Recursively pack subdirectories", settings.flag(ArchiveSettings.recurses, default: true)),
+                "recurse",
+                "Recursively pack subdirectories",
+                settings.flag(ArchiveSettings.recurses, default: true)
+            ),
             .checkbox("move", "Move to archive", move),
             .checkbox("separate", "Create separate archives, one per selected file/dir"),
             .checkbox("skipBase", "Leave out base directory when packing folders (separate archives only)"),
@@ -283,9 +308,10 @@ final class ArchiveCommands {
 
         var options = PackOptions()
         let (prefixFormat, path) = Self.splitPrefix(
-            answer.text("archive").trimmingCharacters(in: .whitespaces))
+            answer.text("archive").trimmingCharacters(in: .whitespaces)
+        )
         // An archive on a server whose address was typed here: the user's own choice of that server.
-        kernel.userTyped(location: path, proposal: proposal, relativeTo: sourceDirectory)
+        kernel.userTyped(location: path, relativeTo: sourceDirectory, proposal: proposal)
         options.format =
             prefixFormat ?? (formats.indices.contains(answer.index("format")) ? formats[answer.index("format")] : .zip)
         options.level = max(0, min(answer.index("level"), 9))
@@ -316,13 +342,16 @@ final class ArchiveCommands {
 
         // Where the archive goes. A path that runs through an existing ZIP adds to it.
         var archive = ArchiveURL.resolved(
-            fileSystems.location(from: path.isEmpty ? "." : path, relativeTo: sourceDirectory))
+            fileSystems.location(from: path.isEmpty ? "." : path, relativeTo: sourceDirectory)
+        )
         var innerFolder = ""
         if let location = ArchiveURL.location(of: archive) {
             guard archive.scheme == ArchiveURL.writableScheme else {
                 ui.inform(
                     "\(location.archive.lastPathComponent) cannot be changed.",
-                    detail: "Only ZIP archives can be added to.", style: .warning)
+                    detail: "Only ZIP archives can be added to.",
+                    style: .warning
+                )
                 return
             }
             (archive, innerFolder, options.format, options.separateArchives) = (
@@ -331,8 +360,10 @@ final class ArchiveCommands {
         } else if path.isEmpty || path.hasSuffix("/") || path == "." {
             archive = archive.appending(name: Packer.archiveName(for: items[0], format: options.format))
         } else {
-            archive = archive.deletingLastPathComponent().appending(
-                name: Self.archiveName(archive.lastPathComponent, format: options.format))
+            archive = archive.deletingLastPathComponent()
+                .appending(
+                    name: Self.archiveName(archive.lastPathComponent, format: options.format)
+                )
         }
 
         model.saveSelection()
@@ -345,9 +376,11 @@ final class ArchiveCommands {
                     // `@Sendable`, so that it may be sent from this thread to the main thread.
                     monitor.ask { @Sendable in
                         ui.choose(
-                            "Overwrite:", detail: "\(fileSystems.displayPath(existing)) already exists.",
+                            "Overwrite:",
+                            detail: "\(fileSystems.displayPath(existing)) already exists.",
                             buttons: ["Overwrite", "Cancel"],
-                            style: .warning) == 0
+                            style: .warning
+                        ) == 0
                     }
                 }
                 let result = packer.run(items, archive: archive, innerFolder: innerFolder)
@@ -362,8 +395,11 @@ final class ArchiveCommands {
                 // No message on success: the new archive appears in the panel (spec 08 › After packing).
                 let written = result.archives.map { $0.deletingLastPathComponent() }
                 refreshPanels(
-                    written + [archive.deletingLastPathComponent(), sourceDirectory], focus: result.archives.first)
-            })
+                    written + [archive.deletingLastPathComponent(), sourceDirectory],
+                    focus: result.archives.first
+                )
+            }
+        )
     }
 
     /// The names the panel marks the operands that were packed with. A branch or list view
@@ -416,17 +452,24 @@ final class ArchiveCommands {
             .text(
                 "target",
                 inside == nil ? "Unpack specific files from archive to:" : "Unpack \(max(marked, 1)) file(s) to",
-                fileSystems.displayPath(target.model.directory)),
+                fileSystems.displayPath(target.model.directory)
+            ),
             .text("mask", "Files to unpack:", "*.*"),
             .checkbox(
-                "paths", "Unpack path names if stored with files",
-                settings.flag(ArchiveSettings.unpackPaths, default: true)),
+                "paths",
+                "Unpack path names if stored with files",
+                settings.flag(ArchiveSettings.unpackPaths, default: true)
+            ),
             .checkbox(
-                "separate", "Unpack each archive to a separate subdir (name of the archive)",
-                settings.flag(ArchiveSettings.unpackSeparate, default: false)),
+                "separate",
+                "Unpack each archive to a separate subdir (name of the archive)",
+                settings.flag(ArchiveSettings.unpackSeparate, default: false)
+            ),
             .checkbox(
-                "overwrite", "Overwrite existing files",
-                settings.flag(ArchiveSettings.unpackOverwrite, default: false))
+                "overwrite",
+                "Overwrite existing files",
+                settings.flag(ArchiveSettings.unpackOverwrite, default: false)
+            )
         ]
         guard let answer = ui.form("Unpack files", detail: "", fields: fields, buttons: ["OK"]) else { return }
         var options = UnpackOptions()
@@ -438,7 +481,10 @@ final class ArchiveCommands {
         let ownFolder = inside.map { $0.archive.deletingLastPathComponent() } ?? directory
         let text = answer.text("target").trimmingCharacters(in: .whitespaces)
         kernel.userTyped(
-            location: text, proposal: fileSystems.displayPath(target.model.directory), relativeTo: ownFolder)
+            location: text,
+            relativeTo: ownFolder,
+            proposal: fileSystems.displayPath(target.model.directory)
+        )
         let targetURL =
             text.isEmpty ? ownFolder : ArchiveURL.resolved(fileSystems.location(from: text, relativeTo: ownFolder))
 
@@ -457,7 +503,10 @@ final class ArchiveCommands {
                         sources.append(
                             Unpacker.Source(
                                 archive: try store.archive(at: inside.archive, cancellation: monitor.cancellation),
-                                base: inside.innerPath, selection: paths))
+                                base: inside.innerPath,
+                                selection: paths
+                            )
+                        )
                     } catch {
                         unreadable.append(error.localizedDescription)
                     }
@@ -467,14 +516,17 @@ final class ArchiveCommands {
                             try store.flush(item.url, cancellation: monitor.cancellation)
                             sources.append(
                                 Unpacker.Source(
-                                    archive: try store.archive(at: item.url, cancellation: monitor.cancellation)))
+                                    archive: try store.archive(at: item.url, cancellation: monitor.cancellation)
+                                )
+                            )
                         } catch {
                             unreadable.append("\(item.name): \(error.localizedDescription)")
                         }
                     }
                 }
                 let unpacker = Unpacker(fileSystems: fileSystems, monitor: monitor, options: options) {
-                    existing, entry in
+                    existing,
+                    entry in
                     // `@Sendable`, so that it may be sent from this thread to the main thread.
                     monitor.ask { @Sendable in
                         ui.pick(
@@ -486,7 +538,8 @@ final class ArchiveCommands {
                                 ("Overwrite", .overwrite), ("Overwrite all", .overwriteAll), ("Skip", .skip),
                                 ("Skip all", .skipAll), ("Cancel", .cancel)
                             ],
-                            fallback: UnpackConflictChoice.cancel)
+                            fallback: UnpackConflictChoice.cancel
+                        )
                     }
                 }
                 var result = unpacker.run(sources, into: targetURL)
@@ -497,13 +550,16 @@ final class ArchiveCommands {
                 if !result.problems.isEmpty {
                     let shown = Self.summary(of: result.problems)
                     ui.inform(
-                        result.unpacked > 0 ? "Some files could not be unpacked!" : "Unpacking failed!", detail: shown,
-                        style: .warning)
+                        result.unpacked > 0 ? "Some files could not be unpacked!" : "Unpacking failed!",
+                        detail: shown,
+                        style: .warning
+                    )
                 } else if !result.cancelled {
                     model.deselect(items.map(\.name))
                 }
                 refreshPanels([targetURL], focus: options.separateFolders ? nil : result.firstTarget)
-            })
+            }
+        )
     }
 
     /// The first problems of a longer list, for a message box.
@@ -546,10 +602,15 @@ final class ArchiveCommands {
                                 tick: {
                                     monitor.report(
                                         JobProgress(
-                                            lines: ["Testing: \(fileSystems.displayPath(url))"], itemsDone: index,
+                                            lines: ["Testing: \(fileSystems.displayPath(url))"],
+                                            itemsDone: index,
                                             itemsTotal: archives.count,
-                                            bytesDone: counter.value, bytesTotal: total))
-                                })
+                                            bytesDone: counter.value,
+                                            bytesTotal: total
+                                        )
+                                    )
+                                }
+                            )
                         }
                         problems += found.map { "\(name): \($0)" }
                         tested += 1
@@ -562,12 +623,15 @@ final class ArchiveCommands {
             completion: { [ui] result in
                 if result.problems.isEmpty {
                     ui.inform(
-                        "Archive test", detail: "No errors found in \(result.tested) archive(s).", style: .information
+                        "Archive test",
+                        detail: "No errors found in \(result.tested) archive(s).",
+                        style: .information
                     )
                 } else {
                     let shown = Self.summary(of: result.problems)
                     ui.inform("Errors found in archive!", detail: shown, style: .critical)
                 }
-            })
+            }
+        )
     }
 }

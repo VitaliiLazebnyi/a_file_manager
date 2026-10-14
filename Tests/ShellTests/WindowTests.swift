@@ -97,7 +97,7 @@ private final class WindowTestPlugin: Plugin {
     }
 
     fileprivate func start(with plugin: WindowTestPlugin? = nil) async -> Running {
-        let kernel = Kernel(productName: StandardPlugins.productName, settings: settings, ui: ui)
+        let kernel = Kernel(productName: StandardPlugins.productName, settings: settings, interaction: ui)
         kernel.load(CorePlugins.make(pasteboard: scratch.pasteboard) + [plugin ?? extra])
         let running = Running(kernel: kernel, shell: Shell(kernel: kernel, home: box.url("home")))
         await settle(running)
@@ -543,7 +543,7 @@ private final class WindowTestPlugin: Plugin {
         #expect(keys.command(for: Shortcut(.character("p"), .control)) == .addPathToCommandLine)
         #expect(
             keys.command(for: .f(8, .option)) == .commandLineHistory
-                && keys.command(for: Shortcut(.down, .control)) == .commandLineHistory
+                && keys.command(for: Shortcut(.downArrow, .control)) == .commandLineHistory
         )
         #expect(keys.command(for: .cmd("l")) == .focusCommandLine && app.kernel.keyClashes.isEmpty)
         // Ctrl+E walks back through the history, the other command forth again.
@@ -594,7 +594,7 @@ private final class WindowTestPlugin: Plugin {
         #expect(action("cd /tmp/x y") == .changeDirectory("/tmp/x y") && action("CD  ..") == .changeDirectory(".."))
         #expect(action("cd") == .changeDirectory("~") && action("cd '/a b'") == .changeDirectory("/a b"))
         #expect(
-            action("cm_SearchFor") == .command("cm_SearchFor", .none)
+            action("cm_SearchFor") == .command("cm_SearchFor", .nothing)
                 && action("cm_searchfor 2") == .command("cm_SearchFor", .index(2))
         )
         #expect(action("cm_SearchFor \"*.txt\"") == .command("cm_SearchFor", .text("*.txt")))
@@ -664,7 +664,7 @@ private final class WindowTestPlugin: Plugin {
     }
 
     @Test func aMenuBarWithoutEditingCommandsStillEdits() {
-        let kernel = Kernel(productName: "Bare", settings: MemorySettings(), ui: ScriptedInteraction())
+        let kernel = Kernel(productName: "Bare", settings: MemorySettings(), interaction: ScriptedInteraction())
         kernel.commands.register(Command("cm_One", "One", [.cmd("z")])) {}
         kernel.menus.add(["cm_One"], to: .filesOpen)
         let menu = MenuBuilder.mainMenu(appName: "Bare", kernel: kernel)
@@ -711,7 +711,7 @@ private final class WindowTestPlugin: Plugin {
     @Test func shortcutsAsTheMacWritesThem() {
         #expect(Shortcut.f(5).displayText == "F5" && Shortcut.f(6, [.shift, .control]).displayText == "⌃⇧F6")
         #expect(Shortcut.cmd("c", .shift).displayText == "⇧⌘C" && Shortcut(.returnKey, .control).displayText == "⌃↩")
-        #expect(Shortcut(.down, .option).displayText == "⌥↓" && Shortcut(.keypadPlus).displayText == "Num +")
+        #expect(Shortcut(.downArrow, .option).displayText == "⌥↓" && Shortcut(.keypadPlus).displayText == "Num +")
     }
 
     // MARK: Progress window

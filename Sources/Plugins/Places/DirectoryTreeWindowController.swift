@@ -133,7 +133,10 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
         self.cache = cache
         let window = TreeWindow(
             contentRect: NSRect(x: 0, y: 0, width: 520, height: 600),
-            styleMask: [.titled, .closable, .resizable, .miniaturizable], backing: .buffered, defer: false)
+            styleMask: [.titled, .closable, .resizable, .miniaturizable],
+            backing: .buffered,
+            defer: false
+        )
         window.title = "Directory Tree"
         window.isReleasedWhenClosed = false
         window.minSize = NSSize(width: 360, height: 300)
@@ -236,14 +239,19 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
         roots = TreeRoots.choices(
             places: places.filter { $0.url.scheme == directory.scheme }
                 + places.filter { $0.url.scheme != directory.scheme },
-            providerRoot: providerRoot)
+            providerRoot: providerRoot
+        )
         rootPopup.removeAllItems()
         for place in roots {
             let path = kernel.fileSystems.displayPath(place.url)
-            rootPopup.menu?.addItem(
-                NSMenuItem(
-                    title: place.name.isEmpty || place.name == path ? path : "\(place.name)  (\(path))",
-                    action: nil, keyEquivalent: ""))
+            rootPopup.menu?
+                .addItem(
+                    NSMenuItem(
+                        title: place.name.isEmpty || place.name == path ? path : "\(place.name)  (\(path))",
+                        action: nil,
+                        keyEquivalent: ""
+                    )
+                )
         }
         let root = TreeRoots.root(for: directory, places: places, providerRoot: providerRoot)
         rootPopup.selectItem(at: roots.firstIndex { $0.url.isSameLocation(as: root) } ?? 0)
@@ -356,7 +364,11 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
         treeIsInCache = false
         let showHidden = showHidden
         let scanner = TreeScanner(
-            root: root, provider: provider, showHidden: showHidden, isExcluded: exclusions(for: root))
+            root: root,
+            provider: provider,
+            showHidden: showHidden,
+            isExcluded: exclusions(for: root)
+        )
         self.scanner = scanner
         statusLabel.stringValue = "Reading directories… (Esc to abort)"
         let (tickets, key) = (storeTickets, root.locationKey + (showHidden ? "\u{0}hidden" : ""))
@@ -379,8 +391,12 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
             if stored {
                 tickets.storeIfLatest(ticket, for: key) {
                     cache.store(
-                        scanner.paths, unscanned: scanner.unscanned, isComplete: completed, for: root,
-                        showHidden: showHidden)
+                        scanner.paths,
+                        unscanned: scanner.unscanned,
+                        isComplete: completed,
+                        for: root,
+                        showHidden: showHidden
+                    )
                 }
             }
             DispatchQueue.main.async { [weak self] in
@@ -426,7 +442,8 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
         var excluded = Set(roots.filter { $0.kind != .home && $0.url.isInside(root) }.map(\.url.locationKey))
         if root.isFileURL, root.path == "/" {
             excluded.formUnion(
-                ["/Volumes", "/System/Volumes", "/dev"].map { URL(fileURLWithPath: $0, isDirectory: true).locationKey })
+                ["/Volumes", "/System/Volumes", "/dev"].map { URL(fileURLWithPath: $0, isDirectory: true).locationKey }
+            )
         }
         return { [excluded] in excluded.contains($0.locationKey) }
     }
@@ -452,7 +469,11 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
                 continue
             }
             let done = tree.attach(
-                level.nodes, ofPath: level.path, from: waitingLinked, limit: Self.linkBudget)
+                level.nodes,
+                ofPath: level.path,
+                from: waitingLinked,
+                limit: Self.linkBudget
+            )
             guard done == level.nodes.count else {
                 waitingLinked = done
                 // The rows of a folder that is still being filled are loaded when it is done.
@@ -588,28 +609,50 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
         searchCounter += 1
         guard let tree, !searchField.stringValue.isEmpty else { return }
         continueSearch(
-            in: tree, text: searchField.stringValue, from: selectedNode, forward: forward,
+            in: tree,
+            text: searchField.stringValue,
+            from: selectedNode,
+            forward: forward,
             includingStart: includingStart,
-            remaining: nil, number: searchCounter)
+            remaining: nil,
+            number: searchCounter
+        )
     }
 
     private func continueSearch(
-        in tree: DirectoryTree, text: String, from start: TreeNode?, forward: Bool, includingStart: Bool,
-        remaining: Int?, number: Int
+        in tree: DirectoryTree,
+        text: String,
+        from start: TreeNode?,
+        forward: Bool,
+        includingStart: Bool,
+        remaining: Int?,
+        number: Int
     ) {
         guard number == searchCounter, tree === self.tree else { return }
         switch tree.search(
-            text, from: start, forward: forward, includingStart: includingStart, remaining: remaining,
-            timeBudget: Self.turnBudget)
+            text,
+            from: start,
+            forward: forward,
+            includingStart: includingStart,
+            remaining: remaining,
+            timeBudget: Self.turnBudget
+        )
         {
         case .found(let match): reveal(match)
         case .none: NSSound.beep()
 
         case .pending(let node, let left):
             DispatchQueue.main.async { [weak self] in
-                self?.continueSearch(
-                    in: tree, text: text, from: node, forward: forward, includingStart: true, remaining: left,
-                    number: number)
+                self?
+                    .continueSearch(
+                        in: tree,
+                        text: text,
+                        from: node,
+                        forward: forward,
+                        includingStart: true,
+                        remaining: left,
+                        number: number
+                    )
             }
         }
     }
@@ -627,7 +670,7 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
             return true
         }
         if handleStepKey(event) { return true }
-        if Shortcut(.up).matches(event) || Shortcut(.down).matches(event) {
+        if Shortcut(.upArrow).matches(event) || Shortcut(.downArrow).matches(event) {
             outline.keyDown(with: event)
             return true
         }
@@ -635,9 +678,9 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
     }
 
     private func handleStepKey(_ event: NSEvent) -> Bool {
-        if Shortcut(.returnKey, .control).matches(event) || Shortcut(.down, .control).matches(event) {
+        if Shortcut(.returnKey, .control).matches(event) || Shortcut(.downArrow, .control).matches(event) {
             search(forward: true)
-        } else if Shortcut(.up, .control).matches(event) {
+        } else if Shortcut(.upArrow, .control).matches(event) {
             search(forward: false)
         } else {
             return false

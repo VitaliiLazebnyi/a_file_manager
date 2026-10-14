@@ -39,7 +39,9 @@ enum PanelShellCommands {
             checked: { settings.flag(PanelSettings.colorsByTypeKey, default: false) }
         ) {
             settings.set(
-                !settings.flag(PanelSettings.colorsByTypeKey, default: false), forKey: PanelSettings.colorsByTypeKey)
+                !settings.flag(PanelSettings.colorsByTypeKey, default: false),
+                forKey: PanelSettings.colorsByTypeKey
+            )
             panels.applySettings()
         }
         commands.register(Command(defineColorsByFileType, "Define Colours by File Type…")) {
@@ -66,21 +68,31 @@ enum PanelShellCommands {
             let fields: [FormField] = [
                 .note(
                     "One entry per line: file masks, “=”, a colour. The first entry that matches a name decides. "
-                        + "Colours: \(names), or #RRGGBB. A “-” in front of an entry switches it off."),
+                        + "Colours: \(names), or #RRGGBB. A “-” in front of an entry switches it off."
+                ),
                 .lines("rules", "", text),
                 .checkbox(
-                    "enabled", "Colour names by file type",
-                    settings.flag(PanelSettings.colorsByTypeKey, default: false))
+                    "enabled",
+                    "Colour names by file type",
+                    settings.flag(PanelSettings.colorsByTypeKey, default: false)
+                )
             ]
-            guard let answer = kernel.ui.form("Colours by File Type", detail: "", fields: fields, buttons: ["OK"])
+            guard
+                let answer = kernel.interaction.form(
+                    "Colours by File Type",
+                    detail: "",
+                    fields: fields,
+                    buttons: ["OK"]
+                )
             else { return }
             text = answer.text("rules")
-            let lines = text.split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) }.filter {
-                !$0.isEmpty
-            }
+            let lines = text.split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) }
+                .filter {
+                    !$0.isEmpty
+                }
             let unreadable = lines.filter { !$0.hasPrefix("-") && ColorRule.parse($0).isEmpty }
             if let first = unreadable.first {
-                kernel.ui.inform("This entry cannot be read:", detail: first, style: .warning)
+                kernel.interaction.inform("This entry cannot be read:", detail: first, style: .warning)
                 continue
             }
             settings.set(lines.joined(separator: ";;"), forKey: PanelSettings.colorRulesKey)

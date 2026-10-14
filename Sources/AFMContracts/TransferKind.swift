@@ -1,9 +1,9 @@
-import AFMKernel
 import Foundation
 
-/// Services plugins offer each other through `Kernel.services`. The protocols live here, so
-/// the plugin that offers one and the plugins that use it share only this module.
-
+/// What `FileTransferService.transfer` does with the files: copy them, or move them.
 public enum TransferKind: Equatable, Sendable {
-    case copy, move
+    /// The files stay where they are, and copies arrive.
+    case copy
+    /// The files leave where they are.
+    case move
 }

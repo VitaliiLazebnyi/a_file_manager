@@ -103,7 +103,10 @@ public final class FolderTabsPlugin: Plugin {
         }
         commands.register(
             Command(
-                .newTabInBackground, "New Folder Tab in Background", [Shortcut(.character("t"), [.control, .shift])])
+                .newTabInBackground,
+                "New Folder Tab in Background",
+                [Shortcut(.character("t"), [.control, .shift])]
+            )
         ) {
             open(in: tabs(), showing: nil, activate: false)
         }
@@ -116,17 +119,21 @@ public final class FolderTabsPlugin: Plugin {
         // The current tab stays active, so several folders can be opened one after another,
         // unless the user wants the new tab in the foreground.
         commands.register(
-            Command(.openInNewTab, "Open Folder in New Tab", [.cmd("t", .shift), Shortcut(.up, control)]),
+            Command(.openInNewTab, "Open Folder in New Tab", [.cmd("t", .shift), Shortcut(.upArrow, control)]),
             enabled: { tabs().active.cursorItem?.isDirectory == true }
         ) {
             open(
-                in: tabs(), showing: tabs().active.cursorItem?.url,
-                activate: settings.flag(Self.foregroundKey, default: false))
+                in: tabs(),
+                showing: tabs().active.cursorItem?.url,
+                activate: settings.flag(Self.foregroundKey, default: false)
+            )
         }
         commands.register(
             Command(
-                .openInNewTabInOtherPanel, "Open Folder in New Tab of Other Panel",
-                [Shortcut(.up, [.control, .shift])])
+                .openInNewTabInOtherPanel,
+                "Open Folder in New Tab of Other Panel",
+                [Shortcut(.upArrow, [.control, .shift])]
+            )
         ) {
             open(in: target().tabs, showing: folderUnderCursor(), activate: true)
         }
@@ -148,10 +155,12 @@ public final class FolderTabsPlugin: Plugin {
         // MARK: Closing
 
         commands.register(
-            Command(.closeTab, "Close Tab", [.cmd("w"), Shortcut(.character("w"), control)]), enabled: hasSeveralTabs,
+            Command(.closeTab, "Close Tab", [.cmd("w"), Shortcut(.character("w"), control)]),
+            enabled: hasSeveralTabs,
             parameterized: { [self] argument in
                 close([argument.index ?? tabs().activeIndex], in: tabs())
-            })
+            }
+        )
         commands.register(
             Command(.closeAllTabs, "Close All Other Tabs", [Shortcut(.character("w"), [.control, .shift])]),
             enabled: hasSeveralTabs
@@ -159,9 +168,12 @@ public final class FolderTabsPlugin: Plugin {
             let others = tabs().tabs.indices.filter { $0 != tabs().activeIndex && !tabs().tabs[$0].isLocked }
             guard !others.isEmpty else { return }
             if settings.flag(Self.confirmCloseAllKey, default: true),
-                kernel.ui.choose(
-                    "Close all tabs?", detail: "The current tab and locked tabs stay open.", buttons: ["OK", "Cancel"],
-                    style: .information) != 0
+                kernel.interaction.choose(
+                    "Close all tabs?",
+                    detail: "The current tab and locked tabs stay open.",
+                    buttons: ["OK", "Cancel"],
+                    style: .information
+                ) != 0
             {
                 return
             }
@@ -184,7 +196,9 @@ public final class FolderTabsPlugin: Plugin {
             let rows = closed.map { entry in
                 URL(string: entry.tab.location).map(kernel.fileSystems.displayPath) ?? entry.tab.location
             }
-            guard let row = kernel.ui.pickRow("Recently closed tabs", rows: rows, button: "Reopen") else { return }
+            guard let row = kernel.interaction.pickRow("Recently closed tabs", rows: rows, button: "Reopen") else {
+                return
+            }
             reopen(closed.count - 1 - row, in: tabs())
         }
 
@@ -194,9 +208,11 @@ public final class FolderTabsPlugin: Plugin {
             Command(.activateTab, "Activate Tab"),
             parameterized: { argument in
                 if let index = argument.index { tabs().activate(index) }
-            })
+            }
+        )
         commands.register(
-            Command(.nextTab, "Next Tab", [Shortcut(.tab, .control), .cmd("]", .shift)]), enabled: hasSeveralTabs
+            Command(.nextTab, "Next Tab", [Shortcut(.tab, .control), .cmd("]", .shift)]),
+            enabled: hasSeveralTabs
         ) {
             tabs().activateNeighbour(1)
         }
@@ -217,7 +233,8 @@ public final class FolderTabsPlugin: Plugin {
                     Command(CommandID.activateTab(side, number), "\(title): Activate Tab \(number)"),
                     parameterized: { argument in
                         panel().tabs.activate((argument.index ?? number) - 1)
-                    })
+                    }
+                )
             }
         }
         let lists: [(CommandID, String, [Shortcut], () -> any PanelHandle)] = [
@@ -232,8 +249,12 @@ public final class FolderTabsPlugin: Plugin {
                 let rows = tabs.tabs.indices.map {
                     "\(tabs.title(at: $0))   —   \(kernel.fileSystems.displayPath(tabs.tabs[$0].directory))"
                 }
-                if let row = kernel.ui.pickRow("Open tabs", rows: rows, selected: tabs.activeIndex, button: "Activate")
-                {
+                if let row = kernel.interaction.pickRow(
+                    "Open tabs",
+                    rows: rows,
+                    selected: tabs.activeIndex,
+                    button: "Activate"
+                ) {
                     tabs.activate(row)
                 }
             }
@@ -242,13 +263,17 @@ public final class FolderTabsPlugin: Plugin {
             tabs().moveTab(from: tabs().activeIndex, to: tabs().activeIndex - 1)
         }
         commands.register(
-            Command(.moveTabRight, "Move Tab Right"), enabled: { tabs().activeIndex < tabs().count - 1 }
+            Command(.moveTabRight, "Move Tab Right"),
+            enabled: { tabs().activeIndex < tabs().count - 1 }
         ) {
             tabs().moveTab(from: tabs().activeIndex, to: tabs().activeIndex + 1)
         }
         commands.register(
             Command(
-                .exchangeWithTabs, "Exchange Directories and Tabs", [Shortcut(.character("u"), [.control, .shift])])
+                .exchangeWithTabs,
+                "Exchange Directories and Tabs",
+                [Shortcut(.character("u"), [.control, .shift])]
+            )
         ) { [self] in
             let (left, right) = (kernel.panels.left.tabs, kernel.panels.right.tabs)
             let (leftState, rightState) = (left.state, right.state)
@@ -270,18 +295,20 @@ public final class FolderTabsPlugin: Plugin {
                     tab.customTitle
                     ?? tabs().title(at: tabs().activeIndex).trimmingCharacters(in: CharacterSet(charactersIn: "*"))
                 guard
-                    let answer = kernel.ui.form(
+                    let answer = kernel.interaction.form(
                         "Rename tab",
                         fields: [
                             .text("name", "New name:", current),
                             .checkbox("locked", "Lock this tab", tab.isLocked)
-                        ])
+                        ]
+                    )
                 else { return }
                 let name = answer.text("name").trimmingCharacters(in: .whitespaces)
                 // The folder's own name, or nothing, gives the tab its automatic title back.
                 tab.customTitle = name.isEmpty || (tab.customTitle == nil && name == current) ? nil : name
                 if tab.isLocked != answer.flag("locked") { tab.isLocked = answer.flag("locked") }
-            })
+            }
+        )
         commands.register(Command(.toggleTabLock, "Lock Tab"), checked: { tabs().active.isLocked }) {
             tabs().active.isLocked.toggle()
         }
@@ -294,29 +321,41 @@ public final class FolderTabsPlugin: Plugin {
 
         commands.register(
             Command(.saveTabs, "Save Tabs to File…"),
-            parameterized: { [self] in save($0, bothSides: false, kernel: kernel) })
+            parameterized: { [self] in save($0, bothSides: false, kernel: kernel) }
+        )
         commands.register(
             Command(.saveTabsOfBothSides, "Save Tabs on Both Sides to File…"),
-            parameterized: { [self] in save($0, bothSides: true, kernel: kernel) })
+            parameterized: { [self] in save($0, bothSides: true, kernel: kernel) }
+        )
         commands.register(
             Command(.openTabs, "Load Tabs from File, Replace Tabs…"),
-            parameterized: { [self] in load($0, replacing: true, kernel: kernel) })
+            parameterized: { [self] in load($0, replacing: true, kernel: kernel) }
+        )
         commands.register(
             Command(.appendTabs, "Load Tabs from File, Keep Current…"),
-            parameterized: { [self] in load($0, replacing: false, kernel: kernel) })
+            parameterized: { [self] in load($0, replacing: false, kernel: kernel) }
+        )
 
         kernel.menus.add([.newTab, .openInNewTab, .closeTab, .nextTab, .previousTab], to: .showTabs)
         kernel.menus.add(
             [.closeAllTabs, .closeDuplicateTabs, .reopenClosedTab, .recentlyClosedTabs, .sourceTabsList],
-            to: MenuSection(.show, order: 42))
+            to: MenuSection(.show, order: 42)
+        )
         kernel.menus.add(
             [.renameTab, .toggleTabLock, .duplicateTab, .copyTabToOtherPanel, .moveTabToOtherPanel, .exchangeWithTabs],
-            to: MenuSection(.show, order: 44))
+            to: MenuSection(.show, order: 44)
+        )
         kernel.menus.add(
-            [.saveTabs, .saveTabsOfBothSides, .openTabs, .appendTabs], to: MenuSection(.show, order: 46))
+            [.saveTabs, .saveTabsOfBothSides, .openTabs, .appendTabs],
+            to: MenuSection(.show, order: 46)
+        )
         kernel.menus.addToContextMenu([.openInNewTab], in: .open, onItemOnly: true)
         kernel.toolbar.add(
-            .newTab, symbol: "plus.rectangle.on.rectangle", group: 60, hint: "Open the current folder in a new tab.")
+            .newTab,
+            symbol: "plus.rectangle.on.rectangle",
+            group: 60,
+            hint: "Open the current folder in a new tab."
+        )
         kernel.toolbar.setSymbol("arrow.uturn.backward.square", for: .reopenClosedTab)
         kernel.toolbar.setSymbol("lock", for: .toggleTabLock)
         kernel.preferences.add(
@@ -325,19 +364,31 @@ public final class FolderTabsPlugin: Plugin {
                 preferences: [
                     Preference(Self.confirmCloseAllKey, "Confirm close all tabs", .flag(default: true)),
                     Preference(
-                        Self.foregroundKey, "Ctrl+Up opens new tab in foreground", .flag(default: false)),
+                        Self.foregroundKey,
+                        "Ctrl+Up opens new tab in foreground",
+                        .flag(default: false)
+                    ),
                     Preference(
-                        Self.nearCurrentKey, "Open new tabs near current tab", .flag(default: false))
-                ]))
+                        Self.nearCurrentKey,
+                        "Open new tabs near current tab",
+                        .flag(default: false)
+                    )
+                ]
+            )
+        )
     }
 
     // MARK: Tabs as records
 
     private func record(of tab: PanelModel) -> PanelTabs.State.Tab {
         PanelTabs.State.Tab(
-            location: tab.directory, sortKey: tab.sort.key.rawValue, descending: tab.sort.descending,
+            location: tab.directory,
+            sortKey: tab.sort.key.rawValue,
+            descending: tab.sort.descending,
             showHidden: tab.showHidden,
-            title: tab.customTitle, locked: tab.isLocked ? true : nil)
+            title: tab.customTitle,
+            locked: tab.isLocked ? true : nil
+        )
     }
 
     /// The most tabs a panel holds; more are not opened (a tab file with thousands of tabs is
@@ -371,8 +422,12 @@ public final class FolderTabsPlugin: Plugin {
     /// would connect to a server is opened but never made the shown one, so that loading a
     /// file connects nowhere; it connects when the user activates it.
     private func restore(
-        _ records: [PanelTabs.State.Tab], in tabs: PanelTabs, at index: Int? = nil, activating active: Int?,
-        fromFile: Bool = false, room: Int? = nil
+        _ records: [PanelTabs.State.Tab],
+        in tabs: PanelTabs,
+        at index: Int? = nil,
+        activating active: Int?,
+        fromFile: Bool = false,
+        room: Int? = nil
     ) {
         var position = min(index ?? tabs.count, tabs.count)
         var opened: [PanelModel] = []
@@ -408,7 +463,11 @@ public final class FolderTabsPlugin: Plugin {
         let kept = wanted == nil ? tabs.active : nil
         batch(tabs) {
             restore(
-                state.tabs, in: tabs, activating: wanted, fromFile: fromFile, room: Self.tabsPerPanelLimit
+                state.tabs,
+                in: tabs,
+                activating: wanted,
+                fromFile: fromFile,
+                room: Self.tabsPerPanelLimit
             )
             // Nothing was opened when no location could be read; the panel then keeps its tabs.
             guard tabs.count > old.count else { return }
@@ -459,8 +518,10 @@ public final class FolderTabsPlugin: Plugin {
         if let location = argument.location { return location }
         guard
             let text = argument.text
-                ?? kernel.ui.prompt(
-                    question, value: kernel.fileSystems.displayPath(directory.appending(name: "tabs.tab"))),
+                ?? kernel.interaction.prompt(
+                    question,
+                    value: kernel.fileSystems.displayPath(directory.appending(name: "tabs.tab"))
+                ),
             !text.trimmingCharacters(in: .whitespaces).isEmpty
         else { return nil }
         let file = kernel.fileSystems.location(from: text, relativeTo: directory)
@@ -490,9 +551,11 @@ public final class FolderTabsPlugin: Plugin {
     private func save(_ argument: CommandArgument, bothSides: Bool, kernel: Kernel) {
         guard let file = tabFile(argument, question: "Save tabs to file:", kernel: kernel) else { return }
         let contents = TabFile(
-            active: kernel.panels.source.tabs.state, inactive: bothSides ? kernel.panels.target.tabs.state : nil)
+            active: kernel.panels.source.tabs.state,
+            inactive: bothSides ? kernel.panels.target.tabs.state : nil
+        )
         let data = Data(contents.text(displayPath: kernel.fileSystems.displayPath).utf8)
-        let (fileSystems, ui) = (kernel.fileSystems, kernel.ui)
+        let (fileSystems, ui) = (kernel.fileSystems, kernel.interaction)
         kernel.jobs.run(
             title: "Save tabs",
             work: { monitor -> SaveOutcome in
@@ -507,8 +570,11 @@ public final class FolderTabsPlugin: Plugin {
                         // `@Sendable`, so that it may be sent from this thread to the main thread.
                         let overwrite = monitor.ask { @Sendable in
                             ui.choose(
-                                "Overwrite the tab file?", detail: fileSystems.displayPath(file),
-                                buttons: ["Overwrite", "Cancel"], style: .warning) == 0
+                                "Overwrite the tab file?",
+                                detail: fileSystems.displayPath(file),
+                                buttons: ["Overwrite", "Cancel"],
+                                style: .warning
+                            ) == 0
                         }
                         guard overwrite else { return .declined }
                     }
@@ -532,10 +598,11 @@ public final class FolderTabsPlugin: Plugin {
             completion: { outcome in
                 switch outcome {
                 case .saved: kernel.panels.refresh([file.deletingLastPathComponent()], focus: file)
-                case .failed(let error): kernel.ui.report(error, title: "The tabs could not be saved.")
+                case .failed(let error): kernel.interaction.report(error, title: "The tabs could not be saved.")
                 case .declined: break
                 }
-            })
+            }
+        )
     }
 
     private func load(_ argument: CommandArgument, replacing: Bool, kernel: Kernel) {
@@ -564,18 +631,22 @@ public final class FolderTabsPlugin: Plugin {
                     // Worked out here, not on the main thread: the file may be a megabyte of lines.
                     return TabFile(
                         text: TabFile.text(decoding: data),
-                        location: { fileSystems.location(from: $0, relativeTo: base) })
+                        location: { fileSystems.location(from: $0, relativeTo: base) }
+                    )
                 }
             },
             completion: { [self] result in
                 switch result {
                 case .failure(let error):
-                    kernel.ui.report(error, title: "The tabs could not be loaded.")
+                    kernel.interaction.report(error, title: "The tabs could not be loaded.")
 
                 case .success(let parsed):
                     guard let contents = parsed else {
-                        kernel.ui.inform(
-                            "The file holds no tabs.", detail: fileSystems.displayPath(file), style: .warning)
+                        kernel.interaction.inform(
+                            "The file holds no tabs.",
+                            detail: fileSystems.displayPath(file),
+                            style: .warning
+                        )
                         return
                     }
                     // A file with both sides fills both panels: its first section goes to the source.
@@ -588,6 +659,7 @@ public final class FolderTabsPlugin: Plugin {
                         }
                     }
                 }
-            })
+            }
+        )
     }
 }

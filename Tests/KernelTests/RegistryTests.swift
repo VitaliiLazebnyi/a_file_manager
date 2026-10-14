@@ -67,7 +67,7 @@ import Testing
         let samples: [(Shortcut, String)] = [
             (.cmd("c", .shift), "shift+cmd+c"), (.f(5), "f5"), (.f(6, .shift), "shift+f6"),
             (Shortcut(.tab, .control), "ctrl+tab"),
-            (Shortcut(.left, .option), "opt+left"), (Shortcut(.keypadPlus), "num+"),
+            (Shortcut(.leftArrow, .option), "opt+left"), (Shortcut(.keypadPlus), "num+"),
             (Shortcut(.keypadPlus, .control), "ctrl+num+"),
             (.cmd("="), "cmd+="), (.cmd("+"), "cmd++"), (Shortcut(.space), "space"),
             (Shortcut(.forwardDelete, .shift), "shift+delete")
@@ -166,7 +166,7 @@ import Testing
 
     @Test func aPluginAddsItsFeaturesThroughTheKernelOnly() throws {
         let plugin = MemoryPlugin()
-        let kernel = Kernel(productName: "Test", settings: MemorySettings(), ui: ScriptedInteraction())
+        let kernel = Kernel(productName: "Test", settings: MemorySettings(), interaction: ScriptedInteraction())
         kernel.load([plugin])
         #expect(kernel.plugins.map(\.name) == ["Memory"])
         #expect(try kernel.fileSystems.provider(for: URL(string: "mem:///x")!).scheme == "mem")
@@ -178,7 +178,7 @@ import Testing
     }
 
     @Test func nothingRunsBeforeTheWindowExists() {
-        let kernel = Kernel(productName: "Test", settings: MemorySettings(), ui: ScriptedInteraction())
+        let kernel = Kernel(productName: "Test", settings: MemorySettings(), interaction: ScriptedInteraction())
         var runs = 0
         // The enabled check would crash on kernel.panels; a blocked registry never asks it.
         kernel.commands.register(

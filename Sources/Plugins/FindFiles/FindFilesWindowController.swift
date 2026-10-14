@@ -51,8 +51,12 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
                 if item.isDirectory { directories += 1 }
             }
             return Self(
-                rows: rows, urls: items.map(\.url), files: items.count - directories, directories: directories,
-                showsDuplicates: false)
+                rows: rows,
+                urls: items.map(\.url),
+                files: items.count - directories,
+                directories: directories,
+                showsDuplicates: false
+            )
         }
 
         static func make(groups: [[FileItem]]) -> Self {
@@ -144,11 +148,16 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
         self.kernel = kernel
         store = SearchStore(settings: kernel.settings)
         form = SearchForm(
-            fields: SearchField.all(fileSystems: kernel.fileSystems, columns: kernel.columns), store: store,
-            ui: kernel.ui)
+            fields: SearchField.all(fileSystems: kernel.fileSystems, columns: kernel.columns),
+            store: store,
+            ui: kernel.interaction
+        )
         let window = FindWindow(
             contentRect: NSRect(x: 0, y: 0, width: 780, height: 640),
-            styleMask: [.titled, .closable, .resizable, .miniaturizable], backing: .buffered, defer: false)
+            styleMask: [.titled, .closable, .resizable, .miniaturizable],
+            backing: .buffered,
+            defer: false
+        )
         window.title = title
         window.isReleasedWhenClosed = false
         window.minSize = NSSize(width: 640, height: 520)
@@ -315,7 +324,9 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
         let places = form.settings.searchIn.split(separator: ";")
             .map {
                 kernel.fileSystems.location(
-                    from: String($0).trimmingCharacters(in: .whitespaces), relativeTo: startDirectory)
+                    from: String($0).trimmingCharacters(in: .whitespaces),
+                    relativeTo: startDirectory
+                )
             }
         // A search whose places are not known is stopped too: better a search again than a drive refused.
         if places.isEmpty
@@ -347,20 +358,26 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
             }
         }
         var query = settings.query(
-            relativeTo: startDirectory, fileSystems: kernel.fileSystems, includeHidden: includeHidden,
-            selected: settings.onlySelected ? selectedItems : [])
+            relativeTo: startDirectory,
+            fileSystems: kernel.fileSystems,
+            includeHidden: includeHidden,
+            selected: settings.onlySelected ? selectedItems : []
+        )
         if inFoundBox.state == .on { query.onlyItems = resultURLs }
         query.resultLimit = Self.resultLimit
         let search = FileSearch(query, fileSystems: kernel.fileSystems, columns: kernel.columns)
         if let problem = search.problem {
-            kernel.ui.report(problem, title: "The search cannot start")
+            kernel.interaction.report(problem, title: "The search cannot start")
             return
         }
         form.rememberHistory(
             limit: Self.historyLengths[
                 min(
                     max(kernel.settings.index(Self.historyLengthKey, default: 1), 0),
-                    Self.historyLengths.count - 1)])
+                    Self.historyLengths.count - 1
+                )
+            ]
+        )
         self.search = search
         rows = [.summary("[Searching...]")]
         (resultURLs, foundFiles, foundDirectories) = ([], 0, 0)
@@ -411,7 +428,8 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
                     {
                         flush(nil)
                     }
-                })
+                }
+            )
             flush(nil)
             DispatchQueue.main.async { [weak self] in
                 guard let self, self.search === search else { return }
@@ -448,7 +466,8 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
             }
             let groups = search.runForDuplicates(
                 onDirectory: { directory in status(fileSystems.displayPath(directory)) },
-                onHashing: { done, total in status("Comparing contents: \(done) of \(total)") })
+                onHashing: { done, total in status("Comparing contents: \(done) of \(total)") }
+            )
             let built = Built.make(groups: groups)
             DispatchQueue.main.async { [weak self] in
                 guard let self, self.search === search else { return }
@@ -470,8 +489,11 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
                 let groups =
                     search.query.duplicates.isActive
                     ? DuplicateFinder.groups(
-                        of: items, options: search.query.duplicates, fileSystems: fileSystems,
-                        cancellation: search.cancellation)
+                        of: items,
+                        options: search.query.duplicates,
+                        fileSystems: fileSystems,
+                        cancellation: search.cancellation
+                    )
                     : nil
                 let built = groups.map(Built.make(groups:)) ?? Built.make(items: items)
                 DispatchQueue.main.async { [weak self] in
@@ -479,7 +501,8 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
                     var notes = self.notes(of: search)
                     if truncated {
                         notes.append(
-                            "Spotlight gave more than \(SpotlightSearch.resultLimit) files, the rest were left out")
+                            "Spotlight gave more than \(SpotlightSearch.resultLimit) files, the rest were left out"
+                        )
                     }
                     self.finish(built: built, notes: notes)
                 }
@@ -530,8 +553,13 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
         statusLabel.stringValue = summary
         earlier.append(
             ResultSet(
-                rows: rows, showsDuplicates: showsDuplicates, urls: resultURLs, files: foundFiles,
-                directories: foundDirectories))
+                rows: rows,
+                showsDuplicates: showsDuplicates,
+                urls: resultURLs,
+                files: foundFiles,
+                directories: foundDirectories
+            )
+        )
         // The last few searches are kept, as far as their lists are not huge.
         var kept = 0
         for (index, set) in earlier.enumerated().reversed() {
@@ -575,7 +603,10 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
 
         case .item(let item):
             return Self.text(
-                of: item, showsDuplicates: showsDuplicates, fileSystems: kernel.fileSystems)
+                of: item,
+                showsDuplicates: showsDuplicates,
+                fileSystems: kernel.fileSystems
+            )
         }
     }
 
@@ -705,7 +736,11 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
             case .item(let item):
                 lines.append(
                     Self.text(
-                        of: item, showsDuplicates: showsDuplicates, fileSystems: fileSystems))
+                        of: item,
+                        showsDuplicates: showsDuplicates,
+                        fileSystems: fileSystems
+                    )
+                )
             }
         }
         return lines.joined(separator: "\n")
@@ -727,17 +762,21 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
             return
         }
         statusLabel.stringValue = "[Copying the list...]"
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            let text = Self.copyText(
-                of: rows, showsDuplicates: showsDuplicates, fileSystems: fileSystems)
-            DispatchQueue.main.async { [weak self] in
-                guard let self, self.copyRequest == request else { return }
-                put(text)
-                if case .summary(let summary)? = self.rows.first, !self.isSearching {
-                    self.statusLabel.stringValue = summary
+        DispatchQueue.global(qos: .userInitiated)
+            .async { [weak self] in
+                let text = Self.copyText(
+                    of: rows,
+                    showsDuplicates: showsDuplicates,
+                    fileSystems: fileSystems
+                )
+                DispatchQueue.main.async { [weak self] in
+                    guard let self, self.copyRequest == request else { return }
+                    put(text)
+                    if case .summary(let summary)? = self.rows.first, !self.isSearching {
+                        self.statusLabel.stringValue = summary
+                    }
                 }
             }
-        }
     }
 
     func numberOfRows(in _: NSTableView) -> Int { rows.count }

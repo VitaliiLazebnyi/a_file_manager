@@ -31,7 +31,10 @@ final class HotlistEditorWindowController: NSWindowController, NSWindowDelegate,
     private let commandField = NSTextField()
     private let targetField = NSTextField()
     private let hideBox = NSButton(
-        checkboxWithTitle: "Hide menu items starting with this character:", target: nil, action: nil)
+        checkboxWithTitle: "Hide menu items starting with this character:",
+        target: nil,
+        action: nil
+    )
     private let hideField = NSTextField()
     private var entryButtons: [NSButton] = []
 
@@ -54,7 +57,10 @@ final class HotlistEditorWindowController: NSWindowController, NSWindowDelegate,
             ? kernel.fileSystems.displayPath(currentDirectory) : currentDirectory.lastPathComponent
         let window = ToolWindow(
             contentRect: NSRect(x: 0, y: 0, width: 640, height: 460),
-            styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
+            styleMask: [.titled, .closable, .resizable],
+            backing: .buffered,
+            defer: false
+        )
         window.title = "Change Directory Menu"
         window.isReleasedWhenClosed = false
         window.minSize = NSSize(width: 520, height: 340)
@@ -119,7 +125,8 @@ final class HotlistEditorWindowController: NSWindowController, NSWindowDelegate,
         fields.column(at: 0).xPlacement = .trailing
         let hiding = NSStackView(views: [hideBox, hideField])
         let hint = NSTextField(
-            labelWithString: "Double click a menu item to hide or show it. Shift+↑ and Shift+↓ move it.")
+            labelWithString: "Double click a menu item to hide or show it. Shift+↑ and Shift+↓ move it."
+        )
         hint.textColor = .secondaryLabelColor
 
         let ok = NSButton(title: "OK", target: self, action: #selector(accept))
@@ -179,8 +186,11 @@ final class HotlistEditorWindowController: NSWindowController, NSWindowDelegate,
 
     private func add(_ entry: HotlistEntry) {
         guard let path = hotlist.insert(entry, at: insertionPath) else {
-            kernel.ui.inform(
-                "The directory menu is full.", detail: "It holds at most \(Hotlist.limit) entries.", style: .warning)
+            kernel.interaction.inform(
+                "The directory menu is full.",
+                detail: "It holds at most \(Hotlist.limit) entries.",
+                style: .warning
+            )
             return
         }
         reload(selecting: path)
@@ -188,15 +198,18 @@ final class HotlistEditorWindowController: NSWindowController, NSWindowDelegate,
 
     @objc private func addItem() {
         guard
-            let title = kernel.ui.prompt(
-                "Title of the new entry:", value: proposedTitle, detail: "A single - makes a separator line."),
+            let title = kernel.interaction.prompt(
+                "Title of the new entry:",
+                value: proposedTitle,
+                detail: "A single - makes a separator line."
+            ),
             !title.isEmpty
         else { return }
         add(.titled(title, command: proposedCommand))
     }
 
     @objc private func addSubmenu() {
-        guard let title = kernel.ui.prompt("Title of the new submenu:"), !title.isEmpty else { return }
+        guard let title = kernel.interaction.prompt("Title of the new submenu:"), !title.isEmpty else { return }
         add(.submenu(title))
     }
 
@@ -214,7 +227,7 @@ final class HotlistEditorWindowController: NSWindowController, NSWindowDelegate,
 
     @objc private func changeTitle() {
         guard let path = selectedPath, let entry = hotlist.entry(at: path), entry.kind != .separator,
-            let title = kernel.ui.prompt("New title:", value: entry.title), !title.isEmpty
+            let title = kernel.interaction.prompt("New title:", value: entry.title), !title.isEmpty
         else { return }
         hotlist.update(at: path) { $0.title = title }
         reload(selecting: path)
@@ -239,9 +252,9 @@ final class HotlistEditorWindowController: NSWindowController, NSWindowDelegate,
     }
 
     private func handleKey(_ event: NSEvent) -> Bool {
-        if Shortcut(.up, .shift).matches(event) {
+        if Shortcut(.upArrow, .shift).matches(event) {
             move(-1)
-        } else if Shortcut(.down, .shift).matches(event) {
+        } else if Shortcut(.downArrow, .shift).matches(event) {
             move(1)
         } else if Shortcut(.forwardDelete).matches(event) || Shortcut(.backspace, .command).matches(event) {
             deleteEntry()

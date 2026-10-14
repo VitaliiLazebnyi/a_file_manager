@@ -72,19 +72,29 @@ public final class SystemToolsPlugin: Plugin {
             Command(.runCommandLine, "Run Command Line"),
             parameterized: { argument in
                 if let line = argument.text { tools.run(line) } else { tools.promptAndRun() }
-            })
+            }
+        )
         commands.register(Command(SystemToolsCommands.runPrompt, "Run Command…"), tools.promptAndRun)
         commands.register(
-            Command(SystemToolsCommands.openTerminal, "Open Terminal Here", runsDuringJobs: true), enabled: isLocal,
-            tools.openTerminal)
+            Command(SystemToolsCommands.openTerminal, "Open Terminal Here", runsDuringJobs: true),
+            enabled: isLocal,
+            tools.openTerminal
+        )
         commands.register(
-            Command(SystemToolsCommands.systemInformation, "System Information…"), tools.showSystemInformation)
+            Command(SystemToolsCommands.systemInformation, "System Information…"),
+            tools.showSystemInformation
+        )
         commands.register(
-            Command(SystemToolsCommands.renameVolume, "Rename Volume…"), enabled: isLocal, tools.renameVolume)
+            Command(SystemToolsCommands.renameVolume, "Rename Volume…"),
+            enabled: isLocal,
+            tools.renameVolume
+        )
         // With a location (the eject buttons of the drives), the drive of that location.
         commands.register(
-            Command(SystemToolsCommands.ejectVolume, "Eject Volume"), enabled: isLocal,
-            parameterized: { tools.ejectVolume($0.location) })
+            Command(SystemToolsCommands.ejectVolume, "Eject Volume"),
+            enabled: isLocal,
+            parameterized: { tools.ejectVolume($0.location) }
+        )
         commands.register(Command(SystemToolsCommands.printList, "Print File List…"), enabled: { model().isListed }) {
             tools.printList(withSubfolders: false)
         }
@@ -95,15 +105,20 @@ public final class SystemToolsPlugin: Plugin {
             tools.printList(withSubfolders: true)
         }
         commands.register(
-            Command(SystemToolsCommands.printFile, "Print File Contents", [.f(9, .control)]), enabled: hasLocalFile
+            Command(SystemToolsCommands.printFile, "Print File Contents", [.f(9, .control)]),
+            enabled: hasLocalFile
         ) {
             if let operands = localFiles() { tools.printFiles(operands) }
         }
         commands.register(
             Command(SystemToolsCommands.openWith, "Open With…", runsDuringJobs: false),
-            enabled: { isLocal() && model().cursorItem != nil }, tools.openWith)
+            enabled: { isLocal() && model().cursorItem != nil },
+            tools.openWith
+        )
         commands.register(
-            Command(SystemToolsCommands.quit, "Quit", [.f(4, .option)], runsDuringJobs: true), tools.quit)
+            Command(SystemToolsCommands.quit, "Quit", [.f(4, .option)], runsDuringJobs: true),
+            tools.quit
+        )
         commands.register(Command(SystemToolsCommands.minimize, "Minimize", runsDuringJobs: true), tools.minimize)
 
         kernel.menus.add([SystemToolsCommands.openWith], to: .filesOpen)
@@ -111,7 +126,9 @@ public final class SystemToolsPlugin: Plugin {
             [
                 SystemToolsCommands.printList, SystemToolsCommands.printListWithSubfolders,
                 SystemToolsCommands.printFile
-            ], to: .filesPrint)
+            ],
+            to: .filesPrint
+        )
         // Files › Quit closes the program as in TC; the Mac's own Quit is in the application menu.
         kernel.menus.add([SystemToolsCommands.quit], to: MenuSection(.files, order: 100))
         kernel.menus.add(
@@ -119,22 +136,32 @@ public final class SystemToolsPlugin: Plugin {
                 SystemToolsCommands.systemInformation, SystemToolsCommands.renameVolume,
                 SystemToolsCommands.ejectVolume,
                 SystemToolsCommands.openTerminal
-            ], to: .commandsTools)
+            ],
+            to: .commandsTools
+        )
         kernel.menus.add([SystemToolsCommands.runPrompt], to: .commandsRun)
         kernel.menus.addToContextMenu([SystemToolsCommands.openWith], in: .tools, onItemOnly: true)
         kernel.menus.addToContextMenu([SystemToolsCommands.openTerminal], in: .tools)
 
         kernel.toolbar.add(
-            SystemToolsCommands.openTerminal, symbol: "terminal", group: 80,
-            hint: "Open a Terminal window in the current folder.")
+            SystemToolsCommands.openTerminal,
+            symbol: "terminal",
+            group: 80,
+            hint: "Open a Terminal window in the current folder."
+        )
         kernel.toolbar.add(
-            SystemToolsCommands.systemInformation, symbol: "desktopcomputer", group: 80,
-            hint: "Show information about this Mac: hardware, macOS and the disks.")
+            SystemToolsCommands.systemInformation,
+            symbol: "desktopcomputer",
+            group: 80,
+            hint: "Show information about this Mac: hardware, macOS and the disks."
+        )
         kernel.toolbar.setSymbol("play.rectangle", for: SystemToolsCommands.runPrompt)
         kernel.toolbar.setSymbol("printer", for: SystemToolsCommands.printList)
         kernel.toolbar.setSymbol(
-            "eject", for: SystemToolsCommands.ejectVolume,
-            hint: "Safely eject the drive the current folder is on (a USB stick, a card, a disk image).")
+            "eject",
+            for: SystemToolsCommands.ejectVolume,
+            hint: "Safely eject the drive the current folder is on (a USB stick, a card, a disk image)."
+        )
         kernel.toolbar.setSymbol("arrow.up.forward.app", for: SystemToolsCommands.openWith)
 
         kernel.preferences.add(
@@ -142,26 +169,33 @@ public final class SystemToolsPlugin: Plugin {
                 title: "System Tools",
                 preferences: [
                     Preference(
-                        Self.terminalKey, "Terminal application (name, path or bundle identifier)",
-                        .text(default: "Terminal")),
+                        Self.terminalKey,
+                        "Terminal application (name, path or bundle identifier)",
+                        .text(default: "Terminal")
+                    ),
                     Preference(
-                        Self.showOutputKey, "Show the output of a command",
-                        .choice(["When there is any", "Always", "Never"], default: 0)),
+                        Self.showOutputKey,
+                        "Show the output of a command",
+                        .choice(["When there is any", "Always", "Never"], default: 0)
+                    ),
                     Preference(
                         SystemTools.printHeaderKey,
                         "Header of printed file lists (%d folder, %p page, %t pages, %D date, %T time)",
-                        .text(default: DirectoryListFormatter.defaultHeader)),
+                        .text(default: DirectoryListFormatter.defaultHeader)
+                    ),
                     Preference(
                         Self.recordHistoryKey,
                         "Remember the command lines that were run (never one that begins with a blank)",
-                        .flag(default: true))
+                        .flag(default: true)
+                    )
                 ]
             ) {
                 // Switched off, what was remembered goes too.
                 if !kernel.settings.flag(Self.recordHistoryKey, default: true) {
                     kernel.settings.scoped(to: "systemTools").set(nil as Data?, forKey: CommandHistory.key)
                 }
-            })
+            }
+        )
     }
 }
 
@@ -203,11 +237,14 @@ final class SystemTools {
         self.launchesApplications = launchesApplications
         let access = volumes ?? (launchesApplications ? SystemVolumes() : RecordedEjects())
         ejection = VolumeEjection(
-            kernel: kernel, access: access, home: { FileManager.default.homeDirectoryForCurrentUser },
-            note: { [unowned self] in note($0) })
+            kernel: kernel,
+            access: access,
+            home: { FileManager.default.homeDirectoryForCurrentUser },
+            note: { [unowned self] in note($0) }
+        )
     }
 
-    private var ui: any UserInteraction { kernel.ui }
+    private var ui: any UserInteraction { kernel.interaction }
     private var model: PanelModel { kernel.panels.source.model }
     private var settings: any SettingsStore { kernel.settings }
     private var home: URL { FileManager.default.homeDirectoryForCurrentUser }
@@ -228,9 +265,11 @@ final class SystemTools {
         let directory = model.directory.isFileURL ? model.directory : home
         guard
             let line = ui.prompt(
-                "Run command:", value: history.first ?? "",
+                "Run command:",
+                value: history.first ?? "",
                 detail:
-                    "The line is run by your shell in \(directory.path). End it with & to leave the program running.")
+                    "The line is run by your shell in \(directory.path). End it with & to leave the program running."
+            )
         else { return }
         run(line)
     }
@@ -251,7 +290,8 @@ final class SystemTools {
             let store = settings.scoped(to: "systemTools")
             store.set(
                 CommandHistory.adding(typed.isDetached ? typed.command + " &" : typed.command, to: history),
-                forKey: CommandHistory.key)
+                forKey: CommandHistory.key
+            )
         }
         guard launchesApplications || Self.isHarmless(typed) else {
             note("skipped: \(DisplayText.oneLine(typed.command))")
@@ -263,7 +303,9 @@ final class SystemTools {
         let runner = ProcessRunner(
             executable: shell.executable,
             arguments: shell.arguments + [typed.isDetached ? typed.command + " &" : typed.command],
-            directory: directory, collectsOutput: !typed.isDetached)
+            directory: directory,
+            collectsOutput: !typed.isDetached
+        )
         let opensApplications = launchesApplications
         let shownCommand = DisplayText.oneLine(typed.command)
         kernel.jobs.run(
@@ -275,7 +317,9 @@ final class SystemTools {
                     // short one this process was started with.
                     if let application = typed.application(relativeTo: directory, path: LoginShell.searchPath) {
                         return .application(
-                            application, files: Self.files(in: typed.arguments, relativeTo: directory))
+                            application,
+                            files: Self.files(in: typed.arguments, relativeTo: directory)
+                        )
                     }
                     runner.environment = LoginShell.environment()
                 }
@@ -283,9 +327,13 @@ final class SystemTools {
                     runner.run(cancellation: monitor.cancellation) { bytes in
                         monitor.report(
                             JobProgress(
-                                lines: [shownCommand, "\(Format.bytes(Int64(bytes))) bytes of output"], itemsDone: 0,
-                                itemsTotal: 0))
-                    })
+                                lines: [shownCommand, "\(Format.bytes(Int64(bytes))) bytes of output"],
+                                itemsDone: 0,
+                                itemsTotal: 0
+                            )
+                        )
+                    }
+                )
             },
             completion: { [self] result in
                 switch result {
@@ -293,10 +341,15 @@ final class SystemTools {
                     note("application: \(DisplayText.oneLine(application.path))")
                     if files.isEmpty {
                         NSWorkspace.shared.openApplication(
-                            at: application, configuration: NSWorkspace.OpenConfiguration())
+                            at: application,
+                            configuration: NSWorkspace.OpenConfiguration()
+                        )
                     } else {
                         NSWorkspace.shared.open(
-                            files, withApplicationAt: application, configuration: NSWorkspace.OpenConfiguration())
+                            files,
+                            withApplicationAt: application,
+                            configuration: NSWorkspace.OpenConfiguration()
+                        )
                     }
 
                 case .finished(let outcome):
@@ -305,7 +358,8 @@ final class SystemTools {
                     kernel.panels.refresh(shown)
                     show(outcome, of: typed)
                 }
-            })
+            }
+        )
     }
 
     nonisolated static func isHarmless(_ typed: TypedCommand) -> Bool {
@@ -331,8 +385,10 @@ final class SystemTools {
     private func show(_ outcome: ProcessOutcome, of typed: TypedCommand) {
         if let failure = outcome.failure {
             ui.inform(
-                "\(DisplayText.oneLine(typed.firstWord, limit: 80)) cannot be started!", detail: failure,
-                style: .warning)
+                "\(DisplayText.oneLine(typed.firstWord, limit: 80)) cannot be started!",
+                detail: failure,
+                style: .warning
+            )
             return
         }
         guard !typed.isDetached else { return }
@@ -375,9 +431,11 @@ final class SystemTools {
             return fm.fileExists(atPath: path) ? URL(fileURLWithPath: path) : nil
         }
         let bundleName = name.lowercased().hasSuffix(".app") ? name : name + ".app"
-        if let found = TypedCommand.applicationFolders.map({ $0.appendingPathComponent(bundleName) }).first(where: {
-            fm.fileExists(atPath: $0.path)
-        }) {
+        if let found = TypedCommand.applicationFolders.map({ $0.appendingPathComponent(bundleName) })
+            .first(where: {
+                fm.fileExists(atPath: $0.path)
+            })
+        {
             return found
         }
         return NSWorkspace.shared.urlForApplication(withBundleIdentifier: name)
@@ -400,12 +458,17 @@ final class SystemTools {
                 guard let application else {
                     return ui.inform(
                         "The terminal application \(DisplayText.oneLine(name, limit: 120)) was not found.",
-                        detail: "Choose another one in the configuration.", style: .warning)
+                        detail: "Choose another one in the configuration.",
+                        style: .warning
+                    )
                 }
                 note("terminal: \(DisplayText.oneLine(directory.path))")
                 // A terminal that is handed a folder opens a window there.
                 NSWorkspace.shared.open(
-                    [directory], withApplicationAt: application, configuration: NSWorkspace.OpenConfiguration())
+                    [directory],
+                    withApplicationAt: application,
+                    configuration: NSWorkspace.OpenConfiguration()
+                )
             }
         }
     }
@@ -428,13 +491,17 @@ final class SystemTools {
                 // Nil: cancelled while a volume did not answer.
                 guard let information = gathered else { return }
                 let answer = ui.form(
-                    "System Information", detail: "", fields: [.lines("information", "", information.text)],
-                    buttons: ["OK", "Copy"])
+                    "System Information",
+                    detail: "",
+                    fields: [.lines("information", "", information.text)],
+                    buttons: ["OK", "Copy"]
+                )
                 if answer?.button == 1, launchesApplications {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(information.text, forType: .string)
                 }
-            })
+            }
+        )
     }
 
     // MARK: Volumes
@@ -447,7 +514,10 @@ final class SystemTools {
     /// of the kernel's, and the job ends, with nil, as soon as it is cancelled, so the
     /// commands of the program are not held up by it.
     nonisolated private static func ask<Answer: Sendable>(
-        _ question: String, of url: URL, _ monitor: any JobMonitor, _ work: @escaping @Sendable () -> Answer
+        _ question: String,
+        of url: URL,
+        _ monitor: any JobMonitor,
+        _ work: @escaping @Sendable () -> Answer
     ) -> Answer? {
         BlockingCalls.answer(from: volumes, to: question + " " + url.path, cancellation: monitor.cancellation) { _ in
             work()
@@ -471,14 +541,18 @@ final class SystemTools {
                 }
                 guard
                     let name = ui.prompt(
-                        "Set volume label - \(DisplayText.oneLine(volume.path))", value: facts.name,
-                        detail: "Volume label")?
-                        .trimmingCharacters(in: .whitespaces), name != facts.name
+                        "Set volume label - \(DisplayText.oneLine(volume.path))",
+                        value: facts.name,
+                        detail: "Volume label"
+                    )?
+                    .trimmingCharacters(in: .whitespaces), name != facts.name
                 else { return }
                 if let problem = VolumeName.problem(with: name) {
                     return ui.inform(
-                        "The volume cannot be named \(DisplayText.oneLine(name, limit: 80))!", detail: problem,
-                        style: .warning)
+                        "The volume cannot be named \(DisplayText.oneLine(name, limit: 80))!",
+                        detail: problem,
+                        style: .warning
+                    )
                 }
                 guard launchesApplications else {
                     note("rename-volume: \(volume.path) -> \(name)")
@@ -501,13 +575,16 @@ final class SystemTools {
                         if let error {
                             return ui.report(
                                 error,
-                                title: "The volume \(DisplayText.oneLine(facts.name, limit: 80)) cannot be renamed!")
+                                title: "The volume \(DisplayText.oneLine(facts.name, limit: 80)) cannot be renamed!"
+                            )
                         }
                         note("rename-volume: \(volume.path) -> \(name)")
                         // A renamed volume is mounted under its new name; the panels follow or climb.
                         kernel.panels.all.forEach { $0.reload() }
-                    })
-            })
+                    }
+                )
+            }
+        )
     }
 
     /// Ejects the drive of `location`, or of the folder the source panel shows (`VolumeEjection`).
@@ -549,8 +626,10 @@ final class SystemTools {
         if withSubfolders {
             guard
                 let depthText = ui.prompt(
-                    "Print file list with subfolders", value: "-1",
-                    detail: "Depth of subfolders to include (-1 = unlimited):")
+                    "Print file list with subfolders",
+                    value: "-1",
+                    detail: "Depth of subfolders to include (-1 = unlimited):"
+                )
             else { return }
             guard let number = Int(depthText.trimmingCharacters(in: .whitespaces)) else {
                 ui.inform("\(depthText) is not a number.")
@@ -558,8 +637,10 @@ final class SystemTools {
             }
             guard
                 let maskText = ui.prompt(
-                    "Print file list with subfolders", value: "*.*",
-                    detail: "Files to include, e.g. *.doc *.txt, or *.* | *.bak to leave some out:")
+                    "Print file list with subfolders",
+                    value: "*.*",
+                    detail: "Files to include, e.g. *.doc *.txt, or *.* | *.bak to leave some out:"
+                )
             else { return }
             (depth, mask) = (number, maskText)
         }
@@ -571,21 +652,30 @@ final class SystemTools {
                 detail: "\(count) item(s) of \(DisplayText.oneLine(kernel.fileSystems.displayPath(directory)))",
                 fields: [
                     .text(
-                        "header", "Header text:",
-                        settings.text(Self.printHeaderKey, default: DirectoryListFormatter.defaultHeader)),
+                        "header",
+                        "Header text:",
+                        settings.text(Self.printHeaderKey, default: DirectoryListFormatter.defaultHeader)
+                    ),
                     .note("%d folder, %p page, %t pages, %D date, %T time, %% percent sign; empty for no header"),
                     .text("lines", "Lines per page:", String(lines)),
                     .checkbox("details", "Print size, date and attributes", panel.viewMode != .brief),
                     .choice(
-                        "output", "Output:", PrintOutput.allCases.map(\.title),
-                        selected: PrintOutput(rawValue: savedOutput) == nil ? 0 : savedOutput)
-                ], buttons: ["Print"])
+                        "output",
+                        "Output:",
+                        PrintOutput.allCases.map(\.title),
+                        selected: PrintOutput(rawValue: savedOutput) == nil ? 0 : savedOutput
+                    )
+                ],
+                buttons: ["Print"]
+            )
         else { return }
         let output = PrintOutput(rawValue: answer.index("output")) ?? .printer
         var formatter = DirectoryListFormatter()
         formatter.header = answer.text("header")
         formatter.linesPerPage = min(
-            max(Int(answer.text("lines").trimmingCharacters(in: .whitespaces)) ?? lines, 5), 500)
+            max(Int(answer.text("lines").trimmingCharacters(in: .whitespaces)) ?? lines, 5),
+            500
+        )
         formatter.isDetailed = answer.flag("details")
         settings.set(formatter.header, forKey: Self.printHeaderKey)
         settings.set(formatter.linesPerPage, forKey: Self.printLinesKey)
@@ -612,9 +702,13 @@ final class SystemTools {
                 let rows =
                     withSubfolders
                     ? ListCollector(
-                        fileSystems: fileSystems, showHidden: showHidden, mask: ListMask(mask), depth: depth,
+                        fileSystems: fileSystems,
+                        showHidden: showHidden,
+                        mask: ListMask(mask),
+                        depth: depth,
                         cancellation: monitor.cancellation
-                    ).rows(of: items)
+                    )
+                    .rows(of: items)
                     : Parallel.map(items, serialBelow: 4_096) { ListRow($0) }
                 // Only the form the chosen output needs is made.
                 let pages = output == .printer ? formatter.pages(directory: base, rows: rows) : []
@@ -629,14 +723,19 @@ final class SystemTools {
                     if exists {
                         let replace = monitor.ask { @MainActor @Sendable in
                             ui.choose(
-                                "Overwrite:", detail: fileSystems.displayPath(file), buttons: ["Overwrite", "Cancel"],
-                                style: .warning) == 0
+                                "Overwrite:",
+                                detail: fileSystems.displayPath(file),
+                                buttons: ["Overwrite", "Cancel"],
+                                style: .warning
+                            ) == 0
                         }
                         guard replace else { return (pages, longest, text, CocoaError(.userCancelled), false) }
                     }
                     // Written beside the file and moved over it, so a failure leaves the old file whole.
-                    let temporary = file.deletingLastPathComponent().appendingPathComponent(
-                        ".\(file.lastPathComponent).\(UUID().uuidString).tmp")
+                    let temporary = file.deletingLastPathComponent()
+                        .appendingPathComponent(
+                            ".\(file.lastPathComponent).\(UUID().uuidString).tmp"
+                        )
                     do {
                         let writer = try provider.write(temporary)
                         try writer.write(Data(text.utf8))
@@ -672,7 +771,8 @@ final class SystemTools {
                 case .viewer:
                     show(text: result.text, title: "File list - \(base)")
                 }
-            })
+            }
+        )
     }
 
     /// Hands the pages to the system's print dialog, which previews them and prints.
@@ -683,7 +783,8 @@ final class SystemTools {
         info.isVerticallyCentered = false
         let operation = NSPrintOperation(
             view: PagePrintView(pages: pages, longestLine: longestLine, linesPerPage: linesPerPage, printInfo: info),
-            printInfo: info)
+            printInfo: info
+        )
         operation.jobTitle = DisplayText.oneLine(title)
         if let window = NSApp.mainWindow {
             operation.runModal(for: window, delegate: nil, didRun: nil, contextInfo: nil)
@@ -701,8 +802,10 @@ final class SystemTools {
             return
         }
         kernel.jobs.run(
-            title: "Reading file list:", work: { _ in operands.items().filter { !$0.isDirectory } },
-            completion: { [self] files in printFiles(files) })
+            title: "Reading file list:",
+            work: { _ in operands.items().filter { !$0.isDirectory } },
+            completion: { [self] files in printFiles(files) }
+        )
     }
 
     func printFiles(_ files: [FileItem]) {
@@ -710,8 +813,11 @@ final class SystemTools {
         let what = files.count == 1 ? DisplayText.oneLine(files[0].name) : "\(files.count) files"
         guard
             ui.choose(
-                "Print", detail: "Print \(what) on the default printer?", buttons: ["Print", "Cancel"],
-                style: .information) == 0
+                "Print",
+                detail: "Print \(what) on the default printer?",
+                buttons: ["Print", "Cancel"],
+                style: .information
+            ) == 0
         else { return }
         // The log says how many when they are many: a line per file would be megabytes.
         let logged =
@@ -723,16 +829,24 @@ final class SystemTools {
             return
         }
         let runner = ProcessRunner(
-            executable: URL(fileURLWithPath: "/usr/bin/lpr"), arguments: files.map(\.url.path), directory: nil)
+            executable: URL(fileURLWithPath: "/usr/bin/lpr"),
+            arguments: files.map(\.url.path),
+            directory: nil
+        )
         kernel.jobs.run(
-            title: "Printing:", work: { monitor in runner.run(cancellation: monitor.cancellation) },
+            title: "Printing:",
+            work: { monitor in runner.run(cancellation: monitor.cancellation) },
             completion: { [self] outcome in
                 if outcome.failure != nil || outcome.status != 0 {
                     return ui.inform(
-                        "\(what) cannot be printed!", detail: outcome.failure ?? outcome.output, style: .warning)
+                        "\(what) cannot be printed!",
+                        detail: outcome.failure ?? outcome.output,
+                        style: .warning
+                    )
                 }
                 note(logged)
-            })
+            }
+        )
     }
 
     // MARK: Open With
@@ -769,8 +883,12 @@ final class SystemTools {
                 note("open-with: \(application.lastPathComponent) \(shownName)")
                 guard launchesApplications else { return }
                 NSWorkspace.shared.open(
-                    [item.url], withApplicationAt: application, configuration: NSWorkspace.OpenConfiguration())
-            })
+                    [item.url],
+                    withApplicationAt: application,
+                    configuration: NSWorkspace.OpenConfiguration()
+                )
+            }
+        )
     }
 
     // MARK: The program

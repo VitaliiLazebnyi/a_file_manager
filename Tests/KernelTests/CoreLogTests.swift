@@ -46,7 +46,7 @@ private func messages(in category: String, since start: Date) throws -> [String]
     @Test func startingAndStoppingThePluginsIsLoggedWithTheirNames() throws {
         let start = Date()
         let name = "Probe \(UUID().uuidString)"
-        let kernel = Kernel(productName: "Test", settings: MemorySettings(), ui: ScriptedInteraction())
+        let kernel = Kernel(productName: "Test", settings: MemorySettings(), interaction: ScriptedInteraction())
         kernel.load([NamedPlugin(name), NamedPlugin(name + " 2")])
         kernel.shutdown()
         let said = try messages(in: "Kernel", since: start)

@@ -142,9 +142,12 @@ private final class StandInDrive: VolumeAccess, @unchecked Sendable {
             removable: Bool? = false,
             ejectable: Bool? = false
         ) -> Bool {
+            func answer(_ said: Bool?) -> Place.Fact {
+                said.map(Place.Fact.known) ?? .unknown
+            }
             var traits = Place.VolumeTraits(path: path)
-            (traits.isRootFileSystem, traits.isInternal, traits.isLocal) = (root, inside, local)
-            (traits.isRemovable, traits.isEjectable) = (removable, ejectable)
+            (traits.isRootFileSystem, traits.isInternal, traits.isLocal) = (answer(root), answer(inside), answer(local))
+            (traits.isRemovable, traits.isEjectable) = (answer(removable), answer(ejectable))
             return traits.mayBeEjected
         }
         // Never: the start-up disk, a system volume, a second disk or partition inside the Mac,

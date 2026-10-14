@@ -5,7 +5,8 @@ public import AppKit
 extension Key {
     private static let keyCodes: [Key: UInt16] = [
         .returnKey: 36, .enter: 76, .tab: 48, .space: 49, .backspace: 51, .forwardDelete: 117, .insert: 114,
-        .home: 115, .end: 119, .pageUp: 116, .pageDown: 121, .left: 123, .right: 124, .down: 125, .up: 126,
+        .home: 115, .end: 119, .pageUp: 116, .pageDown: 121, .leftArrow: 123, .rightArrow: 124, .downArrow: 125,
+        .upArrow: 126,
         .keypadPlus: 69, .keypadMinus: 78, .keypadMultiply: 67, .keypadDivide: 75
     ]
     private static let functionKeyCodes: [UInt16] = [122, 120, 99, 118, 96, 97, 98, 100, 101, 109, 103, 111]
@@ -35,10 +36,10 @@ extension Key {
         case .end: return special(NSEndFunctionKey)
         case .pageUp: return special(NSPageUpFunctionKey)
         case .pageDown: return special(NSPageDownFunctionKey)
-        case .left: return special(NSLeftArrowFunctionKey)
-        case .right: return special(NSRightArrowFunctionKey)
-        case .up: return special(NSUpArrowFunctionKey)
-        case .down: return special(NSDownArrowFunctionKey)
+        case .leftArrow: return special(NSLeftArrowFunctionKey)
+        case .rightArrow: return special(NSRightArrowFunctionKey)
+        case .upArrow: return special(NSUpArrowFunctionKey)
+        case .downArrow: return special(NSDownArrowFunctionKey)
         default: return nil
         }
     }
@@ -93,7 +94,8 @@ extension Shortcut {
 
     private static let keyNames: [Key: String] = [
         .returnKey: "↩", .enter: "⌤", .tab: "⇥", .space: "Space", .backspace: "⌫", .forwardDelete: "⌦", .insert: "Ins",
-        .home: "↖", .end: "↘", .pageUp: "⇞", .pageDown: "⇟", .left: "←", .right: "→", .up: "↑", .down: "↓",
+        .home: "↖", .end: "↘", .pageUp: "⇞", .pageDown: "⇟", .leftArrow: "←", .rightArrow: "→", .upArrow: "↑",
+        .downArrow: "↓",
         .keypadPlus: "Num +", .keypadMinus: "Num −", .keypadMultiply: "Num ×", .keypadDivide: "Num ÷"
     ]
 

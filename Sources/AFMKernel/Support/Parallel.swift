@@ -2,9 +2,15 @@ import Foundation
 
 /// Spreads independent work over the processor's cores.
 public enum Parallel: Sendable {
-    /// Transforms every element, using all cores, and returns the results in the original
-    /// order. `transform` runs on several threads at once and must not touch shared state
-    /// without protecting it. Short inputs are done on the calling thread.
+    /// True while the calling code runs as part of a `map` that the main thread is waiting
+    /// for (on the main thread itself or on one of the helping threads): waiting for the
+    /// main thread from here would never end.
+    public static var isHoldingUpMainThread: Bool { ParallelPool.shared.isWorkingForMainThread }
+
+    /// Transforms every element, using all cores, and returns the results in the original order.
+    ///
+    /// `transform` runs on several threads at once and must not touch shared state without protecting it. Short inputs
+    /// are done on the calling thread.
     ///
     /// Calls may be nested: a transform that calls `map` itself (a walk through a tree of
     /// folders) shares the same threads, so the work below the top level is spread over the
@@ -22,6 +28,7 @@ public enum Parallel: Sendable {
     /// Every piece of the work runs inside an autorelease pool of its own, on whatever thread
     /// it runs: what a transform leaves to be released later (data read through Foundation)
     /// is gone when the piece ends.
+    @preconcurrency
     public static func map<Element, Result>(
         _ items: [Element],
         serialBelow threshold: Int = 2,
@@ -32,24 +39,19 @@ public enum Parallel: Sendable {
         }
         return [Result](unsafeUninitializedCapacity: items.count) { buffer, count in
             // Each iteration writes its own slot, so the slots need no lock.
-            nonisolated(unsafe) let slots = UnsafeMutablePointer<Result>(buffer.baseAddress!)
+            nonisolated(unsafe) let slots = buffer
             items.withUnsafeBufferPointer { source in
                 // Only read, while the call lasts.
-                nonisolated(unsafe) let source = source
-                withoutActuallyEscaping(transform) { transform in
-                    ParallelPool.shared.run(count: source.count) { index in
-                        (slots + index).initialize(to: transform(source[index]))
+                nonisolated(unsafe) let elements = source
+                withoutActuallyEscaping(transform) { work in
+                    ParallelPool.shared.run(count: elements.count) { index in
+                        slots.initializeElement(at: index, to: work(elements[index]))
                     }
                 }
             }
             count = items.count
         }
     }
-
-    /// True while the calling code runs as part of a `map` that the main thread is waiting
-    /// for (on the main thread itself or on one of the helping threads): waiting for the
-    /// main thread from here would never end.
-    public static var isHoldingUpMainThread: Bool { ParallelPool.shared.isWorkingForMainThread }
 
     /// To be called by whatever is about to wait for the main thread (before
     /// `DispatchQueue.main.sync`): stops, in debug builds, a caller that is part of a `map`

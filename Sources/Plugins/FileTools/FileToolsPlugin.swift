@@ -35,19 +35,28 @@ public final class FileToolsPlugin: Plugin {
         commands.register(Command(.encodeFile, "Encode File (MIME, UUE, XXE)…"), enabled: onFile, tools.encode)
         commands.register(Command(.decodeFile, "Decode File (MIME, UUE, XXE, yEnc)…"), enabled: onFile, tools.decode)
         commands.register(
-            Command(.createChecksums, "Create Checksum File(s) (CRC32, MD5, SHA)…"), enabled: hasOperands,
-            tools.createChecksums)
+            Command(.createChecksums, "Create Checksum File(s) (CRC32, MD5, SHA)…"),
+            enabled: hasOperands,
+            tools.createChecksums
+        )
         commands.register(Command(.verifyChecksums, "Verify Checksums"), enabled: hasOperands, tools.verifyChecksums)
         kernel.menus.add(
             [.splitFile, .combineFiles, .encodeFile, .decodeFile, .createChecksums, .verifyChecksums],
-            to: .filesTransform)
+            to: .filesTransform
+        )
         kernel.menus.addToContextMenu([.createChecksums, .verifyChecksums], in: .tools, onItemOnly: true)
         kernel.toolbar.add(
-            .createChecksums, symbol: "number.square", group: 60,
-            hint: "Create checksum files (MD5, SHA and others) for the selected files.")
+            .createChecksums,
+            symbol: "number.square",
+            group: 60,
+            hint: "Create checksum files (MD5, SHA and others) for the selected files."
+        )
         kernel.toolbar.add(
-            .verifyChecksums, symbol: "checkmark.seal", group: 60,
-            hint: "Check the selected files against their checksum file, to find damaged copies.")
+            .verifyChecksums,
+            symbol: "checkmark.seal",
+            group: 60,
+            hint: "Check the selected files against their checksum file, to find damaged copies."
+        )
         kernel.toolbar.setSymbol("scissors", for: .splitFile)
         kernel.toolbar.setSymbol("link", for: .combineFiles)
         kernel.preferences.add(
@@ -55,15 +64,23 @@ public final class FileToolsPlugin: Plugin {
                 title: "File Tools",
                 preferences: [
                     Preference(
-                        FileTools.Keys.onlyErrors, "Verify checksums: show only the errors", .flag(default: false)),
+                        FileTools.Keys.onlyErrors,
+                        "Verify checksums: show only the errors",
+                        .flag(default: false)
+                    ),
                     Preference(
                         FileTools.Keys.appendExtension,
                         "Separate checksum files: add the extension to the file's name (off: replace its extension)",
-                        .flag(default: true)),
+                        .flag(default: true)
+                    ),
                     Preference(
-                        FileTools.Keys.extraTypes, "More masks for checksum files (e.g. *.sum *.crc32)",
-                        .text(default: ""))
-                ]))
+                        FileTools.Keys.extraTypes,
+                        "More masks for checksum files (e.g. *.sum *.crc32)",
+                        .text(default: "")
+                    )
+                ]
+            )
+        )
     }
 }
 
@@ -106,7 +123,7 @@ final class FileTools {
     }
 
     private var source: PanelModel { kernel.panels.source.model }
-    private var ui: any UserInteraction { kernel.ui }
+    private var ui: any UserInteraction { kernel.interaction }
     private var settings: any SettingsStore { kernel.settings }
     private var fileSystems: FileSystemRegistry { kernel.fileSystems }
 
@@ -127,7 +144,7 @@ final class FileTools {
     /// An empty target is the source folder.
     private func folder(from text: String, relativeTo directory: URL) -> URL {
         // A target that was typed (not the proposal left as it was) is the user's own choice of a server, if it names one.
-        kernel.userTyped(location: text, proposal: targetProposal, relativeTo: directory)
+        kernel.userTyped(location: text, relativeTo: directory, proposal: targetProposal)
         return text.trimmingCharacters(in: .whitespaces).isEmpty
             ? directory : fileSystems.location(from: text, relativeTo: directory)
     }
@@ -137,7 +154,9 @@ final class FileTools {
     /// gets the result of the work (nil when it failed or was cancelled), which was made on the
     /// job's thread and reaches the main thread with the completion.
     private func run<Value: Sendable>(
-        _ title: String, job: String, refreshing folders: @escaping @MainActor (Value?) -> [URL],
+        _ title: String,
+        job: String,
+        refreshing folders: @escaping @MainActor (Value?) -> [URL],
         _ work: @escaping @Sendable (ToolRun) throws -> Value,
         then done: @escaping @MainActor (Value) -> Void
     ) {
@@ -147,12 +166,14 @@ final class FileTools {
             work: { monitor -> Result<Value, any Error> in
                 let run = ToolRun(fileSystems: fileSystems, monitor: monitor) { @MainActor @Sendable url in
                     ui.pick(
-                        "Overwrite:", detail: fileSystems.displayPath(url),
+                        "Overwrite:",
+                        detail: fileSystems.displayPath(url),
                         [
                             ("Overwrite", .overwrite), ("Overwrite all", .overwriteAll), ("Skip", .skip),
                             ("Cancel", .cancel)
                         ],
-                        fallback: ExistingFileChoice.cancel)
+                        fallback: ExistingFileChoice.cancel
+                    )
                 }
                 let result = Result { try work(run) }
                 // The last state always reaches the progress window, whatever was held back before.
@@ -164,9 +185,11 @@ final class FileTools {
                 switch result {
                 case .success(let value): done(value)
                 case .failure(ToolError.cancelled): break
-                case .failure(let error): kernel.ui.inform(title, detail: error.localizedDescription, style: .warning)
+                case .failure(let error):
+                    kernel.interaction.inform(title, detail: error.localizedDescription, style: .warning)
                 }
-            })
+            }
+        )
     }
 
     /// Creates the target folder of a tool that, like Copy, makes it when it is missing.
@@ -202,15 +225,21 @@ final class FileTools {
         }
         let target = folder(from: answer.text("target"), relativeTo: directory)
         run(
-            "Split", job: "Split:", refreshing: { (_: [URL]?) in [target] },
+            "Split",
+            job: "Split:",
+            refreshing: { (_: [URL]?) in [target] },
             { run in
                 try Self.prepare(target, run)
                 return try Splitter.split(file, into: target, partSize: size, run: run)
             },
             then: { [ui, fileSystems] _ in
                 ui.inform(
-                    "Split", detail: "Split of \(fileSystems.displayPath(file.url)) succeeded!", style: .information)
-            })
+                    "Split",
+                    detail: "Split of \(fileSystems.displayPath(file.url)) succeeded!",
+                    style: .information
+                )
+            }
+        )
     }
 
     func combine() {
@@ -223,7 +252,9 @@ final class FileTools {
         guard let answer = ui.form("Combine", detail: "", fields: fields, buttons: ["OK"]) else { return }
         let target = folder(from: answer.text("target"), relativeTo: directory)
         run(
-            "Combine", job: "Combine:", refreshing: { (_: Combiner.Outcome?) in [target] },
+            "Combine",
+            job: "Combine:",
+            refreshing: { (_: Combiner.Outcome?) in [target] },
             { run -> Combiner.Outcome in
                 try Self.prepare(target, run)
                 let plan = try Combiner.plan(for: file, run: run)
@@ -234,20 +265,27 @@ final class FileTools {
                 switch outcome.verified {
                 case true?:
                     ui.inform(
-                        "Combine - \(outcome.parts)", detail: "Combine of \(name) succeeded (CRC checksum OK)!",
-                        style: .information)
+                        "Combine - \(outcome.parts)",
+                        detail: "Combine of \(name) succeeded (CRC checksum OK)!",
+                        style: .information
+                    )
 
                 case false?:
                     ui.inform(
                         "Combine - \(outcome.parts)",
                         detail: "Combine of \(name): CRC checksum error! The file is damaged or incomplete.",
-                        style: .critical)
+                        style: .critical
+                    )
 
                 case nil:
                     ui.inform(
-                        "Combine - \(outcome.parts)", detail: "Combine of \(name) succeeded!", style: .information)
+                        "Combine - \(outcome.parts)",
+                        detail: "Combine of \(name) succeeded!",
+                        style: .information
+                    )
                 }
-            })
+            }
+        )
     }
 
     // MARK: Encode and decode
@@ -259,8 +297,11 @@ final class FileTools {
         let fields: [FormField] = [
             .note("Encode the file \(file.name) to directory:"), .text("target", "", targetProposal),
             .choice(
-                "method", "Encode as:", EncodeMethod.allCases.map(\.title),
-                selected: settings.index(Keys.encodeMethod, default: 0)),
+                "method",
+                "Encode as:",
+                EncodeMethod.allCases.map(\.title),
+                selected: settings.index(Keys.encodeMethod, default: 0)
+            ),
             .text("lines", "Lines per file:", lastLines > 0 ? String(lastLines) : ""),
             .text("bytes", "Bytes per file:", ""),
             .note("(Note: header size is not counted)")
@@ -273,12 +314,22 @@ final class FileTools {
         settings.set(lines, forKey: Keys.encodeLines)
         let target = folder(from: answer.text("target"), relativeTo: directory)
         run(
-            "Encode", job: "Encode:", refreshing: { (_: [URL]?) in [target] },
+            "Encode",
+            job: "Encode:",
+            refreshing: { (_: [URL]?) in [target] },
             { run in
                 try Self.prepare(target, run)
                 return try Encoder.encode(
-                    file, into: target, method: method, linesPerFile: lines, bytesPerFile: bytes, run: run)
-            }, then: { _ in })
+                    file,
+                    into: target,
+                    method: method,
+                    linesPerFile: lines,
+                    bytesPerFile: bytes,
+                    run: run
+                )
+            },
+            then: { _ in }
+        )
     }
 
     func decode() {
@@ -292,7 +343,9 @@ final class FileTools {
         let target = folder(from: answer.text("target"), relativeTo: directory)
         let autoRename = answer.flag("autoRename")
         run(
-            "Decode", job: "Decode:", refreshing: { (_: Decoder.Outcome?) in [target] },
+            "Decode",
+            job: "Decode:",
+            refreshing: { (_: Decoder.Outcome?) in [target] },
             { run in
                 // Unlike Copy, Decode does not create a missing target folder.
                 guard run.fileSystems.item(at: target)?.isDirectory == true else {
@@ -310,8 +363,10 @@ final class FileTools {
                     "Decode",
                     detail:
                         "\(file.name) is incomplete or damaged:\n\(shown)\(more)\n\nThe decoded data was written to \(folder) as far as it could be read.",
-                    style: .warning)
-            })
+                    style: .warning
+                )
+            }
+        )
     }
 
     // MARK: Checksums
@@ -346,26 +401,40 @@ final class FileTools {
         let firstName = count == 1 ? operands.items().first?.name : nil
         let lastMethod = ChecksumMethod(rawValue: settings.index(Keys.checksumMethod, default: 0)) ?? .crc32
         let proposal = fileSystems.displayPath(
-            Self.checksumProposal(count: count, firstName: firstName, in: directory, method: lastMethod))
+            Self.checksumProposal(count: count, firstName: firstName, in: directory, method: lastMethod)
+        )
         let fields: [FormField] = [
             .text("target", "Save CRC file(s) to:", proposal),
             .checkbox(
-                "separateFiles", "Create separate checksum files for each file",
-                settings.flag(Keys.separateFiles, default: false)),
+                "separateFiles",
+                "Create separate checksum files for each file",
+                settings.flag(Keys.separateFiles, default: false)
+            ),
             .checkbox(
-                "separateFolders", "Create separate checksum files for each directory",
-                settings.flag(Keys.separateFolders, default: false)),
+                "separateFolders",
+                "Create separate checksum files for each directory",
+                settings.flag(Keys.separateFolders, default: false)
+            ),
             .checkbox(
-                "utf8", "Always use UTF-8 in names (with a byte-order mark)",
-                settings.flag(Keys.forceUTF8, default: false)),
+                "utf8",
+                "Always use UTF-8 in names (with a byte-order mark)",
+                settings.flag(Keys.forceUTF8, default: false)
+            ),
             .checkbox(
-                "unix", "Unix format: line breaks, '/' in paths", settings.flag(Keys.unixFormat, default: true)),
+                "unix",
+                "Unix format: line breaks, '/' in paths",
+                settings.flag(Keys.unixFormat, default: true)
+            ),
             .choice(
-                "method", "Checksum method:", ChecksumMethod.dialogOrder.map(\.title),
-                selected: ChecksumMethod.dialogOrder.firstIndex(of: lastMethod) ?? 0),
+                "method",
+                "Checksum method:",
+                ChecksumMethod.dialogOrder.map(\.title),
+                selected: ChecksumMethod.dialogOrder.firstIndex(of: lastMethod) ?? 0
+            ),
             .note(
                 "The extension follows the method while the proposed name is unchanged. Separate files take a name with *: "
-                    + "*.*.sfv adds the extension, *.sfv replaces the file's own.")
+                    + "*.*.sfv adds the extension, *.sfv replaces the file's own."
+            )
         ]
         guard let answer = ui.form("Create CRC-checksum file", detail: "", fields: fields, buttons: ["OK"]) else {
             return
@@ -386,7 +455,7 @@ final class FileTools {
 
         // The dialog cannot change the proposal while a method is chosen; it is done here.
         let typed = answer.text("target").trimmingCharacters(in: .whitespaces)
-        kernel.userTyped(location: typed, proposal: proposal, relativeTo: directory)
+        kernel.userTyped(location: typed, relativeTo: directory, proposal: proposal)
         var target =
             typed == proposal || typed.isEmpty
             ? Self.checksumProposal(count: count, firstName: firstName, in: directory, method: options.method)
@@ -398,7 +467,8 @@ final class FileTools {
         /// The folders the checksum files went to, found on the job's thread; one entry each, with its key.
         struct Created { var folders: [(url: URL, key: String)] }
         run(
-            "Create CRC-checksum file", job: "Creating checksums:",
+            "Create CRC-checksum file",
+            job: "Creating checksums:",
             refreshing: { [kernel] (created: Created?) in
                 // A panel shows one folder, so with very many folders only those it shows need reading again.
                 guard let folders = created?.folders else { return [directory] }
@@ -420,7 +490,8 @@ final class FileTools {
             then: { _ in
                 // After creation the source selection is cleared, if the panel still shows the folder it was made in.
                 if model.directory.isSameLocation(as: directory) { model.clearSelection() }
-            })
+            }
+        )
     }
 
     /// What Verify made of its run: the text of the window, and the names to mark in the panel.
@@ -467,21 +538,30 @@ final class FileTools {
     }
 
     private func verify(
-        _ title: String, in model: PanelModel, onlyErrors: Bool,
+        _ title: String,
+        in model: PanelModel,
+        onlyErrors: Bool,
         _ work: @escaping @Sendable (ToolRun) throws -> VerifyReport?
     ) {
         let directory = model.directory
         run(
-            title, job: "Verifying checksums:", refreshing: { (_: Verified??) in [] },
+            title,
+            job: "Verifying checksums:",
+            refreshing: { (_: Verified??) in [] },
             { run -> Verified? in
                 guard let report = try work(run) else { return nil }
                 // Text and names are made here, not in the completion on the main thread.
                 return Verified(
-                    title: report.title, text: report.text(onlyErrors: onlyErrors), failedNames: report.failedNames,
-                    errors: report.errors)
+                    title: report.title,
+                    text: report.text(onlyErrors: onlyErrors),
+                    failedNames: report.failedNames,
+                    errors: report.errors
+                )
             },
             then: { [kernel] verified in
-                guard let verified else { return kernel.ui.inform("Please select only SFV, MD5 or SHA files!") }
+                guard let verified else {
+                    return kernel.interaction.inform("Please select only SFV, MD5 or SHA files!")
+                }
                 // The failures are marked in the panel they were checked from.
                 if verified.errors > 0, model.directory.isSameLocation(as: directory) {
                     model.setSelection(names: verified.failedNames)
@@ -489,9 +569,14 @@ final class FileTools {
                 if let viewer = kernel.services.find((any ViewerService).self) {
                     viewer.view(text: verified.text, title: verified.title)
                 } else {
-                    _ = kernel.ui.form(
-                        verified.title, detail: "", fields: [.lines("result", "", verified.text)], buttons: ["Close"])
+                    _ = kernel.interaction.form(
+                        verified.title,
+                        detail: "",
+                        fields: [.lines("result", "", verified.text)],
+                        buttons: ["Close"]
+                    )
                 }
-            })
+            }
+        )
     }
 }

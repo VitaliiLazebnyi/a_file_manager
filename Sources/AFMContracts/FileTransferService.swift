@@ -1,8 +1,9 @@
-import AFMKernel
 public import Foundation
 
 /// Copying and moving files with the usual progress window and questions.
+///
 /// Offered by the file-operations plugin; used, for example, by the clipboard.
+@preconcurrency
 @MainActor
 public protocol FileTransferService {
     /// Transfers `sources` into `directory` under their own names. With `renamingSelfCopies`,

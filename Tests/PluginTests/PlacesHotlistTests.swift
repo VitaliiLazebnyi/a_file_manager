@@ -122,7 +122,7 @@ import Testing
         #expect(HotlistAction("CD  \"/with space\"") == .changeDirectory(path: "/with space", focusingOnIt: false))
         #expect(HotlistAction("cd /Dir/Focusme/:") == .changeDirectory(path: "/Dir/Focusme", focusingOnIt: true))
         #expect(HotlistAction("/plain/path") == .changeDirectory(path: "/plain/path", focusingOnIt: false))
-        #expect(HotlistAction("cm_GoToRoot") == .command("cm_GoToRoot", .none))
+        #expect(HotlistAction("cm_GoToRoot") == .command("cm_GoToRoot", .nothing))
         #expect(HotlistAction("cm_SrcActivateTab 2") == .command("cm_SrcActivateTab", .index(2)))
         #expect(HotlistAction("afm_Something some text") == .command("afm_Something", .text("some text")))
         #expect(HotlistAction("   ") == .nothing)
@@ -336,8 +336,8 @@ import Testing
     @Test func registersCommandsKeysMenuButtonsAndPreferences() {
         let keys = bench.kernel.keyBindings
         #expect(keys.command(for: Shortcut(.character("d"), .control)) == .directoryHotlist)
-        #expect(keys.command(for: Shortcut(.down, .option)) == .directoryHistory)
-        #expect(keys.command(for: Shortcut(.down, [.option, .shift])) == .directoryHistoryUnthinned)
+        #expect(keys.command(for: Shortcut(.downArrow, .option)) == .directoryHistory)
+        #expect(keys.command(for: Shortcut(.downArrow, [.option, .shift])) == .directoryHistoryUnthinned)
         #expect(keys.command(for: .f(10, .option)) == .directoryTree)
         #expect(bench.kernel.keyClashes.isEmpty)
         #expect(
@@ -415,7 +415,7 @@ import Testing
             ui.formAnswers = [pick(row)]
             commands.perform(.directoryHotlist)
         }
-        #expect(recorder.arguments == [.index(3), .none] && rejected == 1)
+        #expect(recorder.arguments == [.index(3), .nothing] && rejected == 1)
         #expect(left.model.directory == memory.url("/A"))
     }
 

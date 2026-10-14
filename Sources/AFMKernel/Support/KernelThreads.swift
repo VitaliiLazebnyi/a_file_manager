@@ -1,15 +1,21 @@
 import Foundation
 
-/// Threads for work that blocks: one per piece of work, kept for a few seconds when idle so
-/// that a run of short pieces does not start a thread each. All state is guarded by `condition`.
-final class KernelThreads: @unchecked Sendable {
-    static let shared = KernelThreads()
+/// Threads for work that blocks: one per piece of work, kept for a few seconds when idle so that a run of short pieces
+/// does not start a thread each.
+///
+/// All state is guarded by `condition`.
+internal final class KernelThreads: @unchecked Sendable {
+    /// The one set of threads of the program.
+    internal static let shared = KernelThreads()
 
     private let condition = NSCondition()
     private var queue: [@Sendable () -> Void] = []
     private var idle = 0
 
-    func run(_ work: @escaping @Sendable () -> Void) {
+    /// Runs `work` on a thread that is idle, or on a new one.
+    ///
+    /// Any thread; returns at once.
+    internal func run(_ work: @escaping @Sendable () -> Void) {
         condition.lock()
         queue.append(work)
         let isTaken = idle >= queue.count
@@ -42,5 +48,9 @@ final class KernelThreads: @unchecked Sendable {
         thread.qualityOfService = .userInitiated
         thread.stackSize = 1 << 20
         thread.start()
+    }
+
+    deinit {
+        // Nothing to release: the one instance lives as long as the program.
     }
 }

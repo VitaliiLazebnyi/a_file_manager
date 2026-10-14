@@ -123,7 +123,7 @@ final class VolumeEjection {
         self.note = note
     }
 
-    private var ui: any UserInteraction { kernel.ui }
+    private var ui: any UserInteraction { kernel.interaction }
 
     /// A tab that left the drive, and where it went.
     private struct Departure {

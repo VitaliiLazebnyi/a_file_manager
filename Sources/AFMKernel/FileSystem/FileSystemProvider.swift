@@ -4,9 +4,10 @@ public import Foundation
 /// may happen on any thread.
 public typealias WatchToken = AnyObject & Sendable
 
-/// Something a panel can show and operations can work on: the local disks, and later
-/// archives or servers (spec 01 › File systems shown in a panel). A provider is chosen by the
-/// scheme of a URL; every URL it is handed has its own scheme.
+/// Something a panel can show and operations can work on: the local disks, and later archives or servers (spec 01 ›
+/// File systems shown in a panel).
+///
+/// A provider is chosen by the scheme of a URL; every URL it is handed has its own scheme.
 ///
 /// **Threading.** A provider is called from several threads at the same time: listings run in
 /// the background, on several cores at once, while jobs and searches read and write on their
@@ -24,14 +25,25 @@ public typealias WatchToken = AnyObject & Sendable
 /// `isCancelled`. Each variant's default is the call without a flag, so a provider adds only
 /// the ones it can really end early, and callers that hold a flag always pass it.
 public protocol FileSystemProvider: AnyObject, Sendable {
+    /// The scheme of every URL of this file system (`file`, `zip`, `sftp`); one plugin's alone.
     var scheme: String { get }
+    /// What can be done with this file system as a whole. Answers at once.
     var capabilities: FileSystemCapabilities { get }
+    /// Whether a path from the root typed while a panel shows this file system (`/pub/files`)
+    /// means a place on it. False, the default, for file systems that write their locations
+    /// with their scheme (`ftp://host/pub`): there such a path is one of the local disks.
+    var readsRootedPaths: Bool { get }
+    /// Whether the locations of this file system are on a server, so that showing one may
+    /// have to connect (and ask for a password). Answers at once; false by default.
+    var connectsToServer: Bool { get }
     /// What can be done at one location, for a file system whose locations differ (a view
     /// that shows folders of several file systems). Answers at once, like `capabilities`,
     /// which is the default. Whoever asks about a particular place asks this.
     func capabilities(for url: URL) -> FileSystemCapabilities
 
     // Reading
+    /// The entries of a directory, all at once; with `showHidden`, hidden ones too. Throws
+    /// when the directory cannot be read.
     func list(_ directory: URL, showHidden: Bool) throws -> [FileItem]
     /// Lists a directory piece by piece: `receive` gets each batch of entries as soon as it is
     /// known, and returns false when no more are wanted. A slow or very large directory can be
@@ -50,6 +62,7 @@ public protocol FileSystemProvider: AnyObject, Sendable {
     func item(at url: URL, cancellation: CancellationFlag) -> FileItem?
     /// The directory above; nil for a root. Works on the URL alone.
     func parent(of directory: URL) -> URL?
+    /// Opens a file to read its contents from the start.
     func read(_ url: URL) throws -> any FileReader
     /// `read(_:)`, where opening itself can take long (a connection, the way to a member of
     /// a compressed archive): opening ends early, by throwing, once `cancellation` is set.
@@ -78,6 +91,8 @@ public protocol FileSystemProvider: AnyObject, Sendable {
     /// Deletes one file, one link, or one **empty** directory. Whoever deletes a tree walks
     /// it, so that every item can be counted, skipped or cancelled.
     func remove(_ url: URL) throws
+    /// Moves an item, folders with what they hold, to the Trash. Throws
+    /// `FileSystemError.notSupported`, the default, where there is none (no `.trash`).
     func trash(_ url: URL) throws
     /// Renames within this file system, in one step. With `replacing`, an existing file at the
     /// destination is replaced; without, an existing destination is an error and stays
@@ -153,12 +168,10 @@ public protocol FileSystemProvider: AnyObject, Sendable {
     /// is not one of its locations. Whatever `displayPath` writes must be readable here, because
     /// dialogs propose targets in that form and read them back.
     func location(from text: String) -> URL?
-    /// Whether a path from the root typed while a panel shows this file system (`/pub/files`)
-    /// means a place on it. False, the default, for file systems that write their locations
-    /// with their scheme (`ftp://host/pub`): there such a path is one of the local disks.
-    var readsRootedPaths: Bool { get }
     /// Entries for the volume list.
     func places() -> [Place]
+    /// The volume a location is on, for the status line; nil, the default, when the file
+    /// system cannot say.
     func volume(of url: URL) -> VolumeInfo?
     /// `volume(of:)`, ended early (with nil) once `cancellation` is set. The question can
     /// wait as long as a listing can (a share that has stopped answering holds it for good),
@@ -176,11 +189,17 @@ public protocol FileSystemProvider: AnyObject, Sendable {
     // The calls that change something, ended early once `cancellation` is set (see
     // Cancellation above). Each one's default is the call without a flag. A file system whose
     // changes travel (to a server) offers them, and whoever holds a flag passes it.
+    /// `createDirectory(at:)`, ended early once `cancellation` is set.
     func createDirectory(at url: URL, cancellation: CancellationFlag) throws
+    /// `remove(_:)`, ended early once `cancellation` is set.
     func remove(_ url: URL, cancellation: CancellationFlag) throws
+    /// `move(_:to:replacing:)`, ended early once `cancellation` is set.
     func move(_ source: URL, to destination: URL, replacing: Bool, cancellation: CancellationFlag) throws
+    /// `setAttributes(_:of:)`, ended early once `cancellation` is set.
     func setAttributes(_ attributes: FileAttributes, of url: URL, cancellation: CancellationFlag) throws
+    /// `copyMetadata(from:to:)`, ended early once `cancellation` is set.
     func copyMetadata(from source: URL, to destination: URL, cancellation: CancellationFlag) throws
+    /// `setQuarantine(_:of:)`, ended early once `cancellation` is set.
     func setQuarantine(_ value: Data, of url: URL, cancellation: CancellationFlag) throws
     /// Creates a directory that must not have been there. With `exclusive`, only the last
     /// component is made new (missing parents are made as usual), and anything already at
@@ -208,9 +227,6 @@ public protocol FileSystemProvider: AnyObject, Sendable {
     /// (a branch, a list, the outside of an archive) names the place where its entries
     /// really are. Nil, the default, for a location that is itself. Works on the URL alone.
     func realLocation(of url: URL) -> URL?
-    /// Whether the locations of this file system are on a server, so that showing one may
-    /// have to connect (and ask for a password). Answers at once; false by default.
-    var connectsToServer: Bool { get }
     /// The order in which several files of this file system are best read one after the
     /// other: an archive that is read as one stream gives them in the order they lie in it,
     /// so that no file makes the reading start over. The default leaves the order as it is.

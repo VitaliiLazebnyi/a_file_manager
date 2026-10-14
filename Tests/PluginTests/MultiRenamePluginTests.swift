@@ -46,7 +46,7 @@ import Testing
         left.model.clearSelection()
         for name in names { left.model.select(mask: name) }
         if names.isEmpty { left.model.selectAll() }
-        #expect(bench.commands.perform(.multiRename, settingsName.map(CommandArgument.text) ?? .none))
+        #expect(bench.commands.perform(.multiRename, settingsName.map(CommandArgument.text) ?? .nothing))
         guard let session = plugin.session else { preconditionFailure("the command opens a session") }
         return session
     }

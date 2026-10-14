@@ -69,7 +69,7 @@ import Testing
     }
 
     func start() async -> Running {
-        let kernel = Kernel(productName: StandardPlugins.productName, settings: settings, ui: ui)
+        let kernel = Kernel(productName: StandardPlugins.productName, settings: settings, interaction: ui)
         kernel.fileSystems.register(memory)
         kernel.load(StandardPlugins.make(pasteboard: scratch.pasteboard, launchesApplications: false))
         let running = Running(kernel: kernel, shell: Shell(kernel: kernel, home: box.url("home")))

@@ -67,7 +67,7 @@ public final class SelectionPlugin: Plugin {
                 select: true,
                 scope: selections.configured,
                 proposal: ext.isEmpty ? "*.*" : "*." + ext,
-                argument: .none
+                argument: .nothing
             )
         }
         commands.register(
@@ -345,7 +345,7 @@ final class Selections {
     }
 
     private var source: PanelModel { kernel.panels.source.model }
-    private var ui: any UserInteraction { kernel.ui }
+    private var ui: any UserInteraction { kernel.interaction }
 
     /// What Num +, Ctrl+Num + and Num * affect, and the choice their Shift variants make.
     var configured: SelectionScope { store.marksFolders ? .both : .files }
@@ -589,8 +589,8 @@ final class Selections {
             guard
                 let row = ui.pickRow(
                     "Define selection",
-                    detail: "Choose the selection type to change:",
                     rows: ["New selection type"] + types.map(\.name),
+                    detail: "Choose the selection type to change:",
                     button: "Edit"
                 )
             else { return }
@@ -868,7 +868,7 @@ final class Selections {
             },
             completion: { [kernel] outcome in
                 switch outcome {
-                case .failed(let error): kernel.ui.report(error, title: "The selection cannot be saved!")
+                case .failed(let error): kernel.interaction.report(error, title: "The selection cannot be saved!")
                 case .done: kernel.panels.refresh([target.deletingLastPathComponent()])
                 case .cancelled: break
                 }

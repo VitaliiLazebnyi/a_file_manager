@@ -35,7 +35,8 @@ enum WindowCommands {
         let commands = kernel.commands
         func toggle(_ id: CommandID, _ region: WindowLayout.Region) {
             commands.register(
-                Command(id, region.caption, runsDuringJobs: true), checked: { layout.isVisible(region) }
+                Command(id, region.caption, runsDuringJobs: true),
+                checked: { layout.isVisible(region) }
             ) {
                 layout.setVisible(region, !layout.isVisible(region))
             }
@@ -45,7 +46,8 @@ enum WindowCommands {
         toggle(.showCommandLine, .commandLine)
         toggle(.showFunctionKeys, .functionKeys)
         commands.register(
-            Command(.panelsStacked, "Panels One Above the Other", runsDuringJobs: true), checked: { layout.isStacked }
+            Command(.panelsStacked, "Panels One Above the Other", runsDuringJobs: true),
+            checked: { layout.isStacked }
         ) {
             layout.isStacked.toggle()
         }
@@ -59,7 +61,10 @@ enum WindowCommands {
         /// A command of the command line; using it shows a line that was switched off
         /// (spec 02 › Showing and hiding regions: a hidden command line reappears).
         func line(
-            _ id: CommandID, _ title: String, _ shortcuts: [Shortcut] = [], _ run: @escaping (CommandLineView) -> Void
+            _ id: CommandID,
+            _ title: String,
+            _ shortcuts: [Shortcut] = [],
+            _ run: @escaping (CommandLineView) -> Void
         ) {
             commands.register(Command(id, title, shortcuts, runsDuringJobs: true)) {
                 layout.setVisible(.commandLine, true)
@@ -68,17 +73,19 @@ enum WindowCommands {
         }
         // Total Commander has no key for the focus command; Cmd+L is where the Mac has "go to the address".
         line(.focusCommandLine, "Focus Command Line", [.cmd("l")]) { $0.focusField() }
-        line(.commandLineHistory, "Command Line History", [.f(8, .option), Shortcut(.down, .control)]) {
+        line(.commandLineHistory, "Command Line History", [.f(8, .option), Shortcut(.downArrow, .control)]) {
             $0.showHistory()
         }
         line(
-            .addNameToCommandLine, "Add Name to Command Line",
+            .addNameToCommandLine,
+            "Add Name to Command Line",
             [Shortcut(.returnKey, .control), Shortcut(.enter, .control)]
         ) {
             $0.addCursorItem(withPath: false)
         }
         line(
-            .addPathAndNameToCommandLine, "Add Name with Path to Command Line",
+            .addPathAndNameToCommandLine,
+            "Add Name with Path to Command Line",
             [Shortcut(.returnKey, [.control, .shift]), Shortcut(.enter, [.control, .shift])]
         ) {
             $0.addCursorItem(withPath: true)
@@ -90,7 +97,7 @@ enum WindowCommands {
             Command(.resetButtonBar, "Reset Button Bar to Default", runsDuringJobs: true),
             enabled: { kernel.toolbar.hasUserLayout(in: kernel.settings) }
         ) {
-            kernel.toolbar.setLayout(nil, in: kernel.settings)
+            kernel.toolbar.resetLayout(in: kernel.settings)
         }
         commands.register(Command(.clearCommandLine, "Clear Command Line", runsDuringJobs: true)) {
             window()?.commandLine.clear()
@@ -101,13 +108,15 @@ enum WindowCommands {
                 .showButtonBar, .showDriveButtons, .showCommandLine, .showFunctionKeys, .panelsStacked,
                 .panelsEqualWidth
             ],
-            to: .showWindow)
+            to: .showWindow
+        )
         kernel.menus.add(
             [
                 .focusCommandLine, .commandLineHistory, .addNameToCommandLine, .addPathAndNameToCommandLine,
                 .addPathToCommandLine
             ],
-            to: .commandsRun)
+            to: .commandsRun
+        )
         kernel.preferences.add(layout.preferencePage())
         // Pictures for the user who wants these on the button bar; none is proposed as a button.
         let symbols: [(CommandID, String)] = [

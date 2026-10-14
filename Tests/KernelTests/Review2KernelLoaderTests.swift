@@ -354,9 +354,9 @@ private final class DeepFileSystem: FileSystemProvider, @unchecked Sendable {
             "../x", "a/../b", "..", ".", "a/./b", "/abs", "a//b", "a/", "", "a/\u{0}", "..\u{2F}\u{301}x",
             "..\u{2F}\u{301}/..\u{2F}\u{301}/x", "a/..\u{2F}\u{301}"
         ] {
-            #expect(PathSafety.components(ofRelativePath: path) == nil, "\(path.debugDescription)")
+            #expect(PathSafety.components(ofRelativePath: path).isEmpty, "\(path.debugDescription)")
         }
-        #expect(PathSafety.components(ofRelativePath: "a/b//", allowingTrailingSeparator: true) == nil)
+        #expect(PathSafety.components(ofRelativePath: "a/b//", allowingTrailingSeparator: true).isEmpty)
     }
 
     @Test func aLocationIsBelowItsRootByBytesNotByLooks() throws {

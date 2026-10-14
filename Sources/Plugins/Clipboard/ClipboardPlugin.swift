@@ -103,13 +103,13 @@ public final class ClipboardPlugin: Plugin {
 
         commands.register(Command(.cutToClipboard, "Cut", [.cmd("x")]).editing(.cut), enabled: hasLocalOperands) {
             [self] in
-            place(model().operandsSnapshot(), cut: true, ui: kernel.ui)
+            place(model().operandsSnapshot(), cut: true, ui: kernel.interaction)
         }
         commands.register(
             Command(.copyToClipboard, "Copy", [.cmd("c")]).editing(.copy),
             enabled: hasLocalOperands
         ) { [self] in
-            place(model().operandsSnapshot(), cut: false, ui: kernel.ui)
+            place(model().operandsSnapshot(), cut: false, ui: kernel.interaction)
         }
         commands.register(
             Command(.pasteFromClipboard, "Paste", [.cmd("v")]).editing(.paste),
@@ -435,7 +435,8 @@ public final class ClipboardPlugin: Plugin {
                 switch result {
                 case .success(let url): kernel.panels.refresh([directory], focus: url)
                 case .failure(is NothingToPaste): break
-                case .failure(let error): kernel.ui.report(error, title: "The clipboard cannot be pasted as a file!")
+                case .failure(let error):
+                    kernel.interaction.report(error, title: "The clipboard cannot be pasted as a file!")
                 }
             }
         )
@@ -520,11 +521,11 @@ public final class ClipboardPlugin: Plugin {
     /// `cm_SaveDetailsToFile`). An existing file is replaced only after a question.
     private func saveDetails(headers: Bool, to proposed: String?, in kernel: Kernel) {
         let directory = kernel.panels.source.model.directory
-        guard let text = proposed ?? kernel.ui.prompt("Save details to file:", value: "details.txt"),
+        guard let text = proposed ?? kernel.interaction.prompt("Save details to file:", value: "details.txt"),
             !text.trimmingCharacters(in: .whitespaces).isEmpty
         else { return }
         let (operands, extra) = detailsInput(in: kernel)
-        let (fileSystems, ui) = (kernel.fileSystems, kernel.ui)
+        let (fileSystems, ui) = (kernel.fileSystems, kernel.interaction)
         let list = NameList(displayPath: { fileSystems.displayPath($0) })
         let url = fileSystems.location(from: text, relativeTo: directory)
         kernel.jobs.run(
@@ -581,7 +582,7 @@ public final class ClipboardPlugin: Plugin {
             completion: { error in
                 // Declining to overwrite is no failure and changes nothing.
                 if (error as? CocoaError)?.code == .userCancelled { return }
-                if let error { kernel.ui.report(error, title: "The details cannot be saved!") }
+                if let error { kernel.interaction.report(error, title: "The details cannot be saved!") }
                 kernel.panels.refresh([url.deletingLastPathComponent()], focus: error == nil ? url : nil)
             }
         )

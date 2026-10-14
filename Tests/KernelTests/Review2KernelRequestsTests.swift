@@ -60,7 +60,7 @@ private final class PlainPlugin: Plugin {
 /// What other areas asked the kernel for in review 2 (documentation/review-2/cross-requests).
 @MainActor @Suite struct Review2KernelRequests {
     @Test func aPluginCanCallTheQuitOffAndFinishItsWorkBeforeIt() async {
-        let kernel = Kernel(productName: "Test", settings: MemorySettings(), ui: ScriptedInteraction())
+        let kernel = Kernel(productName: "Test", settings: MemorySettings(), interaction: ScriptedInteraction())
         let (first, second) = (QuittingPlugin("first"), QuittingPlugin("second"))
         kernel.load([first, PlainPlugin(), second])
         #expect(kernel.shouldTerminate() && first.asked == 1 && second.asked == 1)
@@ -81,7 +81,7 @@ private final class PlainPlugin: Plugin {
     @Test func aQuestionFromAnotherThreadIsAskedOnTheMainThread() async {
         let ui = ScriptedInteraction()
         ui.choiceAnswers = [1]
-        let kernel = Kernel(productName: "Test", settings: MemorySettings(), ui: ui)
+        let kernel = Kernel(productName: "Test", settings: MemorySettings(), interaction: ui)
         let answer: (Int, Bool) = await withCheckedContinuation { continuation in
             Thread.detachNewThread {
                 // Written on the main thread while this thread waits for the answer.
@@ -289,7 +289,7 @@ private final class PlainPlugin: Plugin {
     }
 
     @Test func settingsKeysSayWhatTheyAre() {
-        let kernel = Kernel(productName: "Test", settings: MemorySettings(), ui: ScriptedInteraction())
+        let kernel = Kernel(productName: "Test", settings: MemorySettings(), interaction: ScriptedInteraction())
         let keys = kernel.settingsKeys
         keys.declare("commands.user", kind: .runsCode)
         keys.declare(prefix: "findFiles.history.", kind: .history)
@@ -312,7 +312,7 @@ private final class PlainPlugin: Plugin {
     }
 
     @Test func aBrokenPipeIsAnErrorHereAndStillEndsTheProgramsWeStart() {
-        _ = Kernel(productName: "Test", settings: MemorySettings(), ui: ScriptedInteraction())
+        _ = Kernel(productName: "Test", settings: MemorySettings(), interaction: ScriptedInteraction())
         // Writing to a pipe nobody reads fails; it does not end the program.
         var ends: [Int32] = [0, 0]
         #expect(pipe(&ends) == 0)

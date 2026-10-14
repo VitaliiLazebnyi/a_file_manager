@@ -49,7 +49,7 @@ final class Running {
         func state(_ folder: URL) -> PanelTabs.State { PanelTabs.State(tabs: [.init(location: folder)], active: 0) }
         settings.set(state(left), forKey: "left.tabs")
         settings.set(state(right), forKey: "right.tabs")
-        kernel = Kernel(productName: StandardPlugins.productName, settings: settings, ui: ui)
+        kernel = Kernel(productName: StandardPlugins.productName, settings: settings, interaction: ui)
         providers.forEach(kernel.fileSystems.register)
         kernel.load(StandardPlugins.make(pasteboard: .withUniqueName(), launchesApplications: false))
         shell = Shell(kernel: kernel, home: home)
@@ -140,8 +140,13 @@ func timed(_ count: Int, _ body: (Int) -> Void) {
     say(
         String(
             format: "   single call: median %.2f ms, p99 %.2f ms, max %.2f ms, over 8 ms: %d of %d",
-            durations[count / 2], durations[count * 99 / 100], durations[count - 1], durations.filter { $0 > 8 }.count,
-            count))
+            durations[count / 2],
+            durations[count * 99 / 100],
+            durations[count - 1],
+            durations.filter { $0 > 8 }.count,
+            count
+        )
+    )
 }
 
 // MARK: - Scenario 1: a million files
@@ -179,8 +184,13 @@ func million() {
     let total = left.model.items.count
     say(
         String(
-            format: "   LOAD: first rows %.3f s, complete %.3f s, rows=%d isComplete=%@", firstRows ?? -1,
-            now() - started, total, "\(left.model.isComplete)"))
+            format: "   LOAD: first rows %.3f s, complete %.3f s, rows=%d isComplete=%@",
+            firstRows ?? -1,
+            now() - started,
+            total,
+            "\(left.model.isComplete)"
+        )
+    )
     check(total >= 1_000_000, "1a: only \(total) rows listed")
     step("1b layout + draw table (1M rows)") {
         app.layOut()
@@ -237,7 +247,8 @@ func million() {
     step("3d quick filter removed (Esc)", limit: 120) {
         left.removeQuickFilter()
         check(
-            pump(upTo: 100) { filterSettled() && left.model.items.count == total }, "3d: list did not come back whole"
+            pump(upTo: 100) { filterSettled() && left.model.items.count == total },
+            "3d: list did not come back whole"
         )
     }
 
@@ -254,14 +265,17 @@ func million() {
         app.commands.perform(.selectAll)
         check(
             pump(upTo: 100) { left.model.selectionCount >= total - 300 },
-            "4a: select all marked \(left.model.selectionCount)")
+            "4a: select all marked \(left.model.selectionCount)"
+        )
         pump(for: 0.15)
     }
     say("   marked=\(left.model.selectionCount)")
     step("4b invert selection", limit: 120) {
         app.commands.perform(.invertSelection)
         check(
-            pump(upTo: 100) { left.model.selectionCount == 0 }, "4b: invert left \(left.model.selectionCount) marked")
+            pump(upTo: 100) { left.model.selectionCount == 0 },
+            "4b: invert left \(left.model.selectionCount) marked"
+        )
         pump(for: 0.15)
     }
     say("   marked=\(left.model.selectionCount)")
@@ -275,7 +289,10 @@ func million() {
         }
         say(
             String(
-                format: "   marks of the mask %@ after %.3f s", arrived ? "arrived" : "did NOT arrive", now() - asked)
+                format: "   marks of the mask %@ after %.3f s",
+                arrived ? "arrived" : "did NOT arrive",
+                now() - asked
+            )
         )
         pump(for: 0.15)
     }
@@ -286,7 +303,8 @@ func million() {
         app.commands.perform(.invertSelection)
         check(
             pump(upTo: 100) { left.model.selectionCount == total - byMask },
-            "4d: invert left \(left.model.selectionCount) marked, expected \(total - byMask)")
+            "4d: invert left \(left.model.selectionCount) marked, expected \(total - byMask)"
+        )
         pump(for: 0.15)
     }
     say("   marked=\(left.model.selectionCount)")
@@ -294,7 +312,8 @@ func million() {
         app.commands.perform(.invertSelection)
         check(
             pump(upTo: 100) { left.model.selectionCount == byMask },
-            "4e: invert left \(left.model.selectionCount) marked, expected \(byMask)")
+            "4e: invert left \(left.model.selectionCount) marked, expected \(byMask)"
+        )
         pump(for: 0.15)
     }
     say("   marked=\(left.model.selectionCount)")
@@ -343,8 +362,12 @@ func million() {
             walk(submenu)
             say(
                 String(
-                    format: "     menu '%@' (%d items incl. submenus): %.1f ms", submenu.title as NSString,
-                    submenu.items.count, (now() - t1) * 1_000))
+                    format: "     menu '%@' (%d items incl. submenus): %.1f ms",
+                    submenu.title as NSString,
+                    submenu.items.count,
+                    (now() - t1) * 1_000
+                )
+            )
         }
     }
     step("6 validation x10 (bars, all commands, menu)", limit: 300) {
@@ -362,7 +385,13 @@ func million() {
             String(
                 format:
                     "   per round: bars %.2f ms, %d commands enabled+checked %.2f ms, menu items %.2f ms; worst round %.2f ms",
-                sums.bars * 100, app.kernel.commands.all.count, sums.commands * 100, sums.menu * 100, worst * 1_000))
+                sums.bars * 100,
+                app.kernel.commands.all.count,
+                sums.commands * 100,
+                sums.menu * 100,
+                worst * 1_000
+            )
+        )
     }
     step("6b status line x50 with 333k marked") {
         for _ in 0..<50 {
@@ -390,8 +419,12 @@ func million() {
         check(ok, "7b: coming back did not end")
         say(
             String(
-                format: "   rows shown after %.3f s, fresh after %.3f s, rows=%d", shown ?? -1, now() - t0,
-                left.model.items.count))
+                format: "   rows shown after %.3f s, fresh after %.3f s, rows=%d",
+                shown ?? -1,
+                now() - t0,
+                left.model.items.count
+            )
+        )
     }
 
     // 200 quiet reloads while another "program" creates and deletes files; the watcher is live too.
@@ -433,7 +466,13 @@ func million() {
         say(
             String(
                 format: "   asked=%d quiet reloads in %.1f s; readings started=%d; list versions seen=%d; churn ops=%d",
-                asked, now() - t0, reads, versions.count, churned.count))
+                asked,
+                now() - t0,
+                reads,
+                versions.count,
+                churned.count
+            )
+        )
         check(pump(upTo: 200) { !left.isLoading }, "8: reloading did not settle after the churn stopped")
         // Whatever the churn left behind goes; then the list must match the folder again.
         usleep(100_000)
@@ -450,7 +489,8 @@ func million() {
         check(pump(upTo: 200) { ended && !left.isLoading }, "8b: final reload did not end")
         check(
             left.model.items.count == total,
-            "8b: after the churn the panel lists \(left.model.items.count), the folder has \(total)")
+            "8b: after the churn the panel lists \(left.model.items.count), the folder has \(total)"
+        )
         check(!left.model.items.contains { $0.name.hasPrefix("zz-churn-") }, "8b: churn files still listed")
     }
     finish("scenario 1: 1,000,000 files in a panel", baseline: baseline, app: app)
@@ -594,7 +634,8 @@ func stalled() {
     let (calls, main) = stall.snapshotCalls()
     say(
         "\nPROVIDER CALLS (all threads): "
-            + calls.sorted { $0.key < $1.key }.map { "\($0.key)=\($0.value)" }.joined(separator: ", "))
+            + calls.sorted { $0.key < $1.key }.map { "\($0.key)=\($0.value)" }.joined(separator: ", ")
+    )
     say(
         "PROVIDER CALLS MADE ON THE MAIN THREAD WHILE THE PROVIDER WAS NOT ANSWERING (each would freeze the window for as long as the server is silent): \(main.isEmpty ? "none" : "")"
     )
@@ -629,8 +670,10 @@ func stalled() {
     say(
         localLoad.map {
             String(
-                format: "   local folder (300 files) opened in %.3f s while %d provider calls are blocked", $0,
-                stall.blockedNow)
+                format: "   local folder (300 files) opened in %.3f s while %d provider calls are blocked",
+                $0,
+                stall.blockedNow
+            )
         }
             ?? "   LOCAL FOLDER DID NOT OPEN WITHIN 20 s while \(stall.blockedNow) provider calls are blocked (threads=\(threadCount()))"
     )
@@ -668,7 +711,10 @@ func flood() {
     for index in 0..<files {
         close(
             open(
-                watched.appendingPathComponent(String(format: "base%06d.dat", index)).path, O_CREAT | O_WRONLY, 0o644)
+                watched.appendingPathComponent(String(format: "base%06d.dat", index)).path,
+                O_CREAT | O_WRONLY,
+                0o644
+            )
         )
     }
 
@@ -739,8 +785,15 @@ func flood() {
         String(
             format:
                 "   achieved %d operations (%.0f/s); readings of the folder started=%d; list versions=%d; process CPU %.1f s over %.0f s (%.0f%% of one core, includes the flooding thread itself)",
-            operations.count, Double(operations.count) / seconds, reads, versions.count, cpuFlood, seconds,
-            cpuFlood / seconds * 100))
+            operations.count,
+            Double(operations.count) / seconds,
+            reads,
+            versions.count,
+            cpuFlood,
+            seconds,
+            cpuFlood / seconds * 100
+        )
+    )
     step("settle after flood (3 s + until quiet)", limit: 120) {
         pump(for: 3)
         check(pump(upTo: 100) { !left.isLoading }, "8: panel still reading 100 s after the flood")
@@ -756,7 +809,13 @@ func flood() {
     say(
         String(
             format: "   after settle: panel rows=%d, folder entries=%d, equal=%@; footprint before=%.0fMB after=%.0fMB",
-            shown.count, onDisk.count, "\(onDisk == shown)", footprintBefore, footprintMB()))
+            shown.count,
+            onDisk.count,
+            "\(onDisk == shown)",
+            footprintBefore,
+            footprintMB()
+        )
+    )
     MainWatchdog.shared.setPhase("(harness clean-up, not the app)")
     try? fm.removeItem(at: watched)
     finish("scenario 8: watcher flood", baseline: baseline, app: app)

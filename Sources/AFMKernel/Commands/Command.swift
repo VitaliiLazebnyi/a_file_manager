@@ -2,7 +2,9 @@ import Foundation
 
 /// What the user sees of a command.
 public struct Command: Sendable {
+    /// The name the command is registered and run under.
     public let id: CommandID
+    /// What menus and buttons say, e.g. `Copy…`.
     public let title: String
     /// The keys the command has until the user chooses others (see `KeyBindings`).
     public let defaultShortcuts: [Shortcut]
@@ -11,8 +13,9 @@ public struct Command: Sendable {
     public private(set) var editingRole: EditingRole?
     /// The caption on the function-key bar, shown when the command is bound to a plain F-key.
     public let barLabel: String?
-    /// Whether the command may run while a file job is in progress. Only commands that change
-    /// neither files nor panels should say yes.
+    /// Whether the command may run while a file job is in progress.
+    ///
+    /// Only commands that change neither files nor panels should say yes.
     public let runsDuringJobs: Bool
 
     /// A command called `title`, with its default keys.

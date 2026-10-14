@@ -70,8 +70,11 @@ func generate(_ directory: URL) {
     let lines = writeDense(directory.appendingPathComponent("dense4g.txt"), megabytes: 4_096)
     say(
         String(
-            format: "dense4g.txt: 4 GiB, %d lines (the marker line is cut out of the last one), %.1fs", lines,
-            now() - t))
+            format: "dense4g.txt: 4 GiB, %d lines (the marker line is cut out of the last one), %.1fs",
+            lines,
+            now() - t
+        )
+    )
 
     // 4 GiB, of which every 8 MiB begin with 2 MiB of text; the rest was never written (holes of NUL).
     t = now()
@@ -87,7 +90,10 @@ func generate(_ directory: URL) {
     say(
         String(
             format: "sparse4g.txt: 4 GiB apparent, 512 x 2 MiB of text (%d lines each) with 6 MiB holes, %.1fs",
-            twoLines, now() - t))
+            twoLines,
+            now() - t
+        )
+    )
 
     t = now()
     let single = directory.appendingPathComponent("line2g.txt")
@@ -133,7 +139,7 @@ NSApp.setActivationPolicy(.prohibited)
 MainWatchdog.shared.start()
 let resultsDirectory = arguments[3]
 HangGuard.shared.sampleDirectory = resultsDirectory
-let kernel = Kernel(productName: "Stress", settings: MemorySettings(), ui: ScriptedInteraction())
+let kernel = Kernel(productName: "Stress", settings: MemorySettings(), interaction: ScriptedInteraction())
 kernel.fileSystems.register(LocalFileSystem())
 
 let failureLock = NSLock()
@@ -152,11 +158,12 @@ func fail(_ kind: String, _ detail: @autoclosure () -> String) {
 func openSource(_ url: URL) -> ByteSource {
     // As ViewerPane does for a local file: opened in the background, read through a block cache.
     var source: ByteSource?
-    DispatchQueue.global(qos: .userInitiated).async {
-        let opened = try! ProviderByteSource.open(url, fileSystems: kernel.fileSystems)
-        let cached = CachedByteSource(opened)
-        DispatchQueue.main.async { source = cached }
-    }
+    DispatchQueue.global(qos: .userInitiated)
+        .async {
+            let opened = try! ProviderByteSource.open(url, fileSystems: kernel.fileSystems)
+            let cached = CachedByteSource(opened)
+            DispatchQueue.main.async { source = cached }
+        }
     pump(upTo: 60) { source != nil }
     return source!
 }
@@ -219,7 +226,8 @@ final class Hammer {
             if row.text.utf16.count > columns * 2 {
                 fail(
                     "\(label): row wider than the layout",
-                    "row \(row.index) has \(row.text.utf16.count) units, layout \(columns)")
+                    "row \(row.index) has \(row.text.utf16.count) units, layout \(columns)"
+                )
             }
             if row.range.upperBound > document.content.upperBound || row.range.lowerBound < document.content.lowerBound
             {
@@ -241,9 +249,10 @@ final class Hammer {
                         let cancels = random.next() % 10 < 3
                         if cancels {
                             let delay = Int(random.next() % (isSearcher ? 50_000 : 3_000))
-                            DispatchQueue.global(qos: .userInitiated).asyncAfter(
-                                deadline: .now() + .microseconds(delay)
-                            ) { flag.cancel() }
+                            DispatchQueue.global(qos: .userInitiated)
+                                .asyncAfter(
+                                    deadline: .now() + .microseconds(delay)
+                                ) { flag.cancel() }
                         }
                         let started = now()
                         var threw = false
@@ -252,16 +261,22 @@ final class Hammer {
                             if isSearcher {
                                 op = "search(absent)"
                                 let pattern = try SearchPattern(
-                                    "zzz_not_there_" + String(random.next() % 10), options: SearchOptions(),
-                                    encoding: document.encoding)
+                                    "zzz_not_there_" + String(random.next() % 10),
+                                    options: SearchOptions(),
+                                    encoding: document.encoding
+                                )
                                 let from = Int64(random.next() % UInt64(max(1, document.content.upperBound)))
                                 // Bounded: at most 256 MiB from a random place, so one call ends in time.
                                 let end = min(document.content.upperBound, from + (256 << 20))
                                 if let hit = try ViewerSearch.find(
-                                    pattern, in: document.source, content: document.content.lowerBound..<end,
-                                    from: from, backwards: random.next() % 4 == 0,
-                                    encoding: document.encoding, cancellation: flag)
-                                {
+                                    pattern,
+                                    in: document.source,
+                                    content: document.content.lowerBound..<end,
+                                    from: from,
+                                    backwards: random.next() % 4 == 0,
+                                    encoding: document.encoding,
+                                    cancellation: flag
+                                ) {
                                     fail("\(label): found a text that is not there", "\(hit)")
                                 }
                             } else {
@@ -277,7 +292,8 @@ final class Hammer {
                                         document.readError == nil
                                     {
                                         fail(
-                                            "\(label): no rows for a known row", "row \(first) of \(document.rowCount)"
+                                            "\(label): no rows for a known row",
+                                            "row \(first) of \(document.rowCount)"
                                         )
                                     }
 
@@ -287,7 +303,8 @@ final class Hammer {
                                     let row = try document.row(containing: offset, cancellation: flag)
                                     if let row, row < 0 || row >= max(1, document.rowCount) {
                                         fail(
-                                            "\(label): row(containing:) out of range", "\(row) of \(document.rowCount)"
+                                            "\(label): row(containing:) out of range",
+                                            "\(row) of \(document.rowCount)"
                                         )
                                     }
                                     if row == nil, document.isIndexComplete, !flag.isCancelled, document.rowCount > 0,
@@ -343,8 +360,14 @@ final class Hammer {
             say(
                 "  " + pad("[\(label)] \(op)", 58)
                     + String(
-                        format: " n=%7d mean=%8.3fms max=%9.1fms cancelled=%d threw=%d", s.count,
-                        s.total / Double(max(1, s.count)) * 1_000, s.maxMs, s.cancelled, s.threw))
+                        format: " n=%7d mean=%8.3fms max=%9.1fms cancelled=%d threw=%d",
+                        s.count,
+                        s.total / Double(max(1, s.count)) * 1_000,
+                        s.maxMs,
+                        s.cancelled,
+                        s.threw
+                    )
+            )
         }
     }
 }
@@ -401,8 +424,11 @@ func runFile(_ url: URL, seed: UInt64) {
                         format: "    ... %.0fs: indexed through %.1f%% (%.0f MiB/s), rows %d, footprint %.0f MB",
                         last - started,
                         Double(document.indexedThrough) / Double(max(1, document.length)) * 100,
-                        Double(document.indexedThrough) / 1_048_576 / (last - started), document.rowCount,
-                        footprintMB()))
+                        Double(document.indexedThrough) / 1_048_576 / (last - started),
+                        document.rowCount,
+                        footprintMB()
+                    )
+                )
             }
             return document.isIndexComplete && pager.document === document
         }
@@ -416,8 +442,13 @@ func runFile(_ url: URL, seed: UInt64) {
         let got = pump(upTo: 880) { pager.document === firstDocument && pager.position != nil }
         say(
             String(
-                format: "  open %.3fs; first rows on screen after %.3fs (%@); rows known then: %d", opened,
-                now() - started, got ? "ok" : "NOT within 880 s", firstDocument.rowCount))
+                format: "  open %.3fs; first rows on screen after %.3fs (%@); rows known then: %d",
+                opened,
+                now() - started,
+                got ? "ok" : "NOT within 880 s",
+                firstDocument.rowCount
+            )
+        )
         if !got { fail("\(name): no first rows", "nothing to show within 880 s") }
     }
     step("index to the end (parallel)", limit: 1_000) {
@@ -428,8 +459,14 @@ func runFile(_ url: URL, seed: UInt64) {
                 format:
                     "  index %@ after %.3fs more: rows %d, lines %d, checkpoints %d, footprint %.0f MB, read error: %@",
                 done ? "complete" : "NOT complete",
-                now() - started, firstDocument.rowCount, firstDocument.lineCount, firstDocument.checkpointCount,
-                footprintMB(), String(describing: firstDocument.readError)))
+                now() - started,
+                firstDocument.rowCount,
+                firstDocument.lineCount,
+                firstDocument.checkpointCount,
+                footprintMB(),
+                String(describing: firstDocument.readError)
+            )
+        )
         if !done { fail("\(name): index not complete", "not within the limit") }
     }
 
@@ -447,41 +484,47 @@ func runFile(_ url: URL, seed: UInt64) {
 
     step("indexed: first/last rows and round trips", limit: 300) {
         var done = false
-        DispatchQueue.global(qos: .userInitiated).async {
-            let document = firstDocument!
-            let count = document.rowCount
-            var probe = Random(seed: seed + 5)
-            for round in 0..<300 {
-                let row = round == 0 ? 0 : round == 1 ? max(0, count - 1) : Int(probe.next() % UInt64(max(1, count)))
-                guard let got = try? document.rows(from: row, count: 2), let first = got.first else {
-                    if count > 0 { fail("\(name): round trip: no row", "row \(row) of \(count)") }
-                    continue
+        DispatchQueue.global(qos: .userInitiated)
+            .async {
+                let document = firstDocument!
+                let count = document.rowCount
+                var probe = Random(seed: seed + 5)
+                for round in 0..<300 {
+                    let row =
+                        round == 0 ? 0 : round == 1 ? max(0, count - 1) : Int(probe.next() % UInt64(max(1, count)))
+                    guard let got = try? document.rows(from: row, count: 2), let first = got.first else {
+                        if count > 0 { fail("\(name): round trip: no row", "row \(row) of \(count)") }
+                        continue
+                    }
+                    if let back = try? document.row(containing: first.range.lowerBound), back != row,
+                        !first.range.isEmpty
+                    {
+                        fail(
+                            "\(name): row(containing:) disagrees with rows(from:)",
+                            "row \(row) begins at \(first.range.lowerBound), which is said to be in row \(String(describing: back))"
+                        )
+                    }
+                    if let lineRow = try? document.row(ofLine: first.line) {
+                        if lineRow > row {
+                            fail(
+                                "\(name): row(ofLine:) behind the row of that line",
+                                "line \(first.line): row \(lineRow) > \(row)"
+                            )
+                        }
+                    } else {
+                        fail("\(name): row(ofLine:) finds no row", "line \(first.line) of row \(row)")
+                    }
                 }
-                if let back = try? document.row(containing: first.range.lowerBound), back != row, !first.range.isEmpty {
+                if let last = try? document.rows(from: max(0, count - 1), count: 1).first,
+                    last.range.upperBound != document.content.upperBound
+                {
                     fail(
-                        "\(name): row(containing:) disagrees with rows(from:)",
-                        "row \(row) begins at \(first.range.lowerBound), which is said to be in row \(String(describing: back))"
+                        "\(name): the last row does not end at the end of the file",
+                        "\(last.range) vs \(document.content.upperBound)"
                     )
                 }
-                if let lineRow = try? document.row(ofLine: first.line) {
-                    if lineRow > row {
-                        fail(
-                            "\(name): row(ofLine:) behind the row of that line",
-                            "line \(first.line): row \(lineRow) > \(row)")
-                    }
-                } else {
-                    fail("\(name): row(ofLine:) finds no row", "line \(first.line) of row \(row)")
-                }
+                DispatchQueue.main.async { done = true }
             }
-            if let last = try? document.rows(from: max(0, count - 1), count: 1).first,
-                last.range.upperBound != document.content.upperBound
-            {
-                fail(
-                    "\(name): the last row does not end at the end of the file",
-                    "\(last.range) vs \(document.content.upperBound)")
-            }
-            DispatchQueue.main.async { done = true }
-        }
         pump(upTo: 280) { done }
     }
 
@@ -494,24 +537,30 @@ func runFile(_ url: URL, seed: UInt64) {
         var result: Range<Int64>??
         let started = now()
         var ended = 0.0
-        DispatchQueue.global(qos: .userInitiated).async {
-            var lastReport = Date.distantPast
-            // As ViewerPane.search: progress to the main queue at most ten times a second.
-            let found = try? ViewerSearch.find(
-                pattern, in: document.source, content: document.content, from: start, backwards: backwards,
-                encoding: document.encoding, parallelism: ProcessInfo.processInfo.activeProcessorCount,
-                cancellation: cancel
-            ) { _ in
-                guard Date().timeIntervalSince(lastReport) > 0.1 else { return }
-                lastReport = Date()
-                DispatchQueue.main.async {}
+        DispatchQueue.global(qos: .userInitiated)
+            .async {
+                var lastReport = Date.distantPast
+                // As ViewerPane.search: progress to the main queue at most ten times a second.
+                let found = try? ViewerSearch.find(
+                    pattern,
+                    in: document.source,
+                    content: document.content,
+                    from: start,
+                    backwards: backwards,
+                    encoding: document.encoding,
+                    parallelism: ProcessInfo.processInfo.activeProcessorCount,
+                    cancellation: cancel
+                ) { _ in
+                    guard Date().timeIntervalSince(lastReport) > 0.1 else { return }
+                    lastReport = Date()
+                    DispatchQueue.main.async {}
+                }
+                let at = now()
+                DispatchQueue.main.async {
+                    result = .some(found ?? nil)
+                    ended = at
+                }
             }
-            let at = now()
-            DispatchQueue.main.async {
-                result = .some(found ?? nil)
-                ended = at
-            }
-        }
         if let cancelAfter {
             pump(upTo: cancelAfter) { result != nil }
             cancel.cancel()
@@ -527,8 +576,12 @@ func runFile(_ url: URL, seed: UInt64) {
         fullSearch = seconds
         say(
             String(
-                format: "  marker %@ in %.3fs (%.0f MiB/s)", hit.map { "found at \($0.lowerBound)" } ?? "NOT found",
-                seconds, Double(firstDocument.length) / 1_048_576 / seconds))
+                format: "  marker %@ in %.3fs (%.0f MiB/s)",
+                hit.map { "found at \($0.lowerBound)" } ?? "NOT found",
+                seconds,
+                Double(firstDocument.length) / 1_048_576 / seconds
+            )
+        )
         if name != "sparse4g.txt", name != "newlines1g.txt",
             hit?.upperBound != firstDocument.length - (name.hasPrefix("dense") ? 1 : 0)
         {
@@ -544,7 +597,10 @@ func runFile(_ url: URL, seed: UInt64) {
         var worst = 0.0
         for _ in 0..<30 {
             let (_, latency) = search(
-                "zzz_not_there", from: 0, cancelAfter: Double(random.next() % 1_000) / 1_000 * min(fullSearch, 2))
+                "zzz_not_there",
+                from: 0,
+                cancelAfter: Double(random.next() % 1_000) / 1_000 * min(fullSearch, 2)
+            )
             worst = max(worst, latency)
         }
         say(String(format: "  cancel -> search returned: worst %.1f ms; threads now %d", worst * 1_000, threadCount()))
@@ -562,14 +618,22 @@ func runFile(_ url: URL, seed: UInt64) {
                 String(
                     format:
                         "  %@: %@ in %.3fs, segments reused %d, rows %d, lines %d, checkpoints %d, footprint %.0f MB",
-                    label, done ? "complete" : "NOT complete",
-                    seconds, document.segmentsReused, document.rowCount, document.lineCount, document.checkpointCount,
-                    footprintMB()))
+                    label,
+                    done ? "complete" : "NOT complete",
+                    seconds,
+                    document.segmentsReused,
+                    document.rowCount,
+                    document.lineCount,
+                    document.checkpointCount,
+                    footprintMB()
+                )
+            )
             if !done { fail("\(name): relayout not complete", label) }
             if document.lineCount != firstDocument.lineCount {
                 fail(
                     "\(name): another layout counts other lines",
-                    "\(label): \(document.lineCount) vs \(firstDocument.lineCount)")
+                    "\(label): \(document.lineCount) vs \(firstDocument.lineCount)"
+                )
             }
         }
     }
@@ -585,7 +649,8 @@ func runFile(_ url: URL, seed: UInt64) {
         for round in 0..<40 {
             let columns = 30 + Int(random.next() % 200)
             let document = show(
-                TextLayoutOptions(columns: columns, wordWrap: random.next() % 4 != 0), keeping: random.next() % 2 == 0
+                TextLayoutOptions(columns: columns, wordWrap: random.next() % 4 != 0),
+                keeping: random.next() % 2 == 0
             )
             let hammer = Hammer(document, columns: columns, label: "during indexing")
             hammer.start(threads: 6, searchers: round % 4 == 0 ? 2 : 0, seed: seed + UInt64(round))
@@ -609,7 +674,8 @@ func runFile(_ url: URL, seed: UInt64) {
         }
         hammers.last?.report()
         say(
-            String(format: "  footprint at the end of the storm %.0f MB, peak RSS %.0f MB", footprintMB(), peakRSSMB()))
+            String(format: "  footprint at the end of the storm %.0f MB, peak RSS %.0f MB", footprintMB(), peakRSSMB())
+        )
         // One last layout that nobody stops (a layout stopped with Esc stays unfinished by design).
         let last = show(TextLayoutOptions(columns: fit, wordWrap: true), keeping: true)
         let started = now()
@@ -617,8 +683,11 @@ func runFile(_ url: URL, seed: UInt64) {
         say(
             String(
                 format: "  the last layout was %@ %.3fs after the storm; shown document is the last one: %@",
-                done ? "indexed" : "NOT indexed", now() - started,
-                String(describing: last === pager.document)))
+                done ? "indexed" : "NOT indexed",
+                now() - started,
+                String(describing: last === pager.document)
+            )
+        )
         if done, last.lineCount != firstDocument.lineCount || last.rowCount != firstDocument.rowCount {
             fail(
                 "\(name): the same layout after the storm has other rows",
@@ -646,7 +715,8 @@ func runFile(_ url: URL, seed: UInt64) {
     }
     say(
         "RELAYOUT "
-            + relayout.map { String(format: "%@: %.3fs (reused %d)", $0.0, $0.1, $0.2) }.joined(separator: "; "))
+            + relayout.map { String(format: "%@: %.3fs (reused %d)", $0.0, $0.1, $0.2) }.joined(separator: "; ")
+    )
 }
 
 // MARK: A file that shrinks under the index
@@ -663,8 +733,10 @@ func runTruncation(_ directory: URL, rounds: Int) {
             let source = openSource(url)
             let columns = round % 3 == 2 ? 1_024 : pager.columnsThatFit
             let document = TextDocument(
-                source: source, encoding: .utf8,
-                layout: .text(TextLayoutOptions(columns: columns, wordWrap: round % 3 != 2)))
+                source: source,
+                encoding: .utf8,
+                layout: .text(TextLayoutOptions(columns: columns, wordWrap: round % 3 != 2))
+            )
             pager.show(document, parallel: true)
             let hammer = Hammer(document, columns: columns, label: "truncated")
             hammer.start(threads: 4, searchers: 1, seed: UInt64(round))
@@ -697,10 +769,19 @@ func runTruncation(_ directory: URL, rounds: Int) {
                 String(
                     format:
                         "  round %d: %@ after %.0f ms; indexing %@ %.2fs after the start; rows %d, lines %d, indexed through %d of %d, complete %@, read error: %@",
-                    round, action, delay * 1_000, done ? "ended" : "DID NOT END", now() - started, document.rowCount,
-                    document.lineCount, document.indexedThrough, document.length,
+                    round,
+                    action,
+                    delay * 1_000,
+                    done ? "ended" : "DID NOT END",
+                    now() - started,
+                    document.rowCount,
+                    document.lineCount,
+                    document.indexedThrough,
+                    document.length,
                     String(describing: document.isIndexComplete),
-                    document.readError.map { "\($0)".prefix(120).description } ?? "none"))
+                    document.readError.map { "\($0)".prefix(120).description } ?? "none"
+                )
+            )
             if !done { fail("truncation: indexing does not end", action) }
             // The rows the index knows are asked for after the file has shrunk.
             pump(for: 0.3)
@@ -721,7 +802,10 @@ func runTruncation(_ directory: URL, rounds: Int) {
 func runLeak(_ url: URL) {
     let source = openSource(url)
     let document = TextDocument(
-        source: source, encoding: .utf8, layout: .text(TextLayoutOptions(columns: 131, wordWrap: true)))
+        source: source,
+        encoding: .utf8,
+        layout: .text(TextLayoutOptions(columns: 131, wordWrap: true))
+    )
     document.buildIndex(parallel: true)
     var random = Random(seed: 3)
     say(String(format: "indexed: rows %d, footprint %.0f MB", document.rowCount, footprintMB()))
@@ -731,8 +815,12 @@ func runLeak(_ url: URL) {
         say(
             pad(label, 70)
                 + String(
-                    format: " footprint %7.0f -> %7.0f MB  (%+.1f KB per call)", before, footprintMB(),
-                    (footprintMB() - before) * 1_024 / Double(count)))
+                    format: " footprint %7.0f -> %7.0f MB  (%+.1f KB per call)",
+                    before,
+                    footprintMB(),
+                    (footprintMB() - before) * 1_024 / Double(count)
+                )
+        )
     }
     let rows = document.rowCount
     let lines = document.lineCount
@@ -770,17 +858,31 @@ func runLeak(_ url: URL) {
     // With one chunk at a time everything runs on the calling thread, inside this loop's autorelease pool.
     measure("ViewerSearch.find over the whole file, parallelism 1 (calling thread only)", 100) { _ in
         _ = try? ViewerSearch.find(
-            pattern, in: source, content: document.content, from: 0, backwards: false, encoding: .utf8, parallelism: 1
+            pattern,
+            in: source,
+            content: document.content,
+            from: 0,
+            backwards: false,
+            encoding: .utf8,
+            parallelism: 1
         )
     }
     measure("ViewerSearch.find over the whole file, flag never set", 100) { _ in
         _ = try? ViewerSearch.find(
-            pattern, in: source, content: document.content, from: 0, backwards: false, encoding: .utf8)
+            pattern,
+            in: source,
+            content: document.content,
+            from: 0,
+            backwards: false,
+            encoding: .utf8
+        )
     }
     measure("new TextDocument + buildIndex (another width each time)", 100) { random in
         let other = TextDocument(
-            source: source, encoding: .utf8,
-            layout: .text(TextLayoutOptions(columns: 40 + Int(random.next() % 100), wordWrap: true)))
+            source: source,
+            encoding: .utf8,
+            layout: .text(TextLayoutOptions(columns: 40 + Int(random.next() % 100), wordWrap: true))
+        )
         other.buildIndex(parallel: true)
     }
     func heapLine(_ label: String) {
@@ -792,7 +894,11 @@ func runLeak(_ url: URL) {
                     format:
                         " footprint %6.0f MB; malloc in use %6.0f MB, allocated from the system %6.0f MB; threads %d",
                     footprintMB(),
-                    Double(stats.size_in_use) / 1_048_576, Double(stats.size_allocated) / 1_048_576, threadCount()))
+                    Double(stats.size_in_use) / 1_048_576,
+                    Double(stats.size_allocated) / 1_048_576,
+                    threadCount()
+                )
+        )
     }
     heapLine("right after")
     usleep(5_000_000)
@@ -802,7 +908,13 @@ func runLeak(_ url: URL) {
     // Once more, to see whether a second round adds to it or uses what was kept.
     measure("ViewerSearch.find over the whole file, again", 100) { _ in
         _ = try? ViewerSearch.find(
-            pattern, in: source, content: document.content, from: 0, backwards: false, encoding: .utf8)
+            pattern,
+            in: source,
+            content: document.content,
+            from: 0,
+            backwards: false,
+            encoding: .utf8
+        )
     }
     heapLine("right after the second round")
     usleep(5_000_000)

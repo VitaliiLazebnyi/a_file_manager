@@ -155,7 +155,7 @@ final class Shared<Value>: @unchecked Sendable {
 /// that does not answer holds up only itself.
 extension Application {
     func start(with extra: any FileSystemProvider) async -> Running {
-        let kernel = Kernel(productName: StandardPlugins.productName, settings: settings, ui: ui)
+        let kernel = Kernel(productName: StandardPlugins.productName, settings: settings, interaction: ui)
         kernel.fileSystems.register(memory)
         kernel.fileSystems.register(extra)
         kernel.load(StandardPlugins.make(pasteboard: scratch.pasteboard, launchesApplications: false))
@@ -679,7 +679,7 @@ extension Application {
     }
 
     @Test func theKeyOfAMenuEntryRunsThatEntryAndChecksNoOther() {
-        let kernel = Kernel(productName: "Test", settings: MemorySettings(), ui: ScriptedInteraction())
+        let kernel = Kernel(productName: "Test", settings: MemorySettings(), interaction: ScriptedInteraction())
         var asked = 0
         kernel.commands.register(
             Command("test_Bound", "Bound", [.f(9), .cmd("j")]),

@@ -91,8 +91,8 @@ import Testing
         let keys = bench.kernel.keyBindings
         #expect(keys.command(for: Shortcut(.character("t"), .control)) == .newTab)
         #expect(keys.command(for: Shortcut(.character("t"), [.control, .shift])) == "cm_OpenNewTabBg")
-        #expect(keys.command(for: Shortcut(.up, .control)) == .openInNewTab)
-        #expect(keys.command(for: Shortcut(.up, [.control, .shift])) == "cm_OpenDirInNewTabOther")
+        #expect(keys.command(for: Shortcut(.upArrow, .control)) == .openInNewTab)
+        #expect(keys.command(for: Shortcut(.upArrow, [.control, .shift])) == "cm_OpenDirInNewTabOther")
         #expect(keys.command(for: Shortcut(.character("w"), [.control, .shift])) == "cm_CloseAllTabs")
         #expect(keys.command(for: Shortcut(.character("a"), [.control, .shift])) == "cm_SrcTabsList")
         #expect(bench.kernel.keyClashes.isEmpty)

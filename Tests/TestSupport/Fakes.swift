@@ -232,7 +232,7 @@ public final class TestBench: ShellServices {
         right: URL,
         settings: any SettingsStore = MemorySettings()
     ) {
-        kernel = Kernel(productName: "Test", settings: settings, ui: ui)
+        kernel = Kernel(productName: "Test", settings: settings, interaction: ui)
         fileSystems.forEach(kernel.fileSystems.register)
         kernel.load(plugins)
         panelSet = FakePanelSet(

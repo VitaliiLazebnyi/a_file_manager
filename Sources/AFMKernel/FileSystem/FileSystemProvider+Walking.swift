@@ -1,14 +1,17 @@
 public import Foundation
 
+/// Walks through trees of folders the way any file system can: by listing them.
 extension FileSystemProvider {
+    /// `totalSizeByListing(of:cancellation:)`.
     public func totalSize(of directory: URL, cancellation: CancellationFlag) -> Int64 {
         totalSizeByListing(of: directory, cancellation: cancellation)
     }
 
-    /// The sum as any file system can work it out, by listing every folder; the subfolders
-    /// are measured on all cores at once. What a file system falls back on when it has a
-    /// faster way of its own that does not work everywhere: each subfolder is asked of the
-    /// file system again (`totalSize(of:cancellation:)`), so its faster way gets its chance
+    /// The sum as any file system can work it out, by listing every folder; the subfolders are measured on all cores at
+    /// once.
+    ///
+    /// What a file system falls back on when it has a faster way of its own that does not work everywhere: each
+    /// subfolder is asked of the file system again (`totalSize(of:cancellation:)`), so its faster way gets its chance
     /// one level down.
     ///
     /// A tree can be as deep as whoever made it liked (an archive with thousands of nested
@@ -28,8 +31,8 @@ extension FileSystemProvider {
             !cancellation.isCancelled
         else { return 0 }
         let files = items.reduce(Int64(0)) { $1.isRealDirectory ? $0 : $0.addingSaturated($1.size) }
-        let folders = Parallel.map(items.filter(\.isRealDirectory)) {
-            cancellation.isCancelled ? 0 : self.totalSize(of: $0.url, cancellation: cancellation)
+        let folders = Parallel.map(items.filter(\.isRealDirectory)) { folder in
+            cancellation.isCancelled ? 0 : self.totalSize(of: folder.url, cancellation: cancellation)
         }
         return cancellation.isCancelled ? 0 : folders.reduce(files) { $0.addingSaturated($1) }
     }

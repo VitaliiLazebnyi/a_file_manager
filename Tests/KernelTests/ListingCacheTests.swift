@@ -351,9 +351,13 @@ import Testing
 
     @MainActor @Test func theKernelSwitchesItFromTheSettings() {
         let settings = MemorySettings()
-        #expect(Kernel(productName: "Test", settings: settings, ui: ScriptedInteraction()).listingCache.isEnabled)
+        #expect(
+            Kernel(productName: "Test", settings: settings, interaction: ScriptedInteraction()).listingCache.isEnabled
+        )
         settings.set(false, forKey: ListingCache.settingsKey)
-        #expect(!Kernel(productName: "Test", settings: settings, ui: ScriptedInteraction()).listingCache.isEnabled)
+        #expect(
+            !Kernel(productName: "Test", settings: settings, interaction: ScriptedInteraction()).listingCache.isEnabled
+        )
     }
 
     @Test func manyThreadsAtOnce() {

@@ -1,6 +1,6 @@
-import Foundation
-
-/// The link between running work and the outside. Used from the work's own thread.
+/// The link between running work and the outside.
+///
+/// Used from the work's own thread.
 public protocol JobMonitor: AnyObject, Sendable {
     /// Set when the user presses Cancel or the program quits; the work checks it regularly.
     var cancellation: CancellationFlag { get }

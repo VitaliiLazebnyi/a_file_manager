@@ -38,10 +38,15 @@ public struct SyncPlan: Equatable, Sendable {
         for row in rows where row.accepts(row.action) {
             func copy(_ item: FileItem, to target: URL, shift: Double) -> Copy {
                 Copy(
-                    source: item.url, target: target, relativePath: row.relativePath, isDirectory: row.isDirectory,
-                    size: row.isDirectory ? 0 : item.size, modified: item.modified,
+                    source: item.url,
+                    target: target,
+                    relativePath: row.relativePath,
+                    isDirectory: row.isDirectory,
+                    size: row.isDirectory ? 0 : item.size,
+                    modified: item.modified,
                     targetModified: item.modified.addingTimeInterval(shift),
-                    permissions: item.permissions)
+                    permissions: item.permissions
+                )
             }
             func deletion(_ item: FileItem, into list: inout [Deletion]) {
                 list.append(Deletion(url: item.url, isDirectory: row.isDirectory))
@@ -71,7 +76,8 @@ public struct SyncPlan: Equatable, Sendable {
             // path is not made of plain names (none is, as the comparison makes them) has no
             // place below the new folder and is left out.
             copies.compactMap { copy in
-                guard let names = PathSafety.components(ofRelativePath: copy.relativePath) else { return nil }
+                let names = PathSafety.components(ofRelativePath: copy.relativePath)
+                guard !names.isEmpty else { return nil }
                 var copy = copy
                 copy.target = names.reduce(root) { $0.appending(name: $1) }
                 return copy
@@ -174,7 +180,9 @@ public final class SyncExecutor: @unchecked Sendable {
     private struct Cancelled: Error {}
 
     public init(
-        plan: SyncPlan, options: SyncRunOptions, fileSystems: FileSystemRegistry,
+        plan: SyncPlan,
+        options: SyncRunOptions,
+        fileSystems: FileSystemRegistry,
         cancellation: CancellationFlag = CancellationFlag()
     ) {
         self.plan = plan
@@ -201,7 +209,9 @@ public final class SyncExecutor: @unchecked Sendable {
                                 "\(caption)  (\(index + 1) / \(copies.count))",
                                 "From: " + fileSystems.displayPath(copy.source),
                                 "To: " + fileSystems.displayPath(copy.target)
-                            ], { try self.perform(copy) })
+                            ],
+                            { try self.perform(copy) }
+                        )
                     else { break run }
                     bytesDone = bytesDone.addingSaturated(copy.size)
                 }
@@ -215,8 +225,10 @@ public final class SyncExecutor: @unchecked Sendable {
             for deletion in ordered {
                 guard
                     step(
-                        deletion.url, lines: ["Delete: " + fileSystems.displayPath(deletion.url)],
-                        { try self.perform(deletion) })
+                        deletion.url,
+                        lines: ["Delete: " + fileSystems.displayPath(deletion.url)],
+                        { try self.perform(deletion) }
+                    )
                 else { break run }
             }
             if let root = options.removeEmptyDirectoriesBelow { removeEmptyDirectories(below: root, isRoot: true) }
@@ -242,8 +254,13 @@ public final class SyncExecutor: @unchecked Sendable {
             currentLines = lines
             onProgress(
                 JobProgress(
-                    lines: lines, itemsDone: itemsDone, itemsTotal: itemsTotal, bytesDone: bytesDone,
-                    bytesTotal: bytesTotal))
+                    lines: lines,
+                    itemsDone: itemsDone,
+                    itemsTotal: itemsTotal,
+                    bytesDone: bytesDone,
+                    bytesTotal: bytesTotal
+                )
+            )
             do {
                 if try work() {
                     let folder = url.deletingLastPathComponent()
@@ -349,11 +366,13 @@ public final class SyncExecutor: @unchecked Sendable {
                         // Neither is under the name; the old file is not deleted, and the user is told where it is.
                         try? targetSystem.remove(temporary)
                         throw NSError(
-                            domain: "AFMSync", code: 1,
+                            domain: "AFMSync",
+                            code: 1,
                             userInfo: [
                                 NSLocalizedDescriptionKey:
                                     "The old file could not be put back and is kept as \(fileSystems.displayPath(aside))."
-                            ])
+                            ]
+                        )
                     }
                     throw error
                 }
@@ -415,8 +434,13 @@ public final class SyncExecutor: @unchecked Sendable {
         let report = { (bytes: Int64) in
             self.onProgress(
                 JobProgress(
-                    lines: self.currentLines, itemsDone: self.itemsDone, itemsTotal: self.itemsTotal,
-                    bytesDone: self.bytesDone.addingSaturated(bytes), bytesTotal: self.bytesTotal))
+                    lines: self.currentLines,
+                    itemsDone: self.itemsDone,
+                    itemsTotal: self.itemsTotal,
+                    bytesDone: self.bytesDone.addingSaturated(bytes),
+                    bytesTotal: self.bytesTotal
+                )
+            )
         }
         if sourceSystem === targetSystem {
             do {
@@ -482,7 +506,9 @@ public final class SyncExecutor: @unchecked Sendable {
             else { return }
             let shift = copy.modified.timeIntervalSince(copy.targetModified)
             try? sourceSystem.setAttributes(
-                FileAttributes(modified: arrived.modified.addingTimeInterval(shift)), of: copy.source)
+                FileAttributes(modified: arrived.modified.addingTimeInterval(shift)),
+                of: copy.source
+            )
         }
     }
 

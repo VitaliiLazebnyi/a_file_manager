@@ -41,14 +41,17 @@ public final class Shell: ShellServices {
             if jobService?.isBusy == false { self?.panelCoordinator.jobsEnded() }
         }
         panelCoordinator.onActivityChanged = { [weak self] in self?.mainWindow.scheduleValidation() }
-        let ui = kernel.ui
+        let ui = kernel.interaction
         jobService.askToAbandon = { title in
             ui.choose(
                 "“\(title)” does not stop.",
                 detail:
                     "It may be waiting for a disk or a server that does not answer. You can go on waiting, or stop waiting and "
                     + "use the program again; the operation then ends by itself as soon as the disk or server lets it.",
-                buttons: ["Stop Waiting", "Keep Waiting"], style: .warning, defaultButton: 1) == 0
+                buttons: ["Stop Waiting", "Keep Waiting"],
+                style: .warning,
+                defaultButton: 1
+            ) == 0
         }
     }
 
@@ -87,7 +90,8 @@ public final class Shell: ShellServices {
     /// **Don't Quit** calls the quit off: the program goes on, and what the plugins were
     /// writing they go on writing.
     public func finishToQuit(
-        patience: TimeInterval = Shell.quitPatience, progressDelay: TimeInterval = Shell.quitProgressDelay,
+        patience: TimeInterval = Shell.quitPatience,
+        progressDelay: TimeInterval = Shell.quitProgressDelay,
         then reply: @escaping @MainActor (Bool) -> Void
     ) {
         MainThread.assert("Quitting")
@@ -126,7 +130,8 @@ public final class Shell: ShellServices {
     /// that does not answer) does not keep the program from quitting for ever: the user is
     /// asked whether to quit anyway, and again after twice as long each time the answer is no.
     public func stopJobsToQuit(
-        patience: TimeInterval = Shell.quitPatience, then reply: @escaping @MainActor (Bool) -> Void
+        patience: TimeInterval = Shell.quitPatience,
+        then reply: @escaping @MainActor (Bool) -> Void
     ) {
         guard jobService.isBusy else {
             reply(true)
@@ -134,7 +139,7 @@ public final class Shell: ShellServices {
         }
         var hasReplied = false
         var stopAsking: (() -> Void)?
-        let (jobService, ui) = (jobService, kernel.ui)
+        let (jobService, ui) = (jobService, kernel.interaction)
         func answer(_ quits: Bool) {
             guard !hasReplied else { return }
             hasReplied = true
@@ -151,7 +156,10 @@ public final class Shell: ShellServices {
                         detail:
                             "It may be waiting for a disk or a server that does not answer. If you quit anyway, a file "
                             + "it was writing may be left incomplete.",
-                        buttons: ["Quit Anyway", "Keep Waiting"], style: .warning, defaultButton: 1) == 0
+                        buttons: ["Quit Anyway", "Keep Waiting"],
+                        style: .warning,
+                        defaultButton: 1
+                    ) == 0
                 if quits { answer(true) } else if !hasReplied { ask(after: wait * 2) }
             }
         }
@@ -212,7 +220,7 @@ public final class ShellApplication: NSObject, NSApplicationDelegate, NSMenuItem
     public func applicationDidFinishLaunching(_: Notification) {
         let settings = UserDefaultsSettings()
         self.settings = settings
-        let kernel = Kernel(productName: productName, settings: settings, ui: AlertInteraction())
+        let kernel = Kernel(productName: productName, settings: settings, interaction: AlertInteraction())
         kernel.load(plugins)
         let shell = Shell(kernel: kernel)
         self.kernel = kernel

@@ -34,15 +34,22 @@ public final class CompareContentPlugin: Plugin {
                 let panels = kernel.panels
                 let files =
                     CompareOperands.parse(
-                        argument, fileSystems: kernel.fileSystems, base: panels.source.model.directory)
+                        argument,
+                        fileSystems: kernel.fileSystems,
+                        base: panels.source.model.directory
+                    )
                     ?? CompareOperands.choose(source: panels.source.model, target: panels.target.model)
                 open(files, in: kernel)
-            })
+            }
+        )
         kernel.menus.add([.compareByContent], to: .filesAdvanced)
         kernel.menus.addToContextMenu([.compareByContent], in: .tools, onItemOnly: true)
         kernel.toolbar.add(
-            .compareByContent, symbol: "arrow.left.arrow.right.square", group: 50,
-            hint: "Compare two files and show the differences side by side.")
+            .compareByContent,
+            symbol: "arrow.left.arrow.right.square",
+            group: 50,
+            hint: "Compare two files and show the differences side by side."
+        )
 
         func key(_ name: String) -> String { CompareSettingsKey.scope + "." + name }
         kernel.preferences.add(
@@ -50,18 +57,29 @@ public final class CompareContentPlugin: Plugin {
                 title: "Compare by content",
                 preferences: [
                     Preference(
-                        key(CompareSettingsKey.ignoreCase), "Ignore upper and lower case", .flag(default: true)),
+                        key(CompareSettingsKey.ignoreCase),
+                        "Ignore upper and lower case",
+                        .flag(default: true)
+                    ),
                     Preference(key(CompareSettingsKey.ignoreSpaces), "Ignore repeated spaces", .flag(default: true)),
                     Preference(
-                        key(CompareSettingsKey.ignoreLineEndings), "Ignore line-end differences", .flag(default: true)
+                        key(CompareSettingsKey.ignoreLineEndings),
+                        "Ignore line-end differences",
+                        .flag(default: true)
                     ),
                     Preference(
-                        key(CompareSettingsKey.vertical), "Show the two files above each other", .flag(default: false)
+                        key(CompareSettingsKey.vertical),
+                        "Show the two files above each other",
+                        .flag(default: false)
                     ),
                     Preference(
-                        key(CompareSettingsKey.bytesPerLine), "Bytes per line in binary mode",
-                        .choice(CompareSettingsKey.bytesPerLineChoices.map(String.init), default: 1))
-                ]))
+                        key(CompareSettingsKey.bytesPerLine),
+                        "Bytes per line in binary mode",
+                        .choice(CompareSettingsKey.bytesPerLineChoices.map(String.init), default: 1)
+                    )
+                ]
+            )
+        )
     }
 
     private func open(_ files: (left: URL?, right: URL?), in kernel: Kernel) {
@@ -106,9 +124,13 @@ public final class CompareContentPlugin: Plugin {
             ]
             .compactMap { $0 }.joined(separator: "\n")
             let buttons = [("Save", 0), ("Don't Save", 1)] + (allowCancel ? [("Cancel", 2)] : [])
-            switch kernel.ui.pick(
-                "Save the changes?", detail: "The compared files were edited:\n" + names, buttons,
-                fallback: allowCancel ? 2 : 0, style: .warning)
+            switch kernel.interaction.pick(
+                "Save the changes?",
+                detail: "The compared files were edited:\n" + names,
+                buttons,
+                fallback: allowCancel ? 2 : 0,
+                style: .warning
+            )
             {
             case 0: if !session.saveNow(), allowCancel { return false }
             case 1: session.discardChanges()
@@ -167,9 +189,10 @@ enum CompareOperands {
     )? {
         if let location = argument.location { return (location, nil) }
         guard let text = argument.text else { return nil }
-        let lines = text.split(separator: "\n", omittingEmptySubsequences: false).map {
-            $0.trimmingCharacters(in: .whitespaces)
-        }
+        let lines = text.split(separator: "\n", omittingEmptySubsequences: false)
+            .map {
+                $0.trimmingCharacters(in: .whitespaces)
+            }
         func location(_ line: String?) -> URL? {
             guard let line, !line.isEmpty else { return nil }
             if let url = URL(string: line), let scheme = url.scheme, (try? fileSystems.provider(for: url)) != nil,

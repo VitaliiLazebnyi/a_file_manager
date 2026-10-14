@@ -39,8 +39,8 @@ import Testing
     @Test func registersTheSpecificationsKeysWithoutConflicts() {
         let keys = bench.kernel.keyBindings
         #expect(
-            keys.command(for: Shortcut(.left, .control)) == "cm_TransferLeft"
-                && keys.command(for: Shortcut(.right, .control)) == "cm_TransferRight"
+            keys.command(for: Shortcut(.leftArrow, .control)) == "cm_TransferLeft"
+                && keys.command(for: Shortcut(.rightArrow, .control)) == "cm_TransferRight"
         )
         #expect(keys.command(for: Shortcut(.character("u"), .control)) == .exchangePanels)
         #expect(keys.command(for: Shortcut(.character("r"), .control)) == .reread)

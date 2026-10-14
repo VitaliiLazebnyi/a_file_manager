@@ -179,7 +179,10 @@ final class TextWindowController: NSWindowController {
     init(title: String) {
         let window = ToolWindow(
             contentRect: NSRect(x: 0, y: 0, width: 640, height: 560),
-            styleMask: [.titled, .closable, .resizable, .miniaturizable], backing: .buffered, defer: false)
+            styleMask: [.titled, .closable, .resizable, .miniaturizable],
+            backing: .buffered,
+            defer: false
+        )
         window.title = title
         window.isReleasedWhenClosed = false
         window.center()
@@ -248,10 +251,10 @@ enum LiveMenus {
         case .end: return special(NSEndFunctionKey)
         case .pageUp: return special(NSPageUpFunctionKey)
         case .pageDown: return special(NSPageDownFunctionKey)
-        case .left: return special(NSLeftArrowFunctionKey)
-        case .right: return special(NSRightArrowFunctionKey)
-        case .up: return special(NSUpArrowFunctionKey)
-        case .down: return special(NSDownArrowFunctionKey)
+        case .leftArrow: return special(NSLeftArrowFunctionKey)
+        case .rightArrow: return special(NSRightArrowFunctionKey)
+        case .upArrow: return special(NSUpArrowFunctionKey)
+        case .downArrow: return special(NSDownArrowFunctionKey)
         default: return nil
         }
     }
@@ -305,7 +308,8 @@ enum LiveMenus {
             let item = NSMenuItem(
                 title: DisplayText.oneLine(entry.title.replacingOccurrences(of: "&", with: ""), limit: 120),
                 action: #selector(StartMenuTarget.runEntry(_:)),
-                keyEquivalent: "")
+                keyEquivalent: ""
+            )
             item.target = target
             item.representedObject = StartMenuEntry.commandID(at: index).rawValue
             menu.addItem(item)

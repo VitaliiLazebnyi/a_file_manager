@@ -51,7 +51,8 @@ final class KeyBindingEditor {
     convenience init(kernel: Kernel) {
         self.init(
             commands: kernel.commands.all,
-            overrides: Self.storedOverrides(in: kernel))
+            overrides: Self.storedOverrides(in: kernel)
+        )
     }
 
     /// Takes bindings that were stored elsewhere since this editor was made (the Start menu's
@@ -124,7 +125,9 @@ final class KeyBindingEditor {
             let answer = ui.choose(
                 "\(ShortcutText.display(shortcut)) is already in use",
                 detail: "It runs “\(title)” (\(owner.rawValue)). Give it to this command instead?",
-                buttons: ["Reassign", "Cancel"], style: .warning)
+                buttons: ["Reassign", "Cancel"],
+                style: .warning
+            )
             guard answer == 0 else { return false }
         }
         if adding {
@@ -169,7 +172,9 @@ final class KeyBindingEditor {
     static func reapply(in kernel: Kernel) {
         let overrides = kernel.settings.value([String: [String]].self, forKey: KeyBindings.settingsKey) ?? [:]
         apply(
-            KeyMap.resolve(kernel.commands.all, overrides: overrides), of: kernel.commands.all, to: kernel.keyBindings
+            KeyMap.resolve(kernel.commands.all, overrides: overrides),
+            of: kernel.commands.all,
+            to: kernel.keyBindings
         )
     }
 }
@@ -179,7 +184,8 @@ enum ShortcutText {
     private static let keyNames: [Key: String] = [
         .returnKey: "↩", .enter: "⌤", .tab: "⇥", .space: "Space", .backspace: "⌫", .forwardDelete: "⌦",
         .insert: "Insert",
-        .home: "↖", .end: "↘", .pageUp: "⇞", .pageDown: "⇟", .left: "←", .right: "→", .up: "↑", .down: "↓",
+        .home: "↖", .end: "↘", .pageUp: "⇞", .pageDown: "⇟", .leftArrow: "←", .rightArrow: "→", .upArrow: "↑",
+        .downArrow: "↓",
         .keypadPlus: "Num +", .keypadMinus: "Num −", .keypadMultiply: "Num *", .keypadDivide: "Num /"
     ]
 
@@ -222,7 +228,8 @@ enum ShortcutText {
     private static let namedKeyCodes: [UInt16: Key] = {
         var keys: [UInt16: Key] = [
             36: .returnKey, 76: .enter, 48: .tab, 49: .space, 51: .backspace, 117: .forwardDelete, 114: .insert,
-            115: .home, 119: .end, 116: .pageUp, 121: .pageDown, 123: .left, 124: .right, 125: .down, 126: .up,
+            115: .home, 119: .end, 116: .pageUp, 121: .pageDown, 123: .leftArrow, 124: .rightArrow, 125: .downArrow,
+            126: .upArrow,
             69: .keypadPlus, 78: .keypadMinus, 67: .keypadMultiply, 75: .keypadDivide
         ]
         for (index, code) in [122, 120, 99, 118, 96, 97, 98, 100, 101, 109, 103, 111].enumerated() {
@@ -268,8 +275,11 @@ enum CommandCatalog {
         return commands.map { command in
             let isUser = command.id.rawValue.hasPrefix(UserCommand.prefix)
             return CommandRow(
-                id: command.id, title: command.title, keys: ShortcutText.display(shortcuts(command.id)),
-                category: isUser ? CommandRow.userCategory : menuOf[command.id] ?? CommandRow.otherCategory)
+                id: command.id,
+                title: command.title,
+                keys: ShortcutText.display(shortcuts(command.id)),
+                category: isUser ? CommandRow.userCategory : menuOf[command.id] ?? CommandRow.otherCategory
+            )
         }
     }
 

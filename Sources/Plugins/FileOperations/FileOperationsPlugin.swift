@@ -70,15 +70,19 @@ public final class FileOperationsPlugin: Plugin {
 
         // `.text` carries the dialog's options as switches: `/V1 O2 T="/tmp/" W="*.txt" G` (17 › Commands with parameters).
         commands.register(
-            Command(.copy, "Copy…", [.f(5)], barLabel: "Copy"), enabled: hasOperands,
+            Command(.copy, "Copy…", [.f(5)], barLabel: "Copy"),
+            enabled: hasOperands,
             parameterized: { argument in
                 operations.transfer(.copy, switches: argument.text)
-            })
+            }
+        )
         commands.register(
-            Command(.copyOtherPanel, "Copy to Other Panel…"), enabled: hasOperands,
+            Command(.copyOtherPanel, "Copy to Other Panel…"),
+            enabled: hasOperands,
             parameterized: { argument in
                 operations.transfer(.copy, switches: argument.text)
-            })
+            }
+        )
         commands.register(Command(.copyWithOptions, "Copy with Options…"), enabled: hasOperands) {
             operations.transfer(.copy, dialog: .options)
         }
@@ -89,15 +93,19 @@ public final class FileOperationsPlugin: Plugin {
             operations.transfer(.copy, sameFolder: true)
         }
         commands.register(
-            Command(.renameMove, "Rename/Move…", [.f(6)], barLabel: "Move"), enabled: canMove,
+            Command(.renameMove, "Rename/Move…", [.f(6)], barLabel: "Move"),
+            enabled: canMove,
             parameterized: { argument in
                 operations.transfer(.move, switches: argument.text)
-            })
+            }
+        )
         commands.register(
-            Command(.moveOnly, "Move to Other Panel…"), enabled: canMove,
+            Command(.moveOnly, "Move to Other Panel…"),
+            enabled: canMove,
             parameterized: { argument in
                 operations.transfer(.move, switches: argument.text)
-            })
+            }
+        )
         commands.register(Command(.moveWithOptions, "Rename/Move with Options…"), enabled: canMove) {
             operations.transfer(.move, dialog: .options)
         }
@@ -117,7 +125,8 @@ public final class FileOperationsPlugin: Plugin {
                     // The shell owns the editor that sits on the row; it calls back with the new name.
                     commands.perform(.editNameInPlace)
                 }
-            })
+            }
+        )
         commands.register(
             Command(.renameSingleFile, "Rename File Under Cursor"),
             enabled: { source().cursorItem != nil && isWritable() },
@@ -127,56 +136,83 @@ public final class FileOperationsPlugin: Plugin {
                 } else {
                     commands.perform(.editNameInPlace)
                 }
-            })
+            }
+        )
         // `.text`: the names, as typed into the dialog or as `N="…" G`; the folders are then made without asking.
         commands.register(
-            Command(.makeDirectory, "New Folder…", [.f(7)], barLabel: "NewFolder"), enabled: { takesNew(source()) },
+            Command(.makeDirectory, "New Folder…", [.f(7)], barLabel: "NewFolder"),
+            enabled: { takesNew(source()) },
             parameterized: { argument in
                 operations.makeDirectory(in: kernel.panels.source, names: argument.text)
-            })
+            }
+        )
         commands.register(
             Command(.makeDirectoryOther, "New Folder in Other Panel…", [.f(7, .shift)]),
             enabled: { takesNew(kernel.panels.target.model) },
             parameterized: { argument in
                 operations.makeDirectory(in: kernel.panels.target, names: argument.text)
-            })
+            }
+        )
         // `.text("1")` or `.index(1)`: create the file but do not open the editor (10 › New text file).
         commands.register(
-            Command(.newTextFile, "New Text File…", [.f(4, .shift)]), enabled: { takesNew(source()) },
+            Command(.newTextFile, "New Text File…", [.f(4, .shift)]),
+            enabled: { takesNew(source()) },
             parameterized: { argument in
                 operations.newTextFile(opensEditor: argument.text != "1" && argument.index != 1)
-            })
+            }
+        )
         commands.register(
             Command(
-                .delete, "Move to Trash", [.f(8), Shortcut(.backspace, .command), Shortcut(.forwardDelete)],
-                barLabel: "Delete"),
+                .delete,
+                "Move to Trash",
+                [.f(8), Shortcut(.backspace, .command), Shortcut(.forwardDelete)],
+                barLabel: "Delete"
+            ),
             enabled: canMove
         ) { operations.delete(shifted: false) }
         commands.register(
             Command(
-                .deleteDirectly, "Delete Permanently…",
-                [.f(8, .shift), Shortcut(.backspace, [.command, .option]), Shortcut(.forwardDelete, .shift)]),
+                .deleteDirectly,
+                "Delete Permanently…",
+                [.f(8, .shift), Shortcut(.backspace, [.command, .option]), Shortcut(.forwardDelete, .shift)]
+            ),
             enabled: canMove
         ) { operations.delete(shifted: true) }
 
         kernel.menus.add([.copy, .copySamePanel, .renameMove, .renameOnly], to: .filesTransfer)
         kernel.menus.add(
-            [.copyWithOptions, .moveWithOptions, .copyNoAsk, .moveNoAsk], to: MenuSection(.files, order: 25))
+            [.copyWithOptions, .moveWithOptions, .copyNoAsk, .moveNoAsk],
+            to: MenuSection(.files, order: 25)
+        )
         kernel.menus.add([.makeDirectory, .makeDirectoryOther, .newTextFile], to: .filesCreate)
         kernel.menus.add([.delete, .deleteDirectly], to: .filesDelete)
         kernel.menus.addToContextMenu([.copy, .renameMove, .renameOnly, .delete], in: .transfer, onItemOnly: true)
         kernel.menus.addToContextMenu([.makeDirectory, .newTextFile], in: .create)
 
         kernel.toolbar.add(
-            .copy, symbol: "doc.on.doc", group: 20, hint: "Copy the selected files to the folder of the other panel.")
-        kernel.toolbar.add(
-            .renameMove, symbol: "arrow.right.doc.on.clipboard", group: 20,
-            hint: "Move the selected files to the other panel's folder, or rename them.")
-        kernel.toolbar.add(
-            .makeDirectory, symbol: "folder.badge.plus", group: 20, hint: "Create a new folder in the current folder."
+            .copy,
+            symbol: "doc.on.doc",
+            group: 20,
+            hint: "Copy the selected files to the folder of the other panel."
         )
         kernel.toolbar.add(
-            .delete, symbol: "trash", group: 20, hint: "Move the selected files and folders to the Trash.")
+            .renameMove,
+            symbol: "arrow.right.doc.on.clipboard",
+            group: 20,
+            hint: "Move the selected files to the other panel's folder, or rename them."
+        )
+        kernel.toolbar.add(
+            .makeDirectory,
+            symbol: "folder.badge.plus",
+            group: 20,
+            hint: "Create a new folder in the current folder."
+        )
+        kernel.toolbar.add(
+            .delete,
+            symbol: "trash",
+            group: 20,
+            hint: "Move the selected files and folders to the Trash."
+        )
         kernel.toolbar.setSymbol("doc.badge.gearshape", for: .copyWithOptions)
         kernel.toolbar.setSymbol("doc.badge.plus", for: .newTextFile)
         kernel.toolbar.setSymbol("trash.slash", for: .deleteDirectly)
@@ -238,7 +274,7 @@ final class FileOperations: FileTransferService {
 
     private var source: any PanelHandle { kernel.panels.source }
     private var target: any PanelHandle { kernel.panels.target }
-    private var ui: any UserInteraction { kernel.ui }
+    private var ui: any UserInteraction { kernel.interaction }
     private var fileSystems: FileSystemRegistry { kernel.fileSystems }
 
     // MARK: Jobs
@@ -282,11 +318,12 @@ final class FileOperations: FileTransferService {
     /// thread (the names to deselect, the folders to re-read: work that grows with the
     /// selection), so that the completion on the main thread only applies it.
     private func run<Summary: Sendable>(
-        title: String, makeJob: @escaping @Sendable (CancellationFlag) -> Result<FileJob, JobRefusal>,
+        title: String,
+        makeJob: @escaping @Sendable (CancellationFlag) -> Result<FileJob, JobRefusal>,
         summary: @escaping @Sendable (JobResult) -> Summary,
         completion: @escaping @MainActor (JobResult, Summary) -> Void
     ) {
-        let ui = kernel.ui
+        let ui = kernel.interaction
         let fileSystems = kernel.fileSystems
         let record = recorder()
         let wantsRecord = recordFilter()
@@ -315,7 +352,8 @@ final class FileOperations: FileTransferService {
                 log?.flushSoon()
                 if let refusal = result.refusal, !refusal.isEmpty { ui.inform(refusal, detail: "", style: .warning) }
                 completion(result, summary)
-            })
+            }
+        )
     }
 
     /// What a command works on, taken on the main thread at no cost: how many items, and the
@@ -416,13 +454,18 @@ final class FileOperations: FileTransferService {
         let more = result.failureCount > result.failures.count ? "\n…" : ""
         ui.inform(
             "\(result.failureCount) item(s) could not be processed.",
-            detail: result.failures.joined(separator: "\n") + more, style: .warning)
+            detail: result.failures.joined(separator: "\n") + more,
+            style: .warning
+        )
     }
 
     /// Copy and move (spec 07 › Copy dialog, Target field, Rename and move). `switches` are
     /// the dialog's options as a command line would give them; `G` among them starts at once.
     func transfer(
-        _ kind: TransferKind, sameFolder: Bool = false, dialog: Dialog = .quick, switches text: String? = nil
+        _ kind: TransferKind,
+        sameFolder: Bool = false,
+        dialog: Dialog = .quick,
+        switches text: String? = nil
     ) {
         // What the command works on is fixed now; the panels may show something else by the
         // time the job ends.
@@ -477,7 +520,7 @@ final class FileOperations: FileTransferService {
         }
         // A target the user typed into the dialog is the user's own choice of a server, if it names one.
         if dialog != .none {
-            kernel.userTyped(location: targetText, proposal: proposedTarget, relativeTo: sourceDirectory)
+            kernel.userTyped(location: targetText, relativeTo: sourceDirectory, proposal: proposedTarget)
         }
 
         model.saveSelection()
@@ -489,23 +532,36 @@ final class FileOperations: FileTransferService {
             title: kind == .copy ? "Copy:" : "Rename/Move:",
             makeJob: { [targetText] cancellation in
                 let spec = TargetSpec.parse(
-                    targetText, sourceDirectory: sourceDirectory, operandCount: picked.count, fileSystems: fileSystems,
-                    cancellation: cancellation)
+                    targetText,
+                    sourceDirectory: sourceDirectory,
+                    operandCount: picked.count,
+                    fileSystems: fileSystems,
+                    cancellation: cancellation
+                )
                 if cancellation.isCancelled { return .failure(JobRefusal(message: "")) }
                 let job = FileJob(
-                    kind: .transfer(kind), sources: picked.items().map(\.url), target: spec, fileSystems: fileSystems,
-                    cancellation: cancellation)
+                    kind: .transfer(kind),
+                    sources: picked.items().map(\.url),
+                    target: spec,
+                    fileSystems: fileSystems,
+                    cancellation: cancellation
+                )
                 job.options = jobOptions
                 if job.targetsSourceFolder { return .failure(JobRefusal(message: "You cannot copy a file to itself!")) }
                 do {
                     // A target folder that does not exist is created silently.
-                    try fileSystems.provider(for: spec.directory).createDirectory(
-                        at: spec.directory, cancellation: cancellation)
+                    try fileSystems.provider(for: spec.directory)
+                        .createDirectory(
+                            at: spec.directory,
+                            cancellation: cancellation
+                        )
                 } catch {
                     if cancellation.isCancelled { return .failure(JobRefusal(message: "")) }
                     return .failure(
                         JobRefusal(
-                            message: "The given target path \(fileSystems.displayPath(spec.directory)) is invalid!"))
+                            message: "The given target path \(fileSystems.displayPath(spec.directory)) is invalid!"
+                        )
+                    )
                 }
                 targetDirectory.withLock { $0 = spec.directory }
                 return .success(job)
@@ -520,8 +576,11 @@ final class FileOperations: FileTransferService {
                 var folders = [panelDirectory]
                 if !sourceDirectory.isSameLocation(as: panelDirectory) { folders.append(sourceDirectory) }
                 kernel.panels.refresh(
-                    folders + (targetDirectory.withLock { $0 }.map { [$0] } ?? []), focus: result.lastTarget)
-            })
+                    folders + (targetDirectory.withLock { $0 }.map { [$0] } ?? []),
+                    focus: result.lastTarget
+                )
+            }
+        )
     }
 
     /// The Copy dialog with its options (spec 07 › Copy dialog, Advanced options). The second
@@ -534,26 +593,35 @@ final class FileOperations: FileTransferService {
             .text("filter", "Only files of this type:", ""),
             .note("Masks separated by spaces, exclusions after |, folders end in /:   *.txt *.md | *.bak build/"),
             .choice(
-                "overwrite", "Overwrite options:", OverwriteMode.allCases.map(\.title),
-                selected: options.overwrite.rawValue),
+                "overwrite",
+                "Overwrite options:",
+                OverwriteMode.allCases.map(\.title),
+                selected: options.overwrite.rawValue
+            ),
             .checkbox("attributes", "Keep dates and permissions", options.preservesAttributes),
             .checkbox("folderDates", "Copy date/time of folders", options.preservesFolderDates)
         ]
         if kind == .copy {
             fields.append(
-                .choice("links", "Symbolic links:", OperationSettings.linkTitles, selected: options.links.rawValue))
+                .choice("links", "Symbolic links:", OperationSettings.linkTitles, selected: options.links.rawValue)
+            )
         }
         fields += [
             .checkbox("verify", "Verify (compare checksums after copying)", options.verifies),
             .checkbox("skipErrors", "Keep going on errors (skip what fails, report at the end)", options.skipsErrors),
             .checkbox(
-                "ignoreProtection", "Overwrite/delete read-only and hidden files without asking",
-                options.ignoresProtection)
+                "ignoreProtection",
+                "Overwrite/delete read-only and hidden files without asking",
+                options.ignoresProtection
+            )
         ]
         guard
             let answer = ui.form(
-                kind == .copy ? "Copy" : "Rename/Move", detail: "", fields: fields,
-                buttons: ["OK", "OK, Keep as Defaults"])
+                kind == .copy ? "Copy" : "Rename/Move",
+                detail: "",
+                fields: fields,
+                buttons: ["OK", "OK, Keep as Defaults"]
+            )
         else {
             return nil
         }
@@ -593,7 +661,10 @@ final class FileOperations: FileTransferService {
         let answer = ui.choose(
             toTrash ? kernel.productName : "Permanently delete",
             detail: OperationText.deleteQuestion(count: picked.count, single: picked.single, toTrash: toTrash),
-            buttons: ["Yes", "No"], style: toTrash ? .information : .critical, defaultButton: toTrash ? 0 : 1)
+            buttons: ["Yes", "No"],
+            style: toTrash ? .information : .critical,
+            defaultButton: toTrash ? 0 : 1
+        )
         guard answer == 0 else { return }
         model.saveSelection()
         let fileSystems = self.fileSystems
@@ -602,8 +673,11 @@ final class FileOperations: FileTransferService {
             title: "Deleting:",
             makeJob: { cancellation in
                 let job = FileJob(
-                    kind: .delete(toTrash: toTrash), sources: picked.items().map(\.url), fileSystems: fileSystems,
-                    cancellation: cancellation)
+                    kind: .delete(toTrash: toTrash),
+                    sources: picked.items().map(\.url),
+                    fileSystems: fileSystems,
+                    cancellation: cancellation
+                )
                 job.options = options
                 return .success(job)
             },
@@ -614,12 +688,16 @@ final class FileOperations: FileTransferService {
                 processed.deselect(in: model)
                 reportFailures(of: result, options: options)
                 kernel.panels.refresh([directory])
-            })
+            }
+        )
     }
 
     // FileTransferService
     func transfer(
-        _ kind: TransferKind, _ sources: [URL], into directory: URL, renamingSelfCopies: Bool,
+        _ kind: TransferKind,
+        _ sources: [URL],
+        into directory: URL,
+        renamingSelfCopies: Bool,
         completion: @escaping @MainActor (URL?) -> Void
     ) {
         let fileSystems = self.fileSystems
@@ -638,7 +716,8 @@ final class FileOperations: FileTransferService {
                         JobRefusal(
                             message:
                                 "\(fileSystems.displayPath(real)) is a list of files, not a folder. Nothing can be put into it."
-                        ))
+                        )
+                    )
                 }
                 // Moving a file into the folder it is in already changes nothing, and is not tried.
                 var moved = sources
@@ -648,23 +727,28 @@ final class FileOperations: FileTransferService {
                 }
                 guard !moved.isEmpty else { return .failure(JobRefusal(message: "")) }
                 let job = FileJob(
-                    kind: .transfer(kind), sources: moved, target: TargetSpec(directory: real),
+                    kind: .transfer(kind),
+                    sources: moved,
+                    target: TargetSpec(directory: real),
                     fileSystems: fileSystems,
-                    cancellation: cancellation)
+                    cancellation: cancellation
+                )
                 job.options = jobOptions
                 job.renamesSelfCopies = renamingSelfCopies
                 return .success(job)
             },
             summary: { _ -> [URL] in
                 var seen = Set<String>()
-                return ([directory] + sources.map { $0.deletingLastPathComponent() }).filter {
-                    seen.insert($0.locationKey).inserted
-                }
+                return ([directory] + sources.map { $0.deletingLastPathComponent() })
+                    .filter {
+                        seen.insert($0.locationKey).inserted
+                    }
             },
             completion: { [kernel] result, folders in
                 kernel.panels.refresh(folders, focus: result.lastTarget)
                 completion(result.lastTarget)
-            })
+            }
+        )
     }
 
     // MARK: Rename
@@ -672,7 +756,8 @@ final class FileOperations: FileTransferService {
     /// Runs a quick change of the file system off the main thread and comes back with its
     /// error, if any.
     private func change(
-        _ title: String, _ work: @escaping @Sendable (CancellationFlag) throws -> Void,
+        _ title: String,
+        _ work: @escaping @Sendable (CancellationFlag) throws -> Void,
         then completion: @escaping @MainActor (any Error?) -> Void
     ) {
         kernel.jobs.run(
@@ -684,7 +769,9 @@ final class FileOperations: FileTransferService {
                 } catch {
                     return error
                 }
-            }, completion: completion)
+            },
+            completion: completion
+        )
     }
 
     /// Finishes an in-place rename; the cursor follows the renamed item.
@@ -714,7 +801,10 @@ final class FileOperations: FileTransferService {
                 } catch {
                     record?(
                         OperationRecord(
-                            .rename, source: display.0, target: display.1, status: .failed(error.localizedDescription)
+                            .rename,
+                            source: display.0,
+                            target: display.1,
+                            status: .failed(error.localizedDescription)
                         )
                     )
                     throw error
@@ -723,10 +813,11 @@ final class FileOperations: FileTransferService {
             then: { [kernel] error in
                 // Stopped by the user: nothing to tell.
                 if let error, (error as? CocoaError)?.code != .userCancelled {
-                    kernel.ui.report(error, title: "\(DisplayName.escaped(item.name)) cannot be renamed!")
+                    kernel.interaction.report(error, title: "\(DisplayName.escaped(item.name)) cannot be renamed!")
                 }
                 kernel.panels.refresh([directory], focus: error == nil ? destination : item.url)
-            })
+            }
+        )
     }
 
     /// Shift+F6 with several items: a wildcard mask for all, or a new name for each in turn
@@ -737,12 +828,15 @@ final class FileOperations: FileTransferService {
         guard picked.count > 0, let firstItem = picked.first else { return }
         guard
             let answer = ui.form(
-                "Rename", detail: "",
+                "Rename",
+                detail: "",
                 fields: [
                     .text("mask", "Rename \(picked.count) file(s) to", "*.*"),
                     .note("A mask as in the Copy dialog: *.bak, new_*.*, ?x*.*"),
                     .checkbox("each", "Rename each file separately", false)
-                ], buttons: ["OK"])
+                ],
+                buttons: ["OK"]
+            )
         else { return }
         // With a mask the names are worked out on the job's thread: one per item of the selection.
         var names: [(URL, String)] = []
@@ -787,11 +881,16 @@ final class FileOperations: FileTransferService {
                 // Nothing gets another name: nothing to do and nothing to say.
                 guard !names.isEmpty else { return .failure(JobRefusal(message: "")) }
                 let job = FileJob(
-                    kind: .move, sources: names.map(\.0),
+                    kind: .move,
+                    sources: names.map(\.0),
                     target: TargetSpec(directory: firstItem.url.deletingLastPathComponent()),
-                    fileSystems: fileSystems, cancellation: cancellation)
+                    fileSystems: fileSystems,
+                    cancellation: cancellation
+                )
                 job.newNames = Dictionary(
-                    names.map { ($0.0.locationKey, $0.1) }, uniquingKeysWith: { first, _ in first })
+                    names.map { ($0.0.locationKey, $0.1) },
+                    uniquingKeysWith: { first, _ in first }
+                )
                 job.options = options
                 return .success(job)
             },
@@ -801,7 +900,8 @@ final class FileOperations: FileTransferService {
             completion: { [kernel] _, processed in
                 processed.deselect(in: model)
                 kernel.panels.refresh([directory])
-            })
+            }
+        )
     }
 
     // MARK: New folder, new file
@@ -841,9 +941,11 @@ final class FileOperations: FileTransferService {
             // Pre-filled with the name under the cursor, so similar names are easy to type.
             guard
                 let text = ui.prompt(
-                    "New folder (directory)", value: source.model.cursorItem?.name ?? "",
+                    "New folder (directory)",
+                    value: source.model.cursorItem?.name ?? "",
                     detail: "a/b/c nests, | separates several. With a leading < placeholders work: "
-                        + "<[Y]-[M]-[D] notes, <Copy of [N], <1-10>Part [C], <new[C] (first free name).")
+                        + "<[Y]-[M]-[D] notes, <Copy of [N], <1-10>Part [C], <new[C] (first free name)."
+                )
             else { return }
             typed = text
         }
@@ -875,8 +977,12 @@ final class FileOperations: FileTransferService {
                     do {
                         if exists(url) { throw FileSystemError.alreadyExists(fileSystems.displayPath(url)) }
                         // A folder that appeared since the look above is not taken for the new one.
-                        try fileSystems.provider(for: url).createDirectory(
-                            at: url, exclusive: true, cancellation: cancellation)
+                        try fileSystems.provider(for: url)
+                            .createDirectory(
+                                at: url,
+                                exclusive: true,
+                                cancellation: cancellation
+                            )
                         created = url
                         record?(OperationRecord(.makeFolder, source: fileSystems.displayPath(url)))
                     } catch {
@@ -884,15 +990,21 @@ final class FileOperations: FileTransferService {
                         failures.append((name, error))
                         record?(
                             OperationRecord(
-                                .makeFolder, source: fileSystems.displayPath(url),
-                                status: .failed(error.localizedDescription)))
+                                .makeFolder,
+                                source: fileSystems.displayPath(url),
+                                status: .failed(error.localizedDescription)
+                            )
+                        )
                     }
                 }
                 return (created, failures)
             },
             completion: { [kernel] result in
                 for (name, error) in result.failures {
-                    kernel.ui.report(error, title: "The folder \(DisplayName.escaped(name)) cannot be created!")
+                    kernel.interaction.report(
+                        error,
+                        title: "The folder \(DisplayName.escaped(name)) cannot be created!"
+                    )
                 }
                 // The cursor goes to the last new folder, or to the top of a nested one.
                 var focus: URL?
@@ -901,7 +1013,8 @@ final class FileOperations: FileTransferService {
                     focus = top.map(directory.appendingPathComponent)
                 }
                 kernel.panels.refresh([directory], focus: focus)
-            })
+            }
+        )
     }
 
     /// Shift+F4 (spec 10 › New text file): the names follow the rules of new folders; several
@@ -912,9 +1025,11 @@ final class FileOperations: FileTransferService {
         let openedAt = Date()
         guard
             let typed = ui.prompt(
-                "New text file:", value: model.cursorFile?.name ?? "",
-                detail: "| or quotes separate several files; a leading < turns on placeholders and ranges.")?
-                .trimmingCharacters(in: .whitespaces), !typed.isEmpty
+                "New text file:",
+                value: model.cursorFile?.name ?? "",
+                detail: "| or quotes separate several files; a leading < turns on placeholders and ranges."
+            )?
+            .trimmingCharacters(in: .whitespaces), !typed.isEmpty
         else { return }
         let context = nameContext(for: source, typed: typed, openedAt: openedAt)
         let fileSystems = self.fileSystems
@@ -939,7 +1054,9 @@ final class FileOperations: FileTransferService {
                                 if cancellation.isCancelled { return (urls, nil) }
                                 let provider = try fileSystems.provider(for: url)
                                 try provider.createDirectory(
-                                    at: url.deletingLastPathComponent(), cancellation: cancellation)
+                                    at: url.deletingLastPathComponent(),
+                                    cancellation: cancellation
+                                )
                                 try provider.write(url, cancellation: cancellation).close(attributes: FileAttributes())
                                 record?(OperationRecord(.newFile, source: fileSystems.displayPath(url)))
                             }
@@ -948,8 +1065,11 @@ final class FileOperations: FileTransferService {
                             if cancellation.isCancelled { return (urls, nil) }
                             record?(
                                 OperationRecord(
-                                    .newFile, source: fileSystems.displayPath(url),
-                                    status: .failed(error.localizedDescription)))
+                                    .newFile,
+                                    source: fileSystems.displayPath(url),
+                                    status: .failed(error.localizedDescription)
+                                )
+                            )
                             return (urls, (name, error))
                         }
                     }
@@ -960,7 +1080,7 @@ final class FileOperations: FileTransferService {
             },
             completion: { [kernel] result in
                 if let (name, error) = result.failure {
-                    kernel.ui.report(error, title: "The file \(DisplayName.escaped(name)) cannot be created!")
+                    kernel.interaction.report(error, title: "The file \(DisplayName.escaped(name)) cannot be created!")
                 }
                 guard let last = result.urls.last else { return }
                 kernel.panels.refresh([directory], focus: last)
@@ -968,6 +1088,7 @@ final class FileOperations: FileTransferService {
                 if result.urls.count == 1, result.failure == nil, opensEditor, kernel.commands[.edit] != nil {
                     kernel.commands.perform(.edit, .location(last))
                 }
-            })
+            }
+        )
     }
 }

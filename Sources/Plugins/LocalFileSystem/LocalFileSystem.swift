@@ -759,7 +759,7 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
         let (path, top) = (url.standardizedFileURL.path, root.standardizedFileURL.path)
         let prefix = top.hasSuffix("/") ? top : top + "/"
         guard path.utf8.count > prefix.utf8.count, path.utf8.starts(with: prefix.utf8),
-            let names = PathSafety.components(
+            case let names = PathSafety.components(
                 ofRelativePath: String(decoding: path.utf8.dropFirst(prefix.utf8.count), as: UTF8.self)
             ),
             let last = names.last

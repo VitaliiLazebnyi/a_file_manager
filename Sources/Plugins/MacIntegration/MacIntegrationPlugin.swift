@@ -59,7 +59,8 @@ public final class MacIntegrationPlugin: Plugin {
     /// once, here. `deliver` runs from the main run loop, not from a block of the main queue:
     /// it may ask the user something.
     private func withLocalOperands<Result: Sendable>(
-        of model: PanelModel, _ work: @escaping @Sendable ([URL]) -> Result,
+        of model: PanelModel,
+        _ work: @escaping @Sendable ([URL]) -> Result,
         then deliver: @escaping @MainActor @Sendable (Result) -> Void
     ) {
         let operands = model.operandsSnapshot()
@@ -68,12 +69,13 @@ public final class MacIntegrationPlugin: Plugin {
             deliver(work(urls()))
             return
         }
-        DispatchQueue.global(qos: .userInitiated).async {
-            let result = work(urls())
-            // The main run loop runs its blocks on the main thread.
-            RunLoop.main.perform(inModes: [.common]) { MainActor.assumeIsolated { deliver(result) } }
-            CFRunLoopWakeUp(CFRunLoopGetMain())
-        }
+        DispatchQueue.global(qos: .userInitiated)
+            .async {
+                let result = work(urls())
+                // The main run loop runs its blocks on the main thread.
+                RunLoop.main.perform(inModes: [.common]) { MainActor.assumeIsolated { deliver(result) } }
+                CFRunLoopWakeUp(CFRunLoopGetMain())
+            }
     }
 
     /// What the open Quick Look panel was given last: the panel's list and marks then.
@@ -121,7 +123,8 @@ public final class MacIntegrationPlugin: Plugin {
 
     /// Tests pass a pasteboard of their own and say which applications open a file.
     public init(
-        launchesApplications: Bool = true, pasteboard: NSPasteboard = .general,
+        launchesApplications: Bool = true,
+        pasteboard: NSPasteboard = .general,
         applications: (@Sendable (URL) -> [URL])? = nil
     ) {
         self.launchesApplications = launchesApplications
@@ -169,7 +172,10 @@ public final class MacIntegrationPlugin: Plugin {
         guard launchesApplications else { return }
         if let application {
             NSWorkspace.shared.open(
-                urls, withApplicationAt: application, configuration: NSWorkspace.OpenConfiguration())
+                urls,
+                withApplicationAt: application,
+                configuration: NSWorkspace.OpenConfiguration()
+            )
         } else {
             // Launch Services answers each file in its own time; none of them holds up the main thread.
             urls.forEach { NSWorkspace.shared.open($0, configuration: NSWorkspace.OpenConfiguration()) }
@@ -207,17 +213,22 @@ public final class MacIntegrationPlugin: Plugin {
             parameterized: { [self] argument in
                 guard let url = argument.location ?? cursorFile(), url.isFileURL else { return }
                 let editor = kernel.settings.text(
-                    Self.editorKey, default: Self.defaultEditor)
+                    Self.editorKey,
+                    default: Self.defaultEditor
+                )
                 remember(opened: [url])
                 remember("edit \(DisplayText.oneLine(editor, limit: 200)) \(url.path)")
                 guard launchesApplications else { return }
                 // (The system looks at the file and the application: on a thread of the kernel's own.)
                 BlockingCalls.run {
                     NSWorkspace.shared.open(
-                        [url], withApplicationAt: Self.editorApplication(named: editor),
-                        configuration: NSWorkspace.OpenConfiguration())
+                        [url],
+                        withApplicationAt: Self.editorApplication(named: editor),
+                        configuration: NSWorkspace.OpenConfiguration()
+                    )
                 }
-            })
+            }
+        )
         // `.text`: the editor's name, path or bundle identifier; `.location`: the application;
         // without, the user picks it.
         commands.register(
@@ -228,7 +239,8 @@ public final class MacIntegrationPlugin: Plugin {
                         ?? chooseApplication(title: "Choose the editor for F4")?.path
                 else { return }
                 kernel.settings.set(editor, forKey: Self.editorKey)
-            })
+            }
+        )
 
         commands.register(
             Command(Self.openWithDefault, "Open with Default Application", runsDuringJobs: true),
@@ -250,19 +262,23 @@ public final class MacIntegrationPlugin: Plugin {
                 title: "Applications:",
                 work: { monitor -> [URL]? in
                     BlockingCalls.answer(
-                        from: Self.launchServices, to: "applications " + url.path,
+                        from: Self.launchServices,
+                        to: "applications " + url.path,
                         cancellation: monitor.cancellation
                     ) { _ in applications(url) }
                 },
                 completion: { [self] found in
                     guard let candidates = found else { return }
-                    let rows = candidates.enumerated().map {
-                        Self.applicationName($0.element) + ($0.offset == 0 ? " (default)" : "")
-                    }
+                    let rows = candidates.enumerated()
+                        .map {
+                            Self.applicationName($0.element) + ($0.offset == 0 ? " (default)" : "")
+                        }
                     guard
-                        let row = kernel.ui.pickRow(
-                            "Open “\(DisplayText.oneLine(url.lastPathComponent))” with", rows: rows + ["Other…"],
-                            button: "Open")
+                        let row = kernel.interaction.pickRow(
+                            "Open “\(DisplayText.oneLine(url.lastPathComponent))” with",
+                            rows: rows + ["Other…"],
+                            button: "Open"
+                        )
                     else { return }
                     guard
                         let application = candidates.indices.contains(row)
@@ -271,7 +287,8 @@ public final class MacIntegrationPlugin: Plugin {
                     else { return }
                     remember("open-with \(Self.applicationName(application)) \(url.path)")
                     open([url], with: application)
-                })
+                }
+            )
         }
         commands.register(
             Command(.revealInFinder, "Reveal in Finder", [.cmd("r", .shift)], runsDuringJobs: true),
@@ -290,7 +307,8 @@ public final class MacIntegrationPlugin: Plugin {
 
         commands.register(
             Command(Self.quickLook, "Quick Look", [.cmd("y")], runsDuringJobs: true),
-            enabled: hasLocalOperands, checked: { [self] in launchesApplications && quickLook.isVisible }
+            enabled: hasLocalOperands,
+            checked: { [self] in launchesApplications && quickLook.isVisible }
         ) { [self] in
             withLocalOperands(of: model(), { $0 }) { [self] urls in
                 remember("quicklook " + Self.described(urls))
@@ -307,23 +325,28 @@ public final class MacIntegrationPlugin: Plugin {
         }
 
         commands.register(
-            Command(Self.share, "Share…", runsDuringJobs: true), enabled: hasLocalOperands
+            Command(Self.share, "Share…", runsDuringJobs: true),
+            enabled: hasLocalOperands
         ) { [self] in
             withLocalOperands(of: model(), { $0 }) { [self] urls in
                 // The sharing panel looks at every item; nobody shares a hundred thousand at once.
                 guard urls.count <= Self.shareLimit else {
-                    return kernel.ui.inform(
+                    return kernel.interaction.inform(
                         "Too many items to share",
                         detail: "\(urls.count) items are selected. "
-                            + "At most \(Self.shareLimit) can be shared at a time.", style: .warning)
+                            + "At most \(Self.shareLimit) can be shared at a time.",
+                        style: .warning
+                    )
                 }
                 remember("share " + Self.described(urls))
                 guard launchesApplications, let view = NSApp?.keyWindow?.contentView else { return }
                 let picker = NSSharingServicePicker(items: urls)
                 sharingPicker = picker
                 picker.show(
-                    relativeTo: NSRect(x: view.bounds.midX, y: view.bounds.midY, width: 1, height: 1), of: view,
-                    preferredEdge: .minY)
+                    relativeTo: NSRect(x: view.bounds.midX, y: view.bounds.midY, width: 1, height: 1),
+                    of: view,
+                    preferredEdge: .minY
+                )
             }
         }
         commands.register(Command(Self.editTags, "Finder Tags…"), enabled: hasLocalOperands) { [self] in
@@ -331,14 +354,18 @@ public final class MacIntegrationPlugin: Plugin {
         }
         commands.register(
             Command(
-                Self.copyAsPathname, "Copy as Pathname",
+                Self.copyAsPathname,
+                "Copy as Pathname",
                 [Shortcut(.character("c"), [.command, .option])],
-                runsDuringJobs: true), enabled: { model().directory.isFileURL }
+                runsDuringJobs: true
+            ),
+            enabled: { model().directory.isFileURL }
         ) { [self] in
             let directory = model().directory
             // The paths of a large selection are put together off the main thread.
             withLocalOperands(
-                of: model(), { urls in (urls.isEmpty ? [directory] : urls).map(\.path).joined(separator: "\n") }
+                of: model(),
+                { urls in (urls.isEmpty ? [directory] : urls).map(\.path).joined(separator: "\n") }
             ) { [self] text in
                 pasteboard.clearContents()
                 pasteboard.setString(text, forType: .string)
@@ -349,13 +376,15 @@ public final class MacIntegrationPlugin: Plugin {
         kernel.menus.add([.edit], to: .filesOpen)
         kernel.menus.add(
             [Self.openWith, Self.openWithDefault, Self.quickLook],
-            to: macSection)
+            to: macSection
+        )
         kernel.menus.add(
             [
                 .revealInFinder, Self.share, Self.editTags,
                 Self.copyAsPathname
             ],
-            to: .filesTools)
+            to: .filesTools
+        )
         kernel.menus.add([Self.chooseEditor], to: .configurationCustomize)
         kernel.menus.addToContextMenu([.edit], in: .open, onItemOnly: true)
         kernel.menus.addToContextMenu([.revealInFinder], in: .tools)
@@ -364,13 +393,21 @@ public final class MacIntegrationPlugin: Plugin {
                 Self.openWith, Self.quickLook, Self.share,
                 Self.editTags, Self.copyAsPathname
             ],
-            in: ContextMenuSection(order: 55), onItemOnly: true)
+            in: ContextMenuSection(order: 55),
+            onItemOnly: true
+        )
         kernel.toolbar.add(
-            Self.quickLook, symbol: "eye", group: 60,
-            hint: "Preview the selected file with macOS Quick Look.")
+            Self.quickLook,
+            symbol: "eye",
+            group: 60,
+            hint: "Preview the selected file with macOS Quick Look."
+        )
         kernel.toolbar.add(
-            Self.share, symbol: "square.and.arrow.up", group: 60,
-            hint: "Share the selected files: AirDrop, Mail, Messages and more.")
+            Self.share,
+            symbol: "square.and.arrow.up",
+            group: 60,
+            hint: "Share the selected files: AirDrop, Mail, Messages and more."
+        )
         kernel.toolbar.setSymbol("tag", for: Self.editTags)
         kernel.toolbar.setSymbol("arrow.up.forward.app", for: Self.openWith)
         kernel.toolbar.setSymbol("folder", for: .revealInFinder)
@@ -380,9 +417,13 @@ public final class MacIntegrationPlugin: Plugin {
                 title: "Edit (F4)",
                 preferences: [
                     Preference(
-                        Self.editorKey, "Editor (application name, path or bundle identifier):",
-                        .text(default: Self.defaultEditor))
-                ]))
+                        Self.editorKey,
+                        "Editor (application name, path or bundle identifier):",
+                        .text(default: Self.defaultEditor)
+                    )
+                ]
+            )
+        )
     }
 
     public func stop() {
@@ -429,14 +470,17 @@ public final class MacIntegrationPlugin: Plugin {
     private func editTags(of urls: [URL], in kernel: Kernel) {
         guard let first = urls.first else { return }
         kernel.jobs.run(
-            title: "Reading tags", work: { _ in Self.tags(of: first) },
+            title: "Reading tags",
+            work: { _ in Self.tags(of: first) },
             completion: { [self] current in
                 let subject =
                     urls.count == 1 ? "“\(DisplayText.oneLine(first.lastPathComponent))”" : "\(urls.count) items"
                 guard
-                    let text = kernel.ui.prompt(
-                        "Finder tags of \(subject):", value: current.joined(separator: ", "),
-                        detail: "Separate tags with commas. An empty line removes all tags.")
+                    let text = kernel.interaction.prompt(
+                        "Finder tags of \(subject):",
+                        value: current.joined(separator: ", "),
+                        detail: "Separate tags with commas. An empty line removes all tags."
+                    )
                 else { return }
                 let tags = Self.tags(from: text)
                 kernel.jobs.run(
@@ -453,10 +497,14 @@ public final class MacIntegrationPlugin: Plugin {
                         return (failure, Array(Set(urls.map { $0.deletingLastPathComponent() })))
                     },
                     completion: { [self] result in
-                        if let error = result.error { kernel.ui.report(error, title: "The tags could not be set") }
+                        if let error = result.error {
+                            kernel.interaction.report(error, title: "The tags could not be set")
+                        }
                         remember("tags " + Self.described(urls) + ": " + tags.joined(separator: ", "))
                         kernel.panels.refresh(result.folders)
-                    })
-            })
+                    }
+                )
+            }
+        )
     }
 }

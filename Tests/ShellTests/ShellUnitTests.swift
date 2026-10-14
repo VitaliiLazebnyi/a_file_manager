@@ -84,7 +84,7 @@ import Testing
         #expect(Shortcut.candidates(for: keyEvent(97, "", .shift)) == [.f(6, .shift)])
         #expect(
             Shortcut.candidates(for: keyEvent(123, "", [.option, .numericPad, .function])) == [
-                Shortcut(.left, .option)
+                Shortcut(.leftArrow, .option)
             ]
         )
         #expect(Shortcut.candidates(for: keyEvent(8, "c", .command)) == [.cmd("c")])
@@ -107,7 +107,7 @@ import Testing
         #expect(Shortcut.cmd("c").isMenuSafe && Shortcut(.tab, .control).isMenuSafe)
         // Plain typing keys must stay with text fields; the keypad cannot be shown in a menu.
         #expect(!Shortcut(.returnKey).isMenuSafe && !Shortcut(.space).isMenuSafe && !Shortcut(.backspace).isMenuSafe)
-        #expect(!Shortcut(.left).isMenuSafe && !Shortcut(.keypadPlus, .control).isMenuSafe)
+        #expect(!Shortcut(.leftArrow).isMenuSafe && !Shortcut(.keypadPlus, .control).isMenuSafe)
     }
 
     @Test func menuItemsTakeCaptionFromTheCommandAndKeyFromTheBindings() {

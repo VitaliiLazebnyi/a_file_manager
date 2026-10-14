@@ -1,12 +1,13 @@
 import Foundation
 
-/// The questions under way and those waiting their turn. All state, that of every `Call`
-/// included, is guarded by `lock`.
-final class CallBook: @unchecked Sendable {
-    static let shared = CallBook()
-
-    /// A question to one owner. Equal keys are one question.
-    fileprivate struct Key: Hashable {
+/// The questions under way and those waiting their turn.
+///
+/// All state, that of every `Call` included, is guarded by `lock`.
+internal final class CallBook: @unchecked Sendable {
+    /// A question to one owner.
+    ///
+    /// Equal keys are one question.
+    private struct Key: Hashable {
         let owner: ObjectIdentifier
         let question: String
 
@@ -20,8 +21,9 @@ final class CallBook: @unchecked Sendable {
         }
     }
 
-    fileprivate final class Call: @unchecked Sendable {
-        fileprivate let key: Key
+    /// One question, asked once for all who want its answer.
+    private final class Call: @unchecked Sendable {
+        let key: Key
         let shares: Bool
         /// Set when nobody waits for the answer any more.
         let flag = CancellationFlag()
@@ -31,26 +33,40 @@ final class CallBook: @unchecked Sendable {
         /// Running, and given up by everyone who asked.
         var isStranded = false
 
-        fileprivate init(key: Key, shares: Bool, work: @escaping @Sendable (CancellationFlag) -> Any) {
+        init(key: Key, shares: Bool, work: @escaping @Sendable (CancellationFlag) -> Any) {
             (self.key, self.shares, self.work) = (key, shares, work)
+        }
+
+        deinit {
+            // Nothing to release.
         }
     }
 
     /// One asker's place at a call.
-    final class Ticket: Sendable {
-        private let book: CallBook
-        private let call: Call
-        private let id: Int
+    internal final class Ticket: Sendable {
+        private let leave: @Sendable () -> Void
 
-        fileprivate init(book: CallBook, call: Call, id: Int) {
-            (self.book, self.call, self.id) = (book, call, id)
+        /// `leave` takes the asker's place away; it is safe to call more than once.
+        internal init(leave: @escaping @Sendable () -> Void) {
+            self.leave = leave
         }
 
-        /// The asker no longer wants the answer. Safe from any thread, more than once.
-        func cancel() {
-            book.leave(call, id)
+        /// The asker no longer wants the answer.
+        ///
+        /// Safe from any thread, more than once.
+        internal func cancel() {
+            leave()
+        }
+
+        deinit {
+            // Nothing to release.
         }
     }
+
+    /// The one book of the program.
+    internal static let shared = CallBook()
+    /// The most questions one owner has under way at a time, answered or not.
+    private static let mostAtOnce = 64
 
     private let lock = NSLock()
     private var running: [Key: [Call]] = [:]
@@ -58,12 +74,11 @@ final class CallBook: @unchecked Sendable {
     private var waiting: [Call] = []
     private var underWay: [ObjectIdentifier: Int] = [:]
     private var lastListener = 0
-    /// The most questions one owner has under way at a time, answered or not.
-    private static let mostAtOnce = 64
 
-    /// `listener` is called once with the answer, on the thread that worked it out, unless
-    /// the ticket is cancelled first.
-    func ask(
+    /// Asks `question` of `owner`, or joins the same question under way when `shares` (and
+    /// it shares too). `work` works the answer out on a kernel thread; `listener` is called
+    /// once with the answer, on that thread, unless the ticket is cancelled first.
+    internal func ask(
         owner: AnyObject,
         question: String,
         shares: Bool,
@@ -80,7 +95,7 @@ final class CallBook: @unchecked Sendable {
         {
             call.listeners[id] = listener
             lock.unlock()
-            return Ticket(book: self, call: call, id: id)
+            return Ticket { [self] in leave(call, id) }
         }
         let call = Call(key: key, shares: shares, work: work)
         call.listeners[id] = listener
@@ -88,12 +103,13 @@ final class CallBook: @unchecked Sendable {
         if starts { begin(call) } else { waiting.append(call) }
         lock.unlock()
         if starts { launch(call) }
-        return Ticket(book: self, call: call, id: id)
+        return Ticket { [self] in leave(call, id) }
     }
 
     /// Called with the lock held.
     private func canStart(_ call: Call) -> Bool {
-        (underWay[call.key.owner] ?? 0) < Self.mostAtOnce && !(running[call.key]?.contains { $0.isStranded } ?? false)
+        (underWay[call.key.owner] ?? 0) < Self.mostAtOnce
+            && !(running[call.key]?.contains(where: \.isStranded) ?? false)
     }
 
     /// Called with the lock held.
@@ -134,13 +150,14 @@ final class CallBook: @unchecked Sendable {
             }
         }
         lock.unlock()
-        // Let go of outside the lock, like everything that may hold much.
-        withExtendedLifetime(work) {}
+        withExtendedLifetime(work) {
+            // Let go of outside the lock, like everything that may hold much.
+        }
         for listener in listeners { listener(answer) }
         for next in starts { launch(next) }
     }
 
-    fileprivate func leave(_ call: Call, _ id: Int) {
+    private func leave(_ call: Call, _ id: Int) {
         lock.lock()
         guard let listener = call.listeners.removeValue(forKey: id) else {
             lock.unlock()
@@ -160,6 +177,12 @@ final class CallBook: @unchecked Sendable {
         lock.unlock()
         // Outside the lock: the flag's handlers run here, and closures are let go.
         if isGivenUp { call.flag.cancel() }
-        withExtendedLifetime((listener, work)) {}
+        withExtendedLifetime((listener, work)) {
+            // Only kept alive up to here.
+        }
+    }
+
+    deinit {
+        // Nothing to release: the one book lives as long as the program.
     }
 }

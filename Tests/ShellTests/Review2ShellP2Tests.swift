@@ -123,7 +123,7 @@ private final class FilterProbe: @unchecked Sendable {
 /// without a pass over the list.
 extension Application {
     fileprivate func start(plugins extra: [any Plugin], fileSystems: [any FileSystemProvider] = []) async -> Running {
-        let kernel = Kernel(productName: StandardPlugins.productName, settings: settings, ui: ui)
+        let kernel = Kernel(productName: StandardPlugins.productName, settings: settings, interaction: ui)
         kernel.fileSystems.register(memory)
         fileSystems.forEach(kernel.fileSystems.register)
         // Without the plugins that run command lines and hear of typed addresses where a
