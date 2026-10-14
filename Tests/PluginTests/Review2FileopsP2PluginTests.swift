@@ -528,7 +528,7 @@ final class P2Bench: ShellServices {
         #expect(commands.isEnabled(.pasteFromClipboard))
         commands.perform(.pasteFromClipboard)
         #expect(probe.base.allPaths == ["/A", "/A/one.txt"], "\(probe.base.allPaths)")
-        #expect(bench.ui.log.contains("inform: The clipboard cannot be pasted as a file!"))
+        #expect(bench.interaction.log.contains("inform: The clipboard cannot be pasted as a file!"))
         // And when it can be written, the file is there under its own name only.
         probe.writeFailure = nil
         commands.perform(.pasteFromClipboard)

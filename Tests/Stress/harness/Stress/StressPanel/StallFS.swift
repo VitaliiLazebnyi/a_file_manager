@@ -1,40 +1,45 @@
 import AFMKernel
 import Foundation
-import StressKit
 import TestSupport
 
-/// A provider (scheme `stall`) in front of a `MemoryFileSystem` whose questions about single
-/// files (`item(at:)`, `volume(of:)`, `totalSize`, `entries`) do not answer
+/// A provider (scheme `stall`) in front of a `MemoryFileSystem` that stops answering on request.
+///
+/// Its questions about single files (`item(at:)`, `volume(of:)`, `totalSize`, `entries`) do not answer
 /// while `isStalled` is set, like a share that has stopped talking. Listings stall through the
 /// memory file system's own `stallsListings`.
 ///
 /// A call that arrives ON THE MAIN THREAD while stalled is not held (the harness would hang):
 /// it is recorded with its stack as "would have frozen the window", and answered.
-final class StallFS: FileSystemProvider {
-    let inner: MemoryFileSystem
-    let scheme = "stall"
+///
+/// Unchecked: every stored `var` is guarded by `gate`; `inner` is a `let` of a Sendable type.
+internal final class StallFS: @unchecked Sendable {
+    /// The memory file system that answers once the provider talks.
+    internal let inner: MemoryFileSystem
+    /// Guards the state below; blocked calls wait on it.
     private let gate = NSCondition()
+    /// Whether calls are held.
     private var stalled = false
+    /// Calls held now.
     private var blocked = 0
+    /// The most calls held at once.
     private var mostBlocked = 0
+    /// Calls held now, by method.
     private var blockedBy: [String: Int] = [:]
-    var blockedByMethod: String {
+    /// Calls that arrived on the main thread while stalled, by method: how many, and the first stack.
+    private var mainThreadCalls: [String: (count: Int, stack: [String])] = [:]
+    /// Every call, by method.
+    private var calls: [String: Int] = [:]
+
+    /// Calls held now, by method, as `method=count` pairs.
+    internal var blockedByMethod: String {
         gate.lock()
         defer { gate.unlock() }
-        return blockedBy.filter { $0.value > 0 }.sorted { $0.key < $1.key }.map { "\($0.key)=\($0.value)" }
-            .joined(
-                separator: ", "
-            )
-    }
-    private(set) var mainThreadCalls: [String: (count: Int, stack: [String])] = [:]
-    private(set) var calls: [String: Int] = [:]
-
-    init() {
-        inner = MemoryFileSystem(scheme: "stall")
-        inner.isLocal = false
+        let held = blockedBy.filter { $0.value > 0 }.sorted { $0.key < $1.key }
+        return held.map { "\($0.key)=\($0.value)" }.joined(separator: ", ")
     }
 
-    var isStalled: Bool {
+    /// Whether calls are held; setting it to false lets the held calls go on.
+    internal var isStalled: Bool {
         get {
             gate.lock()
             defer { gate.unlock() }
@@ -49,29 +54,41 @@ final class StallFS: FileSystemProvider {
         }
     }
 
-    func release() {
-        isStalled = false
-        inner.releaseStalls()
-    }
-
-    var blockedNow: Int {
+    /// Calls held now.
+    internal var blockedNow: Int {
         gate.lock()
         defer { gate.unlock() }
         return blocked
     }
-    var mostBlockedAtOnce: Int {
+
+    /// The most calls held at once so far.
+    internal var mostBlockedAtOnce: Int {
         gate.lock()
         defer { gate.unlock() }
         return mostBlocked
     }
 
-    private func count(_ what: String) {
+    /// A provider that answers, with an empty share that is not local.
+    internal init() {
+        inner = MemoryFileSystem(scheme: "stall")
+        inner.isLocal = false
+    }
+
+    /// Lets every held call and listing go on.
+    internal func release() {
+        isStalled = false
+        inner.releaseStalls()
+    }
+
+    /// Counts a call of `what` that is never held.
+    internal func count(_ what: String) {
         gate.lock()
         calls[what, default: 0] += 1
         gate.unlock()
     }
 
-    private func wait(_ what: String, cancellation: CancellationFlag? = nil) {
+    /// Counts a call of `what` and, while stalled, holds it until the stall ends or `cancellation` is set.
+    internal func wait(_ what: String, cancellation: CancellationFlag?) {
         gate.lock()
         calls[what, default: 0] += 1
         guard stalled else {
@@ -97,129 +114,27 @@ final class StallFS: FileSystemProvider {
         blocked += 1
         blockedBy[what, default: 0] += 1
         mostBlocked = max(mostBlocked, blocked)
-        while stalled, cancellation?.isCancelled != true { gate.wait() }
+        while stalled, cancellation?.isCancelled != true {
+            gate.wait()
+        }
         blocked -= 1
         blockedBy[what, default: 0] -= 1
         gate.unlock()
     }
 
-    var capabilities: FileSystemCapabilities { inner.capabilities }
-    // By the protocol `capabilities(for:)` answers at once, from what the provider knows (validation asks
-    // it on the main thread at every tick), so a silent server does not hold it up: counted, never stalled.
-    func capabilities(for url: URL) -> FileSystemCapabilities {
-        count("capabilities(for:)")
-        return inner.capabilities(for: url)
+    /// `wait(_:cancellation:)` for a call that cannot be cancelled.
+    internal func wait(_ what: String) {
+        wait(what, cancellation: nil)
     }
 
-    func list(_ directory: URL, showHidden: Bool) throws -> [FileItem] {
-        wait("list (no cancellation)")
-        return try inner.list(directory, showHidden: showHidden)
-    }
-    func list(_ directory: URL, showHidden: Bool, receive: ([FileItem]) -> Bool) throws {
-        wait("list receive (no cancellation)")
-        try inner.list(directory, showHidden: showHidden, receive: receive)
-    }
-    func list(_ directory: URL, showHidden: Bool, cancellation: CancellationFlag) throws -> [FileItem] {
-        wait("list(cancellation:)", cancellation: cancellation)
-        return try inner.list(directory, showHidden: showHidden, cancellation: cancellation)
-    }
-    func list(_ directory: URL, showHidden: Bool, cancellation: CancellationFlag, receive: ([FileItem]) -> Bool) throws
-    {
-        wait("list(cancellation:receive:)", cancellation: cancellation)
-        try inner.list(directory, showHidden: showHidden, cancellation: cancellation, receive: receive)
-    }
-    func item(at url: URL) -> FileItem? {
-        wait("item(at:)")
-        return inner.item(at: url)
-    }
-    func item(at url: URL, cancellation: CancellationFlag) -> FileItem? {
-        wait("item(at:cancellation:)", cancellation: cancellation)
-        return inner.item(at: url)
-    }
-    func parent(of directory: URL) -> URL? { inner.parent(of: directory) }
-    func read(_ url: URL) throws -> FileReader {
-        wait("read")
-        return try inner.read(url)
-    }
-    func read(_ url: URL, cancellation: CancellationFlag) throws -> FileReader {
-        wait("read(cancellation:)", cancellation: cancellation)
-        return try inner.read(url, cancellation: cancellation)
-    }
-    func createDirectory(at url: URL) throws {
-        wait("createDirectory")
-        try inner.createDirectory(at: url)
-    }
-    func write(_ url: URL) throws -> FileWriter {
-        wait("write")
-        return try inner.write(url)
-    }
-    func write(_ url: URL, cancellation: CancellationFlag) throws -> FileWriter {
-        wait("write(cancellation:)", cancellation: cancellation)
-        return try inner.write(url, cancellation: cancellation)
-    }
-    func append(to url: URL, at offset: Int64?, cancellation: CancellationFlag) throws -> FileWriter {
-        wait("append", cancellation: cancellation)
-        return try inner.append(to: url, at: offset, cancellation: cancellation)
-    }
-    func remove(_ url: URL) throws {
-        wait("remove")
-        try inner.remove(url)
-    }
-    func trash(_ url: URL) throws {
-        wait("trash")
-        try inner.trash(url)
-    }
-    func move(_ source: URL, to destination: URL, replacing: Bool) throws {
-        wait("move")
-        try inner.move(source, to: destination, replacing: replacing)
-    }
-    func copy(_ source: URL, to destination: URL, progress: (Int64) -> Bool) throws {
-        wait("copy")
-        try inner.copy(source, to: destination, progress: progress)
-    }
-    func setAttributes(_ attributes: FileAttributes, of url: URL) throws {
-        wait("setAttributes")
-        try inner.setAttributes(attributes, of: url)
-    }
-    func copyMetadata(from source: URL, to destination: URL) throws {
-        wait("copyMetadata")
-        try inner.copyMetadata(from: source, to: destination)
-    }
-    func commit(_ url: URL, cancellation: CancellationFlag) throws {
-        wait("commit", cancellation: cancellation)
-        try inner.commit(url, cancellation: cancellation)
-    }
-    func quarantine(of url: URL) -> Data? {
-        wait("quarantine")
-        return inner.quarantine(of: url)
-    }
-    func setQuarantine(_ value: Data, of url: URL) throws {
-        wait("setQuarantine")
-        try inner.setQuarantine(value, of: url)
-    }
-    func displayPath(_ url: URL) -> String { inner.displayPath(url) }
-    func location(from text: String) -> URL? { inner.location(from: text) }
-    var readsRootedPaths: Bool { inner.readsRootedPaths }
-    func places() -> [Place] {
-        wait("places")
-        return inner.places()
-    }
-    func volume(of _: URL) -> VolumeInfo? {
-        wait("volume(of:)")
-        return VolumeInfo(name: "Stalling share", freeBytes: 1 << 30, totalBytes: 1 << 40, isLocal: false)
-    }
-    func totalSize(of directory: URL, cancellation: CancellationFlag) -> Int64 {
-        wait("totalSize", cancellation: cancellation)
-        return inner.totalSize(of: directory, cancellation: cancellation)
-    }
-    func watch(_ directories: [URL], onChange: @escaping ([URL]) -> Void) -> AnyObject? {
-        wait("watch")
-        return inner.watch(directories, onChange: onChange)
-    }
-
-    func snapshotCalls() -> (calls: [String: Int], main: [String: (count: Int, stack: [String])]) {
+    /// Every call by method, and the calls that arrived on the main thread while stalled.
+    internal func snapshotCalls() -> (calls: [String: Int], main: [String: (count: Int, stack: [String])]) {
         gate.lock()
         defer { gate.unlock() }
         return (calls, mainThreadCalls)
+    }
+
+    deinit {
+        // Nothing to release.
     }
 }

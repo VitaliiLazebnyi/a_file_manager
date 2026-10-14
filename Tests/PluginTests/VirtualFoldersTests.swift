@@ -289,7 +289,7 @@ import Testing
     @Test func operationsWorkOnTheRealFiles() {
         commands.perform(.branchView)
         left.moveCursor(toName: "docs/in.txt")
-        bench.ui.choiceAnswers = [0]
+        bench.interaction.choiceAnswers = [0]
         commands.perform(.deleteDirectly)
         #expect(!memory.exists("/A/docs/in.txt") && memory.exists("/A/docs/deep/leaf.txt"))
         // The panel still shows the branch, without the deleted file.
@@ -343,9 +343,9 @@ import Testing
         commands.perform("LOADLIST", .location(memory.url("/A/found.lst")))
         #expect(left.names == ["mem:/A/docs/in.txt", "mem:/A/one.txt", "mem:/B/other.txt"])
         #expect(left.tabs.title(at: 0) == "found" && bench.jobService.titles == ["Load file list"])
-        bench.ui.promptAnswers = [.text("mem:/A/missing.lst")]
+        bench.interaction.promptAnswers = [.text("mem:/A/missing.lst")]
         commands.perform("LOADLIST")
-        #expect(bench.ui.log.last == "inform: The list of files could not be loaded.")
+        #expect(bench.interaction.log.last == "inform: The list of files could not be loaded.")
         #expect(FileListFile.lines(in: Data([0xFF, 0xFE, 0x61, 0x00, 0x0A, 0x00, 0x62, 0x00])) == ["a", "b"])
     }
 

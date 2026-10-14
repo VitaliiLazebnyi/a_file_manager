@@ -362,11 +362,11 @@ import Testing
     @Test func namesFromAListThatMoveFilesAreAskedAbout() {
         let session = session(clipboard: { nil }, changes: nil)
         session.loadNames(fromText: "x.txt\nsub/y.txt\nz.txt")
-        bench.ui.choiceAnswers = [1]
+        bench.interaction.choiceAnswers = [1]
         var result: RenameRunResult?
         session.start { result = $0 }
         #expect(result?.cancelled == true && memory.exists("/d/a.txt") && !memory.exists("/d/x.txt"))
-        bench.ui.choiceAnswers = [0]
+        bench.interaction.choiceAnswers = [0]
         session.start { result = $0 }
         #expect(result?.renamed.count == 3 && memory.exists("/d/sub/y.txt"))
     }
@@ -409,7 +409,7 @@ import Testing
             }
         #expect(result?.failures.isEmpty == true && names == [[0xE9, 0x2E, 0x74, 0x78, 0x74]])
         // And Undo writes the accent the way it was.
-        local.ui.choiceAnswers = [0]
+        local.interaction.choiceAnswers = [0]
         session.undo()
         let back = (try FileManager.default.contentsOfDirectory(atPath: box.url("p").path))
             .map {

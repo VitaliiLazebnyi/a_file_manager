@@ -207,7 +207,7 @@ struct FileOpsAdoptVolumes {
         bench.commands.perform(.renameOnly, .text("README"))
         #expect(text(cs.appendingPathComponent("readme")) == "lower")
         #expect(text(cs.appendingPathComponent("README")) == "UPPER")
-        #expect(bench.ui.log.contains { $0.hasPrefix("inform: readme cannot be renamed!") }, "\(bench.ui.log)")
+        #expect(bench.interaction.log.contains { $0.hasPrefix("inform: readme cannot be renamed!") }, "\(bench.interaction.log)")
 
         // Nothing else has the name: a rename that only changes the case is just a rename.
         bench.left.moveCursor(toName: "solo")

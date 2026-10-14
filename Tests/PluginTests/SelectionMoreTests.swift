@@ -315,18 +315,19 @@ import Testing
         #expect(left.model.selection == ["two.txt", "two.md"])
         // The dialog proposes *.*, or the extension under the cursor.
         left.moveCursor(toName: "three.md")
-        bench.ui.promptAnswers = [.accept]
+        bench.interaction.promptAnswers = [.accept]
         commands.perform(Ids.selectGroupCurrentExtension)
         #expect(
             left.model.selection == ["two.txt", "two.md", "three.md"]
-                && bench.ui.log.last == "prompt: Expand selection [*.md]"
+                && bench.interaction.log.last == "prompt: Expand selection [*.md]"
         )
-        bench.ui.promptAnswers = [.cancel]
+        bench.interaction.promptAnswers = [.cancel]
         commands.perform(Ids.clearFolders)
         #expect(left.model.selection.count == 3)
         commands.perform(.selectGroup, .text("<("))
         #expect(
-            bench.ui.log.last == "inform: The regular expression cannot be read." && left.model.selection.count == 3
+            bench.interaction.log.last == "inform: The regular expression cannot be read."
+                && left.model.selection.count == 3
         )
     }
 
@@ -405,7 +406,7 @@ import Testing
 
     @Test func historyAndSelectionTypes() {
         let bench = makeBench()
-        let (commands, left, ui) = (bench.commands, bench.left, bench.ui)
+        let (commands, left, ui) = (bench.commands, bench.left, bench.interaction)
         commands.perform(Ids.selectFromList)
         #expect(ui.log.last == "inform: There are no saved selection types or earlier masks yet.")
         commands.perform(.selectGroup, .text("*.md"))
@@ -440,9 +441,9 @@ import Testing
 
         // A second plugin instance reads the same settings: types and history persist.
         let again = makeBench()
-        again.ui.formAnswers = [.cancel]
+        again.interaction.formAnswers = [.cancel]
         again.commands.perform(Ids.selectFromList)
-        if case .list(let rows, _)? = again.ui.forms.last?.first?.kind {
+        if case .list(let rows, _)? = again.interaction.forms.last?.first?.kind {
             #expect(rows == [">large", "*.md"])
         } else {
             Issue.record("no list")
@@ -468,7 +469,7 @@ import Testing
 
     @Test func savingAndLoadingSelectionFiles() {
         let bench = makeBench()
-        let (commands, left, ui) = (bench.commands, bench.left, bench.ui)
+        let (commands, left, ui) = (bench.commands, bench.left, bench.interaction)
         commands.perform(.selectGroup, .text("docs *.md"))
         ui.promptAnswers = [.text("sel")]
         commands.perform(Ids.saveSelectionToFile)

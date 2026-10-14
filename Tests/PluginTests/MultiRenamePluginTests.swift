@@ -16,7 +16,7 @@ import Testing
     let plugin: MultiRenamePlugin
     let bench: TestBench
 
-    var ui: ScriptedInteraction { bench.ui }
+    var ui: ScriptedInteraction { bench.interaction }
     var left: FakePanel { bench.left }
 
     init() throws {

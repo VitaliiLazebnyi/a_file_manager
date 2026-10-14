@@ -19,7 +19,7 @@ import Testing
     let bench: TestBench
     let early = Date(timeIntervalSince1970: 1_000_000)
 
-    var ui: ScriptedInteraction { bench.ui }
+    var ui: ScriptedInteraction { bench.interaction }
 
     init() {
         memory.addFile("/A/new.txt", "from the left", modified: early.addingTimeInterval(500))
@@ -323,7 +323,7 @@ import Testing
         )
 
         other.commands.perform(.synchronizeDirectories, .text("Missing"))
-        #expect(other.ui.log.last == "inform: There are no saved synchronize settings named Missing.")
+        #expect(other.interaction.log.last == "inform: There are no saved synchronize settings named Missing.")
         session.removeSet(named: "Another")
         #expect(session.savedSets.map(\.name) == ["Backup"])
     }

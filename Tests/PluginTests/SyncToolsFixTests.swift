@@ -381,8 +381,8 @@ private func fixDigest(_ method: ChecksumMethod, _ data: Data, pieces: Int = 1) 
         session.onChange = { [weak session] in
             if let session { phases.append(session.phase) }
         }
-        bench.ui.formAnswers = [.accept]
-        bench.ui.choiceAnswers = [1]
+        bench.interaction.formAnswers = [.accept]
+        bench.interaction.choiceAnswers = [1]
         session.synchronize()
         #expect(phases.contains(.synchronizing) && session.phase == .compared)
         #expect(phases.first == .synchronizing)

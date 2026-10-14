@@ -40,7 +40,7 @@ private func folder(_ output: String?) -> String? {
     let box: Sandbox
 
     var commands: CommandRegistry { bench.commands }
-    var ui: ScriptedInteraction { bench.ui }
+    var ui: ScriptedInteraction { bench.interaction }
 
     init() throws {
         box = try Sandbox()
@@ -136,7 +136,7 @@ private func folder(_ output: String?) -> String? {
         bench.commands.perform(.runCommandLine, .text("printf '%s-%s' a b"))
         #expect(
             viewer.texts.map(\.text) == ["a-b"] && viewer.texts.first?.title == "printf '%s-%s' a b"
-                && bench.ui.forms.isEmpty
+                && bench.interaction.forms.isEmpty
         )
     }
 

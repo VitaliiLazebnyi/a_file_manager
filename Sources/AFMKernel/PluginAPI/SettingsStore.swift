@@ -29,17 +29,16 @@ extension SettingsStore {
         data(forKey: key).flatMap { try? JSONDecoder().decode(type, from: $0) }
     }
 
-    /// Stores a value as JSON.
-    public func set<Value: Encodable>(_ value: Value, forKey key: String) {
-        set(try? JSONEncoder().encode(value), forKey: key)
-    }
-
-    /// Raw data is stored as it is, through `set(_:forKey:)` with a `Data?`.
+    /// Stores a value as JSON; raw data is stored as it is.
     ///
-    /// Without this, `Data` would match the generic method above better and be stored as JSON text.
-    @available(*, unavailable, message: "Pass the data as `Data?`: it is then stored as it is")
-    public func set(_ data: Data, forKey key: String) {
-        set(data as Data?, forKey: key)
+    /// `Data` matches this method better than `set(_:forKey:)` with its `Data?`, so it is told
+    /// apart here: encoded, it would be stored as JSON text.
+    public func set<Value: Encodable>(_ value: Value, forKey key: String) {
+        if let data = value as? Data {
+            set(data as Data?, forKey: key)
+        } else {
+            set(try? JSONEncoder().encode(value), forKey: key)
+        }
     }
 
     /// A plugin's own corner of the settings: its keys cannot clash with anyone else's.

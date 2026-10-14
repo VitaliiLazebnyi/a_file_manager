@@ -869,14 +869,14 @@ private func created(_ url: URL) -> Date? {
 
     @Test func theTrashIsOfferedWhereTheItemsAreNotWhereTheFileSystemSaysInGeneral() {
         bench.left.moveCursor(toName: "one.txt")
-        bench.ui.choiceAnswers = [1]
+        bench.interaction.choiceAnswers = [1]
         bench.commands.perform(.delete)
-        #expect(bench.ui.log.last?.contains("to the Trash") == true)
+        #expect(bench.interaction.log.last?.contains("to the Trash") == true)
 
         bench.left.show(memory.url("/B"))
         bench.left.moveCursor(toName: "two.txt")
-        bench.ui.choiceAnswers = [1]
+        bench.interaction.choiceAnswers = [1]
         bench.commands.perform(.delete)
-        #expect(bench.ui.log.last?.hasPrefix("choose: Permanently delete") == true)
+        #expect(bench.interaction.log.last?.hasPrefix("choose: Permanently delete") == true)
     }
 }

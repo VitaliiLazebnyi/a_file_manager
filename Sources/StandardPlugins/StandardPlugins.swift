@@ -24,13 +24,17 @@ import VirtualFoldersPlugin
 
 /// The plugins that make up the program.
 public enum StandardPlugins {
+    /// The program's name, for the menu, window titles and dialogs.
     public static let productName = "A File Manager"
 
+    /// Makes one of each plugin of the program, in the order they are started.
+    ///
+    /// Main thread only.
     /// The order decides where entries appear inside a menu section; nothing else depends on it.
     /// Tests pass a pasteboard of their own and keep other applications from being started.
-    @MainActor public static func make(pasteboard: NSPasteboard = .general, launchesApplications: Bool = true)
-        -> [any Plugin]
-    {
+    @MainActor
+    @preconcurrency
+    public static func make(pasteboard: NSPasteboard = .general, launchesApplications: Bool = true) -> [any Plugin] {
         [
             LocalFileSystemPlugin(),
             ArchivesPlugin(launchesApplications: launchesApplications),

@@ -293,7 +293,7 @@ import Testing
     var commands: CommandRegistry { bench.commands }
     var left: FakePanel { bench.left }
     var right: FakePanel { bench.right }
-    var ui: ScriptedInteraction { bench.ui }
+    var ui: ScriptedInteraction { bench.interaction }
     var hotlist: Hotlist { plugin.hotlist(in: bench.kernel) }
 
     init() {

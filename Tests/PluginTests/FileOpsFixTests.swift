@@ -639,7 +639,7 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
         bench.left.moveCursor(toName: "readme")
         bench.commands.perform(.renameOnly, .text("README"))
         #expect(namesOnDisk(box.url("A")) == ["README"] && box.read("A/README") == "mine")
-        #expect(!bench.ui.log.contains { $0.hasPrefix("inform") })
+        #expect(!bench.interaction.log.contains { $0.hasPrefix("inform") })
     }
 
     @Test func renamingOntoAnotherFileWhoseNameDiffersInCaseIsRefused() {
@@ -656,7 +656,7 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
         bench.left.moveCursor(toName: "readme")
         bench.commands.perform(.renameOnly, .text("README"))
         #expect(memory.contents("/A/readme") == "first" && memory.contents("/A/README") == "second")
-        #expect(bench.ui.log.contains("inform: readme cannot be renamed!"))
+        #expect(bench.interaction.log.contains("inform: readme cannot be renamed!"))
     }
 
     // MARK: F17
@@ -725,11 +725,11 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
         bench.left.moveCursor(toName: "one.txt")
         bench.commands.perform(ClipboardCommands.saveDetails, .text("details.txt"))
         #expect(box.read("A/details.txt/inside") == "precious")
-        #expect(bench.ui.log.contains("inform: The details cannot be saved!"))
+        #expect(bench.interaction.log.contains("inform: The details cannot be saved!"))
 
         // A file is replaced in one step, without a leftover.
         try box.file("A/notes.txt", "old")
-        bench.ui.choiceAnswers = [0]
+        bench.interaction.choiceAnswers = [0]
         bench.commands.perform(ClipboardCommands.saveDetails, .text("notes.txt"))
         #expect(box.read("A/notes.txt")?.hasPrefix("one.txt\t") == true)
         #expect(!namesOnDisk(box.url("A")).contains { $0.hasSuffix(".tmp") })
@@ -775,14 +775,14 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
         )
         bench.left.moveCursor(toName: "docs")
         // The permissions field keeps what the dialog proposed.
-        bench.ui.formAnswers = [
+        bench.interaction.formAnswers = [
             .values([
                 "recurse": .flag(true), "changeDate": .flag(true), "date": .text("2001-02-03"),
                 "time": .text("04:05:06")
             ])
         ]
         bench.commands.perform(.setAttributes)
-        #expect(bench.ui.forms[0].first { $0.key == "permissions" }?.initialValue == .text("755"))
+        #expect(bench.interaction.forms[0].first { $0.key == "permissions" }?.initialValue == .text("755"))
         #expect(LocalInfo.details(inner)?.mode == 0o600)
         let year = Calendar.current.component(
             .year,
@@ -804,7 +804,7 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
             right: box.url("B")
         )
         bench.left.moveCursor(toName: "one.txt")
-        bench.ui.formAnswers = [.accept]
+        bench.interaction.formAnswers = [.accept]
         bench.commands.perform(.setAttributes)
         #expect(LocalInfo.details(file)?.flags ?? 0 & UInt32(UF_IMMUTABLE) != 0)
     }
@@ -823,7 +823,7 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
         bench.left.moveCursor(toName: "one.txt")
         bench.right.moveCursor(toName: "other.txt")
         // "Load from Target File" applies what it loaded, even though it is another file's mode.
-        bench.ui.formAnswers = [.values([:], button: 1), .accept]
+        bench.interaction.formAnswers = [.values([:], button: 1), .accept]
         bench.commands.perform(.setAttributes)
         #expect(LocalInfo.details(file)?.mode == 0o640)
     }

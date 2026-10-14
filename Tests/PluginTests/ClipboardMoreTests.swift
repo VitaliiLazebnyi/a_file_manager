@@ -119,15 +119,15 @@ import Testing
         #expect(left.model.cursorItem?.name == "details.txt")
         // The name is asked for; an existing file is replaced only after a question.
         left.moveCursor(toName: "two.txt")
-        bench.ui.promptAnswers = [.accept]
-        bench.ui.choiceAnswers = [1]
+        bench.interaction.promptAnswers = [.accept]
+        bench.interaction.choiceAnswers = [1]
         commands.perform(ClipboardCommands.saveDetails)
         #expect(memory.contents("/A/details.txt")?.hasPrefix("Name") == true)
-        bench.ui.promptAnswers = [.accept]
-        bench.ui.choiceAnswers = [0]
+        bench.interaction.promptAnswers = [.accept]
+        bench.interaction.choiceAnswers = [0]
         commands.perform(ClipboardCommands.saveDetails)
         #expect(memory.contents("/A/details.txt") == "two.txt\t1\t\(Format.date(modified))\trw-------")
-        bench.ui.promptAnswers = [.cancel]
+        bench.interaction.promptAnswers = [.cancel]
         commands.perform(ClipboardCommands.saveDetails)
         #expect(bench.jobService.titles.count == 3)
     }

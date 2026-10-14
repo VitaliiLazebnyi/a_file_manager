@@ -49,7 +49,7 @@ final class IntegrationConsent: ServerConsentService {
 
     @Test func aTargetTypedIntoTheCopyDialogIsTheUsersOwnChoice() {
         bench.left.moveCursor(toName: "one.txt")
-        bench.ui.promptAnswers = [.text("srv://in/")]
+        bench.interaction.promptAnswers = [.text("srv://in/")]
         bench.commands.perform(.copy)
         #expect(consent.chosen.count == 1 && consent.chosen.first?.scheme == "srv")
         #expect(server.contents("/in/one.txt") == "one")
@@ -59,7 +59,7 @@ final class IntegrationConsent: ServerConsentService {
         // The other panel shows a place on the server (say, a tab that a file restored).
         bench.right.show(server.url("/in"))
         bench.left.moveCursor(toName: "one.txt")
-        bench.ui.promptAnswers = [.accept]
+        bench.interaction.promptAnswers = [.accept]
         bench.commands.perform(.copy)
         #expect(consent.chosen.isEmpty)
         #expect(server.contents("/in/one.txt") == "one")
