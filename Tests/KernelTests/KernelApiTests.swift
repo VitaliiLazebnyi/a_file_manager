@@ -261,7 +261,7 @@ private func onThread(_ work: @escaping @Sendable () -> Void) {
         let second = CancellationFlag()
         onThread { [memory, fileSystems] in
             try? PanelLoader.stream(
-                memory.url("/far/sub"), showHidden: false, fileSystems: fileSystems, climbing: true,
+                climbingFrom: memory.url("/far/sub"), showHidden: false, fileSystems: fileSystems,
                 cancellation: second
             ) { _ in
                 batches += 1

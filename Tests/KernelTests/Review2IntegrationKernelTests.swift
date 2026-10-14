@@ -70,7 +70,7 @@ private func elsewhere<Value>(_ work: @escaping @Sendable () -> Value) -> Value 
         model.requestSort(ListOrder(key: .size, descending: true))
         let basis = model.basis
         let change = elsewhere {
-            PanelModel.prepare(basis, show: listing(other, arrival), history: .keep, remembered: true)
+            PanelModel.prepare(basis, showRemembered: listing(other, arrival), history: .keep)
         }
         #expect(model.apply(change) == .changed)
         // Filtered (folders stay), in the order that was asked for, which is the panel's now.

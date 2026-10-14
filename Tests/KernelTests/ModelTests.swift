@@ -203,9 +203,7 @@ import Testing
     @Test func selectionCommandsAndTotals() {
         #expect(
             panel.totals
-                == PanelModel.Totals(
-                    selectedBytes: 0, totalBytes: 3_072, selectedFiles: 0, totalFiles: 2,
-                    selectedFolders: 0, totalFolders: 2))
+                == PanelModel.Totals(total: PanelModel.Counts(bytes: 3_072, files: 2, folders: 2)))
         panel.selectAll()
         #expect(
             panel.totals.selectedBytes == 3_072 && panel.totals.selectedFiles == 2 && panel.totals.selectedFolders == 2)

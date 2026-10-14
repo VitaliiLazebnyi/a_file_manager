@@ -58,7 +58,7 @@ private func entry(_ name: String, folder: Bool = false, size: Int64 = 0) -> Fil
             Array($0.utf8).lexicographicallyPrecedes(Array($1.utf8))
         }
         #expect(isAnOrder(names, collator: .current))
-        #expect(isAnOrder(names, collator: NameCollator(identifier: "ru")))
+        #expect(isAnOrder(names, collator: NameCollator(identifier: "ru", numeric: false, library: .system)))
     }
 
     @Test func languagesWithLettersOfTwoCharactersHaveOneOrder() {
@@ -70,7 +70,7 @@ private func entry(_ name: String, folder: Bool = false, size: Int64 = 0) -> Fil
         names += ["aBa", "AA", "aAB", "1aA", "1AA", "ddd", "ddf", "aa", "Aa", "aA"]
         names = Array(Set(names)).sorted()
         for identifier in ["da", "nb", "cy", "es@collation=traditional", "hu", "hr", "en"] {
-            let collator = NameCollator(identifier: identifier)
+            let collator = NameCollator(identifier: identifier, numeric: false, library: .system)
             #expect(isAnOrder(names, collator: collator), "\(identifier)")
             // Sorting on all cores gives that order, with nothing checked or put right afterwards.
             let items = (0..<40).flatMap { round in names.map { entry($0 + (round == 0 ? "" : "-\(round)")) } }

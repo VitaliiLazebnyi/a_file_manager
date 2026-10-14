@@ -51,7 +51,7 @@ public struct TabFile: Equatable, Sendable {
                 lines.append("\(index)_path=\(Self.value(path))")
                 if let title = tab.title, !title.isEmpty { lines.append("\(index)_caption=\(Self.value(title))") }
                 let fields = [
-                    1, tab.sortKey, tab.descending ? 1 : 0, 0, 0, tab.locked == true ? 1 : 0, tab.showHidden ? 1 : 0
+                    1, tab.sortKey, tab.descending ? 1 : 0, 0, 0, tab.locked ? 1 : 0, tab.showHidden ? 1 : 0
                 ]
                 lines.append("\(index)_options=" + fields.map(String.init).joined(separator: "|"))
             }
@@ -165,7 +165,7 @@ public struct TabFile: Equatable, Sendable {
             guard let keys = sections[name] else { return nil }
             let numbers = keys.keys.compactMap { key in key.hasSuffix("_path") ? Int(key.dropLast("_path".count)) : nil
             }.sorted()
-            var tabs: [PanelTabs.State.Tab] = []
+            var tabs: [PanelTabState] = []
             var active = 0
             let wanted = keys["activetab"].flatMap(Int.init) ?? 0
             for number in numbers {
@@ -177,13 +177,15 @@ public struct TabFile: Equatable, Sendable {
                     .map { Int($0) ?? 0 }
                 func field(_ index: Int) -> Int { fields.indices.contains(index) ? fields[index] : 0 }
                 if number == wanted { active = tabs.count }
-                tabs.append(
-                    PanelTabs.State.Tab(
-                        location: url, sortKey: field(1), descending: field(2) == 1, showHidden: field(6) == 1,
-                        title: keys["\(number)_caption"].map(Self.unquoted).flatMap {
-                            $0.isEmpty || $0.count > Self.captionLimit ? nil : $0
-                        },
-                        locked: field(5) == 1 ? true : nil))
+                var tab = PanelTabState(
+                    location: url, showHidden: field(6) == 1,
+                    title: keys["\(number)_caption"].map(Self.unquoted).flatMap {
+                        $0.isEmpty || $0.count > Self.captionLimit ? nil : $0
+                    },
+                    locked: field(5) == 1)
+                // The sort key as the file has it, known or not.
+                (tab.sortKey, tab.descending) = (field(1), field(2) == 1)
+                tabs.append(tab)
             }
             return tabs.isEmpty ? nil : PanelTabs.State(tabs: tabs, active: active)
         }

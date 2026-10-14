@@ -89,7 +89,9 @@ private let everyOrder = [SortKey.name, .ext, .size, .date, .unsorted].flatMap {
             return entry(index % 3 == 0 ? name + ".txt" : name, folder: index % 11 == 0, size: Int64(random.next(9)))
         }
         let languages = ["da", "sv", "de@collation=phonebook", "es@collation=traditional", "cs"]
-        let collators = languages.map { NameCollator(identifier: $0) } + [NameCollator(identifier: "", library: nil)]
+        let withoutLibrary = NameCollator(identifier: "", numeric: false, library: nil)
+        let collators =
+            languages.map { NameCollator(identifier: $0, numeric: false, library: .system) } + [withoutLibrary]
         for order in [ListOrder(key: .name), ListOrder(key: .ext, descending: true), ListOrder(key: .size)] {
             for collator in collators {
                 let sorted = Sorter.sort(items, by: order, collator: collator)
