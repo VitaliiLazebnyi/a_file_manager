@@ -22,6 +22,7 @@
 #   leaks       the tests under `leaks`: no leaked memory
 #   mutation    Muter on the files changed since origin/main (slow)
 #   sbom        writes build/sbom.spdx.json
+#   uitest      the UI tests (UITests/run.sh, XCUITest); only in the logged-in session, not over SSH
 set -euo pipefail
 cd "$(dirname "$0")/.."
 mkdir -p .build-tools
@@ -133,6 +134,10 @@ for gate in "${gates[@]}"; do
     mutation)
       step "Muter on changed files"
       Scripts/mutation.sh
+      ;;
+    uitest)
+      step "UI tests"
+      UITests/run.sh
       ;;
     sbom)
       step "SBOM"

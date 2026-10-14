@@ -9,6 +9,9 @@ build/
 Tests/Fuzz/out/
 Tests/Stress/out/
 
+# The Xcode project of the UI tests, generated from UITests/project.yml by UITests/run.sh
+UITests/AFileManagerUITests.xcodeproj/
+
 # Temporary working files
 scratchpad/
 
