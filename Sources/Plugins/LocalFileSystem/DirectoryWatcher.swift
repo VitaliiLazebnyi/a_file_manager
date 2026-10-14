@@ -180,8 +180,8 @@ final class DirectoryWatcher {
             let mustSchedule = !isScheduled
             isScheduled = true
             let now = DispatchTime.now()
-            let wanted = now.uptimeNanoseconds + UInt64((isRescan ? Watch.rescanDelay : Watch.delay) * 1e9)
-            let earliest = lastDelivery == 0 ? 0 : lastDelivery + UInt64(Watch.minimumGap * 1e9)
+            let wanted = now.uptimeNanoseconds + UInt64((isRescan ? Self.rescanDelay : Self.delay) * 1e9)
+            let earliest = lastDelivery == 0 ? 0 : lastDelivery + UInt64(Self.minimumGap * 1e9)
             lock.unlock()
             guard mustSchedule else { return }
             streamQueue.asyncAfter(deadline: DispatchTime(uptimeNanoseconds: max(wanted, earliest))) { self.deliver() }
@@ -259,9 +259,12 @@ final class DirectoryWatcher {
             resolutions = resolutions.filter { wanted.contains($0.key) }
             let missing = wanted.filter { path in
                 guard let known = resolutions[path] else { return true }
-                return known.real == nil && now &- known.at > Core.failureLifetime
+                return known.real == nil && now &- known.at > Self.failureLifetime
             }
-            guard !missing.isEmpty else { return reconcile() }
+            guard !missing.isEmpty else {
+                reconcile()
+                return
+            }
             let group = DispatchGroup()
             for path in missing {
                 resolutions[path] = nil
@@ -276,7 +279,7 @@ final class DirectoryWatcher {
                 }
             }
             group.notify(queue: control) { [self] in reconcile() }
-            control.asyncAfter(deadline: .now() + Core.resolutionPatience) { [self] in reconcile() }
+            control.asyncAfter(deadline: .now() + Self.resolutionPatience) { [self] in reconcile() }
         }
 
         /// Makes the stream match what is wanted and has been resolved.
@@ -321,18 +324,20 @@ final class DirectoryWatcher {
             else {
                 // Not remembered as watched: the next request tries again, and so does this.
                 Census.wasRefused()
-                return retryLater()
+                retryLater()
+                return
             }
             FSEventStreamSetDispatchQueue(stream, streamQueue)
             guard FSEventStreamStart(stream) else {
                 FSEventStreamInvalidate(stream)
                 FSEventStreamRelease(stream)
                 Census.wasRefused()
-                return retryLater()
+                retryLater()
+                return
             }
             Census.started()
             (self.stream, self.watch, watched) = (stream, watch, resolved)
-            retryDelay = Core.firstRetry
+            retryDelay = Self.firstRetry
         }
 
         /// The system did not give a stream (it has only so many for all programs together,
@@ -343,7 +348,7 @@ final class DirectoryWatcher {
             guard !isRetryPending, !gate.isStopped else { return }
             isRetryPending = true
             let delay = retryDelay
-            retryDelay = min(retryDelay * 2, Core.longestRetry)
+            retryDelay = min(retryDelay * 2, Self.longestRetry)
             control.asyncAfter(deadline: .now() + delay) { [self] in
                 isRetryPending = false
                 reconcile()

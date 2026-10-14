@@ -36,7 +36,7 @@ import Testing
     @discardableResult
     func wait(upTo seconds: TimeInterval = 10, until condition: () -> Bool) async -> Bool {
         let deadline = Date().addingTimeInterval(seconds)
-        while !condition() && Date() < deadline {
+        while !condition(), Date() < deadline {
             try? await Task.sleep(nanoseconds: 5_000_000)
         }
         return condition()
@@ -187,14 +187,14 @@ import Testing
     }
 
     @Test func spaceSelectsAFolderAndCalculatesItsSize() async throws {
-        try box.file("A/docs/deep/big.bin", String(repeating: "x", count: 5000))
+        try box.file("A/docs/deep/big.bin", String(repeating: "x", count: 5_000))
         let app = await start()
         defer { app.stop() }
         app.cursor(app.left, on: "docs")
         #expect(press(app, 49) && app.left.model.selection == ["docs"])
-        let reached1 = await wait { app.left.model.cursorItem?.computedSize == 5006 }
+        let reached1 = await wait { app.left.model.cursorItem?.computedSize == 5_006 }
         #expect(reached1)
-        #expect(app.left.model.totals.selectedBytes == 5006)
+        #expect(app.left.model.totals.selectedBytes == 5_006)
     }
 
     @Test func aClickOnAColumnHeaderSorts() async {
@@ -344,11 +344,11 @@ import Testing
     // MARK: Large and slow directories
 
     @Test func aSlowDirectoryIsShownWhileItIsStillArriving() async {
-        let count = 3000
+        let count = 3_000
         // The listing is held after its second batch until the test says go; no timing decides
         // whether it is still arriving when the checks are made.
         let slow = ScriptedFileSystem()
-        let arriving = (0..<count).map { String(format: "file%04d.txt", ($0 * 7919) % count) } + ["zz-folder"]
+        let arriving = (0..<count).map { String(format: "file%04d.txt", ($0 * 7_919) % count) } + ["zz-folder"]
         slow.batches = stride(from: 0, to: arriving.count, by: 250).map { start in
             arriving[start..<min(start + 250, arriving.count)].map {
                 slow.item(named: $0, in: "/slow", isDirectory: $0 == "zz-folder")
@@ -481,7 +481,7 @@ import Testing
     }
 
     @Test func goingElsewhereStopsASlowListing() async {
-        for index in 0..<2000 { memory.addFile("/slow/file\(index).txt") }
+        for index in 0..<2_000 { memory.addFile("/slow/file\(index).txt") }
         memory.addFile("/quick/only.txt")
         memory.listBatchSize = 100
         // Slow enough that the folder is "arriving" for most of a minute: the test has to see
@@ -560,7 +560,7 @@ import Testing
         app.kernel.jobs.run(
             title: "Asking",
             work: { monitor in
-                monitor.ask { self.ui.choose("Really?", detail: "", buttons: ["Yes", "No"], style: .warning) }
+                monitor.ask { ui.choose("Really?", detail: "", buttons: ["Yes", "No"], style: .warning) }
             }, completion: { answer = $0 })
         await settle(app)
         #expect(answer == 1 && ui.log == ["choose: Really? / "])

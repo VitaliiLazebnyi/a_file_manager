@@ -58,7 +58,7 @@ struct SelectionType: Codable, Equatable {
         guard !text.isEmpty else { return nil }
         var factor = 1.0
         if let unit = text.last, let power = ["b": 0, "k": 1, "m": 2, "g": 3, "t": 4][unit] {
-            factor = pow(1024, Double(power))
+            factor = pow(1_024, Double(power))
             text = String(text.dropLast()).trimmingCharacters(in: .whitespaces)
         }
         guard let number = Double(text.replacingOccurrences(of: ",", with: "")), number >= 0 else { return nil }
@@ -70,7 +70,7 @@ struct SelectionType: Codable, Equatable {
     static func text(ofSize size: Int64?) -> String {
         guard let size else { return "" }
         for (unit, power) in [("G", 3), ("M", 2), ("k", 1)] {
-            let factor = Int64(pow(1024, Double(power)))
+            let factor = Int64(pow(1_024, Double(power)))
             if size >= factor, size % factor == 0 { return "\(size / factor)\(unit)" }
         }
         return String(size)
@@ -190,13 +190,13 @@ final class SelectionStore {
 
     init(settings: SettingsStore) {
         self.settings = settings
-        scoped = settings.scoped(to: SelectionStore.scope)
+        scoped = settings.scoped(to: Self.scope)
     }
 
     /// Whether Num +, Ctrl+Num + and Num * also affect folders (`MarkDirectories`).
-    var marksFolders: Bool { settings.flag(SelectionStore.marksFoldersKey, default: true) }
+    var marksFolders: Bool { settings.flag(Self.marksFoldersKey, default: true) }
     /// Whether comparing treats times exactly one hour apart as equal (`1hourdif`).
-    var ignoresOneHour: Bool { settings.flag(SelectionStore.oneHourKey, default: false) }
+    var ignoresOneHour: Bool { settings.flag(Self.oneHourKey, default: false) }
 
     /// The masks used so far, the newest first.
     var history: [String] { scoped.value([String].self, forKey: "maskHistory") ?? [] }
@@ -204,7 +204,7 @@ final class SelectionStore {
     func remember(_ mask: String) {
         var masks = history.filter { $0 != mask }
         masks.insert(mask, at: 0)
-        scoped.set(Array(masks.prefix(SelectionStore.historyLimit)), forKey: "maskHistory")
+        scoped.set(Array(masks.prefix(Self.historyLimit)), forKey: "maskHistory")
     }
 
     func forget(mask: String) {

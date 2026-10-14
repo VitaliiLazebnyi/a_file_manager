@@ -141,7 +141,7 @@ private final class Collected<Value> {
         var tree = ArchiveTree()
         var model: [String: Bool] = [:]  // path → is a folder
         var generator = SystemRandomNumberGenerator()
-        func check(_ round: Int) -> Bool {
+        func check(_: Int) -> Bool {
             let files = model.filter { !$0.value }.keys
             // Every folder above a file exists, made up or real.
             var folders = Set(model.filter(\.value).keys)
@@ -169,16 +169,18 @@ private final class Collected<Value> {
             }
             return ordered.allSatisfy { tree.entry($0.path)?.order == $0.order }
         }
-        for round in 0..<3000 {
+        for round in 0..<3_000 {
             let path =
                 "d\(Int.random(in: 0..<5, using: &generator))/e\(Int.random(in: 0..<4, using: &generator))/f\(Int.random(in: 0..<30, using: &generator))"
             switch Int.random(in: 0..<4, using: &generator) {
             case 0, 1:
                 tree.insert(ArchiveEntry(path: path, isDirectory: false, size: Int64(round)))
                 model[path] = false
+
             case 2:
                 // Only what the tree's callers remove: a file, or a folder with nothing in it.
                 if tree.remove(path) != nil { model[path] = nil }
+
             default:
                 tree.update(path) { $0.size = -1 }
                 #expect(tree.entry(path).map { $0.size == -1 } ?? true)
@@ -306,7 +308,7 @@ private final class Collected<Value> {
         tar.append(tarBody("hello"))
         tar.append(tarHeader(name: "honest.txt", size: 5))
         tar.append(tarBody("hello"))
-        tar.append(Data(count: 1024))
+        tar.append(Data(count: 1_024))
         try tar.write(to: box.url("door.tar"))
         let second = try box.folder("second")
         result = try bench.unpack(box.url("door.tar"), to: second)
@@ -333,7 +335,7 @@ private final class Collected<Value> {
         tar.append(tarBody("hello"))
         tar.append(tarHeader(name: "/claimed-by-tar/deep.txt", size: 5))
         tar.append(tarBody("hello"))
-        tar.append(Data(count: 1024))
+        tar.append(Data(count: 1_024))
         try tar.write(to: box.url("absolute.tar"))
 
         // Listed without the leading slashes…

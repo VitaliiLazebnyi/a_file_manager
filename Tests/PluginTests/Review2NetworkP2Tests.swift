@@ -275,11 +275,11 @@ private final class Record<Value>: @unchecked Sendable {
         #expect(asked.all.count == 2)
     }
 
-    @Test func theTopOfAServerIsKnownFromTheAddressAlone() throws {
+    @Test func theTopOfAServerIsKnownFromTheAddressAlone() {
         let center = ConnectionCenter(environment: SessionEnvironment())
         let fs = RemoteFileSystem(scheme: "sftp", center: center)
-        let key = ServerKey(scheme: "sftp", host: "files.example.com", port: 2222)
-        let deep = key.url(path: "/" + Array(repeating: "d", count: 3000).joined(separator: "/"))
+        let key = ServerKey(scheme: "sftp", host: "files.example.com", port: 2_222)
+        let deep = key.url(path: "/" + Array(repeating: "d", count: 3_000).joined(separator: "/"))
         // The same answer as climbing with `parent(of:)`, without the climb, and without a connection.
         var climbed = deep
         while let parent = fs.parent(of: climbed) { climbed = parent }
@@ -301,7 +301,7 @@ private final class Record<Value>: @unchecked Sendable {
         consent.userChose(URL(string: "smb://127.0.0.1:\(fixture.server.port)/share")!)
         // Another port of the same host is another server.
         consent.userChose(
-            ServerKey(scheme: "ftp", host: "127.0.0.1", port: fixture.server.port == 21 ? 2121 : 21).url(path: "/"))
+            ServerKey(scheme: "ftp", host: "127.0.0.1", port: fixture.server.port == 21 ? 2_121 : 21).url(path: "/"))
         #expect(throws: (any Error).self) { _ = try fixture.names("/") }
         #expect(asked.all == [fixture.key])
     }
@@ -456,7 +456,7 @@ private final class Record<Value>: @unchecked Sendable {
 @Suite struct Review2NetworkP2Mounting {
     private final class Token {}
 
-    @Test func aMountThatIsNeverAnsweredIsTakenBackWhenItIsCancelled() throws {
+    @Test func aMountThatIsNeverAnsweredIsTakenBackWhenItIsCancelled() {
         let token = Token()
         let cancelled = Record<ObjectIdentifier>()
         let answers = Record<(Int32, [String]) -> Void>()

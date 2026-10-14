@@ -8,14 +8,14 @@ private final class Tracked {
     static let lock = NSLock()
     static var alive = 0
     init() {
-        Tracked.lock.lock()
-        Tracked.alive += 1
-        Tracked.lock.unlock()
+        Self.lock.lock()
+        Self.alive += 1
+        Self.lock.unlock()
     }
     deinit {
-        Tracked.lock.lock()
-        Tracked.alive -= 1
-        Tracked.lock.unlock()
+        Self.lock.lock()
+        Self.alive -= 1
+        Self.lock.unlock()
     }
     static var count: Int {
         lock.lock()
@@ -57,7 +57,7 @@ private func waitUntil(seconds: TimeInterval = 60, _ condition: () -> Bool) -> B
     let end = Date(timeIntervalSinceNow: seconds)
     while !condition() {
         if Date() > end { return false }
-        usleep(2000)
+        usleep(2_000)
     }
     return true
 }
@@ -67,11 +67,11 @@ private func waitUntil(seconds: TimeInterval = 60, _ condition: () -> Bool) -> B
     @Test func whatAPieceLeavesToBeReleasedLaterIsGoneWhenTheCallReturns() {
         // Objects handed to the autorelease pool of whatever thread runs the piece.
         let before = Tracked.count
-        let sums = Parallel.map(Array(0..<4000)) { index -> Int in
+        let sums = Parallel.map(Array(0..<4_000)) { index -> Int in
             _ = Unmanaged.passRetained(Tracked()).autorelease()
             return index
         }
-        #expect(sums.count == 4000)
+        #expect(sums.count == 4_000)
         // The pool's threads live on; their pieces' pools must have been drained all the same.
         #expect(Tracked.count == before)
         // A job of few, large pieces (one index each) too.
@@ -142,8 +142,8 @@ private func waitUntil(seconds: TimeInterval = 60, _ condition: () -> Bool) -> B
         pool.lingering = 0.002
         defer { pool.lingering = 2 }
         for round in 0..<600 {
-            #expect(Parallel.map(Array(0..<40)) { $0 * 2 }.reduce(0, +) == 1560)
-            usleep(UInt32(round % 5) * 1000)
+            #expect(Parallel.map(Array(0..<40)) { $0 * 2 }.reduce(0, +) == 1_560)
+            usleep(UInt32(round % 5) * 1_000)
         }
         pool.lingering = 2
         let later = Counter()
@@ -163,7 +163,7 @@ private func waitUntil(seconds: TimeInterval = 60, _ condition: () -> Bool) -> B
         let done = DispatchSemaphore(value: 0)
         for _ in 0..<6 {
             Thread.detachNewThread {
-                if tree(4) == 1296 { results.add() }
+                if tree(4) == 1_296 { results.add() }
                 done.signal()
             }
         }

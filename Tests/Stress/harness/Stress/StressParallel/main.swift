@@ -27,7 +27,7 @@ final class ThreadPeak {
                 lock.lock()
                 peak = max(peak, count)
                 lock.unlock()
-                usleep(5000)
+                usleep(5_000)
             }
         }
         thread.start()
@@ -99,7 +99,7 @@ func expected(depth: Int, width: Int, path: UInt64) -> UInt64 {
 func tree(depth: Int, width: Int, path: UInt64, _ behaviour: Behaviour) -> UInt64 {
     if depth == 0 {
         let kind = mix(path ^ 0xABCD) % 100
-        if behaviour.sleeps, kind < 4 { usleep(useconds_t(500 + mix(path) % 3000)) }
+        if behaviour.sleeps, kind < 4 { usleep(useconds_t(500 + mix(path) % 3_000)) }
         if behaviour.io, kind >= 4, kind < 10 {
             var info = stat()
             _ = stat("/usr/lib", &info)
@@ -128,6 +128,7 @@ if arguments.count >= 3, arguments[1] == "child" {
         }
         say("child: returned, ordered=\(result == (0..<64).map { $0 * 2 }) mainSyncs=\(mainSyncs.count)")
         exit(0)
+
     case "main-in-map-all-bodies-sync-to-main":
         say("child: main thread calls Parallel.map; every body (also on main) calls DispatchQueue.main.sync")
         let result = Parallel.map(Array(0..<64)) { (value: Int) -> Int in
@@ -136,6 +137,7 @@ if arguments.count >= 3, arguments[1] == "child" {
         }
         say("child: returned \(result.count)")
         exit(0)
+
     default:
         exit(2)
     }
@@ -202,7 +204,7 @@ step("1 10,000 small maps from 32 threads", limit: 120) {
                 var random = Random(seed: UInt64(thread))
                 for round in 0..<313 {
                     let count = Int.random(in: 2...64, using: &random)
-                    let seed = thread * 1000 + round
+                    let seed = thread * 1_000 + round
                     let input = (0..<count).map { $0 &+ seed }
                     let output = Parallel.map(input) { $0 &* 3 &+ 1 }
                     if output != input.map({ $0 &* 3 &+ 1 }) { wrong.add() }

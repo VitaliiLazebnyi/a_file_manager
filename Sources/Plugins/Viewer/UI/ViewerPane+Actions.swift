@@ -73,6 +73,7 @@ extension ViewerPane {
                     self?.onClose()
                 }
             ]
+
         case "Edit":
             return [
                 ViewerAction(
@@ -119,6 +120,7 @@ extension ViewerPane {
                     [weak self] in self?.goToLine()
                 }
             ]
+
         case "Options":
             let isImage = imageView != nil
             let isMedia = mediaView != nil
@@ -152,15 +154,15 @@ extension ViewerPane {
                     isChecked: settings.wrap
                 ) { [weak self] in
                     guard let self else { return }
-                    self.settings.wrap.toggle()
-                    self.relayout()
+                    settings.wrap.toggle()
+                    relayout()
                 },
                 ViewerAction(
                     title: "Show text cursor", shortcuts: [.f(6)], isEnabled: showsText, isChecked: settings.caret
                 ) { [weak self] in
                     guard let self else { return }
-                    self.settings.caret.toggle()
-                    self.pager.showsCaret = self.settings.caret
+                    settings.caret.toggle()
+                    pager.showsCaret = settings.caret
                 },
                 ViewerAction(
                     title: "Larger",
@@ -194,8 +196,8 @@ extension ViewerPane {
                     isChecked: settings.centersImages
                 ) { [weak self] in
                     guard let self else { return }
-                    self.settings.centersImages.toggle()
-                    self.imageView?.centered = self.settings.centersImages
+                    settings.centersImages.toggle()
+                    imageView?.centered = settings.centersImages
                 },
                 ViewerAction(title: "Rotate right", shortcuts: [key("r")], isEnabled: isImage) { [weak self] in
                     self?.imageView?.rotate(by: 1)
@@ -217,6 +219,7 @@ extension ViewerPane {
                 ViewerAction(title: "Save position", isEnabled: !isEmbedded) { [weak self] in self?.onSavePosition() }
             ]
             return entries
+
         case "Encoding":
             let usesCodePage = showsText && mode != .utf8 && mode != .unicode
             var entries: [ViewerAction?] = [
@@ -248,6 +251,7 @@ extension ViewerPane {
                 }
             ]
             return entries
+
         default:
             return []
         }
@@ -303,7 +307,7 @@ extension ViewerPane {
             kernel.panels.source.focus()
             return true
         }
-        for menu in ViewerPane.menuTitles {
+        for menu in Self.menuTitles {
             for case let entry? in menuEntries(menu)
             where entry.isEnabled && entry.shortcuts.contains(where: { $0.matches(event) }) {
                 entry.run()
@@ -407,11 +411,13 @@ extension ViewerPane {
     func setEncoding(_ encoding: ViewerEncoding?) {
         guard loaded != nil else { return }
         switch encoding?.kind {
-        case .utf8?:
+        case .utf8:
             mode = .utf8
-        case .utf16LE?, .utf16BE?:
+
+        case .utf16LE, .utf16BE:
             codePage = encoding
             mode = .unicode
+
         default:
             codePage = encoding
             if mode == .utf8 || mode == .unicode { mode = .text }
@@ -467,7 +473,7 @@ extension ViewerPane {
             let answer = kernel.ui.prompt(
                 isImage ? "Zoom (in %)" : "Go to position (in %)",
                 value: percentText.replacingOccurrences(of: " %", with: "")),
-            let value = ViewerPane.number(in: answer)
+            let value = Self.number(in: answer)
         else { return }
         if let imageView { imageView.setZoom(CGFloat(value / 100)) } else { pager.scroll(toPercent: value) }
     }
@@ -490,7 +496,7 @@ extension ViewerPane {
     func goToOffset() {
         guard let document = pager.document,
             let answer = kernel.ui.prompt("Go to offset", value: "", detail: "Decimal, or hexadecimal as 0x1F40."),
-            let offset = ViewerPane.offset(in: answer)
+            let offset = Self.offset(in: answer)
         else { return }
         pager.reveal(offset: min(max(0, offset), max(0, document.length - 1)))
     }
@@ -501,8 +507,8 @@ extension ViewerPane {
         else { return }
         pager.scroll(toLine: line) { [weak self] found in
             guard let self, !found else { return }
-            self.kernel.ui.inform(
-                self.pager.isIndexing
+            kernel.ui.inform(
+                pager.isIndexing
                     ? "Line \(line) has not been read yet; try again in a moment." : "There is no line \(line).")
         }
     }
@@ -598,6 +604,7 @@ extension ViewerPane {
                 switch result {
                 case .success(let match?):
                     self.pager.reveal(offset: match.lowerBound, select: match, rowsAbove: self.settings.searchGoBack)
+
                 case .success(nil): self.kernel.ui.inform("\"\(lastSearch.text)\" was not found.")
                 case .failure(let error): self.kernel.ui.report(error, title: "Find")
                 }
@@ -616,7 +623,7 @@ extension ViewerPane {
     func copySelection(asHex: Bool, completion: @escaping () -> Void = {}) {
         guard let document = pager.document, let selection = pager.selection else { return }
         // Hex is three characters a byte; the string is made on the main thread for the clipboard.
-        let limit = asHex ? ViewerPane.copyLimit / 2 : ViewerPane.copyLimit
+        let limit = asHex ? Self.copyLimit / 2 : Self.copyLimit
         guard selection.upperBound - selection.lowerBound <= limit else {
             kernel.ui.inform("The selection is too large for the clipboard (more than \(Format.shortSize(limit))).")
             return
@@ -696,7 +703,7 @@ extension ViewerPane {
     }
 
     private func withSelectedText(_ action: @escaping (String) -> Void) {
-        guard let document = pager.document, let selection = pager.selection, selection.count <= 4096 else { return }
+        guard let document = pager.document, let selection = pager.selection, selection.count <= 4_096 else { return }
         workQueue.async {
             guard let text = try? document.text(in: selection) else { return }
             DispatchQueue.main.async { action(text) }
@@ -829,8 +836,8 @@ extension ViewerPane {
             activity = ("Preparing to print…", nil, CancellationFlag())
             let cancel = activity?.cancel
             workQueue.async { [weak self] in
-                let text = ViewerPane.printableText(
-                    of: document, in: range, maxRows: ViewerPane.printPageLimit * linesPerPage,
+                let text = Self.printableText(
+                    of: document, in: range, maxRows: Self.printPageLimit * linesPerPage,
                     cancellation: cancel ?? CancellationFlag())
                 DispatchQueue.main.async {
                     guard let self else { return }
@@ -838,7 +845,7 @@ extension ViewerPane {
                     guard self.loadGeneration == generation, cancel?.isCancelled != true else { return }
                     if text.truncated {
                         self.kernel.ui.inform(
-                            "The text is longer than the \(ViewerPane.printPageLimit) pages that are printed at most: only its first \(ViewerPane.printPageLimit) pages (\(text.lines.count) lines) are printed."
+                            "The text is longer than the \(Self.printPageLimit) pages that are printed at most: only its first \(Self.printPageLimit) pages (\(text.lines.count) lines) are printed."
                         )
                     }
                     run(
@@ -909,8 +916,8 @@ final class TextPrintView: NSView {
         self.lines = lines
         self.font = font
         self.pageSize = pageSize
-        lineHeight = TextPrintView.lineHeight(of: font)
-        linesPerPage = TextPrintView.linesPerPage(font: font, pageHeight: pageSize.height)
+        lineHeight = Self.lineHeight(of: font)
+        linesPerPage = Self.linesPerPage(font: font, pageHeight: pageSize.height)
         attributes = [.font: font, .foregroundColor: NSColor.black]
         // Wider than the page when a row is: the print operation then shrinks the page to fit.
         let widest = CGFloat(min(2_000, lines.reduce(0) { max($0, $1.utf16.count) })) * font.maximumAdvancement.width
@@ -920,7 +927,7 @@ final class TextPrintView: NSView {
                 x: 0, y: 0, width: max(pageSize.width, widest), height: CGFloat(pages * linesPerPage) * lineHeight))
     }
 
-    required init?(coder: NSCoder) { fatalError("not used") }
+    required init?(coder _: NSCoder) { fatalError("not used") }
 
     var pageCount: Int { max(1, (lines.count + linesPerPage - 1) / linesPerPage) }
 

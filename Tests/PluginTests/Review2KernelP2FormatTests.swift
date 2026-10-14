@@ -13,7 +13,7 @@ import Testing
         #expect(Format.kilobytes(.min) == "-9,007,199,254,740,992 k")
         #expect(
             Format.kilobytes(0) == "0 k" && Format.kilobytes(511) == "0 k" && Format.kilobytes(512) == "1 k"
-                && Format.kilobytes(1536) == "2 k")
+                && Format.kilobytes(1_536) == "2 k")
         #expect(Format.bytes(.max) == "9,223,372,036,854,775,807" && Format.bytes(.min) == "-9,223,372,036,854,775,808")
         #expect(Format.shortSize(.max) == "8388608.00 T")
     }
@@ -26,10 +26,10 @@ import Testing
             #expect(Format.speed(value).hasSuffix("/s"), "\(value)")
             #expect(!Format.duration(value).isEmpty, "\(value)")
         }
-        #expect(Format.speed(.nan) == "0 b/s" && Format.speed(-5) == "0 b/s" && Format.speed(2048) == "2.00 k/s")
+        #expect(Format.speed(.nan) == "0 b/s" && Format.speed(-5) == "0 b/s" && Format.speed(2_048) == "2.00 k/s")
         #expect(Format.duration(.infinity) == Format.duration(1e300) && Format.duration(.nan).hasSuffix("min"))
         #expect(
-            Format.duration(0) == "1 s" && Format.duration(59.2) == "1 min" && Format.duration(3600) == "1 h 00 min")
+            Format.duration(0) == "1 s" && Format.duration(59.2) == "1 min" && Format.duration(3_600) == "1 h 00 min")
     }
 
     @Test func numbersAndDatesAreWrittenFromManyThreadsWhileTheRegionChanges() {
@@ -42,7 +42,7 @@ import Testing
         let mismatches = NSLock()
         var wrong = 0
         DispatchQueue.concurrentPerform(iterations: 16) { thread in
-            for round in 0..<2000 {
+            for round in 0..<2_000 {
                 if thread == 0, round % 50 == 0 {
                     NotificationCenter.default.post(name: NSLocale.currentLocaleDidChangeNotification, object: nil)
                     NotificationCenter.default.post(name: .NSSystemTimeZoneDidChange, object: nil)

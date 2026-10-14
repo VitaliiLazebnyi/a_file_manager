@@ -44,7 +44,7 @@ final class CommandBrowserController: NSWindowController, NSWindowDelegate, NSSe
         buildContent(in: window)
     }
 
-    required init?(coder: NSCoder) { fatalError("not used") }
+    required init?(coder _: NSCoder) { fatalError("not used") }
 
     private func buildContent(in window: NSWindow) {
         filter.placeholderString = "Filter"
@@ -136,7 +136,7 @@ final class CommandBrowserController: NSWindowController, NSWindowDelegate, NSSe
         for button in userButtons.dropFirst() { button.isEnabled = selectedUserCommand != nil }
     }
 
-    func controlTextDidChange(_ notification: Notification) { reload() }
+    func controlTextDidChange(_: Notification) { reload() }
     @objc private func categoryChanged() { reload() }
     @objc private func filterAccepted() { accept() }
 
@@ -144,7 +144,10 @@ final class CommandBrowserController: NSWindowController, NSWindowDelegate, NSSe
 
     /// OK, Return or a double click: hands the command to the editor, or runs it.
     private func accept() {
-        guard let row = selected else { return NSSound.beep() }
+        guard let row = selected else {
+            NSSound.beep()
+            return
+        }
         if isPicking {
             picked = row.id
             NSApp.stopModal()
@@ -183,9 +186,10 @@ final class CommandBrowserController: NSWindowController, NSWindowDelegate, NSSe
                 buttons: ["Rename", "Copy"])
         else { return }
         guard let name = UserCommand.name(from: answer.text("name")), center.userCommand(named: name) == nil else {
-            return ui.inform(
+            ui.inform(
                 "The name cannot be used",
                 detail: "It is empty, in use, or has characters other than letters, digits and _.", style: .warning)
+            return
         }
         var renamed = command
         renamed.name = name
@@ -193,7 +197,7 @@ final class CommandBrowserController: NSWindowController, NSWindowDelegate, NSSe
         reload(selecting: renamed.id)
     }
 
-    func windowWillClose(_ notification: Notification) {
+    func windowWillClose(_: Notification) {
         if isPicking { NSApp.stopModal() }
     }
 }

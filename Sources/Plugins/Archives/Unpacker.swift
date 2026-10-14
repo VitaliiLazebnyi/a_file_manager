@@ -145,7 +145,7 @@ final class UnpackFolder {
     func makeFolder(_ names: [String], quarantine: Data?) throws {
         let folder = try openFolder(names[...])
         defer { close(folder) }
-        UnpackFolder.mark(folder, quarantine)
+        Self.mark(folder, quarantine)
     }
 
     /// Makes the symbolic link at `names`. One that stands there is replaced only with `replacing`.
@@ -205,9 +205,9 @@ final class UnpackFolder {
                 ]
                 futimens(file, &times)
             }
-            guard fchmod(file, mode_t(permissions) & UnpackFolder.allowed) == 0 else { throw posixError(errno, place) }
+            guard fchmod(file, mode_t(permissions) & Self.allowed) == 0 else { throw posixError(errno, place) }
             // The mark is on the file before it appears under its name.
-            UnpackFolder.mark(file, quarantine)
+            Self.mark(file, quarantine)
             isOpen = false
             guard close(file) == 0 else { throw posixError(errno, place) }
             let moved =
@@ -471,7 +471,7 @@ final class Unpacker {
             // the place it comes to is checked here once more, whatever the path looked like.
             let names = ArchiveTree.names(of: relative)
             let target = names.reduce(folder) { $0.appending(name: $1) }
-            guard !names.isEmpty, names.allSatisfy(PathSafety.isSafeName), Unpacker.lies(target, below: folder) else {
+            guard !names.isEmpty, names.allSatisfy(PathSafety.isSafeName), Self.lies(target, below: folder) else {
                 result.problems.append("\(entry.path): the name leads outside the folder that is unpacked into")
                 continue
             }
@@ -524,13 +524,17 @@ final class Unpacker {
         if skipAll { return false }
         switch askConflict(existing, entry) {
         case .overwrite: return true
+
         case .overwriteAll:
             overwriteAll = true
             return true
+
         case .skip: return false
+
         case .skipAll:
             skipAll = true
             return false
+
         case .cancel: throw ArchiveError.cancelled
         }
     }
@@ -562,13 +566,13 @@ final class Unpacker {
         /// another archive, a network volume.)
         func makeFolder(_ url: URL, below root: URL) throws {
             guard !made.contains(url.locationKey) else { return }
-            try Unpacker.refuseLinks(from: root, to: url)
+            try Self.refuseLinks(from: root, to: url)
             let provider = try fileSystems.provider(for: url)
             // The folders between the target and this one that are not known yet, top first.
             var missing: [URL] = []
             var current = url
             while !made.contains(current.locationKey), !current.isSameLocation(as: root), missing.count < 4_096,
-                Unpacker.lies(current, below: root), let above = provider.parent(of: current)
+                Self.lies(current, below: root), let above = provider.parent(of: current)
             {
                 missing.append(current)
                 current = above
@@ -709,7 +713,7 @@ final class Unpacker {
                 return try root.makeLink(task.names, to: destination, replacing: task.replaces)
             }
             let (cancellation, bytesDone, hook) = (monitor.cancellation, self.bytesDone, whileUnpacking)
-            return try root.write(
+            try root.write(
                 task.names, replacing: task.replaces, permissions: entry.permissions, modified: entry.modified,
                 quarantine: quarantine, opened: hook.map { hook in { hook(entry) } }
             ) { put in
@@ -719,6 +723,7 @@ final class Unpacker {
                     bytesDone.add(Int64(block.count))
                 }
             }
+            return
         }
         let provider = try fileSystems.provider(for: target)
         if target.isFileURL, !task.replaces {

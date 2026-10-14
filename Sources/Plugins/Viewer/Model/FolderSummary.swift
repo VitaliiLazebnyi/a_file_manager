@@ -17,8 +17,8 @@ struct FolderSummary: Equatable {
             + "\(Format.bytes(bytes)) bytes (\(Format.shortSize(bytes)))"
     }
 
-    static func + (left: FolderSummary, right: FolderSummary) -> FolderSummary {
-        FolderSummary(
+    static func + (left: Self, right: Self) -> Self {
+        Self(
             files: left.files + right.files, folders: left.folders + right.folders,
             bytes: left.bytes.addingSaturated(right.bytes),
             isPartial: left.isPartial || right.isPartial)
@@ -32,7 +32,7 @@ struct FolderSummary: Equatable {
     /// where every folder is a trip; `isPartial` is then set.
     static func measure(
         _ directory: URL, provider: FileSystemProvider, cancellation: CancellationFlag, limit: Int? = nil
-    ) -> FolderSummary {
+    ) -> Self {
         let budget = limit.map { Budget($0) }
         var result = measure(directory, provider: provider, cancellation: cancellation, budget: budget)
         result.isPartial = budget?.isExhausted == true
@@ -69,13 +69,13 @@ struct FolderSummary: Equatable {
 
     private static func measure(
         _ directory: URL, provider: FileSystemProvider, cancellation: CancellationFlag, budget: Budget?
-    ) -> FolderSummary {
+    ) -> Self {
         guard !cancellation.isCancelled, budget?.exhausted != true,
             let items = try? provider.list(directory, showHidden: true, cancellation: cancellation),
             !cancellation.isCancelled
-        else { return FolderSummary() }
-        if let budget, !budget.take(items.count) { return FolderSummary() }
-        var summary = FolderSummary()
+        else { return Self() }
+        if let budget, !budget.take(items.count) { return Self() }
+        var summary = Self()
         for item in items {
             if item.isRealDirectory {
                 summary.folders += 1

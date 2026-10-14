@@ -83,8 +83,8 @@ let myers = FuzzTarget(
             if limit == nil { fzCheck(got == best, "myers-not-shortest", d + " got \(got) best \(best)") }
         }
         // the UTF-16 overload
-        let (ua, ub) = (a.map { UInt16($0 &* 9973 & 0xFFFF) }, b.map { UInt16($0 &* 9973 & 0xFFFF) })
-        if ua.count + ub.count <= 4000 { checkSegments(Myers.diff(ua, ub, costLimit: limit), ua, ub, "myers16", d) }
+        let (ua, ub) = (a.map { UInt16($0 &* 9_973 & 0xFFFF) }, b.map { UInt16($0 &* 9_973 & 0xFFFF) })
+        if ua.count + ub.count <= 4_000 { checkSegments(Myers.diff(ua, ub, costLimit: limit), ua, ub, "myers16", d) }
     })
 
 // MARK: textdiff
@@ -141,9 +141,11 @@ let textDiff = FuzzTarget(
                 }
                 i += 1
                 j += 1
+
             case .added:
                 fzCheck(row.left == nil && row.right == j, "textdiff-rows-order", d)
                 j += 1
+
             case .removed:
                 fzCheck(row.right == nil && row.left == i, "textdiff-rows-order", d)
                 i += 1
@@ -275,7 +277,7 @@ let inline = FuzzTarget(
                     }
                 }
             }
-            if l == r && ua == ub { fzCheck(h.left.isEmpty && h.right.isEmpty, "inline-equal-highlighted", d) }
+            if l == r, ua == ub { fzCheck(h.left.isEmpty && h.right.isEmpty, "inline-equal-highlighted", d) }
         }
     })
 
@@ -354,7 +356,7 @@ let loader = FuzzTarget(
             fzCheck(!block.isEmpty && block.upperBound <= diff.rowCount, "binarydiff-blocks", d)
             block.forEach { marked.insert($0) }
         }
-        for row in 0..<min(diff.rowCount + 1, 3000) {
+        for row in 0..<min(diff.rowCount + 1, 3_000) {
             let offsets = diff.differingOffsets(left: l, right: r, row: row)
             fzCheck(offsets.isEmpty != marked.contains(row), "binarydiff-row", d + " row \(row)")
             let line = diff.text(of: l, row: row)
@@ -373,7 +375,7 @@ let loader = FuzzTarget(
 
 let realisticDates: [Double] = [
     0, 1_700_000_000, 1_700_000_000.789, -62_167_219_200, 253_402_300_799, -1, 951_782_400, 4_102_444_800, 1e10, -1e10,
-    86399.9999
+    86_399.9999
 ]
 let utc = TimeZone(identifier: "UTC")!
 let enUS = Locale(identifier: "en_US_POSIX")
@@ -449,7 +451,7 @@ func runRename(_ bytes: [UInt8], regex: Bool) {
     if dt > slowestRename, dt > 0.005 {
         slowestRename = dt
         fzNote(
-            "rename slowest \(Int(dt * 1000)) ms search=\(settings.search.debugDescription.prefix(160)) name=\(subject.name.debugDescription.prefix(120)) mask=\(settings.nameMask.debugDescription.prefix(120))"
+            "rename slowest \(Int(dt * 1_000)) ms search=\(settings.search.debugDescription.prefix(160)) name=\(subject.name.debugDescription.prefix(120)) mask=\(settings.nameMask.debugDescription.prefix(120))"
         )
     }
     if let name {
@@ -493,7 +495,7 @@ let maskDict = [
 ]
 
 let renameMask = FuzzTarget(
-    "renamemask", maxLen: 4096, dict: maskDict + ["*", "?", "|", "a|b", "*.*"],
+    "renamemask", maxLen: 4_096, dict: maskDict + ["*", "?", "|", "a|b", "*.*"],
     seeds: {
         seedsOf([
             "00000000000000[N]\n[E]\n\n\nreport 2024.final.txt\n/Users/me/Docs\nclip\nx:a,b\n",
@@ -504,7 +506,7 @@ let renameMask = FuzzTarget(
     run: { runRename($0, regex: false) })
 
 let renameRegex = FuzzTarget(
-    "renameregex", maxLen: 2048,
+    "renameregex", maxLen: 2_048,
     dict: maskDict.prefix(12) + [
         "(?P<n>", "(?P=n)", "(?'n'", "(?g)", "(?-g)", "^??", "$1", "$12", "\\U$1", "\\L$2", "\\F$1", "\\n$1", "$89",
         "(a+)+$", "(.*)*", "(?=", "(?<=", "\\b", "(", ")", "|", "*?", "{1,3}", "[a-z]", "\\d+", "$", "^", "\\", "(?R)",
@@ -558,6 +560,7 @@ let planner = FuzzTarget(
             switch k % 5 {
             case 0: targets.append(nil)
             case 1: targets.append(s)
+
             default:
                 targets.append((k & 0x80 != 0 ? folderE : folderD).appending(name: pool[Int(c.byte()) % pool.count]))
             }
@@ -612,7 +615,7 @@ let planner = FuzzTarget(
 
 var slowestTemplate = 0.0
 let nameTemplate = FuzzTarget(
-    "nametemplate", maxLen: 2048,
+    "nametemplate", maxLen: 2_048,
     dict: maskDict + [
         "<", ">", "|", "\"", "<1-10>", "<0-99999>", "<1-3>test[\" (\"C\")\"]", "[\" (\"C\")\"]", "[C:3]", "[C:999]",
         "[C10+5:3]", "[Y-M-D]", "[T2+1D]", "[T1+9223372036854775807Y]",
@@ -661,7 +664,7 @@ let nameTemplate = FuzzTarget(
         let dt = Date().timeIntervalSince(t)
         if dt > slowestTemplate, dt > 0.005 {
             slowestTemplate = dt
-            fzNote("nametemplate slowest \(Int(dt * 1000)) ms typed=\(typed.debugDescription.prefix(300))")
+            fzNote("nametemplate slowest \(Int(dt * 1_000)) ms typed=\(typed.debugDescription.prefix(300))")
         }
         // A list part that expands to nothing ("<[T2+1D]", "<a|[U]") comes back as an empty name, while a
         // counter range filters such names out: noted in the results, not failed, so the run goes on.

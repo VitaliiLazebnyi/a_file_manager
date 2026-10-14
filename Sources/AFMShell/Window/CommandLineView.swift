@@ -73,7 +73,7 @@ final class CommandLineView: NSView, NSComboBoxDelegate {
         }
     }
 
-    required init?(coder: NSCoder) { fatalError("not used") }
+    required init?(coder _: NSCoder) { fatalError("not used") }
 
     var text: String {
         get { field.stringValue }
@@ -128,9 +128,11 @@ final class CommandLineView: NSView, NSComboBoxDelegate {
         case .openCursorItem:
             returnToFileList()
             return commands.perform(.open)
+
         case .changeDirectory(let path):
             noteTypedLocation(path)
             done = commands.perform(.changeDirectory, .text(path))
+
         case .command(let id, let argument): done = commands.perform(id, argument)
         case .run(let line): done = commands.perform(.runCommandLine, .text(isPrivate ? " " + line : line))
         }
@@ -199,7 +201,7 @@ final class CommandLineView: NSView, NSComboBoxDelegate {
 
     /// The keys the line keeps for itself while it is typed in.
     private func handleKey(_ event: NSEvent) -> Bool {
-        if let command = kernel.keyBindings.command(for: event), CommandLineView.ownCommands.contains(command) {
+        if let command = kernel.keyBindings.command(for: event), Self.ownCommands.contains(command) {
             kernel.commands.perform(command)
             return true
         }
@@ -214,29 +216,33 @@ final class CommandLineView: NSView, NSComboBoxDelegate {
         return true
     }
 
-    func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
+    func control(_: NSControl, textView _: NSTextView, doCommandBy selector: Selector) -> Bool {
         // While the list is open, the arrows, Enter and Esc are its own.
         if isHistoryOpen { return false }
         switch selector {
         case #selector(NSResponder.insertNewline(_:)):
             execute()
+
         case #selector(NSResponder.cancelOperation(_:)):
             clear()
             returnToFileList()
+
         case #selector(NSResponder.insertTab(_:)), #selector(NSResponder.insertBacktab(_:)):
             returnToFileList()
+
         case #selector(NSResponder.moveUp(_:)), #selector(NSResponder.moveDown(_:)):
             // ↑ and ↓ belong to the file list even from here; the line keeps its text.
             let model = panels.sourcePanel.model
             returnToFileList()
             model.moveCursor(to: model.cursor + (selector == #selector(NSResponder.moveUp(_:)) ? -1 : 1))
+
         default:
             return false
         }
         return true
     }
 
-    func controlTextDidChange(_ notification: Notification) {
+    func controlTextDidChange(_: Notification) {
         recalled = -1
     }
 }

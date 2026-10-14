@@ -67,13 +67,13 @@ private final class BreakingAnswers: FileJobDelegate {
     var onLines: (([String]) -> Void)?
     private(set) var errors: [String] = []
 
-    func job(_ job: FileJob, progress: JobProgress) { onLines?(progress.lines) }
-    func job(_ job: FileJob, conflictAt target: FileItem, source: FileItem) -> ConflictChoice { .overwrite }
-    func job(_ job: FileJob, failedAt url: URL, error: Error) -> ErrorChoice {
+    func job(_: FileJob, progress: JobProgress) { onLines?(progress.lines) }
+    func job(_: FileJob, conflictAt _: FileItem, source _: FileItem) -> ConflictChoice { .overwrite }
+    func job(_: FileJob, failedAt _: URL, error: Error) -> ErrorChoice {
         errors.append(error.localizedDescription)
         return .skip
     }
-    func job(_ job: FileJob, confirmDeleteNonEmpty directory: URL) -> FolderDeleteChoice { .delete }
+    func job(_: FileJob, confirmDeleteNonEmpty _: URL) -> FolderDeleteChoice { .delete }
 }
 
 @Suite struct ArchiveJobsEndToEnd {
@@ -101,7 +101,7 @@ private final class BreakingAnswers: FileJobDelegate {
     @Test func aMoveOfSmallAndLargeFilesPutsThemInTheArchiveFileOnceAndRemovesTheSources() throws {
         let archive = try makeZip()
         let sources = try makeSources([
-            "a.txt": 20, "b.txt": 3000, "big1.txt": 300_000, "big2.txt": 700_000, "c.txt": 7
+            "a.txt": 20, "b.txt": 3_000, "big1.txt": 300_000, "big2.txt": 700_000, "c.txt": 7
         ])
         let wanted = try Dictionary(
             uniqueKeysWithValues: sources.map { ($0.lastPathComponent, try String(contentsOf: $0, encoding: .utf8)) })
@@ -237,7 +237,7 @@ private final class BreakingAnswers: FileJobDelegate {
         #expect(memory.allPaths == ["/A"])
     }
 
-    @Test func cancelEndsTheListingOfABranchViewThatWaits() throws {
+    @Test func cancelEndsTheListingOfABranchViewThatWaits() {
         memory.stallsListings = true
         let gate = DispatchSemaphore(value: 0)
         probe.onList = { gate.signal() }
@@ -246,7 +246,7 @@ private final class BreakingAnswers: FileJobDelegate {
         let branch = virtual.branch(of: memory.url("/A"))
         let finished = DispatchSemaphore(value: 0)
         Thread {
-            _ = try? self.virtual.list(branch, showHidden: false, cancellation: flag)
+            _ = try? virtual.list(branch, showHidden: false, cancellation: flag)
             finished.signal()
         }.start()
         Thread {
@@ -292,7 +292,7 @@ private final class BreakingAnswers: FileJobDelegate {
         registry.register(probe)
         let virtual = VirtualFileSystem(fileSystems: registry)
         registry.register(virtual)
-        memory.addFile("/far/big.txt", String(repeating: "line of text\n", count: 8000))
+        memory.addFile("/far/big.txt", String(repeating: "line of text\n", count: 8_000))
         let gate = DispatchSemaphore(value: 0)
         probe.onRead = { gate.signal() }
         let source = try ProviderByteSource.open(virtual.branch(of: memory.url("/far/big.txt")), fileSystems: registry)
@@ -301,7 +301,7 @@ private final class BreakingAnswers: FileJobDelegate {
         let outcome = SharedBox<Result<Data, Error>?>(nil)
         let finished = DispatchSemaphore(value: 0)
         Thread {
-            outcome.value = Result { try source.read(at: 10, count: 5000, cancellation: flag) }
+            outcome.value = Result { try source.read(at: 10, count: 5_000, cancellation: flag) }
             finished.signal()
         }.start()
         Thread {

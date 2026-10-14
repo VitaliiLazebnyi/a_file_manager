@@ -22,7 +22,7 @@ struct TypedCommand: Equatable {
         guard !text.isEmpty else { return nil }
         command = text
         isDetached = detached
-        (firstWord, arguments) = TypedCommand.split(text)
+        (firstWord, arguments) = Self.split(text)
     }
 
     /// The first word as a shell would read it (quotes group, a backslash keeps the next
@@ -37,7 +37,7 @@ struct TypedCommand: Equatable {
             if escaped {
                 word.append(character)
                 escaped = false
-            } else if character == "\\" && quote != "'" {
+            } else if character == "\\", quote != "'" {
                 escaped = true
             } else if let open = quote {
                 if character == open { quote = nil } else { word.append(character) }
@@ -69,8 +69,8 @@ struct TypedCommand: Equatable {
     /// only when no installed one has the name, or when it is asked for by path (`./Preview.app`).
     /// `path` is the PATH that decides whether a bare name is a program instead.
     func application(
-        relativeTo directory: URL, searching folders: [URL] = TypedCommand.applicationFolders,
-        path: String = TypedCommand.processPath
+        relativeTo directory: URL, searching folders: [URL] = Self.applicationFolders,
+        path: String = Self.processPath
     ) -> URL? {
         let fm = FileManager.default
         func bundle(at url: URL) -> URL? {
@@ -78,9 +78,9 @@ struct TypedCommand: Equatable {
             return fm.fileExists(atPath: url.path, isDirectory: &isDirectory) && isDirectory.boolValue ? url : nil
         }
         if firstWord.lowercased().hasSuffix(".app") {
-            let here = TypedCommand.location(of: firstWord, relativeTo: directory)
+            let here = Self.location(of: firstWord, relativeTo: directory)
             if firstWord.contains("/") || firstWord.hasPrefix("~") { return bundle(at: here) }
-            return folders.lazy.compactMap { bundle(at: $0.appendingPathComponent(self.firstWord)) }.first
+            return folders.lazy.compactMap { bundle(at: $0.appendingPathComponent(firstWord)) }.first
                 ?? bundle(at: here)
         }
         // A bare name is an application only when nothing else is asked of it; `open -a` and
@@ -88,12 +88,12 @@ struct TypedCommand: Equatable {
         guard arguments.isEmpty, !firstWord.contains("/"), !firstWord.isEmpty else { return nil }
         // A program of that name on the PATH wins: on a case-insensitive disk `mail` would
         // otherwise open Mail.app instead of /usr/bin/mail.
-        if TypedCommand.isOnPath(firstWord, path: path) { return nil }
-        return folders.lazy.compactMap { bundle(at: $0.appendingPathComponent(self.firstWord + ".app")) }.first
+        if Self.isOnPath(firstWord, path: path) { return nil }
+        return folders.lazy.compactMap { bundle(at: $0.appendingPathComponent(firstWord + ".app")) }.first
     }
 
     /// Whether an executable file of that name is in a folder of the PATH.
-    static func isOnPath(_ name: String, path: String = TypedCommand.processPath) -> Bool {
+    static func isOnPath(_ name: String, path: String = Self.processPath) -> Bool {
         path.split(separator: ":").contains { FileManager.default.isExecutableFile(atPath: $0 + "/" + name) }
     }
 
@@ -128,7 +128,7 @@ struct ProcessOutcome {
 /// Cancelling asks the child to end (SIGTERM) and, if it does not listen, ends it (SIGKILL).
 struct ProcessRunner {
     /// The most output that is kept; a command that prints without end must not fill memory.
-    static let outputLimit = 8 * 1024 * 1024
+    static let outputLimit = 8 * 1_024 * 1_024
 
     let executable: URL
     let arguments: [String]
@@ -213,7 +213,7 @@ struct ProcessRunner {
             guard cancellation.isCancelled else { continue }
             outcome.wasCancelled = true
             if let asked = askedToEnd {
-                if Date().timeIntervalSince(asked) > 2 { ProcessRunner.kill(process.processIdentifier) }
+                if Date().timeIntervalSince(asked) > 2 { Self.kill(process.processIdentifier) }
             } else {
                 process.terminate()
                 askedToEnd = Date()

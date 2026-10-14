@@ -21,17 +21,17 @@ public struct ServerKey: Hashable, CustomStringConvertible {
 
     public init(scheme: String, host: String, port: Int? = nil) {
         self.scheme = scheme.lowercased()
-        self.host = ServerKey.canonical(host)
+        self.host = Self.canonical(host)
         // A port outside the range (a damaged or imported settings file) is not a port.
         self.port =
-            port.flatMap { ServerKey.validPorts.contains($0) ? $0 : nil } ?? ServerKey.defaultPort(of: self.scheme)
+            port.flatMap { Self.validPorts.contains($0) ? $0 : nil } ?? Self.defaultPort(of: self.scheme)
     }
 
-    public static let validPorts = 1...65535
+    public static let validPorts = 1...65_535
 
     /// Nil when the URL does not name a server of one of the network schemes.
     public init?(_ url: URL) {
-        guard let scheme = url.scheme?.lowercased(), ServerKey.schemes.contains(scheme), let host = url.host,
+        guard let scheme = url.scheme?.lowercased(), Self.schemes.contains(scheme), let host = url.host,
             !host.isEmpty
         else { return nil }
         self.init(scheme: scheme, host: host, port: url.port)
@@ -62,14 +62,14 @@ public struct ServerKey: Hashable, CustomStringConvertible {
     /// The location of a path on this server, nil when the host cannot be written in a URL.
     /// It never carries a user name or password.
     public func validURL(path: String = "/") -> URL? {
-        guard !host.isEmpty, ServerKey.schemes.contains(scheme) else { return nil }
+        guard !host.isEmpty, Self.schemes.contains(scheme) else { return nil }
         var components = URLComponents()
         components.scheme = scheme
         components.host = host.contains(":") ? "[\(host)]" : host
-        if port != ServerKey.defaultPort(of: scheme), ServerKey.validPorts.contains(port) { components.port = port }
+        if port != Self.defaultPort(of: scheme), Self.validPorts.contains(port) { components.port = port }
         components.path = RemotePath.normalized(path)
         // The URL must name this server again, or it is not a location on it.
-        guard let url = components.url, let back = url.host, ServerKey.bare(back).lowercased() == host else {
+        guard let url = components.url, let back = url.host, Self.bare(back).lowercased() == host else {
             return nil
         }
         return url
@@ -82,7 +82,7 @@ public struct ServerKey: Hashable, CustomStringConvertible {
     public func url(path: String = "/") -> URL {
         if let url = validURL(path: path) { return url }
         var components = URLComponents()
-        components.scheme = ServerKey.schemes.contains(scheme) ? scheme : "ftp"
+        components.scheme = Self.schemes.contains(scheme) ? scheme : "ftp"
         components.host = "host.invalid"
         components.path = RemotePath.normalized(path)
         return components.url ?? URL(string: "ftp://host.invalid/")!
@@ -249,10 +249,10 @@ public struct ServerAddress: Equatable {
             let credentials = authority[..<at]
             authority = String(authority[authority.index(after: at)...])
             if let colon = credentials.firstIndex(of: ":") {
-                user = ServerAddress.decoded(credentials[..<colon])
-                password = ServerAddress.decoded(credentials[credentials.index(after: colon)...])
+                user = Self.decoded(credentials[..<colon])
+                password = Self.decoded(credentials[credentials.index(after: colon)...])
             } else {
-                user = ServerAddress.decoded(credentials)
+                user = Self.decoded(credentials)
             }
             if user?.isEmpty == true { user = nil }
         }

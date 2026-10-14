@@ -224,7 +224,7 @@ import Testing
 
     @MainActor @Test func trackerMeasuresStaysAndSavesToTheSettings() {
         let settings = MemorySettings()
-        var time = Date(timeIntervalSince1970: 1000)
+        var time = Date(timeIntervalSince1970: 1_000)
         let tracker = DirectoryHistoryTracker(settings: settings) { time }
         tracker.visited(url("/a"), on: .left)
         time += 10
@@ -268,7 +268,7 @@ import Testing
     let bench: TestBench
 
     final class Clock {
-        var time = Date(timeIntervalSince1970: 5000)
+        var time = Date(timeIntervalSince1970: 5_000)
     }
 
     /// Records the commands hotlist entries run.

@@ -79,7 +79,7 @@ enum PropertyText {
 
     /// `1,234 bytes (1.21 k)`
     static func size(_ bytes: Int64) -> String {
-        "\(Format.bytes(bytes)) bytes" + (bytes >= 1024 ? " (\(Format.shortSize(bytes)))" : "")
+        "\(Format.bytes(bytes)) bytes" + (bytes >= 1_024 ? " (\(Format.shortSize(bytes)))" : "")
     }
 
     /// "Sunday, October 11, 2026 at 1:19:22 AM", as a property sheet writes dates.
@@ -248,8 +248,10 @@ enum LinkMaker {
             let target =
                 relative ? relativePath(from: destination.deletingLastPathComponent(), to: source) : source.path
             if symlink(target, destination.path) != 0 { throw LocalInfo.posixError(errno, destination) }
+
         case .hard:
             if link(source.path, destination.path) != 0 { throw LocalInfo.posixError(errno, destination) }
+
         case .alias:
             let bookmark = try source.bookmarkData(
                 options: .suitableForBookmarkFile, includingResourceValuesForKeys: nil, relativeTo: nil)

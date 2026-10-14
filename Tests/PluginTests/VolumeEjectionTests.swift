@@ -32,7 +32,7 @@ private final class StandInDrive: VolumeAccess {
         return VolumeFacts(url: volume, name: "STICK", canBeEjected: true)
     }
 
-    func eject(_ volume: VolumeFacts) -> EjectRefusal? {
+    func eject(_: VolumeFacts) -> EjectRefusal? {
         lock.lock()
         defer { lock.unlock() }
         ejectCount += 1

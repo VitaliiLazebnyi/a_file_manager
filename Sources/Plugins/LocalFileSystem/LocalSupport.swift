@@ -34,7 +34,7 @@ final class Interruption {
     /// called already: the call is not to be made.
     func begin() -> Bool {
         // Without the handler the signal would do nothing: the thread is not announced then.
-        let canBeInterrupted = Interruption.installed == 0
+        let canBeInterrupted = Self.installed == 0
         if canBeInterrupted {
             // Some threads (those of Swift's concurrency pool) have it blocked, and then it would not arrive.
             var signals = sigset_t()
@@ -123,8 +123,8 @@ final class MountTable {
     /// Called with the lock held.
     private func refresh() {
         let now = DispatchTime.now().uptimeNanoseconds
-        guard read == 0 || now &- read > MountTable.lifetime else { return }
-        mounts = MountTable.readMounts()
+        guard read == 0 || now &- read > Self.lifetime else { return }
+        mounts = Self.readMounts()
         below = [:]
         for mount in mounts where mount.path != "/" {
             let cut = mount.path.utf8.lastIndex(of: 0x2F) ?? mount.path.utf8.startIndex
@@ -205,11 +205,11 @@ final class LinkResolver {
 
     /// Nil when the target does not exist (a dangling link) or did not answer in time.
     func resolve(_ path: String) -> LinkTarget? {
-        if let target = LinkResolver.absoluteTarget(of: path), MountTable.shared.isLocal(target) == true {
-            return LinkResolver.lookup(path)
+        if let target = Self.absoluteTarget(of: path), MountTable.shared.isLocal(target) == true {
+            return Self.lookup(path)
         }
         lock.lock()
-        guard inFlight < LinkResolver.limit else {
+        guard inFlight < Self.limit else {
             lock.unlock()
             return nil
         }
@@ -223,7 +223,7 @@ final class LinkResolver {
         let done = DispatchSemaphore(value: 0)
         // A thread of the kernel's own: one that never comes back is not one of a dispatch queue's few.
         BlockingCalls.run {
-            let target = LinkResolver.lookup(path)
+            let target = Self.lookup(path)
             answer.lock.lock()
             answer.target = target
             answer.lock.unlock()
@@ -232,7 +232,7 @@ final class LinkResolver {
             self.lock.unlock()
             done.signal()
         }
-        guard done.wait(timeout: .now() + LinkResolver.patience) == .success else { return nil }
+        guard done.wait(timeout: .now() + Self.patience) == .success else { return nil }
         answer.lock.lock()
         defer { answer.lock.unlock() }
         return answer.target
@@ -407,7 +407,7 @@ final class RemoteChanges {
         _ body: @escaping (LocalCall) throws -> Value
     ) throws -> Value {
         lock.lock()
-        let isDead = (stranded[volume] ?? 0) >= RemoteChanges.limit
+        let isDead = (stranded[volume] ?? 0) >= Self.limit
         lock.unlock()
         if isDead {
             throw NSError(

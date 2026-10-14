@@ -94,7 +94,7 @@ import Testing
         #expect(
             finishes {
                 (names, problem) = RenameComputation.names(
-                    subjects, settings: settings, context: self.context, given: nil, fileSystems: FileSystemRegistry()
+                    subjects, settings: settings, context: context, given: nil, fileSystems: FileSystemRegistry()
                 )
             })
         #expect(names.allSatisfy { $0 == nil } && problem as? SearchReplace.Problem == .tooSlow("(a*)*b"))
@@ -272,7 +272,7 @@ import Testing
         for mask in ["[N]1", "[N]2", "[N]3", "[N]4"] { session.settings.nameMask = mask }
         // Nothing was computed for the first three.
         #expect(session.isComputing)
-        for _ in 0..<5000 where session.isComputing { try? await Task.sleep(nanoseconds: 2_000_000) }
+        for _ in 0..<5_000 where session.isComputing { try? await Task.sleep(nanoseconds: 2_000_000) }
         #expect(
             !session.isComputing && session.rows.map(\.newName) == ["a4.txt", "b4.txt", "c4.txt"] && changes - base <= 2
         )
@@ -280,7 +280,7 @@ import Testing
 
     @Test func twoSortsInARowLeaveTheLastOneInForce() async {
         memory.removeTree("/d")
-        for index in 0..<2500 {
+        for index in 0..<2_500 {
             memory.addFile(
                 String(format: "/d/f%04d.txt", index), "x", modified: Date(timeIntervalSince1970: Double(index)))
         }
@@ -288,7 +288,7 @@ import Testing
         let session = session(clipboard: { nil }, changes: nil, background: true)
         session.sort(by: .name, ascending: false)
         session.sort(by: .name, ascending: true)
-        for _ in 0..<5000 where session.isComputing { try? await Task.sleep(nanoseconds: 2_000_000) }
+        for _ in 0..<5_000 where session.isComputing { try? await Task.sleep(nanoseconds: 2_000_000) }
         try? await Task.sleep(nanoseconds: 100_000_000)
         #expect(session.rows.first?.entry.name == "f0000.txt" && session.rows.last?.entry.name == "f2499.txt")
     }
@@ -350,7 +350,7 @@ import Testing
         #expect(next.undoCount == 1)
         var loaded = false
         next.loadUndo { loaded = true }
-        for _ in 0..<5000 where !loaded { try? await Task.sleep(nanoseconds: 2_000_000) }
+        for _ in 0..<5_000 where !loaded { try? await Task.sleep(nanoseconds: 2_000_000) }
         #expect(loaded && next.lastUndo?.count == 1)
     }
 

@@ -27,7 +27,7 @@ let mode = arguments["--mode"] ?? "big"
 let duration = Double(argument("--seconds", 60))
 let readerCount = argument("--readers", 16)
 let expectedEntries = argument("--entries", 200_000)
-let chainDepth = argument("--chain", 2000)
+let chainDepth = argument("--chain", 2_000)
 let results = arguments["--results"] ?? FileManager.default.currentDirectoryPath
 let seed = UInt64(argument("--seed", 1))
 
@@ -90,9 +90,9 @@ final class Counter {
             say(
                 String(
                     format: "TIME %@: n=%d min=%.1fms median=%.1fms p95=%.1fms max=%.1fms", name, sorted.count,
-                    sorted[0] * 1000,
-                    sorted[sorted.count / 2] * 1000, sorted[min(sorted.count - 1, sorted.count * 95 / 100)] * 1000,
-                    sorted.last! * 1000))
+                    sorted[0] * 1_000,
+                    sorted[sorted.count / 2] * 1_000, sorted[min(sorted.count - 1, sorted.count * 95 / 100)] * 1_000,
+                    sorted.last! * 1_000))
         }
     }
 }
@@ -107,7 +107,7 @@ func offMain<T>(_ body: @escaping () -> T) -> T {
     }
     thread.stackSize = 64 << 20
     thread.start()
-    pump(upTo: 7200) { done.value != nil }
+    pump(upTo: 7_200) { done.value != nil }
     return done.value!
 }
 
@@ -361,7 +361,7 @@ func runBig() {
 
     for reader in 0..<readerCount {
         launch("Stress.Reader\(reader)") {
-            var random = Random(seed: seed &* 1000 &+ UInt64(reader))
+            var random = Random(seed: seed &* 1_000 &+ UInt64(reader))
             while !stop.isCancelled {
                 lock.lock()
                 // Mostly the 64 probes; sometimes a member that was added meanwhile.
@@ -490,7 +490,7 @@ func runBig() {
     }
 
     launch("Stress.Adder") {
-        var random = Random(seed: seed &* 4242)
+        var random = Random(seed: seed &* 4_242)
         var batch = 0
         while !stop.isCancelled {
             batch += 1
@@ -536,7 +536,7 @@ func runBig() {
                 findings.violation("commit failed", "batch \(batch): \(error.localizedDescription)")
                 continue
             }
-            counter.time("commit (\(expectedEntries / 1000)k-member archive)", now() - t0)
+            counter.time("commit (\(expectedEntries / 1_000)k-member archive)", now() - t0)
             counter.add("commits")
             if counter.get("commits") % 5 == 0 {
                 say(
@@ -676,7 +676,7 @@ func runBig() {
             String(
                 format:
                     "HAZARD item(at:) without a flag, called on main 20 ms after another thread began opening the archive: returned after %.0f ms (found=%@, opener done=%@)",
-                (now() - t0) * 1000, found == nil ? "no" : "yes", opened.value ? "yes" : "no"))
+                (now() - t0) * 1_000, found == nil ? "no" : "yes", opened.value ? "yes" : "no"))
         pump(upTo: 60) { opened.value }
         fresh.store.close()
     }
@@ -738,7 +738,7 @@ func runDeep() {
                 url = next.url
                 level += 1
             }
-            say(String(format: "deep chain: reached level %d, slowest listing %.2f ms", level, slowest * 1000))
+            say(String(format: "deep chain: reached level %d, slowest listing %.2f ms", level, slowest * 1_000))
             let leaf = bench.readAll(url.appending(name: "leaf.txt"))
             if leaf.data != Data("bottom of the chain\n".utf8) {
                 findings.violation("deep leaf read wrong", "\(String(describing: leaf.error))")
@@ -784,7 +784,7 @@ func runDeep() {
             visit(bench.inside(archive, "t"))
             return count
         }
-        if nodes != 8191 { findings.violation("deep tree has the wrong number of members", "\(nodes)") }
+        if nodes != 8_191 { findings.violation("deep tree has the wrong number of members", "\(nodes)") }
     }
     step("deep: the member with a 60,000-byte path", limit: 300) {
         offMain {
@@ -847,7 +847,7 @@ func runDeep() {
                 findings.violation("deep: committed member reads back wrong (fresh reader)", "")
             }
             let count = (try? fresh.store.archive(at: archive).entries.filter { !$0.isDirectory }.count) ?? -1
-            if count != 8194 { findings.violation("deep: fresh reader counts wrong", "\(count) instead of 8194") }
+            if count != 8_194 { findings.violation("deep: fresh reader counts wrong", "\(count) instead of 8194") }
             fresh.store.close()
         }
     }

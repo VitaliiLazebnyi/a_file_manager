@@ -97,7 +97,7 @@ final class ColumnValueStore {
         let location = location
         guard !working.contains(location), !waiting.isEmpty else { return }
         working.insert(location)
-        let count = min(ColumnValueStore.batchSize, waiting.count)
+        let count = min(Self.batchSize, waiting.count)
         let batch = Array(waiting.suffix(count).reversed())
         waiting.removeLast(count)
         let generation = self.generation
@@ -108,12 +108,12 @@ final class ColumnValueStore {
             work: { Parallel.map(batch) { $0.column.cancellableValue($0.item, flag) } },
             then: { [weak self] texts in
                 guard let self else { return }
-                self.working.remove(location)
+                working.remove(location)
                 if generation == self.generation {
-                    for (request, text) in zip(batch, texts) { self.values[request.key] = text }
-                    self.onArrival?(Set(batch.map(\.item.name)))
+                    for (request, text) in zip(batch, texts) { values[request.key] = text }
+                    onArrival?(Set(batch.map(\.item.name)))
                 }
-                self.work()
+                work()
             })
     }
 }

@@ -80,16 +80,16 @@ final class IntegrationReplies: FileJobDelegate {
     var errors: [String] { lock.withLock { messages } }
     var progressReports: Int { lock.withLock { reports } }
 
-    func job(_ job: FileJob, progress: JobProgress) {
+    func job(_: FileJob, progress: JobProgress) {
         lock.withLock { reports += 1 }
         onProgress?(progress)
     }
-    func job(_ job: FileJob, conflictAt target: FileItem, source: FileItem) -> ConflictChoice { .overwrite }
-    func job(_ job: FileJob, failedAt url: URL, error: Error) -> ErrorChoice {
+    func job(_: FileJob, conflictAt _: FileItem, source _: FileItem) -> ConflictChoice { .overwrite }
+    func job(_: FileJob, failedAt _: URL, error: Error) -> ErrorChoice {
         lock.withLock { messages.append(error.localizedDescription) }
         return .skip
     }
-    func job(_ job: FileJob, confirmDeleteNonEmpty directory: URL) -> FolderDeleteChoice { .delete }
+    func job(_: FileJob, confirmDeleteNonEmpty _: URL) -> FolderDeleteChoice { .delete }
 }
 
 @Suite struct Review2IntegrationFileops {
@@ -162,7 +162,7 @@ final class IntegrationReplies: FileJobDelegate {
         #expect(names("victim/sub.real") == ["a.txt", "b.txt"] && box.exists("victim"))
     }
 
-    @Test func aMoveToAnotherFileSystemTakesTheOriginalsAwayFromTheirTopFolderDown() throws {
+    @Test func aMoveToAnotherFileSystemTakesTheOriginalsAwayFromTheirTopFolderDown() {
         let (from, to) = (MemoryFileSystem(scheme: "from"), MemoryFileSystem(scheme: "to"))
         let registry = FileSystemRegistry()
         registry.register(from)
@@ -205,7 +205,7 @@ final class IntegrationReplies: FileJobDelegate {
         return (from, to, registry)
     }
 
-    @Test func aCommitThatTakesLongReportsWhileItRunsSoThatAPausedJobWaitsInsideIt() throws {
+    @Test func aCommitThatTakesLongReportsWhileItRunsSoThatAPausedJobWaitsInsideIt() {
         let (from, to, registry) = slowTarget()
         let replies = IntegrationReplies()
         let lock = NSLock()
@@ -226,7 +226,7 @@ final class IntegrationReplies: FileJobDelegate {
         #expect(from.allPaths.filter { $0.hasPrefix("/s/") }.isEmpty && to.contents("/t/a.txt") == "a")
     }
 
-    @Test func aCommitThatIsStoppedWhileItRunsRemovesNoOriginal() throws {
+    @Test func aCommitThatIsStoppedWhileItRunsRemovesNoOriginal() {
         let (from, to, registry) = slowTarget()
         let replies = IntegrationReplies()
         let job = FileJob(

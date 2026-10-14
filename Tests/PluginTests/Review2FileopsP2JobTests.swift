@@ -148,12 +148,12 @@ final class P2ProbeFileSystem: FileSystemProvider {
         try note("move", flag: cancellation)
         try base.move(source, to: destination, replacing: replacing)
     }
-    func setAttributes(_ attributes: FileAttributes, of url: URL) throws { try note("setAttributes", flag: nil) }
-    func setAttributes(_ attributes: FileAttributes, of url: URL, cancellation: CancellationFlag) throws {
+    func setAttributes(_: FileAttributes, of _: URL) throws { try note("setAttributes", flag: nil) }
+    func setAttributes(_: FileAttributes, of _: URL, cancellation: CancellationFlag) throws {
         try note("setAttributes", flag: cancellation)
     }
-    func copyMetadata(from source: URL, to destination: URL) throws { try note("copyMetadata", flag: nil) }
-    func copyMetadata(from source: URL, to destination: URL, cancellation: CancellationFlag) throws {
+    func copyMetadata(from _: URL, to _: URL) throws { try note("copyMetadata", flag: nil) }
+    func copyMetadata(from _: URL, to _: URL, cancellation: CancellationFlag) throws {
         try note("copyMetadata", flag: cancellation)
     }
     func setQuarantine(_ value: Data, of url: URL) throws {
@@ -234,15 +234,15 @@ final class P2ViewFileSystem: FileSystemProvider {
     func realLocation(of url: URL) -> URL? { URL(fileURLWithPath: url.path) }
 
     struct Unused: Error {}
-    func list(_ directory: URL, showHidden: Bool) throws -> [FileItem] { throw Unused() }
-    func item(at url: URL) -> FileItem? { nil }
-    func parent(of directory: URL) -> URL? { nil }
-    func read(_ url: URL) throws -> FileReader { throw Unused() }
-    func createDirectory(at url: URL) throws { throw Unused() }
-    func write(_ url: URL) throws -> FileWriter { throw Unused() }
-    func remove(_ url: URL) throws { throw Unused() }
-    func move(_ source: URL, to destination: URL, replacing: Bool) throws { throw Unused() }
-    func copy(_ source: URL, to destination: URL, progress: (Int64) -> Bool) throws { throw Unused() }
+    func list(_: URL, showHidden _: Bool) throws -> [FileItem] { throw Unused() }
+    func item(at _: URL) -> FileItem? { nil }
+    func parent(of _: URL) -> URL? { nil }
+    func read(_: URL) throws -> FileReader { throw Unused() }
+    func createDirectory(at _: URL) throws { throw Unused() }
+    func write(_: URL) throws -> FileWriter { throw Unused() }
+    func remove(_: URL) throws { throw Unused() }
+    func move(_: URL, to _: URL, replacing _: Bool) throws { throw Unused() }
+    func copy(_: URL, to _: URL, progress _: (Int64) -> Bool) throws { throw Unused() }
 }
 
 /// Answers a job's questions and keeps what it was told, from whatever thread.
@@ -258,17 +258,17 @@ final class P2Replies: FileJobDelegate {
     var errors: [String] { lock.withLock { messages } }
     var progress: [(lines: [String], tag: Int)] { lock.withLock { reports } }
 
-    func job(_ job: FileJob, progress: JobProgress) {
+    func job(_: FileJob, progress: JobProgress) {
         let tag = tag?() ?? 0
         lock.withLock { reports.append((progress.lines, tag)) }
     }
-    func job(_ job: FileJob, conflictAt target: FileItem, source: FileItem) -> ConflictChoice { conflict }
-    func job(_ job: FileJob, failedAt url: URL, error: Error) -> ErrorChoice {
+    func job(_: FileJob, conflictAt _: FileItem, source _: FileItem) -> ConflictChoice { conflict }
+    func job(_: FileJob, failedAt _: URL, error: Error) -> ErrorChoice {
         lock.withLock { messages.append(error.localizedDescription) }
         return .skip
     }
-    func job(_ job: FileJob, confirmDeleteNonEmpty directory: URL) -> FolderDeleteChoice { .delete }
-    func job(_ job: FileJob, mergeInto existing: FileItem, source: FileItem) -> MergeChoice { merge }
+    func job(_: FileJob, confirmDeleteNonEmpty _: URL) -> FolderDeleteChoice { .delete }
+    func job(_: FileJob, mergeInto _: FileItem, source _: FileItem) -> MergeChoice { merge }
 }
 
 /// Runs `work` on another thread and waits for it; if it does not end in `seconds`, `rescue`
@@ -331,7 +331,7 @@ func p2Quarantine(_ url: URL) -> String? {
 
     // MARK: F021 — every changing call of a job can be ended
 
-    @Test func everyChangingCallOfAJobCarriesTheJobsFlag() throws {
+    @Test func everyChangingCallOfAJobCarriesTheJobsFlag() {
         memory.quarantineValue = Data("0083;5f000000;Test;".utf8)
         memory.addFile("/s/dir/sub/f.txt", "contents")
         memory.addFile("/s/dir/g.txt", "more")
@@ -356,7 +356,7 @@ func p2Quarantine(_ url: URL) -> String? {
             ]))
     }
 
-    @Test func aRemovalThatWaitsForAServerEndsWhenTheJobIsCancelled() throws {
+    @Test func aRemovalThatWaitsForAServerEndsWhenTheJobIsCancelled() {
         for index in 0..<5 { probe.base.addFile("/gone/f\(index).txt") }
         probe.stallsRemovals = true
         let flag = CancellationFlag()
@@ -371,7 +371,7 @@ func p2Quarantine(_ url: URL) -> String? {
         #expect(probe.base.allPaths.filter { $0.hasPrefix("/gone/") }.count == 5)
     }
 
-    @Test func tidyingUpAfterACancelStillTakesTheTemporaryFileAway() throws {
+    @Test func tidyingUpAfterACancelStillTakesTheTemporaryFileAway() {
         let flaky = FlakyFileSystem()
         fileSystems.register(flaky)
         flaky.base.addFile("/s/big.bin", "0123456789abcdef")
@@ -389,7 +389,7 @@ func p2Quarantine(_ url: URL) -> String? {
         #expect(probe.unflagged.isEmpty)
     }
 
-    @Test func aServerThatDoesNotAnswerTheTidyingUpIsGivenUpOn() throws {
+    @Test func aServerThatDoesNotAnswerTheTidyingUpIsGivenUpOn() {
         let flaky = FlakyFileSystem()
         fileSystems.register(flaky)
         flaky.base.addFile("/s/big.bin", "0123456789abcdef")
@@ -397,7 +397,7 @@ func p2Quarantine(_ url: URL) -> String? {
         let flag = CancellationFlag()
         flaky.afterFirstBlock = {
             // From now on the target does not answer removals.
-            self.probe.stallsRemovals = true
+            probe.stallsRemovals = true
             flag.cancel()
         }
         // (Kept here: the job holds whoever answers its questions weakly.)
@@ -424,7 +424,7 @@ func p2Quarantine(_ url: URL) -> String? {
         // Between the job's look ("nothing there") and its making the folder, a link appears.
         racing.beforeCreating = { url in
             guard url.lastPathComponent == "dir", !FileManager.default.fileExists(atPath: planted.path) else { return }
-            try? FileManager.default.createSymbolicLink(at: planted, withDestinationURL: self.box.url("elsewhere"))
+            try? FileManager.default.createSymbolicLink(at: planted, withDestinationURL: box.url("elsewhere"))
         }
         let replies = P2Replies()
         let job = FileJob(
@@ -438,7 +438,7 @@ func p2Quarantine(_ url: URL) -> String? {
 
     // MARK: A044 — pending writes are flushed before a file is used
 
-    @Test func aFileIsBroughtUpToDateBeforeItIsCopiedMovedOrDeleted() throws {
+    @Test func aFileIsBroughtUpToDateBeforeItIsCopiedMovedOrDeleted() {
         let lock = NSLock()
         var flushed: [String] = []
         let memory = self.memory
@@ -463,7 +463,7 @@ func p2Quarantine(_ url: URL) -> String? {
         #expect(replies.errors.isEmpty)
     }
 
-    @Test func aFileThatCannotBeBroughtUpToDateIsLeftAlone() throws {
+    @Test func aFileThatCannotBeBroughtUpToDateIsLeftAlone() {
         struct NotWritten: LocalizedError {
             var errorDescription: String? { "The archive could not be written." }
         }
@@ -572,7 +572,7 @@ func p2Quarantine(_ url: URL) -> String? {
     }
 
     // F052
-    @Test func aMarkThatCannotBeSetIsCountedAndNotAskedAbout() throws {
+    @Test func aMarkThatCannotBeSetIsCountedAndNotAskedAbout() {
         struct Refused: LocalizedError {
             var errorDescription: String? { "marks are not kept here" }
         }
@@ -600,13 +600,13 @@ func p2Quarantine(_ url: URL) -> String? {
 
     // MARK: F041, F047 — work that grows with the tree is done once, or not at all
 
-    @Test func theLinesOfAReportAreOnlyPutTogetherWhenAReportGoesOut() throws {
+    @Test func theLinesOfAReportAreOnlyPutTogetherWhenAReportGoesOut() {
         for index in 0..<300 { probe.base.addFile("/s/f\(index).txt") }
         probe.base.addDirectory("/t")
         let replies = P2Replies()
         let job = job(.copy, [probe.base.url("/s")], to: probe.base.url("/t"), replies: replies)
         // Nothing is due between the first report and the last.
-        job.progressInterval = 3600
+        job.progressInterval = 3_600
         let result = job.run()
         #expect(result.completed.count == 1 && probe.base.exists("/t/s/f299.txt"))
         // Two paths per report that went out; two per file would be six hundred.
@@ -615,7 +615,7 @@ func p2Quarantine(_ url: URL) -> String? {
             "\(replies.progress.count) reports, \(probe.displayed) paths")
     }
 
-    @Test func aFolderThatIsSkippedIsNotWalkedAgainForTheCount() throws {
+    @Test func aFolderThatIsSkippedIsNotWalkedAgainForTheCount() {
         for index in 0..<4 { probe.base.addFile("/s/dir/sub/f\(index).txt") }
         probe.base.addFile("/t/dir/there.txt")
         let replies = P2Replies()

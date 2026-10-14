@@ -27,12 +27,12 @@ private final class MountedImage {
         image = box.url("\(name).dmg")
         mountPoint = box.url(name)
         guard (try? box.folder(name)) != nil,
-            MountedImage.run(["create", "-size", "4m", "-fs", "HFS+", "-volname", "AFMTest", image.path]),
-            MountedImage.run(["attach", image.path, "-nobrowse", "-mountpoint", mountPoint.path])
+            Self.run(["create", "-size", "4m", "-fs", "HFS+", "-volname", "AFMTest", image.path]),
+            Self.run(["attach", image.path, "-nobrowse", "-mountpoint", mountPoint.path])
         else { return nil }
     }
 
-    deinit { _ = MountedImage.run(["detach", "-force", mountPoint.path]) }
+    deinit { _ = Self.run(["detach", "-force", mountPoint.path]) }
 
     private static func run(_ arguments: [String]) -> Bool {
         let process = Process()
@@ -323,7 +323,7 @@ private final class MountedImage {
 
     init() throws { box = try Sandbox() }
 
-    @Test func aMarkedNameIsNotMarkedForItsNormalisationTwin() throws {
+    @Test func aMarkedNameIsNotMarkedForItsNormalisationTwin() {
         let (composed, decomposed) = ("caf\u{e9}.txt", "cafe\u{301}.txt")
         memory.addFile("/A/" + composed)
         memory.addFile("/A/" + decomposed)

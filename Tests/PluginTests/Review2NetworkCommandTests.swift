@@ -19,7 +19,7 @@ private final class RefusingMounter: VolumeMounter {
                 "The server \(ServerAddress.removingPassword(from: url.absoluteString)) could not be connected: no route."
         )
     }
-    func unmount(_ volume: URL) throws {}
+    func unmount(_: URL) {}
 }
 
 /// The Net commands (review 2: N003, N016, N017, N018, N020, N033, N083, N084, N086, N100, N104, N105).
@@ -129,7 +129,7 @@ private final class RefusingMounter: VolumeMounter {
         #expect(ListPlan.shortened(lines).split(separator: "\n").count == ListPlan.shownLines + 1)
         #expect(ListPlan.shortened(lines).hasSuffix("… and \(30_000 - ListPlan.shownLines) more"))
         // Very many lines that are carried out, each ending at once (the source is not there).
-        let missing = (0..<3000).map { "ftp://\(address)/none\($0).txt" }
+        let missing = (0..<3_000).map { "ftp://\(address)/none\($0).txt" }
         quickConnect("ftp://\(address)/pub")
         try runList(missing, answers: [0])
         #expect(ui.log.contains { $0.hasPrefix("choose: Run this download list? (3000 downloads)") })
@@ -176,7 +176,7 @@ private final class RefusingMounter: VolumeMounter {
             String(decoding: try JSONEncoder().encode(plugin.connections), as: UTF8.self).range(of: "s3cret") == nil)
     }
 
-    @Test func aPasswordBelongsToItsServerAndUser() throws {
+    @Test func aPasswordBelongsToItsServerAndUser() {
         let store = ConnectionStore(settings: MemorySettings(), passwords: passwords)
         var connection = SavedConnection()
         (connection.name, connection.host, connection.user) = ("Work", "files.example.com", "anna")
@@ -197,7 +197,7 @@ private final class RefusingMounter: VolumeMounter {
         foreign.connections = [planted]
         #expect(foreign.vault.password(for: planted.profile) == nil)
         planted = connection
-        planted.port = 2121
+        planted.port = 2_121
         foreign.connections = [planted]
         #expect(foreign.vault.password(for: planted.profile) == nil)
         // A profile that names a connection the store does not have gets nothing.
@@ -217,7 +217,7 @@ private final class RefusingMounter: VolumeMounter {
         #expect(passwords.accounts.filter { $0.contains(connection.id.uuidString) }.isEmpty)
     }
 
-    @Test func passwordsOfAnEarlierVersionAreMovedOnce() throws {
+    @Test func passwordsOfAnEarlierVersionAreMovedOnce() {
         var connection = SavedConnection()
         (connection.name, connection.host, connection.user) = ("Old", "files.example.com", "anna")
         let settings = MemorySettings()
@@ -240,7 +240,7 @@ private final class RefusingMounter: VolumeMounter {
         #expect(foreign.vault.password(for: planted.profile) == nil)
     }
 
-    @Test func certificatesInTheSettingsAreNotBelieved() throws {
+    @Test func certificatesInTheSettingsAreNotBelieved() {
         // A settings file that came with a fingerprint for a server: it is not trusted, and it is removed.
         let settings = MemorySettings()
         settings.set(["files.example.com": ["AA:BB"]], forKey: "network.trustedCertificates")
@@ -299,7 +299,7 @@ private final class RefusingMounter: VolumeMounter {
         #expect(PasswordVault(store: passwords).trustedCertificates() == ["files.example.com": ["CC:DD"]])
     }
 
-    @Test func noMessageShowsAPassword() throws {
+    @Test func noMessageShowsAPassword() {
         // A mount that fails, and an address that is none.
         commands.perform(.netConnect, .text("smb://anna:s3cret-pw@nas.invalid/share"))
         commands.perform(.netConnect, .text("gopher://anna:s3cret-pw@old.invalid/x"))

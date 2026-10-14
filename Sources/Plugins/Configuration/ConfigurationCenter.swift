@@ -117,7 +117,7 @@ final class ConfigurationCenter {
             .note(
                 "Command: a command of the program (cm_…, several separated by commas), cd <folder>, or a program or shell line.\n"
                     + "Shortcut: for example ctrl+shift+n or f9.  Symbol: the name of a system symbol for the button bar.\n"
-                    + ConfigurationCenter.startMenuHint)
+                    + Self.startMenuHint)
         ]
         guard let answer = kernel.ui.form(existing == nil ? "New User Command" : "Edit User Command", fields: fields)
         else { return nil }
@@ -226,7 +226,7 @@ final class ConfigurationCenter {
             .text("parameters", "Parameters:", action.parameters),
             .text("path", "Start path:", action.startPath),
             .text("shortcut", "Shortcut key:", row?.shortcut ?? ""),
-            .note(ConfigurationCenter.startMenuHint)
+            .note(Self.startMenuHint)
         ]
         guard
             let answer = kernel.ui.form(row == nil ? "Add Start Menu Item" : "Change Start Menu Item", fields: fields)
@@ -334,6 +334,7 @@ final class ConfigurationCenter {
             then: { [self] result in
                 switch result {
                 case .failure(let error): kernel.ui.report(error, title: "The settings could not be exported")
+
                 case .success:
                     if tellsWhatIsIncluded {
                         kernel.ui.inform(
@@ -357,6 +358,7 @@ final class ConfigurationCenter {
                 switch result {
                 case .failure(let error):
                     kernel.ui.report(error, title: "The settings could not be imported")
+
                 case .success(let checked):
                     var current: [String: Data] = [:]
                     for key in Set(knownKeys).union(checked.values.keys) {
@@ -373,7 +375,8 @@ final class ConfigurationCenter {
 
     private func confirmAndApply(_ plan: SettingsImportPlan, fileName: String) {
         guard !plan.isEmpty else {
-            return kernel.ui.inform("Nothing to import", detail: plan.summary(fileName: fileName), style: .information)
+            kernel.ui.inform("Nothing to import", detail: plan.summary(fileName: fileName), style: .information)
+            return
         }
         var fields: [FormField] = [.note(plan.summary(fileName: fileName))]
         for part in plan.parts {

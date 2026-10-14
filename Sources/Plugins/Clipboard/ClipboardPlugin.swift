@@ -56,9 +56,9 @@ public final class ClipboardPlugin: Plugin {
     public static let pastesContentsKey = "clipboard.pasteContents"
 
     /// Selections up to this size go to the pasteboard as one object per file.
-    static let eagerLimit = 1000
+    static let eagerLimit = 1_000
     /// Name lists of more items than this are put together off the main thread.
-    static let listedAtOnce = 2000
+    static let listedAtOnce = 2_000
     /// The list of paths as one property list, which the system derives from the files on
     /// the pasteboard: all of them in one read.
     static let fileNamesType = NSPasteboard.PasteboardType("NSFilenamesPboardType")
@@ -122,7 +122,7 @@ public final class ClipboardPlugin: Plugin {
                 // The list of the operands is made where the text is: for a long selection
                 // that is not the main thread.
                 let (operands, directory) = (model().operandsSnapshot(), model().directory)
-                putText(for: ClipboardPlugin.count(of: operands)) { text(operands.items(), directory) }
+                putText(for: Self.count(of: operands)) { text(operands.items(), directory) }
             }
         }
         let displayPath = kernel.fileSystems.displayPath
@@ -196,7 +196,7 @@ public final class ClipboardPlugin: Plugin {
                 title: "Clipboard",
                 preferences: [
                     Preference(
-                        ClipboardPlugin.pastesContentsKey, "Paste a text or picture from the clipboard as a new file",
+                        Self.pastesContentsKey, "Paste a text or picture from the clipboard as a new file",
                         .flag(default: true))
                 ]))
     }
@@ -210,12 +210,12 @@ public final class ClipboardPlugin: Plugin {
 
     /// Puts the operands on the clipboard; the selection stays and nothing visible happens.
     private func place(_ operands: PanelModel.Operands, cut: Bool, ui: UserInteraction) {
-        let count = ClipboardPlugin.count(of: operands)
+        let count = Self.count(of: operands)
         guard count > 0 else { return }
         var forOthers = true
-        if count > ClipboardPlugin.eagerLimit {
+        if count > Self.eagerLimit {
             // Roughly what the system takes for that many; said so that the choice is an informed one.
-            let seconds = max(1, count / 5000)
+            let seconds = max(1, count / 5_000)
             let answer = ui.choose(
                 "\(cut ? "Cut" : "Copy") \(count) files",
                 detail: "They can be pasted in this program at once. Offering them to other programs as well (Finder) "
@@ -266,7 +266,7 @@ public final class ClipboardPlugin: Plugin {
         // What this program put there itself is not read back through the pasteboard.
         if let placed, placed.changeCount == pasteboard.changeCount { return placed.urls }
         // The whole list in one piece, where the other program offers it: one read instead of one per file.
-        if let paths = pasteboard.propertyList(forType: ClipboardPlugin.fileNamesType) as? [String], !paths.isEmpty {
+        if let paths = pasteboard.propertyList(forType: Self.fileNamesType) as? [String], !paths.isEmpty {
             return paths.map { URL(fileURLWithPath: $0, isDirectory: false) }
         }
         return pasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL]
@@ -303,9 +303,15 @@ public final class ClipboardPlugin: Plugin {
     /// slice by slice, with a job that shows the reading and lets it be cancelled. Nothing is
     /// handed over when the reading was cancelled or the clipboard changed meanwhile.
     private func readFiles(in kernel: Kernel, then deliver: @escaping ([URL]) -> Void) {
-        if let placed, placed.changeCount == pasteboard.changeCount { return deliver(placed.urls) }
+        if let placed, placed.changeCount == pasteboard.changeCount {
+            deliver(placed.urls)
+            return
+        }
         let items = pasteboard.pasteboardItems ?? []
-        guard items.count > ClipboardPlugin.readAtOnce else { return deliver(files()) }
+        guard items.count > Self.readAtOnce else {
+            deliver(files())
+            return
+        }
         // A second Paste while the first is still reading the list changes nothing.
         guard reading == nil else { return }
         let reading = FileListReading(items, on: pasteboard)
@@ -323,6 +329,7 @@ public final class ClipboardPlugin: Plugin {
                 self.reading = nil
                 switch outcome {
                 case .abandoned: break
+
                 // Items that are not file locations one by one (an old program's list): asked for whole.
                 case .read(let urls): deliver(urls.isEmpty ? files() : urls)
                 }
@@ -337,10 +344,10 @@ public final class ClipboardPlugin: Plugin {
     /// A yes is remembered for the state of the pasteboard it was found in, so that a menu
     /// that asks at every validation costs one question; a no is asked again, as for files.
     private func hasContent(in kernel: Kernel) -> Bool {
-        guard kernel.settings.flag(ClipboardPlugin.pastesContentsKey, default: true) else { return false }
+        guard kernel.settings.flag(Self.pastesContentsKey, default: true) else { return false }
         let count = pasteboard.changeCount
         if contentFoundAt == count { return true }
-        let found = pasteboard.availableType(from: ClipboardPlugin.imageTypes + [.string]) != nil
+        let found = pasteboard.availableType(from: Self.imageTypes + [.string]) != nil
         contentFoundAt = found ? count : nil
         return found
     }
@@ -372,12 +379,12 @@ public final class ClipboardPlugin: Plugin {
             work: { monitor -> Result<URL, Error> in
                 let cancellation = monitor.cancellation
                 return Result {
-                    guard let content = ClipboardPlugin.content(of: pasteboard) else { throw NothingToPaste() }
+                    guard let content = Self.content(of: pasteboard) else { throw NothingToPaste() }
                     let provider = try fileSystems.provider(for: directory)
                     let data: Data
                     switch content {
                     case .text(let text): data = Data(text.utf8)
-                    case .image(let picture): data = try ClipboardPlugin.png(from: picture)
+                    case .image(let picture): data = try Self.png(from: picture)
                     }
                     let name = PastedContent.freeName(extension: content.fileExtension) {
                         provider.item(at: directory.appending(name: $0), cancellation: cancellation) != nil
@@ -444,7 +451,10 @@ public final class ClipboardPlugin: Plugin {
     /// paths) and only handed to the pasteboard here. The latest request wins: a text that
     /// arrives after something newer went to the clipboard (another text, or files) is dropped.
     private func putText(for count: Int, _ make: @escaping () -> String) {
-        guard count > ClipboardPlugin.listedAtOnce else { return put(make()) }
+        guard count > Self.listedAtOnce else {
+            put(make())
+            return
+        }
         listRequest += 1
         let request = listRequest
         // On a thread of the kernel's own: the shared queues may be busy with work that waits.
@@ -554,7 +564,7 @@ final class FileListProvider: NSObject, NSPasteboardItemDataProvider {
     }
 
     func pasteboard(
-        _ pasteboard: NSPasteboard?, item: NSPasteboardItem, provideDataForType type: NSPasteboard.PasteboardType
+        _: NSPasteboard?, item: NSPasteboardItem, provideDataForType type: NSPasteboard.PasteboardType
     ) {
         item.setString(urls.map(\.path).joined(separator: "\n"), forType: type)
     }
@@ -613,14 +623,17 @@ final class FileListReading {
 
     /// One slice. Main thread.
     private func step(_ cancellation: CancellationFlag, sliced: Bool) {
-        guard !cancellation.isCancelled, pasteboard.changeCount == changeCount else { return finish(.abandoned) }
+        guard !cancellation.isCancelled, pasteboard.changeCount == changeCount else {
+            finish(.abandoned)
+            return
+        }
         let start = DispatchTime.now().uptimeNanoseconds
         var (index, found): (Int, [URL]) = (lock.withLock { next }, [])
         repeat {
             guard index < items.count else { break }
-            if let url = FileListReading.fileURL(of: items[index]) { found.append(url) }
+            if let url = Self.fileURL(of: items[index]) { found.append(url) }
             index += 1
-        } while !sliced || DispatchTime.now().uptimeNanoseconds - start < FileListReading.sliceTime
+        } while !sliced || DispatchTime.now().uptimeNanoseconds - start < Self.sliceTime
         let isDone = index >= items.count
         lock.withLock {
             next = index

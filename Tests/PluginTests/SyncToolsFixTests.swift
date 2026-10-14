@@ -53,7 +53,7 @@ private func fixDigest(_ method: ChecksumMethod, _ data: Data, pieces: Int = 1) 
     }
 
     @Test func partsOfOneFileStillJoin() throws {
-        let data = fixPattern(5000)
+        let data = fixPattern(5_000)
         try box.folder("out")
         try data.write(to: box.url("big.bin"))
         let parts = try Encoder.encode(item("big.bin"), into: box.url("."), method: .mime, linesPerFile: 20, run: run)
@@ -78,11 +78,11 @@ private func fixDigest(_ method: ChecksumMethod, _ data: Data, pieces: Int = 1) 
     }
 
     @Test func splitAndEncodeRefuseToReplaceTheirSource() throws {
-        let data = fixPattern(3000)
+        let data = fixPattern(3_000)
         try data.write(to: box.url("data.001"))
         #expect(throws: ToolError.self) {
             try Splitter.split(
-                item("data.001"), into: box.url("data.001").deletingLastPathComponent(), partSize: 1000, run: run)
+                item("data.001"), into: box.url("data.001").deletingLastPathComponent(), partSize: 1_000, run: run)
         }
         #expect(try Data(contentsOf: box.url("data.001")) == data)
 
@@ -122,12 +122,12 @@ private func fixDigest(_ method: ChecksumMethod, _ data: Data, pieces: Int = 1) 
     @Test(arguments: [
         (0, "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262"),
         (1, "2d3adedff11b61f14c886e35afa036736dcd87a74d27b5c1510225d0f592e213"),
-        (1023, "10108970eeda3eb932baac1428c7a2163b0e924c9a9e25b35bba72b28f70bd11"),
-        (1024, "42214739f095a406f3fc83deb889744ac00df831c10daa55189b5d121c855af7"),
-        (1025, "d00278ae47eb27b34faecf67b4fe263f82d5412916c1ffd97c8cb7fb814b8444"),
-        (2048, "e776b6028c7cd22a4d0ba182a8bf62205d2ef576467e838ed6f2529b85fba24a"),
-        (3072, "b98cb0ff3623be03326b373de6b9095218513e64f1ee2edd2525c7ad1e5cffd2"),
-        (65536, "68d647e619a930e7b1082f74f334b0c65a315725569bdc123f0ee11881717bfe"),
+        (1_023, "10108970eeda3eb932baac1428c7a2163b0e924c9a9e25b35bba72b28f70bd11"),
+        (1_024, "42214739f095a406f3fc83deb889744ac00df831c10daa55189b5d121c855af7"),
+        (1_025, "d00278ae47eb27b34faecf67b4fe263f82d5412916c1ffd97c8cb7fb814b8444"),
+        (2_048, "e776b6028c7cd22a4d0ba182a8bf62205d2ef576467e838ed6f2529b85fba24a"),
+        (3_072, "b98cb0ff3623be03326b373de6b9095218513e64f1ee2edd2525c7ad1e5cffd2"),
+        (65_536, "68d647e619a930e7b1082f74f334b0c65a315725569bdc123f0ee11881717bfe"),
         (1_048_576, "74cb441fd087764ca9c3694da742ebe30cbeb3060a17009ca81825c7a8d10343"),
         (1_048_577, "2f053cd7472cf0cd2f9adaf45c1180255b91b9a865404a63671a0ee5f792ed33"),
         (9_000_007, "5719b9667d3fee9292ca79e9aac4d4668a0738cb3b2ef7ee60258adf5aa9e9cf")
@@ -137,7 +137,7 @@ private func fixDigest(_ method: ChecksumMethod, _ data: Data, pieces: Int = 1) 
         // Whole (the large inputs are hashed on all cores), in megabyte blocks, and in odd pieces.
         #expect(fixDigest(.blake3, data) == expected)
         #expect(fixDigest(.blake3, data, pieces: 7) == expected)
-        #expect(fixDigest(.blake3, data, pieces: 1500) == expected)
+        #expect(fixDigest(.blake3, data, pieces: 1_500) == expected)
     }
 
     @Test func sha3FallbackAgreesWithTheSelectedImplementation() {

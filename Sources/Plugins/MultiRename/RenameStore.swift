@@ -65,22 +65,22 @@ final class RenameStore {
 
     init(settings: SettingsStore) {
         all = settings
-        own = settings.scoped(to: RenameStore.scope)
-        memory = RenameStore.memory(for: settings)
+        own = settings.scoped(to: Self.scope)
+        memory = Self.memory(for: settings)
     }
 
     // MARK: Preferences
 
     /// How many runs can be undone; 0 turns Undo off (`MultiRenameUndoHistoryLen`).
     var undoLimit: Int {
-        max(0, Int(all.text(RenameStore.undoLimitKey, default: "20").trimmingCharacters(in: .whitespaces)) ?? 20)
+        max(0, Int(all.text(Self.undoLimitKey, default: "20").trimmingCharacters(in: .whitespaces)) ?? 20)
     }
 
     /// The saved settings the tool opens with; empty for the last used ones (`MultiRenameLoadSettings`).
-    var startupSettingsName: String { all.text(RenameStore.startupSettingsKey, default: "") }
+    var startupSettingsName: String { all.text(Self.startupSettingsKey, default: "") }
 
     var titleRule: TitleCaseRule {
-        TitleCaseRule(setting: all.text(RenameStore.lowercaseWordsKey, default: TitleCaseRule.defaultSetting))
+        TitleCaseRule(setting: all.text(Self.lowercaseWordsKey, default: TitleCaseRule.defaultSetting))
     }
 
     // MARK: Saved settings
@@ -124,7 +124,7 @@ final class RenameStore {
         guard !text.isEmpty else { return }
         var entries = self.history(history).filter { $0 != text }
         entries.insert(text, at: 0)
-        setHistory(Array(entries.prefix(RenameStore.historyLimit)), history)
+        setHistory(Array(entries.prefix(Self.historyLimit)), history)
     }
 
     func forget(_ text: String, in history: History) {
@@ -163,10 +163,13 @@ final class RenameStore {
     /// Brings the undo history into memory, decoding it off the main thread; `completion` runs
     /// on the main thread. Asking for the history before this has finished decodes it where it is asked.
     func loadUndo(completion: @escaping () -> Void = {}) {
-        guard memory.undo == nil else { return completion() }
+        guard memory.undo == nil else {
+            completion()
+            return
+        }
         let data = own.largeData(forKey: "undo")
         let memory = self.memory
-        RenameStore.writer.async {
+        Self.writer.async {
             let decoded = data.flatMap { try? JSONDecoder().decode([[RenamedItem]].self, from: $0) } ?? []
             performOnMainLoop {
                 if memory.undo == nil { memory.undo = decoded }
@@ -197,7 +200,7 @@ final class RenameStore {
         var kept: [[RenamedItem]] = []
         var total = 0
         for run in (memory.undo ?? []).reversed() {
-            if total + run.count > RenameStore.persistedItemLimit { break }
+            if total + run.count > Self.persistedItemLimit { break }
             kept.append(run)
             total += run.count
         }
@@ -210,12 +213,13 @@ final class RenameStore {
         own.set(kept.count, forKey: "undoCount")
         // The history may be megabytes: the settings keep it apart from the small values (the
         // store that does so writes it away from the main thread).
-        guard kept.reduce(0, { $0 + $1.count }) > RenameStore.backgroundWriteThreshold else {
-            return own.setLarge(try? JSONEncoder().encode(kept), forKey: "undo")
+        guard kept.reduce(0, { $0 + $1.count }) > Self.backgroundWriteThreshold else {
+            own.setLarge(try? JSONEncoder().encode(kept), forKey: "undo")
+            return
         }
         let write = memory.undoWrite
         let (memory, own) = (self.memory, self.own)
-        RenameStore.writer.async {
+        Self.writer.async {
             let data = try? JSONEncoder().encode(kept)
             DispatchQueue.main.async {
                 // A newer change has its own write on the way (or was written at once).

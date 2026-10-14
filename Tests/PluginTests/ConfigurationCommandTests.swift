@@ -205,7 +205,7 @@ import Testing
         try box.file("A/one.txt")
         try box.file("A/two.txt")
         try box.folder("B")
-        plugin = ConfigurationCommands.makePlugin(box)
+        plugin = Self.makePlugin(box)
         bench = TestBench(
             plugins: [NavigationPlugin(), SelectionPlugin(), plugin], fileSystems: [LocalFileSystem()],
             left: box.url("A"), right: box.url("B"), settings: settings)
@@ -358,7 +358,7 @@ import Testing
 
         // The next start registers the stored commands with their keys.
         let restarted = TestBench(
-            plugins: [NavigationPlugin(), ConfigurationCommands.makePlugin(box)], fileSystems: [LocalFileSystem()],
+            plugins: [NavigationPlugin(), Self.makePlugin(box)], fileSystems: [LocalFileSystem()],
             left: box.url("A"), right: box.url("B"), settings: settings)
         #expect(
             restarted.commands[CommandID("em_other")] != nil
@@ -404,7 +404,7 @@ import Testing
 
         // At the next start the entries are in the Start menu, above the editor's entry.
         let restarted = TestBench(
-            plugins: [NavigationPlugin(), ConfigurationCommands.makePlugin(box)], fileSystems: [LocalFileSystem()],
+            plugins: [NavigationPlugin(), Self.makePlugin(box)], fileSystems: [LocalFileSystem()],
             left: box.url("A"), right: box.url("B"), settings: settings)
         let start = restarted.kernel.menus.menus.first { $0.title == "Start" }
         #expect(start?.items == ["cm_UserMenu2", "cm_UserMenu3", nil, "cm_ChangeStartMenu", "afm_StopUserCommands"])

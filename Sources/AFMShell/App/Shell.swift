@@ -126,7 +126,10 @@ public final class Shell: ShellServices {
     /// that does not answer) does not keep the program from quitting for ever: the user is
     /// asked whether to quit anyway, and again after twice as long each time the answer is no.
     public func stopJobsToQuit(patience: TimeInterval = Shell.quitPatience, then reply: @escaping (Bool) -> Void) {
-        guard jobService.isBusy else { return reply(true) }
+        guard jobService.isBusy else {
+            reply(true)
+            return
+        }
         var hasReplied = false
         var stopAsking: (() -> Void)?
         let (jobService, ui) = (jobService, kernel.ui)
@@ -203,7 +206,7 @@ public final class ShellApplication: NSObject, NSApplicationDelegate, NSMenuItem
         app.run()
     }
 
-    public func applicationDidFinishLaunching(_ notification: Notification) {
+    public func applicationDidFinishLaunching(_: Notification) {
         let settings = UserDefaultsSettings()
         self.settings = settings
         let kernel = Kernel(productName: productName, settings: settings, ui: AlertInteraction())
@@ -236,24 +239,24 @@ public final class ShellApplication: NSObject, NSApplicationDelegate, NSMenuItem
         return .terminateLater
     }
 
-    public func applicationWillTerminate(_ notification: Notification) {
+    public func applicationWillTerminate(_: Notification) {
         shell?.saveState()
         shell?.shutDown()
         kernel?.shutdown()
         // Large values are written in the background; the last ones are waited for, not for ever.
-        settings?.waitForWrites(atMost: ShellApplication.settingsPatience)
+        settings?.waitForWrites(atMost: Self.settingsPatience)
     }
 
-    public func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
+    public func applicationShouldTerminateAfterLastWindowClosed(_: NSApplication) -> Bool { false }
 
     // The entries of the menu bar that must work whichever window is in front; the
     // application's delegate is the last stop of every menu action.
 
-    @objc func showSettings(_ sender: Any?) {
+    @objc func showSettings(_: Any?) {
         shell?.showSettings()
     }
 
-    @objc func showMainWindow(_ sender: Any?) {
+    @objc func showMainWindow(_: Any?) {
         shell?.showMainWindow()
     }
 
@@ -261,7 +264,7 @@ public final class ShellApplication: NSObject, NSApplicationDelegate, NSMenuItem
         menuItem.action == #selector(showSettings(_:)) ? shell?.canShowSettings ?? false : true
     }
 
-    public func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+    public func applicationShouldHandleReopen(_: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         if !flag { shell?.showMainWindow() }
         return true
     }

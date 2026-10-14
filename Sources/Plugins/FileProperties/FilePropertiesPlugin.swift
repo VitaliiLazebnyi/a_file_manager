@@ -79,10 +79,10 @@ public final class FilePropertiesPlugin: Plugin {
             // list of a long selection is not made for it.
             let operands = model().operandsSnapshot()
             var urls: [URL] = []
-            if operands.markedCount > FilePropertiesPlugin.finderInfoRequestLimit {
+            if operands.markedCount > Self.finderInfoRequestLimit {
                 for index in operands.shownItems.indices where operands.isMarked(at: index) {
                     urls.append(operands.shownItems[index].url)
-                    if urls.count == FilePropertiesPlugin.finderInfoRequestLimit { break }
+                    if urls.count == Self.finderInfoRequestLimit { break }
                 }
             } else {
                 urls = operands.items().map(\.url)
@@ -129,7 +129,7 @@ public final class FilePropertiesPlugin: Plugin {
     private func showFinderInfo(_ urls: [URL]) {
         let urls = urls.filter(\.isFileURL)
         guard !urls.isEmpty else { return }
-        finderInfoRequests = Array((finderInfoRequests + urls).suffix(FilePropertiesPlugin.finderInfoRequestLimit))
+        finderInfoRequests = Array((finderInfoRequests + urls).suffix(Self.finderInfoRequestLimit))
         guard launchesApplications else { return }
         // Starting a program waits for the system: on a thread for work that waits.
         BlockingCalls.run {
@@ -198,7 +198,8 @@ final class PropertyActions {
         var parsed: (change: AttributeChange, applyAtOnce: Bool)?
         if let text = argument.text {
             guard let read = AttributeChange.parse(parameters: text) else {
-                return ui.inform("The attribute parameters cannot be read!", detail: text, style: .warning)
+                ui.inform("The attribute parameters cannot be read!", detail: text, style: .warning)
+                return
             }
             parsed = (read.change, read.applyAtOnce)
         }
@@ -248,6 +249,7 @@ final class PropertyActions {
             switch draft.change(isLocal: isLocal) {
             case .failure(let problem):
                 ui.inform(problem.message, detail: "", style: .warning)
+
             case .success(let change):
                 // Recurse with the permissions left as they were shown asks for nothing: the
                 // field shows the folder's own mode, not a wish. Said, instead of ending silently.
@@ -260,7 +262,8 @@ final class PropertyActions {
                     if applies { draft.confirmPermissions() }
                     continue
                 }
-                return apply(change, to: items, in: directory)
+                apply(change, to: items, in: directory)
+                return
             }
         }
     }
@@ -278,13 +281,13 @@ final class PropertyActions {
                 let outcome = AttributeJob(
                     change: change, fileSystems: fileSystems, cancellation: monitor.cancellation, meter: meter
                 ).run(items)
-                return (outcome, PropertyActions.folders(of: items, and: directory))
+                return (outcome, Self.folders(of: items, and: directory))
             },
             completion: { [self] outcome, folders in
                 if outcome.failed > 0 {
                     ui.inform(
                         "\(outcome.failed) item(s) could not be changed!",
-                        detail: PropertyActions.summary(of: outcome.failures, total: outcome.failed), style: .warning)
+                        detail: Self.summary(of: outcome.failures, total: outcome.failed), style: .warning)
                 }
                 kernel.panels.refresh(folders)
             })
@@ -389,7 +392,7 @@ final class PropertyActions {
                     // A measured folder shows its size in the Size column and is drawn as selected.
                     // One change for all of them: each is a search of the list and a redraw.
                     let selects = kernel.settings.flag(FilePropertiesPlugin.Settings.selectMeasured, default: true)
-                    PropertyActions.show(result.sizes, prepared: result.prepared, in: model)
+                    Self.show(result.sizes, prepared: result.prepared, in: model)
                     if selects { model.setSelected(true, names: result.sizes.map(\.name)) }
                 }
                 ui.inform(
@@ -424,7 +427,7 @@ final class PropertyActions {
             },
             completion: { result in
                 guard model.directory.isSameLocation(as: directory) else { return }
-                PropertyActions.show(result.sizes, prepared: result.prepared, in: model)
+                Self.show(result.sizes, prepared: result.prepared, in: model)
             })
     }
 
@@ -585,7 +588,7 @@ final class PropertyActions {
                 if result.failed > 0 {
                     kernel.ui.inform(
                         "\(result.failed) link(s) could not be created!",
-                        detail: PropertyActions.summary(of: result.failures, total: result.failed), style: .warning)
+                        detail: Self.summary(of: result.failures, total: result.failed), style: .warning)
                 }
                 kernel.panels.refresh(result.changed, focus: result.created)
             })
@@ -687,7 +690,7 @@ struct AttributeDraft {
 
     func fields(isLocal: Bool, details: LocalDetails?) -> [FormField] {
         func options(_ current: Bool?) -> [String] {
-            guard let current else { return AttributeDraft.flagOptions }
+            guard let current else { return Self.flagOptions }
             return ["Unchanged (\(current ? "set" : "not set"))", "Set", "Clear"]
         }
         func now(_ name: String?) -> String { name.map { " (now \($0))" } ?? "" }

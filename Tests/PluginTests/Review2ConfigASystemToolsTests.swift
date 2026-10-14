@@ -121,7 +121,7 @@ import Testing
     @Test func logLinesStayOneLineAndTheLogIsBounded() {
         commands.perform(.runCommandLine, .text("make 'a\nb'"))
         #expect(tools.log == ["skipped: make 'a\\nb'"])
-        for number in 0..<1200 { commands.perform(.runCommandLine, .text(" make \(number)")) }
+        for number in 0..<1_200 { commands.perform(.runCommandLine, .text(" make \(number)")) }
         #expect(tools.log.count <= 512 && tools.log.last == "skipped: make 1199")
         #expect(DisplayText.oneLine("x\u{1B}[0m\ny") == "x\\u{1B}[0m\\ny")
     }

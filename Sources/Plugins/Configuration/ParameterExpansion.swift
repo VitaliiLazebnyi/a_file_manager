@@ -88,6 +88,7 @@ enum ShellWords {
             case .uppercaseLetter, .lowercaseLetter, .titlecaseLetter, .modifierLetter, .otherLetter, .nonspacingMark,
                 .spacingMark, .decimalNumber:
                 return false
+
             default:
                 return true
             }
@@ -125,11 +126,11 @@ enum ShellWords {
         for scalar in line.unicodeScalars {
             if isEscaped {
                 isEscaped = false
-            } else if scalar == "\\" && inQuotes {
+            } else if scalar == "\\", inQuotes {
                 isEscaped = true
             } else if scalar == "\"" {
                 inQuotes.toggle()
-            } else if scalar == separator && !inQuotes {
+            } else if scalar == separator, !inQuotes {
                 if !current.isEmpty || separator != " " { words.append(String(current)) }
                 current = String.UnicodeScalarView()
                 continue
@@ -161,11 +162,11 @@ enum ShellWords {
             for scalar in written.unicodeScalars {
                 if isEscaped {
                     isEscaped = false
-                } else if scalar == "\\" && inQuotes {
+                } else if scalar == "\\", inQuotes {
                     isEscaped = true
                 } else if scalar == "\"" {
                     inQuotes.toggle()
-                } else if scalar == " " && !inQuotes {
+                } else if scalar == " ", !inQuotes {
                     flush()
                     if !current.isEmpty { words.append(current) }
                     current = []
@@ -196,12 +197,12 @@ enum ShellWords {
                 let scalar = written.unicodeScalars[position]
                 if isEscaped {
                     isEscaped = false
-                } else if scalar == "\\" && inQuotes {
+                } else if scalar == "\\", inQuotes {
                     isEscaped = true
                 } else if scalar == "\"" {
                     inQuotes.toggle()
-                } else if scalar == " " && !inQuotes {
-                    if text.isEmpty && word.isEmpty {
+                } else if scalar == " ", !inQuotes {
+                    if text.isEmpty, word.isEmpty {
                         // Blanks in front of the word.
                         position = written.unicodeScalars.index(after: position)
                         continue
@@ -229,7 +230,7 @@ enum ShellWords {
                 if !quoteSpecial.contains(scalar) { result.append("\\") }
                 result.append(scalar)
                 isEscaped = false
-            } else if scalar == "\\" && inQuotes {
+            } else if scalar == "\\", inQuotes {
                 isEscaped = true
             } else if scalar == "\"" {
                 inQuotes.toggle()
@@ -279,7 +280,7 @@ struct ParameterExpander {
         var run = Run(context: context, tokens: tokens)
         run.expand()
         return ExpandedParameters(
-            pieces: ParameterExpander.trimmed(run.pieces), asksFirst: asksFirst, listFile: run.listFile,
+            pieces: Self.trimmed(run.pieces), asksFirst: asksFirst, listFile: run.listFile,
             usedArguments: run.usedArguments, missingName: run.missingName, problem: run.problem)
     }
 
@@ -384,7 +385,7 @@ struct ParameterExpander {
             self.context = context
             self.tokens = tokens
             var flags = Set<Unicode.Scalar>()
-            Run.codes(of: tokens) { flags.insert($0) }
+            Self.codes(of: tokens) { flags.insert($0) }
             quotesAutomatically = !flags.contains("Q")
             emptyWhenUnselected = flags.contains("Y")
             dropsListWhenUnselected = flags.contains("y")
@@ -435,6 +436,7 @@ struct ParameterExpander {
                 case "A": arguments()
                 case "L", "l", "D": list(withPath: true, encoding: .plain)
                 case "F", "f", "d": list(withPath: false, encoding: .plain)
+
                 case "U", "W":
                     guard let kind = next, kind == "L" || kind == "F" else {
                         literal("%")
@@ -443,10 +445,12 @@ struct ParameterExpander {
                     }
                     position += 1
                     list(withPath: kind == "L", encoding: code == "U" ? .utf8WithMark : .utf16WithMark)
+
                 case "X": leftRight = true
                 case "x": leftRight = false
                 case "q": stripsQuotes.toggle()
                 case "Y", "y", "Z", "Q", "a": break
+
                 default:
                     literal("%")
                     literal(code)
@@ -508,10 +512,12 @@ struct ParameterExpander {
         private mutating func emit(_ piece: ExpandedPiece) {
             switch piece {
             case .text(let text): write(text)
+
             case .value(let value):
                 flushLiteral()
                 pieces.append(.value(value))
                 lexer.feedValue()
+
             case .raw(let value):
                 flushLiteral()
                 pieces.append(.raw(value))
@@ -594,7 +600,7 @@ struct ParameterExpander {
                 return { $0 }
             }
             let (end, open) = rangeEnd(openWith: ["-"])
-            return { Run.slice($0, fromEnd: sign == "-", index, end, open: open) }
+            return { Self.slice($0, fromEnd: sign == "-", index, end, open: open) }
         }
 
         /// The cmd.exe-style suffix `:~start,length` (spec 18 › Substrings).
@@ -620,7 +626,7 @@ struct ParameterExpander {
             }
             if length != nil, next == "~" { position += 1 }
             return { text in
-                if startIsNegative && start == 0 {
+                if startIsNegative, start == 0 {
                     // `-0` cuts the name without its extension, or the extension alone.
                     let parts = FileItem.split(text)
                     guard let length else { return parts.base }
@@ -763,7 +769,10 @@ struct ParameterExpander {
             let parts = Array(panel.path.utf8).split(separator: 0x2F).map { String(decoding: $0, as: UTF8.self) }
             if fromStart {
                 // The Mac has no drive letters: `%B+` is the root, `%B+0` is empty.
-                guard let index else { return single("/") }
+                guard let index else {
+                    single("/")
+                    return
+                }
                 single(index >= 1 && index <= parts.count ? parts[index - 1] : "")
             } else {
                 let back = index ?? 0
@@ -783,14 +792,17 @@ struct ParameterExpander {
             let source = first
             let target = second
             let selected = source.selection
-            guard number <= 2 else { return single(selected.count >= number ? source.path + selected[number - 1] : "") }
+            guard number <= 2 else {
+                single(selected.count >= number ? source.path + selected[number - 1] : "")
+                return
+            }
             let firstName = selected.first ?? source.cursorName
             var one = firstName.map { source.path + $0 } ?? ""
             var two =
                 selected.count >= 2
                 ? source.path + selected[1]
                 : (target.selection.first ?? firstName).map { target.path + $0 } ?? ""
-            if context.sourceIsRight && selected.count < 2 { swap(&one, &two) }
+            if context.sourceIsRight, selected.count < 2 { swap(&one, &two) }
             single(number == 1 ? one : two)
         }
 
@@ -808,7 +820,7 @@ struct ParameterExpander {
                 return
             }
             let (end, open) = rangeEnd(openWith: ["-", "+"])
-            let words = Run.slice(ShellWords.split(typed), fromEnd: fromEnd, index, end, open: open)
+            let words = Self.slice(ShellWords.split(typed), fromEnd: fromEnd, index, end, open: open)
             for (index, word) in words.enumerated() {
                 if index > 0 { write(" ") }
                 word.forEach { emit(stripped($0)) }
@@ -916,13 +928,16 @@ enum DisplayText {
             case "\n": result.append(contentsOf: "\\n".unicodeScalars)
             case "\r": result.append(contentsOf: "\\r".unicodeScalars)
             case "\t": result.append(contentsOf: "\\t".unicodeScalars)
+
             default:
                 switch scalar.properties.generalCategory {
                 // The joiners of emoji and of some scripts are format characters too, and harmless.
                 case .format where scalar.value == 0x200C || scalar.value == 0x200D:
                     result.append(scalar)
+
                 case .control, .format, .lineSeparator, .paragraphSeparator, .surrogate:
                     result.append(contentsOf: "\\u{\(String(scalar.value, radix: 16, uppercase: true))}".unicodeScalars)
+
                 default:
                     result.append(scalar)
                 }

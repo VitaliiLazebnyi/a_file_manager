@@ -77,7 +77,10 @@ public enum BlockingCalls {
             guard slot.close() else { return }
             DispatchQueue.main.async { deliver(answer) }
         }
-        if cancellation?.isCancelled == true { return finish(nil) }
+        if cancellation?.isCancelled == true {
+            finish(nil)
+            return
+        }
         let ticket = CallBook.shared.ask(owner: owner, question: question, shares: sharing, work: { work($0) }) {
             answer in
             finish(answer as? Answer)
@@ -279,7 +282,10 @@ final class CallBook {
 
     fileprivate func leave(_ call: Call, _ id: Int) {
         lock.lock()
-        guard let listener = call.listeners.removeValue(forKey: id) else { return lock.unlock() }
+        guard let listener = call.listeners.removeValue(forKey: id) else {
+            lock.unlock()
+            return
+        }
         var isGivenUp = false
         var work: ((CancellationFlag) -> Any)?
         if call.listeners.isEmpty {

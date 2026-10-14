@@ -35,7 +35,7 @@ public struct Age: Codable, Equatable {
     /// that day, not the current time of day. A count beyond what the calendar can reach gives
     /// the earliest moment there is.
     public func cutoff(before now: Date, calendar: Calendar = .current) -> Date {
-        let count = min(max(count, 0), Age.largestCount)
+        let count = min(max(count, 0), Self.largestCount)
         var step = DateComponents()
         switch unit {
         case .minutes: step.minute = -count
@@ -62,7 +62,7 @@ public struct SizeRule: Codable, Equatable {
         case bytes, kilobytes, megabytes, gigabytes
 
         public var title: String { ["bytes", "kbytes", "Mbytes", "Gbytes"][rawValue] }
-        public var factor: Double { pow(1024, Double(rawValue)) }
+        public var factor: Double { pow(1_024, Double(rawValue)) }
     }
 
     public var comparison: Comparison
@@ -134,7 +134,7 @@ public struct FileCriteria: Codable, Equatable {
         self.size = size
     }
 
-    public var isEmpty: Bool { self == FileCriteria() }
+    public var isEmpty: Bool { self == Self() }
 
     /// The criteria with the moments worked out once, for testing many files. `nil` when no
     /// criterion is set.
@@ -188,23 +188,23 @@ public struct SearchField {
     /// May block on the file system; called on the search's threads, several at once.
     public let value: (FileItem) -> String
 
-    public static func builtIn(fileSystems: FileSystemRegistry) -> [SearchField] {
+    public static func builtIn(fileSystems: FileSystemRegistry) -> [Self] {
         [
-            SearchField(id: "tc.name", title: "Name") { $0.name },
-            SearchField(id: "tc.ext", title: "Extension") { FileItem.split($0.name).ext },
-            SearchField(id: "tc.fullname", title: "Full name with path") { fileSystems.displayPath($0.url) },
-            SearchField(id: "tc.path", title: "Path") { fileSystems.displayPath($0.url.deletingLastPathComponent()) },
-            SearchField(id: "tc.size", title: "Size in bytes") { $0.isDirectory ? "" : String($0.size) },
-            SearchField(id: "tc.date", title: "Date") { Format.date($0.modified) },
-            SearchField(id: "tc.attr", title: "Permissions") { Format.permissions($0.permissions) }
+            Self(id: "tc.name", title: "Name") { $0.name },
+            Self(id: "tc.ext", title: "Extension") { FileItem.split($0.name).ext },
+            Self(id: "tc.fullname", title: "Full name with path") { fileSystems.displayPath($0.url) },
+            Self(id: "tc.path", title: "Path") { fileSystems.displayPath($0.url.deletingLastPathComponent()) },
+            Self(id: "tc.size", title: "Size in bytes") { $0.isDirectory ? "" : String($0.size) },
+            Self(id: "tc.date", title: "Date") { Format.date($0.modified) },
+            Self(id: "tc.attr", title: "Permissions") { Format.permissions($0.permissions) }
         ]
     }
 
     /// The built-in fields followed by the plugins' columns.
-    public static func all(fileSystems: FileSystemRegistry, columns: ColumnRegistry?) -> [SearchField] {
+    public static func all(fileSystems: FileSystemRegistry, columns: ColumnRegistry?) -> [Self] {
         builtIn(fileSystems: fileSystems)
             + (columns?.all ?? []).map { column in
-                SearchField(id: column.id, title: column.title, value: column.value)
+                Self(id: column.id, title: column.title, value: column.value)
             }
     }
 }
@@ -264,16 +264,19 @@ public struct FieldRule: Codable, Equatable {
         case .notEquals: return text.caseInsensitiveCompare(value) != .orderedSame
         case .equalsCase: return text == value
         case .notEqualsCase: return text != value
+
         case .regex:
             guard let expression else { return false }
             return FindRegex.matches(expression, in: text, trip: trip, cancelled: cancelled)
+
         case .notRegex:
             guard let expression else { return true }
             return !FindRegex.matches(expression, in: text, trip: trip, cancelled: cancelled)
+
         case .greater, .less, .greaterOrEqual, .lessOrEqual:
             guard !text.isEmpty else { return false }
             let order: ComparisonResult
-            if let left = FieldRule.number(text), let right = FieldRule.number(value) {
+            if let left = Self.number(text), let right = Self.number(value) {
                 order = left < right ? .orderedAscending : left > right ? .orderedDescending : .orderedSame
             } else {
                 order = text.caseInsensitiveCompare(value)

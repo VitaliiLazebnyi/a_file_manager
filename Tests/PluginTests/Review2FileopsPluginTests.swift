@@ -111,7 +111,7 @@ import VirtualFoldersPlugin
     }
 
     // F056, F006: several items renamed with one mask.
-    @Test func aRenameOfSeveralItemsToOneNameKeepsThemAllAndAsksOnce() throws {
+    @Test func aRenameOfSeveralItemsToOneNameKeepsThemAllAndAsksOnce() {
         bench.left.moveCursor(toName: "a.txt")
         commands.perform(.selectAll)
         bench.left.model.setSelected(false, names: ["sub"])
@@ -173,7 +173,7 @@ import VirtualFoldersPlugin
         #expect((pasteboard.readObjects(forClasses: [NSURL.self]) as? [URL])?.map(\.lastPathComponent) == ["f1.txt"])
     }
 
-    @Test func filesAnotherProgramOffersAsOneListAreReadInOnePiece() throws {
+    @Test func filesAnotherProgramOffersAsOneListAreReadInOnePiece() {
         bench.right.focus()
         // Files written by somebody else: the system offers them as one list as well.
         pasteboard.clearContents()
@@ -188,7 +188,7 @@ import VirtualFoldersPlugin
     }
 
     // F040
-    @Test func aTextIsPastedAsAFileWithoutLeavingADraft() throws {
+    @Test func aTextIsPastedAsAFileWithoutLeavingADraft() {
         pasteboard.clearContents()
         pasteboard.setString("some text", forType: .string)
         bench.right.focus()
@@ -197,7 +197,7 @@ import VirtualFoldersPlugin
     }
 
     // F055
-    @Test func namesThatCouldMisleadAreWrittenOutInQuestions() throws {
+    @Test func namesThatCouldMisleadAreWrittenOutInQuestions() {
         #expect(DisplayName.escaped("plain name.txt") == "plain name.txt")
         #expect(DisplayName.escaped("a\nb\u{202E}txt.exe\u{200B}") == "a<U+000A>b<U+202E>txt.exe<U+200B>")
         let item = FileItem(url: box.url("d/x\ny"), name: "x\ny", isDirectory: false)
@@ -302,7 +302,7 @@ import VirtualFoldersPlugin
     }
 
     // F060, F055
-    @Test func aNameWithALineBreakIsOneLineInTheLog() throws {
+    @Test func aNameWithALineBreakIsOneLineInTheLog() {
         let forged = OperationRecord(
             .copy, source: "/a/x\n2026-01-01 00:00:00: Delete: /etc/passwd", target: "/b/y\r",
             status: .failed("no\nway"))
@@ -349,9 +349,9 @@ import VirtualFoldersPlugin
         let writer = try FileHandle(forWritingTo: file)
         defer { try? writer.close() }
         var text = ""
-        for _ in 0..<2000 where !text.contains("/wait") {
+        for _ in 0..<2_000 where !text.contains("/wait") {
             text = (try? String(contentsOf: file, encoding: .utf8)) ?? ""
-            if !text.contains("/wait") { usleep(5000) }
+            if !text.contains("/wait") { usleep(5_000) }
         }
         try #require(text.contains("/wait"))
         // Another writer empties the file and writes a line of its own.
@@ -434,7 +434,7 @@ final class GatedFileSystem: FileSystemProvider {
     }
 
     // F078
-    @Test func separatorsAreFoundNextToCombiningMarks() throws {
+    @Test func separatorsAreFoundNextToCombiningMarks() {
         // A comment that starts with a combining accent, a name that ends with a format character.
         let file = DescriptIon(data: Data("x \u{0301}comment\r\n\"a b\"\u{0301} c\r\nn\u{0600} text\r\n".utf8))
         #expect(file.entries.count == 3)
@@ -543,7 +543,7 @@ final class GatedFileSystem: FileSystemProvider {
 
 @Suite struct Review2FileopsAttributes {
     // F028, F076
-    @Test func anOctalModeIsTheWholeModeAsForChmod() throws {
+    @Test func anOctalModeIsTheWholeModeAsForChmod() {
         #expect(PermissionChange("755") == .absolute(0o755, keepingSpecialBits: false))
         #expect(PermissionChange("755")?.applied(to: 0o4755, isDirectory: false) == 0o755)
         #expect(PermissionChange("4755")?.applied(to: 0o644, isDirectory: false) == 0o4755)
@@ -624,7 +624,7 @@ final class GatedFileSystem: FileSystemProvider {
     }
 
     // F029, F030
-    @Test func aLongListOfFailuresIsCutForTheMessage() throws {
+    @Test func aLongListOfFailuresIsCutForTheMessage() {
         let failures = (0..<20).map { "item \($0): no" }
         let text = PropertyActions.summary(of: failures, total: 300_000)
         #expect(text.split(separator: "\n").count == 21 && text.hasSuffix("… and 299980 more"))

@@ -59,10 +59,10 @@ final class WindowLayout {
 
     /// The panels one above the other instead of side by side (`cm_VerticalPanels`).
     var isStacked: Bool {
-        get { settings.flag(WindowLayout.stackedKey, default: false) }
+        get { settings.flag(Self.stackedKey, default: false) }
         set {
             guard newValue != isStacked else { return }
-            settings.set(newValue, forKey: WindowLayout.stackedKey)
+            settings.set(newValue, forKey: Self.stackedKey)
             onChange?()
         }
     }
@@ -70,10 +70,10 @@ final class WindowLayout {
     /// The share of the left (or upper) panel in thousandths, as the specification stores it
     /// (`Divider=500`). A panel never gets less than a tenth.
     var divider: Int {
-        get { WindowLayout.clamped(settings.index(WindowLayout.dividerKey, default: 500)) }
+        get { Self.clamped(settings.index(Self.dividerKey, default: 500)) }
         set {
-            guard WindowLayout.clamped(newValue) != divider else { return }
-            settings.set(WindowLayout.clamped(newValue), forKey: WindowLayout.dividerKey)
+            guard Self.clamped(newValue) != divider else { return }
+            settings.set(Self.clamped(newValue), forKey: Self.dividerKey)
             onChange?()
         }
     }
@@ -83,28 +83,28 @@ final class WindowLayout {
     /// Keeps the position the user dragged the divider to. The window already shows it, so
     /// nothing is redrawn.
     func rememberDivider(_ divider: Int) {
-        settings.set(WindowLayout.clamped(divider), forKey: WindowLayout.dividerKey)
+        settings.set(Self.clamped(divider), forKey: Self.dividerKey)
     }
 
     /// Whether the right panel was the source when the window was last used.
     var sourceIsRight: Bool {
-        get { settings.text(WindowLayout.sourceKey, default: "left") == "right" }
-        set { settings.set(newValue ? "right" : "left", forKey: WindowLayout.sourceKey) }
+        get { settings.text(Self.sourceKey, default: "left") == "right" }
+        set { settings.set(newValue ? "right" : "left", forKey: Self.sourceKey) }
     }
 
     /// Position and size of the window outside full-screen mode, in the form `NSWindow` reads.
     var frame: String? {
-        get { settings.value(String.self, forKey: WindowLayout.frameKey) }
-        set { if let newValue { settings.set(newValue, forKey: WindowLayout.frameKey) } }
+        get { settings.value(String.self, forKey: Self.frameKey) }
+        set { if let newValue { settings.set(newValue, forKey: Self.frameKey) } }
     }
 
     var isFullScreen: Bool {
-        get { settings.flag(WindowLayout.fullScreenKey, default: false) }
-        set { settings.set(newValue, forKey: WindowLayout.fullScreenKey) }
+        get { settings.flag(Self.fullScreenKey, default: false) }
+        set { settings.set(newValue, forKey: Self.fullScreenKey) }
     }
 
     /// The user's addition to the window title (`TitleExtraText`).
-    var titleExtra: String { settings.text(WindowLayout.titleExtraKey, default: "") }
+    var titleExtra: String { settings.text(Self.titleExtraKey, default: "") }
 
     /// The title of the main window (spec 01 › Window title): the program's name and version
     /// in place of `Total Commander (x64) 11.58`. The user's extra text goes in front when it
@@ -128,14 +128,14 @@ final class WindowLayout {
         var preferences = Region.allCases.map {
             Preference($0.settingsKey, "Show \($0.caption.lowercased())", .flag(default: $0.isShownByDefault))
         }
-        preferences.append(Preference(WindowLayout.stackedKey, "Panels one above the other", .flag(default: false)))
+        preferences.append(Preference(Self.stackedKey, "Panels one above the other", .flag(default: false)))
         preferences.append(
             Preference(
                 BarButton.iconSizeKey, "Size of the button bar's pictures",
                 .choice(BarButton.iconSizeNames, default: BarButton.defaultIconSize)))
         preferences.append(
             Preference(
-                WindowLayout.titleExtraKey, "Extra text in the window title (*text or $text)", .text(default: "")))
+                Self.titleExtraKey, "Extra text in the window title (*text or $text)", .text(default: "")))
         return PreferencePage(title: "Layout", preferences: preferences) { [weak self] in self?.onChange?() }
     }
 }

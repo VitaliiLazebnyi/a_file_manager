@@ -6,12 +6,12 @@ open class ToolWindow: NSWindow {
     /// Called for Esc before the window closes; return true when Esc was used up.
     public var onEscape: (() -> Bool)?
 
-    open override func cancelOperation(_ sender: Any?) {
+    override open func cancelOperation(_ sender: Any?) {
         if onEscape?() == true { return }
         performClose(sender)
     }
 
-    open override func performKeyEquivalent(with event: NSEvent) -> Bool {
+    override open func performKeyEquivalent(with event: NSEvent) -> Bool {
         if Shortcut.cmd("w").matches(event) {
             performClose(nil)
             return true

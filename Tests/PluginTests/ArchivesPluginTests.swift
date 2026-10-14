@@ -166,7 +166,7 @@ import Testing
         #expect(bench.jobService.titles.suffix(2) == ["Reading:", "Unpacking:"])
     }
 
-    @Test func readOnlyArchivesWithholdTheCommandsThatChange() throws {
+    @Test func readOnlyArchivesWithholdTheCommandsThatChange() {
         #expect(runTool("/usr/bin/tar", ["-czf", "tree.tgz", "tree"], in: box.url("A")).status == 0)
         left.reload()
         enter("tree.tgz")
@@ -183,7 +183,7 @@ import Testing
 
     // MARK: File operations inside an archive
 
-    @Test func copyOutOfAnArchiveWithTheCopyCommand() throws {
+    @Test func copyOutOfAnArchiveWithTheCopyCommand() {
         enter("tree.zip")
         enter("tree")
         // One file to the target panel's folder, as the dialog proposes it.
@@ -203,7 +203,7 @@ import Testing
         #expect(archives.flushPendingChanges().isEmpty && isSound("A/tree.zip"))
     }
 
-    @Test func copyIntoAnArchiveWithTheCopyCommand() throws {
+    @Test func copyIntoAnArchiveWithTheCopyCommand() {
         enter("tree.zip", in: left)
         enter("tree", in: left)
         enter("sub", in: left)
@@ -239,7 +239,7 @@ import Testing
         #expect(unzipList("A/tree.zip").contains("tree/sub/tree/sub/data.bin"))
     }
 
-    @Test func newFolderRenameAndDeleteInsideAnArchive() throws {
+    @Test func newFolderRenameAndDeleteInsideAnArchive() {
         enter("tree.zip")
         enter("tree")
         ui.promptAnswers = [.text("made/deeper")]
@@ -330,7 +330,7 @@ import Testing
         #expect(runTool("/usr/bin/tar", ["-tf", box.url("B/deep/plain.tar").path]).output == "notes.txt\n")
     }
 
-    @Test func packOptions() throws {
+    @Test func packOptions() {
         // Without path names everything is stored flat; without recursion only the files directly inside.
         left.moveCursor(toName: "tree")
         ui.formAnswers = [.values(["paths": .flag(false), "archive": .text(box.url("B/flat.zip").path)])]
@@ -479,7 +479,7 @@ import Testing
         #expect(box.read("A/notes.txt") == "notes")
     }
 
-    @Test func unpackFromInsideAnArchive() throws {
+    @Test func unpackFromInsideAnArchive() {
         enter("tree.zip")
         enter("tree")
         // The marked entries, folders with everything in them, relative to the folder shown.
@@ -508,7 +508,7 @@ import Testing
         #expect(ui.log.last == "inform: Archive test" && bench.jobService.titles == ["Testing:"])
 
         var bytes = try Data(contentsOf: box.url("A/stored.zip"))
-        let position = try #require(bytes.range(of: Data("0123456789012345".utf8))).lowerBound + 5000
+        let position = try #require(bytes.range(of: Data("0123456789012345".utf8))).lowerBound + 5_000
         bytes[position] = 0x58
         try bytes.write(to: box.url("A/stored.zip"))
         commands.perform("cm_TestArchive")

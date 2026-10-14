@@ -64,7 +64,7 @@ public protocol PanelSet: AnyObject {
 extension PanelSet {
     public var all: [PanelHandle] { [left, right] }
 
-    public func contentsChanged(in directories: [URL]) {}
+    public func contentsChanged(in _: [URL]) {}
 
     /// Re-reads every panel that shows one of the directories, after an operation changed
     /// them, and lets go of what is remembered of those no panel shows. `focus` is an item the cursor should go to in the panels that show its folder.

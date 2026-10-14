@@ -32,7 +32,7 @@ public final class TreeCache {
 
     /// Above this size a file is only rewritten by a scan, not for single new folders
     /// (`TreeUpdateLimit`, 2048 KB).
-    public static let updateLimit = 2048 * 1024
+    public static let updateLimit = 2_048 * 1_024
     /// How long additions are collected before the file is written.
     public static let writeDelay: TimeInterval = 2
     /// The most a cache file is read from or written to; a tree of more folders is kept in
@@ -84,7 +84,7 @@ public final class TreeCache {
 
     /// The file of a root; nil for a cache without files.
     public func fileURL(for root: URL, showHidden: Bool = false) -> URL? {
-        let key = TreeCache.key(root, showHidden)
+        let key = Self.key(root, showHidden)
         // A readable name, plus a checksum of the whole key so two roots never share a file.
         let readable = String(root.locationKey.map { $0.isLetter || $0.isNumber ? $0 : "_" }.suffix(60))
         let checksum = key.utf8.reduce(UInt64(14_695_981_039_346_656_037)) { ($0 ^ UInt64($1)) &* 1_099_511_628_211 }
@@ -95,13 +95,13 @@ public final class TreeCache {
     /// What is known of the tree below `root`, from memory or from the file; nil when the
     /// tree was never read.
     public func entry(for root: URL, showHidden: Bool = false) -> Entry? {
-        let key = TreeCache.key(root, showHidden)
+        let key = Self.key(root, showHidden)
         lock.lock()
         let remembered = memory[key]?.entry
         lock.unlock()
         if let remembered { return remembered }
-        guard let file = fileURL(for: root, showHidden: showHidden), let data = TreeCache.read(file),
-            let text = String(data: data, encoding: .utf8), let entry = TreeCache.parseEntry(text, root: root)
+        guard let file = fileURL(for: root, showHidden: showHidden), let data = Self.read(file),
+            let text = String(data: data, encoding: .utf8), let entry = Self.parseEntry(text, root: root)
         else { return nil }
         lock.lock()
         defer { lock.unlock() }
@@ -117,7 +117,7 @@ public final class TreeCache {
     /// Under the lock.
     private func trimMemory(keeping key: String) {
         var total = memory.values.reduce(0) { $0 + $1.entry.paths.count }
-        while memory.count > TreeCache.memoryLimit || total > TreeCache.memoryPathLimit,
+        while memory.count > Self.memoryLimit || total > Self.memoryPathLimit,
             let other = memory.first(where: { $0.key != key && !$0.value.isDirty })
         {
             total -= other.value.entry.paths.count
@@ -143,7 +143,7 @@ public final class TreeCache {
         _ paths: [String], unscanned: [String] = [], isComplete: Bool = true, for root: URL, showHidden: Bool = false
     ) {
         let entry = Entry(paths: paths, unscanned: unscanned, isComplete: isComplete)
-        let key = TreeCache.key(root, showHidden)
+        let key = Self.key(root, showHidden)
         lock.lock()
         memory[key] = Slot(entry, root: root, showHidden: showHidden)
         trimMemory(keeping: key)
@@ -157,7 +157,7 @@ public final class TreeCache {
         var removals: [(file: URL, ticket: Int, key: String)] = []
         lock.lock()
         for hidden in [false, true] {
-            let key = TreeCache.key(root, hidden)
+            let key = Self.key(root, hidden)
             memory[key] = nil
             // A write of this tree that is still on its way must not bring the file back.
             if let file = fileURL(for: root, showHidden: hidden) { removals.append((file, newTicket(for: key), key)) }
@@ -193,7 +193,7 @@ public final class TreeCache {
         lock.lock()
         defer { lock.unlock() }
         for showHidden in isHidden ? [true] : [false, true] {
-            guard let slot = memory[TreeCache.key(root, showHidden)] else { continue }
+            guard let slot = memory[Self.key(root, showHidden)] else { continue }
             if slot.known == nil { slot.known = Set(slot.entry.paths) }
             guard slot.known?.contains(relativePath) == false else { continue }
             // The folder's parents come with it; a reader takes the lines in any order. Nobody
@@ -204,11 +204,11 @@ public final class TreeCache {
                 slot.entry.unscanned.append(path)
                 slot.bytes += path.utf8.count + 3
             }
-            slot.isDirty = slot.bytes <= TreeCache.updateLimit
+            slot.isDirty = slot.bytes <= Self.updateLimit
         }
         guard !writeIsScheduled else { return }
         writeIsScheduled = true
-        updates.asyncAfter(deadline: .now() + TreeCache.writeDelay) { [self] in flush() }
+        updates.asyncAfter(deadline: .now() + Self.writeDelay) { [self] in flush() }
     }
 
     /// Writes the files of the trees that changed.
@@ -246,7 +246,7 @@ public final class TreeCache {
 
     private func write(_ entry: Entry, for root: URL, showHidden: Bool, ticket: Int) {
         guard let directory, let file = fileURL(for: root, showHidden: showHidden) else { return }
-        let key = TreeCache.key(root, showHidden)
+        let key = Self.key(root, showHidden)
         writeLock.lock()
         defer { writeLock.unlock() }
         lock.lock()
@@ -258,7 +258,7 @@ public final class TreeCache {
             at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
         chmod(directory.path, 0o700)
         // Too big for a file: what is there would be out of date, so it goes.
-        if !TreeCache.writePrivately(entry, root: root, to: file) { try? FileManager.default.removeItem(at: file) }
+        if !Self.writePrivately(entry, root: root, to: file) { try? FileManager.default.removeItem(at: file) }
     }
 
     /// Writes a file nobody else can read: a new file of mode 0600 that replaces the old one.
@@ -329,7 +329,7 @@ public final class TreeCache {
         let isComplete = entry.isComplete && entry.paths.allSatisfy(isPlain)
         var piece = Data("root=\(DirectoryHistory.stored(root))\n".utf8)
         if !isComplete { piece.append(contentsOf: "state=partial\n".utf8) }
-        piece.reserveCapacity(1 << 20 + 4096)
+        piece.reserveCapacity(1 << 20 + 4_096)
         func line(_ open: UInt8, _ path: String, _ close: UInt8) -> Bool {
             piece.append(open)
             piece.append(contentsOf: path.utf8)

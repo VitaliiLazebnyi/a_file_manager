@@ -61,7 +61,7 @@ struct TarHeader {
 
     /// The fixed fields of a header block; nil for a block that is not one. `typeFlag` is the
     /// raw type, which the reader needs for the extension records.
-    static func parse(_ block: Data) -> (header: TarHeader, typeFlag: UInt8)? {
+    static func parse(_ block: Data) -> (header: Self, typeFlag: UInt8)? {
         guard block.count >= blockSize else { return nil }
         // The block is copied once, for the check and for the fields.
         let bytes = [UInt8](block.prefix(blockSize))
@@ -74,14 +74,16 @@ struct TarHeader {
             if !prefix.isEmpty { name = prefix + "/" + name }
         }
         let typeFlag = bytes[156]
-        var header = TarHeader(path: name)
+        var header = Self(path: name)
         switch typeFlag {
         case 0, 48, 55: header.kind = name.hasSuffix("/") ? .directory : .file
+
         case 83:
             header.kind = .file
             header.isSparse = true
             header.realSize = octal(bytes[483..<495])
             header.hasSparseExtension = bytes[482] != 0
+
         case 49: header.kind = .hardLink
         case 50: header.kind = .symbolicLink
         case 53: header.kind = .directory
@@ -192,15 +194,15 @@ struct TarHeader {
                 records.append(Data("\(length)\(body)".utf8))
             }
             data.append(
-                TarHeader.block(
+                Self.block(
                     name: "PaxHeader/" + String(name.suffix(80)), typeFlag: 120, size: UInt64(records.count),
                     modified: modified, permissions: 0o644))
             data.append(records)
-            data.append(TarHeader.padding(after: UInt64(records.count)))
+            data.append(Self.padding(after: UInt64(records.count)))
         }
         let typeFlag: UInt8 = kind == .directory ? 53 : kind == .symbolicLink ? 50 : kind == .hardLink ? 49 : 48
         data.append(
-            TarHeader.block(
+            Self.block(
                 name: name, prefix: prefix, typeFlag: typeFlag, size: kind == .file ? size : 0, modified: modified,
                 permissions: permissions, linkTarget: linkTarget))
         return data
@@ -275,6 +277,7 @@ final class TarReader {
             case 75: longLink = text(try payload(header.size))  // GNU long link
             case 120: pax.merge(TarHeader.paxRecords(try payload(header.size))) { _, new in new }
             case 103: _ = try payload(header.size)  // pax global header
+
             default:
                 if let longName { header.path = longName }
                 if let longLink { header.linkTarget = longLink }

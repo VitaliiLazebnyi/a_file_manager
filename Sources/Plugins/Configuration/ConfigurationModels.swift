@@ -49,7 +49,7 @@ final class PreferencePageModel {
 /// A stored list read element by element: an element that cannot be decoded is counted and
 /// skipped, so one bad entry (or a field a later version added) does not take the rest along.
 struct LenientList<Element: Decodable>: Decodable {
-    private struct Ignored: Decodable { init(from decoder: Decoder) throws {} }
+    private struct Ignored: Decodable { init(from _: Decoder) {} }
 
     var elements: [Element] = []
     var skipped = 0
@@ -78,7 +78,7 @@ final class ConfigurationStore {
     /// The most entries that are used of a stored list: each is a command of the program and
     /// an item of a menu, and stored data may hold any number.
     static let startMenuLimit = 500
-    static let userCommandLimit = 2000
+    static let userCommandLimit = 2_000
 
     private let settings: SettingsStore
     /// What was decoded last, until the stored value is written or replaced: user commands are
@@ -94,7 +94,7 @@ final class ConfigurationStore {
     var onProblem: ((String) -> Void)?
 
     init(settings: SettingsStore) {
-        self.settings = settings.scoped(to: ConfigurationStore.owner)
+        self.settings = settings.scoped(to: Self.owner)
     }
 
     /// Forgets what was decoded: the settings were replaced behind the store's back (import, reset).
@@ -120,14 +120,14 @@ final class ConfigurationStore {
         get {
             if let cachedUserCommands { return cachedUserCommands }
             let loaded = Array(
-                load(UserCommand.self, key: ConfigurationStore.userCommandsKey, what: "user commands").prefix(
-                    ConfigurationStore.userCommandLimit))
+                load(UserCommand.self, key: Self.userCommandsKey, what: "user commands").prefix(
+                    Self.userCommandLimit))
             cachedUserCommands = loaded
             return loaded
         }
         set {
             cachedUserCommands = newValue
-            settings.set(newValue, forKey: ConfigurationStore.userCommandsKey)
+            settings.set(newValue, forKey: Self.userCommandsKey)
         }
     }
 
@@ -135,14 +135,14 @@ final class ConfigurationStore {
         get {
             if let cachedStartMenu { return cachedStartMenu }
             let loaded = Array(
-                load(StartMenuEntry.self, key: ConfigurationStore.startMenuKey, what: "Start menu").prefix(
-                    ConfigurationStore.startMenuLimit))
+                load(StartMenuEntry.self, key: Self.startMenuKey, what: "Start menu").prefix(
+                    Self.startMenuLimit))
             cachedStartMenu = loaded
             return loaded
         }
         set {
             cachedStartMenu = newValue
-            settings.set(newValue, forKey: ConfigurationStore.startMenuKey)
+            settings.set(newValue, forKey: Self.startMenuKey)
         }
     }
 
@@ -151,7 +151,7 @@ final class ConfigurationStore {
     /// anything else is saved over it, and the user is told. A copy kept from an earlier time
     /// moves to `<key>.unreadable.previous`, so the newest two are there. The copies are not
     /// exported; Reset All Settings removes them.
-    private func load<Element: Decodable>(_ type: Element.Type, key: String, what: String) -> [Element] {
+    private func load<Element: Decodable>(_: Element.Type, key: String, what: String) -> [Element] {
         guard let data = settings.data(forKey: key) else { return [] }
         let list = try? JSONDecoder().decode(LenientList<Element>.self, from: data)
         if let list, list.skipped == 0 { return list.elements }
@@ -165,15 +165,15 @@ final class ConfigurationStore {
             ? "The stored \(what) could not be read."
             : "\(list!.skipped) of the stored \(what) could not be read and were left out."
         MainLoop.perform { [onProblem] in
-            onProblem?(message + " The original data is kept in the setting “\(ConfigurationStore.owner).\(backup)”.")
+            onProblem?(message + " The original data is kept in the setting “\(Self.owner).\(backup)”.")
         }
         return list?.elements ?? []
     }
 
     /// The pictures the user gave to commands: command name → system symbol.
     var symbols: [String: String] {
-        get { settings.value([String: String].self, forKey: ConfigurationStore.symbolsKey) ?? [:] }
-        set { settings.set(newValue, forKey: ConfigurationStore.symbolsKey) }
+        get { settings.value([String: String].self, forKey: Self.symbolsKey) ?? [:] }
+        set { settings.set(newValue, forKey: Self.symbolsKey) }
     }
 }
 
@@ -314,8 +314,8 @@ struct SettingsArchive: Equatable {
     var values: [String: Data] = [:]
 
     /// What the store holds under the given keys; keys without a value are left out.
-    static func capture(from settings: SettingsStore, keys: [String]) -> SettingsArchive {
-        var archive = SettingsArchive()
+    static func capture(from settings: SettingsStore, keys: [String]) -> Self {
+        var archive = Self()
         for key in keys { archive.values[key] = settings.data(forKey: key) }
         return archive
     }
@@ -354,7 +354,7 @@ struct SettingsArchive: Equatable {
                     "$data": data.base64EncodedString()
                 ]
         }
-        let file: [String: Any] = ["format": SettingsArchive.format, "version": 1, "settings": entries]
+        let file: [String: Any] = ["format": Self.format, "version": 1, "settings": entries]
         return try JSONSerialization.data(withJSONObject: file, options: [.prettyPrinted, .sortedKeys])
     }
 
@@ -362,7 +362,7 @@ struct SettingsArchive: Equatable {
 
     init(data: Data) throws {
         guard let file = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-            file["format"] as? String == SettingsArchive.format,
+            file["format"] as? String == Self.format,
             let entries = file["settings"] as? [String: Any]
         else { throw ArchiveError.notAnArchive }
         for (key, value) in entries {

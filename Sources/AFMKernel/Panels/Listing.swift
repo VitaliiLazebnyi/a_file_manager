@@ -129,7 +129,8 @@ public enum PanelLoader {
                 provider.item(at: location, cancellation: $0)
             }
             if let item, !item.isDirectory, let parent = provider.parent(of: location) {
-                return try list(parent, focus: item.name)
+                try list(parent, focus: item.name)
+                return
             }
             guard climbing, !cancellation.isCancelled else { throw error }
             var current = location
@@ -161,7 +162,8 @@ public enum PanelLoader {
     ) throws {
         if cancellation.isCancelled { return }
         if Thread.isMainThread {
-            return try provider.list(directory, showHidden: showHidden, cancellation: cancellation, receive: receive)
+            try provider.list(directory, showHidden: showHidden, cancellation: cancellation, receive: receive)
+            return
         }
         let relay = Relay()
         let ticket = CallBook.shared.ask(
@@ -186,9 +188,11 @@ public enum PanelLoader {
                     ticket.cancel()
                     return
                 }
+
             case .finished(let result):
                 try result?.get()
                 return
+
             case .abandoned:
                 return
             }

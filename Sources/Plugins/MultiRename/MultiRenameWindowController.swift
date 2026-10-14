@@ -94,7 +94,7 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
         session.onChange = { [weak self] in self?.update() }
     }
 
-    required init?(coder: NSCoder) { fatalError("not used") }
+    required init?(coder _: NSCoder) { fatalError("not used") }
 
     // MARK: Layout
 
@@ -226,7 +226,7 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
         table.usesAlternatingRowBackgroundColors = true
         table.allowsMultipleSelection = true
         table.allowsColumnReordering = false
-        table.registerForDraggedTypes([MultiRenameWindowController.rowType])
+        table.registerForDraggedTypes([Self.rowType])
         table.onKey = { [weak self] event in self?.handleListKey(event) ?? false }
         let scroll = NSScrollView()
         scroll.documentView = table
@@ -304,7 +304,7 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
         update()
     }
 
-    func controlTextDidChange(_ notification: Notification) {
+    func controlTextDidChange(_: Notification) {
         fieldsChanged()
     }
 
@@ -348,7 +348,7 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
 
         let counts = session.counts
         if let problem = session.problem {
-            statusLabel.stringValue = MultiRenameWindowController.describe(problem)
+            statusLabel.stringValue = Self.describe(problem)
             statusLabel.textColor = .systemRed
         } else if counts.conflicts > 0 || counts.errors > 0 {
             statusLabel.stringValue = [
@@ -373,8 +373,10 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
         case RenameMaskError.invalidPlaceholder(let text): return "Invalid placeholder: \(text)"
         case RenameMaskError.contentPluginsUnavailable: return "Content-plugin fields [=…] are not available."
         case SearchReplace.Problem.invalidExpression(let text): return "Invalid regular expression: \(text)"
+
         case SearchReplace.Problem.tooSlow(let text):
             return "The regular expression takes too long for these names: \(text)"
+
         default: return "The rename mask is invalid."
         }
     }
@@ -465,7 +467,7 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
 
     @objc private func showMoreFields(_ sender: NSButton) {
         let menu = NSMenu()
-        for (code, label) in MultiRenameWindowController.moreFields {
+        for (code, label) in Self.moreFields {
             let item = NSMenuItem(title: "\(code)  \(label)", action: #selector(insertFromMenu(_:)), keyEquivalent: "")
             item.target = self
             item.representedObject = code
@@ -476,7 +478,7 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
 
     @objc private func showRangeFields(_ sender: NSButton) {
         let menu = NSMenu()
-        for (letter, label) in MultiRenameWindowController.rangeFields {
+        for (letter, label) in Self.rangeFields {
             let item = NSMenuItem(
                 title: "[\(letter)#-#]  \(label)", action: #selector(insertRangeFromMenu(_:)), keyEquivalent: "")
             item.target = self
@@ -530,11 +532,13 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
         case "default":
             loadedName = nil
             session.settings = .unchanged
+
         case "save":
             if let name = kernel.ui.prompt("Save settings", value: loadedName ?? "", detail: "Name of the settings:") {
                 session.save(as: name)
                 loadedName = name.trimmingCharacters(in: .whitespaces)
             }
+
         case "delete":
             let names = session.store.savedNames
             guard
@@ -544,6 +548,7 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
             else { return }
             session.deleteSaved(names[row])
             if loadedName == names[row] { loadedName = nil }
+
         default:
             let name = String(tag.dropFirst("load:".count))
             if session.load(name) { loadedName = name }
@@ -562,6 +567,7 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
             panel.beginSheetModal(for: window) { [weak self] response in
                 if response == .OK, let url = panel.url { self?.session.loadNames(from: url) }
             }
+
         case "edit": session.editNames()
         default: session.clearGivenNames()
         }
@@ -642,7 +648,7 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
 
     // MARK: The list
 
-    func numberOfRows(in tableView: NSTableView) -> Int { session.rowCount }
+    func numberOfRows(in _: NSTableView) -> Int { session.rowCount }
 
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
         guard let column = tableColumn?.identifier, row >= 0, row < session.rowCount else { return nil }
@@ -664,6 +670,7 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
         switch column.rawValue {
         case "old": cell.stringValue = parts.base
         case "ext": cell.stringValue = parts.ext
+
         case "new":
             cell.stringValue = shown.newName ?? RenameEngine.errorText
             switch status {
@@ -671,14 +678,18 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
             case .ready: break
             case .error: cell.textColor = .systemRed
             case .invalid(let reason): (cell.textColor, cell.toolTip) = (.systemRed, reason)
+
             case .duplicate:
                 (cell.textColor, cell.toolTip) = (.systemRed, "Another file in the list gets the same name.")
+
             case .exists: (cell.textColor, cell.toolTip) = (.systemRed, "A file with this name already exists.")
             }
+
         case "size":
             cell.stringValue = entry.item.isFolder ? "<DIR>" : Format.bytes(entry.item.size)
             cell.alignment = .right
-        case "date": cell.stringValue = MultiRenameWindowController.dateFormatter.string(from: entry.item.modified)
+
+        case "date": cell.stringValue = Self.dateFormatter.string(from: entry.item.modified)
         default: cell.stringValue = kernel.fileSystems.displayPath(entry.directory) + "/"
         }
         return cell
@@ -696,24 +707,24 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
         session.sort(by: key, ascending: sortAscending)
     }
 
-    func tableView(_ tableView: NSTableView, pasteboardWriterForRow row: Int) -> NSPasteboardWriting? {
+    func tableView(_: NSTableView, pasteboardWriterForRow row: Int) -> NSPasteboardWriting? {
         let item = NSPasteboardItem()
-        item.setString(String(row), forType: MultiRenameWindowController.rowType)
+        item.setString(String(row), forType: Self.rowType)
         return item
     }
 
     func tableView(
-        _ tableView: NSTableView, validateDrop info: NSDraggingInfo, proposedRow row: Int,
+        _: NSTableView, validateDrop info: NSDraggingInfo, proposedRow _: Int,
         proposedDropOperation dropOperation: NSTableView.DropOperation
     ) -> NSDragOperation {
         (info.draggingSource as? NSTableView) === table && dropOperation == .above ? .move : []
     }
 
     func tableView(
-        _ tableView: NSTableView, acceptDrop info: NSDraggingInfo, row: Int, dropOperation: NSTableView.DropOperation
+        _ tableView: NSTableView, acceptDrop info: NSDraggingInfo, row: Int, dropOperation _: NSTableView.DropOperation
     ) -> Bool {
         let rows = (info.draggingPasteboard.pasteboardItems ?? []).compactMap {
-            $0.string(forType: MultiRenameWindowController.rowType).flatMap(Int.init)
+            $0.string(forType: Self.rowType).flatMap(Int.init)
         }
         guard !rows.isEmpty else { return false }
         // A reordered list is no longer sorted by any column.
@@ -724,7 +735,7 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
         return true
     }
 
-    func windowWillClose(_ notification: Notification) {
+    func windowWillClose(_: Notification) {
         // The preview under way, and one that waits out the pause, are not wanted any more.
         session.close()
         onClose?()

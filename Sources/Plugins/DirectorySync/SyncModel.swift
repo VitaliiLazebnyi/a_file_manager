@@ -129,7 +129,7 @@ public struct SyncRow: Equatable {
         self.leftDirectory = leftDirectory
         self.rightDirectory = rightDirectory
         self.state = state
-        defaultAction = SyncRow.proposal(for: state, asymmetric: asymmetric)
+        defaultAction = Self.proposal(for: state, asymmetric: asymmetric)
         action = defaultAction
     }
 
@@ -191,18 +191,18 @@ public struct SyncShow: OptionSet, Codable, Equatable {
     public let rawValue: Int
     public init(rawValue: Int) { self.rawValue = rawValue }
 
-    public static let copyToRight = SyncShow(rawValue: 1)
-    public static let equal = SyncShow(rawValue: 2)
-    public static let notEqual = SyncShow(rawValue: 4)
-    public static let copyToLeft = SyncShow(rawValue: 8)
-    public static let duplicates = SyncShow(rawValue: 16)
-    public static let singles = SyncShow(rawValue: 32)
-    public static let all = SyncShow(rawValue: 63)
+    public static let copyToRight = Self(rawValue: 1)
+    public static let equal = Self(rawValue: 2)
+    public static let notEqual = Self(rawValue: 4)
+    public static let copyToLeft = Self(rawValue: 8)
+    public static let duplicates = Self(rawValue: 16)
+    public static let singles = Self(rawValue: 32)
+    public static let all = Self(rawValue: 63)
 
     /// Rows are filtered by the direction the comparison computed, not by what the user made
     /// of it, and by whether the file is on both sides or on one.
     public func shows(_ row: SyncRow) -> Bool {
-        let direction: SyncShow
+        let direction: Self
         switch row.defaultAction {
         case .copyToRight: direction = .copyToRight
         case .copyToLeft, .deleteRight: direction = .copyToLeft

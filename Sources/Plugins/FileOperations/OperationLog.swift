@@ -96,10 +96,10 @@ public final class OperationLog {
         guard configuration.isEnabled, configuration.wants(record) else { return }
         let time = now()
         queue.async {
-            self.pending.append((OperationLog.line(for: record, at: self.stamp.string(from: time)), time))
+            self.pending.append((Self.line(for: record, at: self.stamp.string(from: time)), time))
             guard !self.drainIsScheduled else { return }
             self.drainIsScheduled = true
-            self.queue.asyncAfter(deadline: .now() + OperationLog.delay) { self.drain() }
+            self.queue.asyncAfter(deadline: .now() + Self.delay) { self.drain() }
         }
     }
 
@@ -254,9 +254,11 @@ public final class OperationLog {
         switch configuration.rotation {
         case .never:
             return false
+
         case .daily:
             guard let modified else { return false }
             return day.string(from: modified) != day.string(from: time)
+
         case .size(let limit):
             return size > 0 && size + bytes > limit
         }
@@ -274,6 +276,7 @@ public final class OperationLog {
         switch configuration.rotation {
         case .never:
             return
+
         case .daily:
             var target = copy(day.string(from: written))
             var counter = 2
@@ -282,6 +285,7 @@ public final class OperationLog {
                 counter += 1
             }
             try? fm.moveItem(at: file, to: target)
+
         case .size:
             var counter = 1
             while fm.fileExists(atPath: copy(String(counter)).path) { counter += 1 }
@@ -294,7 +298,7 @@ public final class OperationLog {
             (try? fm.contentsOfDirectory(
                 at: file.deletingLastPathComponent(), includingPropertiesForKeys: [.contentModificationDateKey]))
             ?? []
-        let copies = siblings.filter { OperationLog.isRotatedCopy($0.lastPathComponent, of: file.lastPathComponent) }
+        let copies = siblings.filter { Self.isRotatedCopy($0.lastPathComponent, of: file.lastPathComponent) }
             .map {
                 (
                     $0,

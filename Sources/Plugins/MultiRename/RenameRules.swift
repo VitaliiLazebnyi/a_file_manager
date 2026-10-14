@@ -4,7 +4,7 @@ import Foundation
 /// (spec 18 › Case switches, the `LowercaseStrings` setting).
 struct TitleCaseRule: Equatable {
     static let defaultSetting = "English in Titles:a,an,the,at,by,for,in,of,on,to,from,up,and,as,but,or,nor,yet,so,vs"
-    static let standard = TitleCaseRule(setting: defaultSetting)
+    static let standard = Self(setting: defaultSetting)
 
     let label: String
     let words: Set<String>
@@ -49,14 +49,17 @@ enum LetterCase: Int, Codable, CaseIterable {
         case .unchanged: return text
         case .lower: return text.lowercased()
         case .upper: return text.uppercased()
+
         case .firstUpper:
             guard let first = text.firstIndex(where: { $0.isLetter || $0.isNumber }) else { return text }
             return String(text[..<first]) + text[first...first].uppercased()
                 + text[text.index(after: first)...].lowercased()
+
         case .words:
-            return LetterCase.capitalizingWords(text)
+            return Self.capitalizingWords(text)
+
         case .titleWords:
-            var words = LetterCase.capitalizingWords(text).split(separator: " ", omittingEmptySubsequences: false).map(
+            var words = Self.capitalizingWords(text).split(separator: " ", omittingEmptySubsequences: false).map(
                 String.init)
             let real = words.indices.filter { !words[$0].isEmpty }
             for index in real.dropFirst() where index != real.last || rule.allowsLowercaseLastWord {
@@ -104,7 +107,7 @@ struct RenameSettings: Codable, Equatable {
     var counter = CounterDefinition()
 
     /// The settings of `<default>`: no change.
-    static let unchanged = RenameSettings()
+    static let unchanged = Self()
 }
 
 /// Search & Replace of the Multi-Rename Tool (spec 18 › Search & Replace in the Multi-Rename
@@ -158,14 +161,14 @@ struct SearchReplace {
             return
         }
         if settings.regularExpression {
-            let pattern = SearchReplace.systemPattern(settings.search)
+            let pattern = Self.systemPattern(settings.search)
             guard let expression = try? NSRegularExpression(pattern: pattern, options: options) else {
                 throw Problem.invalidExpression(settings.search)
             }
             pairs = [
                 Pair(
                     finder: .regex(expression),
-                    replacement: SearchReplace.template(
+                    replacement: Self.template(
                         settings.replacement, groups: expression.numberOfCaptureGroups))
             ]
         } else {
@@ -217,6 +220,7 @@ struct SearchReplace {
                     position = match.range.location + match.range.length
                 }
                 text = result + source.substring(from: position)
+
             case .wildcard(let matcher):
                 // Bounded like a regular expression: a long search in a long name is the name times the search.
                 guard
@@ -241,6 +245,7 @@ struct SearchReplace {
         parts.map { part -> String in
             switch part {
             case .text(let text): return text
+
             case .group(let number, let letterCase):
                 guard number < match.numberOfRanges, match.range(at: number).location != NSNotFound else { return "" }
                 return letterCase.apply(to: source.substring(with: match.range(at: number)))
@@ -411,7 +416,7 @@ struct RenameEngine {
             full = joined(replaced, ext)
         }
         full = settings.letterCase.apply(to: full, rule: context.titleRule)
-        return RenameEngine.tidied(full)
+        return Self.tidied(full)
     }
 
     /// Control characters become spaces and slashes at the end are dropped.

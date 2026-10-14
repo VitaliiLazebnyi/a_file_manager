@@ -28,8 +28,8 @@ private final class FakeOverlayHost: PanelOverlayHost {
     init() throws {
         _ = NSApplication.shared
         var lines: [String] = []
-        for number in 1...5000 {
-            lines.append("Line \(number) of the long text, needle\(number % 1000 == 0 ? " GOLD" : "")")
+        for number in 1...5_000 {
+            lines.append("Line \(number) of the long text, needle\(number % 1_000 == 0 ? " GOLD" : "")")
         }
         memory.addFile("/A/long.txt", lines.joined(separator: "\n"))
         memory.addFile("/A/short.txt", "Grüße\tfrom a file\nsecond line")
@@ -39,13 +39,13 @@ private final class FakeOverlayHost: PanelOverlayHost {
         memory.addFile("/A/docs/inner.txt", "inside")
         memory.addFile("/A/docs/more/deep.txt", "12345")
         memory.addFile("/B/other.txt", "other")
-        try ViewerWindows.write(
+        try Self.write(
             Data([0x4D, 0x5A, 0x00, 0x01, 0x02, 0x03] + Array(repeating: UInt8(0xFF), count: 300)), to: "/A/tool.bin",
             in: memory)
-        try ViewerWindows.write(
+        try Self.write(
             Data([0xFF, 0xFE] + (ViewerEncoding.utf16LE.encode("Wide text\r\nzwei") ?? [])), to: "/A/wide.txt",
             in: memory)
-        try ViewerWindows.write(
+        try Self.write(
             Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00]), to: "/A/broken.png", in: memory)
         var hosts: [ObjectIdentifier: FakeOverlayHost] = [:]
         let lookup = HostLookup()
@@ -73,7 +73,7 @@ private final class FakeOverlayHost: PanelOverlayHost {
     @discardableResult
     func wait(upTo seconds: TimeInterval = 10, until condition: () -> Bool) async -> Bool {
         let deadline = Date().addingTimeInterval(seconds)
-        while !condition() && Date() < deadline {
+        while !condition(), Date() < deadline {
             try? await Task.sleep(nanoseconds: 3_000_000)
         }
         return condition()
@@ -266,8 +266,8 @@ private final class FakeOverlayHost: PanelOverlayHost {
         // S shows the same bytes in the DOS character set; the Encoding menu overrides the font.
         pane.handleKey(key("s"))
         #expect(pane.fontSlot == .ascii && pane.encoding == .dos)
-        pane.setEncoding(ViewerEncoding.codePage(1251))
-        #expect(pane.mode == .text && pane.encoding.codePage == 1251)
+        pane.setEncoding(ViewerEncoding.codePage(1_251))
+        #expect(pane.mode == .text && pane.encoding.codePage == 1_251)
         pane.setEncoding(.utf16BE)
         #expect(pane.mode == .unicode && pane.encoding == .utf16BE)
         pane.handleKey(key("7"))
@@ -277,7 +277,7 @@ private final class FakeOverlayHost: PanelOverlayHost {
         pane.handleKey(key("w"))
         #expect(
             !pane.settings.wrap && pane.pager.document == nil
-                || pane.layout == .text(TextLayoutOptions(columns: 1024, wordWrap: false)))
+                || pane.layout == .text(TextLayoutOptions(columns: 1_024, wordWrap: false)))
         pane.handleKey(key("w"))
         #expect(pane.settings.wrap && ListerSettings(bench.kernel.settings).wrap)
         pane.handleKey(functionKey(6))
@@ -428,14 +428,14 @@ private final class FakeOverlayHost: PanelOverlayHost {
         #expect(await wait { pane.statusText.contains("Line 1 ") })
         ui.promptAnswers = [.text("50,5")]
         pane.goToPercent()
-        #expect(await wait { pane.pager.position.map { (2400...2700).contains($0.line) } == true })
+        #expect(await wait { pane.pager.position.map { (2_400...2_700).contains($0.line) } == true })
         #expect(await wait { pane.percentText == "51 %" || pane.percentText == "50 %" || pane.percentText == "52 %" })
         ui.promptAnswers = [.text("99999")]
         pane.goToLine()
         #expect(await wait { ui.log.contains("inform: There is no line 99999.") })
         #expect(
             ViewerPane.number(in: "20,7 %") == 20.7 && ViewerPane.offset(in: "$FF") == 255
-                && ViewerPane.offset(in: "1,024") == 1024)
+                && ViewerPane.offset(in: "1,024") == 1_024)
         // The view draws what it holds.
         let image = try #require(pane.bitmapImageRepForCachingDisplay(in: pane.bounds))
         pane.cacheDisplay(in: pane.bounds, to: image)
@@ -484,7 +484,7 @@ private final class FakeOverlayHost: PanelOverlayHost {
         #expect(plugin.quickView == nil && host(bench.right).overlay == nil && !commands.isChecked(.quickView))
     }
 
-    @Test func switchingToTheCoveredPanelOrChangingItsPlaceEndsTheQuickView() async throws {
+    @Test func switchingToTheCoveredPanelOrChangingItsPlaceEndsTheQuickView() async {
         bench.left.moveCursor(toName: "short.txt")
         commands.perform(.quickView)
         #expect(plugin.quickView != nil)

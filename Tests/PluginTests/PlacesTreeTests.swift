@@ -63,7 +63,7 @@ import Testing
         #expect(tree.paths == ["alpha", "Work", "Work/Other", "Zeta"])
     }
 
-    @Test func neighboursFollowDisplayOrderAndWrapAround() throws {
+    @Test func neighboursFollowDisplayOrderAndWrapAround() {
         let tree = sample()
         var node = tree.root
         var forward: [String] = []
@@ -80,7 +80,7 @@ import Testing
         #expect(backward == Array(tree.paths.reversed()) + [""])
     }
 
-    @Test func quickSearchFindsTheNextFolderStartingWithTheText() throws {
+    @Test func quickSearchFindsTheNextFolderStartingWithTheText() {
         let tree = sample()
         func find(_ text: String, from path: String?, forward: Bool = true, includingStart: Bool = false) -> String? {
             tree.find(text, from: path.flatMap { tree.node(at: $0) }, forward: forward, includingStart: includingStart)
@@ -179,7 +179,7 @@ import Testing
         memory.listBatchSize = 1
         let result = scan(
             TreeScanner(root: memory.url("/W"), provider: memory, batchSize: 64), root: memory.url("/W"))
-        #expect(result.completed && result.tree.count == 1200)
+        #expect(result.completed && result.tree.count == 1_200)
         #expect(
             result.tree.root.children.count == 300
                 && result.tree.node(at: "d10")?.children.map(\.name) == ["s0", "s1", "s2"])

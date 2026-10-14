@@ -64,7 +64,7 @@ final class HotlistEditorWindowController: NSWindowController, NSWindowDelegate,
         reload(selecting: hotlist.rows.first?.path)
     }
 
-    required init?(coder: NSCoder) { fatalError("not used") }
+    required init?(coder _: NSCoder) { fatalError("not used") }
 
     // MARK: Layout
 
@@ -270,9 +270,9 @@ final class HotlistEditorWindowController: NSWindowController, NSWindowDelegate,
         }
     }
 
-    func numberOfRows(in tableView: NSTableView) -> Int { rows.count }
+    func numberOfRows(in _: NSTableView) -> Int { rows.count }
 
-    func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
+    func tableView(_ tableView: NSTableView, viewFor _: NSTableColumn?, row: Int) -> NSView? {
         let identifier = NSUserInterfaceItemIdentifier("entry")
         let cell =
             tableView.makeView(withIdentifier: identifier, owner: nil) as? NSTextField
@@ -282,7 +282,7 @@ final class HotlistEditorWindowController: NSWindowController, NSWindowDelegate,
                 label.lineBreakMode = .byTruncatingTail
                 return label
             }()
-        cell.stringValue = HotlistEditorWindowController.title(of: rows[row])
+        cell.stringValue = Self.title(of: rows[row])
         return cell
     }
 
@@ -296,7 +296,7 @@ final class HotlistEditorWindowController: NSWindowController, NSWindowDelegate,
         }
     }
 
-    func tableViewSelectionDidChange(_ notification: Notification) {
+    func tableViewSelectionDidChange(_: Notification) {
         showSelection()
     }
 
@@ -313,7 +313,7 @@ final class HotlistEditorWindowController: NSWindowController, NSWindowDelegate,
         close()
     }
 
-    func windowWillClose(_ notification: Notification) {
+    func windowWillClose(_: Notification) {
         NSApp.stopModal()
     }
 }

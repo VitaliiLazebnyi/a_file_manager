@@ -309,13 +309,17 @@ enum DisplayText {
         switch scalar.value {
         case 0x0A, 0x09, 0x0D:
             return keepingLines ? nil : Unicode.Scalar(0x2400 + scalar.value)
+
         case 0x00...0x1F:
             // The "control pictures": ␀ ␁ … ␛.
             return Unicode.Scalar(0x2400 + scalar.value)
+
         case 0x7F:
             return "\u{2421}"
+
         case 0x80...0x9F, 0x061C, 0x200E, 0x200F, 0x2028, 0x2029, 0x202A...0x202E, 0x2066...0x2069:
             return "\u{FFFD}"
+
         default:
             return nil
         }

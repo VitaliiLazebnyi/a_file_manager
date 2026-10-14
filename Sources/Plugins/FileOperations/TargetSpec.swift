@@ -32,11 +32,11 @@ public enum TargetMask {
                 if p < src.count { out.append(src[p]) }
                 p += 1
                 i += 1
-            } else if c == "*" && next == "*" {
+            } else if c == "*", next == "*" {
                 out += source
                 p = src.count
                 i += 2
-            } else if c == "*" && next == "?" {
+            } else if c == "*", next == "?" {
                 p = 0
                 i += 2
             } else if c == "*" {
@@ -71,7 +71,7 @@ public struct TargetSpec: Equatable {
         isExactName = true
     }
 
-    public static func == (a: TargetSpec, b: TargetSpec) -> Bool {
+    public static func == (a: Self, b: Self) -> Bool {
         a.directory.isSameLocation(as: b.directory) && a.mask == b.mask && a.isExactName == b.isExactName
     }
 
@@ -86,24 +86,24 @@ public struct TargetSpec: Equatable {
     public static func parse(
         _ text: String, sourceDirectory: URL, operandCount: Int, fileSystems: FileSystemRegistry,
         cancellation: CancellationFlag? = nil
-    ) -> TargetSpec {
+    ) -> Self {
         let text = text.trimmingCharacters(in: .whitespaces)
-        if text.isEmpty { return TargetSpec(directory: sourceDirectory) }
+        if text.isEmpty { return Self(directory: sourceDirectory) }
         let last = (text as NSString).lastPathComponent
         if last.contains("*") || last.contains("?") {
             let folder = String(text.dropLast(last.count))
-            return TargetSpec(directory: fileSystems.location(from: folder, relativeTo: sourceDirectory), mask: last)
+            return Self(directory: fileSystems.location(from: folder, relativeTo: sourceDirectory), mask: last)
         }
         let url = fileSystems.location(from: text, relativeTo: sourceDirectory)
         if text.hasSuffix("/") || last == ".." || last == "."
             || UniqueName.item(at: url, in: fileSystems, cancellation)?.isDirectory == true
         {
-            return TargetSpec(directory: url)
+            return Self(directory: url)
         }
         // A plain new name renames a single item; for several items it names a folder to create.
         return operandCount == 1
-            ? TargetSpec(directory: url.deletingLastPathComponent(), mask: last)
-            : TargetSpec(directory: url)
+            ? Self(directory: url.deletingLastPathComponent(), mask: last)
+            : Self(directory: url)
     }
 }
 

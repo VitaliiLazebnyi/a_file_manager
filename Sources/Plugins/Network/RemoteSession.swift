@@ -250,9 +250,9 @@ extension RemoteSession {
     func setAttributes(_ attributes: FileAttributes, of path: String) throws {
         try setAttributes(attributes, of: path, cancellation: nil)
     }
-    func canAppend(_ path: String) -> Bool { false }
-    func onLinkResolved(_ handler: @escaping (_ path: String, _ isDirectory: Bool) -> Void) {}
-    func openAppend(_ path: String, at offset: Int64?, cancellation: CancellationFlag?) throws -> (
+    func canAppend(_: String) -> Bool { false }
+    func onLinkResolved(_: @escaping (_ path: String, _ isDirectory: Bool) -> Void) {}
+    func openAppend(_: String, at _: Int64?, cancellation _: CancellationFlag?) throws -> (
         writer: FileWriter, size: Int64
     ) {
         throw FileSystemError.notSupported("Continuing a file on this server")
@@ -307,7 +307,7 @@ enum Background {
             condition.broadcast()
         } else if threads < mostThreads, lane.map({ runningIn[$0, default: 0] < mostPerLane }) ?? true {
             threads += 1
-            let thread = Thread { Background.serve() }
+            let thread = Thread { Self.serve() }
             thread.name = "afm.network.background"
             thread.qualityOfService = .utility
             thread.start()

@@ -161,7 +161,7 @@ final class TextPagerView: NSView {
         progress.handler = { [weak self] in self?.indexProgressed() }
     }
 
-    required init?(coder: NSCoder) { fatalError("not used") }
+    required init?(coder _: NSCoder) { fatalError("not used") }
 
     deinit {
         document?.cancellation.cancel()
@@ -738,39 +738,44 @@ final class TextPagerView: NSView {
             return
         }
         let current = caret ?? (row(topRow)?.range.lowerBound ?? document.content.lowerBound, topRow)
-        if motion != .up && motion != .down && motion != .pageUp && motion != .pageDown { preferredX = nil }
+        if motion != .up, motion != .down, motion != .pageUp, motion != .pageDown { preferredX = nil }
         switch motion {
         case .fileStart:
             withRow(0) { [weak self] in self?.setCaret($0.range.lowerBound, row: 0, extending: extending) }
+
         case .fileEnd:
             let last = rowCount - 1
             withRow(last) { [weak self] in self?.setCaret($0.contentEnd, row: last, extending: extending) }
+
         case .up, .down, .pageUp, .pageDown:
             let step = motion == .up ? -1 : motion == .down ? 1 : motion == .pageUp ? -pageRows : pageRows
             let target = max(0, min(rowCount - 1, current.row + step))
             withRow(current.row) { [weak self] from in
                 guard let self else { return }
-                let x = self.preferredX ?? self.xPosition(in: from, of: current.offset)
-                self.preferredX = x
-                self.withRow(target) { [weak self] row in
+                let x = preferredX ?? xPosition(in: from, of: current.offset)
+                preferredX = x
+                withRow(target) { [weak self] row in
                     guard let self, let document = self.document else { return }
-                    self.setCaret(
-                        document.byteOffset(in: row, at: self.textIndex(in: row, atX: x)), row: target,
+                    setCaret(
+                        document.byteOffset(in: row, at: textIndex(in: row, atX: x)), row: target,
                         extending: extending)
                 }
             }
+
         case .rowStart:
             withRow(current.row) { [weak self] in
                 self?.setCaret($0.range.lowerBound, row: $0.index, extending: extending)
             }
+
         case .rowEnd:
             withRow(current.row) { [weak self] in self?.setCaret($0.contentEnd, row: $0.index, extending: extending) }
+
         case .left, .wordLeft:
             withRow(current.row) { [weak self] row in
                 guard let self, let document = self.document else { return }
                 if current.offset <= row.range.lowerBound {
                     guard row.index > 0 else { return }
-                    self.withRow(row.index - 1) { [weak self] previous in
+                    withRow(row.index - 1) { [weak self] previous in
                         guard let self, let document = self.document else { return }
                         // The end of a wrapped row is the same byte as the start of the next:
                         // step onto its last character instead.
@@ -778,15 +783,15 @@ final class TextPagerView: NSView {
                             previous.contentEnd < current.offset
                             ? previous.contentEnd
                             : document.byteOffset(in: previous, at: max(0, previous.text.utf16.count - 1))
-                        self.setCaret(end, row: previous.index, extending: extending)
+                        setCaret(end, row: previous.index, extending: extending)
                     }
                     return
                 }
                 var index = min(document.textIndex(in: row, of: current.offset), row.text.utf16.count)
                 if motion == .wordLeft, document.layout != .hex {
-                    index = TextPagerView.wordStart(before: index, in: row.text)
+                    index = Self.wordStart(before: index, in: row.text)
                 } else if document.layout == .hex {
-                    self.setCaret(current.offset - 1, row: row.index, extending: extending)
+                    setCaret(current.offset - 1, row: row.index, extending: extending)
                     return
                 } else {
                     repeat {
@@ -794,32 +799,33 @@ final class TextPagerView: NSView {
                     } while index > 0
                         && document.byteOffset(in: row, at: index) == document.byteOffset(in: row, at: index - 1)
                 }
-                self.setCaret(document.byteOffset(in: row, at: max(0, index)), row: row.index, extending: extending)
+                setCaret(document.byteOffset(in: row, at: max(0, index)), row: row.index, extending: extending)
             }
+
         case .right, .wordRight:
             withRow(current.row) { [weak self] row in
                 guard let self, let document = self.document else { return }
                 if current.offset >= row.contentEnd {
-                    guard row.index + 1 < self.rowCount else { return }
-                    self.withRow(row.index + 1) { [weak self] next in
+                    guard row.index + 1 < rowCount else { return }
+                    withRow(row.index + 1) { [weak self] next in
                         self?.setCaret(next.range.lowerBound, row: next.index, extending: extending)
                     }
                     return
                 }
                 if document.layout == .hex {
-                    self.setCaret(current.offset + 1, row: row.index, extending: extending)
+                    setCaret(current.offset + 1, row: row.index, extending: extending)
                     return
                 }
                 let count = row.text.utf16.count
                 var index = document.textIndex(in: row, of: current.offset)
                 if motion == .wordRight {
-                    index = TextPagerView.wordStart(after: index, in: row.text)
+                    index = Self.wordStart(after: index, in: row.text)
                 } else {
                     repeat {
                         index += 1
                     } while index < count && document.byteOffset(in: row, at: index) == current.offset
                 }
-                self.setCaret(document.byteOffset(in: row, at: index), row: row.index, extending: extending)
+                setCaret(document.byteOffset(in: row, at: index), row: row.index, extending: extending)
             }
         }
     }
@@ -889,7 +895,7 @@ final class TextPagerView: NSView {
         guard let document, let hit = hit(convert(event.locationInWindow, from: nil)) else { return }
         preferredX = nil
         if event.clickCount == 2 {
-            let word = TextPagerView.wordRange(
+            let word = Self.wordRange(
                 around: min(hit.index, max(0, hit.row.text.utf16.count - 1)), in: hit.row.text)
             let lower = document.byteOffset(in: hit.row, at: word.lowerBound)
             let upper = document.byteOffset(in: hit.row, at: word.upperBound)
@@ -914,7 +920,7 @@ final class TextPagerView: NSView {
         setCaret(document.byteOffset(in: hit.row, at: hit.index), row: hit.row.index, extending: true)
     }
 
-    override func menu(for event: NSEvent) -> NSMenu? { contextMenu() }
+    override func menu(for _: NSEvent) -> NSMenu? { contextMenu() }
 
     /// The text of the row under a point of the window, and the place in it: for the context
     /// menu, which looks for a link there (spec 10 › Context menu rules).
@@ -924,7 +930,7 @@ final class TextPagerView: NSView {
 
     // MARK: Drawing
 
-    override func draw(_ dirtyRect: NSRect) {
+    override func draw(_: NSRect) {
         NSColor.textBackgroundColor.setFill()
         bounds.fill()
         guard let document, let context = NSGraphicsContext.current?.cgContext else { return }

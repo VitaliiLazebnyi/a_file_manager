@@ -84,7 +84,7 @@ enum LocalInfo {
         if let known { return known }
         var entry = passwd()
         var result: UnsafeMutablePointer<passwd>?
-        var buffer = [CChar](repeating: 0, count: 4096)
+        var buffer = [CChar](repeating: 0, count: 4_096)
         let name =
             getpwuid_r(id, &entry, &buffer, buffer.count, &result) == 0 && result != nil
             ? String(cString: entry.pw_name) : String(id)
@@ -102,7 +102,7 @@ enum LocalInfo {
         if let known { return known }
         var entry = group()
         var result: UnsafeMutablePointer<group>?
-        var buffer = [CChar](repeating: 0, count: 4096)
+        var buffer = [CChar](repeating: 0, count: 4_096)
         let name =
             getgrgid_r(id, &entry, &buffer, buffer.count, &result) == 0 && result != nil
             ? String(cString: entry.gr_name) : String(id)
@@ -117,7 +117,7 @@ enum LocalInfo {
         if let number = uid_t(text) { return number }
         var entry = passwd()
         var result: UnsafeMutablePointer<passwd>?
-        var buffer = [CChar](repeating: 0, count: 4096)
+        var buffer = [CChar](repeating: 0, count: 4_096)
         return getpwnam_r(text, &entry, &buffer, buffer.count, &result) == 0 && result != nil ? entry.pw_uid : nil
     }
 
@@ -125,7 +125,7 @@ enum LocalInfo {
         if let number = gid_t(text) { return number }
         var entry = group()
         var result: UnsafeMutablePointer<group>?
-        var buffer = [CChar](repeating: 0, count: 4096)
+        var buffer = [CChar](repeating: 0, count: 4_096)
         return getgrnam_r(text, &entry, &buffer, buffer.count, &result) == 0 && result != nil ? entry.gr_gid : nil
     }
 

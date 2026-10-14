@@ -5,7 +5,7 @@ import Foundation
 enum CompareSide {
     case left, right
 
-    var other: CompareSide { self == .left ? .right : .left }
+    var other: Self { self == .left ? .right : .left }
 }
 
 /// The settings keys of Compare by content, all below `compareContent.`.
@@ -79,7 +79,7 @@ final class CompareSession {
     /// The parts of changed rows that differ inside the line, by row: worked out once for both
     /// sides, since the table asks for each side on every scroll. Emptied with every new `content`.
     private var inlineCache: [Int: (left: [Range<Int>], right: [Range<Int>])] = [:]
-    private static let inlineCacheLimit = 4096
+    private static let inlineCacheLimit = 4_096
     private var findGeneration = 0
     /// Texts of fewer lines than this, none of them long, are compared again at once after an edit;
     /// anything larger goes to the background, so that no work grows with the size of the files on the main thread.
@@ -200,6 +200,7 @@ final class CompareSession {
         switch content {
         case .none:
             return
+
         case .binary(let left, let right, _):
             let bytesPerLine = self.bytesPerLine
             background(
@@ -207,14 +208,15 @@ final class CompareSession {
                 finish: { [self] diff, cancelled in
                     show(.binary(left: left, right: right, diff: diff), cancelled: cancelled)
                 })
+
         case .text(let left, let right, _, let width):
             let (options, anchors) = (self.options, self.anchors)
             let work = { (cancellation: CancellationFlag?) in
                 CompareLoader.text(
                     left: left, right: right, options: options, anchors: anchors, cancellation: cancellation)
             }
-            if left.lines.count + right.lines.count < CompareSession.inlineRecompareBelow,
-                width <= CompareSession.inlineRecompareWidth
+            if left.lines.count + right.lines.count < Self.inlineRecompareBelow,
+                width <= Self.inlineRecompareWidth
             {
                 running?.cancel()
                 show(work(nil))
@@ -259,6 +261,7 @@ final class CompareSession {
         switch content {
         case .none:
             status = isIdentical ? "The two files have the same content!" : ""
+
         case .text(let left, let right, let diff, _):
             let count = diff.blocks.count
             let differences =
@@ -268,6 +271,7 @@ final class CompareSession {
             status =
                 "\(differences)    \(left.encoding.name) <-> \(right.encoding.name)"
                 + (hasUnsavedChanges ? "    [modified]" : "") + (anchors.isEmpty ? "" : "    [resynchronized]")
+
         case .binary(_, _, let diff):
             status =
                 diff.isIdentical
@@ -342,6 +346,7 @@ final class CompareSession {
         switch content {
         case .none: return ""
         case .text: return line(side, row: row).map { String($0.number) } ?? ""
+
         case .binary(let left, let right, let diff):
             return row * diff.bytesPerLine < (side == .left ? left.count : right.count) ? diff.offsetText(row: row) : ""
         }
@@ -352,6 +357,7 @@ final class CompareSession {
         switch content {
         case .none: return nil
         case .text: return line(side, row: row)?.text
+
         case .binary(let left, let right, let diff):
             let text = diff.text(of: side == .left ? left : right, row: row)
             return text.isEmpty ? nil : text
@@ -362,6 +368,7 @@ final class CompareSession {
     func highlights(_ side: CompareSide, row: Int) -> [Range<Int>] {
         switch content {
         case .none: return []
+
         case .text:
             guard kind(ofRow: row) == .changed, let left = line(.left, row: row), let right = line(.right, row: row)
             else { return [] }
@@ -370,10 +377,11 @@ final class CompareSession {
                 ranges = cached
             } else {
                 ranges = TextDiff.inline(left.text, right.text)
-                if inlineCache.count >= CompareSession.inlineCacheLimit { inlineCache.removeAll() }
+                if inlineCache.count >= Self.inlineCacheLimit { inlineCache.removeAll() }
                 inlineCache[row] = ranges
             }
             return side == .left ? ranges.left : ranges.right
+
         case .binary(let left, let right, let diff):
             guard kind(ofRow: row) == .changed else { return [] }
             return diff.differingOffsets(left: left, right: right, row: row).flatMap(diff.textRanges)
@@ -388,7 +396,7 @@ final class CompareSession {
     /// The next row, in either file, whose text contains `needle`, ignoring case; the search
     /// goes round at the ends. Blocks: for callers that are not the window.
     func find(_ needle: String, from row: Int, forward: Bool) -> Int? {
-        CompareSession.search(content, needle, from: row, forward: forward, cancellation: nil)
+        Self.search(content, needle, from: row, forward: forward, cancellation: nil)
     }
 
     /// The same away from the main thread, so that a large file does not freeze the window; a
@@ -400,11 +408,11 @@ final class CompareSession {
         searching?.cancel()
         searching = cancellation
         if runsInline {
-            completion(CompareSession.search(content, needle, from: row, forward: forward, cancellation: nil))
+            completion(Self.search(content, needle, from: row, forward: forward, cancellation: nil))
             return
         }
         CompareWorker.run("Compare find") { [weak self] in
-            let found = CompareSession.search(content, needle, from: row, forward: forward, cancellation: cancellation)
+            let found = Self.search(content, needle, from: row, forward: forward, cancellation: cancellation)
             DispatchQueue.main.async {
                 // Stale when another search started, or the texts changed, meanwhile.
                 guard let self, !cancellation.isCancelled, self.findGeneration == generation else { return }
@@ -424,6 +432,7 @@ final class CompareSession {
         switch content {
         case .none:
             return nil
+
         case .text(let left, let right, let diff, _):
             count = diff.rows.count
             sides = { candidate, side in
@@ -431,6 +440,7 @@ final class CompareSession {
                     side == .left ? (left, diff.rows[candidate].left) : (right, diff.rows[candidate].right)
                 return index.flatMap { document.lines.indices.contains($0) ? document.lines[$0].text : nil }
             }
+
         case .binary(let left, let right, let diff):
             count = diff.rowCount
             sides = { candidate, side in
@@ -480,10 +490,12 @@ final class CompareSession {
         undoStack = []
         switch content {
         case .none: onChange()
+
         case .text(let left, let right, _, _):
             content = .text(left: right, right: left, diff: TextDiff(rows: [], blocks: []), width: 0)
             diffIsCurrent = false
             recompute()
+
         case .binary(let left, let right, _):
             content = .binary(left: right, right: left, diff: BinaryDiff.compute(left: Data(), right: Data()))
             recompute()
@@ -512,7 +524,7 @@ final class CompareSession {
         }
         let touched = (left: splices.contains { $0.side == .left }, right: splices.contains { $0.side == .right })
         undoStack.append((splices, modified))
-        if undoStack.count > CompareSession.undoDepth { undoStack.removeFirst() }
+        if undoStack.count > Self.undoDepth { undoStack.removeFirst() }
         editGeneration += 1
         findGeneration += 1
         modified = (modified.left || touched.left, modified.right || touched.right)

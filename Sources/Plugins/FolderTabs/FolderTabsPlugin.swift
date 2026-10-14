@@ -76,7 +76,7 @@ public final class FolderTabsPlugin: Plugin {
         let target = { kernel.panels.target }
         let tabs = { kernel.panels.source.tabs }
         let hasSeveralTabs = { tabs().count > 1 }
-        let opensNearCurrent = { settings.flag(FolderTabsPlugin.nearCurrentKey, default: false) }
+        let opensNearCurrent = { settings.flag(Self.nearCurrentKey, default: false) }
         let control = KeyModifiers.control
 
         /// Opens a tab at the end, or right of the active tab with "Open new tabs near current
@@ -119,7 +119,7 @@ public final class FolderTabsPlugin: Plugin {
         ) {
             open(
                 in: tabs(), showing: tabs().active.cursorItem?.url,
-                activate: settings.flag(FolderTabsPlugin.foregroundKey, default: false))
+                activate: settings.flag(Self.foregroundKey, default: false))
         }
         commands.register(
             Command(
@@ -156,7 +156,7 @@ public final class FolderTabsPlugin: Plugin {
         ) { [self] in
             let others = tabs().tabs.indices.filter { $0 != tabs().activeIndex && !tabs().tabs[$0].isLocked }
             guard !others.isEmpty else { return }
-            if settings.flag(FolderTabsPlugin.confirmCloseAllKey, default: true),
+            if settings.flag(Self.confirmCloseAllKey, default: true),
                 kernel.ui.choose(
                     "Close all tabs?", detail: "The current tab and locked tabs stay open.", buttons: ["OK", "Cancel"],
                     style: .information) != 0
@@ -166,7 +166,7 @@ public final class FolderTabsPlugin: Plugin {
             close(others, in: tabs())
         }
         commands.register(Command(.closeDuplicateTabs, "Close Duplicate Tabs"), enabled: hasSeveralTabs) { [self] in
-            close(FolderTabsPlugin.duplicates(in: tabs()), in: tabs())
+            close(Self.duplicates(in: tabs()), in: tabs())
         }
         commands.register(
             Command(.reopenClosedTab, "Reopen Closed Tab"),
@@ -321,11 +321,11 @@ public final class FolderTabsPlugin: Plugin {
             PreferencePage(
                 title: "Folder Tabs",
                 preferences: [
-                    Preference(FolderTabsPlugin.confirmCloseAllKey, "Confirm close all tabs", .flag(default: true)),
+                    Preference(Self.confirmCloseAllKey, "Confirm close all tabs", .flag(default: true)),
                     Preference(
-                        FolderTabsPlugin.foregroundKey, "Ctrl+Up opens new tab in foreground", .flag(default: false)),
+                        Self.foregroundKey, "Ctrl+Up opens new tab in foreground", .flag(default: false)),
                     Preference(
-                        FolderTabsPlugin.nearCurrentKey, "Open new tabs near current tab", .flag(default: false))
+                        Self.nearCurrentKey, "Open new tabs near current tab", .flag(default: false))
                 ]))
     }
 
@@ -354,7 +354,7 @@ public final class FolderTabsPlugin: Plugin {
     func connects(_ location: String) -> Bool {
         guard let url = URL(string: location), let scheme = url.scheme?.lowercased() else { return false }
         if let provider = try? fileSystems?.provider(for: url), provider.connectsToServer { return true }
-        return FolderTabsPlugin.connectingSchemes.contains(scheme)
+        return Self.connectingSchemes.contains(scheme)
     }
 
     /// Runs `change` on the tabs, telling whoever listens that the tabs changed once at the
@@ -375,7 +375,7 @@ public final class FolderTabsPlugin: Plugin {
         var position = min(index ?? tabs.count, tabs.count)
         var opened: [PanelModel] = []
         batch(tabs) {
-            for record in records.prefix(max(room ?? FolderTabsPlugin.tabsPerPanelLimit - tabs.count, 0)) {
+            for record in records.prefix(max(room ?? Self.tabsPerPanelLimit - tabs.count, 0)) {
                 guard let location = URL(string: record.location) else { continue }
                 let tab = tabs.insertTab(showing: location, at: position, activate: false)
                 let order = ListOrder(key: SortKey(rawValue: record.sortKey) ?? .name, descending: record.descending)
@@ -406,7 +406,7 @@ public final class FolderTabsPlugin: Plugin {
         let kept = wanted == nil ? tabs.active : nil
         batch(tabs) {
             restore(
-                state.tabs, in: tabs, activating: wanted, fromFile: fromFile, room: FolderTabsPlugin.tabsPerPanelLimit
+                state.tabs, in: tabs, activating: wanted, fromFile: fromFile, room: Self.tabsPerPanelLimit
             )
             // Nothing was opened when no location could be read; the panel then keeps its tabs.
             guard tabs.count > old.count else { return }
@@ -434,7 +434,7 @@ public final class FolderTabsPlugin: Plugin {
             guard tabs.closeTab(at: index) else { continue }
             var list = closedTabs[ObjectIdentifier(tabs), default: []]
             list.append(closed)
-            closedTabs[ObjectIdentifier(tabs)] = Array(list.suffix(FolderTabsPlugin.closedTabsLimit))
+            closedTabs[ObjectIdentifier(tabs)] = Array(list.suffix(Self.closedTabsLimit))
         }
     }
 
@@ -554,7 +554,7 @@ public final class FolderTabsPlugin: Plugin {
                     while let block = try reader.read(upToCount: 1 << 16), !block.isEmpty {
                         data.append(block)
                         // A tab file is a few lines of text; anything long is something else.
-                        guard data.count <= FolderTabsPlugin.tabFileLimit else {
+                        guard data.count <= Self.tabFileLimit else {
                             throw TabFileError.tooLarge(fileSystems.displayPath(file))
                         }
                     }
@@ -568,6 +568,7 @@ public final class FolderTabsPlugin: Plugin {
                 switch result {
                 case .failure(let error):
                     kernel.ui.report(error, title: "The tabs could not be loaded.")
+
                 case .success(let parsed):
                     guard let contents = parsed else {
                         kernel.ui.inform(

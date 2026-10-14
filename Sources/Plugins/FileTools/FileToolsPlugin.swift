@@ -190,7 +190,8 @@ final class FileTools {
         let preset = answer.index("preset")
         guard let size = preset > 0 ? Splitter.presets[preset - 1].bytes : Splitter.size(from: answer.text("size"))
         else {
-            return ui.inform("Split", detail: "Please enter the number of bytes per file!", style: .warning)
+            ui.inform("Split", detail: "Please enter the number of bytes per file!", style: .warning)
+            return
         }
         if preset <= 0 {
             settings.set(answer.text("size").trimmingCharacters(in: .whitespaces), forKey: Keys.splitSize)
@@ -199,7 +200,7 @@ final class FileTools {
         run(
             "Split", job: "Split:", refreshing: { (_: [URL]?) in [target] },
             { run in
-                try FileTools.prepare(target, run)
+                try Self.prepare(target, run)
                 return try Splitter.split(file, into: target, partSize: size, run: run)
             },
             then: { [ui, fileSystems] _ in
@@ -220,7 +221,7 @@ final class FileTools {
         run(
             "Combine", job: "Combine:", refreshing: { (_: Combiner.Outcome?) in [target] },
             { run -> Combiner.Outcome in
-                try FileTools.prepare(target, run)
+                try Self.prepare(target, run)
                 let plan = try Combiner.plan(for: file, run: run)
                 return try Combiner.combine(plan.parts, info: plan.info, into: target, run: run)
             },
@@ -231,11 +232,13 @@ final class FileTools {
                     ui.inform(
                         "Combine - \(outcome.parts)", detail: "Combine of \(name) succeeded (CRC checksum OK)!",
                         style: .information)
+
                 case false?:
                     ui.inform(
                         "Combine - \(outcome.parts)",
                         detail: "Combine of \(name): CRC checksum error! The file is damaged or incomplete.",
                         style: .critical)
+
                 case nil:
                     ui.inform(
                         "Combine - \(outcome.parts)", detail: "Combine of \(name) succeeded!", style: .information)
@@ -268,7 +271,7 @@ final class FileTools {
         run(
             "Encode", job: "Encode:", refreshing: { (_: [URL]?) in [target] },
             { run in
-                try FileTools.prepare(target, run)
+                try Self.prepare(target, run)
                 return try Encoder.encode(
                     file, into: target, method: method, linesPerFile: lines, bytesPerFile: bytes, run: run)
             }, then: { _ in })
@@ -329,11 +332,14 @@ final class FileTools {
         // only how many there are and, for one, its name.
         let (operands, directory) = (model.operandsSnapshot(), model.directory)
         let count = operands.markedCount > 0 ? operands.markedCount : (operands.cursorItem == nil ? 0 : 1)
-        guard count > 0 else { return ui.inform("No files selected!") }
+        guard count > 0 else {
+            ui.inform("No files selected!")
+            return
+        }
         let firstName = count == 1 ? operands.items().first?.name : nil
         let lastMethod = ChecksumMethod(rawValue: settings.index(Keys.checksumMethod, default: 0)) ?? .crc32
         let proposal = fileSystems.displayPath(
-            FileTools.checksumProposal(count: count, firstName: firstName, in: directory, method: lastMethod))
+            Self.checksumProposal(count: count, firstName: firstName, in: directory, method: lastMethod))
         let fields: [FormField] = [
             .text("target", "Save CRC file(s) to:", proposal),
             .checkbox(
@@ -376,7 +382,7 @@ final class FileTools {
         kernel.userTyped(location: typed, proposal: proposal, relativeTo: directory)
         var target =
             typed == proposal || typed.isEmpty
-            ? FileTools.checksumProposal(count: count, firstName: firstName, in: directory, method: options.method)
+            ? Self.checksumProposal(count: count, firstName: firstName, in: directory, method: options.method)
             : fileSystems.location(from: typed, relativeTo: directory)
         if options.separatePerFile, !target.lastPathComponent.contains("*") {
             let pattern = settings.flag(Keys.appendExtension, default: true) ? "*.*." : "*."

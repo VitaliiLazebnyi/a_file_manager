@@ -501,7 +501,7 @@ final class SearchForm: NSObject, NSTableViewDataSource, NSTableViewDelegate {
         reloadSaved()
     }
 
-    func numberOfRows(in tableView: NSTableView) -> Int { saved.count }
+    func numberOfRows(in _: NSTableView) -> Int { saved.count }
 
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
         let identifier = tableColumn?.identifier ?? NSUserInterfaceItemIdentifier("name")
@@ -517,7 +517,7 @@ final class SearchForm: NSObject, NSTableViewDataSource, NSTableViewDelegate {
         return cell
     }
 
-    func tableViewSelectionDidChange(_ notification: Notification) {
+    func tableViewSelectionDidChange(_: Notification) {
         updateEnabled()
     }
 }

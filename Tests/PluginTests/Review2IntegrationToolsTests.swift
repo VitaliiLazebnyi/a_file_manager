@@ -30,7 +30,7 @@ import Testing
 
     @Test func thePartsOfAFileFromAServerAndTheFilePutTogetherAgainCarryItsMark() throws {
         let source = server.addFile("/in/program.bin", String(repeating: "0123456789", count: 500))
-        let parts = try Splitter.split(try item(source), into: target.url("/out"), partSize: 2000, run: run())
+        let parts = try Splitter.split(try item(source), into: target.url("/out"), partSize: 2_000, run: run())
         #expect(parts.count == 4)
         let marked = target.quarantineMarks
         #expect(
@@ -61,8 +61,8 @@ import Testing
     }
 
     @Test func aSourceWithoutAMarkLeavesItsOutputsWithoutOne() throws {
-        let source = target.addFile("/plain/data.bin", String(repeating: "x", count: 3000))
-        _ = try Splitter.split(try item(source), into: target.url("/out"), partSize: 2000, run: run())
+        let source = target.addFile("/plain/data.bin", String(repeating: "x", count: 3_000))
+        _ = try Splitter.split(try item(source), into: target.url("/out"), partSize: 2_000, run: run())
         #expect(target.contents("/out/data.002") != nil && target.quarantineMarks.isEmpty)
     }
 

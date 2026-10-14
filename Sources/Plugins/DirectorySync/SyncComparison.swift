@@ -54,7 +54,7 @@ public final class SyncComparison {
     private var classifying: SyncOptions
 
     /// The size of the blocks files are compared in.
-    static let blockSize = 256 * 1024
+    static let blockSize = 256 * 1_024
 
     public init(
         options: SyncOptions, fileSystems: FileSystemRegistry, cancellation: CancellationFlag = CancellationFlag()
@@ -74,7 +74,7 @@ public final class SyncComparison {
         // is for the ones that round (see `toleranceSeconds`). Otherwise a file changed two seconds
         // after its copy would count as unchanged.
         classifying.toleranceSeconds =
-            SyncComparison.needsTolerance(left, right, fileSystems: fileSystems) ? options.toleranceSeconds : 0
+            Self.needsTolerance(left, right, fileSystems: fileSystems) ? options.toleranceSeconds : 0
         var rows = walk(Side(url: left, exists: true), Side(url: right, exists: true), relative: "", isTop: true)
         compareContents(of: &rows)
         lock.lock()
@@ -90,7 +90,7 @@ public final class SyncComparison {
     /// Whether the dates of these two places may be rounded or shifted by their file systems:
     /// anything but APFS and HFS+ on this Mac (FAT and exFAT keep two-second dates, shares and
     /// servers whatever theirs do, archives two seconds).
-    static func needsTolerance(_ first: URL, _ second: URL, fileSystems: FileSystemRegistry) -> Bool {
+    static func needsTolerance(_ first: URL, _ second: URL, fileSystems _: FileSystemRegistry) -> Bool {
         func exact(_ url: URL) -> Bool {
             guard url.isFileURL else { return false }
             var info = statfs()
@@ -112,13 +112,13 @@ public final class SyncComparison {
     ) {
         if !options.ignoreDate {
             let difference = left.modified.timeIntervalSince(
-                right.modified.addingTimeInterval(Double(options.timeOffsetHours) * 3600))
+                right.modified.addingTimeInterval(Double(options.timeOffsetHours) * 3_600))
             let tolerance = Double(max(0, options.toleranceSeconds))
             // Whole seconds are compared: a file system that keeps less than a nanosecond or
             // millisecond (exFAT, HFS+, SMB) would otherwise show every copy from APFS as older.
             func within(_ seconds: Double) -> Bool { seconds < 1 || seconds <= tolerance }
             let sameTime =
-                within(abs(difference)) || (options.ignoreOneHourDifference && within(abs(abs(difference) - 3600)))
+                within(abs(difference)) || (options.ignoreOneHourDifference && within(abs(abs(difference) - 3_600)))
             if !sameTime { return (difference > 0 ? .leftNewer : .rightNewer, false) }
         }
         guard left.size == right.size else { return (.different, false) }
@@ -191,7 +191,7 @@ public final class SyncComparison {
             $0.rightDirectories += right.exists ? 1 : 0
         }
 
-        let pairs = SyncComparison.sorted(SyncComparison.pair(leftItems, rightItems))
+        let pairs = Self.sorted(Self.pair(leftItems, rightItems))
 
         var rows: [SyncRow] = []
         var folderRows: [SyncRow] = []
@@ -225,7 +225,7 @@ public final class SyncComparison {
                 rows.append(
                     row(
                         pair.isExactMatch
-                            ? SyncComparison.classify(left: leftFile, right: rightFile, options: classifying).state
+                            ? Self.classify(left: leftFile, right: rightFile, options: classifying).state
                             : .excluded))
             } else {
                 // A name that differs only in case from one that is paired elsewhere is not "only here": on a
@@ -328,7 +328,7 @@ public final class SyncComparison {
         guard !cancellation.isCancelled, let left = row.left, let right = row.right else { return .pending }
         defer { update { $0.filesCompared += 1 } }
         do {
-            let same = try SyncComparison.sameContent(
+            let same = try Self.sameContent(
                 left.url, right.url, fileSystems: fileSystems, cancellation: cancellation
             ) { bytes in
                 self.update { $0.bytesCompared += Int64(bytes) }

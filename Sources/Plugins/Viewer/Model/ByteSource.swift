@@ -17,8 +17,10 @@ enum ViewerError: LocalizedError, Equatable {
         switch self {
         case .fileChanged:
             return "The file changed while it was being read (it became shorter); what is shown may be incomplete."
+
         case .notAFile(let name):
             return "\(name) is not a regular file (a pipe, device or socket), and cannot be shown."
+
         case .endless(let name): return "\(name) does not end, and cannot be shown."
         case .busy: return "Too many reads are still waiting for a volume that does not answer; this file was not read."
         }
@@ -133,7 +135,7 @@ final class DataByteSource: ByteSource {
 
     var length: Int64 { Int64(data.count) }
 
-    func read(at offset: Int64, count: Int) throws -> Data {
+    func read(at offset: Int64, count: Int) -> Data {
         let lower = Int(max(0, min(offset, length)))
         let upper = min(data.count, lower + max(0, count))
         return data.subdata(in: lower..<upper)
@@ -188,8 +190,10 @@ final class ProviderByteSource: ByteSource {
                     return target.st_size > 0
                         ? ProviderByteSource(url: url, provider: provider, length: Int64(target.st_size))
                         : DataByteSource(Data())
+
                 case S_IFDIR:
                     break
+
                 default:
                     throw ViewerError.notAFile(url.lastPathComponent)
                 }
@@ -384,7 +388,7 @@ final class DiskBlockCache {
             // The block is gone (a failing disk): its room goes back to the budget.
             present[Int(block / 64)] &= ~(1 << UInt64(block % 64))
             held -= Int64(wanted)
-            DiskBlockCache.release(Int64(wanted))
+            Self.release(Int64(wanted))
             return nil
         }
         return data
@@ -396,7 +400,7 @@ final class DiskBlockCache {
         defer { lock.unlock() }
         guard !failed, data.count == size(of: block), data.count > 0, !isPresent(block),
             held + Int64(data.count) <= limit,
-            DiskBlockCache.reserve(Int64(data.count))
+            Self.reserve(Int64(data.count))
         else { return }
         if descriptor < 0 {
             let path = FileManager.default.temporaryDirectory.appendingPathComponent(
@@ -405,7 +409,7 @@ final class DiskBlockCache {
             let opened = open(path, O_RDWR | O_CREAT | O_EXCL | O_CLOEXEC, 0o600)
             guard opened >= 0 else {
                 failed = true
-                DiskBlockCache.release(Int64(data.count))
+                Self.release(Int64(data.count))
                 return
             }
             // Gone from the directory at once: the system removes the data when the file is closed.
@@ -418,7 +422,7 @@ final class DiskBlockCache {
         guard wrote == data.count else {
             // A full disk: no more is tried.
             failed = true
-            DiskBlockCache.release(Int64(data.count))
+            Self.release(Int64(data.count))
             return
         }
         present[Int(block / 64)] |= 1 << UInt64(block % 64)
@@ -435,7 +439,7 @@ final class DiskBlockCache {
         held = 0
         failed = false
         lock.unlock()
-        if given > 0 { DiskBlockCache.release(given) }
+        if given > 0 { Self.release(given) }
     }
 
     deinit { discard() }
@@ -462,7 +466,7 @@ final class CachedByteSource: ByteSource {
     private var order: [Int64] = []
 
     init(
-        _ base: ByteSource, blockSize: Int = 128 * 1024, capacity: Int = 48, wholeFileLimit: Int64 = 0,
+        _ base: ByteSource, blockSize: Int = 128 * 1_024, capacity: Int = 48, wholeFileLimit: Int64 = 0,
         spillsToDisk: Bool = false,
         diskLimit: Int64 = 1 << 30
     ) {

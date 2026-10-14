@@ -206,7 +206,7 @@ final class Packer {
             if options.separateArchives {
                 let folder = archive.deletingLastPathComponent()
                 for source in sources {
-                    let name = Packer.archiveName(for: source, format: options.format)
+                    let name = Self.archiveName(for: source, format: options.format)
                     plans.append(
                         (
                             folder.appending(name: name), [source],
@@ -347,7 +347,7 @@ final class Packer {
             // first, so that it is not written into the new one afterwards.
             try store.flush(archive, cancellation: cancellation)
         }
-        newMode = Packer.mode(for: members)
+        newMode = Self.mode(for: members)
         switch options.format {
         case .zip:
             let exists = existing != nil
@@ -374,10 +374,13 @@ final class Packer {
                     try writeZip(members, to: output, existing: nil, innerFolder: innerFolder)
                 }
             }
+
         case .tar:
             try build(archive) { output in try writeTar(members, to: output, method: .none) }
+
         case .compressedTar(let codec):
             try build(archive) { output in try writeTar(members, to: output, method: method(for: codec)) }
+
         case .compressedFile(let codec):
             let files = members.filter { !$0.item.isDirectory }
             guard files.count == 1, let file = files.first else {
@@ -396,6 +399,7 @@ final class Packer {
                 try compressor.finish()
                 done.items += 1
             }
+
         case .foreign:
             throw ArchiveError.unsupported("Creating archives of this type")
         }

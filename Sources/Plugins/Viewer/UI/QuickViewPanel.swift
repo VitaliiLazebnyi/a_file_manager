@@ -41,10 +41,10 @@ final class QuickViewPanel {
         host.overlay = container
         pane.onTitleChange = { [weak self] title in
             // A track that names itself replaces the file name (spec 10 › Embedded Lister).
-            guard let self, let item = self.shownItem, title != self.kernel.fileSystems.displayPath(item.url) else {
+            guard let self, let item = shownItem, title != self.kernel.fileSystems.displayPath(item.url) else {
                 return
             }
-            self.headerText = title
+            headerText = title
         }
         follower = CursorFollower(kernel: kernel, delay: delay, panel: { [weak self] in self?.followed }) {
             [weak self] in self?.show($0)

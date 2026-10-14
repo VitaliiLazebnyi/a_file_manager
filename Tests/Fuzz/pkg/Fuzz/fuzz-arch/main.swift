@@ -15,7 +15,7 @@ import LocalFileSystemPlugin
 
 final class QuietMonitor: JobMonitor {
     let cancellation = CancellationFlag()
-    func report(_ progress: JobProgress) {}
+    func report(_: JobProgress) {}
     func ask<Answer>(_ question: () -> Answer) -> Answer { question() }
 }
 
@@ -128,7 +128,7 @@ func checkTree(_ target: String) {
     var seen = 0
     for case let rel as String in walker {
         seen += 1
-        if seen > 5000 { break }
+        if seen > 5_000 { break }
         let path = target + "/" + rel
         var st = stat()
         guard lstat(path, &st) == 0 else { continue }
@@ -212,7 +212,7 @@ func runArchive(_ bytes: [UInt8], name: String, unpack: Bool = true) {
     if let file = try? RandomAccessFile(archive) {
         _ = CompressedSize.ofXZ(file)
         _ = CompressedSize.claimedByGzip(file)
-        _ = GzipHeader(Data(bytes.prefix(1024)))
+        _ = GzipHeader(Data(bytes.prefix(1_024)))
     }
 }
 
@@ -234,7 +234,7 @@ func runList(_ bytes: [UInt8], name: String) {
     if !plain, let file = try? RandomAccessFile(archive) {
         _ = CompressedSize.ofXZ(file)
         _ = CompressedSize.claimedByGzip(file)
-        _ = GzipHeader(Data(bytes.prefix(1024)))
+        _ = GzipHeader(Data(bytes.prefix(1_024)))
     }
 }
 
@@ -460,26 +460,32 @@ func zipFields(_ d: [UInt8]) -> [Int] {
                 out += [4, 6, 8, 10, 12, 14, 16, 20, 24, 28, 30, 32, 34, 36, 38, 42].map { i + $0 }
                 i += 46
                 continue
+
             case (3, 4):
                 out += [4, 6, 8, 10, 14, 18, 22, 26, 28].map { i + $0 }
                 i += 30
                 continue
+
             case (5, 6):
                 out += [4, 6, 8, 10, 12, 16, 20].map { i + $0 }
                 i += 22
                 continue
+
             case (6, 6):
                 out += [4, 12, 14, 16, 20, 24, 32, 40, 48].map { i + $0 }
                 i += 56
                 continue
+
             case (6, 7):
                 out += [4, 8, 16].map { i + $0 }
                 i += 20
                 continue
+
             case (7, 8):
                 out += [4, 8, 12].map { i + $0 }
                 i += 16
                 continue
+
             default: break
             }
         }
@@ -516,22 +522,26 @@ func zipCustom(_ d: inout [UInt8], _ rng: inout Rng) {
     case 0, 1:  // written over the start of the name
         let name = rng.pick(hostileNames)
         for (k, b) in name.enumerated() where k < length && h.nameAt + k < d.count { d[h.nameAt + k] = b }
+
     case 2:  // inserted, with the length corrected (later offsets shift: the directory is then found or not)
         let name = rng.pick(hostileNames)
         guard h.nameAt <= d.count, length + name.count <= 0xFFFF else { return }
         d.insert(contentsOf: name, at: h.nameAt)
         Mutate.put(UInt64(length + name.count), width: 2, at: h.lenAt, bigEndian: false, in: &d)
+
     case 3:  // the type of the member: link, folder, device
         guard h.at + 42 <= d.count, d[h.at + 2] == 1 else { return }
         let mode: UInt64 = rng.pick([0o120777, 0o040755, 0o100644, 0o020644, 0o104755, 0o060000, 0o010000, 0])
         Mutate.put(mode << 16 | UInt64(rng.below(64)), width: 4, at: h.at + 38, bigEndian: false, in: &d)
         d[h.at + 5] = rng.chance(4) ? UInt8(rng.below(20)) : 3
+
     case 4:  // flags and method
         let off = d[h.at + 2] == 1 ? 8 : 6
         Mutate.put(
             rng.pick([0, 1, 8, 0x41, 0x800, 0x809, 0x2000, 0xFFFF]), width: 2, at: h.at + off, bigEndian: false, in: &d
         )
         Mutate.put(rng.pick([0, 8, 9, 12, 14, 99, 0xFFFF]), width: 2, at: h.at + off + 2, bigEndian: false, in: &d)
+
     default:  // sizes say "see the zip64 field"
         let off = d[h.at + 2] == 1 ? 20 : 18
         Mutate.put(0xFFFF_FFFF, width: 4, at: h.at + off + (rng.chance(2) ? 4 : 0), bigEndian: false, in: &d)
@@ -596,8 +606,10 @@ func tarCustom(_ d: inout [UInt8], _ rng: inout Rng) {
                 ] as [UInt64])
             putText(Array((String(v, radix: 8)).utf8), &d, at: h + 124, length: 12)
         }
+
     case 2:  // the type
         d[h + 156] = rng.pick([48, 49, 50, 51, 52, 53, 54, 55, 76, 75, 120, 103, 83, 0, 77, 78, 86, 88, 65]) as UInt8
+
     case 3:  // the name
         let name = rng.pick(hostileNames)
         if rng.chance(2) {
@@ -605,6 +617,7 @@ func tarCustom(_ d: inout [UInt8], _ rng: inout Rng) {
         } else {
             putText(name + Array("pwn.txt".utf8), &d, at: h, length: 100)
         }
+
     case 4:  // the link target
         putText(
             rng.pick(
@@ -612,18 +625,22 @@ func tarCustom(_ d: inout [UInt8], _ rng: inout Rng) {
                     Array($0.utf8)
                 }), &d, at: h + 157, length: 100)
         if rng.chance(2) { d[h + 156] = rng.chance(2) ? 49 : 50 }
+
     case 5:  // the prefix
         putText(rng.pick(hostileNames), &d, at: h + 345, length: 155)
+
     case 6:  // mode and time
         putText(
             Array(String(rng.pick(interesting), radix: 8).utf8.prefix(11)), &d, at: h + (rng.chance(2) ? 100 : 136),
             length: rng.chance(2) ? 8 : 12)
+
     case 7:  // the old GNU sparse fields
         d[h + 156] = 83
         d[h + 482] = rng.chance(2) ? 1 : 0
         putText(Array(String(rng.pick(interesting), radix: 8).utf8.prefix(11)), &d, at: h + 483, length: 12)
+
     default:  // a pax record in the block that follows
-        guard h + 1024 <= d.count else { break }
+        guard h + 1_024 <= d.count else { break }
         let key = rng.pick([
             "path", "linkpath", "size", "mtime", "GNU.sparse.size", "GNU.sparse.realsize", "GNU.sparse.name",
             "GNU.sparse.map", "GNU.sparse.major", "uid", "SCHILY.xattr.x", "hdrcharset"
@@ -690,8 +707,10 @@ func recompressing(_ codec: ArchiveFormat.Codec) -> (inout [UInt8], inout Rng) -
                 out.append(UInt8(truncatingIfNeeded: UInt32(truncatingIfNeeded: inner.count) >> UInt32(k * 8)))
             }
             d = out
+
         case .xz:
             if let out = try? XZCoder.compress(Data(inner)) { d = [UInt8](out) }
+
         case .bzip2: break
         }
     }

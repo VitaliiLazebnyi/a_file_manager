@@ -26,10 +26,10 @@ public struct FTPReply: Equatable {
 /// needs anywhere near this much.
 public enum FTPLimits {
     /// The longest line of a reply, and of a listing, in bytes.
-    public static let lineLength = 4096
+    public static let lineLength = 4_096
     /// The lines and bytes of one reply that are kept; what comes beyond is dropped.
-    public static let replyLines = 1000
-    public static let replyBytes = 64 * 1024
+    public static let replyLines = 1_000
+    public static let replyBytes = 64 * 1_024
     /// The lines of one reply that are read at all before the connection is given up.
     public static let replyLinesRead = 20_000
     /// The entries and bytes of one directory listing.
@@ -157,7 +157,7 @@ public enum FTPSyntax {
         let inner = text[text.index(after: open)..<close]
         guard let delimiter = inner.first else { return nil }
         let fields = inner.split(separator: delimiter, omittingEmptySubsequences: false)
-        guard fields.count >= 5, let port = Int(fields[3]), (1...65535).contains(port) else { return nil }
+        guard fields.count >= 5, let port = Int(fields[3]), (1...65_535).contains(port) else { return nil }
         return port
     }
 
@@ -250,7 +250,7 @@ public enum FTPSyntax {
     public static func timeText(_ date: Date) -> String {
         let parts = utc.dateComponents([.year, .month, .day, .hour, .minute, .second], from: date)
         return String(
-            format: "%04d%02d%02d%02d%02d%02d", parts.year ?? 1970, parts.month ?? 1, parts.day ?? 1,
+            format: "%04d%02d%02d%02d%02d%02d", parts.year ?? 1_970, parts.month ?? 1, parts.day ?? 1,
             parts.hour ?? 0, parts.minute ?? 0, parts.second ?? 0)
     }
 

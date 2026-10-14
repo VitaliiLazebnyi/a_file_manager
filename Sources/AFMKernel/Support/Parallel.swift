@@ -196,10 +196,10 @@ final class ParallelPool {
     }()
 
     private var current: Job? {
-        get { pthread_getspecific(ParallelPool.currentJob).map { Unmanaged<Job>.fromOpaque($0).takeUnretainedValue() } }
+        get { pthread_getspecific(Self.currentJob).map { Unmanaged<Job>.fromOpaque($0).takeUnretainedValue() } }
         set {
             pthread_setspecific(
-                ParallelPool.currentJob, newValue.map { UnsafeRawPointer(Unmanaged.passUnretained($0).toOpaque()) })
+                Self.currentJob, newValue.map { UnsafeRawPointer(Unmanaged.passUnretained($0).toOpaque()) })
         }
     }
 
@@ -226,7 +226,7 @@ final class ParallelPool {
         let job = Job(
             count: count, grain: max(1, count / ((width + 1) * 16)), parent: parent,
             isForMain: parent == nil && Thread.isMainThread,
-            urgency: parent == nil ? ParallelPool.urgencyOfCaller() : QOS_CLASS_UNSPECIFIED,
+            urgency: parent == nil ? Self.urgencyOfCaller() : QOS_CLASS_UNSPECIFIED,
             body: body)
         let root = job.root
         condition.lock()
@@ -284,8 +284,8 @@ final class ParallelPool {
     /// Has the threads looked at soon, and again for as long as there is work or a thread too
     /// many. Called with the lock held.
     private func watch() {
-        let wasPatient = interval > ParallelPool.patience
-        interval = ParallelPool.patience
+        let wasPatient = interval > Self.patience
+        interval = Self.patience
         if !isWatching {
             isWatching = true
             if !hasWatcher {
@@ -342,9 +342,9 @@ final class ParallelPool {
         var waiting = 0
         var waitingIn: [ObjectIdentifier: Int] = [:]
         for (thread, state) in workers {
-            let (time, isRunnable) = ParallelPool.processorTime(of: thread) ?? (state.used, true)
+            let (time, isRunnable) = Self.processorTime(of: thread) ?? (state.used, true)
             // A thread that the machine has no core for is not waiting for anything.
-            if let tree = state.tree, !isRunnable, time &- state.used < ParallelPool.patience / 4 {
+            if let tree = state.tree, !isRunnable, time &- state.used < Self.patience / 4 {
                 waiting += 1
                 waitingIn[ObjectIdentifier(tree), default: 0] += 1
             }
@@ -384,7 +384,7 @@ final class ParallelPool {
         retiring = starts > 0 ? 0 : max(0, ready - width - woken)
         if retiring > 0, idle > 0 { condition.broadcast() }
         changed = changed || starts > 0 || woken > 0 || retiring > 0
-        interval = changed ? ParallelPool.patience : min(interval * 2, ParallelPool.longestPatience)
+        interval = changed ? Self.patience : min(interval * 2, Self.longestPatience)
         if open.isEmpty, threads <= width { isWatching = false }
         return starts
     }
@@ -402,7 +402,7 @@ final class ParallelPool {
         guard result == KERN_SUCCESS else { return nil }
         let seconds = UInt64(info.user_time.seconds) + UInt64(info.system_time.seconds)
         let microseconds = UInt64(info.user_time.microseconds) + UInt64(info.system_time.microseconds)
-        return (seconds * 1_000_000_000 + microseconds * 1000, info.run_state == TH_STATE_RUNNING)
+        return (seconds * 1_000_000_000 + microseconds * 1_000, info.run_state == TH_STATE_RUNNING)
     }
 
     // MARK: Pieces
@@ -475,7 +475,7 @@ final class ParallelPool {
             var urgency = QOS_CLASS_USER_INITIATED
             var timedOut = false
             condition.lock()
-            workers[own] = (ParallelPool.processorTime(of: own)?.used ?? 0, nil)
+            workers[own] = (Self.processorTime(of: own)?.used ?? 0, nil)
             while true {
                 if retiring > 0 {
                     retiring -= 1

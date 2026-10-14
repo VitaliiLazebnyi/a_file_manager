@@ -75,13 +75,13 @@ public final class MenuRegistry {
         menus_.values.sorted { ($0.order, $0.title) < ($1.order, $1.title) }.map { menu in
             Menu(
                 title: menu.title,
-                items: MenuRegistry.flatten(
+                items: Self.flatten(
                     entries.filter { $0.section.menu == menu }.map { ($0.section.order, $0.items) }))
         }
     }
 
     public func contextMenu(onItem: Bool) -> [CommandID?] {
-        MenuRegistry.flatten(contextEntries.filter { onItem || !$0.onItemOnly }.map { ($0.section.order, $0.items) })
+        Self.flatten(contextEntries.filter { onItem || !$0.onItemOnly }.map { ($0.section.order, $0.items) })
     }
 
     private static func flatten(_ contributions: [(order: Int, items: [CommandID])]) -> [CommandID?] {

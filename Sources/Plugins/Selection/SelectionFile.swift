@@ -99,7 +99,7 @@ struct NameBytes: Hashable {
         self.name = name
     }
 
-    static func == (a: NameBytes, b: NameBytes) -> Bool {
+    static func == (a: Self, b: Self) -> Bool {
         let same = a.name.utf8.withContiguousStorageIfAvailable { first in
             b.name.utf8.withContiguousStorageIfAvailable { second in
                 first.count == second.count
@@ -148,7 +148,7 @@ enum DirectoryComparison {
         var right: Set<String> { Set(rightNames) }
         var same: Set<String> { Set(sameNames) }
 
-        static func == (a: Marks, b: Marks) -> Bool { a.left == b.left && a.right == b.right && a.same == b.same }
+        static func == (a: Self, b: Self) -> Bool { a.left == b.left && a.right == b.right && a.same == b.same }
     }
 
     /// The same as places in the two lists that were compared.
@@ -213,7 +213,7 @@ enum DirectoryComparison {
         }
         // Only what found no partner by its bytes is looked at again by the way it reads.
         var readAlike: [String: [Int]] = [:]
-        if taken.count < right.count && taken.count < left.count {
+        if taken.count < right.count, taken.count < left.count {
             for (index, item) in right.enumerated() where !taken.contains(index) {
                 readAlike[key(item.name), default: []].append(index)
             }
@@ -245,21 +245,23 @@ enum DirectoryComparison {
             var difference =
                 Int64(item.modified.timeIntervalSince1970.rounded(.down))
                 - Int64(other.modified.timeIntervalSince1970.rounded(.down))
-            if ignoringOneHour && abs(difference) == 3600 { difference = 0 }
+            if ignoringOneHour, abs(difference) == 3_600 { difference = 0 }
             let sameSize = item.size == other.size
-            if difference == 0 && sameSize { markSame(position, index) }
+            if difference == 0, sameSize { markSame(position, index) }
             switch mode {
             case .missing:
                 break
+
             case .sizeOrMissing:
                 if !sameSize {
                     marks.left.append(position)
                     marks.right.append(index)
                 }
+
             case .newer, .newerOrDifferent:
                 if difference > 0 { marks.left.append(position) }
                 if difference < 0 { marks.right.append(index) }
-                if mode == .newerOrDifferent && difference == 0 && !sameSize {
+                if mode == .newerOrDifferent, difference == 0, !sameSize {
                     marks.left.append(position)
                     marks.right.append(index)
                 }

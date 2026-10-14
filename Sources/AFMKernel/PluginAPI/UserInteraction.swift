@@ -27,7 +27,9 @@ public protocol UserInteraction: AnyObject {
 }
 
 extension UserInteraction {
-    public func choose(_ message: String, detail: String, buttons: [String], style: QuestionStyle, defaultButton: Int?)
+    public func choose(
+        _ message: String, detail: String, buttons: [String], style: QuestionStyle, defaultButton _: Int?
+    )
         -> Int
     {
         choose(message, detail: detail, buttons: buttons, style: style)

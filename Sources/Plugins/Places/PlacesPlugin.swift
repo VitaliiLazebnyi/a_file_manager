@@ -152,7 +152,7 @@ public final class PlacesPlugin: Plugin {
 
     /// Writes the tree cache before the program quits, away from the main thread (a tree of
     /// millions of folders is a file of many megabytes). `stop` then finds nothing left to write.
-    public func prepareToQuit(cancellation: CancellationFlag, completion: @escaping () -> Void) {
+    public func prepareToQuit(cancellation _: CancellationFlag, completion: @escaping () -> Void) {
         let cache = treeCache
         BlockingCalls.run {
             cache.flush()
@@ -245,6 +245,7 @@ public final class PlacesPlugin: Plugin {
                     offersFavorites: !favorites.isEmpty && kernel.settings.flag(Keys.favorites, default: true),
                     isCurrent: isCurrent)
                 if let submenu = list.entry(at: path) { title += " › " + submenu.displayTitle }
+
             case .favorites:
                 menu = HotlistMenu(places: favorites, isCurrent: isCurrent)
                 title += " › Favorites"
@@ -264,18 +265,26 @@ public final class PlacesPlugin: Plugin {
             }
             switch menu.rows[answer.index("row")].action {
             case .run(let entry):
-                return run(entry, inNewTab: answer.button == 1, in: kernel)
+                run(entry, inNewTab: answer.button == 1, in: kernel)
+                return
+
             case .open(let path):
                 level = .user(path)
+
             case .openFavorites:
                 level = .favorites
+
             case .separator:
                 continue
+
             case .addCurrent, .removeCurrent:
                 guard case .user(let path) = level else { return }
-                return toggleCurrentDirectory(at: path, in: kernel)
+                toggleCurrentDirectory(at: path, in: kernel)
+                return
+
             case .configure:
-                return configureHotlist(in: kernel)
+                configureHotlist(in: kernel)
+                return
             }
         }
     }
@@ -295,9 +304,10 @@ public final class PlacesPlugin: Plugin {
             let title = current.lastPathComponent.isEmpty || current.path == "/" ? path : current.lastPathComponent
             guard list.add(.item(title, command: HotlistAction.changeDirectoryCommand(to: path)), to: parent) != nil
             else {
-                return kernel.ui.inform(
+                kernel.ui.inform(
                     "The directory hotlist is full.", detail: "It holds at most \(Hotlist.limit) entries.",
                     style: .warning)
+                return
             }
         }
         store(list, in: kernel)
@@ -328,8 +338,10 @@ public final class PlacesPlugin: Plugin {
             } else {
                 source.show(location)
             }
+
         case .command(let id, let argument):
             kernel.commands.perform(id, argument)
+
         case .nothing:
             break
         }
@@ -383,7 +395,11 @@ public final class PlacesPlugin: Plugin {
             case 1:
                 _ = panel.tabs.openTab(showing: directory)
                 return
-            case 2: return kernel.panels.target.show(directory)
+
+            case 2:
+                kernel.panels.target.show(directory)
+                return
+
             case 3:
                 if case .frequent = row {
                     tracker.removeFrequent(directory)
@@ -391,7 +407,10 @@ public final class PlacesPlugin: Plugin {
                     tracker.remove(directory, from: side)
                 }
                 selected = answer.index("row")
-            default: return panel.show(directory)
+
+            default:
+                panel.show(directory)
+                return
             }
         }
     }

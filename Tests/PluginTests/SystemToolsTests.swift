@@ -14,7 +14,7 @@ private final class RecordingViewer: Plugin, ViewerService {
     var texts: [(text: String, title: String)] = []
 
     func start(in kernel: Kernel) { kernel.services.register(ViewerService.self, self) }
-    func view(_ url: URL) {}
+    func view(_: URL) {}
     func view(text: String, title: String) { texts.append((text, title)) }
 }
 
@@ -47,7 +47,7 @@ private func folder(_ output: String?) -> String? {
         try box.file("A/one.txt", "1")
         try box.folder("B")
         memory.addFile("/A/one.txt", "new")
-        memory.addFile("/A/two.txt", String(repeating: "x", count: 2048))
+        memory.addFile("/A/two.txt", String(repeating: "x", count: 2_048))
         memory.addFile("/A/docs/in.txt", "inside")
         memory.addFile("/A/docs/deep/far.txt", "far")
         memory.addDirectory("/B")
@@ -391,7 +391,7 @@ private func folder(_ output: String?) -> String? {
 
     @Test func severalChildrenRunAtOnce() {
         let outputs = Parallel.map(Array(0..<8)) { number in
-            self.sh("echo \(number)").run(cancellation: CancellationFlag()).output
+            sh("echo \(number)").run(cancellation: CancellationFlag()).output
         }
         #expect(outputs == (0..<8).map { "\($0)\n" })
     }
@@ -414,8 +414,8 @@ private func folder(_ output: String?) -> String? {
         #expect(SystemInformation.memory(128 << 30) == "131,072 M (128 G)")
         #expect(SystemInformation.memory(UInt64(1.5 * Double(1 << 30))) == "1,536 M (1.5 G)")
         #expect(SystemInformation.memory(512 << 20) == "512 M")
-        #expect(SystemInformation.uptime(130 * 3600 + 19 * 60 + 21) == "130h 19m 21s")
-        #expect(SystemInformation.space(free: 2048, total: 4096 * 1024) == "2 k of 4,096 k free")
+        #expect(SystemInformation.uptime(130 * 3_600 + 19 * 60 + 21) == "130h 19m 21s")
+        #expect(SystemInformation.space(free: 2_048, total: 4_096 * 1_024) == "2 k of 4,096 k free")
         #expect(SystemInformation.space(free: nil, total: 1) == "size unknown")
     }
 

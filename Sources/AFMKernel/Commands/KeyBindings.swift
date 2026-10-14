@@ -63,7 +63,7 @@ public final class KeyBindings {
 
     /// The user's bindings from the settings.
     public func load(from settings: SettingsStore) {
-        if let overrides = settings.value([String: [String]].self, forKey: KeyBindings.settingsKey) {
+        if let overrides = settings.value([String: [String]].self, forKey: Self.settingsKey) {
             apply(overrides: overrides)
         }
     }

@@ -62,7 +62,7 @@ final class QuitProgress: NSObject {
     func pressQuitNow() {
         guard !isStopping, !isClosed else { return }
         isStopping = true
-        heading.stringValue = QuitProgress.stoppingText
+        heading.stringValue = Self.stoppingText
         quitButton.isEnabled = false
         onQuitNow?()
     }
@@ -92,7 +92,7 @@ final class QuitProgress: NSObject {
     /// Builds the window without showing it.
     func makePanel() -> NSPanel {
         heading.font = .boldSystemFont(ofSize: 13)
-        let detail = NSTextField(wrappingLabelWithString: QuitProgress.waitingDetail)
+        let detail = NSTextField(wrappingLabelWithString: Self.waitingDetail)
         detail.font = .systemFont(ofSize: 11)
         detail.textColor = .secondaryLabelColor
         let bar = NSProgressIndicator()

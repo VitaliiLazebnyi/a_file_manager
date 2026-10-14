@@ -111,7 +111,7 @@ private func elsewhere<Value>(_ work: @escaping () -> Value) -> Value {
             let model = panel(items)
             model.setFilter(PanelFilter(title: "no 7") { !$0.name.contains("7") })
             model.setSelected(true, names: ["file3.txt", "file5.md", "dir10", "file13.md", "file33.txt"])
-            model.setComputedSizes([(name: "dir10", size: 1000), (name: "dir70", size: 70)])
+            model.setComputedSizes([(name: "dir10", size: 1_000), (name: "dir70", size: 70)])
             model.saveSelection()
             model.moveCursor(to: model.row(ofName: "file23.md")!)
             return model
@@ -327,7 +327,7 @@ private func elsewhere<Value>(_ work: @escaping () -> Value) -> Value {
         let sizes = (0..<10_000).map { (name: "dir\($0 * 2)", size: Int64($0)) }
         model.setComputedSizes(sizes)
         #expect(model.totals.totalBytes == Int64((0..<10_000).reduce(0, +)))
-        #expect(model.item(atRow: model.row(ofName: "dir19998")!)?.computedSize == 9999)
+        #expect(model.item(atRow: model.row(ofName: "dir19998")!)?.computedSize == 9_999)
         #expect(model.listedItems.filter { $0.computedSize != nil }.count == 10_000)
     }
 
@@ -352,7 +352,7 @@ private func elsewhere<Value>(_ work: @escaping () -> Value) -> Value {
     // MARK: Snapshots and copies
 
     @Test func aSnapshotBringsBackTheFilterAndAnswersToThePresentOrder() {
-        let items = sample(1000)
+        let items = sample(1_000)
         let model = panel(items)
         let filter = PanelFilter(title: "7") { $0.name.contains("7") }
         model.setFilter(filter)
@@ -366,7 +366,7 @@ private func elsewhere<Value>(_ work: @escaping () -> Value) -> Value {
         model.open(URL(fileURLWithPath: "/review2/elsewhere"), parent: folder, root: URL(fileURLWithPath: "/"))
         model.setSort(ListOrder(key: .size, descending: true))
         model.restore(snapshot)
-        #expect(model.filter?.title == "7" && model.items.count == shown.count && model.listedItems.count == 1000)
+        #expect(model.filter?.title == "7" && model.items.count == shown.count && model.listedItems.count == 1_000)
         #expect(
             Set(model.items.map(\.name)) == Set(shown) && model.selectedNames.sorted() == ["file17.md", "file7.md"])
         // The list is in the order the panel names.

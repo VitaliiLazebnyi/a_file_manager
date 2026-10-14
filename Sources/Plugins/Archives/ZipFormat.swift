@@ -9,7 +9,7 @@ struct ZipLimits: Equatable {
     /// The largest number of members the classic end record may count.
     var maxEntries: Int = 0xFFFE
 
-    static let standard = ZipLimits()
+    static let standard = Self()
 }
 
 /// Where the compressed bytes of a member are.
@@ -27,7 +27,7 @@ enum ZipDataSource {
 /// What the central directory says about a member, kept completely so that a member can be
 /// written into a new archive without touching its compressed data.
 struct ZipRecord {
-    var versionMadeBy: UInt16 = ZipRecord.madeByUnix
+    var versionMadeBy: UInt16 = Self.madeByUnix
     var flags: UInt16 = 0
     var method: UInt16 = 0
     var dosTime: UInt16 = 0
@@ -83,15 +83,15 @@ struct ZipRecord {
     struct Changes: OptionSet {
         let rawValue: UInt8
         /// The name: it also stands in front of the member's data, which therefore moves.
-        static let name = Changes(rawValue: 1)
+        static let name = Self(rawValue: 1)
         /// The time: also in the header in front of the data, where it is corrected in place.
-        static let time = Changes(rawValue: 2)
+        static let time = Self(rawValue: 2)
         /// What only the directory holds.
-        static let attributes = Changes(rawValue: 4)
+        static let attributes = Self(rawValue: 4)
         /// Not a change: the member came through a writer and has not been renamed since.
         /// A job that copies a file in writes it under a temporary name first; such a member
         /// is still on its way.
-        static let arriving = Changes(rawValue: 8)
+        static let arriving = Self(rawValue: 8)
     }
 
     /// False for a member whose data (or, for a folder, whose header) is not in the archive yet.
@@ -107,15 +107,15 @@ struct ZipRecord {
     static let methodStored: UInt16 = 0
     static let methodDeflate: UInt16 = 8
 
-    var isEncrypted: Bool { flags & ZipRecord.flagEncrypted != 0 }
+    var isEncrypted: Bool { flags & Self.flagEncrypted != 0 }
 
     /// The member's name. Names marked as UTF-8, and names that are valid UTF-8, are read as
     /// such; then Info-ZIP's Unicode field is tried; what is left is the DOS character set
     /// (spec 08 › File-name encoding).
     var name: String {
         if nameRaw.isEmpty {
-            if flags & ZipRecord.flagUTF8 != 0 || nameText.utf8.allSatisfy({ $0 < 0x80 }) { return nameText }
-            if let field = ZipRecord.field(0x7075, in: extra), field.count > 5,
+            if flags & Self.flagUTF8 != 0 || nameText.utf8.allSatisfy({ $0 < 0x80 }) { return nameText }
+            if let field = Self.field(0x7075, in: extra), field.count > 5,
                 let text = String(data: field.dropFirst(5), encoding: .utf8)
             {
                 return text
@@ -123,12 +123,12 @@ struct ZipRecord {
             return nameText
         }
         let nameBytes = self.nameBytes
-        if flags & ZipRecord.flagUTF8 != 0 || nameBytes.allSatisfy({ $0 < 0x80 }),
+        if flags & Self.flagUTF8 != 0 || nameBytes.allSatisfy({ $0 < 0x80 }),
             let text = String(data: nameBytes, encoding: .utf8)
         {
             return text
         }
-        if let field = ZipRecord.field(0x7075, in: extra), field.count > 5,
+        if let field = Self.field(0x7075, in: extra), field.count > 5,
             let text = String(data: field.dropFirst(5), encoding: .utf8)
         {
             return text
@@ -165,7 +165,7 @@ struct ZipRecord {
 
     var modified: Date {
         // The Unix time of the "extended timestamp" field is exact and has no time zone.
-        if let field = ZipRecord.field(0x5455, in: extra), field.count >= 5, field[field.startIndex] & 1 != 0 {
+        if let field = Self.field(0x5455, in: extra), field.count >= 5, field[field.startIndex] & 1 != 0 {
             var reader = ByteReader(Data(field.dropFirst()))
             return Date(timeIntervalSince1970: TimeInterval(Int32(bitPattern: reader.u32())))
         }
@@ -174,7 +174,7 @@ struct ZipRecord {
 
     /// True when the password check byte of this member was taken from its DOS time: it is
     /// encrypted and was written before its checksum was known.
-    var checksPasswordByTime: Bool { isEncrypted && flags & ZipRecord.flagDescriptor != 0 }
+    var checksPasswordByTime: Bool { isEncrypted && flags & Self.flagDescriptor != 0 }
 
     mutating func setModified(_ date: Date) {
         // The DOS time of such a member is part of its encryption: changing it would make the
@@ -186,7 +186,7 @@ struct ZipRecord {
         var field = Data([1])
         field.appendLE(UInt32(bitPattern: Int32(clamped)))
         // The field is nine bytes; other fields make way when the 64 KB of an entry are full.
-        extra = ZipRecord.fitting(ZipRecord.removing(0x5455, from: extra), into: 0xFFFF - 9)
+        extra = Self.fitting(Self.removing(0x5455, from: extra), into: 0xFFFF - 9)
         extra.appendLE(UInt16(0x5455))
         extra.appendLE(UInt16(field.count))
         extra.append(field)
@@ -195,7 +195,7 @@ struct ZipRecord {
 
     mutating func setPermissions(_ permissions: UInt16) {
         let type: UInt32 = isSymbolicLink ? 0o120000 : isDirectory ? 0o040000 : 0o100000
-        versionMadeBy = ZipRecord.madeByUnix
+        versionMadeBy = Self.madeByUnix
         externalAttributes = (type | UInt32(permissions & 0o7777)) << 16 | (isDirectory ? 0x10 : 0)
         unwritten.insert(.attributes)
     }
@@ -204,17 +204,17 @@ struct ZipRecord {
         (nameText, nameRaw) = (name, [])
         nameText.makeContiguousUTF8()
         if nameText.utf8.contains(where: { $0 >= 0x80 }) {
-            flags |= ZipRecord.flagUTF8
+            flags |= Self.flagUTF8
         } else {
-            flags &= ~ZipRecord.flagUTF8
+            flags &= ~Self.flagUTF8
         }
         // The Unicode name field would contradict the new name.
-        extra = ZipRecord.removing(0x7075, from: extra)
+        extra = Self.removing(0x7075, from: extra)
         unwritten.insert(.name)
     }
 
     /// Whether everything a header holds is the same in both records.
-    func hasSameHeader(as other: ZipRecord) -> Bool {
+    func hasSameHeader(as other: Self) -> Bool {
         nameText.utf8.elementsEqual(other.nameText.utf8) && nameRaw == other.nameRaw && dosTime == other.dosTime
             && dosDate == other.dosDate
             && extraStore == other.extraStore
@@ -224,9 +224,9 @@ struct ZipRecord {
 
     /// A new member as this program writes it: Unix attributes, UTF-8 name, exact time.
     static func new(name: String, isDirectory: Bool, modified: Date, permissions: UInt16, isSymbolicLink: Bool = false)
-        -> ZipRecord
+        -> Self
     {
-        var record = ZipRecord()
+        var record = Self()
         record.setName(isDirectory && !name.hasSuffix("/") ? name + "/" : name)
         let type: UInt32 = isSymbolicLink ? 0o120000 : isDirectory ? 0o040000 : 0o100000
         record.externalAttributes = (type | UInt32(permissions & 0o7777)) << 16 | (isDirectory ? 0x10 : 0)
@@ -300,7 +300,7 @@ struct ZipRecord {
 enum DOSTime {
     static func date(time: UInt16, date: UInt16) -> Date {
         var components = DateComponents()
-        components.year = 1980 + Int(date >> 9)
+        components.year = 1_980 + Int(date >> 9)
         components.month = max(1, Int(date >> 5 & 0xF))
         components.day = max(1, Int(date & 0x1F))
         components.hour = Int(time >> 11)
@@ -313,8 +313,8 @@ enum DOSTime {
         guard date.timeIntervalSince1970.isFinite else { return (0, 0x21) }
         let parts = Calendar(identifier: .gregorian).dateComponents(
             [.year, .month, .day, .hour, .minute, .second], from: date)
-        guard let year = parts.year, year >= 1980 else { return (0, 0x21) }
-        let day = UInt16(min(year - 1980, 127)) << 9 | UInt16(parts.month ?? 1) << 5 | UInt16(parts.day ?? 1)
+        guard let year = parts.year, year >= 1_980 else { return (0, 0x21) }
+        let day = UInt16(min(year - 1_980, 127)) << 9 | UInt16(parts.month ?? 1) << 5 | UInt16(parts.day ?? 1)
         let time = UInt16(parts.hour ?? 0) << 11 | UInt16(parts.minute ?? 0) << 5 | UInt16((parts.second ?? 0) / 2)
         return (time, day)
     }
@@ -402,7 +402,7 @@ enum ZipAES {
                         CCKeyDerivationPBKDF(
                             CCPBKDFAlgorithm(kCCPBKDF2), secret.baseAddress, secret.count,
                             salt.bindMemory(to: UInt8.self).baseAddress, salt.count,
-                            CCPseudoRandomAlgorithm(kCCPRFHmacAlgSHA1), 1000, &derived, derived.count)
+                            CCPseudoRandomAlgorithm(kCCPRFHmacAlgSHA1), 1_000, &derived, derived.count)
                     }
                 }
             }
@@ -501,10 +501,10 @@ extension ZipRecord {
     /// Marks a new member as AES-encrypted. Its checksum is left out (AE-2): the HMAC proves
     /// the contents, and a CRC would tell an attacker something about them.
     mutating func setAES(_ field: ZipAES.Field) {
-        flags |= ZipRecord.flagEncrypted
+        flags |= Self.flagEncrypted
         method = ZipAES.method
         crc = 0
-        extra = ZipRecord.fitting(ZipRecord.removing(ZipAES.extraID, from: extra), into: 0xFFFF - 11)
+        extra = Self.fitting(Self.removing(ZipAES.extraID, from: extra), into: 0xFFFF - 11)
         extra.append(field.encoded)
     }
 
@@ -585,15 +585,15 @@ struct ZipCrypto {
     }
 
     private mutating func update(_ byte: UInt8) {
-        keys.0 = ZipCrypto.table[Int((keys.0 ^ UInt32(byte)) & 0xFF)] ^ (keys.0 >> 8)
+        keys.0 = Self.table[Int((keys.0 ^ UInt32(byte)) & 0xFF)] ^ (keys.0 >> 8)
         keys.1 = (keys.1 &+ (keys.0 & 0xFF)) &* 134_775_813 &+ 1
-        keys.2 = ZipCrypto.table[Int((keys.2 ^ (keys.1 >> 24)) & 0xFF)] ^ (keys.2 >> 8)
+        keys.2 = Self.table[Int((keys.2 ^ (keys.1 >> 24)) & 0xFF)] ^ (keys.2 >> 8)
     }
 
     /// Both directions work on the block itself; the keys are kept in registers for the loop.
     private mutating func crypt(_ data: inout Data, decrypting: Bool) {
         var (key0, key1, key2) = keys
-        ZipCrypto.table.withUnsafeBufferPointer { table in
+        Self.table.withUnsafeBufferPointer { table in
             data.withUnsafeMutableBytes { (bytes: UnsafeMutableRawBufferPointer) in
                 for index in 0..<bytes.count {
                     let value = (key2 | 2) & 0xFFFF
@@ -629,7 +629,7 @@ struct ZipCrypto {
     /// The twelve bytes in front of the data: random, ending in the byte a reader checks the
     /// password with.
     mutating func header(check: UInt8) -> Data {
-        var bytes = (0..<ZipCrypto.headerSize - 1).map { _ in UInt8.random(in: 0...255) }
+        var bytes = (0..<Self.headerSize - 1).map { _ in UInt8.random(in: 0...255) }
         bytes.append(check)
         return encrypt(Data(bytes))
     }
@@ -906,7 +906,7 @@ final class ZipWriter {
     }
 
     private func localHeader(_ record: ZipRecord, wide: Bool, extra: Data) throws -> Data {
-        let nameLength = try ZipWriter.nameLength(of: record)
+        let nameLength = try Self.nameLength(of: record)
         var header = Data()
         header.appendLE(ZipDirectory.localSignature)
         header.appendLE(UInt16(wide ? 45 : record.method == 0 && !record.isEncrypted ? 10 : 20))
@@ -936,7 +936,7 @@ final class ZipWriter {
     /// sizes is reserved when the member may grow past the 32-bit fields, and `end` fills in
     /// the real values.
     func begin(_ record: ZipRecord, localExtra: Data? = nil, expectedSize: UInt64? = nil) throws -> OpenMember {
-        let largest = max(record.uncompressedSize, record.compressedSize, expectedSize.map { $0 + $0 / 8 + 1024 } ?? 0)
+        let largest = max(record.uncompressedSize, record.compressedSize, expectedSize.map { $0 + $0 / 8 + 1_024 } ?? 0)
         let member = OpenMember(
             offset: output.position, wide: largest > limits.maxField, localExtra: localExtra ?? record.extra)
         try output.write(try localHeader(record, wide: member.wide, extra: member.localExtra))
@@ -998,7 +998,7 @@ final class ZipWriter {
                 fields.append(wide)
             }
             fields.append(ZipRecord.fitting(record.extra, into: 0xFFFF - fields.count))
-            let nameLength = try ZipWriter.nameLength(of: record)
+            let nameLength = try Self.nameLength(of: record)
             var header = Data()
             header.reserveCapacity(46 + record.nameLength + fields.count + 16)
             header.appendLE(UInt32(0x0201_4B50))
@@ -1076,8 +1076,10 @@ extension ZipWriter {
             let header = try ZipDirectory.localHeader(of: record, at: headerOffset, in: file)
             localExtra = header.extra
             data = FileRangeStream(file, offset: header.dataOffset, length: record.compressedSize)
+
         case .spool(let temporary):
             data = FileRangeStream(try RandomAccessFile(temporary.url), offset: 0, length: record.compressedSize)
+
         case .none:
             break
         }

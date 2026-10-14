@@ -97,7 +97,7 @@ import Testing
         // Enough entries for the items to be made on several threads.
         let box = try Sandbox()
         let fm = FileManager.default
-        for index in 0..<1500 {
+        for index in 0..<1_500 {
             fm.createFile(atPath: box.url("file \(index) é#%.txt").path, contents: Data(count: index % 7))
         }
         for name in ["Some.app", "second.APP", "plain", "dotted.folder", "v1.2", ".hidden.d", "notes.rtfd"] {
@@ -105,7 +105,7 @@ import Testing
         }
         try fm.createSymbolicLink(at: box.url("link.app"), withDestinationURL: box.url("Some.app"))
         let items = try local.list(box.root, showHidden: true)
-        #expect(items.count == 1508 && Set(items.map(\.name)).count == 1508)
+        #expect(items.count == 1_508 && Set(items.map(\.name)).count == 1_508)
         for item in items {
             // Every item is what asking for it alone gives, location and all.
             #expect(item == local.item(at: box.root.appending(name: item.name)), "\(item.name)")
@@ -117,7 +117,7 @@ import Testing
         #expect(packages == ["Some.app", "second.APP", "notes.rtfd"])
         // Asked again, with what was learned about the extensions, the answers are the same.
         #expect(Set(try local.list(box.root, showHidden: true).filter(\.isPackage).map(\.name)) == packages)
-        #expect(try local.list(box.root, showHidden: false).count == 1507)
+        #expect(try local.list(box.root, showHidden: false).count == 1_507)
     }
 
     @Test func aTreeIsMeasuredLikeItIsListed() throws {

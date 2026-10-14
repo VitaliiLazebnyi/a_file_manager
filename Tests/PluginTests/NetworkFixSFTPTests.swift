@@ -37,9 +37,9 @@ final class FakeSFTPServer {
 
     init(root: URL, box: Sandbox, mode: Mode = .normal, delay: ClosedRange<Int> = 20...60) throws {
         let script = box.url("fake-sftp.py")
-        try FakeSFTPServer.script.write(to: script, atomically: true, encoding: .utf8)
+        try Self.script.write(to: script, atomically: true, encoding: .utf8)
         transport = SFTPTransport(
-            executable: FakeSFTPServer.python,
+            executable: Self.python,
             arguments: [script.path, mode.rawValue, root.path, String(delay.lowerBound), String(delay.upperBound)])
     }
 
@@ -246,7 +246,7 @@ final class FakeSFTPServer {
     }
 
     @Test func movesDataThroughTheWindowInBothDirections() throws {
-        let content = NetworkFixSFTP.pattern(4_000_000)
+        let content = Self.pattern(4_000_000)
         let started = Date()
         let writer = try fileSystem.write(url("/big.bin"))
         for start in stride(from: 0, to: content.count, by: 1_000_000) {
@@ -262,13 +262,13 @@ final class FakeSFTPServer {
         // Jumps and small reads, which the window must discard and restart.
         for position in [3_990_000, 17, 1_234_567, 1_234_568, 2_000_000, 40] {
             try reader.seek(to: UInt64(position))
-            #expect(try reader.read(upToCount: 5000) == content.subdata(in: position..<position + 5000))
+            #expect(try reader.read(upToCount: 5_000) == content.subdata(in: position..<position + 5_000))
         }
         // Many small reads one after the other, the pattern of a viewer.
         try reader.seek(to: 100_000)
         var small = Data()
-        for _ in 0..<60 { small.append(try #require(try reader.read(upToCount: 7777))) }
-        #expect(small == content.subdata(in: 100_000..<100_000 + 60 * 7777))
+        for _ in 0..<60 { small.append(try #require(try reader.read(upToCount: 7_777))) }
+        #expect(small == content.subdata(in: 100_000..<100_000 + 60 * 7_777))
         try reader.seek(to: UInt64(content.count))
         #expect(try reader.read(upToCount: 10) == nil)
         reader.close()
@@ -282,8 +282,8 @@ final class FakeSFTPServer {
     }
 
     @Test func aFailingReadDeliversWhatCameBeforeIt() throws {
-        let suite = try NetworkFixSFTP(mode: .failingReads)
-        let content = NetworkFixSFTP.pattern(300_000)
+        let suite = try Self(mode: .failingReads)
+        let content = Self.pattern(300_000)
         try content.write(to: suite.box.url("srv/f.bin"))
         let reader = try suite.fileSystem.read(suite.url("/f.bin"))
         defer { reader.close() }
@@ -294,12 +294,12 @@ final class FakeSFTPServer {
         } catch {
             failed = true
         }
-        #expect(failed && got == content.prefix(98304))
+        #expect(failed && got == content.prefix(98_304))
     }
 
     @Test func aRequestThatTimesOutDoesNotCloseTheChannel() throws {
-        let suite = try NetworkFixSFTP(mode: .hangingStat, timeout: 2)
-        let content = NetworkFixSFTP.pattern(500_000)
+        let suite = try Self(mode: .hangingStat, timeout: 2)
+        let content = Self.pattern(500_000)
         try content.write(to: suite.box.url("srv/f.bin"))
         let session = try suite.center.session(for: suite.key)
         _ = try session.connect(cancellation: nil)

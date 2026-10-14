@@ -153,12 +153,12 @@ private func describe(_ rows: [SyncRow]) -> [String] {
         #expect(state(3) == .equal && state(-3) == .equal && state(4) == .leftNewer && state(-4) == .rightNewer)
         #expect(state(2) { $0.toleranceSeconds = 2 } == .equal && state(3) { $0.toleranceSeconds = 2 } == .leftNewer)
         #expect(state(1) { $0.toleranceSeconds = 0 } == .leftNewer && state(0) { $0.toleranceSeconds = 0 } == .equal)
-        #expect(state(3600) == .leftNewer && state(3600) { $0.ignoreOneHourDifference = true } == .equal)
+        #expect(state(3_600) == .leftNewer && state(3_600) { $0.ignoreOneHourDifference = true } == .equal)
         #expect(
-            state(-3602) { $0.ignoreOneHourDifference = true } == .equal
-                && state(7200) { $0.ignoreOneHourDifference = true } == .leftNewer)
+            state(-3_602) { $0.ignoreOneHourDifference = true } == .equal
+                && state(7_200) { $0.ignoreOneHourDifference = true } == .leftNewer)
         // The right side is two hours behind: its dates are moved before comparing.
-        #expect(state(7200) { $0.timeOffsetHours = 2 } == .equal && state(0) { $0.timeOffsetHours = 2 } == .rightNewer)
+        #expect(state(7_200) { $0.timeOffsetHours = 2 } == .equal && state(0) { $0.timeOffsetHours = 2 } == .rightNewer)
         #expect(
             SyncComparison.classify(
                 left: FileItem(url: memory.url("/a"), name: "a", isDirectory: false, size: 1, modified: early),
@@ -464,6 +464,7 @@ private func describe(_ rows: [SyncRow]) -> [String] {
             case "same.txt": changed[index].action = .deleteBoth
             case "new.txt": changed[index].action = .deleteLeft
             case "update.txt": changed[index].action = .copyToLeft
+
             // What a row cannot do is not planned.
             case "arrives.txt": changed[index].action = .copyToRight
             default: changed[index].action = .none
@@ -565,7 +566,7 @@ private func describe(_ rows: [SyncRow]) -> [String] {
         memory.addFile("/R/update.txt", "older", modified: early)
         outcome = run(plan) { executor in
             executor.onError = { url, _ in
-                if url.lastPathComponent == "new.txt" { self.memory.addFile("/L/new.txt", "back again") }
+                if url.lastPathComponent == "new.txt" { memory.addFile("/L/new.txt", "back again") }
                 return url.lastPathComponent == "new.txt" ? .retry : .skip
             }
         }
@@ -590,7 +591,7 @@ private func describe(_ rows: [SyncRow]) -> [String] {
         for index in all.indices where all[index].name == "back.txt" { all[index].action = .copyToRight }
         let plan = SyncPlan(rows: all)
         #expect(plan.toLeft.isEmpty && plan.deleteRight.count == 6)
-        let outcome = run(plan, options: { $0.removeEmptyDirectoriesBelow = self.memory.url("/R") })
+        let outcome = run(plan, options: { $0.removeEmptyDirectoriesBelow = memory.url("/R") })
         #expect(outcome.errors.isEmpty && outcome.skipped == 0)
         // "Delete all empty directories" also takes those the left has (spec 09 › dialog).
         #expect(

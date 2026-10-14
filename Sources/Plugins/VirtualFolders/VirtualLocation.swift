@@ -26,26 +26,29 @@ public enum VirtualLocation: Equatable {
     /// Reads a URL of the virtual scheme; nil for every other URL and for what is not one of
     /// the forms above.
     public init?(_ url: URL) {
-        guard url.scheme == VirtualLocation.scheme, let host = url.host else { return nil }
+        guard url.scheme == Self.scheme, let host = url.host else { return nil }
         let labels = host.split(separator: ".").map(String.init)
         guard let kind = labels.first else { return nil }
         let id = labels.dropFirst().first { $0.hasPrefix("n") }.flatMap { Int($0.dropFirst()) }
         let hex = labels.dropFirst().filter { $0.hasPrefix("h") }.map { $0.dropFirst() }.joined()
-        guard let prefix = VirtualLocation.text(fromHex: hex) else { return nil }
+        guard let prefix = Self.text(fromHex: hex) else { return nil }
         let path = url.path.isEmpty ? "/" : url.path
         switch kind {
         case "branch":
-            guard let real = VirtualLocation.realURL(prefix: prefix, path: path) else { return nil }
+            guard let real = Self.realURL(prefix: prefix, path: path) else { return nil }
             self = .branch(of: real)
+
         case "pick":
-            guard let id, let real = VirtualLocation.realURL(prefix: prefix, path: path) else { return nil }
+            guard let id, let real = Self.realURL(prefix: prefix, path: path) else { return nil }
             self = .picked(id: id, in: real)
+
         case "list":
             guard let id else { return nil }
             let folder = (path as NSString).deletingLastPathComponent
             let origin =
-                prefix.isEmpty ? nil : VirtualLocation.realURL(prefix: prefix, path: folder.isEmpty ? "/" : folder)
+                prefix.isEmpty ? nil : Self.realURL(prefix: prefix, path: folder.isEmpty ? "/" : folder)
             self = .list(id: id, title: (path as NSString).lastPathComponent, origin: origin)
+
         default:
             return nil
         }
@@ -53,19 +56,21 @@ public enum VirtualLocation: Equatable {
 
     public var url: URL {
         var components = URLComponents()
-        components.scheme = VirtualLocation.scheme
+        components.scheme = Self.scheme
         switch self {
         case .branch(let real):
-            components.host = "branch" + VirtualLocation.hexLabels(VirtualLocation.prefix(of: real))
-            components.path = VirtualLocation.path(of: real)
+            components.host = "branch" + Self.hexLabels(Self.prefix(of: real))
+            components.path = Self.path(of: real)
+
         case .picked(let id, let real):
-            components.host = "pick.n\(id)" + VirtualLocation.hexLabels(VirtualLocation.prefix(of: real))
-            components.path = VirtualLocation.path(of: real)
+            components.host = "pick.n\(id)" + Self.hexLabels(Self.prefix(of: real))
+            components.path = Self.path(of: real)
+
         case .list(let id, let title, let origin):
             components.host =
-                "list.n\(id)" + (origin.map { VirtualLocation.hexLabels(VirtualLocation.prefix(of: $0)) } ?? "")
-            let folder = origin.map(VirtualLocation.path(of:)) ?? ""
-            components.path = (folder == "/" ? "" : folder) + "/" + VirtualLocation.pathComponent(title)
+                "list.n\(id)" + (origin.map { Self.hexLabels(Self.prefix(of: $0)) } ?? "")
+            let folder = origin.map(Self.path(of:)) ?? ""
+            components.path = (folder == "/" ? "" : folder) + "/" + Self.pathComponent(title)
         }
         // Scheme, host and path are all of a form a URL takes; the fallback is never reached.
         return components.url ?? URL(fileURLWithPath: "/")
@@ -110,7 +115,7 @@ public enum VirtualLocation: Equatable {
 
     private static func realURL(prefix: String, path: String) -> URL? {
         // Written into a URL by anyone, so the path is made plain: no `..` leads out of the place.
-        let path = VirtualLocation.plain(path)
+        let path = Self.plain(path)
         if prefix == "file://" { return URL(fileURLWithPath: path, isDirectory: false) }
         // The prefix holds scheme, user, host and port only; anything else in it is not ours.
         guard var components = URLComponents(string: prefix), components.scheme != nil,

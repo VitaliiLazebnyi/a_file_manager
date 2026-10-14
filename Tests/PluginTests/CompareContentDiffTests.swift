@@ -379,7 +379,7 @@ private func isValid<T: Hashable>(_ segments: [DiffSegment], _ a: [T], _ b: [T])
         let diff = BinaryDiff.compute(left: left, right: right, bytesPerLine: 16)
         #expect(diff.differingBytes == changed.count)
         // 65,535 and 65,536 are neighbouring lines across a piece border, and 65,552 is the next: one difference.
-        #expect(diff.blocks == [0..<1, 4095..<4098, 93_750..<93_751, 187_499..<187_500])
+        #expect(diff.blocks == [0..<1, 4_095..<4_098, 93_750..<93_751, 187_499..<187_500])
         #expect(BinaryDiff.compute(left: left, right: left).isIdentical)
     }
 }
@@ -462,7 +462,7 @@ private func isValid<T: Hashable>(_ segments: [DiffSegment], _ a: [T], _ b: [T])
         for (name, content) in [("a", data), ("same", data), ("last", lastByte), ("middle", middle)] {
             try content.write(to: box.url(name))
         }
-        func identical(_ name: String, stretch: Int = 64 * 1024, _ flag: CancellationFlag = CancellationFlag()) throws
+        func identical(_ name: String, stretch: Int = 64 * 1_024, _ flag: CancellationFlag = CancellationFlag()) throws
             -> Bool?
         {
             try CompareLoader.identical(
@@ -486,7 +486,7 @@ private func isValid<T: Hashable>(_ segments: [DiffSegment], _ a: [T], _ b: [T])
         func identical(_ name: String) throws -> Bool? {
             try CompareLoader.identical(
                 memory.url("/a"), memory.url(name), size: Int64(text.utf8.count), fileSystems: fileSystems,
-                stretch: 4096)
+                stretch: 4_096)
         }
         #expect(try identical("/b") == true && identical("/c") == false)
         // The same through the stretches, when the file system says it is local.

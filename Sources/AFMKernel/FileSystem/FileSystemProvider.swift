@@ -58,21 +58,21 @@ public struct FileSystemCapabilities: OptionSet {
     public init(rawValue: Int) { self.rawValue = rawValue }
 
     /// Files and folders can be created, changed and deleted.
-    public static let write = FileSystemCapabilities(rawValue: 1)
+    public static let write = Self(rawValue: 1)
     /// Deleted items can go to a Trash.
-    public static let trash = FileSystemCapabilities(rawValue: 2)
+    public static let trash = Self(rawValue: 2)
     /// An existing file can be opened to continue it (`append(to:at:cancellation:)`).
-    public static let append = FileSystemCapabilities(rawValue: 4)
+    public static let append = Self(rawValue: 4)
     /// What is written is kept back for a while (in memory, in a spool file) before it reaches
     /// its place for good. Whoever is about to destroy the only other copy of what it wrote
     /// calls `commit(_:cancellation:)` first. Without this, `commit` has nothing to do and
     /// need not be called.
-    public static let deferredWrites = FileSystemCapabilities(rawValue: 8)
+    public static let deferredWrites = Self(rawValue: 8)
     /// Said besides `write` by a location whose entries can be deleted or changed while
     /// nothing can be created in it (a list of files gathered from elsewhere): commands
     /// that make something new there (Paste, New Folder, New File, a copy into it) are
     /// withheld, the others are offered.
-    public static let removeOnly = FileSystemCapabilities(rawValue: 16)
+    public static let removeOnly = Self(rawValue: 16)
 }
 
 /// What is carried over when a file is copied from one file system to another.
@@ -419,9 +419,9 @@ extension FileSystemProvider {
         _ = receive(try list(directory, showHidden: showHidden))
     }
 
-    public func capabilities(for url: URL) -> FileSystemCapabilities { capabilities }
+    public func capabilities(for _: URL) -> FileSystemCapabilities { capabilities }
 
-    public func list(_ directory: URL, showHidden: Bool, cancellation: CancellationFlag) throws -> [FileItem] {
+    public func list(_ directory: URL, showHidden: Bool, cancellation _: CancellationFlag) throws -> [FileItem] {
         try list(directory, showHidden: showHidden)
     }
 
@@ -468,23 +468,23 @@ extension FileSystemProvider {
         return try write(url)
     }
 
-    public func append(to url: URL, at offset: Int64?, cancellation: CancellationFlag) throws -> FileWriter {
+    public func append(to _: URL, at _: Int64?, cancellation _: CancellationFlag) throws -> FileWriter {
         throw FileSystemError.notSupported("Continuing a file")
     }
 
-    public func copyMetadata(from source: URL, to destination: URL) throws {
+    public func copyMetadata(from _: URL, to _: URL) throws {
         throw FileSystemError.notSupported("Copying metadata")
     }
-    public func commit(_ url: URL, cancellation: CancellationFlag) throws {}
+    public func commit(_: URL, cancellation _: CancellationFlag) {}
     public func commit(_ url: URL, cancellation: CancellationFlag, progress: (Int64, Int64) -> Bool) throws {
         if cancellation.isCancelled || !progress(0, 0) { throw CocoaError(.userCancelled) }
         try commit(url, cancellation: cancellation)
     }
-    public func quarantine(of url: URL) -> Data? { nil }
-    public func setQuarantine(_ value: Data, of url: URL) throws {}
+    public func quarantine(of _: URL) -> Data? { nil }
+    public func setQuarantine(_: Data, of _: URL) {}
 
-    public func trash(_ url: URL) throws { throw FileSystemError.notSupported("Moving to the Trash") }
-    public func setAttributes(_ attributes: FileAttributes, of url: URL) throws {
+    public func trash(_: URL) throws { throw FileSystemError.notSupported("Moving to the Trash") }
+    public func setAttributes(_: FileAttributes, of _: URL) throws {
         throw FileSystemError.notSupported("Changing attributes")
     }
     public func displayPath(_ url: URL) -> String { url.absoluteString }
@@ -496,12 +496,12 @@ extension FileSystemProvider {
     }
     public var readsRootedPaths: Bool { scheme == "file" }
     public func places() -> [Place] { [] }
-    public func volume(of url: URL) -> VolumeInfo? { nil }
+    public func volume(of _: URL) -> VolumeInfo? { nil }
     public func volume(of url: URL, cancellation: CancellationFlag) -> VolumeInfo? {
         cancellation.isCancelled ? nil : volume(of: url)
     }
-    public func watch(_ directories: [URL], onChange: @escaping ([URL]) -> Void) -> AnyObject? { nil }
-    public func watch(_ directories: [URL], recursively: Bool, onChange: @escaping ([URL]) -> Void) -> AnyObject? {
+    public func watch(_: [URL], onChange _: @escaping ([URL]) -> Void) -> AnyObject? { nil }
+    public func watch(_ directories: [URL], recursively _: Bool, onChange: @escaping ([URL]) -> Void) -> AnyObject? {
         watch(directories, onChange: onChange)
     }
 
@@ -540,17 +540,20 @@ extension FileSystemProvider {
         try createDirectory(at: url)
     }
 
-    public func remove(_ url: URL, below root: URL, cancellation: CancellationFlag) throws {
+    public func remove(_ url: URL, below _: URL, cancellation: CancellationFlag) throws {
         try remove(url, cancellation: cancellation)
     }
 
     public func createDirectory(at url: URL, exclusive: Bool, cancellation: CancellationFlag) throws {
         if cancellation.isCancelled { throw CocoaError(.userCancelled) }
-        guard exclusive else { return try createDirectory(at: url, cancellation: cancellation) }
+        guard exclusive else {
+            try createDirectory(at: url, cancellation: cancellation)
+            return
+        }
         try createDirectory(at: url, exclusive: true)
     }
 
-    public func realLocation(of url: URL) -> URL? { nil }
+    public func realLocation(of _: URL) -> URL? { nil }
     public var connectsToServer: Bool { false }
     public func readOrder(of urls: [URL]) -> [URL] { urls }
 
@@ -723,9 +726,9 @@ public final class FileSystemRegistry {
     /// a file it has nothing to do with, blocks for as long as the writing takes otherwise,
     /// and throws when the file could not be brought up to date.
     public func addFlusher(_ flush: @escaping (URL, CancellationFlag) throws -> Void) {
-        FileSystemRegistry.flushLock.lock()
+        Self.flushLock.lock()
         flushers.append(flush)
-        FileSystemRegistry.flushLock.unlock()
+        Self.flushLock.unlock()
     }
 
     /// Has every registered flusher bring the file at `url` up to date. **Who calls it:**
@@ -733,9 +736,9 @@ public final class FileSystemRegistry {
     /// still have changes for, on its own background thread, before the first read. A throw
     /// means the file on disk is not what the user sees: the operation is not carried out.
     public func flushPendingWrites(to url: URL, cancellation: CancellationFlag) throws {
-        FileSystemRegistry.flushLock.lock()
+        Self.flushLock.lock()
         let flushers = self.flushers
-        FileSystemRegistry.flushLock.unlock()
+        Self.flushLock.unlock()
         for flush in flushers { try flush(url, cancellation) }
     }
 
@@ -745,24 +748,24 @@ public final class FileSystemRegistry {
     /// closes the windows that show its files, stops what reads there. Called on the main
     /// thread with the volume's location; whoever registers is the plugin that holds it.
     public func addVolumeReleaser(_ release: @escaping (URL) -> Void) {
-        FileSystemRegistry.flushLock.lock()
+        Self.flushLock.lock()
         releasers.append(release)
-        FileSystemRegistry.flushLock.unlock()
+        Self.flushLock.unlock()
     }
 
     /// The same for what has to wait on the disk to let go (writing what is pending, closing
     /// files): called on the thread of the job that ejects, after the releasers.
     public func addVolumeCloser(_ close: @escaping (URL, CancellationFlag) -> Void) {
-        FileSystemRegistry.flushLock.lock()
+        Self.flushLock.lock()
         closers.append(close)
-        FileSystemRegistry.flushLock.unlock()
+        Self.flushLock.unlock()
     }
 
     /// Main thread: every releaser lets go of what it shows or reads on `volume`.
     public func releaseVolume(_ volume: URL) {
-        FileSystemRegistry.flushLock.lock()
+        Self.flushLock.lock()
         let releasers = self.releasers
-        FileSystemRegistry.flushLock.unlock()
+        Self.flushLock.unlock()
         for release in releasers { release(volume) }
     }
 
@@ -771,9 +774,9 @@ public final class FileSystemRegistry {
     /// a volume that is ejected then would lose it.
     public func closeFiles(on volume: URL, cancellation: CancellationFlag) throws {
         try flushPendingWrites(to: volume, cancellation: cancellation)
-        FileSystemRegistry.flushLock.lock()
+        Self.flushLock.lock()
         let closers = self.closers
-        FileSystemRegistry.flushLock.unlock()
+        Self.flushLock.unlock()
         for close in closers { close(volume, cancellation) }
     }
 
@@ -820,7 +823,7 @@ public enum TreeWalk {
     /// Calls nested deeper than this on one thread go on without nesting.
     public static let deepestNesting = 32
     /// Levels below which a walk that no longer nests gives up: no real tree is that deep.
-    public static let deepestTree = 1000
+    public static let deepestTree = 1_000
 
     private static let key: pthread_key_t = {
         var key = pthread_key_t()

@@ -32,7 +32,7 @@ public struct TransferRate {
     /// Amount per second; nil until enough has been measured.
     public var perSecond: Double? {
         guard let first = samples.first, let last = samples.last,
-            last.time - first.time >= TransferRate.minimumSpan
+            last.time - first.time >= Self.minimumSpan
         else { return nil }
         return Double(last.amount - first.amount) / (last.time - first.time)
     }

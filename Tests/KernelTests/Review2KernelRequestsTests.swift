@@ -28,7 +28,7 @@ private final class QuittingPlugin: Plugin {
     var sawFlag: CancellationFlag?
 
     init(_ name: String) { self.name = name }
-    func start(in kernel: Kernel) {}
+    func start(in _: Kernel) {}
     func stop() { stopped += 1 }
     func shouldTerminate() -> Bool {
         asked += 1
@@ -36,7 +36,10 @@ private final class QuittingPlugin: Plugin {
     }
     func prepareToQuit(cancellation: CancellationFlag, completion: @escaping () -> Void) {
         sawFlag = cancellation
-        guard finishesLate else { return completion() }
+        guard finishesLate else {
+            completion()
+            return
+        }
         Thread.detachNewThread {
             usleep(20_000)
             completion()
@@ -47,7 +50,7 @@ private final class QuittingPlugin: Plugin {
 
 private final class PlainPlugin: Plugin {
     let name = "plain"
-    func start(in kernel: Kernel) {}
+    func start(in _: Kernel) {}
 }
 
 /// What other areas asked the kernel for in review 2 (documentation/review-2/cross-requests).

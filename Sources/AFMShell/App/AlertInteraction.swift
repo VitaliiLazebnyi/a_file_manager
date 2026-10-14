@@ -38,7 +38,7 @@ public final class AlertInteraction: UserInteraction {
     public func choose(_ message: String, detail: String, buttons: [String], style: QuestionStyle) -> Int {
         choose(
             message, detail: detail, buttons: buttons, style: style,
-            defaultButton: AlertInteraction.defaultButton(for: style, of: buttons))
+            defaultButton: Self.defaultButton(for: style, of: buttons))
     }
 
     /// The same with the caller's say in which button Return presses; nil for none, where the
@@ -128,7 +128,7 @@ public final class UserDefaultsSettings: SettingsStore {
     public init(defaults: UserDefaults = .standard, largeFolder: URL? = nil) {
         self.defaults = defaults
         self.largeFolder =
-            largeFolder ?? (defaults === UserDefaults.standard ? UserDefaultsSettings.standardLargeFolder : nil)
+            largeFolder ?? (defaults === UserDefaults.standard ? Self.standardLargeFolder : nil)
     }
 
     static var standardLargeFolder: URL? {
@@ -174,7 +174,10 @@ public final class UserDefaultsSettings: SettingsStore {
     }
 
     public func setLarge(_ data: Data?, forKey key: String) {
-        guard largeFile(forKey: key) != nil else { return set(data, forKey: key) }
+        guard largeFile(forKey: key) != nil else {
+            set(data, forKey: key)
+            return
+        }
         lock.lock()
         large[key] = .some(data)
         unwritten.insert(key)

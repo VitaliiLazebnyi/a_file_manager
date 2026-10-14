@@ -112,7 +112,7 @@ final class SyncSession {
         options = settings.value(SyncOptions.self, forKey: SyncSettingsKey.options) ?? SyncOptions()
         var show = settings.value(SyncShow.self, forKey: SyncSettingsKey.show) ?? .all
         // With both up nothing would ever be shown (spec 09 › Show filter).
-        if !show.contains(.duplicates) && !show.contains(.singles) { show.formUnion([.duplicates, .singles]) }
+        if !show.contains(.duplicates), !show.contains(.singles) { show.formUnion([.duplicates, .singles]) }
         self.show = show
     }
 
@@ -136,12 +136,12 @@ final class SyncSession {
         if marked.isEmpty {
             selectedNames = []
         } else if marked.reduce(0, { $0 + $1.selectionCount }) < readsInBackgroundFrom {
-            selectedNames = SyncSession.names(of: marked.map { $0.operandsSnapshot() })
+            selectedNames = Self.names(of: marked.map { $0.operandsSnapshot() })
         } else {
             selectedNames = []
             let snapshots = marked.map { $0.operandsSnapshot() }
             DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-                let names = SyncSession.names(of: snapshots)
+                let names = Self.names(of: snapshots)
                 DispatchQueue.main.async {
                     guard let self, self.selectionEpoch == epoch else { return }
                     self.selectedNames = names
@@ -282,7 +282,7 @@ final class SyncSession {
         }
     }
 
-    private func isActionable(_ row: SyncRow) -> Bool { SyncSession.isActionable(row) }
+    private func isActionable(_ row: SyncRow) -> Bool { Self.isActionable(row) }
     private static func isActionable(_ row: SyncRow) -> Bool { row.action != .none && row.accepts(row.action) }
 
     /// The list as it is shown, worked out from the rows alone (so it can be made on any thread).
@@ -329,6 +329,7 @@ final class SyncSession {
         for (position, entry) in layout.entries.enumerated() {
             switch entry {
             case .header: layout.headerPositions.append(position)
+
             case .row(let index):
                 layout.positions[index] = position
                 if isActionable(rows[index]) { layout.actionableCount += 1 }
@@ -349,15 +350,15 @@ final class SyncSession {
             headerPositions = []
             actionableCount = 0
         }
-        if runsInline || rows.count < SyncSession.backgroundFrom {
-            apply(SyncSession.layout(rows: rows, show: show, sort: sort))
+        if runsInline || rows.count < Self.backgroundFrom {
+            apply(Self.layout(rows: rows, show: show, sort: sort))
             return
         }
         let (rows, show, sort, epoch) = (self.rows, self.show, self.sort, actionEpoch)
         if phase == .compared { status = "Preparing the list of \(rows.count) files…" }
         changed()
         SyncWorker.run("Synchronize directories: list") { [weak self] in
-            let layout = SyncSession.layout(rows: rows, show: show, sort: sort)
+            let layout = Self.layout(rows: rows, show: show, sort: sort)
             DispatchQueue.main.async {
                 guard let self, self.layoutGeneration == generation else { return }
                 // Actions set while the list was made are counted again.
@@ -528,7 +529,7 @@ final class SyncSession {
     /// (spec 09 › The "Synchronize" dialog and the run).
     func synchronize() {
         guard phase == .compared, roots != nil, !isPlanning else { return }
-        if runsInline || rows.count < SyncSession.backgroundFrom {
+        if runsInline || rows.count < Self.backgroundFrom {
             present(plan())
             return
         }

@@ -289,7 +289,7 @@ public final class MemoryFileSystem: FileSystemProvider {
 
     private func makeStall() -> Stall {
         Stall(
-            stall, isReleased: { [unowned self] in self.stallsReleased },
+            stall, isReleased: { [unowned self] in stallsReleased },
             onInterrupt: { [weak self] in self?.synchronized { self?.interrupted += 1 } })
     }
 
@@ -351,6 +351,7 @@ public final class MemoryFileSystem: FileSystemProvider {
         case .directory:
             return FileItem(
                 url: url(key), name: name, isDirectory: true, isHidden: name.hasPrefix("."), permissions: 0o755)
+
         case .file(let data, let modified, let permissions):
             return FileItem(
                 url: url(key), name: name, isDirectory: false, isHidden: name.hasPrefix("."),
@@ -488,7 +489,7 @@ public final class MemoryFileSystem: FileSystemProvider {
             return block
         }
 
-        func seek(to offset: UInt64) throws { position = min(Int(offset), data.count) }
+        func seek(to offset: UInt64) { position = min(Int(offset), data.count) }
         func close() {}
     }
 
@@ -499,7 +500,7 @@ public final class MemoryFileSystem: FileSystemProvider {
         }
     }
 
-    public func createDirectory(at url: URL) throws {
+    public func createDirectory(at url: URL) {
         synchronized {
             var path = key(url)
             while path != "/" {
@@ -529,7 +530,7 @@ public final class MemoryFileSystem: FileSystemProvider {
             self.data.append(data)
         }
 
-        func close(attributes: FileAttributes) throws { store(data, attributes) }
+        func close(attributes: FileAttributes) { store(data, attributes) }
     }
 
     public func write(_ url: URL) throws -> FileWriter {
@@ -548,7 +549,7 @@ public final class MemoryFileSystem: FileSystemProvider {
 
     /// Offered when `capabilities` holds `.append`; what has been written shows when the
     /// writer is closed, with the date and permissions the file had unless others are given.
-    public func append(to url: URL, at offset: Int64?, cancellation: CancellationFlag) throws -> FileWriter {
+    public func append(to url: URL, at offset: Int64?, cancellation _: CancellationFlag) throws -> FileWriter {
         guard capabilities(for: url).contains(.append) else { throw FileSystemError.notSupported("Continuing a file") }
         let path = key(url)
         let (head, modified, permissions): (Data, Date, UInt16) = try synchronized {
@@ -577,7 +578,7 @@ public final class MemoryFileSystem: FileSystemProvider {
         }
     }
 
-    public func commit(_ url: URL, cancellation: CancellationFlag) throws {
+    public func commit(_ url: URL, cancellation _: CancellationFlag) throws {
         synchronized { committed.append(decoded(key(url))) }
         if let commitFailure { throw commitFailure }
     }
@@ -598,7 +599,7 @@ public final class MemoryFileSystem: FileSystemProvider {
         try commit(url, cancellation: cancellation)
     }
 
-    public func quarantine(of url: URL) -> Data? { quarantineValue }
+    public func quarantine(of _: URL) -> Data? { quarantineValue }
 
     public func setQuarantine(_ value: Data, of url: URL) throws {
         try synchronized {
@@ -622,7 +623,7 @@ public final class MemoryFileSystem: FileSystemProvider {
         let (from, to) = (key(source), key(destination))
         try synchronized {
             guard nodes[from] != nil else { throw NotFound(path: decoded(from)) }
-            if nodes[to] != nil && !replacing { throw FileSystemError.alreadyExists(decoded(to)) }
+            if nodes[to] != nil, !replacing { throw FileSystemError.alreadyExists(decoded(to)) }
             for candidate in nodes.keys.sorted() where candidate == from || candidate.hasPrefix(from + "/") {
                 nodes[to + candidate.dropFirst(from.count)] = nodes[candidate]
                 nodes[candidate] = nil
@@ -725,7 +726,7 @@ public final class MemoryFileSystem: FileSystemProvider {
         [Place(name: "Memory", url: url("/"), kind: .externalDisk)]
     }
 
-    public func volume(of url: URL) -> VolumeInfo? {
+    public func volume(of _: URL) -> VolumeInfo? {
         VolumeInfo(name: "Memory", isLocal: isLocal)
     }
 }

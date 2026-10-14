@@ -27,58 +27,58 @@ struct ViewerEncoding: Hashable {
     let codePage: Int
     let name: String
 
-    static let utf8 = ViewerEncoding(codePage: 65001, name: "UTF-8")
-    static let utf16LE = ViewerEncoding(codePage: 1200, name: "UTF-16 LE")
-    static let utf16BE = ViewerEncoding(codePage: 1201, name: "UTF-16 BE")
+    static let utf8 = Self(codePage: 65_001, name: "UTF-8")
+    static let utf16LE = Self(codePage: 1_200, name: "UTF-16 LE")
+    static let utf16BE = Self(codePage: 1_201, name: "UTF-16 BE")
     /// What the specification calls ANSI: the Windows code page of Western Europe.
-    static let ansi = ViewerEncoding(codePage: 1252, name: "ANSI / Western Latin 1 (1252)")
+    static let ansi = Self(codePage: 1_252, name: "ANSI / Western Latin 1 (1252)")
     /// What the specification calls ASCII: the DOS code page with the box-drawing characters.
-    static let dos = ViewerEncoding(codePage: 437, name: "ASCII / DOS-USA (437)")
-    static let latin1 = ViewerEncoding(codePage: 28591, name: "ISO Latin 1 (8859-1)")
-    static let macRoman = ViewerEncoding(codePage: 10000, name: "Mac OS Roman (10000)")
+    static let dos = Self(codePage: 437, name: "ASCII / DOS-USA (437)")
+    static let latin1 = Self(codePage: 28_591, name: "ISO Latin 1 (8859-1)")
+    static let macRoman = Self(codePage: 10_000, name: "Mac OS Roman (10000)")
 
-    private static let multiBytePages: Set<Int> = [932, 936, 949, 950, 51932, 54936]
+    private static let multiBytePages: Set<Int> = [932, 936, 949, 950, 51_932, 54_936]
 
     /// The code pages of the specification's Encoding menu, as far as this Mac can convert them.
-    static let codePages: [ViewerEncoding] = [
+    static let codePages: [Self] = [
         ansi, dos, macRoman, latin1,
-        ViewerEncoding(codePage: 1250, name: "Eastern Europe (1250)"),
-        ViewerEncoding(codePage: 1251, name: "Cyrillic Windows (1251)"),
-        ViewerEncoding(codePage: 1253, name: "Greek (1253)"), ViewerEncoding(codePage: 1254, name: "Turkish (1254)"),
-        ViewerEncoding(codePage: 1255, name: "Hebrew (1255)"), ViewerEncoding(codePage: 1256, name: "Arabic (1256)"),
-        ViewerEncoding(codePage: 1257, name: "Baltic (1257)"),
-        ViewerEncoding(codePage: 1258, name: "Vietnamese (1258)"),
-        ViewerEncoding(codePage: 936, name: "Chinese Main Land (936)"),
-        ViewerEncoding(codePage: 950, name: "Chinese Taiwan (950)"),
-        ViewerEncoding(codePage: 932, name: "Japanese (932)"), ViewerEncoding(codePage: 949, name: "Korean (949)"),
-        ViewerEncoding(codePage: 51932, name: "Japanese EUC (51932)"),
-        ViewerEncoding(codePage: 54936, name: "Chinese GB 18030 (54936)"),
-        ViewerEncoding(codePage: 874, name: "Thai (874)"), ViewerEncoding(codePage: 850, name: "DOS-LATIN1 (850)"),
-        ViewerEncoding(codePage: 866, name: "Cyrillic DOS (866)"),
-        ViewerEncoding(codePage: 20866, name: "Cyrillic KOI8-R (20866)")
+        Self(codePage: 1_250, name: "Eastern Europe (1250)"),
+        Self(codePage: 1_251, name: "Cyrillic Windows (1251)"),
+        Self(codePage: 1_253, name: "Greek (1253)"), Self(codePage: 1_254, name: "Turkish (1254)"),
+        Self(codePage: 1_255, name: "Hebrew (1255)"), Self(codePage: 1_256, name: "Arabic (1256)"),
+        Self(codePage: 1_257, name: "Baltic (1257)"),
+        Self(codePage: 1_258, name: "Vietnamese (1258)"),
+        Self(codePage: 936, name: "Chinese Main Land (936)"),
+        Self(codePage: 950, name: "Chinese Taiwan (950)"),
+        Self(codePage: 932, name: "Japanese (932)"), Self(codePage: 949, name: "Korean (949)"),
+        Self(codePage: 51_932, name: "Japanese EUC (51932)"),
+        Self(codePage: 54_936, name: "Chinese GB 18030 (54936)"),
+        Self(codePage: 874, name: "Thai (874)"), Self(codePage: 850, name: "DOS-LATIN1 (850)"),
+        Self(codePage: 866, name: "Cyrillic DOS (866)"),
+        Self(codePage: 20_866, name: "Cyrillic KOI8-R (20866)")
     ].filter(\.isAvailable)
 
     /// Any code page the system knows, for "Other (enter code page manually)"; nil otherwise.
-    static func codePage(_ number: Int) -> ViewerEncoding? {
+    static func codePage(_ number: Int) -> Self? {
         if let known = ([utf8, utf16LE, utf16BE] + codePages).first(where: { $0.codePage == number }) { return known }
-        let encoding = ViewerEncoding(codePage: number, name: "Code page \(number)")
+        let encoding = Self(codePage: number, name: "Code page \(number)")
         return encoding.isAvailable ? encoding : nil
     }
 
     var kind: Kind {
         switch codePage {
-        case 65001: return .utf8
-        case 1200: return .utf16LE
-        case 1201: return .utf16BE
-        default: return ViewerEncoding.multiBytePages.contains(codePage) ? .doubleByte : .singleByte
+        case 65_001: return .utf8
+        case 1_200: return .utf16LE
+        case 1_201: return .utf16BE
+        default: return Self.multiBytePages.contains(codePage) ? .doubleByte : .singleByte
         }
     }
 
     /// The layout of a character's bytes; `.doubleByte` for everything that is not EUC-JP or GB 18030.
     var shape: Shape {
         switch codePage {
-        case 51932: return .eucJP
-        case 54936: return .gb18030
+        case 51_932: return .eucJP
+        case 54_936: return .gb18030
         default: return .doubleByte
         }
     }
@@ -90,10 +90,10 @@ struct ViewerEncoding: Hashable {
 
     /// The encoding the byte-oriented modes (binary, hex) show characters in: this one when
     /// every byte is a character, else ANSI.
-    var byteOriented: ViewerEncoding { kind == .singleByte ? self : .ansi }
+    var byteOriented: Self { kind == .singleByte ? self : .ansi }
 
     /// The encoding a layout really shows this one in.
-    func forLayout(_ layout: ViewerLayout) -> ViewerEncoding {
+    func forLayout(_ layout: ViewerLayout) -> Self {
         if case .text = layout { return self }
         return byteOriented
     }
@@ -111,7 +111,7 @@ struct ViewerEncoding: Hashable {
     var isAvailable: Bool {
         if isUnicode { return true }
         guard let encoding = coreFoundationEncoding else { return false }
-        return ViewerEncoding.multiBytePages.contains(codePage) || CFStringGetMaximumSizeForEncoding(1, encoding) <= 1
+        return Self.multiBytePages.contains(codePage) || CFStringGetMaximumSizeForEncoding(1, encoding) <= 1
     }
 
     /// The bytes of `text` in this encoding (for a search pattern); nil when it has characters
@@ -121,6 +121,7 @@ struct ViewerEncoding: Hashable {
         case .utf8: return Array(text.utf8)
         case .utf16LE: return text.utf16.flatMap { [UInt8($0 & 0xFF), UInt8($0 >> 8)] }
         case .utf16BE: return text.utf16.flatMap { [UInt8($0 >> 8), UInt8($0 & 0xFF)] }
+
         case .singleByte, .doubleByte:
             guard let encoding = coreFoundationEncoding else { return nil }
             return text.data(using: String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(encoding))).map(
@@ -194,8 +195,8 @@ final class CodeTable {
         let isDouble = encoding.kind == .doubleByte
         let shape = encoding.shape
         self.shape = shape
-        var single = [UInt16](repeating: CodeTable.replacement, count: 256)
-        var double: [UInt16] = isDouble ? [UInt16](repeating: CodeTable.replacement, count: 65536) : []
+        var single = [UInt16](repeating: Self.replacement, count: 256)
+        var double: [UInt16] = isDouble ? [UInt16](repeating: Self.replacement, count: 65_536) : []
         var quad: [UInt16] = []
         switch shape {
         case .doubleByte:
@@ -206,36 +207,38 @@ final class CodeTable {
                 } else if let unit = convert([UInt8(byte)]) {
                     single[byte] = unit
                 } else if isDouble, (0x81...0xFE).contains(byte) {
-                    single[byte] = CodeTable.leadByte
+                    single[byte] = Self.leadByte
                     for trail in 0x40...0xFE {
                         if let unit = convert([UInt8(byte), UInt8(trail)]) { double[byte << 8 | trail] = unit }
                     }
                 }
             }
+
         case .eucJP:
             longestCharacter = 3
             for byte in 0..<0x80 { single[byte] = UInt16(byte) }
             // The system's converter has the pairs (JIS X 0208 and the half-width katakana behind 0x8E)
             // but none of the three-byte characters of JIS X 0212: those are one replacement each.
             for trail in 0xA1...0xDF {
-                double[0x8E << 8 | trail] = convert([0x8E, UInt8(trail)]) ?? CodeTable.replacement
+                double[0x8E << 8 | trail] = convert([0x8E, UInt8(trail)]) ?? Self.replacement
             }
             for lead in 0xA1...0xFE {
                 for trail in 0xA1...0xFE {
-                    double[lead << 8 | trail] = convert([UInt8(lead), UInt8(trail)]) ?? CodeTable.replacement
+                    double[lead << 8 | trail] = convert([UInt8(lead), UInt8(trail)]) ?? Self.replacement
                 }
             }
+
         case .gb18030:
             longestCharacter = 4
             for byte in 0..<0x80 { single[byte] = UInt16(byte) }
-            single[0x80] = convert([0x80]) ?? CodeTable.replacement
+            single[0x80] = convert([0x80]) ?? Self.replacement
             for lead in 0x81...0xFE {
-                single[lead] = CodeTable.leadByte
+                single[lead] = Self.leadByte
                 for trail in 0x40...0xFE where trail != 0x7F {
                     if let unit = convert([UInt8(lead), UInt8(trail)]) { double[lead << 8 | trail] = unit }
                 }
             }
-            quad = [UInt16](repeating: CodeTable.replacement, count: 4 * 10 * 1260)
+            quad = [UInt16](repeating: Self.replacement, count: 4 * 10 * 1_260)
             for first in 0..<4 {
                 for second in 0..<10 {
                     for third in 0..<126 {
@@ -244,7 +247,7 @@ final class CodeTable {
                                 UInt8(0x81 + first), UInt8(0x30 + second), UInt8(0x81 + third), UInt8(0x30 + fourth)
                             ]
                             if let unit = convert(bytes) {
-                                quad[(first * 10 + second) * 1260 + third * 10 + fourth] = unit
+                                quad[(first * 10 + second) * 1_260 + third * 10 + fourth] = unit
                             }
                         }
                     }
@@ -266,26 +269,31 @@ final class CodeTable {
         if byte < 0x80 { return 1 }
         switch shape {
         case .doubleByte:
-            guard single[Int(byte)] == CodeTable.leadByte else { return 1 }
+            guard single[Int(byte)] == Self.leadByte else { return 1 }
             // A lead byte before something that cannot be a trail byte (a line end, a digit) is a stray byte.
             guard index + 1 < count else { return 0 }
             return bytes[index + 1] >= 0x40 ? 2 : 1
+
         case .eucJP:
             switch byte {
             case 0x8E:
                 guard index + 1 < count else { return 0 }
                 return (0xA1...0xDF).contains(bytes[index + 1]) ? 2 : 1
+
             case 0x8F:
                 guard index + 1 < count else { return 0 }
                 guard (0xA1...0xFE).contains(bytes[index + 1]) else { return 1 }
                 guard index + 2 < count else { return 0 }
                 return (0xA1...0xFE).contains(bytes[index + 2]) ? 3 : 1
+
             case 0xA1...0xFE:
                 guard index + 1 < count else { return 0 }
                 return (0xA1...0xFE).contains(bytes[index + 1]) ? 2 : 1
+
             default:
                 return 1
             }
+
         case .gb18030:
             guard (0x81...0xFE).contains(byte) else { return 1 }
             guard index + 1 < count else { return 0 }
@@ -304,7 +312,7 @@ final class CodeTable {
     /// where they run into the ASCII range (GB 18030) that is a smaller set than "not a lead byte".
     func isSynchronizing(_ byte: UInt8) -> Bool {
         switch shape {
-        case .doubleByte: return single[Int(byte)] != CodeTable.leadByte
+        case .doubleByte: return single[Int(byte)] != Self.leadByte
         case .eucJP: return byte < 0x80
         case .gb18030: return byte < 0x30 || (0x3A...0x3F).contains(byte) || byte == 0x7F
         }
@@ -322,14 +330,15 @@ extension ViewerEncoding {
         text.units.reserveCapacity(bytes.count / unitSize + 1)
         if text.tracksOffsets { text.offsets.reserveCapacity(bytes.count / unitSize + 1) }
         switch kind {
-        case .utf8: return ViewerEncoding.decodeUTF8(bytes, final, &text)
-        case .utf16LE: return ViewerEncoding.decodeUTF16(bytes, final, littleEndian: true, &text)
-        case .utf16BE: return ViewerEncoding.decodeUTF16(bytes, final, littleEndian: false, &text)
+        case .utf8: return Self.decodeUTF8(bytes, final, &text)
+        case .utf16LE: return Self.decodeUTF16(bytes, final, littleEndian: true, &text)
+        case .utf16BE: return Self.decodeUTF16(bytes, final, littleEndian: false, &text)
+
         case .singleByte, .doubleByte:
             let table = CodeTable.table(for: self)
             return table.shape == .doubleByte
-                ? ViewerEncoding.decodeTable(bytes, final, table, &text)
-                : ViewerEncoding.decodeLayout(bytes, final, table, &text)
+                ? Self.decodeTable(bytes, final, table, &text)
+                : Self.decodeLayout(bytes, final, table, &text)
         }
     }
 
@@ -420,17 +429,20 @@ extension ViewerEncoding {
             case 1:
                 let unit = table.single[byte]
                 text.append(unit == CodeTable.leadByte ? CodeTable.replacement : unit, index)
+
             case 2:
                 text.append(table.double[byte << 8 | Int(bytes[index + 1])], index)
+
             case 3:
                 text.append(CodeTable.replacement, index)
+
             default:
                 let first = byte - 0x81
                 let second = Int(bytes[index + 1]) - 0x30
                 let third = Int(bytes[index + 2]) - 0x81
                 let fourth = Int(bytes[index + 3]) - 0x30
                 if first < 4 {
-                    text.append(table.quad[(first * 10 + second) * 1260 + third * 10 + fourth], index)
+                    text.append(table.quad[(first * 10 + second) * 1_260 + third * 10 + fourth], index)
                 } else if first >= 0x90 - 0x81 {
                     // Beyond the Basic Multilingual Plane the numbering is straight: 0x90308130 is U+10000.
                     let scalar = 0x10000 + (((first - (0x90 - 0x81)) * 10 + second) * 126 + third) * 10 + fourth
@@ -491,7 +503,7 @@ extension ViewerEncoding {
                     scalar = scalar << 6 | UInt32(byte & 0x3F)
                 }
             }
-            if valid && incomplete {
+            if valid, incomplete {
                 if !final { break }
                 valid = false
             }

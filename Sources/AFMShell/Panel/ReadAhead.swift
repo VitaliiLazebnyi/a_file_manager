@@ -52,7 +52,7 @@ final class ReadAhead {
         let order: ListOrder
 
         /// Order aside: the same folder read the same way.
-        func isSameReading(as other: Target) -> Bool {
+        func isSameReading(as other: Self) -> Bool {
             showHidden == other.showHidden && location.isSameLocation(as: other.location)
         }
     }
@@ -210,9 +210,9 @@ final class ReadAhead {
 
     private func startDwell() {
         let rest = rest
-        MainLoop.after(ReadAhead.dwell) { [weak self] in
+        MainLoop.after(Self.dwell) { [weak self] in
             guard let self, self.rest == rest else { return }
-            self.dwellEnded()
+            dwellEnded()
         }
     }
 
@@ -221,10 +221,10 @@ final class ReadAhead {
         if let reading {
             // While a reading is on its way nothing starts; when it ends, the dwell starts again.
             // One that was told to stop long ago and still has not come back is left behind.
-            guard let stopped = reading.cancelledAt, now - stopped > ReadAhead.abandonAfter else { return }
+            guard let stopped = reading.cancelledAt, now - stopped > Self.abandonAfter else { return }
             self.reading = nil
         }
-        if let age = cache.age(of: target.location, showHidden: target.showHidden), age < ReadAhead.freshEnough {
+        if let age = cache.age(of: target.location, showHidden: target.showHidden), age < Self.freshEnough {
             return
         }
         let key = target.location.locationKey
@@ -238,9 +238,9 @@ final class ReadAhead {
     /// Leaves a folder alone for a while.
     private func pause(_ location: URL, for time: TimeInterval) {
         let now = now
-        if pauses.count >= ReadAhead.pauseLimit {
+        if pauses.count >= Self.pauseLimit {
             pauses = pauses.filter { $0.value > now }
-            if pauses.count >= ReadAhead.pauseLimit { pauses = [:] }
+            if pauses.count >= Self.pauseLimit { pauses = [:] }
         }
         pauses[location.locationKey] = now + time
     }
@@ -276,16 +276,18 @@ final class ReadAhead {
         if self.reading === reading { self.reading = nil }
         let target = reading.target
         switch outcome {
-        case .failure?:
-            pause(target.location, for: ReadAhead.pauseAfterError)
-        case .success?:
+        case .failure:
+            pause(target.location, for: Self.pauseAfterError)
+
+        case .success:
             // Read, but not remembered (the cache has its reasons): reading it again while the
             // cursor stays would end the same way.
             if cache.age(of: target.location, showHidden: target.showHidden) == nil {
-                pause(target.location, for: ReadAhead.pauseWhenNotKept)
+                pause(target.location, for: Self.pauseWhenNotKept)
             }
+
         case nil:
-            if reading.wasGivenUp { pause(target.location, for: ReadAhead.pauseWhenTooLarge) }
+            if reading.wasGivenUp { pause(target.location, for: Self.pauseWhenTooLarge) }
         }
         let waiting = reading.waiting
         reading.waiting = []
@@ -307,7 +309,7 @@ final class ReadAhead {
         guard let reading, !reading.cancellation.isCancelled, reading.target.showHidden == showHidden,
             reading.target.location.isSameLocation(as: location)
         else { return nil }
-        if reading.isSilent(for: ReadAhead.stalledAfter) {
+        if reading.isSilent(for: Self.stalledAfter) {
             cancel(reading)
             return nil
         }
@@ -324,7 +326,7 @@ final class ReadAhead {
                 reading.waiting = []
                 reading.unjoin()
                 // The cursor's again: it goes on only while the cursor rests on its folder.
-                if !(self.resting.map { $0.isSameReading(as: reading.target) } ?? false) { self.cancel(reading) }
+                if !(resting.map { $0.isSameReading(as: reading.target) } ?? false) { cancel(reading) }
             })
     }
 

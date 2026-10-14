@@ -139,8 +139,8 @@ import Testing
             left: memory.url("/V"), right: memory.url("/W")
         ).rows
         let plan = SyncPlan(rows: rows, timeOffsetHours: 2)
-        #expect(plan.toRight[0].targetModified == plan.toRight[0].modified.addingTimeInterval(-7200))
-        #expect(plan.toLeft[0].targetModified == plan.toLeft[0].modified.addingTimeInterval(7200))
+        #expect(plan.toRight[0].targetModified == plan.toRight[0].modified.addingTimeInterval(-7_200))
+        #expect(plan.toLeft[0].targetModified == plan.toLeft[0].modified.addingTimeInterval(7_200))
     }
 
     @Test func aFailedCommitIsSaidAndNothingIsDeleted() {

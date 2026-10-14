@@ -178,14 +178,15 @@ enum PartSeries {
     /// letters a…z with carry (`az` → `ba`). Nil when the name has no counter or it is at its end.
     static func next(after name: String) -> String? {
         switch counter(in: name) {
-        case .digits(let range)?:
+        case .digits(let range):
             let digits = name[range]
             guard digits.count <= 18, let value = Int(digits) else { return nil }
             let next = String(value + 1)
             guard next.count <= digits.count else { return nil }
             return name.replacingCharacters(
                 in: range, with: String(repeating: "0", count: digits.count - next.count) + next)
-        case .letters(let range)?:
+
+        case .letters(let range):
             var letters = Array(name[range].utf8)
             var index = letters.count - 1
             while index >= 0 {
@@ -197,6 +198,7 @@ enum PartSeries {
                 index -= 1
             }
             return nil
+
         case nil:
             return nil
         }

@@ -111,7 +111,7 @@ import Testing
             guard !fired else { return }
             fired = true
             try? bench.zip.remove(member)
-            try? self.write("second version", to: member)
+            try? write("second version", to: member)
         }
         #expect(bench.store.flushAll().isEmpty && fired && !bench.store.hasPendingChanges)
         bench.environment.whileWriting = nil

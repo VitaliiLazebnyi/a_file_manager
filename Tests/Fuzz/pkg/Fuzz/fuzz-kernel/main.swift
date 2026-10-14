@@ -9,7 +9,7 @@ func text(_ b: [UInt8]) -> String { String(decoding: b, as: UTF8.self) }
 var slowestMask = 0.0
 
 let fileMask = FuzzTarget(
-    "filemask", maxLen: 4096,
+    "filemask", maxLen: 4_096,
     dict: [
         "*", "?", "[", "]", "*.*", "*.", ".", ";", " ", "[!a-z]", "[[:alpha:]]", "\\", "*a*a*a*a*a*a*a*a*b",
         "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "É", "ß", "İ", "\u{0}"
@@ -108,7 +108,7 @@ let trickyNames: [String] = [
     lone([0xD800]), lone([0x61, 0xDC00, 0x62]), lone([0xD83D]), lone([0xDE00, 0xD83D]), "~", "_", "-", "!", "0", "00",
     "a-b", "a_b", "ab", "a.B", "a.b", "Z", "z", "Ω", "ω"
 ]
-let sizes: [Int64] = [0, 1, 2, 1000, 1 << 32, .max, .max - 1, 1 << 62, 5, 5, 5]
+let sizes: [Int64] = [0, 1, 2, 1_000, 1 << 32, .max, .max - 1, 1 << 62, 5, 5, 5]
 let dates: [Date] = [
     Date(timeIntervalSince1970: 0), Date(timeIntervalSince1970: 1_600_000_000), .distantPast, .distantFuture,
     Date(timeIntervalSinceReferenceDate: 0),
@@ -128,6 +128,7 @@ func nextItem(_ c: inout Choices, previous: String?, allowNaN: Bool = false) -> 
     case 4: name = previous ?? "dup"
     case 5: name = (previous ?? "é").decomposedStringWithCanonicalMapping
     case 6: name = (previous ?? "e\u{301}").precomposedStringWithCanonicalMapping
+
     default:
         let base = trickyNames[c.int(trickyNames.count)]
         name = c.bool() ? base.uppercased() : base + "." + trickyNames[c.int(trickyNames.count)]
@@ -225,16 +226,16 @@ func comparatorIsConsistent(_ items: [FileItem], _ order: ListOrder, collator: N
         for j in 0..<n {
             let ij = before(i, j)
             let ji = before(j, i)
-            if ij && ji { return false }
+            if ij, ji { return false }
             for k in 0..<n where ij && before(j, k) && !before(i, k) { return false }
             // equivalence is transitive as well
-            if !ij && !ji {
+            if !ij, !ji {
                 for k in 0..<n {
                     let jk = before(j, k)
                     let kj = before(k, j)
                     let ik = before(i, k)
                     let ki = before(k, i)
-                    if !jk && !kj && (ik || ki) { return false }
+                    if !jk, !kj, ik || ki { return false }
                 }
             }
         }
@@ -262,7 +263,7 @@ func checkNameOrder(_ items: [FileItem], collator: NameCollator, _ which: String
 }
 
 let sorter = FuzzTarget(
-    "sorter", maxLen: 2048,
+    "sorter", maxLen: 2_048,
     seeds: {
         [
             Array(0..<200).map { UInt8(truncatingIfNeeded: $0 &* 37 &+ 11) },
@@ -280,9 +281,9 @@ let sorter = FuzzTarget(
             // Long enough for the parallel path: the same names again and again, with a counter in some.
             let basis = items
             var grown: [FileItem] = []
-            grown.reserveCapacity(9000)
+            grown.reserveCapacity(9_000)
             var k = 0
-            while grown.count < 8200 + Int(mode >> 4) * 40 {
+            while grown.count < 8_200 + Int(mode >> 4) * 40 {
                 let it = basis[k % basis.count]
                 let name = (k / basis.count) % 3 == 0 ? it.name : it.name + String(k % 97)
                 grown.append(
@@ -322,7 +323,7 @@ let sorter = FuzzTarget(
             "\(order)\n got \(ids(sorted).prefix(60))\nwant \(ids(reference).prefix(60))\n\(describe(items))")
         // Without the system's collator the order is that of the fallback keys: its own definition.
         // (A second slow sort of the 8,000-item lists would take the time of the run: they are compared up to 1,000.)
-        let plainReference = items.count <= 1000 ? referenceSort(items, order, collator: .unavailable) : plain
+        let plainReference = items.count <= 1_000 ? referenceSort(items, order, collator: .unavailable) : plain
         fzCheck(
             ids(plain) == ids(plainReference), "sorter-nokeys-differs-from-definition" + key,
             "\(order)\n got \(ids(plain).prefix(60))\nwant \(ids(plainReference).prefix(60))\n\(describe(items))")
@@ -488,7 +489,7 @@ func checkModel(_ model: PanelModel, last: [FileItem]?, op: String, ordered: Boo
 
 func panelTarget(_ name: String, unique: Bool) -> FuzzTarget {
     FuzzTarget(
-        name, maxLen: 3000,
+        name, maxLen: 3_000,
         seeds: {
             [
                 (0..<400).map { UInt8(truncatingIfNeeded: $0 &* 29 &+ 3) },
@@ -530,11 +531,13 @@ func panelTarget(_ name: String, unique: Bool) -> FuzzTarget {
                     ordered = true
                     model.show(
                         listing(items, other: c.int(5) == 0), focus: c.bool() ? name() : nil, complete: c.bool())
+
                 case 1:
                     let items = nextItems(&c)
                     last = items
                     ordered = true
                     model.showRemembered(listing(items), focus: c.bool() ? name() : nil)
+
                 case 2:
                     guard model.isListed else { continue }
                     let more = model.listedItems + nextItems(&c, max: 12, besides: model.listedItems)
@@ -542,6 +545,7 @@ func panelTarget(_ name: String, unique: Bool) -> FuzzTarget {
                     last = more
                     model.extend(to: Sorter.sort(more, by: order), sortedBy: order)
                     if c.bool() { model.finishLoading() }
+
                 case 3, 4:
                     guard model.isListed else { continue }
                     var items = model.listedItems
@@ -554,30 +558,37 @@ func panelTarget(_ name: String, unique: Bool) -> FuzzTarget {
                     _ = model.update(
                         with: listing(presorted ? Sorter.sort(items, by: model.sort) : items),
                         focus: c.bool() ? name() : nil, presorted: presorted ? model.sort : nil)
+
                 case 5:
                     model.setSort(nextOrder(&c))
                     ordered = true
+
                 case 6:
                     let order = nextOrder(&c)
                     model.setSort(order, presorted: c.int(6) == 0 ? [] : Sorter.sort(model.listedItems, by: order))
                     ordered = true
+
                 case 7:
                     let masks = ["*.txt", "*", "a*", "*é*", "*.", "", "[a-c]*", "*e\u{301}*", "?", "*.TXT;*.png"]
                     let mask = masks[c.int(masks.count)]
                     what += " filter \(mask)"
                     model.setFilter(
                         c.int(4) == 0 ? nil : PanelFilter.mask(mask), narrowing: c.bool() && model.filter == nil)
+
                 case 8:
                     let filter: PanelFilter? = c.int(4) == 0 ? nil : PanelFilter(title: "size") { $0.size > 1 }
                     let stale = c.int(4) == 0
                     _ = model.setFilter(
                         filter, prefiltered: stale ? [] : PanelModel.filtered(model.listedItems, by: filter),
                         listVersion: model.listVersion - (stale ? 1 : 0))
+
                 case 9: model.toggleSelection(row: row())
+
                 case 10:
                     let a = row()
                     let b = row()
                     model.setSelected(c.bool(), rows: min(a, b)...max(a, b))
+
                 case 11: model.setSelected(c.bool(), names: (0..<c.int(5)).map { _ in name() })
                 case 12: model.setSelection(names: (0..<c.int(6)).map { _ in name() })
                 case 13: model.selectAll()
@@ -588,9 +599,12 @@ func panelTarget(_ name: String, unique: Bool) -> FuzzTarget {
                 case 18: model.restoreSelection()
                 case 19: model.deselect((0..<c.int(4)).map { _ in name() })
                 case 20: model.setComputedSize(sizes[c.int(sizes.count)], forName: name())
+
                 case 21:
                     model.setComputedSizes((0..<c.int(4)).map { _ in (name: name(), size: sizes[c.int(sizes.count)]) })
+
                 case 22: snapshots.append((model.snapshot(), last))
+
                 case 23:
                     guard !snapshots.isEmpty else { continue }
                     let (snapshot, then) = snapshots[c.int(snapshots.count)]
@@ -598,6 +612,7 @@ func panelTarget(_ name: String, unique: Bool) -> FuzzTarget {
                     last = then
                     // A snapshot holds the lists as they were; the order and filter of today are not applied to them.
                     ordered = false
+
                 case 24: model.moveCursor(to: row() * (c.int(8) == 0 ? 1_000_000 : 1))
                 default: model.setShowHidden(c.bool())
                 }

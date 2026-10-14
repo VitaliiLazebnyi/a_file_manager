@@ -121,9 +121,9 @@ import Testing
     }
 
     @Test func checksumFileTooLargeForTheLimitIsAnErrorNotAShortenedText() throws {
-        try box.file("big.md5", String(repeating: "x", count: 5000))
-        #expect(throws: ToolError.self) { try run().contents(of: box.url("big.md5"), limit: 1000) }
-        #expect(try run().contents(of: box.url("big.md5"), limit: 5000).count == 5000)
+        try box.file("big.md5", String(repeating: "x", count: 5_000))
+        #expect(throws: ToolError.self) { try run().contents(of: box.url("big.md5"), limit: 1_000) }
+        #expect(try run().contents(of: box.url("big.md5"), limit: 5_000).count == 5_000)
     }
 
     // MARK: Decode
@@ -158,7 +158,7 @@ import Testing
     }
 
     @Test func partsWrittenByTheEncoderStillJoin() throws {
-        let content = Data((0..<5000).map { UInt8(truncatingIfNeeded: $0 &* 7) })
+        let content = Data((0..<5_000).map { UInt8(truncatingIfNeeded: $0 &* 7) })
         try content.write(to: box.url("data.bin"))
         try box.folder("enc")
         try box.folder("dec")
@@ -258,7 +258,7 @@ import Testing
     // MARK: Nothing that was there before is lost
 
     @Test func cancelAfterOverwriteLeavesSplitPartsAsTheyWere() throws {
-        try Data(repeating: 7, count: 3000).write(to: box.url("data.bin"))
+        try Data(repeating: 7, count: 3_000).write(to: box.url("data.bin"))
         try box.file("out/data.001", "old one")
         try box.file("out/data.002", "old two")
         try box.file("out/data.crc", "old crc")
@@ -266,22 +266,22 @@ import Testing
         let cancel = CancellationFlag()
         #expect(throws: ToolError.cancelled) {
             try Splitter.split(
-                item("data.bin"), into: box.url("out"), partSize: 1000, run: run(cancel: cancel, cancelOnAsk: 2))
+                item("data.bin"), into: box.url("out"), partSize: 1_000, run: run(cancel: cancel, cancelOnAsk: 2))
         }
         #expect(
             box.read("out/data.001") == "old one" && box.read("out/data.002") == "old two"
                 && box.read("out/data.crc") == "old crc")
         #expect(names("out") == ["data.001", "data.002", "data.crc"])
         // Without the cancel they are replaced, all together.
-        _ = try Splitter.split(item("data.bin"), into: box.url("out"), partSize: 1000, run: run())
+        _ = try Splitter.split(item("data.bin"), into: box.url("out"), partSize: 1_000, run: run())
         let firstPart = try Data(contentsOf: box.url("out/data.001"))
         let thirdPart = try Data(contentsOf: box.url("out/data.003"))
-        #expect(firstPart.count == 1000 && thirdPart.count == 1000)
+        #expect(firstPart.count == 1_000 && thirdPart.count == 1_000)
         #expect(names("out") == ["data.001", "data.002", "data.003", "data.crc"])
     }
 
     @Test func cancelAfterOverwriteLeavesEncodedFileAsItWas() throws {
-        try Data(repeating: 1, count: 5000).write(to: box.url("data.bin"))
+        try Data(repeating: 1, count: 5_000).write(to: box.url("data.bin"))
         try box.file("out/data.b64", "old")
         let cancel = CancellationFlag()
         #expect(throws: ToolError.cancelled) {

@@ -18,7 +18,7 @@ final class JobBridge: FileJobDelegate {
         self.fileSystems = fileSystems
     }
 
-    func job(_ job: FileJob, progress: JobProgress) {
+    func job(_: FileJob, progress: JobProgress) {
         monitor.report(progress)
     }
 
@@ -72,17 +72,19 @@ final class JobBridge: FileJobDelegate {
                             "Overwrite", "Overwrite all", "Skip", "Skip all", "Overwrite all older",
                             "Rename…", "More…", "Cancel"
                         ], style: .warning,
-                        defaultButton: JobBridge.overwriteDefault)
+                        defaultButton: Self.overwriteDefault)
                     switch button {
                     case 0: return .answer(.overwrite)
                     case 1: return .answer(.overwriteAll)
                     case 2: return .answer(.skip)
                     case 3: return .answer(.skipAll)
                     case 4: return .answer(.overwriteAllOlder)
+
                     case 5:
                         if let name = newName("New name for the file being copied:", proposing: target.name) {
                             return .answer(.rename(name))
                         }
+
                     case 6:
                         guard
                             let row = ui.pickRow(
@@ -92,10 +94,12 @@ final class JobBridge: FileJobDelegate {
                         case .compare: return .compare
                         case .append: return .answer(.append)
                         case .resume: return .answer(.resume)
+
                         case .renameExisting:
                             if let name = newName("New name for the existing target file:", proposing: target.name) {
                                 return .answer(.renameExisting(name))
                             }
+
                         case .autoRenameCopied: return .answer(.autoRenameCopied)
                         case .autoRenameExisting: return .answer(.autoRenameExisting)
                         case .renameOlderSkipNewer: return .answer(.renameOlderSkipNewer)
@@ -103,6 +107,7 @@ final class JobBridge: FileJobDelegate {
                         case .larger: return .answer(.copyAllLarger)
                         case .smaller: return .answer(.copyAllSmaller)
                         }
+
                     default: return .answer(.cancel)
                     }
                 }
@@ -136,7 +141,7 @@ final class JobBridge: FileJobDelegate {
         return text
     }
 
-    func job(_ job: FileJob, failedAt url: URL, error: Error) -> ErrorChoice {
+    func job(_: FileJob, failedAt url: URL, error: Error) -> ErrorChoice {
         monitor.ask {
             ui.pick(
                 "Error with \(DisplayName.escaped(url.lastPathComponent))", detail: error.localizedDescription,
@@ -145,7 +150,7 @@ final class JobBridge: FileJobDelegate {
         }
     }
 
-    func job(_ job: FileJob, confirmDeleteNonEmpty directory: URL) -> FolderDeleteChoice {
+    func job(_: FileJob, confirmDeleteNonEmpty directory: URL) -> FolderDeleteChoice {
         monitor.ask {
             pick(
                 "The directory \(shown(directory)) is not empty!",
@@ -155,7 +160,7 @@ final class JobBridge: FileJobDelegate {
         }
     }
 
-    func job(_ job: FileJob, confirm question: ProtectionQuestion) -> ProtectionChoice {
+    func job(_: FileJob, confirm question: ProtectionQuestion) -> ProtectionChoice {
         let text = OperationText.protection(question, path: shown(question.item.url))
         return monitor.ask {
             pick(
@@ -165,7 +170,7 @@ final class JobBridge: FileJobDelegate {
         }
     }
 
-    func job(_ job: FileJob, mergeInto existing: FileItem, source: FileItem) -> MergeChoice {
+    func job(_: FileJob, mergeInto existing: FileItem, source _: FileItem) -> MergeChoice {
         monitor.ask {
             ui.pick(
                 "The folder \(shown(existing.url)) already exists!",
@@ -176,7 +181,7 @@ final class JobBridge: FileJobDelegate {
     }
 
     /// Skip comes first, so that Return keeps the other volume as it is.
-    func job(_ job: FileJob, crossVolumeAt folder: FileItem, purpose: ProtectionQuestion.Purpose) -> ProtectionChoice {
+    func job(_: FileJob, crossVolumeAt folder: FileItem, purpose: ProtectionQuestion.Purpose) -> ProtectionChoice {
         let (action, detail) =
             purpose == .move
             ? ("Move its contents", "Moving it would move everything on that volume away. Do you want that?")

@@ -46,11 +46,13 @@ final class PreferencesPage: NSObject, OptionsPage, NSTextFieldDelegate {
             switch preference.kind {
             case .flag:
                 control = NSButton(checkboxWithTitle: preference.label, target: self, action: #selector(changed))
+
             case .text:
                 let field = NSTextField(string: "")
                 field.delegate = self
                 field.widthAnchor.constraint(equalToConstant: 300).isActive = true
                 control = field
+
             case .choice(let options, _):
                 let popUp = NSPopUpButton(frame: .zero, pullsDown: false)
                 for option in options {
@@ -94,7 +96,7 @@ final class PreferencesPage: NSObject, OptionsPage, NSTextFieldDelegate {
         onEdit()
     }
 
-    func controlTextDidChange(_ notification: Notification) { changed() }
+    func controlTextDidChange(_: Notification) { changed() }
 
     private func show() {
         for (preference, control) in controls {
@@ -176,12 +178,15 @@ final class KeyboardPage: NSObject, OptionsPage, NSSearchFieldDelegate {
 
     private func change(_ body: (CommandID) -> Void) {
         stopRecording()
-        guard let row = selected else { return NSSound.beep() }
+        guard let row = selected else {
+            NSSound.beep()
+            return
+        }
         body(row.id)
         edited()
     }
 
-    func controlTextDidChange(_ notification: Notification) { reload() }
+    func controlTextDidChange(_: Notification) { reload() }
 
     private func stopRecording() {
         if let monitor { NSEvent.removeMonitor(monitor) }
@@ -192,12 +197,15 @@ final class KeyboardPage: NSObject, OptionsPage, NSSearchFieldDelegate {
     /// The next key press in this window becomes the command's key; Esc gives up.
     private func record(adding: Bool) {
         stopRecording()
-        guard let row = selected else { return NSSound.beep() }
+        guard let row = selected else {
+            NSSound.beep()
+            return
+        }
         status.stringValue = "Press the new shortcut for “\(row.title)”. Esc cancels."
         view.window?.makeFirstResponder(table.tableView)
         monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            guard let self, event.window === self.view.window else { return event }
-            self.stopRecording()
+            guard let self, event.window === view.window else { return event }
+            stopRecording()
             var modifiers: KeyModifiers = []
             if event.modifierFlags.contains(.shift) { modifiers.insert(.shift) }
             if event.modifierFlags.contains(.control) { modifiers.insert(.control) }
@@ -308,7 +316,10 @@ final class ButtonBarPage: NSObject, OptionsPage {
     }
 
     private func move(_ offset: Int) {
-        guard let row = table.selectedRow else { return NSSound.beep() }
+        guard let row = table.selectedRow else {
+            NSSound.beep()
+            return
+        }
         edited(selecting: editor.move(row, by: offset))
     }
 
@@ -317,7 +328,8 @@ final class ButtonBarPage: NSObject, OptionsPage {
         guard let row = table.selectedRow, editor.items.indices.contains(row), let id = editor.items[row],
             id != ToolbarRegistry.lineBreak
         else {
-            return NSSound.beep()
+            NSSound.beep()
+            return
         }
         let ui = center.kernel.ui
         guard
@@ -328,8 +340,9 @@ final class ButtonBarPage: NSObject, OptionsPage {
                 .trimmingCharacters(in: .whitespaces)
         else { return }
         guard name.isEmpty || NSImage(systemSymbolName: name, accessibilityDescription: nil) != nil else {
-            return ui.inform(
+            ui.inform(
                 "No symbol is called “\(name)”", detail: "The SF Symbols app lists the names.", style: .warning)
+            return
         }
         editor.setSymbol(name, for: id)
         edited(selecting: row)
@@ -410,14 +423,20 @@ final class StartMenuPage: NSObject, OptionsPage {
 
     private func change() {
         guard let index = table.selectedRow, draft.rows.indices.contains(index), !draft.rows[index].entry.isSeparator
-        else { return NSSound.beep() }
+        else {
+            NSSound.beep()
+            return
+        }
         guard let row = center.editStartMenuRow(draft.rows[index]) else { return }
         draft.rows[index] = row
         edited(selecting: index)
     }
 
     private func move(_ offset: Int) {
-        guard let row = table.selectedRow else { return NSSound.beep() }
+        guard let row = table.selectedRow else {
+            NSSound.beep()
+            return
+        }
         edited(selecting: draft.move(row, by: offset))
     }
 
@@ -513,7 +532,7 @@ final class OptionsWindowController: NSWindowController, NSWindowDelegate {
         buildContent(in: window)
     }
 
-    required init?(coder: NSCoder) { fatalError("not used") }
+    required init?(coder _: NSCoder) { fatalError("not used") }
 
     private func buildContent(in window: NSWindow) {
         pageList.onSelect = { [weak self] in self?.showSelectedPage() }
@@ -591,7 +610,7 @@ final class OptionsWindowController: NSWindowController, NSWindowDelegate {
     }
 
     /// Closing by Cancel, Esc or the close button drops what was not applied.
-    func windowWillClose(_ notification: Notification) {
+    func windowWillClose(_: Notification) {
         pages.forEach { $0.discard() }
     }
 }

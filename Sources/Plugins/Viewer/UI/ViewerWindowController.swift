@@ -42,8 +42,8 @@ final class ViewerWindowController: NSWindowController, NSWindowDelegate {
         // Esc is the pane's: it stops a search first and closes the window otherwise.
         window.onEscape = { [weak self] in
             guard let self else { return false }
-            if self.pane.activity != nil {
-                self.pane.activity?.cancel.cancel()
+            if pane.activity != nil {
+                pane.activity?.cancel.cancel()
                 return true
             }
             return false
@@ -60,7 +60,7 @@ final class ViewerWindowController: NSWindowController, NSWindowDelegate {
         }
     }
 
-    required init?(coder: NSCoder) { fatalError("not used") }
+    required init?(coder _: NSCoder) { fatalError("not used") }
 
     /// Shows the files of a session, the first one first.
     func show(_ items: [ViewerItem]) {
@@ -114,7 +114,7 @@ final class ViewerWindowController: NSWindowController, NSWindowDelegate {
         settings.setWindowFrame(NSStringFromRect(window.frame), quick: followsCursor)
     }
 
-    func windowWillClose(_ notification: Notification) {
+    func windowWillClose(_: Notification) {
         savePosition()
         follower = nil
         pane.stopWork()
@@ -143,7 +143,7 @@ final class CursorFollower {
         self.show = show
         subscription = kernel.panelEvents.subscribe { [weak self] _, source in
             guard let self, let followed = self.panel(), followed === source else { return }
-            self.schedule(force: false)
+            schedule(force: false)
         }
     }
 
@@ -154,11 +154,11 @@ final class CursorFollower {
         generation += 1
         let wanted = generation
         DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
-            guard let self, self.generation == wanted, let panel = self.panel() else { return }
+            guard let self, generation == wanted, let panel = panel() else { return }
             let item = panel.model.cursorItem
-            if !force, let shown = self.shown, shown == item { return }
-            self.shown = .some(item)
-            self.show(item)
+            if !force, let shown, shown == item { return }
+            shown = .some(item)
+            show(item)
         }
     }
 }

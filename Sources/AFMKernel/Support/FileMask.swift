@@ -51,9 +51,11 @@ public struct FileMask {
             switch shape {
             case .suffix:
                 return name.count >= text.count && isEqual(name.count - text.count)
+
             case .infix:
                 guard name.count >= text.count else { return false }
                 return (0...(name.count - text.count)).contains(where: isEqual)
+
             case .pattern:
                 return FileMask.wild(text.count, name.count, isAny: { text[$0] == 0x2A }) { token, index in
                     text[token] == 0x3F || text[token] == byte(index)
@@ -161,7 +163,7 @@ public struct FileMask {
     /// Several masks are separated by spaces or semicolons. `*.*` matches every name.
     public init(_ text: String) {
         compiled = Compiled(
-            FileMask.folded(text).utf8.split(whereSeparator: { $0 == 0x20 || $0 == 0x3B }).map {
+            Self.folded(text).utf8.split(whereSeparator: { $0 == 0x20 || $0 == 0x3B }).map {
                 String(decoding: $0, as: UTF8.self)
             })
     }
@@ -174,14 +176,14 @@ public struct FileMask {
         // folding it, like the masks, comes to.
         var name = name
         if let matched = name.withUTF8({ bytes in
-            bytes.allSatisfy { $0 < 0x80 } ? FileMask.matches(compiled, bytes, ignoringCase: true) : nil
+            bytes.allSatisfy { $0 < 0x80 } ? Self.matches(compiled, bytes, ignoringCase: true) : nil
         }) {
             return matched
         }
         // Any other name is folded first: case, and the way its accents are written.
-        var folded = FileMask.folded(name)
+        var folded = Self.folded(name)
         if !compiled.countsCharacters || folded.utf8.allSatisfy({ $0 < 0x80 }) {
-            return folded.withUTF8 { FileMask.matches(compiled, $0, ignoringCase: false) }
+            return folded.withUTF8 { Self.matches(compiled, $0, ignoringCase: false) }
         }
         // A `?` is one character, however many bytes it has.
         let characters = folded.unicodeScalars.map(\.value)

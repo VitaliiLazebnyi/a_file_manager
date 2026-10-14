@@ -16,8 +16,8 @@ struct SpaceTotals: Equatable {
     /// Folders that could not be read; their contents are missing from the figures.
     var unreadable = 0
 
-    static func + (left: SpaceTotals, right: SpaceTotals) -> SpaceTotals {
-        SpaceTotals(
+    static func + (left: Self, right: Self) -> Self {
+        Self(
             bytes: left.bytes.addingSaturated(right.bytes), allocated: left.allocated.addingSaturated(right.allocated),
             rounded: left.rounded.addingSaturated(right.rounded),
             files: left.files + right.files, folders: left.folders + right.folders,
@@ -84,7 +84,7 @@ struct SpaceCalculator {
         let allocated =
             measuresAllocated && item.url.isFileURL ? LocalInfo.details(item.url)?.allocated ?? item.size : item.size
         return SpaceTotals(
-            bytes: item.size, allocated: allocated, rounded: SpaceCalculator.round(item.size, to: targetCluster),
+            bytes: item.size, allocated: allocated, rounded: Self.round(item.size, to: targetCluster),
             files: 1)
     }
 
@@ -129,7 +129,7 @@ enum SpaceReport {
     ) -> String {
         var lines = ["\(Format.bytes(totals.bytes)) bytes in \(Format.bytes(Int64(totals.files))) file(s)"]
         if totals.folders > 0 { lines[0] += ",\nin \(Format.bytes(Int64(totals.folders))) directories" }
-        if totals.bytes >= 1024 {
+        if totals.bytes >= 1_024 {
             lines.append("(= \(Format.kilobytes(totals.bytes)), \(Format.shortSize(totals.bytes)))")
         }
         if sourceIsLocal || targetCluster != nil { lines.append("") }

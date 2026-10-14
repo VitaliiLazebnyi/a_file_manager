@@ -10,7 +10,7 @@ private func waitUntil(seconds: TimeInterval = 60, _ condition: () -> Bool) -> B
     let end = Date(timeIntervalSinceNow: seconds)
     while !condition() {
         if Date() > end { return false }
-        usleep(2000)
+        usleep(2_000)
     }
     return true
 }
@@ -156,7 +156,7 @@ private final class DeadVolume {
         #expect(try local.list(linked, showHidden: true).map(\.device) == [device])
     }
 
-    @Test func aFolderAnotherVolumeIsMountedOnHasThatVolumesNumber() throws {
+    @Test func aFolderAnotherVolumeIsMountedOnHasThatVolumesNumber() {
         // Every Mac has volumes mounted below `/`: the device files at `/dev`, and more.
         // What the listing of the folder above says must be what the folder says for itself.
         var checked = 0
@@ -683,7 +683,7 @@ private final class DeadVolume {
                 // a volume is given) and then waits in the listing: two questions are stuck.
                 #expect(waitUntil { dead.waiting == 2 })
             } else {
-                usleep(1000)
+                usleep(1_000)
             }
             flag.cancel()
             guard case .success(let names)? = load.wait() else {
@@ -759,7 +759,7 @@ private final class DeadVolume {
         #expect(!single.has("single"))
         // …and hears what happens in it.
         round = 0
-        while !single.has("single"), round < 600 || Date().timeIntervalSince(started) < 1200 {
+        while !single.has("single"), round < 600 || Date().timeIntervalSince(started) < 1_200 {
             try "y\(round)".write(to: box.url("single/new\(round).txt"), atomically: false, encoding: .utf8)
             try await Task.sleep(nanoseconds: 100_000_000)
             round += 1

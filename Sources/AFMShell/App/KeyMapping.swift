@@ -17,7 +17,7 @@ extension Key {
 
     /// The named key a physical key stands for; nil for keys that produce characters.
     init?(keyCode: UInt16) {
-        guard let key = Key.namedKeys[keyCode] else { return nil }
+        guard let key = Self.namedKeys[keyCode] else { return nil }
         self = key
     }
 
@@ -74,7 +74,7 @@ extension Shortcut {
 
     /// Whether a key press is this shortcut.
     public func matches(_ event: NSEvent) -> Bool {
-        Shortcut.candidates(for: event).contains(self)
+        Self.candidates(for: event).contains(self)
     }
 
     /// The shortcut as the Mac writes it, for tooltips and the function-key bar: `⌃⇧F5`, `⌘C`.
@@ -87,7 +87,7 @@ extension Shortcut {
         switch key {
         case .character(let character): return text + character.uppercased()
         case .function(let number): return text + "F\(number)"
-        default: return text + (Shortcut.keyNames[key] ?? "?")
+        default: return text + (Self.keyNames[key] ?? "?")
         }
     }
 

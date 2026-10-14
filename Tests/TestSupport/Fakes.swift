@@ -28,7 +28,7 @@ public final class ScriptedInteraction: UserInteraction {
 
     public init() {}
 
-    public func prompt(_ message: String, value: String, detail: String) -> String? {
+    public func prompt(_ message: String, value: String, detail _: String) -> String? {
         log.append("prompt: \(message) [\(value)]")
         switch promptAnswers.isEmpty ? .cancel : promptAnswers.removeFirst() {
         case .accept: return value
@@ -37,12 +37,12 @@ public final class ScriptedInteraction: UserInteraction {
         }
     }
 
-    public func choose(_ message: String, detail: String, buttons: [String], style: QuestionStyle) -> Int {
+    public func choose(_ message: String, detail: String, buttons: [String], style _: QuestionStyle) -> Int {
         log.append("choose: \(message) / \(detail)")
         return choiceAnswers.isEmpty ? buttons.count - 1 : choiceAnswers.removeFirst()
     }
 
-    public func inform(_ message: String, detail: String, style: QuestionStyle) {
+    public func inform(_ message: String, detail _: String, style _: QuestionStyle) {
         log.append("inform: \(message)")
     }
 
@@ -50,15 +50,17 @@ public final class ScriptedInteraction: UserInteraction {
         log.append("notice: \(message)")
     }
 
-    public func form(_ title: String, detail: String, fields: [FormField], buttons: [String]) -> FormValues? {
+    public func form(_ title: String, detail _: String, fields: [FormField], buttons _: [String]) -> FormValues? {
         log.append("form: \(title)")
         forms.append(fields)
         switch formAnswers.isEmpty ? .cancel : formAnswers.removeFirst() {
         case .accept: return FormValues(defaultsOf: fields)
+
         case .values(let values, let button):
             var answer = FormValues(defaultsOf: fields, button: button)
             answer.values.merge(values) { _, new in new }
             return answer
+
         case .cancel: return nil
         }
     }
@@ -80,8 +82,8 @@ public final class FakePanel: PanelHandle {
         tabs = PanelTabs(PanelModel(directory: directory))
         tabs.onChange = { [weak self] in
             // A tab that was never shown is read when it becomes the active one.
-            guard let self, !self.model.isListed else { return }
-            self.show(self.model.directory, focus: nil, history: .keep, completion: nil)
+            guard let self, !model.isListed else { return }
+            show(model.directory, focus: nil, history: .keep, completion: nil)
         }
         show(directory, focus: nil, history: .keep, completion: nil)
     }
@@ -98,7 +100,7 @@ public final class FakePanel: PanelHandle {
         }
     }
 
-    public func reload(focus: String?, quietly: Bool, completion: (() -> Void)?) {
+    public func reload(focus: String?, quietly _: Bool, completion: (() -> Void)?) {
         if let result = try? PanelLoader.load(
             model.directory, showHidden: model.showHidden, fileSystems: fileSystems, climbing: true)
         {

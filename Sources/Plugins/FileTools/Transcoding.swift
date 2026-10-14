@@ -126,7 +126,7 @@ enum Encoder {
     /// "Bytes per file" counts the encoded text without the header.
     static func linesPerFile(lines: Int, bytes: Int64, method: EncodeMethod) -> Int {
         let fromBytes = bytes > 0 ? max(1, Int(min(bytes / Int64(method.lineLength), Int64(Int32.max)))) : 0
-        if lines > 0 && fromBytes > 0 { return min(lines, fromBytes) }
+        if lines > 0, fromBytes > 0 { return min(lines, fromBytes) }
         return max(lines, fromBytes)
     }
 
@@ -137,6 +137,7 @@ enum Encoder {
             return
                 "MIME-Version: 1.0\r\nContent-Type: application/octet-stream; name=\"\(quoted)\"\r\nContent-Transfer-Encoding: base64\r\n"
                 + "Content-Disposition: attachment; filename=\"\(quoted)\"\r\n\r\n"
+
         case .uue, .xxe:
             return "begin 644 \(name)\r\n"
         }
@@ -150,7 +151,7 @@ enum Encoder {
         run: ToolRun
     ) throws -> [URL] {
         run.carriesOrigin = true
-        let limit = Encoder.linesPerFile(lines: linesPerFile, bytes: bytesPerFile, method: method)
+        let limit = Self.linesPerFile(lines: linesPerFile, bytes: bytesPerFile, method: method)
         // (The size is what a file system says and the limit what the user typed: neither may overflow a sum.)
         let totalLines = Int(
             max(0, source.size).addingSaturated(Int64(method.bytesPerLine) - 1) / Int64(method.bytesPerLine))
@@ -220,6 +221,7 @@ enum Encoder {
                     return data.base64EncodedData(options: [
                         .lineLength76Characters, .endLineWithCarriageReturn, .endLineWithLineFeed
                     ]) + Data([13, 10])
+
                 case .uue, .xxe: return SixBitText.encode(data, xx: method == .xxe)
                 }
             }
@@ -340,6 +342,7 @@ final class DecodeMachine {
         switch state {
         case .searching, .mimeHeaders: return false
         case .sixBit, .yEnc: return true
+
         case .base64(let endsAtMark, _):
             if endsAtMark { return true }
             let fullLine = lastLineLength >= 76 || (bodyLines >= 2 && lastLineLength == firstLineLength)
@@ -408,8 +411,10 @@ final class DecodeMachine {
         switch state {
         case .sixBit: report("the end line is missing: the text is incomplete (a part may be missing)")
         case .yEnc: report("the =yend line is missing: the text is incomplete (a part may be missing)")
+
         case .base64(let endsAtMark, _):
             if endsAtMark, !sawEndMark { report("the end mark is missing: the text is incomplete") }
+
         case .searching, .mimeHeaders: break
         }
         if isInsideFile { try close() }
@@ -537,12 +542,13 @@ final class DecodeMachine {
                 state = .mimeHeaders(name: nil, isBase64: false)
                 try feed(line)
             } else if !sawText, filesDecoded == 0,
-                line.allSatisfy({ DecodeMachine.base64Values[Int($0)] != 255 || $0 == UInt8(ascii: "=") })
+                line.allSatisfy({ Self.base64Values[Int($0)] != 255 || $0 == UInt8(ascii: "=") })
             {
                 // Nothing but Base64 from the first line on: the output of `base64`.
                 try open(nil, .base64(endsAtMark: false, mime: false))
                 try feed(line)
             }
+
         case .mimeHeaders(var name, var isBase64):
             if line.isEmpty {
                 if isBase64 { try open(name, .base64(endsAtMark: false, mime: true)) } else { state = .searching }
@@ -554,25 +560,31 @@ final class DecodeMachine {
             }
             name = parameter("filename", in: header) ?? name ?? parameter("name", in: header)
             state = .mimeHeaders(name: name, isBase64: isBase64)
+
         case .base64(let endsAtMark, let mime):
             // A boundary of the mail, or the end mark of `uuencode -m`.
-            if endsAtMark && line.starts(with: Array("====".utf8)) {
+            if endsAtMark, line.starts(with: Array("====".utf8)) {
                 sawEndMark = true
-                return try close()
+                try close()
+                return
             }
             // `-` is a digit of the URL-safe alphabet: outside a mail a line starting with `--` is
             // a boundary only when it is not Base64 (a file that starts with "----" is data).
-            if line.starts(with: [45, 45]), mime || DecodeMachine.looksLikeBoundary(line) { return try close() }
-            // The next file or mail part starts here, with or without a boundary in between.
-            if DecodeMachine.startsNewFile(line) {
+            if line.starts(with: [45, 45]), mime || Self.looksLikeBoundary(line) {
                 try close()
-                return try feed(line)
+                return
+            }
+            // The next file or mail part starts here, with or without a boundary in between.
+            if Self.startsNewFile(line) {
+                try close()
+                try feed(line)
+                return
             }
             // The padding is the end of the data.
             var padded = false
             var stray = 0
             sextets.reserveCapacity(sextets.count + line.count)
-            DecodeMachine.base64Values.withUnsafeBufferPointer { table in
+            Self.base64Values.withUnsafeBufferPointer { table in
                 for character in line {
                     let value = table[Int(character)]
                     if value != 255 {
@@ -580,7 +592,7 @@ final class DecodeMachine {
                     } else if character == UInt8(ascii: "=") {
                         padded = true
                         break
-                    } else if character != 32 && character != 9 {
+                    } else if character != 32, character != 9 {
                         stray += 1
                     }
                 }
@@ -591,8 +603,12 @@ final class DecodeMachine {
                 bodyLines += 1
                 lastLineLength = line.count
             }
-            if padded { return try close() }
-            if sextets.count >= 4096 { try flushBase64(final: false) }
+            if padded {
+                try close()
+                return
+            }
+            if sextets.count >= 4_096 { try flushBase64(final: false) }
+
         case .sixBit(var xx):
             if line.elementsEqual(Array("end".utf8)) {
                 let finished = tally
@@ -626,10 +642,12 @@ final class DecodeMachine {
             for byte in bytes { sum = ((sum >> 1) + ((sum & 1) << 15) + UInt32(byte)) & 0xFFFF }
             tally.sum = sum
             try sink.write(bytes)
+
         case .yEnc:
             if line.starts(with: Array("=yend".utf8)) {
                 checkYEnd(text(line))
-                return try close()
+                try close()
+                return
             }
             if line.starts(with: Array("=ypart".utf8)) {
                 let header = text(line)
@@ -716,9 +734,9 @@ enum Decoder {
                 try body(line)
                 start = end + 1
             }
-            while pending.count - start >= LineCutter.longestLine {
-                try body(pending[start..<(start + LineCutter.longestLine)])
-                start += LineCutter.longestLine
+            while pending.count - start >= Self.longestLine {
+                try body(pending[start..<(start + Self.longestLine)])
+                start += Self.longestLine
             }
             pending.removeFirst(start)
         }
@@ -828,7 +846,7 @@ enum Decoder {
         defer { reader.close() }
         let token = run.cancellation.interrupting(reader)
         defer { withExtendedLifetime(token) {} }
-        guard let head = try? reader.read(upToCount: 4096) else { return false }
+        guard let head = try? reader.read(upToCount: 4_096) else { return false }
         for var line in head.split(separator: 10, omittingEmptySubsequences: true) {
             if line.last == 13 { line = line.dropLast() }
             if line.isEmpty { continue }

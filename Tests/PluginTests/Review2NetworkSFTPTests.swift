@@ -36,9 +36,9 @@ import Testing
         let suite = try NetworkFixSFTP(mode: .failingClose)
         #expect(throws: (any Error).self) { try upload(suite, NetworkFixSFTP.pattern(50_000)) }
         // Reading is not affected: the closing of a handle that was only read tells nothing.
-        try NetworkFixSFTP.pattern(1000).write(to: suite.box.url("srv/r.bin"))
+        try NetworkFixSFTP.pattern(1_000).write(to: suite.box.url("srv/r.bin"))
         let reader = try suite.fileSystem.read(suite.url("/r.bin"))
-        #expect(try reader.read(upToCount: 2000)?.count == 1000)
+        #expect(try reader.read(upToCount: 2_000)?.count == 1_000)
         reader.close()
     }
 
@@ -49,8 +49,8 @@ import Testing
         // The writes behind the refused one were on their way and were carried out. What is left
         // on the server is cut back to the first byte that was not confirmed: a true start of the file.
         let stored = suite.box.url("srv/up.bin")
-        #expect(adoptWait(300) { ((try? Data(contentsOf: stored))?.count ?? -1) == 65536 })
-        #expect(try Data(contentsOf: stored) == content.prefix(65536))
+        #expect(adoptWait(300) { ((try? Data(contentsOf: stored))?.count ?? -1) == 65_536 })
+        #expect(try Data(contentsOf: stored) == content.prefix(65_536))
     }
 
     @Test func aServerThatForgetsWhatItConfirmedIsNoticed() throws {
@@ -63,15 +63,15 @@ import Testing
 @Suite(.enabled(if: FakeSFTPServer.isAvailable)) struct Review2NetworkSFTPChannel {
     @Test func aServerThatSaysNothingAtAllIsGivenUp() throws {
         let suite = try NetworkFixSFTP(mode: .hangingStat, timeout: 1)
-        try NetworkFixSFTP.pattern(1000).write(to: suite.box.url("srv/f.bin"))
+        try NetworkFixSFTP.pattern(1_000).write(to: suite.box.url("srv/f.bin"))
         let session = try suite.center.session(for: suite.key)
         _ = try session.connect(cancellation: nil)
-        #expect(try session.entry(at: "/f.bin")?.size == 1000)
+        #expect(try session.entry(at: "/f.bin")?.size == 1_000)
         // Nothing arrives for the whole time a request may take: the line is taken for dead, so
         // the requests that follow do not each wait out their own time on it.
         #expect(throws: NetworkError.self) { _ = try session.entry(at: "/hang") }
         // The next request opens a new channel and is answered.
-        #expect(try session.entry(at: "/f.bin")?.size == 1000)
+        #expect(try session.entry(at: "/f.bin")?.size == 1_000)
         let starts = try String(contentsOf: suite.box.url("sftp-requests.log"), encoding: .utf8).split(separator: "\n")
             .filter { $0 == "16" }
         #expect(starts.count == 2, "a second login was made")
@@ -271,9 +271,9 @@ struct Review2NetworkSFTPSystemServer {
         let reader = try fileSystem.read(url("big.bin"))
         // One page, a jump, one page: read correctly, without megabytes fetched ahead that
         // nobody wants (the window only opens for a caller that reads on).
-        #expect(try reader.read(upToCount: 4096) == content.prefix(4096))
+        #expect(try reader.read(upToCount: 4_096) == content.prefix(4_096))
         try reader.seek(to: 3_000_000)
-        #expect(try reader.read(upToCount: 4096) == content.subdata(in: 3_000_000..<3_004_096))
+        #expect(try reader.read(upToCount: 4_096) == content.subdata(in: 3_000_000..<3_004_096))
         // Reading on from there gets the rest, through the window.
         var rest = Data()
         while let block = try reader.read(upToCount: 1 << 20) { rest.append(block) }

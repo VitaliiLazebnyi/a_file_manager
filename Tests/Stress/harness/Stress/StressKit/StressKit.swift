@@ -140,7 +140,7 @@ public final class MainWatchdog {
         public var started = 0.0
     }
 
-    public static let bounds: [Double] = [2, 4, 8, 16, 33, 100, 250, 1000, 5000]
+    public static let bounds: [Double] = [2, 4, 8, 16, 33, 100, 250, 1_000, 5_000]
     public static let shared = MainWatchdog()
 
     private let lock = NSLock()
@@ -205,8 +205,8 @@ public final class MainWatchdog {
                     semaphore.wait()
                 }
             }
-            let ms = (now() - sent) * 1000
-            let cpuMs = (mainCPU() - cpuBefore) * 1000
+            let ms = (now() - sent) * 1_000
+            let cpuMs = (mainCPU() - cpuBefore) * 1_000
             lock.lock()
             // A stall belongs to the phase in which it ended (the ping was sent before it began).
             let label = phase
@@ -225,10 +225,10 @@ public final class MainWatchdog {
                 entry.stallMs += ms
                 entry.stallCPUMs += cpuMs
             }
-            entry.histogram[MainWatchdog.bounds.firstIndex(where: { ms < $0 }) ?? MainWatchdog.bounds.count] += 1
+            entry.histogram[Self.bounds.firstIndex(where: { ms < $0 }) ?? Self.bounds.count] += 1
             if ms > 8 { entry.over8 += 1 }
             if ms > 100 { entry.over100 += 1 }
-            if ms > 1000 { entry.over1000 += 1 }
+            if ms > 1_000 { entry.over1000 += 1 }
             stats[label] = entry
             if ms > 8 {
                 stalls.append(
@@ -238,7 +238,7 @@ public final class MainWatchdog {
                 )
             }
             lock.unlock()
-            usleep(2000)
+            usleep(2_000)
         }
     }
 
@@ -310,7 +310,7 @@ public final class MainWatchdog {
         let (order, stats, stalls) = snapshot()
         say("\n==== MAIN-THREAD WATCHDOG: \(title) ====")
         say(
-            "histogram bounds (ms): <" + MainWatchdog.bounds.map { String(format: "%g", $0) }.joined(separator: " <")
+            "histogram bounds (ms): <" + Self.bounds.map { String(format: "%g", $0) }.joined(separator: " <")
                 + " >=5000")
         say(
             "(max cpu = processor time the main thread used during its longest stall; stall ms / cpu ms = sums over all stalls > 8 ms: equal means the main thread was working, cpu much smaller means it was blocked or had no core)"

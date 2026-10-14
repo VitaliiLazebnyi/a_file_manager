@@ -8,7 +8,7 @@ import Foundation
 struct DescriptIon: Equatable {
     static let fileName = "descript.ion"
     /// The longest comment the format takes.
-    static let commentLimit = 4095
+    static let commentLimit = 4_095
     /// Follows a comment of several lines, whose lines are joined with a literal `\n`.
     private static let multilineMarker = "\u{04}\u{C2}"
 
@@ -34,12 +34,12 @@ struct DescriptIon: Equatable {
 
     /// Reads whatever can be read; a file that cannot be decoded gives no comments.
     init(data: Data) {
-        self.init(decoded: DescriptIon.decode(data) ?? ("", .ansi))
+        self.init(decoded: Self.decode(data) ?? ("", .ansi))
     }
 
     /// Nil when the bytes cannot be decoded in the encoding their start announces.
     init?(strict data: Data) {
-        guard let decoded = DescriptIon.decode(data) else { return nil }
+        guard let decoded = Self.decode(data) else { return nil }
         self.init(decoded: decoded)
     }
 
@@ -49,7 +49,7 @@ struct DescriptIon: Equatable {
         // Lines are cut where the file has a line feed, whatever stands next to it: taken by
         // characters, a line feed that follows a carriage return would be half of one.
         for line in text.unicodeScalars.split(separator: "\n", omittingEmptySubsequences: true) {
-            if let entry = DescriptIon.parse(line.last == "\r" ? line.dropLast() : line) { entries.append(entry) }
+            if let entry = Self.parse(line.last == "\r" ? line.dropLast() : line) { entries.append(entry) }
         }
     }
 
@@ -123,7 +123,7 @@ struct DescriptIon: Equatable {
 
     /// Sets, replaces or (with an empty text) removes the comment of a file.
     mutating func setComment(_ comment: String, for name: String) {
-        let comment = DescriptIon.normalized(comment)
+        let comment = Self.normalized(comment)
         let wanted = name.lowercased()
         let index = entries.firstIndex { $0.name.lowercased() == wanted }
         switch (index, comment.isEmpty) {
@@ -153,7 +153,7 @@ struct DescriptIon: Equatable {
             if entry.comment.unicodeScalars.contains("\n") {
                 text +=
                     entry.comment.replacingOccurrences(of: "\n", with: "\\n", options: .literal)
-                    + DescriptIon.multilineMarker
+                    + Self.multilineMarker
             } else {
                 text += entry.comment
             }
@@ -181,10 +181,13 @@ struct DescriptIon: Equatable {
                 return bytes
             }
             return Data([0xFF, 0xFE]) + (text.data(using: .utf16LittleEndian) ?? Data())
+
         case .utf8(let bom):
             return bom ? Data([0xEF, 0xBB, 0xBF]) + Data(text.utf8) : unmarked(Data(text.utf8))
+
         case .utf16LittleEndian:
             return Data([0xFF, 0xFE]) + (text.data(using: .utf16LittleEndian) ?? Data())
+
         case .utf16BigEndian:
             return Data([0xFE, 0xFF]) + (text.data(using: .utf16BigEndian) ?? Data())
         }
@@ -208,7 +211,7 @@ final class CommentStore {
     }
 
     /// Comment files larger than this are not read; no folder has that many comments.
-    private static let sizeLimit = 16 * 1024 * 1024
+    private static let sizeLimit = 16 * 1_024 * 1_024
     /// How long a reading is trusted. Changes made here are known at once (`forget`); this is
     /// for changes other programs make.
     private static let lifetime: TimeInterval = 3
@@ -241,7 +244,7 @@ final class CommentStore {
         let patience = Date().addingTimeInterval(waitLimit)
         condition.lock()
         while true {
-            if let known = remembered[key], -known.read.timeIntervalSinceNow < CommentStore.lifetime {
+            if let known = remembered[key], -known.read.timeIntervalSinceNow < Self.lifetime {
                 condition.unlock()
                 return known.comments
             }
@@ -251,7 +254,7 @@ final class CommentStore {
                 condition.unlock()
                 return [:]
             }
-            condition.wait(until: min(patience, Date().addingTimeInterval(CommentStore.waitStep)))
+            condition.wait(until: min(patience, Date().addingTimeInterval(Self.waitStep)))
         }
         beingRead.insert(key)
         let generation = generations[key] ?? 0
@@ -275,7 +278,7 @@ final class CommentStore {
         let key = directory.locationKey
         condition.lock()
         remembered[key] = nil
-        if generations.count > 4096 { generations = generations.filter { beingRead.contains($0.key) } }
+        if generations.count > 4_096 { generations = generations.filter { beingRead.contains($0.key) } }
         generations[key, default: 0] += 1
         condition.unlock()
     }
@@ -296,7 +299,7 @@ final class CommentStore {
         while let block = autoreleasepool(invoking: { try? reader.read(upToCount: 1 << 20) }) {
             if cancellation.isCancelled { return DescriptIon() }
             data.append(block)
-            if data.count > CommentStore.sizeLimit { return DescriptIon() }
+            if data.count > Self.sizeLimit { return DescriptIon() }
         }
         return cancellation.isCancelled ? DescriptIon() : DescriptIon(data: data)
     }
@@ -325,7 +328,7 @@ final class CommentStore {
         do {
             while let block = try reader.read(upToCount: 1 << 20) {
                 data.append(block)
-                if data.count > CommentStore.sizeLimit { throw CommentFileError.unreadable }
+                if data.count > Self.sizeLimit { throw CommentFileError.unreadable }
             }
         } catch {
             throw cancellation.isCancelled ? CocoaError(.userCancelled) : CommentFileError.unreadable
@@ -397,6 +400,7 @@ enum CommentFileError: LocalizedError {
         case .unreadable:
             return
                 "The comment file descript.ion cannot be read completely, so it was left as it is. Writing it now would lose its other comments."
+
         case .unnameable:
             return
                 "A name with a line break, or with both a space and a quotation mark, cannot be written to the comment file descript.ion."

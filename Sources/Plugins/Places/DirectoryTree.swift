@@ -125,12 +125,12 @@ public final class DirectoryTree {
     }
 
     public func url(of node: TreeNode) -> URL {
-        DirectoryTree.components(of: relativePath(of: node)).reduce(rootURL) { $0.appending(name: $1) }
+        Self.components(of: relativePath(of: node)).reduce(rootURL) { $0.appending(name: $1) }
     }
 
     /// The path of `url` relative to the root; nil when it is not the root or below it.
     public func relativePath(of url: URL) -> String? {
-        DirectoryTree.relativePath(of: url, below: rootURL)
+        Self.relativePath(of: url, below: rootURL)
     }
 
     public static func relativePath(of url: URL, below root: URL) -> String? {
@@ -144,7 +144,7 @@ public final class DirectoryTree {
     /// their sorted place); they do not count as read.
     public func node(at path: String, creating: Bool = false) -> TreeNode? {
         var node = root
-        for name in DirectoryTree.components(of: path) {
+        for name in Self.components(of: path) {
             if let child = node.child(named: name) {
                 node = child
             } else if creating {
@@ -160,7 +160,7 @@ public final class DirectoryTree {
     public func nearestNode(to url: URL) -> TreeNode? {
         guard let path = relativePath(of: url) else { return nil }
         var node = root
-        for name in DirectoryTree.components(of: path) {
+        for name in Self.components(of: path) {
             guard let child = node.child(named: name) else { break }
             node = child
         }
@@ -175,12 +175,12 @@ public final class DirectoryTree {
 
     private func insert(_ name: String, into parent: TreeNode) -> TreeNode {
         let node = TreeNode(name: name, parent: parent)
-        if let last = parent.children.last, !DirectoryTree.compare(last.name, name) {
+        if let last = parent.children.last, !Self.compare(last.name, name) {
             // The children are in order: the place is found by halving, not by asking each of them.
             var (low, high) = (0, parent.children.count)
             while low < high {
                 let middle = (low + high) / 2
-                if DirectoryTree.compare(name, parent.children[middle].name) {
+                if Self.compare(name, parent.children[middle].name) {
                     high = middle
                 } else {
                     low = middle + 1
@@ -212,7 +212,7 @@ public final class DirectoryTree {
         revision += 1
         if node.children.isEmpty {
             // The usual case while scanning: nothing is known yet, so nothing is compared.
-            let ordered = sorted ? names : DirectoryTree.sorted(names: Set(names))
+            let ordered = sorted ? names : Self.sorted(names: Set(names))
             node.children = ordered.enumerated().map { index, name in
                 let child = TreeNode(name: name, parent: node)
                 child.indexInParent = index
@@ -223,7 +223,7 @@ public final class DirectoryTree {
             let known = Dictionary(node.children.map { ($0.name, $0) }, uniquingKeysWith: { first, _ in first })
             let wanted = Set(names)
             for child in node.children where !wanted.contains(child.name) { count -= 1 + folderCount(below: child) }
-            node.children = (sorted ? names : DirectoryTree.sorted(names: wanted)).enumerated().map { index, name in
+            node.children = (sorted ? names : Self.sorted(names: wanted)).enumerated().map { index, name in
                 let child =
                     known[name]
                     ?? {
@@ -526,7 +526,7 @@ public final class TreeScanner {
             nodes = DirectoryTree.makeNodes(children, sorted: isSorted)
         }
 
-        public static func == (first: Level, second: Level) -> Bool {
+        public static func == (first: Self, second: Self) -> Bool {
             (first.path, first.children, first.isSorted) == (second.path, second.children, second.isSorted)
         }
     }
@@ -607,7 +607,7 @@ public final class TreeScanner {
     /// the pool, which adds threads while some wait.
     private func readFolders(_ batch: [(path: String, url: URL)]) -> [[Subfolder]] {
         func read(_ folder: (path: String, url: URL)) -> [Subfolder] {
-            TreeScanner.gently { Sorter.sorted(folders(of: folder.url, isScan: true), numeric: true, byName: \.name) }
+            Self.gently { Sorter.sorted(folders(of: folder.url, isScan: true), numeric: true, byName: \.name) }
         }
         guard provider.scheme == "file", root.isFileURL else { return Parallel.map(batch, read) }
         let results = UnsafeMutableBufferPointer<[Subfolder]>.allocate(capacity: batch.count)
@@ -737,14 +737,16 @@ public final class TreeScanner {
                 if !showHidden {
                     guard known, info.st_flags & UInt32(UF_HIDDEN) == 0 else { continue }
                 }
-                isMount = known && ownDevice.map { $0 != info.st_dev } == true && TreeScanner.isMountPoint(url.path)
+                isMount = known && ownDevice.map { $0 != info.st_dev } == true && Self.isMountPoint(url.path)
                 // A folder that is only in the cloud (SF_DATALESS) would be fetched by a listing.
                 isUnread =
-                    isScan && (TreeScanner.isProtected(url) || (known && info.st_flags & TreeScanner.dataless != 0))
+                    isScan && (Self.isProtected(url) || (known && info.st_flags & Self.dataless != 0))
+
             case DT_UNKNOWN:
                 guard lstat(url.path, &info) == 0, (info.st_mode & S_IFMT) == S_IFDIR else { continue }
                 if !showHidden, name.hasPrefix(".") || info.st_flags & UInt32(UF_HIDDEN) != 0 { continue }
-                isUnread = isScan && (TreeScanner.isProtected(url) || info.st_flags & TreeScanner.dataless != 0)
+                isUnread = isScan && (Self.isProtected(url) || info.st_flags & Self.dataless != 0)
+
             default:
                 continue
             }

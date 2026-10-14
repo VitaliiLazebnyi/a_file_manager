@@ -17,7 +17,7 @@ import UniformTypeIdentifiers
     let plugin: ViewerPlugin
     let bench: TestBench
 
-    init() throws {
+    init() {
         _ = NSApplication.shared
         plugin = ViewerPlugin(overlayHost: { _ in nil }, quickViewDelay: 0.01, showsWindows: false)
         bench = TestBench(
@@ -30,7 +30,7 @@ import UniformTypeIdentifiers
     @discardableResult
     func wait(upTo seconds: TimeInterval = 300, until condition: () -> Bool) async -> Bool {
         let deadline = Date().addingTimeInterval(seconds)
-        while !condition() && Date() < deadline {
+        while !condition(), Date() < deadline {
             try? await Task.sleep(nanoseconds: 3_000_000)
         }
         return condition()
@@ -44,8 +44,8 @@ import UniformTypeIdentifiers
 
     // MARK: Nothing waits for the server
 
-    @Test func stoppingThePaneDoesNotWaitForTheReadersOfAServerToClose() async throws {
-        hook.contents["/slow.txt"] = Data(String(repeating: "a line of text\n", count: 2000).utf8)
+    @Test func stoppingThePaneDoesNotWaitForTheReadersOfAServerToClose() async {
+        hook.contents["/slow.txt"] = Data(String(repeating: "a line of text\n", count: 2_000).utf8)
         let gate = DispatchSemaphore(value: 0)
         hook.onClose = { _ = gate.wait(timeout: .now() + 30) }
         let pane = pane()
@@ -65,10 +65,10 @@ import UniformTypeIdentifiers
 
     // MARK: The text that is no longer read
 
-    @Test func aTextThatIsNoLongerReadKeepsWhatItShowsWhenScrolled() async throws {
+    @Test func aTextThatIsNoLongerReadKeepsWhatItShowsWhenScrolled() async {
         let pane = pane()
         pane.frame = NSRect(x: 0, y: 0, width: 700, height: 200)
-        memory.addFile("/A/many.txt", (1...2000).map { "line number \($0)" }.joined(separator: "\n"))
+        memory.addFile("/A/many.txt", (1...2_000).map { "line number \($0)" }.joined(separator: "\n"))
         pane.load(ViewerItem(source: .file(memory.url("/A/many.txt")), title: "many"))
         #expect(await wait { pane.pager.document?.isIndexComplete == true && pane.pager.position != nil })
         pane.stopWork()
@@ -82,7 +82,7 @@ import UniformTypeIdentifiers
 
     // MARK: Links in the page
 
-    @Test func aLinkInAPageLeadsOnlyToFilesBesideIt() async throws {
+    @Test func aLinkInAPageLeadsOnlyToFilesBesideIt() async {
         let pane = pane()
         pane.load(ViewerItem(source: .file(memory.url("/A/index.html")), title: "index"))
         #expect(await wait { pane.loaded != nil })
@@ -103,7 +103,7 @@ import UniformTypeIdentifiers
     @Test func aHugeHTMLFileIsNotLaidOutAsAPageOnTheMainThread() async throws {
         let pane = pane()
         var html = Data("<html><body>".utf8)
-        let line = Data(String(repeating: "<p>paragraph of the page</p>\n", count: 1000).utf8)
+        let line = Data(String(repeating: "<p>paragraph of the page</p>\n", count: 1_000).utf8)
         while html.count < Int(ViewerPane.htmlPageLimit) + (1 << 20) { html.append(line) }
         let writer = try memory.write(memory.url("/A/huge.html"))
         try writer.write(html)
@@ -119,7 +119,7 @@ import UniformTypeIdentifiers
     @Test func aHugeRTFFileIsNotFormattedOnTheMainThread() async throws {
         let pane = pane()
         var rtf = Data("{\\rtf1\\ansi ".utf8)
-        let line = Data(String(repeating: "word ", count: 2000).utf8)
+        let line = Data(String(repeating: "word ", count: 2_000).utf8)
         while rtf.count < Int(ViewerPane.rtfLimit) + (1 << 20) { rtf.append(line) }
         rtf.append(Data("}".utf8))
         let writer = try memory.write(memory.url("/A/huge.rtf"))
@@ -149,7 +149,7 @@ import UniformTypeIdentifiers
     }
 
     @Test func aZoomThatPassesThroughManySizesMakesOneBitmap() async throws {
-        let frame = try picture(2000, 1000)
+        let frame = try picture(2_000, 1_000)
         let cache = ScaledFrameCache()
         // The queue stands still while the sizes are asked for, so how fast this loop runs on a busy
         // machine decides nothing: every size but the last has been overtaken when the queue goes on.

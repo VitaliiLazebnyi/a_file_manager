@@ -216,7 +216,7 @@ import Testing
         #expect(store.revision == before + 1 && store.history(.nameMask) == ["[N]"])
     }
 
-    @Test func persistedUndoIsCapped() async throws {
+    @Test func persistedUndoIsCapped() async {
         let settings = MemorySettings()
         let store = await MainActor.run { RenameStore(settings: settings) }
         let big = (0..<(RenameStore.persistedItemLimit - 10)).map {

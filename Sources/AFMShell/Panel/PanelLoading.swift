@@ -151,7 +151,7 @@ final class PanelLoading {
             var header: PanelLoader.Batch?
             var sentFirst = false
             var lastSent = Date()
-            var interval = PanelLoading.firstPieceDelay
+            var interval = Self.firstPieceDelay
 
             @discardableResult
             func send(isLast: Bool) -> Piece? {
@@ -164,10 +164,10 @@ final class PanelLoading {
                     fresh.add(sorted.items)
                     sorted = fresh
                 }
-                if !sentFirst, !isLast, pending.count > PanelLoading.firstPieceLimit {
+                if !sentFirst, !isLast, pending.count > Self.firstPieceLimit {
                     // Only a part goes into the first piece; the rest waits for the second.
-                    sorted.add(Array(pending.prefix(PanelLoading.firstPieceLimit)))
-                    pending.removeFirst(PanelLoading.firstPieceLimit)
+                    sorted.add(Array(pending.prefix(Self.firstPieceLimit)))
+                    pending.removeFirst(Self.firstPieceLimit)
                 } else {
                     sorted.add(pending)
                     pending = []
@@ -177,7 +177,7 @@ final class PanelLoading {
                     parent: header.listing.parent, root: header.listing.root, volume: header.listing.volume)
                 let piece = Piece(
                     listing: listing, focus: header.focus, order: sorted.order, isFirst: !sentFirst, isLast: isLast)
-                interval = sentFirst ? interval * PanelLoading.intervalGrowth : PanelLoading.secondPieceInterval
+                interval = sentFirst ? interval * Self.intervalGrowth : Self.secondPieceInterval
                 sentFirst = true
                 lastSent = Date()
                 MainLoop.perform {

@@ -84,6 +84,7 @@ enum FindRegex {
         switch firstMatch(regex, in: text, budget: budget, cancelled: cancelled) {
         case .matched: return true
         case .unmatched: return false
+
         case .timedOut:
             if !cancelled() { trip?.recordTimeout() }
             return false

@@ -105,7 +105,7 @@ import Testing
         #expect(left.model.directory == memory.url("/"))
     }
 
-    @Test func choosesTheNeighbourPlace() throws {
+    @Test func choosesTheNeighbourPlace() {
         func place(_ name: String, _ path: String, _ kind: Place.Kind) -> Place {
             Place(name: name, url: URL(fileURLWithPath: path), kind: kind)
         }

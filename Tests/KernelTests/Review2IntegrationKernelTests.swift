@@ -51,7 +51,7 @@ private func elsewhere<Value>(_ work: @escaping () -> Value) -> Value {
         direct.show(listing(other, arrival), focus: "mid.txt")
         let prepared = model()
         let basis = prepared.basis
-        let change = elsewhere { PanelModel.prepare(basis, show: listing(other, self.arrival), focus: "mid.txt") }
+        let change = elsewhere { PanelModel.prepare(basis, show: listing(other, arrival), focus: "mid.txt") }
         #expect(prepared.apply(change) == .changed)
         #expect(prepared.directory == direct.directory && prepared.items.map(\.name) == direct.items.map(\.name))
         #expect(prepared.items.map(\.name) == ["Docs", "alpha.log", "mid.txt", "zeta.txt"])
@@ -69,7 +69,7 @@ private func elsewhere<Value>(_ work: @escaping () -> Value) -> Value {
         model.requestSort(ListOrder(key: .size, descending: true))
         let basis = model.basis
         let change = elsewhere {
-            PanelModel.prepare(basis, show: listing(other, self.arrival), history: .keep, remembered: true)
+            PanelModel.prepare(basis, show: listing(other, arrival), history: .keep, remembered: true)
         }
         #expect(model.apply(change) == .changed)
         // Filtered (folders stay), in the order that was asked for, which is the panel's now.

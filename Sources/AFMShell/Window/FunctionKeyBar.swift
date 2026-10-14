@@ -34,7 +34,7 @@ final class FunctionKeyBar: NSView {
         show([])
     }
 
-    required init?(coder: NSCoder) { fatalError("not used") }
+    required init?(coder _: NSCoder) { fatalError("not used") }
 
     /// What the bar shows while `modifiers` are held. The plain bar has only the commands that
     /// bring a bar caption (F1 and F2 have no button, to save space); with a modifier every
@@ -59,7 +59,7 @@ final class FunctionKeyBar: NSView {
     /// Shows the bar of a modifier state; only Shift, Option and Control count.
     func show(_ held: KeyModifiers) {
         let held = held.contains(.command) ? [] : held.intersection([.shift, .option, .control])
-        let shown = FunctionKeyBar.entries(for: held, commands: kernel.commands, keys: kernel.keyBindings)
+        let shown = Self.entries(for: held, commands: kernel.commands, keys: kernel.keyBindings)
         modifiers = held
         guard shown != entries else { return }
         entries = shown

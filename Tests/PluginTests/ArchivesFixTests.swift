@@ -143,7 +143,7 @@ private func quarantine(of url: URL) -> String? {
                 }
                 let temporary = tree.appending(name: ".afm-\(index).tmp")
                 let writer = try bench.zip.write(temporary)
-                try writer.write(Data(String(repeating: "file \(index) ", count: 2000 * (index + 1)).utf8))
+                try writer.write(Data(String(repeating: "file \(index) ", count: 2_000 * (index + 1)).utf8))
                 try writer.close(attributes: FileAttributes())
                 try bench.zip.move(temporary, to: tree.appending(name: "file\(index).txt"), replacing: false)
             } catch {
@@ -456,7 +456,7 @@ private func quarantine(of url: URL) -> String? {
         try bench.store.flush(archive)
         try reader.seek(to: 0)
         var data = Data()
-        while let block = try reader.read(upToCount: 5000) { data.append(block) }
+        while let block = try reader.read(upToCount: 5_000) { data.append(block) }
         reader.close()
         #expect(data == expected)
         // The entry looked up before the rewrite reads the same bytes, and so does a new one.
@@ -573,7 +573,7 @@ private func quarantine(of url: URL) -> String? {
         bench.environment.clonesArchives = clones
         let plain = try makeZip("plain.zip")
         let stub =
-            Data("#!/bin/sh\necho this would unpack what follows\nexit 0\n".utf8) + Data(repeating: 0x90, count: 5000)
+            Data("#!/bin/sh\necho this would unpack what follows\nexit 0\n".utf8) + Data(repeating: 0x90, count: 5_000)
         let archive = box.url("sfx.zip")
         try (stub + Data(contentsOf: plain)).write(to: archive)
         let tree = bench.inside(archive, "tree")
@@ -626,7 +626,7 @@ private func quarantine(of url: URL) -> String? {
         let file = try RandomAccessFile(archive)
         let random = try #require(ZipDirectory.read(file).records.first { $0.name == "tree/sub/random.bin" })
         guard case .archive(let offset, _) = random.source else { return }
-        damaged[Int(try ZipDirectory.localHeader(of: random, at: offset, in: file).dataOffset) + 1000] ^= 0xFF
+        damaged[Int(try ZipDirectory.localHeader(of: random, at: offset, in: file).dataOffset) + 1_000] ^= 0xFF
         try damaged.write(to: archive)
         try box.file("extra/one.txt", "one")
         try box.file("extra/two.txt", String(repeating: "two", count: 500_000))
@@ -833,7 +833,7 @@ private func quarantine(of url: URL) -> String? {
         var record = ZipRecord.new(name: "small.txt", isDirectory: false, modified: Date(), permissions: 0o644)
         record.method = ZipRecord.methodDeflate
         record.crc = CRC32.of(contents)
-        (record.compressedSize, record.uncompressedSize) = (UInt64(packed.count), 1000)
+        (record.compressedSize, record.uncompressedSize) = (UInt64(packed.count), 1_000)
         let member = try writer.begin(record)
         try writer.append(packed)
         try writer.end(member, record)
@@ -845,7 +845,7 @@ private func quarantine(of url: URL) -> String? {
         #expect(throws: ArchiveError.self) {
             while let block = try stream.read(upToCount: 1 << 16) { read += block.count }
         }
-        #expect(read <= 1000)
+        #expect(read <= 1_000)
         let result = try bench.unpack(archive, to: box.url("out"))
         #expect(result.unpacked == 0 && result.problems.count == 1 && namesOnDisk(box.url("out")).isEmpty)
     }
@@ -971,8 +971,8 @@ private func quarantine(of url: URL) -> String? {
         #expect(records.map(\.utf8.count) == [22, 22, 29, 29])
         data.append(tarBlock(name: "PaxHeader/x", type: 120, size: UInt64(records.joined().utf8.count)))
         data.append(tarData(records.joined()))
-        data.append(tarBlock(name: "GNUSparseFile.0/pax-holes", size: 1024))
-        data.append(Data(repeating: 66, count: 1024))
+        data.append(tarBlock(name: "GNUSparseFile.0/pax-holes", size: 1_024))
+        data.append(Data(repeating: 66, count: 1_024))
         data.append(tarBlock(name: "last.txt", size: 4))
         data.append(tarData("last"))
         data.append(TarHeader.endOfArchive)

@@ -57,6 +57,7 @@ public enum SpotlightQuery {
             switch size.comparison {
             case .greater: parts.append("kMDItemFSSize > \(bytes)")
             case .less: parts.append("kMDItemFSSize < \(bytes)")
+
             case .equal:
                 parts.append("(kMDItemFSSize >= \(bytes) && kMDItemFSSize < \(size.upperBytes))")
             }
@@ -181,7 +182,7 @@ final class SpotlightSearch: NSObject {
         metadataQuery.disableUpdates()
         var paths: [String] = []
         let total = metadataQuery.resultCount
-        let count = min(total, SpotlightSearch.resultLimit)
+        let count = min(total, Self.resultLimit)
         paths.reserveCapacity(count)
         var index = 0
         while index < count, !stopped {

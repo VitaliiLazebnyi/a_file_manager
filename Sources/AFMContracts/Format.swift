@@ -68,18 +68,18 @@ public enum Format {
     /// server are whatever it says), the largest included.
     public static func kilobytes(_ value: Int64) -> String {
         // Rounded to the nearest, without a sum that could leave the range of a number.
-        let (whole, rest) = value.quotientAndRemainder(dividingBy: 1024)
+        let (whole, rest) = value.quotientAndRemainder(dividingBy: 1_024)
         return bytes(whole + (rest >= 512 ? 1 : (rest < -512 ? -1 : 0))) + " k"
     }
 
     /// Counter-strip and drive-line unit: `15 b`, `6.68 k`, `11.06 M`
     public static func shortSize(_ value: Int64) -> String {
         let units = ["k", "M", "G", "T"]
-        guard value >= 1024 else { return "\(value) b" }
-        var amount = Double(value) / 1024
+        guard value >= 1_024 else { return "\(value) b" }
+        var amount = Double(value) / 1_024
         var unit = 0
-        while amount >= 1024 && unit < units.count - 1 {
-            amount /= 1024
+        while amount >= 1_024, unit < units.count - 1 {
+            amount /= 1_024
             unit += 1
         }
         return String(format: "%.2f %@", amount, units[unit])
@@ -98,7 +98,7 @@ public enum Format {
         if total < 60 { return "\(max(total, 1)) s" }
         // Above a minute the seconds are shown in steps of five, so the figure stays calm.
         let stepped = (total + 4) / 5 * 5
-        if stepped < 3600 {
+        if stepped < 3_600 {
             return stepped % 60 == 0 ? "\(stepped / 60) min" : "\(stepped / 60) min \(stepped % 60) s"
         }
         let minutes = (total + 59) / 60

@@ -139,14 +139,14 @@ private final class Notes: @unchecked Sendable {
 @Suite struct Review2NetworkUploads {
     @Test func anUploadThatLostItsEndIsNotASuccess() throws {
         var options = TestFTPServer.Options()
-        options.keepsOfUploads = 1000
+        options.keepsOfUploads = 1_000
         let fixture = try FTPFixture(options)
         let writer = try fixture.fileSystem.write(fixture.url("/up.bin"))
-        try writer.write(Data(repeating: 7, count: 5000))
+        try writer.write(Data(repeating: 7, count: 5_000))
         // The server said 226.
         #expect(throws: NetworkError.self) { try writer.close(attributes: FileAttributes()) }
         fixture.server.options.keepsOfUploads = nil
-        try fixture.upload("/whole.bin", Data(repeating: 7, count: 5000))
+        try fixture.upload("/whole.bin", Data(repeating: 7, count: 5_000))
         #expect(fixture.server.commands.contains("SIZE /whole.bin"))
     }
 
@@ -488,7 +488,7 @@ private final class Notes: @unchecked Sendable {
             $0.parallelConnections = 8
             $0.timeout = 2
         }
-        try fixture.box.file("srv/f.bin", String(repeating: "z", count: 1000))
+        try fixture.box.file("srv/f.bin", String(repeating: "z", count: 1_000))
         // A server that stopped answering, and a viewer that steps through files: every reader
         // is dropped without being closed while its transfer hangs.
         for _ in 0..<24 {

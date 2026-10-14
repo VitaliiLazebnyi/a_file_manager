@@ -30,7 +30,7 @@ import Foundation
 /// start of the file is ignored.
 public struct TabFile: Equatable {
     public static let tabLimit = 256
-    public static let pathLimit = 4096
+    public static let pathLimit = 4_096
     public static let captionLimit = 256
 
     public var active: PanelTabs.State
@@ -48,8 +48,8 @@ public struct TabFile: Equatable {
             var lines = ["[\(name)]"]
             for (index, tab) in state.tabs.enumerated() {
                 let path = URL(string: tab.location).map(displayPath) ?? tab.location
-                lines.append("\(index)_path=\(TabFile.value(path))")
-                if let title = tab.title, !title.isEmpty { lines.append("\(index)_caption=\(TabFile.value(title))") }
+                lines.append("\(index)_path=\(Self.value(path))")
+                if let title = tab.title, !title.isEmpty { lines.append("\(index)_caption=\(Self.value(title))") }
                 let fields = [
                     1, tab.sortKey, tab.descending ? 1 : 0, 0, 0, tab.locked == true ? 1 : 0, tab.showHidden ? 1 : 0
                 ]
@@ -82,6 +82,7 @@ public struct TabFile: Equatable {
             case "\n": quoted += "\\n"
             case "\r": quoted += "\\r"
             case "\t": quoted += "\\t"
+
             default:
                 if unsafe(scalar) {
                     quoted += "\\u{" + String(scalar.value, radix: 16) + "}"
@@ -116,6 +117,7 @@ public struct TabFile: Equatable {
             case "n": result.append("\n")
             case "r": result.append("\r")
             case "t": result.append("\t")
+
             case "u":
                 guard index < scalars.count - 1, scalars[index] == "{",
                     let close = scalars[index...].firstIndex(of: "}"), close < scalars.count - 1
@@ -126,6 +128,7 @@ public struct TabFile: Equatable {
                 else { return value }
                 result.append(unicode)
                 index = close + 1
+
             default: return value
             }
         }
@@ -166,8 +169,8 @@ public struct TabFile: Equatable {
             var active = 0
             let wanted = keys["activetab"].flatMap(Int.init) ?? 0
             for number in numbers {
-                guard tabs.count < TabFile.tabLimit else { break }
-                guard let path = keys["\(number)_path"].map(TabFile.unquoted), path.count <= TabFile.pathLimit,
+                guard tabs.count < Self.tabLimit else { break }
+                guard let path = keys["\(number)_path"].map(Self.unquoted), path.count <= Self.pathLimit,
                     let url = location(path)
                 else { continue }
                 let fields = (keys["\(number)_options"] ?? "").split(separator: "|", omittingEmptySubsequences: false)
@@ -177,8 +180,8 @@ public struct TabFile: Equatable {
                 tabs.append(
                     PanelTabs.State.Tab(
                         location: url, sortKey: field(1), descending: field(2) == 1, showHidden: field(6) == 1,
-                        title: keys["\(number)_caption"].map(TabFile.unquoted).flatMap {
-                            $0.isEmpty || $0.count > TabFile.captionLimit ? nil : $0
+                        title: keys["\(number)_caption"].map(Self.unquoted).flatMap {
+                            $0.isEmpty || $0.count > Self.captionLimit ? nil : $0
                         },
                         locked: field(5) == 1 ? true : nil))
             }

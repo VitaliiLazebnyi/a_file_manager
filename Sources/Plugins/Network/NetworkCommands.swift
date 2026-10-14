@@ -238,6 +238,7 @@ final class NetworkCommands {
                                 fileURLWithPath: NSString(string: localDirectory).expandingTildeInPath,
                                 isDirectory: true))
                     }
+
                 case .failure(let error):
                     // Returns at once: what waits for the server is done in the background.
                     center.disconnect(key)
@@ -251,7 +252,8 @@ final class NetworkCommands {
     func open(saved text: String) {
         let parts = text.split(separator: "|", maxSplits: 1).map { $0.trimmingCharacters(in: .whitespaces) }
         guard let name = parts.first, let connection = store.connection(named: name) else {
-            return ui.inform("There is no saved connection named \(text).", detail: "", style: .warning)
+            ui.inform("There is no saved connection named \(text).", detail: "", style: .warning)
+            return
         }
         // `|*/dir` asks for the active panel, which is where connections open anyway.
         let path = parts.count > 1 ? String(parts[1].drop(while: { $0 == "*" })) : nil
@@ -274,8 +276,9 @@ final class NetworkCommands {
         let text = recent > 0 && history.indices.contains(recent - 1) ? history[recent - 1] : answer.text("address")
         guard let address = ServerAddress(text) else {
             // What was typed may hold a password; it is not shown again.
-            return ui.inform(
+            ui.inform(
                 "\(ServerAddress.removingPassword(from: text)) is not a server address.", detail: "", style: .warning)
+            return
         }
         store.remember(address: address)
         // A user name in the address means: not as a guest.
@@ -307,13 +310,18 @@ final class NetworkCommands {
             switch answer.button {
             case 0:
                 guard let chosen else { continue }
-                return connect(chosen.profile, localDirectory: chosen.localDirectory, saved: chosen)
+                connect(chosen.profile, localDirectory: chosen.localDirectory, saved: chosen)
+                return
+
             case 1:
                 if let created = edit(SavedConnection(), isNew: true) {
                     selected = store.connections.firstIndex { $0.id == created.id } ?? selected
                 }
+
             case 2:
-                return quickConnect()
+                quickConnect()
+                return
+
             case 3:
                 guard let chosen else { continue }
                 var copy = chosen
@@ -321,8 +329,10 @@ final class NetworkCommands {
                 copy.name = chosen.name + " (2)"
                 // The copy takes the password along, to whatever host and user it is saved with.
                 _ = edit(copy, isNew: true, passwordOf: chosen)
+
             case 4:
                 if let chosen { _ = edit(chosen, isNew: false) }
+
             default:
                 guard let chosen,
                     ui.choose(
@@ -466,6 +476,7 @@ final class NetworkCommands {
                 connection.remoteDirectory = center.lastPath(on: key) ?? ""
                 // The password the connection was made with is kept only if the box in the dialog stays ticked.
                 edit(connection, isNew: true, offered: connection.anonymous ? nil : profile.password)
+
             case 1: break
             default: return
             }
@@ -552,7 +563,7 @@ final class NetworkCommands {
             work: { monitor -> Result<Int, Error> in
                 Result {
                     var text =
-                        FileManager.default.fileExists(atPath: list.path) ? try NetworkCommands.readList(list) : ""
+                        FileManager.default.fileExists(atPath: list.path) ? try Self.readList(list) : ""
                     if !text.isEmpty, !text.hasSuffix("\n") { text += "\n" }
                     var refused = 0
                     for item in items {
@@ -578,11 +589,13 @@ final class NetworkCommands {
                 switch result {
                 case .failure(NetworkError.cancelled): break
                 case .failure(let error): kernel.ui.report(error, title: "The download list cannot be written!")
+
                 case .success(let refused) where refused > 0:
                     kernel.ui.inform(
                         "\(refused) of the files were not added to the download list.",
                         detail: "Their names contain a line break or the list's separator, which a list cannot hold.",
                         style: .warning)
+
                 case .success: break
                 }
                 kernel.panels.refresh([list.deletingLastPathComponent()])
@@ -598,14 +611,15 @@ final class NetworkCommands {
     func downloadFromList() {
         guard let list = askForList("File name of download list:") else { return }
         guard let transfers = kernel.services.find(FileTransferService.self) else {
-            return ui.inform("Copying files is not available.", detail: "", style: .warning)
+            ui.inform("Copying files is not available.", detail: "", style: .warning)
+            return
         }
         let target = kernel.panels.target.model.directory
         let base = target.isFileURL ? target : FileManager.default.homeDirectoryForCurrentUser
         kernel.jobs.run(
             title: "Download list:",
             work: { _ in
-                Result { try NetworkCommands.readList(list) }
+                Result { try Self.readList(list) }
             },
             completion: { [kernel] result in
                 let text: String
@@ -648,19 +662,21 @@ final class NetworkCommands {
         else { return }
         if let address = ServerAddress(text), text.contains("://") {
             let user = address.user ?? (address.scheme == "sftp" ? NSUserName() : nil)
-            return connect(
+            connect(
                 ConnectionProfile(
                     key: address.key, tls: address.tls, user: user, password: address.password, anonymous: user == nil
                 ),
                 path: address.hasPath ? address.path : nil)
+            return
         }
         guard let url = URL(string: text), let scheme = url.scheme?.lowercased(),
             ServerSchemes.mountable.contains(scheme), url.host != nil
         else {
             // What was typed may hold a password; it is not shown again.
-            return ui.inform(
+            ui.inform(
                 "\(ServerAddress.removingPassword(from: text)) is not the address of a server.", detail: "",
                 style: .warning)
+            return
         }
         // The address is offered again next time; a password in it is not kept.
         kernel.settings.set(ServerAddress.removingPassword(from: text), forKey: NetworkSettings.lastServer)
@@ -675,8 +691,10 @@ final class NetworkCommands {
                 switch result {
                 case .success(let volumes):
                     if let volume = volumes.first { panel.show(volume) }
+
                 case .failure(NetworkError.cancelled):
                     break
+
                 case .failure(let error):
                     kernel.ui.report(error, title: "Connect failed!")
                 }
@@ -754,9 +772,11 @@ struct ListPlan {
             case .pause(let seconds):
                 items.append(.pause(seconds))
                 continue
+
             case .unsupported(let line):
                 skipped.append(line)
                 continue
+
             case .download(let from, let to): (kind, source, target) = (.download, from, to)
             case .copy(let from, let to): (kind, source, target) = (.copy, from, to)
             case .move(let from, let to): (kind, source, target) = (.move, from, to)
@@ -809,7 +829,7 @@ struct ListPlan {
         if downloads > 0 { counts.append("\(downloads) downloads") }
         if copies > 0 { counts.append("\(copies) uploads or copies") }
         if moves > 0 { counts.append("\(moves) moves") }
-        var detail = "\(list.path) says:\n\n" + ListPlan.shortened(steps.map(\.text))
+        var detail = "\(list.path) says:\n\n" + Self.shortened(steps.map(\.text))
         if touchesLocalFiles {
             detail +=
                 "\n\nThis list does more than download: it sends, copies or moves files that are on this Mac"
@@ -866,6 +886,7 @@ private final class ListRun {
         switch item {
         case .pause(let seconds):
             DispatchQueue.main.asyncAfter(deadline: .now() + seconds) { self.next() }
+
         case .transfer(let step):
             let (from, to) = (step.from, step.to)
             let directory = to.deletingLastPathComponent()

@@ -78,7 +78,7 @@ public enum NameTemplate {
             // The optional digit: the name without a number, then with 2, 3, … until one is free.
             let plain = try expand(part, context, dates, counter: nil, isFirst: true, width: 1)
             if !plain.isEmpty, !context.exists(plain) { return plain }
-            for counter in 2...9999 {
+            for counter in 2...9_999 {
                 let name = try expand(part, context, dates, counter: counter, isFirst: false, width: 1)
                 if !name.isEmpty, !context.exists(name) { return name }
             }
@@ -130,10 +130,10 @@ public enum NameTemplate {
             current = ""
         }
         for character in text {
-            if character == "\"" && quotedLists {
+            if character == "\"", quotedLists {
                 quoted.toggle()
                 if !quoted { finish() }
-            } else if character == "|" && !quoted {
+            } else if character == "|", !quoted {
                 finish()
             } else {
                 current.append(character)
@@ -176,7 +176,7 @@ public enum NameTemplate {
         var quoted = false
         for index in text.indices {
             if text[index] == "\"" { quoted.toggle() }
-            if text[index] == "]" && !quoted { return index }
+            if text[index] == "]", !quoted { return index }
         }
         return nil
     }
@@ -221,10 +221,12 @@ public enum NameTemplate {
             case "F": mode = .title
             case "f": mode = .englishTitle
             case "n": mode = .original
+
             case "X", "X+":
                 let text = clipboardText(context.clipboard ?? "")
-                if text.isEmpty && body == "X" { throw Failure.emptyClipboard }
+                if text.isEmpty, body == "X" { throw Failure.emptyClipboard }
                 emit(text)
+
             default:
                 if let parts = counterParts(body) {
                     // With text around it, the first name of a range (and the plain name of
@@ -270,6 +272,7 @@ public enum NameTemplate {
         case .original, .untouched: return text
         case .upper: return text.uppercased()
         case .lower: return text.lowercased()
+
         case .title, .englishTitle:
             let small: Set<String> =
                 mode == .title
@@ -355,12 +358,15 @@ public enum NameTemplate {
             case "m": text += two(parts.minute)
             case "s": text += two(parts.second)
             case "v": text += String(format: "%03d", (parts.nanosecond ?? 0) / 1_000_000)
+
             case "i":
                 let short = characters.first == "1"
                 if short { characters.removeFirst() }
                 text += hour < 12 ? (short ? "a" : "am") : (short ? "p" : "pm")
+
             case "d", "t":
                 text += dates.text(letter, moment)
+
             default: text.append(letter)
             }
         }

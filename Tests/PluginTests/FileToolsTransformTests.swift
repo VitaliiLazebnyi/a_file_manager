@@ -15,7 +15,7 @@ import Testing
     let settings = MemorySettings()
     let bench: TestBench
     static let megabyteOfPattern = patternData(1_048_576)
-    var megabyte: Data { FileToolsTransforms.megabyteOfPattern }
+    var megabyte: Data { Self.megabyteOfPattern }
 
     var ui: ScriptedInteraction { bench.ui }
     var run: ToolRun { ToolRun(fileSystems: bench.kernel.fileSystems) }
@@ -79,11 +79,11 @@ import Testing
 
     @Test func splitSizes() {
         #expect(
-            Splitter.size(from: "1000") == 1000 && Splitter.size(from: " 2k ") == 2048
+            Splitter.size(from: "1000") == 1_000 && Splitter.size(from: " 2k ") == 2_048
                 && Splitter.size(from: "1.5M") == 1_572_864)
         #expect(
-            Splitter.size(from: "1G") == 1 << 30 && Splitter.size(from: "3 kb") == 3072
-                && Splitter.size(from: "1,024") == 1024)
+            Splitter.size(from: "1G") == 1 << 30 && Splitter.size(from: "3 kb") == 3_072
+                && Splitter.size(from: "1,024") == 1_024)
         #expect(Splitter.size(from: "360 k (5.25\")") == 362_496 && Splitter.size(from: "automatic") == 1_457_664)
         #expect(
             Splitter.size(from: "") == nil && Splitter.size(from: "0") == nil && Splitter.size(from: "-5") == nil
@@ -116,14 +116,14 @@ import Testing
     }
 
     @Test func splitByTypedSizeIntoTheSourceFolderAndOntoAnotherFileSystem() throws {
-        try write("A/data.tar.gz", patternData(2500))
+        try write("A/data.tar.gz", patternData(2_500))
         // An empty target is the source folder; the typed size is remembered.
         perform(.splitFile, ["target": .text(""), "size": .text("1k")])
         #expect(
             namesOnDisk(box.url("A")) == [
                 "data.tar.001", "data.tar.002", "data.tar.003", "data.tar.crc", "data.tar.gz"
             ])
-        #expect(byteCount("A/data.tar.001") == 1024 && byteCount("A/data.tar.003") == 452)
+        #expect(byteCount("A/data.tar.001") == 1_024 && byteCount("A/data.tar.003") == 452)
         #expect(settings.text(FileTools.Keys.splitSize, default: "") == "1k")
         // Any provider will do as a target, and a missing folder is created.
         perform(.splitFile, cursor: "data.tar.gz", ["target": .text("mem:/out/new"), "size": .text("2500")])
@@ -132,7 +132,7 @@ import Testing
     }
 
     @Test func splitRefusesBadSizesAndCleansUp() throws {
-        try write("A/data.bin", patternData(5000))
+        try write("A/data.bin", patternData(5_000))
         perform(.splitFile, ["size": .text("lots")])
         #expect(ui.log.last == "inform: Split" && namesOnDisk(box.url("B")).isEmpty)
         perform(.splitFile, ["size": .text("5")])
@@ -145,7 +145,7 @@ import Testing
         perform(.splitFile, ["size": .text("2000")])
         #expect(
             namesOnDisk(box.url("B")) == ["data.001", "data.002", "data.003", "data.crc"]
-                && byteCount("B/data.002") == 2000)
+                && byteCount("B/data.002") == 2_000)
         #expect(throws: ToolError.self) {
             try Splitter.split(item("A/data.bin"), into: box.url("B"), partSize: 0, run: run)
         }
@@ -200,13 +200,13 @@ import Testing
     }
 
     @Test func combineChecksTheCrc() throws {
-        try write("A/data.bin", patternData(3000))
+        try write("A/data.bin", patternData(3_000))
         perform(.splitFile, ["target": .text(""), "size": .text("1000")])
         let plan = try Combiner.plan(for: item("A/data.001"), run: run)
-        #expect(plan.parts.map(\.name) == ["data.001", "data.002", "data.003"] && plan.info?.size == 3000)
+        #expect(plan.parts.map(\.name) == ["data.001", "data.002", "data.003"] && plan.info?.size == 3_000)
         #expect(try Combiner.combine(plan.parts, info: plan.info, into: box.url("B"), run: run).verified == true)
         // A damaged part is found out.
-        try Data(repeating: 7, count: 1000).write(to: box.url("A/data.002"))
+        try Data(repeating: 7, count: 1_000).write(to: box.url("A/data.002"))
         let damaged = try Combiner.combine(plan.parts, info: plan.info, into: box.url("B"), run: run)
         #expect(damaged.verified == false && damaged.parts == 3)
         // So is a missing one: the row ends where a name is not there.
@@ -265,12 +265,12 @@ import Testing
                 && Encoder.linesPerFile(lines: 10, bytes: 0, method: .uue) == 10)
         #expect(
             Encoder.linesPerFile(lines: 0, bytes: 630, method: .uue) == 10
-                && Encoder.linesPerFile(lines: 3, bytes: 7800, method: .mime) == 3)
+                && Encoder.linesPerFile(lines: 3, bytes: 7_800, method: .mime) == 3)
         #expect(Encoder.linesPerFile(lines: 0, bytes: 5, method: .mime) == 1)
     }
 
     @Test func uuencodeMatchesTheSystemTool() throws {
-        let source = try write("A/decoded.txt", patternData(1100))
+        let source = try write("A/decoded.txt", patternData(1_100))
         perform(.encodeFile, ["method": .index(1)])
         let ours = box.read("B/decoded.uue") ?? ""
         let reference = try systemTool("/usr/bin/uuencode", [source.path, "decoded.txt"]).output
@@ -283,11 +283,11 @@ import Testing
         #expect(
             try systemTool("/usr/bin/uudecode", ["-o", box.url("B/back.txt").path, box.url("B/decoded.uue").path])
                 .status == 0)
-        #expect(data("B/back.txt") == patternData(1100))
+        #expect(data("B/back.txt") == patternData(1_100))
     }
 
     @Test func base64MatchesTheSystemTool() throws {
-        let source = try write("A/decoded.txt", patternData(1100))
+        let source = try write("A/decoded.txt", patternData(1_100))
         perform(.encodeFile)
         let ours = box.read("B/decoded.b64") ?? ""
         let parts = ours.components(separatedBy: "\r\n\r\n")
@@ -300,7 +300,7 @@ import Testing
         #expect(parts.last == reference.replacingOccurrences(of: "\n", with: "\r\n"))
     }
 
-    @Test(arguments: EncodeMethod.allCases, [0, 1, 2, 3, 44, 45, 46, 56, 57, 58, 1000, 150_000])
+    @Test(arguments: EncodeMethod.allCases, [0, 1, 2, 3, 44, 45, 46, 56, 57, 58, 1_000, 150_000])
     func encodeAndDecodeRoundTrip(method: EncodeMethod, count: Int) throws {
         let original = patternData(count)
         try original.write(to: box.url("A/file.bin"))
@@ -317,13 +317,13 @@ import Testing
 
     @Test(arguments: EncodeMethod.allCases)
     func encodeInSeveralParts(method: EncodeMethod) throws {
-        let original = patternData(5000)
+        let original = patternData(5_000)
         try write("A/big.dat", original)
         // 20 lines per file, or as many as fit into 10 lines' worth of bytes.
         let parts = try Encoder.encode(
             item("A/big.dat"), into: box.url("B"), method: method, linesPerFile: 20,
             bytesPerFile: Int64(10 * method.lineLength), run: run)
-        let lines = (5000 + method.bytesPerLine - 1) / method.bytesPerLine
+        let lines = (5_000 + method.bytesPerLine - 1) / method.bytesPerLine
         #expect(parts.count == (lines + 9) / 10 && parts.first?.lastPathComponent == "big001." + method.fileExtension)
         #expect(byteCount("B/big002." + method.fileExtension) == 10 * method.lineLength)
         // Decoding starts at the first part and finds the others by their counter.

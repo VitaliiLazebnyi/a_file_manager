@@ -35,7 +35,7 @@ public enum TextEncoding: Equatable {
     }
 
     /// By byte-order mark; without one, UTF-8 when the bytes are valid UTF-8, else Latin-1.
-    public static func detect(_ data: Data) -> TextEncoding {
+    public static func detect(_ data: Data) -> Self {
         if data.starts(with: [0xEF, 0xBB, 0xBF]) { return .utf8(bom: true) }
         if data.starts(with: [0xFF, 0xFE]) { return .utf16LittleEndian }
         if data.starts(with: [0xFE, 0xFF]) { return .utf16BigEndian }
@@ -44,7 +44,7 @@ public enum TextEncoding: Equatable {
 
     /// `detect` and `decode` in one pass over the bytes, which for UTF-8 without a mark is the
     /// validation that decides between UTF-8 and Latin-1.
-    static func decodeDetected(_ data: Data) -> (encoding: TextEncoding, text: String) {
+    static func decodeDetected(_ data: Data) -> (encoding: Self, text: String) {
         let found = decodeDetectedChecked(data)
         return (found.encoding, found.text)
     }
@@ -52,17 +52,17 @@ public enum TextEncoding: Equatable {
     /// Like `decodeDetected`, and says whether the bytes were read without loss. A file with a
     /// byte-order mark that holds invalid sequences is shown with replacement characters; writing it
     /// back would change those bytes.
-    static func decodeDetectedChecked(_ data: Data) -> (encoding: TextEncoding, text: String, isLossless: Bool) {
+    static func decodeDetectedChecked(_ data: Data) -> (encoding: Self, text: String, isLossless: Bool) {
         if let marked = detect(prefixOf: data) {
             let body = data.dropFirst(marked.bom.count)
             if let text = String(data: body, encoding: marked.stringEncoding) { return (marked, text, true) }
             return (marked, String(decoding: body, as: UTF8.self), false)
         }
         if let text = String(data: data, encoding: .utf8) { return (.utf8(bom: false), text, true) }
-        return (.latin1, TextEncoding.latin1.decode(data), true)
+        return (.latin1, Self.latin1.decode(data), true)
     }
 
-    private static func detect(prefixOf data: Data) -> TextEncoding? {
+    private static func detect(prefixOf data: Data) -> Self? {
         if data.starts(with: [0xEF, 0xBB, 0xBF]) { return .utf8(bom: true) }
         if data.starts(with: [0xFF, 0xFE]) { return .utf16LittleEndian }
         if data.starts(with: [0xFE, 0xFF]) { return .utf16BigEndian }
@@ -124,12 +124,12 @@ public struct TextDocument: Equatable {
     public init(data: Data, encoding: TextEncoding? = nil) {
         if let encoding {
             self.encoding = encoding
-            lines = TextDocument.split(encoding.decode(data))
+            lines = Self.split(encoding.decode(data))
         } else {
             let found = TextEncoding.decodeDetectedChecked(data)
             self.encoding = found.encoding
             isLossless = found.isLossless
-            lines = TextDocument.split(found.text)
+            lines = Self.split(found.text)
         }
     }
 
@@ -206,6 +206,6 @@ public struct TextDocument: Equatable {
     /// and is recognised by its byte-order mark.
     public static func looksBinary(_ data: Data) -> Bool {
         if data.starts(with: [0xFF, 0xFE]) || data.starts(with: [0xFE, 0xFF]) { return false }
-        return data.prefix(64 * 1024).contains(0)
+        return data.prefix(64 * 1_024).contains(0)
     }
 }

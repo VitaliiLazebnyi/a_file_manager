@@ -61,7 +61,7 @@ struct ArchiveEntry {
 /// handles them afterwards may use either.
 struct ArchiveTree {
     /// A member's path may not be longer than this, in bytes (what the system takes as a path).
-    static let maxPathBytes = 4096
+    static let maxPathBytes = 4_096
     /// …nor have more names than this: every name is a folder that has to be kept.
     static let maxDepth = 256
     /// The paths of the folders that were made up may take this many bytes together. Every
@@ -78,7 +78,7 @@ struct ArchiveTree {
     /// The place of the entry at each path.
     private var index: [String: Int32] = [:]
     /// The places of the entries directly inside each folder, by the folder's place.
-    private var children: [Int32: Set<Int32>] = [ArchiveTree.top: []]
+    private var children: [Int32: Set<Int32>] = [Self.top: []]
     private var nextOrder = 0
     /// The entries' places in archive order, kept up while entries come and go. Nil until
     /// it is first asked for.
@@ -178,7 +178,7 @@ struct ArchiveTree {
     }
 
     private func slot(of path: String) -> Int32? {
-        path.isEmpty ? ArchiveTree.top : index[path]
+        path.isEmpty ? Self.top : index[path]
     }
 
     func entry(_ path: String) -> ArchiveEntry? {
@@ -334,8 +334,8 @@ struct ArchiveTree {
         if entry.isDirectory, children[place] == nil { children[place] = [] }
         var path = entry.path
         while !path.isEmpty {
-            let parent = ArchiveTree.parent(of: path)
-            var folder = ArchiveTree.top
+            let parent = Self.parent(of: path)
+            var folder = Self.top
             if !parent.isEmpty {
                 if let known = index[parent] {
                     folder = known
@@ -366,7 +366,7 @@ struct ArchiveTree {
         freeSlots.append(place)
         if entry.isImplicit { implicitBytes -= path.utf8.count }
         children[place] = nil
-        if let folder = slot(of: ArchiveTree.parent(of: path)) { children[folder]?.remove(place) }
+        if let folder = slot(of: Self.parent(of: path)) { children[folder]?.remove(place) }
         return entry
     }
 }

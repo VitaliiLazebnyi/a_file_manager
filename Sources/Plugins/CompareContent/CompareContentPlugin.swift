@@ -107,7 +107,7 @@ public final class CompareContentPlugin: Plugin {
                 "Save the changes?", detail: "The compared files were edited:\n" + names, buttons,
                 fallback: allowCancel ? 2 : 0, style: .warning)
             {
-            case 0: if !session.saveNow() && allowCancel { return false }
+            case 0: if !session.saveNow(), allowCancel { return false }
             case 1: session.discardChanges()
             default: return false
             }

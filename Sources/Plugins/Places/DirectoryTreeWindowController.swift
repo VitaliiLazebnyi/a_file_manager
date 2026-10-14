@@ -33,7 +33,7 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
         /// Option-click on a disclosure triangle (and Option-Right) open a folder and everything
         /// below it: on a disk that is every row at once and a reader for each folder that has
         /// not been read. A folder opens one level.
-        override func expandItem(_ item: Any?, expandChildren: Bool) {
+        override func expandItem(_ item: Any?, expandChildren _: Bool) {
             super.expandItem(item, expandChildren: false)
         }
     }
@@ -140,15 +140,15 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
         window.delegate = self
         // Esc aborts a running scan; when idle it closes the window.
         window.onEscape = { [weak self] in
-            guard let self, self.scanner != nil else { return false }
-            self.stopScanning()
+            guard let self, scanner != nil else { return false }
+            stopScanning()
             return true
         }
         window.onRescanKey = { [weak self] in self?.rescan() }
         buildContent(in: window)
     }
 
-    required init?(coder: NSCoder) { fatalError("not used") }
+    required init?(coder _: NSCoder) { fatalError("not used") }
 
     static func isRescanKey(_ event: NSEvent) -> Bool {
         Shortcut.f(2).matches(event) || Shortcut(.character("r"), .control).matches(event)
@@ -223,8 +223,8 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
             let providerRoot = provider.root(of: directory)
             let places = providers.flatMap { $0.places() }
             DispatchQueue.main.async { [weak self] in
-                guard let self, self.showCounter == counter else { return }
-                self.finishShowing(directory, showHidden: showHidden, providerRoot: providerRoot, places: places)
+                guard let self, showCounter == counter else { return }
+                finishShowing(directory, showHidden: showHidden, providerRoot: providerRoot, places: places)
             }
         }
     }
@@ -281,7 +281,10 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
         scanner = nil
         generation += 1
         let generation = generation
-        guard !rescanning else { return scan(root, selecting: directory, generation: generation, rescanning: true) }
+        guard !rescanning else {
+            scan(root, selecting: directory, generation: generation, rescanning: true)
+            return
+        }
         statusLabel.stringValue = "Reading the directory tree…"
         let showHidden = showHidden
         reading.async { [weak self, cache] in
@@ -291,14 +294,14 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
             DispatchQueue.main.async { [weak self] in
                 guard let self, self.generation == generation else { return }
                 guard let cached, let entry else {
-                    return self.scan(root, selecting: directory, generation: generation, rescanning: false)
+                    return scan(root, selecting: directory, generation: generation, rescanning: false)
                 }
                 // The folder the panel shows is in the tree even if the cache is older than it.
                 _ = cached.node(at: cached.relativePath(of: directory) ?? "", creating: true)
-                self.adopt(cached, selecting: directory)
-                self.isComplete = entry.isComplete
-                self.treeIsInCache = true
-                self.showCount()
+                adopt(cached, selecting: directory)
+                isComplete = entry.isComplete
+                treeIsInCache = true
+                showCount()
             }
         }
     }
@@ -358,8 +361,8 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
             let completed = scanner.run { levels in
                 DispatchQueue.main.async { [weak self] in
                     guard let self, self.generation == generation else { return }
-                    self.waiting += levels.map { ($0, generation) }
-                    self.linkWaiting()
+                    waiting += levels.map { ($0, generation) }
+                    linkWaiting()
                 }
             }
             // The scanner has collected the paths itself: nothing is built from the tree on the
@@ -376,9 +379,9 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
             DispatchQueue.main.async { [weak self] in
                 guard let self, self.generation == generation else { return }
                 self.scanner = nil
-                self.isComplete = completed
-                self.treeIsInCache = stored
-                if self.isShown { self.showCount() } else { self.releaseTreeIfCached() }
+                isComplete = completed
+                treeIsInCache = stored
+                if isShown { showCount() } else { releaseTreeIfCached() }
             }
         }
     }
@@ -434,7 +437,7 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
         // Without a window the tree is only filled; the outline is loaded when the window returns.
         let visible = isShown
         let began = Date()
-        func overBudget() -> Bool { Date().timeIntervalSince(began) > DirectoryTreeWindowController.turnBudget }
+        func overBudget() -> Bool { Date().timeIntervalSince(began) > Self.turnBudget }
         while waitingHead < waiting.count, !overBudget() {
             let (level, generation) = waiting[waitingHead]
             guard generation == self.generation else {
@@ -442,7 +445,7 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
                 continue
             }
             let done = tree.attach(
-                level.nodes, ofPath: level.path, from: waitingLinked, limit: DirectoryTreeWindowController.linkBudget)
+                level.nodes, ofPath: level.path, from: waitingLinked, limit: Self.linkBudget)
             guard done == level.nodes.count else {
                 waitingLinked = done
                 // The rows of a folder that is still being filled are loaded when it is done.
@@ -533,8 +536,8 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
                 self?.demanded.remove(id)
                 // A scan that got here first has the same answer.
                 guard let self, self.generation == generation || self.tree === tree, !node.isScanned else { return }
-                self.apply(level)
-                if self.scanner == nil { self.showCount() }
+                apply(level)
+                if scanner == nil { showCount() }
             }
         }
     }
@@ -586,10 +589,11 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
         guard number == searchCounter, tree === self.tree else { return }
         switch tree.search(
             text, from: start, forward: forward, includingStart: includingStart, remaining: remaining,
-            timeBudget: DirectoryTreeWindowController.turnBudget)
+            timeBudget: Self.turnBudget)
         {
         case .found(let match): reveal(match)
         case .none: NSSound.beep()
+
         case .pending(let node, let left):
             DispatchQueue.main.async { [weak self] in
                 self?.continueSearch(
@@ -599,13 +603,13 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
         }
     }
 
-    func controlTextDidChange(_ notification: Notification) {
+    func controlTextDidChange(_: Notification) {
         search(includingStart: true)
     }
 
     /// Keys in the quick-search field: Ctrl+Enter and Ctrl+arrows step through the matches, and
     /// plain arrows move the cursor in the tree.
-    func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
+    func control(_: NSControl, textView _: NSTextView, doCommandBy _: Selector) -> Bool {
         guard let event = NSApp.currentEvent, event.type == .keyDown else { return false }
         if Shortcut(.returnKey).matches(event) || Shortcut(.enter).matches(event) {
             accept()
@@ -633,14 +637,14 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
     /// Keys in the tree: Enter goes there, F2 rescans, and typing fills the quick search.
     private func handleKey(_ event: NSEvent) -> Bool {
         if handleStepKey(event) { return true }
-        if DirectoryTreeWindowController.isRescanKey(event) {
+        if Self.isRescanKey(event) {
             rescan()
         } else if Shortcut(.returnKey).matches(event) || Shortcut(.enter).matches(event) {
             accept()
         } else if Shortcut(.backspace).matches(event) {
             searchField.stringValue = String(searchField.stringValue.dropLast())
             search(includingStart: true)
-        } else if let typed = DirectoryTreeWindowController.typedText(event) {
+        } else if let typed = Self.typedText(event) {
             searchField.stringValue += typed
             search(includingStart: true)
         } else {
@@ -667,7 +671,10 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
         let url = tree.url(of: node)
         close()
         // While a job runs the panels stay where they are, as for every command that moves them.
-        guard !kernel.jobs.isBusy else { return kernel.commands.onRejected() }
+        guard !kernel.jobs.isBusy else {
+            kernel.commands.onRejected()
+            return
+        }
         kernel.panels.source.show(url)
     }
 
@@ -675,17 +682,17 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
         close()
     }
 
-    func windowWillClose(_ notification: Notification) {
+    func windowWillClose(_: Notification) {
         isShown = false
         showCounter += 1
         if scanner != nil {
             // The scan goes on without the window, for a while at most.
             let current = generation
-            DispatchQueue.main.asyncAfter(deadline: .now() + DirectoryTreeWindowController.hiddenScanLimit) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + Self.hiddenScanLimit) {
                 [weak self] in
-                guard let self, self.generation == current, !self.isShown, self.scanner != nil else { return }
-                self.stopScanning()
-                self.releaseTreeIfCached()
+                guard let self, generation == current, !isShown, scanner != nil else { return }
+                stopScanning()
+                releaseTreeIfCached()
             }
         } else {
             releaseTreeIfCached()
@@ -694,22 +701,22 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
 
     // MARK: Outline
 
-    func outlineView(_ outlineView: NSOutlineView, numberOfChildrenOfItem item: Any?) -> Int {
+    func outlineView(_: NSOutlineView, numberOfChildrenOfItem item: Any?) -> Int {
         guard let node = item as? TreeNode else { return tree == nil ? 0 : 1 }
         return node.children.count
     }
 
-    func outlineView(_ outlineView: NSOutlineView, child index: Int, ofItem item: Any?) -> Any {
+    func outlineView(_: NSOutlineView, child index: Int, ofItem item: Any?) -> Any {
         guard let node = item as? TreeNode else { return tree?.root as Any }
         return node.children[index]
     }
 
-    func outlineView(_ outlineView: NSOutlineView, isItemExpandable item: Any) -> Bool {
+    func outlineView(_: NSOutlineView, isItemExpandable item: Any) -> Bool {
         guard let node = item as? TreeNode else { return false }
         return !node.children.isEmpty || !node.isScanned
     }
 
-    func outlineView(_ outlineView: NSOutlineView, viewFor tableColumn: NSTableColumn?, item: Any) -> NSView? {
+    func outlineView(_ outlineView: NSOutlineView, viewFor _: NSTableColumn?, item: Any) -> NSView? {
         let identifier = NSUserInterfaceItemIdentifier("folder")
         let cell =
             outlineView.makeView(withIdentifier: identifier, owner: nil) as? NSTextField
@@ -725,7 +732,7 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
         return cell
     }
 
-    func outlineViewSelectionDidChange(_ notification: Notification) {
+    func outlineViewSelectionDidChange(_: Notification) {
         updatePath()
     }
 }

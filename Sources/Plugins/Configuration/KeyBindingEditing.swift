@@ -50,7 +50,7 @@ final class KeyBindingEditor {
     convenience init(kernel: Kernel) {
         self.init(
             commands: kernel.commands.all,
-            overrides: KeyBindingEditor.storedOverrides(in: kernel))
+            overrides: Self.storedOverrides(in: kernel))
     }
 
     /// Takes bindings that were stored elsewhere since this editor was made (the Start menu's
@@ -67,7 +67,7 @@ final class KeyBindingEditor {
     }
 
     func rebase(kernel: Kernel) {
-        rebase(commands: kernel.commands.all, overrides: KeyBindingEditor.storedOverrides(in: kernel))
+        rebase(commands: kernel.commands.all, overrides: Self.storedOverrides(in: kernel))
     }
 
     static func storedOverrides(in kernel: Kernel) -> [String: [String]] {
@@ -154,7 +154,7 @@ final class KeyBindingEditor {
         } else {
             settings.set(overrides, forKey: KeyBindings.settingsKey)
         }
-        KeyBindingEditor.apply(resolved, of: commands, to: keyBindings)
+        Self.apply(resolved, of: commands, to: keyBindings)
     }
 
     static func apply(_ keys: [CommandID: [Shortcut]], of commands: [Command], to keyBindings: KeyBindings) {

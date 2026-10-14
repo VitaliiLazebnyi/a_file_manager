@@ -63,7 +63,7 @@ import Testing
 
     /// A string the misaligned halves of the characters of `run` decode to: what a decoder that
     /// starts one byte off sees, and the aligned text never contains.
-    private func misaligned(_ encoding: ViewerEncoding, _ run: String, runStart: Int) throws -> String {
+    private func misaligned(_ encoding: ViewerEncoding, _ run: String, runStart _: Int) throws -> String {
         let bytes = try #require(encoding.encode(run))
         var text = DecodedText()
         _ = encoding.decode(Array(bytes[1..<9]), final: true, into: &text)
@@ -80,7 +80,7 @@ import Testing
         let alphabet = Array(try #require(alphabets[codePage])).filter { encoding.encode(String($0)) != nil }
         #expect(alphabet.count >= 8)
         // 300,000 characters (600,000 bytes) without a single byte below 0x40, from an odd offset.
-        var state: UInt64 = 12345
+        var state: UInt64 = 12_345
         var run = ""
         for _ in 0..<300_000 {
             state = state &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
@@ -96,10 +96,10 @@ import Testing
         for needle in wanted + strangers where !needle.isEmpty {
             let reference = occurrences(of: needle, in: data, encoding: encoding)
             // Chunk sizes that put the borders at every parity and far from any ASCII byte.
-            for chunk in [4096, 10_007, 65_536, 262_145] {
+            for chunk in [4_096, 10_007, 65_536, 262_145] {
                 let boundaries = CharacterBoundaries(
                     source: DataByteSource(data), content: 0..<Int64(data.count), encoding: encoding)
-                for start in [0, 1, 2, 3, 4097, 100_001, 299_998, 300_001, 599_999, 600_002, Int64(data.count) - 3]
+                for start in [0, 1, 2, 3, 4_097, 100_001, 299_998, 300_001, 599_999, 600_002, Int64(data.count) - 3]
                     as [Int64]
                 {
                     let forward = try find(
@@ -128,7 +128,7 @@ import Testing
             init(_ data: Data) { self.data = data }
             var length: Int64 { Int64(data.count) }
             var bytesRead: Int64 { counter.value }
-            func read(at offset: Int64, count: Int) throws -> Data {
+            func read(at offset: Int64, count: Int) -> Data {
                 let lower = Int(max(0, min(offset, length)))
                 let upper = min(data.count, lower + max(0, count))
                 counter.mutate { $0 += Int64(upper - lower) }
@@ -176,10 +176,10 @@ import Testing
         // The usual case: line ends are in reach, and the answer is the same as ever.
         let sjis = try #require(ViewerEncoding.codePage(932))
         let line = "日本語のテキスト、ｶﾀｶﾅと ASCII 12345\n"
-        let data = Data(try #require(sjis.encode(String(repeating: line, count: 3000))))
+        let data = Data(try #require(sjis.encode(String(repeating: line, count: 3_000))))
         let reference = occurrences(of: "テキスト、", in: data, encoding: sjis)
-        #expect(reference.count == 3000)
-        for chunk in [4096, 7777, 65_536] {
+        #expect(reference.count == 3_000)
+        for chunk in [4_096, 7_777, 65_536] {
             var from: Int64 = 0
             var found: [Range<Int64>] = []
             while let next = try find("テキスト、", SearchOptions(), in: data, from: from, encoding: sjis, chunk: chunk) {
@@ -213,9 +213,9 @@ import Testing
     }
 
     @Test func rawByteSearchGivesTheAnswerOfTheDecodedSearch() throws {
-        let latin = try #require(ViewerEncoding.codePage(1252))
+        let latin = try #require(ViewerEncoding.codePage(1_252))
         let dos = try #require(ViewerEncoding.codePage(437))
-        let koi = try #require(ViewerEncoding.codePage(20866))
+        let koi = try #require(ViewerEncoding.codePage(20_866))
         let needles = [
             "word", "WORD", "Word_1", "foo", "bar", "x", "xx", "1", "_", "e", "E", "s", "ss", "strasse", "k", "kelvin",
             "star", "fi", "find", "ff", "st", "i", "stanbul", "12", "foo-bar", " ", "(word)"
@@ -243,7 +243,7 @@ import Testing
                                     wholeWords: wholeWords, caseSensitive: caseSensitive, backwards: backwards)
                                 for (start, chunk) in [
                                     (Int64(0), 1 << 20), (Int64(data.count), 977), (Int64(data.count / 2), 313),
-                                    (Int64(data.count / 3 + 1), 4096)
+                                    (Int64(data.count / 3 + 1), 4_096)
                                 ] {
                                     let raw = try find(
                                         needle, options, in: data, from: start, encoding: encoding, chunk: chunk,
@@ -281,7 +281,7 @@ import Testing
                 wholeWords: options.wholeWords)
             var found: [Range<Int64>] = []
             var from: Int64 = 0
-            while let next = try find("quick", options, in: data, from: from, encoding: .utf8, chunk: 1000) {
+            while let next = try find("quick", options, in: data, from: from, encoding: .utf8, chunk: 1_000) {
                 found.append(next)
                 from = next.lowerBound + 1
             }

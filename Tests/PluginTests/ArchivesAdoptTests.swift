@@ -11,7 +11,7 @@ private final class EndlessDeflate: ByteStream {
     private var block = Data()
     let reads = SharedCounter()
 
-    func read(upToCount count: Int) throws -> Data? {
+    func read(upToCount count: Int) -> Data? {
         reads.add(1)
         // Not final, stored, 65535 bytes (and the complement of that number).
         if block.isEmpty { block = Data([0x00, 0xFF, 0xFF, 0x00, 0x00]) + Data(count: 0xFFFF) }
@@ -342,7 +342,7 @@ private func outside(_ root: URL, _ path: String) throws -> URL {
         let source = EndlessDeflate()
         let control = StreamInterrupt()
         let stream = InflateStream(source, wrapping: .raw, control: control)
-        #expect(try stream.read(upToCount: 1000)?.count == 1000)
+        #expect(try stream.read(upToCount: 1_000)?.count == 1_000)
         signal(when: { source.reads.value > 50 }) { control.set() }
         // Skipping through what never ends: it ends because the request comes from another thread.
         #expect(throws: ArchiveError.self) { try stream.skip(.max) }
@@ -394,7 +394,7 @@ private func outside(_ root: URL, _ path: String) throws -> URL {
 
         // Interrupted in the middle of a member: ended, and so is everything after.
         let first = try bench.readOnly.read(root.appending(name: "big.log"), cancellation: flag)
-        #expect(try first.read(upToCount: 1000)?.count == 1000)
+        #expect(try first.read(upToCount: 1_000)?.count == 1_000)
         first.interrupt()
         #expect(throws: ArchiveError.self) { _ = try first.read(upToCount: 10) }
         #expect(throws: ArchiveError.self) { try first.seek(to: 0) }
@@ -477,9 +477,9 @@ private func outside(_ root: URL, _ path: String) throws -> URL {
         let onServer = bench.memory.url("/store/tree.zip")
         try bench.pack([tree], to: onServer)
         let root = ArchiveURL.make(scheme: "zip", archive: onServer)
-        _ = bench.memory.addFile("/store/log.txt", String(repeating: "x", count: 1000))
+        _ = bench.memory.addFile("/store/log.txt", String(repeating: "x", count: 1_000))
         let place = try outside(root, "/store/log.txt")
-        #expect(bench.zip.item(at: place, cancellation: CancellationFlag())?.size == 1000)
+        #expect(bench.zip.item(at: place, cancellation: CancellationFlag())?.size == 1_000)
         #expect(
             try bench.zip.list(try outside(root, "/store"), showHidden: true, cancellation: CancellationFlag()).map(
                 \.name

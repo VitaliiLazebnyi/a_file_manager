@@ -108,20 +108,20 @@ public final class PasswordVault {
     /// The first call also moves the passwords an earlier version kept by identifier alone, once.
     public func setConnections(_ connections: [SavedConnection]) {
         var current: [UUID: String] = [:]
-        for connection in connections { current[connection.id] = PasswordVault.account(of: connection) }
+        for connection in connections { current[connection.id] = Self.account(of: connection) }
         lock.lock()
         let isFirst = accounts.isEmpty
         accounts = current
         lock.unlock()
         guard isFirst, !current.isEmpty else { return }
         queue.async { [store] in
-            guard store.password(for: PasswordVault.boundAccount) == nil else { return }
+            guard store.password(for: Self.boundAccount) == nil else { return }
             for (id, account) in current {
                 guard let old = store.password(for: id.uuidString) else { continue }
                 if store.password(for: account) == nil { store.setPassword(old, for: account) }
                 store.setPassword(nil, for: id.uuidString)
             }
-            store.setPassword("1", for: PasswordVault.boundAccount)
+            store.setPassword("1", for: Self.boundAccount)
         }
     }
 
@@ -141,7 +141,7 @@ public final class PasswordVault {
 
     /// Stores, or with nil removes, the password of a connection. Returns at once.
     public func setPassword(_ password: String?, for connection: SavedConnection) {
-        let account = PasswordVault.account(of: connection)
+        let account = Self.account(of: connection)
         queue.async { [store] in store.setPassword(password, for: account) }
     }
 
@@ -149,7 +149,7 @@ public final class PasswordVault {
     /// for a connection whose host or user the user changed in the dialog. With `removing`,
     /// the original's is removed afterwards. Returns at once.
     public func carryPassword(from original: SavedConnection, to connection: SavedConnection, removing: Bool) {
-        let (from, to) = (PasswordVault.account(of: original), PasswordVault.account(of: connection))
+        let (from, to) = (Self.account(of: original), Self.account(of: connection))
         guard from != to else { return }
         queue.async { [store] in
             if let password = store.password(for: from) { store.setPassword(password, for: to) }
@@ -159,7 +159,7 @@ public final class PasswordVault {
 
     /// The certificates the user accepted for good, by host. Waits for the store.
     public func trustedCertificates() -> [String: [String]] {
-        queue.sync { [store] in PasswordVault.decode(store.password(for: PasswordVault.trustedAccount)) }
+        queue.sync { [store] in Self.decode(store.password(for: Self.trustedAccount)) }
     }
 
     /// Makes `fingerprints` the certificates accepted for good for `host`, in place of what was
@@ -167,11 +167,11 @@ public final class PasswordVault {
     public func setTrusted(_ fingerprints: [String], for host: String, adding: Bool) {
         let host = host.lowercased()
         queue.async { [store] in
-            var all = PasswordVault.decode(store.password(for: PasswordVault.trustedAccount))
+            var all = Self.decode(store.password(for: Self.trustedAccount))
             let kept = adding ? (all[host] ?? []).filter { !fingerprints.contains($0) } : []
             all[host] = kept + fingerprints
             guard let data = try? JSONEncoder().encode(all) else { return }
-            store.setPassword(String(decoding: data, as: UTF8.self), for: PasswordVault.trustedAccount)
+            store.setPassword(String(decoding: data, as: UTF8.self), for: Self.trustedAccount)
         }
     }
 
@@ -388,9 +388,9 @@ public final class ConnectionStore {
     }
 
     public var connections: [SavedConnection] {
-        get { settings.value([SavedConnection].self, forKey: ConnectionStore.connectionsKey) ?? [] }
+        get { settings.value([SavedConnection].self, forKey: Self.connectionsKey) ?? [] }
         set {
-            settings.set(newValue, forKey: ConnectionStore.connectionsKey)
+            settings.set(newValue, forKey: Self.connectionsKey)
             vault.setConnections(newValue)
             onChange()
         }
@@ -419,20 +419,20 @@ public final class ConnectionStore {
 
     /// The connection the list starts on (spec 11 › The list).
     public var lastUsed: UUID? {
-        get { settings.value(UUID.self, forKey: ConnectionStore.lastUsedKey) }
-        set { settings.set(newValue, forKey: ConnectionStore.lastUsedKey) }
+        get { settings.value(UUID.self, forKey: Self.lastUsedKey) }
+        set { settings.set(newValue, forKey: Self.lastUsedKey) }
     }
 
     /// The addresses of quick connections, newest first. They never contain a password.
     public var history: [String] {
-        settings.value([String].self, forKey: ConnectionStore.historyKey) ?? []
+        settings.value([String].self, forKey: Self.historyKey) ?? []
     }
 
     public func remember(address: ServerAddress) {
         let text = address.textWithoutPassword
         settings.set(
-            Array(([text] + history.filter { $0 != text }).prefix(ConnectionStore.historyLimit)),
-            forKey: ConnectionStore.historyKey)
+            Array(([text] + history.filter { $0 != text }).prefix(Self.historyLimit)),
+            forKey: Self.historyKey)
     }
 
     /// What an earlier version kept in the settings: certificates to always trust, by host.

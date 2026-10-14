@@ -94,7 +94,7 @@ import Testing
 
     @Test func partialDatesKeepTheOtherParts() throws {
         let original = try #require(
-            utc.date(from: DateComponents(year: 2026, month: 10, day: 11, hour: 9, minute: 58, second: 52)))
+            utc.date(from: DateComponents(year: 2_026, month: 10, day: 11, hour: 9, minute: 58, second: 52)))
         func change(_ date: String, _ time: String) -> String? {
             guard let new = TimestampChange(date: date, time: time)?.applied(to: original, now: Date(), calendar: utc)
             else { return nil }
@@ -122,7 +122,7 @@ import Testing
             parsed.applyAtOnce && parsed.change.hidden == true && parsed.change.locked == false && parsed.change.recurse
         )
         #expect(parsed.change.permissions == .absolute(0o640, keepingSpecialBits: false))
-        #expect(parsed.change.timestamp?.parts == [2020, 1, 2, 3, 4, 0])
+        #expect(parsed.change.timestamp?.parts == [2_020, 1, 2, 3, 4, 0])
         let dialog = try #require(AttributeChange.parse(parameters: "-h +mu+x"))
         #expect(!dialog.applyAtOnce && dialog.change.hidden == false && dialog.change.timestamp == nil)
         // `+c +t`: the current date, and the time as it is.
@@ -149,8 +149,9 @@ import Testing
 
     @Test func spaceReportWording() {
         let small = SpaceReport.text(
-            SpaceTotals(bytes: 23, allocated: 4096, rounded: 4096, files: 1), sourceIsLocal: true, targetCluster: 4096,
-            volume: VolumeInfo(name: "Disk", freeBytes: 2048 * 1024, totalBytes: 4096 * 1024), cancelled: false)
+            SpaceTotals(bytes: 23, allocated: 4_096, rounded: 4_096, files: 1), sourceIsLocal: true,
+            targetCluster: 4_096,
+            volume: VolumeInfo(name: "Disk", freeBytes: 2_048 * 1_024, totalBytes: 4_096 * 1_024), cancelled: false)
         #expect(
             small == """
                 23 bytes in 1 file(s)
@@ -169,8 +170,8 @@ import Testing
             large.contains("1 folder(s) could not be read") && large.contains("stopped")
                 && !large.contains("Actual space"))
         #expect(
-            SpaceCalculator.round(1, to: 4096) == 4096 && SpaceCalculator.round(4096, to: 4096) == 4096
-                && SpaceCalculator.round(0, to: 4096) == 0)
+            SpaceCalculator.round(1, to: 4_096) == 4_096 && SpaceCalculator.round(4_096, to: 4_096) == 4_096
+                && SpaceCalculator.round(0, to: 4_096) == 0)
         #expect(SpaceCalculator.round(5, to: nil) == 5)
     }
 }
@@ -183,7 +184,7 @@ import Testing
         let huge = SpaceTotals(bytes: .max - 5, allocated: .max, rounded: .max - 1, files: 1)
         let sum = huge + SpaceTotals(bytes: 100, allocated: 100, rounded: 100, files: 1)
         #expect(sum.bytes == .max && sum.allocated == .max && sum.rounded == .max && sum.files == 2)
-        #expect(SpaceCalculator.round(.max, to: 4096) > 0 && SpaceCalculator.round(.max - 3, to: 4096) > 0)
+        #expect(SpaceCalculator.round(.max, to: 4_096) > 0 && SpaceCalculator.round(.max - 3, to: 4_096) > 0)
     }
 }
 
@@ -228,7 +229,7 @@ import Testing
 
     @Test func measuresRealAllocationOnTheLocalDisk() throws {
         let box = try Sandbox()
-        try box.file("a/one.txt", String(repeating: "x", count: 5000))
+        try box.file("a/one.txt", String(repeating: "x", count: 5_000))
         try box.file("a/deep/two.txt", "2")
         try FileManager.default.createSymbolicLink(
             atPath: box.url("a/link").path, withDestinationPath: box.url("a/deep").path)
@@ -236,8 +237,8 @@ import Testing
         let totals = SpaceCalculator(fileSystems: fileSystems, targetCluster: LocalInfo.clusterSize(at: box.root))
             .measure([folder])[0]
         // The link is counted as a link, not followed.
-        #expect(totals.files == 3 && totals.folders == 2 && totals.bytes == 5001)
-        #expect(totals.allocated >= 5001 && totals.rounded >= 5001 && totals.rounded % 512 == 0)
+        #expect(totals.files == 3 && totals.folders == 2 && totals.bytes == 5_001)
+        #expect(totals.allocated >= 5_001 && totals.rounded >= 5_001 && totals.rounded % 512 == 0)
     }
 
     @Test func columnsAnswerFromManyThreadsAtOnce() throws {
@@ -619,7 +620,7 @@ import Testing
         #expect(memory.contents("/M/descript.ion") == "sub a folder\r\n")
         left.moveCursor(toName: "b.txt")
         ui.formAnswers = [
-            .values(["comment": .text(String(repeating: "x", count: 5000))]), .values(["comment": .text("größer")])
+            .values(["comment": .text(String(repeating: "x", count: 5_000))]), .values(["comment": .text("größer")])
         ]
         commands.perform("cm_EditComment")
         #expect(

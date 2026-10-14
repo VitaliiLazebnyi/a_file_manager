@@ -32,11 +32,11 @@ enum PermissionChange: Equatable {
             let mode = UInt16(text, radix: 8)
         {
             self = .absolute(mode, keepingSpecialBits: false)
-        } else if let mode = PermissionChange.mode(fromLetters: text) {
+        } else if let mode = Self.mode(fromLetters: text) {
             self = .absolute(mode, keepingSpecialBits: true)
         } else {
             let clauses = text.split(separator: ",", omittingEmptySubsequences: false).map {
-                PermissionChange.clause(String($0))
+                Self.clause(String($0))
             }
             guard !clauses.contains(nil) else { return nil }
             self = .symbolic(clauses.compactMap { $0 })
@@ -100,10 +100,12 @@ enum PermissionChange: Equatable {
         switch self {
         case .unchanged:
             return ""
+
         case .absolute(let mode, let keepingSpecialBits):
             if !keepingSpecialBits { return PropertyText.octal(mode) }
             return (0..<9).map { index in mode & (0o400 >> UInt16(index)) != 0 ? ["r", "w", "x"][index % 3] : "-" }
                 .joined()
+
         case .symbolic(let clauses):
             return clauses.map { clause in
                 let who =
@@ -121,8 +123,10 @@ enum PermissionChange: Equatable {
         switch self {
         case .unchanged:
             return mode
+
         case .absolute(let new, let keepingSpecialBits):
             return keepingSpecialBits ? (mode & 0o7000) | (new & 0o777) : new & 0o7777
+
         case .symbolic(let clauses):
             var mode = mode
             for clause in clauses {
@@ -150,7 +154,7 @@ struct TimestampChange: Equatable {
     /// The moment the command ran, for every item alike.
     var usesCurrentTime = false
 
-    static let current = TimestampChange(parts: Array(repeating: nil, count: 6), usesCurrentTime: true)
+    static let current = Self(parts: Array(repeating: nil, count: 6), usesCurrentTime: true)
 
     init(parts: [Int?], usesCurrentTime: Bool = false) {
         self.parts = parts
@@ -159,8 +163,8 @@ struct TimestampChange: Equatable {
 
     /// Nil when a field is neither empty nor a date or time in the form above.
     init?(date: String, time: String) {
-        guard let day = TimestampChange.fields(date, count: 3...3, limits: [1...9999, 1...12, 1...31]),
-            var clock = TimestampChange.fields(time, count: 2...4, limits: [0...23, 0...59, 0...59, 0...999])
+        guard let day = Self.fields(date, count: 3...3, limits: [1...9_999, 1...12, 1...31]),
+            var clock = Self.fields(time, count: 2...4, limits: [0...23, 0...59, 0...59, 0...999])
         else { return nil }
         // Seconds that are left out become 0; fractions of a second are not kept.
         if clock.count == 2 { clock.append(0) }
@@ -241,8 +245,8 @@ struct AttributeChange: Equatable {
     /// `+d<date>`, `+t<time>`, `+c` current date and time, and for the Mac `+m<permissions>`.
     /// A leading `=` means "apply without showing the dialog". Windows' `a` and `s` have no
     /// counterpart and are ignored. Nil when a token cannot be read.
-    static func parse(parameters: String) -> (change: AttributeChange, applyAtOnce: Bool)? {
-        var change = AttributeChange()
+    static func parse(parameters: String) -> (change: Self, applyAtOnce: Bool)? {
+        var change = Self()
         var applyAtOnce = false
         var (date, time, changesDate) = ("", "", false)
         for (index, token) in parameters.split(separator: " ").enumerated() {
@@ -260,16 +264,20 @@ struct AttributeChange: Equatable {
             case "r" where value.isEmpty: change.locked = sign == "+"
             case "f" where value.isEmpty: change.recurse = sign == "+"
             case "a" where value.isEmpty, "s" where value.isEmpty: break
+
             case "c" where value.isEmpty:
                 // Fills both fields; a later `+t` without a value empties the time again, so
                 // that `+c +t` changes the date only.
                 (date, time) = TimestampChange.fieldTexts(for: Date())
                 changesDate = true
+
             case "d": (date, changesDate) = (value, true)
             case "t": (time, changesDate) = (value, true)
+
             case "m":
                 guard let permissions = PermissionChange(value) else { return nil }
                 change.permissions = permissions
+
             default: return nil
             }
         }
@@ -339,13 +347,19 @@ final class AttributeJob {
     }
 
     private func each(_ items: [FileItem], serialBelow threshold: Int = 2, _ body: (FileItem) -> Void) {
-        guard items.count >= threshold, items.count > 1 else { return items.forEach(body) }
+        guard items.count >= threshold, items.count > 1 else {
+            items.forEach(body)
+            return
+        }
         _ = Parallel.map(items, serialBelow: threshold) { body($0) }
     }
 
     private func process(_ item: FileItem) {
         guard !cancellation.isCancelled else { return }
-        guard change.recurse, item.isRealDirectory else { return apply(to: item) }
+        guard change.recurse, item.isRealDirectory else {
+            apply(to: item)
+            return
+        }
         // The contents come first and the folder last, so that taking a folder's own
         // permissions away does not lock the job out of it. A folder that cannot be read
         // yet is changed first: the change may be what opens it.

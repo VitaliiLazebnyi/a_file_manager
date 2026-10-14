@@ -34,14 +34,14 @@ struct SettingsSchema {
 
     func isKnown(_ key: String) -> Bool {
         if preferences[key] != nil || known.contains(key) || key == keyBindingsKey
-            || SettingsSchema.tabKeys.contains(key)
+            || Self.tabKeys.contains(key)
         {
             return true
         }
         guard !isBackup(key), let dot = key.firstIndex(of: "."),
             key[key.index(after: dot)...].contains(where: { $0 != "." })
         else { return false }
-        return SettingsSchema.namespaces.contains(String(key[..<dot]))
+        return Self.namespaces.contains(String(key[..<dot]))
     }
 
     /// The copy the program keeps of stored data it could not read. It is neither exported nor imported.
@@ -60,7 +60,7 @@ struct SettingsSchema {
 
     /// Servers, user names and the certificates accepted for them.
     func isConnectionData(_ key: String) -> Bool {
-        key == SettingsSchema.connectionsKey || key == SettingsSchema.lastConnectionKey
+        key == Self.connectionsKey || key == Self.lastConnectionKey
             || group(of: key, value: nil) == .trust
     }
 
@@ -75,25 +75,25 @@ struct SettingsSchema {
     /// The group a key belongs to; nil for an ordinary setting. `value` is the value in the
     /// file, where the group depends on it.
     func group(of key: String, value: Any?) -> Group? {
-        if key == SettingsSchema.userCommandsKey || key == SettingsSchema.startMenuKey { return .commands }
+        if key == Self.userCommandsKey || key == Self.startMenuKey { return .commands }
         if key == keyBindingsKey { return .keys }
-        if key == SettingsSchema.hotlistKey { return .hotlist }
-        if key == SettingsSchema.connectionsKey || key == SettingsSchema.lastConnectionKey { return .connections }
+        if key == Self.hotlistKey { return .hotlist }
+        if key == Self.connectionsKey || key == Self.lastConnectionKey { return .connections }
         // What its own plugin says a key is: a key that decides whom the program trusts is
         // asked about whatever it is called (the list of servers a password may be sent to
         // without protection has none of the words looked for below in its name), and so is
         // one that holds something that is run.
         switch declaredKind(key) {
-        case .trust?: return .trust
-        case .connection?: return .connections
-        case .runsCode?: return .programs
+        case .trust: return .trust
+        case .connection: return .connections
+        case .runsCode: return .programs
         default: break
         }
         let lowered = key.lowercased()
         if lowered.hasPrefix("network."), ["certificate", "trust", "tls"].contains(where: lowered.contains) {
             return .trust
         }
-        if SettingsSchema.tabKeys.contains(key) {
+        if Self.tabKeys.contains(key) {
             // Tabs on this Mac's disks are ordinary; one on a server makes the program connect.
             guard let state = value as? [String: Any], let tabs = state["tabs"] as? [[String: Any]] else { return nil }
             let isRemote = tabs.contains { tab in
@@ -124,11 +124,11 @@ struct CheckedSettings {
     var limited = 0
 
     /// The largest file that is read: a settings file is some hundred kilobytes.
-    static let fileLimit = 16 * 1024 * 1024
+    static let fileLimit = 16 * 1_024 * 1_024
     /// No number of a settings file may be larger: counters are counted on, sizes multiplied.
     static let numberLimit: Double = 1_000_000_000_000
     static let frequentCountLimit = 1_000_000
-    static let userCommandLimit = 2000
+    static let userCommandLimit = 2_000
     static let startMenuLimit = 500
     static let textLimit = 65_536
 
@@ -139,7 +139,8 @@ struct CheckedSettings {
         var errorDescription: String? {
             switch self {
             case .tooLarge:
-                "The file is larger than \(CheckedSettings.fileLimit / 1024 / 1024) MB; a settings file is never that large. Nothing was imported."
+                "The file is larger than \(CheckedSettings.fileLimit / 1_024 / 1_024) MB; a settings file is never that large. Nothing was imported."
+
             case .unreadable(let key):
                 "The value of “\(DisplayText.oneLine(key, limit: 80))” in this file cannot be read, so nothing was imported."
             }
@@ -164,20 +165,20 @@ struct CheckedSettings {
                 unknown.append(key)
                 continue
             }
-            guard data.count <= CheckedSettings.fileLimit,
+            guard data.count <= Self.fileLimit,
                 let parsed = try? JSONSerialization.jsonObject(with: data, options: .fragmentsAllowed)
             else {
                 throw Problem.unreadable(key)
             }
-            var object = CheckedSettings.limitingNumbers(parsed, &limited)
-            if key == SettingsSchema.frequentFoldersKey { object = CheckedSettings.limitingCounts(object, &limited) }
+            var object = Self.limitingNumbers(parsed, &limited)
+            if key == SettingsSchema.frequentFoldersKey { object = Self.limitingCounts(object, &limited) }
             guard
                 let clean = try? JSONSerialization.data(
                     withJSONObject: object, options: [.fragmentsAllowed, .sortedKeys])
             else {
                 throw Problem.unreadable(key)
             }
-            try CheckedSettings.checkShape(of: key, clean, object, schema: schema)
+            try Self.checkShape(of: key, clean, object, schema: schema)
             values[key] = clean
             objects[key] = object
         }
@@ -223,6 +224,7 @@ struct CheckedSettings {
             switch kind {
             case .flag: try require(object is NSNumber && isBoolean(object as! NSNumber))
             case .text: try require((object as? String).map { $0.utf8.count <= textLimit } ?? false)
+
             case .choice(let options, _):
                 guard let number = object as? NSNumber, !isBoolean(number), let index = Int(exactly: number.doubleValue)
                 else { throw Problem.unreadable(key) }
@@ -241,16 +243,21 @@ struct CheckedSettings {
                 list.elements.allSatisfy {
                     UserCommand.name(from: $0.name) == $0.name && $0.title.utf8.count <= textLimit && isShort($0.action)
                 })
+
         case SettingsSchema.startMenuKey:
             let list = try decoded(LenientList<StartMenuEntry>.self)
             try require(list.skipped == 0 && list.elements.count <= startMenuLimit)
             try require(list.elements.allSatisfy { $0.title.utf8.count <= textLimit && isShort($0.action) })
+
         case SettingsSchema.symbolsKey:
             _ = try decoded([String: String].self)
+
         case schema.keyBindingsKey:
             _ = try decoded([String: [String]].self)
+
         case SettingsSchema.connectionsKey:
             try require(object is [[String: Any]])
+
         default:
             if SettingsSchema.tabKeys.contains(key) { _ = try decoded(PanelTabs.State.self) }
         }
@@ -354,7 +361,7 @@ struct SettingsImportPlan {
         }.sorted()
         parts = SettingsSchema.Group.allCases.compactMap { group in
             guard let keys = grouped[group]?.sorted(), !keys.isEmpty else { return nil }
-            return SettingsImportPlan.part(group, keys: keys, objects: objects)
+            return Self.part(group, keys: keys, objects: objects)
         }
     }
 
@@ -378,6 +385,7 @@ struct SettingsImportPlan {
                 }
             }
             title = "Import the user commands and the Start menu (\(lines.count)). They run programs and shell lines."
+
         case .keys:
             for (command, keys) in (objects[keys[0]] as? [String: [String]] ?? [:]).sorted(by: { $0.key < $1.key }) {
                 lines.append(
@@ -386,10 +394,12 @@ struct SettingsImportPlan {
                             ? "no key" : keys.map { DisplayText.oneLine($0, limit: 40) }.joined(separator: ", ")))
             }
             title = "Import the key bindings (\(lines.count) commands). They decide what every key does."
+
         case .programs:
             lines = keys.map { "\($0):  \(show(objects[$0]))" }
             title =
                 "Import the programs and files other settings name (\(lines.count)): the editor, the terminal, files that are written."
+
         case .trust:
             for key in keys {
                 if let hosts = objects[key] as? [String: Any] {
@@ -404,15 +414,20 @@ struct SettingsImportPlan {
             title =
                 "Import what is trusted of servers (\(lines.count)): certificates accepted for good, and servers a password may be sent to "
                 + "without protection. Such a server is connected to, or sent the password, without a question."
+
         case .connections:
             for connection in objects[SettingsSchema.connectionsKey] as? [[String: Any]] ?? [] {
                 lines.append("\(show(connection["name"])):  \(show(connection["user"]))@\(show(connection["host"]))")
             }
             title =
                 "Import the saved connections (\(lines.count)). Their passwords are not in the file and are asked for again."
+
         case .hotlist:
             func walk(_ object: Any) {
-                if let list = object as? [Any] { return list.forEach(walk) }
+                if let list = object as? [Any] {
+                    list.forEach(walk)
+                    return
+                }
                 guard let entry = object as? [String: Any] else { return }
                 if let command = entry["command"] as? String, !command.isEmpty {
                     lines.append("\(show(entry["title"] ?? entry["name"])):  \(show(command))")
@@ -421,6 +436,7 @@ struct SettingsImportPlan {
             }
             keys.forEach { walk(objects[$0] as Any) }
             title = "Import the directory hotlist (\(lines.count) entries). An entry can run a command of the program."
+
         case .tabs:
             for key in keys {
                 for tab in (objects[key] as? [String: Any])?["tabs"] as? [[String: Any]] ?? [] {
@@ -502,8 +518,8 @@ struct SettingsExportOptions: Equatable {
     /// What is told about the file, before or after it is written.
     func description(count: Int) -> String {
         var left: [String] = []
-        if !includesHistory { left.append(SettingsExportOptions.historyNote) }
-        if !includesConnections { left.append(SettingsExportOptions.connectionsNote) }
+        if !includesHistory { left.append(Self.historyNote) }
+        if !includesConnections { left.append(Self.connectionsNote) }
         var text =
             "The file holds \(count) settings: the options of all pages, the key bindings, the button bar, the user commands, the Start menu, "
             + "the directory hotlist and the panels' tabs. Passwords are never in it. Only you can read the file."

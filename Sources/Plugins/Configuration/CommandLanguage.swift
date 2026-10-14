@@ -27,7 +27,7 @@ struct UserCommand: Codable, Equatable {
 
     var id: CommandID { CommandID(rawValue: name) }
     /// What menus and lists show.
-    var caption: String { title.isEmpty ? String(name.dropFirst(UserCommand.prefix.count)) : title }
+    var caption: String { title.isEmpty ? String(name.dropFirst(Self.prefix.count)) : title }
 
     /// The name as it is stored: letters, digits and `_` after `em_`. Nil when nothing usable
     /// is left of what the user typed.
@@ -45,7 +45,7 @@ struct StartMenuEntry: Codable, Equatable {
     var title: String
     var action = CommandAction()
 
-    static let separator = StartMenuEntry(title: "-")
+    static let separator = Self(title: "-")
     var isSeparator: Bool { title == "-" }
 
     /// The name of the command that runs the entry at `index` (counted from 0).

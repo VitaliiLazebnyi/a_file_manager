@@ -45,7 +45,7 @@ import Testing
 
     @Test func aLongWildcardIsNotSlow() {
         let mask = SearchMask(String(repeating: "a*", count: 40) + "b")
-        #expect(finishes { _ = mask.matches(String(repeating: "a", count: 5000)) })
+        #expect(finishes { _ = mask.matches(String(repeating: "a", count: 5_000)) })
     }
 
     @Test func textSearchSkipsPipesAndDevices() throws {
@@ -54,7 +54,7 @@ import Testing
         #expect(mkfifo(box.url("pipe.txt").path, 0o644) == 0)
         var found: [String] = []
         let ended = finishes {
-            FileSearch(SearchQuery(directory: box.root, text: "needle"), fileSystems: self.fileSystems).run {
+            FileSearch(SearchQuery(directory: box.root, text: "needle"), fileSystems: fileSystems).run {
                 found.append($0.name)
             }
         }
@@ -76,7 +76,7 @@ import Testing
         // The root twice, and a folder inside it: still every file once.
         query.moreDirectories = [box.root, box.url("a")]
         var groups: [[FileItem]] = []
-        #expect(finishes { groups = FileSearch(query, fileSystems: self.fileSystems).runForDuplicates() })
+        #expect(finishes { groups = FileSearch(query, fileSystems: fileSystems).runForDuplicates() })
         #expect(groups.count == 1)
         // The hard link is the same file as one.txt, not a duplicate of it.
         #expect(groups.first.map { Set($0.map(\.name)).count } == 2)

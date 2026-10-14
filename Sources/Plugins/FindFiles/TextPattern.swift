@@ -21,10 +21,12 @@ public enum TextEncoding: String, Codable, CaseIterable {
         switch self {
         case .utf8: return .utf8
         case .western: return .windowsCP1252
+
         case .dos:
             return String.Encoding(
                 rawValue: CFStringConvertEncodingToNSStringEncoding(
                     CFStringEncoding(CFStringEncodings.dosLatinUS.rawValue)))
+
         case .utf16: return .utf16LittleEndian
         }
     }
@@ -219,7 +221,7 @@ public struct TextPattern {
         if options.hex {
             matcher = .bytes([
                 Needle(
-                    elements: try TextPattern.hexElements(text, caseSensitive: caseSensitive),
+                    elements: try Self.hexElements(text, caseSensitive: caseSensitive),
                     wholeWords: options.wholeWords)
             ])
             droppedEncodings = []
@@ -235,11 +237,11 @@ public struct TextPattern {
                 throw Problem.badRegex(error.localizedDescription)
             }
         } else {
-            let plain = TextPattern.unescape(text)
+            let plain = Self.unescape(text)
             var needles: [Needle] = []
             var dropped: [TextEncoding] = []
             for encoding in encodings {
-                let found = TextPattern.needles(
+                let found = Self.needles(
                     for: plain, in: encoding, caseSensitive: caseSensitive, wholeWords: options.wholeWords)
                 if found.isEmpty { dropped.append(encoding) }
                 for needle in found
@@ -263,6 +265,7 @@ public struct TextPattern {
                 case "t": result.append("\t")
                 case "n": result.append("\n")
                 case "\\": result.append("\\")
+
                 default:
                     result.append("\\")
                     result.append(character)
@@ -370,9 +373,10 @@ public struct TextPattern {
     /// Nil when the search was cancelled or the file could not be read to its end.
     private func search(_ reader: FileReader, cancellation: CancellationFlag?, blockSize: Int) -> Bool? {
         switch matcher {
-        case .bytes(let needles): return TextPattern.search(needles, reader, cancellation, blockSize)
+        case .bytes(let needles): return Self.search(needles, reader, cancellation, blockSize)
+
         case .regex(let regex, let encodings):
-            return TextPattern.search(regex, encodings, reader, cancellation, blockSize, trip)
+            return Self.search(regex, encodings, reader, cancellation, blockSize, trip)
         }
     }
 
@@ -433,6 +437,7 @@ public struct TextPattern {
             {
             case .matched: return true
             case .unmatched: return false
+
             case .timedOut:
                 gaveUp = true
                 if cancellation?.isCancelled != true { trip.recordTimeout() }
@@ -479,7 +484,7 @@ public struct TextPattern {
 
         /// How much of a piece cut in the middle of a long line is looked at again with the next one,
         /// so that a match across the cut is found as long as it is shorter than this.
-        private static let cutOverlap = 4096
+        private static let cutOverlap = 4_096
 
         mutating func feed(_ block: Data) -> String? {
             pending.append(block)
@@ -504,13 +509,13 @@ public struct TextPattern {
                 pending.removeFirst(cut)
                 return text
             }
-            guard pending.count > LineDecoder.longestLine else { return nil }
+            guard pending.count > Self.longestLine else { return nil }
             // A line without a break that is too long: handed out in pieces, cut between
             // characters, with the end of each piece repeated at the start of the next.
             let cut = boundary(atOrBefore: pending.count)
             guard cut > 0 else { return nil }
             let text = decode(pending.prefix(cut))
-            pending.removeFirst(boundary(atOrBefore: max(0, cut - LineDecoder.cutOverlap)))
+            pending.removeFirst(boundary(atOrBefore: max(0, cut - Self.cutOverlap)))
             return text
         }
 
@@ -534,8 +539,10 @@ public struct TextPattern {
                 var index = position
                 while index > 0, pending[pending.startIndex + index] & 0xC0 == 0x80 { index -= 1 }
                 return index
+
             case .utf16:
                 return position / 4 * 4
+
             case .western, .dos:
                 return position
             }
@@ -561,7 +568,7 @@ public struct TextPattern {
                 var index = bytes.count / 2 * 2 - 2
                 while index >= 0 {
                     let (line, zero) = bigEndian ? (bytes[index + 1], bytes[index]) : (bytes[index], bytes[index + 1])
-                    if line == 0x0A && zero == 0 { return index + 2 }
+                    if line == 0x0A, zero == 0 { return index + 2 }
                     index -= 2
                 }
                 return nil
@@ -571,9 +578,11 @@ public struct TextPattern {
         private func decode(_ data: Data) -> String? {
             switch encoding {
             case .utf8: return String(decoding: data, as: UTF8.self)
+
             case .utf16:
                 return String(
                     data: data.prefix(data.count / 2 * 2), encoding: bigEndian ? .utf16BigEndian : .utf16LittleEndian)
+
             case .western, .dos:
                 return String(data: data, encoding: encoding.stringEncoding)
                     ?? String(data: data, encoding: .isoLatin1)
@@ -587,14 +596,14 @@ public struct TextPattern {
 
         init(_ data: Data) { self.data = data }
 
-        func read(upToCount count: Int) throws -> Data? {
+        func read(upToCount count: Int) -> Data? {
             guard position < data.count else { return nil }
             let end = min(position + count, data.count)
             defer { position = end }
             return data.subdata(in: position..<end)
         }
 
-        func seek(to offset: UInt64) throws { position = min(Int(clamping: offset), data.count) }
+        func seek(to offset: UInt64) { position = min(Int(clamping: offset), data.count) }
         func close() {}
     }
 }

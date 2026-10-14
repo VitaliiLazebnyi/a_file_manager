@@ -21,8 +21,14 @@ final class TabBarView: NSView {
 
         /// The button follows the mouse itself, so that a press can turn into a drag.
         override func mouseDown(with event: NSEvent) {
-            guard let bar else { return super.mouseDown(with: event) }
-            if event.clickCount == 2 { return bar.onClose?(tag) ?? () }
+            guard let bar else {
+                super.mouseDown(with: event)
+                return
+            }
+            if event.clickCount == 2 {
+                bar.onClose?(tag) ?? ()
+                return
+            }
             let start = event.locationInWindow
             var isDragging = false
             while let next = window?.nextEvent(matching: [.leftMouseUp, .leftMouseDragged]) {
@@ -45,9 +51,9 @@ final class TabBarView: NSView {
             }
         }
 
-        override func otherMouseDown(with event: NSEvent) { bar?.onClose?(tag) }
+        override func otherMouseDown(with _: NSEvent) { bar?.onClose?(tag) }
 
-        override func menu(for event: NSEvent) -> NSMenu? { bar?.menuProvider?(tag) }
+        override func menu(for _: NSEvent) -> NSMenu? { bar?.menuProvider?(tag) }
     }
 
     override init(frame: NSRect) {
@@ -68,7 +74,7 @@ final class TabBarView: NSView {
         ])
     }
 
-    required init?(coder: NSCoder) { fatalError("not used") }
+    required init?(coder _: NSCoder) { fatalError("not used") }
 
     /// The captions of the tabs, for checks.
     var titles: [String] { stack.arrangedSubviews.compactMap { ($0 as? NSButton)?.title } }
@@ -135,5 +141,5 @@ final class TabBarView: NSView {
         if event.clickCount == 2 { onNewTab?() }
     }
 
-    override func otherMouseDown(with event: NSEvent) { onNewTab?() }
+    override func otherMouseDown(with _: NSEvent) { onNewTab?() }
 }

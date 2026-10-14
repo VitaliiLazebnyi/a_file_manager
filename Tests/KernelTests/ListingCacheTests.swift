@@ -268,7 +268,9 @@ import Testing
             case 0, 1:
                 cache.store(
                     listing, sortedBy: name, showHidden: index % 2 == 0, readTime: 0, since: cache.startReading())
+
             case 2: _ = cache.entry(for: listing.directory, showHidden: index % 2 == 0)
+
             case 3, 4:
                 // Whatever is handed out is one whole listing in the order that was asked for.
                 if let entry = cache.entry(for: listing.directory, showHidden: index % 2 == 0, sortedBy: order) {
@@ -276,6 +278,7 @@ import Testing
                     check(entry.order == order && items.count == listing.items.count)
                     check(zip(items, items.dropFirst()).allSatisfy { !Sorter.areInOrder($1, $0, by: order) })
                 }
+
             case 5: cache.invalidate([listing.directory])
             default: _ = cache.age(of: listing.directory, showHidden: false)
             }

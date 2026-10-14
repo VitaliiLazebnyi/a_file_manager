@@ -8,7 +8,7 @@ private func waitUntil(seconds: TimeInterval = 60, _ condition: () -> Bool) -> B
     let end = Date(timeIntervalSinceNow: seconds)
     while !condition() {
         if Date() > end { return false }
-        usleep(2000)
+        usleep(2_000)
     }
     return true
 }
@@ -46,7 +46,7 @@ private final class StalledFileSystem: FileSystemProvider {
 
     private func isDead(_ url: URL) -> Bool { url.path.hasPrefix("/dead") }
 
-    func volume(of url: URL) -> VolumeInfo? { VolumeInfo(name: "plain") }
+    func volume(of _: URL) -> VolumeInfo? { VolumeInfo(name: "plain") }
     func volume(of url: URL, cancellation: CancellationFlag) -> VolumeInfo? {
         guard isDead(url), stallsVolume else { return VolumeInfo(name: "alive") }
         note("volume", cancellation)
@@ -147,7 +147,7 @@ private final class StalledFileSystem: FileSystemProvider {
         for round in 0..<40 {
             let (cancellation, ended) = (CancellationFlag(), DispatchSemaphore(value: 0))
             load("/dead", stalled, registry, cancellation: cancellation, ended: ended)
-            if round == 0 { #expect(waitUntil { stalled.count("list") == 1 }) } else { usleep(1000) }
+            if round == 0 { #expect(waitUntil { stalled.count("list") == 1 }) } else { usleep(1_000) }
             cancellation.cancel()
             #expect(ended.wait(timeout: .now() + 60) == .success)
         }
@@ -226,7 +226,7 @@ private final class DeepFileSystem: FileSystemProvider {
 
     init(depth: Int) { self.depth = depth }
 
-    func list(_ directory: URL, showHidden: Bool) throws -> [FileItem] {
+    func list(_ directory: URL, showHidden _: Bool) -> [FileItem] {
         lock.lock()
         listed += 1
         lock.unlock()
@@ -239,16 +239,16 @@ private final class DeepFileSystem: FileSystemProvider {
         }
         return items
     }
-    func item(at url: URL) -> FileItem? { nil }
+    func item(at _: URL) -> FileItem? { nil }
     func parent(of directory: URL) -> URL? {
         directory.pathComponents.count > 1 ? directory.deletingLastPathComponent() : nil
     }
-    func read(_ url: URL) throws -> FileReader { throw FileSystemError.notSupported("Reading") }
-    func createDirectory(at url: URL) throws {}
-    func write(_ url: URL) throws -> FileWriter { throw FileSystemError.notSupported("Writing") }
-    func remove(_ url: URL) throws {}
-    func move(_ source: URL, to destination: URL, replacing: Bool) throws {}
-    func copy(_ source: URL, to destination: URL, progress: (Int64) -> Bool) throws {}
+    func read(_: URL) throws -> FileReader { throw FileSystemError.notSupported("Reading") }
+    func createDirectory(at _: URL) {}
+    func write(_: URL) throws -> FileWriter { throw FileSystemError.notSupported("Writing") }
+    func remove(_: URL) {}
+    func move(_: URL, to _: URL, replacing _: Bool) {}
+    func copy(_: URL, to _: URL, progress _: (Int64) -> Bool) {}
 }
 
 /// Review 2, K003/K038: the size of a tree that is deeper than any stack.
@@ -410,7 +410,7 @@ private final class DeepFileSystem: FileSystemProvider {
     @Test func noMaskTakesLongOnAnyName() {
         // The shapes that make a matcher go back and forth: many `*` against a name that
         // nearly fits. Bounded by the two lengths multiplied, whatever they hold.
-        let name = String(repeating: "a", count: 4000)
+        let name = String(repeating: "a", count: 4_000)
         let masks = [
             String(repeating: "*a", count: 60) + "*b", String(repeating: "a*", count: 100) + "?b",
             "*" + String(repeating: "?", count: 300) + "b",

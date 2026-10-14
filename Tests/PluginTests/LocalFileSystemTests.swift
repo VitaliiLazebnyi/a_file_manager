@@ -9,7 +9,7 @@ import Testing
 
     @Test func listsADirectory() throws {
         let box = try Sandbox()
-        try box.file("a.txt", String(repeating: "a", count: 2048))
+        try box.file("a.txt", String(repeating: "a", count: 2_048))
         try box.folder("docs")
         try box.file(".hidden")
         try FileManager.default.createSymbolicLink(at: box.url("link"), withDestinationURL: box.url("docs"))
@@ -17,7 +17,7 @@ import Testing
         #expect(Set(visible.map(\.name)) == ["a.txt", "docs", "link"])
         #expect(try local.list(box.root, showHidden: true).count == 4)
         let file = try #require(visible.first { $0.name == "a.txt" })
-        #expect(!file.isDirectory && file.size == 2048)
+        #expect(!file.isDirectory && file.size == 2_048)
         let link = try #require(visible.first { $0.name == "link" })
         #expect(link.isDirectory && link.isSymlink && !link.isRealDirectory)
         #expect(throws: (any Error).self) { try local.list(box.url("missing"), showHidden: false) }
@@ -28,7 +28,7 @@ import Testing
     @Test func theBulkListingAgreesWithLookingAtEachEntry() throws {
         let box = try Sandbox()
         try box.file(
-            "plain.txt", String(repeating: "p", count: 1234), modified: Date(timeIntervalSince1970: 1_700_000_000))
+            "plain.txt", String(repeating: "p", count: 1_234), modified: Date(timeIntervalSince1970: 1_700_000_000))
         try box.file("script.sh", "#!/bin/sh")
         try FileManager.default.setAttributes([.posixPermissions: 0o750], ofItemAtPath: box.url("script.sh").path)
         try box.file(".dotfile", "h")
@@ -52,7 +52,7 @@ import Testing
         }
         let byName = Dictionary(uniqueKeysWithValues: listed.map { ($0.name, $0) })
         #expect(
-            byName["plain.txt"]?.size == 1234
+            byName["plain.txt"]?.size == 1_234
                 && byName["plain.txt"]?.modified == Date(timeIntervalSince1970: 1_700_000_000))
         #expect(byName["script.sh"]?.permissions == 0o750)
         #expect(byName["Tool.app"]?.isPackage == true && byName["folder"]?.isPackage == false)
@@ -70,7 +70,7 @@ import Testing
 
     @Test func aLargeFolderIsListedInPieces() throws {
         let box = try Sandbox()
-        let count = 9000
+        let count = 9_000
         for index in 0..<count { FileManager.default.createFile(atPath: box.url("f\(index).dat").path, contents: nil) }
         try box.file(".hidden")
         // The whole listing, examined in parallel, has every entry exactly once.

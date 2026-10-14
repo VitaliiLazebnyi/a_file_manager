@@ -164,12 +164,12 @@ import Testing
             ])
     }
 
-    @Test func manyWalksAtOnceShareTheProvidersSafely() throws {
+    @Test func manyWalksAtOnceShareTheProvidersSafely() {
         for folder in 0..<40 { memory.addFile("/shared/d\(folder)/x/f.txt") }
         let virtual = VirtualFileSystem(fileSystems: fileSystems)
         let counts = Parallel.map(Array(0..<8)) { index -> Int in
             if index % 2 == 0 { virtual.options = VirtualFileSystem.Options(listsFolders: false) }
-            return ((try? virtual.list(virtual.branch(of: self.memory.url("/shared")), showHidden: false)) ?? []).count
+            return ((try? virtual.list(virtual.branch(of: memory.url("/shared")), showHidden: false)) ?? []).count
         }
         #expect(counts == Array(repeating: 40, count: 8))
     }
@@ -312,8 +312,8 @@ import Testing
         #expect(left.model.directory == memory.url("/B"))
     }
 
-    @Test func aForgottenListFailsWithoutHarm() throws {
-        let stale = VirtualLocation.list(id: 4711, title: "Old", origin: memory.url("/A")).url
+    @Test func aForgottenListFailsWithoutHarm() {
+        let stale = VirtualLocation.list(id: 4_711, title: "Old", origin: memory.url("/A")).url
         left.show(stale)
         #expect(left.model.directory == memory.url("/A") && left.failures.count == 1)
         #expect(fileSystem.item(at: stale) == nil && fileSystem.parent(of: stale) == memory.url("/A"))
@@ -372,7 +372,7 @@ private final class WatchableFileSystem: FileSystemProvider {
     func url(_ path: String) -> URL { URL(string: "watched://" + path)! }
     func fire() { onChange?(watched) }
 
-    func list(_ directory: URL, showHidden: Bool) throws -> [FileItem] {
+    func list(_ directory: URL, showHidden _: Bool) throws -> [FileItem] {
         switch directory.path {
         case "/top": return [FileItem(url: url("/top/sub"), name: "sub", isDirectory: true)]
         case "/top/sub": return [FileItem(url: url("/top/sub/f.txt"), name: "f.txt", isDirectory: false)]
@@ -384,14 +384,14 @@ private final class WatchableFileSystem: FileSystemProvider {
         FileItem(url: url, name: url.lastPathComponent, isDirectory: url.pathExtension.isEmpty)
     }
     func parent(of directory: URL) -> URL? { directory.path == "/" ? nil : directory.deletingLastPathComponent() }
-    func read(_ url: URL) throws -> FileReader { throw FileSystemError.notSupported("Reading") }
-    func createDirectory(at url: URL) throws { throw FileSystemError.notSupported("Writing") }
-    func write(_ url: URL) throws -> FileWriter { throw FileSystemError.notSupported("Writing") }
-    func remove(_ url: URL) throws { throw FileSystemError.notSupported("Writing") }
-    func move(_ source: URL, to destination: URL, replacing: Bool) throws {
+    func read(_: URL) throws -> FileReader { throw FileSystemError.notSupported("Reading") }
+    func createDirectory(at _: URL) throws { throw FileSystemError.notSupported("Writing") }
+    func write(_: URL) throws -> FileWriter { throw FileSystemError.notSupported("Writing") }
+    func remove(_: URL) throws { throw FileSystemError.notSupported("Writing") }
+    func move(_: URL, to _: URL, replacing _: Bool) throws {
         throw FileSystemError.notSupported("Writing")
     }
-    func copy(_ source: URL, to destination: URL, progress: (Int64) -> Bool) throws {
+    func copy(_: URL, to _: URL, progress _: (Int64) -> Bool) throws {
         throw FileSystemError.notSupported("Writing")
     }
 

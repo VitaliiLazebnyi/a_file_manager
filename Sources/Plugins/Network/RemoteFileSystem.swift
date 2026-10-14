@@ -223,7 +223,7 @@ private final class EntryCache {
     private static let lifetime: TimeInterval = 10
     private static let capacity = 64
     private static let journalLifetime: TimeInterval = 300
-    private static let journalLimit = 1024
+    private static let journalLimit = 1_024
 
     /// Stores a complete listing that was started at `startedAt`.
     func store(_ entries: [RemoteEntry], for directory: URL, includesHidden: Bool, startedAt: Date) {
@@ -236,7 +236,7 @@ private final class EntryCache {
             guard let name = change.name else { return }
             byName[name] = change.entry
         }
-        if directories.count >= EntryCache.capacity { directories.removeAll() }
+        if directories.count >= Self.capacity { directories.removeAll() }
         directories[key] = Directory(read: Date(), includesHidden: includesHidden, entries: byName)
     }
 
@@ -280,7 +280,7 @@ private final class EntryCache {
     /// The listing of a directory unless it is too old. Called with the lock held.
     private func fresh(_ key: String) -> Directory? {
         guard let known = directories[key] else { return nil }
-        if Date().timeIntervalSince(known.read) < EntryCache.lifetime { return known }
+        if Date().timeIntervalSince(known.read) < Self.lifetime { return known }
         directories[key] = nil
         return nil
     }
@@ -288,9 +288,9 @@ private final class EntryCache {
     private func note(_ key: String, name: String?, entry: RemoteEntry?) {
         let now = Date()
         var changes = journal[key] ?? []
-        let cutoff = now.addingTimeInterval(-EntryCache.journalLifetime)
+        let cutoff = now.addingTimeInterval(-Self.journalLifetime)
         if let first = changes.firstIndex(where: { $0.at >= cutoff }), first > 0 { changes.removeFirst(first) }
-        if changes.count >= EntryCache.journalLimit { changes = [Change(at: now, name: nil, entry: nil)] }
+        if changes.count >= Self.journalLimit { changes = [Change(at: now, name: nil, entry: nil)] }
         changes.append(Change(at: now, name: name, entry: entry))
         journal[key] = changes
         if journal.count > 256 { journal = journal.filter { $0.value.last.map { $0.at >= cutoff } ?? false } }
@@ -452,7 +452,7 @@ public final class RemoteFileSystem: FileSystemProvider {
         // A link the session resolves after the listing was delivered is a folder in what is remembered, too.
         session.onLinkResolved { [weak self] link, isDirectory in
             guard let self, let parent = RemotePath.parent(of: link) else { return }
-            self.cache.updateIfKnown(RemotePath.name(of: link), in: key.url(path: parent)) {
+            cache.updateIfKnown(RemotePath.name(of: link), in: key.url(path: parent)) {
                 $0.isDirectory = isDirectory
             }
         }
@@ -483,11 +483,13 @@ public final class RemoteFileSystem: FileSystemProvider {
         let (parentURL, name) = (key.url(path: parent), RemotePath.name(of: path))
         switch cache.lookUp(name, in: parentURL) {
         case .entry(let entry): return entry
+
         case .absent:
             guard beforeOverwriting, session.singleLookupsAreCheap || cache.hasNameAlike(name, in: parentURL) else {
                 return nil
             }
             return try session.entry(at: path, cancellation: cancellation)
+
         case .unknown: break
         }
         // Where one question costs several commands and a listing, the listing is read once
@@ -698,7 +700,7 @@ public final class RemoteFileSystem: FileSystemProvider {
         do {
             do {
                 try session.rename(from, to: to, replacing: replacing, cancellation: cancellation)
-            } catch let refusal where replacing && RemoteFileSystem.isRefusal(refusal) {
+            } catch let refusal where replacing && Self.isRefusal(refusal) {
                 isPlain = false
                 cache.forget(parentURL(source), parentURL(destination))
                 // Asked of the server, not of what is remembered: both answers decide over a file.
@@ -743,7 +745,7 @@ public final class RemoteFileSystem: FileSystemProvider {
         _ to: String, with from: String, on session: RemoteSession, refusal: Error, cancellation: CancellationFlag?
     ) throws {
         let directory = RemotePath.parent(of: to) ?? "/"
-        let aside = RemotePath.join(directory, RemoteFileSystem.asideName(for: RemotePath.name(of: to)))
+        let aside = RemotePath.join(directory, Self.asideName(for: RemotePath.name(of: to)))
         do {
             try session.rename(to, to: aside, replacing: false, cancellation: cancellation)
         } catch {
@@ -783,7 +785,7 @@ public final class RemoteFileSystem: FileSystemProvider {
     }
 
     /// A server does not copy; the caller reads the file and writes it again.
-    public func copy(_ source: URL, to destination: URL, progress: (Int64) -> Bool) throws {
+    public func copy(_: URL, to _: URL, progress _: (Int64) -> Bool) throws {
         throw FileSystemError.crossesVolumes
     }
 
@@ -843,7 +845,7 @@ public final class RemoteFileSystem: FileSystemProvider {
     /// from here to a disk asks for it and puts it on the copy.
     public func quarantine(of url: URL) -> Data? {
         guard let key = ServerKey(url), key.scheme == scheme else { return nil }
-        return RemoteFileSystem.quarantineMark(agent: center.agentName)
+        return Self.quarantineMark(agent: center.agentName)
     }
 
     /// `flags;time;agent;event`: downloaded (`0083`, what browsers write), the time in

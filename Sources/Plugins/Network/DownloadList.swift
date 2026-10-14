@@ -50,7 +50,7 @@ public enum DownloadList {
             if lowered.hasPrefix("sleep:") {
                 let milliseconds = TimeInterval(body(after: "sleep:")) ?? 0
                 // Not a number, below zero, or longer than anyone would wait: clamped.
-                return .pause(milliseconds.isFinite ? min(longestPause, max(0, milliseconds / 1000)) : 0)
+                return .pause(milliseconds.isFinite ? min(longestPause, max(0, milliseconds / 1_000)) : 0)
             }
             if lowered.hasPrefix("header:") || lowered.hasPrefix("copyflags:") { return .unsupported(line) }
             if lowered.hasPrefix("move:") {

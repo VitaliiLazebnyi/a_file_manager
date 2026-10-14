@@ -35,7 +35,7 @@ public enum Myers {
     /// bound is chosen for a total of a few hundred million steps whatever the size; real
     /// files, whose differences number thousands, never come near it.
     static func defaultLimit(forSize size: Int) -> Int? {
-        size < exactBelow ? nil : max(256, min(8192, 250_000_000 / size))
+        size < exactBelow ? nil : max(256, min(8_192, 250_000_000 / size))
     }
 
     /// `costLimit` bounds the effort per split; nil chooses by size. The result is cut short

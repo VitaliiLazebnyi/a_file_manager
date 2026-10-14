@@ -92,7 +92,7 @@ struct RenamePlanner {
             let finalKey = finalKeys[index]
             if holders[finalKey, default: 0] > 1 {
                 result[index] = .duplicate
-            } else if existing.contains(finalKey) && !sourceKeys.contains(finalKey) {
+            } else if existing.contains(finalKey), !sourceKeys.contains(finalKey) {
                 result[index] = .exists
             }
         }
@@ -126,7 +126,7 @@ struct RenamePlanner {
                 let wish = Wish(key: targetKey, isFolder: isFolder[index])
                 var number = nextNumber[wish] ?? 2
                 repeat {
-                    chosen = RenamePlanner.numbered(target, number, isFolder: isFolder[index])
+                    chosen = Self.numbered(target, number, isFolder: isFolder[index])
                     number += 1
                 } while claimed.contains(key(chosen)) || existing.contains(key(chosen)) || wanted.contains(key(chosen))
                 nextNumber[wish] = number

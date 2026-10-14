@@ -84,7 +84,7 @@ final class TLSServer {
     init(mode: TLSMode, box: Sandbox, refusesProtection: Bool = false) throws {
         let (certificate, key, script) = (box.url("cert.pem"), box.url("key.pem"), box.url("ftps.py"))
         let make = Process()
-        make.executableURL = URL(fileURLWithPath: TLSServer.openssl)
+        make.executableURL = URL(fileURLWithPath: Self.openssl)
         make.arguments = [
             "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", key.path, "-out", certificate.path, "-days",
             "2",
@@ -93,10 +93,10 @@ final class TLSServer {
         (make.standardOutput, make.standardError) = (FileHandle.nullDevice, FileHandle.nullDevice)
         try make.run()
         make.waitUntilExit()
-        try TLSServer.script.write(to: script, atomically: true, encoding: .utf8)
+        try Self.script.write(to: script, atomically: true, encoding: .utf8)
 
         let output = Pipe()
-        process.executableURL = URL(fileURLWithPath: TLSServer.python)
+        process.executableURL = URL(fileURLWithPath: Self.python)
         process.arguments =
             [script.path, mode == .implicit ? "implicit" : "explicit", certificate.path, key.path, box.url("srv").path]
             + (refusesProtection ? ["refuse-prot"] : [])

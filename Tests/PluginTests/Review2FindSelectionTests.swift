@@ -86,7 +86,7 @@ import Testing
 
     /// Gives the main run loop the time to hand the result of background work back.
     func settle(_ condition: () -> Bool) async {
-        for _ in 0..<5000 where !condition() { try? await Task.sleep(nanoseconds: 2_000_000) }
+        for _ in 0..<5_000 where !condition() { try? await Task.sleep(nanoseconds: 2_000_000) }
     }
 
     @Test func aRegexMaskIsEvaluatedOffTheMainThread() async {

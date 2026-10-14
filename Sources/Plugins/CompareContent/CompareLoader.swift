@@ -39,10 +39,10 @@ public struct ComparedFiles {
 /// be costly, the two are read once side by side.
 public enum CompareLoader {
     /// Files of the same size from here on are checked for identity before being loaded.
-    public static let quickCheckFrom: Int64 = 16 * 1024 * 1024
+    public static let quickCheckFrom: Int64 = 16 * 1_024 * 1_024
     /// Larger files are not loaded for display; only whether they are identical is told.
-    public static let loadLimit: Int64 = 128 * 1024 * 1024
-    public static let stretch = 4 * 1024 * 1024
+    public static let loadLimit: Int64 = 128 * 1_024 * 1_024
+    public static let stretch = 4 * 1_024 * 1_024
 
     public static func load(
         left: URL, right: URL, forceBinary: Bool = false, options: DiffOptions = DiffOptions(), bytesPerLine: Int = 16,
@@ -150,7 +150,7 @@ public enum CompareLoader {
     /// Whether two files of `size` bytes have the same content; nil when cancelled.
     public static func identical(
         _ first: URL, _ second: URL, size: Int64, fileSystems: FileSystemRegistry,
-        cancellation: CancellationFlag = CancellationFlag(), stretch: Int = CompareLoader.stretch
+        cancellation: CancellationFlag = CancellationFlag(), stretch: Int = Self.stretch
     ) throws -> Bool? {
         if cancellation.isCancelled { return nil }
         try fileSystems.flushPendingWrites(to: first, cancellation: cancellation)
@@ -275,12 +275,15 @@ public enum CompareLoader {
             case .changedOnDisk(let name):
                 return
                     "\(name) was changed by someone else after it was loaded. It is not overwritten; compare the files again."
+
             case .notRepresentable(let name, let encoding):
                 return
                     "\(name) has characters that \(encoding.name) cannot hold, so it is not saved (that would turn them into question marks)."
+
             case .invalidSequences(let name, let encoding):
                 return
                     "\(name) has bytes that are not valid \(encoding.name). Saving would change them, so it is not saved."
+
             case .sameFile(let name):
                 return "Both sides are the same file (\(name)) and both were edited, so it is not saved."
             }

@@ -105,7 +105,7 @@ public enum NameEncoding: Int, Codable, CaseIterable {
 final class NameMemory {
     private let lock = NSLock()
     private var spellings: [Data: String.Encoding] = [:]
-    private static let capacity = 65536
+    private static let capacity = 65_536
 
     var isEmpty: Bool {
         lock.lock()
@@ -123,7 +123,7 @@ final class NameMemory {
     func remember(_ name: String, encoding: String.Encoding) {
         lock.lock()
         defer { lock.unlock() }
-        if spellings.count >= NameMemory.capacity { spellings.removeAll() }
+        if spellings.count >= Self.capacity { spellings.removeAll() }
         spellings[Data(name.utf8)] = encoding
     }
 
@@ -188,7 +188,7 @@ public struct FTPServerConfig {
 final class LinkMemory {
     private let lock = NSLock()
     private var kinds: [String: Bool] = [:]
-    private static let capacity = 2048
+    private static let capacity = 2_048
 
     func isDirectory(_ path: String) -> Bool? {
         lock.lock()
@@ -199,7 +199,7 @@ final class LinkMemory {
     func remember(_ path: String, isDirectory: Bool) {
         lock.lock()
         defer { lock.unlock() }
-        if kinds.count >= LinkMemory.capacity { kinds.removeAll() }
+        if kinds.count >= Self.capacity { kinds.removeAll() }
         kinds[path] = isDirectory
     }
 
@@ -638,7 +638,7 @@ final class FTPConnection {
     /// The error for a reply that refused a command; a server that insists on TLS session reuse
     /// on the data connections gets its own, so the user is told what is wrong.
     private func refusal(_ reply: FTPReply, otherwise: Error? = nil) -> Error {
-        if protectsData, FTPConnection.requiresSessionReuse(reply) {
+        if protectsData, Self.requiresSessionReuse(reply) {
             return NetworkError.sessionReuseRequired(reply.message)
         }
         return otherwise ?? NetworkError.refused(reply)
@@ -776,7 +776,7 @@ final class FTPConnection {
         do {
             while wanted,
                 let block = try channel.read(
-                    upToCount: 256 * 1024, timeout: config.timeout, cancellation: cancellation)
+                    upToCount: 256 * 1_024, timeout: config.timeout, cancellation: cancellation)
             {
                 onActivity?()
                 bytesSoFar += Int64(block.count)
@@ -791,7 +791,10 @@ final class FTPConnection {
             if cancellation?.isCancelled == true { abandonTransfer() } else { abortTransfer() }
             throw error
         }
-        guard wanted else { return cancellation?.isCancelled == true ? abandonTransfer() : abortTransfer() }
+        guard wanted else {
+            cancellation?.isCancelled == true ? abandonTransfer() : abortTransfer()
+            return
+        }
         if let rest = splitter.finish() { deliver([rest]) }
         if splitter.dropped > 0 {
             log?(
@@ -809,7 +812,7 @@ final class FTPConnection {
     /// is only asked through for a short while.
     private func resolveLinks(_ links: [RemoteEntry], in path: String, cancellation: CancellationFlag?) -> [RemoteEntry]
     {
-        let deadline = Date().addingTimeInterval(FTPConnection.linkBudget)
+        let deadline = Date().addingTimeInterval(Self.linkBudget)
         var asked = 0
         return links.map { link in
             var link = link
@@ -818,7 +821,7 @@ final class FTPConnection {
                 link.isDirectory = known
             } else if link.linkTarget?.hasSuffix("/") == true {
                 link.isDirectory = true
-            } else if asked < FTPConnection.resolvedLinks, Date() < deadline, isUsable,
+            } else if asked < Self.resolvedLinks, Date() < deadline, isUsable,
                 cancellation?.isCancelled != true
             {
                 asked += 1
@@ -846,5 +849,5 @@ final class FTPConnection {
 
     private static let resolvedLinks = 32
     private static let linkBudget: TimeInterval = 1.5
-    private static let rememberedLinks = 2048
+    private static let rememberedLinks = 2_048
 }

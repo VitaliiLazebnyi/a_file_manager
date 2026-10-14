@@ -121,7 +121,7 @@ func adoptCancel(_ flag: CancellationFlag, after delay: TimeInterval = 0.3) {
 
     @Test func interruptingAReaderEndsAReadThatWaitsForTheServer() throws {
         let fixture = try FTPFixture { $0.timeout = 600 }
-        try fixture.box.file("srv/f.bin", String(repeating: "z", count: 1000))
+        try fixture.box.file("srv/f.bin", String(repeating: "z", count: 1_000))
         fixture.server.options.stallRETR = true
         let flag = CancellationFlag()
         let reader = try fixture.fileSystem.read(fixture.url("/f.bin"), cancellation: flag)
@@ -164,7 +164,7 @@ func adoptCancel(_ flag: CancellationFlag, after delay: TimeInterval = 0.3) {
         // The server reads nothing, so the socket buffers fill up and a write blocks.
         let outcome = AdoptOutcome {
             let block = Data(count: 1 << 20)
-            for _ in 0..<2000 { try writer.write(block) }
+            for _ in 0..<2_000 { try writer.write(block) }
         }
         #expect(adoptWait { fixture.server.commands.contains { $0.hasPrefix("STOR") } })
         Thread.sleep(forTimeInterval: 1)
@@ -330,7 +330,7 @@ func adoptCancel(_ flag: CancellationFlag, after delay: TimeInterval = 0.3) {
 @Suite(.enabled(if: FakeSFTPServer.isAvailable)) struct NetworkAdoptSFTP {
     @Test func aCancelledListingEndsAndTheChannelStaysOpen() throws {
         let suite = try NetworkFixSFTP(mode: .hangingIO, timeout: 600)
-        try NetworkFixSFTP.pattern(1000).write(to: suite.box.url("srv/f.bin"))
+        try NetworkFixSFTP.pattern(1_000).write(to: suite.box.url("srv/f.bin"))
         let flag = CancellationFlag()
         let outcome = AdoptOutcome {
             _ = try suite.fileSystem.list(suite.url("/"), showHidden: false, cancellation: flag)
@@ -343,7 +343,7 @@ func adoptCancel(_ flag: CancellationFlag, after delay: TimeInterval = 0.3) {
         #expect(outcome.failed)
         let session = try suite.center.session(for: suite.key)
         #expect(session.isConnected)
-        #expect(try session.entry(at: "/f.bin")?.size == 1000)
+        #expect(try session.entry(at: "/f.bin")?.size == 1_000)
 
         // A question that is never answered ends with the flag as well.
         let second = CancellationFlag()
@@ -364,7 +364,7 @@ func adoptCancel(_ flag: CancellationFlag, after delay: TimeInterval = 0.3) {
         let stuck = try suite.fileSystem.read(suite.url("/a.bin"), cancellation: flag)
         let token = flag.interrupting(stuck)
         let bystander = try suite.fileSystem.read(suite.url("/b.bin"))
-        #expect(try bystander.read(upToCount: 1000) == other.prefix(1000))
+        #expect(try bystander.read(upToCount: 1_000) == other.prefix(1_000))
 
         // Reads past 98304 are never answered.
         let outcome = AdoptOutcome { while try stuck.read(upToCount: 1 << 20) != nil {} }
@@ -381,7 +381,7 @@ func adoptCancel(_ flag: CancellationFlag, after delay: TimeInterval = 0.3) {
         // The channel is open and the other transfer goes on.
         let session = try suite.center.session(for: suite.key)
         #expect(session.isConnected)
-        var rest = other.prefix(1000)
+        var rest = other.prefix(1_000)
         while let block = try bystander.read(upToCount: 1 << 20) { rest.append(block) }
         #expect(rest == other)
         bystander.close()

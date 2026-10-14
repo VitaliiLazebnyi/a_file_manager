@@ -50,7 +50,7 @@ func bytes(index: Int, size: Int) -> Data {
     var data = Data(count: size)
     data.withUnsafeMutableBytes { raw in
         let buffer = raw.bindMemory(to: UInt8.self)
-        var state = UInt64(truncatingIfNeeded: index) &* 0x9E37_79B9_7F4A_7C15 &+ 12345
+        var state = UInt64(truncatingIfNeeded: index) &* 0x9E37_79B9_7F4A_7C15 &+ 12_345
         var position = 0
         while position < size {
             state = state &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
@@ -75,7 +75,8 @@ func makeManifest() -> [Entry] {
         let folder = min(folderCount - 1, index / perFolder)
         entries.append(
             Entry(
-                path: String(format: "d%04d/f%06d.dat", folder, index), index: index, size: 16 + (index &* 7919) % 2048
+                path: String(format: "d%04d/f%06d.dat", folder, index), index: index,
+                size: 16 + (index &* 7_919) % 2_048
             ))
     }
     // Larger than FileJob.smallFileLimit (4 MB): copied one after another, as a stream.
@@ -244,7 +245,7 @@ final class Recorder: FileJobDelegate {
         self.label = label
     }
 
-    func job(_ job: FileJob, progress: JobProgress) {
+    func job(_: FileJob, progress: JobProgress) {
         lock.lock()
         reports += 1
         if let last {
@@ -278,14 +279,14 @@ final class Recorder: FileJobDelegate {
         return last
     }
 
-    func job(_ job: FileJob, conflictAt target: FileItem, source: FileItem) -> ConflictChoice {
+    func job(_: FileJob, conflictAt _: FileItem, source _: FileItem) -> ConflictChoice {
         lock.lock()
         questions += 1
         lock.unlock()
         return monitor.ask { .overwriteAll }
     }
 
-    func job(_ job: FileJob, failedAt url: URL, error: Error) -> ErrorChoice {
+    func job(_: FileJob, failedAt url: URL, error: Error) -> ErrorChoice {
         lock.lock()
         questions += 1
         errors.append("\(url.lastPathComponent): \(error.localizedDescription)")
@@ -294,15 +295,15 @@ final class Recorder: FileJobDelegate {
         return monitor.ask { answer }
     }
 
-    func job(_ job: FileJob, confirmDeleteNonEmpty directory: URL) -> FolderDeleteChoice {
+    func job(_: FileJob, confirmDeleteNonEmpty _: URL) -> FolderDeleteChoice {
         lock.lock()
         questions += 1
         lock.unlock()
         return monitor.ask { .all }
     }
 
-    func job(_ job: FileJob, confirm question: ProtectionQuestion) -> ProtectionChoice { monitor.ask { .all } }
-    func job(_ job: FileJob, mergeInto existing: FileItem, source: FileItem) -> MergeChoice {
+    func job(_: FileJob, confirm _: ProtectionQuestion) -> ProtectionChoice { monitor.ask { .all } }
+    func job(_: FileJob, mergeInto _: FileItem, source _: FileItem) -> MergeChoice {
         monitor.ask { .mergeAll }
     }
 }
@@ -422,7 +423,7 @@ func offMain<T>(_ body: @escaping () -> T) -> T {
     }
     thread.stackSize = 16 << 20
     thread.start()
-    pump(upTo: 3600) { done.value != nil }
+    pump(upTo: 3_600) { done.value != nil }
     return done.value!
 }
 
@@ -911,7 +912,7 @@ if memSeeds > 0 {
         (0..<memFiles).map {
             Entry(
                 path: String(format: "m%03d/g%05d.dat", min(memFolders - 1, $0 / perFolder), $0), index: 900_000 + $0,
-                size: 8 + ($0 &* 131) % 1500)
+                size: 8 + ($0 &* 131) % 1_500)
         }
         + (0..<3).map { Entry(path: "top\($0).bin", index: 990_000 + $0, size: 300_000 + $0 * 4_096) }
     let memSource = root.appendingPathComponent("memsrc")

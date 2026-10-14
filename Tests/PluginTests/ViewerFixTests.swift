@@ -75,7 +75,7 @@ import Testing
         #expect(try find("gröSSE", sensitive, in: data) == nil)
         #expect(try find("gröSSE", in: data, from: 1)?.lowerBound == 8)
         // One byte per character.
-        let latin = try #require(ViewerEncoding.codePage(1252))
+        let latin = try #require(ViewerEncoding.codePage(1_252))
         let bytes = try #require(latin.encode("über Übung über")).withUnsafeBufferPointer { Data($0) }
         #expect(try find("über", sensitive, in: bytes, from: 1, encoding: latin, chunkSize: 4) == 11..<15)
     }
@@ -144,7 +144,7 @@ import Testing
         let text = sampleText(seed: 7, lines: 600)
         let utf8 = Data(text.utf8)
         let gbk = try #require(ViewerEncoding.codePage(936))
-        let latin = try #require(ViewerEncoding.codePage(1252))
+        let latin = try #require(ViewerEncoding.codePage(1_252))
         let cases: [(Data, ViewerEncoding)] = [
             (utf8, .utf8), (utf8, latin),
             (Data(text.filter { gbk.encode(String($0)) != nil }.flatMap { gbk.encode(String($0)) ?? [] }), gbk),
@@ -155,16 +155,16 @@ import Testing
             for options in [
                 TextLayoutOptions(columns: 20, wordWrap: true),
                 TextLayoutOptions(columns: 80, wordWrap: true, tabWidth: 4),
-                TextLayoutOptions(columns: 33, wordWrap: false), TextLayoutOptions(columns: 1000, wordWrap: true)
+                TextLayoutOptions(columns: 33, wordWrap: false), TextLayoutOptions(columns: 1_000, wordWrap: true)
             ] {
-                for (segment, chunk) in [(1 << 20, 1 << 20), (700, 61), (97, 16), (4096, 1000)] {
+                for (segment, chunk) in [(1 << 20, 1 << 20), (700, 61), (97, 16), (4_096, 1_000)] {
                     var results: [[String]] = []
                     var counts: [[Int]] = []
                     for raw in [true, false] {
                         let document = TextDocument(
                             source: DataByteSource(data), encoding: encoding, layout: .text(options))
                         document.buildIndex(
-                            parallel: segment < 1000, segmentSize: segment, chunkSize: chunk, rawScan: raw)
+                            parallel: segment < 1_000, segmentSize: segment, chunkSize: chunk, rawScan: raw)
                         results.append(try signature(document))
                         counts.append([document.rowCount, document.lineCount])
                     }
@@ -214,12 +214,12 @@ import Testing
         #expect(MemoryLayout<Int64>.stride + MemoryLayout<UInt32>.stride == 12)
     }
 
-    @Test func aFailedReadIsRecordedAndShown() throws {
+    @Test func aFailedReadIsRecordedAndShown() {
         final class Failing: ByteSource {
-            let length: Int64 = 3000
+            let length: Int64 = 3_000
             func read(at offset: Int64, count: Int) throws -> Data {
-                if offset >= 1000 { throw CocoaError(.fileReadUnknown) }
-                return Data(repeating: UInt8(ascii: "a"), count: min(count, 1000 - Int(offset)))
+                if offset >= 1_000 { throw CocoaError(.fileReadUnknown) }
+                return Data(repeating: UInt8(ascii: "a"), count: min(count, 1_000 - Int(offset)))
             }
         }
         let document = TextDocument(
@@ -231,7 +231,7 @@ import Testing
 
     // MARK: HTML
 
-    @Test func htmlIsStrippedFromUnitsAndCanBeCancelled() throws {
+    @Test func htmlIsStrippedFromUnitsAndCanBeCancelled() {
         let html = "<p>One &amp; two</p><script>x<y</script><a href=\"u\">l</a><!-- c --><pre> a  b </pre>"
         let expected = HTMLText.plainText(from: html)
         #expect(expected.text == "One & two\nl {u}\n a  b\n" && expected.links == ["u"])
@@ -265,7 +265,7 @@ import Testing
             var length: Int64 { Int64(data.count) }
             private let lock = NSLock()
             private(set) var reads = 0
-            func read(at offset: Int64, count: Int) throws -> Data {
+            func read(at offset: Int64, count: Int) -> Data {
                 lock.lock()
                 reads += 1
                 lock.unlock()

@@ -90,9 +90,9 @@ public final class MultiRenamePlugin: Plugin {
         // A closed tool lets go of its window and session (a running job holds on to the
         // session itself); the settings last used are kept for the next time.
         controller.onClose = { [weak self, weak controller] in
-            guard let self, self.window === controller else { return }
-            self.lastSettings = self.session?.settings ?? self.lastSettings
-            self.window = nil
+            guard let self, window === controller else { return }
+            lastSettings = self.session?.settings ?? lastSettings
+            window = nil
             self.session = nil
         }
         controller.showWindow(nil)

@@ -84,10 +84,10 @@ final class WatchedFileSystem: FileSystemProvider {
         condition.unlock()
         return Token { [weak self] in
             guard let self else { return }
-            self.condition.lock()
-            self.living -= 1
-            self.ended += 1
-            self.condition.unlock()
+            condition.lock()
+            living -= 1
+            ended += 1
+            condition.unlock()
         }
     }
 
@@ -582,7 +582,7 @@ extension Application {
 
     func wait(upTo seconds: TimeInterval = 10, until condition: () -> Bool) async -> Bool {
         let deadline = Date().addingTimeInterval(seconds)
-        while !condition() && Date() < deadline { try? await Task.sleep(nanoseconds: 2_000_000) }
+        while !condition(), Date() < deadline { try? await Task.sleep(nanoseconds: 2_000_000) }
         return condition()
     }
 
@@ -614,7 +614,7 @@ extension Application {
             Background.storage("order", at: URL(fileURLWithPath: "/order"), work: { number }, then: { got.append($0) })
         }
         var computed = 0
-        Background.compute(work: { (0..<1000).reduce(0, +) }, then: { computed = $0 })
+        Background.compute(work: { (0..<1_000).reduce(0, +) }, then: { computed = $0 })
         let done = await wait { got.count == 20 && computed != 0 }
         #expect(done && got == Array(0..<20) && computed == 499_500)
         // Something large is let go of elsewhere; the variable is empty at once.
@@ -647,7 +647,7 @@ extension Application {
         var isOffered = true
         var validated = 0
         var senders: [NSMenuItem] = []
-        func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        func validateMenuItem(_: NSMenuItem) -> Bool {
             validated += 1
             return isOffered
         }

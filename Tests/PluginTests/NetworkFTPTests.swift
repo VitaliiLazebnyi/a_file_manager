@@ -59,7 +59,7 @@ final class FTPFixture {
         defer { reader.close() }
         if offset > 0 { try reader.seek(to: offset) }
         var data = Data()
-        while let block = try reader.read(upToCount: 4096) { data.append(block) }
+        while let block = try reader.read(upToCount: 4_096) { data.append(block) }
         return data
     }
 
@@ -86,7 +86,7 @@ final class FTPFixture {
         #expect(items.map(\.name) == ["name with spaces.dat", "pub", "readme.txt"])
         #expect(items.map(\.isDirectory) == [false, true, false])
         #expect(items[0].size == 8 && items[2].size == 5)
-        #expect(items[2].modified == old || abs(items[2].modified.timeIntervalSince(old)) < 86400)
+        #expect(items[2].modified == old || abs(items[2].modified.timeIntervalSince(old)) < 86_400)
         #expect(items[0].url == fixture.url("/name with spaces.dat"))
         #expect(try fixture.names("/", showHidden: true).contains(".hidden"))
         #expect(try fixture.names("/pub") == ["inner.txt"])
@@ -144,8 +144,8 @@ final class FTPFixture {
         defer { reader.close() }
         #expect(try reader.read(upToCount: 10) == content.prefix(10))
         // A short hop forward stays on the same transfer; a jump back starts a new one.
-        try reader.seek(to: 1000)
-        #expect(try reader.read(upToCount: 5) == content.subdata(in: 1000..<1005))
+        try reader.seek(to: 1_000)
+        #expect(try reader.read(upToCount: 5) == content.subdata(in: 1_000..<1_005))
         try reader.seek(to: 500_000)
         #expect(try reader.read(upToCount: 5) == content.subdata(in: 500_000..<500_005))
         try reader.seek(to: 3)
@@ -381,7 +381,7 @@ final class FTPFixture {
         let fixture = try FTPFixture()
         try Data(count: 4_000_000).write(to: fixture.box.url("srv/big.bin"))
         let reader = try fixture.fileSystem.read(fixture.url("/big.bin"))
-        #expect(try reader.read(upToCount: 1000)?.count == 1000)
+        #expect(try reader.read(upToCount: 1_000)?.count == 1_000)
         fixture.center.disconnect(fixture.key)
         var failed = false
         do {

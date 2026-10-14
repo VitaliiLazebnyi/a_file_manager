@@ -76,7 +76,7 @@ public final class PanelModel {
 
         /// The totals with some bytes more or less; nil when the sum leaves the range of a
         /// number or may have left it before.
-        fileprivate func adding(bytes: Int64, selected: Bool) -> Totals? {
+        fileprivate func adding(bytes: Int64, selected: Bool) -> Self? {
             var totals = self
             let old = selected ? selectedBytes : totalBytes
             let (sum, overflow) = old.addingReportingOverflow(bytes)
@@ -150,11 +150,14 @@ public final class PanelModel {
     public var savedSelection: Set<String> {
         switch saved {
         case .none: return []
+
         case .places(let places):
             var names = Set<String>(minimumCapacity: places.count)
             places.forEach { names.insert(listedItems[$0].name) }
             return names
+
         case .names(let names): return Set(names.lazy.map(\.name))
+
         case .remains(let remains, let places):
             var names = Set<String>(minimumCapacity: places.count)
             places.forEach { names.insert(remains.lists[0][$0].name) }
@@ -435,7 +438,7 @@ public final class PanelModel {
     /// The saved marks no longer go by places: the list they are places of is about to go.
     private func keepSavedMarksByName() {
         guard case .places(let places) = saved else { return }
-        if places.count <= 4096 {
+        if places.count <= 4_096 {
             var names = Set<ExactName>(minimumCapacity: places.count)
             places.forEach { names.insert(ExactName(listedItems[$0].name)) }
             saved = .names(names)
@@ -467,9 +470,11 @@ public final class PanelModel {
     private func destination(of place: Int, in old: [FileItem], by moves: Moves, shift: inout Int) -> Int? {
         switch moves {
         case .same: return place
+
         case .table(let table):
             let to = table[place]
             return to == .max ? nil : Int(to)
+
         case .byName:
             guard let found = self.place(of: old[place], near: place + shift) else { return nil }
             shift = found - place
@@ -500,7 +505,7 @@ public final class PanelModel {
         // `listed` holds the old list from here on, for as long as its entries are looked at.
         arrangementChanged(list: true, index: index)
         var moves = moves
-        if case .byName = moves, oldMarks.count + oldSized.count > PanelModel.indexedAbove {
+        if case .byName = moves, oldMarks.count + oldSized.count > Self.indexedAbove {
             // Very many entries to find again by name: all of them at once, on all cores.
             let finder = NameFinder(listedItems, index: nameIndex)
             moves = .table(ListWork.moves(from: listed, to: finder))
@@ -612,7 +617,7 @@ public final class PanelModel {
         sort = snapshot.sort
         if wanted != snapshot.sort {
             // Announces the change itself.
-            _ = take(PanelModel.prepare(Basis(self, discards: false), sort: wanted, indexing: false))
+            _ = take(Self.prepare(Basis(self, discards: false), sort: wanted, indexing: false))
         } else {
             changed(.contents)
         }
@@ -651,11 +656,13 @@ public final class PanelModel {
             if !history[historyIndex].isSameLocation(as: directory) {
                 history.removeSubrange((historyIndex + 1)...)
                 history.append(directory)
-                if history.count > PanelModel.historyLimit { history.removeFirst() }
+                if history.count > Self.historyLimit { history.removeFirst() }
                 historyIndex = history.count - 1
             }
+
         case .step(let delta):
             historyIndex = max(0, min(historyIndex + delta, history.count - 1))
+
         case .keep:
             break
         }
@@ -784,7 +791,7 @@ public final class PanelModel {
     @discardableResult
     public func update(with listing: Listing, focus: String? = nil, presorted: ListOrder? = nil) -> Bool {
         take(
-            PanelModel.prepare(
+            Self.prepare(
                 Basis(self, discards: false), update: listing, focus: focus, presorted: presorted, tabulating: false))
             == .changed
     }
@@ -1304,7 +1311,7 @@ public final class PanelModel {
     /// `isInArrivalOrder`).
     public func setSort(_ order: ListOrder) {
         requestedSort = nil
-        _ = take(PanelModel.prepare(Basis(self, discards: false), sort: order, indexing: false))
+        _ = take(Self.prepare(Basis(self, discards: false), sort: order, indexing: false))
     }
 
     /// Takes a new order together with the list already in that order: `listedItems` as they
@@ -1314,7 +1321,10 @@ public final class PanelModel {
     /// entries are in it is worked out here, on the calling thread: **not for the main
     /// thread on long lists**; `prepare(_:sort:)` and `apply` leave nothing of that to it.
     public func setSort(_ order: ListOrder, presorted sorted: [FileItem]) {
-        guard sorted.count == listedItems.count else { return setSort(order) }
+        guard sorted.count == listedItems.count else {
+            setSort(order)
+            return
+        }
         let cursorName = cursorItem?.name
         requestedSort = nil
         sort = order
@@ -1350,7 +1360,7 @@ public final class PanelModel {
     public func setFilter(_ filter: PanelFilter?, narrowing: Bool = false) {
         let basis = Basis(self, discards: false)
         guard narrowing, let filter else {
-            _ = take(PanelModel.prepare(basis, filter: filter))
+            _ = take(Self.prepare(basis, filter: filter))
             return
         }
         let (shown, places) = ListWork.narrow(items, at: shownPlaces, by: filter)
@@ -1584,6 +1594,7 @@ public final class PanelModel {
         switch change {
         case .replace: break
         case .add: bits.formUnion(marks)
+
         case .remove:
             bits = marks
             bits.subtract(rows.bits)
@@ -1598,9 +1609,11 @@ public final class PanelModel {
         var bits = Bitset(size: listedItems.count)
         switch saved {
         case .none: break
+
         case .places(let places):
             bits = places
             if shownPlaces != nil { bits.formIntersection(shownBits()) }
+
         case .names(let names):
             if names.count < items.count / 4 {
                 for name in names {
@@ -1613,9 +1626,10 @@ public final class PanelModel {
                     bits.insert(place(ofShown: index))
                 }
             }
+
         case .remains(let remains, let places):
             let old = remains.lists[0]
-            if places.count > PanelModel.indexedAbove {
+            if places.count > Self.indexedAbove {
                 // Very many names to find: all of them at once, on all cores.
                 let finder = NameFinder(listedItems, index: nameIndex)
                 let table = ListWork.moves(from: old, to: finder)
@@ -1657,7 +1671,7 @@ public final class PanelModel {
     /// the list on whatever thread asks it.
     public func operands() -> [FileItem] {
         guard !marks.isEmpty else { return cursorItem.map { [$0] } ?? [] }
-        return PanelModel.gathered(marks, of: listedItems, shown: items)
+        return Self.gathered(marks, of: listedItems, shown: items)
     }
 
     /// The marked entries in the order of the list. For any thread.
@@ -1878,7 +1892,7 @@ struct ExactName: Hashable {
         self.name = name
     }
 
-    static func == (a: ExactName, b: ExactName) -> Bool { areSame(a.name, b.name) }
+    static func == (a: Self, b: Self) -> Bool { areSame(a.name, b.name) }
 
     func hash(into hasher: inout Hasher) {
         if name.utf8.withContiguousStorageIfAvailable({ hasher.combine(bytes: UnsafeRawBufferPointer($0)) }) == nil {
@@ -1913,8 +1927,8 @@ public struct PanelFilter {
     }
 
     /// Files whose names match a file mask; folders always stay (spec 03 › Display filters).
-    public static func mask(_ text: String) -> PanelFilter {
+    public static func mask(_ text: String) -> Self {
         let mask = FileMask(text)
-        return PanelFilter(title: text) { $0.isFolder || mask.matches($0.name) }
+        return Self(title: text) { $0.isFolder || mask.matches($0.name) }
     }
 }

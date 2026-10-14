@@ -36,7 +36,7 @@ private final class FakeMounter: VolumeMounter {
         return [mountPoint]
     }
 
-    func unmount(_ volume: URL) throws { ejected.append(volume) }
+    func unmount(_ volume: URL) { ejected.append(volume) }
 }
 
 /// The network plugin driven through its commands: the connection dialogs, the panels on a
@@ -113,7 +113,7 @@ private final class FakeMounter: VolumeMounter {
 
     // MARK: Connecting and disconnecting
 
-    @Test func quickConnectShowsTheServerAndDisconnectReturns() throws {
+    @Test func quickConnectShowsTheServerAndDisconnectReturns() {
         quickConnect()
         #expect(left.model.directory == url("/") && left.names == ["pub", "readme.txt"])
         #expect(left.model.volume?.isLocal == false)
@@ -215,7 +215,7 @@ private final class FakeMounter: VolumeMounter {
             } == true)
     }
 
-    @Test func asksForAPasswordThatIsNotStored() throws {
+    @Test func asksForAPasswordThatIsNotStored() {
         server.options.user = "anna"
         server.options.password = "pw"
         // Not anonymous and no user in the address: user name and password are asked while connecting.
@@ -297,7 +297,7 @@ private final class FakeMounter: VolumeMounter {
 
     // MARK: File operations on the server
 
-    @Test func downloadsWithTheCopyJob() throws {
+    @Test func downloadsWithTheCopyJob() {
         quickConnect("ftp://\(address)/pub")
         right.show(box.url("other"))
         // One file, then a folder with what is in it. The target is written as a `file:` URL:
@@ -355,7 +355,7 @@ private final class FakeMounter: VolumeMounter {
         #expect(!ui.log.contains { $0.hasPrefix("choose: Error") })
     }
 
-    @Test func movesBetweenServerAndDisk() throws {
+    @Test func movesBetweenServerAndDisk() {
         quickConnect("ftp://\(address)/pub")
         left.moveCursor(toName: "report.txt")
         ui.promptAnswers = [.text(localTarget)]

@@ -297,19 +297,19 @@ import UniformTypeIdentifiers
     }
 
     @Test func eucJPAndGB18030AreOffered() throws {
-        let euc = try #require(ViewerEncoding.codePage(51932))
-        let gb = try #require(ViewerEncoding.codePage(54936))
+        let euc = try #require(ViewerEncoding.codePage(51_932))
+        let gb = try #require(ViewerEncoding.codePage(54_936))
         #expect(euc.kind == .doubleByte && euc.shape == .eucJP && gb.kind == .doubleByte && gb.shape == .gb18030)
         #expect(euc.isAvailable && gb.isAvailable)
         let offered = ViewerEncoding.codePages.map(\.codePage)
-        #expect(offered.contains(51932) && offered.contains(54936))
+        #expect(offered.contains(51_932) && offered.contains(54_936))
         #expect(!euc.byteOriented.isUnicode && euc.byteOriented == .ansi)
         // Another code page of many bytes is still not offered.
-        #expect(ViewerEncoding.codePage(50220) == nil)
+        #expect(ViewerEncoding.codePage(50_220) == nil)
     }
 
     @Test func eucJPTextIsDecodedWithItsOffsets() throws {
-        let euc = try #require(ViewerEncoding.codePage(51932))
+        let euc = try #require(ViewerEncoding.codePage(51_932))
         let characters = ["日", "本", "語", "a", "ｱ", "ｲ", "テ", "キ", "ス", "ト", "、", " ", "b", "\n", "漢", "字"]
         let (data, starts) = try encode(characters, euc)
         #expect(data.count == starts.last! + 2)
@@ -328,7 +328,7 @@ import UniformTypeIdentifiers
     }
 
     @Test func gb18030TextIsDecodedWithItsOffsets() throws {
-        let gb = try #require(ViewerEncoding.codePage(54936))
+        let gb = try #require(ViewerEncoding.codePage(54_936))
         // Two-byte characters, ASCII, four-byte ones in and beyond the Basic Multilingual Plane.
         let characters = ["中", "文", "a", "1", "\u{80}", "\u{FFFF}", "\u{20000}", "😀", "€", "龙", "9", "\n", "b"]
         let (data, starts) = try encode(characters, gb)
@@ -349,8 +349,8 @@ import UniformTypeIdentifiers
     }
 
     @Test func textDecodedInPiecesEqualsTextDecodedWhole() throws {
-        let euc = try #require(ViewerEncoding.codePage(51932))
-        let gb = try #require(ViewerEncoding.codePage(54936))
+        let euc = try #require(ViewerEncoding.codePage(51_932))
+        let gb = try #require(ViewerEncoding.codePage(54_936))
         let eucData =
             try encode(["日", "本", "a", "ｱ", "語", "\n", "テ", "ス", "ト", "漢"], euc).data
             + Data([0x8F, 0xB0, 0xA1, 0x41, 0x8E])
@@ -385,8 +385,8 @@ import UniformTypeIdentifiers
     }
 
     @Test func characterBoundariesAreExactInEUCJPAndGB18030() throws {
-        let euc = try #require(ViewerEncoding.codePage(51932))
-        let gb = try #require(ViewerEncoding.codePage(54936))
+        let euc = try #require(ViewerEncoding.codePage(51_932))
+        let gb = try #require(ViewerEncoding.codePage(54_936))
         // Long runs without a byte that stands by itself: the boundary cannot be guessed from the neighbours.
         let kanji = (0..<400).map { ["日", "本", "語", "漢", "字", "龍"][$0 % 6] }
         let rareGB = (0..<400).map { ["\u{20000}", "龙", "\u{80}", "文", "😀", "中"][$0 % 6] }
@@ -412,8 +412,8 @@ import UniformTypeIdentifiers
     }
 
     @Test func aSearchInEUCJPAndGB18030FindsWholeCharactersWhateverTheChunkSize() throws {
-        let euc = try #require(ViewerEncoding.codePage(51932))
-        let gb = try #require(ViewerEncoding.codePage(54936))
+        let euc = try #require(ViewerEncoding.codePage(51_932))
+        let gb = try #require(ViewerEncoding.codePage(54_936))
         for (encoding, characters, needle) in [
             (
                 euc, (0..<300).map { ["日", "本", "語", "漢", "字"][$0 % 5] } + ["龍", "亀"] + (0..<20).map { _ in "日" }, "龍亀"
@@ -427,7 +427,7 @@ import UniformTypeIdentifiers
             let (data, starts) = try encode(characters, encoding)
             let at = starts[300]
             let want = Int64(at)..<Int64(starts[302])
-            for chunk in [3, 7, 16, 61, 4096] {
+            for chunk in [3, 7, 16, 61, 4_096] {
                 let pattern = try SearchPattern(needle, options: SearchOptions(), encoding: encoding)
                 let found = try ViewerSearch.find(
                     pattern, in: DataByteSource(data), content: 0..<Int64(data.count), from: 0, backwards: false,
@@ -446,8 +446,8 @@ import UniformTypeIdentifiers
     }
 
     @Test func aTextDocumentInGB18030AndEUCJPShowsItsRows() throws {
-        let euc = try #require(ViewerEncoding.codePage(51932))
-        let gb = try #require(ViewerEncoding.codePage(54936))
+        let euc = try #require(ViewerEncoding.codePage(51_932))
+        let gb = try #require(ViewerEncoding.codePage(54_936))
         let eucText = "日本語のテキスト\nｱｲｳ abc\n漢字\n"
         let gbText = "中文 \u{20000} 文本\n€ 龙\n"
         for (encoding, text) in [(euc, eucText), (gb, gbText)] {
@@ -459,7 +459,7 @@ import UniformTypeIdentifiers
 
     // MARK: Printing (the whole text, to a page limit)
 
-    @Test func printingCoversALongTextInFull() throws {
+    @Test func printingCoversALongTextInFull() {
         // 40,000 lines of 50 bytes: 2 MB, which the old limit of 512 KB cut at a quarter.
         let line = String(repeating: "x", count: 49)
         let text = (1...40_000).map { _ in line }.joined(separator: "\n") + "\n"
@@ -574,15 +574,15 @@ import UniformTypeIdentifiers
         let capabilities: FileSystemCapabilities = []
         let entry: FileItem
         init(_ entry: FileItem) { self.entry = entry }
-        func list(_ directory: URL, showHidden: Bool) throws -> [FileItem] { [] }
-        func parent(of directory: URL) -> URL? { nil }
-        func createDirectory(at url: URL) throws {}
-        func write(_ url: URL) throws -> FileWriter { throw FileSystemError.notSupported("x") }
-        func remove(_ url: URL) throws {}
-        func move(_ source: URL, to destination: URL, replacing: Bool) throws {}
-        func copy(_ source: URL, to destination: URL, progress: (Int64) -> Bool) throws {}
-        func item(at url: URL) -> FileItem? { entry }
-        func read(_ url: URL) throws -> FileReader {
+        func list(_: URL, showHidden _: Bool) -> [FileItem] { [] }
+        func parent(of _: URL) -> URL? { nil }
+        func createDirectory(at _: URL) {}
+        func write(_: URL) throws -> FileWriter { throw FileSystemError.notSupported("x") }
+        func remove(_: URL) {}
+        func move(_: URL, to _: URL, replacing _: Bool) {}
+        func copy(_: URL, to _: URL, progress _: (Int64) -> Bool) {}
+        func item(at _: URL) -> FileItem? { entry }
+        func read(_: URL) throws -> FileReader {
             throw FileSystemError.notSupported("a link whose target size is known is not read to be measured")
         }
     }
@@ -599,7 +599,7 @@ import UniformTypeIdentifiers
 
     // MARK: Closing at the end
 
-    @Test func theTemporaryCopiesAreDeletedInTheBackgroundWhenTheProgramQuits() throws {
+    @Test func theTemporaryCopiesAreDeletedInTheBackgroundWhenTheProgramQuits() {
         let copies = TemporaryCopies()
         let memory = MemoryFileSystem()
         memory.addFile("/remote/clip.mov", String(repeating: "m", count: 5_000))
@@ -637,11 +637,11 @@ import UniformTypeIdentifiers
         let folder = try scratch()
         defer { try? FileManager.default.removeItem(at: folder) }
         let url = folder.appendingPathComponent("f.txt")
-        try Data(repeating: UInt8(ascii: "z"), count: 1000).write(to: url)
+        try Data(repeating: UInt8(ascii: "z"), count: 1_000).write(to: url)
         let registry = FileSystemRegistry()
         registry.register(LocalFileSystem())
         let source = try ProviderByteSource.open(url, fileSystems: registry)
-        #expect(source.length == 1000)
+        #expect(source.length == 1_000)
         #expect(try source.read(at: 0, count: 4) == Data("zzzz".utf8))
         // The reader that was kept belongs to the old file; a source closed meanwhile has none.
         source.close()

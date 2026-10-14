@@ -25,12 +25,12 @@ final class CommandRunner {
     /// How deep user commands may call each other, and how many steps one run may take with
     /// everything it calls: a loop the name check does not see still ends.
     static let depthLimit = 16
-    static let stepLimit = 1000
+    static let stepLimit = 1_000
     /// With this many marked, the marked names are gathered and the placeholders replaced off
     /// the main thread.
-    static let backgroundSelectionThreshold = 5000
+    static let backgroundSelectionThreshold = 5_000
     /// A line of more pieces than this is checked where it is started, off the main thread.
-    static let checkedHereLimit = 4096
+    static let checkedHereLimit = 4_096
     var environment = ProcessInfo.processInfo.environment
     /// Finds the definition of a user command, so that a chain can wait for what it starts.
     var userCommand: ((String) -> UserCommand?)?
@@ -83,7 +83,10 @@ final class CommandRunner {
 
     /// Runs `work` away from the main thread and `completion` on it.
     func offMain<Result>(_ work: @escaping () -> Result, then completion: @escaping (Result) -> Void) {
-        guard let background else { return completion(work()) }
+        guard let background else {
+            completion(work())
+            return
+        }
         background.async {
             let result = work()
             MainLoop.perform { completion(result) }
@@ -92,7 +95,10 @@ final class CommandRunner {
 
     /// The same for list files, which are handled in the order they were asked for.
     private func onListQueue<Result>(_ work: @escaping () -> Result, then completion: @escaping (Result) -> Void) {
-        guard let listQueue else { return completion(work()) }
+        guard let listQueue else {
+            completion(work())
+            return
+        }
         listQueue.async {
             let result = work()
             MainLoop.perform { completion(result) }
@@ -118,7 +124,7 @@ final class CommandRunner {
             let written =
                 (try? file.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
                 ?? .distantPast
-            if Date().timeIntervalSince(written) < CommandRunner.listGrace {
+            if Date().timeIntervalSince(written) < Self.listGrace {
                 kept += 1
             } else {
                 try? fm.removeItem(at: file)
@@ -165,7 +171,7 @@ final class CommandRunner {
         // The marks and the list are taken as they are (nothing is copied); the marked items,
         // which are exactly those, are picked out here for a few and away from the main thread for many.
         let operands = model.operandsSnapshot()
-        guard background != nil, count >= CommandRunner.backgroundSelectionThreshold else {
+        guard background != nil, count >= Self.backgroundSelectionThreshold else {
             snapshot.selection = operands.markedItems().map(name(of:))
             return (snapshot, nil)
         }
@@ -187,7 +193,8 @@ final class CommandRunner {
             environment: environment, arguments: ShellLine.display(arguments), listFolder: listFolder)
         context.argumentPieces = arguments
         guard left.gather != nil || right.gather != nil else {
-            return completion(ParameterExpander(context: context).expand(template))
+            completion(ParameterExpander(context: context).expand(template))
+            return
         }
         let prepared = context
         offMain(
@@ -246,14 +253,16 @@ final class CommandRunner {
         if let name, call.names.contains(name) {
             kernel.ui.inform(
                 "“\(title)” calls itself", detail: "The command \(name) was not run again.", style: .warning)
-            return completion?() ?? ()
+            completion?() ?? ()
+            return
         }
-        guard call.names.count < CommandRunner.depthLimit else {
+        guard call.names.count < Self.depthLimit else {
             kernel.ui.inform(
                 "“\(title)” is nested too deeply",
-                detail: "User commands call each other more than \(CommandRunner.depthLimit) levels deep. "
+                detail: "User commands call each other more than \(Self.depthLimit) levels deep. "
                     + "The command was not run.", style: .warning)
-            return completion?() ?? ()
+            completion?() ?? ()
+            return
         }
         let steps = CommandLanguage.steps(action.command, environment: environment, resolve: resolve)
         guard !steps.isEmpty else { return }
@@ -291,7 +300,10 @@ final class CommandRunner {
                 style: .warning)
             return
         }
-        if let problem = expanded.problem { return refuse(title, problem) }
+        if let problem = expanded.problem {
+            refuse(title, problem)
+            return
+        }
         if !action.parameters.isEmpty, !arguments.isEmpty, !expanded.usedArguments {
             pieces = ParameterExpander.trimmed(pieces + [.text(" ")] + arguments)
         }
@@ -308,14 +320,15 @@ final class CommandRunner {
         }
         // The line is checked before anything of the command runs. (A line with thousands of
         // names is checked where it is started; a refusal is reported from there.)
-        if isExternal, pieces.count <= CommandRunner.checkedHereLimit,
+        if isExternal, pieces.count <= Self.checkedHereLimit,
             case .failure(let refusal) = ShellLine.script(externalLine(action.command, parameters: pieces))
         {
-            return refuse(
+            refuse(
                 title,
                 refusal.explanation
                     + " A file name is handed to the shell as data, and that is not possible at this place of the line."
             )
+            return
         }
         let listURL = expanded.listFile?.url
         let chain = Chain(
@@ -327,9 +340,12 @@ final class CommandRunner {
         let begin = { [self] in
             perform(steps[...], chain, then: completion)
             // Commands of the program have read the list by now; a started process removes it itself.
-            if !isExternal { removeListFile(listURL, after: CommandRunner.listGrace) }
+            if !isExternal { removeListFile(listURL, after: Self.listGrace) }
         }
-        guard let list = expanded.listFile else { return begin() }
+        guard let list = expanded.listFile else {
+            begin()
+            return
+        }
         onListQueue(
             {
                 Result {
@@ -360,12 +376,13 @@ final class CommandRunner {
         var rest = steps
         while let step = rest.popFirst() {
             chain.call.budget.steps += 1
-            guard chain.call.budget.steps <= CommandRunner.stepLimit else {
+            guard chain.call.budget.steps <= Self.stepLimit else {
                 chain.call.budget.isSpent = true
-                return kernel.ui.inform(
+                kernel.ui.inform(
                     "“\(chain.title)” was stopped",
-                    detail: "It ran \(CommandRunner.stepLimit) steps with the commands it calls, "
+                    detail: "It ran \(Self.stepLimit) steps with the commands it calls, "
                         + "which looks like a loop. The remaining steps were not run.", style: .warning)
+                return
             }
             switch step {
             case .wait(let milliseconds):
@@ -380,6 +397,7 @@ final class CommandRunner {
                     }
                 }
                 return
+
             case .perform(let id, let written):
                 // A chained command takes only what is written after its name.
                 let pieces: [ExpandedPiece] =
@@ -400,12 +418,14 @@ final class CommandRunner {
                 } else {
                     kernel.commands.perform(id, CommandLanguage.argument(from: text, location: location))
                 }
+
             case .changeDirectory(let path):
                 let folder = path.isEmpty ? ShellWords.unquoted(ShellLine.display(chain.parameters)) : path
                 guard !folder.isEmpty else { continue }
                 kernel.commands.perform(.changeDirectory, .text(folder))
                 // With `cd`, the start path is shown in the other panel (spec 14 › Start path).
                 if !chain.startPath.isEmpty { kernel.panels.target.show(location(chain.startPath)) }
+
             case .external:
                 let later = rest
                 // The next step of a chain (`em_build, cm_RereadSource`) runs when the program has ended.
@@ -416,6 +436,7 @@ final class CommandRunner {
                     self?.perform(later, chain, then: done)
                 }
                 if waits { return }
+
             case .unknown(let command):
                 kernel.ui.inform(
                     "Unknown command", detail: "No command is called \(DisplayText.oneLine(command, limit: 80)).",
@@ -450,7 +471,7 @@ final class CommandRunner {
         let source = kernel.panels.source.model.directory
         let directory = folder ?? (source.isFileURL ? source.path : NSHomeDirectory())
         let (grace, listURL, generation, children) = (
-            CommandRunner.listGrace, chain.listURL, chain.call.generation, self.children
+            Self.listGrace, chain.listURL, chain.call.generation, self.children
         )
         let program = DisplayText.oneLine(ShellWords.unquoted(ShellWords.firstWord(of: line).word), limit: 80)
         if waits { waiting += 1 }
@@ -476,7 +497,7 @@ final class CommandRunner {
                 return finished("The start folder \(DisplayText.oneLine(folder)) does not exist.")
             }
             let script: ShellScript
-            switch ShellLine.script(CommandRunner.applicationLine(for: line) ?? line) {
+            switch ShellLine.script(Self.applicationLine(for: line) ?? line) {
             case .failure(let refusal): return finished(refusal.explanation)
             case .success(let made): script = made
             }
@@ -487,6 +508,7 @@ final class CommandRunner {
             {
             case .failure(let failure):
                 finished(failure.message)
+
             case .success(let pid):
                 children.watch(pid, waitedFor: waits) { ending in
                     // The shell's own way of saying that it found no such program, or could not run it.

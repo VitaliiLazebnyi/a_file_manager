@@ -29,7 +29,7 @@ let needle = "NEEDLE_XYZ"
 func generate(_ root: URL) {
     let line = "The quick brown fox jumps over the lazy dog; pack my box with five dozen liquor jugs.\n"
     let body = String(repeating: line, count: 4)
-    DispatchQueue.concurrentPerform(iterations: 2000) { folder in
+    DispatchQueue.concurrentPerform(iterations: 2_000) { folder in
         let (a, b, c) = (folder / 100, (folder / 10) % 10, folder % 10)
         let directory = root.appendingPathComponent(String(format: "d%02d/e%d/f%d", a, b, c))
         try! fm.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -39,7 +39,7 @@ func generate(_ root: URL) {
             let name = String(format: isText ? "n%02d-%06d.txt" : "b%02d-%06d.dat", file, global)
             var text = "file \(global)\n" + body
             if global % 97 == 0 { text += "here is the \(needle) of file \(global)\n" }
-            if global % 1013 == 0 { text += "lowercase needle_xyz too\n" }
+            if global % 1_013 == 0 { text += "lowercase needle_xyz too\n" }
             try! Data(text.utf8).write(to: directory.appendingPathComponent(name))
         }
     }
@@ -373,7 +373,7 @@ step("window: \(cancels) searches cancelled at random", limit: Double(cancels) *
         let test = cases[Int(random.next() % UInt64(cases.count))]
         let usual = typical[test.label] ?? 1
         // Anywhere from at once to a little past the usual end.
-        let delay = Double(random.next() % 1000) / 1000 * usual * 1.1
+        let delay = Double(random.next() % 1_000) / 1_000 * usual * 1.1
         let before = finishedCount
         startThroughWindow(test)
         pump(upTo: delay) { finishedCount > before }
@@ -419,8 +419,8 @@ if !sorted.isEmpty {
     say(
         String(
             format: "cancel -> finished: n=%d median=%.1fms p95=%.1fms max=%.1fms (%@); %d ended before the cancel",
-            sorted.count, sorted[sorted.count / 2] * 1000, sorted[Int(Double(sorted.count) * 0.95)] * 1000,
-            sorted.last! * 1000, worstCancel.1, completedInstead))
+            sorted.count, sorted[sorted.count / 2] * 1_000, sorted[Int(Double(sorted.count) * 0.95)] * 1_000,
+            sorted.last! * 1_000, worstCancel.1, completedInstead))
     say(
         "threads right after each round: min \(threadsAfter.min()!) max \(threadsAfter.max()!) last \(threadsAfter.last!)"
     )
@@ -432,7 +432,7 @@ var engineReturn: [Double] = []
 step("engine: \(cancels) runs cancelled from another thread", limit: Double(cancels) * 30 + 60) {
     for round in 0..<cancels {
         let test = cases[Int(random.next() % UInt64(cases.count))]
-        let delay = Double(random.next() % 1000) / 1000 * (typical[test.label] ?? 1)
+        let delay = Double(random.next() % 1_000) / 1_000 * (typical[test.label] ?? 1)
         let search = FileSearch(
             SearchQuery(directory: test.directory, names: test.names, text: test.text), fileSystems: fileSystems)
         var returned = false
@@ -464,7 +464,8 @@ if !returns.isEmpty {
     say(
         String(
             format: "engine cancel -> run returned: median=%.1fms p95=%.1fms max=%.1fms",
-            returns[returns.count / 2] * 1000, returns[Int(Double(returns.count) * 0.95)] * 1000, returns.last! * 1000
+            returns[returns.count / 2] * 1_000, returns[Int(Double(returns.count) * 0.95)] * 1_000,
+            returns.last! * 1_000
         )
     )
 }

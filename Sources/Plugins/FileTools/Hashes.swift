@@ -17,7 +17,7 @@ enum ChecksumMethod: Int, CaseIterable, Codable {
     case md5, sha1, sha256, sha512, sha224, sha384, sha3_256, sha3_512, sha3_224, sha3_384, blake3
 
     /// The order of the dialog.
-    static let dialogOrder: [ChecksumMethod] = [
+    static let dialogOrder: [Self] = [
         .crc32, .md5, .sha1, .blake3, .sha224, .sha256, .sha384, .sha512,
         .sha3_224, .sha3_256, .sha3_384, .sha3_512
     ]
@@ -79,7 +79,7 @@ enum ChecksumMethod: Int, CaseIterable, Codable {
 
     /// The methods a digest of this many hex digits can come from (spec 08 › Hash-length
     /// disambiguation), the SHA-2 family first.
-    static func candidates(hexDigits: Int) -> [ChecksumMethod] {
+    static func candidates(hexDigits: Int) -> [Self] {
         [.crc32, .md5, .sha1, .sha224, .sha256, .sha384, .sha512, .sha3_224, .sha3_256, .sha3_384, .sha3_512, .blake3]
             .filter { $0.digestLength * 2 == hexDigits }
     }
@@ -93,24 +93,28 @@ enum ChecksumMethod: Int, CaseIterable, Codable {
         case .sha384: return CryptoHasher<SHA384>()
         case .sha512: return CryptoHasher<SHA512>()
         case .sha224: return SHA224Hasher()
+
         case .sha3_256:
             // CryptoKit has SHA-3 from the macOS 26 SDK on (Swift 6.2); older toolchains use the fallback.
             #if swift(>=6.2)
                 if #available(macOS 26.0, *) { return CryptoHasher<SHA3_256>() }
             #endif
             return SHA3Hasher(digestLength: digestLength)
+
         case .sha3_384:
             // CryptoKit has SHA-3 from the macOS 26 SDK on (Swift 6.2); older toolchains use the fallback.
             #if swift(>=6.2)
                 if #available(macOS 26.0, *) { return CryptoHasher<SHA3_384>() }
             #endif
             return SHA3Hasher(digestLength: digestLength)
+
         case .sha3_512:
             // CryptoKit has SHA-3 from the macOS 26 SDK on (Swift 6.2); older toolchains use the fallback.
             #if swift(>=6.2)
                 if #available(macOS 26.0, *) { return CryptoHasher<SHA3_512>() }
             #endif
             return SHA3Hasher(digestLength: digestLength)
+
         case .sha3_224: return SHA3Hasher(digestLength: digestLength)
         case .blake3: return BLAKE3Hasher()
         }
@@ -222,7 +226,7 @@ final class SHA3Hasher: StreamHasher {
         for index in 0..<(rate / 8) {
             state[index] ^= UInt64(littleEndian: block.loadUnaligned(fromByteOffset: index * 8, as: UInt64.self))
         }
-        SHA3Hasher.permute(state)
+        Self.permute(state)
     }
 
     @inline(__always) private static func rotl(_ x: UInt64, _ n: UInt64) -> UInt64 { (x &<< n) | (x &>> (64 &- n)) }
@@ -376,7 +380,7 @@ final class SHA3Hasher: StreamHasher {
 /// value of such a subtree does not depend on what is around it.
 final class BLAKE3Hasher: StreamHasher {
     private static let chunkStart: UInt32 = 1, chunkEnd: UInt32 = 2, parent: UInt32 = 4, root: UInt32 = 8
-    private static let chunkSize = 1024
+    private static let chunkSize = 1_024
 
     private static let iv: UnsafePointer<UInt32> = {
         let words: [UInt32] = [
@@ -584,7 +588,7 @@ final class BLAKE3Hasher: StreamHasher {
         chunkCounter += 1 << UInt64(level)
         while total & 1 == 0, stackCount > 0 {
             stackCount -= 1
-            BLAKE3Hasher.join(stack + stackCount * 8, value, isRoot: false, into: value)
+            Self.join(stack + stackCount * 8, value, isRoot: false, into: value)
             total >>= 1
         }
         (stack + stackCount * 8).update(from: value, count: 8)
@@ -593,8 +597,8 @@ final class BLAKE3Hasher: StreamHasher {
 
     private func closeBufferedChunk() {
         withUnsafeTemporaryAllocation(of: UInt32.self, capacity: 8) { value in
-            BLAKE3Hasher.chunk(
-                buffer, length: BLAKE3Hasher.chunkSize, counter: chunkCounter, isRoot: false, into: value.baseAddress!
+            Self.chunk(
+                buffer, length: Self.chunkSize, counter: chunkCounter, isRoot: false, into: value.baseAddress!
             )
             add(value.baseAddress!, level: 0)
         }
@@ -604,7 +608,7 @@ final class BLAKE3Hasher: StreamHasher {
     func update(_ data: Data) {
         data.withUnsafeBytes { (input: UnsafeRawBufferPointer) in
             guard let base = input.baseAddress, input.count > 0 else { return }
-            let size = BLAKE3Hasher.chunkSize
+            let size = Self.chunkSize
             var offset = 0
             // More input follows a full chunk that was held back.
             if bufferLength == size { closeBufferedChunk() }
@@ -623,7 +627,7 @@ final class BLAKE3Hasher: StreamHasher {
                 var level = 0
                 while 1 << (level + 1) <= chunks, chunkCounter % (1 << UInt64(level + 1)) == 0 { level += 1 }
                 withUnsafeTemporaryAllocation(of: UInt32.self, capacity: 8) { value in
-                    BLAKE3Hasher.subtree(
+                    Self.subtree(
                         base + offset, chunks: 1 << level, counter: chunkCounter, into: value.baseAddress!)
                     add(value.baseAddress!, level: level)
                 }
@@ -639,11 +643,11 @@ final class BLAKE3Hasher: StreamHasher {
         var words = [UInt32](repeating: 0, count: 16)
         withUnsafeTemporaryAllocation(of: UInt32.self, capacity: 8) { value in
             let value = value.baseAddress!
-            BLAKE3Hasher.chunk(
+            Self.chunk(
                 buffer, length: bufferLength, counter: chunkCounter, isRoot: stackCount == 0, into: value)
             // The last chunk is joined with the finished subtrees from the smallest up.
             for index in stride(from: stackCount - 1, through: 0, by: -1) {
-                BLAKE3Hasher.join(stack + index * 8, value, isRoot: index == 0, into: value)
+                Self.join(stack + index * 8, value, isRoot: index == 0, into: value)
             }
             for index in 0..<8 { words[index] = value[index] }
         }

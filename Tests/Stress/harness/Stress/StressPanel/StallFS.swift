@@ -208,7 +208,7 @@ final class StallFS: FileSystemProvider {
         wait("places")
         return inner.places()
     }
-    func volume(of url: URL) -> VolumeInfo? {
+    func volume(of _: URL) -> VolumeInfo? {
         wait("volume(of:)")
         return VolumeInfo(name: "Stalling share", freeBytes: 1 << 30, totalBytes: 1 << 40, isLocal: false)
     }

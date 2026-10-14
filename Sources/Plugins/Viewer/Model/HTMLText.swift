@@ -79,7 +79,7 @@ enum HTMLText {
             entries.removeAll { $0.0 == TagKey("pre") }
             entries.append((TagKey("pre"), .preformatted))
             for (key, kind) in entries {
-                var slot = TagTable.slot(key)
+                var slot = Self.slot(key)
                 while slots[slot] != nil { slot = (slot + 1) & 127 }
                 slots[slot] = (key, kind)
             }
@@ -92,7 +92,7 @@ enum HTMLText {
         }
 
         @inline(__always) func kind(of key: TagKey) -> TagKind? {
-            var slot = TagTable.slot(key)
+            var slot = Self.slot(key)
             while let entry = slots[slot] {
                 if entry.key == key { return entry.kind }
                 slot = (slot + 1) & 127
@@ -423,7 +423,7 @@ enum HTMLText {
                     let letter = input[position]
                     if letter >= 0x30 && letter <= 0x39 || letter >= 0x61 && letter <= 0x7A {
                         key.append(UInt8(letter))
-                    } else if letter >= 0x41 && letter <= 0x5A {
+                    } else if letter >= 0x41, letter <= 0x5A {
                         key.append(UInt8(letter) | 0x20)
                     } else if letter >= 0x80 {
                         key.append(0xFF)
@@ -482,7 +482,8 @@ enum HTMLText {
     static func decodeEntity(_ name: String) -> String? {
         if name.hasPrefix("#x") || name.hasPrefix("#X") {
             return UInt32(name.dropFirst(2), radix: 16).flatMap(Unicode.Scalar.init).map { String(Character($0)) }
-        } else if name.hasPrefix("#") {
+        }
+        if name.hasPrefix("#") {
             return UInt32(name.dropFirst()).flatMap(Unicode.Scalar.init).map { String(Character($0)) }
         }
         return entities[name]

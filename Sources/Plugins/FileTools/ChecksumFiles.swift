@@ -287,7 +287,7 @@ struct VerifyReport {
         for section in sections {
             lines.append(section.title + ":")
             lines += section.rows.filter { !onlyErrors || $0.result != .ok }.map {
-                VerifyReport.row($0.name, $0.result)
+                Self.row($0.name, $0.result)
             }
             lines.append("")
         }
@@ -492,7 +492,7 @@ enum ChecksumRun {
         for entry in entries {
             let url = outputURL(for: entry.file, target: target, options: options)
             // Names are relative to the checksum file's folder; files elsewhere keep their full path.
-            var name = ChecksumRun.name(of: entry.file.url, in: url.deletingLastPathComponent())
+            var name = Self.name(of: entry.file.url, in: url.deletingLastPathComponent())
             if options.separatePerFolder || (options.separatePerFile && name.hasPrefix("/")) { name = entry.file.name }
             if let index = groupIndex[url.locationKey] {
                 groups[index].entries.append((name, entry.digest))
@@ -626,6 +626,7 @@ enum ChecksumRun {
                 }
                 rows.append(
                     (file.item.name, found.contains { $0.hex == file.digest.lowercased() } ? .ok : .wrongChecksum))
+
             case .failure:
                 rows.append((file.item.name, .readError))
             }

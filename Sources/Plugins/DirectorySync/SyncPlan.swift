@@ -34,7 +34,7 @@ public struct SyncPlan: Equatable {
     /// processed (spec 09 › Window and workflow). `timeOffsetHours` is the time difference that
     /// the comparison allowed for (the dates of the right side plus this are the left's).
     public init(rows: [SyncRow], timeOffsetHours: Int = 0) {
-        let offset = Double(timeOffsetHours) * 3600
+        let offset = Double(timeOffsetHours) * 3_600
         for row in rows where row.accepts(row.action) {
             func copy(_ item: FileItem, to target: URL, shift: Double) -> Copy {
                 Copy(
@@ -48,11 +48,13 @@ public struct SyncPlan: Equatable {
             }
             switch row.action {
             case .none: break
+
             // Left plus nothing is right plus the offset: a copy to the right is dated back, one to the left forward.
             case .copyToRight: if let left = row.left { toRight.append(copy(left, to: row.rightURL, shift: -offset)) }
             case .copyToLeft: if let right = row.right { toLeft.append(copy(right, to: row.leftURL, shift: offset)) }
             case .deleteLeft: if let left = row.left { deletion(left, into: &deleteLeft) }
             case .deleteRight: if let right = row.right { deletion(right, into: &deleteRight) }
+
             case .deleteBoth:
                 if let left = row.left { deletion(left, into: &deleteLeft) }
                 if let right = row.right { deletion(right, into: &deleteRight) }
@@ -258,10 +260,13 @@ public final class SyncExecutor {
                 case .retry:
                     outcome.errors.removeLast()
                     outcome.skipped -= 1
+
                 case .skip: return true
+
                 case .skipAll:
                     skipAllErrors = true
                     return true
+
                 case .cancel:
                     outcome.wasCancelled = true
                     return false
@@ -292,14 +297,16 @@ public final class SyncExecutor {
         if let existing {
             if existing.isDirectory { throw FileSystemError.alreadyExists(fileSystems.displayPath(copy.target)) }
             if skipAllExisting { return false }
-            if options.confirmOverwrites && !overwriteAll {
+            if options.confirmOverwrites, !overwriteAll {
                 switch onOverwrite(existing, copy) {
                 case .overwrite: break
                 case .overwriteAll: overwriteAll = true
                 case .skip: return false
+
                 case .skipAll:
                     skipAllExisting = true
                     return false
+
                 case .cancel: throw Cancelled()
                 }
             }

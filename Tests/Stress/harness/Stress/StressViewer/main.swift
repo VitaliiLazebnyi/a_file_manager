@@ -67,7 +67,7 @@ func writeDense(_ url: URL, megabytes: Int) -> Int {
 func generate(_ directory: URL) {
     try! FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     var t = now()
-    let lines = writeDense(directory.appendingPathComponent("dense4g.txt"), megabytes: 4096)
+    let lines = writeDense(directory.appendingPathComponent("dense4g.txt"), megabytes: 4_096)
     say(
         String(
             format: "dense4g.txt: 4 GiB, %d lines (the marker line is cut out of the last one), %.1fs", lines,
@@ -98,7 +98,7 @@ func generate(_ directory: URL) {
     while block.count < 1 << 20 { block.append(contentsOf: phrase) }
     block.removeLast(block.count - (1 << 20))
     let data = Data(block)
-    for _ in 0..<2047 { handle.write(data) }
+    for _ in 0..<2_047 { handle.write(data) }
     var last = data
     last.replaceSubrange(last.count - marker.utf8.count..<last.count, with: Array(marker.utf8))
     handle.write(last)
@@ -110,7 +110,7 @@ func generate(_ directory: URL) {
     FileManager.default.createFile(atPath: newlines.path, contents: nil)
     handle = try! FileHandle(forWritingTo: newlines)
     let feed = Data(repeating: 0x0A, count: 1 << 20)
-    for _ in 0..<1024 { handle.write(feed) }
+    for _ in 0..<1_024 { handle.write(feed) }
     try! handle.close()
     say(String(format: "newlines1g.txt: 1 GiB of line feeds, %.1fs", now() - t))
 }
@@ -198,14 +198,14 @@ final class Hammer {
         var entry = stats[op] ?? OpStats()
         entry.count += 1
         entry.total += seconds
-        entry.maxMs = max(entry.maxMs, seconds * 1000)
+        entry.maxMs = max(entry.maxMs, seconds * 1_000)
         if cancelled { entry.cancelled += 1 }
         if threw { entry.threw += 1 }
         stats[op] = entry
         lock.unlock()
     }
 
-    func check(_ rows: [DisplayRow], first: Int, flagCancelled: Bool) {
+    func check(_ rows: [DisplayRow], first: Int, flagCancelled _: Bool) {
         for (position, row) in rows.enumerated() {
             if row.index != first + position {
                 fail("\(label): row number", "asked from \(first), got index \(row.index) at position \(position)")
@@ -233,7 +233,7 @@ final class Hammer {
         for index in 0..<threads + searchers {
             group.enter()
             let thread = Thread { [self] in
-                var random = Random(seed: seed &* 1000 &+ UInt64(index))
+                var random = Random(seed: seed &* 1_000 &+ UInt64(index))
                 let isSearcher = index >= threads
                 while !isStopped {
                     autoreleasepool {
@@ -280,6 +280,7 @@ final class Hammer {
                                             "\(label): no rows for a known row", "row \(first) of \(document.rowCount)"
                                         )
                                     }
+
                                 case 2:
                                     op = "row(containing:)"
                                     let offset = Int64(random.next() % UInt64(max(1, document.content.upperBound)))
@@ -294,6 +295,7 @@ final class Hammer {
                                     {
                                         fail("\(label): no row for an offset of a complete index", "offset \(offset)")
                                     }
+
                                 default:
                                     op = "row(ofLine:)"
                                     let lines = document.lineCount
@@ -342,7 +344,7 @@ final class Hammer {
                 "  " + pad("[\(label)] \(op)", 58)
                     + String(
                         format: " n=%7d mean=%8.3fms max=%9.1fms cancelled=%d threw=%d", s.count,
-                        s.total / Double(max(1, s.count)) * 1000, s.maxMs, s.cancelled, s.threw))
+                        s.total / Double(max(1, s.count)) * 1_000, s.maxMs, s.cancelled, s.threw))
         }
     }
 }
@@ -376,7 +378,7 @@ func runFile(_ url: URL, seed: UInt64) {
         "file \(name): \(((try? FileManager.default.attributesOfItem(atPath: url.path)[.size]) as? Int64) ?? -1) bytes; threads at baseline \(baselineThreads)"
     )
 
-    let pager = TextPagerView(frame: NSRect(x: 0, y: 0, width: 1000, height: 700))
+    let pager = TextPagerView(frame: NSRect(x: 0, y: 0, width: 1_000, height: 700))
     let fit = pager.columnsThatFit
     var source: ByteSource!
     var firstDocument: TextDocument!
@@ -418,7 +420,7 @@ func runFile(_ url: URL, seed: UInt64) {
                 now() - started, got ? "ok" : "NOT within 880 s", firstDocument.rowCount))
         if !got { fail("\(name): no first rows", "nothing to show within 880 s") }
     }
-    step("index to the end (parallel)", limit: 1000) {
+    step("index to the end (parallel)", limit: 1_000) {
         let started = now()
         let done = waitIndexed(firstDocument)
         say(
@@ -527,7 +529,7 @@ func runFile(_ url: URL, seed: UInt64) {
             String(
                 format: "  marker %@ in %.3fs (%.0f MiB/s)", hit.map { "found at \($0.lowerBound)" } ?? "NOT found",
                 seconds, Double(firstDocument.length) / 1_048_576 / seconds))
-        if name != "sparse4g.txt" && name != "newlines1g.txt",
+        if name != "sparse4g.txt", name != "newlines1g.txt",
             hit?.upperBound != firstDocument.length - (name.hasPrefix("dense") ? 1 : 0)
         {
             fail("\(name): the marker at the end was not found where it is", "\(String(describing: hit))")
@@ -542,15 +544,15 @@ func runFile(_ url: URL, seed: UInt64) {
         var worst = 0.0
         for _ in 0..<30 {
             let (_, latency) = search(
-                "zzz_not_there", from: 0, cancelAfter: Double(random.next() % 1000) / 1000 * min(fullSearch, 2))
+                "zzz_not_there", from: 0, cancelAfter: Double(random.next() % 1_000) / 1_000 * min(fullSearch, 2))
             worst = max(worst, latency)
         }
-        say(String(format: "  cancel -> search returned: worst %.1f ms; threads now %d", worst * 1000, threadCount()))
+        say(String(format: "  cancel -> search returned: worst %.1f ms; threads now %d", worst * 1_000, threadCount()))
     }
 
     var relayout: [(String, Double, Int)] = []
     func timedLayout(_ label: String, _ options: TextLayoutOptions) {
-        step("relayout: \(label)", limit: 1000) {
+        step("relayout: \(label)", limit: 1_000) {
             let started = now()
             let document = show(options, keeping: true)
             let done = waitIndexed(document)
@@ -573,11 +575,11 @@ func runFile(_ url: URL, seed: UInt64) {
     }
     timedLayout("wider, wrap at \(fit + 23)", TextLayoutOptions(columns: fit + 23, wordWrap: true))
     timedLayout("narrow, wrap at 40", TextLayoutOptions(columns: 40, wordWrap: true))
-    timedLayout("no wrap, cut at 1024", TextLayoutOptions(columns: 1024, wordWrap: false))
+    timedLayout("no wrap, cut at 1024", TextLayoutOptions(columns: 1_024, wordWrap: false))
 
     // The window dragged wider and narrower while the text is being indexed: every new width
     // drops the layout before. All the while threads read rows and search, and the user scrolls.
-    step("storm: 40 relayouts during indexing + 6 readers + 2 searchers + user", limit: 1200) {
+    step("storm: 40 relayouts during indexing + 6 readers + 2 searchers + user", limit: 1_200) {
         var hammers: [Hammer] = []
         var peakThreads = 0
         for round in 0..<40 {
@@ -588,7 +590,7 @@ func runFile(_ url: URL, seed: UInt64) {
             let hammer = Hammer(document, columns: columns, label: "during indexing")
             hammer.start(threads: 6, searchers: round % 4 == 0 ? 2 : 0, seed: seed + UInt64(round))
             hammers.append(hammer)
-            let end = now() + Double(random.next() % 400) / 1000
+            let end = now() + Double(random.next() % 400) / 1_000
             pump(upTo: 5) {
                 userAction(pager, &random, mayStop: true)
                 return now() > end
@@ -655,28 +657,30 @@ func runTruncation(_ directory: URL, rounds: Int) {
     step("idle baseline") { pump(for: 1) }
     let baselineThreads = threadCount()
     for round in 0..<rounds {
-        step("(harness: writing the 1 GiB file)") { _ = writeDense(url, megabytes: 1024) }
+        step("(harness: writing the 1 GiB file)") { _ = writeDense(url, megabytes: 1_024) }
         step("truncate while indexing", limit: 300) {
-            let pager = TextPagerView(frame: NSRect(x: 0, y: 0, width: 1000, height: 700))
+            let pager = TextPagerView(frame: NSRect(x: 0, y: 0, width: 1_000, height: 700))
             let source = openSource(url)
-            let columns = round % 3 == 2 ? 1024 : pager.columnsThatFit
+            let columns = round % 3 == 2 ? 1_024 : pager.columnsThatFit
             let document = TextDocument(
                 source: source, encoding: .utf8,
                 layout: .text(TextLayoutOptions(columns: columns, wordWrap: round % 3 != 2)))
             pager.show(document, parallel: true)
             let hammer = Hammer(document, columns: columns, label: "truncated")
             hammer.start(threads: 4, searchers: 1, seed: UInt64(round))
-            let delay = Double(random.next() % 300) / 1000
+            let delay = Double(random.next() % 300) / 1_000
             let kind = round % 4
             let cutter = Thread {
                 usleep(UInt32(delay * 1_000_000))
                 switch kind {
                 case 0: truncate(url.path, 300 << 20)
                 case 1: truncate(url.path, 0)
+
                 case 2:
-                    truncate(url.path, 12345)
+                    truncate(url.path, 12_345)
                     usleep(20_000)
                     truncate(url.path, 2 << 30)
+
                 default: unlink(url.path)
                 }
             }
@@ -693,7 +697,7 @@ func runTruncation(_ directory: URL, rounds: Int) {
                 String(
                     format:
                         "  round %d: %@ after %.0f ms; indexing %@ %.2fs after the start; rows %d, lines %d, indexed through %d of %d, complete %@, read error: %@",
-                    round, action, delay * 1000, done ? "ended" : "DID NOT END", now() - started, document.rowCount,
+                    round, action, delay * 1_000, done ? "ended" : "DID NOT END", now() - started, document.rowCount,
                     document.lineCount, document.indexedThrough, document.length,
                     String(describing: document.isIndexComplete),
                     document.readError.map { "\($0)".prefix(120).description } ?? "none"))
@@ -728,7 +732,7 @@ func runLeak(_ url: URL) {
             pad(label, 70)
                 + String(
                     format: " footprint %7.0f -> %7.0f MB  (%+.1f KB per call)", before, footprintMB(),
-                    (footprintMB() - before) * 1024 / Double(count)))
+                    (footprintMB() - before) * 1_024 / Double(count)))
     }
     let rows = document.rowCount
     let lines = document.lineCount
@@ -757,10 +761,10 @@ func runLeak(_ url: URL) {
         _ = try? document.row(ofLine: 1 + Int($0.next() % UInt64(lines)), cancellation: CancellationFlag())
     }
     measure("source.read(at:count:32K), no flag") {
-        _ = try? source.read(at: Int64($0.next() % UInt64(length)), count: 32 * 1024)
+        _ = try? source.read(at: Int64($0.next() % UInt64(length)), count: 32 * 1_024)
     }
     measure("source.read(at:count:32K, cancellation:), flag never set") {
-        _ = try? source.read(at: Int64($0.next() % UInt64(length)), count: 32 * 1024, cancellation: CancellationFlag())
+        _ = try? source.read(at: Int64($0.next() % UInt64(length)), count: 32 * 1_024, cancellation: CancellationFlag())
     }
     let pattern = try! SearchPattern("zzz_not_there", options: SearchOptions(), encoding: .utf8)
     // With one chunk at a time everything runs on the calling thread, inside this loop's autorelease pool.
@@ -809,10 +813,13 @@ switch arguments[1] {
 case "leak":
     runLeak(URL(fileURLWithPath: arguments[2]))
     exit(0)
+
 case "run":
     runFile(URL(fileURLWithPath: arguments[2]), seed: arguments.count > 4 ? UInt64(arguments[4])! : 1)
+
 case "truncate":
     runTruncation(URL(fileURLWithPath: arguments[2]), rounds: arguments.count > 4 ? Int(arguments[4])! : 12)
+
 default:
     say("usage")
     exit(2)

@@ -25,13 +25,13 @@ private final class OldAnswers: FileJobDelegate {
 
     var errors: [String] { lock.withLock { messages } }
 
-    func job(_ job: FileJob, progress: JobProgress) {}
-    func job(_ job: FileJob, conflictAt target: FileItem, source: FileItem) -> ConflictChoice { conflict }
-    func job(_ job: FileJob, failedAt url: URL, error: Error) -> ErrorChoice {
+    func job(_: FileJob, progress _: JobProgress) {}
+    func job(_: FileJob, conflictAt _: FileItem, source _: FileItem) -> ConflictChoice { conflict }
+    func job(_: FileJob, failedAt _: URL, error: Error) -> ErrorChoice {
         lock.withLock { messages.append(error.localizedDescription) }
         return .skip
     }
-    func job(_ job: FileJob, confirmDeleteNonEmpty directory: URL) -> FolderDeleteChoice { .delete }
+    func job(_: FileJob, confirmDeleteNonEmpty _: URL) -> FolderDeleteChoice { .delete }
 }
 
 private func names(in folder: URL) -> [String] {

@@ -20,7 +20,7 @@ enum PanelDrop {
     /// other programs expect of a drag of several files. A larger drag (making a hundred
     /// thousand pasteboard items takes a third of a second and more) travels as one item that
     /// hands out its files only when a program asks for them.
-    static let itemsWrittenSingly = 2000
+    static let itemsWrittenSingly = 2_000
 
     /// What a drag that started in a panel carries. Main thread only.
     ///
@@ -92,7 +92,7 @@ enum PanelDrop {
 
         /// Another program asks for a file: the first one of the local disks.
         func pasteboard(
-            _ pasteboard: NSPasteboard?, item: NSPasteboardItem, provideDataForType type: NSPasteboard.PasteboardType
+            _: NSPasteboard?, item: NSPasteboardItem, provideDataForType type: NSPasteboard.PasteboardType
         ) {
             if type == .fileURL, let first = items.first(where: { $0.url.isFileURL }) {
                 item.setString(first.url.absoluteString, forType: .fileURL)
@@ -268,7 +268,7 @@ struct DragSources {
         for source in sources {
             let key = source.locationKey
             places.insert(key)
-            folders.insert(DragSources.parent(of: key) ?? source.deletingLastPathComponent().locationKey)
+            folders.insert(Self.parent(of: key) ?? source.deletingLastPathComponent().locationKey)
         }
         (self.places, self.folders) = (places, folders)
     }
@@ -289,7 +289,7 @@ struct DragSources {
         var key: String? = destination.locationKey
         while let current = key {
             if places.contains(current) { return true }
-            key = DragSources.parent(of: current)
+            key = Self.parent(of: current)
         }
         return kind == .move && folders.count == 1 && folders.contains(destination.locationKey)
     }
@@ -313,7 +313,7 @@ final class DropSession {
     private var verdicts: [String: Bool] = [:]
 
     /// From this many sources on, their places are worked out in the background.
-    static let backgroundThreshold = 5000
+    static let backgroundThreshold = 5_000
 
     init(sequence: Int, sources: [URL]) {
         self.sequence = sequence
@@ -335,20 +335,20 @@ final class DropSession {
         payload.whenReady { [weak self] locations in
             guard let self, self.payload != nil else { return }
             self.payload = nil
-            self.sources = locations
-            self.locate()
+            sources = locations
+            locate()
         }
     }
 
     private func locate() {
         let sources = sources
-        if sources.count < DropSession.backgroundThreshold {
+        if sources.count < Self.backgroundThreshold {
             places = DragSources(sources)
         } else {
             Background.compute(
                 work: { DragSources(sources) },
                 then: { [weak self] in
-                    if let self, self.places == nil { self.places = $0 }
+                    if let self, places == nil { places = $0 }
                 })
         }
     }

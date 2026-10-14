@@ -53,20 +53,20 @@ private final class RootedFileSystem: FileSystemProvider {
         return climbs
     }
 
-    func list(_ directory: URL, showHidden: Bool) throws -> [FileItem] { [] }
-    func item(at url: URL) -> FileItem? { nil }
+    func list(_: URL, showHidden _: Bool) -> [FileItem] { [] }
+    func item(at _: URL) -> FileItem? { nil }
     func parent(of directory: URL) -> URL? {
         lock.lock()
         climbs += 1
         lock.unlock()
         return directory.path == "/" ? nil : directory.deletingLastPathComponent()
     }
-    func read(_ url: URL) throws -> FileReader { throw FileSystemError.notSupported("Reading") }
-    func createDirectory(at url: URL) throws {}
-    func write(_ url: URL) throws -> FileWriter { throw FileSystemError.notSupported("Writing") }
-    func remove(_ url: URL) throws {}
-    func move(_ source: URL, to destination: URL, replacing: Bool) throws {}
-    func copy(_ source: URL, to destination: URL, progress: (Int64) -> Bool) throws {}
+    func read(_: URL) throws -> FileReader { throw FileSystemError.notSupported("Reading") }
+    func createDirectory(at _: URL) {}
+    func write(_: URL) throws -> FileWriter { throw FileSystemError.notSupported("Writing") }
+    func remove(_: URL) {}
+    func move(_: URL, to _: URL, replacing _: Bool) {}
+    func copy(_: URL, to _: URL, progress _: (Int64) -> Bool) {}
 
     func root(of url: URL) -> URL {
         guard knowsItsTop else {
@@ -143,7 +143,7 @@ private final class RootedFileSystem: FileSystemProvider {
             model.moveCursor(to: 7)
             plain.moveCursor(to: 7)
             let sizes: [(name: String, size: Int64)] = [
-                ("dir0", 1000), ("dir30", 500), ("dir3", 70), ("nobody", 9)
+                ("dir0", 1_000), ("dir30", 500), ("dir3", 70), ("nobody", 9)
             ]
             // The basis holds the list as well: the copy is made where `prepare` runs.
             let basis = model.basis
@@ -316,14 +316,14 @@ private final class RootedFileSystem: FileSystemProvider {
             let capabilities: FileSystemCapabilities = [.write]
             let memory: MemoryFileSystem
             init(_ memory: MemoryFileSystem) { self.memory = memory }
-            func list(_ directory: URL, showHidden: Bool) throws -> [FileItem] { [] }
-            func item(at url: URL) -> FileItem? { nil }
-            func parent(of directory: URL) -> URL? { nil }
-            func read(_ url: URL) throws -> FileReader { throw FileSystemError.notSupported("Reading") }
-            func createDirectory(at url: URL) throws {}
-            func write(_ url: URL) throws -> FileWriter { throw FileSystemError.notSupported("Writing") }
-            func remove(_ url: URL) throws {}
-            func move(_ source: URL, to destination: URL, replacing: Bool) throws {}
+            func list(_: URL, showHidden _: Bool) -> [FileItem] { [] }
+            func item(at _: URL) -> FileItem? { nil }
+            func parent(of _: URL) -> URL? { nil }
+            func read(_: URL) throws -> FileReader { throw FileSystemError.notSupported("Reading") }
+            func createDirectory(at _: URL) {}
+            func write(_: URL) throws -> FileWriter { throw FileSystemError.notSupported("Writing") }
+            func remove(_: URL) {}
+            func move(_: URL, to _: URL, replacing _: Bool) {}
             func copy(_ source: URL, to destination: URL, progress: (Int64) -> Bool) throws {
                 try memory.copy(memory.url(source.path), to: memory.url(destination.path), progress: progress)
             }
@@ -510,7 +510,7 @@ private final class RootedFileSystem: FileSystemProvider {
 
     // MARK: The fake file system the other areas test with
 
-    @Test func theFakeHoldsChangesThatCameWithAFlagUntilItIsSetOrTheyAreLetGo() throws {
+    @Test func theFakeHoldsChangesThatCameWithAFlagUntilItIsSetOrTheyAreLetGo() {
         let memory = MemoryFileSystem()
         memory.addFile("/a.txt", "a")
         memory.addFile("/b.txt", "b")
@@ -523,7 +523,7 @@ private final class RootedFileSystem: FileSystemProvider {
             ended.signal()
         }
         // Until the call really waits: a condition, not a length of time.
-        while memory.stalledChanges == 0 { usleep(1000) }
+        while memory.stalledChanges == 0 { usleep(1_000) }
         #expect(memory.exists("/a.txt"))
         flag.cancel()
         ended.wait()
@@ -535,7 +535,7 @@ private final class RootedFileSystem: FileSystemProvider {
             try? memory.move(memory.url("/b.txt"), to: memory.url("/c.txt"), replacing: false, cancellation: other)
             ended.signal()
         }
-        while memory.stalledChanges == 0 { usleep(1000) }
+        while memory.stalledChanges == 0 { usleep(1_000) }
         memory.releaseStalls()
         ended.wait()
         #expect(memory.exists("/c.txt") && !memory.exists("/b.txt"))
@@ -559,7 +559,7 @@ private final class RootedFileSystem: FileSystemProvider {
             names = try? memory.list(memory.url("/dead"), showHidden: true, cancellation: flag).map(\.name)
             ended.signal()
         }
-        while memory.stalledListings(of: "/dead") == 0 { usleep(1000) }
+        while memory.stalledListings(of: "/dead") == 0 { usleep(1_000) }
         #expect(memory.stalledListings(of: "/alive") == 0)
         memory.releaseStalls()
         ended.wait()

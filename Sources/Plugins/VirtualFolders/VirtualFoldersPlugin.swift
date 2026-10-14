@@ -44,7 +44,7 @@ public final class VirtualFoldersPlugin: Plugin, FileListService {
         let isVirtual = { (panel: PanelHandle) in VirtualLocation(panel.model.directory) != nil }
         let isBranch = { (panel: PanelHandle) -> Bool in
             switch VirtualLocation(panel.model.directory) {
-            case .branch?, .picked?: return true
+            case .branch, .picked: return true
             default: return false
             }
         }
@@ -84,10 +84,10 @@ public final class VirtualFoldersPlugin: Plugin, FileListService {
                 title: "Branch View",
                 preferences: [
                     Preference(
-                        VirtualFoldersPlugin.listsFoldersKey, "List the folders too, not only the files in them",
+                        Self.listsFoldersKey, "List the folders too, not only the files in them",
                         .flag(default: false)),
                     Preference(
-                        VirtualFoldersPlugin.entersPackagesKey, "Show the contents of packages (applications, bundles)",
+                        Self.entersPackagesKey, "Show the contents of packages (applications, bundles)",
                         .flag(default: false))
                 ],
                 onChange: { [self] in
@@ -100,8 +100,8 @@ public final class VirtualFoldersPlugin: Plugin, FileListService {
     private func applyOptions() {
         guard let kernel else { return }
         fileSystem?.options = VirtualFileSystem.Options(
-            listsFolders: kernel.settings.flag(VirtualFoldersPlugin.listsFoldersKey, default: false),
-            entersPackages: kernel.settings.flag(VirtualFoldersPlugin.entersPackagesKey, default: false))
+            listsFolders: kernel.settings.flag(Self.listsFoldersKey, default: false),
+            entersPackages: kernel.settings.flag(Self.entersPackagesKey, default: false))
     }
 
     // MARK: FileListService
@@ -170,7 +170,10 @@ public final class VirtualFoldersPlugin: Plugin, FileListService {
                 tab.setSelected(true, names: names)
             }
         }
-        guard case .picked = location, let fileSystem else { return show(selecting: []) }
+        guard case .picked = location, let fileSystem else {
+            show(selecting: [])
+            return
+        }
         // The names of what the view was made from are taken in the background: there may be
         // hundreds of thousands.
         let virtual = tab.directory
@@ -272,6 +275,7 @@ public enum FileListFile {
             case "n": result.append("\n")
             case "r": result.append("\r")
             case "t": result.append("\t")
+
             case "u":
                 guard index < body.count, body[index] == "{", let close = body[index...].firstIndex(of: "}") else {
                     return nil
@@ -282,6 +286,7 @@ public enum FileListFile {
                 else { return nil }
                 result.append(unicode)
                 index = close + 1
+
             default: return nil
             }
         }
@@ -304,6 +309,7 @@ public enum FileListFile {
             case "\n": text += "\\n"
             case "\r": text += "\\r"
             case "\t": text += "\\t"
+
             default:
                 if isUnsafe(scalar) {
                     text += "\\u{" + String(scalar.value, radix: 16) + "}"

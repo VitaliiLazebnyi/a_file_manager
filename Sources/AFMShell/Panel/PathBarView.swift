@@ -73,15 +73,15 @@ final class PathBarView: NSView {
     @objc private func ejectPressed() { onEject?() }
 
     /// The width the path may take: all of the bar but the eject button.
-    private var textArea: CGFloat { bounds.width - (ejectButton.isHidden ? 0 : PathBarView.ejectWidth) }
+    private var textArea: CGFloat { bounds.width - (ejectButton.isHidden ? 0 : Self.ejectWidth) }
 
     override func layout() {
         super.layout()
         ejectButton.frame = NSRect(
-            x: bounds.width - PathBarView.ejectWidth, y: 0, width: PathBarView.ejectWidth, height: bounds.height)
+            x: bounds.width - Self.ejectWidth, y: 0, width: Self.ejectWidth, height: bounds.height)
     }
 
-    required init?(coder: NSCoder) { fatalError("not used") }
+    required init?(coder _: NSCoder) { fatalError("not used") }
 
     override var isFlipped: Bool { true }
 
@@ -90,7 +90,7 @@ final class PathBarView: NSView {
         guard text != self.text || segments != self.segments else { return }
         self.text = text
         self.segments = segments
-        let attributes: [NSAttributedString.Key: Any] = [.font: PathBarView.font]
+        let attributes: [NSAttributedString.Key: Any] = [.font: Self.font]
         let whole = text as NSString
         func width(upTo index: Int) -> CGFloat {
             ceil(whole.substring(to: min(index, whole.length)).size(withAttributes: attributes).width)
@@ -124,7 +124,7 @@ final class PathBarView: NSView {
 
     /// A path that is longer than the bar shows its end.
     private var textOrigin: CGFloat {
-        min(PathBarView.inset, textArea - PathBarView.inset - textWidth)
+        min(Self.inset, textArea - Self.inset - textWidth)
     }
 
     private func segment(at point: NSPoint) -> Int? {
@@ -132,14 +132,14 @@ final class PathBarView: NSView {
         return spans.firstIndex { x >= $0.minX && x < $0.maxX }
     }
 
-    override func draw(_ dirtyRect: NSRect) {
+    override func draw(_: NSRect) {
         (isActive ? NSColor.selectedContentBackgroundColor : NSColor.unemphasizedSelectedContentBackgroundColor)
             .setFill()
         bounds.fill()
         let attributed = NSMutableAttributedString(
             string: text,
             attributes: [
-                .font: PathBarView.font,
+                .font: Self.font,
                 .foregroundColor: isActive ? NSColor.alternateSelectedControlTextColor : NSColor.labelColor
             ])
         if let hovered, segments.indices.contains(hovered) {
@@ -168,7 +168,7 @@ final class PathBarView: NSView {
         hovered = segment(at: convert(event.locationInWindow, from: nil))
     }
 
-    override func mouseExited(with event: NSEvent) {
+    override func mouseExited(with _: NSEvent) {
         hovered = nil
     }
 
@@ -192,5 +192,5 @@ final class PathBarView: NSView {
         NSPoint(x: textOrigin + (spans[index].minX + spans[index].maxX) / 2, y: bounds.midY)
     }
 
-    override func menu(for event: NSEvent) -> NSMenu? { menuProvider?() }
+    override func menu(for _: NSEvent) -> NSMenu? { menuProvider?() }
 }

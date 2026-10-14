@@ -141,7 +141,7 @@ private func isExactly(_ name: String, _ other: String) -> Bool { name.utf8.elem
         #expect(bench.left.model.selectionCount == 0)
     }
 
-    @Test func invertingTreatsTheTwinsApart() throws {
+    @Test func invertingTreatsTheTwinsApart() {
         let bench = makeBench()
         let model = bench.left.model
         model.setSelected(true, names: [composed])
@@ -228,7 +228,7 @@ extension MemoryFileSystem {
         return found
     }
 
-    @Test func aFileListedBesideItsFolderIsFoundOnce() throws {
+    @Test func aFileListedBesideItsFolderIsFoundOnce() {
         var query = SearchQuery(directory: memory.url("/D"), names: "*.txt")
         query.onlyItems = [
             memory.url("/D"), memory.url("/D/top.txt"), memory.url("/D/sub/s.txt"), memory.url("/D/sub/deep/x.txt")
@@ -358,7 +358,7 @@ extension MemoryFileSystem {
                 })
         }
         let memory = MemoryFileSystem()
-        let pairs = (0..<3000).map { index -> SyncComparison.Pair in
+        let pairs = (0..<3_000).map { index -> SyncComparison.Pair in
             let text = name()
             return SyncComparison.Pair(
                 left: FileItem(url: memory.url("/" + String(index)), name: text, isDirectory: false), right: nil)
@@ -597,8 +597,8 @@ extension MemoryFileSystem {
     @Test func cancellingEndsABlockedIdentityCheck() {
         let memory = MemoryFileSystem()
         memory.isLocal = false
-        memory.addFile("/a", String(repeating: "0123456789", count: 1000))
-        memory.addFile("/b", String(repeating: "0123456789", count: 1000))
+        memory.addFile("/a", String(repeating: "0123456789", count: 1_000))
+        memory.addFile("/b", String(repeating: "0123456789", count: 1_000))
         let probe = ProbingFileSystem(memory)
         let registry = FileSystemRegistry()
         registry.register(probe)
@@ -685,8 +685,8 @@ extension MemoryFileSystem {
 
     @Test func sixBitLoopsMatchTheFirstImplementation() {
         let lengths =
-            [0, 1, 2, 3, 4, 43, 44, 45, 46, 47, 89, 90, 91, 92, 135, 1000, 4096, 65_537]
-            + (0..<60).map { ($0 * 7919) % 3000 }
+            [0, 1, 2, 3, 4, 43, 44, 45, 46, 47, 89, 90, 91, 92, 135, 1_000, 4_096, 65_537]
+            + (0..<60).map { ($0 * 7_919) % 3_000 }
         for (index, length) in lengths.enumerated() {
             let data = random(length, seed: UInt64(index + 1))
             for xx in [false, true] {

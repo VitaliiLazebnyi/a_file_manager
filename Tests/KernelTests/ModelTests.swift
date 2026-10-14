@@ -119,9 +119,9 @@ import Testing
         let count = 60_000
         let items = (0..<count).map { index in
             item(
-                "file\((index &* 7919) % count)-\(index % 3).\(["txt", "md", "swift"][index % 3])",
+                "file\((index &* 7_919) % count)-\(index % 3).\(["txt", "md", "swift"][index % 3])",
                 folder: index % 97 == 0,
-                size: Int64((index &* 31) % 5000), time: TimeInterval((index &* 17) % 9000))
+                size: Int64((index &* 31) % 5_000), time: TimeInterval((index &* 17) % 9_000))
         }
         for order in [
             ListOrder(), ListOrder(key: .size, descending: true), ListOrder(key: .date), ListOrder(key: .unsorted)
@@ -141,8 +141,8 @@ import Testing
     init() throws {
         memory.addDirectory("/work/docs")
         memory.addDirectory("/work/bin")
-        memory.addFile("/work/a.txt", String(repeating: "a", count: 2048))
-        memory.addFile("/work/b.md", String(repeating: "b", count: 1024))
+        memory.addFile("/work/a.txt", String(repeating: "a", count: 2_048))
+        memory.addFile("/work/b.md", String(repeating: "b", count: 1_024))
         memory.addFile("/work/.hidden")
         fileSystems.register(memory)
         panel = PanelModel(directory: memory.url("/work"))
@@ -203,11 +203,11 @@ import Testing
         #expect(
             panel.totals
                 == PanelModel.Totals(
-                    selectedBytes: 0, totalBytes: 3072, selectedFiles: 0, totalFiles: 2,
+                    selectedBytes: 0, totalBytes: 3_072, selectedFiles: 0, totalFiles: 2,
                     selectedFolders: 0, totalFolders: 2))
         panel.selectAll()
         #expect(
-            panel.totals.selectedBytes == 3072 && panel.totals.selectedFiles == 2 && panel.totals.selectedFolders == 2)
+            panel.totals.selectedBytes == 3_072 && panel.totals.selectedFiles == 2 && panel.totals.selectedFolders == 2)
         panel.select(mask: "*.txt", select: false)
         #expect(panel.selection == ["bin", "docs", "b.md"])
         panel.invertSelection()
@@ -218,8 +218,8 @@ import Testing
         #expect(panel.selection == ["a.txt"])
         panel.setSelected(true, rows: 1...2)
         #expect(panel.selection == ["a.txt", "bin", "docs"])
-        panel.setComputedSize(4096, forName: "docs")
-        #expect(panel.totals.totalBytes == 3072 + 4096 && panel.totals.selectedBytes == 2048 + 4096)
+        panel.setComputedSize(4_096, forName: "docs")
+        #expect(panel.totals.totalBytes == 3_072 + 4_096 && panel.totals.selectedBytes == 2_048 + 4_096)
     }
 
     @Test func historyGoesBackAndForward() throws {
@@ -244,13 +244,13 @@ import Testing
     @Test func updateKeepsCursorSelectionAndFolderSizes() throws {
         panel.moveCursor(to: panel.row(ofName: "b.md")!)
         panel.toggleSelection(row: panel.row(ofName: "a.txt")!)
-        panel.setComputedSize(4096, forName: "docs")
+        panel.setComputedSize(4_096, forName: "docs")
         #expect(!panel.update(with: try listing("/work")))
         memory.addFile("/work/0-new.txt")
         #expect(panel.update(with: try listing("/work")))
         #expect(panel.cursorItem?.name == "b.md")
         #expect(panel.selection == ["a.txt"])
-        #expect(panel.items.first { $0.name == "docs" }?.computedSize == 4096)
+        #expect(panel.items.first { $0.name == "docs" }?.computedSize == 4_096)
         #expect(panel.update(with: try listing("/work"), focus: "0-new.txt"))
         #expect(panel.cursorItem?.name == "0-new.txt")
     }

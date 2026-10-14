@@ -212,7 +212,7 @@ import Testing
         let list = NameList(displayPath: { $0.path })
         var folder = FileItem(url: URL(fileURLWithPath: "/x/docs"), name: "docs", isDirectory: true)
         #expect(list.details([folder], .fullPath, headers: false, mask: 3) == "/x/docs/\t<DIR>")
-        folder.computedSize = 4096
+        folder.computedSize = 4_096
         #expect(list.details([folder], .name, headers: false, mask: 3) == "docs/\t4096")
         // A package is listed like a file and gets no slash.
         let app = FileItem(

@@ -61,13 +61,13 @@ final class FormDialog: NSObject, NSTextViewDelegate {
             label.maximumNumberOfLines = 0
             guard let control = makeControl(for: field) else {
                 // A note takes the whole width.
-                label.preferredMaxLayoutWidth = FormDialog.fieldWidth + 120
+                label.preferredMaxLayoutWidth = Self.fieldWidth + 120
                 return [label]
             }
             if case .checkbox = field.kind { return [NSGridCell.emptyContentView, control] }
             control.setAccessibilityLabel(field.label)
             label.alignment = .right
-            label.preferredMaxLayoutWidth = FormDialog.labelWidth
+            label.preferredMaxLayoutWidth = Self.labelWidth
             return field.label.isEmpty ? [control] : [label, control]
         }
         let grid = NSGridView(views: rows)
@@ -123,20 +123,23 @@ final class FormDialog: NSObject, NSTextViewDelegate {
     }
 
     private func makeControl(for field: FormField) -> NSView? {
-        let width = FormDialog.fieldWidth
+        let width = Self.fieldWidth
         switch field.kind {
         case .note:
             return nil
+
         case .text(let value):
             let input = NSTextField(string: value)
             configure(input, width: width)
             controls.append((field, { .text(input.stringValue) }))
             return input
+
         case .secureText:
             let input = NSSecureTextField(string: "")
             configure(input, width: width)
             controls.append((field, { .text(input.stringValue) }))
             return input
+
         case .multilineText(let value):
             let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: width, height: 120))
             textView.string = value
@@ -157,11 +160,13 @@ final class FormDialog: NSObject, NSTextViewDelegate {
             takesKeyboard(textView)
             controls.append((field, { .text(textView.string) }))
             return scroll
+
         case .checkbox(let isOn):
             let box = NSButton(checkboxWithTitle: field.label, target: nil, action: nil)
             box.state = isOn ? .on : .off
             controls.append((field, { .flag(box.state == .on) }))
             return box
+
         case .choice(let options, let selected):
             let popUp = NSPopUpButton(frame: .zero, pullsDown: false)
             // Added one by one: `addItems` drops options with the same caption.
@@ -172,6 +177,7 @@ final class FormDialog: NSObject, NSTextViewDelegate {
             popUp.widthAnchor.constraint(lessThanOrEqualToConstant: width).isActive = true
             controls.append((field, { .index(popUp.indexOfSelectedItem) }))
             return popUp
+
         case .list(let rows, let selected):
             let list = FormList(rows: rows, selected: selected, width: width)
             list.onAccept = { [weak self] in self?.alert?.buttons.first?.performClick(nil) }
@@ -239,7 +245,7 @@ final class FormList: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
         scroll.borderType = .bezelBorder
         scroll.widthAnchor.constraint(equalToConstant: width).isActive = true
         scroll.heightAnchor.constraint(equalToConstant: min(320, max(90, CGFloat(rows.count) * 20 + 4))).isActive = true
-        if rows.count > FormList.filterThreshold {
+        if rows.count > Self.filterThreshold {
             let search = NSSearchField()
             search.placeholderString = "Filter"
             search.sendsSearchStringImmediately = true
@@ -307,12 +313,12 @@ final class FormList: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
         if table.clickedRow >= 0 { onAccept?() }
     }
 
-    func controlTextDidChange(_ notification: Notification) {
+    func controlTextDidChange(_: Notification) {
         if let searchField { filter(searchField.stringValue) }
     }
 
     /// From the filter field the arrow and page keys move through the list.
-    func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
+    func control(_: NSControl, textView _: NSTextView, doCommandBy selector: Selector) -> Bool {
         let page = max(1, table.rows(in: table.visibleRect).length - 1)
         switch selector {
         case #selector(NSResponder.moveUp(_:)): moveSelection(by: -1)
@@ -324,9 +330,9 @@ final class FormList: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
         return true
     }
 
-    func numberOfRows(in tableView: NSTableView) -> Int { shown.count }
+    func numberOfRows(in _: NSTableView) -> Int { shown.count }
 
-    func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
+    func tableView(_ tableView: NSTableView, viewFor _: NSTableColumn?, row: Int) -> NSView? {
         let identifier = NSUserInterfaceItemIdentifier("cell")
         let label =
             tableView.makeView(withIdentifier: identifier, owner: nil) as? NSTextField
@@ -339,7 +345,7 @@ final class FormList: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
         return label
     }
 
-    func tableView(_ tableView: NSTableView, typeSelectStringFor tableColumn: NSTableColumn?, row: Int) -> String? {
+    func tableView(_: NSTableView, typeSelectStringFor _: NSTableColumn?, row: Int) -> String? {
         shown.indices.contains(row) ? rows[shown[row]] : nil
     }
 }

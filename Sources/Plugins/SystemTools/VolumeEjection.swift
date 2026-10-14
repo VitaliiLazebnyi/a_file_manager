@@ -74,7 +74,7 @@ final class SystemVolumes: VolumeAccess {
         let dissenter = (error.userInfo[NSFileManagerUnmountDissentingProcessIdentifierErrorKey] as? NSNumber)?
             .int32Value
         return EjectRefusal(
-            program: dissenter.flatMap(SystemVolumes.programName), isThisProgram: dissenter == getpid(),
+            program: dissenter.flatMap(Self.programName), isThisProgram: dissenter == getpid(),
             reason: error.localizedDescription)
     }
 
@@ -180,6 +180,7 @@ final class VolumeEjection {
                 case .success:
                     note("eject: \(volume.path)")
                     ui.notice("\(name) can now be removed safely.")
+
                 case .failure(let refusal as EjectRefusal):
                     comeBack(departures, from: volume)
                     let detail: String
@@ -195,6 +196,7 @@ final class VolumeEjection {
                     ui.inform(
                         "\(name) cannot be ejected", detail: detail + "\nNothing on the drive was changed.",
                         style: .warning)
+
                 case .failure(let error):
                     comeBack(departures, from: volume)
                     ui.inform(
@@ -242,7 +244,7 @@ final class VolumeEjection {
     }
 
     /// The eject was refused: the tabs that are still where they went go back to the drive.
-    private func comeBack(_ departures: [Departure], from volume: URL) {
+    private func comeBack(_ departures: [Departure], from _: URL) {
         for departure in departures {
             guard let panel = departure.panel, let tab = departure.tab, panel.tabs.tabs.contains(where: { $0 === tab }),
                 tab.directory.isSameLocation(as: departure.to)

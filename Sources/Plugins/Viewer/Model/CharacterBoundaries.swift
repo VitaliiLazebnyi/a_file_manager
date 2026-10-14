@@ -52,7 +52,7 @@ final class CharacterBoundaries {
 
     private func remember(_ block: Int64, _ boundary: Int64) {
         lock.lock()
-        if known.count >= CharacterBoundaries.keptLimit, known[block] == nil {
+        if known.count >= Self.keptLimit, known[block] == nil {
             // The start of the text stays; the rest is found again where it is needed.
             known = [0: content.lowerBound]
         }
@@ -111,7 +111,7 @@ final class CharacterBoundaries {
         while !computing.try() {
             try cancellation?.throwIfCancelled()
             if let hit = cached(block) { return hit }
-            usleep(2000)
+            usleep(2_000)
         }
         defer { computing.unlock() }
         if let hit = cached(block) { return hit }

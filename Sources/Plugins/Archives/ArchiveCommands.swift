@@ -112,7 +112,7 @@ final class ArchiveCommands {
 
     /// Enter on a file inside an archive shows what the archive knows about it
     /// (spec 08 › Enter on a file inside an archive).
-    func showMember(_ file: FileItem, in panel: PanelHandle) -> Bool {
+    func showMember(_ file: FileItem, in _: PanelHandle) -> Bool {
         guard let location = ArchiveURL.location(of: file.url), !file.isDirectory else { return false }
         let store = self.store
         kernel.jobs.run(
@@ -239,7 +239,10 @@ final class ArchiveCommands {
         refreshOptions()
         let model = source.model
         let (items, sourceDirectory, targetDirectory) = (model.operands(), model.directory, target.model.directory)
-        guard !items.isEmpty else { return ui.inform("No files selected!") }
+        guard !items.isEmpty else {
+            ui.inform("No files selected!")
+            return
+        }
         let formats = ArchiveFormat.writable
         let stored = settings.index(ArchiveSettings.format, default: 0)
         let defaultFormat = formats.indices.contains(stored) ? stored : 0
@@ -277,7 +280,7 @@ final class ArchiveCommands {
         guard let answer = ui.form("Pack files", detail: "", fields: fields, buttons: ["OK"]) else { return }
 
         var options = PackOptions()
-        let (prefixFormat, path) = ArchiveCommands.splitPrefix(
+        let (prefixFormat, path) = Self.splitPrefix(
             answer.text("archive").trimmingCharacters(in: .whitespaces))
         // An archive on a server whose address was typed here: the user's own choice of that server.
         kernel.userTyped(location: path, proposal: proposal, relativeTo: sourceDirectory)
@@ -302,7 +305,8 @@ final class ArchiveCommands {
         }
         if answer.flag("encrypt") {
             guard options.format == .zip else {
-                return ui.inform("Only ZIP archives can be encrypted.", detail: "", style: .warning)
+                ui.inform("Only ZIP archives can be encrypted.", detail: "", style: .warning)
+                return
             }
             guard let secret = askNewPassword() else { return }
             (options.password, options.encryption) = (secret.password, secret.encryption)
@@ -314,9 +318,10 @@ final class ArchiveCommands {
         var innerFolder = ""
         if let location = ArchiveURL.location(of: archive) {
             guard archive.scheme == ArchiveURL.writableScheme else {
-                return ui.inform(
+                ui.inform(
                     "\(location.archive.lastPathComponent) cannot be changed.",
                     detail: "Only ZIP archives can be added to.", style: .warning)
+                return
             }
             (archive, innerFolder, options.format, options.separateArchives) = (
                 location.archive, location.innerPath, .zip, false
@@ -325,7 +330,7 @@ final class ArchiveCommands {
             archive = archive.appending(name: Packer.archiveName(for: items[0], format: options.format))
         } else {
             archive = archive.deletingLastPathComponent().appending(
-                name: ArchiveCommands.archiveName(archive.lastPathComponent, format: options.format))
+                name: Self.archiveName(archive.lastPathComponent, format: options.format))
         }
 
         model.saveSelection()
@@ -345,7 +350,7 @@ final class ArchiveCommands {
                 let result = packer.run(items, archive: archive, innerFolder: innerFolder)
                 // Which of a hundred thousand operands were packed is worked out here, not on
                 // the main thread.
-                return (result, ArchiveCommands.names(of: items, packedAs: result.completed))
+                return (result, Self.names(of: items, packedAs: result.completed))
             },
             completion: { [self] outcome in
                 let result = outcome.result
@@ -375,11 +380,11 @@ final class ArchiveCommands {
     /// Asks twice for the password of a new archive, and how to encrypt; nil on Cancel. The
     /// old encryption is offered for exchange with old programs, and is said to be weak.
     private func askNewPassword() -> (password: String, encryption: ZipEncryption)? {
-        var detail = ArchiveCommands.encryptionNote
+        var detail = Self.encryptionNote
         while true {
             let fields: [FormField] = [
                 .password("password", "Password:"), .password("repeat", "Repeat password:"),
-                .checkbox("legacy", ArchiveCommands.legacyLabel)
+                .checkbox("legacy", Self.legacyLabel)
             ]
             guard let answer = ui.form("Encrypt", detail: detail, fields: fields, buttons: ["OK"]) else { return nil }
             let password = answer.text("password")
@@ -388,7 +393,7 @@ final class ArchiveCommands {
             }
             detail =
                 (password.isEmpty ? "The password must not be empty." : "The two passwords are not the same.") + "\n\n"
-                + ArchiveCommands.encryptionNote
+                + Self.encryptionNote
         }
     }
 
@@ -401,7 +406,8 @@ final class ArchiveCommands {
         let (directory, marked, items) = (model.directory, model.selectionCount, model.operands())
         let inside = ArchiveURL.location(of: directory)
         guard inside != nil || !items.isEmpty else {
-            return ui.inform("No files selected!", detail: "", style: .warning)
+            ui.inform("No files selected!", detail: "", style: .warning)
+            return
         }
         let fields: [FormField] = [
             .text(
@@ -485,7 +491,7 @@ final class ArchiveCommands {
             },
             completion: { [self] result in
                 if !result.problems.isEmpty {
-                    let shown = ArchiveCommands.summary(of: result.problems)
+                    let shown = Self.summary(of: result.problems)
                     ui.inform(
                         result.unpacked > 0 ? "Some files could not be unpacked!" : "Unpacking failed!", detail: shown,
                         style: .warning)
@@ -509,7 +515,10 @@ final class ArchiveCommands {
         var archives = model.operands().filter { !$0.isDirectory }.map(\.url)
         // Inside an archive the archive itself is tested.
         if let inside = ArchiveURL.location(of: model.directory) { archives = [inside.archive] }
-        guard !archives.isEmpty else { return ui.inform("No files selected!", detail: "", style: .warning) }
+        guard !archives.isEmpty else {
+            ui.inform("No files selected!", detail: "", style: .warning)
+            return
+        }
         let (fileSystems, store) = (self.fileSystems, self.store)
         kernel.jobs.run(
             title: "Testing:",
@@ -552,7 +561,7 @@ final class ArchiveCommands {
                         "Archive test", detail: "No errors found in \(result.tested) archive(s).", style: .information
                     )
                 } else {
-                    let shown = ArchiveCommands.summary(of: result.problems)
+                    let shown = Self.summary(of: result.problems)
                     ui.inform("Errors found in archive!", detail: shown, style: .critical)
                 }
             })

@@ -25,7 +25,7 @@ public enum SystemToolsCommands {
 /// Where tests keep the plugin from ejecting: volumes as they are, ejects only recorded.
 private final class RecordedEjects: VolumeAccess {
     func facts(of directory: URL) -> VolumeFacts { SystemVolumes().facts(of: directory) }
-    func eject(_ volume: VolumeFacts) -> EjectRefusal? { nil }
+    func eject(_: VolumeFacts) -> EjectRefusal? { nil }
 }
 
 /// Command line execution, terminal, system information, volume name, printing file lists
@@ -140,23 +140,23 @@ public final class SystemToolsPlugin: Plugin {
                 title: "System Tools",
                 preferences: [
                     Preference(
-                        SystemToolsPlugin.terminalKey, "Terminal application (name, path or bundle identifier)",
+                        Self.terminalKey, "Terminal application (name, path or bundle identifier)",
                         .text(default: "Terminal")),
                     Preference(
-                        SystemToolsPlugin.showOutputKey, "Show the output of a command",
+                        Self.showOutputKey, "Show the output of a command",
                         .choice(["When there is any", "Always", "Never"], default: 0)),
                     Preference(
                         SystemTools.printHeaderKey,
                         "Header of printed file lists (%d folder, %p page, %t pages, %D date, %T time)",
                         .text(default: DirectoryListFormatter.defaultHeader)),
                     Preference(
-                        SystemToolsPlugin.recordHistoryKey,
+                        Self.recordHistoryKey,
                         "Remember the command lines that were run (never one that begins with a blank)",
                         .flag(default: true))
                 ]
             ) {
                 // Switched off, what was remembered goes too.
-                if !kernel.settings.flag(SystemToolsPlugin.recordHistoryKey, default: true) {
+                if !kernel.settings.flag(Self.recordHistoryKey, default: true) {
                     kernel.settings.scoped(to: "systemTools").set(nil as Data?, forKey: CommandHistory.key)
                 }
             })
@@ -174,7 +174,7 @@ final class SystemTools {
     static let printLinesKey = "systemTools.printLines"
     static let printOutputKey = "systemTools.printOutput"
     /// In a list of this length or longer, the marked items are picked out off the main thread.
-    static let backgroundSelectionThreshold = 5000
+    static let backgroundSelectionThreshold = 5_000
 
     /// What tests may really run: programs that only write text.
     static let harmlessCommands: Set<String> = ["echo", "printf", "true", "false", "pwd"]
@@ -189,7 +189,7 @@ final class SystemTools {
 
     private func note(_ line: String) {
         log.append(DisplayText.oneLine(line, limit: 400))
-        if log.count > SystemTools.logLimit { log.removeFirst(log.count - SystemTools.logLimit / 2) }
+        if log.count > Self.logLimit { log.removeFirst(log.count - Self.logLimit / 2) }
     }
 
     private var ejection: VolumeEjection!
@@ -249,7 +249,7 @@ final class SystemTools {
                 CommandHistory.adding(typed.isDetached ? typed.command + " &" : typed.command, to: history),
                 forKey: CommandHistory.key)
         }
-        guard launchesApplications || SystemTools.isHarmless(typed) else {
+        guard launchesApplications || Self.isHarmless(typed) else {
             note("skipped: \(DisplayText.oneLine(typed.command))")
             return
         }
@@ -270,7 +270,7 @@ final class SystemTools {
                     // short one this process was started with.
                     if let application = typed.application(relativeTo: directory, path: LoginShell.searchPath) {
                         return .application(
-                            application, files: SystemTools.files(in: typed.arguments, relativeTo: directory))
+                            application, files: Self.files(in: typed.arguments, relativeTo: directory))
                     }
                     runner.environment = LoginShell.environment()
                 }
@@ -293,6 +293,7 @@ final class SystemTools {
                         NSWorkspace.shared.open(
                             files, withApplicationAt: application, configuration: NSWorkspace.OpenConfiguration())
                     }
+
                 case .finished(let outcome):
                     note((typed.isDetached ? "started: " : "ran: ") + shownCommand)
                     // The command may have changed the folders the panels show.
@@ -324,15 +325,16 @@ final class SystemTools {
     /// Shows what the command wrote: in the viewer when a plugin offers one, else in a dialog.
     private func show(_ outcome: ProcessOutcome, of typed: TypedCommand) {
         if let failure = outcome.failure {
-            return ui.inform(
+            ui.inform(
                 "\(DisplayText.oneLine(typed.firstWord, limit: 80)) cannot be started!", detail: failure,
                 style: .warning)
+            return
         }
         guard !typed.isDetached else { return }
         let mode = settings.index(SystemToolsPlugin.showOutputKey, default: 0)
         var text = outcome.output
         if outcome.isTruncated {
-            text += "\n[The output was cut off after \(ProcessRunner.outputLimit / 1024 / 1024) MB.]"
+            text += "\n[The output was cut off after \(ProcessRunner.outputLimit / 1_024 / 1_024) MB.]"
         }
         var title = DisplayText.oneLine(typed.command)
         if outcome.wasCancelled {
@@ -388,7 +390,7 @@ final class SystemTools {
         let name = settings.text(SystemToolsPlugin.terminalKey, default: "Terminal")
         // (Looking an application up asks the disk: on a thread of the kernel's own.)
         BlockingCalls.run {
-            let application = SystemTools.application(named: name.trimmingCharacters(in: .whitespaces))
+            let application = Self.application(named: name.trimmingCharacters(in: .whitespaces))
             DispatchQueue.main.async { [self] in
                 guard let application else {
                     return ui.inform(
@@ -454,7 +456,7 @@ final class SystemTools {
         kernel.jobs.run(
             title: "Volume:",
             work: { monitor in
-                SystemTools.ask("volume", of: directory, monitor) { SystemVolumes().facts(of: directory) }
+                Self.ask("volume", of: directory, monitor) { SystemVolumes().facts(of: directory) }
             },
             completion: { [self] answer in
                 // Nil: the question was cancelled.
@@ -480,7 +482,7 @@ final class SystemTools {
                 kernel.jobs.run(
                     title: "Renaming volume:",
                     work: { monitor -> Error?? in
-                        SystemTools.ask("rename to \(name)", of: volume, monitor) { () -> Error? in
+                        Self.ask("rename to \(name)", of: volume, monitor) { () -> Error? in
                             do {
                                 try (volume as NSURL).setResourceValue(name, forKey: .volumeNameKey)
                                 return nil
@@ -546,7 +548,8 @@ final class SystemTools {
                     detail: "Depth of subfolders to include (-1 = unlimited):")
             else { return }
             guard let number = Int(depthText.trimmingCharacters(in: .whitespaces)) else {
-                return ui.inform("\(depthText) is not a number.")
+                ui.inform("\(depthText) is not a number.")
+                return
             }
             guard
                 let maskText = ui.prompt(
@@ -555,8 +558,8 @@ final class SystemTools {
             else { return }
             (depth, mask) = (number, maskText)
         }
-        let lines = settings.index(SystemTools.printLinesKey, default: 60)
-        let savedOutput = settings.index(SystemTools.printOutputKey, default: 0)
+        let lines = settings.index(Self.printLinesKey, default: 60)
+        let savedOutput = settings.index(Self.printOutputKey, default: 0)
         guard
             let answer = ui.form(
                 "Print directory",
@@ -564,7 +567,7 @@ final class SystemTools {
                 fields: [
                     .text(
                         "header", "Header text:",
-                        settings.text(SystemTools.printHeaderKey, default: DirectoryListFormatter.defaultHeader)),
+                        settings.text(Self.printHeaderKey, default: DirectoryListFormatter.defaultHeader)),
                     .note("%d folder, %p page, %t pages, %D date, %T time, %% percent sign; empty for no header"),
                     .text("lines", "Lines per page:", String(lines)),
                     .checkbox("details", "Print size, date and attributes", panel.viewMode != .brief),
@@ -579,9 +582,9 @@ final class SystemTools {
         formatter.linesPerPage = min(
             max(Int(answer.text("lines").trimmingCharacters(in: .whitespaces)) ?? lines, 5), 500)
         formatter.isDetailed = answer.flag("details")
-        settings.set(formatter.header, forKey: SystemTools.printHeaderKey)
-        settings.set(formatter.linesPerPage, forKey: SystemTools.printLinesKey)
-        settings.set(output.rawValue, forKey: SystemTools.printOutputKey)
+        settings.set(formatter.header, forKey: Self.printHeaderKey)
+        settings.set(formatter.linesPerPage, forKey: Self.printLinesKey)
+        settings.set(output.rawValue, forKey: Self.printOutputKey)
 
         var file: URL?
         if output == .textFile {
@@ -604,7 +607,7 @@ final class SystemTools {
                         fileSystems: fileSystems, showHidden: showHidden, mask: ListMask(mask), depth: depth,
                         cancellation: monitor.cancellation
                     ).rows(of: items)
-                    : Parallel.map(items, serialBelow: 4096) { ListRow($0) }
+                    : Parallel.map(items, serialBelow: 4_096) { ListRow($0) }
                 // Only the form the chosen output needs is made.
                 let pages = output == .printer ? formatter.pages(directory: base, rows: rows) : []
                 let text = output == .printer ? "" : formatter.text(directory: base, rows: rows)
@@ -646,6 +649,7 @@ final class SystemTools {
                 switch output {
                 case .printer:
                     print(result.pages, longestLine: result.longest, linesPerPage: formatter.linesPerPage, title: base)
+
                 case .textFile:
                     guard let file else { return }
                     if let error = result.error {
@@ -656,6 +660,7 @@ final class SystemTools {
                     }
                     note("list-file: \(fileSystems.displayPath(file))")
                     kernel.panels.refresh([file.deletingLastPathComponent()], focus: file)
+
                 case .viewer:
                     show(text: result.text, title: "File list - \(base)")
                 }
@@ -683,8 +688,9 @@ final class SystemTools {
     /// printer through the system's print service, which knows text, PDF and pictures.
     func printFiles(_ operands: PanelModel.Operands) {
         // A few files are picked out here; the marked files of a long list in a job.
-        guard operands.markedCount > SystemTools.backgroundSelectionThreshold else {
-            return printFiles(operands.items().filter { !$0.isDirectory })
+        guard operands.markedCount > Self.backgroundSelectionThreshold else {
+            printFiles(operands.items().filter { !$0.isDirectory })
+            return
         }
         kernel.jobs.run(
             title: "Reading file list:", work: { _ in operands.items().filter { !$0.isDirectory } },
@@ -732,7 +738,7 @@ final class SystemTools {
             title: "Applications:",
             work: { monitor -> [(name: String, url: URL)]? in
                 // Launch Services looks at the file to know its type: on a volume that does not answer, that waits.
-                SystemTools.ask("applications", of: item.url, monitor) {
+                Self.ask("applications", of: item.url, monitor) {
                     let workspace = NSWorkspace.shared
                     let usual = workspace.urlForApplication(toOpen: item.url)
                     var applications = workspace.urlsForApplications(toOpen: item.url)

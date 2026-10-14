@@ -28,7 +28,7 @@ import Testing
             offsets += text.offsets.map { base + Int($0) }
             pending.removeFirst(used)
             base += used
-            if position >= data.count && used == 0 { break }
+            if position >= data.count, used == 0 { break }
         }
         return (units, offsets)
     }
@@ -129,7 +129,7 @@ import Testing
         #expect(
             ViewerDetection.htmlCharset(
                 Data("<meta http-equiv=\"Content-Type\" content=\"text/html; charset=windows-1251\">".utf8))?.codePage
-                == 1251)
+                == 1_251)
         #expect(ViewerDetection.htmlCharset(Data("<meta charset='UTF-8'>".utf8)) == .utf8)
     }
 
@@ -258,12 +258,12 @@ import Testing
         for encoding in [ViewerEncoding.utf8, .utf16LE] {
             let data = Data(try #require(encoding.encode(text)))
             for options in [
-                TextLayoutOptions(columns: 72, wordWrap: true), TextLayoutOptions(columns: 1024, wordWrap: false)
+                TextLayoutOptions(columns: 72, wordWrap: true), TextLayoutOptions(columns: 1_024, wordWrap: false)
             ] {
                 let reference = referenceRows(data, encoding, options)
                 // Small segments and chunks, so that lines cross both many times.
                 let document = document(
-                    data, encoding, .text(options), parallel: parallel, segment: 96 * 1024 + 2, chunk: 8 * 1024)
+                    data, encoding, .text(options), parallel: parallel, segment: 96 * 1_024 + 2, chunk: 8 * 1_024)
                 #expect(document.isIndexComplete && document.rowCount == reference.count)
                 #expect(document.lineCount == reference.filter(\.startsLine).count)
                 var position = 0
@@ -274,7 +274,7 @@ import Testing
                         rows.map(\.range.lowerBound) == expected.map(\.start)
                             && rows.map(\.startsLine) == expected.map(\.startsLine),
                         "rows from \(position), \(encoding.name)")
-                    position += 7919
+                    position += 7_919
                 }
                 for row in [0, 63, 64, 65, reference.count / 2, reference.count - 1] {
                     #expect(try document.row(containing: reference[row].start) == row)
@@ -292,8 +292,8 @@ import Testing
         for number in 0..<200_000 { lines.append("line \(number) " + String(repeating: "x", count: number % 50)) }
         let data = Data(lines.joined(separator: "\n").utf8)
         let document = document(
-            data, .utf8, .text(TextLayoutOptions(columns: 1024, wordWrap: false)), segment: 256 * 1024,
-            chunk: 64 * 1024)
+            data, .utf8, .text(TextLayoutOptions(columns: 1_024, wordWrap: false)), segment: 256 * 1_024,
+            chunk: 64 * 1_024)
         #expect(document.rowCount == lines.count && document.lineCount == lines.count)
         for row in [0, 1, 4_095, 77_777, 199_999] {
             #expect(try document.rows(from: row, count: 1).first?.text == lines[row])
@@ -306,7 +306,8 @@ import Testing
     @Test func aFileWithoutLineEndsIsStillCutIntoRows() throws {
         let data = Data(repeating: 0x61, count: 300_000)
         let document = document(
-            data, .ansi, .text(TextLayoutOptions(columns: 1000, wordWrap: true)), segment: 32 * 1024, chunk: 4 * 1024)
+            data, .ansi, .text(TextLayoutOptions(columns: 1_000, wordWrap: true)), segment: 32 * 1_024, chunk: 4 * 1_024
+        )
         #expect(document.rowCount == 300 && document.lineCount == 1)
         #expect(try document.rows(from: 299, count: 5).map(\.range) == [299_000..<300_000])
         #expect(try document.row(containing: 150_500) == 150)
@@ -317,7 +318,7 @@ import Testing
             source: DataByteSource(Data(repeating: 0x0A, count: 1 << 20)), encoding: .utf8,
             layout: .text(TextLayoutOptions(columns: 80, wordWrap: true)))
         document.cancellation.cancel()
-        document.buildIndex(parallel: true, segmentSize: 64 * 1024)
+        document.buildIndex(parallel: true, segmentSize: 64 * 1_024)
         #expect(!document.isIndexComplete && document.rowCount == 0)
     }
 
@@ -473,7 +474,7 @@ import Testing
                 text.utf8.distance(from: text.startIndex, to: expected.lowerBound))..<Int64(
                 text.utf8.distance(from: text.startIndex, to: expected.upperBound))
         let start = backwards ? Int64(data.count) : 0
-        for chunk in [64, 100, 4096, 1 << 20] {
+        for chunk in [64, 100, 4_096, 1 << 20] {
             #expect(
                 try find(
                     "grüße aus köln, 日本", SearchOptions(backwards: backwards), in: data, from: start, chunk: chunk)
@@ -534,12 +535,12 @@ import Testing
             try ViewerSearch.find(
                 pattern, in: DataByteSource(data), content: 0..<Int64(data.count), from: 0, backwards: false,
                 encoding: .utf8,
-                chunkSize: 4096, cancellation: cancelled) == nil)
+                chunkSize: 4_096, cancellation: cancelled) == nil)
         var reports: [Double] = []
         let found = try ViewerSearch.find(
             pattern, in: DataByteSource(data), content: 0..<Int64(data.count), from: 0, backwards: false,
             encoding: .utf8,
-            chunkSize: 4096, parallelism: 4
+            chunkSize: 4_096, parallelism: 4
         ) { reports.append($0) }
         #expect(found == Int64(1 << 20)..<Int64((1 << 20) + 6))
         #expect(reports.count > 10 && reports == reports.sorted() && (reports.last ?? 2) <= 1)
@@ -570,10 +571,10 @@ import Testing
         #expect(try source.read(250_000..<250_300) == data.subdata(in: 250_000..<250_300))
         #expect(try source.read(at: 400_000, count: 5).isEmpty)
         // Many threads at once, each through a reader of its own.
-        let cached = CachedByteSource(source, blockSize: 4096, capacity: 8)
+        let cached = CachedByteSource(source, blockSize: 4_096, capacity: 8)
         let pieces = Parallel.map(Array(0..<400)) { number -> Bool in
-            let lower = (number * 7919) % 290_000
-            let length = 1 + (number * 131) % 9000
+            let lower = (number * 7_919) % 290_000
+            let length = 1 + (number * 131) % 9_000
             return (try? cached.read(at: Int64(lower), count: length)) == data.subdata(in: lower..<lower + length)
         }
         #expect(pieces.allSatisfy { $0 })

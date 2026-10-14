@@ -149,7 +149,7 @@ enum MenuBuilder {
 
     /// The menu bar: the application menu, the plugins' menus in their order, the Window menu,
     /// and the plugins' Help menu last, where the Mac has it.
-    static func mainMenu(appName: String, kernel: Kernel, limit: Int = MenuBuilder.screenLimit) -> NSMenu {
+    static func mainMenu(appName: String, kernel: Kernel, limit: Int = Self.screenLimit) -> NSMenu {
         let main = NSMenu()
         let keys = kernel.keyBindings
         func add(_ menu: NSMenu) {
@@ -314,7 +314,7 @@ final class MenuKeys: NSObject, NSMenuDelegate {
 
     /// Runs the action of the entry the key belonged to, with the entry as its sender, the way
     /// choosing it from the menu would.
-    @objc func performMatched(_ sender: Any?) {
+    @objc func performMatched(_: Any?) {
         guard let item = matched else { return }
         matched = nil
         if let action = item.action { NSApp.sendAction(action, to: item.target, from: item) }
@@ -347,12 +347,12 @@ final class MenuKeys: NSObject, NSMenuDelegate {
 
     /// The entry of `menu`, or of a menu inside it, that has this key.
     private func item(in menu: NSMenu, for event: NSEvent) -> NSMenuItem? {
-        let shortcuts = MenuKeys.shortcuts(for: event)
+        let shortcuts = Self.shortcuts(for: event)
         guard !shortcuts.isEmpty else { return nil }
         // A command's entry has the key the bindings give it.
         for shortcut in shortcuts {
             if let id = kernel.keyBindings.command(for: shortcut), kernel.keyBindings.menuShortcut(for: id) == shortcut,
-                let item = MenuKeys.find(
+                let item = Self.find(
                     in: menu, where: { MenuBuilder.command(of: $0) == id && !$0.keyEquivalent.isEmpty })
             {
                 return item
@@ -360,7 +360,7 @@ final class MenuKeys: NSObject, NSMenuDelegate {
         }
         // The standard entries (Undo, and Cut, Copy, Paste where no plugin brought them) all have Cmd.
         guard event.modifierFlags.contains(.command) else { return nil }
-        return MenuKeys.find(in: menu) { item in
+        return Self.find(in: menu) { item in
             guard MenuBuilder.command(of: item) == nil, !item.keyEquivalent.isEmpty else { return false }
             var modifiers = KeyModifiers(item.keyEquivalentModifierMask)
             let key = item.keyEquivalent.lowercased()

@@ -123,11 +123,11 @@ import Testing
 
     @Test func menusAreOrderedAndGrouped() {
         let menus = MenuRegistry()
-        menus.add(["sort"], to: MenuSection(Menus.show, order: 10))
-        menus.add(["copy", "move"], to: MenuSection(Menus.files, order: 20))
-        menus.add(["open"], to: MenuSection(Menus.files, order: 10))
-        menus.add(["view"], to: MenuSection(Menus.files, order: 10))
-        menus.add(["delete"], to: MenuSection(Menus.files, order: 40))
+        menus.add(["sort"], to: MenuSection(Self.show, order: 10))
+        menus.add(["copy", "move"], to: MenuSection(Self.files, order: 20))
+        menus.add(["open"], to: MenuSection(Self.files, order: 10))
+        menus.add(["view"], to: MenuSection(Self.files, order: 10))
+        menus.add(["delete"], to: MenuSection(Self.files, order: 40))
         #expect(menus.menus.map(\.title) == ["Files", "Show"])
         #expect(menus.menus[0].items == ["open", "view", nil, "copy", "move", nil, "delete"])
     }
@@ -310,9 +310,9 @@ import Testing
 
     @Test func jobProgressChoosesBytesOrItems() {
         let copying = JobProgress(
-            lines: ["From: a", "To: b"], itemsDone: 1, itemsTotal: 4, bytesDone: 250, bytesTotal: 1000)
+            lines: ["From: a", "To: b"], itemsDone: 1, itemsTotal: 4, bytesDone: 250, bytesTotal: 1_000)
         #expect(
-            copying.measuresBytes && copying.amountDone == 250 && copying.amountTotal == 1000
+            copying.measuresBytes && copying.amountDone == 250 && copying.amountTotal == 1_000
                 && copying.fraction == 0.25)
         let deleting = JobProgress(lines: ["Deleting: a"], itemsDone: 1, itemsTotal: 4)
         #expect(

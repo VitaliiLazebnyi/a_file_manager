@@ -21,7 +21,7 @@ struct QuickFilter {
     /// The filter for the model; nil when nothing is typed and nothing lies below.
     var combined: PanelFilter? {
         guard !text.isEmpty else { return base }
-        let (matches, base) = (QuickFilter.matcher(for: text), base)
+        let (matches, base) = (Self.matcher(for: text), base)
         return PanelFilter(title: title) { item in matches(item.name) && (base?.matches(item) ?? true) }
     }
 
@@ -110,7 +110,7 @@ final class QuickFilterBar: NSView, NSTextFieldDelegate {
         ])
     }
 
-    required init?(coder: NSCoder) { fatalError("not used") }
+    required init?(coder _: NSCoder) { fatalError("not used") }
 
     /// Puts the keyboard into the field, with the caret at the end of what is there.
     func beginEditing() {
@@ -123,17 +123,19 @@ final class QuickFilterBar: NSView, NSTextFieldDelegate {
 
     @objc private func closePressed() { onCancel?() }
 
-    func controlTextDidChange(_ notification: Notification) {
+    func controlTextDidChange(_: Notification) {
         onChange?(field.stringValue)
     }
 
-    func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
+    func control(_: NSControl, textView _: NSTextView, doCommandBy selector: Selector) -> Bool {
         switch selector {
         case #selector(NSResponder.cancelOperation(_:)):
             onCancel?()
+
         case #selector(NSResponder.insertNewline(_:)), #selector(NSResponder.moveUp(_:)),
             #selector(NSResponder.moveDown(_:)):
             onReturn?()
+
         default:
             return false
         }

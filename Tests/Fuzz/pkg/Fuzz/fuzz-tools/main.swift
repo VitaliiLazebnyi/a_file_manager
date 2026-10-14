@@ -59,7 +59,7 @@ let checksumNames = [
 ]
 
 let checksum = FuzzTarget(
-    "checksum", maxLen: 4096,
+    "checksum", maxLen: 4_096,
     dict: [
         "; comment\n", " *", "  ", "\\", "\\\\", "\\n", "\\r", "MD5 (", "SHA256 (", "SHA1(", "BLAKE3 (", ") = ",
         "d41d8cd98f00b204e9800998ecf8427e", "da39a3ee5e6b4b0d3255bfef95601890afd80709", "00000000",
@@ -94,7 +94,7 @@ let checksum = FuzzTarget(
 
 /// The whole of Verify: the checksum file lies next to two real files.
 let verify = FuzzTarget(
-    "verify", maxLen: 2048,
+    "verify", maxLen: 2_048,
     dict: [
         "a.txt", "sub/b.bin", "sub\\b.bin", "3610a686", "d41d8cd98f00b204e9800998ecf8427e", " *", "  ", "\n",
         "../out/canary/keep.txt", "/", "MD5 (", ") = ", "\\"
@@ -130,7 +130,7 @@ let verify = FuzzTarget(
 final class MemorySink: DecodeSink {
     var files: [(name: String?, bytes: Int)] = []
     var open = false
-    func begin(name: String?) throws {
+    func begin(name: String?) {
         fzCheck(!open, "decode-begin-while-open", "")
         open = true
         files.append((name, 0))
@@ -143,11 +143,11 @@ final class MemorySink: DecodeSink {
                 "\(String(describing: name).debugDescription) -> \(safe.debugDescription)")
         }
     }
-    func write(_ bytes: [UInt8]) throws {
+    func write(_ bytes: [UInt8]) {
         fzCheck(open, "decode-write-without-file", "")
         files[files.count - 1].bytes += bytes.count
     }
-    func end() throws {
+    func end() {
         fzCheck(open, "decode-end-without-file", "")
         open = false
     }
@@ -199,7 +199,7 @@ func decodeSeeds() -> [[UInt8]] {
 
 /// The decoders alone, into memory: fast.
 let decodeMemory = FuzzTarget(
-    "decodemem", maxLen: 4096, dict: decodeDict, seeds: decodeSeeds,
+    "decodemem", maxLen: 4_096, dict: decodeDict, seeds: decodeSeeds,
     run: { bytes in
         let sink = MemorySink()
         let machine = DecodeMachine(sink: sink)
@@ -231,7 +231,7 @@ let decodeMemory = FuzzTarget(
 /// Decode as the command does it: from files in a folder (the input may hold several parts,
 /// separated by the byte 0x1C) into a target folder.
 let decodeFiles = FuzzTarget(
-    "decode", maxLen: 4096, dict: decodeDict + ["\u{1C}"], seeds: { decodeSeeds().map { [0] + $0 } },
+    "decode", maxLen: 4_096, dict: decodeDict + ["\u{1C}"], seeds: { decodeSeeds().map { [0] + $0 } },
     setUp: setUpTools,
     run: { bytes in
         guard let first = bytes.first else { return }
@@ -263,7 +263,7 @@ let decodeFiles = FuzzTarget(
 // MARK: split and combine
 
 let splitCombine = FuzzTarget(
-    "combine", maxLen: 1024,
+    "combine", maxLen: 1_024,
     dict: [
         "filename=", "size=", "crc32=", "\r\n", "\n", "=", "../", "/", "\\", "..", "data.001", "data.crc", "FFFFFFFF",
         "-1", "9223372036854775807", "9223372036854775808", "0x", "+", " ", "\u{2028}", "\u{85}"
@@ -335,7 +335,7 @@ let partSeries = FuzzTarget(
             var current = name
             var steps = 0
             var seen = Set<String>([name])
-            while let next = PartSeries.next(after: current), steps < 3000 {
+            while let next = PartSeries.next(after: current), steps < 3_000 {
                 fzCheck(
                     seen.insert(next).inserted, "parts-cycle",
                     "\(name.debugDescription) comes back to \(next.debugDescription)")

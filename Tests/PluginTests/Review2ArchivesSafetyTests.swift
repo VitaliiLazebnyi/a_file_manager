@@ -92,7 +92,7 @@ private func tarBody(_ text: String) -> Data {
             tar.append(tarHeader(name: name, size: 4))
             tar.append(tarBody("data"))
         }
-        tar.append(Data(count: 1024))
+        tar.append(Data(count: 1_024))
         try tar.write(to: box.url("slash.tar"))
         var archives = [zip, box.url("slash.tar")]
         // The reproducers the fuzzer left, when they are there.
@@ -153,6 +153,7 @@ private func tarBody(_ text: String) -> Data {
             switch round % 3 {
             case 0: tree.insert(ArchiveEntry(path: path, isDirectory: false))
             case 1: tree.remove(path)
+
             default:
                 // A rename: out, and in again elsewhere with the position it had.
                 if var entry = tree.remove(path) {
@@ -272,7 +273,7 @@ private func tarBody(_ text: String) -> Data {
         let plain = try writeZip(
             "wide.zip", limits: ZipLimits(maxField: 0xFFFF_FFFE, maxEntries: 2),
             names: ["a.txt", "b.txt", "c.txt", "d.txt"])
-        var stubbed = Data(repeating: 0x90, count: 5000)
+        var stubbed = Data(repeating: 0x90, count: 5_000)
         stubbed.append(try Data(contentsOf: plain))
         try stubbed.write(to: box.url("sfx.zip"))
         let contents = try ZipDirectory.read(try RandomAccessFile(box.url("sfx.zip")))
@@ -287,7 +288,7 @@ private func tarBody(_ text: String) -> Data {
         tar.append(tarHeader(name: "name.txt", type: 49, link: "target.txt"))
         tar.append(tarHeader(name: "name.txt", size: 3))
         tar.append(tarBody("own"))
-        tar.append(Data(count: 1024))
+        tar.append(Data(count: 1_024))
         try tar.write(to: box.url("links.tar"))
         let root = bench.inside(box.url("links.tar"), scheme: ArchiveURL.readOnlyScheme)
         #expect(try bench.read(root.appending(name: "name.txt")) == Data("own".utf8))
@@ -360,7 +361,7 @@ private func tarBody(_ text: String) -> Data {
         var encrypted = Data()
         var offset = 0
         // Blocks of every awkward length, so the key stream is carried over correctly.
-        for size in [1, 15, 16, 17, 31, 4096, 65_537, 30_000] {
+        for size in [1, 15, 16, 17, 31, 4_096, 65_537, 30_000] {
             let end = min(plain.count, offset + size)
             encrypted.append(encrypting.encrypt(plain.subdata(in: offset..<end)))
             offset = end

@@ -43,19 +43,19 @@ public struct CopyFilter: Equatable {
 
     public init(_ text: String = "") {
         let halves = text.split(separator: "|", maxSplits: 1, omittingEmptySubsequences: false).map(String.init)
-        for token in CopyFilter.tokens(halves.first ?? "") {
-            if let folder = CopyFilter.folderPattern(token) {
+        for token in Self.tokens(halves.first ?? "") {
+            if let folder = Self.folderPattern(token) {
                 includedFolders.append(folder)
             } else {
                 includedFiles.append(token.lowercased())
             }
         }
-        for token in CopyFilter.tokens(halves.count > 1 ? halves[1] : "") {
+        for token in Self.tokens(halves.count > 1 ? halves[1] : "") {
             if token == "/" {
                 excludesBaseFiles = true
             } else if token == "**/" {
                 skipsEmptyFolders = true
-            } else if let folder = CopyFilter.folderPattern(token) {
+            } else if let folder = Self.folderPattern(token) {
                 excludedFolders.append(folder)
             } else {
                 excludedFiles.append(token.lowercased())
@@ -107,7 +107,7 @@ public struct CopyFilter: Equatable {
         for character in text {
             if character == "\"" {
                 quoted.toggle()
-            } else if character == " " && !quoted {
+            } else if character == " ", !quoted {
                 if !current.isEmpty { tokens.append(current) }
                 current = ""
             } else {

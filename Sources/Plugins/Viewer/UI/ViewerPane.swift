@@ -123,7 +123,7 @@ final class ViewerPane: NSView, NSMenuDelegate {
         self.settings = settings
         self.temporaryCopies = temporaryCopies
         self.isEmbedded = isEmbedded
-        menuButtons = ViewerPane.menuTitles.map { title in
+        menuButtons = Self.menuTitles.map { title in
             let button = NSPopUpButton(frame: .zero, pullsDown: true)
             button.isBordered = false
             button.addItem(withTitle: title)
@@ -139,7 +139,7 @@ final class ViewerPane: NSView, NSMenuDelegate {
         applySettings()
     }
 
-    required init?(coder: NSCoder) { fatalError("not used") }
+    required init?(coder _: NSCoder) { fatalError("not used") }
 
     deinit {
         cancellation.cancel()
@@ -248,11 +248,11 @@ final class ViewerPane: NSView, NSMenuDelegate {
         // inside the main window, only while the pane has the keyboard (spec 10 › Embedded
         // Lister: "these keep their Lister meaning").
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            guard let self, let window = self.window, event.window === window, window.attachedSheet == nil,
-                !self.isEmbedded || self.hasKeyboard,
-                !(window.firstResponder is NSText) || self.richText === window.firstResponder
+            guard let self, let window, event.window === window, window.attachedSheet == nil,
+                !isEmbedded || hasKeyboard,
+                !(window.firstResponder is NSText) || richText === window.firstResponder
             else { return event }
-            return self.handleKey(event) ? nil : event
+            return handleKey(event) ? nil : event
         }
     }
 
@@ -287,6 +287,7 @@ final class ViewerPane: NSView, NSMenuDelegate {
                         return Loaded(
                             item: item, source: DataByteSource(data), sample: data.prefix(ViewerDetection.sampleSize),
                             guess: ViewerDetection.TextGuess(encoding: .utf8), content: .other, parallel: true)
+
                     case .file(let url):
                         let provider = try fileSystems.provider(for: url)
                         // What a plugin still holds back for this file (an archive written after a delay) is written first.
@@ -343,6 +344,7 @@ final class ViewerPane: NSView, NSMenuDelegate {
                     self.loaded = loaded
                     self.chooseStartupMode(for: loaded)
                     self.present()
+
                 case .failure(let error):
                     self.failure = error.localizedDescription
                     self.showMessage(error.localizedDescription)
@@ -397,7 +399,7 @@ final class ViewerPane: NSView, NSMenuDelegate {
             let isLocal = provider.volume(of: url, cancellation: cancellation)?.isLocal ?? true
             let summary = FolderSummary.measure(
                 url, provider: provider, cancellation: cancellation,
-                limit: isLocal ? nil : ViewerPane.remoteFolderEntryLimit)
+                limit: isLocal ? nil : Self.remoteFolderEntryLimit)
             DispatchQueue.main.async {
                 guard let self, self.loadGeneration == generation, !cancellation.isCancelled else { return }
                 self.folderSummary = summary
@@ -450,6 +452,7 @@ final class ViewerPane: NSView, NSMenuDelegate {
         case 2: return .binary
         case 3: return .hex
         case 0 where loaded.guess.isBinary: return .binary
+
         default:
             switch loaded.guess.encoding.kind {
             case .utf8: return .utf8
@@ -475,9 +478,11 @@ final class ViewerPane: NSView, NSMenuDelegate {
         guard let loaded else { return .utf8 }
         switch mode {
         case .utf8: return .utf8
+
         case .unicode:
             if let codePage, codePage.unitSize == 2 { return codePage }
             return loaded.guess.encoding.unitSize == 2 ? loaded.guess.encoding : .utf16LE
+
         case .html where strippedHTML != nil: return .utf8
         default: return codePage ?? fontSlot.encoding
         }
@@ -496,6 +501,7 @@ final class ViewerPane: NSView, NSMenuDelegate {
         switch mode {
         case .binary: return .binary(width: settings.binaryWidth)
         case .hex: return .hex
+
         default:
             guard settings.wrap else {
                 return .text(
@@ -550,7 +556,7 @@ final class ViewerPane: NSView, NSMenuDelegate {
         let encoding =
             ViewerDetection.htmlCharset(loaded.sample)
             ?? (loaded.guess.encoding.isUnicode ? loaded.guess.encoding : codePage ?? fontSlot.encoding)
-        guard loaded.source.length <= ViewerPane.htmlTextLimit else {
+        guard loaded.source.length <= Self.htmlTextLimit else {
             mode = startupTextMode(for: loaded)
             present()
             return
@@ -648,7 +654,7 @@ final class ViewerPane: NSView, NSMenuDelegate {
             // A file on the local disk is read by the framework that shows it, as far as it needs;
             // only other file systems are read whole into memory here.
             func whole() -> Data? {
-                guard loaded.source.length <= ViewerPane.wholeFileLimit else { return nil }
+                guard loaded.source.length <= Self.wholeFileLimit else { return nil }
                 if url.isFileURL { return try? Data(contentsOf: url, options: .mappedIfSafe) }
                 return try? loaded.source.read(0..<loaded.source.length, cancellation: presentCancel)
             }
@@ -671,21 +677,25 @@ final class ViewerPane: NSView, NSMenuDelegate {
                             $0, minimumDelay: minimumDelay, cancellation: presentCancel, firstFrame: early)
                     }
                 if let image { ready = .image(image) }
+
             case .pdf:
                 let document = url.isFileURL ? PDFDocument(url: url) : whole().flatMap(PDFDocument.init(data:))
                 if let document { ready = .pdf(document) }
+
             case .html:
-                if length > ViewerPane.htmlPageLimit {
+                if length > Self.htmlPageLimit {
                     ready = .asText
                 } else if let data = whole() {
                     ready = .html(htmlEncoding.string(from: data))
                 }
+
             case .rtf:
-                if length > ViewerPane.rtfLimit {
+                if length > Self.rtfLimit {
                     ready = .asText
                 } else if let text = whole().flatMap({ NSAttributedString(rtf: $0, documentAttributes: nil) }) {
                     ready = .rtf(text)
                 }
+
             case .media, .other:
                 switch copies.localCopy(for: url, fileSystems: fileSystems, owner: owner, cancellation: presentCancel) {
                 case .success(let local): ready = .local(local)
@@ -703,20 +713,24 @@ final class ViewerPane: NSView, NSMenuDelegate {
                     }
                     self.showImage(image)
                     return
+
                 case .pdf(let document):
                     let view = RichViews.pdfView(document)
                     self.pdfView = view
                     self.setContent(view)
+
                 case .html(let html):
                     let view = WebContentView(frame: self.contentHost.bounds)
                     view.onLink = { [weak self] in self?.followLink($0) }
                     self.webView = view
                     self.setContent(view)
                     view.show(html: html)
+
                 case .rtf(let text):
                     let views = RichViews.textView(text)
                     self.richText = views.text
                     self.setContent(views.scroll)
+
                 case .local(let local) where content == .media:
                     let view = MediaView(frame: self.contentHost.bounds)
                     view.onEnd = { [weak self] in self?.onStep(1) }
@@ -724,6 +738,7 @@ final class ViewerPane: NSView, NSMenuDelegate {
                     self.mediaView = view
                     self.setContent(view)
                     view.play(local, volume: self.settings.playerVolume)
+
                 case .local(let local):
                     if self.settings.usesQuickLook, !self.internalOnly, let view = RichViews.quickLookView(local) {
                         self.previewView = view
@@ -731,8 +746,10 @@ final class ViewerPane: NSView, NSMenuDelegate {
                     } else {
                         self.showMessage("This is not an image or a multimedia file. Choose a text mode (1, 2 or 3).")
                     }
+
                 case .failed(let reason):
                     self.showMessage(reason)
+
                 case .asText:
                     self.mode = self.startupTextMode(for: loaded)
                     self.present()
@@ -776,12 +793,12 @@ final class ViewerPane: NSView, NSMenuDelegate {
         resizeWork?.cancel()
         let work = DispatchWorkItem { [weak self] in
             guard let self else { return }
-            self.resizeWork = nil
+            resizeWork = nil
             // The end of the live resize asks again.
-            guard !self.inLiveResize, !self.pager.inLiveResize else { return }
-            guard self.contentView === self.pager, self.pager.shownLayout != nil, self.pager.shownLayout != self.layout
+            guard !inLiveResize, !pager.inLiveResize else { return }
+            guard contentView === pager, pager.shownLayout != nil, pager.shownLayout != layout
             else { return }
-            self.present(keeping: self.pager.topOffset)
+            present(keeping: pager.topOffset)
         }
         resizeWork = work
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25, execute: work)
@@ -825,7 +842,7 @@ final class ViewerPane: NSView, NSMenuDelegate {
     func menuNeedsUpdate(_ menu: NSMenu) {
         guard let index = menuButtons.firstIndex(where: { $0.menu === menu }) else { return }
         while menu.items.count > 1 { menu.removeItem(at: 1) }
-        fill(menu, with: menuEntries(ViewerPane.menuTitles[index]))
+        fill(menu, with: menuEntries(Self.menuTitles[index]))
     }
 
     /// The titles of the entries of one of the menus, for tests.

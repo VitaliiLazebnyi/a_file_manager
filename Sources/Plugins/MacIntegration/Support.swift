@@ -19,13 +19,16 @@ enum DisplayText {
             case "\n": result.append(contentsOf: "\\n".unicodeScalars)
             case "\r": result.append(contentsOf: "\\r".unicodeScalars)
             case "\t": result.append(contentsOf: "\\t".unicodeScalars)
+
             default:
                 switch scalar.properties.generalCategory {
                 // The joiners of emoji and of some scripts are format characters too, and harmless.
                 case .format where scalar.value == 0x200C || scalar.value == 0x200D:
                     result.append(scalar)
+
                 case .control, .format, .lineSeparator, .paragraphSeparator, .surrogate:
                     result.append(contentsOf: "\\u{\(String(scalar.value, radix: 16, uppercase: true))}".unicodeScalars)
+
                 default:
                     result.append(scalar)
                 }

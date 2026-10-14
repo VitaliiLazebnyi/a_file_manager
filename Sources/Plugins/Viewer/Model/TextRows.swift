@@ -98,7 +98,7 @@ struct RowSplitter {
             // A mark that combines with the character before, the second half of a surrogate
             // pair, and what a joiner joins take no column: a row is never cut in front of them.
             let isSecondHalf = (0xDC00...0xDFFF).contains(unit)
-            let takesNone = isSecondHalf || joined || RowSplitter.takesNoColumn(unit)
+            let takesNone = isSecondHalf || joined || Self.takesNoColumn(unit)
             let width =
                 unit == 0x09
                 ? tabWidth - column % tabWidth
@@ -143,6 +143,7 @@ struct RowSplitter {
         case 0x0300...0x036F, 0x1AB0...0x1AFF, 0x1DC0...0x1DFF, 0x200B...0x200F, 0x20D0...0x20FF, 0x3099...0x309A,
             0xFE00...0xFE0F, 0xFE20...0xFE2F:
             return true
+
         default: return false
         }
     }
@@ -220,13 +221,13 @@ final class TextRowIndex {
     static let stride = 64
     /// Checkpoints are at least this many bytes apart on average: a file of nothing but line
     /// ends would need one per 64 bytes otherwise.
-    static let minimumCheckpointDistance = 4096
+    static let minimumCheckpointDistance = 4_096
     /// A segment holds no more checkpoints than this (3 MB): a line of many gigabytes, which is
     /// all rows of one segment, gets them farther apart instead (a lookup then cuts a few hundred
     /// kilobytes more of text, which costs less than a megabyte of checkpoints per 4 MB).
     static let maximumCheckpoints = 1 << 18
     /// A scan looks at the density of its checkpoints from this many on.
-    static let thinningThreshold = 2048
+    static let thinningThreshold = 2_048
 
     struct Checkpoint {
         var offset: Int64
@@ -251,11 +252,11 @@ final class TextRowIndex {
         var endIndex: Int { count }
 
         mutating func append(_ checkpoint: Checkpoint) {
-            if count & (CheckpointList.chunkSize - 1) == 0 {
+            if count & (Self.chunkSize - 1) == 0 {
                 marks.append([])
                 lines.append([])
-                marks[marks.count - 1].reserveCapacity(CheckpointList.chunkSize)
-                lines[lines.count - 1].reserveCapacity(CheckpointList.chunkSize)
+                marks[marks.count - 1].reserveCapacity(Self.chunkSize)
+                lines[lines.count - 1].reserveCapacity(Self.chunkSize)
             }
             marks[marks.count - 1].append(checkpoint.offset << 1 | (checkpoint.startsLine ? 1 : 0))
             lines[lines.count - 1].append(UInt32(truncatingIfNeeded: checkpoint.linesBefore))
@@ -263,15 +264,15 @@ final class TextRowIndex {
         }
 
         subscript(index: Int) -> Checkpoint {
-            let chunk = index >> CheckpointList.chunkShift
-            let inChunk = index & (CheckpointList.chunkSize - 1)
+            let chunk = index >> Self.chunkShift
+            let inChunk = index & (Self.chunkSize - 1)
             let mark = marks[chunk][inChunk]
             return Checkpoint(offset: mark >> 1, linesBefore: Int(lines[chunk][inChunk]), startsLine: mark & 1 == 1)
         }
 
         /// Every `step`th checkpoint, the first included.
-        func thinned(every step: Int) -> CheckpointList {
-            var result = CheckpointList()
+        func thinned(every step: Int) -> Self {
+            var result = Self()
             for index in Swift.stride(from: 0, to: count, by: Swift.max(1, step)) { result.append(self[index]) }
             return result
         }
@@ -332,7 +333,7 @@ final class TextRowIndex {
         var linesBefore: Int
         /// The row the text must not be walked past from here (a segment that could not be read
         /// follows); nil when the rows go on.
-        var endRow: Int? = nil
+        var endRow: Int?
     }
 
     /// What a build was given: a later layout may take its segments over when this is the same.
@@ -497,7 +498,7 @@ final class TextRowIndex {
                 do {
                     // The segment that comes next in file order shows what it has found so far, so a
                     // file whose first line is gigabytes long is not blank until it is all read.
-                    segment = try TextRowIndex.scan(
+                    segment = try Self.scan(
                         source: source, content: content, segment: bounds[number], isFirst: number == 0,
                         encoding: encoding,
                         options: options, chunkSize: chunkSize, rawScan: rawScan, cancellation: cancellation,
@@ -846,11 +847,11 @@ final class TextRowIndex {
                     if unit == 1, position + 8 <= count {
                         // Short lines are the most; their ends are found without a call.
                         let word = load(position)
-                        let ends = TextRowIndex.matches(in: word, 0x0A) | TextRowIndex.matches(in: word, 0x0D)
+                        let ends = Self.matches(in: word, 0x0A) | Self.matches(in: word, 0x0D)
                         if ends != 0 {
                             let before = ends.trailingZeroBitCount >> 3
                             lineEnd = position + before
-                            plainShort = TextRowIndex.matches(in: word, 0x09) & (1 << UInt64(before * 8) &- 1) == 0
+                            plainShort = Self.matches(in: word, 0x09) & (1 << UInt64(before * 8) &- 1) == 0
                         } else {
                             searchFrom = position + 8
                         }
@@ -930,7 +931,7 @@ final class TextRowIndex {
             guard offset < coveredEnd || complete,
                 let segment = lastSegment(where: { $0.checkpoints[0].offset <= offset })
             else { return nil }
-            return position(segment, TextRowIndex.lastIndex(in: segment.checkpoints) { $0.offset <= offset } ?? 0)
+            return position(segment, Self.lastIndex(in: segment.checkpoints) { $0.offset <= offset } ?? 0)
         }
     }
 
@@ -942,7 +943,7 @@ final class TextRowIndex {
             }
             return position(
                 segment,
-                TextRowIndex.lastIndex(in: segment.checkpoints) { $0.linesBefore <= line - segment.firstLine } ?? 0)
+                Self.lastIndex(in: segment.checkpoints) { $0.linesBefore <= line - segment.firstLine } ?? 0)
         }
     }
 
@@ -955,7 +956,7 @@ final class TextRowIndex {
     }
 
     private func lastSegment(where matches: (Segment) -> Bool) -> Segment? {
-        TextRowIndex.lastIndex(in: published, where: matches).map { published[$0] }
+        Self.lastIndex(in: published, where: matches).map { published[$0] }
     }
 
     /// The last element of a sorted array for which `matches` holds (it holds for a prefix).

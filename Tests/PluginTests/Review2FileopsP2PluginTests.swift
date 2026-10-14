@@ -35,21 +35,22 @@ final class P2RecordingUI: UserInteraction {
     var formAnswer: ([FormField]) -> FormValues? = { _ in nil }
     var promptAnswer: (String) -> String? = { _ in nil }
 
-    func prompt(_ message: String, value: String, detail: String) -> String? { promptAnswer(value) }
-    func choose(_ message: String, detail: String, buttons: [String], style: QuestionStyle) -> Int {
+    func prompt(_: String, value: String, detail _: String) -> String? { promptAnswer(value) }
+    func choose(_ message: String, detail _: String, buttons: [String], style _: QuestionStyle) -> Int {
         let question = Question(message: message, buttons: buttons, defaultButton: -1)
         questions.append(question)
         return answer(question) ?? 0
     }
-    func choose(_ message: String, detail: String, buttons: [String], style: QuestionStyle, defaultButton: Int?) -> Int
+    func choose(_ message: String, detail _: String, buttons: [String], style _: QuestionStyle, defaultButton: Int?)
+        -> Int
     {
         let question = Question(message: message, buttons: buttons, defaultButton: defaultButton)
         questions.append(question)
         // Return presses the default button; without one, nothing happens until Esc: the last.
         return answer(question) ?? defaultButton ?? buttons.count - 1
     }
-    func inform(_ message: String, detail: String, style: QuestionStyle) { messages.append(message) }
-    func form(_ title: String, detail: String, fields: [FormField], buttons: [String]) -> FormValues? {
+    func inform(_ message: String, detail _: String, style _: QuestionStyle) { messages.append(message) }
+    func form(_ title: String, detail _: String, fields: [FormField], buttons _: [String]) -> FormValues? {
         forms.append(title)
         return formAnswer(fields)
     }
@@ -73,7 +74,7 @@ final class P2DeferredJobs: JobService {
 
     final class Monitor: JobMonitor {
         let cancellation = CancellationFlag()
-        func report(_ progress: JobProgress) {}
+        func report(_: JobProgress) {}
         func ask<Answer>(_ question: () -> Answer) -> Answer { question() }
     }
 
@@ -178,7 +179,7 @@ final class P2Bench: ShellServices {
         #expect(question.message == "Test" && question.defaultButton == 0 && box.exists("d/keep.txt"))
     }
 
-    @Test func theQuestionsOfAJobThatDestroySomethingDefaultToSkip() throws {
+    @Test func theQuestionsOfAJobThatDestroySomethingDefaultToSkip() {
         let fileSystems = FileSystemRegistry()
         fileSystems.register(memory)
         let bridge = JobBridge(monitor: P2DeferredJobs.Monitor(), ui: ui, fileSystems: fileSystems)
@@ -237,7 +238,7 @@ final class P2Bench: ShellServices {
         #expect(FileOperations.Picked(model).count == (model.cursorItem == nil ? 0 : 1))
     }
 
-    @Test func theMarksOfWhatWasProcessedComeOffAndTheOthersStay() throws {
+    @Test func theMarksOfWhatWasProcessedComeOffAndTheOthersStay() {
         let bench = bench()
         let model = bench.left.model
         model.selectAll()
@@ -261,7 +262,7 @@ final class P2Bench: ShellServices {
         #expect(model.selectionCount == 2)
     }
 
-    @Test func afterACopyOnlyTheCopiedItemsLoseTheirMark() throws {
+    @Test func afterACopyOnlyTheCopiedItemsLoseTheirMark() {
         let bench = bench()
         memory.addDirectory("/B/two.txt")  // a folder in the way of one of the three
         bench.right.reload()
@@ -274,7 +275,7 @@ final class P2Bench: ShellServices {
     }
 
     // F009
-    @Test func deleteAsksWhatTheFolderCanDoOnceNotPerItem() throws {
+    @Test func deleteAsksWhatTheFolderCanDoOnceNotPerItem() {
         for index in 0..<60 { memory.addFile("/many/f\(index).txt") }
         let bench = bench(left: memory.url("/many"))
         bench.left.model.selectAll()
@@ -291,7 +292,7 @@ final class P2Bench: ShellServices {
     }
 
     // F027: the log's last lines at the end of the program.
-    @Test func theLogIsWrittenWhileTheProgramPreparesToQuit() async throws {
+    @Test func theLogIsWrittenWhileTheProgramPreparesToQuit() async {
         let settings = MemorySettings()
         settings.set(true, forKey: OperationSettings.logEnabled)
         settings.set(box.url("logs/operations.log").path, forKey: OperationSettings.logFile)
@@ -311,7 +312,7 @@ final class P2Bench: ShellServices {
         plugin.stop()
     }
 
-    @Test func aLogThatCannotBeWrittenHoldsUpNeitherTheQuitNorItsCaller() async throws {
+    @Test func aLogThatCannotBeWrittenHoldsUpNeitherTheQuitNorItsCaller() async {
         var configuration = OperationLog.Configuration()
         configuration.isEnabled = true
         configuration.file = box.url("logs/operations.log")
@@ -358,7 +359,7 @@ final class P2Bench: ShellServices {
     }
 
     // New folders are made exclusively, and a job that is cancelled makes none.
-    @Test func aNewFolderIsNotTakenForOneThatAppearedMeanwhile() throws {
+    @Test func aNewFolderIsNotTakenForOneThatAppearedMeanwhile() {
         let bench = bench()
         #expect(bench.commands.perform(.makeDirectory, .text("fresh|fresh/inner|one.txt")))
         #expect(memory.exists("/A/fresh/inner"))
@@ -398,7 +399,7 @@ final class P2Bench: ShellServices {
     }
 
     // F003
-    @Test func aLongListOfNamesIsMadeInTheBackgroundAndTheLatestRequestWins() async throws {
+    @Test func aLongListOfNamesIsMadeInTheBackgroundAndTheLatestRequestWins() async {
         let count = ClipboardPlugin.listedAtOnce + 50
         for index in 0..<count { probe.base.addFile("/long/f\(index).txt") }
         bench.left.show(probe.base.url("/long"))
@@ -433,7 +434,7 @@ final class P2Bench: ShellServices {
 
     // F039
     @Test func aLongListOfFilesFromAnotherProgramIsReadInSlices() async throws {
-        let urls = (0..<3000).map { box.url("src/f\($0).txt") }
+        let urls = (0..<3_000).map { box.url("src/f\($0).txt") }
         writeAsAnotherProgram(urls)
         let items = try #require(pasteboard.pasteboardItems)
         // Read from a job's thread, the main thread does the reading a slice at a time.
@@ -463,7 +464,7 @@ final class P2Bench: ShellServices {
         #expect(stale.run(cancellation: CancellationFlag()) { _, _ in } == .abandoned)
     }
 
-    @Test func aSliceIsShortAndOnlyFileLocationsAreTaken() throws {
+    @Test func aSliceIsShortAndOnlyFileLocationsAreTaken() {
         // A slice may take a few thousandths of a second, so that the main thread gets its
         // turn between two of them.
         #expect(FileListReading.sliceTime <= 10_000_000)
@@ -499,7 +500,7 @@ final class P2Bench: ShellServices {
     }
 
     // F040: the failure path.
-    @Test func aTextThatCannotBeWrittenLeavesNoDraftBehind() throws {
+    @Test func aTextThatCannotBeWrittenLeavesNoDraftBehind() {
         struct DiskFull: LocalizedError {
             var errorDescription: String? { "The disk is full." }
         }
@@ -518,7 +519,7 @@ final class P2Bench: ShellServices {
                 && probe.base.contents("/A/Clipboard.txt") == "some text")
     }
 
-    @Test func whetherThereIsSomethingToPasteIsAskedOncePerStateOfTheClipboard() throws {
+    @Test func whetherThereIsSomethingToPasteIsAskedOncePerStateOfTheClipboard() {
         pasteboard.clearContents()
         pasteboard.setString("text", forType: .string)
         #expect(commands.isEnabled(.pasteFromClipboard) && commands.isEnabled(.pasteFromClipboard))
@@ -558,7 +559,7 @@ final class P2Bench: ShellServices {
         memory.stallsListings = true
         var totals: [SpaceTotals] = []
         p2CancelSoon(flag)
-        let ended = p2Finishes(rescue: { self.memory.releaseStalls() }) { totals = calculator.measure(items) }
+        let ended = p2Finishes(rescue: { memory.releaseStalls() }) { totals = calculator.measure(items) }
         #expect(ended)
         // What was not read is not "unreadable": the calculation was stopped, and says so elsewhere.
         #expect(totals.reduce(SpaceTotals(), +).unreadable == 0 && totals.count == items.count)
@@ -576,7 +577,7 @@ final class P2Bench: ShellServices {
         let job = AttributeJob(change: change, fileSystems: fileSystems, cancellation: flag)
         var outcome = AttributeJob.Outcome()
         p2CancelSoon(flag)
-        let ended = p2Finishes(rescue: { self.memory.releaseStalls() }) { outcome = job.run(items) }
+        let ended = p2Finishes(rescue: { memory.releaseStalls() }) { outcome = job.run(items) }
         #expect(ended && outcome.cancelled)
         // Nothing "failed": the job was stopped.
         #expect(outcome.failed == 0 && outcome.failures.isEmpty)
@@ -610,7 +611,7 @@ final class P2Bench: ShellServices {
     }
 
     // V070: the comment column's threads.
-    @Test func nobodyWaitsForEverForACommentFileThatIsNotComing() throws {
+    @Test func nobodyWaitsForEverForACommentFileThatIsNotComing() {
         probe.base.addFile("/A/descript.ion", "a.txt the comment\r\n")
         probe.base.addFile("/A/a.txt")
         let store = CommentStore(fileSystems: fileSystems)
@@ -630,19 +631,19 @@ final class P2Bench: ShellServices {
             reader.signal()
         }
         // The first thread has the file open before the others ask.
-        for _ in 0..<60_000 where probe.reads.count == alreadyRead { usleep(1000) }
+        for _ in 0..<60_000 where probe.reads.count == alreadyRead { usleep(1_000) }
         #expect(probe.reads.count == alreadyRead + 1)
         // A thread that waits for that reading gives up when its own flag is set…
         p2CancelSoon(second, after: 0.1)
         #expect(
-            p2Finishes(rescue: { self.probe.base.releaseStalls() }) {
+            p2Finishes(rescue: { probe.base.releaseStalls() }) {
                 let comments = store.comments(in: folder, cancellation: second)
                 lock.withLock { answers[1] = comments }
             })
         // …and one without a flag when its patience runs out.
         store.waitLimit = 0.2
         #expect(
-            p2Finishes(rescue: { self.probe.base.releaseStalls() }) {
+            p2Finishes(rescue: { probe.base.releaseStalls() }) {
                 let comments = store.comments(in: folder)
                 lock.withLock { answers[2] = comments }
             })
@@ -794,7 +795,7 @@ final class P2Bench: ShellServices {
     }
 
     // F070
-    @Test func allFolderSizesAreOfferedOnlyWhereThereAreFolders() throws {
+    @Test func allFolderSizesAreOfferedOnlyWhereThereAreFolders() {
         #expect(bench.commands.isEnabled(.countDirectoryContents))
         bench.left.show(box.url("files"))
         #expect(!bench.commands.isEnabled(.countDirectoryContents))
@@ -819,7 +820,7 @@ final class P2Bench: ShellServices {
     }
 
     // F010, and the sizes and marks after Calculate Occupied Space.
-    @Test func whatACommandChangedIsShownInThePanelAfterwards() throws {
+    @Test func whatACommandChangedIsShownInThePanelAfterwards() {
         bench.left.moveCursor(toName: "a.txt")
         #expect(bench.commands.perform(.setAttributes, .text("= +m600")))
         jobs.deliver()

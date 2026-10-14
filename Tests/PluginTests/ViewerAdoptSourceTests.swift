@@ -99,7 +99,7 @@ final class ViewerRemoteLike: ByteSource {
     var fetched: Int64 { counter.value.bytes }
     var requests: Int { counter.value.requests }
 
-    func read(at offset: Int64, count: Int) throws -> Data {
+    func read(at offset: Int64, count: Int) -> Data {
         let lower = Int(max(0, min(offset, length)))
         let upper = min(data.count, lower + max(0, count))
         counter.mutate {
@@ -145,20 +145,20 @@ final class ViewerRemoteLike: ByteSource {
     // MARK: Disk cache
 
     @Test func blocksAreKeptOnDiskAndGivenBack() {
-        let cache = DiskBlockCache(blockSize: 1000, length: 4500)
+        let cache = DiskBlockCache(blockSize: 1_000, length: 4_500)
         #expect(!cache.isOpen && cache.read(0) == nil && !cache.contains(0))
-        let first = Data((0..<1000).map { UInt8($0 % 251) })
+        let first = Data((0..<1_000).map { UInt8($0 % 251) })
         let tail = Data(repeating: 7, count: 500)
         cache.store(2, first)
         cache.store(4, tail)
         // A block of the wrong size (a short read in the middle) is not kept.
         cache.store(1, Data(repeating: 1, count: 999))
-        cache.store(3, Data(repeating: 1, count: 1001))
+        cache.store(3, Data(repeating: 1, count: 1_001))
         #expect(
             cache.isOpen && cache.contains(2) && cache.contains(4) && !cache.contains(1) && !cache.contains(3)
                 && !cache.contains(0))
         #expect(cache.read(2) == first && cache.read(4) == tail && cache.read(0) == nil)
-        #expect(cache.storedBytes == 1500)
+        #expect(cache.storedBytes == 1_500)
         cache.discard()
         #expect(!cache.isOpen && cache.storedBytes == 0 && cache.read(2) == nil)
         // It starts anew when it is used again.
@@ -167,11 +167,11 @@ final class ViewerRemoteLike: ByteSource {
     }
 
     @Test func aCacheStopsAtItsLimit() {
-        let cache = DiskBlockCache(blockSize: 1000, length: 10_000, limit: 3000)
-        for block in 0..<10 { cache.store(Int64(block), Data(repeating: UInt8(block), count: 1000)) }
-        #expect(cache.storedBytes == 3000)
+        let cache = DiskBlockCache(blockSize: 1_000, length: 10_000, limit: 3_000)
+        for block in 0..<10 { cache.store(Int64(block), Data(repeating: UInt8(block), count: 1_000)) }
+        #expect(cache.storedBytes == 3_000)
         #expect((0..<10).filter { cache.contains(Int64($0)) } == [0, 1, 2])
-        #expect(cache.read(1) == Data(repeating: 1, count: 1000))
+        #expect(cache.read(1) == Data(repeating: 1, count: 1_000))
     }
 
     @Test func aBigFileOfASlowSourceIsNotFetchedAgainWhenItIsLaidOutAgain() throws {
@@ -253,7 +253,7 @@ final class ViewerRemoteLike: ByteSource {
 
     // MARK: Cancellation
 
-    private func stalledFile(_ memory: MemoryFileSystem, size: Int) throws -> (FileSystemRegistry, URL) {
+    private func stalledFile(_ memory: MemoryFileSystem, size: Int) -> (FileSystemRegistry, URL) {
         let registry = FileSystemRegistry()
         registry.register(memory)
         let url = memory.addFile("/far/big.txt", String(repeating: "line of text\n", count: size / 13))
@@ -269,7 +269,7 @@ final class ViewerRemoteLike: ByteSource {
             let flag = CancellationFlag()
             let outcome = ViewerAdoptBox<Result<Data, Error>?>(nil)
             let worker = ViewerAdoptWorker {
-                outcome.value = Result { try source.read(at: 10, count: 5000, cancellation: flag) }
+                outcome.value = Result { try source.read(at: 10, count: 5_000, cancellation: flag) }
             }
             worker.start()
             #expect(worker.waitUntilWaiting())
@@ -290,7 +290,7 @@ final class ViewerRemoteLike: ByteSource {
         let memory = MemoryFileSystem()
         let (registry, url) = try stalledFile(memory, size: 50_000)
         let source = CachedByteSource(
-            try ProviderByteSource.open(url, fileSystems: registry), blockSize: 4096, capacity: 4)
+            try ProviderByteSource.open(url, fileSystems: registry), blockSize: 4_096, capacity: 4)
         let other = CancellationFlag()
         let mine = CancellationFlag()
         mine.cancel()
@@ -328,7 +328,7 @@ final class ViewerRemoteLike: ByteSource {
         let fetch = LinkedCancellation(document.cancellation)
         let outcome = ViewerAdoptBox<Result<[DisplayRow], Error>?>(nil)
         let worker = ViewerAdoptWorker {
-            outcome.value = Result { try document.rows(from: 3000, count: 20, cancellation: fetch.flag) }
+            outcome.value = Result { try document.rows(from: 3_000, count: 20, cancellation: fetch.flag) }
         }
         worker.start()
         #expect(worker.waitUntilWaiting())

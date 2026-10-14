@@ -42,11 +42,11 @@ extension PanelViewController {
         pendingQuickFilter?()
         let tab = model
         pendingQuickFilterTyping = (tab, text)
-        pendingQuickFilter = MainLoop.after(PanelViewController.quickFilterDelay) { [weak self] in
+        pendingQuickFilter = MainLoop.after(Self.quickFilterDelay) { [weak self] in
             guard let self else { return }
-            self.pendingQuickFilter = nil
-            self.pendingQuickFilterTyping = nil
-            self.applyQuickFilter(text, to: tab)
+            pendingQuickFilter = nil
+            pendingQuickFilterTyping = nil
+            applyQuickFilter(text, to: tab)
         }
     }
 
@@ -83,7 +83,7 @@ extension PanelViewController {
     func setFilter(_ filter: PanelFilter?, of tab: PanelModel, narrowing: Bool = false) -> Bool {
         let id = ObjectIdentifier(tab)
         filterJobs[id] = nil
-        guard tab.listedItems.count >= PanelViewController.backgroundSortThreshold else {
+        guard tab.listedItems.count >= Self.backgroundSortThreshold else {
             tab.setFilter(filter, narrowing: narrowing)
             return true
         }
@@ -93,13 +93,13 @@ extension PanelViewController {
         change(
             tab, while: { [weak self] in self?.filterJobs[id] == job }, by: { PanelModel.prepare($0, filter: filter) },
             then: { [weak self] outcome in
-                guard let self, outcome != nil, self.filterJobs[id] == job else { return }
-                self.filterJobs[id] = nil
+                guard let self, outcome != nil, filterJobs[id] == job else { return }
+                filterJobs[id] = nil
                 // Whoever waited for the filter to be in place (the quick filter's field) looks again.
-                if tab === self.model {
-                    _ = self.dropStaleQuickFilter(of: tab)
-                    self.showQuickFilterBar()
-                    self.updateStatus()
+                if tab === model {
+                    _ = dropStaleQuickFilter(of: tab)
+                    showQuickFilterBar()
+                    updateStatus()
                 }
             })
         return false
@@ -252,12 +252,15 @@ extension PanelViewController {
         guard !commands.isBlocked() else { return nil }
         focus()
         if index != tabs.activeIndex { commands.perform(.activateTab, .index(index)) }
-        return MenuBuilder.menu("", PanelViewController.tabMenuCommands, commands: commands, keys: kernel.keyBindings)
+        return MenuBuilder.menu("", Self.tabMenuCommands, commands: commands, keys: kernel.keyBindings)
     }
 
     /// A tab was dragged to another place in the strip.
     func moveTab(from index: Int, to destination: Int) {
-        guard !commands.isBlocked() else { return commands.onRejected() }
+        guard !commands.isBlocked() else {
+            commands.onRejected()
+            return
+        }
         tabs.moveTab(from: index, to: destination)
     }
 
@@ -365,7 +368,8 @@ extension PanelViewController {
     /// progress and asks the usual questions. Asks first when the user wants that.
     func carryOut(_ plan: DropPlan) {
         guard !commands.isBlocked(), let transfers = kernel.services.find(FileTransferService.self) else {
-            return commands.onRejected()
+            commands.onRejected()
+            return
         }
         if settings.confirmsDrops {
             let verb = plan.kind == .move ? "Move" : "Copy"
@@ -384,7 +388,7 @@ extension PanelViewController {
 
     // The table of the Full view drags and takes drops through its data source.
 
-    func tableView(_ tableView: NSTableView, pasteboardWriterForRow row: Int) -> NSPasteboardWriting? {
+    func tableView(_: NSTableView, pasteboardWriterForRow row: Int) -> NSPasteboardWriting? {
         // The table drags the row that was grabbed; when that row is marked, all marked items
         // go along: in the program through the drag's ticket, for other programs in `willBeginAt`.
         pendingDragItems = draggingItems(forRow: row)
@@ -392,8 +396,8 @@ extension PanelViewController {
     }
 
     func tableView(
-        _ tableView: NSTableView, draggingSession session: NSDraggingSession, willBeginAt screenPoint: NSPoint,
-        forRowIndexes rowIndexes: IndexSet
+        _: NSTableView, draggingSession session: NSDraggingSession, willBeginAt _: NSPoint,
+        forRowIndexes _: IndexSet
     ) {
         let items = pendingDragItems
         pendingDragItems = []
@@ -405,8 +409,8 @@ extension PanelViewController {
     }
 
     func tableView(
-        _ tableView: NSTableView, draggingSession session: NSDraggingSession, endedAt screenPoint: NSPoint,
-        operation: NSDragOperation
+        _: NSTableView, draggingSession _: NSDraggingSession, endedAt _: NSPoint,
+        operation _: NSDragOperation
     ) {
         pendingDragItems = []
         PanelDrop.endDrag()
@@ -414,8 +418,8 @@ extension PanelViewController {
     }
 
     func tableView(
-        _ tableView: NSTableView, validateDrop info: NSDraggingInfo, proposedRow row: Int,
-        proposedDropOperation dropOperation: NSTableView.DropOperation
+        _ tableView: NSTableView, validateDrop info: NSDraggingInfo, proposedRow _: Int,
+        proposedDropOperation _: NSTableView.DropOperation
     ) -> NSDragOperation {
         let (operation, target) = validateDrop(
             info, row: tableView.row(at: tableView.convert(info.draggingLocation, from: nil)))
@@ -424,7 +428,8 @@ extension PanelViewController {
     }
 
     func tableView(
-        _ tableView: NSTableView, acceptDrop info: NSDraggingInfo, row: Int, dropOperation: NSTableView.DropOperation
+        _ tableView: NSTableView, acceptDrop info: NSDraggingInfo, row _: Int,
+        dropOperation _: NSTableView.DropOperation
     ) -> Bool {
         acceptDrop(info, row: tableView.row(at: tableView.convert(info.draggingLocation, from: nil)))
     }

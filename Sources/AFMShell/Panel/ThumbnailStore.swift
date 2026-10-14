@@ -46,12 +46,12 @@ final class ThumbnailStore {
 
     /// The memory the pictures may take, counted in pixels of 4 bytes. A 256 pt tile on a
     /// Retina screen is 1 MB, so the count alone would allow gigabytes.
-    static let costLimit = 192 * 1024 * 1024
+    static let costLimit = 192 * 1_024 * 1_024
 
     init(source: ThumbnailSource = QuickLookThumbnails()) {
         self.source = source
-        cache.countLimit = 3000
-        cache.totalCostLimit = ThumbnailStore.costLimit
+        cache.countLimit = 3_000
+        cache.totalCostLimit = Self.costLimit
     }
 
     /// What a picture costs the cache: its size in bytes as pixels.
@@ -70,7 +70,7 @@ final class ThumbnailStore {
     /// The picture, when it is there; otherwise nil, and it is on its way unless the file has none.
     func image(for item: FileItem, side: CGFloat, scale: CGFloat) -> NSImage? {
         MainThread.assert("The thumbnails")
-        let key = ThumbnailStore.key(for: item, side: side)
+        let key = Self.key(for: item, side: side)
         if let image = cache.object(forKey: key as NSString) { return image }
         guard running[key] == nil, !without.contains(key) else { return nil }
         let name = item.name
@@ -82,7 +82,7 @@ final class ThumbnailStore {
                 guard let self, self.running[key]?.token == token else { return }
                 self.running[key] = nil
                 if let image {
-                    self.cache.setObject(image, forKey: key as NSString, cost: ThumbnailStore.cost(of: image))
+                    self.cache.setObject(image, forKey: key as NSString, cost: Self.cost(of: image))
                     self.onArrival?(name)
                 } else {
                     self.without.insert(key)

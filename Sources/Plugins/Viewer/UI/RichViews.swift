@@ -37,10 +37,12 @@ final class TemporaryCopies {
         var message: String {
             switch self {
             case .cancelled: return ""
+
             case .tooLarge(let size):
                 return
                     "The file (\(Format.shortSize(size))) is too large to be copied from its file system for this mode (the limit is \(Format.shortSize(TemporaryCopies.sizeLimit))). "
                     + "Choose a text mode (1, 2 or 3)."
+
             case .noRoom: return "There is not enough free space on the disk to copy the file for this mode."
             case .unreadable: return "The file cannot be shown in this mode."
             }
@@ -68,7 +70,7 @@ final class TemporaryCopies {
 
     init(directory: URL = FileManager.default.temporaryDirectory) {
         self.directory = directory
-        _ = TemporaryCopies.sweepOnce
+        _ = Self.sweepOnce
     }
 
     /// The file itself when it is on the local disk, else a copy of it read through its
@@ -93,7 +95,7 @@ final class TemporaryCopies {
         if let known = use(key, by: owner) { return .success(known) }
         if cancellation.isCancelled { return .failure(.cancelled) }
         // A file of a server is not put on the disk without asking whether it fits.
-        if let size = item?.size, size > TemporaryCopies.sizeLimit { return .failure(.tooLarge(size)) }
+        if let size = item?.size, size > Self.sizeLimit { return .failure(.tooLarge(size)) }
         let started = begin(owner)
         // Changes that a plugin still holds back for this file (an archive written after a delay) are written first.
         do { try fileSystems.flushPendingWrites(to: url, cancellation: cancellation) } catch {
@@ -104,11 +106,11 @@ final class TemporaryCopies {
         }
         defer { reader.close() }
         guard let folder = newFolder() else { return .failure(.unreadable) }
-        if let size = item?.size, let free = freeSpace(), free - size < TemporaryCopies.freeSpaceMargin {
+        if let size = item?.size, let free = freeSpace(), free - size < Self.freeSpaceMargin {
             try? FileManager.default.removeItem(at: folder)
             return .failure(.noRoom)
         }
-        let name = TemporaryCopies.safeName(url.lastPathComponent)
+        let name = Self.safeName(url.lastPathComponent)
         let target = folder.appendingPathComponent(name, isDirectory: false)
         // The name is one component of the folder just made, and the file is new (O_EXCL).
         guard target.deletingLastPathComponent().standardizedFileURL.path == folder.standardizedFileURL.path else {
@@ -132,7 +134,7 @@ final class TemporaryCopies {
                     guard !cancellation.isCancelled else { return false }
                     written += Int64(block.count)
                     // A size that the listing did not tell is limited as it is read.
-                    guard written <= TemporaryCopies.sizeLimit else {
+                    guard written <= Self.sizeLimit else {
                         refusal = .tooLarge(written)
                         return false
                     }
@@ -233,7 +235,7 @@ final class TemporaryCopies {
         var kept = 0
         var keptBytes: Int64 = 0
         for (key, copy) in idle {
-            if kept < TemporaryCopies.idleLimit, keptBytes + copy.size <= TemporaryCopies.idleByteLimit {
+            if kept < Self.idleLimit, keptBytes + copy.size <= Self.idleByteLimit {
                 kept += 1
                 keptBytes += copy.size
             } else {
@@ -291,7 +293,7 @@ final class TemporaryCopies {
         lock.unlock()
         if base == nil {
             let created = directory.appendingPathComponent(
-                "\(TemporaryCopies.prefix)p\(getpid())-\(UUID().uuidString)", isDirectory: true)
+                "\(Self.prefix)p\(getpid())-\(UUID().uuidString)", isDirectory: true)
             guard
                 (try? FileManager.default.createDirectory(
                     at: created, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])) != nil
@@ -358,7 +360,7 @@ final class MediaView: NSView {
         addSubview(playerView)
     }
 
-    required init?(coder: NSCoder) { fatalError("not used") }
+    required init?(coder _: NSCoder) { fatalError("not used") }
 
     deinit {
         if let endObserver { NotificationCenter.default.removeObserver(endObserver) }
@@ -450,11 +452,11 @@ final class WebContentView: NSView, WKNavigationDelegate {
         addSubview(webView)
     }
 
-    required init?(coder: NSCoder) { fatalError("not used") }
+    required init?(coder _: NSCoder) { fatalError("not used") }
 
     func show(html: String) {
         expectsPage = true
-        webView.loadHTMLString(WebContentView.policy + html, baseURL: nil)
+        webView.loadHTMLString(Self.policy + html, baseURL: nil)
     }
 
     /// What a navigation is allowed to do: the first one (the page, from a string), a jump to a
@@ -482,10 +484,10 @@ final class WebContentView: NSView, WKNavigationDelegate {
     }
 
     func webView(
-        _ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
+        _: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
         decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
     ) {
-        let decision = WebContentView.decide(
+        let decision = Self.decide(
             isMainFrame: navigationAction.targetFrame?.isMainFrame ?? false,
             isLinkClick: navigationAction.navigationType == .linkActivated,
             url: navigationAction.request.url, expectsPage: expectsPage)
@@ -493,9 +495,11 @@ final class WebContentView: NSView, WKNavigationDelegate {
         case .allow:
             if navigationAction.navigationType != .linkActivated { expectsPage = false }
             decisionHandler(.allow)
+
         case .followLink:
             if let url = navigationAction.request.url { onLink(url) }
             decisionHandler(.cancel)
+
         case .cancel:
             decisionHandler(.cancel)
         }
@@ -555,7 +559,7 @@ final class LinkGate: NSObject, NSTextViewDelegate, PDFViewDelegate {
 
     /// Keeps the gate alive for as long as `view` is (the views hold their delegates weakly).
     func attach(to view: NSObject) {
-        objc_setAssociatedObject(view, &LinkGate.key, self, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+        objc_setAssociatedObject(view, &Self.key, self, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
     }
 
     func open(_ link: Any) {
@@ -563,13 +567,13 @@ final class LinkGate: NSObject, NSTextViewDelegate, PDFViewDelegate {
         if let url, LinkPolicy.opensInBrowser(url) { opener(url) }
     }
 
-    func textView(_ textView: NSTextView, clickedOnLink link: Any, at charIndex: Int) -> Bool {
+    func textView(_: NSTextView, clickedOnLink link: Any, at _: Int) -> Bool {
         open(link)
         // Handled: the text view does not open it again.
         return true
     }
 
-    func pdfViewWillClick(onLink sender: PDFView, with url: URL) {
+    func pdfViewWillClick(onLink _: PDFView, with url: URL) {
         open(url)
     }
 }

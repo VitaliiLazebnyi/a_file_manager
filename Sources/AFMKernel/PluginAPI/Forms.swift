@@ -31,23 +31,23 @@ public struct FormField {
         self.kind = kind
     }
 
-    public static func text(_ key: String, _ label: String, _ value: String = "") -> FormField {
-        FormField(key, label, .text(value))
+    public static func text(_ key: String, _ label: String, _ value: String = "") -> Self {
+        Self(key, label, .text(value))
     }
-    public static func password(_ key: String, _ label: String) -> FormField { FormField(key, label, .secureText) }
-    public static func lines(_ key: String, _ label: String, _ value: String = "") -> FormField {
-        FormField(key, label, .multilineText(value))
+    public static func password(_ key: String, _ label: String) -> Self { Self(key, label, .secureText) }
+    public static func lines(_ key: String, _ label: String, _ value: String = "") -> Self {
+        Self(key, label, .multilineText(value))
     }
-    public static func checkbox(_ key: String, _ label: String, _ isOn: Bool = false) -> FormField {
-        FormField(key, label, .checkbox(isOn))
+    public static func checkbox(_ key: String, _ label: String, _ isOn: Bool = false) -> Self {
+        Self(key, label, .checkbox(isOn))
     }
-    public static func choice(_ key: String, _ label: String, _ options: [String], selected: Int = 0) -> FormField {
-        FormField(key, label, .choice(options, selected: selected))
+    public static func choice(_ key: String, _ label: String, _ options: [String], selected: Int = 0) -> Self {
+        Self(key, label, .choice(options, selected: selected))
     }
-    public static func list(_ key: String, _ label: String, _ rows: [String], selected: Int = 0) -> FormField {
-        FormField(key, label, .list(rows, selected: selected))
+    public static func list(_ key: String, _ label: String, _ rows: [String], selected: Int = 0) -> Self {
+        Self(key, label, .list(rows, selected: selected))
     }
-    public static func note(_ text: String) -> FormField { FormField("", text, .note) }
+    public static func note(_ text: String) -> Self { Self("", text, .note) }
 
     /// What the field holds before the user changes anything; nil for a note.
     public var initialValue: FormValues.Value? {

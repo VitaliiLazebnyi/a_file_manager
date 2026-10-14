@@ -57,7 +57,8 @@ final class BarCommandButton: NSButton {
 
     override func mouseDown(with event: NSEvent) {
         guard event.modifierFlags.contains(.command), let onCommandMouseDown else {
-            return super.mouseDown(with: event)
+            super.mouseDown(with: event)
+            return
         }
         onCommandMouseDown(event)
     }
@@ -74,8 +75,8 @@ final class BarCommandButton: NSButton {
         }
     }
 
-    override func mouseEntered(with event: NSEvent) { isMouseInside = true }
-    override func mouseExited(with event: NSEvent) { isMouseInside = false }
+    override func mouseEntered(with _: NSEvent) { isMouseInside = true }
+    override func mouseExited(with _: NSEvent) { isMouseInside = false }
 
     override func draw(_ dirtyRect: NSRect) {
         let fill: NSColor?
@@ -102,13 +103,16 @@ final class BarSeparatorView: NSView {
     static let width: CGFloat = 9
     var onMouseDown: ((NSEvent) -> Void)?
 
-    override func draw(_ dirtyRect: NSRect) {
+    override func draw(_: NSRect) {
         NSColor.separatorColor.setFill()
         NSRect(x: floor(bounds.midX), y: 3, width: 1, height: max(bounds.height - 6, 0)).fill()
     }
 
     override func mouseDown(with event: NSEvent) {
-        guard let onMouseDown else { return super.mouseDown(with: event) }
+        guard let onMouseDown else {
+            super.mouseDown(with: event)
+            return
+        }
         onMouseDown(event)
     }
 
@@ -186,11 +190,11 @@ final class ButtonBarView: NSView, NSDraggingSource {
         indicator.layer?.cornerRadius = 1
         indicator.isHidden = true
         addSubview(indicator)
-        registerForDraggedTypes([ButtonBarView.pasteboardType])
+        registerForDraggedTypes([Self.pasteboardType])
         rebuild()
     }
 
-    required init?(coder: NSCoder) { fatalError("not used") }
+    required init?(coder _: NSCoder) { fatalError("not used") }
 
     /// The layout without what cannot be shown: buttons whose command no plugin registered are
     /// left out, and so are the separators and line breaks that would then stand at an end,
@@ -216,7 +220,7 @@ final class ButtonBarView: NSView, NSDraggingSource {
 
     /// Draws the bar again from the registry; called when the layout changed.
     func rebuild() {
-        let layout = ButtonBarView.entries(of: kernel.toolbar.layout(from: kernel.settings), commands: kernel.commands)
+        let layout = Self.entries(of: kernel.toolbar.layout(from: kernel.settings), commands: kernel.commands)
         entries = layout.map { $0?.command }
         buttons = []
         slots = []
@@ -231,7 +235,7 @@ final class ButtonBarView: NSView, NSDraggingSource {
             let dragged = Dragged.group(line: line, group: group)
             handle.onMouseDown = { [weak self, weak handle] event in
                 guard let self, let handle else { return }
-                self.trackDrag(dragged, of: handle, from: event)
+                trackDrag(dragged, of: handle, from: event)
             }
             slots.append(.handle(line: line, group: group))
             items.append(handle)
@@ -256,7 +260,7 @@ final class ButtonBarView: NSView, NSDraggingSource {
             let dragged = Dragged.button(line: line, group: group, index: index)
             button.onCommandMouseDown = { [weak self, weak button] event in
                 guard let self, let button else { return }
-                if !self.trackDrag(dragged, of: button, from: event) { self.buttonPressed(button) }
+                if !trackDrag(dragged, of: button, from: event) { buttonPressed(button) }
             }
             slots.append(.button(line: line, group: group, index: index))
             index += 1
@@ -273,7 +277,7 @@ final class ButtonBarView: NSView, NSDraggingSource {
                 button.frame.size.height = side
             }
             button.identifier = NSUserInterfaceItemIdentifier(command.id.rawValue)
-            button.toolTip = ButtonBarView.toolTip(
+            button.toolTip = Self.toolTip(
                 for: command, keys: kernel.keyBindings, hint: kernel.toolbar.hint(for: command.id))
             button.setAccessibilityLabel(command.title)
             buttons.append(button)
@@ -302,8 +306,8 @@ final class ButtonBarView: NSView, NSDraggingSource {
         validate()
     }
 
-    override func menu(for event: NSEvent) -> NSMenu? {
-        let menu = MenuBuilder.menu("", ButtonBarView.contextCommands, commands: kernel.commands, keys: nil)
+    override func menu(for _: NSEvent) -> NSMenu? {
+        let menu = MenuBuilder.menu("", Self.contextCommands, commands: kernel.commands, keys: nil)
         return menu.items.isEmpty ? nil : menu
     }
 
@@ -313,12 +317,15 @@ final class ButtonBarView: NSView, NSDraggingSource {
     func apply(_ dragged: Dragged, to target: DropTarget?) {
         var arrangement = ButtonBarArrangement(entries: entries)
         switch (dragged, target) {
-        case (.button(let line, let group, let index), .button(let to)?):
+        case (.button(let line, let group, let index), .button(let to)):
             arrangement.moveButton(line: line, group: group, index: index, to: to)
+
         case (.button(let line, let group, let index), nil):
             arrangement.removeButton(line: line, group: group, index: index)
-        case (.group(let line, let group), .group(let place)?):
+
+        case (.group(let line, let group), .group(let place)):
             arrangement.moveGroup(line: line, group: group, to: place)
+
         default: return
         }
         guard arrangement.entries != entries else { return }
@@ -328,7 +335,7 @@ final class ButtonBarView: NSView, NSDraggingSource {
     /// Waits for the mouse to move a few points before a drag starts, so that a press that
     /// does not move stays a press. Answers whether a drag was started.
     @discardableResult
-    private func trackDrag(_ item: Dragged, of view: NSView, from event: NSEvent) -> Bool {
+    private func trackDrag(_ item: Dragged, of _: NSView, from event: NSEvent) -> Bool {
         guard let window else { return false }
         let start = event.locationInWindow
         while let next = window.nextEvent(matching: [.leftMouseDragged, .leftMouseUp]) {
@@ -347,9 +354,11 @@ final class ButtonBarView: NSView, NSDraggingSource {
             switch (item, slot) {
             case (.button(let l, let g, let i), .button(let line, let group, let index)):
                 return (l, g, i) == (line, group, index) ? view : nil
+
             case (.group(let l, let g), .handle(let line, let group)),
                 (.group(let l, let g), .button(let line, let group, _)):
                 return (l, g) == (line, group) ? view : nil
+
             default: return nil
             }
         }
@@ -358,9 +367,9 @@ final class ButtonBarView: NSView, NSDraggingSource {
     private func beginDrag(_ item: Dragged, from event: NSEvent) {
         let views = views(of: item)
         guard let first = views.first else { return }
-        let image = ButtonBarView.picture(of: views)
+        let image = Self.picture(of: views)
         let pasteboardItem = NSPasteboardItem()
-        pasteboardItem.setString("", forType: ButtonBarView.pasteboardType)
+        pasteboardItem.setString("", forType: Self.pasteboardType)
         let draggingItem = NSDraggingItem(pasteboardWriter: pasteboardItem)
         draggingItem.setDraggingFrame(
             NSRect(origin: convert(first.frame, from: flow).origin, size: image.size), contents: image)
@@ -423,6 +432,7 @@ final class ButtonBarView: NSView, NSDraggingSource {
             }
             func distance(_ anchor: NSPoint) -> CGFloat { hypot(anchor.x - point.x, 3 * (anchor.y - point.y)) }
             return anchors.min { distance($0.point) < distance($1.point) }.map { .group($0.place) }
+
         case .button:
             // The row under the mouse, or the nearest one.
             func distance(to frame: NSRect) -> CGFloat {
@@ -432,7 +442,7 @@ final class ButtonBarView: NSView, NSDraggingSource {
             let inRow = frames.indices.filter { frames[$0].minY == nearest.minY }
             for index in inRow {
                 if case .handle(let line, let group) = slots[index],
-                    abs(point.x - frames[index].midX) <= ButtonBarView.handleSnap
+                    abs(point.x - frames[index].midX) <= Self.handleSnap
                 {
                     return .button(.newGroup(.line(line, at: group)))
                 }
@@ -446,6 +456,7 @@ final class ButtonBarView: NSView, NSDraggingSource {
             switch slots[index] {
             case .button(let line, let group, let position):
                 return .button(.inGroup(line: line, group: group, at: before ? position : position + 1))
+
             case .handle(let line, let group):
                 if before, group > 0 {
                     return .button(.inGroup(line: line, group: group - 1, at: lines[line][group - 1].count))
@@ -471,6 +482,7 @@ final class ButtonBarView: NSView, NSDraggingSource {
                 }
                 guard let last = slots.lastIndex(where: { $0.line == line }) else { return nil }
                 return mark(atX: frames[last].maxX + 2, around: frames[last], width: width)
+
             case .newLine:
                 guard let first = frames.first, let bottom = frames.map(\.maxY).max() else { return nil }
                 return NSRect(
@@ -481,6 +493,7 @@ final class ButtonBarView: NSView, NSDraggingSource {
         switch target {
         case .group(let target): return place(target, width: 3)
         case .button(.newGroup(let target)): return place(target, width: 7)
+
         case .button(.inGroup(let line, let group, let at)):
             if let next = frame(of: .button(line: line, group: group, index: at)) {
                 return mark(atX: next.minX - 1, around: next, width: 2)
@@ -520,7 +533,7 @@ final class ButtonBarView: NSView, NSDraggingSource {
         return .move
     }
 
-    override func draggingExited(_ sender: NSDraggingInfo?) { indicator.isHidden = true }
+    override func draggingExited(_: NSDraggingInfo?) { indicator.isHidden = true }
 
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
         indicator.isHidden = true
@@ -531,13 +544,13 @@ final class ButtonBarView: NSView, NSDraggingSource {
         return true
     }
 
-    func draggingSession(_ session: NSDraggingSession, sourceOperationMaskFor context: NSDraggingContext)
+    func draggingSession(_: NSDraggingSession, sourceOperationMaskFor context: NSDraggingContext)
         -> NSDragOperation
     {
         context == .withinApplication ? .move : []
     }
 
-    func draggingSession(_ session: NSDraggingSession, endedAt screenPoint: NSPoint, operation: NSDragOperation) {
+    func draggingSession(_: NSDraggingSession, endedAt screenPoint: NSPoint, operation: NSDragOperation) {
         indicator.isHidden = true
         flow.items.forEach { $0.alphaValue = 1 }
         // The bar as it was during the drag, with the room for a new line.
@@ -581,7 +594,7 @@ final class DriveBarView: NSView {
         rebuild()
     }
 
-    required init?(coder: NSCoder) { fatalError("not used") }
+    required init?(coder _: NSCoder) { fatalError("not used") }
 
     private static func symbol(for kind: Place.Kind) -> String {
         switch kind {
@@ -601,7 +614,7 @@ final class DriveBarView: NSView {
             let button = BarButton.make(target: self, action: #selector(buttonPressed(_:)))
             button.title = DisplayText.clean(place.name)
             button.image = NSImage(
-                systemSymbolName: DriveBarView.symbol(for: place.kind), accessibilityDescription: nil)
+                systemSymbolName: Self.symbol(for: place.kind), accessibilityDescription: nil)
             button.imagePosition = .imageLeading
             button.tag = index
             button.toolTip = DisplayText.clean(kernel.fileSystems.displayPath(place.url))
@@ -651,7 +664,7 @@ final class DriveBarView: NSView {
     /// the panel cannot go anywhere (a job is running).
     func validate() {
         let isEnabled = kernel.commands.isEnabled(.changeDirectory)
-        let current = DriveBarView.currentPlace(among: places, for: kernel.panels.source.model.directory)
+        let current = Self.currentPlace(among: places, for: kernel.panels.source.model.directory)
         for (index, button) in buttons.enumerated() {
             let state: NSControl.StateValue = index == current ? .on : .off
             if button.isEnabled != isEnabled { button.isEnabled = isEnabled }

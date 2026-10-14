@@ -180,8 +180,8 @@ enum ArchiveFormat: Equatable {
         switch self {
         case .zip: return "ZIP"
         case .tar: return "TAR"
-        case .compressedTar(let codec): return "TAR." + ArchiveFormat.suffix(codec).uppercased()
-        case .compressedFile(let codec): return ArchiveFormat.suffix(codec).uppercased()
+        case .compressedTar(let codec): return "TAR." + Self.suffix(codec).uppercased()
+        case .compressedFile(let codec): return Self.suffix(codec).uppercased()
         case .foreign: return "archive"
         }
     }
@@ -195,7 +195,7 @@ enum ArchiveFormat: Equatable {
     }
 
     /// The formats Pack can create, in the order of the dialog.
-    static let writable: [ArchiveFormat] = [
+    static let writable: [Self] = [
         .zip, .tar, .compressedTar(.gzip), .compressedTar(.bzip2), .compressedTar(.xz),
         .compressedFile(.gzip), .compressedFile(.bzip2), .compressedFile(.xz)
     ]
@@ -205,8 +205,8 @@ enum ArchiveFormat: Equatable {
         switch self {
         case .zip: return "zip"
         case .tar: return "tar"
-        case .compressedTar(let codec): return "tar." + ArchiveFormat.suffix(codec)
-        case .compressedFile(let codec): return ArchiveFormat.suffix(codec)
+        case .compressedTar(let codec): return "tar." + Self.suffix(codec)
+        case .compressedFile(let codec): return Self.suffix(codec)
         case .foreign: return ""
         }
     }
@@ -219,7 +219,7 @@ enum ArchiveFormat: Equatable {
         case .compressedTar(.gzip): return ["tar.gz", "tgz", "taz"]
         case .compressedTar(.bzip2): return ["tar.bz2", "tbz2", "tbz"]
         case .compressedTar(.xz): return ["tar.xz", "txz"]
-        case .compressedFile(let codec): return [ArchiveFormat.suffix(codec)]
+        case .compressedFile(let codec): return [Self.suffix(codec)]
         case .foreign: return []
         }
     }
@@ -248,7 +248,7 @@ enum ArchiveFormat: Equatable {
 
     /// Looks at the first bytes of a file. `tarInside` is asked only for compressed streams:
     /// whether what they hold starts like a TAR archive.
-    static func detect(head: Data, name: String, tarInside: (Codec) -> Bool) -> ArchiveFormat {
+    static func detect(head: Data, name: String, tarInside: (Codec) -> Bool) -> Self {
         let bytes = [UInt8](head.prefix(512))
         func starts(_ signature: [UInt8]) -> Bool {
             bytes.count >= signature.count && Array(bytes[..<signature.count]) == signature
@@ -311,7 +311,7 @@ enum ForeignArchive {
         if !known {
             // ISO 9660: "CD001" at the start of a volume descriptor, 32 KB into the image.
             for sector in [16, 17, 18] where !known {
-                known = (try? file.read(at: UInt64(sector) * 2048 + 1, count: 5)) == Data("CD001".utf8)
+                known = (try? file.read(at: UInt64(sector) * 2_048 + 1, count: 5)) == Data("CD001".utf8)
             }
         }
         guard known else { return nil }
@@ -354,14 +354,19 @@ enum ArchiveError: LocalizedError {
         case .notFound(let path): return "\(path) does not exist in the archive."
         case .notADirectory(let path): return "\(path) is not a folder."
         case .readOnly(let name): return "Archives of this type cannot be changed (\(name))."
+
         case .changedOutside(let name):
             return "\(name) was changed by another program; the changes made here were not written."
+
         case .noRoom(let name): return "There is not enough room on the disk to write the changes into \(name)."
+
         case .noScratchRoom(let name):
             return "There is not enough room on the startup disk to open \(name): it has to be copied there first."
+
         case .nameCollision(let name):
             return
                 "Several files would be stored under the name \(name). Pack with path names, or pack them one by one."
+
         case .unsaved(let what): return what
         case .toolFailed(let message): return message
         case .cancelled: return "The operation was cancelled."

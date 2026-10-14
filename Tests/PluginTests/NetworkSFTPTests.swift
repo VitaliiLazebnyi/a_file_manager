@@ -108,7 +108,7 @@ let systemSFTPServer = "/usr/libexec/sftp-server"
     }
 
     @Test func manyThreadsShareOneChannel() throws {
-        for index in 0..<12 { try box.file("d\(index)/f\(index).txt", String(repeating: "x", count: index * 1000)) }
+        for index in 0..<12 { try box.file("d\(index)/f\(index).txt", String(repeating: "x", count: index * 1_000)) }
         let results = Parallel.map(Array(0..<12)) { index -> Int in
             let names = (try? fileSystem.list(url("d\(index)"), showHidden: true).map(\.name)) ?? []
             guard names == ["f\(index).txt"], let reader = try? fileSystem.read(url("d\(index)/f\(index).txt")) else {
@@ -116,11 +116,11 @@ let systemSFTPServer = "/usr/libexec/sftp-server"
             }
             defer { reader.close() }
             var count = 0
-            while let block = try? reader.read(upToCount: 4096) { count += block.count }
+            while let block = try? reader.read(upToCount: 4_096) { count += block.count }
             return count
         }
-        #expect(results == (0..<12).map { $0 * 1000 })
-        #expect(fileSystem.totalSize(of: url("")) == Int64((0..<12).reduce(0) { $0 + $1 * 1000 }))
+        #expect(results == (0..<12).map { $0 * 1_000 })
+        #expect(fileSystem.totalSize(of: url("")) == Int64((0..<12).reduce(0) { $0 + $1 * 1_000 }))
     }
 
     @Test func reconnectsAfterDisconnect() throws {
@@ -145,7 +145,7 @@ let systemSFTPServer = "/usr/libexec/sftp-server"
         var values = NetworkOptions.Values()
         (values.timeout, values.keepAliveInterval) = (20, 45)
         let profile = ConnectionProfile(
-            key: ServerKey(scheme: "sftp", host: "-oProxyCommand=evil", port: 2222), user: "deploy")
+            key: ServerKey(scheme: "sftp", host: "-oProxyCommand=evil", port: 2_222), user: "deploy")
         let arguments = SFTPSession.sshArguments(for: profile, options: values)
         #expect(arguments.suffix(4) == ["-s", "--", "-oproxycommand=evil", "sftp"])
         #expect(arguments.contains("ConnectTimeout=20") && arguments.contains("ServerAliveInterval=45"))

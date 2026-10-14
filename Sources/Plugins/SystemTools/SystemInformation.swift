@@ -35,22 +35,22 @@ struct SystemInformation: Equatable {
 
     /// Memory as the dialog writes it: `131,072 M (128 G)`.
     static func memory(_ bytes: UInt64) -> String {
-        let megabytes = Int64(bytes / (1024 * 1024))
+        let megabytes = Int64(bytes / (1_024 * 1_024))
         let gigabytes = Double(bytes) / Double(1 << 30)
         let rounded = gigabytes.rounded() == gigabytes ? String(Int(gigabytes)) : String(format: "%.1f", gigabytes)
-        return megabytes >= 1024 ? "\(Format.bytes(megabytes)) M (\(rounded) G)" : "\(Format.bytes(megabytes)) M"
+        return megabytes >= 1_024 ? "\(Format.bytes(megabytes)) M (\(rounded) G)" : "\(Format.bytes(megabytes)) M"
     }
 
     /// Time since start: `130h 19m 21s`.
     static func uptime(_ seconds: TimeInterval) -> String {
         let total = max(0, Int(seconds))
-        return "\(total / 3600)h \(total / 60 % 60)m \(total % 60)s"
+        return "\(total / 3_600)h \(total / 60 % 60)m \(total % 60)s"
     }
 
     /// Free space of a volume as on the drive line: `1,439,946,852 k of 7,811,085,600 k free`.
     static func space(free: Int64?, total: Int64?) -> String {
         guard let free, let total else { return "size unknown" }
-        return "\(Format.bytes(free / 1024)) k of \(Format.bytes(total / 1024)) k free"
+        return "\(Format.bytes(free / 1_024)) k of \(Format.bytes(total / 1_024)) k free"
     }
 
     // MARK: Asking the system
@@ -81,23 +81,23 @@ struct SystemInformation: Equatable {
             }
         }
         guard result == KERN_SUCCESS, total > 0 else { return nil }
-        let pageSize = UInt64(systemNumber("hw.pagesize") ?? 4096)
+        let pageSize = UInt64(systemNumber("hw.pagesize") ?? 4_096)
         let free =
             (UInt64(statistics.free_count) + UInt64(statistics.inactive_count) + UInt64(statistics.speculative_count))
             * pageSize
         let load = 100 - Int(Double(min(free, total)) / Double(total) * 100)
-        return "\(Format.bytes(Int64(free / (1024 * 1024)))) M (\(load) %)"
+        return "\(Format.bytes(Int64(free / (1_024 * 1_024)))) M (\(load) %)"
     }
 
     /// `displays` are the screens as text; they belong to the main thread and are read there
     /// before the job starts.
-    static func gather(displays: [String] = []) -> SystemInformation {
+    static func gather(displays: [String] = []) -> Self {
         // Without a flag nothing can cancel, so there is always an answer.
-        gather(displays: displays, cancellation: CancellationFlag()) ?? SystemInformation(sections: [])
+        gather(displays: displays, cancellation: CancellationFlag()) ?? Self(sections: [])
     }
 
     /// Nil when `cancellation` was set before every volume had answered.
-    static func gather(displays: [String], cancellation: CancellationFlag) -> SystemInformation? {
+    static func gather(displays: [String], cancellation: CancellationFlag) -> Self? {
         let process = ProcessInfo.processInfo
         var hardware = [Row(label: "Model", value: systemText("hw.model") ?? "unknown")]
         hardware.append(Row(label: "Processor", value: systemText("machdep.cpu.brand_string") ?? "unknown"))
@@ -135,7 +135,7 @@ struct SystemInformation: Equatable {
 
         let mounted = volumes(cancellation: cancellation)
         guard !cancellation.isCancelled else { return nil }
-        return SystemInformation(sections: [
+        return Self(sections: [
             Section(title: "Hardware", rows: hardware), Section(title: "Software", rows: software),
             Section(title: "Volumes", rows: mounted)
         ])

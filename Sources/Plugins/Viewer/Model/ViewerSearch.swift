@@ -18,8 +18,10 @@ enum SearchError: LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .empty: return "There is nothing to search for."
+
         case .badHex(let text):
             return "\"\(text)\" is not a hex string. Write bytes as 00 FF 12, literal text in quotes: \"PK\"0102."
+
         case .badExpression(let reason): return "The regular expression cannot be used: \(reason)"
         }
     }
@@ -54,16 +56,16 @@ struct SearchPattern {
             }
         }
         if options.hex {
-            kind = .bytes(try SearchPattern.hexBytes(text, encoding: encoding))
+            kind = .bytes(try Self.hexBytes(text, encoding: encoding))
         } else if options.regex {
             kind = try expression(text)
         } else {
-            let plain = SearchPattern.unescape(text)
+            let plain = Self.unescape(text)
             guard !plain.isEmpty else { throw SearchError.empty }
             // `\n` stands for a line break. The specification's Lister finds CR+LF only; files
             // on a Mac end their lines with LF, so every kind of line break is found.
-            if plain.contains(SearchPattern.lineBreak) {
-                let parts = plain.components(separatedBy: String(SearchPattern.lineBreak)).map(
+            if plain.contains(Self.lineBreak) {
+                let parts = plain.components(separatedBy: String(Self.lineBreak)).map(
                     NSRegularExpression.escapedPattern(for:))
                 kind = try expression(parts.joined(separator: "(?:\\r\\n|\\r|\\n)"))
             } else {
@@ -85,9 +87,9 @@ struct SearchPattern {
                 continue
             }
             switch characters.next() {
-            case "t"?: result.append("\t")
-            case "n"?: result.append(lineBreak)
-            case "\\"?: result.append("\\")
+            case "t": result.append("\t")
+            case "n": result.append(lineBreak)
+            case "\\": result.append("\\")
             case let other?: result.append("\\\(other)")
             case nil: result.append("\\")
             }
@@ -138,7 +140,7 @@ struct SearchPattern {
 /// order wins. Blocks; call it on a background thread.
 enum ViewerSearch {
     /// The longest match a regular expression can have across a chunk border.
-    static let expressionOverlap = 64 * 1024
+    static let expressionOverlap = 64 * 1_024
 
     /// The next match that begins at or after `start` or, with `backwards`, the last one that
     /// begins before `start`. Nil when there is none or the search was cancelled (a read that
@@ -225,6 +227,7 @@ enum ViewerSearch {
                 lower..<min(content.upperBound, accepted.upperBound + Int64(needle.count - 1)),
                 cancellation: cancellation)
             return bytes(needle, in: data, base: lower, accepted: accepted, last: last)
+
         case .text(let needle):
             // Matching case, the needle's bytes in a UTF-8 or one-byte-per-character file are
             // searched for in the raw bytes: no decoding, and no characters in between to go wrong.
@@ -250,11 +253,12 @@ enum ViewerSearch {
             let length = needle.utf16.count
             let matcher = TextMatcher(needle, caseSensitive: pattern.caseSensitive)
             // Folding can lengthen a match to several times the needle (ß for ss, ﬃ for ffi).
-            return try decoded(context, accepted, Int64(max(4096, length * 12 + 32))) { text, units, first, end in
+            return try decoded(context, accepted, Int64(max(4_096, length * 12 + 32))) { text, units, first, end in
                 matcher.find(in: units, from: first, before: end, last: last) {
                     !pattern.wholeWords || isWholeWord($0, in: text)
                 }
             }
+
         case .expression(let expression):
             return try decoded(context, accepted, Int64(expressionOverlap)) { text, _, first, end in
                 var result: NSRange?
@@ -349,10 +353,10 @@ enum ViewerSearch {
                 var folded: [UInt16] = []
                 var index = 0
                 while index < units.count {
-                    let (value, width) = TextMatcher.character(units, at: index)
+                    let (value, width) = Self.character(units, at: index)
                     if units[index] < 0x80 {
                         folded.append(units[index] >= 0x41 && units[index] <= 0x5A ? units[index] | 0x20 : units[index])
-                    } else if let piece = TextMatcher.fold(value, &cache) {
+                    } else if let piece = Self.fold(value, &cache) {
                         folded.append(contentsOf: piece)
                     } else {
                         folded.append(contentsOf: units[index..<index + width])
@@ -400,8 +404,8 @@ enum ViewerSearch {
                     index += 1
                     continue
                 }
-                let (value, width) = TextMatcher.character(units, at: index)
-                if let folded = TextMatcher.fold(value, &cache) {
+                let (value, width) = Self.character(units, at: index)
+                if let folded = Self.fold(value, &cache) {
                     guard matched + folded.count <= length else { return nil }
                     for offset in 0..<folded.count where needle[matched + offset] != folded[offset] { return nil }
                     matched += folded.count
@@ -457,7 +461,7 @@ enum ViewerSearch {
                     index -= 1
                     continue
                 } else {
-                    width = TextMatcher.character(units, at: index).width
+                    width = Self.character(units, at: index).width
                     if let stop = self.end(ofMatchAt: index, in: units, &cache) {
                         let range = NSRange(location: index, length: stop - index)
                         if accepts(range) { return range }
@@ -509,8 +513,10 @@ enum ViewerSearch {
                     let third = index + 2 < count ? start[index + 2] : 0
                     switch byte {
                     case 0xC3 where second == 0x9F, 0xC5 where second == 0xBF: return true
+
                     case 0xE1 where second == 0xBA && third == 0x9E, 0xE2 where second == 0x84 && third == 0xAA:
                         return true
+
                     case 0xEF where second == 0xAC && (0x80...0x86).contains(third): return true
                     default: break
                     }

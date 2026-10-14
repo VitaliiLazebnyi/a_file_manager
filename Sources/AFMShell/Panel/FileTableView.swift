@@ -10,10 +10,14 @@ final class FileTableView: NSTableView {
     /// bound to nothing finds a file by the start of its name, which is the panel's doing
     /// (`typeToFind`) and not the table's own.
     override func keyDown(with event: NSEvent) {
-        guard let panel else { return super.keyDown(with: event) }
+        guard let panel else {
+            super.keyDown(with: event)
+            return
+        }
         if panel.handleKey(event) { return }
         if event.modifierFlags.isDisjoint(with: [.command, .control]), let typed = FileGridView.typedText(of: event) {
-            return panel.typeToFind(typed, at: event.timestamp)
+            panel.typeToFind(typed, at: event.timestamp)
+            return
         }
         super.keyDown(with: event)
     }
@@ -57,10 +61,10 @@ final class FileTableView: NSTableView {
 
     // Cmd+A, Cmd+C, Cmd+X and Cmd+V arrive as the standard editing actions (see `EditingRole`).
 
-    override func selectAll(_ sender: Any?) { panel?.perform(.selectAll) }
-    @objc func copy(_ sender: Any?) { panel?.perform(.copy) }
-    @objc func cut(_ sender: Any?) { panel?.perform(.cut) }
-    @objc func paste(_ sender: Any?) { panel?.perform(.paste) }
+    override func selectAll(_: Any?) { panel?.perform(.selectAll) }
+    @objc func copy(_: Any?) { panel?.perform(.copy) }
+    @objc func cut(_: Any?) { panel?.perform(.cut) }
+    @objc func paste(_: Any?) { panel?.perform(.paste) }
 
     override func validateUserInterfaceItem(_ item: NSValidatedUserInterfaceItem) -> Bool {
         if let menuItem = item as? NSMenuItem, let id = MenuBuilder.command(of: menuItem) {
@@ -76,7 +80,7 @@ final class CursorRowView: NSTableRowView {
     static let reuseIdentifier = NSUserInterfaceItemIdentifier("afm.row")
     weak var panel: PanelViewController?
 
-    override func drawSelection(in dirtyRect: NSRect) {
+    override func drawSelection(in _: NSRect) {
         guard panel?.isActive == true else { return }
         CursorBar.draw(in: bounds)
     }

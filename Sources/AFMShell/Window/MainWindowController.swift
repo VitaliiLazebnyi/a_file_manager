@@ -40,7 +40,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation, NSSp
         commandLine = CommandLineView(kernel: kernel, panels: panels)
         functionKeyBar = FunctionKeyBar(kernel: kernel)
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 1180, height: 700),
+            contentRect: NSRect(x: 0, y: 0, width: 1_180, height: 700),
             styleMask: [.titled, .closable, .resizable, .miniaturizable], backing: .buffered, defer: false)
         window.minSize = NSSize(width: 640, height: 360)
         window.isReleasedWhenClosed = false
@@ -79,12 +79,12 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation, NSSp
         subscription = kernel.panelEvents.subscribe { [weak self] event, panel in
             guard let self else { return }
             if event == .becameSource { self.layout.sourceIsRight = panel === self.panels.rightPanel }
-            self.scheduleValidation()
+            scheduleValidation()
         }
         observe()
     }
 
-    required init?(coder: NSCoder) { fatalError("not used") }
+    required init?(coder _: NSCoder) { fatalError("not used") }
 
     private func observe() {
         let center = NotificationCenter.default
@@ -148,18 +148,18 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation, NSSp
     private func positionDivider() {
         guard splitExtent > 0 else { return }
         isPositioningDivider = true
-        splitView.setPosition((splitExtent * CGFloat(layout.divider) / 1000).rounded(), ofDividerAt: 0)
+        splitView.setPosition((splitExtent * CGFloat(layout.divider) / 1_000).rounded(), ofDividerAt: 0)
         isPositioningDivider = false
     }
 
-    func splitView(_ splitView: NSSplitView, resizeSubviewsWithOldSize oldSize: NSSize) {
+    func splitView(_ splitView: NSSplitView, resizeSubviewsWithOldSize _: NSSize) {
         // Both panels keep their share of the window.
         splitView.adjustSubviews()
         positionDivider()
     }
 
     func splitView(
-        _ splitView: NSSplitView, constrainSplitPosition proposedPosition: CGFloat, ofSubviewAt dividerIndex: Int
+        _: NSSplitView, constrainSplitPosition proposedPosition: CGFloat, ofSubviewAt _: Int
     ) -> CGFloat {
         guard splitExtent > 0 else { return proposedPosition }
         return min(splitExtent * 0.9, max(splitExtent * 0.1, proposedPosition))
@@ -173,7 +173,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation, NSSp
             splitExtent > 0
         else { return }
         let first = splitView.isVertical ? panels.leftPanel.view.frame.width : panels.leftPanel.view.frame.height
-        layout.rememberDivider(Int((first / splitExtent * 1000).rounded()))
+        layout.rememberDivider(Int((first / splitExtent * 1_000).rounded()))
     }
 
     // MARK: Buttons that follow their commands
@@ -189,8 +189,8 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation, NSSp
     @objc func scheduleValidation() {
         guard !validationPending else { return }
         validationPending = true
-        let earliest = lastValidation.at + MainWindowController.validationRest * lastValidation.cost
-        let delay = max(MainWindowController.validationDelay, earliest - uptime)
+        let earliest = lastValidation.at + Self.validationRest * lastValidation.cost
+        let delay = max(Self.validationDelay, earliest - uptime)
         MainLoop.after(delay) { [weak self] in
             self?.validationPending = false
             self?.validateBars()
@@ -200,7 +200,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation, NSSp
     /// The window handled an event. Nothing says that anything changed, so the bars are only
     /// looked at if that was not done for a while.
     @objc private func windowUpdated() {
-        if uptime - lastValidation.at >= MainWindowController.quietValidationInterval { scheduleValidation() }
+        if uptime - lastValidation.at >= Self.quietValidationInterval { scheduleValidation() }
     }
 
     /// True while a check of the bars is on its way.

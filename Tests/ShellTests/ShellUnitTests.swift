@@ -12,10 +12,10 @@ import Testing
         rate.add(amount: 0, at: 10)
         rate.add(amount: 500, at: 10.5)
         #expect(rate.perSecond == nil)
-        #expect(rate.remaining(total: 1000) == nil)
-        rate.add(amount: 2000, at: 12)
-        #expect(rate.perSecond == 1000)
-        #expect(rate.remaining(total: 5000) == 3)
+        #expect(rate.remaining(total: 1_000) == nil)
+        rate.add(amount: 2_000, at: 12)
+        #expect(rate.perSecond == 1_000)
+        #expect(rate.remaining(total: 5_000) == 3)
     }
 
     @Test func followsTheLastSecondsOnly() {
@@ -23,9 +23,9 @@ import Testing
         // 100 per second for 10 s, then 1000 per second for 5 s.
         for second in 0...10 { rate.add(amount: Int64(second * 100), at: Double(second)) }
         #expect(rate.perSecond == 100)
-        for second in 11...15 { rate.add(amount: Int64(1000 + (second - 10) * 1000), at: Double(second)) }
-        #expect(rate.perSecond == 1000)
-        #expect(rate.remaining(total: 16000) == 10)
+        for second in 11...15 { rate.add(amount: Int64(1_000 + (second - 10) * 1_000), at: Double(second)) }
+        #expect(rate.perSecond == 1_000)
+        #expect(rate.remaining(total: 16_000) == 10)
     }
 
     @Test func stalledAndFinishedJobs() {
@@ -33,9 +33,9 @@ import Testing
         rate.add(amount: 500, at: 0)
         rate.add(amount: 500, at: 3)
         #expect(rate.perSecond == 0)
-        #expect(rate.remaining(total: 1000) == nil)
-        rate.add(amount: 1000, at: 4)
-        #expect(rate.remaining(total: 1000) == 0)
+        #expect(rate.remaining(total: 1_000) == nil)
+        rate.add(amount: 1_000, at: 4)
+        #expect(rate.remaining(total: 1_000) == 0)
         rate.reset()
         #expect(rate.perSecond == nil)
     }
@@ -131,7 +131,8 @@ import Testing
     }
 
     @Test func statusLine() {
-        let totals = PanelModel.Totals(selectedBytes: 5 * 1024, totalBytes: 8 * 1024, selectedFiles: 4, totalFiles: 14)
+        let totals = PanelModel.Totals(
+            selectedBytes: 5 * 1_024, totalBytes: 8 * 1_024, selectedFiles: 4, totalFiles: 14)
         #expect(PanelViewController.statusText(totals) == "5 k / 8 k in 4 / 14 file(s)")
         let withFolders = PanelModel.Totals(totalFiles: 0, totalFolders: 2)
         #expect(PanelViewController.statusText(withFolders) == "0 k / 0 k in 0 / 0 file(s), 0 / 2 dir(s)")

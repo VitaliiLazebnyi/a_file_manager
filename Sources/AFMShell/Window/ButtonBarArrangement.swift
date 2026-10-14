@@ -28,7 +28,7 @@ struct ButtonBarArrangement: Equatable {
         for entry in entries {
             switch entry {
             case nil: lines[lines.count - 1].append([])
-            case ToolbarRegistry.lineBreak?: lines.append([[]])
+            case ToolbarRegistry.lineBreak: lines.append([[]])
             case let command?: lines[lines.count - 1][lines[lines.count - 1].count - 1].append(command)
             }
         }
@@ -60,6 +60,7 @@ struct ButtonBarArrangement: Equatable {
                 (0...marked[toLine][toGroup].count).contains(at)
             else { return }
             marked[toLine][toGroup].insert(command, at: at)
+
         case .newGroup(let place):
             guard Self.insert([command], at: place, into: &marked) else { return }
         }
@@ -95,6 +96,7 @@ struct ButtonBarArrangement: Equatable {
         case .line(let line, let at):
             guard lines.indices.contains(line), (0...lines[line].count).contains(at) else { return false }
             lines[line].insert(group.map(Optional.init), at: at)
+
         case .newLine(let at):
             guard (0...lines.count).contains(at) else { return false }
             lines.insert([group.map(Optional.init)], at: at)

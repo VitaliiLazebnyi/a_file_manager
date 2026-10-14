@@ -334,7 +334,7 @@ final class Selections {
         let directories = models.map(\.directory)
         func attempt(_ number: Int) {
             let frozen = models.map(Frozen.init)
-            guard heavy && background else {
+            guard heavy, background else {
                 let result = work(frozen, flag)
                 _ = apply(frozen, result)
                 if running === flag { running = nil }
@@ -352,7 +352,7 @@ final class Selections {
                         zip(models, directories).allSatisfy({ $0.directory.isSameLocation(as: $1) })
                     else { return finish() }
                     if apply(frozen, result) { return finish() }
-                    guard number < Selections.attempts else {
+                    guard number < Self.attempts else {
                         finish()
                         return self.kernel.commands.onRejected()
                     }
@@ -374,7 +374,7 @@ final class Selections {
     ) {
         // A regular expression can take long on any list.
         compute(
-            heavy: model.items.count > Selections.longList || mask?.isRegex == true, models: [model],
+            heavy: model.items.count > Self.longList || mask?.isRegex == true, models: [model],
             { frozen, _ in
                 PanelModel.rows(of: frozen[0].basis, where: matches)
             },
@@ -394,7 +394,7 @@ final class Selections {
         indices find: @escaping ([FileItem], PanelModel.Operands, CancellationFlag) -> [Int]
     ) {
         compute(
-            heavy: model.items.count > Selections.longList || mask?.isRegex == true, models: [model],
+            heavy: model.items.count > Self.longList || mask?.isRegex == true, models: [model],
             { frozen, flag in
                 find(frozen[0].items, frozen[0].operands, flag)
             },
@@ -403,7 +403,7 @@ final class Selections {
                     self?.ui.inform("The regular expression takes too long.", detail: mask.text, style: .warning)
                     return true
                 }
-                return Selections.take(indices, change, in: frozen[0])
+                return Self.take(indices, change, in: frozen[0])
             })
     }
 
@@ -411,8 +411,9 @@ final class Selections {
         let model = frozen.model
         switch change {
         case .replace:
-            if indices.isEmpty && model.selectionCount == 0 { return model.shownVersion == frozen.shownVersion }
+            if indices.isEmpty, model.selectionCount == 0 { return model.shownVersion == frozen.shownVersion }
             return model.setSelection(indices: indices, shownVersion: frozen.shownVersion)
+
         case .add: return model.setSelected(true, indices: indices, shownVersion: frozen.shownVersion)
         case .remove: return model.setSelected(false, indices: indices, shownVersion: frozen.shownVersion)
         }
@@ -427,10 +428,13 @@ final class Selections {
     /// Select group / Unselect group (spec 03 › Select and unselect group): asks for a mask,
     /// or takes it from `.text` (the `SELECTFILES` way).
     func group(select: Bool, scope: SelectionScope, proposal: String = "*.*", argument: CommandArgument) {
-        if let mask = argument.text { return apply(mask, select: select, scope: scope) }
+        if let mask = argument.text {
+            apply(mask, select: select, scope: scope)
+            return
+        }
         guard
             let mask = ui.prompt(
-                select ? "Expand selection" : "Shrink selection", value: proposal, detail: Selections.maskHelp)
+                select ? "Expand selection" : "Shrink selection", value: proposal, detail: Self.maskHelp)
         else { return }
         apply(mask, select: select, scope: scope)
     }
@@ -443,7 +447,8 @@ final class Selections {
         if text.hasPrefix(">") {
             let name = String(text.dropFirst()).trimmingCharacters(in: .whitespaces)
             guard let type = store.type(named: name) else {
-                return ui.inform("There is no selection type called \(name).", detail: "", style: .warning)
+                ui.inform("There is no selection type called \(name).", detail: "", style: .warning)
+                return
             }
             rule = SelectionRule(type)
         } else {
@@ -451,18 +456,20 @@ final class Selections {
             store.remember(text)
         }
         guard rule.mask.isValid else {
-            return ui.inform("The regular expression cannot be read.", detail: rule.mask.text, style: .warning)
+            ui.inform("The regular expression cannot be read.", detail: rule.mask.text, style: .warning)
+            return
         }
         let model = source
         let base = model.directory
         let change: PanelModel.SelectionChange = select ? .add : .remove
         // `A>B` pairs files of the same folder: that is worked out over the whole list, in order.
         guard !rule.isPairwise else {
-            return mark(
+            mark(
                 model, change, timedOut: rule.mask,
                 indices: { items, _, flag in
                     rule.matchingIndices(among: items, base: base, scope: scope, cancelled: { flag.isCancelled })
                 })
+            return
         }
         let probe = rule.probe(base: base)
         mark(model, change, timedOut: rule.mask, matching: { scope.contains($0) && probe($0) })
@@ -473,7 +480,10 @@ final class Selections {
     func groupFromList() {
         let types = store.types
         let rows = types.map { ">" + $0.name } + store.history
-        guard !rows.isEmpty else { return ui.inform("There are no saved selection types or earlier masks yet.") }
+        guard !rows.isEmpty else {
+            ui.inform("There are no saved selection types or earlier masks yet.")
+            return
+        }
         guard
             let answer = ui.form(
                 "Select group", detail: "Predefined selection types (>name) and the masks used so far:",
@@ -484,8 +494,10 @@ final class Selections {
         switch answer.button {
         case 2:
             if row < types.count { store.removeType(named: types[row].name) } else { store.forget(mask: rows[row]) }
+
         case 1:
             apply(rows[row], select: false, scope: .both)
+
         default:
             apply(rows[row], select: true, scope: configured)
         }
@@ -520,11 +532,17 @@ final class Selections {
         ]
         guard
             let answer = ui.form(
-                "Define selection", detail: Selections.maskHelp, fields: fields, buttons: ["Save", "Delete"])
+                "Define selection", detail: Self.maskHelp, fields: fields, buttons: ["Save", "Delete"])
         else { return }
         let name = answer.text("name").trimmingCharacters(in: .whitespaces)
-        if answer.button == 1 { return store.removeType(named: name.isEmpty ? type.name : name) }
-        guard !name.isEmpty else { return ui.inform("A selection type needs a name.", detail: "", style: .warning) }
+        if answer.button == 1 {
+            store.removeType(named: name.isEmpty ? type.name : name)
+            return
+        }
+        guard !name.isEmpty else {
+            ui.inform("A selection type needs a name.", detail: "", style: .warning)
+            return
+        }
 
         /// An empty field is no condition; a field that cannot be read stops the saving.
         var unreadable: [String] = []
@@ -547,9 +565,10 @@ final class Selections {
         saved.links = SelectionType.Tri(rawValue: answer.index("links")) ?? .any
         if !SelectionMask(saved.mask).isValid { unreadable.append(saved.mask) }
         guard unreadable.isEmpty else {
-            return ui.inform(
+            ui.inform(
                 "The selection type was not saved.", detail: "Cannot read: " + unreadable.joined(separator: ", "),
                 style: .warning)
+            return
         }
         store.save(saved)
     }
@@ -563,7 +582,8 @@ final class Selections {
         let change: PanelModel.SelectionChange = select ? .add : .remove
         guard step != 0 else {
             if scope == .both { return select ? model.selectAll() : model.clearSelection() }
-            return mark(model, change, matching: scope.contains)
+            mark(model, change, matching: scope.contains)
+            return
         }
         // A step beyond the list is the same as the list's length.
         let step = max(-Int(Int32.max), min(step, Int(Int32.max)))
@@ -599,7 +619,10 @@ final class Selections {
     func invert(scope: SelectionScope) {
         let model = source
         // Inverting everything is a pass over bits.
-        if scope == .both { return model.invertSelection() }
+        if scope == .both {
+            model.invertSelection()
+            return
+        }
         // The entries of the scope change their mark and the others keep theirs.
         mark(
             model, .replace,
@@ -773,7 +796,7 @@ final class Selections {
                     let token = monitor.cancellation.interrupting(reader)
                     defer { withExtendedLifetime(token) {} }
                     var data = Data()
-                    while data.count < Selections.readLimit, !monitor.cancellation.isCancelled,
+                    while data.count < Self.readLimit, !monitor.cancellation.isCancelled,
                         let block = try reader.read(upToCount: 1 << 20)
                     {
                         data.append(autoreleasepool { block })
@@ -798,11 +821,13 @@ final class Selections {
     func loadFromClipboard() {
         let model = source
         let (items, directory) = (model.items, model.directory)
-        guard let text = pasteboard.string(forType: .string), text.utf8.count <= Selections.clipboardLimit else {
-            return kernel.commands.onRejected()
+        guard let text = pasteboard.string(forType: .string), text.utf8.count <= Self.clipboardLimit else {
+            kernel.commands.onRejected()
+            return
         }
-        guard background, items.count > Selections.longList || text.utf8.count > Selections.longList * 8 else {
-            return select(ListedNames(text, among: items), in: model, directory: directory)
+        guard background, items.count > Self.longList || text.utf8.count > Self.longList * 8 else {
+            select(ListedNames(text, among: items), in: model, directory: directory)
+            return
         }
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             let names = autoreleasepool { ListedNames(text, among: items) }
@@ -837,7 +862,10 @@ final class Selections {
     private func select(_ names: ListedNames, in model: PanelModel, directory: URL) {
         // The panel may have gone elsewhere while the names were found.
         guard model.directory.isSameLocation(as: directory) else { return }
-        if names.isEmpty { return model.selectionCount == 0 ? () : model.clearSelection() }
+        if names.isEmpty {
+            model.selectionCount == 0 ? () : model.clearSelection()
+            return
+        }
         mark(model, .replace, matching: names.contains)
     }
 
@@ -862,8 +890,8 @@ final class Selections {
             },
             apply: { frozen, marks in
                 // Both are tried: a panel that has changed is worked out again with the other.
-                let first = Selections.take(marks.left, .replace, in: frozen[0])
-                let second = Selections.take(marks.right, .replace, in: frozen[1])
+                let first = Self.take(marks.left, .replace, in: frozen[0])
+                let second = Self.take(marks.right, .replace, in: frozen[1])
                 return first && second
             })
     }
@@ -889,7 +917,8 @@ final class Selections {
     func markNewerHideSame() {
         let models = [kernel.panels.left.model, kernel.panels.right.model]
         if models.contains(where: { shows(.comparison, in: $0) }) {
-            return models.forEach { end(.comparison, in: $0) }
+            models.forEach { end(.comparison, in: $0) }
+            return
         }
         let folders = models.map(\.directory)
         let ignoresOneHour = store.ignoresOneHour
@@ -933,10 +962,10 @@ final class Selections {
                 }
                 guard fresh else { return false }
                 for ((model, title), marked) in zip(zip(models, titles), outcome.marked) {
-                    self.restrictions = self.restrictions.filter { $0.value.model != nil }
-                    self.restrictions[ObjectIdentifier(model)] = Restriction(
+                    restrictions = restrictions.filter { $0.value.model != nil }
+                    restrictions[ObjectIdentifier(model)] = Restriction(
                         model: model, view: .comparison, directory: model.directory, title: title)
-                    self.mark(model, .replace, matching: { marked.contains(NameBytes($0.name)) })
+                    mark(model, .replace, matching: { marked.contains(NameBytes($0.name)) })
                 }
                 return true
             })

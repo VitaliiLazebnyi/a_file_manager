@@ -56,7 +56,7 @@ public final class NavigationPlugin: Plugin {
     static func path(fromClipboard text: String) -> String? {
         // Only the first line that has anything on it is looked at, however long the text is: the
         // first 8 KB of it (a path is not longer), cut at a byte, which only touches the last character.
-        let head = text.utf8.count > 8192 ? String(decoding: text.utf8.prefix(8192), as: UTF8.self) : text
+        let head = text.utf8.count > 8_192 ? String(decoding: text.utf8.prefix(8_192), as: UTF8.self) : text
         let line =
             head.split(maxSplits: 1, omittingEmptySubsequences: true, whereSeparator: \.isNewline).first.map(
                 String.init) ?? ""
@@ -239,7 +239,7 @@ public final class NavigationPlugin: Plugin {
             kernel.jobs.run(
                 title: "Go to volume",
                 work: { _ -> Place? in
-                    NavigationPlugin.neighbourPlace(of: current, in: providers.flatMap { $0.places() }, delta: delta)
+                    Self.neighbourPlace(of: current, in: providers.flatMap { $0.places() }, delta: delta)
                 },
                 completion: { place in
                     guard let place else { return commands.onRejected() }

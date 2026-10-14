@@ -24,8 +24,8 @@ struct Bitset: Equatable {
         recount()
     }
 
-    static func full(_ size: Int) -> Bitset {
-        Bitset(size: size, words: [UInt64](repeating: .max, count: (size + 63) / 64))
+    static func full(_ size: Int) -> Self {
+        Self(size: size, words: [UInt64](repeating: .max, count: (size + 63) / 64))
     }
 
     private mutating func trim() {
@@ -65,19 +65,19 @@ struct Bitset: Equatable {
         return true
     }
 
-    mutating func formUnion(_ other: Bitset) {
+    mutating func formUnion(_ other: Self) {
         precondition(other.size == size)
         for index in words.indices { words[index] |= other.words[index] }
         recount()
     }
 
-    mutating func formIntersection(_ other: Bitset) {
+    mutating func formIntersection(_ other: Self) {
         precondition(other.size == size)
         for index in words.indices { words[index] &= other.words[index] }
         recount()
     }
 
-    mutating func subtract(_ other: Bitset) {
+    mutating func subtract(_ other: Self) {
         precondition(other.size == size)
         for index in words.indices { words[index] &= ~other.words[index] }
         recount()
@@ -131,7 +131,7 @@ struct NameIndex {
         var capacity = 16
         while capacity < items.count * 2 { capacity <<= 1 }
         mask = capacity - 1
-        let hashes = NameIndex.hashes(of: items)
+        let hashes = Self.hashes(of: items)
         var slots = [UInt64](repeating: 0, count: capacity)
         var twins: [UInt32: [UInt32]] = [:]
         let mask = self.mask
@@ -143,11 +143,11 @@ struct NameIndex {
                     while true {
                         let held = slots[slot]
                         if held == 0 {
-                            slots[slot] = hash & NameIndex.tag | UInt64(place + 1)
+                            slots[slot] = hash & Self.tag | UInt64(place + 1)
                             break
                         }
-                        if held & NameIndex.tag == hash & NameIndex.tag {
-                            let other = Int(held & ~NameIndex.tag) - 1
+                        if held & Self.tag == hash & Self.tag {
+                            let other = Int(held & ~Self.tag) - 1
                             if ExactName.areSame(items[other].name, items[place].name) {
                                 twins[UInt32(other), default: []].append(UInt32(place))
                                 break
@@ -188,13 +188,13 @@ struct NameIndex {
 
     /// The first place of the name in `items`, which must be the list the index was made of.
     func place(of name: String, in items: [FileItem]) -> Int? {
-        let hash = NameIndex.hash(name)
+        let hash = Self.hash(name)
         var slot = Int(truncatingIfNeeded: hash) & mask
         while true {
             let held = slots[slot]
             if held == 0 { return nil }
-            if held & NameIndex.tag == hash & NameIndex.tag {
-                let other = Int(held & ~NameIndex.tag) - 1
+            if held & Self.tag == hash & Self.tag {
+                let other = Int(held & ~Self.tag) - 1
                 if ExactName.areSame(items[other].name, name) { return other }
             }
             slot = (slot + 1) & mask
@@ -209,15 +209,15 @@ struct NameIndex {
     }
 
     /// The index of the same entries after they changed places: `moves[old]` is the new place.
-    func moved(by moves: [UInt32]) -> NameIndex {
+    func moved(by moves: [UInt32]) -> Self {
         var slots = slots
         slots.withUnsafeMutableBufferPointer { slots in
             for slot in slots.indices where slots[slot] != 0 {
                 let held = slots[slot]
-                slots[slot] = held & NameIndex.tag | UInt64(moves[Int(held & ~NameIndex.tag) - 1] + 1)
+                slots[slot] = held & Self.tag | UInt64(moves[Int(held & ~Self.tag) - 1] + 1)
             }
         }
-        guard !twins.isEmpty else { return NameIndex(slots: slots, mask: mask, twins: [:]) }
+        guard !twins.isEmpty else { return Self(slots: slots, mask: mask, twins: [:]) }
         // The lowest place of a name stands for it, as in an index made afresh.
         var moved: [UInt32: [UInt32]] = [:]
         var firsts: [UInt32: UInt32] = [:]
@@ -227,10 +227,10 @@ struct NameIndex {
             firsts[moves[Int(first)]] = places[0]
         }
         for slot in slots.indices where slots[slot] != 0 {
-            let place = UInt32(slots[slot] & ~NameIndex.tag) - 1
-            if let first = firsts[place] { slots[slot] = slots[slot] & NameIndex.tag | UInt64(first + 1) }
+            let place = UInt32(slots[slot] & ~Self.tag) - 1
+            if let first = firsts[place] { slots[slot] = slots[slot] & Self.tag | UInt64(first + 1) }
         }
-        return NameIndex(slots: slots, mask: mask, twins: moved)
+        return Self(slots: slots, mask: mask, twins: moved)
     }
 }
 
@@ -289,9 +289,9 @@ struct Tally {
     }
 
     /// The sum of two parts counted apart; right when both are plain.
-    func joined(with other: Tally) -> Tally {
+    func joined(with other: Self) -> Self {
         let (sum, overflow) = bytes.addingReportingOverflow(other.bytes)
-        return Tally(
+        return Self(
             bytes: overflow ? .max : sum, files: files + other.files, folders: folders + other.folders,
             isPlain: isPlain && other.isPlain && !overflow)
     }
@@ -301,7 +301,7 @@ struct Tally {
 /// cores for long lists.
 enum ListWork {
     /// Lists are cut into pieces of this many entries, and shorter ones are not cut at all.
-    static let pieceSize = 8192
+    static let pieceSize = 8_192
 
     static func pieces(_ count: Int, of size: Int = pieceSize) -> [Range<Int>] {
         stride(from: 0, to: count, by: size).map { $0..<min($0 + size, count) }

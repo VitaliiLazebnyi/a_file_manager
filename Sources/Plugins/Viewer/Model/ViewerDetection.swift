@@ -5,7 +5,7 @@ import Foundation
 /// these are the viewer's. Pure functions on a sample of the file.
 enum ViewerDetection {
     /// How many bytes from the start of a file are looked at.
-    static let sampleSize = 64 * 1024
+    static let sampleSize = 64 * 1_024
 
     struct TextGuess: Equatable {
         var encoding: ViewerEncoding
@@ -79,8 +79,8 @@ enum ViewerDetection {
         var text = DecodedText()
         let used = ViewerEncoding.utf8.decode(bytes, final: false, into: &text)
         // A sequence that only lacks its end is fine when the sample was cut off there.
-        if used < bytes.count && !(mayBeCutOff && bytes.count - used < 4) { return .invalid }
-        if text.units.contains(CodeTable.replacement) && !containsReplacementCharacter(bytes) { return .invalid }
+        if used < bytes.count, !(mayBeCutOff && bytes.count - used < 4) { return .invalid }
+        if text.units.contains(CodeTable.replacement), !containsReplacementCharacter(bytes) { return .invalid }
         return text.units.count == used ? .ascii : .multiByte
     }
 
@@ -168,7 +168,7 @@ enum ViewerDetection {
     /// The character set an HTML file names in its head (`<meta charset=…>`, or the
     /// `http-equiv` form), if any (spec 10 › HTML text).
     static func htmlCharset(_ sample: Data) -> ViewerEncoding? {
-        let head = String(decoding: sample.prefix(4096), as: UTF8.self).lowercased()
+        let head = String(decoding: sample.prefix(4_096), as: UTF8.self).lowercased()
         guard let range = head.range(of: "charset=") else { return nil }
         let name = head[range.upperBound...].drop { "\"' ".contains($0) }.prefix {
             $0.isLetter || $0.isNumber || "-_".contains($0)
@@ -179,6 +179,7 @@ enum ViewerDetection {
         case "utf-16be": return .utf16BE
         case "iso-8859-1", "latin1": return .latin1
         case "macintosh": return .macRoman
+
         default:
             if name.hasPrefix("windows-"), let number = Int(name.dropFirst(8)) {
                 return ViewerEncoding.codePage(number)

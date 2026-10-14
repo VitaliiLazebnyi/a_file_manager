@@ -230,7 +230,7 @@ final class DataStream: SeekableStream {
         self.data = data
     }
 
-    func read(upToCount count: Int) throws -> Data? {
+    func read(upToCount count: Int) -> Data? {
         guard !data.isEmpty else { return nil }
         let block = data.prefix(count)
         data = data.dropFirst(block.count)
@@ -604,24 +604,24 @@ final class ScratchFolder {
 
     init(in parent: URL = FileManager.default.temporaryDirectory) {
         url = parent.appendingPathComponent(
-            "\(ScratchFolder.prefix)\(getpid())-\(UUID().uuidString)", isDirectory: true)
+            "\(Self.prefix)\(getpid())-\(UUID().uuidString)", isDirectory: true)
     }
 
     private var listPath: String { url.path + ".external" }
 
     /// Makes the folder if it is not there. Any thread.
     private func prepare() throws {
-        _ = ScratchFolder.atExit
-        ScratchFolder.lock.lock()
+        _ = Self.atExit
+        Self.lock.lock()
         let (made, kept) = (isMade, isKept)
-        if !kept { ScratchFolder.folders[url.path] = Paths(externals: externals, list: listPath) }
-        ScratchFolder.lock.unlock()
+        if !kept { Self.folders[url.path] = Paths(externals: externals, list: listPath) }
+        Self.lock.unlock()
         if made, FileManager.default.fileExists(atPath: url.path) { return }
         try FileManager.default.createDirectory(
             at: url, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
-        ScratchFolder.lock.lock()
+        Self.lock.lock()
         isMade = true
-        ScratchFolder.lock.unlock()
+        Self.lock.unlock()
     }
 
     func newFile(_ suffix: String = "tmp") throws -> URL {
@@ -643,12 +643,12 @@ final class ScratchFolder {
     /// Notes a temporary file or folder that lies outside this folder. It is removed with the
     /// folder if it is still there then, and by the next start if the program dies before.
     func noteExternal(_ url: URL) {
-        guard ScratchFolder.isOwnExternalName(url.lastPathComponent) else { return }
+        guard Self.isOwnExternalName(url.lastPathComponent) else { return }
         try? prepare()
-        ScratchFolder.lock.lock()
+        Self.lock.lock()
         externals.append(url.path)
-        if !isKept { ScratchFolder.folders[self.url.path] = Paths(externals: externals, list: listPath) }
-        ScratchFolder.lock.unlock()
+        if !isKept { Self.folders[self.url.path] = Paths(externals: externals, list: listPath) }
+        Self.lock.unlock()
         // One short line appended; a list that cannot be written only means no sweep later.
         let descriptor = open(listPath, O_WRONLY | O_CREAT | O_APPEND | O_NOFOLLOW, 0o600)
         guard descriptor >= 0 else { return }
@@ -658,31 +658,31 @@ final class ScratchFolder {
     }
 
     func removeAll() {
-        ScratchFolder.lock.lock()
+        Self.lock.lock()
         let (stays, outside) = (isKept, externals)
         if !stays {
             externals = []
-            ScratchFolder.folders[url.path] = nil
+            Self.folders[url.path] = nil
         }
-        ScratchFolder.lock.unlock()
+        Self.lock.unlock()
         guard !stays else { return }
         try? FileManager.default.removeItem(at: url)
-        for path in outside { ScratchFolder.removeExternal(path) }
+        for path in outside { Self.removeExternal(path) }
         unlink(listPath)
     }
 
     /// Leaves the folder on the disk, also when the program exits and when a later start
     /// clears away what crashes left: it holds data that could not be written where it belongs.
     func keep() {
-        ScratchFolder.lock.lock()
+        Self.lock.lock()
         isKept = true
-        ScratchFolder.folders.removeValue(forKey: url.path)
-        ScratchFolder.lock.unlock()
+        Self.folders.removeValue(forKey: url.path)
+        Self.lock.unlock()
         unlink(listPath)
         try? FileManager.default.createDirectory(
             at: url, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
         FileManager.default.createFile(
-            atPath: url.appendingPathComponent(ScratchFolder.keptMark).path, contents: Data())
+            atPath: url.appendingPathComponent(Self.keptMark).path, contents: Data())
     }
 
     /// Removes the folders, and the temporary files noted outside them, of processes that no

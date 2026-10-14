@@ -36,11 +36,13 @@ public enum NetworkError: LocalizedError {
         case .untrustedCertificate(let info): return "The server's certificate is not trusted: \(info.problem)"
         case .unexpected(let what): return "Unexpected answer from the server: \(what)"
         case .notConnected(let server): return "There is no connection to \(server)."
+
         case .sessionReuseRequired(let said):
             return
                 "The server requires the encrypted data connections to reuse the TLS session of the control connection, "
                 + "which this program does not support (the server said: \(said)). "
                 + "Turn off \"require session reuse\" on the server (vsftpd: require_ssl_reuse=NO) or use SFTP."
+
         case .incomplete(let what): return what
         case .busy(let what): return what
         }
@@ -205,7 +207,7 @@ final class TLSSettings {
             { [self] _, secTrust, complete in
                 beforeEvaluating()
                 complete(evaluate(sec_trust_copy_ref(secTrust).takeRetainedValue()))
-            }, TLSSettings.verifyQueue)
+            }, Self.verifyQueue)
         return options
     }
 
@@ -291,25 +293,25 @@ final class FTPAuthTLSFramer: NWProtocolFramerImplementation {
     private var parser = FTPReplyParser()
     private var askedForTLS = false
 
-    init(framer: NWProtocolFramer.Instance) {}
+    init(framer _: NWProtocolFramer.Instance) {}
 
-    func start(framer: NWProtocolFramer.Instance) -> NWProtocolFramer.StartResult { .willMarkReady }
-    func wakeup(framer: NWProtocolFramer.Instance) {}
-    func stop(framer: NWProtocolFramer.Instance) -> Bool { true }
-    func cleanup(framer: NWProtocolFramer.Instance) {}
+    func start(framer _: NWProtocolFramer.Instance) -> NWProtocolFramer.StartResult { .willMarkReady }
+    func wakeup(framer _: NWProtocolFramer.Instance) {}
+    func stop(framer _: NWProtocolFramer.Instance) -> Bool { true }
+    func cleanup(framer _: NWProtocolFramer.Instance) {}
 
     func handleOutput(
-        framer: NWProtocolFramer.Instance, message: NWProtocolFramer.Message, messageLength: Int, isComplete: Bool
+        framer: NWProtocolFramer.Instance, message _: NWProtocolFramer.Message, messageLength: Int, isComplete _: Bool
     ) {
         try? framer.writeOutputNoCopy(length: messageLength)
     }
 
     func handleInput(framer: NWProtocolFramer.Instance) -> Int {
-        let report = framer.options[FTPAuthTLSFramer.reportKey] as? ExplicitTLSReport
+        let report = framer.options[Self.reportKey] as? ExplicitTLSReport
         while true {
             var line: String?
             // One line at a time, so nothing that follows the last reply is taken away.
-            let parsed = framer.parseInput(minimumIncompleteLength: 1, maximumLength: 16384) { buffer, _ in
+            let parsed = framer.parseInput(minimumIncompleteLength: 1, maximumLength: 16_384) { buffer, _ in
                 guard let buffer, let end = buffer.firstIndex(of: 0x0A) else { return 0 }
                 var bytes = Array(buffer[..<end])
                 if bytes.last == 0x0D { bytes.removeLast() }
@@ -326,7 +328,7 @@ final class FTPAuthTLSFramer: NWProtocolFramerImplementation {
                 framer.writeOutput(data: Data("AUTH TLS\r\n".utf8))
                 continue
             }
-            guard reply.code == 234, let tls = framer.options[FTPAuthTLSFramer.tlsKey] as? NWProtocolTLS.Options else {
+            guard reply.code == 234, let tls = framer.options[Self.tlsKey] as? NWProtocolTLS.Options else {
                 return fail(framer, report, reply)
             }
             do {
@@ -385,7 +387,7 @@ final class NetStream {
     /// More than this is not read ahead of the caller.
     private static let highWater = 1 << 20
     /// Uploads go out in pieces of this size, a few at a time.
-    private static let sendPiece = 128 * 1024
+    private static let sendPiece = 128 * 1_024
     private static let sendsInFlight = 4
     /// The read part of the buffer is cut off once it is this large.
     private static let compactAt = 1 << 20
@@ -400,9 +402,11 @@ final class NetStream {
         case .none:
             parameters = NWParameters(tls: nil, tcp: tcp)
             isEncrypted = false
+
         case .tls(let settings):
             parameters = NWParameters(tls: settings.options(), tcp: tcp)
             isEncrypted = true
+
         case .explicitFTP(let settings, let report):
             parameters = NWParameters(tls: nil, tcp: tcp)
             isEncrypted = false
@@ -434,6 +438,7 @@ final class NetStream {
             switch state {
             case .ready:
                 isReady = true
+
             case .waiting(let error), .failed(let error):
                 // "Waiting" is how a refused or unreachable address shows; nobody waits for a
                 // server to appear here.
@@ -442,8 +447,10 @@ final class NetStream {
                         isReady
                         ? NetworkError.connectionLost : NetworkError.connectionFailed(error.localizedDescription)
                 }
+
             case .cancelled:
                 if failure == nil { failure = NetworkError.connectionLost }
+
             default:
                 break
             }
@@ -480,11 +487,11 @@ final class NetStream {
     /// Keeps one receive call outstanding while there is room in the buffer. Runs on the queue.
     private func receiveMore() {
         condition.lock()
-        let wanted = !isReceiving && !atEnd && !isClosed && buffered < NetStream.highWater
+        let wanted = !isReceiving && !atEnd && !isClosed && buffered < Self.highWater
         if wanted { isReceiving = true }
         condition.unlock()
         guard wanted else { return }
-        connection.receive(minimumIncompleteLength: 1, maximumLength: 256 * 1024) {
+        connection.receive(minimumIncompleteLength: 1, maximumLength: 256 * 1_024) {
             [weak self] data, _, isComplete, error in
             guard let self else { return }
             condition.lock()
@@ -509,7 +516,7 @@ final class NetStream {
         if readOffset == buffer.count {
             buffer.removeAll(keepingCapacity: true)
             readOffset = 0
-        } else if readOffset >= NetStream.compactAt {
+        } else if readOffset >= Self.compactAt {
             buffer.removeSubrange(0..<readOffset)
             readOffset = 0
         }
@@ -599,17 +606,18 @@ final class NetStream {
     /// uplink goes through as long as it keeps moving, and a few pieces are under way at a
     /// time to keep the line busy.
     func write(_ data: Data, timeout: TimeInterval, cancellation: CancellationFlag? = nil) throws {
-        if data.count <= NetStream.sendPiece {
-            return try send(data, isFinal: false, timeout: timeout, cancellation: cancellation)
+        if data.count <= Self.sendPiece {
+            try send(data, isFinal: false, timeout: timeout, cancellation: cancellation)
+            return
         }
         var outstanding: [Pending<Bool>] = []
         var offset = data.startIndex
         do {
             while offset < data.endIndex {
-                let end = min(offset + NetStream.sendPiece, data.endIndex)
+                let end = min(offset + Self.sendPiece, data.endIndex)
                 outstanding.append(submit(data[offset..<end], isFinal: false))
                 offset = end
-                if outstanding.count >= NetStream.sendsInFlight {
+                if outstanding.count >= Self.sendsInFlight {
                     try complete(outstanding.removeFirst(), timeout: timeout, cancellation: cancellation)
                 }
             }
@@ -702,7 +710,7 @@ final class DataListener {
 
     /// `peer` is the address of the server, `local` the address of this end of the control connection.
     init(peer: String, local: String?) throws {
-        self.peer = DataListener.comparable(peer)
+        self.peer = Self.comparable(peer)
         var bound: NWListener?
         if let local {
             let parameters = NWParameters.tcp
@@ -732,7 +740,7 @@ final class DataListener {
     private func begin(timeout: TimeInterval) throws -> Int? {
         let started = Pending<Bool>()
         listener.newConnectionHandler = { [accepted, peer] connection in
-            guard case .hostPort(let host, _) = connection.endpoint, DataListener.comparable("\(host)") == peer else {
+            guard case .hostPort(let host, _) = connection.endpoint, Self.comparable("\(host)") == peer else {
                 // Not the server: turned away, and the wait goes on.
                 connection.cancel()
                 return

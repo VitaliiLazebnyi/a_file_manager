@@ -37,7 +37,7 @@ final class FlowView: NSView {
         setContentCompressionResistancePriority(.required, for: .vertical)
     }
 
-    required init?(coder: NSCoder) { fatalError("not used") }
+    required init?(coder _: NSCoder) { fatalError("not used") }
 
     override var isFlipped: Bool { true }
 

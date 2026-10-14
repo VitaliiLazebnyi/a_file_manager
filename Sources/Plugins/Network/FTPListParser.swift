@@ -59,7 +59,7 @@ public struct RemoteEntry: Equatable {
 public enum FTPListParser {
     /// A line of a listing longer than this is not an entry: no server has names this long, and
     /// what a hostile one sends must not cost more than a glance.
-    public static let longestLine = 4096
+    public static let longestLine = 4_096
 
     /// Sizes and dates come from the server and are taken as they fit: a size that is no
     /// number or below zero is 0, one too large for a number is the largest there is.
@@ -70,7 +70,7 @@ public enum FTPListParser {
 
     /// A date built from numbers a server sent; nil when they are not a date of our era.
     static func date(_ components: DateComponents, calendar: Calendar) -> Date? {
-        guard let year = components.year, (1...9999).contains(year),
+        guard let year = components.year, (1...9_999).contains(year),
             (components.month ?? 1) >= 1, (components.month ?? 1) <= 12, (components.day ?? 1) >= 1,
             (components.day ?? 1) <= 31,
             (0...24).contains(components.hour ?? 0), (0...59).contains(components.minute ?? 0),
@@ -111,6 +111,7 @@ public enum FTPListParser {
                         entry.linkTarget = String(value[value.index(after: colon)...])
                     }
                 }
+
             case "size", "sizd": entry.size = size(value[...])
             case "modify": entry.modified = FTPSyntax.time(value)
             case "unix.mode": entry.permissions = UInt16(value, radix: 8).map { $0 & 0o7777 }
@@ -158,8 +159,8 @@ public enum FTPListParser {
     public static func entries(
         of lines: [String], asMLSD: Bool, now: Date = Date(), calendar: Calendar = localCalendar
     ) -> [RemoteEntry] {
-        Parallel.map(lines, serialBelow: 2000) { asMLSD ? mlsd($0) : list($0, now: now, calendar: calendar) }.compactMap
-        { $0 }
+        Parallel.map(lines, serialBelow: 2_000) { asMLSD ? mlsd($0) : list($0, now: now, calendar: calendar) }
+            .compactMap { $0 }
     }
 
     public static let localCalendar: Calendar = {
@@ -291,7 +292,7 @@ public enum FTPListParser {
 
         var entry = RemoteEntry(name: "", isDirectory: type == "d" || type == "D", isSymlink: type == "l")
         entry.isSpecial = "cbps".unicodeScalars.contains(type)
-        let tokens = FTPListParser.tokens(line)
+        let tokens = Self.tokens(line)
         var name: String?
 
         // <size> <month> <day> <year|time> <name>, then <size> <day> <month> <year|time> <name>.
@@ -382,7 +383,7 @@ public enum FTPListParser {
         components.year = thisYear
         guard let date = date(components, calendar: calendar) else { return nil }
         // A date without a year lies in the past; a day of slack covers the server's time zone.
-        if date > now.addingTimeInterval(86400) {
+        if date > now.addingTimeInterval(86_400) {
             components.year = thisYear - 1
             return self.date(components, calendar: calendar)
         }
@@ -449,7 +450,7 @@ public enum FTPListParser {
             size = self.size(Substring(text(line[kindStart..<position].filter(isDigit)[...])))
         }
         guard space() > 0, position < line.count else { return nil }
-        if year < 100 { year += year < 70 ? 2000 : 1900 }
+        if year < 100 { year += year < 70 ? 2_000 : 1_900 }
         var components = DateComponents()
         (components.year, components.month, components.day, components.hour, components.minute) = (
             year, month, day, hour, minute
@@ -472,13 +473,16 @@ public enum FTPListParser {
             switch kind {
             case "/": entry.isDirectory = true
             case "s": entry.size = size(value[...])
+
             case "m":
                 // Seconds since 1970; anything else, or a time beyond the year 9999, is no date.
                 if value.utf8.count <= 12, let seconds = Int64(value), (0...253_402_300_799).contains(seconds) {
                     entry.modified = Date(timeIntervalSince1970: TimeInterval(seconds))
                 }
+
             case "u" where value.hasPrefix("p"):
                 entry.permissions = UInt16(value.dropFirst(), radix: 8).map { $0 & 0o7777 }
+
             default: break
             }
         }

@@ -66,7 +66,7 @@ private final class WindowTestPlugin: Plugin {
     @discardableResult
     func wait(upTo seconds: TimeInterval = 10, until condition: () -> Bool) async -> Bool {
         let deadline = Date().addingTimeInterval(seconds)
-        while !condition() && Date() < deadline {
+        while !condition(), Date() < deadline {
             try? await Task.sleep(nanoseconds: 5_000_000)
         }
         return condition()
@@ -173,7 +173,7 @@ private final class WindowTestPlugin: Plugin {
             Issue.record("no flow")
             return
         }
-        flow.frame.size.width = 2000
+        flow.frame.size.width = 2_000
         flow.layout()
         let frames = flow.items.map { bar.convert($0.frame, from: flow) }
         #expect(frames.count == 8 && Set(frames.map(\.minY)).count == 2 && frames[6].minX == frames[0].minX)
@@ -686,7 +686,7 @@ private final class WindowTestPlugin: Plugin {
         func end() { lock.withLock { finished = true } }
 
         func work(_ monitor: JobMonitor) -> String {
-            while !monitor.cancellation.isCancelled && !lock.withLock({ finished }) {
+            while !monitor.cancellation.isCancelled, !lock.withLock({ finished }) {
                 monitor.report(JobProgress(lines: ["Working"], itemsDone: count, itemsTotal: 1_000_000))
                 lock.withLock { reports += 1 }
                 Thread.sleep(forTimeInterval: 0.001)

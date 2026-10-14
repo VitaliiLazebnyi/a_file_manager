@@ -200,7 +200,7 @@ extension Application {
 
     @Test func freeSpaceFollowsTheFileSystemWhenItReportsANewFigure() async {
         let share = ScriptedFileSystem()
-        share.volumeFigure = VolumeInfo(name: "Share", freeBytes: 100, totalBytes: 1000, isLocal: false)
+        share.volumeFigure = VolumeInfo(name: "Share", freeBytes: 100, totalBytes: 1_000, isLocal: false)
         share.batches = [[share.item(named: "a.txt", in: "/share/sub")]]
         let app = await start()
         defer { app.stop() }
@@ -218,7 +218,7 @@ extension Application {
                 userInfo: [FileSystemRegistry.volumeRootKey: share.url(root)])
         }
         // Another volume's news is not for this panel; the right one's is, also from a higher root.
-        share.volumeFigure = VolumeInfo(name: "Share", freeBytes: 40, totalBytes: 1000, isLocal: false)
+        share.volumeFigure = VolumeInfo(name: "Share", freeBytes: 40, totalBytes: 1_000, isLocal: false)
         report(root: "/elsewhere")
         report(root: "/share")
         #expect(await wait { app.left.model.volume?.freeBytes == 40 })

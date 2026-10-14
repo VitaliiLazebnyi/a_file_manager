@@ -27,7 +27,7 @@ public protocol Plugin: AnyObject {
 extension Plugin {
     public func stop() {}
     public func shouldTerminate() -> Bool { true }
-    public func prepareToQuit(cancellation: CancellationFlag, completion: @escaping () -> Void) { completion() }
+    public func prepareToQuit(cancellation _: CancellationFlag, completion: @escaping () -> Void) { completion() }
 }
 
 /// What the window shell provides to plugins once it exists.
@@ -77,7 +77,7 @@ public final class Kernel {
         listingCache.isEnabled = settings.value(Bool.self, forKey: ListingCache.settingsKey) ?? true
         // Nothing can run before the panels exist.
         commands.isBlocked = { true }
-        _ = Kernel.ignoreBrokenPipes
+        _ = Self.ignoreBrokenPipes
     }
 
     /// Writing to a pipe or socket whose other end has gone (a helper program that ended, a

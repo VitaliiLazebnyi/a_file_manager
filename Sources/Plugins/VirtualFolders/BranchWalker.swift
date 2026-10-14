@@ -78,10 +78,10 @@ public struct BranchWalker {
         var child = Start(url, prefix: name + "/")
         guard url.isFileURL else { return child }
         var info = stat()
-        guard lstat(url.path, &info) == 0, !BranchWalker.mountFolders.contains(url.path) else { return nil }
+        guard lstat(url.path, &info) == 0, !Self.mountFolders.contains(url.path) else { return nil }
         if let device = parent.device, info.st_dev != device, !parent.crossesDisks { return nil }
         // Another device than the folder it lies in: a mounted volume, or a firmlink.
-        if let own = parent.ownDevice, info.st_dev != own, BranchWalker.isMountPoint(url.path) { return nil }
+        if let own = parent.ownDevice, info.st_dev != own, Self.isMountPoint(url.path) { return nil }
         guard entered.insert(DirectoryKey(device: info.st_dev, inode: info.st_ino)).inserted else { return nil }
         child.device = parent.device
         child.ownDevice = info.st_dev
@@ -126,18 +126,18 @@ public struct BranchWalker {
         var isFirstLevel = true
         while !level.isEmpty, !isCancelled() {
             var next: [Start] = []
-            for from in stride(from: 0, to: level.count, by: BranchWalker.directoriesPerBatch) {
+            for from in stride(from: 0, to: level.count, by: Self.directoriesPerBatch) {
                 if isCancelled() { return visited }
-                let chunk = Array(level[from..<min(from + BranchWalker.directoriesPerBatch, level.count)])
+                let chunk = Array(level[from..<min(from + Self.directoriesPerBatch, level.count)])
                 let listings = Parallel.map(chunk) { start in
                     Result {
-                        let provider = try self.fileSystems.provider(for: start.directory)
+                        let provider = try fileSystems.provider(for: start.directory)
                         guard let cancellation else {
-                            return try provider.list(start.directory, showHidden: self.showHidden)
+                            return try provider.list(start.directory, showHidden: showHidden)
                         }
                         // Piece by piece: a provider can give up half-way through a huge folder.
                         var items: [FileItem] = []
-                        try provider.list(start.directory, showHidden: self.showHidden, cancellation: cancellation) {
+                        try provider.list(start.directory, showHidden: showHidden, cancellation: cancellation) {
                             batch in
                             items += batch
                             return true
@@ -150,7 +150,8 @@ public struct BranchWalker {
                 for (start, listing) in zip(chunk, listings) {
                     switch listing {
                     case .failure(let error):
-                        if mustRead && isFirstLevel { throw error }
+                        if mustRead, isFirstLevel { throw error }
+
                     case .success(let items):
                         if visited.count < keeping { visited.append(start.directory) }
                         for item in items {

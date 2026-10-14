@@ -14,7 +14,7 @@ import Testing
     let plugin: ViewerPlugin
     let bench: TestBench
 
-    init() throws {
+    init() {
         _ = NSApplication.shared
         plugin = ViewerPlugin(overlayHost: { _ in nil }, quickViewDelay: 0.01, showsWindows: false)
         bench = TestBench(plugins: [plugin], fileSystems: [memory], left: memory.url("/A"), right: memory.url("/B"))
@@ -24,7 +24,7 @@ import Testing
     @discardableResult
     func wait(upTo seconds: TimeInterval = 30, until condition: () -> Bool) async -> Bool {
         let deadline = Date().addingTimeInterval(seconds)
-        while !condition() && Date() < deadline {
+        while !condition(), Date() < deadline {
             try? await Task.sleep(nanoseconds: 3_000_000)
         }
         return condition()
@@ -37,7 +37,7 @@ import Testing
         return done.wait(timeout: .now() + seconds) == .success
     }
 
-    @Test func closingThePaneEndsAReadThatWaitsForTheServer() async throws {
+    @Test func closingThePaneEndsAReadThatWaitsForTheServer() throws {
         memory.addFile("/A/slow.txt", String(repeating: "a slow line\n", count: 20_000))
         memory.stallsReads = true
         defer { memory.releaseStalls() }
@@ -51,7 +51,7 @@ import Testing
         #expect(pane.loaded == nil)
     }
 
-    @Test func switchingFilesInTheQuickViewDropsTheFileThatIsStillBeingRead() async throws {
+    @Test func switchingFilesInTheQuickViewDropsTheFileThatIsStillBeingRead() async {
         memory.addFile("/A/slow.txt", String(repeating: "a slow line\n", count: 20_000))
         memory.stallsReads = true
         defer { memory.releaseStalls() }

@@ -390,7 +390,7 @@ private func created(_ url: URL) -> Date? {
         #expect(tag(copy) == "linked")
     }
 
-    @Test func foldersTheJobCreatedAreGivenTheirMetadataLastAndOnlyWhenAttributesAreKept() throws {
+    @Test func foldersTheJobCreatedAreGivenTheirMetadataLastAndOnlyWhenAttributesAreKept() {
         let base = MemoryFileSystem()
         base.keepsMetadata = true
         base.addFile("/src/tree/a.txt")

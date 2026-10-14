@@ -46,15 +46,15 @@ struct PanelSettings {
     init() {}
 
     init(from settings: SettingsStore) {
-        let limit = CGFloat(Double(settings.text(PanelSettings.briefWidthLimitKey, default: "200")) ?? 200)
-        briefWidthLimit = settings.flag(PanelSettings.limitsBriefWidthKey, default: true) ? max(60, limit) : nil
-        let sizes = PanelSettings.thumbnailSizes
+        let limit = CGFloat(Double(settings.text(Self.briefWidthLimitKey, default: "200")) ?? 200)
+        briefWidthLimit = settings.flag(Self.limitsBriefWidthKey, default: true) ? max(60, limit) : nil
+        let sizes = Self.thumbnailSizes
         thumbnailSide =
-            sizes[min(max(settings.index(PanelSettings.thumbnailSizeKey, default: 1), 0), sizes.count - 1)]
-        confirmsDrops = settings.flag(PanelSettings.confirmsDropsKey, default: true)
-        if settings.flag(PanelSettings.colorsByTypeKey, default: false) {
+            sizes[min(max(settings.index(Self.thumbnailSizeKey, default: 1), 0), sizes.count - 1)]
+        confirmsDrops = settings.flag(Self.confirmsDropsKey, default: true)
+        if settings.flag(Self.colorsByTypeKey, default: false) {
             colorRules = ColorRule.parse(
-                settings.text(PanelSettings.colorRulesKey, default: PanelSettings.defaultColorRules))
+                settings.text(Self.colorRulesKey, default: Self.defaultColorRules))
         }
     }
 
@@ -119,18 +119,18 @@ struct ColorRule {
     /// Reads the list: one entry per line (or separated by `;;`), each `masks = colour`. An
     /// entry that cannot be read is left out, and so is one whose mask starts with `-`, which
     /// is how an entry is switched off without deleting it.
-    static func parse(_ text: String) -> [ColorRule] {
+    static func parse(_ text: String) -> [Self] {
         text.replacingOccurrences(of: ";;", with: "\n").split(separator: "\n").compactMap { line in
             guard let equals = line.lastIndex(of: "=") else { return nil }
             let mask = line[..<equals].trimmingCharacters(in: .whitespaces)
             let colorText = line[line.index(after: equals)...].trimmingCharacters(in: .whitespaces)
             guard !mask.isEmpty, !mask.hasPrefix("-"), let color = color(named: colorText) else { return nil }
-            return ColorRule(maskText: mask, colorText: colorText, color: color)
+            return Self(maskText: mask, colorText: colorText, color: color)
         }
     }
 
     /// The colour of a name; nil when no entry matches.
-    static func color(for name: String, in rules: [ColorRule]) -> NSColor? {
+    static func color(for name: String, in rules: [Self]) -> NSColor? {
         rules.first { $0.matches(name) }?.color
     }
 }

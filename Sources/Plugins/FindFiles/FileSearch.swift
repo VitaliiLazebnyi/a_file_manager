@@ -36,7 +36,7 @@ public struct SearchMask {
             return isPlainWord ? "*\(token)*" : token
         }
         func patterns(_ part: Substring?) -> [String] {
-            SearchMask.tokens(String(part ?? "")).map(pattern)
+            Self.tokens(String(part ?? "")).map(pattern)
         }
         var included = patterns(parts.first)
         // `Letter to Mr. Smith.doc` typed as it is: the whole field is tried as one name too.
@@ -56,7 +56,7 @@ public struct SearchMask {
         for character in text {
             if character == "\"" {
                 inQuotes.toggle()
-            } else if character == " " && !inQuotes {
+            } else if character == " ", !inQuotes {
                 if !current.isEmpty { tokens.append(current) }
                 current = ""
             } else {
@@ -79,7 +79,7 @@ public struct SearchMask {
             return FindRegex.matches(expression, in: name, trip: trip, cancelled: cancelled)
         }
         let name = Array(name.lowercased())
-        func hit(_ pattern: [Character]) -> Bool { SearchMask.wildcard(pattern, name) }
+        func hit(_ pattern: [Character]) -> Bool { Self.wildcard(pattern, name) }
         return (includeCharacters.isEmpty || includeCharacters.contains(where: hit))
             && !excludeCharacters.contains(where: hit)
     }
@@ -326,7 +326,7 @@ public final class FileSearch {
         var reported = Set<String>()
         var parents: [String: FileIdentity?] = [:]
         func reportKey(_ item: FileItem) -> String {
-            guard item.url.isFileURL else { return FileSearch.locationKey(of: item.url) }
+            guard item.url.isFileURL else { return Self.locationKey(of: item.url) }
             let parent = item.url.deletingLastPathComponent()
             let identity: FileIdentity?
             if let known = parents[parent.path] {
@@ -382,7 +382,7 @@ public final class FileSearch {
     {
         var files: [FileItem] = []
         runWalk(
-            limit: min(query.resultLimit ?? Int.max, FileSearch.duplicateCandidateLimit), onDirectory: onDirectory
+            limit: min(query.resultLimit ?? Int.max, Self.duplicateCandidateLimit), onDirectory: onDirectory
         ) {
             if !$0.isDirectory { files.append($0) }
         }
@@ -532,7 +532,7 @@ public final class FileSearch {
                 root.isDuplicateRoot = !claim(url, depth: root.depth)
                 root.isClaimed = true
             }
-            jobs.start(threads: Walk.threadCount)
+            jobs.start(threads: Self.threadCount)
             var first: [JobStack.Job] = []
             for root in roots {
                 if root.url == nil {
@@ -552,7 +552,7 @@ public final class FileSearch {
             while let node = stack.popLast() {
                 condition.lock()
                 setNeeded(node)
-                while !node.isListed && node.pending > 0 && !isStopped {
+                while !node.isListed, node.pending > 0, !isStopped {
                     condition.wait(until: Date(timeIntervalSinceNow: 0.05))
                 }
                 setNeeded(nil)
@@ -629,7 +629,10 @@ public final class FileSearch {
             guard let url = node.url, !isStopped, !node.isDuplicateRoot,
                 node.isClaimed || claim(url, depth: node.depth),
                 let provider = try? search.fileSystems.provider(for: url)
-            else { return finishJob(of: node) }
+            else {
+                finishJob(of: node)
+                return
+            }
             let descend = search.query.maxDepth.map { node.depth < $0 } ?? true
             var wanted: [FileItem] = []
             var subfolders: [(name: String, url: URL)] = []
@@ -671,10 +674,12 @@ public final class FileSearch {
             } catch {
                 guard isStreaming else { return finishJob(of: node) }
                 // What was reported stays; the folder ends here.
-                return jobs.push(publish(node, candidates: [], children: []))
+                jobs.push(publish(node, candidates: [], children: []))
+                return
             }
             guard !isStopped else {
-                return isStreaming ? jobs.push(publish(node, candidates: [], children: [])) : finishJob(of: node)
+                isStreaming ? jobs.push(publish(node, candidates: [], children: [])) : finishJob(of: node)
+                return
             }
             // Only what is reported needs an order, and only the matches are sorted.
             sortedByName(&wanted)
@@ -795,7 +800,7 @@ public final class FileSearch {
                 condition.lock()
                 var next: Job?
                 while next == nil {
-                    while stack.isEmpty && !isClosed { condition.wait() }
+                    while stack.isEmpty, !isClosed { condition.wait() }
                     guard !isClosed, let top = stack.last else {
                         condition.unlock()
                         return
@@ -815,7 +820,7 @@ public final class FileSearch {
     /// Where the contents of an archive file are listed: the location another file system
     /// reads out of the file's own, if any does. Works on the text alone.
     private func archiveRoot(of file: FileItem, in provider: FileSystemProvider) -> URL? {
-        guard FileSearch.archiveExtensions.contains(FileItem.split(file.name).ext.lowercased()) else { return nil }
+        guard Self.archiveExtensions.contains(FileItem.split(file.name).ext.lowercased()) else { return nil }
         let notations = [provider.displayPath(file.url), file.url.absoluteString]
         for other in fileSystems.all where other !== provider {
             if let url = notations.lazy.compactMap({ other.location(from: $0) }).first { return url }

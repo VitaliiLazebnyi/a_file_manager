@@ -34,7 +34,7 @@ public protocol FileListService {
 }
 
 extension FileListService {
-    public func show(_ files: [URL], title: String, in panel: PanelHandle, isUnique: Bool) {
+    public func show(_ files: [URL], title: String, in panel: PanelHandle, isUnique _: Bool) {
         show(files, title: title, in: panel)
     }
 }

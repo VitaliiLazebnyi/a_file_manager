@@ -68,14 +68,18 @@ enum FileListColumn: String, CaseIterable {
         switch self {
         case .name:
             return DisplayText.clean(item.isFolder ? "[\(item.name)]" : item.baseName)
+
         case .ext:
             return DisplayText.clean(item.ext)
+
         case .size:
             if !item.isDirectory { return Format.bytes(item.size) }
             if let size = item.computedSize { return Format.bytes(size) }
             return item.isPackage ? "<PKG>" : item.isSymlink ? "<LNK>" : "<DIR>"
+
         case .date:
             return Format.date(item.modified)
+
         case .attr:
             return Format.permissions(item.permissions)
         }
@@ -92,7 +96,7 @@ enum FileListColumn: String, CaseIterable {
             if field.textColor != color { field.textColor = color }
         }
         guard self == .name, let imageView = cell.imageView else { return }
-        let icon = item.map { FileListColumn.icon(for: $0, own: ownIcons) } ?? FileListColumn.parentIcon
+        let icon = item.map { Self.icon(for: $0, own: ownIcons) } ?? Self.parentIcon
         if imageView.image !== icon { imageView.image = icon }
         let alpha: CGFloat = item?.isHidden == true ? 0.5 : 1
         if imageView.alphaValue != alpha { imageView.alphaValue = alpha }
@@ -100,7 +104,7 @@ enum FileListColumn: String, CaseIterable {
 
     /// The icons of file types, by extension; main thread only. Extensions are whatever the
     /// names in a folder end in, so the store is bounded like the others.
-    private static var typeIcons = TwoGenerationCache<String, NSImage>(limit: 2000)
+    private static var typeIcons = TwoGenerationCache<String, NSImage>(limit: 2_000)
 
     /// The icon of the `[..]` row.
     static let parentIcon = NSImage(
@@ -134,7 +138,7 @@ enum FileListColumn: String, CaseIterable {
     static let extraCellIdentifier = NSUserInterfaceItemIdentifier("extra")
 
     static func makeExtraCell() -> NSTableCellView {
-        let cell = FileListColumn.ext.makeCell()
+        let cell = Self.ext.makeCell()
         cell.identifier = extraCellIdentifier
         return cell
     }
@@ -246,7 +250,7 @@ final class IconStore {
     private var busy: Set<String> = []
 
     /// The icons of a few screens.
-    static let limit = 4000
+    static let limit = 4_000
     /// Most that wait for one folder; the ones asked for longest ago (rows long out of sight) are dropped.
     static let waitingLimit = 512
     /// Icons fetched in one trip.
@@ -261,9 +265,9 @@ final class IconStore {
         let folder = (path as NSString).deletingLastPathComponent
         var line = waiting[folder] ?? []
         line.append(key)
-        if line.count > IconStore.waitingLimit {
-            line.prefix(line.count - IconStore.waitingLimit).forEach { asked.remove($0) }
-            line.removeFirst(line.count - IconStore.waitingLimit)
+        if line.count > Self.waitingLimit {
+            line.prefix(line.count - Self.waitingLimit).forEach { asked.remove($0) }
+            line.removeFirst(line.count - Self.waitingLimit)
         }
         waiting[folder] = line
         fetch(in: folder)
@@ -275,12 +279,12 @@ final class IconStore {
 
     /// Forgets every icon, for checks.
     func removeAll() {
-        icons = TwoGenerationCache(limit: IconStore.limit)
+        icons = TwoGenerationCache(limit: Self.limit)
     }
 
     private func fetch(in folder: String) {
         guard !busy.contains(folder), var line = waiting[folder], !line.isEmpty else { return }
-        let count = min(IconStore.batchSize, line.count)
+        let count = min(Self.batchSize, line.count)
         let batch = Array(line.suffix(count).reversed())
         line.removeLast(count)
         waiting[folder] = line.isEmpty ? nil : line
@@ -291,14 +295,14 @@ final class IconStore {
             work: { batch.map { source($0.path) } },
             then: { [weak self] fetched in
                 guard let self else { return }
-                self.busy.remove(folder)
+                busy.remove(folder)
                 for (key, icon) in zip(batch, fetched) {
-                    self.asked.remove(key)
-                    self.icons[key] = icon
+                    asked.remove(key)
+                    icons[key] = icon
                 }
                 NotificationCenter.default.post(
-                    name: IconStore.didArrive, object: self, userInfo: [IconStore.pathsKey: Set(batch.map(\.path))])
-                self.fetch(in: folder)
+                    name: Self.didArrive, object: self, userInfo: [Self.pathsKey: Set(batch.map(\.path))])
+                fetch(in: folder)
             })
     }
 }

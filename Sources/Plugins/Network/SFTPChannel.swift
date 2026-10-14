@@ -90,7 +90,10 @@ struct SFTPEncoder {
     /// server itself spelled another way (decomposed, or not UTF-8 at all): those go back as
     /// the bytes they came as, or they would not name the same file.
     mutating func string(_ value: String) {
-        guard let names, !names.isEmpty else { return bytes(Data(value.precomposedStringWithCanonicalMapping.utf8)) }
+        guard let names, !names.isEmpty else {
+            bytes(Data(value.precomposedStringWithCanonicalMapping.utf8))
+            return
+        }
         var result = Data()
         for (index, piece) in Array(value.utf8).split(separator: 0x2F, omittingEmptySubsequences: false).enumerated() {
             if index > 0 { result.append(0x2F) }
@@ -263,7 +266,7 @@ final class AskpassHelper {
     private let endMarker = "END-" + UUID().uuidString
     private var received = Data()
     /// More than this is not collected while a question has no end.
-    private static let longestQuestion = 64 * 1024
+    private static let longestQuestion = 64 * 1_024
 
     init() throws {
         directory = FileManager.default.temporaryDirectory.appendingPathComponent("afm-askpass-\(UUID().uuidString)")
@@ -318,13 +321,13 @@ final class AskpassHelper {
 
     /// A question that has arrived completely; nil when there is none.
     func pendingQuestion() -> Question? {
-        var buffer = [UInt8](repeating: 0, count: 4096)
+        var buffer = [UInt8](repeating: 0, count: 4_096)
         while true {
             let count = read(question, &buffer, buffer.count)
             guard count > 0 else { break }
             received.append(buffer, count: count)
-            if received.count > AskpassHelper.longestQuestion {
-                received.removeFirst(received.count - AskpassHelper.longestQuestion)
+            if received.count > Self.longestQuestion {
+                received.removeFirst(received.count - Self.longestQuestion)
             }
         }
         let text = String(decoding: received, as: UTF8.self)
@@ -414,7 +417,7 @@ final class SFTPChannel {
     func errorMessageAtTheEnd() -> String {
         // The reading thread comes to the end once the process has gone; on a busy machine that
         // can take a moment longer than the process itself, so it is given a few seconds.
-        if lastWords.wait(timeout: .now() + SFTPChannel.lastWordsTime + SFTPChannel.endTime) == .success {
+        if lastWords.wait(timeout: .now() + Self.lastWordsTime + Self.endTime) == .success {
             lastWords.signal()
         }
         return errorMessage
@@ -433,7 +436,7 @@ final class SFTPChannel {
             guard let self, !data.isEmpty else { return handle.readabilityHandler = nil }
             lock.lock()
             errorText.append(data)
-            if errorText.count > 8192 { errorText = Data(errorText.suffix(4096)) }
+            if errorText.count > 8_192 { errorText = Data(errorText.suffix(4_096)) }
             lock.unlock()
         }
         do {
@@ -455,7 +458,7 @@ final class SFTPChannel {
         let lastWords = lastWords
         let reader = Thread { [weak self] in
             defer { Darwin.close(output) }
-            SFTPChannel.readPackets(from: output) { self?.received($0) ?? false }
+            Self.readPackets(from: output) { self?.received($0) ?? false }
             // The stream ended, or what came was not SFTP: the dialogue is over, and ssh with it.
             // What ssh said last (why the login failed) is read before anyone is told: its two
             // outputs end together, and the end of one may be seen before the text of the other.
@@ -497,8 +500,8 @@ final class SFTPChannel {
         handle.readabilityHandler = nil
         let descriptor = handle.fileDescriptor
         _ = fcntl(descriptor, F_SETFL, fcntl(descriptor, F_GETFL) | O_NONBLOCK)
-        let deadline = Date().addingTimeInterval(SFTPChannel.lastWordsTime)
-        var buffer = [UInt8](repeating: 0, count: 4096)
+        let deadline = Date().addingTimeInterval(Self.lastWordsTime)
+        var buffer = [UInt8](repeating: 0, count: 4_096)
         errorReading.lock()
         defer { errorReading.unlock() }
         while Date() < deadline {
@@ -509,7 +512,7 @@ final class SFTPChannel {
             guard count > 0 else { return }
             lock.lock()
             errorText.append(buffer, count: count)
-            if errorText.count > 8192 { errorText = Data(errorText.suffix(4096)) }
+            if errorText.count > 8_192 { errorText = Data(errorText.suffix(4_096)) }
             lock.unlock()
         }
     }
@@ -536,7 +539,7 @@ final class SFTPChannel {
             let length = Int(header.reduce(UInt32(0)) { $0 << 8 | UInt32($1) })
             // Nothing the protocol sends is this large (a read brings 32 KB, OpenSSH never sends more
             // than 256 KB); a wrong length means the stream is not SFTP, and is not made room for.
-            guard length >= 1, length <= SFTPChannel.largestPacket, let payload = readExactly(length),
+            guard length >= 1, length <= Self.largestPacket, let payload = readExactly(length),
                 let kind = SFTPPacket.Kind(rawValue: payload[0])
             else { return }
             // The body is a view of the payload; nothing is copied.
@@ -613,7 +616,7 @@ final class SFTPChannel {
                 if stuck >= writeTimeout { throw NetworkError.timedOut("sending to the server") }
                 if cancellation?.isCancelled == true {
                     if sent == 0 { throw NetworkError.cancelled }
-                    if stuck >= SFTPChannel.cancelGrace { throw NetworkError.connectionLost }
+                    if stuck >= Self.cancelGrace { throw NetworkError.connectionLost }
                 }
                 var wanted = pollfd(fd: descriptor, events: Int16(POLLOUT), revents: 0)
                 _ = Darwin.poll(&wanted, 1, 200)

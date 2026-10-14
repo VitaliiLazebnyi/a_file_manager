@@ -52,7 +52,7 @@ final class IntegrationHookedMemory: FileSystemProvider {
         }
         try base.createDirectory(at: url, exclusive: exclusive)
     }
-    func createDirectory(at url: URL, exclusive: Bool, cancellation: CancellationFlag) throws {
+    func createDirectory(at url: URL, exclusive: Bool, cancellation _: CancellationFlag) throws {
         try createDirectory(at: url, exclusive: exclusive)
     }
 }

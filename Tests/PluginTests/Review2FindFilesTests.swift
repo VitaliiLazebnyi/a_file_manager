@@ -71,7 +71,7 @@ import Testing
         var slow = SearchQuery(directory: memory.url("/slow"))
         slow.fieldRules = FieldRules(isEnabled: true, rules: [FieldRule("tc.name", .regex, "^(a+)+$")])
         var found = ["not run"]
-        #expect(finishes { found = self.names(of: slow) })
+        #expect(finishes { found = names(of: slow) })
         #expect(found.isEmpty)
     }
 
@@ -120,7 +120,7 @@ import Testing
 
     // MARK: The walk
 
-    @Test func hitsOfAFolderComeBeforeItsLastFilesAreTested() throws {
+    @Test func hitsOfAFolderComeBeforeItsLastFilesAreTested() {
         // 70 files; the tests of the last ones wait until the first hits have been reported.
         for index in 0..<70 { memory.addFile(String(format: "/many/f%02d.txt", index)) }
         let release = DispatchSemaphore(value: 0)
@@ -154,7 +154,7 @@ import Testing
         #expect(finishes(within: 600) { while lock.withLock({ hits }) < 70 { Thread.sleep(forTimeInterval: 0.01) } })
     }
 
-    @Test func aSlowFrontJobDoesNotLetTheOthersListTheWholeTree() throws {
+    @Test func aSlowFrontJobDoesNotLetTheOthersListTheWholeTree() {
         for folder in 0..<200 {
             for file in 0..<10 { memory.addFile(String(format: "/wide/d%03d/f%d.txt", folder, file)) }
         }
@@ -181,7 +181,7 @@ import Testing
         #expect(listed < 100)
         release.signal()
         // The 2,000 files and the 200 folders.
-        #expect(done.wait(timeout: .now() + 60) == .success && count == 2200)
+        #expect(done.wait(timeout: .now() + 60) == .success && count == 2_200)
     }
 
     @Test func cancellingAContentSearchWhileItRunsIsSafe() {
@@ -195,7 +195,7 @@ import Testing
             query.fieldRules = FieldRules(isEnabled: true, rules: [FieldRule("tc.size", .greater, "1")])
             let search = FileSearch(query, fileSystems: fileSystems)
             Thread {
-                Thread.sleep(forTimeInterval: Double(round) / 2000)
+                Thread.sleep(forTimeInterval: Double(round) / 2_000)
                 search.cancel()
             }.start()
             #expect(finishes { search.run { _ in } })
@@ -211,7 +211,7 @@ import Testing
         #expect(finishes { search.run { _ in found += 1 } })
         #expect(found == 5 && search.reachedResultLimit)
         var all = SearchQuery(directory: memory.url("/deep"))
-        all.resultLimit = 1000
+        all.resultLimit = 1_000
         let complete = FileSearch(all, fileSystems: fileSystems)
         var every = 0
         complete.run { _ in every += 1 }
@@ -228,7 +228,7 @@ import Testing
         var query = SearchQuery(directory: memory.url("/found"), names: "n1.txt")
         query.onlyItems = items
         var hits: [String] = []
-        #expect(finishes { hits = self.names(of: query) })
+        #expect(finishes { hits = names(of: query) })
         // A file listed beside the folder that holds it is found once, by the folder.
         #expect(hits.count == 300)
     }
@@ -324,14 +324,14 @@ private final class MemoryReader: FileReader {
 
     init(_ data: Data) { self.data = data }
 
-    func read(upToCount count: Int) throws -> Data? {
+    func read(upToCount count: Int) -> Data? {
         guard position < data.count else { return nil }
         let end = min(position + count, data.count)
         defer { position = end }
         return data.subdata(in: position..<end)
     }
 
-    func seek(to offset: UInt64) throws { position = min(Int(offset), data.count) }
+    func seek(to offset: UInt64) { position = min(Int(offset), data.count) }
     func close() {}
     func interrupt() {}
 }

@@ -39,26 +39,26 @@ final class Replies: FileJobDelegate {
         if let cancelAtBytes, progress.bytesDone >= cancelAtBytes { job.cancel() }
     }
 
-    func job(_ job: FileJob, conflictAt target: FileItem, source: FileItem) -> ConflictChoice {
+    func job(_: FileJob, conflictAt target: FileItem, source _: FileItem) -> ConflictChoice {
         lock.withLock {
             asked.append(target.name)
             return conflictScript.count > 1 ? conflictScript.removeFirst() : conflictScript[0]
         }
     }
 
-    func job(_ job: FileJob, failedAt url: URL, error: Error) -> ErrorChoice {
+    func job(_: FileJob, failedAt _: URL, error: Error) -> ErrorChoice {
         lock.withLock { failureTexts.append(error.localizedDescription) }
         return failure
     }
 
-    func job(_ job: FileJob, confirmDeleteNonEmpty directory: URL) -> FolderDeleteChoice { .delete }
+    func job(_: FileJob, confirmDeleteNonEmpty _: URL) -> FolderDeleteChoice { .delete }
 
-    func job(_ job: FileJob, confirm question: ProtectionQuestion) -> ProtectionChoice {
+    func job(_: FileJob, confirm question: ProtectionQuestion) -> ProtectionChoice {
         lock.withLock { protectionAsked.append("\(question.reason) \(question.purpose) \(question.item.name)") }
         return protection
     }
 
-    func job(_ job: FileJob, mergeInto existing: FileItem, source: FileItem) -> MergeChoice {
+    func job(_: FileJob, mergeInto existing: FileItem, source _: FileItem) -> MergeChoice {
         lock.withLock { mergeAsked.append(existing.name) }
         return merge
     }
@@ -339,7 +339,7 @@ func runJob(
         #expect(quiet.protections.isEmpty)
     }
 
-    @Test func deletingReadOnlyAndHiddenFilesAsks() throws {
+    @Test func deletingReadOnlyAndHiddenFilesAsks() {
         let (fileSystems, memory) = makeFileSystems()
         memory.addFile("/a/ro.txt", "r", permissions: 0o444)
         memory.addFile("/a/.hidden", "h")
@@ -377,7 +377,7 @@ func runJob(
         #expect(delete.protections.count == 1 && !box.exists("A/locked.txt") && deleted.completed.count == 1)
     }
 
-    @Test func mergingIntoAnExistingFolderCanBeAskedAbout() throws {
+    @Test func mergingIntoAnExistingFolderCanBeAskedAbout() {
         let (fileSystems, memory) = makeFileSystems()
         memory.addFile("/a/docs/one.txt", "1")
         memory.addFile("/b/docs/keep.txt", "k")
@@ -402,7 +402,7 @@ func runJob(
 
 /// The options of the Copy dialog: filter, attributes, links, verify, errors, the log's records.
 @Suite struct TransferOptionsInJobs {
-    @Test func theFilterChoosesWhatIsCopied() throws {
+    @Test func theFilterChoosesWhatIsCopied() {
         let (fileSystems, memory) = makeFileSystems()
         for path in [
             "/a/one.txt", "/a/two.bak", "/a/docs/in.txt", "/a/docs/pic.jpg", "/a/docs/build/out.txt",
@@ -432,7 +432,7 @@ func runJob(
         #expect(memory.allPaths.filter { $0.hasPrefix("/b/") } == ["/b/docs", "/b/docs/in.txt", "/b/one.txt"])
     }
 
-    @Test func aFilteredMoveKeepsWhatWasLeftOut() throws {
+    @Test func aFilteredMoveKeepsWhatWasLeftOut() {
         let (fileSystems, memory) = makeFileSystems()
         memory.addFile("/a/docs/in.txt", "t")
         memory.addFile("/a/docs/pic.jpg", "j")
@@ -524,7 +524,7 @@ func runJob(
     @Test func verifyCatchesACorruptedCopy() throws {
         let box = try Sandbox()
         let (fileSystems, wrapped) = makeWrappedFileSystems()
-        try box.file("A/data.bin", String(repeating: "d", count: 3000))
+        try box.file("A/data.bin", String(repeating: "d", count: 3_000))
         wrapped.base.addDirectory("/inbox")
         let source = [box.url("A/data.bin")]
         let target = TargetSpec(directory: wrapped.base.url("/inbox"))
@@ -534,7 +534,7 @@ func runJob(
         runJob(.copy, source, to: target, replies: Replies(), fileSystems: fileSystems)
         // (The damaged bytes are no text any more, so there is nothing to read back as a string.)
         #expect(
-            wrapped.base.item(at: wrapped.base.url("/inbox/data.bin"))?.size == 3000
+            wrapped.base.item(at: wrapped.base.url("/inbox/data.bin"))?.size == 3_000
                 && wrapped.base.contents("/inbox/data.bin") == nil)
         wrapped.base.removeTree("/inbox/data.bin")
 
@@ -545,7 +545,7 @@ func runJob(
         #expect(replies.errors.count == 1 && replies.errors[0].hasPrefix("Verify failed"))
         // Neither the damaged file nor its temporary name remains, and the source is untouched.
         #expect(wrapped.base.allPaths == ["/inbox"] && failed.completed.isEmpty && failed.failureCount == 1)
-        #expect(box.read("A/data.bin")?.count == 3000)
+        #expect(box.read("A/data.bin")?.count == 3_000)
 
         // A verified move keeps the source when the copy is bad, and removes it when it is good.
         let moving = Replies()
@@ -557,7 +557,7 @@ func runJob(
         }
         #expect(
             good.completed.count == 1 && !box.exists("A/data.bin")
-                && wrapped.base.contents("/inbox/data.bin")?.count == 3000)
+                && wrapped.base.contents("/inbox/data.bin")?.count == 3_000)
     }
 
     @Test func checksumsCompareContents() throws {
@@ -576,7 +576,7 @@ func runJob(
                 .hasPrefix("0967115f") == true)
     }
 
-    @Test func keepingGoingOnErrorsSkipsWithoutAskingAndCounts() throws {
+    @Test func keepingGoingOnErrorsSkipsWithoutAskingAndCounts() {
         let (fileSystems, memory) = makeFileSystems()
         memory.addFile("/a/one.txt", "1")
         memory.addDirectory("/b")
@@ -612,7 +612,7 @@ func runJob(
         #expect(resumed.completed.count == 1 && memory.contents("/inbox/big.bin") == content)
     }
 
-    @Test func everyItemIsRecordedForTheLog() throws {
+    @Test func everyItemIsRecordedForTheLog() {
         let (fileSystems, memory) = makeFileSystems()
         memory.addFile("/a/docs/in.txt", "1")
         memory.addFile("/a/one.txt", "new")
@@ -658,7 +658,7 @@ func runJob(
 
     /// A tree of small files in memory: /src/file000.txt … and /src/sub/…
     func fill(_ memory: MemoryFileSystem) {
-        for index in 0..<ParallelCopies.count {
+        for index in 0..<Self.count {
             memory.addFile(String(format: "/src/file%03d.txt", index), "content \(index)")
             if index % 4 == 0 { memory.addFile(String(format: "/src/sub/deep%03d.txt", index), "deep \(index)") }
         }
@@ -676,7 +676,7 @@ func runJob(
         ) { $0.parallelWidth = 4 }
         #expect(result.completed.count == 1 && !result.cancelled)
         #expect(wrapped.mostWritesAtOnce > 1 && wrapped.mostWritesAtOnce <= 4)
-        for index in 0..<ParallelCopies.count {
+        for index in 0..<Self.count {
             #expect(wrapped.base.contents(String(format: "/dst/src/file%03d.txt", index)) == "content \(index)")
         }
         #expect(
@@ -721,7 +721,7 @@ func runJob(
     @Test func conflictsAreAskedOneAtATimeInProcessingOrder() {
         let (fileSystems, wrapped) = makeWrappedFileSystems()
         fill(wrapped.base)
-        for index in stride(from: 0, to: ParallelCopies.count, by: 10) {
+        for index in stride(from: 0, to: Self.count, by: 10) {
             wrapped.base.addFile(String(format: "/dst/src/file%03d.txt", index), "old")
         }
         wrapped.delay = 0.001
@@ -742,9 +742,9 @@ func runJob(
         let box = try Sandbox()
         let (fileSystems, wrapped) = makeWrappedFileSystems()
         // Streams from memory onto the disk: each file arrives under a temporary name first.
-        for index in 0..<ParallelCopies.count {
+        for index in 0..<Self.count {
             wrapped.base.addFile(
-                String(format: "/src/file%03d.txt", index), String(repeating: "\(index % 10)", count: 3000))
+                String(format: "/src/file%03d.txt", index), String(repeating: "\(index % 10)", count: 3_000))
         }
         try box.folder("B")
         let replies = Replies()
@@ -759,7 +759,7 @@ func runJob(
         let arrived = namesOnDisk(box.url("B/src"))
         #expect(arrived.count >= 29 && arrived.count < ParallelCopies.count)
         // No temporary names, and every file that is there is whole.
-        #expect(arrived.allSatisfy { $0.hasPrefix("file") && box.read("B/src/" + $0)?.count == 3000 })
+        #expect(arrived.allSatisfy { $0.hasPrefix("file") && box.read("B/src/" + $0)?.count == 3_000 })
         // Nothing arrives after the job has returned.
         Thread.sleep(forTimeInterval: 0.05)
         #expect(namesOnDisk(box.url("B/src")) == arrived)

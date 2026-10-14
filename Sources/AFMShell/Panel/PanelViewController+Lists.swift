@@ -37,8 +37,8 @@ extension PanelViewController {
         sortHeader.onClick = { [weak self] column in self?.headerClicked(column) }
         sortHeader.menuProvider = { [weak self] in
             guard let self else { return nil }
-            self.fillHeaderMenu()
-            return self.headerMenu
+            fillHeaderMenu()
+            return headerMenu
         }
         gridBox.orientation = .vertical
         gridBox.spacing = 0
@@ -93,7 +93,7 @@ extension PanelViewController {
             // a tenth of a microsecond for each that went. Only when so many rows go at once
             // that this adds up to more than making the visible ones anew is the list taken anew.
             let removed = tableView.numberOfRows - model.rowCount
-            if full || removed > PanelViewController.rowsRemovedInPlace {
+            if full || removed > Self.rowsRemovedInPlace {
                 tableView.reloadData()
             } else {
                 tableView.noteNumberOfRowsChanged()
@@ -209,7 +209,7 @@ extension PanelViewController {
         let (items, cursor) = (tab.items, tab.cursor - offset)
         typeFind?.cancel()
         typeFind = nil
-        guard items.count >= PanelViewController.backgroundSortThreshold else {
+        guard items.count >= Self.backgroundSortThreshold else {
             if let index = TypeSelect.row(matching: prefix, in: items, from: cursor) {
                 tab.moveCursor(to: index + offset)
             }
@@ -220,10 +220,10 @@ extension PanelViewController {
         Background.compute(
             work: { TypeSelect.row(matching: prefix, in: items, from: cursor, cancellation: flag) },
             then: { [weak self] index in
-                guard let self, self.typeFind === flag else { return }
-                self.typeFind = nil
+                guard let self, typeFind === flag else { return }
+                typeFind = nil
                 // The list the rows were counted in is still the one on screen.
-                guard self.model === tab, tab.shownVersion == version, let index else { return }
+                guard model === tab, tab.shownVersion == version, let index else { return }
                 tab.moveCursor(to: index + offset)
             })
     }
@@ -233,7 +233,10 @@ extension PanelViewController {
     func gridDidScroll() {
         // The cells that come into view are drawn from the model, whatever was noted before.
         gridMarks = [:]
-        guard viewMode == .thumbnails else { return thumbnails.keepOnly([]) }
+        guard viewMode == .thumbnails else {
+            thumbnails.keepOnly([])
+            return
+        }
         let side = settings.thumbnailSide
         thumbnails.keepOnly(
             Set(
@@ -287,13 +290,13 @@ extension PanelViewController {
         guard isViewLoaded else { return }
         rememberColumnWidths()
         for column in tableView.tableColumns
-        where column.identifier.rawValue.hasPrefix(PanelViewController.extraColumnPrefix) {
+        where column.identifier.rawValue.hasPrefix(Self.extraColumnPrefix) {
             tableView.removeTableColumn(column)
         }
         var shown: Set<String> = []
         for id in extraColumns where shown.insert(id).inserted {
             guard let column = kernel.columns[id] else { continue }
-            let identifier = PanelViewController.extraColumnPrefix + id
+            let identifier = Self.extraColumnPrefix + id
             let tableColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(identifier))
             tableColumn.title = column.title
             tableColumn.width = CGFloat(columnWidths[identifier] ?? Double(column.width))
@@ -314,8 +317,8 @@ extension PanelViewController {
     /// The plugin column a table column stands for.
     private func contentColumn(of tableColumn: NSTableColumn) -> ContentColumn? {
         let identifier = tableColumn.identifier.rawValue
-        guard identifier.hasPrefix(PanelViewController.extraColumnPrefix) else { return nil }
-        return kernel.columns[String(identifier.dropFirst(PanelViewController.extraColumnPrefix.count))]
+        guard identifier.hasPrefix(Self.extraColumnPrefix) else { return nil }
+        return kernel.columns[String(identifier.dropFirst(Self.extraColumnPrefix.count))]
     }
 
     /// Values of plugin columns were computed: the rows on screen that show them are drawn again.
@@ -323,7 +326,7 @@ extension PanelViewController {
         guard !showsGrid else { return }
         let columns = IndexSet(
             tableView.tableColumns.indices.filter {
-                tableView.tableColumns[$0].identifier.rawValue.hasPrefix(PanelViewController.extraColumnPrefix)
+                tableView.tableColumns[$0].identifier.rawValue.hasPrefix(Self.extraColumnPrefix)
             })
         let visible = tableView.rows(in: tableView.visibleRect)
         let rows = IndexSet(
@@ -397,11 +400,11 @@ extension PanelViewController {
 
     // MARK: Table
 
-    func numberOfRows(in tableView: NSTableView) -> Int { model.rowCount }
+    func numberOfRows(in _: NSTableView) -> Int { model.rowCount }
 
     /// Row views are used again like cells: scrolling and reloading would otherwise make one
     /// for every row that comes into sight.
-    func tableView(_ tableView: NSTableView, rowViewForRow row: Int) -> NSTableRowView? {
+    func tableView(_ tableView: NSTableView, rowViewForRow _: Int) -> NSTableRowView? {
         if let reused = tableView.makeView(withIdentifier: CursorRowView.reuseIdentifier, owner: nil) as? CursorRowView
         {
             reused.panel = self
@@ -413,17 +416,17 @@ extension PanelViewController {
         return rowView
     }
 
-    func tableViewSelectionDidChange(_ notification: Notification) {
+    func tableViewSelectionDidChange(_: Notification) {
         guard !syncing, tableView.selectedRow >= 0 else { return }
         model.cursor = tableView.selectedRow
         host?.panelCursorDidChange(self)
     }
 
-    func tableView(_ tableView: NSTableView, didClick tableColumn: NSTableColumn) {
+    func tableView(_: NSTableView, didClick tableColumn: NSTableColumn) {
         if let column = FileListColumn(rawValue: tableColumn.identifier.rawValue) { headerClicked(column) }
     }
 
-    func tableViewColumnDidResize(_ notification: Notification) {
+    func tableViewColumnDidResize(_: Notification) {
         // Widths are written down when the program quits and when the columns change; a drag
         // of a column border would otherwise save on every point of its way.
         rememberColumnWidths()

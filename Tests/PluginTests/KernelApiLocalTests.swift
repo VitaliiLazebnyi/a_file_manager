@@ -39,7 +39,7 @@ import Testing
     @Test func aCancelledListingStopsBeforeTheNextBuffer() throws {
         let box = try Sandbox()
         // More names than one buffer holds, so the listing comes in several pieces.
-        let count = 9000
+        let count = 9_000
         for index in 0..<count {
             let descriptor = open(
                 box.url("a-rather-long-name-to-fill-the-buffer-sooner-\(index).dat").path, O_WRONLY | O_CREAT, 0o644)

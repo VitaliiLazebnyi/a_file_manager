@@ -20,7 +20,10 @@ final class QuickLookController: NSResponder, QLPreviewPanelDataSource, QLPrevie
 
     /// Shows the panel with these files, or closes it when it is open.
     func toggle(_ urls: [URL]) {
-        if let panel = visiblePanel { return panel.orderOut(nil) }
+        if let panel = visiblePanel {
+            panel.orderOut(nil)
+            return
+        }
         guard !urls.isEmpty, let panel = QLPreviewPanel.shared() else { return }
         self.urls = urls
         if host == nil, let window = NSApp.mainWindow {
@@ -52,7 +55,7 @@ final class QuickLookController: NSResponder, QLPreviewPanelDataSource, QLPrevie
         if isVisible, urls.contains(where: { $0.isSameLocation(as: volume) || $0.isInside(volume) }) { close() }
     }
 
-    override func acceptsPreviewPanelControl(_ panel: QLPreviewPanel!) -> Bool { true }
+    override func acceptsPreviewPanelControl(_: QLPreviewPanel!) -> Bool { true }
 
     override func beginPreviewPanelControl(_ panel: QLPreviewPanel!) {
         panel.dataSource = self
@@ -64,13 +67,13 @@ final class QuickLookController: NSResponder, QLPreviewPanelDataSource, QLPrevie
         panel.delegate = nil
     }
 
-    func numberOfPreviewItems(in panel: QLPreviewPanel!) -> Int { urls.count }
+    func numberOfPreviewItems(in _: QLPreviewPanel!) -> Int { urls.count }
 
-    func previewPanel(_ panel: QLPreviewPanel!, previewItemAt index: Int) -> QLPreviewItem! {
+    func previewPanel(_: QLPreviewPanel!, previewItemAt index: Int) -> QLPreviewItem! {
         urls.indices.contains(index) ? urls[index] as NSURL : nil
     }
 
-    func previewPanel(_ panel: QLPreviewPanel!, handle event: NSEvent!) -> Bool {
+    func previewPanel(_: QLPreviewPanel!, handle event: NSEvent!) -> Bool {
         guard let event, event.type == .keyDown, let responder = host?.firstResponder, responder !== self else {
             return false
         }

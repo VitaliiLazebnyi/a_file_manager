@@ -55,7 +55,7 @@ enum SelectionRegex {
                 stop.pointee = true
             }
         }
-        if timedOut && !cancelled() { trip.recordTimeout() }
+        if timedOut, !cancelled() { trip.recordTimeout() }
         return found
     }
 }

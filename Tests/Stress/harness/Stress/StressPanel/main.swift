@@ -53,7 +53,7 @@ final class Running {
         providers.forEach(kernel.fileSystems.register)
         kernel.load(StandardPlugins.make(pasteboard: .withUniqueName(), launchesApplications: false))
         shell = Shell(kernel: kernel, home: home)
-        shell.mainWindow.window?.setContentSize(NSSize(width: 1500, height: 900))
+        shell.mainWindow.window?.setContentSize(NSSize(width: 1_500, height: 900))
         layOut()
     }
 
@@ -133,7 +133,7 @@ func timed(_ count: Int, _ body: (Int) -> Void) {
     for index in 0..<count {
         let t0 = now()
         body(index)
-        durations.append((now() - t0) * 1000)
+        durations.append((now() - t0) * 1_000)
         CFRunLoopRunInMode(.defaultMode, 0.0005, false)
     }
     durations.sort()
@@ -302,12 +302,12 @@ func million() {
 
     // Cursor.
     step("5a cursor: 1000 x Page Down command", limit: 120) {
-        timed(1000) { _ in app.commands.perform(.cursorPageDown) }
+        timed(1_000) { _ in app.commands.perform(.cursorPageDown) }
         pump(for: 0.15)
     }
     step("5b cursor: 1000 x random row", limit: 120) {
         var random = Random(seed: 5)
-        timed(1000) { _ in left.model.moveCursor(to: Int.random(in: 0..<left.model.rowCount, using: &random)) }
+        timed(1_000) { _ in left.model.moveCursor(to: Int.random(in: 0..<left.model.rowCount, using: &random)) }
         pump(for: 0.15)
     }
     step("5c cursor: 300 x select-and-move-down (Insert)", limit: 120) {
@@ -322,7 +322,7 @@ func million() {
             let t0 = now()
             _ = app.kernel.commands.isEnabled(command.id)
             _ = app.kernel.commands.isChecked(command.id)
-            costs.append(("\(command.id) \"\(command.title)\"", (now() - t0) * 1000))
+            costs.append(("\(command.id) \"\(command.title)\"", (now() - t0) * 1_000))
         }
         costs.sort { $0.1 > $1.1 }
         say(String(format: "   all %d commands: %.1f ms; the slowest:", costs.count, costs.reduce(0) { $0 + $1.1 }))
@@ -330,7 +330,7 @@ func million() {
         // What a real validation tick does (the bars), and what opening each top-level menu costs.
         let t0 = now()
         app.shell.mainWindow.validateBars()
-        say(String(format: "   validateBars (the 0.1 s tick): %.2f ms", (now() - t0) * 1000))
+        say(String(format: "   validateBars (the 0.1 s tick): %.2f ms", (now() - t0) * 1_000))
         for item in menu.items {
             guard let submenu = item.submenu else { continue }
             let t1 = now()
@@ -344,7 +344,7 @@ func million() {
             say(
                 String(
                     format: "     menu '%@' (%d items incl. submenus): %.1f ms", submenu.title as NSString,
-                    submenu.items.count, (now() - t1) * 1000))
+                    submenu.items.count, (now() - t1) * 1_000))
         }
     }
     step("6 validation x10 (bars, all commands, menu)", limit: 300) {
@@ -362,7 +362,7 @@ func million() {
             String(
                 format:
                     "   per round: bars %.2f ms, %d commands enabled+checked %.2f ms, menu items %.2f ms; worst round %.2f ms",
-                sums.bars * 100, app.kernel.commands.all.count, sums.commands * 100, sums.menu * 100, worst * 1000))
+                sums.bars * 100, app.kernel.commands.all.count, sums.commands * 100, sums.menu * 100, worst * 1_000))
     }
     step("6b status line x50 with 333k marked") {
         for _ in 0..<50 {
@@ -766,6 +766,7 @@ switch mode {
 case "million": million()
 case "stalled": stalled()
 case "flood": flood()
+
 default:
     say("unknown mode")
     exit(2)

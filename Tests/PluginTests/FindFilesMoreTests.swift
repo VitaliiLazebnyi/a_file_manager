@@ -138,7 +138,7 @@ import Testing
     }()
 
     func date(_ day: Int, _ hour: Int = 12) -> Date {
-        calendar.date(from: DateComponents(year: 2026, month: 10, day: day, hour: hour))!
+        calendar.date(from: DateComponents(year: 2_026, month: 10, day: day, hour: hour))!
     }
 
     func file(
@@ -155,15 +155,15 @@ import Testing
     @Test func ageCutsOffAtMidnightForDaysAndLonger() {
         let now = date(12, 15)
         #expect(Age(3, .hours).cutoff(before: now, calendar: calendar) == date(12, 12))
-        #expect(Age(90, .minutes).cutoff(before: now, calendar: calendar) == now.addingTimeInterval(-5400))
+        #expect(Age(90, .minutes).cutoff(before: now, calendar: calendar) == now.addingTimeInterval(-5_400))
         #expect(Age(2, .days).cutoff(before: now, calendar: calendar) == date(10, 0))
         #expect(Age(1, .weeks).cutoff(before: now, calendar: calendar) == date(5, 0))
         #expect(
             Age(1, .months).cutoff(before: now, calendar: calendar)
-                == calendar.date(from: DateComponents(year: 2026, month: 9, day: 12)))
+                == calendar.date(from: DateComponents(year: 2_026, month: 9, day: 12)))
         #expect(
             Age(1, .years).cutoff(before: now, calendar: calendar)
-                == calendar.date(from: DateComponents(year: 2025, month: 10, day: 12)))
+                == calendar.date(from: DateComponents(year: 2_025, month: 10, day: 12)))
     }
 
     @Test func dateCriteria() {
@@ -189,11 +189,11 @@ import Testing
 
     @Test func sizeRules() {
         #expect(SizeRule(.equal, 19).matches(19) && !SizeRule(.equal, 19).matches(20))
-        #expect(SizeRule(.greater, 1, .kilobytes).matches(1025) && !SizeRule(.greater, 1, .kilobytes).matches(1024))
+        #expect(SizeRule(.greater, 1, .kilobytes).matches(1_025) && !SizeRule(.greater, 1, .kilobytes).matches(1_024))
         #expect(
             SizeRule(.less, 0.5, .megabytes).matches(524_287) && !SizeRule(.less, 0.5, .megabytes).matches(524_288))
-        #expect(SizeRule(.equal, 2, .kilobytes).matches(2048) && SizeRule(.equal, 2, .kilobytes).matches(3071))
-        #expect(!SizeRule(.equal, 2, .kilobytes).matches(3072) && !SizeRule(.equal, 2, .kilobytes).matches(2047))
+        #expect(SizeRule(.equal, 2, .kilobytes).matches(2_048) && SizeRule(.equal, 2, .kilobytes).matches(3_071))
+        #expect(!SizeRule(.equal, 2, .kilobytes).matches(3_072) && !SizeRule(.equal, 2, .kilobytes).matches(2_047))
         #expect(
             SizeRule(.greater, 0.1, .gigabytes).matches(107_374_183)
                 && !SizeRule(.greater, 0.1, .gigabytes).matches(107_374_182))
@@ -276,13 +276,13 @@ private final class ArchiveFake: FileSystemProvider {
     func item(at url: URL) -> FileItem? { inner.item(at: url) }
     func parent(of directory: URL) -> URL? { inner.parent(of: directory) }
     func read(_ url: URL) throws -> FileReader { try inner.read(url) }
-    func createDirectory(at url: URL) throws { throw FileSystemError.notSupported("Writing") }
-    func write(_ url: URL) throws -> FileWriter { throw FileSystemError.notSupported("Writing") }
-    func remove(_ url: URL) throws { throw FileSystemError.notSupported("Writing") }
-    func move(_ source: URL, to destination: URL, replacing: Bool) throws {
+    func createDirectory(at _: URL) throws { throw FileSystemError.notSupported("Writing") }
+    func write(_: URL) throws -> FileWriter { throw FileSystemError.notSupported("Writing") }
+    func remove(_: URL) throws { throw FileSystemError.notSupported("Writing") }
+    func move(_: URL, to _: URL, replacing _: Bool) throws {
         throw FileSystemError.notSupported("Writing")
     }
-    func copy(_ source: URL, to destination: URL, progress: (Int64) -> Bool) throws {
+    func copy(_: URL, to _: URL, progress _: (Int64) -> Bool) throws {
         throw FileSystemError.notSupported("Writing")
     }
     func displayPath(_ url: URL) -> String { inner.displayPath(url) }
@@ -665,7 +665,7 @@ private final class ArchiveFake: FileSystemProvider {
         sized.criteria.size = SizeRule(.equal, 2, .kilobytes)
         sized.criteria.dateFrom = Date(timeIntervalSince1970: 0)
         sized.criteria.olderThan = Age(1, .hours)
-        let now = Date(timeIntervalSince1970: 7200)
+        let now = Date(timeIntervalSince1970: 7_200)
         #expect(
             SpotlightQuery.string(for: sized, now: now)
                 == "(kMDItemFSSize >= 2048 && kMDItemFSSize < 3072) && kMDItemFSContentChangeDate >= $time.iso(1970-01-01T00:00:00Z)"
@@ -770,7 +770,7 @@ private final class ArchiveFake: FileSystemProvider {
         change(&settings)
         window.form.settings = settings
         window.startSearch()
-        for _ in 0..<2000 where window.isSearching { try? await Task.sleep(nanoseconds: 2_000_000) }
+        for _ in 0..<2_000 where window.isSearching { try? await Task.sleep(nanoseconds: 2_000_000) }
     }
 
     @Test func registersCommandsMenusAndPreferences() {

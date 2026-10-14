@@ -21,7 +21,7 @@ struct DecodedImage {
 enum ImageDecoder {
     /// No side of a decoded frame is longer than this: an image of several hundred megapixels
     /// is downsampled while it is decoded and never exists at full size in memory.
-    static let largestSide = 8192
+    static let largestSide = 8_192
     /// The frames of an animation may take this much memory together; the rest is left out.
     static let animationMemoryLimit = 512 << 20
     /// An image of more pixels than this is not decoded (a file that claims billions of pixels
@@ -233,7 +233,7 @@ final class ScaledFrameCache {
         let wanted = Key(frame: ObjectIdentifier(frame), width: width, height: height)
         if key == wanted { return ready }
         guard building, width > 0, height > 0, width * height < frame.width * frame.height * 9 / 10,
-            width * height <= ScaledFrameCache.pixelLimit
+            width * height <= Self.pixelLimit
         else {
             return nil
         }
@@ -242,10 +242,10 @@ final class ScaledFrameCache {
         generation += 1
         let token = generation
         let latest = latest
-        queue.asyncAfter(deadline: .now() + ScaledFrameCache.settle) { [weak self] in
+        queue.asyncAfter(deadline: .now() + Self.settle) { [weak self] in
             // Overtaken while it waited: another size is wanted now.
             guard latest.value == token else { return }
-            let scaled = autoreleasepool { ScaledFrameCache.scale(frame, width: width, height: height) }
+            let scaled = autoreleasepool { Self.scale(frame, width: width, height: height) }
             DispatchQueue.main.async {
                 guard let self, self.generation == token else { return }
                 self.ready = scaled
@@ -290,7 +290,7 @@ final class ImageCanvasView: NSScrollView {
         /// The frame at the size it is drawn at, for an image that is shown smaller than it is.
         let scaled = ScaledFrameCache()
 
-        override func draw(_ dirtyRect: NSRect) {
+        override func draw(_: NSRect) {
             guard let frameImage, let context = NSGraphicsContext.current?.cgContext else { return }
             context.saveGState()
             context.interpolationQuality = isAnimated || inLiveResize ? .low : .high
@@ -346,7 +346,7 @@ final class ImageCanvasView: NSScrollView {
         canvas.scaled.onReady = { [weak canvas] in canvas?.needsDisplay = true }
     }
 
-    required init?(coder: NSCoder) { fatalError("not used") }
+    required init?(coder _: NSCoder) { fatalError("not used") }
 
     deinit { timer?.invalidate() }
 
@@ -473,10 +473,10 @@ final class ImageCanvasView: NSScrollView {
         timer = Timer.scheduledTimer(withTimeInterval: image.frames[frameIndex].delay, repeats: false) {
             [weak self] _ in
             guard let self, let image = self.image else { return }
-            self.frameIndex = (self.frameIndex + 1) % image.frames.count
-            self.canvas.frameImage = image.frames[self.frameIndex].image
-            self.canvas.needsDisplay = true
-            self.scheduleNextFrame()
+            frameIndex = (frameIndex + 1) % image.frames.count
+            canvas.frameImage = image.frames[frameIndex].image
+            canvas.needsDisplay = true
+            scheduleNextFrame()
         }
     }
 

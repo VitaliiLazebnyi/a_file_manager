@@ -22,10 +22,10 @@ public struct ListOrder: Equatable {
     }
 
     /// A header click: the same column reverses, another column starts in its own direction.
-    public func clicked(_ key: SortKey) -> ListOrder {
+    public func clicked(_ key: SortKey) -> Self {
         key == self.key
-            ? ListOrder(key: key, descending: !descending)
-            : ListOrder(key: key, descending: key.startsDescending)
+            ? Self(key: key, descending: !descending)
+            : Self(key: key, descending: key.startsDescending)
     }
 }
 
@@ -107,9 +107,9 @@ public enum Sorter {
         fileprivate let key: [UInt8]
         fileprivate let name: String
 
-        public static func == (a: NameKey, b: NameKey) -> Bool { ExactName.areSame(a.name, b.name) }
+        public static func == (a: Self, b: Self) -> Bool { ExactName.areSame(a.name, b.name) }
 
-        public static func < (a: NameKey, b: NameKey) -> Bool {
+        public static func < (a: Self, b: Self) -> Bool {
             if ExactName.areSame(a.name, b.name) { return false }
             var result = a.key.withUnsafeBufferPointer { first in
                 b.key.withUnsafeBufferPointer { SortKeys.bytewise(first, $0) }
@@ -276,7 +276,8 @@ public enum Sorter {
         let cores = ProcessInfo.processInfo.activeProcessorCount
         guard indexes.count > parallelThreshold, cores > 1 else {
             var run = indexes
-            return run.sort(by: isBefore)
+            run.sort(by: isBefore)
+            return
         }
         let bucketCount = min(256, cores * 8)
         // The boundaries between the buckets come from a sample spread over the list.
@@ -456,7 +457,7 @@ struct SortKeys {
         /// No key could be made: the comparison is worked out from the names.
         static let keyless: UInt16 = 4
 
-        var isFolder: Bool { flags & Record.folder != 0 }
+        var isFolder: Bool { flags & Self.folder != 0 }
     }
 
     /// The memory the records point into.
@@ -477,9 +478,11 @@ struct SortKeys {
     static func primary(of item: FileItem, _ key: SortKey) -> Int64 {
         switch key {
         case .size: return item.size
+
         case .date:
             let bits = Int64(bitPattern: (item.modified.timeIntervalSinceReferenceDate + 0).bitPattern)
             return bits < 0 ? bits ^ Int64.max : bits
+
         default: return 0
         }
     }
@@ -502,7 +505,7 @@ struct SortKeys {
             let records = buffer.baseAddress!
             blocks = items.withUnsafeBufferPointer { items in
                 Parallel.map(pieces) { piece in
-                    SortKeys.build(items, piece, into: records, order: order, collator: collator)
+                    Self.build(items, piece, into: records, order: order, collator: collator)
                 }
             }
             count = items.count
@@ -515,12 +518,12 @@ struct SortKeys {
     }
 
     /// The keys of the same items in another order.
-    func permuted(by indexes: [UInt32]) -> SortKeys {
-        SortKeys(order: order, collator: collator, records: indexes.map { records[Int($0)] }, blocks: blocks)
+    func permuted(by indexes: [UInt32]) -> Self {
+        Self(order: order, collator: collator, records: indexes.map { records[Int($0)] }, blocks: blocks)
     }
 
     /// The keys of two lists merged: each place takes the next key of the first or second list.
-    init(merging first: SortKeys, _ second: SortKeys, fromSecond: [Bool]) {
+    init(merging first: Self, _ second: Self, fromSecond: [Bool]) {
         var records: [Record] = []
         records.reserveCapacity(fromSecond.count)
         var (i, j) = (0, 0)
@@ -778,7 +781,7 @@ final class NameCollator {
 
     init(identifier: String, numeric: Bool) {
         var status: Int32 = 0
-        guard let library = NameCollator.library, let handle = library.open(identifier, &status), status <= 0 else {
+        guard let library = Self.library, let handle = library.open(identifier, &status), status <= 0 else {
             collator = nil
             return
         }

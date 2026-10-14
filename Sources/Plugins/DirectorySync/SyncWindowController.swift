@@ -68,7 +68,7 @@ final class SyncWindowController: NSWindowController, NSWindowDelegate, NSTableV
         self.session = session
         kernel = session.kernel
         let window = ToolWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 1000, height: 620),
+            contentRect: NSRect(x: 0, y: 0, width: 1_000, height: 620),
             styleMask: [.titled, .closable, .resizable, .miniaturizable], backing: .buffered, defer: false)
         window.title = "Synchronize directories"
         window.isReleasedWhenClosed = false
@@ -87,7 +87,7 @@ final class SyncWindowController: NSWindowController, NSWindowDelegate, NSTableV
         session.onRowsChange = { [weak self] rows in self?.refreshRows(rows) }
     }
 
-    required init?(coder: NSCoder) { fatalError("not used") }
+    required init?(coder _: NSCoder) { fatalError("not used") }
 
     /// Shows the window with what the session holds now.
     func show() {
@@ -167,7 +167,7 @@ final class SyncWindowController: NSWindowController, NSWindowDelegate, NSTableV
         indicatorLabel.lineBreakMode = .byTruncatingMiddle
         indicatorLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
-        for (id, title, width) in SyncWindowController.columns {
+        for (id, title, width) in Self.columns {
             let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(id))
             column.title = title
             column.width = width
@@ -229,7 +229,7 @@ final class SyncWindowController: NSWindowController, NSWindowDelegate, NSTableV
         oneHourBox.state = options.ignoreOneHourDifference ? .on : .off
         onlySelectedBox.state = session.onlySelected ? .on : .off
         onlySelectedBox.isEnabled = !session.selectedNames.isEmpty
-        tolerancePopup.selectItem(at: SyncWindowController.tolerances.firstIndex(of: options.toleranceSeconds) ?? 2)
+        tolerancePopup.selectItem(at: Self.tolerances.firstIndex(of: options.toleranceSeconds) ?? 2)
         offsetField.stringValue = String(options.timeOffsetHours)
         for (button, part) in showButtons { button.state = session.show.contains(part) ? .on : .off }
     }
@@ -254,7 +254,7 @@ final class SyncWindowController: NSWindowController, NSWindowDelegate, NSTableV
         options.asymmetric = asymmetricBox.state == .on
         options.emptyDirectories = emptyDirectoriesBox.state == .on
         options.ignoreOneHourDifference = oneHourBox.state == .on
-        options.toleranceSeconds = SyncWindowController.tolerances[max(0, min(2, tolerancePopup.indexOfSelectedItem))]
+        options.toleranceSeconds = Self.tolerances[max(0, min(2, tolerancePopup.indexOfSelectedItem))]
         options.timeOffsetHours = Int(offsetField.stringValue.trimmingCharacters(in: .whitespaces)) ?? 0
         session.options = options
         session.onlySelected = onlySelectedBox.state == .on
@@ -526,14 +526,14 @@ final class SyncWindowController: NSWindowController, NSWindowDelegate, NSTableV
 
     // MARK: Table
 
-    func numberOfRows(in tableView: NSTableView) -> Int { session.entries.count }
+    func numberOfRows(in _: NSTableView) -> Int { session.entries.count }
 
-    func tableView(_ tableView: NSTableView, isGroupRow row: Int) -> Bool {
+    func tableView(_: NSTableView, isGroupRow row: Int) -> Bool {
         if case .header = session.entries[row] { return true }
         return false
     }
 
-    func tableView(_ tableView: NSTableView, shouldSelectRow row: Int) -> Bool {
+    func tableView(_: NSTableView, shouldSelectRow row: Int) -> Bool {
         if case .header = session.entries[row] { return false }
         return true
     }
@@ -554,12 +554,13 @@ final class SyncWindowController: NSWindowController, NSWindowDelegate, NSTableV
             cell.stringValue = directory
             cell.textColor = .secondaryLabelColor
             cell.font = .boldSystemFont(ofSize: NSFont.smallSystemFontSize)
+
         case .row(let index):
             let item = session.rows[index]
-            cell.textColor = SyncWindowController.color(of: item)
+            cell.textColor = Self.color(of: item)
             cell.font = .systemFont(ofSize: NSFont.systemFontSize)
             cell.alignment = id.hasSuffix("Size") ? .right : (id == "action" ? .center : .left)
-            cell.stringValue = SyncWindowController.text(of: item, column: id)
+            cell.stringValue = Self.text(of: item, column: id)
         }
         return cell
     }
@@ -575,6 +576,7 @@ final class SyncWindowController: NSWindowController, NSWindowDelegate, NSTableV
         case "rightName": return name(row.right)
         case "rightSize": return size(row.right)
         case "rightDate": return date(row.right)
+
         default:
             if row.action != .none { return row.action.symbol }
             switch row.state {
@@ -591,6 +593,7 @@ final class SyncWindowController: NSWindowController, NSWindowDelegate, NSTableV
         switch row.defaultAction {
         case .copyToRight: return .systemGreen
         case .copyToLeft, .deleteRight: return .systemBlue
+
         default:
             switch row.state {
             case .equal: return .labelColor
@@ -601,7 +604,7 @@ final class SyncWindowController: NSWindowController, NSWindowDelegate, NSTableV
     }
 
     /// A click on a column header sorts by name, size or date of that side; again reverses.
-    func tableView(_ tableView: NSTableView, didClick tableColumn: NSTableColumn) {
+    func tableView(_: NSTableView, didClick tableColumn: NSTableColumn) {
         let id = tableColumn.identifier.rawValue
         guard id != "action" else { return }
         let side: SyncSide = id.hasPrefix("left") ? .left : .right
@@ -610,11 +613,11 @@ final class SyncWindowController: NSWindowController, NSWindowDelegate, NSTableV
         session.sort = (key, side, same ? !session.sort.ascending : true)
     }
 
-    func tableViewSelectionDidChange(_ notification: Notification) {
+    func tableViewSelectionDidChange(_: Notification) {
         updateIndicator()
     }
 
-    func windowWillClose(_ notification: Notification) {
+    func windowWillClose(_: Notification) {
         session.cancelComparison()
     }
 }
@@ -629,7 +632,7 @@ private final class ClosureMenuItem: NSMenuItem {
         target = self
     }
 
-    required init(coder: NSCoder) { fatalError("not used") }
+    required init(coder _: NSCoder) { fatalError("not used") }
 
     @objc private func runClosure() { run() }
 }

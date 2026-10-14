@@ -38,11 +38,11 @@ final class PanelCoordinator: PanelSet, PanelHost {
         func makePanel(_ key: String) -> PanelViewController {
             let state = kernel.settings.value(PanelTabs.State.self, forKey: key)
             let tabs = PanelTabs(restoring: state, fallback: home)
-            PanelCoordinator.keepFromConnectingAtStart(tabs, home: home, fileSystems: kernel.fileSystems)
+            Self.keepFromConnectingAtStart(tabs, home: home, fileSystems: kernel.fileSystems)
             return PanelViewController(tabs: tabs, kernel: kernel)
         }
-        leftPanel = makePanel(PanelCoordinator.stateKeys[0])
-        rightPanel = makePanel(PanelCoordinator.stateKeys[1])
+        leftPanel = makePanel(Self.stateKeys[0])
+        rightPanel = makePanel(Self.stateKeys[1])
         sourcePanel = leftPanel
         leftPanel.host = self
         rightPanel.host = self
@@ -129,8 +129,8 @@ final class PanelCoordinator: PanelSet, PanelHost {
     }
 
     func saveState() {
-        kernel.settings.set(leftPanel.tabs.state, forKey: PanelCoordinator.stateKeys[0])
-        kernel.settings.set(rightPanel.tabs.state, forKey: PanelCoordinator.stateKeys[1])
+        kernel.settings.set(leftPanel.tabs.state, forKey: Self.stateKeys[0])
+        kernel.settings.set(rightPanel.tabs.state, forKey: Self.stateKeys[1])
         for (panel, key) in zip(panels, PanelViewState.keys) { kernel.settings.set(panel.viewState, forKey: key) }
     }
 
@@ -180,7 +180,7 @@ final class PanelCoordinator: PanelSet, PanelHost {
                 for directory in directories { missed[directory.locationKey] = directory }
                 // Each folder is noted once however often it is reported; beyond a handful of
                 // folders everything is simply looked at again.
-                missedChanges = missed.count > PanelCoordinator.missedLimit ? nil : missed
+                missedChanges = missed.count > Self.missedLimit ? nil : missed
             } else {
                 missedChanges = nil
             }
@@ -286,23 +286,23 @@ final class PanelCoordinator: PanelSet, PanelHost {
             work: { [weak self, weak watch] () -> AnyObject? in
                 provider.watch([directory]) { [weak self, weak watch] changed in
                     // Main thread, as the file system promises.
-                    guard let self, let watch, watch.isWanted, self.watches[key] === watch else { return }
-                    self.reloadChangedPanels(showing: changed)
+                    guard let self, let watch, watch.isWanted, watches[key] === watch else { return }
+                    reloadChangedPanels(showing: changed)
                 }
             },
             then: { [weak self] watcher in
                 var watcher = watcher
                 watch.isStarting = false
-                guard let self, !self.isShutDown, self.watches[key] === watch else {
+                guard let self, !isShutDown, watches[key] === watch else {
                     return Background.release(&watcher)
                 }
                 guard watch.isWanted else {
-                    self.watches[key] = nil
+                    watches[key] = nil
                     return Background.release(&watcher)
                 }
                 watch.watcher = watcher
-                if ProcessInfo.processInfo.systemUptime - began > PanelCoordinator.slowWatch {
-                    self.reloadChangedPanels(showing: [directory])
+                if ProcessInfo.processInfo.systemUptime - began > Self.slowWatch {
+                    reloadChangedPanels(showing: [directory])
                 }
             })
     }
@@ -338,7 +338,7 @@ final class PanelCoordinator: PanelSet, PanelHost {
         onActivityChanged?()
     }
 
-    func placesForVolumeList(of panel: PanelViewController) -> [Place] {
+    func placesForVolumeList(of _: PanelViewController) -> [Place] {
         // Asked again for the next time; what is known is shown now.
         places.refresh()
         return places.all
@@ -354,7 +354,7 @@ final class PanelCoordinator: PanelSet, PanelHost {
         kernel.panelEvents.post(.selectionChanged, from: panel)
     }
 
-    func panel(_ panel: PanelViewController, joinReadingOf location: URL, showHidden: Bool) -> ReadAhead.Joined? {
+    func panel(_: PanelViewController, joinReadingOf location: URL, showHidden: Bool) -> ReadAhead.Joined? {
         readAhead.join(location, showHidden: showHidden)
     }
 }
@@ -401,7 +401,7 @@ final class PlacesStore {
         observers.append(
             (
                 center,
-                center.addObserver(forName: PlacesStore.placesDidChange, object: nil, queue: .main) { [weak self] _ in
+                center.addObserver(forName: Self.placesDidChange, object: nil, queue: .main) { [weak self] _ in
                     self?.refresh()
                 }
             ))
@@ -438,16 +438,16 @@ final class PlacesStore {
             then: { [weak self] (answer: [Place]?) in
                 guard let self else { return }
                 let places = answer ?? []
-                self.asking.remove(index)
-                self.answered.insert(index)
-                let wasComplete = self.isComplete
-                self.isComplete = self.answered.count == self.providers.count
-                if !PlacesStore.areSame(places, self.answers[index]) || wasComplete != self.isComplete {
-                    self.answers[index] = places
-                    self.all = self.answers.flatMap { $0 }
-                    self.handlers.forEach { $0() }
+                asking.remove(index)
+                answered.insert(index)
+                let wasComplete = isComplete
+                isComplete = answered.count == providers.count
+                if !Self.areSame(places, answers[index]) || wasComplete != isComplete {
+                    answers[index] = places
+                    all = answers.flatMap { $0 }
+                    handlers.forEach { $0() }
                 }
-                if self.askAgain.remove(index) != nil { self.ask(index) }
+                if askAgain.remove(index) != nil { ask(index) }
             })
     }
 

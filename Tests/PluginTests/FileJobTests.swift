@@ -96,14 +96,14 @@ import Testing
         #expect(Format.bytes(250_944) == "250,944")
         #expect(Format.kilobytes(0) == "0 k")
         #expect(Format.shortSize(15) == "15 b")
-        #expect(Format.shortSize(6840) == "6.68 k")
+        #expect(Format.shortSize(6_840) == "6.68 k")
         #expect(Format.permissions(0o755) == "rwxr-xr-x")
         #expect(Format.permissions(0o600) == "rw-------")
         #expect(Format.speed(11_600_000) == "11.06 M/s")
         #expect(Format.duration(0.2) == "1 s")
         #expect(Format.duration(78) == "1 min 20 s")
-        #expect(Format.duration(3599) == "1 h 00 min")
-        #expect(Format.duration(7500) == "2 h 05 min")
+        #expect(Format.duration(3_599) == "1 h 00 min")
+        #expect(Format.duration(7_500) == "2 h 05 min")
         // The date follows the user's region; it always shows year and time.
         let date = Format.date(Date(timeIntervalSince1970: 1_700_000_000))
         #expect(date.contains("2023") && date.contains(":"))
@@ -490,18 +490,18 @@ import Testing
         #expect(Set(answers.progress.map(\.bytesDone)).count > 2)
     }
 
-    @Test func jobsWithinAnotherFileSystemUseItsOwnOperations() throws {
+    @Test func jobsWithinAnotherFileSystemUseItsOwnOperations() {
         let (fileSystems, memory) = makeFileSystems()
-        memory.addFile("/a/one.txt", String(repeating: "1", count: 3000))
+        memory.addFile("/a/one.txt", String(repeating: "1", count: 3_000))
         memory.addFile("/a/docs/two.txt", "2")
         memory.addDirectory("/b")
-        memory.copyBlockSize = 1000
+        memory.copyBlockSize = 1_000
         let answers = Answers()
         runJob(
             .copy, [memory.url("/a/one.txt")], to: TargetSpec(directory: memory.url("/b")), answers: answers,
             fileSystems: fileSystems)
-        #expect(memory.contents("/b/one.txt")?.count == 3000)
-        #expect(answers.progress.map(\.bytesDone).contains(2000))
+        #expect(memory.contents("/b/one.txt")?.count == 3_000)
+        #expect(answers.progress.map(\.bytesDone).contains(2_000))
 
         runJob(.move, [memory.url("/a/docs")], to: TargetSpec(directory: memory.url("/b")), fileSystems: fileSystems)
         #expect(memory.contents("/b/docs/two.txt") == "2" && !memory.exists("/a/docs"))
@@ -514,21 +514,21 @@ import Testing
         #expect(memory.allPaths == ["/a", "/a/one.txt", "/b"])
     }
 
-    @Test func aFileSystemThatCannotCopyByItselfIsStreamed() throws {
+    @Test func aFileSystemThatCannotCopyByItselfIsStreamed() {
         let (fileSystems, memory) = makeFileSystems()
-        memory.addFile("/serverA/data.bin", String(repeating: "d", count: 2000), permissions: 0o640)
+        memory.addFile("/serverA/data.bin", String(repeating: "d", count: 2_000), permissions: 0o640)
         memory.addDirectory("/serverB")
         memory.refusesInternalCopy = true
         let result = runJob(
             .copy, [memory.url("/serverA/data.bin")], to: TargetSpec(directory: memory.url("/serverB")),
             fileSystems: fileSystems)
         #expect(result.completed.count == 1)
-        #expect(memory.contents("/serverB/data.bin")?.count == 2000)
+        #expect(memory.contents("/serverB/data.bin")?.count == 2_000)
         #expect(memory.item(at: memory.url("/serverB/data.bin"))?.permissions == 0o640)
         #expect(memory.allPaths == ["/serverA", "/serverA/data.bin", "/serverB", "/serverB/data.bin"])
     }
 
-    @Test func anUnreadableFolderIsNotMovedAwayOrDeleted() throws {
+    @Test func anUnreadableFolderIsNotMovedAwayOrDeleted() {
         let (fileSystems, memory) = makeFileSystems()
         memory.addFile("/a/docs/precious.txt", "p")
         memory.addDirectory("/b/docs")
@@ -550,7 +550,7 @@ import Testing
 
     /// A volume without a Trash: the job asks whether to delete for good (the stand-in
     /// delegate agrees, as it does to every protection question).
-    @Test func trashWhereThereIsNoneOffersToDeleteForGood() throws {
+    @Test func trashWhereThereIsNoneOffersToDeleteForGood() {
         let (fileSystems, memory) = makeFileSystems()
         memory.addFile("/a/one.txt")
         let answers = Answers()

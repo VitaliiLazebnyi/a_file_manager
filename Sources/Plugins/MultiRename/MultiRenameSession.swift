@@ -35,7 +35,7 @@ final class ClipboardSource {
             if !isRequested {
                 isRequested = true
                 queue.async { [self] in
-                    let found = read().map { String($0.prefix(Snapshot.longest)) }
+                    let found = read().map { String($0.prefix(Self.longest)) }
                     condition.lock()
                     (text, isRead) = (found, true)
                     condition.broadcast()
@@ -44,8 +44,8 @@ final class ClipboardSource {
             }
             defer { condition.unlock() }
             // A clipboard that was waited for in vain is not waited for again by every name of the list.
-            if !isRead, let gaveUp = gaveUpAt, Date().timeIntervalSince(gaveUp) < Snapshot.grace { return nil }
-            let deadline = Date(timeIntervalSinceNow: Snapshot.patience)
+            if !isRead, let gaveUp = gaveUpAt, Date().timeIntervalSince(gaveUp) < Self.grace { return nil }
+            let deadline = Date(timeIntervalSinceNow: Self.patience)
             while !isRead, condition.wait(until: deadline) {}
             if !isRead { gaveUpAt = Date() }
             return isRead ? text : nil
@@ -200,14 +200,17 @@ final class MultiRenameSession {
     /// A change of the fields: the preview is started after a short pause, so that typing a
     /// mask starts one preview and not one per key. Without background work it is made at once.
     private func scheduleRefresh() {
-        guard previewsInBackground else { return refresh() }
+        guard previewsInBackground else {
+            refresh()
+            return
+        }
         previewCancellation.cancel()
         isComputing = true
         refreshRequest += 1
         let request = refreshRequest
-        DispatchQueue.main.asyncAfter(deadline: .now() + MultiRenameSession.typingPause) { [weak self] in
-            guard let self, self.refreshRequest == request else { return }
-            self.refresh()
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.typingPause) { [weak self] in
+            guard let self, refreshRequest == request else { return }
+            refresh()
         }
     }
 
@@ -328,8 +331,9 @@ final class MultiRenameSession {
             listChanged(keepingFolders: true)
         }
         sortRequest += 1
-        guard previewsInBackground, entries.count >= MultiRenameSession.backgroundSortThreshold else {
-            return apply(permutation())
+        guard previewsInBackground, entries.count >= Self.backgroundSortThreshold else {
+            apply(permutation())
+            return
         }
         let (generation, request) = (listGeneration, sortRequest)
         isComputing = true
@@ -408,8 +412,9 @@ final class MultiRenameSession {
             if settings == .unchanged { listChanged(keepingFolders: true) } else { settings = .unchanged }
             onChange?()
         }
-        guard previewsInBackground, oldEntries.count >= MultiRenameSession.backgroundSortThreshold else {
-            return finish(renamed())
+        guard previewsInBackground, oldEntries.count >= Self.backgroundSortThreshold else {
+            finish(renamed())
+            return
         }
         let generation = listGeneration
         isComputing = true
@@ -462,7 +467,10 @@ final class MultiRenameSession {
             }
             completion?()
         }
-        guard previewsInBackground else { return finish(read()) }
+        guard previewsInBackground else {
+            finish(read())
+            return
+        }
         // (The file may lie on a server: on a thread of the kernel's own.)
         BlockingCalls.run {
             let result = autoreleasepool { read() }
@@ -485,8 +493,9 @@ final class MultiRenameSession {
             loadNames(fromText: answer.text("names"))
         }
         // The text of a long list is put together in the background.
-        guard previewsInBackground, entries.count >= MultiRenameSession.backgroundSortThreshold else {
-            return ask(targetNames.joined(separator: "\n"))
+        guard previewsInBackground, entries.count >= Self.backgroundSortThreshold else {
+            ask(targetNames.joined(separator: "\n"))
+            return
         }
         let (current, names, generation) = (entries, newNames, listGeneration)
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
@@ -625,10 +634,12 @@ final class MultiRenameSession {
                     case .cancel:
                         outcome.result.cancelled = true
                         return outcome
+
                     case .autoRename:
                         targets = preview.planner.autoRenamed(
                             sources: sources, targets: targets, isFolder: entries.map(\.item.isFolder),
                             existing: preview.existing)
+
                     case .skip:
                         // Leaving an item where it is can put it in the way of another one.
                         targets = preview.planner.skippingConflicts(
@@ -735,7 +746,10 @@ final class MultiRenameSession {
         // Pressed again while this one is under way, it would find the same run and undo it twice.
         isBusy = true
         listGeneration += 1
-        guard previewsInBackground else { return performUndo(completion: completion) }
+        guard previewsInBackground else {
+            performUndo(completion: completion)
+            return
+        }
         store.loadUndo { [weak self] in self?.performUndo(completion: completion) }
     }
 

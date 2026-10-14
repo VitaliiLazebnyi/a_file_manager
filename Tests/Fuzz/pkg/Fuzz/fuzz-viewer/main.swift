@@ -8,7 +8,7 @@ import FuzzCore
 
 let encodings: [ViewerEncoding] =
     [.utf8, .utf16LE, .utf16BE, .ansi, .dos, .latin1, .macRoman]
-    + [932, 936, 949, 950, 1251, 874].compactMap(ViewerEncoding.codePage)
+    + [932, 936, 949, 950, 1_251, 874].compactMap(ViewerEncoding.codePage)
 let doubleByte = encodings.filter { $0.kind == .doubleByte }
 
 func describe(_ bytes: [UInt8]) -> String {
@@ -25,7 +25,7 @@ func size(_ c: inout Choices, least: Int = 1) -> Int {
 // MARK: - encoding detection and decoding
 
 let detect = FuzzTarget(
-    "detect", maxLen: 8192,
+    "detect", maxLen: 8_192,
     dict: [
         "charset=", "windows-1252", "windows-99999999999999999999", "utf-16be", "<html", "<!doctype html", "%PDF-",
         "{\\rtf", "RIFF", "WEBP", ".html", ".bmp"
@@ -143,7 +143,7 @@ func allRows(_ document: TextDocument, _ what: String) -> [RowKey] {
 }
 
 let rowsTarget = FuzzTarget(
-    "rows", maxLen: 6000,
+    "rows", maxLen: 6_000,
     dict: [
         "\r\n", "\n", "\r", "\t", " ", "\r\r\n", "\n\n\n\n", "a b c d e f g ", "\u{3000}", "\u{2028}", "\u{85}", "é",
         "日本", "😀", "e\u{301}"
@@ -330,7 +330,7 @@ let rowsTarget = FuzzTarget(
 // MARK: - character boundaries
 
 let boundariesTarget = FuzzTarget(
-    "boundaries", maxLen: 4096,
+    "boundaries", maxLen: 4_096,
     rawDict: [
         [0x81, 0x40], [0x82, 0xA0], [0x81], [0xFE, 0xFE], [0x0A], [0x20], [0x81, 0x3F], [0xE0, 0x40], [0x80], [0xFF],
         [0xA1, 0xA1], [0x81, 0x81, 0x81, 0x81, 0x81, 0x81, 0x81]
@@ -392,7 +392,7 @@ let safeExpressions = [
 ]
 
 let searchTarget = FuzzTarget(
-    "search", maxLen: 4096,
+    "search", maxLen: 4_096,
     dict: [
         "foo", "bar", "\\n", "\\t", "\\\\", "\"PK\"0102", "0D 0A", "ß", "ſ", "İ", "ı", "K", "é", "É", "e\u{301}", "ǅ",
         "σς", "\n", "\r\n", " ", "日本", "あ"
@@ -429,7 +429,7 @@ let searchTarget = FuzzTarget(
         let data = c.rest()
         var typed = String(decoding: patternBytes.prefix(48), as: UTF8.self)
         // Expressions are the user's own; only harmless ones are tried, so that time spent is the search's.
-        if options.regex && !options.hex {
+        if options.regex, !options.hex {
             typed = safeExpressions[patternBytes.reduce(0) { ($0 &+ Int($1)) } % safeExpressions.count]
         }
         guard let pattern = try? SearchPattern(typed, options: options, encoding: encoding) else { return }
@@ -474,6 +474,7 @@ let searchTarget = FuzzTarget(
         // Plain text and bytes: the chunk size changes nothing.
         switch pattern.kind {
         case .expression: break
+
         case .text, .bytes:
             guard let whole = find(1 << 20, raw: false, from: start) else { fzFail("search-threw", what) }
             if whole != decoded {
@@ -541,7 +542,7 @@ let htmlTarget = FuzzTarget(
         let fast = HTMLText.plainText(units: units, linkBraces: braces)
         let dt = Date().timeIntervalSince(t)
         if units.count >= 512 {
-            let perKB = dt / (Double(units.count) / 1024)
+            let perKB = dt / (Double(units.count) / 1_024)
             if perKB > htmlNotes {
                 htmlNotes = perKB
                 fzNote(
@@ -583,7 +584,7 @@ if CommandLine.arguments.count >= 3, CommandLine.arguments[1] == "scale" {
             best = min(best, Date().timeIntervalSince(t))
         }
         print(
-            "x\(factor): \(units.count) units, \(String(format: "%.3f", best * 1000)) ms, \(String(format: "%.2f", best * 1e6 / (Double(units.count) / 1024))) us per 1024 units"
+            "x\(factor): \(units.count) units, \(String(format: "%.3f", best * 1_000)) ms, \(String(format: "%.2f", best * 1e6 / (Double(units.count) / 1_024))) us per 1024 units"
         )
     }
     exit(0)

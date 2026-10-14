@@ -5,7 +5,7 @@ import FuzzC
 //
 //   fuzz-X list
 //   fuzz-X fuzz <target> --out DIR [--time SECS] [--seeds DIR] [--timeout S] [--rss MB] [--seed N]
-//   fuzz-X run  <target> FILE...          run inputs once (reproduce)
+//   fuzz-X run  <target> FILE... run inputs once (reproduce)
 //   fuzz-X min  <target> FILE OUT         delta-debug a reproducer
 //
 // `fuzz` is a supervisor: it starts a worker (the same binary), which writes every input to
@@ -65,7 +65,7 @@ public struct Choices {
 public let interesting: [UInt64] = [
     0, 1, 0x7F, 0x80, 0xFF, 0x100, 0x7FFF, 0x8000, 0xFFFF, 0x10000, 0x7FFF_FFFF, 0x8000_0000,
     0xFFFF_FFFF, 0x1_0000_0000, 0x7FFF_FFFF_FFFF_FFFF, 0x8000_0000_0000_0000, 0xFFFF_FFFF_FFFF_FFFF,
-    0xFFFF_FFFE, 0xFFFE, 2, 16, 32, 64, 512, 1024, 4096, 65534, 0xFFFF_FFFF_FFFF_FFFE
+    0xFFFF_FFFE, 0xFFFE, 2, 16, 32, 64, 512, 1_024, 4_096, 65_534, 0xFFFF_FFFF_FFFF_FFFE
 ]
 
 public enum Mutate {
@@ -91,11 +91,13 @@ public enum Mutate {
         switch rng.below(19) {
         case 0: if n > 0 { d[rng.below(n)] ^= 1 << UInt8(rng.below(8)) }
         case 1: if n > 0 { d[rng.below(n)] = UInt8(truncatingIfNeeded: rng.next()) }
+
         case 2, 3:  // an interesting integer in a 1/2/4/8-byte field, at random or at a known field offset
             let width = [1, 2, 2, 4, 4, 4, 8, 8][rng.below(8)]
             guard n >= width else { break }
             let at = (!fields.isEmpty && rng.chance(2)) ? rng.pick(fields) : rng.below(n - width + 1)
             put(rng.pick(interesting), width: width, at: at, bigEndian: rng.chance(3), in: &d)
+
         case 4:  // a length field plus or minus a little
             let width = [1, 2, 4, 8][rng.below(4)]
             guard n >= width else { break }
@@ -104,18 +106,22 @@ public enum Mutate {
             let v = get(width: width, at: at, bigEndian: be, in: d)
             let delta = UInt64(rng.below(4) + 1)
             put(rng.chance(2) ? v &+ delta : v &- delta, width: width, at: at, bigEndian: be, in: &d)
+
         case 5: if n > 0 { d.removeSubrange(rng.below(n)...) }  // truncate
+
         case 6:  // remove a block
             guard n > 1 else { break }
             let a = rng.below(n)
             let len = min(n - a, 1 + rng.below(rng.chance(4) ? n : 16))
             d.removeSubrange(a..<a + len)
+
         case 7:  // duplicate a block
             guard n > 0 else { break }
             let a = rng.below(n)
             let len = min(n - a, 1 + rng.below(rng.chance(4) ? n : 32))
             let block = Array(d[a..<a + len])
             d.insert(contentsOf: block, at: rng.below(n + 1))
+
         case 8:  // copy a block over another place
             guard n > 1 else { break }
             let a = rng.below(n)
@@ -123,16 +129,19 @@ public enum Mutate {
             let to = rng.below(n)
             let block = Array(d[a..<a + len])
             for (i, b) in block.enumerated() where to + i < d.count { d[to + i] = b }
+
         case 9:  // insert random bytes
             let len = 1 + rng.below(8)
             d.insert(contentsOf: (0..<len).map { _ in UInt8(truncatingIfNeeded: rng.next()) }, at: rng.below(n + 1))
+
         case 10:  // insert a run of one byte
-            let len = 1 + rng.below(rng.chance(8) ? 4096 : 64)
+            let len = 1 + rng.below(rng.chance(8) ? 4_096 : 64)
             let b: UInt8 =
                 rng.chance(2)
                 ? rng.pick([0, 0xFF, 0x20, 0x41, 0x2F, 0x0A, 0x30, 0x80, 0x2E, 0x39])
                 : UInt8(truncatingIfNeeded: rng.next())
             d.insert(contentsOf: [UInt8](repeating: b, count: len), at: rng.below(n + 1))
+
         case 11, 12:  // splice with another input
             guard !other.isEmpty else { break }
             let a = rng.below(n + 1)
@@ -143,6 +152,7 @@ public enum Mutate {
                 let len = min(other.count - b, 1 + rng.below(64))
                 d.insert(contentsOf: other[b..<b + len], at: a)
             }
+
         case 13, 14:  // a dictionary token, inserted or written over
             guard !dict.isEmpty else { break }
             let tok = rng.pick(dict)
@@ -152,11 +162,13 @@ public enum Mutate {
                 let at = rng.below(n - tok.count + 1)
                 for (i, b) in tok.enumerated() { d[at + i] = b }
             }
+
         case 15:  // arithmetic on a byte
             if n > 0 {
                 let i = rng.below(n)
                 d[i] = rng.chance(2) ? d[i] &+ UInt8(1 + rng.below(16)) : d[i] &- UInt8(1 + rng.below(16))
             }
+
         case 16:  // an ASCII number replaced by an interesting one
             guard n > 0 else { break }
             var a = rng.below(n)
@@ -174,12 +186,14 @@ public enum Mutate {
                 "99999999999999999999999999", "00000000000", "7777777777777777777777", "-9223372036854775808"
             ]
             d.replaceSubrange(a..<e, with: Array(rng.pick(texts).utf8))
+
         case 17:  // swap two blocks
             guard n > 4 else { break }
             let len = 1 + rng.below(min(16, n / 2))
             let a = rng.below(n - len + 1)
             let b = rng.below(n - len + 1)
             for i in 0..<len { d.swapAt(a + i, b + i) }
+
         default:  // overwrite with a run
             guard n > 0 else { break }
             let a = rng.below(n)
@@ -219,7 +233,7 @@ public struct FuzzTarget {
 
 /// A broken invariant: reported as a finding with `key` as its signature.
 public func fzFail(_ key: String, _ detail: String = "") -> Never {
-    fz_fail(key + "\n" + String(detail.prefix(4000)))
+    fz_fail(key + "\n" + String(detail.prefix(4_000)))
 }
 public func fzCheck(_ ok: @autoclosure () -> Bool, _ key: String, _ detail: @autoclosure () -> String = "") {
     if !ok() { fzFail(key, detail()) }
@@ -244,7 +258,7 @@ func listDir(_ path: String) -> [String] {
 func mkdir(_ p: String) { try? FileManager.default.createDirectory(atPath: p, withIntermediateDirectories: true) }
 
 struct Options {
-    var out = "", seedsDir: String?, time = 60.0, timeout = 2.0, rssMB = 2048, seed: UInt64 = 1, maxExecs = Int.max
+    var out = "", seedsDir: String?, time = 60.0, timeout = 2.0, rssMB = 2_048, seed: UInt64 = 1, maxExecs = Int.max
     init(_ args: [String]) {
         var i = 0
         while i < args.count {
@@ -254,24 +268,31 @@ struct Options {
             case "--out":
                 out = v
                 i += 1
+
             case "--seeds":
                 seedsDir = v
                 i += 1
+
             case "--time":
                 time = Double(v) ?? 60
                 i += 1
+
             case "--timeout":
                 timeout = Double(v) ?? 2
                 i += 1
+
             case "--rss":
-                rssMB = Int(v) ?? 2048
+                rssMB = Int(v) ?? 2_048
                 i += 1
+
             case "--seed":
                 seed = UInt64(v) ?? 1
                 i += 1
+
             case "--execs":
                 maxExecs = Int(v) ?? Int.max
                 i += 1
+
             default: break
             }
             i += 1
@@ -300,6 +321,7 @@ public func fuzzMain(_ targets: [FuzzTarget]) -> Never {
     case "worker": worker(target, Options(rest))
     case "run": runOnce(target, rest)
     case "min": minimise(target, rest)
+
     default:
         print("unknown mode")
         exit(2)
@@ -311,14 +333,14 @@ public func fuzzMain(_ targets: [FuzzTarget]) -> Never {
 func runOnce(_ target: FuzzTarget, _ args: [String]) -> Never {
     var files: [String] = []
     var timeout = 2.0
-    var rss = 2048
+    var rss = 2_048
     var i = 0
     while i < args.count {
         if args[i] == "--timeout", i + 1 < args.count {
             timeout = Double(args[i + 1]) ?? 2
             i += 1
         } else if args[i] == "--rss", i + 1 < args.count {
-            rss = Int(args[i + 1]) ?? 2048
+            rss = Int(args[i + 1]) ?? 2_048
             i += 1
         } else {
             files.append(args[i])
@@ -340,7 +362,7 @@ func runOnce(_ target: FuzzTarget, _ args: [String]) -> Never {
         fz_exec_begin()
         autoreleasepool { target.run(d) }
         fz_exec_end()
-        print("ok \(f) \(d.count) bytes \(String(format: "%.1f", (fz_now() - t) * 1000)) ms")
+        print("ok \(f) \(d.count) bytes \(String(format: "%.1f", (fz_now() - t) * 1_000)) ms")
     }
     removeWork(fzWorkDir)
     exit(0)
@@ -401,7 +423,7 @@ func worker(_ target: FuzzTarget, _ o: Options) -> Never {
         guard force || now - lastStat > 0.5 else { return }
         lastStat = now
         let text =
-            "execs \(execs)\nedges \(fz_cov_edges())\nslowest_ms \(String(format: "%.2f", slowest * 1000))\nslowest_ms_per_kb \(String(format: "%.3f", slowestPerKB * 1000))\nnote \(note)\n"
+            "execs \(execs)\nedges \(fz_cov_edges())\nslowest_ms \(String(format: "%.2f", slowest * 1_000))\nslowest_ms_per_kb \(String(format: "%.3f", slowestPerKB * 1_000))\nnote \(note)\n"
         ftruncate(statFD, 0)
         _ = text.withCString { pwrite(statFD, $0, strlen($0), 0) }
     }
@@ -428,7 +450,7 @@ func worker(_ target: FuzzTarget, _ o: Options) -> Never {
                 writeFile(out + "/slow/slowest.bin", d)
             }
         }
-        if d.count >= 512 { slowestPerKB = max(slowestPerKB, dt / (Double(d.count) / 1024)) }
+        if d.count >= 512 { slowestPerKB = max(slowestPerKB, dt / (Double(d.count) / 1_024)) }
         stat()
         return fz_cov_collect() != 0
     }
@@ -460,8 +482,8 @@ func worker(_ target: FuzzTarget, _ o: Options) -> Never {
             (try? String(contentsOfFile: progressPath, encoding: .utf8))?.trimmingCharacters(
                 in: .whitespacesAndNewlines) ?? "0") ?? 0
     var index = 0
-    outer: for d in seedInputs.prefix(seedCount) where d.count <= 6000 {
-        let step = max(1, d.count / 1500)
+    outer: for d in seedInputs.prefix(seedCount) where d.count <= 6_000 {
+        let step = max(1, d.count / 1_500)
         var len = 0
         while len < d.count {
             if index >= progress {
@@ -480,7 +502,7 @@ func worker(_ target: FuzzTarget, _ o: Options) -> Never {
     try? String(max(progress, index)).write(toFile: progressPath, atomically: false, encoding: .utf8)
 
     // Stage 2: random stacked mutations.
-    var rng = Rng(o.seed &* 0x1234_5678_9ABC &+ UInt64(getpid()) &+ UInt64(Date().timeIntervalSince1970 * 1000))
+    var rng = Rng(o.seed &* 0x1234_5678_9ABC &+ UInt64(getpid()) &+ UInt64(Date().timeIntervalSince1970 * 1_000))
     var baseRSS = fz_rss()
     while fz_now() < deadline, execs < o.maxExecs {
         // newer corpus entries are picked more often
@@ -504,7 +526,7 @@ func worker(_ target: FuzzTarget, _ o: Options) -> Never {
         }
         if d.count > target.maxLen { d.removeSubrange(target.maxLen...) }
         if exec(d), guided { keep(d) }
-        if execs % 2048 == 0 {
+        if execs % 2_048 == 0 {
             // a worker that has grown a lot (leaks, caches) is replaced by a fresh one
             let r = fz_rss()
             if baseRSS == 0 { baseRSS = r }

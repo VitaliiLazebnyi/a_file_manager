@@ -90,7 +90,7 @@ public struct DiffOptions: Equatable, Codable {
         guard lines.count >= 20_000 else { return lines.map(hash) }
         let size = max(2_000, lines.count / (ProcessInfo.processInfo.activeProcessorCount * 4))
         let ranges = stride(from: 0, to: lines.count, by: size).map { $0..<min($0 + size, lines.count) }
-        return Parallel.map(ranges) { lines[$0].map(self.hash) }.flatMap { $0 }
+        return Parallel.map(ranges) { lines[$0].map(hash) }.flatMap { $0 }
     }
 }
 
@@ -128,7 +128,7 @@ public struct TextDiff: Equatable {
         left: [TextLine], right: [TextLine], options: DiffOptions = DiffOptions(),
         anchors: [(left: Int, right: Int)] = [], costLimit: Int? = nil,
         cancellation: CancellationFlag? = nil
-    ) -> TextDiff {
+    ) -> Self {
         let keys = Parallel.map([left, right]) { options.hashes($0) }
         let (leftKeys, rightKeys) = (keys[0], keys[1])
         var rows: [DiffRow] = []
@@ -181,7 +181,7 @@ public struct TextDiff: Equatable {
                 rows[index] = DiffRow(left: one, right: two, kind: .changed)
             }
         }
-        return TextDiff(rows: rows, blocks: TextDiff.blocks(of: rows))
+        return Self(rows: rows, blocks: Self.blocks(of: rows))
     }
 
     static func blocks(of rows: [DiffRow]) -> [Range<Int>] {
@@ -201,7 +201,7 @@ public struct TextDiff: Equatable {
 
     /// The lines of the right text put together from the rows: the right file again, which is
     /// what makes a set of rows a correct diff.
-    public func rebuiltRight<Line>(left: [Line], right: [Line]) -> [Line] {
+    public func rebuiltRight<Line>(left _: [Line], right: [Line]) -> [Line] {
         rows.compactMap { row in
             switch row.kind {
             case .equal, .changed, .added: return row.right.map { right[$0] }
@@ -213,7 +213,7 @@ public struct TextDiff: Equatable {
     // MARK: Inside a line
 
     /// The within-line comparison covers this many characters (spec 09 › Comparison rules).
-    public static let inlineLimit = 4096
+    public static let inlineLimit = 4_096
 
     /// The parts of two differing lines that differ, as ranges of UTF-16 units. After a
     /// difference the comparison only picks up again where at least `minimumMatch` characters
@@ -320,12 +320,12 @@ public struct BinaryDiff: Equatable {
     /// Compares on all cores: the lines are dealt out in large pieces, and each piece reports
     /// its differing stretches.
     public static func compute(left: Data, right: Data, bytesPerLine: Int = 16, cancellation: CancellationFlag? = nil)
-        -> BinaryDiff
+        -> Self
     {
         let width = max(1, bytesPerLine)
         let rowCount = (max(left.count, right.count) + width - 1) / width
         let common = min(left.count, right.count)
-        let pieceRows = max(4096, rowCount / (ProcessInfo.processInfo.activeProcessorCount * 4) + 1)
+        let pieceRows = max(4_096, rowCount / (ProcessInfo.processInfo.activeProcessorCount * 4) + 1)
         let pieces = stride(from: 0, to: rowCount, by: pieceRows).map { $0..<min($0 + pieceRows, rowCount) }
 
         let found: [(blocks: [Range<Int>], bytes: Int)] = left.withUnsafeBytes { first in
@@ -366,7 +366,7 @@ public struct BinaryDiff: Equatable {
                 blocks.append(block)
             }
         }
-        return BinaryDiff(
+        return Self(
             bytesPerLine: width, leftCount: left.count, rightCount: right.count, blocks: blocks,
             differingBytes: found.reduce(0) { $0 + $1.bytes })
     }
@@ -400,7 +400,7 @@ public struct BinaryDiff: Equatable {
         return (0..<bytesPerLine).filter { offset in
             let position = from + offset
             let (inLeft, inRight) = (position < left.count, position < right.count)
-            if inLeft && inRight { return left[left.startIndex + position] != right[right.startIndex + position] }
+            if inLeft, inRight { return left[left.startIndex + position] != right[right.startIndex + position] }
             return inLeft != inRight
         }
     }

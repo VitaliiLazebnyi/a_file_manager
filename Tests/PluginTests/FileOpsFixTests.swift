@@ -76,7 +76,7 @@ final class OddFileSystem: FileSystemProvider {
     func move(_ source: URL, to destination: URL, replacing: Bool) throws {
         try base.move(source, to: destination, replacing: replacing)
     }
-    func copy(_ source: URL, to destination: URL, progress: (Int64) -> Bool) throws {
+    func copy(_: URL, to _: URL, progress _: (Int64) -> Bool) throws {
         throw FileSystemError.crossesVolumes
     }
     func displayPath(_ url: URL) -> String { base.displayPath(url) }
@@ -88,15 +88,15 @@ final class OddFileSystem: FileSystemProvider {
 final class RetryOnce: FileJobDelegate {
     private let lock = NSLock()
     private(set) var errors: [String] = []
-    func job(_ job: FileJob, progress: JobProgress) {}
-    func job(_ job: FileJob, conflictAt target: FileItem, source: FileItem) -> ConflictChoice { .overwrite }
-    func job(_ job: FileJob, failedAt url: URL, error: Error) -> ErrorChoice {
+    func job(_: FileJob, progress _: JobProgress) {}
+    func job(_: FileJob, conflictAt _: FileItem, source _: FileItem) -> ConflictChoice { .overwrite }
+    func job(_: FileJob, failedAt _: URL, error: Error) -> ErrorChoice {
         lock.withLock {
             errors.append(error.localizedDescription)
             return errors.count == 1 ? .retry : .skip
         }
     }
-    func job(_ job: FileJob, confirmDeleteNonEmpty directory: URL) -> FolderDeleteChoice { .delete }
+    func job(_: FileJob, confirmDeleteNonEmpty _: URL) -> FolderDeleteChoice { .delete }
 }
 
 private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
@@ -247,7 +247,7 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
         #expect(result.completed.isEmpty && !odd.removed.contains(odd.base.url("/d")))
     }
 
-    @Test func deletingNeverFollowsAHostileName() throws {
+    @Test func deletingNeverFollowsAHostileName() {
         let fileSystems = FileSystemRegistry()
         let odd = OddFileSystem()
         fileSystems.register(odd)
@@ -261,7 +261,7 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
 
     // MARK: F6
 
-    @Test func onlyAPlaceWithoutATrashOffersPermanentDeletion() throws {
+    @Test func onlyAPlaceWithoutATrashOffersPermanentDeletion() {
         let fileSystems = FileSystemRegistry()
         let odd = OddFileSystem()
         fileSystems.register(odd)
@@ -286,7 +286,7 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
                 && !odd.base.exists("/a/one.txt"))
     }
 
-    @Test func aFailedTrashCanBeRetried() throws {
+    @Test func aFailedTrashCanBeRetried() {
         let fileSystems = FileSystemRegistry()
         let odd = OddFileSystem()
         fileSystems.register(odd)
@@ -451,7 +451,7 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
 
     // MARK: F14
 
-    @Test func olderMeansOlderByMoreThanTheGranularityOfTheTarget() throws {
+    @Test func olderMeansOlderByMoreThanTheGranularityOfTheTarget() {
         let (fileSystems, memory) = makeFileSystems()
         let base = Date(timeIntervalSince1970: 1_000_000)
         memory.addFile("/a/near.txt", "new", modified: base.addingTimeInterval(1.5))
@@ -467,7 +467,7 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
         #expect(memory.contents("/b/near.txt") == "old" && memory.contents("/b/far.txt") == "new")
     }
 
-    @Test func olderOrSameKeepsAnOlderTargetOnlyBeyondTheTolerance() throws {
+    @Test func olderOrSameKeepsAnOlderTargetOnlyBeyondTheTolerance() {
         let (fileSystems, memory) = makeFileSystems()
         let base = Date(timeIntervalSince1970: 1_000_000)
         memory.addFile("/a/near.txt", "new", modified: base)
@@ -591,7 +591,7 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
         #expect(!bench.ui.log.contains { $0.hasPrefix("inform") })
     }
 
-    @Test func renamingOntoAnotherFileWhoseNameDiffersInCaseIsRefused() throws {
+    @Test func renamingOntoAnotherFileWhoseNameDiffersInCaseIsRefused() {
         // A file system that tells the two names apart, as a case-sensitive volume does.
         let memory = MemoryFileSystem()
         memory.addFile("/A/readme", "first")
@@ -624,7 +624,7 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
 
     @Test func theToolbarAsksWithoutBuildingTheListOfOperands() throws {
         let box = try Sandbox()
-        for index in 0..<2000 { try box.file("A/f\(index).txt", "x") }
+        for index in 0..<2_000 { try box.file("A/f\(index).txt", "x") }
         try box.folder("B")
         let mac = MacIntegrationPlugin(
             launchesApplications: false, pasteboard: NSPasteboard.withUniqueName(), applications: { _ in [] })
@@ -676,7 +676,7 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
             plugins: [SelectionPlugin(), mac], fileSystems: [LocalFileSystem()], left: box.url("A"),
             right: box.url("B"))
         bench.left.moveCursor(toName: "notes.txt")
-        for _ in 0..<1000 { bench.commands.perform(MacIntegrationPlugin.openWithDefault) }
+        for _ in 0..<1_000 { bench.commands.perform(MacIntegrationPlugin.openWithDefault) }
         #expect(mac.opened.count <= 256 && mac.log.count <= 512 && mac.log.last?.hasPrefix("open ") == true)
     }
 
@@ -706,7 +706,7 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
             .year,
             from: (try? FileManager.default.attributesOfItem(atPath: inner.path)[.modificationDate] as? Date) ?? Date()
         )
-        #expect(year == 2001)
+        #expect(year == 2_001)
     }
 
     @Test func pressingOKOnALockedFileDoesNotUnlockIt() throws {
@@ -779,12 +779,12 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
         let memory = MemoryFileSystem()
         let fileSystems = FileSystemRegistry()
         fileSystems.register(memory)
-        memory.addFile("/A/descript.ion", String(repeating: "x", count: 17 * 1024 * 1024))
+        memory.addFile("/A/descript.ion", String(repeating: "x", count: 17 * 1_024 * 1_024))
         let store = CommentStore(fileSystems: fileSystems)
         #expect(throws: (any Error).self) {
             try store.setComment("x", for: "one.txt", in: memory.url("/A"), hidden: false)
         }
-        #expect(memory.contents("/A/descript.ion")?.count == 17 * 1024 * 1024)
+        #expect(memory.contents("/A/descript.ion")?.count == 17 * 1_024 * 1_024)
     }
 
     // MARK: F12

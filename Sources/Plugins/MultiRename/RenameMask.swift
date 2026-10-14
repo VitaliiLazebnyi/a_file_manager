@@ -100,14 +100,17 @@ struct CharacterRange: Equatable {
         case .single:
             last = start
             width = 1
+
         case .toEnd:
             last = count - 1
+
         case .position(let position):
             // After a start counted from the end, the end is counted from the end as well:
             // `[N-8-5]` is the 8th-last to the 5th-last character.
             let position = first < 0 && position > 0 ? -position : position
             last = index(position)
             if (first < 0) == (position < 0) { width = abs(position - first) + 1 }
+
         case .length(let length):
             last = start + length - 1
             width = length
@@ -224,7 +227,7 @@ struct RenameMask {
                 tokens.append(.invalid(.invalidPlaceholder(String(characters[position...]))))
                 break
             }
-            tokens += RenameMask.commands(Array(characters[(position + 1)..<close]))
+            tokens += Self.commands(Array(characters[(position + 1)..<close]))
             position = close + 1
         }
         flush()
@@ -341,6 +344,7 @@ struct RenameMask {
                 case "X":
                     let optional = scanner.accept("+")
                     tokens.append(.text(.clipboard(optional: optional), scanner.startsRange ? scanner.range() : nil))
+
                 case "B":
                     let fromLeft = scanner.accept("+")
                     guard let level = scanner.number() else { return fail() }
@@ -350,17 +354,22 @@ struct RenameMask {
                         range = parsed
                     }
                     tokens.append(.text(fromLeft ? .folderFromLeft(level) : .folderFromRight(level), range))
+
                 case "S":
                     tokens.append(.size)
+
                 case "I":
                     tokens.append(.folderDot(scanner.accept("1") ? true : scanner.accept("0") ? false : nil))
+
                 case "C":
                     guard let counter = inlineCounter(&scanner) else { return fail() }
                     tokens.append(.counter(counter.isInline ? counter.definition : nil))
+
                 case "c":
                     let kind = scanner.isDigit() ? scanner.number() ?? 1 : 1
                     guard (1...3).contains(kind) else { return fail() }
                     tokens.append(.count(kind))
+
                 case "T":
                     guard let source = scanner.next().flatMap({ Int(String($0)) }), (1...4).contains(source) else {
                         return fail()
@@ -374,8 +383,10 @@ struct RenameMask {
                         offset = TimeOffset(value: negative ? -value : value, unit: unit)
                     }
                     tokens.append(.timeSource(source, offset))
+
                 case "u":
                     tokens.append(.precompose)
+
                 case "%":
                     var name = ""
                     while let next = scanner.peek(), next != "%" {
@@ -391,8 +402,10 @@ struct RenameMask {
                     } else {
                         tokens.append(.text(.environment(name, .whole), nil))
                     }
+
                 case "=":
                     return fail(.contentPluginsUnavailable)
+
                 default:
                     return fail()
                 }
@@ -494,9 +507,11 @@ extension RenameMask {
             switch state.timeSource {
             case 2: date = context.opened
             case 3: date = context.changed
+
             case 4:
                 guard let found = context.contentDate?(subject) else { throw RenameMaskError.noContentDate }
                 date = found
+
             default: date = subject.modified
             }
             if let offset = state.timeOffset {
@@ -520,24 +535,31 @@ extension RenameMask {
             switch token {
             case .literal(let literal):
                 text = literal
+
             case .text(let source, let range):
-                let value = try RenameMask.value(of: source, subject, context, state)
+                let value = try Self.value(of: source, subject, context, state)
                 text = range?.apply(to: value) ?? value
+
             case .size:
                 text = String(subject.size)
+
             case .counter(let inline):
-                text = try RenameMask.counterText(inline, index: index, context: context)
+                text = try Self.counterText(inline, index: index, context: context)
+
             case .count(let kind):
                 switch kind {
                 case 2:
-                    text = RenameMask.padded(context.count, digits: RenameMask.width(context.counter.digits, context))
+                    text = Self.padded(context.count, digits: Self.width(context.counter.digits, context))
+
                 case 3:
-                    text = RenameMask.padded(
-                        try RenameMask.number(
+                    text = Self.padded(
+                        try Self.number(
                             context.counter.start, plus: context.counter.step, times: max(context.count - 1, 0)),
-                        digits: RenameMask.width(context.counter.digits, context))
+                        digits: Self.width(context.counter.digits, context))
+
                 default: text = String(context.count)
                 }
+
             case .date(let field):
                 let (components, date) = try moment()
                 let hour = components.hour ?? 0
@@ -553,18 +575,23 @@ extension RenameMask {
                 case .millisecond: text = String(format: "%03d", min(999, (components.nanosecond ?? 0) / 1_000_000))
                 case .amPm: text = hour < 12 ? "am" : "pm"
                 case .amPmShort: text = hour < 12 ? "a" : "p"
-                case .date: text = RenameMask.nameSafe(formats.date.string(from: date))
-                case .time: text = RenameMask.nameSafe(formats.time.string(from: date))
+                case .date: text = Self.nameSafe(formats.date.string(from: date))
+                case .time: text = Self.nameSafe(formats.time.string(from: date))
                 }
+
             case .timeSource(let source, let offset):
                 state.timeSource = source
                 state.timeOffset = offset
+
             case .letterCase(let newCase):
                 letterCase = newCase
+
             case .precompose:
                 precompose = true
+
             case .folderDot(let setting):
                 state.foldersHaveNoExtension = setting ?? !state.foldersHaveNoExtension
+
             case .invalid(let error):
                 throw error
             }
@@ -583,7 +610,7 @@ extension RenameMask {
     /// Name and extension as the masks see them: split at the last dot, also for folders
     /// unless `[I]` is on.
     static func parts(of subject: RenameSubject, _ state: MaskState) -> (name: String, ext: String) {
-        if subject.isFolder && state.foldersHaveNoExtension { return (subject.name, "") }
+        if subject.isFolder, state.foldersHaveNoExtension { return (subject.name, "") }
         // As in `FileItem.split`: a leading dot starts no extension, a trailing dot ends none
         // (`Acme Inc.` keeps its dot in the name).
         guard let dot = subject.name.lastIndex(of: "."), dot != subject.name.startIndex,
@@ -607,9 +634,11 @@ extension RenameMask {
         case .parent: return fromRight(0)
         case .grandparent: return fromRight(1)
         case .folderFromRight(let level): return fromRight(level)
+
         // `[B+0]` is the drive letter on Windows; a Mac path has nothing in that place.
         case .folderFromLeft(let level):
             return level >= 1 && folders.indices.contains(level - 1) ? folders[level - 1] : ""
+
         case .clipboard(let optional):
             guard let text = context.clipboard ?? context.clipboardLoader?(), !text.isEmpty else {
                 if optional { return "" }
@@ -617,11 +646,13 @@ extension RenameMask {
             }
             let firstLine = text.split(whereSeparator: \.isNewline).first.map(String.init) ?? ""
             return String(firstLine.map { "*?:\\|\"<>/".contains($0) ? "_" : $0 })
+
         case .environment(let name, let form):
             let value = context.environment[name] ?? ""
             switch form {
             case .whole: return value
             case .lastPart: return value.split(whereSeparator: { $0 == "/" || $0 == "\\" }).last.map(String.init) ?? ""
+
             case .separator(let separator):
                 return String(value.compactMap { $0 == ":" ? nil : ($0 == "/" || $0 == "\\") ? separator : $0 })
             }

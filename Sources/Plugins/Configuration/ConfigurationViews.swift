@@ -65,7 +65,10 @@ final class RowsTable: NSScrollView, NSTableViewDataSource, NSTableViewDelegate 
         var onReturn: (() -> Void)?
 
         override func keyDown(with event: NSEvent) {
-            if event.keyCode == 36 || event.keyCode == 76, let onReturn { return onReturn() }
+            if event.keyCode == 36 || event.keyCode == 76, let onReturn {
+                onReturn()
+                return
+            }
             super.keyDown(with: event)
         }
     }
@@ -103,7 +106,7 @@ final class RowsTable: NSScrollView, NSTableViewDataSource, NSTableViewDelegate 
         translatesAutoresizingMaskIntoConstraints = false
     }
 
-    required init?(coder: NSCoder) { fatalError("not used") }
+    required init?(coder _: NSCoder) { fatalError("not used") }
 
     var tableView: NSTableView { table }
 
@@ -129,9 +132,9 @@ final class RowsTable: NSScrollView, NSTableViewDataSource, NSTableViewDelegate 
         selectedRow = selected.map { min($0, rows.count - 1) }
     }
 
-    func numberOfRows(in tableView: NSTableView) -> Int { rows.count }
+    func numberOfRows(in _: NSTableView) -> Int { rows.count }
 
-    func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
+    func tableView(_: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
         let column = tableColumn.flatMap { Int($0.identifier.rawValue) } ?? 0
         let label = NSTextField(labelWithString: rows[row].indices.contains(column) ? rows[row][column] : "")
         label.lineBreakMode = .byTruncatingTail
@@ -159,7 +162,7 @@ final class RowsTable: NSScrollView, NSTableViewDataSource, NSTableViewDelegate 
         return cell
     }
 
-    func tableViewSelectionDidChange(_ notification: Notification) { onSelect() }
+    func tableViewSelectionDidChange(_: Notification) { onSelect() }
 
     @objc private func doubleClicked() {
         if table.clickedRow >= 0 { onActivate() }
@@ -191,7 +194,7 @@ final class TextWindowController: NSWindowController {
         window.contentView = scroll
     }
 
-    required init?(coder: NSCoder) { fatalError("not used") }
+    required init?(coder _: NSCoder) { fatalError("not used") }
 
     func show(_ text: String) {
         textView.string = text

@@ -424,18 +424,18 @@ func snapshot(_ folder: URL) -> [String: Data?] {
         #expect(contents.isZip64 && contents.records.count == 4)
         #expect(runTool("/usr/bin/unzip", ["-tq", small.url.path]).status == 0)
         // A member larger than the size fields, and members behind an offset that does not fit.
-        let large = try write([5000, 300, 300], limits: ZipLimits(maxField: 1000, maxEntries: 100))
+        let large = try write([5_000, 300, 300], limits: ZipLimits(maxField: 1_000, maxEntries: 100))
         #expect(large.zip64)
         contents = try ZipDirectory.read(RandomAccessFile(large.url))
-        #expect(contents.records.map(\.uncompressedSize) == [5000, 300, 300])
+        #expect(contents.records.map(\.uncompressedSize) == [5_000, 300, 300])
         let check = runTool("/usr/bin/unzip", ["-tq", large.url.path])
         #expect(check.status == 0, "\(check.output)")
         let opened = try bench.store.archive(at: large.url)
         #expect(ArchiveTester.test(opened, cancellation: CancellationFlag()).isEmpty)
-        #expect(try bench.read(bench.inside(large.url, "file0.txt")) == Data(repeating: 65, count: 5000))
+        #expect(try bench.read(bench.inside(large.url, "file0.txt")) == Data(repeating: 65, count: 5_000))
 
         // Changing such an archive keeps it readable.
-        bench.environment.limits = ZipLimits(maxField: 1000, maxEntries: 100)
+        bench.environment.limits = ZipLimits(maxField: 1_000, maxEntries: 100)
         try bench.zip.remove(bench.inside(large.url, "file1.txt"))
         try bench.store.flush(large.url)
         #expect(runTool("/usr/bin/unzip", ["-tq", large.url.path]).status == 0)
@@ -525,7 +525,7 @@ func snapshot(_ folder: URL) -> [String: Data?] {
         // One byte in the middle of the stored random data is flipped.
         var bytes = try Data(contentsOf: archive)
         let needle = try Data(contentsOf: tree.appendingPathComponent("sub/random.bin")).prefix(64)
-        let position = try #require(bytes.range(of: needle)).lowerBound + 1000
+        let position = try #require(bytes.range(of: needle)).lowerBound + 1_000
         bytes[position] ^= 0xFF
         try bytes.write(to: archive)
         opened = try bench.store.archive(at: archive)
@@ -543,7 +543,7 @@ func snapshot(_ folder: URL) -> [String: Data?] {
         try bench.pack([tree], to: box.url("deflated.zip"))
         var deflated = try Data(contentsOf: box.url("deflated.zip"))
         let log = try #require(deflated.range(of: Data("tree/big.log".utf8))).upperBound
-        deflated.replaceSubrange((log + 2000)..<(log + 2040), with: Data(repeating: 0x55, count: 40))
+        deflated.replaceSubrange((log + 2_000)..<(log + 2_040), with: Data(repeating: 0x55, count: 40))
         try deflated.write(to: box.url("deflated.zip"))
         let broken = ArchiveTester.test(
             try bench.store.archive(at: box.url("deflated.zip")), cancellation: CancellationFlag())
@@ -581,7 +581,7 @@ func snapshot(_ folder: URL) -> [String: Data?] {
         #expect(file.name == "über.txt" && file.permissions == 0o444)
         #expect(
             Calendar.current.dateComponents([.year, .month, .day, .hour], from: file.modified)
-                == DateComponents(year: 2021, month: 1, day: 1, hour: 12))
+                == DateComponents(year: 2_021, month: 1, day: 1, hour: 12))
         try bench.unpack(url, to: box.url("safe/inner"))
         #expect(
             box.exists("safe/inner/DIR/über.txt") && !box.exists("safe/inner/evil.txt") && !box.exists("evil.txt")
@@ -609,7 +609,7 @@ func snapshot(_ folder: URL) -> [String: Data?] {
         header.size = 0o100000000000
         let blocks = header.encoded()
         #expect(blocks.count == 3 * 512)
-        let reader = TarReader(DataStream(blocks + Data(count: 1024)))
+        let reader = TarReader(DataStream(blocks + Data(count: 1_024)))
         let read = try #require(try reader.next())
         #expect(read.path == unsplittable && read.size == 0o100000000000)
         parsed = try #require(TarHeader.parse(TarHeader(path: "dir", kind: .directory).encoded()))
@@ -661,7 +661,7 @@ func snapshot(_ folder: URL) -> [String: Data?] {
         // More than the compressors hold before they write: the member stays open across rounds.
         let megabytes = ProcessInfo.processInfo.activeProcessorCount * 2 + 3
         var block = Data()
-        for index in 0..<16_384 { block.append(Data(String(format: "%07d %055d\n", index, index &* 7919).utf8)) }
+        for index in 0..<16_384 { block.append(Data(String(format: "%07d %055d\n", index, index &* 7_919).utf8)) }
         #expect(block.count == 1 << 20)
         let handle = try FileHandle(forWritingTo: try box.file("huge.dat", ""))
         for round in 0..<megabytes {
@@ -706,7 +706,7 @@ func snapshot(_ folder: URL) -> [String: Data?] {
         // A tool that fails says why.
         let failing = try ProcessStream(
             Tool.bsdtar, ["-cf", "-", "--format", "pax", "@" + box.url("missing.7z").path])
-        #expect(throws: ArchiveError.self) { while try failing.read(upToCount: 4096) != nil {} }
+        #expect(throws: ArchiveError.self) { while try failing.read(upToCount: 4_096) != nil {} }
         // Arguments reach the tool as they are: no shell reads the name.
         let odd = try box.file("odd $(touch pwned) ; name's \"x\".txt", "odd")
         #expect(runTool("/usr/bin/bzip2", ["-k", odd.path]).status == 0)

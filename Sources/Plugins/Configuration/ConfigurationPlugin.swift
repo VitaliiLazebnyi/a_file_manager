@@ -50,7 +50,7 @@ public final class ConfigurationPlugin: Plugin {
         self.launchesApplications = launchesApplications
         self.background = background
         // Lists of this process go to a folder of its own, so another running instance is left alone.
-        self.listFolder = listFolder ?? ConfigurationPlugin.listsParent.appendingPathComponent(String(getpid()))
+        self.listFolder = listFolder ?? Self.listsParent.appendingPathComponent(String(getpid()))
         sweepsStaleFolders = listFolder == nil
         self.settingsKeys = settingsKeys
     }
@@ -80,12 +80,12 @@ public final class ConfigurationPlugin: Plugin {
         let runner = CommandRunner(
             kernel: kernel, launchesApplications: launchesApplications, background: background, listFolder: listFolder
         )
-        let keys = settingsKeys ?? { [unowned kernel] in ConfigurationPlugin.storedKeys(of: kernel.settings) }
+        let keys = settingsKeys ?? { [unowned kernel] in Self.storedKeys(of: kernel.settings) }
         let center = ConfigurationCenter(kernel: kernel, runner: runner, enumeratedKeys: keys)
         self.center = center
         runner.removeListFiles()
         if sweepsStaleFolders {
-            let parent = ConfigurationPlugin.listsParent
+            let parent = Self.listsParent
             runner.offMain({ CommandRunner.removeStaleListFolders(in: parent) }, then: { _ in })
         }
 
@@ -100,7 +100,7 @@ public final class ConfigurationPlugin: Plugin {
             kernel.menus.add(section, to: MenuSection(.start, order: 10 + index))
         }
         kernel.menus.add(
-            [ConfigurationPlugin.changeStartMenu, ConfigurationPlugin.stopUserCommands],
+            [Self.changeStartMenu, Self.stopUserCommands],
             to: MenuSection(.start, order: 10_000))
     }
 
@@ -110,50 +110,50 @@ public final class ConfigurationPlugin: Plugin {
             commands.register(Command(id, title, shortcuts, runsDuringJobs: true), open)
         }
         window(.configuration, "Options…", [.cmd(",")]) { center.showOptions(.first) }
-        window(ConfigurationPlugin.redefineHotkeys, "Redefine Hotkeys…") { center.showOptions(.keyboard) }
-        window(ConfigurationPlugin.buttonBarConfig, "Button Bar…") { center.showOptions(.buttonBar) }
-        window(ConfigurationPlugin.changeStartMenu, "Change Start Menu…") { center.showOptions(.startMenu) }
-        window(ConfigurationPlugin.commandBrowser, "Choose Command…") { center.browser().show() }
-        window(ConfigurationPlugin.userCommands, "User Commands…") {
+        window(Self.redefineHotkeys, "Redefine Hotkeys…") { center.showOptions(.keyboard) }
+        window(Self.buttonBarConfig, "Button Bar…") { center.showOptions(.buttonBar) }
+        window(Self.changeStartMenu, "Change Start Menu…") { center.showOptions(.startMenu) }
+        window(Self.commandBrowser, "Choose Command…") { center.browser().show() }
+        window(Self.userCommands, "User Commands…") {
             center.browser().show(category: CommandRow.userCategory)
         }
-        window(ConfigurationPlugin.newUserCommand, "New User Command…") { _ = center.editUserCommand(nil) }
-        window(ConfigurationPlugin.keyboardHelp, "Keyboard Shortcuts") {
+        window(Self.newUserCommand, "New User Command…") { _ = center.editUserCommand(nil) }
+        window(Self.keyboardHelp, "Keyboard Shortcuts") {
             center.showText(center.keyboardHelp(), title: "Keyboard Shortcuts")
         }
-        window(ConfigurationPlugin.helpIndex, "What Is Where") {
+        window(Self.helpIndex, "What Is Where") {
             center.showText(center.whatIsWhere(), title: "What Is Where")
         }
-        window(ConfigurationPlugin.about, "About \(kernel.productName)") { NSApp?.orderFrontStandardAboutPanel(nil) }
+        window(Self.about, "About \(kernel.productName)") { NSApp?.orderFrontStandardAboutPanel(nil) }
 
         kernel.menus.add([.configuration], to: .configurationOptions)
         kernel.menus.add(
             [
-                ConfigurationPlugin.redefineHotkeys, ConfigurationPlugin.buttonBarConfig,
-                ConfigurationPlugin.commandBrowser,
-                ConfigurationPlugin.userCommands, ConfigurationPlugin.newUserCommand
+                Self.redefineHotkeys, Self.buttonBarConfig,
+                Self.commandBrowser,
+                Self.userCommands, Self.newUserCommand
             ], to: .configurationCustomize)
         kernel.menus.add(
-            [ConfigurationPlugin.helpIndex, ConfigurationPlugin.keyboardHelp, ConfigurationPlugin.about],
+            [Self.helpIndex, Self.keyboardHelp, Self.about],
             to: .helpTopics)
         kernel.toolbar.setSymbol("gearshape", for: .configuration)
-        kernel.toolbar.setSymbol("keyboard", for: ConfigurationPlugin.keyboardHelp)
-        kernel.toolbar.setSymbol("command", for: ConfigurationPlugin.commandBrowser)
+        kernel.toolbar.setSymbol("keyboard", for: Self.keyboardHelp)
+        kernel.toolbar.setSymbol("command", for: Self.commandBrowser)
     }
 
     /// Save, export, import and reset (spec 19 › Save Position, Save Settings, adapted: the Mac
     /// stores a setting the moment it changes, so there is little left to save by hand).
     private func registerSettingsCommands(_ center: ConfigurationCenter, in kernel: Kernel) {
         let commands = kernel.commands
-        commands.register(Command(ConfigurationPlugin.savePosition, "Save Position", runsDuringJobs: true)) {
+        commands.register(Command(Self.savePosition, "Save Position", runsDuringJobs: true)) {
             center.savePosition()
         }
-        commands.register(Command(ConfigurationPlugin.saveSettings, "Save Settings", runsDuringJobs: true)) {
+        commands.register(Command(Self.saveSettings, "Save Settings", runsDuringJobs: true)) {
             center.saveSettingsNow()
         }
         // `.location`: the file to write or read; without, the user is asked for it.
         commands.register(
-            Command(ConfigurationPlugin.exportSettings, "Export Settings…", runsDuringJobs: true),
+            Command(Self.exportSettings, "Export Settings…", runsDuringJobs: true),
             parameterized: { argument in
                 // With a file given, the export holds the settings alone and says so afterwards.
                 if let url = argument.location {
@@ -161,30 +161,30 @@ public final class ConfigurationPlugin: Plugin {
                     return center.exportSettings(to: url)
                 }
                 guard let options = center.askExportOptions(),
-                    let url = ConfigurationPlugin.askForFile(saving: true, kernel.productName),
+                    let url = Self.askForFile(saving: true, kernel.productName),
                     url.isFileURL
                 else { return }
                 center.exportSettings(to: url, options: options, tellsWhatIsIncluded: false)
             })
         commands.register(
-            Command(ConfigurationPlugin.importSettings, "Import Settings…"),
+            Command(Self.importSettings, "Import Settings…"),
             parameterized: { argument in
-                guard let url = argument.location ?? ConfigurationPlugin.askForFile(saving: false, kernel.productName),
+                guard let url = argument.location ?? Self.askForFile(saving: false, kernel.productName),
                     url.isFileURL
                 else { return }
                 center.importSettings(from: url)
             })
-        commands.register(Command(ConfigurationPlugin.resetSettings, "Reset All Settings…")) { center.resetSettings() }
+        commands.register(Command(Self.resetSettings, "Reset All Settings…")) { center.resetSettings() }
         // A chain of commands that waits (`cm_wait`, a program it started) can be ended.
         commands.register(
-            Command(ConfigurationPlugin.stopUserCommands, "Stop Waiting User Commands", runsDuringJobs: true),
+            Command(Self.stopUserCommands, "Stop Waiting User Commands", runsDuringJobs: true),
             enabled: { center.runner.isWaiting }
         ) { center.runner.stopWaiting() }
-        kernel.menus.add([ConfigurationPlugin.savePosition, ConfigurationPlugin.saveSettings], to: .configurationSave)
+        kernel.menus.add([Self.savePosition, Self.saveSettings], to: .configurationSave)
         kernel.menus.add(
             [
-                ConfigurationPlugin.exportSettings, ConfigurationPlugin.importSettings,
-                ConfigurationPlugin.resetSettings
+                Self.exportSettings, Self.importSettings,
+                Self.resetSettings
             ],
             to: MenuSection(.configuration, order: 40))
     }

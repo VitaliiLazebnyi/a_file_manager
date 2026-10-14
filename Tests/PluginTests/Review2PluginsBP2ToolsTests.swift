@@ -57,8 +57,8 @@ import Testing
 
     @Test func feedingBLAKE3InSmallPiecesGivesTheSameDigest() {
         // The piece is smaller than what BLAKE3 spreads over threads (16 chunks of 1 KB).
-        #expect(ChecksumRun.serialPiece < 16 * 1024)
-        for size in [0, 1, 1023, 1024, 8191, 8192, 8193, 100_000, (1 << 20) + 7, 3 << 20] {
+        #expect(ChecksumRun.serialPiece < 16 * 1_024)
+        for size in [0, 1, 1_023, 1_024, 8_191, 8_192, 8_193, 100_000, (1 << 20) + 7, 3 << 20] {
             let block = Data((0..<size).map { UInt8(truncatingIfNeeded: $0 &* 31 &+ $0 >> 8) })
             let whole = BLAKE3Hasher()
             let spread = BLAKE3Hasher()
@@ -109,7 +109,7 @@ import Testing
 
     // MARK: The reproducers of the fuzzer
 
-    @Test func theChecksumFileWithAnEmptyNameYieldsNoEntryWithoutAName() throws {
+    @Test func theChecksumFileWithAnEmptyNameYieldsNoEntryWithoutAName() {
         guard let data = reproducer("checksum-empty-name.md5") else { return }
         let text = ChecksumFile.text(from: data)
         for name in ["a.md5", "a.sfv", "a.sha1", "a.sha256", "a.bk3", "a.sha512"] {
@@ -197,7 +197,7 @@ import Testing
 
     // MARK: T040, a listing the cancel cut short, with the flag unset when it began
 
-    @Test func aListingThatTheCancelEndsWhileItRunsIsNotAnEmptyFolder() throws {
+    @Test func aListingThatTheCancelEndsWhileItRunsIsNotAnEmptyFolder() {
         let memory = MemoryFileSystem()
         let registry = FileSystemRegistry()
         registry.register(memory)

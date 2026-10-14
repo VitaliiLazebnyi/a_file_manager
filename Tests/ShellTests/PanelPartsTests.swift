@@ -198,7 +198,7 @@ import Testing
     }
 
     @Test func aDragIsLookedAtOnceAndNotAtEveryMoveOfTheMouse() {
-        let sources = (0..<1000).map { URL(fileURLWithPath: "/x/f\($0).txt") }
+        let sources = (0..<1_000).map { URL(fileURLWithPath: "/x/f\($0).txt") }
         let session = DropSession(sequence: 7, sources: sources)
         let (inside, elsewhere) = (URL(fileURLWithPath: "/x"), URL(fileURLWithPath: "/y"))
         #expect(
@@ -384,7 +384,7 @@ import Testing
 
     @Test func theBriefViewsStatusLineDescribesTheItemUnderTheCursor() {
         let file = FileItem(
-            url: URL(fileURLWithPath: "/x/win.ini"), name: "win.ini", isDirectory: false, size: 1234,
+            url: URL(fileURLWithPath: "/x/win.ini"), name: "win.ini", isDirectory: false, size: 1_234,
             modified: Date(timeIntervalSince1970: 0), permissions: 0o644)
         let text = PanelViewController.detailText(for: file)
         #expect(text.hasPrefix("win  ini  1,234  ") && text.hasSuffix("  rw-r--r--"))
@@ -396,7 +396,7 @@ import Testing
 @MainActor @Suite(.serialized) struct PanelStores {
     func wait(upTo seconds: TimeInterval = 10, until condition: () -> Bool) async -> Bool {
         let deadline = Date().addingTimeInterval(seconds)
-        while !condition() && Date() < deadline { try? await Task.sleep(nanoseconds: 2_000_000) }
+        while !condition(), Date() < deadline { try? await Task.sleep(nanoseconds: 2_000_000) }
         return condition()
     }
 
@@ -525,7 +525,8 @@ import Testing
         var requested: [String] = []
         var cancelled: [String] = []
 
-        func thumbnail(for url: URL, side: CGFloat, scale: CGFloat, completion: @escaping (NSImage?) -> Void) -> () ->
+        func thumbnail(for url: URL, side _: CGFloat, scale _: CGFloat, completion: @escaping (NSImage?) -> Void) -> ()
+            ->
             Void
         {
             let name = url.lastPathComponent

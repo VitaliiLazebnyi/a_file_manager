@@ -73,7 +73,7 @@ import Testing
         #expect(try virtual.list(url, showHidden: false).count == 1)
     }
 
-    @Test func evictionSparesAListThatIsShown() throws {
+    @Test func evictionSparesAListThatIsShown() {
         let watchable = WatchedSystem()
         fileSystems.register(watchable)
         let first = virtual.register(files: [watchable.url("/d/f")], title: "First", origin: nil)
@@ -107,7 +107,7 @@ import Testing
         // The rest comes as one more report once the window has passed (the timer runs at the
         // pace of a busy machine, so it is waited for rather than timed).
         let deadline = Date().addingTimeInterval(30)
-        while reports.value < 2 && Date() < deadline { try await Task.sleep(nanoseconds: 10_000_000) }
+        while reports.value < 2, Date() < deadline { try await Task.sleep(nanoseconds: 10_000_000) }
         #expect(reports.value == 2)
         _ = watcher
     }
@@ -159,20 +159,20 @@ private final class WatchedSystem: FileSystemProvider {
     func url(_ path: String) -> URL { URL(string: "watched://" + path)! }
     func fire() { onChange?([]) }
 
-    func list(_ directory: URL, showHidden: Bool) throws -> [FileItem] { [] }
+    func list(_: URL, showHidden _: Bool) -> [FileItem] { [] }
     func item(at url: URL) -> FileItem? { FileItem(url: url, name: url.lastPathComponent, isDirectory: false) }
     func parent(of directory: URL) -> URL? { directory.path == "/" ? nil : directory.deletingLastPathComponent() }
-    func read(_ url: URL) throws -> FileReader { throw FileSystemError.notSupported("Reading") }
-    func createDirectory(at url: URL) throws { throw FileSystemError.notSupported("Writing") }
-    func write(_ url: URL) throws -> FileWriter { throw FileSystemError.notSupported("Writing") }
-    func remove(_ url: URL) throws { throw FileSystemError.notSupported("Writing") }
-    func move(_ source: URL, to destination: URL, replacing: Bool) throws {
+    func read(_: URL) throws -> FileReader { throw FileSystemError.notSupported("Reading") }
+    func createDirectory(at _: URL) throws { throw FileSystemError.notSupported("Writing") }
+    func write(_: URL) throws -> FileWriter { throw FileSystemError.notSupported("Writing") }
+    func remove(_: URL) throws { throw FileSystemError.notSupported("Writing") }
+    func move(_: URL, to _: URL, replacing _: Bool) throws {
         throw FileSystemError.notSupported("Writing")
     }
-    func copy(_ source: URL, to destination: URL, progress: (Int64) -> Bool) throws {
+    func copy(_: URL, to _: URL, progress _: (Int64) -> Bool) throws {
         throw FileSystemError.notSupported("Writing")
     }
-    func watch(_ directories: [URL], onChange: @escaping ([URL]) -> Void) -> AnyObject? {
+    func watch(_: [URL], onChange: @escaping ([URL]) -> Void) -> AnyObject? {
         self.onChange = onChange
         return self
     }

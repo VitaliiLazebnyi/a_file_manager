@@ -62,14 +62,14 @@ struct NameList {
     /// thread. `mask` picks columns by bit (1 = name, 2 = the first column after it, 4 = the
     /// next, …; spec 17 › Commands with parameters); nil, 0 and 1 give every column.
     func details(_ items: [FileItem], _ style: Style, headers: Bool, extra: [Column] = [], mask: Int? = nil) -> String {
-        var columns = [Column(title: "Name") { self.entry($0, style) }] + NameList.standardColumns + extra
+        var columns = [Column(title: "Name") { entry($0, style) }] + Self.standardColumns + extra
         if let mask, mask > 1 {
             columns = columns.enumerated().filter { $0.offset < Int.bitWidth - 1 && mask & (1 << $0.offset) != 0 }.map(
                 \.element)
         }
         let picked = columns
         var lines = Parallel.map(items, serialBelow: extra.isEmpty ? Int.max : 2) { item in
-            picked.map { NameList.field($0.value(item)) }.joined(separator: "\t")
+            picked.map { Self.field($0.value(item)) }.joined(separator: "\t")
         }
         if headers { lines.insert(picked.map(\.title).joined(separator: "\t"), at: 0) }
         return lines.joined(separator: "\n")

@@ -54,8 +54,10 @@ enum SSHQuestion: Equatable {
         switch self {
         case .server(_, let host, let text):
             return "The server \(host) asks (this text comes from the server):\n\n\(text)"
+
         case .other:
             return "The secure shell passes on this question, which may come from the server:\n\n\(question)"
+
         case .password, .passphrase, .hostKey:
             return question
         }
@@ -91,7 +93,7 @@ final class SFTPSession: RemoteSession {
     private let names = NameMemory()
 
     /// The largest piece read or written with one request; every server takes this much.
-    fileprivate static let blockSize = 32768
+    fileprivate static let blockSize = 32_768
     /// The most requests of a transfer that are under way at the same time. With 32 KB each this
     /// keeps 2 MB on the way, which is what a fast line with a long delay needs; a slow line
     /// gets fewer (`TransferWindow`).
@@ -159,10 +161,12 @@ final class SFTPSession: RemoteSession {
         switch SSHQuestion(question) {
         case .password(let asked, let server):
             (user, host) = (asked, server)
+
         case .server(let asked, let server, let text):
             let lowered = text.lowercased()
             guard lowered.contains("password"), !lowered.contains("passphrase") else { return false }
             (user, host) = (asked, server)
+
         case .passphrase, .hostKey, .other:
             return false
         }
@@ -245,7 +249,7 @@ final class SFTPSession: RemoteSession {
                         return true
                     }
                     let isConfirmation = question.kind == .confirm || kind == .hostKey
-                    let isPassword = SFTPSession.asksForPassword(question.text, of: profile)
+                    let isPassword = Self.asksForPassword(question.text, of: profile)
                     if !isConfirmation, !offeredPassword, isPassword, let password = profile.password {
                         // The stored password answers the first request for this server's password.
                         offeredPassword = true
@@ -316,7 +320,7 @@ final class SFTPSession: RemoteSession {
                 throw NetworkError.loginFailed("The user name is not valid.")
             }
             created = SFTPChannel(
-                executable: "/usr/bin/ssh", arguments: SFTPSession.sshArguments(for: profile, options: options),
+                executable: "/usr/bin/ssh", arguments: Self.sshArguments(for: profile, options: options),
                 environment: askpass?.environment ?? [:])
         }
         created.writeTimeout = max(10, options.timeout)
@@ -406,7 +410,7 @@ final class SFTPSession: RemoteSession {
         channel.sendWithoutAnswer(.close) { $0.bytes(handle) }
     }
 
-    func list(_ path: String, showHidden: Bool, cancellation: CancellationFlag?, receive: ([RemoteEntry]) -> Bool)
+    func list(_ path: String, showHidden _: Bool, cancellation: CancellationFlag?, receive: ([RemoteEntry]) -> Bool)
         throws
     {
         try perform(cancellation: cancellation) { channel in
@@ -578,7 +582,7 @@ final class SFTPSession: RemoteSession {
     }
 
     /// Every server can write at any position of a file it has open.
-    func canAppend(_ path: String) -> Bool { true }
+    func canAppend(_: String) -> Bool { true }
 
     /// Opens the file for writing without creating or emptying it, cuts it to `offset` when it is
     /// longer (`fsetstat` with a size), and writes from there.
@@ -637,8 +641,8 @@ private struct TransferWindow {
         let elapsed = Date().timeIntervalSince(started)
         // Nothing is known in the first moments; the caller's own slow start applies.
         guard elapsed > 0.25, bytes > 0 else { return SFTPSession.window }
-        let wanted = Double(bytes) / elapsed * TransferWindow.seconds / Double(max(1, block))
-        return max(TransferWindow.least, min(SFTPSession.window, Int(wanted.rounded(.up))))
+        let wanted = Double(bytes) / elapsed * Self.seconds / Double(max(1, block))
+        return max(Self.least, min(SFTPSession.window, Int(wanted.rounded(.up))))
     }
 }
 
@@ -836,7 +840,7 @@ private final class SFTPFileReader: FileReader {
         }
         rewind(to: offset)
         // A jump: what follows may be one small read, so nothing is read ahead until it reads on.
-        depth = SFTPFileReader.firstDepth
+        depth = Self.firstDepth
         readsInARow = 0
     }
 

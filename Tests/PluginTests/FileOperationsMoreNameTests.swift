@@ -14,7 +14,7 @@ import Testing
         context.calendar = calendar
         context.now = Date(timeIntervalSince1970: 1_791_813_787.25)
         context.cursorName = "Holiday pics.jpeg"
-        context.cursorSize = 4096
+        context.cursorSize = 4_096
         context.parentName = "Photos"
         context.grandparentName = "Data"
         context.clipboard = "from: the *clipboard*\nsecond line"
@@ -273,7 +273,7 @@ import Testing
         log.write(OperationRecord(.copy, source: "today"))
         log.flush()
         // The file was last written two days ago, as far as the disk knows.
-        let before = Date(timeIntervalSinceNow: -2 * 86400)
+        let before = Date(timeIntervalSinceNow: -2 * 86_400)
         try FileManager.default.setAttributes(
             [.modificationDate: before], ofItemAtPath: box.url("logs/operations.log").path)
         clock.now = Date()

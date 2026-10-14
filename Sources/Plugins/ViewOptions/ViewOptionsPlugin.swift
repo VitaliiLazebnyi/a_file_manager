@@ -62,13 +62,13 @@ public final class ViewOptionsPlugin: Plugin {
                 title: "Display",
                 preferences: [
                     Preference(
-                        ViewOptionsPlugin.hiddenInBothPanelsKey, "Hidden Files switches both panels at once",
+                        Self.hiddenInBothPanelsKey, "Hidden Files switches both panels at once",
                         .flag(default: true)),
                     Preference(
-                        ViewOptionsPlugin.programMasksKey, "Show › Programs lists executable files and",
-                        .text(default: ViewOptionsPlugin.defaultProgramMasks)),
+                        Self.programMasksKey, "Show › Programs lists executable files and",
+                        .text(default: Self.defaultProgramMasks)),
                     Preference(
-                        ViewOptionsPlugin.columnsSwitchToFullKey, "Choosing custom columns switches to the Full view",
+                        Self.columnsSwitchToFullKey, "Choosing custom columns switches to the Full view",
                         .flag(default: true))
                 ]))
     }
@@ -96,11 +96,11 @@ public final class ViewOptionsPlugin: Plugin {
             kernel.toolbar.add(id, symbol: symbol, group: 60, hint: hint)
         }
         commands.register(
-            Command(ViewOptionsPlugin.customColumns, "Custom Columns…", [.f(1, .shift)]),
+            Command(Self.customColumns, "Custom Columns…", [.f(1, .shift)]),
             enabled: { !kernel.columns.all.isEmpty }
         ) { [self] in chooseColumns(in: kernel) }
 
-        kernel.menus.add(views.map(\.0) + [ViewOptionsPlugin.customColumns], to: .showViewType)
+        kernel.menus.add(views.map(\.0) + [Self.customColumns], to: .showViewType)
     }
 
     /// One checkbox per column the plugins offer. The columns that stay keep their order;
@@ -119,7 +119,7 @@ public final class ViewOptionsPlugin: Plugin {
         let columns = kept + offered.map(\.id).filter { chosen.contains($0) && !kept.contains($0) }
         guard columns != panel.extraColumns else { return }
         panel.extraColumns = columns
-        if !chosen.isEmpty, kernel.settings.flag(ViewOptionsPlugin.columnsSwitchToFullKey, default: true) {
+        if !chosen.isEmpty, kernel.settings.flag(Self.columnsSwitchToFullKey, default: true) {
             panel.viewMode = .full
         }
     }
@@ -130,34 +130,34 @@ public final class ViewOptionsPlugin: Plugin {
         let commands = kernel.commands
         let model = { kernel.panels.source.model }
         let settings = kernel.settings
-        let kind = { [self] in self.kind(of: model()) }
+        let kind = { [self] in kind(of: model()) }
 
         commands.register(
-            Command(ViewOptionsPlugin.allFiles, "All Files", [.f(10, .control)]), checked: { model().filter == nil }
+            Command(Self.allFiles, "All Files", [.f(10, .control)]), checked: { model().filter == nil }
         ) { [self] in
             apply(nil, as: nil, to: model())
         }
         commands.register(
-            Command(ViewOptionsPlugin.programs, "Programs", [.f(11, .control)]), checked: { kind() == .programs }
+            Command(Self.programs, "Programs", [.f(11, .control)]), checked: { kind() == .programs }
         ) { [self] in
             let masks = FileMask(
-                settings.text(ViewOptionsPlugin.programMasksKey, default: ViewOptionsPlugin.defaultProgramMasks))
+                settings.text(Self.programMasksKey, default: Self.defaultProgramMasks))
             apply(
-                PanelFilter(title: "<programs>") { ViewOptionsPlugin.isProgram($0, masks: masks) }, as: .programs,
+                PanelFilter(title: "<programs>") { Self.isProgram($0, masks: masks) }, as: .programs,
                 to: model())
         }
         commands.register(
-            Command(ViewOptionsPlugin.lastCustomFilter, "Last Custom Filter"),
-            enabled: { settings.data(forKey: ViewOptionsPlugin.lastMaskKey) != nil }
+            Command(Self.lastCustomFilter, "Last Custom Filter"),
+            enabled: { settings.data(forKey: Self.lastMaskKey) != nil }
         ) { [self] in
             apply(
-                DisplayMask(settings.text(ViewOptionsPlugin.lastMaskKey, default: "*.*")).filter, as: .custom,
+                DisplayMask(settings.text(Self.lastMaskKey, default: "*.*")).filter, as: .custom,
                 to: model())
         }
         commands.register(
-            Command(ViewOptionsPlugin.customFilter, "Custom…", [.f(12, .control)]), checked: { kind() == .custom },
+            Command(Self.customFilter, "Custom…", [.f(12, .control)]), checked: { kind() == .custom },
             parameterized: { [self] argument in
-                let last = settings.text(ViewOptionsPlugin.lastMaskKey, default: "*.*")
+                let last = settings.text(Self.lastMaskKey, default: "*.*")
                 guard
                     let text = argument.text
                         ?? kernel.ui.prompt(
@@ -165,12 +165,12 @@ public final class ViewOptionsPlugin: Plugin {
                             detail: "Masks after “|” are left out; “| name/” hides folders.")
                 else { return }
                 let mask = DisplayMask(text)
-                if !mask.text.isEmpty { settings.set(mask.text, forKey: ViewOptionsPlugin.lastMaskKey) }
+                if !mask.text.isEmpty { settings.set(mask.text, forKey: Self.lastMaskKey) }
                 // `*.*` shows everything: the filter is taken away.
                 apply(mask.filter, as: .custom, to: model())
             })
         commands.register(
-            Command(ViewOptionsPlugin.onlySelected, "Only Selected Files"), enabled: { model().hasSelection },
+            Command(Self.onlySelected, "Only Selected Files"), enabled: { model().hasSelection },
             checked: { kind() == .selected }
         ) { [self] in
             // A snapshot: marking other files later does not bring hidden ones back. The marks
@@ -184,7 +184,7 @@ public final class ViewOptionsPlugin: Plugin {
         // Hidden files are shown or hidden in every tab, of both panels unless the user wants it otherwise.
         commands.register(Command(.showHidden, "Hidden Files", [.cmd(".", .shift)]), checked: { model().showHidden }) {
             let show = !model().showHidden
-            let both = settings.flag(ViewOptionsPlugin.hiddenInBothPanelsKey, default: true)
+            let both = settings.flag(Self.hiddenInBothPanelsKey, default: true)
             for panel in both ? kernel.panels.all : [kernel.panels.source] {
                 panel.tabs.tabs.forEach { $0.setShowHidden(show) }
                 panel.reload()
@@ -194,8 +194,8 @@ public final class ViewOptionsPlugin: Plugin {
 
         kernel.menus.add(
             [
-                ViewOptionsPlugin.allFiles, ViewOptionsPlugin.programs, ViewOptionsPlugin.lastCustomFilter,
-                ViewOptionsPlugin.customFilter, ViewOptionsPlugin.onlySelected, .showHidden
+                Self.allFiles, Self.programs, Self.lastCustomFilter,
+                Self.customFilter, Self.onlySelected, .showHidden
             ], to: .showFilters)
     }
 
@@ -234,8 +234,9 @@ public final class ViewOptionsPlugin: Plugin {
         let ticket = lastFilterTicket
         filterTickets[id] = ticket
         // Taking a filter away shows the list as it is: nothing to work through.
-        guard title != nil, model.listedItems.count >= ViewOptionsPlugin.backgroundFilterThreshold else {
-            return model.setFilter(make())
+        guard title != nil, model.listedItems.count >= Self.backgroundFilterThreshold else {
+            model.setFilter(make())
+            return
         }
         filterInBackground(model, make, ticket: ticket, tries: 1)
     }
@@ -250,8 +251,8 @@ public final class ViewOptionsPlugin: Plugin {
                 // A later filter has taken over.
                 guard filterTickets[id] == ticket else { return }
                 if model.apply(prepared) != .stale { return }
-                if model.listedItems.count < ViewOptionsPlugin.backgroundFilterThreshold
-                    || tries >= ViewOptionsPlugin.staleTries
+                if model.listedItems.count < Self.backgroundFilterThreshold
+                    || tries >= Self.staleTries
                 {
                     // The list is short now, or it keeps changing faster than it can be filtered.
                     model.setFilter(make())
@@ -300,9 +301,10 @@ public final class ViewOptionsPlugin: Plugin {
             if !isAsItCame { reload() }
             return
         }
-        guard model.listedItems.count >= ViewOptionsPlugin.backgroundSortThreshold else {
+        guard model.listedItems.count >= Self.backgroundSortThreshold else {
             pendingOrders[id] = nil
-            return model.setSort(order)
+            model.setSort(order)
+            return
         }
         pendingOrders[id] = order
         // The wish is the model's from here on: a reading of the folder that arrives while
@@ -336,7 +338,7 @@ public final class ViewOptionsPlugin: Plugin {
                     pendingOrders[id] = nil
                     return
                 }
-                guard model.listedItems.count >= ViewOptionsPlugin.backgroundSortThreshold else {
+                guard model.listedItems.count >= Self.backgroundSortThreshold else {
                     // The list is short now.
                     pendingOrders[id] = nil
                     return model.setSort(order)

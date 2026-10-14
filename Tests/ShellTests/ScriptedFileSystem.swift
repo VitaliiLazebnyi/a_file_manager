@@ -73,9 +73,10 @@ final class ScriptedFileSystem: FileSystemProvider {
     var scheme: String { inner.scheme }
     var capabilities: FileSystemCapabilities { inner.capabilities }
 
-    func list(_ directory: URL, showHidden: Bool) throws -> [FileItem] { batches.flatMap { $0 } }
+    func list(_: URL, showHidden _: Bool) -> [FileItem] { batches.flatMap { $0 } }
 
-    func list(_ directory: URL, showHidden: Bool, cancellation: CancellationFlag, receive: ([FileItem]) -> Bool) throws
+    func list(_ directory: URL, showHidden _: Bool, cancellation: CancellationFlag, receive: ([FileItem]) -> Bool)
+        throws
     {
         let started = Date()
         let holds = batchesAt[directory.path] == nil ? holdBefore : nil
@@ -111,7 +112,7 @@ final class ScriptedFileSystem: FileSystemProvider {
         }
     }
 
-    func volume(of url: URL) -> VolumeInfo? {
+    func volume(of _: URL) -> VolumeInfo? {
         condition.lock()
         defer { condition.unlock() }
         asks += 1

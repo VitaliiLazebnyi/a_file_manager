@@ -79,9 +79,9 @@ import Testing
     }
 
     @Test func theFastScanAgreesOnLongPagesToo() {
-        for seed in 1000...1012 as ClosedRange<UInt64> {
+        for seed in 1_000...1_012 as ClosedRange<UInt64> {
             let next = random(seed)
-            let units = generate(next, count: 4000)
+            let units = generate(next, count: 4_000)
             #expect(HTMLText.plainText(units: units) == HTMLReference.plainText(units: units), "seed \(seed)")
             #expect(
                 HTMLText.plainText(units: units, linkBraces: false)
@@ -136,7 +136,7 @@ import Testing
     }
 
     @Test func aFrameIsScaledOnceForTheSizeItIsShownAt() async throws {
-        let frame = try picture(2000, 1000)
+        let frame = try picture(2_000, 1_000)
         let cache = ScaledFrameCache()
         let ready = Counter()
         cache.onReady = { ready.count += 1 }
@@ -154,14 +154,14 @@ import Testing
         #expect(cache.image(for: frame, width: 400, height: 200)?.width == 400)
         // Showing it larger than it is, or at nearly its own size, needs no bitmap; nor does a huge one.
         #expect(
-            cache.image(for: frame, width: 3000, height: 1500) == nil
-                && cache.image(for: frame, width: 1990, height: 995) == nil)
-        let big = try picture(8000, 6000)
-        #expect(cache.image(for: big, width: 7000, height: 5800) == nil)
+            cache.image(for: frame, width: 3_000, height: 1_500) == nil
+                && cache.image(for: frame, width: 1_990, height: 995) == nil)
+        let big = try picture(8_000, 6_000)
+        #expect(cache.image(for: big, width: 7_000, height: 5_800) == nil)
         await settled(cache)
         #expect(cache.made == 2)
         // A new frame, or an invalidation, drops the bitmap.
-        let other = try picture(2000, 1000)
+        let other = try picture(2_000, 1_000)
         cache.queue.suspend()
         #expect(cache.image(for: other, width: 400, height: 200) == nil)
         cache.invalidate()
@@ -172,7 +172,7 @@ import Testing
     }
 
     @Test func aScaledFrameKeepsItsColorsAndSides() throws {
-        let scaled = try #require(ScaledFrameCache.scale(try picture(1000, 500), width: 100, height: 50))
+        let scaled = try #require(ScaledFrameCache.scale(try picture(1_000, 500), width: 100, height: 50))
         #expect(scaled.width == 100 && scaled.height == 50)
         let rep = NSBitmapImageRep(cgImage: scaled)
         let left = try #require(rep.colorAt(x: 10, y: 25)?.usingColorSpace(.sRGB))
@@ -183,10 +183,10 @@ import Testing
     }
 
     @Test func aLargeImageIsResampledOnceWhileItIsScrolledAndDrawnAgain() async throws {
-        let frame = try picture(4000, 2000)
+        let frame = try picture(4_000, 2_000)
         let view = ImageCanvasView(frame: NSRect(x: 0, y: 0, width: 400, height: 300))
         view.fit = .window
-        view.show(DecodedImage(frames: [(image: frame, delay: 0.1)], pixelSize: CGSize(width: 4000, height: 2000)))
+        view.show(DecodedImage(frames: [(image: frame, delay: 0.1)], pixelSize: CGSize(width: 4_000, height: 2_000)))
         view.layoutSubtreeIfNeeded()
         func drawn() throws -> NSBitmapImageRep {
             let rep = try #require(view.bitmapImageRepForCachingDisplay(in: view.bounds))

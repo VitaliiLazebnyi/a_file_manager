@@ -117,21 +117,21 @@ final class TestFTPServer {
     init(root: URL, options: Options = Options()) throws {
         self.root = root
         currentOptions = options
-        let listener = try TestFTPServer.listen()
-        port = TestFTPServer.port(of: listener)
+        let listener = try Self.listen()
+        port = Self.port(of: listener)
         acceptor = Acceptor(listener: listener)
         acceptor.run { [weak self] client in
             guard let self else { return false }
-            self.lock.lock()
+            lock.lock()
             // Stopped between the accept and here: `stop` has cut the connections it knew.
-            if self.stopped {
-                self.lock.unlock()
+            if stopped {
+                lock.unlock()
                 return false
             }
-            self.clients.insert(client)
-            self.peak = max(self.peak, self.clients.count)
-            self.opened += 1
-            self.lock.unlock()
+            clients.insert(client)
+            peak = max(peak, clients.count)
+            opened += 1
+            lock.unlock()
             Thread.detachNewThread { Session(server: self, socket: client).run() }
             return true
         }
@@ -309,7 +309,7 @@ final class TestFTPServer {
 
     fileprivate static func receiveAll(_ descriptor: Int32) -> Data {
         var data = Data()
-        var buffer = [UInt8](repeating: 0, count: 65536)
+        var buffer = [UInt8](repeating: 0, count: 65_536)
         while true {
             let count = recv(descriptor, &buffer, buffer.count, 0)
             if count <= 0 { return data }
@@ -391,7 +391,7 @@ private final class Session {
     }
 
     private func readLine() -> String? {
-        var buffer = [UInt8](repeating: 0, count: 4096)
+        var buffer = [UInt8](repeating: 0, count: 4_096)
         while true {
             if let end = pending.firstIndex(of: 0x0A) {
                 var line = pending[pending.startIndex..<end]
@@ -439,16 +439,20 @@ private final class Session {
             reply(options.user == nil ? "230 Welcome" : "331 Password please")
             loggedIn = options.user == nil
             return true
+
         case "PASS":
             loggedIn = options.user == nil || (user == options.user && argument == options.password)
             reply(loggedIn ? "230 Welcome" : "530 Login incorrect")
             return true
+
         case "QUIT":
             reply("221 Bye")
             return false
+
         case "AUTH", "PBSZ", "PROT":
             reply("502 No TLS here")
             return true
+
         default:
             break
         }
@@ -458,6 +462,7 @@ private final class Session {
         }
         switch verb {
         case "SYST": reply("215 UNIX Type: L8")
+
         case "FEAT":
             guard options.offersFeatures else {
                 reply("502 Not implemented")
@@ -470,9 +475,11 @@ private final class Session {
             if options.offersEPSV { lines.append(" EPSV") }
             lines.append("211 End")
             reply(lines.joined(separator: "\r\n"))
+
         case "OPTS": reply("200 OK")
         case "NOOP": reply("200 OK")
         case "PWD": reply("257 \"\(directory.replacingOccurrences(of: "\"", with: "\"\""))\" is the current directory")
+
         case "CWD", "CDUP":
             guard let url = local(verb == "CDUP" ? ".." : argument), isDirectory(url) else {
                 reply("550 No such directory")
@@ -480,7 +487,9 @@ private final class Session {
             }
             directory = virtual(url)
             reply("250 OK")
+
         case "TYPE": reply("200 Type set")
+
         case "PASV", "EPSV":
             guard verb == "PASV" || options.offersEPSV else {
                 reply("500 Unknown command")
@@ -498,6 +507,7 @@ private final class Session {
                 verb == "PASV"
                     ? "227 Entering Passive Mode (127,0,0,1,\(port / 256),\(port % 256))"
                     : "229 Entering Extended Passive Mode (|||\(port)|)")
+
         case "PORT":
             let numbers = argument.split(separator: ",").compactMap { Int($0) }
             guard numbers.count == 6 else {
@@ -506,6 +516,7 @@ private final class Session {
             }
             active = (numbers[0..<4].map(String.init).joined(separator: "."), numbers[4] * 256 + numbers[5])
             reply("200 PORT OK")
+
         case "EPRT":
             let fields = argument.split(separator: "|")
             guard fields.count == 3, let port = Int(fields[2]) else {
@@ -514,9 +525,11 @@ private final class Session {
             }
             active = (String(fields[1]), port)
             reply("200 EPRT OK")
+
         case "REST":
             restart = UInt64(argument) ?? 0
             reply("350 Restarting at \(restart)")
+
         case "LIST", "NLST", "MLSD":
             guard verb != "MLSD" || options.offersMLSD else {
                 reply("500 Unknown command")
@@ -548,6 +561,7 @@ private final class Session {
             let listing = options.rawListing ?? Data((preamble + lines.map { $0 + "\r\n" }.joined()).utf8)
             transfer { TestFTPServer.sendAll($0, listing) }
             server.listingEnded()
+
         case "MLST":
             guard options.offersMLSD else {
                 reply("500 Unknown command")
@@ -558,6 +572,7 @@ private final class Session {
                 break
             }
             reply("250-Listing\r\n \(line(for: url, name: virtual(url), mlsd: true, dos: false))\r\n250 End")
+
         case "SIZE":
             guard options.offersSize else {
                 reply("500 Unknown command")
@@ -568,22 +583,25 @@ private final class Session {
                 break
             }
             reply("213 \(size(of: url))")
+
         case "MDTM":
             guard let url = local(argument), fm.fileExists(atPath: url.path), !isDirectory(url) else {
                 reply("550 Not a file")
                 break
             }
             reply("213 \(stamp(modified(url)))")
+
         case "MFMT":
             let parts = argument.split(separator: " ", maxSplits: 1)
             guard parts.count == 2, let url = local(String(parts[1])),
-                let date = Session.stampFormat.date(from: String(parts[0]))
+                let date = Self.stampFormat.date(from: String(parts[0]))
             else {
                 reply("501 Bad arguments")
                 break
             }
             try? fm.setAttributes([.modificationDate: date], ofItemAtPath: url.path)
             reply("213 Modify=\(parts[0]); \(parts[1])")
+
         case "SITE":
             let parts = argument.split(separator: " ", maxSplits: 2)
             guard parts.count == 3, parts[0].uppercased() == "CHMOD", let mode = Int(parts[1], radix: 8),
@@ -594,6 +612,7 @@ private final class Session {
             }
             try? fm.setAttributes([.posixPermissions: mode], ofItemAtPath: url.path)
             reply("200 CHMOD OK")
+
         case "RETR":
             guard let url = local(argument), !isDirectory(url), let data = try? Data(contentsOf: url) else {
                 reply("550 No such file")
@@ -615,6 +634,7 @@ private final class Session {
                 break
             }
             transfer { TestFTPServer.sendAll($0, data.subdata(in: offset..<data.count)) }
+
         case "STOR", "APPE":
             guard let url = local(argument), isDirectory(url.deletingLastPathComponent()), !isDirectory(url) else {
                 reply("553 Cannot create the file")
@@ -641,6 +661,7 @@ private final class Session {
                     return false
                 }
             }
+
         case "DELE":
             guard let url = local(argument), fm.fileExists(atPath: url.path), !isDirectory(url) else {
                 reply("550 No such file")
@@ -651,12 +672,14 @@ private final class Session {
                 break
             }
             reply((try? fm.removeItem(at: url)) != nil ? "250 Deleted" : "550 Cannot delete")
+
         case "RMD":
             guard let url = local(argument), isDirectory(url) else {
                 reply("550 Not a directory")
                 break
             }
             reply(rmdir(url.path) == 0 ? "250 Removed" : "550 Directory not empty")
+
         case "MKD":
             guard let url = local(argument), !fm.fileExists(atPath: url.path) else {
                 reply("550 Already exists")
@@ -665,6 +688,7 @@ private final class Session {
             reply(
                 (try? fm.createDirectory(at: url, withIntermediateDirectories: false)) != nil
                     ? "257 \"\(virtual(url))\" created" : "550 Cannot create")
+
         case "RNFR":
             guard let url = local(argument), fm.fileExists(atPath: url.path) else {
                 reply("550 No such file")
@@ -672,6 +696,7 @@ private final class Session {
             }
             renameFrom = url.path
             reply("350 Ready for RNTO")
+
         case "RNTO":
             guard let from = renameFrom, let url = local(argument) else {
                 reply("503 RNFR first")
@@ -687,6 +712,7 @@ private final class Session {
                 break
             }
             reply(rename(from, url.path) == 0 ? "250 Renamed" : "550 Cannot rename")
+
         default:
             reply("500 Unknown command")
         }
@@ -715,13 +741,18 @@ private final class Session {
             self.active = nil
             if let delay = server.options.activeNeverConnects {
                 Thread.sleep(forTimeInterval: delay)
-                return reply("425 Cannot open the data connection")
+                reply("425 Cannot open the data connection")
+                return
             }
             connection = TestFTPServer.connect(to: active.host, port: active.port)
         } else {
-            return reply("425 Use PASV or PORT first")
+            reply("425 Use PASV or PORT first")
+            return
         }
-        guard let connection else { return reply("425 Cannot open the data connection") }
+        guard let connection else {
+            reply("425 Cannot open the data connection")
+            return
+        }
         let succeeded = work(connection)
         close(connection)
         if server.options.announcesTwice { reply("150 Still at it") }
@@ -751,7 +782,7 @@ private final class Session {
     private static let oldFormat = formatter("MMM dd  yyyy", utc: false)
     private static let dosFormat = formatter("MM-dd-yy  hh:mma", utc: false)
 
-    private func stamp(_ date: Date) -> String { Session.stampFormat.string(from: date) }
+    private func stamp(_ date: Date) -> String { Self.stampFormat.string(from: date) }
 
     private func line(for url: URL, name: String, mlsd: Bool, dos: Bool) -> String {
         let (isFolder, date, bytes) = (isDirectory(url), modified(url), size(of: url))
@@ -762,19 +793,19 @@ private final class Session {
         }
         if dos {
             return
-                "\(Session.dosFormat.string(from: date))  \(isFolder ? "     <DIR>         " : String(format: "%19lld", bytes)) \(name)"
+                "\(Self.dosFormat.string(from: date))  \(isFolder ? "     <DIR>         " : String(format: "%19lld", bytes)) \(name)"
         }
         let letters = (0..<9).map { index -> Character in
             mode & (1 << (8 - index)) != 0 ? Array("rwxrwxrwx")[index] : "-"
         }
         if let target = try? fm.destinationOfSymbolicLink(atPath: url.path) {
-            let isOld = date < Date().addingTimeInterval(-180 * 86400)
-            let when = (isOld ? Session.oldFormat : Session.recentFormat).string(from: date)
+            let isOld = date < Date().addingTimeInterval(-180 * 86_400)
+            let when = (isOld ? Self.oldFormat : Self.recentFormat).string(from: date)
             return
                 "lrwxrwxrwx   1 owner    group    \(String(format: "%10lld", Int64(target.utf8.count))) \(when) \(name) -> \(target)"
         }
-        let isOld = date < Date().addingTimeInterval(-180 * 86400) || date > Date().addingTimeInterval(3600)
-        let when = (isOld ? Session.oldFormat : Session.recentFormat).string(from: date)
+        let isOld = date < Date().addingTimeInterval(-180 * 86_400) || date > Date().addingTimeInterval(3_600)
+        let when = (isOld ? Self.oldFormat : Self.recentFormat).string(from: date)
         return
             "\(isFolder ? "d" : "-")\(String(letters))   1 owner    group    \(String(format: "%10lld", bytes)) \(when) \(name)"
     }

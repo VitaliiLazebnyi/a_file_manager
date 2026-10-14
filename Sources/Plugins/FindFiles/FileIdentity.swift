@@ -14,10 +14,10 @@ struct FileIdentity: Hashable {
 
     /// What a local path is, with one system call; nil for other locations or a path that
     /// cannot be examined. Links are followed unless `followingLinks` is off.
-    static func of(_ url: URL, followingLinks: Bool = true) -> (identity: FileIdentity, isRegularFile: Bool)? {
+    static func of(_ url: URL, followingLinks: Bool = true) -> (identity: Self, isRegularFile: Bool)? {
         guard let info = status(of: url, followingLinks: followingLinks) else { return nil }
         return (
-            FileIdentity(device: UInt64(bitPattern: Int64(info.st_dev)), inode: UInt64(info.st_ino)),
+            Self(device: UInt64(bitPattern: Int64(info.st_dev)), inode: UInt64(info.st_ino)),
             info.st_mode & S_IFMT == S_IFREG
         )
     }
@@ -83,7 +83,7 @@ final class LocalFileReader: FileReader {
             guard let base = buffer.baseAddress, buffer.count > 0 else { return 0 }
             while true {
                 let result = Darwin.read(descriptor, base, buffer.count)
-                if result < 0 && errno == EINTR { continue }
+                if result < 0, errno == EINTR { continue }
                 return result
             }
         }

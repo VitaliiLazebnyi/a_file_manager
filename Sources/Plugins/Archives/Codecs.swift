@@ -57,7 +57,7 @@ final class Deflater {
 
     func compress(_ input: Data, flush: Flush) -> Data {
         var output = Data()
-        let capacity = max(1 << 14, min(input.count / 2 + 1024, 1 << 20))
+        let capacity = max(1 << 14, min(input.count / 2 + 1_024, 1 << 20))
         let chunk = UnsafeMutablePointer<UInt8>.allocate(capacity: capacity)
         defer { chunk.deallocate() }
         let mode = flush == .finish ? Z_FINISH : flush == .sync ? Z_SYNC_FLUSH : Z_NO_FLUSH
@@ -71,7 +71,7 @@ final class Deflater {
                 output.append(chunk, count: capacity - Int(stream.pointee.avail_out))
                 if status == Z_STREAM_END || status == Z_STREAM_ERROR { break }
                 // Done when the output buffer was not filled and the input is used up.
-                if stream.pointee.avail_out != 0 && stream.pointee.avail_in == 0 { break }
+                if stream.pointee.avail_out != 0, stream.pointee.avail_in == 0 { break }
             }
             stream.pointee.next_in = nil
         }
@@ -117,7 +117,7 @@ final class InflateStream: ByteStream {
 
     private func refill() throws {
         guard stream.pointee.avail_in == 0, !sourceEnded else { return }
-        guard let block = try source.read(upToCount: InflateStream.inputSize) else {
+        guard let block = try source.read(upToCount: Self.inputSize) else {
             sourceEnded = true
             return
         }
@@ -148,7 +148,7 @@ final class InflateStream: ByteStream {
     }
 
     private func fill(_ buffer: UnsafeMutablePointer<Bytef>, capacity: Int, produced: inout Int) throws {
-        while produced == 0 && !isFinished {
+        while produced == 0, !isFinished {
             try control?.check()
             try refill()
             stream.pointee.next_out = buffer
@@ -158,6 +158,7 @@ final class InflateStream: ByteStream {
             switch status {
             case Z_OK:
                 break
+
             case Z_STREAM_END:
                 // A GZIP file may hold several members one after the other.
                 try refill()
@@ -166,10 +167,13 @@ final class InflateStream: ByteStream {
                 } else {
                     isFinished = true
                 }
+
             case Z_BUF_ERROR where sourceEnded && stream.pointee.avail_in == 0:
                 throw ArchiveError.damaged("the compressed data ends too early")
+
             case Z_BUF_ERROR:
                 break
+
             default:
                 throw ArchiveError.damaged("the compressed data cannot be decoded")
             }
@@ -235,7 +239,7 @@ final class XZCoder {
                     throw ArchiveError.damaged("the LZMA data cannot be decoded")
                 }
                 if output.count >= limit { break }
-                if stream.pointee.dst_size != 0 && stream.pointee.src_size == 0 { break }
+                if stream.pointee.dst_size != 0, stream.pointee.src_size == 0 { break }
             }
         }
         return (output, consumed, ended)
@@ -299,7 +303,7 @@ final class XZStream: ByteStream {
                     try control?.check()
                     if let block = try source.read(upToCount: 1 << 16) { pending = block } else { sourceEnded = true }
                 }
-                if pending.isEmpty && sourceEnded { isFinished = true } else { try coder.restart() }
+                if pending.isEmpty, sourceEnded { isFinished = true } else { try coder.restart() }
             } else if result.output.isEmpty, sourceEnded, pending.isEmpty {
                 throw ArchiveError.damaged("the compressed data ends too early")
             }
@@ -361,7 +365,7 @@ enum Tool {
 
     /// Runs the program with `input` on its standard input and returns its standard output.
     static func filter(_ executable: String, _ arguments: [String], input: Data) throws -> Data {
-        let process = Tool.process(executable, arguments)
+        let process = Self.process(executable, arguments)
         let (stdin, stdout, stderr) = (Pipe(), Pipe(), Pipe())
         process.standardInput = stdin
         process.standardOutput = stdout
@@ -422,9 +426,9 @@ final class ProcessStream: ByteStream {
         try process.run()
         Tool.collect(errorPipe.fileHandleForReading, group: errorsRead) { [weak self] text in
             guard let self else { return }
-            self.lock.lock()
-            self.errors = text
-            self.lock.unlock()
+            lock.lock()
+            errors = text
+            lock.unlock()
         }
         control?.onSet { [weak self] in self?.stop() }
     }
@@ -561,6 +565,7 @@ extension ArchiveFormat.Codec {
         switch self {
         case .gzip: return InflateStream(FileRangeStream(file), wrapping: .gzip, control: control)
         case .xz: return try XZStream(FileRangeStream(file), control: control)
+
         case .bzip2:
             // The child opens the file by its path: it must still be the file that was listed.
             guard file.isStillAtItsPath else {
@@ -600,6 +605,7 @@ final class ParallelCompressor {
         case .none: (pieceSize, windowSize) = (1 << 20, 1 << 20)
         case .gzip: (pieceSize, windowSize) = (1 << 20, (1 << 20) * cores)
         case .bzip2: (pieceSize, windowSize) = (4 << 20, (4 << 20) * cores)
+
         // The LZMA encoder needs a lot of memory per stream, so fewer run at once.
         case .xz: (pieceSize, windowSize) = (8 << 20, (8 << 20) * min(cores, 4))
         }
@@ -612,7 +618,10 @@ final class ParallelCompressor {
     }
 
     func write(_ data: Data) throws {
-        if method == .none { return try output.write(data) }
+        if method == .none {
+            try output.write(data)
+            return
+        }
         buffer.append(data)
         if buffer.count >= windowSize { try drain(final: false) }
     }
@@ -648,8 +657,10 @@ final class ParallelCompressor {
                 switch method {
                 case .gzip(let level):
                     return (Deflater.piece(piece, level: level, final: final && index == lastIndex), CRC32.of(piece))
+
                 case .bzip2(let level):
                     return (try Tool.filter(Tool.bzip2, ["-c", "-\(max(1, min(level, 9)))"], input: piece), 0)
+
                 case .xz: return (try XZCoder.compress(piece), 0)
                 case .none: return (piece, 0)
                 }

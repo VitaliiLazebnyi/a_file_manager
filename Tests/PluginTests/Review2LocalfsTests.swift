@@ -41,7 +41,7 @@ private func status(_ url: URL) -> stat {
 
     // MARK: Special files
 
-    private func fifo(_ box: Sandbox, _ name: String = "pipe") throws -> URL {
+    private func fifo(_ box: Sandbox, _ name: String = "pipe") -> URL {
         let url = box.url(name)
         #expect(mkfifo(url.path, 0o600) == 0)
         return url
@@ -58,7 +58,7 @@ private func status(_ url: URL) -> stat {
             ("zero", URL(fileURLWithPath: "/dev/zero")), ("folder", box.root)
         ] {
             let returned = finishes {
-                let threw = (try? self.local.read(url)) == nil
+                let threw = (try? local.read(url)) == nil
                 lock.lock()
                 results[name] = threw
                 lock.unlock()
@@ -83,7 +83,7 @@ private func status(_ url: URL) -> stat {
         let lock = NSLock()
         for url in [pipe, box.url("pipelink"), box.url("filelink")] {
             let returned = finishes {
-                let failed = (try? self.local.append(to: url, at: nil)) == nil
+                let failed = (try? local.append(to: url, at: nil)) == nil
                 lock.lock()
                 threw.append(failed)
                 lock.unlock()
@@ -104,21 +104,21 @@ private func status(_ url: URL) -> stat {
         let pipe = try fifo(box)
         let file = try box.file("f.txt", "data")
         var threw = false
-        #expect(finishes { threw = (try? self.local.copyMetadata(from: file, to: pipe)) == nil })
+        #expect(finishes { threw = (try? local.copyMetadata(from: file, to: pipe)) == nil })
         #expect(threw)
-        #expect(finishes { threw = (try? self.local.copyMetadata(from: pipe, to: file)) == nil })
+        #expect(finishes { threw = (try? local.copyMetadata(from: pipe, to: file)) == nil })
         #expect(threw)
         // A folder is a tree: it is not copied here, without progress and without a way to stop.
         try box.file("tree/a.txt")
         var calls = 0
         #expect(throws: (any Error).self) {
-            try self.local.copy(box.url("tree"), to: box.url("tree2")) { _ in
+            try local.copy(box.url("tree"), to: box.url("tree2")) { _ in
                 calls += 1
                 return true
             }
         }
         #expect(!box.exists("tree2") && calls == 0)
-        #expect(throws: (any Error).self) { try self.local.copy(pipe, to: box.url("pipe2")) { _ in true } }
+        #expect(throws: (any Error).self) { try local.copy(pipe, to: box.url("pipe2")) { _ in true } }
         // A link is copied as a link.
         try FileManager.default.createSymbolicLink(at: box.url("ln"), withDestinationURL: file)
         try local.copy(box.url("ln"), to: box.url("ln2")) { _ in true }
@@ -206,7 +206,7 @@ private func status(_ url: URL) -> stat {
         let third = try local.write(private600)
         try third.close(attributes: FileAttributes(permissions: 0o600))
         #expect(status(private600).st_mode & 0o777 == 0o600)
-        #expect(throws: FileSystemError.self) { try self.local.write(url) }
+        #expect(throws: FileSystemError.self) { try local.write(url) }
     }
 
     @Test func theAttributesOfANewFileGoToTheFileAndNotToWhatTheNameBecame() throws {
@@ -246,7 +246,7 @@ private func status(_ url: URL) -> stat {
         try local.setAttributes(FileAttributes(modified: date, permissions: 0o600), of: target)
         #expect(status(target).st_mode & 0o7777 == 0o600 && local.item(at: target)?.modified == date)
         #expect(throws: (any Error).self) {
-            try self.local.setAttributes(FileAttributes(permissions: 0o600), of: box.url("missing"))
+            try local.setAttributes(FileAttributes(permissions: 0o600), of: box.url("missing"))
         }
     }
 
@@ -259,7 +259,7 @@ private func status(_ url: URL) -> stat {
         try FileManager.default.createSymbolicLink(at: box.url("todir"), withDestinationURL: box.url("dir"))
         try FileManager.default.createSymbolicLink(at: box.url("rel"), withDestinationURL: URL(string: "dir/../dir")!)
         var items: [FileItem] = []
-        #expect(finishes { items = (try? self.local.list(box.root, showHidden: true)) ?? [] })
+        #expect(finishes { items = (try? local.list(box.root, showHidden: true)) ?? [] })
         let byName = Dictionary(uniqueKeysWithValues: items.map { ($0.name, $0) })
         #expect(byName["dangling"]?.isSymlink == true && byName["dangling"]?.isDirectory == false)
         #expect(byName["topipe"]?.isSpecial == true && byName["pipe"]?.isSpecial == true)
@@ -289,9 +289,9 @@ private func status(_ url: URL) -> stat {
         try local.copy(source, to: box.url("dst.txt")) { _ in true }
         #expect(status(box.url("dst.txt")).st_flags & UInt32(UF_IMMUTABLE) != 0)
         // Not unlocked and deleted merely because it was copied by this file system.
-        #expect(throws: (any Error).self) { try self.local.remove(box.url("dst.txt")) }
+        #expect(throws: (any Error).self) { try local.remove(box.url("dst.txt")) }
         #expect(throws: (any Error).self) {
-            try self.local.move(box.url("dst.txt"), to: box.url("moved.txt"), replacing: false)
+            try local.move(box.url("dst.txt"), to: box.url("moved.txt"), replacing: false)
         }
         #expect(box.exists("dst.txt"))
         // A locked folder whose metadata was copied is the user's as well.
@@ -300,7 +300,7 @@ private func status(_ url: URL) -> stat {
         lock(folder)
         try local.copyMetadata(from: folder, to: copy)
         #expect(status(copy).st_flags & UInt32(UF_IMMUTABLE) != 0)
-        #expect(throws: (any Error).self) { try self.local.remove(copy) }
+        #expect(throws: (any Error).self) { try local.remove(copy) }
         #expect(box.exists("copydir"))
     }
 
@@ -314,7 +314,7 @@ private func status(_ url: URL) -> stat {
         try local.move(temporary, to: box.url("final.txt"), replacing: false)
         #expect(status(box.url("final.txt")).st_flags & UInt32(UF_IMMUTABLE) != 0)
         // The entry went with the rename: the file with its real name is refused now.
-        #expect(throws: (any Error).self) { try self.local.remove(box.url("final.txt")) }
+        #expect(throws: (any Error).self) { try local.remove(box.url("final.txt")) }
         // A temporary that is abandoned can be removed.
         let abandoned = box.url(".afm-\(UUID().uuidString).tmp")
         try local.copy(source, to: abandoned) { _ in true }
@@ -327,7 +327,7 @@ private func status(_ url: URL) -> stat {
         defer { unlockAll(in: box) }
         let source = try box.file("src.txt", "d")
         lock(source)
-        let count = 4096 + 40
+        let count = 4_096 + 40
         for number in 0..<count { try local.copy(source, to: box.url(".afm-\(number).tmp")) { _ in true } }
         // The recent ones are all still this file system's to rename (a wipe at 4,096 drops them).
         for number in (count - 30)..<count {
@@ -390,7 +390,7 @@ private func status(_ url: URL) -> stat {
         let fresh = LocalFileSystem()
         let start = DispatchTime.now().uptimeNanoseconds
         let first = fresh.places()
-        for _ in 0..<1000 { _ = fresh.places() }
+        for _ in 0..<1_000 { _ = fresh.places() }
         // No call waits for the first reading (it used to wait a second at a time).
         #expect(DispatchTime.now().uptimeNanoseconds - start < 800_000_000)
         #expect(first.first?.kind == .home)

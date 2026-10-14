@@ -28,13 +28,13 @@ final class Review2HookProvider: FileSystemProvider {
         return closed
     }
 
-    func list(_ directory: URL, showHidden: Bool) throws -> [FileItem] { [] }
+    func list(_: URL, showHidden _: Bool) -> [FileItem] { [] }
     func parent(of directory: URL) -> URL? { directory.deletingLastPathComponent() }
-    func createDirectory(at url: URL) throws { throw FileSystemError.notSupported("x") }
-    func write(_ url: URL) throws -> FileWriter { throw FileSystemError.notSupported("x") }
-    func remove(_ url: URL) throws {}
-    func move(_ source: URL, to destination: URL, replacing: Bool) throws {}
-    func copy(_ source: URL, to destination: URL, progress: (Int64) -> Bool) throws {}
+    func createDirectory(at _: URL) throws { throw FileSystemError.notSupported("x") }
+    func write(_: URL) throws -> FileWriter { throw FileSystemError.notSupported("x") }
+    func remove(_: URL) {}
+    func move(_: URL, to _: URL, replacing _: Bool) {}
+    func copy(_: URL, to _: URL, progress _: (Int64) -> Bool) {}
 
     func item(at url: URL) -> FileItem? {
         FileItem(
@@ -52,7 +52,7 @@ final class Review2HookProvider: FileSystemProvider {
             self.data = data
         }
 
-        func read(upToCount count: Int) throws -> Data? {
+        func read(upToCount count: Int) -> Data? {
             guard let data else { return Data(repeating: 0x41, count: count) }
             guard position < data.count else { return nil }
             let block = data.subdata(in: position..<min(data.count, position + count))
@@ -60,7 +60,7 @@ final class Review2HookProvider: FileSystemProvider {
             return block
         }
 
-        func seek(to offset: UInt64) throws { position = Int(offset) }
+        func seek(to offset: UInt64) { position = Int(offset) }
 
         func close() {
             owner.onClose()
@@ -70,7 +70,7 @@ final class Review2HookProvider: FileSystemProvider {
         }
     }
 
-    func read(_ url: URL) throws -> FileReader {
+    func read(_ url: URL) -> FileReader {
         Reader(
             self, data: endless.contains(url.path) ? nil : contents[url.path] ?? Data(count: Int(sizes[url.path] ?? 0))
         )
@@ -99,12 +99,12 @@ final class Review2HookProvider: FileSystemProvider {
         let directory = try folder()
         defer { try? FileManager.default.removeItem(at: directory) }
         let target = directory.appendingPathComponent("target.log")
-        try Data(repeating: UInt8(ascii: "x"), count: 5000).write(to: target)
+        try Data(repeating: UInt8(ascii: "x"), count: 5_000).write(to: target)
         let link = directory.appendingPathComponent("current.log")
         try FileManager.default.createSymbolicLink(at: link, withDestinationURL: target)
         let source = try ProviderByteSource.open(link, fileSystems: local())
-        #expect(source is ProviderByteSource && source.length == 5000)
-        #expect(try source.read(at: 4990, count: 100).count == 10)
+        #expect(source is ProviderByteSource && source.length == 5_000)
+        #expect(try source.read(at: 4_990, count: 100).count == 10)
         // An empty file is empty, through a link too.
         let empty = directory.appendingPathComponent("empty")
         try Data().write(to: empty)
@@ -136,7 +136,7 @@ final class Review2HookProvider: FileSystemProvider {
         #expect(worker.waitUntilFinished(timeout: 20) && outcome.value)
     }
 
-    @Test func measuringAFileOfUnknownSizeStopsWithItsFlag() throws {
+    @Test func measuringAFileOfUnknownSizeStopsWithItsFlag() {
         let provider = Review2HookProvider()
         provider.endless = ["/stream"]
         let registry = FileSystemRegistry()
@@ -217,19 +217,19 @@ final class Review2HookProvider: FileSystemProvider {
         final class Flaky: ByteSource {
             let length: Int64 = 40_000
             var short = true
-            func read(at offset: Int64, count: Int) throws -> Data {
+            func read(at offset: Int64, count: Int) -> Data {
                 let wanted = min(count, 40_000 - Int(offset))
                 return Data(repeating: 0x61, count: short ? wanted / 2 : wanted)
             }
         }
         let base = Flaky()
-        let cached = CachedByteSource(base, blockSize: 4096, capacity: 8)
+        let cached = CachedByteSource(base, blockSize: 4_096, capacity: 8)
         // A read that came back short ...
         #expect(try cached.read(at: 0, count: 100).count == 100)
         base.short = false
         // ... is not remembered: the next one asks again and gets the whole block.
-        #expect(try cached.read(at: 0, count: 4096).count == 4096)
-        #expect(try cached.read(at: 0, count: 4096).count == 4096)
+        #expect(try cached.read(at: 0, count: 4_096).count == 4_096)
+        #expect(try cached.read(at: 0, count: 4_096).count == 4_096)
     }
 
     @Test func aLongReadOfFourBlocksGoesPastTheMemoryCache() throws {
@@ -276,7 +276,7 @@ final class Review2HookProvider: FileSystemProvider {
     @Test func aSaveOfAFileThatBecameShorterFailsAndLeavesTheTargetAlone() throws {
         final class Short: ByteSource {
             let length: Int64 = 2_000_000
-            func read(at offset: Int64, count: Int) throws -> Data {
+            func read(at offset: Int64, count: Int) -> Data {
                 offset >= 1_500_000 ? Data() : Data(repeating: 0x42, count: min(count, 1_500_000 - Int(offset)))
             }
         }
@@ -356,7 +356,7 @@ final class Review2HookProvider: FileSystemProvider {
         let memory = MemoryFileSystem()
         let registry = FileSystemRegistry()
         registry.register(memory)
-        let url = memory.addFile("/a/clip.mp4", String(repeating: "c", count: 1000))
+        let url = memory.addFile("/a/clip.mp4", String(repeating: "c", count: 1_000))
         let copies = TemporaryCopies()
         defer { copies.removeAll() }
         let owner = ObjectIdentifier(copies)
@@ -441,9 +441,11 @@ final class Review2HookProvider: FileSystemProvider {
     @Test func codePagesThatCannotBeDecodedAreNotOffered() {
         // EUC-JP and GB 18030 were taken out in the first pass and are back (second pass), decoded by their layout; other
         // code pages of many bytes (ISO-2022, EUC-KR, HZ ...) are still not offered.
-        #expect(ViewerEncoding.codePage(51932) != nil && ViewerEncoding.codePage(54936) != nil)
-        for page in [50220, 50221, 50222, 51949, 52936] { #expect(ViewerEncoding.codePage(page) == nil, "\(page)") }
-        for page in [1252, 437, 866, 932, 936, 949, 950, 28591, 20866, 65001] {
+        #expect(ViewerEncoding.codePage(51_932) != nil && ViewerEncoding.codePage(54_936) != nil)
+        for page in [50_220, 50_221, 50_222, 51_949, 52_936] {
+            #expect(ViewerEncoding.codePage(page) == nil, "\(page)")
+        }
+        for page in [1_252, 437, 866, 932, 936, 949, 950, 28_591, 20_866, 65_001] {
             #expect(ViewerEncoding.codePage(page) != nil, "\(page)")
         }
         #expect(ViewerEncoding.codePages.contains(.ansi) && ViewerEncoding.codePages.contains { $0.codePage == 932 })

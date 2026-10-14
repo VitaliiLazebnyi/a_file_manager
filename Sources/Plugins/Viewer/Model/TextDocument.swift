@@ -42,17 +42,17 @@ struct HexFormat: Equatable {
     /// The column of the first hex digit of byte `position` in a row.
     func hexColumn(_ position: Int) -> Int { offsetDigits + 2 + position * 3 }
     /// The column of the character of byte `position`.
-    func characterColumn(_ position: Int) -> Int { offsetDigits + 2 + HexFormat.bytesPerRow * 3 + 2 + position }
+    func characterColumn(_ position: Int) -> Int { offsetDigits + 2 + Self.bytesPerRow * 3 + 2 + position }
 
     func line(offset: Int64, bytes: [UInt8], table: CodeTable) -> String {
         let digits = Array("0123456789ABCDEF".utf16)
         var units: [UInt16] = []
-        units.reserveCapacity(characterColumn(HexFormat.bytesPerRow))
+        units.reserveCapacity(characterColumn(Self.bytesPerRow))
         let offsetText = String(offset, radix: 16, uppercase: true)
         units.append(contentsOf: repeatElement(0x30, count: max(0, offsetDigits - offsetText.count)))
         units.append(contentsOf: offsetText.utf16)
         units.append(contentsOf: [0x3A, 0x20])
-        for position in 0..<HexFormat.bytesPerRow {
+        for position in 0..<Self.bytesPerRow {
             if position < bytes.count {
                 units.append(digits[Int(bytes[position] >> 4)])
                 units.append(digits[Int(bytes[position] & 0x0F)])
@@ -62,7 +62,7 @@ struct HexFormat: Equatable {
             }
         }
         units.append(contentsOf: [0x7C, 0x20])
-        for byte in bytes { units.append(HexFormat.printable(table.single[Int(byte)])) }
+        for byte in bytes { units.append(Self.printable(table.single[Int(byte)])) }
         return String(decoding: units, as: UTF16.self)
     }
 
@@ -138,6 +138,7 @@ final class TextDocument {
                 ? previous?.index : nil
             index = TextRowIndex(start: range.lowerBound, reusing: before)
             tableEncoding = nil
+
         case .binary, .hex:
             self.encoding = encoding.byteOriented
             content = 0..<source.length
@@ -277,7 +278,7 @@ final class TextDocument {
         var found: Int?
         try walk(from: position, cancellation) { row, _, startsLine, number, _, _, _ in
             if let end = position.endRow, row >= end { return false }
-            if startsLine && number == line { found = row }
+            if startsLine, number == line { found = row }
             return found == nil && number <= line
         }
         return found
@@ -300,7 +301,7 @@ final class TextDocument {
         var readPosition = position.offset
         var text = DecodedText()
         while true {
-            let wanted = Int(min(32 * 1024, content.upperBound - readPosition))
+            let wanted = Int(min(32 * 1_024, content.upperBound - readPosition))
             let chunk = try source.read(at: readPosition, count: wanted, interruptedBy: cancellation)
             readPosition += Int64(chunk.count)
             bytes.append(contentsOf: chunk)

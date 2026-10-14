@@ -100,7 +100,7 @@ final class FTPSession: RemoteSession {
     /// An idle connection older than this is tested before it is used again.
     private static let trustedIdleTime: TimeInterval = 20
     /// The keep-alive stops after this long without real use (spec 11 › Field semantics).
-    private static let keepAliveLimit: TimeInterval = 3600
+    private static let keepAliveLimit: TimeInterval = 3_600
 
     /// How long a wait for a connection, or for another thread's login, goes on while nothing
     /// moves on any connection of the session and no question is open. Tests shorten it.
@@ -329,7 +329,7 @@ final class FTPSession: RemoteSession {
                 // A password on plain FTP can be read by anyone on the way.
                 if profile.tls == .none, profile.user != "anonymous", !(profile.password ?? "").isEmpty,
                     !askedUnprotected,
-                    environment.asksAboutUnprotectedLoopback || !FTPSession.isLoopback(profile.key.host)
+                    environment.asksAboutUnprotectedLoopback || !Self.isLoopback(profile.key.host)
                 {
                     guard
                         try ask(
@@ -433,14 +433,14 @@ final class FTPSession: RemoteSession {
                 let server = currentProfile.key.description
                 if isClosed { throw leave(NetworkError.notConnected(server)) }
                 let limit = max(1, environment.options.values.parallelConnections)
-                let hasSlot = transfer.map { holders(of: $0) < limit + FTPSession.extraTransferConnections } ?? true
+                let hasSlot = transfer.map { holders(of: $0) < limit + Self.extraTransferConnections } ?? true
                 if hasSlot {
                     if !fresh, let connection = idle.popLast() {
                         candidate = connection
                         break
                     }
                     let serverHasRoom =
-                        busyRetries <= FTPSession.busyDelays.count && (openNotBefore.map { Date() >= $0 } ?? true)
+                        busyRetries <= Self.busyDelays.count && (openNotBefore.map { Date() >= $0 } ?? true)
                     // A connection that is on its way back is waited for, for a moment.
                     let oneIsComing =
                         (returning > 0 || pinged != nil) && !fresh && Date().timeIntervalSince(began) < returnGrace
@@ -474,7 +474,7 @@ final class FTPSession: RemoteSession {
 
             if let connection = candidate {
                 // A connection that sat idle may have been dropped by the server or a router.
-                if Date().timeIntervalSince(connection.lastUsed) > FTPSession.trustedIdleTime,
+                if Date().timeIntervalSince(connection.lastUsed) > Self.trustedIdleTime,
                     !connection.isAlive(cancellation: cancellation ?? closing)
                 {
                     discard(connection, wasInUse: false, transfer: transfer)
@@ -500,8 +500,8 @@ final class FTPSession: RemoteSession {
                         // thread takes a connection that comes free, or asks the server again
                         // after a while; when the server keeps saying no, only the former.
                         busyReply = reply
-                        if busyRetries < FTPSession.busyDelays.count {
-                            openNotBefore = Date().addingTimeInterval(FTPSession.busyDelays[busyRetries])
+                        if busyRetries < Self.busyDelays.count {
+                            openNotBefore = Date().addingTimeInterval(Self.busyDelays[busyRetries])
                         }
                         busyRetries += 1
                         again = true
@@ -649,7 +649,7 @@ final class FTPSession: RemoteSession {
             // One connection is kept warm for an hour; the others go when nothing has happened for a while.
             let isTheOne = idle.isEmpty && kept == 0
             condition.unlock()
-            let wanted = isTheOne ? resting < FTPSession.keepAliveLimit : resting < max(120, interval * 2)
+            let wanted = isTheOne ? resting < Self.keepAliveLimit : resting < max(120, interval * 2)
             let alive = wanted && connection.isAlive(cancellation: closing)
             condition.lock()
             pinged = nil
@@ -721,8 +721,8 @@ final class FTPSession: RemoteSession {
         condition.lock()
         var seen = Set<String>()
         pendingLinks = Array(
-            (paths + pendingLinks).filter { seen.insert($0).inserted }.prefix(FTPSession.backgroundLinks))
-        linkDeadline = Date().addingTimeInterval(FTPSession.backgroundLinkTime)
+            (paths + pendingLinks).filter { seen.insert($0).inserted }.prefix(Self.backgroundLinks))
+        linkDeadline = Date().addingTimeInterval(Self.backgroundLinkTime)
         let start = !isResolving && !isClosed
         if start { isResolving = true }
         condition.unlock()
@@ -744,7 +744,7 @@ final class FTPSession: RemoteSession {
                 condition.unlock()
                 return
             }
-            let batch = Array(pendingLinks.prefix(FTPSession.backgroundLinkBatch))
+            let batch = Array(pendingLinks.prefix(Self.backgroundLinkBatch))
             pendingLinks.removeFirst(batch.count)
             condition.unlock()
 
@@ -831,7 +831,7 @@ final class FTPSession: RemoteSession {
     }
 
     /// FTP has one rename, and what it does to an existing destination is the server's choice.
-    func rename(_ source: String, to destination: String, replacing: Bool, cancellation: CancellationFlag?) throws {
+    func rename(_ source: String, to destination: String, replacing _: Bool, cancellation: CancellationFlag?) throws {
         try withEither(closing, cancellation) { closing in
             try command(repeatable: false, cancellation: closing) {
                 try $0.rename(source, to: destination, cancellation: closing)
@@ -978,7 +978,7 @@ private final class FTPReader: FileReader {
     /// Set by `interrupt`; the waits of this reader (also for a free connection) look at it.
     private let abort = CancellationFlag()
     /// A short way forward is read and thrown away instead of starting a new transfer.
-    private static let skipLimit: UInt64 = 256 * 1024
+    private static let skipLimit: UInt64 = 256 * 1_024
 
     init(session: FTPSession, path: String, asText: Bool) {
         self.session = session
@@ -1064,7 +1064,7 @@ private final class FTPReader: FileReader {
         defer { end() }
         if offset == position, !atEnd { return }
         if asText { throw FileSystemError.notSupported("Continuing a transfer in text mode") }
-        if let active, !atEnd, offset > position, offset - position <= FTPReader.skipLimit {
+        if let active, !atEnd, offset > position, offset - position <= Self.skipLimit {
             var left = Int(offset - position)
             do {
                 while left > 0 {
@@ -1208,7 +1208,7 @@ private final class FTPWriter: FileWriter {
         } catch {
             if interrupted { active.connection.abandonTransfer() } else { active.connection.abortTransfer() }
             giveBack(active.connection)
-            if failed && !interrupted { return }
+            if failed, !interrupted { return }
             throw error
         }
         defer { giveBack(active.connection) }

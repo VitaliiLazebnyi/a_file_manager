@@ -39,17 +39,17 @@ private final class Review2WatchFileSystem: FileSystemProvider {
         for (directories, report) in all { report(directories) }
     }
 
-    func list(_ directory: URL, showHidden: Bool) throws -> [FileItem] { [] }
+    func list(_: URL, showHidden _: Bool) -> [FileItem] { [] }
     func item(at url: URL) -> FileItem? { FileItem(url: url, name: url.lastPathComponent, isDirectory: false) }
     func parent(of directory: URL) -> URL? { directory.path == "/" ? nil : directory.deletingLastPathComponent() }
-    func read(_ url: URL) throws -> FileReader { throw FileSystemError.notSupported("Reading") }
-    func createDirectory(at url: URL) throws { throw FileSystemError.notSupported("Writing") }
-    func write(_ url: URL) throws -> FileWriter { throw FileSystemError.notSupported("Writing") }
-    func remove(_ url: URL) throws { throw FileSystemError.notSupported("Writing") }
-    func move(_ source: URL, to destination: URL, replacing: Bool) throws {
+    func read(_: URL) throws -> FileReader { throw FileSystemError.notSupported("Reading") }
+    func createDirectory(at _: URL) throws { throw FileSystemError.notSupported("Writing") }
+    func write(_: URL) throws -> FileWriter { throw FileSystemError.notSupported("Writing") }
+    func remove(_: URL) throws { throw FileSystemError.notSupported("Writing") }
+    func move(_: URL, to _: URL, replacing _: Bool) throws {
         throw FileSystemError.notSupported("Writing")
     }
-    func copy(_ source: URL, to destination: URL, progress: (Int64) -> Bool) throws {
+    func copy(_: URL, to _: URL, progress _: (Int64) -> Bool) throws {
         throw FileSystemError.notSupported("Writing")
     }
 
@@ -62,7 +62,7 @@ private final class Review2WatchFileSystem: FileSystemProvider {
 }
 
 @Suite struct Review2ConfigBVirtualFileSystem {
-    @Test func watcherReportsReachTheCallerOnTheMainThreadWhicheverThreadFiresThem() async throws {
+    @Test func watcherReportsReachTheCallerOnTheMainThreadWhicheverThreadFiresThem() async {
         let provider = Review2WatchFileSystem()
         let registry = FileSystemRegistry()
         registry.register(provider)
@@ -103,7 +103,7 @@ private final class Review2WatchFileSystem: FileSystemProvider {
         _ = watcher
     }
 
-    @Test func aHugeListIsRegisteredWithoutWorkOnTheCallerAndWatchedByAtMostTheLimit() throws {
+    @Test func aHugeListIsRegisteredWithoutWorkOnTheCallerAndWatchedByAtMostTheLimit() {
         let provider = Review2WatchFileSystem()
         let registry = FileSystemRegistry()
         registry.register(provider)
@@ -147,7 +147,7 @@ private final class Review2WatchFileSystem: FileSystemProvider {
         #expect(plain == ["/a/x.txt", "/b/x.txt", "/c/y", "/d/y"])
     }
 
-    @Test func leastRecentlyUsedUnwatchedListGoesFirst() throws {
+    @Test func leastRecentlyUsedUnwatchedListGoesFirst() {
         let provider = Review2WatchFileSystem()
         let registry = FileSystemRegistry()
         registry.register(provider)
@@ -178,7 +178,7 @@ private final class Review2WatchFileSystem: FileSystemProvider {
         #expect(virtual.capabilities.isSubset(of: local) && virtual.capabilities.isSubset(of: limited.capabilities))
     }
 
-    @Test func realLocationOfABranchItemIsTheRealFile() throws {
+    @Test func realLocationOfABranchItemIsTheRealFile() {
         let registry = FileSystemRegistry()
         let virtual = VirtualFileSystem(fileSystems: registry)
         let real = URL(fileURLWithPath: "/Users/x/dir/a.txt")
@@ -187,7 +187,7 @@ private final class Review2WatchFileSystem: FileSystemProvider {
         #expect(virtual.realLocation(of: VirtualLocation.list(id: 1, title: "T", origin: nil).url) == nil)
     }
 
-    @Test func aTypedListNoteNeedsTheListsOwnTitle() throws {
+    @Test func aTypedListNoteNeedsTheListsOwnTitle() {
         let provider = Review2WatchFileSystem()
         let registry = FileSystemRegistry()
         registry.register(provider)
@@ -276,7 +276,7 @@ private final class Review2WatchFileSystem: FileSystemProvider {
     }
 
     @Test func aStoredHistoryHoldsNoMoreThanItKeeps() throws {
-        let visits = (0..<1000).map { #"{"location":"file:///d\#($0)","isVisible":true}"# }.joined(separator: ",")
+        let visits = (0..<1_000).map { #"{"location":"file:///d\#($0)","isVisible":true}"# }.joined(separator: ",")
         let history = try JSONDecoder().decode(DirectoryHistory.self, from: Data(#"{"visits":[\#(visits)]}"#.utf8))
         #expect(history.visits.count == DirectoryHistory.storedLimit && history.current?.path == "/d999")
         var again = history
@@ -338,7 +338,7 @@ private final class Review2WatchFileSystem: FileSystemProvider {
         let file = try #require(cache.fileURL(for: root))
         try FileManager.default.createDirectory(
             at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
-        let line = "[" + String(repeating: "x", count: 1022) + "]\n"
+        let line = "[" + String(repeating: "x", count: 1_022) + "]\n"
         var text = "root=" + root.absoluteString + "\n"
         text += String(repeating: line, count: TreeCache.fileLimit / line.utf8.count + 10)
         try text.write(to: file, atomically: true, encoding: .utf8)
@@ -391,9 +391,9 @@ private final class Review2WatchFileSystem: FileSystemProvider {
         #expect(values.count == 3 && values[1] == IOPOL_THROTTLE && values[2] == values[0], "\(values)")
     }
 
-    @Test func quickSearchWorksInSlicesAndMatchesTheBlockingSearch() throws {
+    @Test func quickSearchWorksInSlicesAndMatchesTheBlockingSearch() {
         let root = URL(fileURLWithPath: "/Volumes/R2", isDirectory: true)
-        let tree = DirectoryTree(rootURL: root, paths: (0..<5000).map { "dir\($0)" } + ["needle"])
+        let tree = DirectoryTree(rootURL: root, paths: (0..<5_000).map { "dir\($0)" } + ["needle"])
         let blocking = tree.find("needle", from: nil)
         var progress = tree.search("needle", from: nil, timeBudget: 0)
         var steps = 0
@@ -418,7 +418,7 @@ private final class Review2WatchFileSystem: FileSystemProvider {
 @Suite struct Review2ConfigBTabs {
     let memory = MemoryFileSystem()
 
-    func read(_ text: String) -> TabFile? { TabFile(text: text) { self.memory.location(from: $0) } }
+    func read(_ text: String) -> TabFile? { TabFile(text: text) { memory.location(from: $0) } }
 
     @Test func pathsAndCaptionsWithLineBreaksRoundTripWithoutInjectingLines() throws {
         let awkward = memory.url("/tmp/a\n1_path=sftp://evil.example/x")
@@ -453,7 +453,7 @@ private final class Review2WatchFileSystem: FileSystemProvider {
     }
 
     @Test func aTabFileOpensNoMoreThanTheLimit() throws {
-        let lines = (0..<5000).map { "\($0)_path=mem:/d\($0)" }.joined(separator: "\n")
+        let lines = (0..<5_000).map { "\($0)_path=mem:/d\($0)" }.joined(separator: "\n")
         let file = try #require(read("[activetabs]\n" + lines + "\n"))
         #expect(file.active.tabs.count == TabFile.tabLimit)
         let huge = String(repeating: "x", count: TabFile.pathLimit + 1)
@@ -503,7 +503,7 @@ private final class Review2WatchFileSystem: FileSystemProvider {
     }
 
     @Test func aFileWithThousandsOfTabsOpensTheLimit() {
-        let lines = (0..<3000).map { "\($0)_path=mem:/A/d\($0)" }.joined(separator: "\n")
+        let lines = (0..<3_000).map { "\($0)_path=mem:/A/d\($0)" }.joined(separator: "\n")
         memory.addFile("/B/huge.tab", "[activetabs]\n" + lines + "\n")
         bench.commands.perform("APPENDTABS", .location(memory.url("/B/huge.tab")))
         #expect(bench.left.tabs.count <= FolderTabsPlugin.tabsPerPanelLimit)

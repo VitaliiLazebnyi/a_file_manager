@@ -53,7 +53,7 @@ private let everyOrder = [SortKey.name, .ext, .size, .date, .unsorted].flatMap {
     }
 
     @Test func sortingGivesTheOrderOfTheComparisonForEveryKindOfName() {
-        for (count, seed) in [(0, 1), (1, 2), (2, 3), (700, 4), (3000, 5)] as [(Int, UInt64)] {
+        for (count, seed) in [(0, 1), (1, 2), (2, 3), (700, 4), (3_000, 5)] as [(Int, UInt64)] {
             let items = variedItems(count, seed: seed)
             for order in everyOrder {
                 #expect(Sorter.sort(items, by: order) == reference(items, order), "\(count) items by \(order)")
@@ -82,7 +82,7 @@ private let everyOrder = [SortKey.name, .ext, .size, .date, .unsorted].flatMap {
             "aa", "a", "å", "ä", "ae", "æ", "ö", "ø", "o", "z", "y", "ü", "u", "w", "v", "ch", "c", "h", "Aa", "Z",
             "ll", "l", "ñ", "n"
         ]
-        let items = (0..<2500).map { index -> FileItem in
+        let items = (0..<2_500).map { index -> FileItem in
             let name =
                 (0..<(1 + random.next(3))).map { _ in syllables[random.next(syllables.count)] }.joined()
                 + String(random.next(50)) + "-\(index)"
@@ -117,7 +117,7 @@ private let everyOrder = [SortKey.name, .ext, .size, .date, .unsorted].flatMap {
     }
 
     @Test func mergingAndAddingBatchesGiveTheSortedList() {
-        let items = variedItems(1500, seed: 7)
+        let items = variedItems(1_500, seed: 7)
         for order in everyOrder {
             let (first, second) = (Array(items[..<900]), Array(items[900...]))
             let merged = Sorter.merge(Sorter.sort(first, by: order), with: Sorter.sort(second, by: order), by: order)
@@ -360,8 +360,8 @@ private let everyOrder = [SortKey.name, .ext, .size, .date, .unsorted].flatMap {
         #expect(model.totals == counted(model))
         model.setSelected(false, names: ["file7.txt", "file12.txt"])
         #expect(model.totals == counted(model))
-        model.setComputedSize(5000, forName: "folder0")
-        #expect(model.totals == counted(model) && model.totals.selectedBytes >= 5000)
+        model.setComputedSize(5_000, forName: "folder0")
+        #expect(model.totals == counted(model) && model.totals.selectedBytes >= 5_000)
         model.setComputedSize(70, forName: "folder0")
         model.setComputedSize(9, forName: "folder10")
         #expect(model.totals == counted(model))

@@ -157,7 +157,7 @@ private func sourceLike(_ count: Int, seed: UInt64) -> [Int] {
         #expect(!session.hasUnsavedChanges)
     }
 
-    @Test func quittingAsksAboutUnsavedEditsAndCanBeCalledOff() throws {
+    @Test func quittingAsksAboutUnsavedEditsAndCanBeCalledOff() {
         open()
         session.setText("two edited", .left, row: 1)
         ui.choiceAnswers = [2]  // Cancel

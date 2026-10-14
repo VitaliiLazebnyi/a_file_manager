@@ -11,14 +11,14 @@ import Testing
         #expect(Format.kilobytes(.min) == "-9,007,199,254,740,992 k")
         #expect(
             Format.kilobytes(0) == "0 k" && Format.kilobytes(511) == "0 k" && Format.kilobytes(512) == "1 k"
-                && Format.kilobytes(1535) == "1 k")
-        #expect(Format.kilobytes(1536) == "2 k" && Format.kilobytes(3_693_568) == "3,607 k")
+                && Format.kilobytes(1_535) == "1 k")
+        #expect(Format.kilobytes(1_536) == "2 k" && Format.kilobytes(3_693_568) == "3,607 k")
         #expect(Format.bytes(.max) == "9,223,372,036,854,775,807" && Format.bytes(.min) == "-9,223,372,036,854,775,808")
         #expect(
-            Format.bytes(0) == "0" && Format.bytes(999) == "999" && Format.bytes(1000) == "1,000"
+            Format.bytes(0) == "0" && Format.bytes(999) == "999" && Format.bytes(1_000) == "1,000"
                 && Format.bytes(250_944) == "250,944")
         #expect(
-            Format.bytes(-1) == "-1" && Format.bytes(-1000) == "-1,000" && Format.bytes(-123_456) == "-123,456"
+            Format.bytes(-1) == "-1" && Format.bytes(-1_000) == "-1,000" && Format.bytes(-123_456) == "-123,456"
                 && Format.bytes(100_000) == "100,000")
         #expect(Format.shortSize(.max).hasSuffix(" T") && Format.shortSize(.min).hasSuffix(" b"))
     }
@@ -32,7 +32,8 @@ import Testing
             #expect(!Format.duration(time).isEmpty)
         }
         #expect(
-            Format.duration(8) == "8 s" && Format.duration(80) == "1 min 20 s" && Format.duration(7500) == "2 h 05 min")
+            Format.duration(8) == "8 s" && Format.duration(80) == "1 min 20 s" && Format.duration(7_500) == "2 h 05 min"
+        )
     }
 
     @Test func sumsOfSizesStopAtTheEndsOfTheRange() {

@@ -140,7 +140,7 @@ public enum DuplicateFinder {
         let on: String
 
         /// The mount that holds `url`, when it is not a local disk; nil otherwise.
-        static func of(_ url: URL) -> Mount? {
+        static func of(_ url: URL) -> Self? {
             var info = statfs()
             guard url.withUnsafeFileSystemRepresentation({ $0.map { statfs($0, &info) } ?? -1 }) == 0,
                 info.f_flags & UInt32(MNT_LOCAL) == 0
@@ -151,7 +151,7 @@ public enum DuplicateFinder {
                 }
             }
             let (from, on) = (text(info.f_mntfromname), text(info.f_mntonname))
-            return from.isEmpty ? nil : Mount(from: text(info.f_fstypename) + ":" + from, on: on)
+            return from.isEmpty ? nil : Self(from: text(info.f_fstypename) + ":" + from, on: on)
         }
 
         /// The file in the share, as the same text for every place the share is mounted at.

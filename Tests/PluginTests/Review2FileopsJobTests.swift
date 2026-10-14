@@ -72,7 +72,7 @@ final class FlakyFileSystem: FileSystemProvider {
     func move(_ source: URL, to destination: URL, replacing: Bool) throws {
         try base.move(source, to: destination, replacing: replacing)
     }
-    func copy(_ source: URL, to destination: URL, progress: (Int64) -> Bool) throws {
+    func copy(_: URL, to _: URL, progress _: (Int64) -> Bool) throws {
         throw FileSystemError.crossesVolumes
     }
     func displayPath(_ url: URL) -> String { base.displayPath(url) }
@@ -96,23 +96,23 @@ final class Review2Replies: FileJobDelegate {
         (self.conflict, failureAnswers, self.volume) = (conflict, failures, volume)
     }
 
-    func job(_ job: FileJob, progress: JobProgress) {}
-    func job(_ job: FileJob, conflictAt target: FileItem, source: FileItem) -> ConflictChoice {
+    func job(_: FileJob, progress _: JobProgress) {}
+    func job(_: FileJob, conflictAt target: FileItem, source _: FileItem) -> ConflictChoice {
         lock.withLock { conflicts.append(target.name) }
         return conflict
     }
-    func job(_ job: FileJob, failedAt url: URL, error: Error) -> ErrorChoice {
+    func job(_: FileJob, failedAt _: URL, error: Error) -> ErrorChoice {
         lock.withLock {
             errors.append(error.localizedDescription)
             return failureAnswers.count > 1 ? failureAnswers.removeFirst() : failureAnswers[0]
         }
     }
-    func job(_ job: FileJob, confirmDeleteNonEmpty directory: URL) -> FolderDeleteChoice { .delete }
-    func job(_ job: FileJob, confirm question: ProtectionQuestion) -> ProtectionChoice {
+    func job(_: FileJob, confirmDeleteNonEmpty _: URL) -> FolderDeleteChoice { .delete }
+    func job(_: FileJob, confirm question: ProtectionQuestion) -> ProtectionChoice {
         if question.reason == .locked { lock.withLock { locked += 1 } }
         return .proceed
     }
-    func job(_ job: FileJob, crossVolumeAt folder: FileItem, purpose: ProtectionQuestion.Purpose) -> ProtectionChoice {
+    func job(_: FileJob, crossVolumeAt folder: FileItem, purpose _: ProtectionQuestion.Purpose) -> ProtectionChoice {
         lock.withLock { volumes.append(folder.name) }
         return volume
     }
@@ -526,7 +526,7 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
         #expect(box.read("t/same.txt") == "old")
     }
 
-    @Test func theGrainOfAVolumeDecidesTheTolerance() throws {
+    @Test func theGrainOfAVolumeDecidesTheTolerance() {
         let (_, memory) = makeFileSystems()
         #expect(FileIdentity.timestampGrain(of: memory.url("/a/b.txt")) == 2)
         // A place that does not exist yet answers for the folder above it.
@@ -631,7 +631,7 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
 
     // MARK: F046, F045, F049, F053, F051, F021
 
-    @Test func abortAlsoSetsTheJobsOwnFlagSoThatNothingWaitsOnIt() throws {
+    @Test func abortAlsoSetsTheJobsOwnFlagSoThatNothingWaitsOnIt() {
         let (fileSystems, memory) = makeFileSystems()
         let flag = CancellationFlag()
         let job = FileJob(
@@ -828,7 +828,7 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
         #expect(delete.completed.count == 2 && answers.errors.isEmpty && namesOnDisk(box.root).isEmpty)
     }
 
-    @Test func aTreeDeeperThanTheLimitIsReportedNotEntered() throws {
+    @Test func aTreeDeeperThanTheLimitIsReportedNotEntered() {
         let (fileSystems, memory) = makeFileSystems()
         let limit = 12
         var path = "/deep"
@@ -934,7 +934,7 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
     }
 
     // F012, F020
-    @Test func deletingAFolderDoesNotGoIntoAVolumeMountedInsideIt() throws {
+    @Test func deletingAFolderDoesNotGoIntoAVolumeMountedInsideIt() {
         defer { detach() }
         guard attached else { return }
         let fileSystems = makeFileSystems().0
@@ -976,7 +976,7 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
         #expect(box.read("t/tree/beside.txt") == "outside" && !box.exists("t/tree/mnt/precious.txt"))
     }
 
-    @Test func withAnExplicitYesTheVolumeIsEntered() throws {
+    @Test func withAnExplicitYesTheVolumeIsEntered() {
         defer { detach() }
         guard attached else { return }
         let fileSystems = makeFileSystems().0

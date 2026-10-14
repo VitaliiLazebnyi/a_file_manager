@@ -31,17 +31,17 @@ final class Answers: FileJobDelegate {
         if let cancelAtItems, progress.itemsDone >= cancelAtItems { job.cancel() }
     }
 
-    func job(_ job: FileJob, conflictAt target: FileItem, source: FileItem) -> ConflictChoice {
+    func job(_: FileJob, conflictAt target: FileItem, source _: FileItem) -> ConflictChoice {
         conflicts.append(target.name)
         return conflict
     }
 
-    func job(_ job: FileJob, failedAt url: URL, error: Error) -> ErrorChoice {
+    func job(_: FileJob, failedAt _: URL, error: Error) -> ErrorChoice {
         errors.append(error.localizedDescription)
         return failure
     }
 
-    func job(_ job: FileJob, confirmDeleteNonEmpty directory: URL) -> FolderDeleteChoice {
+    func job(_: FileJob, confirmDeleteNonEmpty directory: URL) -> FolderDeleteChoice {
         nonEmptyQuestions.append(directory.lastPathComponent)
         return folderDelete
     }

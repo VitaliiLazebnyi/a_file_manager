@@ -23,7 +23,7 @@ public final class FindFilesPlugin: Plugin {
         let source = { kernel.panels.source.model }
         kernel.fileSystems.addVolumeReleaser { [weak self] volume in
             guard let self else { return }
-            for window in [self.window].compactMap({ $0 }) + self.separateWindows {
+            for window in [window].compactMap({ $0 }) + separateWindows {
                 window.cancelSearch(ifItReads: volume)
             }
         }

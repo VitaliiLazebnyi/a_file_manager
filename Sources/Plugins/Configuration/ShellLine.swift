@@ -34,11 +34,14 @@ struct ShellContext {
             case .comment: return "A placeholder stands in a comment (after #)."
             case .backslash: return "A placeholder cannot follow a backslash. Put it in quotes instead."
             case .dollar: return "A placeholder cannot follow a $ sign."
+
             case .arithmetic:
                 return "A placeholder cannot stand where the shell works out a number: in $((…)), ((…)), $[…], "
                     + "in the subscript of $name[…], or in a test that compares numbers (-eq, -lt …)."
+
             case .parameterExpansion:
                 return "A placeholder cannot stand in or after a ${…} expression with an operator."
+
             case .caseInSubstitution: return "A placeholder cannot stand after a case statement inside $(…)."
             }
         }
@@ -151,11 +154,13 @@ struct ShellContext {
         case "case" where frames.count > 1: poisoned = .caseInSubstitution
         case "[[", "[", "test": if test == nil { test = (false, false) }
         case "]]", "]": test = nil
+
         case "-eq", "-ne", "-lt", "-le", "-gt", "-ge":
             if test != nil {
                 test?.comparesNumbers = true
                 if test?.hasValue == true { hasArithmeticTest = true }
             }
+
         default: break
         }
     }
@@ -209,6 +214,7 @@ struct ShellContext {
                     return
                 }
             }
+
         default: break
         }
 
@@ -228,13 +234,14 @@ struct ShellContext {
             if scalar == "}" {
                 pop()
                 wordEmpty = false
-            } else if !ShellContext.isSimpleParameterCharacter(scalar) {
+            } else if !Self.isSimpleParameterCharacter(scalar) {
                 poisoned = .parameterExpansion
             }
 
         case .arithmetic(let parens):
             switch scalar {
             case "(": frames[frames.count - 1] = .arithmetic(parens: parens + 1)
+
             case ")":
                 if parens == 0 {
                     pop()
@@ -242,6 +249,7 @@ struct ShellContext {
                 } else {
                     frames[frames.count - 1] = .arithmetic(parens: parens - 1)
                 }
+
             case "\"", "'", "`", "\\": poisoned = .arithmetic
             default: break
             }
@@ -259,24 +267,30 @@ struct ShellContext {
                     openedSubstitution = true
                     startWord()
                     return
+
                 case "{":
                     push(.braces)
                     return
+
                 case "[":
                     poisoned = .arithmetic
                     return
+
                 default: break
                 }
             }
             switch scalar {
             case "\\": escaped = true
             case "\"": pop()
+
             case "`":
                 push(.backtick)
                 wordEmpty = false
+
             case "$":
                 dollar = true
                 wordEmpty = false
+
             default: wordEmpty = false
             }
 
@@ -297,15 +311,19 @@ struct ShellContext {
                     openedSubstitution = true
                     startWord()
                     return
+
                 case "{":
                     push(.braces)
                     return
+
                 case "'":
                     push(.ansiQuote)
                     return
+
                 case "[":
                     poisoned = .arithmetic
                     return
+
                 default: break
                 }
             }
@@ -318,34 +336,43 @@ struct ShellContext {
                 escaped = true
                 tokenStart = false
                 keyword = nil
+
             case "'":
                 push(.singleQuote)
                 tokenStart = false
                 keyword = nil
+
             case "\"":
                 push(.doubleQuote)
                 tokenStart = false
                 keyword = nil
+
             case "`":
                 content()
                 push(.backtick)
+
             case "$":
                 content()
                 dollar = true
+
             case "#":
                 if tokenStart { comment = true } else { content() }
+
             case " ", "\t", ">":
                 endWord()
                 startWord()
+
             case "\n", ";", "&", "|":
                 endWord()
                 startWord()
                 // The command ends, and a `test` with it.
                 test = nil
+
             case "<":
                 endWord()
                 startWord()
                 lessThans = hadLessThans + 1
+
             case "(":
                 endWord()
                 // `((` is the arithmetic command.
@@ -356,6 +383,7 @@ struct ShellContext {
                 frames[frames.count - 1] = .code(parens: parens + 1)
                 startWord()
                 openedParenthesis = true
+
             case ")":
                 endWord()
                 guard poisoned == nil else { return }
@@ -367,6 +395,7 @@ struct ShellContext {
                     frames[frames.count - 1] = .code(parens: max(0, parens - 1))
                     startWord()
                 }
+
             default:
                 tokenStart = false
                 wordEmpty = false
@@ -407,6 +436,7 @@ enum ShellLine {
         switch place {
         case .word: return "\"" + name + "\""
         case .doubleQuoted: return name
+
         // The user's quote is closed, the reference stands in double quotes, the quote opens again.
         case .singleQuoted: return "'\"" + name + "\"'"
         }
@@ -423,9 +453,11 @@ enum ShellLine {
             case .text(let text), .raw(let text):
                 line += text
                 lexer.feed(text)
+
             case .value(let value):
                 switch lexer.feedValue() {
                 case .failure(let refusal): return .failure(refusal)
+
                 case .success(let place):
                     line += reference(values.count, at: place)
                     values.append(value)
@@ -447,6 +479,7 @@ enum ShellLine {
             case .text(let text), .raw(let text):
                 line += text
                 lexer.feed(text)
+
             case .value(let value):
                 let startsWord = lexer.isAtWordStart
                 switch lexer.feedValue() {
@@ -457,6 +490,7 @@ enum ShellLine {
                     } else {
                         line += ShellWords.needsQuoting(value) ? ShellWords.quoted(value) : value
                     }
+
                 case .success(.singleQuoted): line += ShellWords.singleQuoteEscaped(value)
                 case .success(.doubleQuoted), .failure: line += ShellWords.escaped(value)
                 }
@@ -497,6 +531,7 @@ enum ShellLine {
             case .text(let text), .raw(let text):
                 line += text
                 lexer.feed(text)
+
             case .value(let value):
                 let place = try? lexer.feedValue().get()
                 if let place, isTame(value) {

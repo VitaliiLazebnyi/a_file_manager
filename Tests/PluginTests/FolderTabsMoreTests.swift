@@ -10,10 +10,10 @@ import Testing
     let memory = MemoryFileSystem()
 
     func read(_ text: String) -> TabFile? {
-        TabFile(text: text) { self.memory.location(from: $0) }
+        TabFile(text: text) { memory.location(from: $0) }
     }
 
-    @Test func writesAndReadsBothSides() throws {
+    @Test func writesAndReadsBothSides() {
         let active = PanelTabs.State(
             tabs: [
                 .init(location: memory.url("/A"), title: "Work", locked: true),

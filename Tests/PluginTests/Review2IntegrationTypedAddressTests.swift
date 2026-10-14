@@ -67,7 +67,7 @@ final class IntegrationConsent: ServerConsentService {
 // fileops request 12): the commands that make something new in the panel's folder are
 // withheld there, and Delete is not.
 @MainActor @Suite struct Review2IntegrationLists {
-    @Test func nothingNewIsOfferedInAListOfFilesAndDeleteIs() throws {
+    @Test func nothingNewIsOfferedInAListOfFilesAndDeleteIs() {
         let memory = MemoryFileSystem()
         memory.addFile("/A/one.txt", "one")
         memory.addFile("/A/two.txt", "two")

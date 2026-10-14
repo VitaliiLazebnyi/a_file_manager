@@ -15,9 +15,9 @@ public struct HotlistEntry: Codable, Equatable {
     public var command: String
     /// Shown in the other panel at the same time; empty for none.
     public var target: String
-    public var children: [HotlistEntry]
+    public var children: [Self]
 
-    public init(kind: Kind, title: String, command: String = "", target: String = "", children: [HotlistEntry] = []) {
+    public init(kind: Kind, title: String, command: String = "", target: String = "", children: [Self] = []) {
         self.kind = kind
         self.title = title
         self.command = command
@@ -25,18 +25,18 @@ public struct HotlistEntry: Codable, Equatable {
         self.children = children
     }
 
-    public static func item(_ title: String, command: String, target: String = "") -> HotlistEntry {
-        HotlistEntry(kind: .item, title: title, command: command, target: target)
+    public static func item(_ title: String, command: String, target: String = "") -> Self {
+        Self(kind: .item, title: title, command: command, target: target)
     }
 
-    public static func submenu(_ title: String, _ children: [HotlistEntry] = []) -> HotlistEntry {
-        HotlistEntry(kind: .submenu, title: title, children: children)
+    public static func submenu(_ title: String, _ children: [Self] = []) -> Self {
+        Self(kind: .submenu, title: title, children: children)
     }
 
-    public static let separator = HotlistEntry(kind: .separator, title: "-")
+    public static let separator = Self(kind: .separator, title: "-")
 
     /// An entry for what the user typed as a title: a single `-` makes a separator.
-    public static func titled(_ title: String, command: String) -> HotlistEntry {
+    public static func titled(_ title: String, command: String) -> Self {
         title.trimmingCharacters(in: .whitespaces) == "-" ? .separator : .item(title, command: command)
     }
 
@@ -55,7 +55,7 @@ public struct Hotlist: Codable, Equatable {
     public typealias Path = [Int]
 
     /// The most entries the list takes (spec 12 › Storage and limits).
-    public static let limit = 2000
+    public static let limit = 2_000
 
     public var entries: [HotlistEntry]
     /// Entries whose title starts with this are hidden while `hidesMarked` is on.
@@ -113,7 +113,7 @@ public struct Hotlist: Codable, Equatable {
         var kept: [HotlistEntry] = []
         for var entry in entries {
             guard room > 0 else {
-                dropped += 1 + entry.children.reduce(0) { $0 + Hotlist.size(of: $1) }
+                dropped += 1 + entry.children.reduce(0) { $0 + Self.size(of: $1) }
                 continue
             }
             room -= 1
@@ -159,7 +159,7 @@ public struct Hotlist: Codable, Equatable {
     /// Returns where it landed, or nil when the level does not exist or the list is full.
     @discardableResult
     public mutating func insert(_ entry: HotlistEntry, at path: Path) -> Path? {
-        guard let index = path.last, count < Hotlist.limit else { return nil }
+        guard let index = path.last, count < Self.limit else { return nil }
         let parent = Array(path.dropLast())
         return withChildren(of: parent) { level in
             let position = min(max(index, 0), level.count)
@@ -287,7 +287,7 @@ public enum HotlistAction: Equatable {
 
     /// The path of a target-path field, which may be written plain or as `cd path`.
     public static func targetPath(_ text: String) -> String? {
-        guard case .changeDirectory(let path, _) = HotlistAction(text), !path.isEmpty else { return nil }
+        guard case .changeDirectory(let path, _) = Self(text), !path.isEmpty else { return nil }
         return path
     }
 }
@@ -333,18 +333,20 @@ public struct HotlistMenu {
             if marked, selected == nil { selected = rows.count }
             switch entry.kind {
             case .separator:
-                rows.append(Row(title: HotlistMenu.separatorTitle, action: .separator))
+                rows.append(Row(title: Self.separatorTitle, action: .separator))
+
             case .submenu:
                 rows.append(
-                    Row(title: HotlistMenu.mark(marked) + entry.displayTitle + "  ▸", action: .open(path + [index])))
+                    Row(title: Self.mark(marked) + entry.displayTitle + "  ▸", action: .open(path + [index])))
+
             case .item:
                 if marked, current == nil { current = path + [index] }
-                rows.append(Row(title: HotlistMenu.mark(marked) + entry.displayTitle, action: .run(entry)))
+                rows.append(Row(title: Self.mark(marked) + entry.displayTitle, action: .run(entry)))
             }
         }
-        if !rows.isEmpty { rows.append(Row(title: HotlistMenu.separatorTitle, action: .separator)) }
+        if !rows.isEmpty { rows.append(Row(title: Self.separatorTitle, action: .separator)) }
         if offersFavorites, path.isEmpty {
-            rows.append(Row(title: HotlistMenu.mark(false) + "Favorites  ▸", action: .openFavorites))
+            rows.append(Row(title: Self.mark(false) + "Favorites  ▸", action: .openFavorites))
         }
         rows.append(
             current.map { Row(title: "− Remove current dir", action: .removeCurrent($0)) }
@@ -356,7 +358,7 @@ public struct HotlistMenu {
 
     /// A fixed list of places without the editing items (the Mac's Favorites).
     public init(places: [HotlistEntry], isCurrent: (HotlistEntry) -> Bool) {
-        rows = places.map { Row(title: HotlistMenu.mark(isCurrent($0)) + $0.displayTitle, action: .run($0)) }
+        rows = places.map { Row(title: Self.mark(isCurrent($0)) + $0.displayTitle, action: .run($0)) }
         selected = places.firstIndex(where: isCurrent) ?? 0
     }
 

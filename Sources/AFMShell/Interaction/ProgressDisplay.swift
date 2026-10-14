@@ -39,9 +39,12 @@ final class ProgressDisplay {
         self.monitor = monitor
         showsRemaining = false
         observeWindow()
-        if panel != nil { return refresh() }
+        if panel != nil {
+            refresh()
+            return
+        }
         MainLoop.after(0.4) { [weak self, weak monitor] in
-            if let self, let monitor, self.monitor === monitor { self.show() }
+            if let self, let monitor, self.monitor === monitor { show() }
         }
     }
 
@@ -51,8 +54,8 @@ final class ProgressDisplay {
         guard observers.isEmpty, let window else { return }
         let center = NotificationCenter.default
         let retry: (Notification) -> Void = { [weak self] _ in
-            guard let self, self.monitor != nil, self.panel == nil else { return }
-            self.show()
+            guard let self, monitor != nil, panel == nil else { return }
+            show()
         }
         observers = [
             center.addObserver(
@@ -230,7 +233,7 @@ final class ProgressContentView: NSView {
         }
     }
 
-    required init?(coder: NSCoder) { fatalError("not used") }
+    required init?(coder _: NSCoder) { fatalError("not used") }
 
     /// The window of its own is smaller than the sheet: its title bar names the operation, and
     /// Esc must not stop a job the user sent out of the way.

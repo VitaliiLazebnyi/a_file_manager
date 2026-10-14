@@ -208,7 +208,7 @@ import Testing
         _ = try fixture.center.connect(fixture.key)
         for index in 0..<12 {
             let target = fixture.url("/in/file\(index).dat")
-            let content = Data(repeating: UInt8(index), count: 1000 + index)
+            let content = Data(repeating: UInt8(index), count: 1_000 + index)
             // The checks a copy job makes before it writes.
             #expect(fixture.fileSystem.item(at: target) == nil)
             #expect(fixture.fileSystem.item(at: target) == nil)
@@ -302,7 +302,7 @@ import Testing
                 defer { reader.close() }
                 var data = try #require(try reader.read(upToCount: 50_000))
                 try fixture.upload("/copy\(index).bin", content)
-                while let block = try reader.read(upToCount: 64 * 1024) { data.append(block) }
+                while let block = try reader.read(upToCount: 64 * 1_024) { data.append(block) }
                 if data != content { failures.add("content \(index)") }
             } catch {
                 failures.add("\(error)")
@@ -361,7 +361,7 @@ import Testing
 
     @Test func closingAReaderEndsAReadThatWaitsForTheServer() throws {
         let fixture = try FTPFixture { $0.timeout = 600 }
-        try fixture.box.file("srv/f.bin", String(repeating: "z", count: 1000))
+        try fixture.box.file("srv/f.bin", String(repeating: "z", count: 1_000))
         fixture.server.options.stallRETR = true
         let reader = try fixture.fileSystem.read(fixture.url("/f.bin"))
         let outcome = FailureBox()

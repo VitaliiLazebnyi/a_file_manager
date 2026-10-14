@@ -97,13 +97,13 @@ import Testing
                 modified: now.addingTimeInterval(-daysOld * 86_400))
         }
         let items = [
-            file("small.txt", size: 10, daysOld: 1), file("big.txt", size: 5000, daysOld: 40),
-            file("big.md", size: 9000, daysOld: 2),
-            file(".secret.txt", size: 2000, daysOld: 0.5, hidden: true),
+            file("small.txt", size: 10, daysOld: 1), file("big.txt", size: 5_000, daysOld: 40),
+            file("big.md", size: 9_000, daysOld: 2),
+            file(".secret.txt", size: 2_000, daysOld: 0.5, hidden: true),
             file("dir.txt", size: 0, daysOld: 0, folder: true)
         ]
         var type = SelectionType(name: "big", mask: "*.txt")
-        type.minSize = 1024
+        type.minSize = 1_024
         #expect(
             SelectionRule(type).names(among: items, base: URL(fileURLWithPath: "/x"), now: now) == [
                 "big.txt", ".secret.txt"
@@ -117,7 +117,7 @@ import Testing
         recent.kind = .files
         recent.modifiedFrom = now.addingTimeInterval(-3 * 86_400)
         recent.modifiedTo = now.addingTimeInterval(-86_400)
-        recent.maxSize = 9000
+        recent.maxSize = 9_000
         #expect(
             SelectionRule(recent).names(among: items, base: URL(fileURLWithPath: "/x"), now: now) == [
                 "small.txt", "big.md"
@@ -128,7 +128,7 @@ import Testing
                 && SelectionType.size(from: "12") == 12)
         #expect(
             SelectionType.size(from: "big") == nil && SelectionType.text(ofSize: 10_240) == "10k"
-                && SelectionType.text(ofSize: 1500) == "1500")
+                && SelectionType.text(ofSize: 1_500) == "1500")
         let day = SelectionType.date(from: "2026-10-11")
         #expect(
             day != nil && SelectionType.date(from: "2026-10-11", endOfDay: true) == day?.addingTimeInterval(86_399))
@@ -173,7 +173,7 @@ import Testing
         let left = [
             file("same", 1, 100), file("newer", 1, 200.9), file("older", 1, 100), file("size", 1, 100),
             file("onlyLeft", 1, 1),
-            file("hour", 1, 3700), folder("both"), folder("leftDir"), file("kind", 1, 1)
+            file("hour", 1, 3_700), folder("both"), folder("leftDir"), file("kind", 1, 1)
         ]
         let right = [
             file("same", 1, 100.4), file("newer", 1, 100), file("older", 2, 200), file("size", 2, 100),
@@ -223,7 +223,7 @@ import Testing
         memory.addFile("/A/two.txt", "2", modified: old)
         memory.addFile("/A/two.md", "2", modified: old)
         memory.addFile("/A/three.md", "333", modified: old)
-        memory.addFile("/A/big.bin", String(repeating: "x", count: 4096), modified: old)
+        memory.addFile("/A/big.bin", String(repeating: "x", count: 4_096), modified: old)
         memory.addDirectory("/B/shared")
         memory.addDirectory("/B/extra")
         memory.addFile("/B/one.txt", "old", modified: old)
@@ -562,15 +562,15 @@ import Testing
     }
 
     @Test func aLargeListIsSelectedWithFewAnnouncements() {
-        for index in 0..<3000 { memory.addFile("/big/file\(index).\(index % 2 == 0 ? "txt" : "md")") }
+        for index in 0..<3_000 { memory.addFile("/big/file\(index).\(index % 2 == 0 ? "txt" : "md")") }
         let bench = makeBench()
         bench.left.show(memory.url("/big"))
         var announcements = 0
         bench.left.model.onChange = { _ in announcements += 1 }
         bench.commands.perform(.selectGroup, .text("*.txt"))
-        #expect(bench.left.model.selection.count == 1500 && announcements <= 2)
+        #expect(bench.left.model.selection.count == 1_500 && announcements <= 2)
         announcements = 0
         bench.commands.perform(.unselectGroup, .text("file1*"))
-        #expect(bench.left.model.selection.count == 1500 - 555 && announcements == 1)
+        #expect(bench.left.model.selection.count == 1_500 - 555 && announcements == 1)
     }
 }

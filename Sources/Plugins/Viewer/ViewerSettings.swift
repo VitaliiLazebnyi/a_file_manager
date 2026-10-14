@@ -15,6 +15,7 @@ enum ViewMode: Int, CaseIterable {
         case .html: return "HTML text (strip tags)"
         case .unicode: return "Unicode"
         case .utf8: return "UTF-8"
+
         // The Mac's counterpart of the Explorer preview and of Lister plugins.
         case .preview: return "Quick Look Preview"
         }
@@ -82,11 +83,11 @@ final class ListerSettings {
     /// 0 = auto-detect, 1 ANSI, 2 ASCII, 3 variable (the font part of `Startup`).
     var startupFont: Int { store.index(Key.startupFont, default: 0) }
     /// Characters per row of wrapped text; 0 wraps at the edge of the window.
-    var textWidth: Int { number(Key.textWidth, default: 0, in: 0...16384) }
-    var binaryWidth: Int { number(Key.binaryWidth, default: 75, in: 8...1024) }
+    var textWidth: Int { number(Key.textWidth, default: 0, in: 0...16_384) }
+    var binaryWidth: Int { number(Key.binaryWidth, default: 75, in: 8...1_024) }
     var tabWidth: Int { number(Key.tabWidth, default: 8, in: 1...64) }
     /// Where a row is cut when text is not wrapped.
-    var unwrapWidth: Int { number(Key.unwrapWidth, default: 1024, in: 80...16384) }
+    var unwrapWidth: Int { number(Key.unwrapWidth, default: 1_024, in: 80...16_384) }
     var searchGoBack: Int { number(Key.searchGoBack, default: 3, in: 0...50) }
     var loadsGraphics: Bool { store.flag(Key.graphics, default: true) }
     var playsMultimedia: Bool { store.flag(Key.multimedia, default: true) }
@@ -95,11 +96,11 @@ final class ListerSettings {
     var linkBraces: Bool { store.flag(Key.linkBraces, default: true) }
     var usesQuickLook: Bool { store.flag(Key.quickLook, default: true) }
     var quickLookTypes: Set<String> {
-        ViewerDetection.extensions(in: store.text(Key.quickLookTypes, default: ListerSettings.defaultQuickLookTypes))
+        ViewerDetection.extensions(in: store.text(Key.quickLookTypes, default: Self.defaultQuickLookTypes))
     }
     var additionalMediaTypes: Set<String> { ViewerDetection.extensions(in: store.text(Key.mediaTypes, default: "")) }
     var noMediaTypes: Set<String> { ViewerDetection.extensions(in: store.text(Key.noMediaTypes, default: "")) }
-    var gifMinimumDelay: Double { Double(number(Key.gifDelay, default: 80, in: 10...5000)) / 1000 }
+    var gifMinimumDelay: Double { Double(number(Key.gifDelay, default: 80, in: 10...5_000)) / 1_000 }
 
     /// The page of the configuration dialog; `onChange` runs after the user changed something.
     static func preferencePage(onChange: @escaping () -> Void) -> PreferencePage {

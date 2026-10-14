@@ -92,7 +92,7 @@ struct WildcardMatcher {
             switch scalar {
             case "*": pieces.append(.star)
             case "?": pieces.append(.literal(nil))
-            default: pieces.append(.literal(caseSensitive ? scalar.value : WildcardMatcher.folded(scalar)))
+            default: pieces.append(.literal(caseSensitive ? scalar.value : Self.folded(scalar)))
             }
         }
         // A lone `*` is the greedy kind (the whole name), not an anchored lazy one.
@@ -143,7 +143,7 @@ struct WildcardMatcher {
     /// counted in `guardian`, and a search given up three times is not tried again).
     func matches(in text: String, firstOnly: Bool, guardian: RenameRegexGuard, cancelled: () -> Bool) -> [NSRange]? {
         if guardian.isTripped || cancelled() { return nil }
-        let found = matches(in: text, firstOnly: firstOnly, budget: WildcardMatcher.budget, cancelled: cancelled)
+        let found = matches(in: text, firstOnly: firstOnly, budget: Self.budget, cancelled: cancelled)
         if found == nil, !cancelled() { guardian.recordTimeout() }
         return found
     }
@@ -154,8 +154,8 @@ struct WildcardMatcher {
         var offsets = [Int](repeating: 0, count: scalars.count + 1)
         for (index, scalar) in scalars.enumerated() { offsets[index + 1] = offsets[index] + scalar.utf16.count }
         let subject = Subject(
-            values: scalars.map { caseSensitive ? $0.value : WildcardMatcher.folded($0) },
-            breaks: scalars.map { WildcardMatcher.isLineBreak($0.value) })
+            values: scalars.map { caseSensitive ? $0.value : Self.folded($0) },
+            breaks: scalars.map { Self.isLineBreak($0.value) })
         // Looked at every few thousand steps: the clock is not asked for every character.
         let deadline = budget.isFinite ? ThreadTime.used + budget : .infinity
         var (steps, isOver) = (0, false)
@@ -199,7 +199,7 @@ struct WildcardMatcher {
                 // The run of characters up to the next star (or the end of the search).
                 var end = index + 1
                 while end < pieces.count, case .literal = pieces[end] { end += 1 }
-                if end == pieces.count && index == pieces.count - 1 {
+                if end == pieces.count, index == pieces.count - 1 {
                     // A star at the very end takes the rest of the name, up to a line break.
                     while position < subject.count, !subject.breaks[position] { position += 1 }
                     return position

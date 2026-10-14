@@ -130,9 +130,13 @@ final class ProgressJobService: JobService {
             // Left behind long ago and back at last: the plugin hears of it (it tidies up and
             // reads the panels again), the queue has long moved on.
             abandonedCount -= 1
-            return deliver()
+            deliver()
+            return
         }
-        guard running === job else { return deliver() }
+        guard running === job else {
+            deliver()
+            return
+        }
         stopQuestion?()
         stopQuestion = nil
         // The window stays for the next job of the queue; the last one takes it away
@@ -180,7 +184,10 @@ final class ProgressJobService: JobService {
 
     func cancelAll(then completion: @escaping () -> Void) {
         MainThread.assert("The job service")
-        guard isBusy else { return completion() }
+        guard isBusy else {
+            completion()
+            return
+        }
         idleCallbacks.append(completion)
         isCancellingAll = true
         running?.cancel()
@@ -201,12 +208,12 @@ final class ProgressJobService: JobService {
     private func askAboutStopping(_ job: QueuedJob, after wait: TimeInterval) {
         stopQuestion = MainLoop.after(wait) { [weak self, weak job] in
             guard let self else { return }
-            self.stopQuestion = nil
-            guard let job, self.running === job, !job.isFinished else { return }
-            let abandons = !self.isQuitting && self.askToAbandon?(job.title) == true
+            stopQuestion = nil
+            guard let job, running === job, !job.isFinished else { return }
+            let abandons = !isQuitting && askToAbandon?(job.title) == true
             // The job may have ended while the question was on screen.
-            guard self.running === job, !job.isFinished else { return }
-            if abandons { self.abandon(job) } else { self.askAboutStopping(job, after: wait * 2) }
+            guard running === job, !job.isFinished else { return }
+            if abandons { abandon(job) } else { askAboutStopping(job, after: wait * 2) }
         }
     }
 
@@ -292,7 +299,7 @@ final class PauseGate {
     /// the flag can be set by anyone without telling the gate.
     func passWhenOpen(_ cancellation: CancellationFlag) {
         condition.lock()
-        while paused && !cancellation.isCancelled {
+        while paused, !cancellation.isCancelled {
             condition.wait(until: Date().addingTimeInterval(0.1))
         }
         condition.unlock()
@@ -347,7 +354,10 @@ final class ProgressSheet: JobMonitor {
         gate.passWhenOpen(cancellation)
         let time = ProcessInfo.processInfo.systemUptime
         reportLock.lock()
-        guard time - lastReport > 0.05 else { return reportLock.unlock() }
+        guard time - lastReport > 0.05 else {
+            reportLock.unlock()
+            return
+        }
         lastReport = time
         reportCount += 1
         let number = reportCount

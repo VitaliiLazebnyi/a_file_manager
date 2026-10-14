@@ -151,7 +151,7 @@ public final class ViewerPlugin: Plugin, ViewerService {
 
     /// Closes the windows and deletes the temporary copies of remote files in the background, so the
     /// program does not wait for the disk on the main thread when it quits.
-    public func prepareToQuit(cancellation: CancellationFlag, completion: @escaping () -> Void) {
+    public func prepareToQuit(cancellation _: CancellationFlag, completion: @escaping () -> Void) {
         hideQuickView()
         windows.forEach { $0.close() }
         windows = []
@@ -257,8 +257,10 @@ public final class ViewerPlugin: Plugin, ViewerService {
         let fields = page.preferences.map { preference -> FormField in
             switch (preference.kind, kernel.settings.value(of: preference)) {
             case (.flag, .flag(let isOn)): return .checkbox(preference.key, preference.label, isOn)
+
             case (.choice(let options, _), .index(let index)):
                 return .choice(preference.key, preference.label, options, selected: index)
+
             case (_, .text(let text)): return .text(preference.key, preference.label, text)
             default: return .note(preference.label)
             }

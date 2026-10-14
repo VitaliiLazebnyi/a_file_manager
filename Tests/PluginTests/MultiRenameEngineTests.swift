@@ -22,7 +22,7 @@ import Testing
     }()
 
     let photo = RenameSubject(
-        name: "IMG_1001.jpg", size: 4711, modified: MultiRenameEngine.date, directoryPath: "/Users/ada/work/photos")
+        name: "IMG_1001.jpg", size: 4_711, modified: Self.date, directoryPath: "/Users/ada/work/photos")
 
     func name(
         _ mask: String, ext: String = "[E]", _ subject: RenameSubject? = nil, index: Int = 0,
@@ -149,7 +149,7 @@ import Testing
         #expect(part("[y][H][i][i1]") == "2510ama")
         #expect(part("[d]") == "12-1-25")
         #expect(part("[t]") == "10.05.09 AM")
-        let evening = RenameSubject(name: "a", modified: MultiRenameEngine.date.addingTimeInterval(3 * 3600))
+        let evening = RenameSubject(name: "a", modified: Self.date.addingTimeInterval(3 * 3_600))
         #expect(part("[h]-[H]-[i]", evening) == "13-01-pm")
         #expect(part("[H]", RenameSubject(name: "a", modified: Date(timeIntervalSince1970: 0))) == "12")
     }
@@ -339,7 +339,7 @@ import Testing
 
     @Test func manyNamesOnAllCoresKeepTheirOrder() {
         let registry = FileSystemRegistry()
-        let entries = (0..<5000).map {
+        let entries = (0..<5_000).map {
             RenameEntry(
                 FileItem(url: URL(fileURLWithPath: "/nowhere/f\($0).txt"), name: "f\($0).txt", isDirectory: false))
         }
@@ -348,7 +348,7 @@ import Testing
         let names = RenameComputation.names(
             entries, settings: settings, context: context, given: nil, fileSystems: registry
         ).names
-        #expect(names.count == 5000 && names[0] == "f0-00001.txt" && names[4999] == "f4999-05000.txt")
+        #expect(names.count == 5_000 && names[0] == "f0-00001.txt" && names[4_999] == "f4999-05000.txt")
         #expect(
             names.enumerated().allSatisfy { $0.element == String(format: "f%d-%05d.txt", $0.offset, $0.offset + 1) })
     }

@@ -39,18 +39,18 @@ private func reproducer(_ name: String) throws -> Data {
     @Test func theFormatsAreStillRead() throws {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = try #require(TimeZone(identifier: "UTC"))
-        let now = try #require(calendar.date(from: DateComponents(year: 2024, month: 6, day: 15)))
+        let now = try #require(calendar.date(from: DateComponents(year: 2_024, month: 6, day: 15)))
         func list(_ line: String) -> RemoteEntry? { FTPListParser.list(line, now: now, calendar: calendar) }
         func day(_ year: Int, _ month: Int, _ day: Int, _ hour: Int = 0, _ minute: Int = 0) -> Date? {
             calendar.date(from: DateComponents(year: year, month: month, day: day, hour: hour, minute: minute))
         }
         var entry = try #require(list("-rw-r--r--   1 owner    group        1234 Jan 31  2024 a file  with spaces.txt"))
         #expect(
-            entry.name == "a file  with spaces.txt" && entry.size == 1234 && entry.modified == day(2024, 1, 31)
+            entry.name == "a file  with spaces.txt" && entry.size == 1_234 && entry.modified == day(2_024, 1, 31)
                 && entry.permissions == 0o644)
         // The time instead of the year means the last months; a date ahead of today is last year's.
-        #expect(list("-rw-r--r-- 1 o g 7 Mar  5 12:30 r.txt")?.modified == day(2024, 3, 5, 12, 30))
-        #expect(list("-rw-r--r-- 1 o g 7 Dec 24 08:00 r.txt")?.modified == day(2023, 12, 24, 8, 0))
+        #expect(list("-rw-r--r-- 1 o g 7 Mar  5 12:30 r.txt")?.modified == day(2_024, 3, 5, 12, 30))
+        #expect(list("-rw-r--r-- 1 o g 7 Dec 24 08:00 r.txt")?.modified == day(2_023, 12, 24, 8, 0))
         // No group, device numbers, a name that starts with a space, a link.
         #expect(list("drwxr-xr-x 2 owner 4096 Feb 29 2024 dir")?.isDirectory == true)
         entry = try #require(list("crw-rw-rw- 1 root wheel 3, 2 Jan  1  2020 null"))
@@ -59,9 +59,9 @@ private func reproducer(_ name: String) throws -> Data {
         entry = try #require(list("lrwxrwxrwx 1 o g 9 Jan 01 2020 link -> /some/where"))
         #expect(entry.name == "link" && entry.linkTarget == "/some/where" && entry.isSymlink)
         // The day before the month, other languages, ISO dates with and without a zone, NetWare.
-        #expect(list("-rw-r--r-- 1 o g 5 31. Jan 2024 e.txt")?.modified == day(2024, 1, 31))
-        #expect(list("-rw-r--r-- 1 o g 5 déc. 24 2023 f.txt")?.modified == day(2023, 12, 24))
-        #expect(list("-rw-r--r-- 1 o g 5 2024-01-31 12:34 iso.txt")?.modified == day(2024, 1, 31, 12, 34))
+        #expect(list("-rw-r--r-- 1 o g 5 31. Jan 2024 e.txt")?.modified == day(2_024, 1, 31))
+        #expect(list("-rw-r--r-- 1 o g 5 déc. 24 2023 f.txt")?.modified == day(2_023, 12, 24))
+        #expect(list("-rw-r--r-- 1 o g 5 2024-01-31 12:34 iso.txt")?.modified == day(2_024, 1, 31, 12, 34))
         entry = try #require(list("-rw-r--r-- 1 o g 5 2024-01-31 12:34:56.789 +0100 zone.txt"))
         #expect(entry.name == "zone.txt" && entry.size == 5)
         #expect(list("-rw-r--r-- 1 o g 5 2024-01-31 12:34 +0100")?.name == "+0100")
@@ -70,9 +70,9 @@ private func reproducer(_ name: String) throws -> Data {
         #expect(list("-rw-r--r-- 1 o g 5 Jan 01 2020 Feb 02 2021 x")?.name == "Feb 02 2021 x")
         // Windows.
         entry = try #require(list("01-31-24  03:04PM              1,234 report final.doc"))
-        #expect(entry.name == "report final.doc" && entry.size == 1234 && entry.modified == day(2024, 1, 31, 15, 4))
+        #expect(entry.name == "report final.doc" && entry.size == 1_234 && entry.modified == day(2_024, 1, 31, 15, 4))
         #expect(list("01-31-2024  15:04       <DIR>          Program Files")?.isDirectory == true)
-        #expect(list("12-01-99  12:05AM  7 old.txt")?.modified == day(1999, 12, 1, 0, 5))
+        #expect(list("12-01-99  12:05AM  7 old.txt")?.modified == day(1_999, 12, 1, 0, 5))
         #expect(list("01-31-24  03:04PM       <NOPE>         x") == nil && list("01-31-24  03:04PM 12") == nil)
         // Lines that are no entry.
         for line in [
@@ -117,7 +117,7 @@ private func reproducer(_ name: String) throws -> Data {
 
         // A megabyte without a line end is dropped as it comes; what follows it is read.
         var hostile = LineSplitter()
-        for _ in 0..<1024 { #expect(hostile.feed(Data(repeating: 0x39, count: 1024)).isEmpty) }
+        for _ in 0..<1_024 { #expect(hostile.feed(Data(repeating: 0x39, count: 1_024)).isEmpty) }
         #expect(hostile.feed(Data("\nfine\n".utf8)) == [Data("fine".utf8)])
         #expect(hostile.dropped == 1 && hostile.finish() == nil)
         // The longest line that is kept, and one byte more.
@@ -235,7 +235,7 @@ private func reproducer(_ name: String) throws -> Data {
         _ = connection.hostText
         _ = connection.profile
         // The key itself takes no port that is none either.
-        for port in [-2, 0, 65536, Int.max, Int.min] {
+        for port in [-2, 0, 65_536, Int.max, Int.min] {
             let key = ServerKey(scheme: "sftp", host: "h.example", port: port)
             #expect(key.port == 22 && key.url(path: "/x").absoluteString == "sftp://h.example/x")
         }
@@ -246,7 +246,7 @@ private func reproducer(_ name: String) throws -> Data {
                 #"{"id":"00000000-0000-0000-0000-000000000001","host":"h","port":2121,"kind":99,"passive":"yes","user":"u"}"#
                     .utf8))
         #expect(
-            partial.host == "h" && partial.port == 2121 && partial.kind == .ftp && partial.passive
+            partial.host == "h" && partial.port == 2_121 && partial.kind == .ftp && partial.passive
                 && partial.user == "u")
         #expect(throws: (any Error).self) { try JSONDecoder().decode(SavedConnection.self, from: Data("{}".utf8)) }
         // What is written is read back the same.
@@ -445,7 +445,7 @@ private func reproducer(_ name: String) throws -> Data {
         let fields = String(decoding: mark, as: UTF8.self).split(separator: ";", omittingEmptySubsequences: false)
         #expect(fields.count == 4 && fields[0] == "0083" && fields[2] == "Some  Program" && fields[3].isEmpty)
         let stamp = try #require(Int(fields[1], radix: 16))
-        #expect(abs(Double(stamp) - Date().timeIntervalSince1970) < 3600)
+        #expect(abs(Double(stamp) - Date().timeIntervalSince1970) < 3_600)
         #expect(fileSystem.quarantine(of: URL(fileURLWithPath: "/tmp/x")) == nil)
         #expect(
             String(

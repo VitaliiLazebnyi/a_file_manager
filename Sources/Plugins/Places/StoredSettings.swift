@@ -10,7 +10,7 @@ final class DecodeReport {
 /// An array read element by element: an element that cannot be decoded is counted in the
 /// decoder's `DecodeReport` and skipped, the rest is kept.
 struct LenientElements<Element: Decodable>: Decodable {
-    private struct Ignored: Decodable { init(from decoder: Decoder) throws {} }
+    private struct Ignored: Decodable { init(from _: Decoder) {} }
 
     var elements: [Element] = []
 
@@ -77,8 +77,8 @@ extension Hotlist {
         hidesMarked = try container.decodeIfPresent(Bool.self, forKey: .hidesMarked) ?? false
         // The limit holds for what is stored as well as for what is added (a file that was
         // edited by hand or imported); what is cut off is counted, so the user is told.
-        var room = Hotlist.limit
-        let cut = Hotlist.trimmed(&entries, room: &room)
+        var room = Self.limit
+        let cut = Self.trimmed(&entries, room: &room)
         (decoder.userInfo[DecodeReport.key] as? DecodeReport)?.skipped += cut
     }
 }

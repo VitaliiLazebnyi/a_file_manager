@@ -53,9 +53,9 @@ public struct DirectoryHistory: Codable, Equatable {
         if stayedInPrevious, !visits.isEmpty { visits[visits.count - 1].isVisible = true }
         let earlier = visits.firstIndex { $0.key == key }
         let wasVisible = earlier.map { visits.remove(at: $0).isVisible } ?? false
-        visits.append(Visit(location: DirectoryHistory.stored(directory), isVisible: wasVisible))
-        if visits.count > DirectoryHistory.storedLimit {
-            visits.removeFirst(visits.count - DirectoryHistory.storedLimit)
+        visits.append(Visit(location: Self.stored(directory), isVisible: wasVisible))
+        if visits.count > Self.storedLimit {
+            visits.removeFirst(visits.count - Self.storedLimit)
         }
         return true
     }
@@ -95,7 +95,7 @@ extension DirectoryHistory {
         let container = try decoder.container(keyedBy: Keys.self)
         visits = Array(
             (try container.decodeIfPresent(LenientElements<Visit>.self, forKey: .visits)?.elements ?? []).suffix(
-                DirectoryHistory.storedLimit))
+                Self.storedLimit))
     }
 }
 
@@ -108,8 +108,8 @@ extension FrequentFolders {
         let stored = try container.decodeIfPresent([String: Int].self, forKey: .counts) ?? [:]
         // No negative count, and no more than are kept: the most visited stay.
         let kept =
-            stored.count > FrequentFolders.storedLimit
-            ? Array(stored.sorted { ($1.value, $0.key) < ($0.value, $1.key) }.prefix(FrequentFolders.storedLimit))
+            stored.count > Self.storedLimit
+            ? Array(stored.sorted { ($1.value, $0.key) < ($0.value, $1.key) }.prefix(Self.storedLimit))
             : Array(stored)
         counts = Dictionary(uniqueKeysWithValues: kept.map { ($0.key, max($0.value, 0)) })
     }
@@ -130,7 +130,7 @@ public struct FrequentFolders: Codable, Equatable {
         // A stored count can be anything (settings are imported): it stops at the top.
         let before = counts[own] ?? 0
         counts[own] = before == Int.max ? before : before + 1
-        guard counts.count > FrequentFolders.storedLimit else { return }
+        guard counts.count > Self.storedLimit else { return }
         // The least visited folder makes room; the one just counted stays.
         if let rarest = counts.filter({ $0.key != own }).min(by: { ($0.value, $0.key) < ($1.value, $1.key) }) {
             counts[rarest.key] = nil
@@ -220,11 +220,11 @@ public final class DirectoryHistoryTracker {
         self.now = now
         for side in Side.allCases {
             histories[side] = StoredSettings.load(
-                DirectoryHistory.self, key: DirectoryHistoryTracker.key(side), in: settings, problem: problem)
+                DirectoryHistory.self, key: Self.key(side), in: settings, problem: problem)
         }
         frequent =
             StoredSettings.load(
-                FrequentFolders.self, key: DirectoryHistoryTracker.frequentKey, in: settings, problem: problem)
+                FrequentFolders.self, key: Self.frequentKey, in: settings, problem: problem)
             ?? FrequentFolders()
     }
 
@@ -240,7 +240,7 @@ public final class DirectoryHistoryTracker {
     public func visited(_ directory: URL, on side: Side) {
         var history = history(of: side)
         let time = now()
-        let stayed = entered[side].map { time.timeIntervalSince($0) >= DirectoryHistoryTracker.thinningDelta } ?? false
+        let stayed = entered[side].map { time.timeIntervalSince($0) >= Self.thinningDelta } ?? false
         guard history.record(directory.standardized, stayedInPrevious: stayed) else { return }
         entered[side] = time
         histories[side] = history
@@ -267,7 +267,7 @@ public final class DirectoryHistoryTracker {
         if isFrequent { frequentChanged = true }
         guard !writeIsScheduled else { return }
         writeIsScheduled = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + DirectoryHistoryTracker.writeDelay) { [weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.writeDelay) { [weak self] in
             self?.writeChanges()
         }
     }
@@ -278,16 +278,16 @@ public final class DirectoryHistoryTracker {
     private func writeChanges() {
         writeIsScheduled = false
         guard savesChanges() else { return }
-        for side in changedSides { settings.set(history(of: side), forKey: DirectoryHistoryTracker.key(side)) }
-        if frequentChanged { settings.set(frequent, forKey: DirectoryHistoryTracker.frequentKey) }
+        for side in changedSides { settings.set(history(of: side), forKey: Self.key(side)) }
+        if frequentChanged { settings.set(frequent, forKey: Self.frequentKey) }
         changedSides = []
         frequentChanged = false
     }
 
     /// "Save now".
     public func save() {
-        for side in Side.allCases { settings.set(history(of: side), forKey: DirectoryHistoryTracker.key(side)) }
-        settings.set(frequent, forKey: DirectoryHistoryTracker.frequentKey)
+        for side in Side.allCases { settings.set(history(of: side), forKey: Self.key(side)) }
+        settings.set(frequent, forKey: Self.frequentKey)
         changedSides = []
         frequentChanged = false
     }
@@ -300,7 +300,7 @@ public final class DirectoryHistoryTracker {
         changedSides = []
         frequentChanged = false
         frequent = FrequentFolders()
-        for side in Side.allCases { settings.set(nil as Data?, forKey: DirectoryHistoryTracker.key(side)) }
-        settings.set(nil as Data?, forKey: DirectoryHistoryTracker.frequentKey)
+        for side in Side.allCases { settings.set(nil as Data?, forKey: Self.key(side)) }
+        settings.set(nil as Data?, forKey: Self.frequentKey)
     }
 }

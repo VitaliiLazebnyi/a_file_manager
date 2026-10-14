@@ -108,7 +108,7 @@ import Testing
     }
 
     @Test func previewInTheBackground() async {
-        let items = (0..<3000).map {
+        let items = (0..<3_000).map {
             FileItem(url: memory.addFile("/many/f\($0).txt"), name: "f\($0).txt", isDirectory: false)
         }
         var settings = RenameSettings()
@@ -125,7 +125,7 @@ import Testing
         // test of the process; in a full run that alone has taken more than 20 s. The limit
         // only ends a preview that never comes.
         let deadline = Date().addingTimeInterval(600)
-        while session.isComputing && Date() < deadline { try? await Task.sleep(nanoseconds: 2_000_000) }
+        while session.isComputing, Date() < deadline { try? await Task.sleep(nanoseconds: 2_000_000) }
         #expect(!session.isComputing && changes >= 1)
         #expect(session.rows.first?.newName == "f0+00001.txt" && session.rows.last?.newName == "f2999+03000.txt")
         #expect(session.rows.allSatisfy { $0.status == .ready })

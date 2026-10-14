@@ -206,7 +206,7 @@ final class ToolRun {
         defer { withExtendedLifetime(token) {} }
         do {
             while try autoreleasepool(invoking: { () throws -> Bool in
-                guard let block = try reader.read(upToCount: ToolRun.blockSize), !block.isEmpty else { return false }
+                guard let block = try reader.read(upToCount: Self.blockSize), !block.isEmpty else { return false }
                 data.append(block)
                 return true
             }) {
@@ -242,10 +242,13 @@ final class ToolRun {
             case .cancel:
                 cancellation.cancel()
                 throw ToolError.cancelled
+
             case .skip:
                 return nil
+
             case .autoRename:
-                url = ToolRun.freeName(for: url, provider: provider)
+                url = Self.freeName(for: url, provider: provider)
+
             case .overwrite, .overwriteAll:
                 // The old file stays until the new one is complete: it is written under a
                 // temporary name that replaces the old file when it is finished.
@@ -425,12 +428,15 @@ final class ToolOutput {
         switch state {
         case .open:
             abandon()
+
         case .closed:
             state = .undone
             if let temporary { try? provider.remove(temporary) }
+
         case .done:
             state = .undone
             if temporary == nil { try? provider.remove(url) }
+
         case .undone:
             break
         }

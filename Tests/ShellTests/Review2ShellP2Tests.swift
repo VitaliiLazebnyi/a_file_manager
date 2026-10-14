@@ -22,7 +22,7 @@ private final class QuitTestPlugin: Plugin {
     var hasNothingToDo = false
     private var registration: AnyObject?
 
-    func start(in kernel: Kernel) {}
+    func start(in _: Kernel) {}
 
     func shouldTerminate() -> Bool {
         asked += 1
@@ -31,7 +31,10 @@ private final class QuitTestPlugin: Plugin {
 
     func prepareToQuit(cancellation: CancellationFlag, completion: @escaping () -> Void) {
         prepared += 1
-        guard !hasNothingToDo else { return completion() }
+        guard !hasNothingToDo else {
+            completion()
+            return
+        }
         pending = (cancellation, completion)
         if givesUpWhenTold {
             registration = cancellation.onCancel { DispatchQueue.main.async { [weak self] in self?.finish() } }

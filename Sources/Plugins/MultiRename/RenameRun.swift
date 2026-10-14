@@ -9,7 +9,7 @@ struct RenameEntry {
 
     init(_ item: FileItem) {
         self.item = item
-        name = RenameEntry.diskName(of: item)
+        name = Self.diskName(of: item)
     }
 
     /// The name the file has in its folder. A list gathered from elsewhere (a branch view, a
@@ -19,7 +19,7 @@ struct RenameEntry {
         item.name.utf8.contains(0x2F) ? item.url.lastPathComponent : item.name
     }
 
-    var diskName: String { RenameEntry.diskName(of: item) }
+    var diskName: String { Self.diskName(of: item) }
 
     var directory: URL { item.url.deletingLastPathComponent() }
 }
@@ -356,7 +356,7 @@ struct RenameSurvey {
             }
             // A folder away from every source folder (a rename that moves items there): a
             // local one is asked of its volume, else it is taken to tell the cases apart.
-            if folds == nil { folds = RenameSurvey.volumeFoldsCase(folder) }
+            if folds == nil { folds = Self.volumeFoldsCase(folder) }
             if folds == true { folded.insert(key) }
         }
         return folded.isEmpty
@@ -520,7 +520,7 @@ final class RenameRunner {
             // step without replacing. It goes by way of a temporary name instead, which no volume
             // takes for the file's own, and never as a replacement of "itself" (a file system
             // that cleans up after such a replacement could take the file away).
-            if RenameRunner.differsInNormalizationOnly(step.from, step.to) {
+            if Self.differsInNormalizationOnly(step.from, step.to) {
                 let temporary = step.from.deletingLastPathComponent().appending(
                     name: ".afm-nf-\(UUID().uuidString.prefix(8)).tmp")
                 try provider.move(step.from, to: temporary, replacing: false)
@@ -536,7 +536,7 @@ final class RenameRunner {
             // that is checked, not assumed, so that a wrong guess about the volume cannot
             // overwrite a different file (it is reported as a collision instead).
             try provider.move(
-                step.from, to: step.to, replacing: step.ontoItself && RenameRunner.isSameFile(step.from, step.to))
+                step.from, to: step.to, replacing: step.ontoItself && Self.isSameFile(step.from, step.to))
         }
 
         for step in steps {
@@ -551,6 +551,7 @@ final class RenameRunner {
                 switch step.kind {
                 case .park:
                     parked[step.item] = step
+
                 case .direct, .unpark:
                     parked[step.item] = nil
                     result.renamed.append(RenamedItem(from: sources[step.item], to: step.to))

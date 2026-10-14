@@ -52,6 +52,7 @@ struct GridGeometry: Equatable {
             return CGRect(
                 x: CGFloat(line) * cell.width, y: CGFloat(offset) * cell.height, width: cell.width, height: cell.height
             )
+
         case .rows:
             return CGRect(
                 x: CGFloat(offset) * cell.width, y: CGFloat(line) * cell.height, width: cell.width, height: cell.height
@@ -117,7 +118,7 @@ struct TypeSelect {
 
     /// Adds a typed character and returns what to look for.
     mutating func add(_ characters: String, at time: TimeInterval) -> String {
-        if time - lastKey > TypeSelect.pause { prefix = "" }
+        if time - lastKey > Self.pause { prefix = "" }
         lastKey = time
         prefix += characters
         return prefix
@@ -267,12 +268,13 @@ final class FileGridView: NSView, NSDraggingSource, NSUserInterfaceValidations {
         case .columns:
             // Measuring the names is a pass over the list; the list only changes in `reload`, while
             // the panel being resized asks for the layout on every step.
-            let widest = widestName ?? FileGridView.widestBriefName(in: model.items)
+            let widest = widestName ?? Self.widestBriefName(in: model.items)
             widestName = widest
             cell = CGSize(
-                width: FileGridView.briefColumnWidth(
+                width: Self.briefColumnWidth(
                     widest: widest, limit: panel?.settings.briefWidthLimit, viewport: viewport.width),
-                height: FileGridView.briefRowHeight)
+                height: Self.briefRowHeight)
+
         case .rows:
             cell = CGSize(width: tileSide + 20, height: tileSide + 40)
         }
@@ -408,17 +410,17 @@ final class FileGridView: NSView, NSDraggingSource, NSUserInterfaceValidations {
     }
 
     private func drawBriefCell(_ item: FileItem?, in frame: NSRect, color: NSColor, ownIcons: Bool) {
-        let icon = item.map { FileListColumn.icon(for: $0, own: ownIcons) } ?? FileGridView.parentIcon
+        let icon = item.map { FileListColumn.icon(for: $0, own: ownIcons) } ?? Self.parentIcon
         icon?.draw(
             in: NSRect(x: frame.minX + 3, y: frame.midY - 8, width: 16, height: 16), from: .zero,
             operation: .sourceOver,
             fraction: item?.isHidden == true ? 0.5 : 1, respectFlipped: true, hints: nil)
-        let text = FileGridView.caption(for: item) as NSString
+        let text = Self.caption(for: item) as NSString
         text.draw(
             with: NSRect(x: frame.minX + 24, y: frame.minY + 2, width: frame.width - 30, height: frame.height - 4),
             options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine],
             attributes: [
-                .font: FileGridView.nameFont, .foregroundColor: color, .paragraphStyle: FileGridView.briefStyle
+                .font: Self.nameFont, .foregroundColor: color, .paragraphStyle: Self.briefStyle
             ])
     }
 
@@ -442,19 +444,19 @@ final class FileGridView: NSView, NSDraggingSource, NSUserInterfaceValidations {
                 ),
                 from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
         } else {
-            let icon = item.map { FileListColumn.icon(for: $0, own: ownIcons) } ?? FileGridView.parentIcon
+            let icon = item.map { FileListColumn.icon(for: $0, own: ownIcons) } ?? Self.parentIcon
             let iconSide = min(side, max(32, side / 2))
             icon?.draw(
                 in: NSRect(x: box.midX - iconSide / 2, y: box.midY - iconSide / 2, width: iconSide, height: iconSide),
                 from: .zero,
                 operation: .sourceOver, fraction: item?.isHidden == true ? 0.5 : 1, respectFlipped: true, hints: nil)
         }
-        let text = FileGridView.caption(for: item) as NSString
+        let text = Self.caption(for: item) as NSString
         text.draw(
             with: NSRect(x: frame.minX + 3, y: box.maxY + 4, width: frame.width - 6, height: 16),
             options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine],
             attributes: [
-                .font: FileGridView.captionFont, .foregroundColor: color, .paragraphStyle: FileGridView.captionStyle
+                .font: Self.captionFont, .foregroundColor: color, .paragraphStyle: Self.captionStyle
             ])
     }
 
@@ -469,13 +471,16 @@ final class FileGridView: NSView, NSDraggingSource, NSUserInterfaceValidations {
     /// nothing move the cursor, as they do in the table of the Full view, and letters find a
     /// file by typing.
     override func keyDown(with event: NSEvent) {
-        guard let panel else { return super.keyDown(with: event) }
+        guard let panel else {
+            super.keyDown(with: event)
+            return
+        }
         if panel.handleKey(event) { return }
         let modifiers = event.modifierFlags.intersection([.command, .control, .option, .shift])
         let directions: [UInt16: GridGeometry.Direction] = [123: .left, 124: .right, 125: .down, 126: .up]
         if modifiers.isEmpty, let direction = directions[event.keyCode] {
             panel.moveCursor(direction)
-        } else if modifiers.isDisjoint(with: [.command, .control]), let typed = FileGridView.typedText(of: event) {
+        } else if modifiers.isDisjoint(with: [.command, .control]), let typed = Self.typedText(of: event) {
             panel.typeToFind(typed, at: event.timestamp)
         } else {
             super.keyDown(with: event)
@@ -492,10 +497,10 @@ final class FileGridView: NSView, NSDraggingSource, NSUserInterfaceValidations {
 
     // Cmd+A, Cmd+C, Cmd+X and Cmd+V arrive as the standard editing actions (see `EditingRole`).
 
-    override func selectAll(_ sender: Any?) { panel?.perform(.selectAll) }
-    @objc func copy(_ sender: Any?) { panel?.perform(.copy) }
-    @objc func cut(_ sender: Any?) { panel?.perform(.cut) }
-    @objc func paste(_ sender: Any?) { panel?.perform(.paste) }
+    override func selectAll(_: Any?) { panel?.perform(.selectAll) }
+    @objc func copy(_: Any?) { panel?.perform(.copy) }
+    @objc func cut(_: Any?) { panel?.perform(.cut) }
+    @objc func paste(_: Any?) { panel?.perform(.paste) }
 
     // MARK: Mouse
 
@@ -533,7 +538,7 @@ final class FileGridView: NSView, NSDraggingSource, NSUserInterfaceValidations {
         let items = panel.draggingItems(forRow: pressed.row).enumerated().map {
             index, pasteboardItem -> NSDraggingItem in
             let dragged = NSDraggingItem(pasteboardWriter: pasteboardItem)
-            dragged.setDraggingFrame(frame, contents: index < FileGridView.imagedDragItems ? image : nil)
+            dragged.setDraggingFrame(frame, contents: index < Self.imagedDragItems ? image : nil)
             return dragged
         }
         guard !items.isEmpty else { return }
@@ -541,7 +546,7 @@ final class FileGridView: NSView, NSDraggingSource, NSUserInterfaceValidations {
         PanelDrop.offerFileNames(on: session.draggingPasteboard)
     }
 
-    override func mouseUp(with event: NSEvent) {
+    override func mouseUp(with _: NSEvent) {
         // Still pressed: the mouse was not dragged away.
         if renameOnRelease, let pressed { panel?.scheduleRename(row: pressed.row) }
         renameOnRelease = false
@@ -574,13 +579,13 @@ final class FileGridView: NSView, NSDraggingSource, NSUserInterfaceValidations {
 
     // MARK: Drag and drop
 
-    func draggingSession(_ session: NSDraggingSession, sourceOperationMaskFor context: NSDraggingContext)
+    func draggingSession(_: NSDraggingSession, sourceOperationMaskFor _: NSDraggingContext)
         -> NSDragOperation
     {
         [.copy, .move, .generic]
     }
 
-    func draggingSession(_ session: NSDraggingSession, endedAt screenPoint: NSPoint, operation: NSDragOperation) {
+    func draggingSession(_: NSDraggingSession, endedAt _: NSPoint, operation _: NSDragOperation) {
         PanelDrop.endDrag()
         PanelDrop.endSession()
     }
@@ -631,16 +636,16 @@ final class SortHeaderView: NSView {
 
     private func frame(of index: Int) -> NSRect {
         NSRect(
-            x: CGFloat(index) * SortHeaderView.buttonWidth, y: 0, width: SortHeaderView.buttonWidth,
+            x: CGFloat(index) * Self.buttonWidth, y: 0, width: Self.buttonWidth,
             height: bounds.height)
     }
 
-    override func draw(_ dirtyRect: NSRect) {
+    override func draw(_: NSRect) {
         NSColor.windowBackgroundColor.setFill()
         bounds.fill()
         NSColor.separatorColor.setFill()
         NSRect(x: 0, y: bounds.height - 1, width: bounds.width, height: 1).fill()
-        for (index, column) in SortHeaderView.columns.enumerated() {
+        for (index, column) in Self.columns.enumerated() {
             let frame = frame(of: index)
             NSRect(x: frame.maxX - 1, y: 4, width: 1, height: frame.height - 8).fill()
             let isSortKey = column.sortKey == order.key
@@ -656,10 +661,10 @@ final class SortHeaderView: NSView {
 
     override func mouseDown(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
-        if let index = SortHeaderView.columns.indices.first(where: { frame(of: $0).contains(point) }) {
-            onClick?(SortHeaderView.columns[index])
+        if let index = Self.columns.indices.first(where: { frame(of: $0).contains(point) }) {
+            onClick?(Self.columns[index])
         }
     }
 
-    override func menu(for event: NSEvent) -> NSMenu? { menuProvider?() }
+    override func menu(for _: NSEvent) -> NSMenu? { menuProvider?() }
 }

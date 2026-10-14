@@ -40,7 +40,10 @@ public final class FileOperationsPlugin: Plugin {
     /// nothing but itself, and no longer than the user wants to wait (`cancellation`).
     /// `stop()` then finds nothing left to write.
     public func prepareToQuit(cancellation: CancellationFlag, completion: @escaping () -> Void) {
-        guard let operations else { return completion() }
+        guard let operations else {
+            completion()
+            return
+        }
         operations.flushLog(cancellation: cancellation, completion: completion)
     }
 
@@ -239,13 +242,16 @@ final class FileOperations: FileTransferService {
     static let logFlushTimeout: TimeInterval = 2
 
     func flushLog() {
-        log?.flush(timeout: FileOperations.logFlushTimeout)
+        log?.flush(timeout: Self.logFlushTimeout)
     }
 
     /// Writes what the log still holds, off the calling thread; `completion` is called once,
     /// on some thread, when it is written or `cancellation` was set.
     func flushLog(cancellation: CancellationFlag, completion: @escaping () -> Void) {
-        guard let log else { return completion() }
+        guard let log else {
+            completion()
+            return
+        }
         log.flush(cancellation: cancellation, completion: completion)
     }
 
@@ -284,6 +290,7 @@ final class FileOperations: FileTransferService {
                 switch makeJob(monitor.cancellation) {
                 case .failure(let refusal):
                     result = JobResult(refusal: refusal.message)
+
                 case .success(let job):
                     let bridge = JobBridge(monitor: monitor, ui: ui, fileSystems: fileSystems)
                     job.delegate = bridge
@@ -446,6 +453,7 @@ final class FileOperations: FileTransferService {
         switch dialog {
         case .none:
             break
+
         case .quick:
             let hint =
                 !hasTargetFolder
@@ -453,6 +461,7 @@ final class FileOperations: FileTransferService {
                 : "A name or a mask such as *.bak renames. More choices: Files › \(kind == .copy ? "Copy" : "Rename/Move") with Options…"
             guard let text = ui.prompt(heading, value: targetText, detail: hint) else { return }
             targetText = text
+
         case .options:
             guard let answer = askForOptions(heading, kind: kind, target: targetText, options: &options) else { return }
             targetText = answer
@@ -787,7 +796,7 @@ final class FileOperations: FileTransferService {
 
     /// What the placeholders of a new name refer to (spec 18 › Rename and new-folder
     /// placeholders): the item under the cursor, the folder, the moment the dialog opened.
-    private func nameContext(for panel: PanelHandle, typed text: String, openedAt: Date) -> NameTemplate.Context {
+    private func nameContext(for panel: PanelHandle, typed _: String, openedAt: Date) -> NameTemplate.Context {
         let model = panel.model
         var context = NameTemplate.Context()
         if let item = source.model.cursorItem {
@@ -840,7 +849,7 @@ final class FileOperations: FileTransferService {
                 }
                 var created: URL?
                 var failures: [(String, Error)] = []
-                context.clipboard = FileOperations.clipboardText(for: typed)
+                context.clipboard = Self.clipboardText(for: typed)
                 context.exists = { exists(fileSystems.location(from: $0, relativeTo: directory)) }
                 let names: [String]
                 do {
@@ -904,7 +913,7 @@ final class FileOperations: FileTransferService {
                 func exists(_ url: URL) -> Bool {
                     (try? fileSystems.provider(for: url))?.item(at: url, cancellation: cancellation) != nil
                 }
-                context.clipboard = FileOperations.clipboardText(for: typed)
+                context.clipboard = Self.clipboardText(for: typed)
                 context.exists = { exists(fileSystems.location(from: $0, relativeTo: directory)) }
                 var urls: [URL] = []
                 do {

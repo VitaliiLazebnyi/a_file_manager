@@ -53,18 +53,18 @@ struct SelectionMask {
         /// For a name of plain ASCII bytes and a mask with no folder part; nil when `nameBytes` is.
         func matches(bytes name: UnsafeBufferPointer<UInt8>, isFolder: Bool) -> Bool? {
             guard let nameBytes, !usesPath else { return nil }
-            if foldersOnly && !isFolder { return false }
+            if foldersOnly, !isFolder { return false }
             return Wildcard.matches(ascii: nameBytes, name)
         }
 
         /// `chain` is the folders leading to the entry, in lower case.
         func matches(_ name: [Character], isFolder: Bool, chain: [[Character]]) -> Bool {
-            if foldersOnly && !isFolder { return false }
+            if foldersOnly, !isFolder { return false }
             guard Wildcard.matches(self.name, name) else { return false }
             guard usesPath else { return true }
             // Without a leading separator the chain may start below any subdirectory.
             let patterns = isAnchored ? folders : [Array("**")] + folders
-            return Token.chain(patterns, matches: chain)
+            return Self.chain(patterns, matches: chain)
         }
 
         /// Whether the folder patterns fit the folders from the first to the last; `**` stands
@@ -117,11 +117,11 @@ struct SelectionMask {
             isValid = expression != nil
             return
         }
-        let (primary, related) = SelectionMask.split(text, at: ">")
+        let (primary, related) = Self.split(text, at: ">")
         self.related = related.map { $0.trimmingCharacters(in: .whitespaces) }.flatMap { $0.isEmpty ? nil : $0 }
-        let (included, excluded) = SelectionMask.split(primary, at: "|")
-        includes = SelectionMask.tokens(included).compactMap(Token.init)
-        excludes = SelectionMask.tokens(excluded ?? "").compactMap(Token.init)
+        let (included, excluded) = Self.split(primary, at: "|")
+        includes = Self.tokens(included).compactMap(Token.init)
+        excludes = Self.tokens(excluded ?? "").compactMap(Token.init)
     }
 
     /// Whether the folders leading to an entry matter; when not, callers need not work them out.
@@ -209,7 +209,7 @@ struct SelectionMask {
         var quoted = false
         for index in text.indices {
             if text[index] == "\"" { quoted.toggle() }
-            if text[index] == separator && !quoted {
+            if text[index] == separator, !quoted {
                 return (String(text[..<index]), String(text[text.index(after: index)...]))
             }
         }
@@ -224,7 +224,7 @@ struct SelectionMask {
         for character in text {
             if character == "\"" {
                 quoted.toggle()
-            } else if !quoted && (character == " " || character == ";") {
+            } else if !quoted, character == " " || character == ";" {
                 if !current.isEmpty { tokens.append(current) }
                 current = ""
             } else {
@@ -328,9 +328,11 @@ enum Wildcard {
                 case "*":
                     if position < source.count { result += String(source[position...]) }
                     position = source.count
+
                 case "?":
                     if position < source.count { result.append(source[position]) }
                     position += 1
+
                 default:
                     result.append(character)
                     position += 1

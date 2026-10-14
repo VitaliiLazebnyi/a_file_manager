@@ -86,7 +86,7 @@ import Testing
     @discardableResult
     func wait(upTo seconds: TimeInterval = 10, until condition: () -> Bool) async -> Bool {
         let deadline = Date().addingTimeInterval(seconds)
-        while !condition() && Date() < deadline { try? await Task.sleep(nanoseconds: 5_000_000) }
+        while !condition(), Date() < deadline { try? await Task.sleep(nanoseconds: 5_000_000) }
         return condition()
     }
 
@@ -209,7 +209,7 @@ import Testing
         #expect(app.left.model.directory.lastPathComponent == "A" && app.left.gridView.geometry.count == 5)
     }
 
-    @Test func thumbnailsAreMadeInTheBackgroundForLocalFilesOnly() async throws {
+    @Test func thumbnailsAreMadeInTheBackgroundForLocalFilesOnly() async {
         let app = await start()
         defer { app.stop() }
         let source = PanelStores.ScriptedThumbnails()

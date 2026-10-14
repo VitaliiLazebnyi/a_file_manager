@@ -91,7 +91,7 @@ import Testing
 
     /// Every template in which a placeholder may stand, with what the shell must make of it.
     static let templates: [(template: String, expected: (String, String) -> [String])] = [
-        ("%N", { name, guarded in [guarded] }),
+        ("%N", { _, guarded in [guarded] }),
         ("x%Ny", { name, _ in ["x" + name + "y"] }),
         ("--out=%N", { name, _ in ["--out=" + name] }),
         ("\"%N\"", { _, guarded in [guarded] }),

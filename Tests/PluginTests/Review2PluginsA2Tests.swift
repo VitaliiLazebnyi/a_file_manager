@@ -36,7 +36,7 @@ import Testing
     }
 
     func settle(_ condition: () -> Bool) async {
-        for _ in 0..<5000 where !condition() { try? await Task.sleep(nanoseconds: 2_000_000) }
+        for _ in 0..<5_000 where !condition() { try? await Task.sleep(nanoseconds: 2_000_000) }
     }
 
     @Test func theByteMatcherGivesTheAnswersOfTheCharacterMatcher() {
@@ -337,7 +337,7 @@ import Testing
         right: PanelSnapshot(path: "/B/", cursorName: "other.md"),
         listFolder: URL(fileURLWithPath: "/tmp/lists"), listName: "test")
 
-    @Test func aSubstringOfTheLargestLengthDoesNotTrap() throws {
+    @Test func aSubstringOfTheLargestLengthDoesNotTrap() {
         // The reproducer of the fuzzer (`pexpand-substring-length-overflow.bin`) and the same words by hand.
         let repro = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
             .appendingPathComponent("Fuzz/repro/misc/pexpand-substring-length-overflow.bin")
@@ -499,7 +499,7 @@ import Testing
         // The way to the folder the window opened is made beforehand, with a stale child.
         let chain = try #require(tree.node(at: "mid/x", creating: true))
         _ = tree.node(at: "mid/gone", creating: true)
-        let names = ["x"] + (0..<1000).map { "n\($0)" }
+        let names = ["x"] + (0..<1_000).map { "n\($0)" }
         let nodes = DirectoryTree.makeNodes(names)
         let mid = try #require(tree.node(at: "mid"))
         var done = tree.attach(nodes, ofPath: "mid", from: 0, limit: 100)
@@ -511,10 +511,10 @@ import Testing
             done = tree.attach(nodes, ofPath: "mid", from: done, limit: 100)
             turns += 1
         }
-        #expect(turns == 11 && mid.children.count == 1001 && mid.isScanned)
+        #expect(turns == 11 && mid.children.count == 1_001 && mid.isScanned)
         #expect(mid.children.first { $0.name == "x" } === chain && mid.children.allSatisfy { $0.name != "gone" })
         #expect(
-            tree.count == 1 + 1001
+            tree.count == 1 + 1_001
                 && mid.children.enumerated().allSatisfy { $0.element.indexInParentForTests == $0.offset })
     }
 }
@@ -529,7 +529,7 @@ extension TreeNode {
     @Test func aPathIsTakenFromTheStartOfAVeryLongClipboardLine() {
         let long = "/Users/me/Documents" + String(repeating: "x", count: 5_000_000)
         let path = NavigationPlugin.path(fromClipboard: long)
-        #expect(path?.hasPrefix("/Users/me/Documents") == true && (path?.utf8.count ?? .max) <= 8192)
+        #expect(path?.hasPrefix("/Users/me/Documents") == true && (path?.utf8.count ?? .max) <= 8_192)
         #expect(NavigationPlugin.path(fromClipboard: "\n\n  \"/a b\"  \nsecond") == "/a b")
     }
 
@@ -629,7 +629,7 @@ extension TreeNode {
                 && steps.filter { $0.kind == .unpark }.count == 1)
     }
 
-    @Test func theFuzzerReproducersOfTheRenameMasksEnd() throws {
+    @Test func theFuzzerReproducersOfTheRenameMasksEnd() {
         // `renamemask-wildcard-backtracking.bin` and `renameregex-catastrophic.bin`: the text after the
         // choice bytes is name mask, extension mask, search, replacement and the name, one to a line.
         let directory = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()

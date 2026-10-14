@@ -69,7 +69,7 @@ public final class SystemVolumeMounter: VolumeMounter {
     private let patience: TimeInterval
 
     public convenience init() {
-        self.init(calls: Calls(), unmountTime: SystemVolumeMounter.unmountTime)
+        self.init(calls: Calls(), unmountTime: Self.unmountTime)
     }
 
     init(calls: Calls, unmountTime: TimeInterval) {
@@ -109,7 +109,7 @@ public final class SystemVolumeMounter: VolumeMounter {
         let (started, request) = calls.mount(url) { status, mountPoints in outcome.set(status, mountPoints) }
         guard started == 0 else {
             throw VolumeError(
-                message: "The server \(shown) could not be connected: \(SystemVolumeMounter.reason(started)).")
+                message: "The server \(shown) could not be connected: \(Self.reason(started)).")
         }
         while outcome.done.wait(timeout: .now() + 0.1) == .timedOut {
             guard cancellation.isCancelled else { continue }
@@ -119,7 +119,7 @@ public final class SystemVolumeMounter: VolumeMounter {
         guard let result = outcome.value, result.status == 0 else {
             throw VolumeError(
                 message:
-                    "The server \(shown) could not be connected: \(SystemVolumeMounter.reason(outcome.value?.status ?? EIO))."
+                    "The server \(shown) could not be connected: \(Self.reason(outcome.value?.status ?? EIO))."
             )
         }
         return result.paths.map { URL(fileURLWithPath: $0, isDirectory: true) }

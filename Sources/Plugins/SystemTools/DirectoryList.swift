@@ -89,7 +89,7 @@ struct DirectoryListFormatter {
     static let defaultHeader = "%d - Page %p/%t"
 
     /// The header with its placeholders; empty turns the header off.
-    var header = DirectoryListFormatter.defaultHeader
+    var header = Self.defaultHeader
     /// Lines on a page, header included.
     var linesPerPage = 60
     /// Full view prints size, date and attributes; Brief prints the names only.
@@ -143,7 +143,7 @@ struct DirectoryListFormatter {
         let nameWidth = min(nameWidthLimit, rows.map { $0.name.count + ($0.isFolder ? 1 : 0) }.max() ?? 0)
         let sizeWidth = rows.map { $0.isFolder ? 5 : Format.bytes($0.size).count }.max() ?? 0
         return rows.map { line($0, nameWidth: nameWidth, sizeWidth: sizeWidth) } + [
-            "", DirectoryListFormatter.footer(rows)
+            "", Self.footer(rows)
         ]
     }
 
@@ -158,7 +158,7 @@ struct DirectoryListFormatter {
         return chunks.enumerated().map { index, chunk in
             guard hasHeader else { return chunk }
             return [
-                DirectoryListFormatter.expand(
+                Self.expand(
                     header, directory: directory, page: index + 1, pages: chunks.count, now: now), ""
             ] + chunk
         }
@@ -203,7 +203,7 @@ final class PagePrintView: NSView {
             frame: NSRect(x: 0, y: 0, width: pageSize.width, height: pageSize.height * CGFloat(max(pages.count, 1))))
     }
 
-    required init?(coder: NSCoder) { fatalError("not used") }
+    required init?(coder _: NSCoder) { fatalError("not used") }
 
     override var isFlipped: Bool { true }
 

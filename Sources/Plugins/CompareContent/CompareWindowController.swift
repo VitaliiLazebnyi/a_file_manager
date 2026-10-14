@@ -67,7 +67,7 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
             NSFont(name: settings.text(CompareSettingsKey.fontName, default: ""), size: size)
             ?? .monospacedSystemFont(ofSize: size, weight: .regular)
         let window = ToolWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 1100, height: 680),
+            contentRect: NSRect(x: 0, y: 0, width: 1_100, height: 680),
             styleMask: [.titled, .closable, .resizable, .miniaturizable], backing: .buffered, defer: false)
         window.title = "Compare contents"
         window.isReleasedWhenClosed = false
@@ -85,7 +85,7 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
         session.onChange = { [weak self] in self?.refresh() }
     }
 
-    required init?(coder: NSCoder) { fatalError("not used") }
+    required init?(coder _: NSCoder) { fatalError("not used") }
 
     func show() {
         if let url = session.leftURL ?? session.rightURL { base = url.deletingLastPathComponent() }
@@ -389,10 +389,10 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
         session.find(needle, from: currentRow, forward: forward) { [weak self] row in
             guard let self else { return }
             if let row {
-                self.statusLabel.stringValue = self.session.status
-                self.go(toRow: row)
+                statusLabel.stringValue = session.status
+                go(toRow: row)
             } else {
-                self.statusLabel.stringValue = "\"\(needle)\" was not found."
+                statusLabel.stringValue = "\"\(needle)\" was not found."
                 NSSound.beep()
             }
         }
@@ -484,7 +484,7 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
     }
 
     /// The keys of the panes (spec 09 › Compare by content › Keys).
-    private func handleKey(_ event: NSEvent, in table: NSTableView) -> Bool {
+    private func handleKey(_ event: NSEvent, in _: NSTableView) -> Bool {
         func key(_ character: String, _ modifiers: KeyModifiers) -> Bool {
             Shortcut(.character(character), modifiers).matches(event)
         }
@@ -521,7 +521,7 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
 
     // MARK: Tables
 
-    func numberOfRows(in tableView: NSTableView) -> Int { session.rowCount }
+    func numberOfRows(in _: NSTableView) -> Int { session.rowCount }
 
     private func side(of tableView: NSTableView) -> CompareSide { tableView === leftTable ? .left : .right }
 
@@ -537,9 +537,11 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
         let hasLine = session.text(side(of: tableView), row: row) != nil
         switch session.kind(ofRow: row) {
         case .equal: view.fill = nil
+
         case .changed:
             view.fill =
                 hasLine ? NSColor.systemYellow.withAlphaComponent(0.16) : NSColor.systemGray.withAlphaComponent(0.14)
+
         case .added, .removed:
             view.fill =
                 hasLine ? NSColor.systemRed.withAlphaComponent(0.14) : NSColor.systemGray.withAlphaComponent(0.14)
@@ -591,14 +593,14 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
 
     // MARK: Window
 
-    func windowShouldClose(_ sender: NSWindow) -> Bool {
+    func windowShouldClose(_: NSWindow) -> Bool {
         guard session.hasUnsavedChanges else { return true }
         // Closing this way does not ask again; whatever was not saved is given up.
         whenChangesAreSettled { [weak self] in self?.close() }
         return false
     }
 
-    func windowWillClose(_ notification: Notification) {
+    func windowWillClose(_: Notification) {
         NotificationCenter.default.removeObserver(self)
         if NSFontManager.shared.target === self { NSFontManager.shared.target = nil }
         session.cancel()

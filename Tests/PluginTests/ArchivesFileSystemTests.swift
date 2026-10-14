@@ -443,19 +443,24 @@ import Testing
                 switch index % 6 {
                 case 0:
                     if try bench.read(tree.appending(name: "big.log")) != expected { failures.add(1) }
+
                 case 1:
                     if try bench.zip.list(tree, showHidden: true).count < 5 { failures.add(1) }
                     if bench.zip.item(at: tree.appending(name: "readme.txt"))?.size != 17_600 { failures.add(1) }
+
                 case 2:
                     try write("thread \(index)", to: tree.appending(name: "sub").appending(name: "t\(index).txt"))
+
                 case 3:
                     try bench.zip.createDirectory(at: tree.appending(name: "made\(index)"))
                     try bench.zip.move(
                         tree.appending(name: "made\(index)"), to: tree.appending(name: "moved\(index)"),
                         replacing: false)
+
                 case 4:
                     if try bench.read(inTar.appending(name: "big.log")) != expected { failures.add(1) }
                     if try bench.readOnly.list(inTar, showHidden: true).count != 5 { failures.add(1) }
+
                 default:
                     try bench.store.flush(archive)
                     if bench.zip.parent(of: tree) != bench.inside(archive) { failures.add(1) }

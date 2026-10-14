@@ -59,7 +59,7 @@ public struct SearchSettings: Codable, Equatable {
         var parts: [String] = []
         if !searchFor.isEmpty { parts.append(searchFor) }
         if namesAreRegex { parts.append("regex") }
-        if findText && !text.isEmpty { parts.append("text \"\(text)\"") }
+        if findText, !text.isEmpty { parts.append("text \"\(text)\"") }
         if criteria.dateFrom != nil || criteria.dateTo != nil || criteria.notOlderThan != nil
             || criteria.olderThan != nil
         {
@@ -77,7 +77,7 @@ public struct SearchSettings: Codable, Equatable {
 
     /// These settings as they are loaded into a window that holds `current`: a "Search for" or
     /// "Search in" saved with a leading `>` leaves the window's field as it is.
-    public func loaded(over current: SearchSettings) -> SearchSettings {
+    public func loaded(over current: Self) -> Self {
         var result = self
         if searchFor.hasPrefix(">") { result.searchFor = current.searchFor }
         if searchIn.hasPrefix(">") { result.searchIn = current.searchIn }
@@ -111,7 +111,7 @@ public final class SearchStore {
 
     /// In name order.
     public var searches: [SavedSearch] {
-        (settings.value([SavedSearch].self, forKey: SearchStore.searchesKey) ?? [])
+        (settings.value([SavedSearch].self, forKey: Self.searchesKey) ?? [])
             .sorted { Sorter.compare($0.name, $1.name) == .orderedAscending }
     }
 
@@ -123,12 +123,12 @@ public final class SearchStore {
     public func save(_ search: SavedSearch) {
         settings.set(
             searches.filter { $0.name.caseInsensitiveCompare(search.name) != .orderedSame } + [search],
-            forKey: SearchStore.searchesKey)
+            forKey: Self.searchesKey)
     }
 
     public func delete(named name: String) {
         settings.set(
-            searches.filter { $0.name.caseInsensitiveCompare(name) != .orderedSame }, forKey: SearchStore.searchesKey)
+            searches.filter { $0.name.caseInsensitiveCompare(name) != .orderedSame }, forKey: Self.searchesKey)
     }
 
     /// What was typed into a field before, newest first.

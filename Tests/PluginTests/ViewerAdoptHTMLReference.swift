@@ -35,7 +35,7 @@ enum HTMLReference {
 
             func append(_ string: String) {
                 text.append(contentsOf: string.utf16)
-                endsInWhitespace = text.last.map(HTMLReference.referenceIsWhitespace) ?? true
+                endsInWhitespace = text.last.map(Self.referenceIsWhitespace) ?? true
             }
             func lineBreak() {
                 while text.last == 0x20 { text.removeLast() }
@@ -180,7 +180,7 @@ enum HTMLReference {
                     let letter = input[position]
                     if letter >= 0x30 && letter <= 0x39 || letter >= 0x61 && letter <= 0x7A {
                         nameBytes.append(UInt8(letter))
-                    } else if letter >= 0x41 && letter <= 0x5A {
+                    } else if letter >= 0x41, letter <= 0x5A {
                         nameBytes.append(UInt8(letter) | 0x20)
                     } else if letter >= 0x80 {
                         nameBytes.append(0xFF)
@@ -190,7 +190,7 @@ enum HTMLReference {
                     position += 1
                 }
                 let name = String(decoding: nameBytes, as: UTF8.self)
-                if !isClosing, HTMLReference.skippedElements.contains(name) {
+                if !isClosing, Self.skippedElements.contains(name) {
                     // Everything up to the matching end tag is not text.
                     if let end = findClosing(nameBytes, from: index) {
                         let after = find(0x3E, from: end)
@@ -215,7 +215,7 @@ enum HTMLReference {
                 } else if name == "pre" {
                     preformatted = max(0, preformatted + (isClosing ? -1 : 1))
                     lineBreak()
-                } else if HTMLReference.blockTags.contains(name) {
+                } else if Self.blockTags.contains(name) {
                     lineBreak()
                 }
             }

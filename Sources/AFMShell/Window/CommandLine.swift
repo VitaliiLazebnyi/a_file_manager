@@ -25,11 +25,11 @@ enum CommandLineAction: Equatable {
         let rest = parts.count > 1 ? parts[1].trimmingCharacters(in: .whitespaces) : ""
         if word.lowercased() == "cd" {
             // `cd` alone goes home, as it does in a shell.
-            self = .changeDirectory(rest.isEmpty ? "~" : CommandLineAction.unquoted(rest))
+            self = .changeDirectory(rest.isEmpty ? "~" : Self.unquoted(rest))
         } else if let command = commands[CommandID(rawValue: word)]
             ?? commands.all.first(where: { $0.id.rawValue.lowercased() == word.lowercased() })
         {
-            self = .command(command.id, CommandLineAction.argument(from: rest))
+            self = .command(command.id, Self.argument(from: rest))
         } else {
             self = .run(line)
         }
@@ -81,13 +81,13 @@ final class CommandLineHistory {
     init(settings: SettingsStore) {
         self.settings = settings
         entries = Array(
-            (settings.value([String].self, forKey: CommandLineHistory.settingsKey) ?? []).prefix(
-                CommandLineHistory.limit))
+            (settings.value([String].self, forKey: Self.settingsKey) ?? []).prefix(
+                Self.limit))
         forgetIfSwitchedOff()
     }
 
     /// Whether lines are remembered at all.
-    var isRecording: Bool { settings.flag(CommandLineHistory.recordKey, default: true) }
+    var isRecording: Bool { settings.flag(Self.recordKey, default: true) }
 
     /// A line that is not for the history: it begins with a blank.
     static func isPrivate(_ line: String) -> Bool {
@@ -99,9 +99,9 @@ final class CommandLineHistory {
     @discardableResult
     func forgetIfSwitchedOff() -> Bool {
         guard !isRecording else { return false }
-        if !entries.isEmpty || settings.data(forKey: CommandLineHistory.settingsKey) != nil {
+        if !entries.isEmpty || settings.data(forKey: Self.settingsKey) != nil {
             entries = []
-            settings.set(nil as Data?, forKey: CommandLineHistory.settingsKey)
+            settings.set(nil as Data?, forKey: Self.settingsKey)
         }
         return true
     }
@@ -109,17 +109,17 @@ final class CommandLineHistory {
     /// A line that is run again moves to the front instead of appearing twice. `line` is
     /// the line as it was typed, with the blank it may begin with.
     func add(_ line: String) {
-        guard !forgetIfSwitchedOff(), !CommandLineHistory.isPrivate(line) else { return }
+        guard !forgetIfSwitchedOff(), !Self.isPrivate(line) else { return }
         let line = line.trimmingCharacters(in: .whitespaces)
         guard !line.isEmpty else { return }
         entries.removeAll { $0 == line }
         entries.insert(line, at: 0)
-        entries = Array(entries.prefix(CommandLineHistory.limit))
-        settings.set(entries, forKey: CommandLineHistory.settingsKey)
+        entries = Array(entries.prefix(Self.limit))
+        settings.set(entries, forKey: Self.settingsKey)
     }
 
     func remove(_ line: String) {
         entries.removeAll { $0 == line }
-        settings.set(entries, forKey: CommandLineHistory.settingsKey)
+        settings.set(entries, forKey: Self.settingsKey)
     }
 }

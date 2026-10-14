@@ -46,7 +46,7 @@ let descriptLine = FuzzTarget(
     })
 
 let descript = FuzzTarget(
-    "descript", maxLen: 8192,
+    "descript", maxLen: 8_192,
     dict: ["\"", "\r\n", "\n", " ", "\u{04}\u{C2}", "\\n", "descript.ion"],
     rawDict: [
         [0xFF, 0xFE], [0xFE, 0xFF], [0xEF, 0xBB, 0xBF], [0x04, 0xC2], [0x00, 0xD8], [0xD8, 0x00], [0x81], [0x00]
@@ -104,7 +104,7 @@ let descriptStoreFS = MemoryFileSystem()
 let descriptStore: FuzzTarget = {
     let registry = FileSystemRegistry()
     return FuzzTarget(
-        "descript-store", maxLen: 4096,
+        "descript-store", maxLen: 4_096,
         dict: ["\"", "\r\n", " ", "\u{04}\u{C2}", "\\n"], rawDict: [[0xFF, 0xFE], [0xFE, 0xFF], [0xEF, 0xBB, 0xBF]],
         seeds: { seedTexts(["a.txt hello\r\n\"b c.txt\" world\r\n"]) },
         setUp: { registry.register(descriptStoreFS) },
@@ -138,7 +138,7 @@ let descriptStore: FuzzTarget = {
                     marks.contains { e.key.hasPrefix($0) } || glued(e.key + " " + e.value + "\r\n")
                         || glued("\"" + e.key + "\" ")
                 }
-                if known && !descriptAll { return }
+                if known, !descriptAll { return }
                 // A comment that ends with the text of the multi-line marker itself (U+0004 Â) cannot be told from a
                 // marked one once it is written: the format has no way to say so. Left out, as in `descript-line`.
                 for (name, comment) in comments where name != "new.txt" && !comment.hasSuffix("\u{04}\u{C2}") {
@@ -155,7 +155,7 @@ let descriptStore: FuzzTarget = {
 
 let tabRegistry = FileSystemRegistry()
 let tabFile = FuzzTarget(
-    "tabfile", maxLen: 4096,
+    "tabfile", maxLen: 4_096,
     dict: [
         "[activetabs]", "[inactivetabs]", "_path=", "_caption=", "_options=", "activetab=", "|", "\n", "=", ";", "0",
         "1", "-1",
@@ -231,7 +231,7 @@ let tabFile = FuzzTarget(
 // MARK: - selection files
 
 let selectionFile = FuzzTarget(
-    "selection", maxLen: 4096,
+    "selection", maxLen: 4_096,
     dict: ["\r\n", "\n", "\\", "/", "a.txt", "sub\\", "e\u{301}", "é", "\u{2028}", "\u{85}", "C:\\dir\\a.txt"],
     rawDict: [[0xFF, 0xFE], [0xFE, 0xFF], [0xEF, 0xBB, 0xBF], [0x00, 0xD8, 0x00, 0xD8], [0x0D, 0x00, 0x0A, 0x00]],
     seeds: {
@@ -384,7 +384,7 @@ final class SettingsBench {
 }
 
 let settingsImport = FuzzTarget(
-    "settings", maxLen: 8192,
+    "settings", maxLen: 8_192,
     dict: [
         "\"format\"", "\"A File Manager settings\"", "\"settings\"", "\"$data\"", "\"configuration.userCommands\"",
         "\"configuration.startMenu\"",
@@ -467,7 +467,7 @@ let settingsImport = FuzzTarget(
 // MARK: - lenient decoders of stored values
 
 let lenient = FuzzTarget(
-    "lenient", maxLen: 8192,
+    "lenient", maxLen: 8_192,
     dict: [
         "\"name\"", "\"title\"", "\"action\"", "\"command\"", "\"parameters\"", "\"startPath\"", "\"symbol\"",
         "\"children\"", "\"kind\"", "\"item\"",
@@ -538,7 +538,7 @@ let expansionDict = [
 ]
 
 let pexpand = FuzzTarget(
-    "pexpand", maxLen: 2048, dict: expansionDict,
+    "pexpand", maxLen: 2_048, dict: expansionDict,
     seeds: {
         seedTexts([
             "%P%N %T\n", "?\"%S\" '%N' %O.%E\n", "%N:~1,3 %N:~-0,2 %N:~-4 %S+1-2:~0,1\n",
@@ -587,6 +587,7 @@ let pexpand = FuzzTarget(
         fzCheck(ShellLine.display(result.pieces) == result.text, "pexpand-text-is-not-the-display")
         switch ShellLine.script(result.pieces) {
         case .failure(let refusal): _ = refusal.explanation
+
         case .success(let script):
             // The values are apart from the line: as many references as values, each of the harmless form.
             // (By bytes: a reference may be followed by a combining mark of the user's text, which joins its brace.)
@@ -871,7 +872,7 @@ func quoteCases(name: String, dir: String, value: String, selection: [String]) -
 var quoteCasesRun = 0
 
 let quote = FuzzTarget(
-    "quote", maxLen: 1024,
+    "quote", maxLen: 1_024,
     seeds: {
         [
             [1, 0, 1, 4, 1, 5, 1, 7, 1, 8, 2, 4, 41, 2, 26, 34],

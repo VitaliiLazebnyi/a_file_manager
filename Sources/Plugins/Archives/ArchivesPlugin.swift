@@ -146,7 +146,10 @@ public final class ArchivesPlugin: Plugin {
     /// keeps it on the disk and says where.
     public func prepareToQuit(cancellation: CancellationFlag, completion: @escaping () -> Void) {
         let (store, environment) = (self.store, self.environment)
-        guard store.hasPendingChanges else { return completion() }
+        guard store.hasPendingChanges else {
+            completion()
+            return
+        }
         Thread.detachNewThread {
             store.flushAll(cancellation: cancellation)
             // Not waiting is not waiting: the stop does not start the writes over.
@@ -172,7 +175,10 @@ public final class ArchivesPlugin: Plugin {
         let (store, environment) = (self.store, self.environment)
         // From here on the delayed writes start nothing; this is the one write.
         environment.isStopping = true
-        guard store.hasPendingChanges else { return store.close() }
+        guard store.hasPendingChanges else {
+            store.close()
+            return
+        }
 
         let state = StopState()
         let deadline = Date(timeIntervalSinceNow: environment.quitTimeout)
@@ -190,22 +196,24 @@ public final class ArchivesPlugin: Plugin {
                 for failure in failures {
                     var text = failure.error.localizedDescription
                     switch outcomes[ObjectIdentifier(failure.archive)] {
-                    case .saved(let url)?: text += "\n\nThe files that were added are in \(url.path)."
-                    case .kept(let folder)?:
+                    case .saved(let url): text += "\n\nThe files that were added are in \(url.path)."
+
+                    case .kept(let folder):
                         text +=
                             "\n\nThe files that were added could not be saved elsewhere. Their compressed data is in \(folder.path)"
                             + " (index.txt there says which file is which)."
-                    case .nothingToSave?, nil: break
+
+                    case .nothingToSave, nil: break
                     }
                     reports.append((ArchiveError.unsaved(text), failure.name))
                 }
             }
             state.finish(reports)
         }
-        if !ArchivesPlugin.wait(until: deadline, for: state) {
+        if !Self.wait(until: deadline, for: state) {
             // Long enough: the writes end where they are, and what they hold is kept.
             environment.quitting.cancel()
-            _ = ArchivesPlugin.wait(
+            _ = Self.wait(
                 until: Date(timeIntervalSinceNow: min(15, max(1, environment.quitTimeout))), for: state)
         }
         guard let reports = state.reports else {
@@ -247,9 +255,9 @@ public final class ArchivesPlugin: Plugin {
         while state.reports == nil, Date() < deadline {
             if Thread.isMainThread {
                 // A run loop with nothing to watch returns at once; then this must not spin.
-                if !RunLoop.current.run(mode: .default, before: Date(timeIntervalSinceNow: 0.02)) { usleep(5000) }
+                if !RunLoop.current.run(mode: .default, before: Date(timeIntervalSinceNow: 0.02)) { usleep(5_000) }
             } else {
-                usleep(5000)
+                usleep(5_000)
             }
         }
         return state.reports != nil
