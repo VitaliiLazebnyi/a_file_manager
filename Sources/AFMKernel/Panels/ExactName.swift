@@ -1,5 +1,3 @@
-import Foundation
-
 /// A name as it is written: equal only to a name of the same bytes, where two `String`s are equal
 /// as soon as they read the same (`é` as one character, or as `e` and an accent).
 ///
@@ -24,8 +22,7 @@ internal struct ExactName: Hashable, Sendable {
     internal static func areSame(_ lhs: String, _ rhs: String) -> Bool {
         let same = lhs.utf8.withContiguousStorageIfAvailable { first in
             rhs.utf8.withContiguousStorageIfAvailable { second in
-                first.count == second.count
-                    && (first.isEmpty || memcmp(first.baseAddress, second.baseAddress, first.count) == 0)
+                first.count == second.count && first.elementsEqual(second)
             }
         }
         // A name whose UTF-8 is not in one piece (a string the system bridged) is walked.

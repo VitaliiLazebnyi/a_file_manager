@@ -1,4 +1,4 @@
-import Foundation
+import Darwin
 
 /// The functions of the system's collation library (ICU) that a `NameCollator` uses.
 internal struct CollationLibrary {

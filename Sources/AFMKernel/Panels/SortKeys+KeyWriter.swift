@@ -1,5 +1,3 @@
-import Foundation
-
 /// Making the records.
 extension SortKeys {
     /// Writes the records of one run of items and the bytes they point into.
