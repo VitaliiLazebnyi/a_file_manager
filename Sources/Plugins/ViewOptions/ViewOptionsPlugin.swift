@@ -80,7 +80,9 @@ public final class ViewOptionsPlugin: Plugin {
 
     // MARK: Views and columns
 
-    private func registerViews(in kernel: Kernel) {
+    private func registerViews(in owner: Kernel) {
+        // The kernel keeps what is registered here; it must not be kept by it in turn.
+        unowned let kernel = owner
         let commands = kernel.commands
         let source = { kernel.panels.source }
         let views: [(CommandID, String, Shortcut, PanelViewMode, String, String)] = [
@@ -131,7 +133,9 @@ public final class ViewOptionsPlugin: Plugin {
 
     // MARK: Display filters
 
-    private func registerFilters(in kernel: Kernel) {
+    private func registerFilters(in owner: Kernel) {
+        // The kernel keeps what is registered here; it must not be kept by it in turn.
+        unowned let kernel = owner
         let commands = kernel.commands
         let model = { kernel.panels.source.model }
         let settings = kernel.settings
@@ -358,7 +362,9 @@ public final class ViewOptionsPlugin: Plugin {
         }
     }
 
-    private func registerSorting(in kernel: Kernel) {
+    private func registerSorting(in owner: Kernel) {
+        // The kernel keeps what is registered here; it must not be kept by it in turn.
+        unowned let kernel = owner
         let commands = kernel.commands
         let model = { kernel.panels.source.model }
         let reload = { kernel.panels.source.reload() }

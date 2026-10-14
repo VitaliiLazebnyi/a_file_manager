@@ -55,7 +55,9 @@ public final class SystemToolsPlugin: Plugin {
         self.volumes = volumes
     }
 
-    public func start(in kernel: Kernel) {
+    public func start(in owner: Kernel) {
+        // The kernel keeps what is registered here; it must not be kept by it in turn.
+        unowned let kernel = owner
         let tools = SystemTools(kernel, launchesApplications: launchesApplications, volumes: volumes)
         self.tools = tools
         let commands = kernel.commands
@@ -182,7 +184,8 @@ final class SystemTools {
     /// Characters with which a harmless first word could still start something else.
     private nonisolated static let shellOperators = CharacterSet(charactersIn: ";|&$`<>(){}\n\\")
 
-    private let kernel: Kernel
+    /// Unowned: the kernel owns the plugin, and through it this.
+    private unowned let kernel: Kernel
     private let launchesApplications: Bool
     private(set) var log: [String] = []
     /// The log keeps its newest lines; a program that runs for weeks must not grow with every command.

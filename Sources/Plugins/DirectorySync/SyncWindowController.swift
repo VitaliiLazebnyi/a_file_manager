@@ -10,7 +10,8 @@ final class SyncWindowController: NSWindowController, NSWindowDelegate, NSTableV
     NSMenuDelegate
 {
     private let session: SyncSession
-    private let kernel: Kernel
+    /// Unowned: the kernel owns the plugin, and through it this.
+    private unowned let kernel: Kernel
 
     private let setsButton = NSPopUpButton(frame: .zero, pullsDown: true)
     private let leftField = NSTextField()

@@ -46,7 +46,8 @@ final class SyncSession {
         case idle, comparing, compared, synchronizing
     }
 
-    let kernel: Kernel
+    /// Unowned: the kernel owns the plugin, and through it this.
+    unowned let kernel: Kernel
     private let settings: any SettingsStore
 
     var leftPath = ""

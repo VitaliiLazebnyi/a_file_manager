@@ -11,7 +11,8 @@ import Foundation
 /// come back to the main thread through `Kernel.askUser`.
 @MainActor
 final class NetworkCommands {
-    private let kernel: Kernel
+    /// Unowned: the kernel owns the plugin, and through it this.
+    private unowned let kernel: Kernel
     private let center: ConnectionCenter
     private let store: ConnectionStore
     private let mounter: any VolumeMounter?
@@ -43,8 +44,10 @@ final class NetworkCommands {
     /// The questions handed to `askUser` are marked `@Sendable`: they hold only values that are
     /// safe on any thread, and without the mark the compiler cannot check them.
     func connectQuestions() {
-        let (kernel, store, center) = (self.kernel, self.store, self.center)
-        let environment = center.environment
+        // The questions are kept by the environment, which the kernel keeps through the plugin:
+        // they must keep neither.
+        unowned let (kernel, environment) = (self.kernel, center.environment)
+        let store = self.store
         let vault = store.vault
         environment.askCredentials = { profile, message in
             kernel.askUser { @Sendable ui -> Credentials? in

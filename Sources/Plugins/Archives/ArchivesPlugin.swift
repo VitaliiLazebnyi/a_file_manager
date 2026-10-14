@@ -27,7 +27,9 @@ public final class ArchivesPlugin: Plugin {
         self.launchesApplications = launchesApplications
     }
 
-    public func start(in kernel: Kernel) {
+    public func start(in owner: Kernel) {
+        // The kernel keeps what is registered here; it must not be kept by it in turn.
+        unowned let kernel = owner
         let (store, environment) = (self.store, self.environment)
         let actions = ArchiveCommands(kernel: kernel, store: store, launchesApplications: launchesApplications)
         actions.refreshOptions()

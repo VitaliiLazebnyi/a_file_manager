@@ -43,7 +43,8 @@ public final class PlacesPlugin: Plugin {
     private let keepsTreesOnDisk: Bool
     private let favorites: [HotlistEntry]
     private let now: () -> Date
-    private var kernel: Kernel?
+    /// Weak: the kernel owns the plugin.
+    private weak var owner: Kernel?
     private var tracker: DirectoryHistoryTracker?
     private var subscription: AnyObject?
     private var treeWindow: DirectoryTreeWindowController?
@@ -69,8 +70,10 @@ public final class PlacesPlugin: Plugin {
         self.now = now
     }
 
-    public func start(in kernel: Kernel) {
-        self.kernel = kernel
+    public func start(in owner: Kernel) {
+        // The kernel keeps what is registered here; it must not be kept by it in turn.
+        unowned let kernel = owner
+        self.owner = owner
         let applicationSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
         let ownFolder = applicationSupport?.appendingPathComponent(kernel.productName, isDirectory: true)
             .appendingPathComponent("TreeCache", isDirectory: true)
@@ -161,7 +164,7 @@ public final class PlacesPlugin: Plugin {
     }
 
     public func stop() {
-        if let kernel, kernel.settings.flag(Keys.saveHistory, default: true) { tracker?.save() }
+        if let kernel = owner, kernel.settings.flag(Keys.saveHistory, default: true) { tracker?.save() }
         // A scan that went on in the background ends here; what the cache holds is written now.
         treeWindow?.shutDown()
         treeCache.flush()

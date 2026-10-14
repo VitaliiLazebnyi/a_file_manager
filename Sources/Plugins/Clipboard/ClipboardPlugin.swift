@@ -85,7 +85,9 @@ public final class ClipboardPlugin: Plugin {
         self.pasteboard = pasteboard
     }
 
-    public func start(in kernel: Kernel) {
+    public func start(in owner: Kernel) {
+        // The kernel keeps what is registered here; it must not be kept by it in turn.
+        unowned let kernel = owner
         let commands = kernel.commands
         let model = { kernel.panels.source.model }
         let hasOperands = { model().hasOperands }

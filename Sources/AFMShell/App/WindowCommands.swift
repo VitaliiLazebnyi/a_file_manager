@@ -29,7 +29,9 @@ extension CommandID {
 enum WindowCommands {
     /// `window` answers nil until the window exists; the commands are registered before it,
     /// because it is built from the final key bindings.
-    static func register(in kernel: Kernel, layout: WindowLayout, window: @escaping () -> MainWindowController?) {
+    static func register(in owner: Kernel, layout: WindowLayout, window: @escaping () -> MainWindowController?) {
+        // The kernel keeps what is registered here; it must not be kept by it in turn.
+        unowned let kernel = owner
         let commands = kernel.commands
         func toggle(_ id: CommandID, _ region: WindowLayout.Region) {
             commands.register(

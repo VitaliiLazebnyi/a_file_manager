@@ -19,7 +19,9 @@ public final class FindFilesPlugin: Plugin {
 
     public init() {}
 
-    public func start(in kernel: Kernel) {
+    public func start(in owner: Kernel) {
+        // The kernel keeps what is registered here; it must not be kept by it in turn.
+        unowned let kernel = owner
         let source = { kernel.panels.source.model }
         kernel.fileSystems.addVolumeReleaser { [weak self] volume in
             guard let self else { return }

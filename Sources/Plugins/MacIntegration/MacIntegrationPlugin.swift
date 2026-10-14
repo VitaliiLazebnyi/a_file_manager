@@ -176,7 +176,9 @@ public final class MacIntegrationPlugin: Plugin {
         }
     }
 
-    public func start(in kernel: Kernel) {
+    public func start(in owner: Kernel) {
+        // The kernel keeps what is registered here; it must not be kept by it in turn.
+        unowned let kernel = owner
         let commands = kernel.commands
         // The system's Quick Look panel keeps the file it previews: it closes before the drive is ejected.
         kernel.fileSystems.addVolumeReleaser { [weak self] volume in self?.quickLook.close(ifShowing: volume) }

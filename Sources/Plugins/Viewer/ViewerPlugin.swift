@@ -29,7 +29,8 @@ public final class ViewerPlugin: Plugin, ViewerService {
     private let overlayHost: (any PanelHandle) -> any PanelOverlayHost?
     private let quickViewDelay: TimeInterval
     private let showsWindows: Bool
-    private var kernel: Kernel?
+    /// Weak: the kernel owns the plugin.
+    private weak var owner: Kernel?
     private var settings: ListerSettings?
     private let temporaryCopies = TemporaryCopies()
     private(set) var windows: [ViewerWindowController] = []
@@ -49,8 +50,10 @@ public final class ViewerPlugin: Plugin, ViewerService {
         self.showsWindows = showsWindows
     }
 
-    public func start(in kernel: Kernel) {
-        self.kernel = kernel
+    public func start(in owner: Kernel) {
+        // The kernel keeps what is registered here; it must not be kept by it in turn.
+        unowned let kernel = owner
+        self.owner = owner
         settings = ListerSettings(kernel.settings)
         let commands = kernel.commands
         kernel.fileSystems.addVolumeReleaser { [weak self] volume in self?.letGo(of: volume) }
@@ -161,7 +164,7 @@ public final class ViewerPlugin: Plugin, ViewerService {
     // MARK: ViewerService
 
     public func view(_ url: URL) {
-        guard let kernel else { return }
+        guard let kernel = owner else { return }
         open([ViewerItem(source: .file(url), title: kernel.fileSystems.displayPath(url))], internalOnly: false)
     }
 
@@ -174,7 +177,7 @@ public final class ViewerPlugin: Plugin, ViewerService {
     /// Opens a Lister window on the files of a session; it fills when the first has been read.
     @discardableResult
     func open(_ items: [ViewerItem], internalOnly: Bool, followsCursor: Bool = false) -> ViewerWindowController? {
-        guard let kernel, let settings else { return nil }
+        guard let kernel = owner, let settings else { return nil }
         let controller = ViewerWindowController(
             kernel: kernel, settings: settings, temporaryCopies: temporaryCopies, internalOnly: internalOnly,
             followsCursor: followsCursor, followDelay: quickViewDelay
@@ -209,7 +212,7 @@ public final class ViewerPlugin: Plugin, ViewerService {
             hideQuickView()
             return
         }
-        guard let kernel, let settings else { return }
+        guard let kernel = owner, let settings else { return }
         let source = kernel.panels.source
         let target = kernel.panels.target
         guard let host = overlayHost(target) else {
@@ -252,7 +255,7 @@ public final class ViewerPlugin: Plugin, ViewerService {
     /// Configure Lister (spec 10 › Configure Lister): the options of the preference page as
     /// one dialog, for the command and for Options › Configure… in a Lister window.
     private func configure() {
-        guard let kernel else { return }
+        guard let kernel = owner else { return }
         let page = ListerSettings.preferencePage {}
         let fields = page.preferences.map { preference -> FormField in
             switch (preference.kind, kernel.settings.value(of: preference)) {

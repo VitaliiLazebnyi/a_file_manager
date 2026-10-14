@@ -9,7 +9,8 @@ import AppKit
 /// Main thread only.
 final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTableViewDataSource, NSTableViewDelegate {
     private let session: CompareSession
-    private let kernel: Kernel
+    /// Unowned: the kernel owns the plugin, and through it this.
+    private unowned let kernel: Kernel
     private let settings: any SettingsStore
     private let onClose: (CompareWindowController) -> Void
 

@@ -47,7 +47,8 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
         }
     }
 
-    private let kernel: Kernel
+    /// Unowned: the kernel owns the plugin, and through it this.
+    private unowned let kernel: Kernel
     private let cache: TreeCache
     private let rootPopup = NSPopUpButton()
     private let outline = TreeOutlineView()

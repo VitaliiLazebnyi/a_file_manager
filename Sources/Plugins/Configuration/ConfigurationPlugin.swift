@@ -76,7 +76,9 @@ public final class ConfigurationPlugin: Plugin {
         }.sorted()
     }
 
-    public func start(in kernel: Kernel) {
+    public func start(in owner: Kernel) {
+        // The kernel keeps what is registered here; it must not be kept by it in turn.
+        unowned let kernel = owner
         let runner = CommandRunner(
             kernel: kernel, launchesApplications: launchesApplications, background: background, listFolder: listFolder
         )
@@ -143,7 +145,9 @@ public final class ConfigurationPlugin: Plugin {
 
     /// Save, export, import and reset (spec 19 › Save Position, Save Settings, adapted: the Mac
     /// stores a setting the moment it changes, so there is little left to save by hand).
-    private func registerSettingsCommands(_ center: ConfigurationCenter, in kernel: Kernel) {
+    private func registerSettingsCommands(_ center: ConfigurationCenter, in owner: Kernel) {
+        // The kernel keeps what is registered here; it must not be kept by it in turn.
+        unowned let kernel = owner
         let commands = kernel.commands
         commands.register(Command(Self.savePosition, "Save Position", runsDuringJobs: true)) {
             center.savePosition()

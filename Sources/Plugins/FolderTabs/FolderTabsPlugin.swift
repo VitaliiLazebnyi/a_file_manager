@@ -68,7 +68,9 @@ public final class FolderTabsPlugin: Plugin {
     /// Asked whether a location connects to a server (`FileSystemProvider.connectsToServer`).
     private var fileSystems: FileSystemRegistry?
 
-    public func start(in kernel: Kernel) {
+    public func start(in owner: Kernel) {
+        // The kernel keeps what is registered here; it must not be kept by it in turn.
+        unowned let kernel = owner
         fileSystems = kernel.fileSystems
         let commands = kernel.commands
         let settings = kernel.settings

@@ -96,8 +96,11 @@ public final class NavigationPlugin: Plugin {
         }
     }
 
-    public func start(in kernel: Kernel) {
-        let commands = kernel.commands
+    public func start(in owner: Kernel) {
+        // The kernel keeps what is registered here; it must not be kept by it in turn.
+        unowned let kernel = owner
+        // Some handlers run other commands; the registry keeps them, so they hold it unowned.
+        unowned let commands = kernel.commands
         let source = { kernel.panels.source }
         let target = { kernel.panels.target }
 

@@ -22,7 +22,9 @@ public final class FileToolsPlugin: Plugin {
         self.pasteboard = pasteboard
     }
 
-    public func start(in kernel: Kernel) {
+    public func start(in owner: Kernel) {
+        // The kernel keeps what is registered here; it must not be kept by it in turn.
+        unowned let kernel = owner
         let tools = FileTools(kernel, pasteboard: pasteboard)
         let source = { kernel.panels.source.model }
         let onFile = { source().cursorItem.map { !$0.isDirectory } ?? false }
@@ -94,7 +96,8 @@ final class FileTools {
         static let onlyErrors = scope + "verifyOnlyErrors"
     }
 
-    private let kernel: Kernel
+    /// Unowned: the kernel owns the plugin, and through it this.
+    private unowned let kernel: Kernel
     private let pasteboard: NSPasteboard?
 
     init(_ kernel: Kernel, pasteboard: NSPasteboard?) {

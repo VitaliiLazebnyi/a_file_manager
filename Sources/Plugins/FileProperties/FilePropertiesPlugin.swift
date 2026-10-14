@@ -35,7 +35,9 @@ public final class FilePropertiesPlugin: Plugin {
         self.launchesApplications = launchesApplications
     }
 
-    public func start(in kernel: Kernel) {
+    public func start(in owner: Kernel) {
+        // The kernel keeps what is registered here; it must not be kept by it in turn.
+        unowned let kernel = owner
         let comments = CommentStore(fileSystems: kernel.fileSystems)
         PropertyColumns.register(in: kernel.columns, comments: comments)
         let actions = PropertyActions(kernel, comments: comments) { [weak self] urls in self?.showFinderInfo(urls) }
@@ -156,7 +158,8 @@ public final class FilePropertiesPlugin: Plugin {
 /// the result and refresh the panels.
 @MainActor
 final class PropertyActions {
-    private let kernel: Kernel
+    /// Unowned: the kernel owns the plugin, and through it this.
+    private unowned let kernel: Kernel
     private let comments: CommentStore
     let showFinderInfo: ([URL]) -> Void
 

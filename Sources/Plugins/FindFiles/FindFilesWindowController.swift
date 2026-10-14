@@ -119,7 +119,8 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
     private var feedButton = NSButton()
     private var newSearchButton = NSButton()
 
-    private let kernel: Kernel
+    /// Unowned: the kernel owns the plugin, and through it this.
+    private unowned let kernel: Kernel
     private let store: SearchStore
     private var includeHidden = false
     private var startDirectory = URL(fileURLWithPath: "/")

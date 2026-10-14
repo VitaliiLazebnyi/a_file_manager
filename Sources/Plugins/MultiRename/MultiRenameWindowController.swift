@@ -29,7 +29,8 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
         }
     }
 
-    private let kernel: Kernel
+    /// Unowned: the kernel owns the plugin, and through it this.
+    private unowned let kernel: Kernel
     private let session: MultiRenameSession
     /// Called when the window has closed, so that its owner can let go of it.
     var onClose: (() -> Void)?
