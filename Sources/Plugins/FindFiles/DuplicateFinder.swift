@@ -4,7 +4,7 @@ import Foundation
 
 /// "Find duplicate files" of the Advanced tab (spec 09 › Duplicate finder). The ticked
 /// sub-criteria must all hold between the files of a group.
-public struct DuplicateOptions: Codable, Equatable {
+public struct DuplicateOptions: Codable, Equatable, Sendable {
     public var isEnabled: Bool
     public var sameName: Bool
     public var sameSize: Bool
@@ -39,7 +39,7 @@ public enum DuplicateFinder {
     /// order. A cancelled run returns nothing, so no half-compared files are shown.
     public static func groups(
         of items: [FileItem], options: DuplicateOptions, fileSystems: FileSystemRegistry,
-        cancellation: CancellationFlag = CancellationFlag(), onProgress: ((Int, Int) -> Void)? = nil
+        cancellation: CancellationFlag = CancellationFlag(), onProgress: (@Sendable (Int, Int) -> Void)? = nil
     ) -> [[FileItem]] {
         guard options.isActive else { return [] }
         func key(_ item: FileItem) -> Key {
@@ -53,7 +53,8 @@ public enum DuplicateFinder {
         keyed = withoutSingles(distinctFiles(keyed))
         if options.sameContents {
             let lock = NSLock()
-            var done = 0
+            /// Guarded by `lock`.
+            nonisolated(unsafe) var done = 0
             let total = keyed.count
             let digests = Parallel.map(keyed) { entry -> Data? in
                 let digest = digest(of: entry.item.url, fileSystems: fileSystems, cancellation: cancellation)

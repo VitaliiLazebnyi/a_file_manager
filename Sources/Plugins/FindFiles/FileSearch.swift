@@ -124,7 +124,7 @@ public struct SearchMask {
 
 /// Everything a search is told (spec 09 › General tab, Advanced tab, Plugins tab). All
 /// criteria that are set must hold.
-public struct SearchQuery {
+public struct SearchQuery: Sendable {
     /// The first (and usually only) start directory.
     public var directory: URL
     /// Further start directories: "Search in" takes several, separated by `;`.
@@ -195,7 +195,10 @@ public struct SearchQuery {
 /// **Memory.** The listing of folders ahead of the one being reported is held back while a
 /// budget of listed but not yet reported entries is used up, so that a slow front job (a huge
 /// file, a stalled share) does not let the other threads read the whole tree into memory.
-public final class FileSearch {
+///
+/// Safe to share as said above: `limitReached` is guarded by `limitLock`, and the test settings
+/// `budget` and `partialListingAfter` are set before `run` only.
+public final class FileSearch: @unchecked Sendable {
     public let query: SearchQuery
     public let cancellation = CancellationFlag()
     /// Why the search cannot run as asked (a text that is no hex string, a broken regular
@@ -283,7 +286,8 @@ public final class FileSearch {
         var roots: [Walk.Node] = []
         // The tree is let go of on another thread: a cancelled search may hold a million entries.
         defer {
-            let dropped = (walk.close(), roots)
+            // This thread lets go of them here: nothing else holds them any more.
+            let dropped = Handover((walk.close(), roots))
             DispatchQueue.global(qos: .utility).async { withExtendedLifetime(dropped) {} }
         }
         if let only = query.onlyItems {
@@ -377,7 +381,9 @@ public final class FileSearch {
     /// (spec 09 › Duplicate finder); empty when the search was cancelled. The files are all
     /// held while they are compared, so a search stops at `duplicateCandidateLimit` of them
     /// and says so (`reachedResultLimit`).
-    public func runForDuplicates(onDirectory: (URL) -> Void = { _ in }, onHashing: ((Int, Int) -> Void)? = nil)
+    public func runForDuplicates(
+        onDirectory: (URL) -> Void = { _ in }, onHashing: (@Sendable (Int, Int) -> Void)? = nil
+    )
         -> [[FileItem]]
     {
         var files: [FileItem] = []
@@ -739,7 +745,8 @@ public final class FileSearch {
 
     /// Jobs for a few threads, taken from the top of a stack so that the work follows the
     /// order the results are wanted in. Closing drops what is left, and anything pushed after.
-    private final class JobStack {
+    /// `stack` and `isClosed` are guarded by `condition`; `shouldHold` is set once, before `start`.
+    private final class JobStack: @unchecked Sendable {
         struct Job {
             let node: Node?
             /// Lists a folder (as opposed to testing entries).
