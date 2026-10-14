@@ -1359,7 +1359,8 @@ public final class LocalFileSystem: FileSystemProvider {
         let cloud = home.appendingPathComponent("Library/Mobile Documents/com~apple~CloudDocs", isDirectory: true)
         if fm.fileExists(atPath: cloud.path) { places.append(Place(name: "iCloud Drive", url: cloud, kind: .folder)) }
         places.append(Place(name: "Applications", url: URL(fileURLWithPath: "/Applications", isDirectory: true), kind: .folder))
-        let keys: [URLResourceKey] = [.volumeNameKey, .volumeIsInternalKey, .volumeIsLocalKey, .volumeIsRemovableKey, .volumeIsEjectableKey]
+        let keys: [URLResourceKey] = [.volumeNameKey, .volumeIsInternalKey, .volumeIsLocalKey, .volumeIsRemovableKey, .volumeIsEjectableKey,
+                                      .volumeIsRootFileSystemKey]
         let volumes = fm.mountedVolumeURLs(includingResourceValuesForKeys: nil, options: [.skipHiddenVolumes]) ?? []
         final class Slot {
             let lock = NSLock()
@@ -1375,7 +1376,10 @@ public final class LocalFileSystem: FileSystemProvider {
                 let values = try? volume.resourceValues(forKeys: Set(keys))
                 let place = Place(name: values?.volumeName ?? volume.lastPathComponent, url: volume,
                                   kind: LocalFileSystem.volumeKind(path: volume.path, isInternal: values?.volumeIsInternal, isLocal: values?.volumeIsLocal,
-                                                                   isRemovable: values?.volumeIsRemovable, isEjectable: values?.volumeIsEjectable))
+                                                                   isRemovable: values?.volumeIsRemovable, isEjectable: values?.volumeIsEjectable),
+                                  canBeEjected: Place.isEjectable(path: volume.path, isRootFileSystem: values?.volumeIsRootFileSystem,
+                                                                  isInternal: values?.volumeIsInternal, isLocal: values?.volumeIsLocal,
+                                                                  isRemovable: values?.volumeIsRemovable, isEjectable: values?.volumeIsEjectable))
                 slot.lock.lock()
                 slot.place = place
                 slot.lock.unlock()

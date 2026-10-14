@@ -239,6 +239,9 @@ final class ButtonBarPage: NSObject, OptionsPage {
             edited(selecting: editor.insert(id, after: table.selectedRow))
         },
         ActionButton("Add Separator") { [unowned self] in edited(selecting: editor.insert(nil, after: table.selectedRow)) },
+        ActionButton("Add Line Break") { [unowned self] in
+            edited(selecting: editor.insert(ToolbarRegistry.lineBreak, after: table.selectedRow))
+        },
         ActionButton("Remove") { [unowned self] in
             guard let row = table.selectedRow else { return NSSound.beep() }
             editor.remove(at: row)
@@ -265,8 +268,10 @@ final class ButtonBarPage: NSObject, OptionsPage {
 
     private func reload(selecting row: Int? = nil) {
         let commands = center.kernel.commands
-        table.show(editor.items.map { id in id.map { [commands[$0]?.title ?? "(unknown command)", $0.rawValue] } ?? ["———", ""] },
-                   symbols: editor.items.map { $0.map(editor.symbol(for:)) }, selecting: row)
+        table.show(editor.items.map { id in
+            guard let id else { return ["———", ""] }
+            return id == ToolbarRegistry.lineBreak ? ["═══ New line ═══", ""] : [commands[id]?.title ?? "(unknown command)", id.rawValue]
+        }, symbols: editor.items.map { id in id.flatMap { $0 == ToolbarRegistry.lineBreak ? nil : editor.symbol(for: $0) } }, selecting: row)
     }
 
     private func edited(selecting row: Int?) {
@@ -281,7 +286,9 @@ final class ButtonBarPage: NSObject, OptionsPage {
 
     /// The picture of a button is a system symbol, chosen by its name.
     private func chooseSymbol() {
-        guard let row = table.selectedRow, editor.items.indices.contains(row), let id = editor.items[row] else { return NSSound.beep() }
+        guard let row = table.selectedRow, editor.items.indices.contains(row), let id = editor.items[row], id != ToolbarRegistry.lineBreak else {
+            return NSSound.beep()
+        }
         let ui = center.kernel.ui
         guard let name = ui.prompt("Symbol for “\(center.kernel.commands[id]?.title ?? id.rawValue)”:", value: editor.symbol(for: id),
                                    detail: "The name of a system symbol (SF Symbols), such as folder.badge.plus. Empty: the command's own.")?

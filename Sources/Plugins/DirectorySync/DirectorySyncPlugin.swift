@@ -25,7 +25,7 @@ public final class DirectorySyncPlugin: Plugin {
             open(in: kernel, set: argument.text)
         })
         kernel.menus.add([.synchronizeDirectories], to: .commandsTools)
-        kernel.toolbar.add(.synchronizeDirectories, symbol: "arrow.triangle.2.circlepath", group: 50)
+        kernel.toolbar.add(.synchronizeDirectories, symbol: "arrow.triangle.2.circlepath", group: 50, hint: "Compare two folders, including subfolders, and copy what differs to make them the same.")
 
         func key(_ name: String) -> String { SyncSettingsKey.scope + "." + name }
         kernel.preferences.add(PreferencePage(title: "Synchronize directories", preferences: [

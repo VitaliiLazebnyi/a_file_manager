@@ -20,6 +20,9 @@ protocol PanelHost: AnyObject {
     /// The places of the volume list, as far as they are known; they are asked for in the
     /// background, and `placesDidChange` tells the panel when more are known.
     func placesForVolumeList(of panel: PanelViewController) -> [Place]
+    /// The drive that can be ejected (a USB stick, a disk image, a share) a location is on,
+    /// from what is known of the places; nil for one that cannot be ejected.
+    func ejectableVolume(containing location: URL) -> Place?
 }
 
 /// One file panel on screen: drive line, folder tabs, path bar, file list and status line
@@ -311,6 +314,10 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
         }
         pathBar.onNavigate = { [weak self] location in self?.performFocused(.changeDirectory, .location(location)) }
         pathBar.menuProvider = { [weak self] in self?.pathMenu() }
+        pathBar.onEject = { [weak self] in
+            guard let self, let volume = self.host?.ejectableVolume(containing: self.model.directory) else { return }
+            self.performFocused(.ejectVolume, .location(volume.url))
+        }
 
         for column in FileListColumn.allCases {
             let tableColumn = column.makeTableColumn()
@@ -1312,6 +1319,12 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
     /// More places are known than when the volume list was last filled.
     func placesDidChange() {
         if volumeMenuIsOpen, let menu = volumeButton.menu { fillVolumeMenu(menu) }
+        updateEjectButton()
+    }
+
+    /// Shows the eject button of the path bar while the folder is on a drive that can be ejected.
+    func updateEjectButton() {
+        pathBar.ejectableVolumeName = host?.ejectableVolume(containing: model.directory)?.name
     }
 
     private func fillVolumeMenu(_ menu: NSMenu) {

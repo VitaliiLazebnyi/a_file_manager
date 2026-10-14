@@ -160,6 +160,8 @@ public final class MacIntegrationPlugin: Plugin {
     public func start(in kernel: Kernel) {
         let commands = kernel.commands
         let workspace = NSWorkspace.shared
+        // The system's Quick Look panel keeps the file it previews: it closes before the drive is ejected.
+        kernel.fileSystems.addVolumeReleaser { [weak self] volume in self?.quickLook.close(ifShowing: volume) }
         let model = { kernel.panels.source.model }
         let cursorFile = { model().cursorFile.flatMap { $0.url.isFileURL ? $0.url : nil } }
         let cursorItem = { model().cursorItem.flatMap { $0.url.isFileURL ? $0.url : nil } }
@@ -289,8 +291,8 @@ public final class MacIntegrationPlugin: Plugin {
         kernel.menus.addToContextMenu([MacIntegrationPlugin.openWith, MacIntegrationPlugin.quickLook, MacIntegrationPlugin.share,
                                        MacIntegrationPlugin.editTags, MacIntegrationPlugin.copyAsPathname],
                                       in: ContextMenuSection(order: 55), onItemOnly: true)
-        kernel.toolbar.add(MacIntegrationPlugin.quickLook, symbol: "eye", group: 60)
-        kernel.toolbar.add(MacIntegrationPlugin.share, symbol: "square.and.arrow.up", group: 60)
+        kernel.toolbar.add(MacIntegrationPlugin.quickLook, symbol: "eye", group: 60, hint: "Preview the selected file with macOS Quick Look.")
+        kernel.toolbar.add(MacIntegrationPlugin.share, symbol: "square.and.arrow.up", group: 60, hint: "Share the selected files: AirDrop, Mail, Messages and more.")
         kernel.toolbar.setSymbol("tag", for: MacIntegrationPlugin.editTags)
         kernel.toolbar.setSymbol("arrow.up.forward.app", for: MacIntegrationPlugin.openWith)
         kernel.toolbar.setSymbol("folder", for: .revealInFinder)

@@ -33,7 +33,7 @@ public final class CompareContentPlugin: Plugin {
         })
         kernel.menus.add([.compareByContent], to: .filesAdvanced)
         kernel.menus.addToContextMenu([.compareByContent], in: .tools, onItemOnly: true)
-        kernel.toolbar.add(.compareByContent, symbol: "rectangle.split.2x1", group: 50)
+        kernel.toolbar.add(.compareByContent, symbol: "arrow.left.arrow.right.square", group: 50, hint: "Compare two files and show the differences side by side.")
 
         func key(_ name: String) -> String { CompareSettingsKey.scope + "." + name }
         kernel.preferences.add(PreferencePage(title: "Compare by content", preferences: [

@@ -46,6 +46,10 @@ public final class ScriptedInteraction: UserInteraction {
         log.append("inform: \(message)")
     }
 
+    public func notice(_ message: String) {
+        log.append("notice: \(message)")
+    }
+
     public func form(_ title: String, detail: String, fields: [FormField], buttons: [String]) -> FormValues? {
         log.append("form: \(title)")
         forms.append(fields)

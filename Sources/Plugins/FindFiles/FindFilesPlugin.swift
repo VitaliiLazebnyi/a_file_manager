@@ -21,6 +21,10 @@ public final class FindFilesPlugin: Plugin {
 
     public func start(in kernel: Kernel) {
         let source = { kernel.panels.source.model }
+        kernel.fileSystems.addVolumeReleaser { [weak self] volume in
+            guard let self else { return }
+            for window in [self.window].compactMap({ $0 }) + self.separateWindows { window.cancelSearch(ifItReads: volume) }
+        }
         kernel.commands.register(Command(.searchFor, "Find Files…", [.f(7, .option), .cmd("f")], runsDuringJobs: true),
                                  parameterized: { [self] argument in
             mainWindow(in: kernel).show(startingIn: argument.location ?? source().directory, includeHidden: source().showHidden)
@@ -38,7 +42,7 @@ public final class FindFilesPlugin: Plugin {
         }
         kernel.menus.add([.searchFor], to: .filesTools)
         kernel.menus.add([.searchStandalone, .searchInCursorDirectory], to: .commandsTools)
-        kernel.toolbar.add(.searchFor, symbol: "magnifyingglass", group: 40)
+        kernel.toolbar.add(.searchFor, symbol: "magnifyingglass", group: 40, hint: "Search for files by name, text inside, size or date.")
 
         kernel.preferences.add(PreferencePage(title: "Find Files", preferences: [
             Preference(FindFilesWindowController.keepResultsKey, "Keep the results of the last search when the window is opened again",

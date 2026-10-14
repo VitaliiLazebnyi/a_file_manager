@@ -67,7 +67,7 @@ public final class VirtualFoldersPlugin: Plugin, FileListService {
         commands.register(Command(.loadFileList, "Load File List into Panel…"), parameterized: { [self] in loadList($0) })
 
         kernel.menus.add([.branchView, .branchViewSelected], to: .commandsPlaces)
-        kernel.toolbar.add(.branchView, symbol: "list.bullet.indent", group: 30)
+        kernel.toolbar.add(.branchView, symbol: "list.bullet.indent", group: 30, hint: "Show the files of this folder and of all its subfolders in one list.")
         kernel.toolbar.setSymbol("list.bullet.rectangle", for: .loadFileList)
         kernel.preferences.add(PreferencePage(title: "Branch View", preferences: [
             Preference(VirtualFoldersPlugin.listsFoldersKey, "List the folders too, not only the files in them", .flag(default: false)),

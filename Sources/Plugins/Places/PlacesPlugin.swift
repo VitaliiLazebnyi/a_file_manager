@@ -110,9 +110,9 @@ public final class PlacesPlugin: Plugin {
         }
 
         kernel.menus.add([.directoryTree, .directoryHotlist, .directoryHistory], to: .commandsPlaces)
-        kernel.toolbar.add(.directoryHotlist, symbol: "star", group: 30)
-        kernel.toolbar.add(.directoryHistory, symbol: "clock.arrow.circlepath", group: 30)
-        kernel.toolbar.add(.directoryTree, symbol: "folder.badge.gearshape", group: 30)
+        kernel.toolbar.add(.directoryHotlist, symbol: "star", group: 30, hint: "Your favourite folders: jump to one, or add the current folder.")
+        kernel.toolbar.add(.directoryHistory, symbol: "clock.arrow.circlepath", group: 30, hint: "The folders you visited recently: jump back to one.")
+        kernel.toolbar.add(.directoryTree, symbol: "folder.badge.gearshape", group: 30, hint: "Show all folders as a tree and jump to one.")
         kernel.toolbar.setSymbol("star.leadinghalf.filled", for: .toggleHotlistEntry)
         kernel.toolbar.setSymbol("star.square", for: .configureHotlist)
 

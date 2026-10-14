@@ -18,6 +18,9 @@ public protocol UserInteraction: AnyObject {
     /// the first button; whoever shows real dialogs offers this.
     func choose(_ message: String, detail: String, buttons: [String], style: QuestionStyle, defaultButton: Int?) -> Int
     func inform(_ message: String, detail: String, style: QuestionStyle)
+    /// A short message that asks nothing and needs no answer ("… can be removed safely"):
+    /// shown for a moment without holding anything up. The default is `inform`.
+    func notice(_ message: String)
     /// A dialog with several fields. Every button in `buttons` accepts the dialog; a Cancel
     /// button is added to them, and nil is returned when the user takes it.
     func form(_ title: String, detail: String, fields: [FormField], buttons: [String]) -> FormValues?
@@ -45,6 +48,10 @@ extension UserInteraction {
 
     public func inform(_ message: String) {
         inform(message, detail: "", style: .information)
+    }
+
+    public func notice(_ message: String) {
+        inform(message)
     }
 
     public func report(_ error: Error, title: String) {

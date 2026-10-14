@@ -328,6 +328,12 @@ final class PanelCoordinator: PanelSet, PanelHost {
         return places.all
     }
 
+    func ejectableVolume(containing location: URL) -> Place? {
+        guard location.isFileURL else { return nil }
+        let drives = places.all.filter(\.canBeEjected)
+        return DriveBarView.currentPlace(among: drives, for: location).map { drives[$0] }
+    }
+
     func panelSelectionDidChange(_ panel: PanelViewController) {
         kernel.panelEvents.post(.selectionChanged, from: panel)
     }

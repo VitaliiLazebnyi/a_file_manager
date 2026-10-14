@@ -47,6 +47,7 @@ public final class FileOperationsPlugin: Plugin {
     public func start(in kernel: Kernel) {
         let operations = FileOperations(kernel)
         self.operations = operations
+        kernel.fileSystems.addVolumeCloser { [weak operations] volume, _ in operations?.closeLog(on: volume) }
         let commands = kernel.commands
         let source = { kernel.panels.source.model }
         let hasOperands = { source().hasOperands }
@@ -122,10 +123,10 @@ public final class FileOperationsPlugin: Plugin {
         kernel.menus.addToContextMenu([.copy, .renameMove, .renameOnly, .delete], in: .transfer, onItemOnly: true)
         kernel.menus.addToContextMenu([.makeDirectory, .newTextFile], in: .create)
 
-        kernel.toolbar.add(.copy, symbol: "doc.on.doc", group: 20)
-        kernel.toolbar.add(.renameMove, symbol: "arrow.right.doc.on.clipboard", group: 20)
-        kernel.toolbar.add(.makeDirectory, symbol: "folder.badge.plus", group: 20)
-        kernel.toolbar.add(.delete, symbol: "trash", group: 20)
+        kernel.toolbar.add(.copy, symbol: "doc.on.doc", group: 20, hint: "Copy the selected files to the folder of the other panel.")
+        kernel.toolbar.add(.renameMove, symbol: "arrow.right.doc.on.clipboard", group: 20, hint: "Move the selected files to the other panel's folder, or rename them.")
+        kernel.toolbar.add(.makeDirectory, symbol: "folder.badge.plus", group: 20, hint: "Create a new folder in the current folder.")
+        kernel.toolbar.add(.delete, symbol: "trash", group: 20, hint: "Move the selected files and folders to the Trash.")
         kernel.toolbar.setSymbol("doc.badge.gearshape", for: .copyWithOptions)
         kernel.toolbar.setSymbol("doc.badge.plus", for: .newTextFile)
         kernel.toolbar.setSymbol("trash.slash", for: .deleteDirectly)
@@ -157,7 +158,27 @@ final class FileOperations: FileTransferService {
 
     private let kernel: Kernel
     /// The log as last configured; made again when the configuration page changed something.
-    private var log: OperationLog?
+    private var log: OperationLog? {
+        didSet {
+            logLock.lock()
+            sharedLog = log
+            logLock.unlock()
+        }
+    }
+    /// `log` for the thread that ejects a volume, which may be the one the log is written to.
+    private let logLock = NSLock()
+    private var sharedLog: OperationLog?
+
+    /// Job thread: a log written to `volume` writes what it has and closes its file, so the
+    /// volume can be ejected. The next line opens it again.
+    func closeLog(on volume: URL) {
+        logLock.lock()
+        let log = sharedLog
+        logLock.unlock()
+        guard let log else { return }
+        let file = log.configuration.file
+        if file.isSameLocation(as: volume) || file.isInside(volume) { log.flush() }
+    }
 
     init(_ kernel: Kernel) {
         self.kernel = kernel

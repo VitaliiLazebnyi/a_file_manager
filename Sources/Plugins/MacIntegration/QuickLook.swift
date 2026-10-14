@@ -45,6 +45,11 @@ final class QuickLookController: NSResponder, QLPreviewPanelDataSource, QLPrevie
         visiblePanel?.orderOut(nil)
     }
 
+    /// Closes the panel when it previews a file of `volume`.
+    func close(ifShowing volume: URL) {
+        if isVisible, urls.contains(where: { $0.isSameLocation(as: volume) || $0.isInside(volume) }) { close() }
+    }
+
     override func acceptsPreviewPanelControl(_ panel: QLPreviewPanel!) -> Bool { true }
 
     override func beginPreviewPanelControl(_ panel: QLPreviewPanel!) {

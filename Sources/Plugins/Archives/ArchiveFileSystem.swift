@@ -291,21 +291,49 @@ final class ArchiveStore {
     /// innermost first. A look into the table for every other file: no archive is opened, and
     /// none that has nothing waiting is touched.
     func bringUpToDate(_ url: URL, cancellation: CancellationFlag) throws {
-        func concerns(_ archive: OpenArchive) -> Bool {
-            // The file an archive inside archives finally lies in.
-            var file = archive.archiveURL
-            for _ in 0..<64 {
-                guard case .inside(let location)? = ArchiveURL.parse(file) else { break }
-                file = location.archive
-            }
-            file = ArchiveURL.resolved(file)
-            return file.isSameLocation(as: url) || PathSafety.isContained(file, in: url)
-        }
+        let concerns = { (archive: OpenArchive) in ArchiveStore.archive(archive, liesIn: url) }
         for _ in 0..<(2 * environment.maxNesting + 4) {
             let pending = openArchives.filter { $0.hasPendingChanges && concerns($0) }
                 .sorted { ArchiveURL.nesting(of: $0.archiveURL) > ArchiveURL.nesting(of: $1.archiveURL) }
             guard !pending.isEmpty else { return }
             for archive in pending { try archive.commit(cancellation: cancellation) }
+        }
+    }
+
+    /// Whether an archive is the file at `url`, lies in that folder, or inside such an archive.
+    private static func archive(_ archive: OpenArchive, liesIn url: URL) -> Bool {
+        // The file an archive inside archives finally lies in.
+        var file = archive.archiveURL
+        for _ in 0..<64 {
+            guard case .inside(let location)? = ArchiveURL.parse(file) else { break }
+            file = location.archive
+        }
+        file = ArchiveURL.resolved(file)
+        return file.isSameLocation(as: url) || PathSafety.isContained(file, in: url)
+    }
+
+    /// Lets go of the archives that lie on `volume` (before it is ejected): their files are
+    /// closed. Only archives with nothing left to write go (`retireIfIdle`); the eject has
+    /// written their changes first (`bringUpToDate`). One in use stays, and the eject is
+    /// then refused for it. Blocks on the archives' own locks: not for the main thread.
+    func release(on volume: URL) {
+        // `opened` belongs to the table's lock, a slot's `archive` to the slot's own.
+        lock.lock()
+        let candidates = opened.filter { ArchiveStore.archive($0.value, liesIn: volume) }.compactMap { key, _ in slots[key].map { (key, $0) } }
+        lock.unlock()
+        for (key, slot) in candidates {
+            guard slot.lock.try() else { continue }
+            var released: OpenArchive?
+            if slot.archive?.retireIfIdle() != false {
+                lock.lock()
+                if slots[key] === slot {
+                    slots[key] = nil
+                    released = opened.removeValue(forKey: key)
+                }
+                lock.unlock()
+            }
+            slot.lock.unlock()
+            _ = released
         }
     }
 

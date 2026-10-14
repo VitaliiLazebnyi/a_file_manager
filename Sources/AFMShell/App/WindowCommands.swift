@@ -13,6 +13,11 @@ extension CommandID {
     static let nextCommandLine: CommandID = "cm_NextCommand"
     /// Provided by whichever plugin edits the button bar; the bar's context menu offers it.
     static let changeButtonBar: CommandID = "cm_ConfigChangeButtonBar"
+    /// Not a Total Commander command: puts back the button bar the plugins proposed.
+    static let resetButtonBar: CommandID = "cm_ResetButtonBar"
+    /// Provided by the system tools: ejects the drive of the location it is given (the drive
+    /// of the source panel without one). The eject buttons of the drive bar and path bar run it.
+    static let ejectVolume: CommandID = "afm_EjectVolume"
 }
 
 /// The commands of the window around the panels: which bars are shown, how the panels are
@@ -62,6 +67,10 @@ enum WindowCommands {
         line(.addPathToCommandLine, "Add Path to Command Line", [Shortcut(.character("p"), .control)]) { $0.addPath() }
         line(.previousCommandLine, "Previous Command Line", [Shortcut(.character("e"), .control)]) { $0.recall(1) }
         line(.nextCommandLine, "Next Command Line") { $0.recall(-1) }
+        commands.register(Command(.resetButtonBar, "Reset Button Bar to Default", runsDuringJobs: true),
+                          enabled: { kernel.toolbar.hasUserLayout(in: kernel.settings) }) {
+            kernel.toolbar.setLayout(nil, in: kernel.settings)
+        }
         commands.register(Command(.clearCommandLine, "Clear Command Line", runsDuringJobs: true)) { window()?.commandLine.clear() }
 
         kernel.menus.add([.showButtonBar, .showDriveButtons, .showCommandLine, .showFunctionKeys, .panelsStacked, .panelsEqualWidth],

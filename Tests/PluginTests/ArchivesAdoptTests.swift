@@ -192,6 +192,23 @@ private func outside(_ root: URL, _ path: String) throws -> URL {
         #expect(FileSignature.of(archive.path) == before)
     }
 
+    @Test func anArchiveOnADriveIsWrittenAndLetGoOfBeforeTheDriveIsEjected() throws {
+        bench.environment.immediateWriteLimit = 0
+        let archive = try makeZip()
+        let tree = bench.inside(archive, "tree")
+        try bench.zip.createDirectory(at: tree.appending(name: "made"))
+        // Something else on the drive, or another drive, is no reason to let go.
+        bench.store.release(on: box.url("elsewhere"))
+        #expect(bench.store.openArchive(at: archive) != nil)
+        // An archive with changes still to write stays: going now would lose them.
+        bench.store.release(on: box.root)
+        #expect(bench.store.openArchive(at: archive) != nil && !listed(archive).contains("tree/made/"))
+        // As the eject does it: written first, then let go of.
+        try bench.store.bringUpToDate(box.root, cancellation: CancellationFlag())
+        bench.store.release(on: box.root)
+        #expect(bench.store.openArchive(at: archive) == nil && listed(archive).contains("tree/made/") && isSound(archive))
+    }
+
     @Test func aFailedCommitKeepsEverythingForTheNextTry() throws {
         bench.environment.immediateWriteLimit = 0
         let archive = try makeZip()

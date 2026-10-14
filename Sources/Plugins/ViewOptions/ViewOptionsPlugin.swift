@@ -70,14 +70,14 @@ public final class ViewOptionsPlugin: Plugin {
     private func registerViews(in kernel: Kernel) {
         let commands = kernel.commands
         let source = { kernel.panels.source }
-        let views: [(CommandID, String, Shortcut, PanelViewMode, String)] = [
-            (.viewBrief, "Brief", .f(1, .control), .brief, "list.bullet"),
-            (.viewFull, "Full", .f(2, .control), .full, "list.dash"),
-            (.viewThumbnails, "Thumbnail View", .f(1, [.control, .shift]), .thumbnails, "square.grid.2x2"),
+        let views: [(CommandID, String, Shortcut, PanelViewMode, String, String)] = [
+            (.viewBrief, "Brief", .f(1, .control), .brief, "list.bullet", "Show only the names, in several columns."),
+            (.viewFull, "Full", .f(2, .control), .full, "list.dash", "Show one row per file, with size, date and attributes."),
+            (.viewThumbnails, "Thumbnail View", .f(1, [.control, .shift]), .thumbnails, "square.grid.2x2", "Show pictures of the files."),
         ]
-        for (id, title, shortcut, mode, symbol) in views {
+        for (id, title, shortcut, mode, symbol, hint) in views {
             commands.register(Command(id, title, [shortcut]), checked: { source().viewMode == mode }) { source().viewMode = mode }
-            kernel.toolbar.add(id, symbol: symbol, group: 60)
+            kernel.toolbar.add(id, symbol: symbol, group: 60, hint: hint)
         }
         commands.register(Command(ViewOptionsPlugin.customColumns, "Custom Columns…", [.f(1, .shift)]),
                           enabled: { !kernel.columns.all.isEmpty }) { [self] in chooseColumns(in: kernel) }

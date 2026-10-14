@@ -241,7 +241,7 @@ public final class FolderTabsPlugin: Plugin {
                          to: MenuSection(.show, order: 44))
         kernel.menus.add([.saveTabs, .saveTabsOfBothSides, .openTabs, .appendTabs], to: MenuSection(.show, order: 46))
         kernel.menus.addToContextMenu([.openInNewTab], in: .open, onItemOnly: true)
-        kernel.toolbar.add(.newTab, symbol: "plus.rectangle.on.rectangle", group: 60)
+        kernel.toolbar.add(.newTab, symbol: "plus.rectangle.on.rectangle", group: 60, hint: "Open the current folder in a new tab.")
         kernel.toolbar.setSymbol("arrow.uturn.backward.square", for: .reopenClosedTab)
         kernel.toolbar.setSymbol("lock", for: .toggleTabLock)
         kernel.preferences.add(PreferencePage(title: "Folder Tabs", preferences: [

@@ -108,8 +108,10 @@ private final class WindowTestPlugin: Plugin {
         let commands = bar.entries.compactMap { $0 }
         #expect(commands.contains(.copy) && commands.contains(.showHidden) && commands.allSatisfy { app.commands[$0] != nil })
         #expect(bar.entries.first != nil && bar.entries.last != nil && !zip(bar.entries, bar.entries.dropFirst()).contains { $0 == nil && $1 == nil })
-        let tips = bar.buttons.map(\.toolTip)
-        #expect(tips.contains("Copy… (F5)") && tips.contains("Hidden Files (⇧⌘.)") && tips.count == commands.count)
+        // The name and key of each button, and below them what it does where its plugin says.
+        let tips = bar.buttons.map { $0.toolTip ?? "" }
+        #expect(tips.contains("Copy… (F5)\nCopy the selected files to the folder of the other panel.") && tips.contains("Hidden Files (⇧⌘.)"))
+        #expect(tips.count == commands.count)
         #expect(!bar.isHidden && bar.buttons.allSatisfy { $0.image != nil })
         // The buttons follow their commands: Copy needs something under the cursor.
         let (copy, hidden) = (bar.buttons[commands.firstIndex(of: .copy) ?? 0], bar.buttons[commands.firstIndex(of: .showHidden) ?? 0])
@@ -128,7 +130,113 @@ private final class WindowTestPlugin: Plugin {
         #expect(bar.entries == [.showHidden, nil, .showCommandLine] && bar.buttons[1].state == .on)
         // The context menu offers the configuration and the switches of the window.
         let titles = bar.menu(for: NSEvent())?.items.filter { !$0.isSeparatorItem }.map(\.title) ?? []
-        #expect(titles == ["Options…", "Button Bar", "Drive Buttons", "Command Line", "Function Key Buttons"])
+        #expect(titles == ["Options…", "Reset Button Bar to Default", "Button Bar", "Drive Buttons", "Command Line", "Function Key Buttons"])
+    }
+
+    @Test func theButtonBarIsRearrangedByDragging() async {
+        let app = await start()
+        defer { app.stop() }
+        let bar = app.window.buttonBar
+        let br = ToolbarRegistry.lineBreak
+        app.kernel.toolbar.setLayout([.copy, .showHidden, nil, .showCommandLine, .showFunctionKeys, br, .showDriveButtons], in: settings)
+        // Every group has a handle in front of it, the first one of a line too.
+        #expect(bar.slots == [.handle(line: 0, group: 0), .button(line: 0, group: 0, index: 0), .button(line: 0, group: 0, index: 1),
+                              .handle(line: 0, group: 1), .button(line: 0, group: 1, index: 0), .button(line: 0, group: 1, index: 1),
+                              .handle(line: 1, group: 0), .button(line: 1, group: 0, index: 0)])
+        // The buttons are square, so the frame under the mouse is one too.
+        #expect(bar.buttons.allSatisfy { $0.frame.width == $0.frame.height })
+        // Laid out by hand (the window is never shown): wide enough for one row, yet the
+        // line break starts a second one.
+        guard let flow = bar.subviews.compactMap({ $0 as? FlowView }).first else { Issue.record("no flow"); return }
+        flow.frame.size.width = 2000
+        flow.layout()
+        let frames = flow.items.map { bar.convert($0.frame, from: flow) }
+        #expect(frames.count == 8 && Set(frames.map(\.minY)).count == 2 && frames[6].minX == frames[0].minX)
+        func middle(_ index: Int) -> NSPoint { NSPoint(x: frames[index].midX, y: frames[index].midY) }
+        // A button dropped on the left half of another goes before it; on a handle, into a group of its own.
+        let copy = ButtonBarView.Dragged.button(line: 0, group: 0, index: 0)
+        #expect(bar.dropTarget(for: copy, at: NSPoint(x: frames[4].minX + 2, y: frames[4].midY)) == .button(.inGroup(line: 0, group: 1, at: 0)))
+        #expect(bar.dropTarget(for: copy, at: NSPoint(x: frames[5].maxX - 2, y: frames[5].midY)) == .button(.inGroup(line: 0, group: 1, at: 2)))
+        #expect(bar.dropTarget(for: copy, at: middle(3)) == .button(.newGroup(.line(0, at: 1))))
+        #expect(bar.dropTarget(for: copy, at: middle(6)) == .button(.newGroup(.line(1, at: 0))))
+        // Past the end of the first line: a new group there, though the line has room left.
+        #expect(bar.dropTarget(for: copy, at: NSPoint(x: frames[5].maxX + 200, y: frames[5].midY)) == .button(.newGroup(.line(0, at: 2))))
+        // A group goes to the nearest handle or line end.
+        #expect(bar.dropTarget(for: .group(line: 1, group: 0), at: middle(3)) == .group(.line(0, at: 1)))
+        #expect(bar.dropTarget(for: .group(line: 0, group: 0), at: NSPoint(x: frames[7].maxX + 50, y: frames[7].midY)) == .group(.line(1, at: 1)))
+        bar.apply(.group(line: 1, group: 0), to: .group(.line(0, at: 0)))
+        // The line it leaves empty disappears.
+        #expect(bar.entries == [.showDriveButtons, nil, .copy, .showHidden, nil, .showCommandLine, .showFunctionKeys])
+        // A group dropped below the bar starts a new line.
+        bar.apply(.group(line: 0, group: 1), to: .group(.newLine(at: 1)))
+        #expect(bar.entries == [.showDriveButtons, nil, .showCommandLine, .showFunctionKeys, br, .copy, .showHidden])
+        bar.apply(.button(line: 0, group: 1, index: 1), to: .button(.inGroup(line: 1, group: 0, at: 1)))
+        #expect(bar.entries == [.showDriveButtons, nil, .showCommandLine, br, .copy, .showFunctionKeys, .showHidden])
+        // A button dragged off the bar is removed, and so is the group it leaves empty.
+        bar.apply(.button(line: 0, group: 0, index: 0), to: nil)
+        #expect(bar.entries == [.showCommandLine, br, .copy, .showFunctionKeys, .showHidden])
+        #expect(app.kernel.toolbar.layout(from: settings).map { $0?.command } == bar.entries)
+        // Reset puts back what the plugins proposed.
+        #expect(app.commands.isEnabled(.resetButtonBar))
+        app.commands.perform(.resetButtonBar)
+        #expect(!app.kernel.toolbar.hasUserLayout(in: settings) && !app.commands.isEnabled(.resetButtonBar))
+        #expect(bar.entries == ButtonBarView.entries(of: app.kernel.toolbar.defaultLayout, commands: app.commands).map { $0?.command })
+    }
+
+    @Test func barButtonsKeepTheirToolTips() {
+        // The hover frame has a tracking area of its own; the tool tip's must survive it.
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 200, height: 100), styleMask: [.titled], backing: .buffered, defer: false)
+        let button = BarCommandButton(frame: NSRect(x: 10, y: 10, width: 40, height: 40))
+        let path = PathBarView(frame: NSRect(x: 0, y: 60, width: 200, height: 22))
+        for view in [button, path] as [NSView] {
+            window.contentView?.addSubview(view)
+            view.toolTip = "Copy… (F5)"
+            view.updateTrackingAreas()
+            view.updateTrackingAreas()
+            let owners = view.trackingAreas.map { "\(type(of: $0.owner as AnyObject))" }
+            #expect(owners.contains("NSToolTipManager") && owners.filter { $0 != "NSToolTipManager" }.count == 1, "\(owners)")
+        }
+    }
+
+    @Test func thePathBarOffersToEjectTheDriveItIsOn() {
+        let bar = PathBarView(frame: NSRect(x: 0, y: 0, width: 300, height: 22))
+        bar.update(text: "/Volumes/STICK/photos/*.*", segments: [])
+        #expect(bar.ejectButton.isHidden)
+        var ejected = 0
+        bar.onEject = { ejected += 1 }
+        bar.ejectableVolumeName = "STICK"
+        bar.layout()
+        #expect(!bar.ejectButton.isHidden && bar.ejectButton.toolTip == "Eject “STICK”" && bar.ejectButton.frame.maxX == 300)
+        bar.ejectButton.performClick(nil)
+        #expect(ejected == 1)
+        bar.ejectableVolumeName = nil
+        #expect(bar.ejectButton.isHidden)
+    }
+
+    @Test func buttonBarArrangementLeavesNoEmptyGroupOrLine() {
+        let (a, b, c, d, br): (CommandID, CommandID, CommandID, CommandID, CommandID) = ("a", "b", "c", "d", ToolbarRegistry.lineBreak)
+        var bar = ButtonBarArrangement(entries: [a, b, nil, c, br, d])
+        #expect(bar.lines == [[[a, b], [c]], [[d]]])
+        // Within its own group, after itself: the original place is accounted for.
+        bar.moveButton(line: 0, group: 0, index: 0, to: .inGroup(line: 0, group: 0, at: 2))
+        #expect(bar.entries == [b, a, nil, c, br, d])
+        // The last button of a line takes the line with it.
+        bar.moveButton(line: 1, group: 0, index: 0, to: .inGroup(line: 0, group: 1, at: 0))
+        #expect(bar.entries == [b, a, nil, d, c])
+        bar.moveButton(line: 0, group: 0, index: 1, to: .newGroup(.newLine(at: 1)))
+        #expect(bar.entries == [b, nil, d, c, br, a])
+        bar.moveButton(line: 0, group: 0, index: 0, to: .newGroup(.newLine(at: 0)))
+        #expect(bar.entries == [b, br, d, c, br, a])
+        bar.moveGroup(line: 2, group: 0, to: .line(0, at: 0))
+        #expect(bar.entries == [a, nil, b, br, d, c])
+        bar.moveGroup(line: 0, group: 0, to: .line(0, at: 2))
+        #expect(bar.entries == [b, nil, a, br, d, c])
+        bar.moveGroup(line: 1, group: 0, to: .newLine(at: 0))
+        #expect(bar.entries == [d, c, br, b, nil, a])
+        bar.removeButton(line: 1, group: 0, index: 0)
+        #expect(bar.entries == [d, c, br, a])
+        // Separators and line breaks at the ends, side by side or around nothing make nothing empty.
+        #expect(ButtonBarArrangement(entries: [br, nil, a, nil, br, nil, br, b, nil]).lines == [[[a]], [[b]]])
     }
 
     @Test func theDriveButtonsAreHiddenUntilSwitchedOnAndShowPlaces() async {

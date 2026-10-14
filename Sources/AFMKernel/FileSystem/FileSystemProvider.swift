@@ -9,11 +9,28 @@ public struct Place {
     public let name: String
     public let url: URL
     public let kind: Kind
+    /// A drive that can be taken from the Mac: it gets an eject button. Never a disk inside
+    /// the Mac (`isEjectable(...)`), never a place that is not a volume.
+    public let canBeEjected: Bool
 
-    public init(name: String, url: URL, kind: Kind) {
+    public init(name: String, url: URL, kind: Kind, canBeEjected: Bool = false) {
         self.name = name
         self.url = url
         self.kind = kind
+        self.canBeEjected = canBeEjected
+    }
+
+    /// The one rule for which volumes may be ejected, from what the system says of them (nil:
+    /// it said nothing). Never the start-up disk or a system volume, and never a disk built
+    /// into the Mac; a USB stick, a card, a disk image, an external disk and a server's share
+    /// may. A disk the system does not call external is taken for an internal one.
+    public static func isEjectable(path: String, isRootFileSystem: Bool?, isInternal: Bool?, isLocal: Bool?, isRemovable: Bool?,
+                                   isEjectable: Bool?) -> Bool {
+        if isRootFileSystem == true || path == "/" || path.hasPrefix("/System/") { return false }
+        // A card in the Mac's own reader is internal and removable: it may go.
+        if isEjectable == true || isRemovable == true { return true }
+        if isLocal == false { return true }
+        return isInternal == false
     }
 }
 
@@ -607,6 +624,8 @@ extension FileSystemProvider {
 public final class FileSystemRegistry {
     private var providers: [FileSystemProvider] = []
     private var flushers: [(URL, CancellationFlag) throws -> Void] = []
+    private var releasers: [(URL) -> Void] = []
+    private var closers: [(URL, CancellationFlag) -> Void] = []
 
     public init() {}
 
@@ -683,6 +702,44 @@ public final class FileSystemRegistry {
         let flushers = self.flushers
         FileSystemRegistry.flushLock.unlock()
         for flush in flushers { try flush(url, cancellation) }
+    }
+
+    // MARK: Letting go of a volume
+
+    /// Registers who keeps something open on volumes and lets go of it before one is ejected:
+    /// closes the windows that show its files, stops what reads there. Called on the main
+    /// thread with the volume's location; whoever registers is the plugin that holds it.
+    public func addVolumeReleaser(_ release: @escaping (URL) -> Void) {
+        FileSystemRegistry.flushLock.lock()
+        releasers.append(release)
+        FileSystemRegistry.flushLock.unlock()
+    }
+
+    /// The same for what has to wait on the disk to let go (writing what is pending, closing
+    /// files): called on the thread of the job that ejects, after the releasers.
+    public func addVolumeCloser(_ close: @escaping (URL, CancellationFlag) -> Void) {
+        FileSystemRegistry.flushLock.lock()
+        closers.append(close)
+        FileSystemRegistry.flushLock.unlock()
+    }
+
+    /// Main thread: every releaser lets go of what it shows or reads on `volume`.
+    public func releaseVolume(_ volume: URL) {
+        FileSystemRegistry.flushLock.lock()
+        let releasers = self.releasers
+        FileSystemRegistry.flushLock.unlock()
+        for release in releasers { release(volume) }
+    }
+
+    /// Job thread: what is pending for `volume` is written (`flushPendingWrites`), then every
+    /// closer closes what it keeps open there. A failed write is thrown, and nothing is closed:
+    /// a volume that is ejected then would lose it.
+    public func closeFiles(on volume: URL, cancellation: CancellationFlag) throws {
+        try flushPendingWrites(to: volume, cancellation: cancellation)
+        FileSystemRegistry.flushLock.lock()
+        let closers = self.closers
+        FileSystemRegistry.flushLock.unlock()
+        for close in closers { close(volume, cancellation) }
     }
 
     /// Blocks like the provider's own `item(at:)`; not for the main thread.

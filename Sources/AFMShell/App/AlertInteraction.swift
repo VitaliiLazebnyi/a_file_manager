@@ -88,6 +88,12 @@ public final class AlertInteraction: UserInteraction {
         alert(message, detail, style).runModal()
     }
 
+    /// A message near the bottom of the main window that goes away by itself; clicks go
+    /// through it to what lies below.
+    public func notice(_ message: String) {
+        Notice.show(message, over: NSApp.mainWindow ?? NSApp.keyWindow)
+    }
+
     public func form(_ title: String, detail: String, fields: [FormField], buttons: [String]) -> FormValues? {
         FormDialog(fields: fields).run(title: title, detail: detail, buttons: buttons)
     }

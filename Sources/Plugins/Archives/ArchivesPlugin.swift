@@ -62,6 +62,7 @@ public final class ArchivesPlugin: Plugin {
         // Changes to a ZIP are written into its file after a delay. Whoever is about to
         // read, copy, move or delete that file (or the folder it lies in) asks for them first.
         kernel.fileSystems.addFlusher { url, cancellation in try store.bringUpToDate(url, cancellation: cancellation) }
+        kernel.fileSystems.addVolumeCloser { volume, _ in store.release(on: volume) }
         // Ahead of the general opener, which would hand an archive to its application.
         kernel.openers.add(priority: 10, actions.open)
         kernel.openers.add(priority: 5, actions.showMember)
@@ -80,8 +81,8 @@ public final class ArchivesPlugin: Plugin {
 
         kernel.menus.add([.packFiles, .moveToArchive, .unpackFiles, .testArchive, .openAsArchive], to: .filesArchives)
         kernel.menus.addToContextMenu([.packFiles, .unpackFiles, .testArchive], in: .archives, onItemOnly: true)
-        kernel.toolbar.add(.packFiles, symbol: "archivebox", group: 30)
-        kernel.toolbar.add(.unpackFiles, symbol: "shippingbox", group: 30)
+        kernel.toolbar.add(.packFiles, symbol: "archivebox", group: 30, hint: "Pack the selected files into an archive (ZIP, TAR and others).")
+        kernel.toolbar.add(.unpackFiles, symbol: "shippingbox", group: 30, hint: "Unpack the selected archives.")
         kernel.toolbar.setSymbol("checkmark.seal", for: .testArchive)
         kernel.toolbar.setSymbol("arrow.down.right.and.arrow.up.left", for: .openAsArchive)
 

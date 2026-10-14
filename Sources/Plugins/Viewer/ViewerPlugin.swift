@@ -50,6 +50,7 @@ public final class ViewerPlugin: Plugin, ViewerService {
         self.kernel = kernel
         settings = ListerSettings(kernel.settings)
         let commands = kernel.commands
+        kernel.fileSystems.addVolumeReleaser { [weak self] volume in self?.letGo(of: volume) }
         let model = { kernel.panels.source.model }
         let cursorFile = { model().cursorItem.flatMap { $0.isDirectory ? nil : $0.url } }
         /// The marked files, or without any the file under the cursor (spec 10 › Keys and commands).
@@ -97,8 +98,8 @@ public final class ViewerPlugin: Plugin, ViewerService {
         kernel.menus.add([.view], to: .filesOpen)
         kernel.menus.addToContextMenu([.view], in: .open, onItemOnly: true)
         kernel.menus.add([.quickView, .separateQuickView], to: .showViewType)
-        kernel.toolbar.add(.view, symbol: "eye", group: 20)
-        kernel.toolbar.add(.quickView, symbol: "magnifyingglass", group: 20)
+        kernel.toolbar.add(.view, symbol: "doc.text.magnifyingglass", group: 20, hint: "Open the selected file in the viewer.")
+        kernel.toolbar.add(.quickView, symbol: "sidebar.right", group: 20, hint: "Show the file under the cursor in the other panel, as you move through the list.")
         kernel.toolbar.setSymbol("macwindow.on.rectangle", for: .separateQuickView)
         kernel.toolbar.setSymbol("gearshape", for: .configureLister)
         kernel.preferences.add(ListerSettings.preferencePage { [weak self] in self?.settingsChanged() })
@@ -180,6 +181,22 @@ public final class ViewerPlugin: Plugin, ViewerService {
         quickView = QuickViewPanel(kernel: kernel, settings: settings, temporaryCopies: temporaryCopies, host: host, covering: target, following: source,
                                    internalOnly: internalOnly, delay: quickViewDelay) { [weak self] in self?.hideQuickView() }
         quickView?.pane.onConfigure = { [weak self] in self?.configure() }
+    }
+
+    /// Before `volume` is ejected: the Lister windows that show one of its files close, and a
+    /// quick view of one shows nothing until the cursor moves on.
+    func letGo(of volume: URL) {
+        func isOnVolume(_ url: URL?) -> Bool {
+            guard let url, url.isFileURL else { return false }
+            return url.isSameLocation(as: volume) || url.isInside(volume)
+        }
+        for window in windows where isOnVolume(window.pane.item?.url) || window.items.contains(where: { isOnVolume($0.url) }) {
+            window.pane.clear()
+            window.close()
+        }
+        if let quickView, isOnVolume(quickView.pane.item?.url) || isOnVolume(quickView.shownItem?.url) {
+            quickView.pane.clear()
+        }
     }
 
     private func hideQuickView() {

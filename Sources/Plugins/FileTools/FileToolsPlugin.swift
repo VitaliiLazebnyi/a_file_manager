@@ -36,8 +36,8 @@ public final class FileToolsPlugin: Plugin {
         commands.register(Command(.verifyChecksums, "Verify Checksums"), enabled: hasOperands, tools.verifyChecksums)
         kernel.menus.add([.splitFile, .combineFiles, .encodeFile, .decodeFile, .createChecksums, .verifyChecksums], to: .filesTransform)
         kernel.menus.addToContextMenu([.createChecksums, .verifyChecksums], in: .tools, onItemOnly: true)
-        kernel.toolbar.add(.createChecksums, symbol: "number.square", group: 60)
-        kernel.toolbar.add(.verifyChecksums, symbol: "checkmark.seal", group: 60)
+        kernel.toolbar.add(.createChecksums, symbol: "number.square", group: 60, hint: "Create checksum files (MD5, SHA and others) for the selected files.")
+        kernel.toolbar.add(.verifyChecksums, symbol: "checkmark.seal", group: 60, hint: "Check the selected files against their checksum file, to find damaged copies.")
         kernel.toolbar.setSymbol("scissors", for: .splitFile)
         kernel.toolbar.setSymbol("link", for: .combineFiles)
         kernel.preferences.add(PreferencePage(title: "File Tools", preferences: [

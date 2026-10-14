@@ -1188,6 +1188,12 @@ public final class PanelModel {
     public var backLocation: URL? { historyIndex > 0 ? history[historyIndex - 1] : nil }
     public var forwardLocation: URL? { historyIndex < history.count - 1 ? history[historyIndex + 1] : nil }
 
+    /// The most recent place of the history before the current one that `isWanted` accepts
+    /// (the folder the user came from before entering a volume that is about to go away).
+    public func lastVisited(where isWanted: (URL) -> Bool) -> URL? {
+        history[..<min(historyIndex, history.count)].last(where: isWanted)
+    }
+
     // MARK: Sorting and filters
 
     /// Notes the order the user asked for without putting the list into it: costs nothing,

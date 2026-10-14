@@ -3,7 +3,8 @@ import AppKit
 
 /// The current-directory bar: the path with the display mask, coloured by whether its panel
 /// is the source. Each part of the path can be clicked to go there
-/// (spec 03 › Current-directory bar).
+/// (spec 03 › Current-directory bar). While the folder is on a drive that can be ejected, an
+/// eject button stands at the right end.
 final class PathBarView: NSView {
     /// A part of the path that leads somewhere: its place in the text (UTF-16) and the folder.
     struct Segment: Equatable {
@@ -16,26 +17,67 @@ final class PathBarView: NSView {
     /// A click on a part of the path above the current folder.
     var onNavigate: ((URL) -> Void)?
     var menuProvider: (() -> NSMenu?)?
+    /// A click on the eject button.
+    var onEject: (() -> Void)?
+    let ejectButton = NSButton()
+    /// The name of the drive the eject button ejects; nil hides the button.
+    var ejectableVolumeName: String? {
+        didSet {
+            guard ejectableVolumeName != oldValue else { return }
+            ejectButton.isHidden = ejectableVolumeName == nil
+            let title = ejectableVolumeName.map { "Eject “\(DisplayText.clean($0))”" }
+            ejectButton.toolTip = title
+            ejectButton.setAccessibilityLabel(title)
+            needsLayout = true
+            needsDisplay = true
+        }
+    }
     private(set) var text = ""
     private(set) var segments: [Segment] = []
     /// Where each segment is drawn, from the start of the text.
     private var spans: [(minX: CGFloat, maxX: CGFloat)] = []
     private var textWidth: CGFloat = 0
+    /// The area that follows the mouse. Only this one is replaced: the others belong to
+    /// AppKit (the tool tip's among them).
+    private var mouseArea: NSTrackingArea?
     private var hovered: Int? {
         didSet { if hovered != oldValue { needsDisplay = true } }
     }
 
     var isActive = false {
-        didSet { needsDisplay = true }
+        didSet {
+            needsDisplay = true
+            ejectButton.contentTintColor = isActive ? .alternateSelectedControlTextColor : .labelColor
+        }
     }
 
     private static let font = NSFont.systemFont(ofSize: 12, weight: .medium)
     private static let inset: CGFloat = 6
+    private static let ejectWidth: CGFloat = 22
 
     override init(frame: NSRect) {
         super.init(frame: frame)
         heightAnchor.constraint(equalToConstant: 22).isActive = true
         setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        ejectButton.isBordered = false
+        ejectButton.image = NSImage(systemSymbolName: "eject.fill", accessibilityDescription: "Eject")?
+            .withSymbolConfiguration(.init(pointSize: 11, weight: .semibold))
+        ejectButton.imagePosition = .imageOnly
+        ejectButton.refusesFirstResponder = true
+        ejectButton.target = self
+        ejectButton.action = #selector(ejectPressed)
+        ejectButton.isHidden = true
+        addSubview(ejectButton)
+    }
+
+    @objc private func ejectPressed() { onEject?() }
+
+    /// The width the path may take: all of the bar but the eject button.
+    private var textArea: CGFloat { bounds.width - (ejectButton.isHidden ? 0 : PathBarView.ejectWidth) }
+
+    override func layout() {
+        super.layout()
+        ejectButton.frame = NSRect(x: bounds.width - PathBarView.ejectWidth, y: 0, width: PathBarView.ejectWidth, height: bounds.height)
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
@@ -81,7 +123,7 @@ final class PathBarView: NSView {
 
     /// A path that is longer than the bar shows its end.
     private var textOrigin: CGFloat {
-        min(PathBarView.inset, bounds.width - PathBarView.inset - textWidth)
+        min(PathBarView.inset, textArea - PathBarView.inset - textWidth)
     }
 
     private func segment(at point: NSPoint) -> Int? {
@@ -99,7 +141,7 @@ final class PathBarView: NSView {
             attributed.addAttribute(.underlineStyle, value: NSUnderlineStyle.single.rawValue, range: segments[hovered].range)
         }
         NSGraphicsContext.saveGraphicsState()
-        bounds.insetBy(dx: 2, dy: 0).clip()
+        NSRect(x: 2, y: 0, width: max(textArea - 4, 0), height: bounds.height).clip()
         attributed.draw(at: NSPoint(x: textOrigin, y: (bounds.height - attributed.size().height) / 2))
         NSGraphicsContext.restoreGraphicsState()
     }
@@ -108,9 +150,11 @@ final class PathBarView: NSView {
 
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
-        trackingAreas.forEach(removeTrackingArea)
-        addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseMoved, .mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect],
-                                       owner: self, userInfo: nil))
+        if let mouseArea { removeTrackingArea(mouseArea) }
+        let area = NSTrackingArea(rect: .zero, options: [.mouseMoved, .mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect],
+                                  owner: self, userInfo: nil)
+        addTrackingArea(area)
+        mouseArea = area
     }
 
     override func mouseMoved(with event: NSEvent) {

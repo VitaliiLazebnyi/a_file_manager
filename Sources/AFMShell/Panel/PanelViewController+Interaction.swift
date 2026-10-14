@@ -207,6 +207,7 @@ extension PanelViewController {
         pathBar.update(text: DisplayText.clean((path.hasSuffix("/") ? path : path + "/") + displayMask),
                        segments: PathBarView.segments(of: path, ancestors: ancestors.reversed()))
         pathBar.toolTip = DisplayText.clean(path)
+        updateEjectButton()
     }
 
     /// The menu of the path bar: copying the path, and the commands about places that are there.

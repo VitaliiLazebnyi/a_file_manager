@@ -32,7 +32,7 @@ public final class MultiRenamePlugin: Plugin {
         })
         kernel.menus.add([.multiRename], to: .filesAdvanced)
         kernel.menus.addToContextMenu([.multiRename], in: .tools, onItemOnly: true)
-        kernel.toolbar.add(.multiRename, symbol: "character.cursor.ibeam", group: 50)
+        kernel.toolbar.add(.multiRename, symbol: "character.cursor.ibeam", group: 50, hint: "Rename many files at once, with a pattern, counters and search and replace.")
         kernel.preferences.add(PreferencePage(title: "Multi-Rename Tool", preferences: [
             Preference(RenameStore.undoLimitKey, "Rename runs that can be undone (0 = no Undo)", .text(default: "20")),
             Preference(RenameStore.startupSettingsKey, "Saved settings to open the tool with (empty = last used)", .text(default: "")),

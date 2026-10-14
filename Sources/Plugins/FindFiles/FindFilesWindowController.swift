@@ -294,6 +294,15 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
         if isSearching { cancelSearch() } else { close() }
     }
 
+    /// Stops the running search if it looks through `volume` (which is about to be ejected).
+    func cancelSearch(ifItReads volume: URL) {
+        guard isSearching else { return }
+        let places = form.settings.searchIn.split(separator: ";")
+            .map { kernel.fileSystems.location(from: String($0).trimmingCharacters(in: .whitespaces), relativeTo: startDirectory) }
+        // A search whose places are not known is stopped too: better a search again than a drive refused.
+        if places.isEmpty || places.contains(where: { $0.isFileURL && ($0.isSameLocation(as: volume) || $0.isInside(volume)) }) { cancelSearch() }
+    }
+
     /// Stops the running search; it ends through the usual path with what it has.
     func cancelSearch() {
         search?.cancel()

@@ -22,6 +22,12 @@ public enum SystemToolsCommands {
     public static let minimize: CommandID = "cm_Minimize"
 }
 
+/// Where tests keep the plugin from ejecting: volumes as they are, ejects only recorded.
+private final class RecordedEjects: VolumeAccess {
+    func facts(of directory: URL) -> VolumeFacts { SystemVolumes().facts(of: directory) }
+    func eject(_ volume: VolumeFacts) -> EjectRefusal? { nil }
+}
+
 /// Command line execution, terminal, system information, volume name, printing file lists
 /// and Open With (spec 02 › Command line, 12 › System Information, Volume label, Printing).
 public final class SystemToolsPlugin: Plugin {
@@ -32,6 +38,7 @@ public final class SystemToolsPlugin: Plugin {
     public static let recordHistoryKey = "systemTools.recordHistory"
 
     private let launchesApplications: Bool
+    private let volumes: VolumeAccess?
     private var tools: SystemTools?
 
     /// What the plugin started or, where tests keep it from acting, would have started:
@@ -41,13 +48,15 @@ public final class SystemToolsPlugin: Plugin {
 
     /// Tests turn `launchesApplications` off, so they do not start other applications. Then
     /// only harmless lines such as `echo` are really run (by `/bin/sh`, without the user's
-    /// profile); nothing is printed, opened, renamed, ejected or quit.
-    public init(launchesApplications: Bool = true) {
+    /// profile); nothing is printed, opened, renamed, ejected or quit. `volumes` stands in for
+    /// the volumes of the Mac when a test ejects one.
+    public init(launchesApplications: Bool = true, volumes: VolumeAccess? = nil) {
         self.launchesApplications = launchesApplications
+        self.volumes = volumes
     }
 
     public func start(in kernel: Kernel) {
-        let tools = SystemTools(kernel, launchesApplications: launchesApplications)
+        let tools = SystemTools(kernel, launchesApplications: launchesApplications, volumes: volumes)
         self.tools = tools
         let commands = kernel.commands
         let model = { kernel.panels.source.model }
@@ -64,7 +73,9 @@ public final class SystemToolsPlugin: Plugin {
         commands.register(Command(SystemToolsCommands.openTerminal, "Open Terminal Here", runsDuringJobs: true), enabled: isLocal, tools.openTerminal)
         commands.register(Command(SystemToolsCommands.systemInformation, "System Information…"), tools.showSystemInformation)
         commands.register(Command(SystemToolsCommands.renameVolume, "Rename Volume…"), enabled: isLocal, tools.renameVolume)
-        commands.register(Command(SystemToolsCommands.ejectVolume, "Eject Volume"), enabled: isLocal, tools.ejectVolume)
+        // With a location (the eject buttons of the drives), the drive of that location.
+        commands.register(Command(SystemToolsCommands.ejectVolume, "Eject Volume"), enabled: isLocal,
+                          parameterized: { tools.ejectVolume($0.location) })
         commands.register(Command(SystemToolsCommands.printList, "Print File List…"), enabled: { model().isListed }) {
             tools.printList(withSubfolders: false)
         }
@@ -89,11 +100,12 @@ public final class SystemToolsPlugin: Plugin {
         kernel.menus.addToContextMenu([SystemToolsCommands.openWith], in: .tools, onItemOnly: true)
         kernel.menus.addToContextMenu([SystemToolsCommands.openTerminal], in: .tools)
 
-        kernel.toolbar.add(SystemToolsCommands.openTerminal, symbol: "terminal", group: 80)
-        kernel.toolbar.add(SystemToolsCommands.systemInformation, symbol: "info.circle", group: 80)
+        kernel.toolbar.add(SystemToolsCommands.openTerminal, symbol: "terminal", group: 80, hint: "Open a Terminal window in the current folder.")
+        kernel.toolbar.add(SystemToolsCommands.systemInformation, symbol: "desktopcomputer", group: 80, hint: "Show information about this Mac: hardware, macOS and the disks.")
         kernel.toolbar.setSymbol("play.rectangle", for: SystemToolsCommands.runPrompt)
         kernel.toolbar.setSymbol("printer", for: SystemToolsCommands.printList)
-        kernel.toolbar.setSymbol("eject", for: SystemToolsCommands.ejectVolume)
+        kernel.toolbar.setSymbol("eject", for: SystemToolsCommands.ejectVolume,
+                                 hint: "Safely eject the drive the current folder is on (a USB stick, a card, a disk image).")
         kernel.toolbar.setSymbol("arrow.up.forward.app", for: SystemToolsCommands.openWith)
 
         kernel.preferences.add(PreferencePage(title: "System Tools", preferences: [
@@ -142,9 +154,14 @@ final class SystemTools {
         if log.count > SystemTools.logLimit { log.removeFirst(log.count - SystemTools.logLimit / 2) }
     }
 
-    init(_ kernel: Kernel, launchesApplications: Bool) {
+    private var ejection: VolumeEjection!
+
+    init(_ kernel: Kernel, launchesApplications: Bool, volumes: VolumeAccess? = nil) {
         self.kernel = kernel
         self.launchesApplications = launchesApplications
+        let access = volumes ?? (launchesApplications ? SystemVolumes() : RecordedEjects())
+        ejection = VolumeEjection(kernel: kernel, access: access, home: { FileManager.default.homeDirectoryForCurrentUser },
+                                  note: { [unowned self] in note($0) })
     }
 
     private var ui: UserInteraction { kernel.ui }
@@ -337,12 +354,6 @@ final class SystemTools {
 
     // MARK: Volumes
 
-    private struct VolumeFacts {
-        var url: URL?
-        var name = ""
-        var canBeEjected = false
-    }
-
     /// Stands for the volumes in `BlockingCalls`: the questions to them are counted together.
     private static let volumes = NSObject()
 
@@ -354,22 +365,11 @@ final class SystemTools {
         BlockingCalls.answer(from: volumes, to: question + " " + url.path, cancellation: monitor.cancellation) { _ in work() }
     }
 
-    /// What is known of the volume a folder is on. Asks the volume: job thread.
-    private static func volume(of directory: URL) -> VolumeFacts {
-        let keys: Set<URLResourceKey> = [.volumeURLKey, .volumeNameKey, .volumeIsEjectableKey, .volumeIsRemovableKey, .volumeIsInternalKey,
-                                         .volumeIsLocalKey, .volumeIsRootFileSystemKey]
-        guard let values = try? directory.resourceValues(forKeys: keys), let url = values.volume else { return VolumeFacts() }
-        let leavesTheMac = values.volumeIsEjectable == true || values.volumeIsRemovable == true || values.volumeIsInternal == false
-            || values.volumeIsLocal == false
-        let isSystem = values.volumeIsRootFileSystem == true || url.path == "/" || url.path.hasPrefix("/System/")
-        return VolumeFacts(url: url, name: values.volumeName ?? url.lastPathComponent, canBeEjected: leavesTheMac && !isSystem)
-    }
-
     /// "Set volume label" (spec 12 › Volume label): renames the volume of the source panel
     /// through the system's own interface, which asks for rights itself where it needs them.
     func renameVolume() {
         let directory = model.directory
-        kernel.jobs.run(title: "Volume:", work: { monitor in SystemTools.ask("volume", of: directory, monitor) { SystemTools.volume(of: directory) } },
+        kernel.jobs.run(title: "Volume:", work: { monitor in SystemTools.ask("volume", of: directory, monitor) { SystemVolumes().facts(of: directory) } },
                         completion: { [self] answer in
             // Nil: the question was cancelled.
             guard let facts = answer else { return }
@@ -402,39 +402,9 @@ final class SystemTools {
         })
     }
 
-    /// Ejects the volume the source panel shows. The panels leave the volume first, because
-    /// a volume in use cannot be ejected.
-    func ejectVolume() {
-        let directory = model.directory
-        kernel.jobs.run(title: "Volume:", work: { monitor in SystemTools.ask("volume", of: directory, monitor) { SystemTools.volume(of: directory) } },
-                        completion: { [self] answer in
-            guard let facts = answer else { return }
-            guard let volume = facts.url, facts.canBeEjected else {
-                return ui.inform("\(DisplayText.oneLine(facts.name.isEmpty ? directory.path : facts.name)) cannot be ejected.", detail: "", style: .warning)
-            }
-            guard launchesApplications else {
-                note("eject: \(volume.path)")
-                return
-            }
-            for panel in kernel.panels.all where panel.model.directory.isSameLocation(as: volume) || panel.model.directory.isInside(volume) {
-                panel.show(home)
-            }
-            let shownName = DisplayText.oneLine(facts.name, limit: 80)
-            kernel.jobs.run(title: "Ejecting \(shownName):", work: { monitor -> Error?? in
-                SystemTools.ask("eject", of: volume, monitor) { () -> Error? in
-                    do {
-                        try NSWorkspace.shared.unmountAndEjectDevice(at: volume)
-                        return nil
-                    } catch {
-                        return error
-                    }
-                }
-            }, completion: { [self] answer in
-                guard let error = answer else { return }
-                if let error { return ui.report(error, title: "\(shownName) cannot be ejected!") }
-                note("eject: \(volume.path)")
-            })
-        })
+    /// Ejects the drive of `location`, or of the folder the source panel shows (`VolumeEjection`).
+    func ejectVolume(_ location: URL? = nil) {
+        ejection.eject(driveOf: location ?? model.directory)
     }
 
     // MARK: Printing
