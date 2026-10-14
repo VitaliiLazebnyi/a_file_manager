@@ -41,7 +41,11 @@ enum LoginShell {
         process.standardOutput = pipe
         let ended = DispatchSemaphore(value: 0)
         process.terminationHandler = { _ in ended.signal() }
-        guard (try? process.run()) != nil else { return nil }
+        guard (try? process.run()) != nil else {
+            // Foundation does not let go of the handler of a process that did not start.
+            process.terminationHandler = nil
+            return nil
+        }
         guard ended.wait(timeout: .now() + 3) == .success else {
             process.terminate()
             return nil
