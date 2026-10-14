@@ -556,8 +556,9 @@ extension TreeNode {
         for index in 0..<60 { memory.addFile(String(format: "/huge/f%02d.txt", index)) }
         memory.listBatchSize = 10
         memory.listBatchDelay = 0.2
-        let search = FileSearch(SearchQuery(directory: memory.url("/huge")), fileSystems: fileSystems)
-        search.partialListingAfter = 10
+        let search = FileSearch(
+            SearchQuery(directory: memory.url("/huge")), fileSystems: fileSystems,
+            tuning: .init(partialListingAfter: 10))
         let began = Date()
         // Written by the other thread before it signals, read here after the wait.
         nonisolated(unsafe) var firstAt: TimeInterval?
@@ -587,8 +588,7 @@ extension TreeNode {
         var query = SearchQuery(directory: memory.url("/parts"))
         query.names = "a*"
         var found: [String] = []
-        let search = FileSearch(query, fileSystems: fileSystems)
-        search.partialListingAfter = 7
+        let search = FileSearch(query, fileSystems: fileSystems, tuning: .init(partialListingAfter: 7))
         search.run { found.append($0.name) }
         #expect(
             Set(found) == Set((0..<45).filter { $0 % 2 == 0 }.map { String(format: "a%02d.txt", $0) })

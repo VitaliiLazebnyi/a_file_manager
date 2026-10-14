@@ -182,11 +182,11 @@ public struct PreparedCriteria {
 /// A piece of information about a file that a rule of the Plugins tab can test: the built-in
 /// ones (the `tc` pseudo-plugin of the spec) and every column a plugin registered
 /// (spec 09 › Plugins tab).
-public struct SearchField {
+public struct SearchField: Sendable {
     public let id: String
     public let title: String
     /// May block on the file system; called on the search's threads, several at once.
-    public let value: (FileItem) -> String
+    public let value: @Sendable (FileItem) -> String
 
     public static func builtIn(fileSystems: FileSystemRegistry) -> [Self] {
         [
