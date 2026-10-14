@@ -17,7 +17,7 @@ public final class MacIntegrationPlugin: Plugin {
     /// would have been opened is recorded in `opened` and `log` either way.
     private let launchesApplications: Bool
     private let pasteboard: NSPasteboard
-    private let applications: (URL) -> [URL]
+    private let applications: @Sendable (URL) -> [URL]
     /// The files most recently handed to an application (or that would have been); for tests.
     public private(set) var opened: [URL] = []
     /// What was done, one line each, the most recent ones: `edit TextEdit /a/b.txt`,
@@ -47,28 +47,31 @@ public final class MacIntegrationPlugin: Plugin {
     /// From this many marked items on, they are picked out off the main thread.
     static let backgroundListThreshold = 5_000
     /// The most items Finder is asked to select, and the most that are shared, at a time.
-    static let revealLimit = 1_000
+    nonisolated static let revealLimit = 1_000
     static let shareLimit = 1_000
-    /// Stands for Launch Services in `BlockingCalls`.
-    private static let launchServices = NSObject()
+    /// Stands for Launch Services in `BlockingCalls`. Never changed, and used for nothing but
+    /// what object it is.
+    nonisolated(unsafe) private static let launchServices = NSObject()
 
     /// The local operands of a panel, worked on by `work` and handed to `deliver` on the main
     /// thread. With many marked items both happen on a background thread first (the marks and
     /// the list are taken as they are, which copies nothing); with few, everything is done at
     /// once, here. `deliver` runs from the main run loop, not from a block of the main queue:
     /// it may ask the user something.
-    private func withLocalOperands<Result>(
-        of model: PanelModel, _ work: @escaping ([URL]) -> Result, then deliver: @escaping (Result) -> Void
+    private func withLocalOperands<Result: Sendable>(
+        of model: PanelModel, _ work: @escaping @Sendable ([URL]) -> Result,
+        then deliver: @escaping @MainActor @Sendable (Result) -> Void
     ) {
         let operands = model.operandsSnapshot()
-        func urls() -> [URL] { operands.items().map(\.url).filter(\.isFileURL) }
+        @Sendable func urls() -> [URL] { operands.items().map(\.url).filter(\.isFileURL) }
         guard operands.markedCount >= Self.backgroundListThreshold else {
             deliver(work(urls()))
             return
         }
         DispatchQueue.global(qos: .userInitiated).async {
             let result = work(urls())
-            RunLoop.main.perform(inModes: [.common]) { deliver(result) }
+            // The main run loop runs its blocks on the main thread.
+            RunLoop.main.perform(inModes: [.common]) { MainActor.assumeIsolated { deliver(result) } }
             CFRunLoopWakeUp(CFRunLoopGetMain())
         }
     }
@@ -118,16 +121,17 @@ public final class MacIntegrationPlugin: Plugin {
 
     /// Tests pass a pasteboard of their own and say which applications open a file.
     public init(
-        launchesApplications: Bool = true, pasteboard: NSPasteboard = .general, applications: ((URL) -> [URL])? = nil
+        launchesApplications: Bool = true, pasteboard: NSPasteboard = .general,
+        applications: (@Sendable (URL) -> [URL])? = nil
     ) {
         self.launchesApplications = launchesApplications
         self.pasteboard = pasteboard
-        self.applications = applications ?? Self.installedApplications
+        self.applications = applications ?? { Self.installedApplications(for: $0) }
     }
 
     /// The applications that open a file, the default one first. Launch Services looks at the
     /// file to know its type: not for the main thread.
-    private static func installedApplications(for url: URL) -> [URL] {
+    nonisolated private static func installedApplications(for url: URL) -> [URL] {
         let workspace = NSWorkspace.shared
         var all = workspace.urlsForApplications(toOpen: url)
         if let preferred = workspace.urlForApplication(toOpen: url) {
@@ -138,7 +142,7 @@ public final class MacIntegrationPlugin: Plugin {
     }
 
     /// Finds the application the editor preference names. Looks at the disk: not for the main thread.
-    static func editorApplication(named text: String) -> URL {
+    nonisolated static func editorApplication(named text: String) -> URL {
         let fallback = URL(fileURLWithPath: "/System/Applications/TextEdit.app")
         let text = text.trimmingCharacters(in: .whitespaces)
         let fm = FileManager.default
@@ -174,7 +178,6 @@ public final class MacIntegrationPlugin: Plugin {
 
     public func start(in kernel: Kernel) {
         let commands = kernel.commands
-        let workspace = NSWorkspace.shared
         // The system's Quick Look panel keeps the file it previews: it closes before the drive is ejected.
         kernel.fileSystems.addVolumeReleaser { [weak self] volume in self?.quickLook.close(ifShowing: volume) }
         let model = { kernel.panels.source.model }
@@ -208,7 +211,7 @@ public final class MacIntegrationPlugin: Plugin {
                 guard launchesApplications else { return }
                 // (The system looks at the file and the application: on a thread of the kernel's own.)
                 BlockingCalls.run {
-                    workspace.open(
+                    NSWorkspace.shared.open(
                         [url], withApplicationAt: Self.editorApplication(named: editor),
                         configuration: NSWorkspace.OpenConfiguration())
                 }
@@ -279,7 +282,7 @@ public final class MacIntegrationPlugin: Plugin {
                 remember("reveal " + Self.described(urls.isEmpty ? [directory] : urls))
                 guard launches else { return }
                 // Finder is asked away from the main thread: it looks at every file it is to select.
-                BlockingCalls.run { workspace.activateFileViewerSelecting(urls.isEmpty ? [directory] : urls) }
+                BlockingCalls.run { NSWorkspace.shared.activateFileViewerSelecting(urls.isEmpty ? [directory] : urls) }
             }
         }
 
@@ -398,14 +401,14 @@ public final class MacIntegrationPlugin: Plugin {
     // MARK: Finder tags
 
     /// The Finder tags of a file. Reads the disk: not for the main thread.
-    static func tags(of url: URL) -> [String] {
+    nonisolated static func tags(of url: URL) -> [String] {
         var value: AnyObject?
         try? (URL(fileURLWithPath: url.path) as NSURL).getResourceValue(&value, forKey: .tagNamesKey)
         return value as? [String] ?? []
     }
 
     /// Replaces the Finder tags of a file. Writes to the disk: not for the main thread.
-    static func setTags(_ tags: [String], of url: URL) throws {
+    nonisolated static func setTags(_ tags: [String], of url: URL) throws {
         try (url as NSURL).setResourceValue(tags, forKey: .tagNamesKey)
     }
 
