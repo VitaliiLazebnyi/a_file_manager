@@ -340,9 +340,9 @@ private func outside(_ root: URL, _ path: String) throws -> URL {
 
     @Test func thePackedOperandsAreDeselectedByTheNamesThePanelMarksThemWith() {
         // A branch or list view names its items by path.
-        let notes = FileItem(url: URL(fileURLWithPath: "/A/notes.txt"), name: "sub/notes.txt", isDirectory: false)
-        let todo = FileItem(url: URL(fileURLWithPath: "/A/todo.txt"), name: "other/todo.txt", isDirectory: false)
-        let left = FileItem(url: URL(fileURLWithPath: "/A/left.txt"), name: "left.txt", isDirectory: false)
+        let notes = FileItem(url: URL(fileURLWithPath: "/A/notes.txt"), name: "sub/notes.txt")
+        let todo = FileItem(url: URL(fileURLWithPath: "/A/todo.txt"), name: "other/todo.txt")
+        let left = FileItem(url: URL(fileURLWithPath: "/A/left.txt"), name: "left.txt")
         #expect(
             ArchiveCommands.names(of: [notes, todo, left], packedAs: [notes.url, todo.url]) == [
                 "sub/notes.txt", "other/todo.txt"

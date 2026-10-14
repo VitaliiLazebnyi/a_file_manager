@@ -519,7 +519,7 @@ extension Application {
                 + (0..<count).map { script.item(named: String(format: "f%06d.txt", $0), in: "/long") }
         ]
         script.batchesAt = [
-            "/long/sub": [[FileItem(url: script.url("/long/sub/in.bin"), name: "in.bin", isDirectory: false, size: 7)]]
+            "/long/sub": [[FileItem(url: script.url("/long/sub/in.bin"), name: "in.bin", stat: .init(size: 7))]]
         ]
         let app = await start(with: script)
         defer { app.stop() }
@@ -810,7 +810,7 @@ extension Application {
         )
         let store = ColumnValueStore()
         store.reset(folder: URL(string: "cols://host/a")!)
-        _ = store.text(of: column, for: FileItem(url: URL(string: "cols://host/a/x")!, name: "x", isDirectory: false))
+        _ = store.text(of: column, for: FileItem(url: URL(string: "cols://host/a/x")!, name: "x"))
         let deadline = Date().addingTimeInterval(30)
         while flags.value.isEmpty, Date() < deadline { try? await Task.sleep(nanoseconds: 2_000_000) }
         #expect(flags.value.count == 1 && flags.value.first?.isCancelled == false)

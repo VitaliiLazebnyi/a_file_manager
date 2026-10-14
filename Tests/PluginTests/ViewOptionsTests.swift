@@ -201,7 +201,7 @@ import Testing
 
     @Test func displayMasks() {
         func item(_ name: String, folder: Bool = false) -> FileItem {
-            FileItem(url: URL(fileURLWithPath: "/x/" + name), name: name, isDirectory: folder)
+            FileItem(url: URL(fileURLWithPath: "/x/" + name), name: name, kind: .init(isDirectory: folder))
         }
         let images = DisplayMask("*.bmp *.gif;*.JPG")
         #expect(

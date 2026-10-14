@@ -9,7 +9,8 @@ func text(_ b: [UInt8]) -> String { String(decoding: b, as: UTF8.self) }
 var slowestMask = 0.0
 
 let fileMask = FuzzTarget(
-    "filemask", maxLen: 4_096,
+    "filemask",
+    maxLen: 4_096,
     dict: [
         "*", "?", "[", "]", "*.*", "*.", ".", ";", " ", "[!a-z]", "[[:alpha:]]", "\\", "*a*a*a*a*a*a*a*a*b",
         "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "É", "ß", "İ", "\u{0}"
@@ -18,7 +19,8 @@ let fileMask = FuzzTarget(
         [
             "*.txt *.md\nreadme.txt", "report_??.*\nreport_01.pdf", "*a*\nbanana", "*.\nREADME", "[a-c]*;*.JPG\nb.jpg",
             "*é*\nCAFÉ.TXT", "name.\nname", "*a*a*a*a*a*b\naaaaaaaaaaaaaaaaaaaaaaaa"
-        ].map { Array($0.utf8) }
+        ]
+        .map { Array($0.utf8) }
     },
     run: { bytes in
         var c = Choices(bytes)
@@ -39,8 +41,10 @@ let fileMask = FuzzTarget(
         if !pattern.isEmpty, pattern.allSatisfy({ $0 == "*" }) { fzCheck(a, "filemask-star", name.debugDescription) }
         // The rules as `FileMask` states them, worked out the slow way.
         fzCheck(
-            a == referenceMaskMatches(pattern, name), "filemask-differs-from-rules",
-            "mask \(pattern.debugDescription) name \(name.debugDescription): matcher \(a)")
+            a == referenceMaskMatches(pattern, name),
+            "filemask-differs-from-rules",
+            "mask \(pattern.debugDescription) name \(name.debugDescription): matcher \(a)"
+        )
         // Neither case nor the way an accent is written counts, in the mask or in the name.
         for other in [
             name.uppercased(), name.lowercased(), name.decomposedStringWithCanonicalMapping,
@@ -48,18 +52,25 @@ let fileMask = FuzzTarget(
         ]
         where maskFolded(other) == maskFolded(name) {
             fzCheck(
-                mask.matches(other) == a, "filemask-case-or-accent-form-counts",
-                "mask \(pattern.debugDescription) name \(name.debugDescription) other \(other.debugDescription)")
+                mask.matches(other) == a,
+                "filemask-case-or-accent-form-counts",
+                "mask \(pattern.debugDescription) name \(name.debugDescription) other \(other.debugDescription)"
+            )
         }
         fzCheck(
             FileMask(pattern.decomposedStringWithCanonicalMapping).matches(name) == a,
-            "filemask-mask-accent-form-counts", "mask \(pattern.debugDescription) name \(name.debugDescription)")
-    })
+            "filemask-mask-accent-form-counts",
+            "mask \(pattern.debugDescription) name \(name.debugDescription)"
+        )
+    }
+)
 
 /// The form masks and names are compared in (the rule of the type: without case, accents composed).
 func maskFolded(_ text: String) -> [UInt32] {
-    text.folding(options: .caseInsensitive, locale: nil).precomposedStringWithCanonicalMapping.unicodeScalars.map(
-        \.value)
+    text.folding(options: .caseInsensitive, locale: nil).precomposedStringWithCanonicalMapping.unicodeScalars
+        .map(
+            \.value
+        )
 }
 
 /// `FileMask` by its documented rules, with no shortcuts: masks are separated by spaces or
@@ -137,11 +148,14 @@ func nextItem(_ c: inout Choices, previous: String?, allowNaN: Bool = false) -> 
     var modified = dates[c.int(dates.count)]
     if allowNaN, flags & 0x80 != 0, c.int(4) == 0 { modified = Date(timeIntervalSinceReferenceDate: .nan) }
     let isDirectory = flags & 3 == 0
-    return FileItem(
-        url: dir.appendingPathComponent(name.isEmpty ? "_" : name), name: name, isDirectory: isDirectory,
-        isPackage: isDirectory && flags & 4 != 0,
-        isHidden: flags & 8 != 0, size: sizes[c.int(sizes.count)], modified: modified,
-        computedSize: flags & 0x30 == 0x30 ? sizes[c.int(sizes.count)] : nil)
+    var item = FileItem(
+        url: dir.appendingPathComponent(name.isEmpty ? "_" : name),
+        name: name,
+        kind: .init(isDirectory: isDirectory, isPackage: isDirectory && flags & 4 != 0, isHidden: flags & 8 != 0),
+        stat: .init(size: sizes[c.int(sizes.count)], modified: modified)
+    )
+    item.computedSize = flags & 0x30 == 0x30 ? sizes[c.int(sizes.count)] : nil
+    return item
 }
 
 /// With `uniqueNames`, no two items have the same bytes for a name (as in a folder on a disk);
@@ -164,20 +178,27 @@ func nextOrder(_ c: inout Choices) -> ListOrder {
 }
 
 func describe(_ items: [FileItem]) -> String {
-    items.prefix(40).map {
-        "\($0.isFolder ? "[D]" : "")\(Array($0.name.utf16).map { String($0, radix: 16) }.joined(separator: " "))|\($0.size)|\($0.modified.timeIntervalSinceReferenceDate)"
-    }.joined(separator: ", ")
+    items.prefix(40)
+        .map {
+            "\($0.isFolder ? "[D]" : "")\(Array($0.name.utf16).map { String($0, radix: 16) }.joined(separator: " "))|\($0.size)|\($0.modified.timeIntervalSinceReferenceDate)"
+        }
+        .joined(separator: ", ")
 }
 
 /// Identity of an entry in a result: the object it came from is not kept, so the position in the input stands for it.
 func tagged(_ items: [FileItem]) -> [FileItem] {
     // The url carries the index; nothing in the order looks at it.
-    items.enumerated().map { index, item in
-        FileItem(
-            url: URL(fileURLWithPath: "/i/\(index)"), name: item.name, isDirectory: item.isDirectory,
-            isPackage: item.isPackage, isHidden: item.isHidden,
-            size: item.size, modified: item.modified, computedSize: item.computedSize)
-    }
+    items.enumerated()
+        .map { index, item in
+            var tagged = FileItem(
+                url: URL(fileURLWithPath: "/i/\(index)"),
+                name: item.name,
+                kind: .init(isDirectory: item.isDirectory, isPackage: item.isPackage, isHidden: item.isHidden),
+                stat: .init(size: item.size, modified: item.modified)
+            )
+            tagged.computedSize = item.computedSize
+            return tagged
+        }
 }
 func ids(_ items: [FileItem]) -> [Int] { items.map { Int($0.url.lastPathComponent) ?? -1 } }
 
@@ -253,17 +274,22 @@ func checkNameOrder(_ items: [FileItem], collator: NameCollator, _ which: String
             let ba = Sorter.compareNames(b, a, collator: collator)
             let same = Array(a.utf16) == Array(b.utf16)
             fzCheck(
-                (ab == .orderedSame) == same, "sorter-names-equal-without-being-the-same" + which,
-                "\(Array(a.utf16)) \(Array(b.utf16)): \(ab.rawValue)")
+                (ab == .orderedSame) == same,
+                "sorter-names-equal-without-being-the-same" + which,
+                "\(Array(a.utf16)) \(Array(b.utf16)): \(ab.rawValue)"
+            )
             fzCheck(
-                ab.rawValue == -ba.rawValue, "sorter-names-order-not-antisymmetric" + which,
-                "\(Array(a.utf16)) \(Array(b.utf16)): \(ab.rawValue) and \(ba.rawValue)")
+                ab.rawValue == -ba.rawValue,
+                "sorter-names-order-not-antisymmetric" + which,
+                "\(Array(a.utf16)) \(Array(b.utf16)): \(ab.rawValue) and \(ba.rawValue)"
+            )
         }
     }
 }
 
 let sorter = FuzzTarget(
-    "sorter", maxLen: 2_048,
+    "sorter",
+    maxLen: 2_048,
     seeds: {
         [
             Array(0..<200).map { UInt8(truncatingIfNeeded: $0 &* 37 &+ 11) },
@@ -288,8 +314,12 @@ let sorter = FuzzTarget(
                 let name = (k / basis.count) % 3 == 0 ? it.name : it.name + String(k % 97)
                 grown.append(
                     FileItem(
-                        url: it.url, name: name, isDirectory: it.isDirectory, isPackage: it.isPackage,
-                        size: it.size &+ Int64(k % 5), modified: it.modified))
+                        url: it.url,
+                        name: name,
+                        kind: .init(isDirectory: it.isDirectory, isPackage: it.isPackage),
+                        stat: .init(size: it.size &+ Int64(k % 5), modified: it.modified)
+                    )
+                )
                 k += 1
             }
             items = grown
@@ -297,55 +327,75 @@ let sorter = FuzzTarget(
         items = tagged(items)
         let sorted = Sorter.sort(items, by: order)
         fzCheck(
-            ids(sorted).sorted() == Array(items.indices), "sorter-not-a-permutation", "\(order) \(describe(items))")
+            ids(sorted).sorted() == Array(items.indices),
+            "sorter-not-a-permutation",
+            "\(order) \(describe(items))"
+        )
         let plain = Sorter.sort(items, by: order, collator: .unavailable)
         fzCheck(
-            ids(plain).sorted() == Array(items.indices), "sorter-not-a-permutation-nokeys",
-            "\(order) \(describe(items))")
+            ids(plain).sorted() == Array(items.indices),
+            "sorter-not-a-permutation-nokeys",
+            "\(order) \(describe(items))"
+        )
         let reference = referenceSort(items, order)
         // The order is defined by collation keys and then bytes, so "before" is an order in the strict
         // sense for any names, with the system's collator and with the fallback keys alike.
         fzCheck(
-            comparatorIsConsistent(items, order), "sorter-comparison-is-not-an-order", "\(order) \(describe(items))")
+            comparatorIsConsistent(items, order),
+            "sorter-comparison-is-not-an-order",
+            "\(order) \(describe(items))"
+        )
         fzCheck(
-            comparatorIsConsistent(items, order, collator: .unavailable), "sorter-comparison-is-not-an-order-nokeys",
-            "\(order) \(describe(items))")
+            comparatorIsConsistent(items, order, collator: .unavailable),
+            "sorter-comparison-is-not-an-order-nokeys",
+            "\(order) \(describe(items))"
+        )
         checkNameOrder(items, collator: .current, "")
         checkNameOrder(items, collator: .unavailable, "-nokeys")
         var key: String { items.count > 60 || comparatorIsConsistent(items, order) ? "" : "-inconsistent-comparator" }
         if let at = isSorted(sorted, order) {
             fzFail(
                 "sorter-out-of-order" + key,
-                "\(order) at \(at): \(describe(Array(sorted[(at - 1)...at]))) of \(describe(items))")
+                "\(order) at \(at): \(describe(Array(sorted[(at - 1)...at]))) of \(describe(items))"
+            )
         }
         fzCheck(
-            ids(sorted) == ids(reference), "sorter-differs-from-definition" + key,
-            "\(order)\n got \(ids(sorted).prefix(60))\nwant \(ids(reference).prefix(60))\n\(describe(items))")
+            ids(sorted) == ids(reference),
+            "sorter-differs-from-definition" + key,
+            "\(order)\n got \(ids(sorted).prefix(60))\nwant \(ids(reference).prefix(60))\n\(describe(items))"
+        )
         // Without the system's collator the order is that of the fallback keys: its own definition.
         // (A second slow sort of the 8,000-item lists would take the time of the run: they are compared up to 1,000.)
         let plainReference = items.count <= 1_000 ? referenceSort(items, order, collator: .unavailable) : plain
         fzCheck(
-            ids(plain) == ids(plainReference), "sorter-nokeys-differs-from-definition" + key,
-            "\(order)\n got \(ids(plain).prefix(60))\nwant \(ids(plainReference).prefix(60))\n\(describe(items))")
+            ids(plain) == ids(plainReference),
+            "sorter-nokeys-differs-from-definition" + key,
+            "\(order)\n got \(ids(plain).prefix(60))\nwant \(ids(plainReference).prefix(60))\n\(describe(items))"
+        )
         guard items.count <= 200 else { return }
         // Turning the order round gives what sorting anew gives.
         let other = c.bool() ? ListOrder(key: order.key, descending: !order.descending) : nextOrder(&c)
         let resorted = Sorter.resort(sorted, from: order, to: other)
         fzCheck(
-            ids(resorted) == ids(Sorter.sort(sorted, by: other)), "resort-differs-from-sort" + key,
-            "\(order) -> \(other) \(describe(sorted))")
+            ids(resorted) == ids(Sorter.sort(sorted, by: other)),
+            "resort-differs-from-sort" + key,
+            "\(order) -> \(other) \(describe(sorted))"
+        )
         // Batches merged into a sorted list.
         let cut = items.isEmpty ? 0 : c.int(items.count + 1)
         let first = Sorter.sort(Array(items[..<cut]), by: order)
         let second = Sorter.sort(Array(items[cut...]), by: order)
         let merged = Sorter.merge(first, with: second, by: order)
         fzCheck(
-            ids(merged).sorted() == Array(items.indices), "merge-not-a-permutation",
-            "\(order) cut \(cut) \(describe(items))")
+            ids(merged).sorted() == Array(items.indices),
+            "merge-not-a-permutation",
+            "\(order) cut \(cut) \(describe(items))"
+        )
         if let at = isSorted(merged, order) {
             fzFail(
                 "merge-out-of-order" + key,
-                "\(order) cut \(cut) at \(at): \(describe(Array(merged[(at - 1)...at]))) of \(describe(items))")
+                "\(order) cut \(cut) at \(at): \(describe(Array(merged[(at - 1)...at]))) of \(describe(items))"
+            )
         }
         var list = SortedFileList(order: order)
         var at = 0
@@ -355,28 +405,35 @@ let sorter = FuzzTarget(
             at += n
         }
         fzCheck(
-            ids(list.items).sorted() == Array(items.indices), "sortedlist-not-a-permutation",
-            "\(order) \(describe(items))")
+            ids(list.items).sorted() == Array(items.indices),
+            "sortedlist-not-a-permutation",
+            "\(order) \(describe(items))"
+        )
         if let at = isSorted(list.items, order) {
             fzFail(
                 "sortedlist-out-of-order" + key,
-                "\(order) at \(at): \(describe(Array(list.items[(at - 1)...at]))) of \(describe(items))")
+                "\(order) at \(at): \(describe(Array(list.items[(at - 1)...at]))) of \(describe(items))"
+            )
         }
         if order.key != .unsorted {
             fzCheck(
-                ids(list.items) == ids(reference), "sortedlist-differs-from-definition" + key,
-                "\(order)\n got \(ids(list.items).prefix(60))\nwant \(ids(reference).prefix(60))\n\(describe(items))")
+                ids(list.items) == ids(reference),
+                "sortedlist-differs-from-definition" + key,
+                "\(order)\n got \(ids(list.items).prefix(60))\nwant \(ids(reference).prefix(60))\n\(describe(items))"
+            )
         }
-    })
+    }
+)
 
 // MARK: - PanelModel
 
 func same(_ a: [FileItem], _ b: [FileItem]) -> Bool {
     a.count == b.count
-        && zip(a, b).allSatisfy {
-            ExactName.areSame($0.name, $1.name) && $0.isDirectory == $1.isDirectory && $0.size == $1.size
-                && $0.computedSize == $1.computedSize
-        }
+        && zip(a, b)
+            .allSatisfy {
+                ExactName.areSame($0.name, $1.name) && $0.isDirectory == $1.isDirectory && $0.size == $1.size
+                    && $0.computedSize == $1.computedSize
+            }
 }
 
 func checkModel(_ model: PanelModel, last: [FileItem]?, op: String, ordered: Bool) {
@@ -386,8 +443,10 @@ func checkModel(_ model: PanelModel, last: [FileItem]?, op: String, ordered: Boo
     let offset = model.hasParentRow ? 1 : 0
     fzCheck(rows == items.count + offset, "panel-rowcount", op)
     fzCheck(
-        model.cursor >= 0 && model.cursor <= max(rows - 1, 0), "panel-cursor-out-of-range",
-        "\(op): cursor \(model.cursor) of \(rows) rows")
+        model.cursor >= 0 && model.cursor <= max(rows - 1, 0),
+        "panel-cursor-out-of-range",
+        "\(op): cursor \(model.cursor) of \(rows) rows"
+    )
     // What is shown is what was listed, filtered.
     let shown = model.filter.map { f in listed.filter(f.matches) } ?? listed
     if !same(items, shown) {
@@ -420,31 +479,41 @@ func checkModel(_ model: PanelModel, last: [FileItem]?, op: String, ordered: Boo
     }
     fzCheck(model.isSelected(row: 0) == false || !model.hasParentRow, "panel-parent-row-marked", op)
     fzCheck(
-        model.selectionCount == markedRows, "panel-selectioncount-vs-marked-rows",
-        "\(op): count \(model.selectionCount), \(markedRows) rows")
+        model.selectionCount == markedRows,
+        "panel-selectioncount-vs-marked-rows",
+        "\(op): count \(model.selectionCount), \(markedRows) rows"
+    )
     fzCheck(model.hasSelection == (markedRows > 0), "panel-hasselection", op)
     // `selectedNames`: one per marked entry, as written, in the order of the list.
     fzCheck(
-        model.selectedNames.map { Array($0.utf16) } == markedNames, "panel-selectednames-vs-marked-rows",
-        "\(op): \(model.selectedNames.count) names, \(markedRows) rows")
+        model.selectedNames.map { Array($0.utf16) } == markedNames,
+        "panel-selectednames-vs-marked-rows",
+        "\(op): \(model.selectedNames.count) names, \(markedRows) rows"
+    )
     // `selection` is a set of names: one member for names that read the same (documented), never more
     // members than marks, and exactly the marked names.
     let selection = model.selection
     fzCheck(
-        selection.count <= model.selectionCount && selection.isEmpty == (markedRows == 0), "panel-selection-set-size",
-        "\(op): \(selection.count) vs \(model.selectionCount)")
+        selection.count <= model.selectionCount && selection.isEmpty == (markedRows == 0),
+        "panel-selection-set-size",
+        "\(op): \(selection.count) vs \(model.selectionCount)"
+    )
     fzCheck(selection == Set(model.selectedNames), "panel-selection-set-vs-selectednames", op)
     for (index, item) in items.enumerated() where !identical {
         fzCheck(
-            model.isSelected(item) == model.isSelected(row: index + offset), "panel-isselected-item-vs-row",
-            "\(op): row \(index + offset) \(describe([item]))")
+            model.isSelected(item) == model.isSelected(row: index + offset),
+            "panel-isselected-item-vs-row",
+            "\(op): row \(index + offset) \(describe([item]))"
+        )
     }
     // The operands are the marked entries; without marks, the entry under the cursor.
     let operands = model.operands()
     if markedRows > 0 {
         fzCheck(
-            operands.map { Array($0.name.utf16) } == markedNames, "panel-operands-vs-marked-rows",
-            "\(op): \(operands.count) operands, \(markedRows) marked rows")
+            operands.map { Array($0.name.utf16) } == markedNames,
+            "panel-operands-vs-marked-rows",
+            "\(op): \(operands.count) operands, \(markedRows) marked rows"
+        )
     } else {
         fzCheck(operands.count <= 1, "panel-operands-without-marks", "\(op): \(operands.count)")
     }
@@ -470,8 +539,10 @@ func checkModel(_ model: PanelModel, last: [FileItem]?, op: String, ordered: Boo
         }
         guard let found = model.item(atRow: row) else { fzFail("panel-row-of-name-out-of-range", "\(op): row \(row)") }
         fzCheck(
-            ExactName.areSame(found.name, item.name), "panel-row-of-name-other-item",
-            "\(op): asked \(describe([item])) got \(describe([found]))")
+            ExactName.areSame(found.name, item.name),
+            "panel-row-of-name-other-item",
+            "\(op): asked \(describe([item])) got \(describe([found]))"
+        )
         if !identical {
             fzCheck(row == index + offset, "panel-row-of-name-wrong-row", "\(op): \(row) vs \(index + offset)")
         }
@@ -489,7 +560,8 @@ func checkModel(_ model: PanelModel, last: [FileItem]?, op: String, ordered: Boo
 
 func panelTarget(_ name: String, unique: Bool) -> FuzzTarget {
     FuzzTarget(
-        name, maxLen: 3_000,
+        name,
+        maxLen: 3_000,
         seeds: {
             [
                 (0..<400).map { UInt8(truncatingIfNeeded: $0 &* 29 &+ 3) },
@@ -510,8 +582,11 @@ func panelTarget(_ name: String, unique: Bool) -> FuzzTarget {
             func listing(_ items: [FileItem], other: Bool = false) -> Listing {
                 let d = other ? dir.appendingPathComponent("sub") : dir
                 return Listing(
-                    directory: d, items: items, parent: c.bool() ? d.deletingLastPathComponent() : nil,
-                    root: URL(fileURLWithPath: "/"))
+                    directory: d,
+                    items: items,
+                    parent: c.bool() ? d.deletingLastPathComponent() : nil,
+                    root: URL(fileURLWithPath: "/")
+                )
             }
             func name() -> String {
                 let items = model.listedItems
@@ -530,7 +605,10 @@ func panelTarget(_ name: String, unique: Bool) -> FuzzTarget {
                     last = items
                     ordered = true
                     model.show(
-                        listing(items, other: c.int(5) == 0), focus: c.bool() ? name() : nil, complete: c.bool())
+                        listing(items, other: c.int(5) == 0),
+                        focus: c.bool() ? name() : nil,
+                        complete: c.bool()
+                    )
 
                 case 1:
                     let items = nextItems(&c)
@@ -557,7 +635,9 @@ func panelTarget(_ name: String, unique: Bool) -> FuzzTarget {
                     let presorted = op == 4
                     _ = model.update(
                         with: listing(presorted ? Sorter.sort(items, by: model.sort) : items),
-                        focus: c.bool() ? name() : nil, presorted: presorted ? model.sort : nil)
+                        focus: c.bool() ? name() : nil,
+                        presorted: presorted ? model.sort : nil
+                    )
 
                 case 5:
                     model.setSort(nextOrder(&c))
@@ -573,14 +653,18 @@ func panelTarget(_ name: String, unique: Bool) -> FuzzTarget {
                     let mask = masks[c.int(masks.count)]
                     what += " filter \(mask)"
                     model.setFilter(
-                        c.int(4) == 0 ? nil : PanelFilter.mask(mask), narrowing: c.bool() && model.filter == nil)
+                        c.int(4) == 0 ? nil : PanelFilter.mask(mask),
+                        narrowing: c.bool() && model.filter == nil
+                    )
 
                 case 8:
                     let filter: PanelFilter? = c.int(4) == 0 ? nil : PanelFilter(title: "size") { $0.size > 1 }
                     let stale = c.int(4) == 0
                     _ = model.setFilter(
-                        filter, prefiltered: stale ? [] : PanelModel.filtered(model.listedItems, by: filter),
-                        listVersion: model.listVersion - (stale ? 1 : 0))
+                        filter,
+                        prefiltered: stale ? [] : PanelModel.filtered(model.listedItems, by: filter),
+                        listVersion: model.listVersion - (stale ? 1 : 0)
+                    )
 
                 case 9: model.toggleSelection(row: row())
 
@@ -623,7 +707,8 @@ func panelTarget(_ name: String, unique: Bool) -> FuzzTarget {
                 if case 20...21 = op { last = nil }
                 checkModel(model, last: [7, 8].contains(op) ? nil : last, op: what, ordered: ordered)
             }
-        })
+        }
+    )
 }
 let panel = panelTarget("panel", unique: true)
 let panelDup = panelTarget("paneldup", unique: false)
@@ -638,13 +723,16 @@ struct Shuffler: RandomNumberGenerator {
 var shuffler = Shuffler()
 
 let selfTest = FuzzTarget(
-    "selftest", maxLen: 64, seeds: { [Array("hello world".utf8)] },
+    "selftest",
+    maxLen: 64,
+    seeds: { [Array("hello world".utf8)] },
     run: { b in
         if b.count > 3, b[0] == 0x43, b[1] == 0x52 {
             let a = [1, 2, 3]
             _ = a[Int(b[2])]
         }
         if b.count > 5, b[0] == 0x48, b[1] == 0x41 { while true {} }
-    })
+    }
+)
 
 fuzzMain([fileMask, sorter, panel, panelDup, selfTest])

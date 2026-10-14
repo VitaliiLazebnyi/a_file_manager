@@ -33,7 +33,9 @@ import Testing
         TestBench(
             plugins: [SelectionPlugin(pasteboard: pasteboard, background: background)],
             fileSystems: [LocalFileSystem(), memory],
-            left: memory.url("/A"), right: memory.url("/B"))
+            left: memory.url("/A"),
+            right: memory.url("/B")
+        )
     }
 
     func settle(_ condition: () -> Bool) async {
@@ -53,7 +55,8 @@ import Testing
                 let expected = Wildcard.matches(Array(pattern.lowercased()), Array(name.lowercased()))
                 #expect(
                     SelectionMask(pattern).matches(MaskEntry(name: name)) == expected,
-                    "\(pattern.debugDescription) on \(name.debugDescription)")
+                    "\(pattern.debugDescription) on \(name.debugDescription)"
+                )
             }
         }
         // Several masks, an exclusion and folders-only masks keep their meaning.
@@ -61,7 +64,8 @@ import Testing
         #expect(mask.matches("a.txt") && mask.matches("B.MD") && !mask.matches("draft.txt") && !mask.matches("a.png"))
         #expect(
             SelectionMask("sub/").matches("sub", isFolder: true)
-                && !SelectionMask("sub/").matches("sub", isFolder: false))
+                && !SelectionMask("sub/").matches("sub", isFolder: false)
+        )
     }
 
     @Test func aListThatChangesWhileAMaskIsWorkedOutGetsTheMaskAfterwards() async {
@@ -163,8 +167,11 @@ import Testing
     @Test func theIndexedComparisonIsTheComparisonByName() {
         func file(_ name: String, size: Int64 = 1, seconds: TimeInterval = 0, folder: Bool = false) -> FileItem {
             FileItem(
-                url: URL(fileURLWithPath: "/x/" + name), name: name, isDirectory: folder, size: size,
-                modified: Date(timeIntervalSince1970: seconds))
+                url: URL(fileURLWithPath: "/x/" + name),
+                name: name,
+                kind: .init(isDirectory: folder),
+                stat: .init(size: size, modified: Date(timeIntervalSince1970: seconds))
+            )
         }
         let left = [
             file("a"), file("b", seconds: 100), file("c", size: 5), file("d", folder: true), file("only left"),
@@ -177,9 +184,17 @@ import Testing
         for mode in [DirectoryComparison.Mode.newerOrDifferent, .missing, .sizeOrMissing, .newer] {
             for withFolders in [false, true] {
                 let names = DirectoryComparison.compare(
-                    left: left, right: right, mode: mode, withSubdirectories: withFolders)
+                    left: left,
+                    right: right,
+                    mode: mode,
+                    withSubdirectories: withFolders
+                )
                 let indices = DirectoryComparison.compareIndices(
-                    left: left, right: right, mode: mode, withSubdirectories: withFolders)
+                    left: left,
+                    right: right,
+                    mode: mode,
+                    withSubdirectories: withFolders
+                )
                 #expect(Set(indices.left.map { left[$0].name }) == names.left)
                 #expect(Set(indices.right.map { right[$0].name }) == names.right)
                 #expect(
@@ -208,12 +223,14 @@ import Testing
         #expect(bench.left.model.items.map(\.name) == ["newer.txt"] && bench.left.model.selection == ["newer.txt"])
         #expect(
             bench.right.model.items.map(\.name) == ["newer.txt", "only_right.txt"]
-                && bench.right.model.selection == ["only_right.txt"])
+                && bench.right.model.selection == ["only_right.txt"]
+        )
         #expect(bench.commands.isChecked(Ids.markNewerHideSame))
         // Chosen again, the lists are whole again.
         bench.commands.perform(Ids.markNewerHideSame)
         #expect(
-            bench.left.model.filter == nil && bench.left.model.items.count == 2 && bench.right.model.items.count == 3)
+            bench.left.model.filter == nil && bench.left.model.items.count == 2 && bench.right.model.items.count == 3
+        )
     }
 }
 
@@ -271,9 +288,11 @@ import Testing
         #expect(model.sort.key == .size && steps.background.isEmpty && steps.main.isEmpty)
         let descending = model.sort.descending
         #expect(
-            zip(model.items, model.items.dropFirst()).allSatisfy {
-                descending ? $0.size >= $1.size : $0.size <= $1.size
-            })
+            zip(model.items, model.items.dropFirst())
+                .allSatisfy {
+                    descending ? $0.size >= $1.size : $0.size <= $1.size
+                }
+        )
         #expect(model.items.contains { $0.name == "new.txt" })
     }
 
@@ -289,9 +308,11 @@ import Testing
         #expect(model.sort.key == .size && model.requestedSort == nil && steps.background.isEmpty && steps.main.isEmpty)
         let descending = model.sort.descending
         #expect(
-            zip(model.items, model.items.dropFirst()).allSatisfy {
-                descending ? $0.size >= $1.size : $0.size <= $1.size
-            })
+            zip(model.items, model.items.dropFirst())
+                .allSatisfy {
+                    descending ? $0.size >= $1.size : $0.size <= $1.size
+                }
+        )
     }
 
     @Test func aWishForAnOrderSurvivesAListThatArrivesBeforeItIsMet() {
@@ -304,7 +325,9 @@ import Testing
             model.sort
                 == ListOrder(
                     key: .date,
-                    descending: !ListOrder(key: .date, descending: SortKey.date.startsDescending).descending))
+                    descending: !ListOrder(key: .date, descending: SortKey.date.startsDescending).descending
+                )
+        )
     }
 
     @Test func unsortedAfterAnotherKeyReadsTheFolderAgain() {
@@ -313,7 +336,11 @@ import Testing
         small.addFile("/S/apple.txt")
         small.addFile("/S/mango.txt")
         let bench = TestBench(
-            plugins: [ViewOptionsPlugin()], fileSystems: [small], left: small.url("/S"), right: small.url("/S"))
+            plugins: [ViewOptionsPlugin()],
+            fileSystems: [small],
+            left: small.url("/S"),
+            right: small.url("/S")
+        )
         bench.commands.perform(.sortByName)
         #expect(bench.left.names == bench.left.names.sorted())
         bench.commands.perform(.unsorted)
@@ -338,7 +365,9 @@ import Testing
     let context = ExpansionContext(
         left: PanelSnapshot(path: "/A dir/", cursorName: "my file.txt", selection: ["a.txt", "b\u{2028}c.txt"]),
         right: PanelSnapshot(path: "/B/", cursorName: "other.md"),
-        listFolder: URL(fileURLWithPath: "/tmp/lists"), listName: "test")
+        listFolder: URL(fileURLWithPath: "/tmp/lists"),
+        listName: "test"
+    )
 
     @Test func aSubstringOfTheLargestLengthDoesNotTrap() {
         // The reproducer of the fuzzer (`pexpand-substring-length-overflow.bin`) and the same words by hand.
@@ -355,7 +384,8 @@ import Testing
         }
         #expect(
             ParameterExpander(context: context).expand("%N:~6,9223372036854775807").text
-                == ParameterExpander(context: context).expand("%N:~6,99").text)
+                == ParameterExpander(context: context).expand("%N:~6,99").text
+        )
     }
 
     @Test func aNameWithAnyKindOfLineEndIsNotPassedInAListFile() {
@@ -370,17 +400,20 @@ import Testing
         var commands: [UserCommand] = []
         for index in 0..<200 {
             commands.append(
-                UserCommand(name: "em_\(index)", title: "", action: CommandAction(command: "echo \(index)")))
+                UserCommand(name: "em_\(index)", title: "", action: CommandAction(command: "echo \(index)"))
+            )
         }
         commands.append(UserCommand(name: "em_7", title: "", action: CommandAction(command: "echo again")))
         store.userCommands = commands
         #expect(store.userCommand(named: "em_150")?.action.command == "echo 150")
         // Of two commands of one name the first is the one.
         #expect(
-            store.userCommand(named: "em_7")?.action.command == "echo 7" && store.userCommand(named: "nothing") == nil)
+            store.userCommand(named: "em_7")?.action.command == "echo 7" && store.userCommand(named: "nothing") == nil
+        )
         store.userCommands = Array(commands.prefix(3))
         #expect(
-            store.userCommand(named: "em_150") == nil && store.userCommand(named: "em_1")?.action.command == "echo 1")
+            store.userCommand(named: "em_150") == nil && store.userCommand(named: "em_1")?.action.command == "echo 1"
+        )
     }
 }
 
@@ -412,8 +445,10 @@ import Testing
         var nested = Hotlist()
         nested.entries = [
             HotlistEntry(
-                kind: .submenu, title: "m",
-                children: (0..<(Hotlist.limit + 5)).map { .item("c\($0)", command: "cd /c\($0)") }),
+                kind: .submenu,
+                title: "m",
+                children: (0..<(Hotlist.limit + 5)).map { .item("c\($0)", command: "cd /c\($0)") }
+            ),
             .item("after", command: "cd /after")
         ]
         let reloaded = try JSONDecoder().decode(Hotlist.self, from: try JSONEncoder().encode(nested))
@@ -462,7 +497,9 @@ import Testing
         let cache = TreeCache(directory: box.url("many"))
         for index in 0..<4 {
             cache.store(
-                (0..<600_000).map { "p\($0)" }, for: URL(fileURLWithPath: "/tmp/root\(index)/", isDirectory: true))
+                (0..<600_000).map { "p\($0)" },
+                for: URL(fileURLWithPath: "/tmp/root\(index)/", isDirectory: true)
+            )
         }
         // Not all four are held (that would be more than the limit); each is still there from its file.
         for index in 0..<4 {
@@ -486,7 +523,8 @@ import Testing
         #expect(children.first { $0.name == "a50" } === made && children.first { $0.name == "a95" } === later)
         #expect(
             tree.count == 100 && children.enumerated().allSatisfy { $0.element.indexInParentForTests == $0.offset }
-                && tree.root.isScanned)
+                && tree.root.isScanned
+        )
         // A folder that was made and is not in the listing has gone.
         let tree2 = DirectoryTree(rootURL: root)
         var at = tree2.attach(Array(DirectoryTree.makeNodes(["x1", "x2", "x3"])), ofPath: "", from: 0, limit: 1)
@@ -518,7 +556,8 @@ import Testing
         #expect(mid.children.first { $0.name == "x" } === chain && mid.children.allSatisfy { $0.name != "gone" })
         #expect(
             tree.count == 1 + 1_001
-                && mid.children.enumerated().allSatisfy { $0.element.indexInParentForTests == $0.offset })
+                && mid.children.enumerated().allSatisfy { $0.element.indexInParentForTests == $0.offset }
+        )
     }
 }
 
@@ -558,8 +597,10 @@ extension TreeNode {
         memory.listBatchSize = 10
         memory.listBatchDelay = 0.2
         let search = FileSearch(
-            SearchQuery(directory: memory.url("/huge")), fileSystems: fileSystems,
-            tuning: .init(partialListingAfter: 10))
+            SearchQuery(directory: memory.url("/huge")),
+            fileSystems: fileSystems,
+            tuning: .init(partialListingAfter: 10)
+        )
         let began = Date()
         // Written by the other thread before it signals, read here after the wait.
         nonisolated(unsafe) var firstAt: TimeInterval?
@@ -572,7 +613,8 @@ extension TreeNode {
                 found.append($0.name)
             }
             done.signal()
-        }.start()
+        }
+        .start()
         #expect(done.wait(timeout: .now() + 120) == .success)
         let total = Date().timeIntervalSince(began)
         // Five pauses of 0.2 s lie between the first batch and the last.
@@ -593,7 +635,8 @@ extension TreeNode {
         search.run { found.append($0.name) }
         #expect(
             Set(found) == Set((0..<45).filter { $0 % 2 == 0 }.map { String(format: "a%02d.txt", $0) })
-                && found.count == 23)
+                && found.count == 23
+        )
     }
 
     @Test func oneShareMountedTwiceIsOnePlace() {
@@ -617,11 +660,13 @@ extension TreeNode {
         #expect(planner.steps(sources: sources, targets: targets, cancelled: { true }).isEmpty)
         var calls = 0
         let part = planner.steps(
-            sources: sources, targets: targets,
+            sources: sources,
+            targets: targets,
             cancelled: {
                 calls += 1
                 return calls > 2
-            })
+            }
+        )
         #expect(part.count < 40_000)
     }
 
@@ -631,7 +676,8 @@ extension TreeNode {
         let steps = RenamePlanner().steps(sources: sources, targets: targets)
         #expect(
             steps.count == 4 && steps.filter { $0.kind == .park }.count == 1
-                && steps.filter { $0.kind == .unpark }.count == 1)
+                && steps.filter { $0.kind == .unpark }.count == 1
+        )
     }
 
     @Test func theFuzzerReproducersOfTheRenameMasksEnd() {
@@ -643,9 +689,10 @@ extension TreeNode {
             ("renamemask-wildcard-backtracking.bin", false), ("renameregex-catastrophic.bin", true)
         ] {
             guard let data = try? Data(contentsOf: directory.appendingPathComponent(file)) else { continue }
-            let lines = data.dropFirst(13).split(separator: 0x0A, omittingEmptySubsequences: false).map {
-                String(decoding: $0, as: UTF8.self)
-            }
+            let lines = data.dropFirst(13).split(separator: 0x0A, omittingEmptySubsequences: false)
+                .map {
+                    String(decoding: $0, as: UTF8.self)
+                }
             var settings = RenameSettings()
             settings.nameMask = lines[0]
             settings.extensionMask = lines[1]
@@ -655,14 +702,19 @@ extension TreeNode {
             var context = RenameContext()
             context.count = 3
             let subject = RenameSubject(
-                name: lines[4], isFolder: false, size: 1, modified: Date(timeIntervalSince1970: 0), directoryPath: "/d"
+                name: lines[4],
+                isFolder: false,
+                size: 1,
+                modified: Date(timeIntervalSince1970: 0),
+                directoryPath: "/d"
             )
             let engine = RenameEngine(settings, context: context)
             let done = DispatchSemaphore(value: 0)
             Thread {
                 _ = engine.newName(for: subject, index: 0)
                 done.signal()
-            }.start()
+            }
+            .start()
             #expect(done.wait(timeout: .now() + 60) == .success, "\(file)")
         }
     }
@@ -679,7 +731,8 @@ extension TreeNode {
         #expect(
             link.withUnsafeFileSystemRepresentation { target in
                 one.withUnsafeFileSystemRepresentation { source in Darwin.link(source!, target!) }
-            } == 0)
+            } == 0
+        )
         #expect(RenameRunner.isSameFileOnDisk(one, link) == nil)
     }
 }

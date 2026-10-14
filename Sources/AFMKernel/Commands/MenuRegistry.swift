@@ -1,37 +1,5 @@
 import Foundation
 
-/// A menu of the menu bar. Menus are shown in the order of their `order` values.
-public struct MenuID: Hashable, Sendable {
-    public let title: String
-    public let order: Int
-
-    public init(_ title: String, order: Int) {
-        self.title = title
-        self.order = order
-    }
-}
-
-/// A group of entries inside a menu; groups are shown in the order of their `order` values,
-/// with a separator between them. Plugins that share a section share one constant.
-public struct MenuSection: Hashable, Sendable {
-    public let menu: MenuID
-    public let order: Int
-
-    public init(_ menu: MenuID, order: Int) {
-        self.menu = menu
-        self.order = order
-    }
-}
-
-/// A group of entries in the context menu of the file list.
-public struct ContextMenuSection: Hashable, Sendable {
-    public let order: Int
-
-    public init(order: Int) {
-        self.order = order
-    }
-}
-
 /// Where plugins say in which menus their commands appear. The shell builds the menu bar and
 /// the context menu from this; it has no menu layout of its own.
 @MainActor
@@ -60,7 +28,8 @@ public final class MenuRegistry {
         let menu = section.menu
         precondition(
             menus_[menu.title] == nil || menus_[menu.title] == menu,
-            "Two different menus are called \(menu.title); plugins must share one MenuID")
+            "Two different menus are called \(menu.title); plugins must share one MenuID"
+        )
         menus_[menu.title] = menu
         entries.append((section, items))
     }
@@ -73,12 +42,15 @@ public final class MenuRegistry {
 
     /// The menus of the menu bar, in order.
     public var menus: [Menu] {
-        menus_.values.sorted { ($0.order, $0.title) < ($1.order, $1.title) }.map { menu in
-            Menu(
-                title: menu.title,
-                items: Self.flatten(
-                    entries.filter { $0.section.menu == menu }.map { ($0.section.order, $0.items) }))
-        }
+        menus_.values.sorted { ($0.order, $0.title) < ($1.order, $1.title) }
+            .map { menu in
+                Menu(
+                    title: menu.title,
+                    items: Self.flatten(
+                        entries.filter { $0.section.menu == menu }.map { ($0.section.order, $0.items) }
+                    )
+                )
+            }
     }
 
     public func contextMenu(onItem: Bool) -> [CommandID?] {

@@ -220,9 +220,10 @@ public final class VirtualFileSystem: FileSystemProvider, @unchecked Sendable {
         var total = lists.values.reduce(0) { $0 + $1.raw.count }
         while lists.count > Self.listLimit || total > Self.entryLimit {
             guard
-                let oldest = lists.filter({ $0.key != id && watchedLists[$0.key] == nil }).min(by: {
-                    $0.value.stamp < $1.value.stamp
-                })
+                let oldest = lists.filter({ $0.key != id && watchedLists[$0.key] == nil })
+                    .min(by: {
+                        $0.value.stamp < $1.value.stamp
+                    })
             else { return }
             total -= oldest.value.raw.count
             lists[oldest.key] = nil
@@ -276,7 +277,11 @@ public final class VirtualFileSystem: FileSystemProvider, @unchecked Sendable {
                 }
             }
             return FileList.Prepared(
-                entries: list.isUnique ? raw : entries, examples: examples, parents: parents, isLocal: isLocal)
+                entries: list.isUnique ? raw : entries,
+                examples: examples,
+                parents: parents,
+                isLocal: isLocal
+            )
         }
     }
 
@@ -345,19 +350,29 @@ public final class VirtualFileSystem: FileSystemProvider, @unchecked Sendable {
     }
 
     private func listing(
-        _ directory: URL, showHidden: Bool, cancellation: CancellationFlag?, receive: ([FileItem]) -> Bool
+        _ directory: URL,
+        showHidden: Bool,
+        cancellation: CancellationFlag?,
+        receive: ([FileItem]) -> Bool
     ) throws {
         guard let location = VirtualLocation(directory) else { throw FileSystemError.noProvider(directory) }
         let options = self.options
         let walker = BranchWalker(
-            fileSystems: fileSystems, showHidden: showHidden, listsFolders: options.listsFolders,
-            entersPackages: options.entersPackages)
+            fileSystems: fileSystems,
+            showHidden: showHidden,
+            listsFolders: options.listsFolders,
+            entersPackages: options.entersPackages
+        )
         switch location {
         case .branch(let real):
             noteCapabilities(of: [real], for: directory)
             let visited = try walker.walk(
-                [BranchWalker.Start(real)], mustRead: true, keeping: Self.watchLimit,
-                cancellation: cancellation, receive: receive)
+                [BranchWalker.Start(real)],
+                mustRead: true,
+                keeping: Self.watchLimit,
+                cancellation: cancellation,
+                receive: receive
+            )
             // What a stopped walk read is not the branch.
             if cancellation?.isCancelled != true { remember(visited, for: directory) }
 
@@ -377,7 +392,11 @@ public final class VirtualFileSystem: FileSystemProvider, @unchecked Sendable {
             if cancellation?.isCancelled == true { return }
             if !files.isEmpty, !receive(files) { return }
             let visited = try walker.walk(
-                starts, keeping: Self.watchLimit, cancellation: cancellation, receive: receive)
+                starts,
+                keeping: Self.watchLimit,
+                cancellation: cancellation,
+                receive: receive
+            )
             if cancellation?.isCancelled != true { remember([real] + visited, for: directory) }
 
         case .list(let id, let title, _):
@@ -468,12 +487,15 @@ public final class VirtualFileSystem: FileSystemProvider, @unchecked Sendable {
             // A directory is the virtual folder itself; anything else is simply the real file.
             return item.isDirectory
                 ? FileItem(
-                    url: url, name: item.name, isDirectory: true, modified: item.modified,
-                    permissions: item.permissions) : item
+                    url: url,
+                    name: item.name,
+                    kind: .directory,
+                    stat: .init(modified: item.modified, permissions: item.permissions)
+                ) : item
 
         case .list(let id, let title, _):
             return registered(id, as: VirtualLocation(url)!) == nil
-                ? nil : FileItem(url: url, name: title, isDirectory: true, permissions: 0o555)
+                ? nil : FileItem(url: url, name: title, kind: .directory, stat: .init(permissions: 0o555))
 
         case nil:
             return nil
@@ -644,7 +666,9 @@ public final class VirtualFileSystem: FileSystemProvider, @unchecked Sendable {
                 return VolumeInfo(name: "Search result:", isLocal: true)
             }
             return VolumeInfo(
-                name: "Search result:", isLocal: list.preparedIfReady?.isLocal ?? list.raw.first?.isFileURL ?? true)
+                name: "Search result:",
+                isLocal: list.preparedIfReady?.isLocal ?? list.raw.first?.isFileURL ?? true
+            )
 
         case nil:
             return nil
@@ -677,7 +701,8 @@ public final class VirtualFileSystem: FileSystemProvider, @unchecked Sendable {
                 // Done by the preparation of the list; a list that is not through yet is
                 // looked at in its first files only, so this takes no time on the main thread.
                 real =
-                    registered(id, as: location!).map { list in
+                    registered(id, as: location!)
+                    .map { list in
                         list.preparedIfReady?.parents
                             ?? parents(ofFirst: Self.parentScanLimit, of: list.raw)
                     } ?? []

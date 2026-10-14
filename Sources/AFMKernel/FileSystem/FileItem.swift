@@ -2,23 +2,60 @@ public import Foundation
 
 /// One entry of a directory, on whatever file system it lives (spec 03 › Rows in Full view).
 public struct FileItem: Equatable, Sendable {
+    /// What kind of entry it is: the flags a listing gives besides the name.
+    public struct Kind: OptionSet, Hashable, Sendable {
+        public let rawValue: UInt8
+        public init(rawValue: UInt8) { self.rawValue = rawValue }
+
+        /// A directory, or a symbolic link that points to one.
+        public static let directory = Self(rawValue: 1)
+        public static let symlink = Self(rawValue: 2)
+        /// A directory that is shown and opened like a file (a macOS bundle such as `.app`).
+        public static let package = Self(rawValue: 4)
+        public static let hidden = Self(rawValue: 8)
+        /// Neither a file with contents nor a directory: a pipe, a device or a socket, or a
+        /// link to one.
+        public static let special = Self(rawValue: 16)
+
+        /// The flags from what a file system found out one by one.
+        public init(
+            isDirectory: Bool = false,
+            isSymlink: Bool = false,
+            isPackage: Bool = false,
+            isHidden: Bool = false,
+            isSpecial: Bool = false
+        ) {
+            self = Kind(rawValue: 0)
+            if isDirectory { insert(.directory) }
+            if isSymlink { insert(.symlink) }
+            if isPackage { insert(.package) }
+            if isHidden { insert(.hidden) }
+            if isSpecial { insert(.special) }
+        }
+    }
+
+    /// What a file system says about the contents of an entry: its size, the date of its
+    /// last change and its permissions.
+    public struct Stat: Equatable, Sendable {
+        public var size: Int64
+        public var modified: Date
+        public var permissions: UInt16
+
+        /// Nothing in it, never changed (the first second of 1970), readable by all and
+        /// writable by its owner, unless said otherwise.
+        public init(size: Int64 = 0, modified: Date = Date(timeIntervalSince1970: 0), permissions: UInt16 = 0o644) {
+            self.size = size
+            self.modified = modified
+            self.permissions = permissions
+        }
+    }
+
     public let url: URL
     public let name: String
-    /// A directory, or a symbolic link that points to one.
-    public let isDirectory: Bool
-    public let isSymlink: Bool
-    /// A directory that is shown and opened like a file (a macOS bundle such as `.app`).
-    public let isPackage: Bool
-    public let isHidden: Bool
-    public let size: Int64
-    public let modified: Date
-    public let permissions: UInt16
+    public let kind: Kind
+    public let stat: Stat
     /// Folder size calculated with Space; replaces `<DIR>` in the Size column.
     public var computedSize: Int64?
-    /// Neither a file with contents nor a directory: a pipe, a device or a socket, or a link
-    /// to one. Opening it to read may never return, so whoever reads files by the dozen
-    /// (a search) leaves these out. False where the file system knows no such things.
-    public let isSpecial: Bool
     /// For a link to a regular file: the size of that file; nil for everything else, and
     /// where the file system did not look.
     public var linkTargetSize: Int64? {
@@ -30,33 +67,28 @@ public struct FileItem: Equatable, Sendable {
     private var targetSize = Self.unknown
     private static let unknown = Int64.min
 
-    public init(
-        url: URL,
-        name: String,
-        isDirectory: Bool,
-        isSymlink: Bool = false,
-        isPackage: Bool = false,
-        isHidden: Bool = false,
-        size: Int64 = 0,
-        modified: Date = Date(timeIntervalSince1970: 0),
-        permissions: UInt16 = 0o644,
-        computedSize: Int64? = nil,
-        isSpecial: Bool = false,
-        linkTargetSize: Int64? = nil
-    ) {
-        targetSize = linkTargetSize ?? Self.unknown
-        self.isSpecial = isSpecial
+    /// An entry called `name` at `url`; a plain empty file unless `kind` and `stat` say more.
+    public init(url: URL, name: String, kind: Kind = [], stat: Stat = Stat(), linkTargetSize: Int64? = nil) {
         self.url = url
         self.name = name
-        self.isDirectory = isDirectory
-        self.isSymlink = isSymlink
-        self.isPackage = isPackage
-        self.isHidden = isHidden
-        self.size = size
-        self.modified = modified
-        self.permissions = permissions
-        self.computedSize = computedSize
+        self.kind = kind
+        self.stat = stat
+        targetSize = linkTargetSize ?? Self.unknown
     }
+
+    /// A directory, or a symbolic link that points to one.
+    public var isDirectory: Bool { kind.contains(.directory) }
+    public var isSymlink: Bool { kind.contains(.symlink) }
+    /// A directory that is shown and opened like a file (a macOS bundle such as `.app`).
+    public var isPackage: Bool { kind.contains(.package) }
+    public var isHidden: Bool { kind.contains(.hidden) }
+    /// Neither a file with contents nor a directory: a pipe, a device or a socket, or a link
+    /// to one. Opening it to read may never return, so whoever reads files by the dozen
+    /// (a search) leaves these out. False where the file system knows no such things.
+    public var isSpecial: Bool { kind.contains(.special) }
+    public var size: Int64 { stat.size }
+    public var modified: Date { stat.modified }
+    public var permissions: UInt16 { stat.permissions }
 
     /// Listed with the folders, in brackets, and entered with Enter.
     public var isFolder: Bool { isDirectory && !isPackage }
@@ -96,153 +128,4 @@ public struct FileItem: Equatable, Sendable {
     }
 
     static let noExtension = -1
-}
-
-extension URL {
-    /// The location of an entry inside this directory. Unlike `appendingPathComponent(_:)`,
-    /// which asks the disk whether the result is a folder (one trip to the server per call on
-    /// a network share), this works on the text alone.
-    ///
-    /// The name is taken as it is: one that holds a `/`, or is `..`, leads somewhere else.
-    /// That is wanted for a path the user typed and for nothing that comes from outside (an
-    /// archive, a server, a list file): such names go through `appending(safeName:)` or
-    /// `PathSafety`.
-    public func appending(name: String) -> URL {
-        appendingPathComponent(name, isDirectory: false)
-    }
-
-    /// The location of an entry inside this directory, for a name that comes from outside:
-    /// nil unless the name is one name (`PathSafety.isSafeName`), so the result is always
-    /// directly inside this directory.
-    public func appending(safeName name: String) -> URL? {
-        PathSafety.isSafeName(name) ? appendingPathComponent(name, isDirectory: false) : nil
-    }
-
-    /// Identifies a location across file systems: scheme, host, port and path, without a
-    /// trailing slash. Two URLs show the same place exactly when their keys are equal.
-    public var locationKey: String {
-        let path = self.path
-        let host = (self.host ?? "") + (port.map { ":\($0)" } ?? "")
-        return (scheme ?? "file") + "://" + host
-            + (path.count > 1 && path.hasSuffix("/") ? String(path.dropLast()) : path)
-    }
-
-    public func isSameLocation(as other: URL) -> Bool {
-        locationKey == other.locationKey
-    }
-
-    /// Whether two locations are the same file: for local files the same entry of the same
-    /// volume (device and inode, links not followed unless `followingLinks`), however the two
-    /// paths are written; false when either is not there. For other locations, and when the
-    /// disk cannot say, the same location as text. Asks the disk: not for the main thread.
-    public func isSameFile(as other: URL, followingLinks: Bool = false) -> Bool {
-        guard isFileURL, other.isFileURL else { return isSameLocation(as: other) }
-        var (own, others) = (stat(), stat())
-        let look = followingLinks ? stat : lstat
-        guard look(path, &own) == 0, look(other.path, &others) == 0 else { return false }
-        return own.st_dev == others.st_dev && own.st_ino == others.st_ino
-    }
-
-    /// True when `self` lies somewhere below `ancestor`. The keys are compared byte for byte:
-    /// a folder whose name merely reads like the ancestor's, or goes on with an accent after
-    /// the last character, is another folder.
-    public func isInside(_ ancestor: URL) -> Bool {
-        let (own, parent) = (locationKey, ancestor.locationKey)
-        return own.utf8.starts(with: (parent.utf8.last == 0x2F ? parent : parent + "/").utf8)
-    }
-}
-
-/// Checks on names and paths that come from outside the program: the entries of an archive,
-/// the answers of a server, the lines of a list file. Whoever writes a file at such a path
-/// must end up below the folder it was told to fill, whatever the path says.
-///
-/// Everything here goes by **bytes**. A path is cut at the byte `/` and nowhere else. Cutting
-/// a `String` by its characters does not find every separator: a `/` followed by a combining
-/// mark is one character that is not `/`, so a path of `..`, such a `/`, and more looked like
-/// a single harmless name to code that split on characters, and the file system, which goes
-/// by bytes, walked up a folder.
-public enum PathSafety: Sendable {
-    /// Whether `name` can be the name of one entry: not empty, not `.` or `..`, and holding
-    /// neither the byte `/` nor a zero byte.
-    public static func isSafeName(_ name: String) -> Bool {
-        var name = name
-        return name.withUTF8 { isSafeName($0) }
-    }
-
-    private static func isSafeName(_ name: UnsafeBufferPointer<UInt8>) -> Bool {
-        if name.isEmpty || name.contains(0x2F) || name.contains(0) { return false }
-        if name.count == 1, name[0] == 0x2E { return false }
-        if name.count == 2, name[0] == 0x2E, name[1] == 0x2E { return false }
-        return true
-    }
-
-    /// The names a relative path is made of, cut at every `/` byte. Nil unless every one of
-    /// them is a safe name: no empty one (a leading, doubled or trailing `/`), no `.`, no
-    /// `..`, no zero byte. With `allowingTrailingSeparator`, one `/` at the end is let pass,
-    /// as archives write their folders.
-    public static func components(ofRelativePath path: String, allowingTrailingSeparator: Bool = false) -> [String]? {
-        var bytes = Array(path.utf8)
-        if allowingTrailingSeparator, bytes.last == 0x2F { bytes.removeLast() }
-        guard !bytes.isEmpty else { return nil }
-        var names: [String] = []
-        for part in bytes.split(separator: 0x2F, omittingEmptySubsequences: false) {
-            guard part.withUnsafeBufferPointer({ isSafeName($0) }) else { return nil }
-            // Cut at an ASCII byte, valid UTF-8 stays valid UTF-8.
-            names.append(String(decoding: part, as: UTF8.self))
-        }
-        return names
-    }
-
-    /// Whether `url` lies below `root` once both are written out in full: the paths are read
-    /// the way the file system reads them (an empty name is no name, so `a//..` is the folder
-    /// above `a`; `.` is the folder itself, `..` the one above) and compared byte for byte,
-    /// component by component. A path whose `..` leads above its start lies nowhere. With
-    /// `resolvingLinks`, symbolic links on the way are followed first, for both, which asks
-    /// the disk and is for local files only: a link inside the folder that points out of it
-    /// is then seen for what it is, also when the file at the end does not exist yet.
-    public static func isContained(_ url: URL, in root: URL, resolvingLinks: Bool = false) -> Bool {
-        guard (url.scheme ?? "file") == (root.scheme ?? "file"), url.host == root.host, url.port == root.port else {
-            return false
-        }
-        func bytes(_ url: URL) -> [UInt8]? {
-            written(Array((resolvingLinks && url.isFileURL ? resolved(url.path) : url.path).utf8))
-        }
-        guard let own = bytes(url), let above = bytes(root), own.count > above.count, own.starts(with: above) else {
-            return false
-        }
-        return above.last == 0x2F || own[above.count] == 0x2F
-    }
-
-    /// A path written out in full, by its text alone: empty names and `.` left out, each `..`
-    /// taking away the name before it. Nil when a `..` has nothing left to take away.
-    private static func written(_ path: [UInt8]) -> [UInt8]? {
-        var names: [ArraySlice<UInt8>] = []
-        for name in path.split(separator: 0x2F) where !name.elementsEqual([0x2E]) {
-            if name.elementsEqual([0x2E, 0x2E]) {
-                guard names.popLast() != nil else { return nil }
-            } else {
-                names.append(name)
-            }
-        }
-        let joined = Array(names.joined(separator: [0x2F]))
-        return path.first == 0x2F ? [0x2F] + joined : joined
-    }
-
-    /// The path of a local file (which starts at the root) with every link on the way
-    /// followed: the longest start of the path that exists is resolved by the system (links
-    /// and `..` as the disk has them), and what does not exist yet follows it as written.
-    private static func resolved(_ path: String) -> String {
-        let names = Array(path.utf8).split(separator: 0x2F)
-        for count in stride(from: names.count, to: 0, by: -1) {
-            let start = "/" + names[..<count].map { String(decoding: $0, as: UTF8.self) }.joined(separator: "/")
-            guard let real = realpath(start, nil) else { continue }
-            defer { free(real) }
-            return names[count...]
-                .reduce(String(cString: real)) { text, name in
-                    text + "/" + String(decoding: name, as: UTF8.self)
-                }
-        }
-        // Nothing but the root exists, and the root is itself.
-        return path
-    }
 }

@@ -15,8 +15,13 @@ public struct RemoteEntry: Equatable, Sendable {
     public var isSpecial = false
 
     public init(
-        name: String, isDirectory: Bool, isSymlink: Bool = false, linkTarget: String? = nil, size: Int64 = 0,
-        modified: Date? = nil, permissions: UInt16? = nil
+        name: String,
+        isDirectory: Bool,
+        isSymlink: Bool = false,
+        linkTarget: String? = nil,
+        size: Int64 = 0,
+        modified: Date? = nil,
+        permissions: UInt16? = nil
     ) {
         self.name = name
         self.isDirectory = isDirectory
@@ -45,10 +50,20 @@ public struct RemoteEntry: Equatable, Sendable {
     /// The entry as a panel shows it.
     func item(in directory: URL) -> FileItem {
         FileItem(
-            url: directory.appending(name: name), name: name, isDirectory: isDirectory, isSymlink: isSymlink,
-            isHidden: name.hasPrefix("."), size: isDirectory ? 0 : size,
-            modified: modified ?? Date(timeIntervalSince1970: 0),
-            permissions: permissions ?? (isDirectory ? 0o755 : 0o644), isSpecial: isSpecial)
+            url: directory.appending(name: name),
+            name: name,
+            kind: .init(
+                isDirectory: isDirectory,
+                isSymlink: isSymlink,
+                isHidden: name.hasPrefix("."),
+                isSpecial: isSpecial
+            ),
+            stat: .init(
+                size: isDirectory ? 0 : size,
+                modified: modified ?? Date(timeIntervalSince1970: 0),
+                permissions: permissions ?? (isDirectory ? 0o755 : 0o644)
+            )
+        )
     }
 }
 
@@ -157,7 +172,10 @@ public enum FTPListParser {
 
     /// A whole listing. Large ones are parsed on all cores.
     public static func entries(
-        of lines: [String], asMLSD: Bool, now: Date = Date(), calendar: Calendar = localCalendar
+        of lines: [String],
+        asMLSD: Bool,
+        now: Date = Date(),
+        calendar: Calendar = localCalendar
     ) -> [RemoteEntry] {
         Parallel.map(lines, serialBelow: 2_000) { asMLSD ? mlsd($0) : list($0, now: now, calendar: calendar) }
             .compactMap { $0 }

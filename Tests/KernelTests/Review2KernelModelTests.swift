@@ -6,24 +6,28 @@ import Testing
 private let folder = URL(fileURLWithPath: "/review2/folder")
 
 private func file(_ name: String, size: Int64 = 1, in directory: URL = folder) -> FileItem {
-    FileItem(url: directory.appendingPathComponent(name), name: name, isDirectory: false, size: size)
+    FileItem(url: directory.appendingPathComponent(name), name: name, stat: .init(size: size))
 }
 
 private func dir(_ name: String) -> FileItem {
-    FileItem(url: folder.appendingPathComponent(name), name: name, isDirectory: true)
+    FileItem(url: folder.appendingPathComponent(name), name: name, kind: .directory)
 }
 
 private func listing(_ items: [FileItem], at directory: URL = folder) -> Listing {
     Listing(
-        directory: directory, items: items, parent: directory.deletingLastPathComponent(),
-        root: URL(fileURLWithPath: "/"))
+        directory: directory,
+        items: items,
+        parent: directory.deletingLastPathComponent(),
+        root: URL(fileURLWithPath: "/")
+    )
 }
 
 /// Folders `dir0…`, files `file0.txt…` with sizes that tell them apart.
 private func sample(_ count: Int) -> [FileItem] {
-    (0..<count).map {
-        $0 % 10 == 0 ? dir("dir\($0)") : file("file\($0).\($0 % 3 == 0 ? "txt" : "md")", size: Int64($0 % 97 + 1))
-    }
+    (0..<count)
+        .map {
+            $0 % 10 == 0 ? dir("dir\($0)") : file("file\($0).\($0 % 3 == 0 ? "txt" : "md")", size: Int64($0 % 97 + 1))
+        }
 }
 
 @MainActor private func panel(_ items: [FileItem], sort: ListOrder = ListOrder()) -> PanelModel {
@@ -88,8 +92,10 @@ private func elsewhere<Value>(_ work: @escaping @Sendable () -> Value) -> Value 
         model.setComputedSizes([(name: "dir0", size: 500), (name: "dir10", size: 7)])
         model.setFilter(PanelFilter.mask("*.txt"))
         _ = model.setFilter(
-            PanelFilter.mask("*.md"), prefiltered: PanelModel.filtered(model.listedItems, by: .mask("*.md")),
-            listVersion: version)
+            PanelFilter.mask("*.md"),
+            prefiltered: PanelModel.filtered(model.listedItems, by: .mask("*.md")),
+            listVersion: version
+        )
         model.setFilter(nil)
         model.selectAll()
         #expect(model.listVersion == version)
@@ -171,7 +177,11 @@ private func elsewhere<Value>(_ work: @escaping @Sendable () -> Value) -> Value 
         #expect(!model.setSelection(rows))
         #expect(
             !model.setSort(
-                ListOrder(), presorted: Sorter.sort(items, by: ListOrder()), listVersion: model.listVersion - 1))
+                ListOrder(),
+                presorted: Sorter.sort(items, by: ListOrder()),
+                listVersion: model.listVersion - 1
+            )
+        )
         #expect(state(model) == before && announced == 0)
         // What only touches marks, the cursor or sizes does not make a prepared change stale.
         let basis = model.basis
@@ -183,7 +193,8 @@ private func elsewhere<Value>(_ work: @escaping @Sendable () -> Value) -> Value 
         #expect(model.selectedNames.sorted() == ["file7.md", "file8.md"] && model.cursorItem?.name == "file8.md")
         #expect(
             model.item(atRow: model.row(ofName: "dir20")!)?.computedSize == 20
-                && model.listedItems.first { $0.name == "dir30" }?.computedSize == 30)
+                && model.listedItems.first { $0.name == "dir30" }?.computedSize == 30
+        )
         #expect(model.totals == counted(model) && model.totals.totalBytes == counted(model).totalBytes)
     }
 
@@ -200,7 +211,8 @@ private func elsewhere<Value>(_ work: @escaping @Sendable () -> Value) -> Value 
         let other = URL(fileURLWithPath: "/review2/other")
         #expect(
             model.apply(PanelModel.prepare(model.basis, update: listing([file("x.txt", in: other)], at: other)))
-                == .changed)
+                == .changed
+        )
         #expect(model.directory.path == other.path && model.items.map(\.name) == ["x.txt"] && model.selectionCount == 0)
     }
 
@@ -220,7 +232,8 @@ private func elsewhere<Value>(_ work: @escaping @Sendable () -> Value) -> Value 
         model.select(where: { $0.isFolder }, select: false)
         #expect(
             model.selectionCount == count - 1 - count / 10 && model.totals == counted(model)
-                && model.totals.selectedFolders == 0)
+                && model.totals.selectedFolders == 0
+        )
         model.select(mask: "*.txt", select: false)
         #expect(model.operands().allSatisfy { $0.name.hasSuffix(".md") } && model.totals == counted(model))
         model.restoreSelection()
@@ -236,7 +249,8 @@ private func elsewhere<Value>(_ work: @escaping @Sendable () -> Value) -> Value 
         let rows = elsewhere { PanelModel.rows(of: basis) { !$0.isFolder && $0.size > 50 } }
         #expect(model.setSelection(rows) && model.selectionCount == rows.count && rows.count > 0)
         #expect(
-            model.operands().allSatisfy { $0.size > 50 && $0.name.hasSuffix(".txt") } && model.totals == counted(model))
+            model.operands().allSatisfy { $0.size > 50 && $0.name.hasSuffix(".txt") } && model.totals == counted(model)
+        )
         #expect(model.setSelection(rows, .remove) && model.selectionCount == 0)
         #expect(model.setSelection(rows, .add) && model.selectionCount == rows.count)
     }
@@ -265,7 +279,8 @@ private func elsewhere<Value>(_ work: @escaping @Sendable () -> Value) -> Value 
             model.setSelected(true, names: ["twin.txt"])
             #expect(
                 model.selectionCount == 2 && model.totals.selectedFiles == 2 && model.totals.selectedBytes == 7
-                    && model.operands().count == 2)
+                    && model.operands().count == 2
+            )
             for _ in 0..<4 { _ = model.row(ofName: "single.txt") }
             #expect(model.totals == counted(model) && model.selectionCount == 2)
             model.setSelected(false, names: ["twin.txt"])
@@ -309,7 +324,8 @@ private func elsewhere<Value>(_ work: @escaping @Sendable () -> Value) -> Value 
         #expect(
             sizes(model.listedItems) == [
                 Array(decomposed.utf8): 11, Array(composed.utf8): 22, Array("plain".utf8): 33, Array("f7".utf8): 7
-            ])
+            ]
+        )
         #expect(sizes(model.items) == [Array(composed.utf8): 22, Array("plain".utf8): 33, Array("f7".utf8): 7])
         #expect(model.totals == counted(model) && model.totals.totalBytes == 22 + 33 + 7 + 1)
         // What is shown is still the listed entries the filter lets through, sizes and all.
@@ -339,13 +355,22 @@ private func elsewhere<Value>(_ work: @escaping @Sendable () -> Value) -> Value 
         model.update(with: listing(Array(items.dropFirst(3)) + [dir("dir0"), file("fresh.txt")]))
         #expect(
             model.listedItems.first { $0.name == "dir0" }?.computedSize == 5
-                && model.listedItems.first { $0.name == "dir290" }?.computedSize == 9)
+                && model.listedItems.first { $0.name == "dir290" }?.computedSize == 9
+        )
         model.setSort(
             ListOrder(key: .date),
             presorted: Sorter.sort(
                 model.listedItems.map {
-                    FileItem(url: $0.url, name: $0.name, isDirectory: $0.isDirectory, size: $0.size)
-                }, by: ListOrder(key: .date)))
+                    FileItem(
+                        url: $0.url,
+                        name: $0.name,
+                        kind: .init(isDirectory: $0.isDirectory),
+                        stat: .init(size: $0.size)
+                    )
+                },
+                by: ListOrder(key: .date)
+            )
+        )
         #expect(model.listedItems.filter { $0.computedSize != nil }.map(\.name).sorted() == ["dir0", "dir290"])
         #expect(model.totals == counted(model))
     }
@@ -369,7 +394,8 @@ private func elsewhere<Value>(_ work: @escaping @Sendable () -> Value) -> Value 
         model.restore(snapshot)
         #expect(model.filter?.title == "7" && model.items.count == shown.count && model.listedItems.count == 1_000)
         #expect(
-            Set(model.items.map(\.name)) == Set(shown) && model.selectedNames.sorted() == ["file17.md", "file7.md"])
+            Set(model.items.map(\.name)) == Set(shown) && model.selectedNames.sorted() == ["file17.md", "file7.md"]
+        )
         // The list is in the order the panel names.
         #expect(model.sort == ListOrder(key: .size, descending: true))
         #expect(model.listedItems.map(\.name) == Sorter.sort(items, by: model.sort).map(\.name))
@@ -404,8 +430,11 @@ private func elsewhere<Value>(_ work: @escaping @Sendable () -> Value) -> Value 
             listing(
                 [
                     file("file2.md", in: other), file("zzz", in: other),
-                    FileItem(url: other.appendingPathComponent("dir10"), name: "dir10", isDirectory: true)
-                ], at: other))
+                    FileItem(url: other.appendingPathComponent("dir10"), name: "dir10", kind: .directory)
+                ],
+                at: other
+            )
+        )
         #expect(model.savedSelection == ["file1.md", "file2.md", "dir10"])
         model.restoreSelection()
         #expect(model.selectedNames.sorted() == ["dir10", "file2.md"])

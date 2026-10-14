@@ -43,7 +43,12 @@ import Testing
     @Test func progressLine() {
         var rate = TransferRate()
         let copying = JobProgress(
-            lines: ["From: a", "To: b"], itemsDone: 1, itemsTotal: 4, bytesDone: 20 << 20, bytesTotal: 100 << 20)
+            lines: ["From: a", "To: b"],
+            itemsDone: 1,
+            itemsTotal: 4,
+            bytesDone: 20 << 20,
+            bytesTotal: 100 << 20
+        )
         #expect(ProgressSheet.speedLine(rate, for: copying) == "Calculating…")
         rate.add(amount: 0, at: 0)
         rate.add(amount: 20 << 20, at: 2)
@@ -61,8 +66,17 @@ import Testing
 @MainActor @Suite struct KeysAndMenus {
     func keyEvent(_ keyCode: UInt16, _ characters: String = "", _ flags: NSEvent.ModifierFlags = []) -> NSEvent {
         NSEvent.keyEvent(
-            with: .keyDown, location: .zero, modifierFlags: flags, timestamp: 0, windowNumber: 0, context: nil,
-            characters: characters, charactersIgnoringModifiers: characters, isARepeat: false, keyCode: keyCode)!
+            with: .keyDown,
+            location: .zero,
+            modifierFlags: flags,
+            timestamp: 0,
+            windowNumber: 0,
+            context: nil,
+            characters: characters,
+            charactersIgnoringModifiers: characters,
+            isARepeat: false,
+            keyCode: keyCode
+        )!
     }
 
     @Test func keyPressesBecomeShortcuts() {
@@ -71,7 +85,8 @@ import Testing
         #expect(
             Shortcut.candidates(for: keyEvent(123, "", [.option, .numericPad, .function])) == [
                 Shortcut(.left, .option)
-            ])
+            ]
+        )
         #expect(Shortcut.candidates(for: keyEvent(8, "c", .command)) == [.cmd("c")])
         #expect(Shortcut.candidates(for: keyEvent(8, "C", [.command, .shift])) == [.cmd("c", .shift)])
         #expect(Shortcut.candidates(for: keyEvent(69, "+", .numericPad)) == [Shortcut(.keypadPlus)])
@@ -99,12 +114,13 @@ import Testing
         let keys = KeyBindings()
         let commands = CommandRegistry(keyBindings: keys)
         commands.register(Command("cm_Copy", "Copy…", [Shortcut(.returnKey), .f(5), .cmd("k")])) {}
-        commands.register(Command("cm_Paste", "Paste", [.cmd("v")], editingRole: .paste)) {}
+        commands.register(Command("cm_Paste", "Paste", [.cmd("v")]).editing(.paste)) {}
         let item = MenuBuilder.item(commands["cm_Copy"]!, keys: keys)
         #expect(item.title == "Copy…")
         #expect(
             item.keyEquivalent == String(UnicodeScalar(UInt32(NSF5FunctionKey))!)
-                && item.keyEquivalentModifierMask.isEmpty)
+                && item.keyEquivalentModifierMask.isEmpty
+        )
         #expect(MenuBuilder.command(of: item) == "cm_Copy")
         let paste = MenuBuilder.item(commands["cm_Paste"]!, keys: keys)
         #expect(paste.action == #selector(NSText.paste(_:)) && paste.keyEquivalentModifierMask == .command)
@@ -113,7 +129,8 @@ import Testing
         keys.apply(overrides: ["cm_Copy": ["f9"]])
         #expect(
             MenuBuilder.item(commands["cm_Copy"]!, keys: keys).keyEquivalent
-                == String(UnicodeScalar(UInt32(NSF9FunctionKey))!))
+                == String(UnicodeScalar(UInt32(NSF9FunctionKey))!)
+        )
     }
 
     @Test func menusSkipUnregisteredNamesAndDoubleSeparators() {
@@ -132,7 +149,11 @@ import Testing
 
     @Test func statusLine() {
         let totals = PanelModel.Totals(
-            selectedBytes: 5 * 1_024, totalBytes: 8 * 1_024, selectedFiles: 4, totalFiles: 14)
+            selectedBytes: 5 * 1_024,
+            totalBytes: 8 * 1_024,
+            selectedFiles: 4,
+            totalFiles: 14
+        )
         #expect(PanelViewController.statusText(totals) == "5 k / 8 k in 4 / 14 file(s)")
         let withFolders = PanelModel.Totals(totalFiles: 0, totalFolders: 2)
         #expect(PanelViewController.statusText(withFolders) == "0 k / 0 k in 0 / 0 file(s), 0 / 2 dir(s)")

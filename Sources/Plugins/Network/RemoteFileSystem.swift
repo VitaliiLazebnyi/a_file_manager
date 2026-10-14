@@ -113,7 +113,10 @@ public final class ConnectionCenter: @unchecked Sendable {
             // Nothing is known: a guest on an FTP server, the Mac's user on a secure shell
             // (with the keys and the configuration that user has). Not without asking.
             var guest = ConnectionProfile(
-                key: key, user: key.scheme == "sftp" ? NSUserName() : nil, anonymous: key.scheme != "sftp")
+                key: key,
+                user: key.scheme == "sftp" ? NSUserName() : nil,
+                anonymous: key.scheme != "sftp"
+            )
             guest.asksBeforeConnecting = !isChosen
             return guest
         }
@@ -460,7 +463,10 @@ public final class RemoteFileSystem: FileSystemProvider {
     /// Reads a directory and remembers the listing. A visit is what the panels do; reading
     /// the directory to answer a question about one entry is not. A cancelled listing is not remembered.
     private func read(
-        _ directory: URL, showHidden: Bool, isVisit: Bool, cancellation: CancellationFlag?,
+        _ directory: URL,
+        showHidden: Bool,
+        isVisit: Bool,
+        cancellation: CancellationFlag?,
         receive: ([FileItem]) -> Bool
     ) throws {
         let (session, key, path) = try resolve(directory)
@@ -540,7 +546,7 @@ public final class RemoteFileSystem: FileSystemProvider {
         else { return nil }
         let path = RemotePath.of(url)
         guard let parent = RemotePath.parent(of: path) else {
-            return FileItem(url: key.url(), name: key.host, isDirectory: true, permissions: 0o755)
+            return FileItem(url: key.url(), name: key.host, kind: .directory, stat: .init(permissions: 0o755))
         }
         var named = entry
         named.name = RemotePath.name(of: path)
@@ -736,8 +742,11 @@ public final class RemoteFileSystem: FileSystemProvider {
         }
         if isPlain {
             cache.move(
-                RemotePath.name(of: from), from: parentURL(source), to: parentURL(destination),
-                as: RemotePath.name(of: to))
+                RemotePath.name(of: from),
+                from: parentURL(source),
+                to: parentURL(destination),
+                as: RemotePath.name(of: to)
+            )
         } else {
             cache.forget(parentURL(source), parentURL(destination))
         }
@@ -761,7 +770,10 @@ public final class RemoteFileSystem: FileSystemProvider {
     /// rest is seen through whatever the flag says (it still ends with the session and at the
     /// time limits): a Cancel between the two renames would leave the name without a file.
     private func replace(
-        _ to: String, with from: String, on session: any RemoteSession, refusal: any Error,
+        _ to: String,
+        with from: String,
+        on session: any RemoteSession,
+        refusal: any Error,
         cancellation: CancellationFlag?
     ) throws {
         let directory = RemotePath.parent(of: to) ?? "/"
@@ -781,7 +793,8 @@ public final class RemoteFileSystem: FileSystemProvider {
             } catch {
                 throw NetworkError.incomplete(
                     "\(RemotePath.name(of: to)) could not be replaced (\(refusal.localizedDescription)), "
-                        + "and the file that was there could not be put back: it is kept on the server as \(aside).")
+                        + "and the file that was there could not be put back: it is kept on the server as \(aside)."
+                )
             }
             throw error
         }
@@ -799,8 +812,11 @@ public final class RemoteFileSystem: FileSystemProvider {
     static func asideName(for name: String) -> String {
         let mark = String(UInt32.random(in: 0...UInt32.max), radix: 16)
         // Short enough for servers with a limit of 255 bytes for a name.
-        let kept = String(decoding: name.utf8.prefix(180), as: UTF8.self).replacingOccurrences(
-            of: "\u{FFFD}", with: "")
+        let kept = String(decoding: name.utf8.prefix(180), as: UTF8.self)
+            .replacingOccurrences(
+                of: "\u{FFFD}",
+                with: ""
+            )
         return ".\(kept).replaced-\(mark)"
     }
 
@@ -854,7 +870,8 @@ public final class RemoteFileSystem: FileSystemProvider {
         // of the kind, and it leaves a session alone that is in the middle of its login.
         if address.user != nil || prefix != scheme + "://", !center.isConnected(address.key) {
             center.announce(
-                ConnectionProfile(key: address.key, tls: address.tls, user: address.user, password: address.password))
+                ConnectionProfile(key: address.key, tls: address.tls, user: address.user, password: address.password)
+            )
         }
         return address.url
     }
@@ -877,11 +894,14 @@ public final class RemoteFileSystem: FileSystemProvider {
 
     /// The connected servers, for the volume list.
     public func places() -> [Place] {
-        center.connected.filter { $0.key.scheme == scheme }.map { profile in
-            Place(
-                name: profile.title, url: profile.key.url(path: center.lastPath(on: profile.key) ?? "/"),
-                kind: .externalDisk)
-        }
+        center.connected.filter { $0.key.scheme == scheme }
+            .map { profile in
+                Place(
+                    name: profile.title,
+                    url: profile.key.url(path: center.lastPath(on: profile.key) ?? "/"),
+                    kind: .externalDisk
+                )
+            }
     }
 
     public func volume(of url: URL) -> VolumeInfo? {

@@ -154,9 +154,13 @@ final class ArchiveStore: @unchecked Sendable {
             // Reached through a symbolic link, the archive is changed where it really lies:
             // a new file put at the link's place would leave the real one as it was.
             return try OpenArchive(
-                archiveURL: url, localURL: Durable.realFile(url), fetchedCopy: nil, remoteStamp: nil,
+                archiveURL: url,
+                localURL: Durable.realFile(url),
+                fetchedCopy: nil,
+                remoteStamp: nil,
                 cancellation: cancellation,
-                environment: environment)
+                environment: environment
+            )
         }
         // An archive on a server or inside another archive is fetched to the disk first
         // (spec 08 › Nested archives). The copy is removed again when the fetch is given up.
@@ -195,8 +199,14 @@ final class ArchiveStore: @unchecked Sendable {
         let quarantine = provider.quarantine(of: url)
         Quarantine.apply(quarantine, to: local)
         return try OpenArchive(
-            archiveURL: url, localURL: local, fetchedCopy: copy, remoteStamp: (item.size, item.modified),
-            quarantine: quarantine, cancellation: cancellation, environment: environment)
+            archiveURL: url,
+            localURL: local,
+            fetchedCopy: copy,
+            remoteStamp: (item.size, item.modified),
+            quarantine: quarantine,
+            cancellation: cancellation,
+            environment: environment
+        )
     }
 
     /// The archive if it is open now; never opens one and never waits for one that is being
@@ -212,10 +222,11 @@ final class ArchiveStore: @unchecked Sendable {
     private func evict(keeping key: String) {
         // `lastUsed` belongs to the table's lock, `archive` to the slot's own.
         lock.lock()
-        let candidates = slots.filter { $0.key != key }.map {
-            (key: $0.key, slot: $0.value, lastUsed: $0.value.lastUsed)
-        }
-        .sorted { $0.lastUsed < $1.lastUsed }
+        let candidates = slots.filter { $0.key != key }
+            .map {
+                (key: $0.key, slot: $0.value, lastUsed: $0.value.lastUsed)
+            }
+            .sorted { $0.lastUsed < $1.lastUsed }
         let archives = Array(opened.values)
         lock.unlock()
         var excess = candidates.count - capacity + 1
@@ -332,9 +343,10 @@ final class ArchiveStore: @unchecked Sendable {
     func release(on volume: URL) {
         // `opened` belongs to the table's lock, a slot's `archive` to the slot's own.
         lock.lock()
-        let candidates = opened.filter { Self.archive($0.value, liesIn: volume) }.compactMap { key, _ in
-            slots[key].map { (key, $0) }
-        }
+        let candidates = opened.filter { Self.archive($0.value, liesIn: volume) }
+            .compactMap { key, _ in
+                slots[key].map { (key, $0) }
+            }
         lock.unlock()
         for (key, slot) in candidates where slot.lock.try() {
             var released: OpenArchive?
@@ -417,8 +429,10 @@ final class ArchiveFileSystem: FileSystemProvider {
         case .inside(let location):
             do {
                 return .inside(
-                    try store.archive(at: location.archive, cancellation: cancellation), path: location.innerPath,
-                    location: location)
+                    try store.archive(at: location.archive, cancellation: cancellation),
+                    path: location.innerPath,
+                    location: location
+                )
             } catch ArchiveError.notAnArchive {
                 // A folder that is named like an archive (a typed path on a server is read
                 // by its text alone): the place is simply further down that folder.
@@ -429,9 +443,10 @@ final class ArchiveFileSystem: FileSystemProvider {
                 guard found?.isRealDirectory == true else {
                     throw ArchiveError.notAnArchive(location.archive.lastPathComponent)
                 }
-                let place = ArchiveTree.names(of: location.innerPath).reduce(location.archive) {
-                    $0.appending(name: $1)
-                }
+                let place = ArchiveTree.names(of: location.innerPath)
+                    .reduce(location.archive) {
+                        $0.appending(name: $1)
+                    }
                 return .outside(provider, place)
             }
 
@@ -496,9 +511,10 @@ final class ArchiveFileSystem: FileSystemProvider {
                 throw archive.entry(path) == nil ? ArchiveError.notFound(path) : ArchiveError.notADirectory(path)
             }
             let base = directory.standardized
-            return children.filter { showHidden || !$0.name.hasPrefix(".") }.map {
-                $0.item(at: base.appending(name: $0.name))
-            }
+            return children.filter { showHidden || !$0.name.hasPrefix(".") }
+                .map {
+                    $0.item(at: base.appending(name: $0.name))
+                }
         }
     }
 
@@ -522,7 +538,11 @@ final class ArchiveFileSystem: FileSystemProvider {
         case .inside(let archive, let path, _):
             if path.isEmpty {
                 return FileItem(
-                    url: url, name: archive.name, isDirectory: true, modified: archive.modified, permissions: 0o755)
+                    url: url,
+                    name: archive.name,
+                    kind: .directory,
+                    stat: .init(modified: archive.modified, permissions: 0o755)
+                )
             }
             return archive.entry(path)?.item(at: url)
         }
@@ -536,7 +556,10 @@ final class ArchiveFileSystem: FileSystemProvider {
         case .inside(let location):
             if location.isRoot { return location.archive.deletingLastPathComponent() }
             return ArchiveURL.make(
-                scheme: scheme, archive: location.archive, innerPath: ArchiveTree.parent(of: location.innerPath))
+                scheme: scheme,
+                archive: location.archive,
+                innerPath: ArchiveTree.parent(of: location.innerPath)
+            )
 
         case .outside(let outer):
             return (try? outerProvider(for: outer))?.parent(of: outer)
@@ -961,8 +984,10 @@ final class ArchiveFileSystem: FileSystemProvider {
         if path == "~" || path.hasPrefix("~/") { path = NSString(string: path).expandingTildeInPath }
         guard path.hasPrefix("/") else { return nil }
         let names = ArchiveTree.names(of: path)
-        let known = store.environment.options.extensions.union(Self.zipExtensions).union(
-            ArchiveFormat.writable.flatMap(\.extensions))
+        let known = store.environment.options.extensions.union(Self.zipExtensions)
+            .union(
+                ArchiveFormat.writable.flatMap(\.extensions)
+            )
         var prefix = ""
         for (index, name) in names.enumerated() {
             prefix += "/" + name

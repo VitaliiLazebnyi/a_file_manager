@@ -1,21 +1,6 @@
 public import AFMKernel
 import Foundation
 
-/// The menus of the menu bar and the sections inside them, shared by every plugin that adds
-/// entries (spec 04 › Main menu, in the Mac's menu order). A plugin with a menu of its own
-/// declares its own `MenuID`.
-extension MenuID {
-    public static let files = MenuID("Files", order: 10)
-    public static let edit = MenuID("Edit", order: 20)
-    public static let mark = MenuID("Mark", order: 30)
-    public static let commands = MenuID("Commands", order: 40)
-    public static let net = MenuID("Net", order: 45)
-    public static let show = MenuID("Show", order: 50)
-    public static let configuration = MenuID("Configuration", order: 60)
-    public static let start = MenuID("Start", order: 70)
-    public static let help = MenuID("Help", order: 90)
-}
-
 extension MenuSection {
     public static let filesOpen = MenuSection(.files, order: 10)
     public static let filesTransfer = MenuSection(.files, order: 20)
@@ -70,14 +55,4 @@ extension MenuSection {
     public static let configurationSave = MenuSection(.configuration, order: 30)
 
     public static let helpTopics = MenuSection(.help, order: 10)
-}
-
-extension ContextMenuSection {
-    public static let open = ContextMenuSection(order: 10)
-    public static let transfer = ContextMenuSection(order: 20)
-    public static let clipboard = ContextMenuSection(order: 30)
-    public static let create = ContextMenuSection(order: 40)
-    public static let tools = ContextMenuSection(order: 50)
-    public static let archives = ContextMenuSection(order: 45)
-    public static let properties = ContextMenuSection(order: 60)
 }

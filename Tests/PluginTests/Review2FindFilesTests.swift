@@ -21,7 +21,8 @@ import Testing
         Thread {
             work()
             done.signal()
-        }.start()
+        }
+        .start()
         return done.wait(timeout: .now() + seconds) == .success
     }
 
@@ -55,7 +56,8 @@ import Testing
         Thread {
             Thread.sleep(forTimeInterval: 0.1)
             cancellation.cancel()
-        }.start()
+        }
+        .start()
         // Written by the other thread before it signals, read here after the wait.
         nonisolated(unsafe) var cancelled: Bool?
         #expect(finishes { cancelled = second.accepts(MemoryReader(data), cancellation: cancellation) })
@@ -135,7 +137,8 @@ import Testing
             ContentColumn(id: "gate", title: "Gate") { item in
                 if item.name >= "f64" { _ = release.wait(timeout: .now() + 30) }
                 return "open"
-            })
+            }
+        )
         var query = SearchQuery(directory: memory.url("/many"))
         query.fieldRules = FieldRules(isEnabled: true, rules: [FieldRule("gate", .equals, "open")])
         let search = FileSearch(query, fileSystems: fileSystems, columns: columns)
@@ -171,7 +174,8 @@ import Testing
             ContentColumn(id: "gate", title: "Gate") { item in
                 if item.url.path == "/wide/d000/f0.txt" { _ = release.wait(timeout: .now() + 60) }
                 return "open"
-            })
+            }
+        )
         var query = SearchQuery(directory: memory.url("/wide"))
         query.fieldRules = FieldRules(isEnabled: true, rules: [FieldRule("gate", .equals, "open")])
         let search = FileSearch(query, fileSystems: fileSystems, columns: columns, tuning: .init(budget: 30))
@@ -181,7 +185,8 @@ import Testing
         Thread {
             search.run { _ in count += 1 }
             done.signal()
-        }.start()
+        }
+        .start()
         // While the first folder's test is held, the other threads read a few folders ahead and then wait.
         Thread.sleep(forTimeInterval: 1)
         let listed = memory.listRequests.filter { $0.hasPrefix("/wide/d") }.count
@@ -204,7 +209,8 @@ import Testing
             Thread {
                 Thread.sleep(forTimeInterval: Double(round) / 2_000)
                 search.cancel()
-            }.start()
+            }
+            .start()
             #expect(finishes { search.run { _ in } })
         }
     }
@@ -248,18 +254,24 @@ import Testing
     @Test func theSameRemotePlaceWrittenTwoWaysIsNotADuplicateOfItself() {
         func item(_ text: String) -> FileItem {
             FileItem(
-                url: URL(string: text)!, name: "same.txt", isDirectory: false, size: 5,
-                modified: Date(timeIntervalSince1970: 1))
+                url: URL(string: text)!,
+                name: "same.txt",
+                stat: .init(size: 5, modified: Date(timeIntervalSince1970: 1))
+            )
         }
         let options = DuplicateOptions(isEnabled: true, sameName: true, sameSize: true, sameContents: false)
         let twice = DuplicateFinder.groups(
-            of: [item("sftp://HOST/a/same.txt"), item("sftp://host/a/same.txt")], options: options,
-            fileSystems: fileSystems)
+            of: [item("sftp://HOST/a/same.txt"), item("sftp://host/a/same.txt")],
+            options: options,
+            fileSystems: fileSystems
+        )
         #expect(twice.isEmpty)
         // Two different files of one name are still a group.
         let two = DuplicateFinder.groups(
-            of: [item("sftp://host/a/same.txt"), item("sftp://host/b/same.txt")], options: options,
-            fileSystems: fileSystems)
+            of: [item("sftp://host/a/same.txt"), item("sftp://host/b/same.txt")],
+            options: options,
+            fileSystems: fileSystems
+        )
         #expect(two.count == 1 && two[0].count == 2)
     }
 
@@ -308,7 +320,8 @@ import Testing
         settings.depth = Int.max
         #expect(
             settings.query(relativeTo: memory.url("/"), fileSystems: fileSystems, includeHidden: false).maxDepth
-                == Int.max)
+                == Int.max
+        )
         #expect(SizeRule(.greater, .infinity, .gigabytes).bytes == Int64.max && SizeRule(.less, .nan).bytes == 0)
     }
 

@@ -255,11 +255,11 @@ private final class DeepFileSystem: FileSystemProvider, @unchecked Sendable {
         listed += 1
         lock.unlock()
         let level = directory.pathComponents.count - 1
-        var items = [FileItem(url: directory.appendingPathComponent("f"), name: "f", isDirectory: false, size: 3)]
+        var items = [FileItem(url: directory.appendingPathComponent("f"), name: "f", stat: .init(size: 3))]
         if isEndless {
-            items.append(FileItem(url: directory, name: "d", isDirectory: true))
+            items.append(FileItem(url: directory, name: "d", kind: .directory))
         } else if level < depth {
-            items.append(FileItem(url: directory.appendingPathComponent("d"), name: "d", isDirectory: true))
+            items.append(FileItem(url: directory.appendingPathComponent("d"), name: "d", kind: .directory))
         }
         return items
     }

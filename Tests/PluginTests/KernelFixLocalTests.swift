@@ -91,7 +91,7 @@ import Testing
             #expect(local.item(at: box.url(name))?.isSpecial == listed[name]?.isSpecial, "\(name)")
         }
         // Other file systems know no such things, and say so by default.
-        #expect(!FileItem(url: box.url("x"), name: "x", isDirectory: false).isSpecial)
+        #expect(!FileItem(url: box.url("x"), name: "x").isSpecial)
     }
 
     @Test func aLargeFolderIsListedLikeASmallOne() throws {
@@ -256,12 +256,7 @@ extension Int {
         let root = URL(fileURLWithPath: "/", isDirectory: true)
         let long = (0..<(ViewOptionsPlugin.backgroundSortThreshold + 500))
             .map {
-                FileItem(
-                    url: memory.url("/A/f\($0).txt"),
-                    name: "f\($0).txt",
-                    isDirectory: false,
-                    size: Int64($0 % 977)
-                )
+                FileItem(url: memory.url("/A/f\($0).txt"), name: "f\($0).txt", stat: .init(size: Int64($0 % 977)))
             }
         model.show(Listing(directory: memory.url("/A"), items: long, parent: root, root: root))
         bench.commands.perform("cm_SrcByName")

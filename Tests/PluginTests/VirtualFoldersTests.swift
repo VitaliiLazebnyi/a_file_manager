@@ -394,14 +394,14 @@ private final class WatchableFileSystem: FileSystemProvider, @unchecked Sendable
 
     func list(_ directory: URL, showHidden _: Bool) throws -> [FileItem] {
         switch directory.path {
-        case "/top": return [FileItem(url: url("/top/sub"), name: "sub", isDirectory: true)]
-        case "/top/sub": return [FileItem(url: url("/top/sub/f.txt"), name: "f.txt", isDirectory: false)]
+        case "/top": return [FileItem(url: url("/top/sub"), name: "sub", kind: .directory)]
+        case "/top/sub": return [FileItem(url: url("/top/sub/f.txt"), name: "f.txt")]
         default: throw FileSystemError.notSupported("Listing")
         }
     }
 
     func item(at url: URL) -> FileItem? {
-        FileItem(url: url, name: url.lastPathComponent, isDirectory: url.pathExtension.isEmpty)
+        FileItem(url: url, name: url.lastPathComponent, kind: .init(isDirectory: url.pathExtension.isEmpty))
     }
     func parent(of directory: URL) -> URL? { directory.path == "/" ? nil : directory.deletingLastPathComponent() }
     func read(_: URL) throws -> any FileReader { throw FileSystemError.notSupported("Reading") }

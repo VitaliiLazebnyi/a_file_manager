@@ -261,14 +261,18 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
         return FileItem(
             url: url,
             name: entry.name,
-            isDirectory: isDirectory,
-            isSymlink: isSymlink,
-            isPackage: isDirectory && !isSymlink && isPackage(url),
-            isHidden: entry.isHidden,
-            size: isRegular ? entry.size : 0,
-            modified: entry.modified,
-            permissions: UInt16(entry.mode & 0o7777),
-            isSpecial: isSpecial,
+            kind: .init(
+                isDirectory: isDirectory,
+                isSymlink: isSymlink,
+                isPackage: isDirectory && !isSymlink && isPackage(url),
+                isHidden: entry.isHidden,
+                isSpecial: isSpecial
+            ),
+            stat: .init(
+                size: isRegular ? entry.size : 0,
+                modified: entry.modified,
+                permissions: UInt16(entry.mode & 0o7777)
+            ),
             linkTargetSize: targetSize
         )
     }
@@ -351,14 +355,18 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
         return FileItem(
             url: url,
             name: name,
-            isDirectory: isDirectory,
-            isSymlink: isSymlink,
-            isPackage: isPackage,
-            isHidden: name.hasPrefix(".") || (st.st_flags & UInt32(UF_HIDDEN)) != 0,
-            size: type == S_IFREG ? Int64(st.st_size) : 0,
-            modified: modified,
-            permissions: UInt16(st.st_mode & 0o7777),
-            isSpecial: isSpecial,
+            kind: .init(
+                isDirectory: isDirectory,
+                isSymlink: isSymlink,
+                isPackage: isPackage,
+                isHidden: name.hasPrefix(".") || (st.st_flags & UInt32(UF_HIDDEN)) != 0,
+                isSpecial: isSpecial
+            ),
+            stat: .init(
+                size: type == S_IFREG ? Int64(st.st_size) : 0,
+                modified: modified,
+                permissions: UInt16(st.st_mode & 0o7777)
+            ),
             linkTargetSize: targetSize
         )
     }
@@ -1524,14 +1532,7 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
                         isRemovable: values?.volumeIsRemovable,
                         isEjectable: values?.volumeIsEjectable
                     ),
-                    canBeEjected: Place.isEjectable(
-                        path: volume.path,
-                        isRootFileSystem: values?.volumeIsRootFileSystem,
-                        isInternal: values?.volumeIsInternal,
-                        isLocal: values?.volumeIsLocal,
-                        isRemovable: values?.volumeIsRemovable,
-                        isEjectable: values?.volumeIsEjectable
-                    )
+                    canBeEjected: Place.VolumeTraits(path: volume.path, values: values).mayBeEjected
                 )
                 slot.lock.lock()
                 slot.place = place

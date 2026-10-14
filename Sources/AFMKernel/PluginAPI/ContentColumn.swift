@@ -4,6 +4,9 @@ import Foundation
 /// kernel knows nothing of (a comment, an owner, a checksum). This is what content plugins are
 /// in the specification (15 › Content plugins, 03 › Custom columns).
 public struct ContentColumn: Sendable {
+    /// The text of a row for a caller that can give up (`cancellableValue`).
+    public typealias CancellableValue = @Sendable (FileItem, CancellationFlag) -> String
+
     /// Unique among all columns, e.g. `comment`.
     public let id: String
     public let title: String
@@ -17,10 +20,13 @@ public struct ContentColumn: Sendable {
     /// wanted (the panel has left the folder), and a column that reads the file ends its
     /// reading then and returns whatever it has. Every column has it; one that was made
     /// without a flag answers as `value` does.
-    public let cancellableValue: @Sendable (FileItem, CancellationFlag) -> String
+    public let cancellableValue: CancellableValue
 
     public init(
-        id: String, title: String, width: Int = 120, alignsRight: Bool = false,
+        id: String,
+        title: String,
+        width: Int = 120,
+        alignsRight: Bool = false,
         value: @escaping @Sendable (FileItem) -> String
     ) {
         self.id = id
@@ -33,8 +39,11 @@ public struct ContentColumn: Sendable {
 
     /// A column whose text can take long to find out (it reads the file, or asks a server).
     public init(
-        id: String, title: String, width: Int = 120, alignsRight: Bool = false,
-        cancellableValue: @escaping @Sendable (FileItem, CancellationFlag) -> String
+        id: String,
+        title: String,
+        width: Int = 120,
+        alignsRight: Bool = false,
+        cancellableValue: @escaping CancellableValue
     ) {
         self.id = id
         self.title = title
@@ -43,28 +52,4 @@ public struct ContentColumn: Sendable {
         self.cancellableValue = cancellableValue
         value = { cancellableValue($0, CancellationFlag()) }
     }
-}
-
-/// The columns plugins offer. Filled while the plugins start and only read afterwards, so it
-/// may be read from any thread. Which of them a panel shows is the panel's state
-/// (`PanelHandle.extraColumns`).
-///
-/// Unchecked: `columns` is guarded by `lock`, so a late registration cannot race a reader.
-public final class ColumnRegistry: @unchecked Sendable {
-    private let lock = NSLock()
-    private var columns: [ContentColumn] = []
-
-    public init() {}
-
-    public func register(_ column: ContentColumn) {
-        lock.lock()
-        defer { lock.unlock() }
-        precondition(!columns.contains { $0.id == column.id }, "The column \(column.id) is registered twice")
-        columns.append(column)
-    }
-
-    /// Every column, in registration order.
-    public var all: [ContentColumn] { lock.withLock { columns } }
-
-    public subscript(id: String) -> ContentColumn? { lock.withLock { columns.first { $0.id == id } } }
 }

@@ -35,7 +35,10 @@ import VirtualFoldersPlugin
             plugins: [
                 virtual, FileOperationsPlugin(), ClipboardPlugin(pasteboard: scratch.pasteboard), SelectionPlugin()
             ],
-            fileSystems: [LocalFileSystem()], left: box.url("d"), right: box.url("t"))
+            fileSystems: [LocalFileSystem()],
+            left: box.url("d"),
+            right: box.url("t")
+        )
     }
 
     private func branch(of path: String) throws -> URL {
@@ -47,7 +50,10 @@ import VirtualFoldersPlugin
         let transfers = try #require(bench.kernel.services.find((any FileTransferService).self))
         var ended = false
         transfers.transfer(
-            .move, [box.url("d/a.txt"), box.url("d/b.txt")], into: try branch(of: "d"), renamingSelfCopies: false
+            .move,
+            [box.url("d/a.txt"), box.url("d/b.txt")],
+            into: try branch(of: "d"),
+            renamingSelfCopies: false
         ) { _ in ended = true }
         #expect(ended && box.read("d/a.txt") == "precious" && box.read("d/b.txt") == "second")
         #expect(namesOnDisk(box.url("d")) == ["a.txt", "b.txt", "sub"])
@@ -63,13 +69,18 @@ import VirtualFoldersPlugin
         let transfers = try #require(bench.kernel.services.find((any FileTransferService).self))
         transfers.transfer(.copy, [box.url("d/a.txt")], into: try branch(of: "d"), renamingSelfCopies: true) { _ in }
         #expect(
-            namesOnDisk(box.url("d")) == ["a (2).txt", "a.txt", "b.txt", "sub"] && box.read("d/a.txt") == "precious")
+            namesOnDisk(box.url("d")) == ["a (2).txt", "a.txt", "b.txt", "sub"] && box.read("d/a.txt") == "precious"
+        )
     }
 
     @Test func nothingCanBePastedIntoAListOfFiles() throws {
         let transfers = try #require(bench.kernel.services.find((any FileTransferService).self))
-        let list = try #require(virtual.fileSystem).register(
-            files: [box.url("d/a.txt")], title: "Found", origin: box.url("d"))
+        let list = try #require(virtual.fileSystem)
+            .register(
+                files: [box.url("d/a.txt")],
+                title: "Found",
+                origin: box.url("d")
+            )
         transfers.transfer(.copy, [box.url("d/b.txt")], into: list, renamingSelfCopies: false) { _ in }
         #expect(ui.log.contains { $0.hasPrefix("inform") && $0.contains("list of files") })
         #expect(namesOnDisk(box.root) == ["d", "t"] && namesOnDisk(box.url("t")).isEmpty)
@@ -88,15 +99,21 @@ import VirtualFoldersPlugin
 
     @Test func aListOfFilesIsNotOfferedAsATarget() throws {
         bench.right.show(
-            try #require(virtual.fileSystem).register(
-                files: [box.url("d/a.txt")], title: "Found", origin: box.url("d")))
+            try #require(virtual.fileSystem)
+                .register(
+                    files: [box.url("d/a.txt")],
+                    title: "Found",
+                    origin: box.url("d")
+                )
+        )
         bench.left.moveCursor(toName: "b.txt")
         ui.promptAnswers = [.accept]
         commands.perform(.copy)
         // The proposal is the name alone, never "Found (list 7)/b.txt", which would read as a folder to make.
         #expect(
             ui.log.contains("prompt: Copy \"b.txt\" to [b.txt]")
-                && ui.log.contains("inform: You cannot copy a file to itself!"))
+                && ui.log.contains("inform: You cannot copy a file to itself!")
+        )
         #expect(namesOnDisk(box.root) == ["d", "t"] && namesOnDisk(box.url("d")) == ["a.txt", "b.txt", "sub"])
     }
 
@@ -149,7 +166,8 @@ import VirtualFoldersPlugin
         #expect(ui.log.contains { $0.hasPrefix("choose: Copy \(count) files") })
         #expect(
             pasteboard.pasteboardItems?.count == 1
-                && pasteboard.canReadObject(forClasses: [NSURL.self], options: nil) == false)
+                && pasteboard.canReadObject(forClasses: [NSURL.self], options: nil) == false
+        )
         #expect(pasteboard.string(forType: .string)?.split(separator: "\n").count == count)
         // Paste here takes the files from memory.
         #expect(commands.isEnabled(.pasteFromClipboard))
@@ -203,7 +221,7 @@ import VirtualFoldersPlugin
     @Test func namesThatCouldMisleadAreWrittenOutInQuestions() {
         #expect(DisplayName.escaped("plain name.txt") == "plain name.txt")
         #expect(DisplayName.escaped("a\nb\u{202E}txt.exe\u{200B}") == "a<U+000A>b<U+202E>txt.exe<U+200B>")
-        let item = FileItem(url: box.url("d/x\ny"), name: "x\ny", isDirectory: false)
+        let item = FileItem(url: box.url("d/x\ny"), name: "x\ny")
         #expect(OperationText.deleteQuestion([item], toTrash: false).contains("x<U+000A>y"))
         #expect(OperationText.heading("Copy", [item]) == "Copy \"x<U+000A>y\" to")
         #expect(PropertyText.shown("a\u{202E}b") == "a<U+202E>b")
@@ -218,28 +236,33 @@ import VirtualFoldersPlugin
         #expect(
             try NameTemplate.names(from: "<[N1,-9223372036854775808]", context: context) == [
                 "[N1,-9223372036854775808]"
-            ])
+            ]
+        )
         // A number of nineteen digits is no position; the bracket stays as typed.
         #expect(
             try NameTemplate.names(from: "<x[N9223372036854775807--9223372036854775807]", context: context)
-                == ["x[N9223372036854775807--9223372036854775807]"])
+                == ["x[N9223372036854775807--9223372036854775807]"]
+        )
         #expect(
             try NameTemplate.names(from: "<x[N1,9223372036854775807]", context: context) == [
                 "x[N1,9223372036854775807]"
-            ])
+            ]
+        )
         // Large numbers that are positions are cut to the length of the name.
         #expect(try NameTemplate.names(from: "<x[N999999999999999999--999999999999999999]", context: context) == ["x"])
         #expect(try NameTemplate.names(from: "<x[N1,999999999999999999]", context: context) == ["xreport"])
         #expect(try NameTemplate.names(from: "<x[N-999999999999999999-]", context: context) == ["xreport"])
         #expect(
-            try NameTemplate.names(from: "<x[N99999999999999999999]", context: context) == ["x[N99999999999999999999]"])
+            try NameTemplate.names(from: "<x[N99999999999999999999]", context: context) == ["x[N99999999999999999999]"]
+        )
         #expect(try NameTemplate.names(from: "<x[C:-9223372036854775808]", context: context) == ["x"])
         #expect(try NameTemplate.names(from: "<1-2>x[C:-9223372036854775808]", context: context) == ["x1", "x2"])
         // The ranges that are meant still work.
         #expect(
             try NameTemplate.names(from: "<[N2-4]|[N2,3]|[N-3-]|[N05-9]", context: context) == [
                 "epo", "epo", "ort", "000rt"
-            ])
+            ]
+        )
         for name in [
             "nametemplate-slice-overflow.bin", "nametemplate-slice-length-overflow.bin", "nametemplate-empty-name.bin"
         ] {
@@ -307,8 +330,11 @@ import VirtualFoldersPlugin
     // F060, F055
     @Test func aNameWithALineBreakIsOneLineInTheLog() {
         let forged = OperationRecord(
-            .copy, source: "/a/x\n2026-01-01 00:00:00: Delete: /etc/passwd", target: "/b/y\r",
-            status: .failed("no\nway"))
+            .copy,
+            source: "/a/x\n2026-01-01 00:00:00: Delete: /etc/passwd",
+            target: "/b/y\r",
+            status: .failed("no\nway")
+        )
         let line = OperationLog.line(for: forged, at: "T")
         #expect(
             line
@@ -317,7 +343,8 @@ import VirtualFoldersPlugin
         #expect(line.filter { $0 == "\n" }.count == 1)
         #expect(
             OperationLog.line(for: OperationRecord(.delete, source: "/plain/ü name.txt"), at: "T")
-                == "T: Delete: /plain/ü name.txt\n")
+                == "T: Delete: /plain/ü name.txt\n"
+        )
     }
 
     // F061
@@ -456,10 +483,12 @@ final class GatedFileSystem: FileSystemProvider, @unchecked Sendable {
     @Test func aNameTheFileCannotHoldIsRefusedInsteadOfBeingReadBackAsAnother() throws {
         #expect(
             DescriptIon.canName("plain.txt") && DescriptIon.canName("with space.txt")
-                && DescriptIon.canName("quote\"inside"))
+                && DescriptIon.canName("quote\"inside")
+        )
         #expect(
             !DescriptIon.canName("line\nbreak") && !DescriptIon.canName("a \"b\" c") && !DescriptIon.canName("\"start")
-                && !DescriptIon.canName(""))
+                && !DescriptIon.canName("")
+        )
         let memory = MemoryFileSystem()
         let fileSystems = FileSystemRegistry()
         fileSystems.register(memory)
@@ -567,7 +596,7 @@ final class GatedFileSystem: FileSystemProvider, @unchecked Sendable {
         }
         let parsed = try #require(AttributeChange.parse(parameters: "+mu+x,go-w +f"))
         var draft = AttributeDraft(items: [
-            FileItem(url: URL(fileURLWithPath: "/tmp/x"), name: "x", isDirectory: false, permissions: 0o644)
+            FileItem(url: URL(fileURLWithPath: "/tmp/x"), name: "x", stat: .init(permissions: 0o644))
         ])
         draft.take(parsed.change)
         #expect(draft.permissions == "u+x,go-w" && draft.untouchedPermissions == nil)
@@ -577,7 +606,7 @@ final class GatedFileSystem: FileSystemProvider, @unchecked Sendable {
     // F028: Recurse with the mode left as shown.
     @Test func recurseWithUntouchedPermissionsIsAskedAboutNotDroppedSilently() throws {
         var draft = AttributeDraft(items: [
-            FileItem(url: URL(fileURLWithPath: "/tmp/d"), name: "d", isDirectory: true, permissions: 0o750)
+            FileItem(url: URL(fileURLWithPath: "/tmp/d"), name: "d", kind: .directory, stat: .init(permissions: 0o750))
         ])
         draft.recurse = true
         let untouched = try draft.change(isLocal: true).get()
@@ -611,7 +640,8 @@ final class GatedFileSystem: FileSystemProvider, @unchecked Sendable {
         outcome = AttributeJob(change: change, fileSystems: fileSystems).run([try #require(local.item(at: lockedFile))])
         #expect(
             outcome.failed == 1 && LocalInfo.details(lockedFile)?.isLocked == true
-                && LocalInfo.details(lockedFile)?.mode == 0o444)
+                && LocalInfo.details(lockedFile)?.mode == 0o444
+        )
         // With "Locked: clear" the same change goes through.
         change.locked = false
         outcome = AttributeJob(change: change, fileSystems: fileSystems).run([try #require(local.item(at: lockedFile))])

@@ -35,7 +35,8 @@ import Testing
         let marked = target.quarantineMarks
         #expect(
             marked["/out/program.001"] == mark && marked["/out/program.002"] == mark
-                && marked["/out/program.003"] == mark)
+                && marked["/out/program.003"] == mark
+        )
         // Put together from parts that lie on the server, the whole carries it too.
         for name in ["program.001", "program.002", "program.003", "program.crc"] {
             _ = server.addFile("/parts/" + name, target.contents("/out/" + name) ?? "")
@@ -55,7 +56,10 @@ import Testing
         _ = server.addFile("/in/tool.b64", target.contents("/out/tool.b64") ?? "")
         target.addDirectory("/decoded")
         let decoded = try Decoder.decode(
-            try item(server.url("/in/tool.b64")), into: target.url("/decoded"), run: run())
+            try item(server.url("/in/tool.b64")),
+            into: target.url("/decoded"),
+            run: run()
+        )
         #expect(decoded.count == 1 && target.contents("/decoded/tool.sh") == "#!/bin/sh\necho harmless\n")
         #expect(target.quarantineMarks["/decoded/tool.sh"] == mark)
     }
@@ -73,8 +77,7 @@ import Testing
         #expect(parts.count == 2 && target.contents("/out/small.001") == "small")
         // A file a server says is nearly the largest number of bytes there is.
         let real = try item(source)
-        let huge = FileItem(
-            url: real.url, name: real.name, isDirectory: false, size: .max - 1, modified: real.modified)
+        let huge = FileItem(url: real.url, name: real.name, stat: .init(size: .max - 1, modified: real.modified))
         #expect(throws: ToolError.self) {
             try Splitter.split(huge, into: target.url("/out"), partSize: 1 << 20, run: run())
         }

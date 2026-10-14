@@ -239,7 +239,7 @@ import Testing
             log.append("archive \(file.name)")
             return true
         }
-        func file(_ name: String) -> FileItem { FileItem(url: memory.url("/" + name), name: name, isDirectory: false) }
+        func file(_ name: String) -> FileItem { FileItem(url: memory.url("/" + name), name: name) }
         #expect(bench.kernel.openers.open(file("a.zip"), in: bench.left))
         #expect(bench.kernel.openers.open(file("a.txt"), in: bench.left))
         #expect(log == ["archive a.zip", "general a.txt"])

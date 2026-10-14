@@ -26,7 +26,8 @@ import Testing
         Thread {
             work()
             done.signal()
-        }.start()
+        }
+        .start()
         return done.wait(timeout: .now() + seconds) == .success
     }
 
@@ -55,14 +56,16 @@ import Testing
         // Written by the other thread before the wait ends, read here after it.
         nonisolated(unsafe) var found: [String] = []
         let ended = finishes {
-            FileSearch(SearchQuery(directory: box.root, text: "needle"), fileSystems: fileSystems).run {
-                found.append($0.name)
-            }
+            FileSearch(SearchQuery(directory: box.root, text: "needle"), fileSystems: fileSystems)
+                .run {
+                    found.append($0.name)
+                }
         }
         #expect(ended && found == ["real.txt"])
         #expect(
             FileIdentity.canBeRead(box.url("real.txt")) && !FileIdentity.canBeRead(box.url("pipe.txt"))
-                && !FileIdentity.canBeRead(URL(fileURLWithPath: "/dev/zero")))
+                && !FileIdentity.canBeRead(URL(fileURLWithPath: "/dev/zero"))
+        )
     }
 
     @Test func duplicatesIgnorePipesHardLinksAndRepeatedRoots() throws {
@@ -134,8 +137,11 @@ import Testing
         #expect(
             finishes {
                 search.run(
-                    onDirectory: { folders.append($0.lastPathComponent) }, onMatch: { found.append($0.url.path) })
-            })
+                    onDirectory: { folders.append($0.lastPathComponent) },
+                    onMatch: { found.append($0.url.path) }
+                )
+            }
+        )
         #expect(found == expected)
         #expect(folders.count == 41 && folders.first == box.root.lastPathComponent)
     }
@@ -176,7 +182,9 @@ import Testing
                     q.criteria.size = SizeRule(.equal, .nan, .gigabytes)
                     return q
                 }()
-            ).contains("kMDItemFSSize"))
+            )
+            .contains("kMDItemFSSize")
+        )
     }
 
     @Test func preparedCriteriaAgreeWithTheDirectOnes() {
@@ -185,11 +193,15 @@ import Testing
         criteria.notOlderThan = Age(3, .days)
         criteria.size = SizeRule(.greater, 10)
         let fresh = FileItem(
-            url: URL(fileURLWithPath: "/a"), name: "a", isDirectory: false, size: 20,
-            modified: now.addingTimeInterval(-3_600))
+            url: URL(fileURLWithPath: "/a"),
+            name: "a",
+            stat: .init(size: 20, modified: now.addingTimeInterval(-3_600))
+        )
         let old = FileItem(
-            url: URL(fileURLWithPath: "/b"), name: "b", isDirectory: false, size: 20,
-            modified: now.addingTimeInterval(-86_400 * 30))
+            url: URL(fileURLWithPath: "/b"),
+            name: "b",
+            stat: .init(size: 20, modified: now.addingTimeInterval(-86_400 * 30))
+        )
         let prepared = criteria.prepared(now: now)
         #expect(prepared?.matches(fresh) == true && prepared?.matches(old) == false)
         #expect(criteria.matches(fresh, now: now) && !criteria.matches(old, now: now))
@@ -198,16 +210,19 @@ import Testing
 
     @Test func regexTextSearchReadsLinesInBlocks() {
         let pattern = try? TextPattern(
-            "^beta$", caseSensitive: true,
+            "^beta$",
+            caseSensitive: true,
             options: {
                 var o = TextSearchOptions()
                 o.regex = true
                 return o
-            }())
+            }()
+        )
         var lines = (0..<20_000).map { "line \($0)" }
         lines.insert("beta", at: 15_000)
         #expect(pattern?.isFound(in: Data(lines.joined(separator: "\n").utf8), blockSize: 4_096) == true)
         #expect(
-            pattern?.isFound(in: Data(lines.dropFirst(15_001).joined(separator: "\n").utf8), blockSize: 4_096) == false)
+            pattern?.isFound(in: Data(lines.dropFirst(15_001).joined(separator: "\n").utf8), blockSize: 4_096) == false
+        )
     }
 }

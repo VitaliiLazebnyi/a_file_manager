@@ -7,7 +7,7 @@ import Testing
 private let folder = URL(fileURLWithPath: "/review2/requests")
 
 private func file(_ name: String, size: Int64 = 1, in directory: URL = folder) -> FileItem {
-    FileItem(url: directory.appendingPathComponent(name), name: name, isDirectory: false, size: size)
+    FileItem(url: directory.appendingPathComponent(name), name: name, stat: .init(size: size))
 }
 
 @MainActor private func panel(_ items: [FileItem]) -> PanelModel {
@@ -268,7 +268,7 @@ private final class PlainPlugin: Plugin {
         #expect(item.linkTargetSize == nil)
         item.linkTargetSize = 0
         #expect(item.linkTargetSize == 0 && item != file("link"))
-        let made = FileItem(url: folder, name: "x", isDirectory: false, linkTargetSize: 77)
+        let made = FileItem(url: folder, name: "x", linkTargetSize: 77)
         #expect(made.linkTargetSize == 77)
         // The same file under two names.
         let sandbox = try Sandbox()

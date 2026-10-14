@@ -25,7 +25,8 @@ final class AdoptOutcome: @unchecked Sendable {
             finished = true
             lock.unlock()
             done.signal()
-        }.start()
+        }
+        .start()
     }
 
     /// True when the call ended within `seconds`. The default is long on purpose: these tests
@@ -50,7 +51,8 @@ func adoptCancel(_ flag: CancellationFlag, after delay: TimeInterval = 0.3) {
     Thread {
         Thread.sleep(forTimeInterval: delay)
         flag.cancel()
-    }.start()
+    }
+    .start()
 }
 
 /// Cancelling, appending, per-location capabilities and links, against the FTP test server.
@@ -267,7 +269,9 @@ func adoptCancel(_ flag: CancellationFlag, after delay: TimeInterval = 0.3) {
         try fixture.box.folder("srv/d")
         for index in 0..<40 {
             try FileManager.default.createSymbolicLink(
-                at: fixture.box.url("srv/link\(index)"), withDestinationURL: fixture.box.url("srv/d"))
+                at: fixture.box.url("srv/link\(index)"),
+                withDestinationURL: fixture.box.url("srv/d")
+            )
         }
         let first = try fixture.fileSystem.list(fixture.url("/"), showHidden: false).filter(\.isSymlink)
         #expect(first.count == 40)
@@ -288,7 +292,9 @@ func adoptCancel(_ flag: CancellationFlag, after delay: TimeInterval = 0.3) {
         try fixture.box.folder("srv/d")
         for index in 0..<40 {
             try FileManager.default.createSymbolicLink(
-                at: fixture.box.url("srv/link\(index)"), withDestinationURL: fixture.box.url("srv/d"))
+                at: fixture.box.url("srv/link\(index)"),
+                withDestinationURL: fixture.box.url("srv/d")
+            )
         }
         // The listing is remembered by the file system, with some links not resolved yet.
         let stored = Date()
@@ -315,7 +321,9 @@ func adoptCancel(_ flag: CancellationFlag, after delay: TimeInterval = 0.3) {
         #expect(FTPConnection.requiresSessionReuse(reply(522, "Data connection must use cached TLS session")))
         #expect(
             FTPConnection.requiresSessionReuse(
-                reply(425, "Unable to build data connection: TLS session of data connection not resumed.")))
+                reply(425, "Unable to build data connection: TLS session of data connection not resumed.")
+            )
+        )
         #expect(FTPConnection.requiresSessionReuse(reply(421, "TLS session reuse required")))
         #expect(!FTPConnection.requiresSessionReuse(reply(425, "Can't open data connection")))
         #expect(!FTPConnection.requiresSessionReuse(reply(550, "No such file")))
@@ -348,7 +356,7 @@ func adoptCancel(_ flag: CancellationFlag, after delay: TimeInterval = 0.3) {
         // A question that is never answered ends with the flag as well.
         let second = CancellationFlag()
         // Written by the other thread before the wait ends, read here after it.
-        nonisolated(unsafe) var found: FileItem? = FileItem(url: suite.url("/x"), name: "x", isDirectory: false)
+        nonisolated(unsafe) var found: FileItem? = FileItem(url: suite.url("/x"), name: "x")
         let asking = AdoptOutcome { found = suite.fileSystem.item(at: suite.url("/hang"), cancellation: second) }
         Thread.sleep(forTimeInterval: 0.3)
         adoptCancel(second, after: 0)
@@ -424,8 +432,11 @@ func adoptCancel(_ flag: CancellationFlag, after delay: TimeInterval = 0.3) {
         let box = try Sandbox()
         let server = try FakeSFTPServer(root: box.url("."), box: box, mode: .stalled)
         let channel = SFTPChannel(
-            executable: server.transport.executable, arguments: server.transport.arguments, environment: [:],
-            writeTimeout: 600)
+            executable: server.transport.executable,
+            arguments: server.transport.arguments,
+            environment: [:],
+            writeTimeout: 600
+        )
         try channel.start(timeout: 10, cancellation: nil) { true }
         defer { channel.close() }
         let flag = CancellationFlag()
@@ -457,8 +468,10 @@ func adoptCancel(_ flag: CancellationFlag, after delay: TimeInterval = 0.3) {
         let center = ConnectionCenter(environment: environment)
         center.makeSession = { profile, environment in
             SFTPSession(
-                profile: profile, environment: environment,
-                transport: SFTPTransport(executable: systemSFTPServer, arguments: ["-e"]))
+                profile: profile,
+                environment: environment,
+                transport: SFTPTransport(executable: systemSFTPServer, arguments: ["-e"])
+            )
         }
         fileSystem = RemoteFileSystem(scheme: "sftp", center: center)
     }

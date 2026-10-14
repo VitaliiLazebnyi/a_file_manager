@@ -188,8 +188,8 @@ final class P2Bench: ShellServices {
         fileSystems.register(memory)
         let bridge = JobBridge(monitor: P2DeferredJobs.Monitor(), ui: ui, fileSystems: fileSystems)
         let job = FileJob(kind: .copy, sources: [], fileSystems: fileSystems)
-        let old = FileItem(url: memory.url("/B/one.txt"), name: "one.txt", isDirectory: false, size: 1)
-        let new = FileItem(url: memory.url("/A/one.txt"), name: "one.txt", isDirectory: false, size: 2)
+        let old = FileItem(url: memory.url("/B/one.txt"), name: "one.txt", stat: .init(size: 1))
+        let new = FileItem(url: memory.url("/A/one.txt"), name: "one.txt", stat: .init(size: 2))
         // Each is answered with Return.
         #expect(bridge.job(job, conflictAt: old, source: new) == .skip)
         #expect(ui.questions.last?.message == "Overwrite:" && ui.questions.last?.defaultButton == 2)

@@ -17,9 +17,8 @@ private func entry(_ name: String, folder: Bool = false, size: Int64 = 0, time: 
     FileItem(
         url: URL(fileURLWithPath: "/tmp/\(name)"),
         name: name,
-        isDirectory: folder,
-        size: size,
-        modified: Date(timeIntervalSince1970: time)
+        kind: .init(isDirectory: folder),
+        stat: .init(size: size, modified: Date(timeIntervalSince1970: time))
     )
 }
 
@@ -584,7 +583,12 @@ private final class HugeSizes: FileSystemProvider {
     func list(_ directory: URL, showHidden: Bool) throws -> [FileItem] {
         try inner.list(directory, showHidden: showHidden)
             .map {
-                FileItem(url: $0.url, name: $0.name, isDirectory: $0.isDirectory, size: $0.isDirectory ? 0 : .max - 5)
+                FileItem(
+                    url: $0.url,
+                    name: $0.name,
+                    kind: .init(isDirectory: $0.isDirectory),
+                    stat: .init(size: $0.isDirectory ? 0 : .max - 5)
+                )
             }
     }
     func item(at url: URL) -> FileItem? { inner.item(at: url) }

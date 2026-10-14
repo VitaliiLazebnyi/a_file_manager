@@ -427,8 +427,8 @@ private func onThread(_ work: @escaping @Sendable () -> Void) {
                 FileItem(
                     url: directory.appending(name: "n\(index)"),
                     name: index % 7 == 0 ? "dir\(index)" : "file\(index).txt",
-                    isDirectory: index % 7 == 0,
-                    size: Int64(index)
+                    kind: .init(isDirectory: index % 7 == 0),
+                    stat: .init(size: Int64(index))
                 )
             }
     }

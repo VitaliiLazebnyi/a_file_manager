@@ -16,7 +16,8 @@ import Testing
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: box.url("bin/mail").path)
         #expect(
             TypedCommand.isOnPath("mail", path: box.url("bin").path)
-                && !TypedCommand.isOnPath("mail", path: box.url("Apps").path))
+                && !TypedCommand.isOnPath("mail", path: box.url("Apps").path)
+        )
         #expect(TypedCommand.isOnPath("sh", path: "/bin:/usr/bin"))
         // A name that no program has still opens the application.
         let app = try #require(TypedCommand("afmnotaprogram"))
@@ -25,7 +26,8 @@ import Testing
         if TypedCommand.isOnPath("mail") {
             #expect(
                 try #require(TypedCommand("mail")).application(relativeTo: box.root, searching: [box.url("Apps")])
-                    == nil)
+                    == nil
+            )
         }
         // A path ending in .app is an application whatever the PATH holds.
         #expect(try #require(TypedCommand(box.url("Apps/mail.app").path)).application(relativeTo: box.root) != nil)
@@ -34,8 +36,10 @@ import Testing
     @Test func cancellingEndsAChildThatIgnoresTerminate() {
         let flag = CancellationFlag()
         let runner = ProcessRunner(
-            executable: URL(fileURLWithPath: "/bin/sh"), arguments: ["-c", "trap '' TERM; sleep 30 & wait"],
-            directory: nil)
+            executable: URL(fileURLWithPath: "/bin/sh"),
+            arguments: ["-c", "trap '' TERM; sleep 30 & wait"],
+            directory: nil
+        )
         Thread.detachNewThread {
             Thread.sleep(forTimeInterval: 0.3)
             flag.cancel()
@@ -161,7 +165,7 @@ private final class WatchedSystem: FileSystemProvider, @unchecked Sendable {
     @MainActor func fire() { onChange?([]) }
 
     func list(_: URL, showHidden _: Bool) -> [FileItem] { [] }
-    func item(at url: URL) -> FileItem? { FileItem(url: url, name: url.lastPathComponent, isDirectory: false) }
+    func item(at url: URL) -> FileItem? { FileItem(url: url, name: url.lastPathComponent) }
     func parent(of directory: URL) -> URL? { directory.path == "/" ? nil : directory.deletingLastPathComponent() }
     func read(_: URL) throws -> any FileReader { throw FileSystemError.notSupported("Reading") }
     func createDirectory(at _: URL) throws { throw FileSystemError.notSupported("Writing") }

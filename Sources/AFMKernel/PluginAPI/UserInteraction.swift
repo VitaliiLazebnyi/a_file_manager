@@ -1,9 +1,5 @@
 import Foundation
 
-public enum QuestionStyle: Sendable {
-    case information, warning, critical
-}
-
 /// Every question the program asks goes through here, so plugins do not depend on windows
 /// and can be driven by a script in tests.
 @MainActor
@@ -29,7 +25,11 @@ public protocol UserInteraction: AnyObject, Sendable {
 
 extension UserInteraction {
     public func choose(
-        _ message: String, detail: String, buttons: [String], style: QuestionStyle, defaultButton _: Int?
+        _ message: String,
+        detail: String,
+        buttons: [String],
+        style: QuestionStyle,
+        defaultButton _: Int?
     )
         -> Int
     {
@@ -50,7 +50,11 @@ extension UserInteraction {
     {
         guard
             let answer = form(
-                title, detail: detail, fields: [.list("row", "", rows, selected: selected)], buttons: [button])
+                title,
+                detail: detail,
+                fields: [.list("row", "", rows, selected: selected)],
+                buttons: [button]
+            )
         else { return nil }
         let row = answer.index("row")
         return rows.indices.contains(row) ? row : nil
@@ -70,7 +74,10 @@ extension UserInteraction {
 
     /// A question whose buttons stand for values; `fallback` when the dialog is dismissed.
     public func pick<Choice>(
-        _ message: String, detail: String, _ choices: [(String, Choice)], fallback: Choice,
+        _ message: String,
+        detail: String,
+        _ choices: [(String, Choice)],
+        fallback: Choice,
         style: QuestionStyle = .warning
     ) -> Choice {
         let index = choose(message, detail: detail, buttons: choices.map(\.0), style: style)

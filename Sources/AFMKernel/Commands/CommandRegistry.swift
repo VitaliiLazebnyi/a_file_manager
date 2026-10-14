@@ -1,37 +1,5 @@
 import Foundation
 
-/// The standard editing action a command shares its key with. The shell sends such a command
-/// along the system's editing path, so text fields keep Cmd+C, Cmd+V, Cmd+X and Cmd+A.
-public enum EditingRole: Sendable {
-    case cut, copy, paste, selectAll
-}
-
-/// What the user sees of a command.
-public struct Command: Sendable {
-    public let id: CommandID
-    public let title: String
-    /// The keys the command has until the user chooses others (see `KeyBindings`).
-    public let defaultShortcuts: [Shortcut]
-    public let editingRole: EditingRole?
-    /// The caption on the function-key bar, shown when the command is bound to a plain F-key.
-    public let barLabel: String?
-    /// Whether the command may run while a file job is in progress. Only commands that change
-    /// neither files nor panels should say yes.
-    public let runsDuringJobs: Bool
-
-    public init(
-        _ id: CommandID, _ title: String, _ defaultShortcuts: [Shortcut] = [], editingRole: EditingRole? = nil,
-        barLabel: String? = nil, runsDuringJobs: Bool = false
-    ) {
-        self.id = id
-        self.title = title
-        self.defaultShortcuts = defaultShortcuts
-        self.editingRole = editingRole
-        self.barLabel = barLabel
-        self.runsDuringJobs = runsDuringJobs
-    }
-}
-
 /// The one place every command is registered and passes through, whatever triggered it: menu,
 /// key, button, context menu or another plugin (spec 20 › Command dispatch contract).
 /// Used on the main thread only.
@@ -59,7 +27,9 @@ public final class CommandRegistry {
 
     /// Registers a command whose handler looks at its argument.
     public func register(
-        _ command: Command, enabled: @escaping () -> Bool = { true }, checked: @escaping () -> Bool = { false },
+        _ command: Command,
+        enabled: @escaping () -> Bool = { true },
+        checked: @escaping () -> Bool = { false },
         parameterized run: @escaping (CommandArgument) -> Void
     ) {
         precondition(entries[command.id] == nil, "Command \(command.id) is registered twice")
@@ -69,7 +39,9 @@ public final class CommandRegistry {
     }
 
     public func register(
-        _ command: Command, enabled: @escaping () -> Bool = { true }, checked: @escaping () -> Bool = { false },
+        _ command: Command,
+        enabled: @escaping () -> Bool = { true },
+        checked: @escaping () -> Bool = { false },
         _ run: @escaping () -> Void
     ) {
         register(command, enabled: enabled, checked: checked, parameterized: { _ in run() })

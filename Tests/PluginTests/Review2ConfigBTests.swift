@@ -41,7 +41,7 @@ private final class Review2WatchFileSystem: FileSystemProvider, @unchecked Senda
     }
 
     func list(_: URL, showHidden _: Bool) -> [FileItem] { [] }
-    func item(at url: URL) -> FileItem? { FileItem(url: url, name: url.lastPathComponent, isDirectory: false) }
+    func item(at url: URL) -> FileItem? { FileItem(url: url, name: url.lastPathComponent) }
     func parent(of directory: URL) -> URL? { directory.path == "/" ? nil : directory.deletingLastPathComponent() }
     func read(_: URL) throws -> any FileReader { throw FileSystemError.notSupported("Reading") }
     func createDirectory(at _: URL) throws { throw FileSystemError.notSupported("Writing") }
@@ -86,10 +86,11 @@ private final class Review2WatchFileSystem: FileSystemProvider, @unchecked Senda
         #expect(watcher != nil)
         // From a background thread, as a file system's own queue would.
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-            DispatchQueue.global().async {
-                provider.fire()
-                continuation.resume()
-            }
+            DispatchQueue.global()
+                .async {
+                    provider.fire()
+                    continuation.resume()
+                }
         }
         await drainMainQueue()
         #expect(threads.value == [true])
@@ -148,10 +149,10 @@ private final class Review2WatchFileSystem: FileSystemProvider, @unchecked Senda
 
     @Test func namesInASelectedBranchNeverClash() {
         let items = [
-            FileItem(url: URL(fileURLWithPath: "/a/x.txt"), name: "x.txt", isDirectory: false),
-            FileItem(url: URL(fileURLWithPath: "/b/x.txt"), name: "x.txt", isDirectory: false),
-            FileItem(url: URL(fileURLWithPath: "/c/y"), name: "y", isDirectory: false),
-            FileItem(url: URL(fileURLWithPath: "/d/y"), name: "y", isDirectory: false)
+            FileItem(url: URL(fileURLWithPath: "/a/x.txt"), name: "x.txt"),
+            FileItem(url: URL(fileURLWithPath: "/b/x.txt"), name: "x.txt"),
+            FileItem(url: URL(fileURLWithPath: "/c/y"), name: "y"),
+            FileItem(url: URL(fileURLWithPath: "/d/y"), name: "y")
         ]
         // Two paths that read alike are told apart as well.
         let names = VirtualFileSystem.uniqueNames(of: items) { _ in "same" }
@@ -221,10 +222,13 @@ private final class Review2WatchFileSystem: FileSystemProvider, @unchecked Senda
         let hex = hostText.split(separator: ".").dropFirst().filter { $0.hasPrefix("h") }.map { $0.dropFirst() }
             .joined()
         let decoded = String(
-            bytes: stride(from: 0, to: hex.count, by: 2).compactMap { index -> UInt8? in
-                let start = hex.index(hex.startIndex, offsetBy: index)
-                return UInt8(hex[start..<hex.index(start, offsetBy: 2)], radix: 16)
-            }, encoding: .utf8)
+            bytes: stride(from: 0, to: hex.count, by: 2)
+                .compactMap { index -> UInt8? in
+                    let start = hex.index(hex.startIndex, offsetBy: index)
+                    return UInt8(hex[start..<hex.index(start, offsetBy: 2)], radix: 16)
+                },
+            encoding: .utf8
+        )
         #expect(decoded?.contains("s3cret") == false)
         #expect(VirtualLocation(url)?.realDirectory?.user == "someone")
     }
@@ -257,7 +261,8 @@ private final class Review2WatchFileSystem: FileSystemProvider, @unchecked Senda
         #expect(
             FileListFile.lines(in: Data(old.utf8)) == [
                 "/a/b.txt", "C:\\dir\\file.txt", "/spaced/path", "\"half", "\\n/not/an/escape", "\"/with\\q\""
-            ])
+            ]
+        )
     }
 
     @Test func aHugeListFileIsRefused() throws {
@@ -331,9 +336,10 @@ private final class Review2WatchFileSystem: FileSystemProvider, @unchecked Senda
         for round in 0..<20 { cache.store((0...round).map { "f\($0)" }, for: root) }
         cache.flush()
         #expect(TreeCache(directory: box.url("cache")).paths(for: root)?.count == 20)
-        let leftovers = try FileManager.default.contentsOfDirectory(atPath: box.url("cache").path).filter {
-            $0.contains(".tmp")
-        }
+        let leftovers = try FileManager.default.contentsOfDirectory(atPath: box.url("cache").path)
+            .filter {
+                $0.contains(".tmp")
+            }
         #expect(leftovers.isEmpty)
     }
 
@@ -350,7 +356,9 @@ private final class Review2WatchFileSystem: FileSystemProvider, @unchecked Senda
         let root = URL(fileURLWithPath: "/Volumes/R2")
         let file = try #require(cache.fileURL(for: root))
         try FileManager.default.createDirectory(
-            at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+            at: file.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
         let line = "[" + String(repeating: "x", count: 1_022) + "]\n"
         var text = "root=" + root.absoluteString + "\n"
         text += String(repeating: line, count: TreeCache.fileLimit / line.utf8.count + 10)
@@ -438,18 +446,25 @@ private final class Review2WatchFileSystem: FileSystemProvider, @unchecked Senda
         let tab = PanelTabs.State.Tab(location: awkward, title: "t\n1_path=/etc")
         let file = TabFile(
             active: PanelTabs.State(
-                tabs: [tab, PanelTabs.State.Tab(location: memory.url("/second"), title: " padded ")], active: 0))
+                tabs: [tab, PanelTabs.State.Tab(location: memory.url("/second"), title: " padded ")],
+                active: 0
+            )
+        )
         let text = file.text(displayPath: memory.displayPath)
         // No line of the file starts a tab of its own that was not written as one.
         #expect(
-            text.split(whereSeparator: \.isNewline).filter {
-                $0.hasPrefix("1_path=sftp") || $0.hasPrefix("1_path=/etc")
-            }.isEmpty)
+            text.split(whereSeparator: \.isNewline)
+                .filter {
+                    $0.hasPrefix("1_path=sftp") || $0.hasPrefix("1_path=/etc")
+                }
+                .isEmpty
+        )
         let back = try #require(read(text))
         #expect(back == file)
         #expect(
             back.active.tabs.count == 2 && back.active.tabs[0].title == "t\n1_path=/etc"
-                && back.active.tabs[1].title == " padded ")
+                && back.active.tabs[1].title == " padded "
+        )
     }
 
     @Test func aByteOrderMarkAndUTF16FilesAreRead() throws {
@@ -484,12 +499,16 @@ private final class Review2WatchFileSystem: FileSystemProvider, @unchecked Senda
         bench = TestBench(
             plugins: [FolderTabsPlugin()],
             fileSystems: [memory, Review2WatchFileSystem(scheme: "sftp"), Review2WatchFileSystem(scheme: "ftp")],
-            left: memory.url("/A"), right: memory.url("/B"))
+            left: memory.url("/A"),
+            right: memory.url("/B")
+        )
     }
 
     @Test func loadingAFileNeverMakesAServerTabTheShownOne() {
         memory.addFile(
-            "/B/tabs.tab", "[activetabs]\n0_path=mem:/A\n1_path=sftp://evil.example/x\n2_path=mem:/B\nactivetab=1\n")
+            "/B/tabs.tab",
+            "[activetabs]\n0_path=mem:/A\n1_path=sftp://evil.example/x\n2_path=mem:/B\nactivetab=1\n"
+        )
         bench.commands.perform("OPENTABS", .location(memory.url("/B/tabs.tab")))
         let tabs = bench.left.tabs
         #expect(tabs.count == 3)
@@ -499,7 +518,9 @@ private final class Review2WatchFileSystem: FileSystemProvider, @unchecked Senda
 
     @Test func aFileWhoseTabsAllConnectLeavesTheShownTabAlone() {
         memory.addFile(
-            "/B/tabs.tab", "[activetabs]\n0_path=sftp://evil.example/x\n1_path=ftp://other.example/y\nactivetab=0\n")
+            "/B/tabs.tab",
+            "[activetabs]\n0_path=sftp://evil.example/x\n1_path=ftp://other.example/y\nactivetab=0\n"
+        )
         bench.commands.perform("OPENTABS", .location(memory.url("/B/tabs.tab")))
         let tabs = bench.left.tabs
         #expect(tabs.active.directory == memory.url("/A") && tabs.count == 3)
@@ -535,7 +556,9 @@ private final class Review2WatchFileSystem: FileSystemProvider, @unchecked Senda
         bench = TestBench(
             plugins: [NavigationPlugin(pasteboard: scratch.pasteboard, home: memory.url("/home"))],
             fileSystems: [memory],
-            left: memory.url("/A"), right: memory.url("/B"))
+            left: memory.url("/A"),
+            right: memory.url("/B")
+        )
     }
 
     @Test func goingToANeighbourVolumeAsksTheDisksInAJob() {

@@ -23,7 +23,8 @@ let descriptAll = true
 
 /// One well-formed line: a name without separators, a space, a comment.
 let descriptLine = FuzzTarget(
-    "descript-line", maxLen: 256,
+    "descript-line",
+    maxLen: 256,
     dict: ["\u{301}", "\u{600}", "\u{200D}", "\u{FE0F}", "é", ".txt", "\u{20D2}", "\u{1F1E6}"],
     seeds: { seedTexts(["\u{8}file.txt\u{0}a comment", "\u{3}a.b\u{0}x"]) },
     run: { bytes in
@@ -42,11 +43,14 @@ let descriptLine = FuzzTarget(
             file.entries.count == 1 && Array(file.entries[0].name.utf8) == Array(name.utf8)
                 && Array(file.entries[0].comment.utf8) == Array(comment.utf8),
             quoted ? "descript-quoted-line-misread" : "descript-line-misread",
-            "line \(line.debugDescription) wanted \(want) got \(file.entries)")
-    })
+            "line \(line.debugDescription) wanted \(want) got \(file.entries)"
+        )
+    }
+)
 
 let descript = FuzzTarget(
-    "descript", maxLen: 8_192,
+    "descript",
+    maxLen: 8_192,
     dict: ["\"", "\r\n", "\n", " ", "\u{04}\u{C2}", "\\n", "descript.ion"],
     rawDict: [
         [0xFF, 0xFE], [0xFE, 0xFF], [0xEF, 0xBB, 0xBF], [0x04, 0xC2], [0x00, 0xD8], [0xD8, 0x00], [0x81], [0x00]
@@ -85,8 +89,10 @@ let descript = FuzzTarget(
             || file.entries.contains { glued($0.name + " " + $0.comment + "\r\n") || glued("\"" + $0.name + "\" ") }
         if strict != nil, !known || descriptAll {
             fzCheck(
-                again.entries == file.entries, "descript-rewrite-changes-entries",
-                "before \(file.entries.prefix(5)) after \(again.entries.prefix(5)) bytes \(bytes.prefix(80))")
+                again.entries == file.entries,
+                "descript-rewrite-changes-entries",
+                "before \(file.entries.prefix(5)) after \(again.entries.prefix(5)) bytes \(bytes.prefix(80))"
+            )
         }
         // A change of one comment, as the Comment dialog makes it.
         var c = Choices(bytes)
@@ -97,15 +103,18 @@ let descript = FuzzTarget(
         file.setComment("", for: file.entries.first?.name ?? "x")
         _ = file.data()
         _ = DescriptIon.normalized(comment)
-    })
+    }
+)
 
 // The store on top of a file system, as the Comment column and the Comment dialog use it.
 let descriptStoreFS = MemoryFileSystem()
 let descriptStore: FuzzTarget = {
     let registry = FileSystemRegistry()
     return FuzzTarget(
-        "descript-store", maxLen: 4_096,
-        dict: ["\"", "\r\n", " ", "\u{04}\u{C2}", "\\n"], rawDict: [[0xFF, 0xFE], [0xFE, 0xFF], [0xEF, 0xBB, 0xBF]],
+        "descript-store",
+        maxLen: 4_096,
+        dict: ["\"", "\r\n", " ", "\u{04}\u{C2}", "\\n"],
+        rawDict: [[0xFF, 0xFE], [0xFE, 0xFF], [0xEF, 0xBB, 0xBF]],
         seeds: { seedTexts(["a.txt hello\r\n\"b c.txt\" world\r\n"]) },
         setUp: { registry.register(descriptStoreFS) },
         run: { bytes in
@@ -118,7 +127,7 @@ let descriptStore: FuzzTarget = {
             } catch { return }
             let store = CommentStore(fileSystems: registry)
             let comments = store.comments(in: dir)
-            _ = store.comment(for: FileItem(url: dir.appending(name: "a.txt"), name: "a.txt", isDirectory: false))
+            _ = store.comment(for: FileItem(url: dir.appending(name: "a.txt"), name: "a.txt"))
             do {
                 try store.setComment("fresh\ncomment", for: "new.txt", in: dir, hidden: false)
                 let after = store.comments(in: dir)
@@ -128,7 +137,10 @@ let descriptStore: FuzzTarget = {
                     return
                 }
                 fzCheck(
-                    after["new.txt"] == "fresh\ncomment", "descript-store-set-lost", "\(after["new.txt"] ?? "nil")")
+                    after["new.txt"] == "fresh\ncomment",
+                    "descript-store-set-lost",
+                    "\(after["new.txt"] ?? "nil")"
+                )
                 let marks = ["\u{FEFF}", "ÿþ", "þÿ", "ï»¿"]
                 let delimiters: Set<Unicode.Scalar> = [" ", "\"", "\r", "\n", "\\"]
                 func glued(_ s: String) -> Bool {
@@ -143,19 +155,22 @@ let descriptStore: FuzzTarget = {
                 // marked one once it is written: the format has no way to say so. Left out, as in `descript-line`.
                 for (name, comment) in comments where name != "new.txt" && !comment.hasSuffix("\u{04}\u{C2}") {
                     fzCheck(
-                        after[name] == comment, "descript-store-other-comment-changed",
+                        after[name] == comment,
+                        "descript-store-other-comment-changed",
                         "name \(name.debugDescription) before \(comment.debugDescription) after \((after[name] ?? "nil").debugDescription)"
                     )
                 }
             } catch {}
-        })
+        }
+    )
 }()
 
 // MARK: - tab files
 
 let tabRegistry = FileSystemRegistry()
 let tabFile = FuzzTarget(
-    "tabfile", maxLen: 4_096,
+    "tabfile",
+    maxLen: 4_096,
     dict: [
         "[activetabs]", "[inactivetabs]", "_path=", "_caption=", "_options=", "activetab=", "|", "\n", "=", ";", "0",
         "1", "-1",
@@ -178,7 +193,8 @@ let tabFile = FuzzTarget(
         guard
             let contents = TabFile(
                 text: String(decoding: Data(bytes), as: UTF8.self),
-                location: { tabRegistry.location(from: $0, relativeTo: base) })
+                location: { tabRegistry.location(from: $0, relativeTo: base) }
+            )
         else { return }
         // What FolderTabsPlugin.replace / restore do with the result.
         func apply(_ state: PanelTabs.State, replacing: Bool) {
@@ -226,12 +242,14 @@ let tabFile = FuzzTarget(
         // Saved again and read again, the file names the same tabs.
         let written = contents.text(displayPath: { tabRegistry.displayPath($0) })
         _ = TabFile(text: written, location: { tabRegistry.location(from: $0, relativeTo: base) })
-    })
+    }
+)
 
 // MARK: - selection files
 
 let selectionFile = FuzzTarget(
-    "selection", maxLen: 4_096,
+    "selection",
+    maxLen: 4_096,
     dict: ["\r\n", "\n", "\\", "/", "a.txt", "sub\\", "e\u{301}", "é", "\u{2028}", "\u{85}", "C:\\dir\\a.txt"],
     rawDict: [[0xFF, 0xFE], [0xFE, 0xFF], [0xEF, 0xBB, 0xBF], [0x00, 0xD8, 0x00, 0xD8], [0x0D, 0x00, 0x0A, 0x00]],
     seeds: {
@@ -258,9 +276,10 @@ let selectionFile = FuzzTarget(
         for (i, line) in lines.prefix(40).enumerated() where i % 2 == 0 { known.append(line) }
         let base = URL(string: "mem:///d/")!
         var seen = Set<[UInt8]>()
-        let items = known.filter { seen.insert(Array($0.utf8)).inserted }.enumerated().map { i, n in
-            FileItem(url: base.appending(name: n.isEmpty ? "_" : n), name: n, isDirectory: i % 3 == 1)
-        }
+        let items = known.filter { seen.insert(Array($0.utf8)).inserted }.enumerated()
+            .map { i, n in
+                FileItem(url: base.appending(name: n.isEmpty ? "_" : n), name: n, kind: .init(isDirectory: i % 3 == 1))
+            }
         let model = PanelModel(directory: base)
         model.show(Listing(directory: base, items: items, parent: nil, root: base))
         let names = Set(model.items.map(\.name))
@@ -275,8 +294,10 @@ let selectionFile = FuzzTarget(
         fzCheck(model.selectionCount <= model.items.count, "selection-count-too-large")
         let marked = model.items.filter { model.isSelected($0) }
         fzCheck(
-            marked.count == model.selectionCount, "selection-count-differs",
-            "\(marked.count) vs \(model.selectionCount)")
+            marked.count == model.selectionCount,
+            "selection-count-differs",
+            "\(marked.count) vs \(model.selectionCount)"
+        )
         // Saved and loaded again, the same entries are marked.
         for encoding in [SelectionFile.Encoding.unicode, .ansi] {
             let saved = SelectionFile.encode(marked, as: encoding)
@@ -288,11 +309,14 @@ let selectionFile = FuzzTarget(
                 })
             {
                 fzCheck(
-                    Set(back).isSuperset(of: marked.map(\.name)), "selection-roundtrip-loses",
-                    "\(marked.map(\.name)) -> \(back)")
+                    Set(back).isSuperset(of: marked.map(\.name)),
+                    "selection-roundtrip-loses",
+                    "\(marked.map(\.name)) -> \(back)"
+                )
             }
         }
-    })
+    }
+)
 
 // MARK: - settings import
 
@@ -330,7 +354,11 @@ func useStoredSettings(_ settings: SettingsStore) {
         let shown = history.shown(thinning: true, limit: 30) + history.shown(thinning: false)
         let top = tracker.frequent.top(20)
         _ = HistoryMenu(
-            history: shown, frequent: top, current: history.current ?? base, displayPath: { $0.absoluteString })
+            history: shown,
+            frequent: top,
+            current: history.current ?? base,
+            displayPath: { $0.absoluteString }
+        )
         // The user goes to folders the history names, and elsewhere.
         for url in (shown.prefix(4) + top.prefix(4).map(\.directory) + [base]) { tracker.visited(url, on: side) }
         if let first = shown.first {
@@ -366,25 +394,33 @@ final class SettingsBench {
     init() {
         let lists = URL(fileURLWithPath: fzWorkDir + "/lists")
         plugin = ConfigurationPlugin(
-            launchesApplications: false, background: nil, listFolder: lists,
+            launchesApplications: false,
+            background: nil,
+            listFolder: lists,
             settingsKeys: {
                 [
                     "extra.key", "places.hotlist", "places.history.left", "places.history.right",
                     "places.history.frequent"
                 ]
-            })
+            }
+        )
         memory.addFile("/A/my file.txt")
         memory.addFile("/A/-rf")
         memory.addFile("/A/one.txt")
         _ = memory.addDirectory("/B")
         bench = TestBench(
-            plugins: [plugin], fileSystems: [memory], left: memory.url("/A"), right: memory.url("/B"),
-            settings: settings)
+            plugins: [plugin],
+            fileSystems: [memory],
+            left: memory.url("/A"),
+            right: memory.url("/B"),
+            settings: settings
+        )
     }
 }
 
 let settingsImport = FuzzTarget(
-    "settings", maxLen: 8_192,
+    "settings",
+    maxLen: 8_192,
     dict: [
         "\"format\"", "\"A File Manager settings\"", "\"settings\"", "\"$data\"", "\"configuration.userCommands\"",
         "\"configuration.startMenu\"",
@@ -429,7 +465,9 @@ let settingsImport = FuzzTarget(
         if ProcessInfo.processInfo.environment["FZ_VERBOSE"] != nil {
             do {
                 _ = try CheckedSettings(
-                    SettingsArchive(data: CheckedSettings.read(url)), schema: center.settingsSchema())
+                    SettingsArchive(data: CheckedSettings.read(url)),
+                    schema: center.settingsSchema()
+                )
             } catch { print("refused: \(error)") }
             // To see how far an input gets: what the program said, and what was stored.
             print(
@@ -462,12 +500,14 @@ let settingsImport = FuzzTarget(
         if let out = try? archive.encoded() {
             do { _ = try SettingsArchive(data: out) } catch { fzFail("settings-export-unreadable", "\(error)") }
         }
-    })
+    }
+)
 
 // MARK: - lenient decoders of stored values
 
 let lenient = FuzzTarget(
-    "lenient", maxLen: 8_192,
+    "lenient",
+    maxLen: 8_192,
     dict: [
         "\"name\"", "\"title\"", "\"action\"", "\"command\"", "\"parameters\"", "\"startPath\"", "\"symbol\"",
         "\"children\"", "\"kind\"", "\"item\"",
@@ -496,8 +536,10 @@ let lenient = FuzzTarget(
         if let text = try? JSONDecoder().decode(String.self, from: data) {
             if let shortcut = Shortcut(notation: text) {
                 fzCheck(
-                    Shortcut(notation: shortcut.notation) == shortcut, "shortcut-notation-roundtrip",
-                    "\(text.debugDescription) -> \(shortcut.notation.debugDescription)")
+                    Shortcut(notation: shortcut.notation) == shortcut,
+                    "shortcut-notation-roundtrip",
+                    "\(text.debugDescription) -> \(shortcut.notation.debugDescription)"
+                )
             }
             _ = UserCommand.name(from: text)
         }
@@ -517,7 +559,8 @@ let lenient = FuzzTarget(
         }
         _ = configuration.startMenu
         _ = configuration.symbols
-    })
+    }
+)
 
 // MARK: - parameter expansion
 
@@ -538,7 +581,9 @@ let expansionDict = [
 ]
 
 let pexpand = FuzzTarget(
-    "pexpand", maxLen: 2_048, dict: expansionDict,
+    "pexpand",
+    maxLen: 2_048,
+    dict: expansionDict,
     seeds: {
         seedTexts([
             "%P%N %T\n", "?\"%S\" '%N' %O.%E\n", "%N:~1,3 %N:~-0,2 %N:~-4 %S+1-2:~0,1\n",
@@ -552,7 +597,10 @@ let pexpand = FuzzTarget(
         let template = text(c.until(0x0A))
         let flags = c.byte()
         var left = PanelSnapshot(
-            path: "/Users/x y/Docs/", cursorName: "my file.tar.gz", selection: ["a.txt", "b c.txt", "-rf", "é.d"])
+            path: "/Users/x y/Docs/",
+            cursorName: "my file.tar.gz",
+            selection: ["a.txt", "b c.txt", "-rf", "é.d"]
+        )
         var right = PanelSnapshot(path: "/Volumes/Back up/", cursorName: "other.bin", selection: ["z"])
         if flags & 1 != 0 { left.cursorName = flags & 2 != 0 ? nil : nameFrom(&c) }
         if flags & 4 != 0 { left.selection = (0..<Int(c.byte() % 5)).map { _ in nameFrom(&c) } }
@@ -562,8 +610,14 @@ let pexpand = FuzzTarget(
         }
         let arguments = flags & 128 != 0 ? text(c.take(Int(c.byte() % 40))) : "one \"two three\" four"
         let context = ExpansionContext(
-            left: left, right: right, sourceIsRight: flags & 2 != 0, environment: ["HOME": "/Users/x y", "E": "a\"b"],
-            arguments: arguments, listFolder: URL(fileURLWithPath: "/tmp/lists"), listName: "fixed")
+            left: left,
+            right: right,
+            sourceIsRight: flags & 2 != 0,
+            environment: ["HOME": "/Users/x y", "E": "a\"b"],
+            arguments: arguments,
+            listFolder: URL(fileURLWithPath: "/tmp/lists"),
+            listName: "fixed"
+        )
         let result = ParameterExpander(context: context).expand(template)
         fzCheck(ParameterExpander(context: context).expand(template) == result, "pexpand-unstable")
         // The words around it: what the runner and the command language do with such text.
@@ -573,8 +627,10 @@ let pexpand = FuzzTarget(
         _ = ShellWords.quoted(template)
         _ = CommandLanguage.expandingEnvironment(template, context.environment)
         let steps = CommandLanguage.steps(
-            template, environment: context.environment,
-            resolve: { $0.lowercased().hasPrefix("cm_") ? CommandID(rawValue: $0) : nil })
+            template,
+            environment: context.environment,
+            resolve: { $0.lowercased().hasPrefix("cm_") ? CommandID(rawValue: $0) : nil }
+        )
         for step in steps {
             if case .perform(_, let parameter) = step {
                 _ = CommandLanguage.argument(from: parameter, location: { URL(fileURLWithPath: $0) })
@@ -595,7 +651,9 @@ let pexpand = FuzzTarget(
             for index in script.values.indices {
                 fzCheck(
                     line.range(of: Data(("${" + ShellLine.variable(index) + "}").utf8)) != nil,
-                    "pexpand-script-value-without-reference", script.line.debugDescription)
+                    "pexpand-script-value-without-reference",
+                    script.line.debugDescription
+                )
             }
             _ = script.text
             _ = script.arguments
@@ -606,7 +664,8 @@ let pexpand = FuzzTarget(
         _ = ParameterExpander.usesSelection(result.pieces)
         if let pieces = CommandRunner.applicationLine(for: result.pieces) { _ = ShellLine.script(pieces) }
         _ = CommandLanguage.environmentPieces(template, context.environment)
-    })
+    }
+)
 
 // MARK: - names and values against real shells
 //
@@ -697,7 +756,11 @@ func runThroughShell(_ shell: String, _ cases: [(pieces: [ExpandedPiece], extern
     let environment = ["PATH": "/usr/bin:/bin", "HOME": folder, "LC_ALL": "en_US.UTF-8"]
     guard
         case .success(let pid) = ChildProcess.spawn(
-            executable: shell, arguments: options + script.arguments, environment: environment, directory: folder)
+            executable: shell,
+            arguments: options + script.arguments,
+            environment: environment,
+            directory: folder
+        )
     else {
         fzFail("quote-shell-not-started", shell)
     }
@@ -707,8 +770,10 @@ func runThroughShell(_ shell: String, _ cases: [(pieces: [ExpandedPiece], extern
     let output = FileManager.default.contents(atPath: folder + "/.out").map { [UInt8]($0) } ?? []
     var arguments = output.split(separator: 0, omittingEmptySubsequences: false).map(Array.init)
     if arguments.last == [] { arguments.removeLast() }
-    var groups = arguments.split(separator: Array(quoteSeparator.utf8), omittingEmptySubsequences: false).map(
-        Array.init)
+    var groups = arguments.split(separator: Array(quoteSeparator.utf8), omittingEmptySubsequences: false)
+        .map(
+            Array.init
+        )
     if groups.last == [] { groups.removeLast() }
     let created = ((try? FileManager.default.contentsOfDirectory(atPath: folder)) ?? []).filter { $0 != ".out" }
         .sorted()
@@ -752,30 +817,37 @@ func checkQuoteCases(_ cases: [QuoteCase]) {
         fzCheck(
             script.line == tame.line && script.values.count == tame.values.count,
             "quote-line-depends-on-the-names " + one.template,
-            "\(one.detail)\nline: \(script.line.debugDescription)\nwith tame names: \(tame.line.debugDescription)")
+            "\(one.detail)\nline: \(script.line.debugDescription)\nwith tame names: \(tame.line.debugDescription)"
+        )
     }
     for shell in ["/bin/zsh", "/bin/sh"] {
         // The first case of every set goes to a program of its own.
-        let run = cases.enumerated().map {
-            (pieces: $0.element.pieces, external: $0.element.template == "%N" && $0.offset < 200)
-        }
+        let run = cases.enumerated()
+            .map {
+                (pieces: $0.element.pieces, external: $0.element.template == "%N" && $0.offset < 200)
+            }
         guard case .success(let outcome) = runThroughShell(shell, run) else {
             fzFail("quote-refused-in-script", shell)
         }
         // 1. Nothing of a name ran.
         fzCheck(
-            outcome.created.isEmpty, "quote-command-ran " + shell,
-            "created \(outcome.created)\n" + cases.prefix(40).map(\.detail).joined(separator: "\n"))
+            outcome.created.isEmpty,
+            "quote-command-ran " + shell,
+            "created \(outcome.created)\n" + cases.prefix(40).map(\.detail).joined(separator: "\n")
+        )
         fzCheck(
-            outcome.cases.count == cases.count, "quote-script-broken " + shell,
+            outcome.cases.count == cases.count,
+            "quote-script-broken " + shell,
             "\(outcome.cases.count) cases came back of \(cases.count)\n"
-                + cases.prefix(40).map(\.detail).joined(separator: "\n"))
+                + cases.prefix(40).map(\.detail).joined(separator: "\n")
+        )
         // 2. The arguments are the names, byte for byte.
         for (one, got) in zip(cases, outcome.cases) {
             let fits =
                 got.count == one.expected.count
-                && zip(one.expected, got).allSatisfy { accepted, bytes in accepted.contains { Array($0.utf8) == bytes }
-                }
+                && zip(one.expected, got)
+                    .allSatisfy { accepted, bytes in accepted.contains { Array($0.utf8) == bytes }
+                    }
             if !fits {
                 fzFail(
                     "quote-argument-differs \(one.template) \(shell)",
@@ -806,7 +878,11 @@ func quoteCases(name: String, dir: String, value: String, selection: [String]) -
             context: ExpansionContext(
                 left: PanelSnapshot(path: path, cursorName: name, selection: selection),
                 right: PanelSnapshot(path: "/other/", cursorName: "o", selection: []),
-                environment: ["V": value], listFolder: URL(fileURLWithPath: fzWorkDir + "/lists"), listName: "fixed"))
+                environment: ["V": value],
+                listFolder: URL(fileURLWithPath: fzWorkDir + "/lists"),
+                listName: "fixed"
+            )
+        )
     }
     let real = expander(name, path, value, selection)
     let tame = expander("n", "/tmp/d/", "v", selection.map { _ in "s" })
@@ -816,12 +892,19 @@ func quoteCases(name: String, dir: String, value: String, selection: [String]) -
     func add(_ template: String, _ expected: [[String]]) {
         let expanded = real.expand(template)
         fzCheck(
-            expanded.problem == nil && !expanded.missingName, "quote-expansion-problem " + template,
-            inputs + " problem \(expanded.problem ?? "missing name")")
+            expanded.problem == nil && !expanded.missingName,
+            "quote-expansion-problem " + template,
+            inputs + " problem \(expanded.problem ?? "missing name")"
+        )
         cases.append(
             QuoteCase(
-                template: template, pieces: quoteControl(expanded.pieces), tamePieces: tame.expand(template).pieces,
-                expected: expected, detail: "template \(template.debugDescription) " + inputs))
+                template: template,
+                pieces: quoteControl(expanded.pieces),
+                tamePieces: tame.expand(template).pieces,
+                expected: expected,
+                detail: "template \(template.debugDescription) " + inputs
+            )
+        )
     }
     add("%N", [[guarded(name)]])
     add("\"%N\"", [[guarded(name)]])
@@ -858,7 +941,9 @@ func quoteCases(name: String, dir: String, value: String, selection: [String]) -
                 pieces: CommandLanguage.environmentPieces(template, ["V": value]),
                 tamePieces: CommandLanguage.environmentPieces(template, ["V": "v"]),
                 expected: [[before + value] + (before.isEmpty ? [guarded(value)] : [])],
-                detail: "command field \(template.debugDescription) value=\(value.debugDescription)"))
+                detail: "command field \(template.debugDescription) value=\(value.debugDescription)"
+            )
+        )
     }
     // 4. Where no reference is safe, the line is refused whatever the name.
     for template in refusedTemplates {
@@ -872,7 +957,8 @@ func quoteCases(name: String, dir: String, value: String, selection: [String]) -
 var quoteCasesRun = 0
 
 let quote = FuzzTarget(
-    "quote", maxLen: 1_024,
+    "quote",
+    maxLen: 1_024,
     seeds: {
         [
             [1, 0, 1, 4, 1, 5, 1, 7, 1, 8, 2, 4, 41, 2, 26, 34],
@@ -895,17 +981,24 @@ let quote = FuzzTarget(
             let dir = hostileName(&c)
             let value = hostileName(&c)
             cases += quoteCases(
-                name: name, dir: dir, value: value, selection: [hostileName(&c), hostileName(&c), hostileName(&c)])
+                name: name,
+                dir: dir,
+                value: value,
+                selection: [hostileName(&c), hostileName(&c), hostileName(&c)]
+            )
         }
         checkQuoteCases(cases)
         quoteCasesRun += cases.count * 2
         fzNote("quote cases checked by this worker: \(quoteCasesRun)")
-    })
+    }
+)
 
 /// One name, given as the input's UTF-8 text, as the cursor name, a marked name, a folder and the
 /// value of a variable, through every template of `quote` in zsh and sh. Prints what arrived.
 let quoteDemo = FuzzTarget(
-    "quote-demo", maxLen: 256, seeds: { seedTexts(["my file.txt"]) },
+    "quote-demo",
+    maxLen: 256,
+    seeds: { seedTexts(["my file.txt"]) },
     run: { bytes in
         var name = text(bytes)
         name.unicodeScalars.removeAll { $0 == "/" || $0.value == 0 }
@@ -913,15 +1006,17 @@ let quoteDemo = FuzzTarget(
         let cases = quoteCases(name: name, dir: name, value: name, selection: [name, "b c", name])
         for shell in ["/bin/zsh", "/bin/sh"] {
             if case .success(let outcome) = runThroughShell(
-                shell, cases.prefix(3).map { (pieces: $0.pieces, external: true) })
-            {
+                shell,
+                cases.prefix(3).map { (pieces: $0.pieces, external: true) }
+            ) {
                 print(
                     "\(shell) %N, \"%N\", '%N' to /usr/bin/printf: \(outcome.cases.map(describeBytes)); files created: \(outcome.created)"
                 )
             }
         }
         checkQuoteCases(cases)
-    })
+    }
+)
 
 fuzzMain([
     quoteDemo, descript, descriptLine, descriptStore, tabFile, selectionFile, settingsImport, lenient, pexpand, quote

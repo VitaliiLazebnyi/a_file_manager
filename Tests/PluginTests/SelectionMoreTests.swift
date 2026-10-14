@@ -83,7 +83,7 @@ import Testing
         let base = URL(string: "mem:///work")!
         func item(_ path: String) -> FileItem {
             let url = URL(string: "mem:///work/" + path)!
-            return FileItem(url: url, name: path.replacingOccurrences(of: "/", with: "-"), isDirectory: false)
+            return FileItem(url: url, name: path.replacingOccurrences(of: "/", with: "-"))
         }
         let items = [item("a.txt"), item("sub/b.txt"), item("sub/deep/c.txt")]
         #expect(SelectionRule(mask: "/*.txt").names(among: items, base: base) == ["a.txt"])
@@ -100,10 +100,8 @@ import Testing
             FileItem(
                 url: URL(fileURLWithPath: "/x/" + name),
                 name: name,
-                isDirectory: folder,
-                isHidden: hidden,
-                size: size,
-                modified: now.addingTimeInterval(-daysOld * 86_400)
+                kind: .init(isDirectory: folder, isHidden: hidden),
+                stat: .init(size: size, modified: now.addingTimeInterval(-daysOld * 86_400))
             )
         }
         let items = [
@@ -157,9 +155,9 @@ import Testing
 
     @Test func selectionFiles() {
         let items = [
-            FileItem(url: URL(fileURLWithPath: "/x/dir1"), name: "dir1", isDirectory: true),
-            FileItem(url: URL(fileURLWithPath: "/x/ro.txt"), name: "ro.txt", isDirectory: false),
-            FileItem(url: URL(fileURLWithPath: "/x/sél.txt"), name: "sél.txt", isDirectory: false)
+            FileItem(url: URL(fileURLWithPath: "/x/dir1"), name: "dir1", kind: .directory),
+            FileItem(url: URL(fileURLWithPath: "/x/ro.txt"), name: "ro.txt"),
+            FileItem(url: URL(fileURLWithPath: "/x/sél.txt"), name: "sél.txt")
         ]
         let unicode = SelectionFile.encode(items, as: .unicode)
         #expect(Array(unicode.prefix(8)) == [0xFF, 0xFE, 0x64, 0, 0x69, 0, 0x72, 0])
@@ -183,13 +181,11 @@ import Testing
             FileItem(
                 url: URL(fileURLWithPath: "/x/" + name),
                 name: name,
-                isDirectory: false,
-                size: size,
-                modified: Date(timeIntervalSince1970: time)
+                stat: .init(size: size, modified: Date(timeIntervalSince1970: time))
             )
         }
         func folder(_ name: String) -> FileItem {
-            FileItem(url: URL(fileURLWithPath: "/x/" + name), name: name, isDirectory: true)
+            FileItem(url: URL(fileURLWithPath: "/x/" + name), name: name, kind: .directory)
         }
         let left = [
             file("same", 1, 100), file("newer", 1, 200.9), file("older", 1, 100), file("size", 1, 100),

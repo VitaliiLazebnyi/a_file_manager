@@ -229,7 +229,7 @@ import Testing
 
     @Test func aCalculatedFolderSizeReplacesDIR() {
         let list = NameList(displayPath: { $0.path })
-        var folder = FileItem(url: URL(fileURLWithPath: "/x/docs"), name: "docs", isDirectory: true)
+        var folder = FileItem(url: URL(fileURLWithPath: "/x/docs"), name: "docs", kind: .directory)
         #expect(list.details([folder], .fullPath, headers: false, mask: 3) == "/x/docs/\t<DIR>")
         folder.computedSize = 4_096
         #expect(list.details([folder], .name, headers: false, mask: 3) == "docs/\t4096")
@@ -237,9 +237,8 @@ import Testing
         let app = FileItem(
             url: URL(fileURLWithPath: "/x/A.app"),
             name: "A.app",
-            isDirectory: true,
-            isPackage: true,
-            size: 7
+            kind: [.directory, .package],
+            stat: .init(size: 7)
         )
         #expect(list.names([app], .name) == "A.app")
     }

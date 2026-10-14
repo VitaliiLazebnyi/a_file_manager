@@ -39,9 +39,11 @@ final class Review2HookProvider: FileSystemProvider, @unchecked Sendable {
 
     func item(at url: URL) -> FileItem? {
         FileItem(
-            url: url, name: url.lastPathComponent, isDirectory: false,
-            size: sizes[url.path] ?? Int64(contents[url.path]?.count ?? 0),
-            isSpecial: special.contains(url.path))
+            url: url,
+            name: url.lastPathComponent,
+            kind: .init(isSpecial: special.contains(url.path)),
+            stat: .init(size: sizes[url.path] ?? Int64(contents[url.path]?.count ?? 0))
+        )
     }
 
     /// Unchecked: used by one thread at a time, as the protocol allows.
@@ -74,7 +76,8 @@ final class Review2HookProvider: FileSystemProvider, @unchecked Sendable {
 
     func read(_ url: URL) -> any FileReader {
         Reader(
-            self, data: endless.contains(url.path) ? nil : contents[url.path] ?? Data(count: Int(sizes[url.path] ?? 0))
+            self,
+            data: endless.contains(url.path) ? nil : contents[url.path] ?? Data(count: Int(sizes[url.path] ?? 0))
         )
     }
 }
@@ -84,7 +87,9 @@ final class Review2HookProvider: FileSystemProvider, @unchecked Sendable {
 @Suite struct Review2ViewerSource {
     private func folder() throws -> URL {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent(
-            "afm-r2viewer-\(UUID().uuidString)", isDirectory: true)
+            "afm-r2viewer-\(UUID().uuidString)",
+            isDirectory: true
+        )
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         return url
     }
@@ -206,7 +211,8 @@ final class Review2HookProvider: FileSystemProvider, @unchecked Sendable {
         #expect(provider.closeCount == 2)
         // Letting go of the source closes what it holds, off the thread that lets go.
         var again: ProviderByteSource? = try #require(
-            try ProviderByteSource.open(URL(string: "hook:///a")!, fileSystems: registry) as? ProviderByteSource)
+            try ProviderByteSource.open(URL(string: "hook:///a")!, fileSystems: registry) as? ProviderByteSource
+        )
         _ = try again?.read(at: 0, count: 10)
         again = nil
         ViewerCleanup.drain()
@@ -256,10 +262,12 @@ final class Review2HookProvider: FileSystemProvider, @unchecked Sendable {
         try FileManager.default.linkItem(at: file, to: hard)
         #expect(
             ViewerSave.isSameFile(file, file) && ViewerSave.isSameFile(file, link) && ViewerSave.isSameFile(link, file)
-                && ViewerSave.isSameFile(file, hard))
+                && ViewerSave.isSameFile(file, hard)
+        )
         #expect(
             !ViewerSave.isSameFile(file, directory.appendingPathComponent("other.txt"))
-                && !ViewerSave.isSameFile(nil, file))
+                && !ViewerSave.isSameFile(nil, file)
+        )
         // A target that does not exist yet, spelled differently.
         #expect(ViewerSave.isSameFile(directory.appendingPathComponent("x/../a.txt"), file))
     }
@@ -312,7 +320,9 @@ final class Review2HookProvider: FileSystemProvider, @unchecked Sendable {
             let safe = TemporaryCopies.safeName(name)
             #expect(
                 !safe.isEmpty && safe != "." && safe != ".." && !safe.contains("/") && !safe.contains(":")
-                    && !safe.contains("\u{0}"), "\(name.debugDescription) -> \(safe.debugDescription)")
+                    && !safe.contains("\u{0}"),
+                "\(name.debugDescription) -> \(safe.debugDescription)"
+            )
             #expect(safe.utf8.count <= 255)
         }
         #expect(TemporaryCopies.safeName("../../x") == "_.._.._x")
@@ -346,7 +356,10 @@ final class Review2HookProvider: FileSystemProvider, @unchecked Sendable {
         let copies = TemporaryCopies()
         defer { copies.removeAll() }
         let result = copies.localCopy(
-            for: URL(string: "hook:///huge.mov")!, fileSystems: registry, cancellation: CancellationFlag())
+            for: URL(string: "hook:///huge.mov")!,
+            fileSystems: registry,
+            cancellation: CancellationFlag()
+        )
         if case .failure(let refusal) = result {
             #expect(refusal == .tooLarge(50 << 30) && refusal.message.contains("too large"))
         } else {
@@ -364,13 +377,15 @@ final class Review2HookProvider: FileSystemProvider, @unchecked Sendable {
         defer { copies.removeAll() }
         let owner = ObjectIdentifier(copies)
         let first = try #require(
-            copies.localURL(for: url, fileSystems: registry, owner: owner, cancellation: CancellationFlag()))
+            copies.localURL(for: url, fileSystems: registry, owner: owner, cancellation: CancellationFlag())
+        )
         copies.removeAll()
         copies.waitForCleanup()
         // The folder is gone with its entry: copying again makes a new one.
         #expect(!FileManager.default.fileExists(atPath: first.path))
         let second = try #require(
-            copies.localURL(for: url, fileSystems: registry, owner: owner, cancellation: CancellationFlag()))
+            copies.localURL(for: url, fileSystems: registry, owner: owner, cancellation: CancellationFlag())
+        )
         #expect(FileManager.default.fileExists(atPath: second.path))
     }
 
@@ -379,7 +394,8 @@ final class Review2HookProvider: FileSystemProvider, @unchecked Sendable {
     @Test func onlyWebAndMailLinksOpenInTheBrowser() {
         #expect(
             LinkPolicy.opensInBrowser(URL(string: "https://example.com/a")!)
-                && LinkPolicy.opensInBrowser(URL(string: "http://example.com")!))
+                && LinkPolicy.opensInBrowser(URL(string: "http://example.com")!)
+        )
         #expect(LinkPolicy.opensInBrowser(URL(string: "mailto:a@example.com")!))
         for text in [
             "file:///Applications/Calculator.app", "smb://evil/share", "sftp://evil/x", "ftp://evil/x",
@@ -409,7 +425,8 @@ final class Review2HookProvider: FileSystemProvider, @unchecked Sendable {
         #expect(remoteTarget("next.html") == "sftp://host/pub/doc/next.html")
         #expect(
             remoteTarget("sftp://other/pub/doc/next.html") == nil && remoteTarget("ftp://host/pub/doc/next.html") == nil
-                && remoteTarget("../up.html") == nil)
+                && remoteTarget("../up.html") == nil
+        )
     }
 
     @Test func aPageShownFromAStringNavigatesOnceAndThenNowhere() {
@@ -421,10 +438,14 @@ final class Review2HookProvider: FileSystemProvider, @unchecked Sendable {
         for text in ["https://evil.example/x", "http://127.0.0.1:18473/refresh", "file:///etc/passwd", "ftp://evil/x"] {
             #expect(
                 Page.decide(isMainFrame: true, isLinkClick: false, url: URL(string: text), expectsPage: false)
-                    == .cancel, "\(text)")
+                    == .cancel,
+                "\(text)"
+            )
             #expect(
                 Page.decide(isMainFrame: true, isLinkClick: false, url: URL(string: text), expectsPage: true)
-                    == .cancel, "\(text)")
+                    == .cancel,
+                "\(text)"
+            )
         }
         #expect(Page.decide(isMainFrame: true, isLinkClick: false, url: nil, expectsPage: true) == .allow)
         #expect(Page.decide(isMainFrame: true, isLinkClick: false, url: blank, expectsPage: false) == .cancel)
@@ -432,11 +453,17 @@ final class Review2HookProvider: FileSystemProvider, @unchecked Sendable {
         // A click is handed on, and a jump inside the page stays.
         #expect(
             Page.decide(
-                isMainFrame: true, isLinkClick: true, url: URL(string: "https://example.com"), expectsPage: false)
-                == .followLink)
+                isMainFrame: true,
+                isLinkClick: true,
+                url: URL(string: "https://example.com"),
+                expectsPage: false
+            )
+                == .followLink
+        )
         #expect(
             Page.decide(isMainFrame: true, isLinkClick: true, url: URL(string: "about:blank#part"), expectsPage: false)
-                == .allow)
+                == .allow
+        )
     }
 
     // MARK: Encodings
@@ -464,7 +491,11 @@ final class Review2HookProvider: FileSystemProvider, @unchecked Sendable {
         let all = FolderSummary.measure(memory.url("/tree"), provider: memory, cancellation: CancellationFlag())
         #expect(all.files == 100 && all.folders == 5 && !all.isPartial)
         let limited = FolderSummary.measure(
-            memory.url("/tree"), provider: memory, cancellation: CancellationFlag(), limit: 30)
+            memory.url("/tree"),
+            provider: memory,
+            cancellation: CancellationFlag(),
+            limit: 30
+        )
         #expect(limited.isPartial && limited.files < 100 && limited.text.hasPrefix("At least "))
     }
 }

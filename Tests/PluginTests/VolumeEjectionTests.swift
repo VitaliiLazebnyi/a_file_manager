@@ -76,11 +76,13 @@ private final class StandInDrive: VolumeAccess, @unchecked Sendable {
         #expect(bench.left.model.directory.isSameLocation(as: box.url("A")))
         #expect(
             background.directory.isSameLocation(as: home)
-                && bench.right.model.directory.isSameLocation(as: box.url("B")))
+                && bench.right.model.directory.isSameLocation(as: box.url("B"))
+        )
         #expect(released.count == 1 && released.first?.isSameLocation(as: stick) == true && drive.ejects == 1)
         #expect(
             bench.ui.log.last == "notice: “STICK” can now be removed safely."
-                && tools.log.last == "eject: \(stick.path)")
+                && tools.log.last == "eject: \(stick.path)"
+        )
     }
 
     @Test func theDriveOfAGivenLocationIsEjectedWhicheverPanelIsActive() {
@@ -102,7 +104,9 @@ private final class StandInDrive: VolumeAccess, @unchecked Sendable {
 
     @Test func whatThisProgramLetGoOfIsGivenAMoment() {
         let drive = StandInDrive(
-            stick, refusals: [EjectRefusal(program: "AFileManager", isThisProgram: true, reason: "busy")])
+            stick,
+            refusals: [EjectRefusal(program: "AFileManager", isThisProgram: true, reason: "busy")]
+        )
         let (bench, _) = bench(drive)
         bench.left.show(stick)
         bench.commands.perform(SystemToolsCommands.ejectVolume)
@@ -131,12 +135,17 @@ private final class StandInDrive: VolumeAccess, @unchecked Sendable {
 
     @Test func onlyDrivesThatLeaveTheMacCanBeEjected() {
         func ejectable(
-            _ path: String, root: Bool? = false, internal inside: Bool?, local: Bool? = true, removable: Bool? = false,
+            _ path: String,
+            root: Bool? = false,
+            internal inside: Bool?,
+            local: Bool? = true,
+            removable: Bool? = false,
             ejectable: Bool? = false
         ) -> Bool {
-            Place.isEjectable(
-                path: path, isRootFileSystem: root, isInternal: inside, isLocal: local, isRemovable: removable,
-                isEjectable: ejectable)
+            var traits = Place.VolumeTraits(path: path)
+            (traits.isRootFileSystem, traits.isInternal, traits.isLocal) = (root, inside, local)
+            (traits.isRemovable, traits.isEjectable) = (removable, ejectable)
+            return traits.mayBeEjected
         }
         // Never: the start-up disk, a system volume, a second disk or partition inside the Mac,
         // or a disk the system says nothing about.

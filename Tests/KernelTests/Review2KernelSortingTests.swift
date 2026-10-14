@@ -4,7 +4,12 @@ import Testing
 @testable import AFMKernel
 
 private func entry(_ name: String, folder: Bool = false, size: Int64 = 0) -> FileItem {
-    FileItem(url: URL(fileURLWithPath: "/tmp/\(name)"), name: name, isDirectory: folder, size: size)
+    FileItem(
+        url: URL(fileURLWithPath: "/tmp/\(name)"),
+        name: name,
+        kind: .init(isDirectory: folder),
+        stat: .init(size: size)
+    )
 }
 
 /// Review 2, K001/K002, K021-K024: the order of names is the order of their collation keys,
@@ -50,9 +55,10 @@ private func entry(_ name: String, folder: Bool = false, size: Int64 = 0) -> Fil
         var names = letters
         names += letters.flatMap { a in letters.map { a + $0 } }
         names += ["ий", "ийтф", "й", "ёе", "её", "еёе", "ийи", "йий"].flatMap { a in letters.prefix(3).map { a + $0 } }
-        names = Array(Set(names.map { Array($0.utf8) })).map { String(decoding: $0, as: UTF8.self) }.sorted {
-            Array($0.utf8).lexicographicallyPrecedes(Array($1.utf8))
-        }
+        names = Array(Set(names.map { Array($0.utf8) })).map { String(decoding: $0, as: UTF8.self) }
+            .sorted {
+                Array($0.utf8).lexicographicallyPrecedes(Array($1.utf8))
+            }
         #expect(isAnOrder(names, collator: .current))
         #expect(isAnOrder(names, collator: NameCollator(identifier: "ru")))
     }
@@ -72,9 +78,12 @@ private func entry(_ name: String, folder: Bool = false, size: Int64 = 0) -> Fil
             let items = (0..<40).flatMap { round in names.map { entry($0 + (round == 0 ? "" : "-\(round)")) } }
             let sorted = Sorter.sort(items, by: ListOrder(key: .name), collator: collator)
             #expect(
-                zip(sorted, sorted.dropFirst()).allSatisfy {
-                    Sorter.areInOrder($0, $1, by: ListOrder(key: .name), collator: collator)
-                }, "\(identifier)")
+                zip(sorted, sorted.dropFirst())
+                    .allSatisfy {
+                        Sorter.areInOrder($0, $1, by: ListOrder(key: .name), collator: collator)
+                    },
+                "\(identifier)"
+            )
         }
     }
 
@@ -98,30 +107,39 @@ private func entry(_ name: String, folder: Bool = false, size: Int64 = 0) -> Fil
             return Int((state >> 33) % UInt64(limit))
         }
         let letters = Array("ийеёИЕяаåøæÅñžłъ")
-        let items = (0..<24_000).map { index -> FileItem in
-            let name =
-                String((0..<(2 + next(5))).map { _ in letters[next(letters.count)] }) + (index % 4 == 0 ? ".txt" : "")
-            return entry(name + "\(index % 7)", folder: index % 13 == 0, size: Int64(next(5)))
-        }
+        let items = (0..<24_000)
+            .map { index -> FileItem in
+                let name =
+                    String((0..<(2 + next(5))).map { _ in letters[next(letters.count)] })
+                    + (index % 4 == 0 ? ".txt" : "")
+                return entry(name + "\(index % 7)", folder: index % 13 == 0, size: Int64(next(5)))
+            }
         for order in [
             ListOrder(key: .name, descending: true), ListOrder(key: .ext), ListOrder(key: .size, descending: true)
         ] {
             let sorted = Sorter.sort(items, by: order)
             #expect(sorted.count == items.count)
             #expect(
-                zip(sorted, sorted.dropFirst()).allSatisfy { !Sorter.areInOrder($1, $0, by: order) }, "by \(order)")
+                zip(sorted, sorted.dropFirst()).allSatisfy { !Sorter.areInOrder($1, $0, by: order) },
+                "by \(order)"
+            )
             // Turning the direction round is the same list as sorting the other way.
             let turned = ListOrder(key: order.key, descending: !order.descending)
             #expect(
                 Sorter.resort(sorted, from: order, to: turned).map(\.name)
-                    == Sorter.sort(sorted, by: turned).map(\.name), "\(order) turned")
+                    == Sorter.sort(sorted, by: turned).map(\.name),
+                "\(order) turned"
+            )
             // Merging two sorted halves is the sorted whole.
             let merged = Sorter.merge(
-                Sorter.sort(Array(items[..<10_000]), by: order), with: Sorter.sort(Array(items[10_000...]), by: order),
-                by: order)
+                Sorter.sort(Array(items[..<10_000]), by: order),
+                with: Sorter.sort(Array(items[10_000...]), by: order),
+                by: order
+            )
             #expect(
                 zip(merged, merged.dropFirst()).allSatisfy { !Sorter.areInOrder($1, $0, by: order) },
-                "merged by \(order)")
+                "merged by \(order)"
+            )
         }
     }
 

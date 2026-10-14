@@ -24,8 +24,12 @@ import Testing
         memory.addFile("/B/two.txt", "two", modified: early)
         memory.addFile("/B/sub/three.txt", "three", modified: early)
         bench = TestBench(
-            plugins: [plugin], fileSystems: [LocalFileSystem(), memory], left: memory.url("/A"),
-            right: memory.url("/B"), settings: settings)
+            plugins: [plugin],
+            fileSystems: [LocalFileSystem(), memory],
+            left: memory.url("/A"),
+            right: memory.url("/B"),
+            settings: settings
+        )
     }
 
     func opened(asymmetric: Bool = true, _ configure: (SyncSession) -> Void = { _ in }) -> SyncSession {
@@ -77,10 +81,11 @@ import Testing
     }
 
     @Test func namesThatDifferOnlyInCaseAreNotPairedWithAnotherName() {
-        let left = ["a.txt", "A.txt"].map {
-            FileItem(url: URL(fileURLWithPath: "/L/\($0)"), name: $0, isDirectory: false)
-        }
-        let right = ["a.txt"].map { FileItem(url: URL(fileURLWithPath: "/R/\($0)"), name: $0, isDirectory: false) }
+        let left = ["a.txt", "A.txt"]
+            .map {
+                FileItem(url: URL(fileURLWithPath: "/L/\($0)"), name: $0)
+            }
+        let right = ["a.txt"].map { FileItem(url: URL(fileURLWithPath: "/R/\($0)"), name: $0) }
         let pairs = SyncComparison.pair(left, right)
         #expect(pairs.count == 2)
         let single = pairs.first { $0.right == nil }
@@ -95,8 +100,11 @@ import Testing
         memory.addFile("/C/a.txt", "x", modified: early)
         memory.addFile("/C/A.txt", "y", modified: early)
         memory.addFile("/D/a.txt", "x", modified: early)
-        let result = SyncComparison(options: SyncOptions(), fileSystems: bench.kernel.fileSystems).run(
-            left: memory.url("/C"), right: memory.url("/D"))
+        let result = SyncComparison(options: SyncOptions(), fileSystems: bench.kernel.fileSystems)
+            .run(
+                left: memory.url("/C"),
+                right: memory.url("/D")
+            )
         let rows = result.rows.sorted { $0.name < $1.name }
         #expect(rows.map(\.name) == ["A.txt", "a.txt"])
         #expect(rows[0].state == .excluded && rows[0].action == .none)
@@ -108,11 +116,15 @@ import Testing
         _ = a
         memory.addFile("/U/a.txt", "x", modified: early.addingTimeInterval(2))
         // The memory file system is no APFS: the two-second tolerance applies.
-        let tolerant = SyncComparison(options: SyncOptions(), fileSystems: bench.kernel.fileSystems).run(
-            left: memory.url("/T"), right: memory.url("/U"))
+        let tolerant = SyncComparison(options: SyncOptions(), fileSystems: bench.kernel.fileSystems)
+            .run(
+                left: memory.url("/T"),
+                right: memory.url("/U")
+            )
         #expect(tolerant.toleranceSeconds == 3 && tolerant.rows.first?.state == .equal)
         #expect(
-            SyncComparison.needsTolerance(memory.url("/T"), memory.url("/U"), fileSystems: bench.kernel.fileSystems))
+            SyncComparison.needsTolerance(memory.url("/T"), memory.url("/U"), fileSystems: bench.kernel.fileSystems)
+        )
     }
 
     @Test func aLocalApfsPairKeepsNoTolerance() throws {
@@ -120,8 +132,11 @@ import Testing
         try box.file("L/a.txt", "x", modified: early)
         try box.file("R/a.txt", "x", modified: early.addingTimeInterval(2))
         let registry = bench.kernel.fileSystems
-        let result = SyncComparison(options: SyncOptions(), fileSystems: registry).run(
-            left: box.url("L"), right: box.url("R"))
+        let result = SyncComparison(options: SyncOptions(), fileSystems: registry)
+            .run(
+                left: box.url("L"),
+                right: box.url("R")
+            )
         // On a volume that keeps exact dates (APFS, HFS+) two seconds are a difference.
         if !SyncComparison.needsTolerance(box.url("L"), box.url("R"), fileSystems: registry) {
             #expect(result.toleranceSeconds == 0 && result.rows.first?.state == .rightNewer)
@@ -135,9 +150,12 @@ import Testing
         options.timeOffsetHours = 2
         memory.addFile("/V/a.txt", "new", modified: early.addingTimeInterval(10_000))
         memory.addFile("/W/b.txt", "right", modified: early.addingTimeInterval(20_000))
-        let rows = SyncComparison(options: options, fileSystems: bench.kernel.fileSystems).run(
-            left: memory.url("/V"), right: memory.url("/W")
-        ).rows
+        let rows = SyncComparison(options: options, fileSystems: bench.kernel.fileSystems)
+            .run(
+                left: memory.url("/V"),
+                right: memory.url("/W")
+            )
+            .rows
         let plan = SyncPlan(rows: rows, timeOffsetHours: 2)
         #expect(plan.toRight[0].targetModified == plan.toRight[0].modified.addingTimeInterval(-7_200))
         #expect(plan.toLeft[0].targetModified == plan.toLeft[0].modified.addingTimeInterval(7_200))
@@ -181,12 +199,18 @@ import Testing
         memory.refusesInternalCopy = true
         memory.addFile("/L/new.txt", "fresh", modified: early.addingTimeInterval(500))
         memory.addDirectory("/R")
-        let rows = SyncComparison(options: SyncOptions(), fileSystems: bench.kernel.fileSystems).run(
-            left: memory.url("/L"), right: memory.url("/R")
-        ).rows
+        let rows = SyncComparison(options: SyncOptions(), fileSystems: bench.kernel.fileSystems)
+            .run(
+                left: memory.url("/L"),
+                right: memory.url("/R")
+            )
+            .rows
         let outcome = SyncExecutor(
-            plan: SyncPlan(rows: rows), options: SyncRunOptions(), fileSystems: bench.kernel.fileSystems
-        ).run()
+            plan: SyncPlan(rows: rows),
+            options: SyncRunOptions(),
+            fileSystems: bench.kernel.fileSystems
+        )
+        .run()
         #expect(outcome.errors.isEmpty && outcome.copied == 1 && memory.contents("/R/new.txt") == "fresh")
         #expect(memory.allPaths.allSatisfy { !$0.contains("afm-sync") })
         #expect(!memory.commits.isEmpty)
@@ -195,9 +219,12 @@ import Testing
     @Test func aCancelledCopyLeavesNoTemporaryBehind() {
         memory.addFile("/L/f.bin", "new content", modified: early.addingTimeInterval(500))
         memory.addFile("/R/f.bin", "old", modified: early)
-        let rows = SyncComparison(options: SyncOptions(), fileSystems: bench.kernel.fileSystems).run(
-            left: memory.url("/L"), right: memory.url("/R")
-        ).rows
+        let rows = SyncComparison(options: SyncOptions(), fileSystems: bench.kernel.fileSystems)
+            .run(
+                left: memory.url("/L"),
+                right: memory.url("/R")
+            )
+            .rows
         let flag = CancellationFlag()
         let executor = SyncExecutor(
             plan: SyncPlan(rows: rows),
@@ -206,7 +233,9 @@ import Testing
                 o.confirmOverwrites = false
                 return o
             }(),
-            fileSystems: bench.kernel.fileSystems, cancellation: flag)
+            fileSystems: bench.kernel.fileSystems,
+            cancellation: flag
+        )
         // The cancel arrives once the copy to the temporary is complete: the first progress report after the transfer.
         var reports = 0
         executor.onProgress = { _ in
@@ -230,7 +259,10 @@ import Testing
                 var o = SyncRunOptions()
                 o.useTrash = false
                 return o
-            }(), fileSystems: bench.kernel.fileSystems, cancellation: flag)
+            }(),
+            fileSystems: bench.kernel.fileSystems,
+            cancellation: flag
+        )
         _ = executor.run()
         #expect(memory.exists("/R/keep/inside.txt"))
     }
@@ -240,14 +272,22 @@ import Testing
         var items: [SyncRow] = []
         for index in 0..<50 {
             let item = FileItem(
-                url: URL(fileURLWithPath: "/L/f\(index).txt"), name: "f\(index).txt", isDirectory: false,
-                size: Int64((index * 7) % 5),
-                modified: early.addingTimeInterval(Double(index % 3)))
+                url: URL(fileURLWithPath: "/L/f\(index).txt"),
+                name: "f\(index).txt",
+                stat: .init(size: Int64((index * 7) % 5), modified: early.addingTimeInterval(Double(index % 3)))
+            )
             items.append(
                 SyncRow(
-                    directory: "", isDirectory: false, left: item, right: nil,
+                    directory: "",
+                    isDirectory: false,
+                    left: item,
+                    right: nil,
                     leftDirectory: URL(fileURLWithPath: "/L"),
-                    rightDirectory: URL(fileURLWithPath: "/R"), state: .leftOnly, asymmetric: false))
+                    rightDirectory: URL(fileURLWithPath: "/R"),
+                    state: .leftOnly,
+                    asymmetric: false
+                )
+            )
         }
         let layout = SyncSession.layout(rows: items, show: .all, sort: (.size, .left, true))
         let sizes = layout.entries.compactMap { entry -> Int64? in

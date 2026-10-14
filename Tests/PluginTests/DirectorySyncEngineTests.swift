@@ -28,8 +28,11 @@ private func describe(_ rows: [SyncRow]) -> [String] {
     {
         var options = SyncOptions()
         configure(&options)
-        return SyncComparison(options: options, fileSystems: fileSystems).run(
-            left: memory.url(left), right: memory.url(right))
+        return SyncComparison(options: options, fileSystems: fileSystems)
+            .run(
+                left: memory.url(left),
+                right: memory.url(right)
+            )
     }
 
     /// One file of every kind the comparison tells apart.
@@ -57,7 +60,10 @@ private func describe(_ rows: [SyncRow]) -> [String] {
         for side in ["/L", "/R"] {
             memory.addFile(side + "/" + composed, side == "/L" ? "left composed" : "right composed", modified: early)
             memory.addFile(
-                side + "/" + decomposed, side == "/L" ? "left decomposed" : "right decomposed", modified: early)
+                side + "/" + decomposed,
+                side == "/L" ? "left decomposed" : "right decomposed",
+                modified: early
+            )
         }
         // A twin that only one side holds, in the other form, is the same name to that side.
         memory.addFile("/L/\u{FC}ber.txt", "same", modified: early)
@@ -85,13 +91,15 @@ private func describe(_ rows: [SyncRow]) -> [String] {
                 "twin.txt equal none",
                 "other/only-right.txt rightOnly copyToLeft", "sub/only-left.txt leftOnly copyToRight",
                 "sub/deep/inner.txt equal none"
-            ])
+            ]
+        )
         #expect(result.errors.isEmpty && !result.wasCancelled)
         // /L, /L/sub, /L/sub/deep on the left; /R, /R/other, /R/sub, /R/sub/deep on the right.
         #expect(result.leftDirectories == 3 && result.rightDirectories == 4)
         #expect(
             SyncSummary(result.rows).text
-                == "Files found: 10  (Identical: 3, Different: 3, Unique left: 2, Unique right: 2)")
+                == "Files found: 10  (Identical: 3, Different: 3, Unique left: 2, Unique right: 2)"
+        )
         #expect(SyncSummary([]).text == "Files found: 0")
     }
 
@@ -106,7 +114,8 @@ private func describe(_ rows: [SyncRow]) -> [String] {
         let result = compare { $0.byContent = true }
         let states = Dictionary(uniqueKeysWithValues: result.rows.map { ($0.relativePath, $0.state) })
         #expect(
-            states["twin.txt"] == .different && states["equal.txt"] == .equal && states["sub/deep/inner.txt"] == .equal)
+            states["twin.txt"] == .different && states["equal.txt"] == .equal && states["sub/deep/inner.txt"] == .equal
+        )
         #expect(states["newer-left.txt"] == .leftNewer && states["size.txt"] == .different)
         #expect(!result.rows.contains { $0.state == .pending })
     }
@@ -116,7 +125,8 @@ private func describe(_ rows: [SyncRow]) -> [String] {
         memory.addFile("/L/dated.txt", "1234", modified: early)
         memory.addFile("/R/dated.txt", "abcd", modified: early.addingTimeInterval(9_999))
         var states = Dictionary(
-            uniqueKeysWithValues: compare { $0.ignoreDate = true }.rows.map { ($0.relativePath, $0) })
+            uniqueKeysWithValues: compare { $0.ignoreDate = true }.rows.map { ($0.relativePath, $0) }
+        )
         #expect(states["dated.txt"]?.state == .equal)
         // Same length, different dates: only the size counts.
         #expect(states["newer-left.txt"]?.state == .equal && states["newer-right.txt"]?.state == .different)
@@ -125,10 +135,13 @@ private func describe(_ rows: [SyncRow]) -> [String] {
             uniqueKeysWithValues: compare {
                 $0.ignoreDate = true
                 $0.byContent = true
-            }.rows.map { ($0.relativePath, $0) })
+            }
+            .rows.map { ($0.relativePath, $0) }
+        )
         #expect(
             states["dated.txt"]?.state == .different && states["newer-left.txt"]?.state == .different
-                && states["equal.txt"]?.state == .equal)
+                && states["equal.txt"]?.state == .equal
+        )
     }
 
     @Test func asymmetricDeletesOnTheRightAndNeverCopiesLeft() {
@@ -145,9 +158,11 @@ private func describe(_ rows: [SyncRow]) -> [String] {
             var options = SyncOptions()
             configure(&options)
             let left = FileItem(
-                url: memory.url("/a"), name: "a", isDirectory: false, size: 1,
-                modified: early.addingTimeInterval(seconds))
-            let right = FileItem(url: memory.url("/b"), name: "a", isDirectory: false, size: 1, modified: early)
+                url: memory.url("/a"),
+                name: "a",
+                stat: .init(size: 1, modified: early.addingTimeInterval(seconds))
+            )
+            let right = FileItem(url: memory.url("/b"), name: "a", stat: .init(size: 1, modified: early))
             return SyncComparison.classify(left: left, right: right, options: options).state
         }
         #expect(state(3) == .equal && state(-3) == .equal && state(4) == .leftNewer && state(-4) == .rightNewer)
@@ -156,19 +171,22 @@ private func describe(_ rows: [SyncRow]) -> [String] {
         #expect(state(3_600) == .leftNewer && state(3_600) { $0.ignoreOneHourDifference = true } == .equal)
         #expect(
             state(-3_602) { $0.ignoreOneHourDifference = true } == .equal
-                && state(7_200) { $0.ignoreOneHourDifference = true } == .leftNewer)
+                && state(7_200) { $0.ignoreOneHourDifference = true } == .leftNewer
+        )
         // The right side is two hours behind: its dates are moved before comparing.
         #expect(state(7_200) { $0.timeOffsetHours = 2 } == .equal && state(0) { $0.timeOffsetHours = 2 } == .rightNewer)
         #expect(
             SyncComparison.classify(
-                left: FileItem(url: memory.url("/a"), name: "a", isDirectory: false, size: 1, modified: early),
-                right: FileItem(url: memory.url("/b"), name: "a", isDirectory: false, size: 1, modified: early),
+                left: FileItem(url: memory.url("/a"), name: "a", stat: .init(size: 1, modified: early)),
+                right: FileItem(url: memory.url("/b"), name: "a", stat: .init(size: 1, modified: early)),
                 options: {
                     var options = SyncOptions()
                     options.byContent = true
                     return options
                 }()
-            ).needsContent)
+            )
+            .needsContent
+        )
     }
 
     @Test func masksWithExclusions() {
@@ -176,9 +194,11 @@ private func describe(_ rows: [SyncRow]) -> [String] {
         #expect(SyncMask("*.* | *.bak;~*").matchesFile("a.txt") && !SyncMask("*.* | *.bak;~*").matchesFile("~a.txt"))
         #expect(
             SyncMask("").matchesFile("anything") && SyncMask("| *.o").matchesFile("a.c")
-                && !SyncMask("| *.o").matchesFile("a.o"))
+                && !SyncMask("| *.o").matchesFile("a.o")
+        )
         #expect(
-            SyncMask("*.* | build/ .git/").excludesFolder("build") && !SyncMask("*.* | build/").excludesFolder("src"))
+            SyncMask("*.* | build/ .git/").excludesFolder("build") && !SyncMask("*.* | build/").excludesFolder("src")
+        )
         #expect(SyncMask("*.* | build/").matchesFile("build"))
 
         makeTree()
@@ -187,7 +207,8 @@ private func describe(_ rows: [SyncRow]) -> [String] {
                 "equal.txt equal none", "left.txt leftOnly copyToRight", "right.txt rightOnly copyToLeft",
                 "size.txt different none",
                 "twin.txt equal none", "other/only-right.txt rightOnly copyToLeft"
-            ])
+            ]
+        )
         #expect(compare { $0.mask = "*.md" }.rows.isEmpty)
     }
 
@@ -198,7 +219,8 @@ private func describe(_ rows: [SyncRow]) -> [String] {
             describe(rows) == [
                 "left.txt leftOnly copyToRight", "right.txt rightOnly copyToLeft",
                 "sub/only-left.txt leftOnly copyToRight", "sub/deep/inner.txt equal none"
-            ])
+            ]
+        )
     }
 
     @Test func emptyDirectoriesAreRowsOfTheirOwn() {
@@ -209,15 +231,18 @@ private func describe(_ rows: [SyncRow]) -> [String] {
         #expect(describe(compare().rows) == ["gone/file.txt rightOnly copyToLeft"])
         #expect(
             describe(compare { $0.emptyDirectories = true }.rows)
-                == ["empty/ leftOnly copyToRight", "gone/ rightOnly copyToLeft", "gone/file.txt rightOnly copyToLeft"])
+                == ["empty/ leftOnly copyToRight", "gone/ rightOnly copyToLeft", "gone/file.txt rightOnly copyToLeft"]
+        )
         let asymmetric = compare {
             $0.emptyDirectories = true
             $0.asymmetric = true
-        }.rows
+        }
+        .rows
         #expect(
             describe(asymmetric) == [
                 "empty/ leftOnly copyToRight", "gone/ rightOnly deleteRight", "gone/file.txt rightOnly deleteRight"
-            ])
+            ]
+        )
         #expect(SyncSummary(asymmetric).files == 1)
     }
 
@@ -234,7 +259,8 @@ private func describe(_ rows: [SyncRow]) -> [String] {
             describe(rows) == [
                 "Readme.txt excluded none", "thing excluded none", "Docs/a.txt equal none",
                 "Docs/b.txt rightOnly copyToLeft"
-            ])
+            ]
+        )
         #expect(!rows[0].accepts(.copyToRight) && !rows[1].accepts(.deleteBoth) && rows[0].accepts(.none))
         // Folders that differ only in case are one folder, and each side keeps its own spelling.
         #expect(rows[3].leftURL.path == "/L/Docs/b.txt" && rows[3].rightURL.path == "/R/docs/b.txt")
@@ -299,7 +325,8 @@ private func describe(_ rows: [SyncRow]) -> [String] {
             #expect((bits & 1 != 0) || rows.allSatisfy { $0.directory.isEmpty && !$0.isDirectory }, "options \(bits)")
             #expect(
                 (bits & 4 == 0) || !rows.contains { $0.state == .leftNewer || $0.state == .rightNewer },
-                "options \(bits)")
+                "options \(bits)"
+            )
             #expect((bits & 8 == 0) || !rows.contains { $0.action == .copyToLeft }, "options \(bits)")
             #expect((bits & 8 != 0) || !rows.contains { $0.action == .deleteRight }, "options \(bits)")
             #expect(rows.contains { $0.isDirectory } == (bits & 17 == 17), "options \(bits)")
@@ -316,9 +343,14 @@ private func describe(_ rows: [SyncRow]) -> [String] {
             memory.addFile(
                 "/R/" + name,
                 String(repeating: "a", count: 2_000)
-                    + (index % 7 == 0 ? "x" : "\(index)").padding(
-                        toLength: "\(index)".count, withPad: "x", startingAt: 0),
-                modified: early)
+                    + (index % 7 == 0 ? "x" : "\(index)")
+                    .padding(
+                        toLength: "\(index)".count,
+                        withPad: "x",
+                        startingAt: 0
+                    ),
+                modified: early
+            )
         }
         var options = SyncOptions()
         options.byContent = true
@@ -339,7 +371,8 @@ private func describe(_ rows: [SyncRow]) -> [String] {
         }
         #expect(
             last.filesCompared == 300 && last.filesToCompare == 300 && last.bytesCompared > 0
-                && last.leftDirectories == 13)
+                && last.leftDirectories == 13
+        )
     }
 
     @Test func comparesAcrossFileSystemsAndIgnoresLinks() throws {
@@ -348,18 +381,24 @@ private func describe(_ rows: [SyncRow]) -> [String] {
         try box.file("L/changed.txt", "left bytes!", modified: early)
         try box.file("L/target.txt", "x", modified: early)
         try FileManager.default.createSymbolicLink(
-            at: box.url("L/link.txt"), withDestinationURL: box.url("L/target.txt"))
+            at: box.url("L/link.txt"),
+            withDestinationURL: box.url("L/target.txt")
+        )
         try FileManager.default.createSymbolicLink(at: box.url("L/loop"), withDestinationURL: box.url("L"))
         memory.addFile("/R/same.txt", "identical bytes", modified: early)
         memory.addFile("/R/changed.txt", "right bytes", modified: early)
         var options = SyncOptions()
         options.byContent = true
-        let result = SyncComparison(options: options, fileSystems: fileSystems).run(
-            left: box.url("L"), right: memory.url("/R"))
+        let result = SyncComparison(options: options, fileSystems: fileSystems)
+            .run(
+                left: box.url("L"),
+                right: memory.url("/R")
+            )
         #expect(
             describe(result.rows) == [
                 "changed.txt different none", "same.txt equal none", "target.txt leftOnly copyToRight"
-            ])
+            ]
+        )
     }
 
     @Test func streamsOfUnevenBlocksCompareCorrectly() throws {
@@ -372,18 +411,36 @@ private func describe(_ rows: [SyncRow]) -> [String] {
         var bytes = 0
         #expect(
             try SyncComparison.sameContent(
-                memory.url("/a"), memory.url("/b"), fileSystems: fileSystems, cancellation: flag
-            ) { bytes += $0 } == true)
+                memory.url("/a"),
+                memory.url("/b"),
+                fileSystems: fileSystems,
+                cancellation: flag
+            ) { bytes += $0 } == true
+        )
         #expect(bytes == 700_000)
         #expect(
             try SyncComparison.sameContent(
-                memory.url("/a"), memory.url("/c"), fileSystems: fileSystems, cancellation: flag) == false)
+                memory.url("/a"),
+                memory.url("/c"),
+                fileSystems: fileSystems,
+                cancellation: flag
+            ) == false
+        )
         #expect(
             try SyncComparison.sameContent(
-                memory.url("/a"), memory.url("/d"), fileSystems: fileSystems, cancellation: flag) == false)
+                memory.url("/a"),
+                memory.url("/d"),
+                fileSystems: fileSystems,
+                cancellation: flag
+            ) == false
+        )
         #expect(throws: (any Error).self) {
             try SyncComparison.sameContent(
-                memory.url("/a"), memory.url("/missing"), fileSystems: fileSystems, cancellation: flag)
+                memory.url("/a"),
+                memory.url("/missing"),
+                fileSystems: fileSystems,
+                cancellation: flag
+            )
         }
     }
 
@@ -398,7 +455,8 @@ private func describe(_ rows: [SyncRow]) -> [String] {
         #expect(shown([.notEqual, .duplicates, .singles]) == ["size.txt"])
         #expect(
             shown(SyncShow.all.subtracting(.singles)).count == 6
-                && shown(SyncShow.all.subtracting(.duplicates)).count == 4)
+                && shown(SyncShow.all.subtracting(.duplicates)).count == 4
+        )
         #expect(shown([.duplicates, .singles]).isEmpty)
     }
 
@@ -408,7 +466,8 @@ private func describe(_ rows: [SyncRow]) -> [String] {
         let (left, right, pair) = (rows["left.txt"]!, rows["right.txt"]!, rows["size.txt"]!)
         #expect(
             left.accepts(.copyToRight) && left.accepts(.deleteLeft) && !left.accepts(.copyToLeft)
-                && !left.accepts(.deleteRight) && !left.accepts(.deleteBoth))
+                && !left.accepts(.deleteRight) && !left.accepts(.deleteBoth)
+        )
         #expect(right.accepts(.copyToLeft) && right.accepts(.deleteRight) && !right.accepts(.copyToRight))
         #expect(pair.accepts(.copyToLeft) && pair.accepts(.copyToRight) && pair.accepts(.deleteBoth))
         // A click goes through what is possible: nothing, right, left for a pair without default.
@@ -447,14 +506,19 @@ private func describe(_ rows: [SyncRow]) -> [String] {
     func rows(_ configure: (inout SyncOptions) -> Void = { _ in }) -> [SyncRow] {
         var options = SyncOptions()
         configure(&options)
-        return SyncComparison(options: options, fileSystems: fileSystems).run(
-            left: memory.url("/L"), right: memory.url("/R")
-        ).rows
+        return SyncComparison(options: options, fileSystems: fileSystems)
+            .run(
+                left: memory.url("/L"),
+                right: memory.url("/R")
+            )
+            .rows
     }
 
     @discardableResult
     func run(
-        _ plan: SyncPlan, confirming: Bool = false, _ prepare: (SyncExecutor) -> Void = { _ in },
+        _ plan: SyncPlan,
+        confirming: Bool = false,
+        _ prepare: (SyncExecutor) -> Void = { _ in },
         options configure: (inout SyncRunOptions) -> Void = { _ in }
     ) -> SyncOutcome {
         var options = SyncRunOptions()
@@ -490,7 +554,8 @@ private func describe(_ rows: [SyncRow]) -> [String] {
         #expect(second.toRight.isEmpty && second.toLeft.map(\.relativePath) == ["update.txt"])
         #expect(
             second.deleteLeft.map(\.url.lastPathComponent) == ["new.txt", "same.txt"]
-                && second.deleteRight.map(\.url.lastPathComponent) == ["same.txt"])
+                && second.deleteRight.map(\.url.lastPathComponent) == ["same.txt"]
+        )
     }
 
     @Test func bothDirectionsArriveWithTheirDatesAndTheSidesAreEqualAfterwards() {
@@ -498,10 +563,12 @@ private func describe(_ rows: [SyncRow]) -> [String] {
         let outcome = run(SyncPlan(rows: rows())) { $0.onProgress = { progress.append($0) } }
         #expect(outcome.copied == 4 && outcome.skipped == 0 && outcome.errors.isEmpty && !outcome.wasCancelled)
         #expect(
-            memory.contents("/R/new.txt") == "from the left" && memory.contents("/R/update.txt") == "newer on the left")
+            memory.contents("/R/new.txt") == "from the left" && memory.contents("/R/update.txt") == "newer on the left"
+        )
         #expect(
             memory.contents("/L/back.txt") == "newer on the right"
-                && memory.contents("/L/sub/deep/arrives.txt") == "from the right")
+                && memory.contents("/L/sub/deep/arrives.txt") == "from the right"
+        )
         #expect(memory.item(at: memory.url("/R/new.txt"))?.modified == early.addingTimeInterval(500))
         #expect(memory.item(at: memory.url("/L/sub/deep/arrives.txt"))?.modified == early.addingTimeInterval(7))
         // No temporary file stays behind.
@@ -510,12 +577,14 @@ private func describe(_ rows: [SyncRow]) -> [String] {
                 "/L", "/L/back.txt", "/L/new.txt", "/L/same.txt", "/L/sub", "/L/sub/deep", "/L/sub/deep/arrives.txt",
                 "/L/update.txt", "/R", "/R/back.txt", "/R/new.txt", "/R/same.txt", "/R/sub", "/R/sub/deep",
                 "/R/sub/deep/arrives.txt", "/R/update.txt"
-            ])
+            ]
+        )
         #expect(Set(outcome.changedDirectories.map(\.path)) == ["/L", "/R", "/L/sub/deep"])
         // Right to left runs first (spec 09 › Running it).
         #expect(
             progress.first?.lines.first == "Right -> Left  (1 / 2)"
-                && progress.last?.lines.first?.hasPrefix("Left -> Right") == true)
+                && progress.last?.lines.first?.hasPrefix("Left -> Right") == true
+        )
         #expect(progress.last?.itemsTotal == 4 && progress.last?.bytesTotal == 62)
         #expect(rows { $0.byContent = true }.allSatisfy { $0.state == .equal })
     }
@@ -537,7 +606,8 @@ private func describe(_ rows: [SyncRow]) -> [String] {
         outcome = run(SyncPlan(rows: rows()), confirming: true) { $0.onOverwrite = { _, _ in .skipAll } }
         #expect(
             outcome.copied == 1 && outcome.skipped == 2 && memory.contents("/R/update.txt") == "older"
-                && memory.exists("/R/new.txt"))
+                && memory.exists("/R/new.txt")
+        )
 
         asked = []
         outcome = run(SyncPlan(rows: rows()), confirming: true) { executor in
@@ -557,8 +627,12 @@ private func describe(_ rows: [SyncRow]) -> [String] {
         let flag = CancellationFlag()
         flag.cancel()
         let second = SyncExecutor(
-            plan: SyncPlan(rows: rows()), options: SyncRunOptions(), fileSystems: fileSystems, cancellation: flag
-        ).run()
+            plan: SyncPlan(rows: rows()),
+            options: SyncRunOptions(),
+            fileSystems: fileSystems,
+            cancellation: flag
+        )
+        .run()
         #expect(second.wasCancelled && second.copied == 0)
     }
 
@@ -575,7 +649,8 @@ private func describe(_ rows: [SyncRow]) -> [String] {
         }
         #expect(
             failed == ["back.txt", "new.txt"] && outcome.errors.count == 2 && outcome.skipped == 2
-                && outcome.copied == 2)
+                && outcome.copied == 2
+        )
         #expect(memory.contents("/L/back.txt") == "older" && memory.contents("/R/update.txt") == "newer on the left")
 
         // Retry after the cause has gone.
@@ -613,7 +688,8 @@ private func describe(_ rows: [SyncRow]) -> [String] {
         #expect(
             memory.allPaths.filter { $0.hasPrefix("/R") } == [
                 "/R", "/R/back.txt", "/R/new.txt", "/R/same.txt", "/R/update.txt"
-            ])
+            ]
+        )
         #expect(memory.contents("/R/back.txt") == "older")
     }
 
@@ -630,7 +706,9 @@ private func describe(_ rows: [SyncRow]) -> [String] {
             SyncPlan(
                 rows: all.filter {
                     $0.directory.hasPrefix("doomed") || $0.name == "doomed" || $0.relativePath.hasPrefix("fresh")
-                }))
+                }
+            )
+        )
         #expect(
             memory.exists("/R/fresh/inner") && memory.exists("/R/doomed/keep.txt") && !memory.exists("/R/doomed/go.txt")
         )
@@ -649,11 +727,13 @@ private func describe(_ rows: [SyncRow]) -> [String] {
             options: {
                 $0.deleteLeft = false
                 $0.copyToLeft = false
-            })
+            }
+        )
         // Parts of the plan the dialog switched off are not run.
         #expect(
             outcome.deleted == 1 && outcome.copied == 0 && memory.exists("/L/same.txt") && !memory.exists("/R/same.txt")
-                && !memory.exists("/L/sub"))
+                && !memory.exists("/L/sub")
+        )
         outcome = run(SyncPlan(rows: all.filter { $0.name != "same.txt" }))
         #expect(!memory.exists("/L/new.txt") && memory.exists("/L/sub/deep/arrives.txt") && outcome.deleted == 1)
     }
@@ -665,7 +745,8 @@ private func describe(_ rows: [SyncRow]) -> [String] {
         run(plan)
         #expect(
             memory.contents("/Elsewhere/sub/deep/arrives.txt") == "from the right"
-                && memory.contents("/Backup/today/new.txt") == "from the left")
+                && memory.contents("/Backup/today/new.txt") == "from the left"
+        )
         #expect(memory.contents("/L/back.txt") == "older" && !memory.exists("/L/sub"))
     }
 
@@ -679,9 +760,12 @@ private func describe(_ rows: [SyncRow]) -> [String] {
         func compare() -> [SyncRow] {
             var options = SyncOptions()
             options.byContent = true
-            return SyncComparison(options: options, fileSystems: fileSystems).run(
-                left: box.url("L"), right: memory.url("/M")
-            ).rows
+            return SyncComparison(options: options, fileSystems: fileSystems)
+                .run(
+                    left: box.url("L"),
+                    right: memory.url("/M")
+                )
+                .rows
         }
         let outcome = run(SyncPlan(rows: compare()))
         #expect(outcome.errors.isEmpty && outcome.copied == 4)
@@ -698,7 +782,8 @@ private func describe(_ rows: [SyncRow]) -> [String] {
         memory.refusesInternalCopy = true
         let outcome = run(SyncPlan(rows: rows()))
         #expect(
-            outcome.copied == 4 && outcome.errors.isEmpty && memory.contents("/R/update.txt") == "newer on the left")
+            outcome.copied == 4 && outcome.errors.isEmpty && memory.contents("/R/update.txt") == "newer on the left"
+        )
         #expect(memory.item(at: memory.url("/R/update.txt"))?.modified == early.addingTimeInterval(60))
     }
 }

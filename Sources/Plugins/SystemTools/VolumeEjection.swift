@@ -48,13 +48,13 @@ final class SystemVolumes: VolumeAccess {
         guard let values = try? directory.resourceValues(forKeys: keys), let url = values.volume else {
             return VolumeFacts()
         }
-        let canBeEjected = Place.isEjectable(
-            path: url.path, isRootFileSystem: values.volumeIsRootFileSystem, isInternal: values.volumeIsInternal,
-            isLocal: values.volumeIsLocal, isRemovable: values.volumeIsRemovable, isEjectable: values.volumeIsEjectable
-        )
+        let canBeEjected = Place.VolumeTraits(path: url.path, values: values).mayBeEjected
         return VolumeFacts(
-            url: url, name: values.volumeName ?? url.lastPathComponent, canBeEjected: canBeEjected,
-            isNetwork: values.volumeIsLocal == false)
+            url: url,
+            name: values.volumeName ?? url.lastPathComponent,
+            canBeEjected: canBeEjected,
+            isNetwork: values.volumeIsLocal == false
+        )
     }
 
     func eject(_ volume: VolumeFacts) -> EjectRefusal? {
@@ -75,8 +75,10 @@ final class SystemVolumes: VolumeAccess {
         let dissenter = (error.userInfo[NSFileManagerUnmountDissentingProcessIdentifierErrorKey] as? NSNumber)?
             .int32Value
         return EjectRefusal(
-            program: dissenter.flatMap(Self.programName), isThisProgram: dissenter == getpid(),
-            reason: error.localizedDescription)
+            program: dissenter.flatMap(Self.programName),
+            isThisProgram: dissenter == getpid(),
+            reason: error.localizedDescription
+        )
     }
 
     /// The name the user knows a program by: the application's, else the process's.
@@ -143,13 +145,16 @@ final class VolumeEjection {
                 guard let volume = facts.url, facts.canBeEjected else {
                     return ui.inform(
                         "\(DisplayText.oneLine(facts.name.isEmpty ? directory.path : facts.name)) cannot be ejected.",
-                        detail: "", style: .warning)
+                        detail: "",
+                        style: .warning
+                    )
                 }
                 leave(volume) { [self] departures in
                     kernel.fileSystems.releaseVolume(volume)
                     eject(facts, volume: volume, departures: departures)
                 }
-            })
+            }
+        )
     }
 
     private func eject(_ facts: VolumeFacts, volume: URL, departures: [Departure]) {
@@ -197,8 +202,10 @@ final class VolumeEjection {
                         detail = refusal.reason
                     }
                     ui.inform(
-                        "\(name) cannot be ejected", detail: detail + "\nNothing on the drive was changed.",
-                        style: .warning)
+                        "\(name) cannot be ejected",
+                        detail: detail + "\nNothing on the drive was changed.",
+                        style: .warning
+                    )
 
                 case .failure(let error):
                     comeBack(departures, from: volume)
@@ -206,9 +213,11 @@ final class VolumeEjection {
                         "\(name) was not ejected",
                         detail: "What is still to be written to it could not be written: "
                             + "\(error.localizedDescription)\nThe drive stays connected, so that nothing is lost.",
-                        style: .warning)
+                        style: .warning
+                    )
                 }
-            })
+            }
+        )
     }
 
     // MARK: Panels
@@ -264,8 +273,11 @@ final class VolumeEjection {
     private func retarget(_ tab: PanelModel, to location: URL) {
         let provider = try? kernel.fileSystems.provider(for: location)
         tab.open(
-            location, parent: provider?.parent(of: location), root: provider?.root(of: location) ?? location,
-            history: .record)
+            location,
+            parent: provider?.parent(of: location),
+            root: provider?.root(of: location) ?? location,
+            history: .record
+        )
     }
 
     /// Stands for the volumes in `BlockingCalls`: the questions to them are counted together.
@@ -274,7 +286,10 @@ final class VolumeEjection {
     /// Asks something of a volume from a job. A volume that has stopped answering may never
     /// return: the question then goes on alone, and the job ends, with nil, once cancelled.
     nonisolated private static func ask<Answer: Sendable>(
-        _ question: String, of url: URL, _ monitor: any JobMonitor, _ work: @escaping @Sendable () -> Answer
+        _ question: String,
+        of url: URL,
+        _ monitor: any JobMonitor,
+        _ work: @escaping @Sendable () -> Answer
     ) -> Answer? {
         BlockingCalls.answer(from: volumes, to: question + " " + url.path, cancellation: monitor.cancellation) { _ in
             work()

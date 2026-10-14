@@ -57,9 +57,8 @@ import Testing
         FileItem(
             url: URL(fileURLWithPath: "/tmp/\(name)"),
             name: name,
-            isDirectory: folder,
-            size: size,
-            modified: Date(timeIntervalSince1970: time)
+            kind: .init(isDirectory: folder),
+            stat: .init(size: size, modified: Date(timeIntervalSince1970: time))
         )
     }
 
@@ -382,7 +381,7 @@ import Testing
         #expect(panel.cursorItem?.name == "b.md" && panel.cursor == 4)
         // On [..] it stays on [..].
         panel.moveCursor(to: 0)
-        let more = Array(entry.values) + [FileItem(url: memory.url("/work/0.txt"), name: "0.txt", isDirectory: false)]
+        let more = Array(entry.values) + [FileItem(url: memory.url("/work/0.txt"), name: "0.txt")]
         panel.extend(to: Sorter.sort(more, by: panel.sort), sortedBy: panel.sort)
         #expect(panel.cursorIsOnParentRow && panel.items.count == 5)
     }

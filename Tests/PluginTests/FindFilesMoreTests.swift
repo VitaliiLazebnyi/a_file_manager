@@ -158,13 +158,8 @@ import Testing
         FileItem(
             url: URL(fileURLWithPath: "/x/" + name),
             name: name,
-            isDirectory: directory,
-            isSymlink: symlink,
-            isPackage: package,
-            isHidden: hidden,
-            size: size,
-            modified: modified,
-            permissions: permissions
+            kind: .init(isDirectory: directory, isSymlink: symlink, isPackage: package, isHidden: hidden),
+            stat: .init(size: size, modified: modified, permissions: permissions)
         )
     }
 
