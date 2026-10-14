@@ -1,7 +1,7 @@
 public import Foundation
 
 /// How a connection to an FTP server is secured (spec 11 › Address and URL syntax).
-public enum TLSMode: Int, Codable, Equatable {
+public enum TLSMode: Int, Codable, Equatable, Sendable {
     /// Plain FTP.
     case none = 0
     /// `AUTH TLS` on the plain control connection (`ftpes://`, and `ftps://` on any port but 990).
@@ -12,7 +12,7 @@ public enum TLSMode: Int, Codable, Equatable {
 
 /// What identifies a server in the URLs a panel shows: the scheme, the host and the port.
 /// The user name is not part of it, so one server has one connection at a time.
-public struct ServerKey: Hashable, CustomStringConvertible {
+public struct ServerKey: Hashable, CustomStringConvertible, Sendable {
     public static let schemes = ["ftp", "ftps", "sftp"]
 
     public let scheme: String
@@ -211,7 +211,7 @@ public enum RemotePath {
 /// `host:port`, `user@host:port` or `scheme://user:password@host:port/path`, where everything
 /// but the host is optional. The user name and the password are taken out of the text here and
 /// travel separately; the URLs handed to the panels never contain them.
-public struct ServerAddress: Equatable {
+public struct ServerAddress: Equatable, Sendable {
     public var scheme: String
     public var tls: TLSMode
     public var host: String

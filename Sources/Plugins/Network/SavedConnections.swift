@@ -3,7 +3,7 @@ public import Foundation
 import Security
 
 /// Where the passwords of saved connections are kept. Safe from any thread.
-public protocol PasswordStore: AnyObject {
+public protocol PasswordStore: AnyObject, Sendable {
     func password(for account: String) -> String?
     /// Nil removes the password.
     func setPassword(_ password: String?, for account: String)
@@ -16,12 +16,12 @@ public final class KeychainPasswords: PasswordStore {
     /// The four calls of the Security framework this class makes; tests put a recording
     /// stand-in in their place, so the order of the calls is tested without a Keychain.
     struct Calls {
-        var copy: (_ query: CFDictionary, _ result: UnsafeMutablePointer<CFTypeRef?>?) -> OSStatus = {
+        var copy: @Sendable (_ query: CFDictionary, _ result: UnsafeMutablePointer<CFTypeRef?>?) -> OSStatus = {
             SecItemCopyMatching($0, $1)
         }
-        var update: (_ query: CFDictionary, _ changes: CFDictionary) -> OSStatus = { SecItemUpdate($0, $1) }
-        var add: (_ item: CFDictionary) -> OSStatus = { SecItemAdd($0, nil) }
-        var delete: (_ query: CFDictionary) -> OSStatus = { SecItemDelete($0) }
+        var update: @Sendable (_ query: CFDictionary, _ changes: CFDictionary) -> OSStatus = { SecItemUpdate($0, $1) }
+        var add: @Sendable (_ item: CFDictionary) -> OSStatus = { SecItemAdd($0, nil) }
+        var delete: @Sendable (_ query: CFDictionary) -> OSStatus = { SecItemDelete($0) }
     }
 
     private let service: String
@@ -82,7 +82,9 @@ public final class KeychainPasswords: PasswordStore {
 /// the user to unlock it), so nothing here is done on the calling thread unless the caller is
 /// a connecting thread that needs the answer: changes are queued, in order, and reads wait
 /// for the changes before them. The main thread only ever queues.
-public final class PasswordVault {
+///
+/// `accounts` is guarded by `lock`; the store is used on `queue`.
+public final class PasswordVault: @unchecked Sendable {
     private let store: any PasswordStore
     private let queue = DispatchQueue(label: "afm.network.keychain", qos: .userInitiated)
     private let lock = NSLock()
@@ -114,7 +116,7 @@ public final class PasswordVault {
         accounts = current
         lock.unlock()
         guard isFirst, !current.isEmpty else { return }
-        queue.async { [store] in
+        queue.async { [store, current] in
             guard store.password(for: Self.boundAccount) == nil else { return }
             for (id, account) in current {
                 guard let old = store.password(for: id.uuidString) else { continue }
@@ -194,7 +196,8 @@ public final class PasswordVault {
 }
 
 /// Passwords that live as long as the program; for tests, which never touch the Keychain.
-public final class MemoryPasswords: PasswordStore {
+/// All state is guarded by `lock`.
+public final class MemoryPasswords: PasswordStore, @unchecked Sendable {
     private let lock = NSLock()
     private var passwords: [String: String] = [:]
 
@@ -221,9 +224,9 @@ public final class MemoryPasswords: PasswordStore {
 
 /// A connection the user saved (spec 11 › "FTP: connection details" dialog). The password is
 /// not part of it: it is kept in the Keychain under the connection's `id`.
-public struct SavedConnection: Codable, Equatable {
+public struct SavedConnection: Codable, Equatable, Sendable {
     /// The protocols in the order the dialog offers them.
-    public enum Kind: Int, Codable, CaseIterable {
+    public enum Kind: Int, Codable, CaseIterable, Sendable {
         case ftp, ftpExplicitTLS, ftpImplicitTLS, sftp
 
         public var title: String {
@@ -267,7 +270,7 @@ public struct SavedConnection: Codable, Equatable {
     }
 
     /// How directories are listed (spec 11 › Listing: MLSD or LIST).
-    public enum Listing: Int, Codable, CaseIterable {
+    public enum Listing: Int, Codable, CaseIterable, Sendable {
         case automatic, mlsd, list
 
         public var title: String {
@@ -367,6 +370,7 @@ public struct SavedConnection: Codable, Equatable {
 
 /// The saved connections and what else the connection dialogs remember, in the plugin's corner
 /// of the settings (`network.`). Passwords go to the `PasswordStore`. Main thread only.
+@MainActor
 public final class ConnectionStore {
     private let settings: any SettingsStore
     public let passwords: any PasswordStore

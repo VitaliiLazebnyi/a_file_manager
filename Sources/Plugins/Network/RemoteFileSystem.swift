@@ -9,7 +9,10 @@ public import Foundation
 ///
 /// **Threading.** Safe from any thread; the state is guarded by a lock. `onChange` is called on
 /// the thread that connected or disconnected.
-public final class ConnectionCenter {
+///
+/// `makeSession`, `storedPassword` and `agentName` are set while the plugin starts and only read
+/// afterwards; everything else is guarded by `lock`.
+public final class ConnectionCenter: @unchecked Sendable {
     public let environment: SessionEnvironment
     private let lock = NSLock()
     private var sessions: [ServerKey: any RemoteSession] = [:]
@@ -17,10 +20,10 @@ public final class ConnectionCenter {
     private var saved: [ConnectionProfile] = []
     private var lastPaths: [ServerKey: String] = [:]
     /// Builds the session for a profile; the plugin sets it for the protocols it speaks.
-    var makeSession: (ConnectionProfile, SessionEnvironment) -> any RemoteSession? = { _, _ in nil }
+    var makeSession: @Sendable (ConnectionProfile, SessionEnvironment) -> (any RemoteSession)? = { _, _ in nil }
     /// The stored password of a saved connection: of this very server and login, not of
     /// whatever connection carries the same identifier. Called on the thread that connects.
-    public var storedPassword: (ConnectionProfile) -> String? = { _ in nil }
+    public var storedPassword: @Sendable (ConnectionProfile) -> String? = { _ in nil }
     /// The servers the user chose to connect to (a saved connection, the connection dialogs, an
     /// earlier yes). A server that is none of these is asked about before the first login.
     private var chosen: Set<ServerKey> = []
@@ -202,7 +205,9 @@ public final class ConnectionCenter {
 /// A listing that was under way while the directory changed would bring the old state back
 /// when it is stored. Changes are therefore also noted for a while in a journal, and a
 /// listing that finishes is brought up to date with the changes made since it started.
-private final class EntryCache {
+///
+/// All state is guarded by `lock`.
+private final class EntryCache: @unchecked Sendable {
     private struct Directory {
         let read: Date
         let includesHidden: Bool
@@ -874,7 +879,10 @@ public final class RemoteFileSystem: FileSystemProvider {
 /// Passes everything on to another writer and keeps the cached listing of its directory
 /// right: the entry gets its size and date when the file is finished, and the directory is
 /// forgotten when the file is not (a failed or abandoned upload leaves an unknown state).
-private final class CachingWriter: FileWriter {
+///
+/// Used by one thread at a time, as `FileWriter` allows; `interrupt` only passes the call on to
+/// the writer underneath, which is safe from any thread.
+private final class CachingWriter: FileWriter, @unchecked Sendable {
     private let writer: any FileWriter
     private let cache: EntryCache
     private let directory: URL

@@ -9,6 +9,7 @@ import Foundation
 /// there. Everything that reaches a server or a disk runs in a job (`kernel.jobs.run`) or on a
 /// background queue; the questions connections ask in the middle (a password, a certificate)
 /// come back to the main thread through `Kernel.askUser`.
+@MainActor
 final class NetworkCommands {
     private let kernel: Kernel
     private let center: ConnectionCenter
@@ -38,12 +39,15 @@ final class NetworkCommands {
     /// Routes the questions of the connections to the user. They are asked from the thread
     /// that connects and answered on the main thread. Nothing here touches the Keychain: what
     /// is to be stored is handed to the vault, which works on a queue of its own.
+    ///
+    /// The questions handed to `askUser` are marked `@Sendable`: they hold only values that are
+    /// safe on any thread, and without the mark the compiler cannot check them.
     func connectQuestions() {
         let (kernel, store, center) = (self.kernel, self.store, self.center)
         let environment = center.environment
         let vault = store.vault
         environment.askCredentials = { profile, message in
-            kernel.askUser { ui -> Credentials? in
+            kernel.askUser { @Sendable ui -> Credentials? in
                 // The title names the connection, so password managers can fill the dialog in.
                 var fields: [FormField] = [
                     .text("user", "User name:", profile.user ?? ""), .password("password", "Password:")
@@ -80,7 +84,7 @@ final class NetworkCommands {
             }
         }
         environment.askToConnect = { profile in
-            kernel.askUser { ui -> Bool in
+            kernel.askUser { @Sendable ui -> Bool in
                 let how =
                     profile.key.scheme == "sftp"
                     ? "A secure shell login as \(profile.user ?? NSUserName()) would be made, with the keys and the configuration of your account."
@@ -103,7 +107,7 @@ final class NetworkCommands {
             if kernel.settings.value([String].self, forKey: NetworkSettings.unprotectedHosts)?.contains(host) == true {
                 return true
             }
-            return kernel.askUser { ui -> Bool in
+            return kernel.askUser { @Sendable ui -> Bool in
                 let detail = """
                     \(profile.key.description) is a plain FTP connection. The password travels unencrypted, \
                     and anyone on the way can read it, and the files.
@@ -126,7 +130,7 @@ final class NetworkCommands {
             }
         }
         environment.askToTrust = { profile, certificate in
-            kernel.askUser { ui -> Bool in
+            kernel.askUser { @Sendable ui -> Bool in
                 let detail = """
                     The certificate was not signed by a trusted party!
                     Continue anyway?
@@ -151,7 +155,7 @@ final class NetworkCommands {
         environment.askToTrustChanged = { profile, certificate, known in
             // Whether the old certificate was accepted for good is read here, on the connecting thread.
             let wasStored = vault.hasTrusted(for: profile.key.host)
-            return kernel.askUser { ui -> Bool in
+            return kernel.askUser { @Sendable ui -> Bool in
                 let detail = """
                     WARNING: THE CERTIFICATE OF THIS SERVER HAS CHANGED.
 
@@ -188,7 +192,7 @@ final class NetworkCommands {
             }
         }
         environment.askSecret = { profile, question, isSecret in
-            kernel.askUser { ui -> String? in
+            kernel.askUser { @Sendable ui -> String? in
                 if !isSecret {
                     // The secure shell asks to confirm a host key it has not seen.
                     // Return is No: a key is accepted on purpose.
@@ -531,7 +535,7 @@ final class NetworkCommands {
 
     /// The text of a list file. A list is a small text; a file that is no plain file, or
     /// larger than `DownloadList.largestFile`, is not read.
-    static func readList(_ list: URL) throws -> String {
+    nonisolated static func readList(_ list: URL) throws -> String {
         let values = try list.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
         guard values.isRegularFile == true else { throw VolumeError(message: "\(list.path) is not a file.") }
         let limit = DownloadList.largestFile
@@ -844,6 +848,7 @@ struct ListPlan {
 
 /// One run through a download list. The copy jobs are asynchronous, so the run moves from
 /// line to line in their completions. Main thread only; it keeps itself alive until the end.
+@MainActor
 private final class ListRun {
     private var items: ArraySlice<ListPlan.Item>
     private let kernel: Kernel

@@ -5,7 +5,7 @@ import Network
 import Security
 
 /// What can go wrong between this program and a server.
-public enum NetworkError: LocalizedError {
+public enum NetworkError: LocalizedError, Sendable {
     case timedOut(String)
     case connectionFailed(String)
     case connectionLost
@@ -59,7 +59,9 @@ public enum NetworkError: LocalizedError {
 }
 
 /// A value one thread waits for and another delivers. Safe from any thread.
-final class Pending<Value> {
+///
+/// All state is guarded by `condition`.
+final class Pending<Value: Sendable>: @unchecked Sendable {
     private let condition = NSCondition()
     private var value: Value?
 
@@ -94,7 +96,7 @@ final class Pending<Value> {
 }
 
 /// What the user is shown of a certificate that could not be verified (spec 11 › Certificates).
-public struct CertificateInfo: Equatable {
+public struct CertificateInfo: Equatable, Sendable {
     /// SHA-256 of the certificate, as `AB:CD:…`.
     public let fingerprint: String
     public let subject: String
@@ -108,13 +110,16 @@ public struct CertificateInfo: Equatable {
 /// The certificates trusted for good are not read from the settings, which a file from
 /// somebody else can replace: `load` fetches them, on first use, from where only the user's
 /// own answers are kept (the Keychain).
-public final class CertificateTrust {
+///
+/// `load` is set while the plugin starts and only read afterwards; everything else is guarded by
+/// `lock`.
+public final class CertificateTrust: @unchecked Sendable {
     private let lock = NSLock()
     private var accepted: [String: Set<String>]
     private var isLoaded = false
     /// Reads the certificates that were accepted for good. Called once, on the thread that
     /// first connects with TLS, never on the main thread by this module.
-    public var load: (() -> [String: [String]])?
+    public var load: (@Sendable () -> [String: [String]])?
 
     public init(accepted: [String: [String]] = [:]) {
         self.accepted = [:]
@@ -164,13 +169,16 @@ public final class CertificateTrust {
 /// What a TLS connection needs to know: whose certificate to expect and which exceptions the
 /// user made. `rejected` receives the certificate when the handshake fails because of it, so
 /// the thread that connects can ask the user and try again.
-final class TLSSettings {
+///
+/// `beforeEvaluating` is set before the connection starts and only read afterwards; the rest is
+/// guarded by `lock` or does not change.
+final class TLSSettings: @unchecked Sendable {
     let host: String
     let trust: CertificateTrust
     private let lock = NSLock()
     private var rejectedCertificate: CertificateInfo?
     /// Called where a certificate is checked, before the check; tests make a check slow with it.
-    var beforeEvaluating: () -> Void = {}
+    var beforeEvaluating: @Sendable () -> Void = {}
 
     init(host: String, trust: CertificateTrust) {
         self.host = host
@@ -248,7 +256,9 @@ extension CertificateInfo {
 /// What the explicit-TLS start-up of a control connection reports back: the greeting it read,
 /// or the reply that refused `AUTH TLS`. Written on the connection's queue, read after the
 /// connection is ready or has failed.
-final class ExplicitTLSReport {
+///
+/// All state is guarded by `lock`.
+final class ExplicitTLSReport: @unchecked Sendable {
     private let lock = NSLock()
     private var greetingReply: FTPReply?
     private var refusalReply: FTPReply?
@@ -357,7 +367,10 @@ final class FTPAuthTLSFramer: NWProtocolFramerImplementation {
 /// a buffer under a lock, and the calling thread waits on it. The methods may be called from
 /// any thread, but the callers use one stream from one thread at a time. Waiting never blocks
 /// the queue, and a time-out leaves the stream usable.
-final class NetStream {
+///
+/// All mutable state is guarded by `condition`; the connection and the queue are safe from any
+/// thread.
+final class NetStream: @unchecked Sendable {
     enum Security {
         case none
         /// TLS from the first byte.
@@ -696,7 +709,8 @@ final class DataListener {
     private var listener: NWListener
     private var isBound: Bool
     private let queue = DispatchQueue(label: "afm.network.listener")
-    private let accepted = Pending<NWConnection>()
+    /// `NWConnection` is `Sendable` only from macOS 14; it is safe from any thread before that too.
+    private let accepted = Pending<Handover<NWConnection>>()
     private let peer: String
 
     /// The text of an address without what differs between two spellings of the same one: the
@@ -745,7 +759,7 @@ final class DataListener {
                 connection.cancel()
                 return
             }
-            accepted.fulfill(connection)
+            accepted.fulfill(Handover(connection))
         }
         listener.stateUpdateHandler = { state in
             switch state {
@@ -764,7 +778,7 @@ final class DataListener {
         guard let connection = try accepted.wait(timeout: timeout, cancellation: cancellation) else {
             throw NetworkError.timedOut("waiting for the server's data connection")
         }
-        let stream = NetStream(accepted: connection)
+        let stream = NetStream(accepted: connection.value)
         stream.start()
         return stream
     }

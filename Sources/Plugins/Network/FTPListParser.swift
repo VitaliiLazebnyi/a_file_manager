@@ -2,7 +2,7 @@ import AFMKernel
 public import Foundation
 
 /// One entry of a directory on a server, as far as the server told.
-public struct RemoteEntry: Equatable {
+public struct RemoteEntry: Equatable, Sendable {
     public var name: String
     public var isDirectory: Bool
     public var isSymlink: Bool
