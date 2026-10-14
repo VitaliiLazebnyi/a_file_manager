@@ -12,12 +12,8 @@ for f in "${formulae[@]}"; do brew list --formula "$f" >/dev/null 2>&1 || missin
 [[ ${#missing[@]} -gt 0 ]] && brew install --quiet "${missing[@]}"
 brew list --cask codeql >/dev/null 2>&1 || brew install --quiet --cask codeql
 
-# Muter comes from its own tap, which Homebrew asks to trust by name.
-if ! command -v muter >/dev/null; then
-  brew tap --quiet muter-mutation-testing/formulae
-  brew trust --formula muter-mutation-testing/formulae/muter 2>/dev/null || true
-  brew install --quiet muter
-fi
+# Muter is built from source with the project's patch (Homebrew's build loses mutants; see the hand-over).
+[[ -x "$HOME/.afm-tools/bin/muter" ]] || "$(dirname "$0")/build-muter.sh"
 
 command -v prettier >/dev/null || npm install --global --silent prettier@3
 command -v jscpd >/dev/null || npm install --global --silent jscpd@4

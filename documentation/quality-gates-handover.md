@@ -206,7 +206,9 @@ initializer called from a nonisolated context under their Swift 5 settings), so 
   in chunks of about 2 hours (`MUTATION_CHUNK_HOURS`) and skips chunks done before, so after a restart the same command
   continues. When all are done, copy each clone's `.build/mutation/shard-<i>-of-<n>` to one checkout at that commit and
   run `Scripts/mutation-shard.sh merge <folders>`: it checks that every file under `Sources` was mutated and runs the
-  gate over all reports. With 8 clones a full run takes about 62 hours per clone (4: about 125).
+  gate over all reports. With 8 clones a full run takes about 62 hours per clone (4: about 125). The macOS licence
+  allows two macOS VMs running at once on one Mac, so on this host a full run is two shards of about 250 hours each;
+  more shards need more Macs.
 
 ## Gotchas met so far
 
