@@ -49,9 +49,9 @@ public final class MacIntegrationPlugin: Plugin {
     /// The most items Finder is asked to select, and the most that are shared, at a time.
     nonisolated static let revealLimit = 1_000
     static let shareLimit = 1_000
-    /// Stands for Launch Services in `BlockingCalls`. Never changed, and used for nothing but
-    /// what object it is.
-    nonisolated(unsafe) private static let launchServices = NSObject()
+    /// Stands for Launch Services in `BlockingCalls`: used for nothing but what object it is.
+    private final class LaunchServices: Sendable {}
+    nonisolated private static let launchServices = LaunchServices()
 
     /// The local operands of a panel, worked on by `work` and handed to `deliver` on the main
     /// thread. With many marked items both happen on a background thread first (the marks and
