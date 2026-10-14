@@ -272,7 +272,7 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
     @objc private func compare() {
         whenChangesAreSettled { [self] in
             let fileSystems = kernel.fileSystems
-            func location(_ field: NSTextField) -> URL? {
+            @MainActor func location(_ field: NSTextField) -> URL? {
                 let text = field.stringValue.trimmingCharacters(in: .whitespaces)
                 return text.isEmpty ? nil : fileSystems.location(from: text, relativeTo: base)
             }

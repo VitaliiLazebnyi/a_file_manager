@@ -3,7 +3,7 @@ public import AFMKernel
 public import Foundation
 
 /// Two files as the compare window shows them.
-public enum CompareContent {
+public enum CompareContent: Sendable {
     case none
     /// `width` is the longest line in UTF-16 units, for the width of the panes.
     case text(left: TextDocument, right: TextDocument, diff: TextDiff, width: Int)
@@ -16,7 +16,7 @@ public enum CompareContent {
 }
 
 /// The outcome of loading and comparing two files.
-public struct ComparedFiles {
+public struct ComparedFiles: Sendable {
     public var isIdentical = false
     public var content = CompareContent.none
     /// Why there is nothing to show: a file is missing, unreadable, or too large.
@@ -173,10 +173,13 @@ public enum CompareLoader {
 
         // Shared by the workers, behind the lock: the next stretch to take and what was found.
         let lock = NSLock()
-        var next = 0
-        var differs = false
-        var failure: any Error?
-        func take() -> Int? {
+        /// Guarded by `lock`.
+        nonisolated(unsafe) var next = 0
+        /// Guarded by `lock`.
+        nonisolated(unsafe) var differs = false
+        /// Guarded by `lock`.
+        nonisolated(unsafe) var failure: (any Error)?
+        @Sendable func take() -> Int? {
             lock.lock()
             defer { lock.unlock() }
             guard !differs, failure == nil, next < stretches, !cancellation.isCancelled else { return nil }
