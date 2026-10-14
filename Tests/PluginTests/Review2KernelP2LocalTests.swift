@@ -99,12 +99,12 @@ private final class DeadVolume: @unchecked Sendable {
 
     /// A file system that takes the folder for a volume that is not a disk of this Mac.
     func fileSystem(patienceAfterCancel: TimeInterval = 0.2, volumePatience: TimeInterval = 0.3) -> LocalFileSystem {
-        let local = LocalFileSystem()
-        local.probes.willAsk = { [self] in willAsk($0) }
-        local.probes.isLocal = { [self] in holds($0) ? false : nil }
-        local.probes.patienceAfterCancel = patienceAfterCancel
-        local.probes.volumePatience = volumePatience
-        return local
+        var probes = LocalProbes()
+        probes.willAsk = { [self] in willAsk($0) }
+        probes.isLocal = { [self] in holds($0) ? false : nil }
+        probes.patienceAfterCancel = patienceAfterCancel
+        probes.volumePatience = volumePatience
+        return LocalFileSystem(probes: probes)
     }
 }
 
@@ -430,15 +430,16 @@ private final class DeadVolume: @unchecked Sendable {
         // The flag is set by the system's own hand between two steps: after the lock is off
         // (the first step that waits on the volume) and before the date is set.
         let flag = CancellationFlag()
-        let stopping = LocalFileSystem()
         // Used by the callbacks, which run one at a time while the calls below wait for them.
         nonisolated(unsafe) var steps = 0
-        stopping.probes.willAsk = { path in
+        var probes = LocalProbes()
+        probes.willAsk = { path in
             guard path == file.path else { return }
             steps += 1
             // 1: looking at the item, 2: taking the lock off, 3: setting the date.
             if steps == 3 { flag.cancel() }
         }
+        let stopping = LocalFileSystem(probes: probes)
         var failure: (any Error)?
         do {
             try stopping.setAttributes(

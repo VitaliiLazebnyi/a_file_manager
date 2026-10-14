@@ -240,9 +240,10 @@ import Testing
         let box = try Sandbox()
         // The disk says what the test tells it to. (The real figures move by gigabytes while
         // other programs write, which no margin allows for.)
-        let local = LocalFileSystem()
         let (plain, spare): (Int64, Int64) = (100 << 30, 7 << 30)
-        local.probes.freeSpace = { _ in (available: plain, important: plain + spare) }
+        var probes = LocalProbes()
+        probes.freeSpace = { _ in (available: plain, important: plain + spare) }
+        let local = LocalFileSystem(probes: probes)
         var info = statfs()
         #expect(statfs(box.root.path, &info) == 0)
         let mountPoint = withUnsafeBytes(of: &info.f_mntonname) {
