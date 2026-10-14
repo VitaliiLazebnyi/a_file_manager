@@ -7,6 +7,11 @@
 #                       notarised; this script never contacts Apple itself.
 #   AFM_BUILD_DIR       the build folder of the Swift Package Manager; default ".build".
 #   AFM_APP_DIR         where the application is put; default "build".
+#   AFM_CONFIGURATION   "release" (default) or "debug".
+#   AFM_BUNDLE_ID       another bundle identifier, and with it other preferences and another
+#                       folder in Application Support (the UI tests use their own).
+#   AFM_COVERAGE        1: the program counts which code ran, like `swift test
+#                       --enable-code-coverage`; it writes the counts where LLVM_PROFILE_FILE says.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -14,17 +19,25 @@ identity="${CODESIGN_IDENTITY:--}"
 scratch="${AFM_BUILD_DIR:-.build}"
 out="${AFM_APP_DIR:-build}"
 entitlements="Resources/AFileManager.entitlements"
+configuration="${AFM_CONFIGURATION:-release}"
+flags=(-c "$configuration" --scratch-path "$scratch")
+if [ "${AFM_COVERAGE:-0}" = "1" ]; then
+    flags+=(-Xswiftc -profile-generate -Xswiftc -profile-coverage-mapping)
+fi
 
 plutil -lint Resources/Info.plist "$entitlements" >/dev/null
 
-swift build -c release --scratch-path "$scratch"
-bin="$(swift build -c release --scratch-path "$scratch" --show-bin-path)"
+swift build "${flags[@]}"
+bin="$(swift build "${flags[@]}" --show-bin-path)"
 
 app="$out/A File Manager.app"
 rm -rf "$app"
 mkdir -p "$app/Contents/MacOS"
 cp "$bin/AFileManager" "$app/Contents/MacOS/AFileManager"
 cp Resources/Info.plist "$app/Contents/Info.plist"
+if [ -n "${AFM_BUNDLE_ID:-}" ]; then
+    plutil -replace CFBundleIdentifier -string "$AFM_BUNDLE_ID" "$app/Contents/Info.plist"
+fi
 printf 'APPL????' > "$app/Contents/PkgInfo"
 # Nobody but the owner writes into the bundle, and nothing rides along on the copies
 # (a quarantine mark, a Finder comment).
