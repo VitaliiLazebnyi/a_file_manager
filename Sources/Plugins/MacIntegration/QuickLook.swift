@@ -6,7 +6,9 @@ import Quartz
 /// feeds it in the responder chain of the main window, so this object puts itself there, behind
 /// the window; keys the panel does not use go on to the file list, which lets the cursor keys
 /// move through the folder while the preview follows. Main thread only.
-final class QuickLookController: NSResponder, QLPreviewPanelDataSource, QLPreviewPanelDelegate {
+final class QuickLookController: NSResponder, @preconcurrency QLPreviewPanelDataSource,
+    @preconcurrency QLPreviewPanelDelegate
+{
     private var urls: [URL] = []
     private weak var host: NSWindow?
 
@@ -58,14 +60,19 @@ final class QuickLookController: NSResponder, QLPreviewPanelDataSource, QLPrevie
 
     override func acceptsPreviewPanelControl(_: QLPreviewPanel!) -> Bool { true }
 
+    // The panel asks for control on the main thread.
     override func beginPreviewPanelControl(_ panel: QLPreviewPanel!) {
-        panel.dataSource = self
-        panel.delegate = self
+        MainActor.assumeIsolated {
+            panel.dataSource = self
+            panel.delegate = self
+        }
     }
 
     override func endPreviewPanelControl(_ panel: QLPreviewPanel!) {
-        panel.dataSource = nil
-        panel.delegate = nil
+        MainActor.assumeIsolated {
+            panel.dataSource = nil
+            panel.delegate = nil
+        }
     }
 
     func numberOfPreviewItems(in _: QLPreviewPanel!) -> Int { urls.count }
