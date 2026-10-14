@@ -54,7 +54,7 @@ public enum TargetMask {
 }
 
 /// Where a Copy or Move goes: a folder plus a name mask (spec 07 › Target field).
-public struct TargetSpec: Equatable {
+public struct TargetSpec: Equatable, Sendable {
     public var directory: URL
     public var mask: String
     /// The mask is a name to be taken as it is, even if it holds `*` or `?`.

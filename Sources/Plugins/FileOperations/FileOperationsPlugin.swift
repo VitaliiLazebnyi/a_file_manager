@@ -44,7 +44,9 @@ public final class FileOperationsPlugin: Plugin {
             completion()
             return
         }
-        operations.flushLog(cancellation: cancellation, completion: completion)
+        // `Plugin.prepareToQuit` lets `completion` be called on any thread, so it may go to the log's queue.
+        let completion = Handover(completion)
+        operations.flushLog(cancellation: cancellation) { completion.value() }
     }
 
     public func start(in kernel: Kernel) {
@@ -214,11 +216,12 @@ final class FileOperations: FileTransferService {
     }
     /// `log` for the thread that ejects a volume, which may be the one the log is written to.
     private let logLock = NSLock()
-    private var sharedLog: OperationLog?
+    /// Guarded by `logLock`.
+    nonisolated(unsafe) private var sharedLog: OperationLog?
 
     /// Job thread: a log written to `volume` writes what it has and closes its file, so the
     /// volume can be ejected. The next line opens it again.
-    func closeLog(on volume: URL) {
+    nonisolated func closeLog(on volume: URL) {
         logLock.lock()
         let log = sharedLog
         logLock.unlock()
@@ -247,7 +250,7 @@ final class FileOperations: FileTransferService {
 
     /// Writes what the log still holds, off the calling thread; `completion` is called once,
     /// on some thread, when it is written or `cancellation` was set.
-    func flushLog(cancellation: CancellationFlag, completion: @escaping () -> Void) {
+    func flushLog(cancellation: CancellationFlag, completion: @escaping @Sendable () -> Void) {
         guard let log else {
             completion()
             return
@@ -256,17 +259,19 @@ final class FileOperations: FileTransferService {
     }
 
     /// Where a job's records go: nil while the log is switched off.
-    private func recorder() -> ((OperationRecord) -> Void)? {
+    private func recorder() -> (@Sendable (OperationRecord) -> Void)? {
         let configuration = OperationSettings.logConfiguration(from: kernel.settings)
         guard configuration.isEnabled else { return nil }
         if log?.configuration != configuration { log = OperationLog(configuration) }
-        return log.map { log in { log.write($0) } }
+        guard let log else { return nil }
+        return { log.write($0) }
     }
 
     /// Which records the log is going to keep, so that a job makes no others.
-    private func recordFilter() -> ((OperationRecord.Verb, OperationRecord.Status) -> Bool)? {
+    private func recordFilter() -> (@Sendable (OperationRecord.Verb, OperationRecord.Status) -> Bool)? {
         let configuration = OperationSettings.logConfiguration(from: kernel.settings)
-        return configuration.isEnabled ? { configuration.wants($0, $1) } : nil
+        guard configuration.isEnabled else { return nil }
+        return { configuration.wants($0, $1) }
     }
 
     /// Runs `makeJob` and the job it returns on the job thread, with the progress window; the
@@ -274,9 +279,10 @@ final class FileOperations: FileTransferService {
     /// `summary` turns the job's result into what the completion needs while still on the job
     /// thread (the names to deselect, the folders to re-read: work that grows with the
     /// selection), so that the completion on the main thread only applies it.
-    private func run<Summary>(
-        title: String, makeJob: @escaping (CancellationFlag) -> Result<FileJob, JobRefusal>,
-        summary: @escaping (JobResult) -> Summary, completion: @escaping (JobResult, Summary) -> Void
+    private func run<Summary: Sendable>(
+        title: String, makeJob: @escaping @Sendable (CancellationFlag) -> Result<FileJob, JobRefusal>,
+        summary: @escaping @Sendable (JobResult) -> Summary,
+        completion: @escaping @MainActor (JobResult, Summary) -> Void
     ) {
         let ui = kernel.ui
         let fileSystems = kernel.fileSystems
@@ -319,6 +325,7 @@ final class FileOperations: FileTransferService {
         let first: FileItem?
         let snapshot: PanelModel.Operands
 
+        @MainActor
         init(_ model: PanelModel) {
             let operands = model.operandsSnapshot()
             snapshot = operands
@@ -369,7 +376,7 @@ final class FileOperations: FileTransferService {
             }
         }
 
-        /// Main thread.
+        @MainActor
         func deselect(in model: PanelModel) {
             guard !indices.isEmpty else { return }
             if !model.setSelected(false, indices: indices, shownVersion: shownVersion) { model.deselect(names) }
@@ -472,12 +479,13 @@ final class FileOperations: FileTransferService {
         }
 
         model.saveSelection()
-        var targetDirectory: URL?
+        // Found on the job's thread, read by the completion.
+        let targetDirectory = Guarded<URL?>(nil)
         let fileSystems = self.fileSystems
         let jobOptions = options
         run(
             title: kind == .copy ? "Copy:" : "Rename/Move:",
-            makeJob: { cancellation in
+            makeJob: { [targetText] cancellation in
                 let spec = TargetSpec.parse(
                     targetText, sourceDirectory: sourceDirectory, operandCount: picked.count, fileSystems: fileSystems,
                     cancellation: cancellation)
@@ -497,7 +505,7 @@ final class FileOperations: FileTransferService {
                         JobRefusal(
                             message: "The given target path \(fileSystems.displayPath(spec.directory)) is invalid!"))
                 }
-                targetDirectory = spec.directory
+                targetDirectory.withLock { $0 = spec.directory }
                 return .success(job)
             },
             summary: { result in
@@ -509,7 +517,8 @@ final class FileOperations: FileTransferService {
                 // After a copy or rename in the same folder the cursor goes to the new item.
                 var folders = [panelDirectory]
                 if !sourceDirectory.isSameLocation(as: panelDirectory) { folders.append(sourceDirectory) }
-                kernel.panels.refresh(folders + (targetDirectory.map { [$0] } ?? []), focus: result.lastTarget)
+                kernel.panels.refresh(
+                    folders + (targetDirectory.withLock { $0 }.map { [$0] } ?? []), focus: result.lastTarget)
             })
     }
 
@@ -609,13 +618,14 @@ final class FileOperations: FileTransferService {
     // FileTransferService
     func transfer(
         _ kind: TransferKind, _ sources: [URL], into directory: URL, renamingSelfCopies: Bool,
-        completion: @escaping (URL?) -> Void
+        completion: @escaping @MainActor (URL?) -> Void
     ) {
         let fileSystems = self.fileSystems
         var options = OperationSettings.options(from: kernel.settings)
         // Whoever uses the service gets the questions, not the dialog's presets.
         options.overwrite = .ask
         options.skipsErrors = false
+        let jobOptions = options
         run(
             title: kind == .move ? "Rename/Move:" : "Copy:",
             makeJob: { cancellation in
@@ -639,7 +649,7 @@ final class FileOperations: FileTransferService {
                     kind: .transfer(kind), sources: moved, target: TargetSpec(directory: real),
                     fileSystems: fileSystems,
                     cancellation: cancellation)
-                job.options = options
+                job.options = jobOptions
                 job.renamesSelfCopies = renamingSelfCopies
                 return .success(job)
             },
@@ -660,8 +670,8 @@ final class FileOperations: FileTransferService {
     /// Runs a quick change of the file system off the main thread and comes back with its
     /// error, if any.
     private func change(
-        _ title: String, _ work: @escaping (CancellationFlag) throws -> Void,
-        then completion: @escaping (any Error?) -> Void
+        _ title: String, _ work: @escaping @Sendable (CancellationFlag) throws -> Void,
+        then completion: @escaping @MainActor (any Error?) -> Void
     ) {
         kernel.jobs.run(
             title: title,
@@ -766,7 +776,7 @@ final class FileOperations: FileTransferService {
         // one name are noticed.
         run(
             title: "Rename/Move:",
-            makeJob: { cancellation in
+            makeJob: { [mask] cancellation in
                 let names =
                     !mask.isEmpty
                     ? picked.items().map { ($0.url, TargetMask.apply(mask, to: $0.url.lastPathComponent)) }
@@ -812,7 +822,7 @@ final class FileOperations: FileTransferService {
 
     /// The text of the clipboard for `[X]`, read only when the name asks for it, and on the
     /// job's thread: another program may hand its text over slowly.
-    private static func clipboardText(for typed: String) -> String? {
+    nonisolated private static func clipboardText(for typed: String) -> String? {
         typed.contains("[X") ? NSPasteboard.general.string(forType: .string) : nil
     }
 
@@ -836,15 +846,16 @@ final class FileOperations: FileTransferService {
             typed = text
         }
         guard !typed.trimmingCharacters(in: .whitespaces).isEmpty else { return }
-        var context = nameContext(for: panel, typed: typed, openedAt: openedAt)
+        let context = nameContext(for: panel, typed: typed, openedAt: openedAt)
         let fileSystems = self.fileSystems
         let record = recorder()
         kernel.jobs.run(
             title: "New folder:",
             work: { monitor -> (created: URL?, failures: [(String, any Error)]) in
                 let cancellation = monitor.cancellation
+                var context = context
                 /// Whether something is at a location, asked so that the question ends with the job.
-                func exists(_ url: URL) -> Bool {
+                @Sendable func exists(_ url: URL) -> Bool {
                     (try? fileSystems.provider(for: url))?.item(at: url, cancellation: cancellation) != nil
                 }
                 var created: URL?
@@ -903,14 +914,15 @@ final class FileOperations: FileTransferService {
                 detail: "| or quotes separate several files; a leading < turns on placeholders and ranges.")?
                 .trimmingCharacters(in: .whitespaces), !typed.isEmpty
         else { return }
-        var context = nameContext(for: source, typed: typed, openedAt: openedAt)
+        let context = nameContext(for: source, typed: typed, openedAt: openedAt)
         let fileSystems = self.fileSystems
         let record = recorder()
         kernel.jobs.run(
             title: "New file:",
             work: { monitor -> (urls: [URL], failure: (String, any Error)?) in
                 let cancellation = monitor.cancellation
-                func exists(_ url: URL) -> Bool {
+                var context = context
+                @Sendable func exists(_ url: URL) -> Bool {
                     (try? fileSystems.provider(for: url))?.item(at: url, cancellation: cancellation) != nil
                 }
                 context.clipboard = Self.clipboardText(for: typed)

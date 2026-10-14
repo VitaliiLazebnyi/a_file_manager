@@ -16,9 +16,9 @@ import Foundation
 ///
 /// The related-files form `*.jpg>*.cr2` is not supported. A value type without shared state:
 /// safe to use from any thread.
-public struct CopyFilter: Equatable {
+public struct CopyFilter: Equatable, Sendable {
     /// Where the walk through a tree is, as far as the filter cares.
-    public struct Position: Equatable {
+    public struct Position: Equatable, Sendable {
         /// 0 in the folder the operation starts in.
         public var depth: Int
         /// Whether the files of this folder are wanted at all.

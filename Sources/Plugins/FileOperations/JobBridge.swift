@@ -7,7 +7,7 @@ import Foundation
 /// **Threading.** The job calls from its own threads; every dialog is shown through
 /// `JobMonitor.ask`, which takes it to the main thread and waits. What needs to read files
 /// (comparing two files) runs on the calling job thread, between two dialogs.
-final class JobBridge: FileJobDelegate {
+final class JobBridge: FileJobDelegate, Sendable {
     private let monitor: any JobMonitor
     private let ui: any UserInteraction
     private let fileSystems: FileSystemRegistry
@@ -23,7 +23,7 @@ final class JobBridge: FileJobDelegate {
     }
 
     /// What the Overwrite dialog came back with: an answer for the job, or a wish to compare first.
-    private enum OverwriteStep {
+    private enum OverwriteStep: Sendable {
         case answer(ConflictChoice)
         case compare
     }
@@ -62,7 +62,7 @@ final class JobBridge: FileJobDelegate {
             .smaller
         ]
         while true {
-            let step: OverwriteStep = monitor.ask {
+            let step: OverwriteStep = monitor.ask { @MainActor @Sendable [more] in
                 while true {
                     // Return presses Skip: a file that is overwritten is gone, one that is skipped
                     // can still be copied.
@@ -122,7 +122,7 @@ final class JobBridge: FileJobDelegate {
                 source.url, target.url, in: fileSystems, flags: [monitor.cancellation]
             ) { self.monitor.cancellation.isCancelled }
             if monitor.cancellation.isCancelled { return .cancel }
-            monitor.ask {
+            monitor.ask { @MainActor @Sendable in
                 let paths = "\(shown(source.url))\n\(shown(target.url))"
                 switch same {
                 case true?: ui.inform("The two files have the same content!", detail: paths, style: .information)
@@ -134,6 +134,7 @@ final class JobBridge: FileJobDelegate {
     }
 
     /// Asks for a name; nil when the user gave none or kept the proposal's place by cancelling. Main thread.
+    @MainActor
     private func newName(_ message: String, proposing name: String) -> String? {
         guard let text = ui.prompt(message, value: name)?.trimmingCharacters(in: .whitespaces), !text.isEmpty,
             !text.contains("/")
@@ -142,7 +143,7 @@ final class JobBridge: FileJobDelegate {
     }
 
     func job(_: FileJob, failedAt url: URL, error: any Error) -> ErrorChoice {
-        monitor.ask {
+        monitor.ask { @MainActor @Sendable in
             ui.pick(
                 "Error with \(DisplayName.escaped(url.lastPathComponent))", detail: error.localizedDescription,
                 [("Skip", .skip), ("Skip all", .skipAll), ("Retry", .retry), ("Abort", .abort)],
@@ -151,7 +152,7 @@ final class JobBridge: FileJobDelegate {
     }
 
     func job(_: FileJob, confirmDeleteNonEmpty directory: URL) -> FolderDeleteChoice {
-        monitor.ask {
+        monitor.ask { @MainActor @Sendable in
             pick(
                 "The directory \(shown(directory)) is not empty!",
                 detail: "Do you want to delete it with all its files and subdirectories?",
@@ -162,7 +163,7 @@ final class JobBridge: FileJobDelegate {
 
     func job(_: FileJob, confirm question: ProtectionQuestion) -> ProtectionChoice {
         let text = OperationText.protection(question, path: shown(question.item.url))
-        return monitor.ask {
+        return monitor.ask { @MainActor @Sendable in
             pick(
                 text.message, detail: text.detail,
                 [(text.action, .proceed), ("All", .all), ("Skip", .skip), ("Cancel", .cancel)],
@@ -171,7 +172,7 @@ final class JobBridge: FileJobDelegate {
     }
 
     func job(_: FileJob, mergeInto existing: FileItem, source _: FileItem) -> MergeChoice {
-        monitor.ask {
+        monitor.ask { @MainActor @Sendable in
             ui.pick(
                 "The folder \(shown(existing.url)) already exists!",
                 detail: "Do you want to copy into it? Files with the same names are asked about one by one.",
@@ -186,7 +187,7 @@ final class JobBridge: FileJobDelegate {
             purpose == .move
             ? ("Move its contents", "Moving it would move everything on that volume away. Do you want that?")
             : ("Delete its contents", "Deleting it would delete everything on that volume. Do you want that?")
-        return monitor.ask {
+        return monitor.ask { @MainActor @Sendable in
             pick(
                 "\(shown(folder.url)) is another volume (a mounted disk, disk image or share)!", detail: detail,
                 [("Skip", .skip), (action, .proceed), ("All Volumes", .all), ("Cancel", .cancel)],
@@ -201,6 +202,7 @@ final class JobBridge: FileJobDelegate {
     /// A question whose first button destroys something (overwrites, deletes for good, empties
     /// another volume): Return presses the button at `safe`, which leaves things as they are,
     /// and the destroying answer has to be chosen. Main thread.
+    @MainActor
     private func pick<Choice>(
         _ message: String, detail: String, _ choices: [(String, Choice)], fallback: Choice,
         style: QuestionStyle = .warning, returnPresses safe: Int

@@ -48,7 +48,7 @@ public enum Checksum {
     /// different without a byte being read; otherwise the two are read side by side on two cores.
     public static func sameContents(
         _ a: URL, _ b: URL, in fileSystems: FileSystemRegistry, flags: [CancellationFlag] = [],
-        isCancelled: () -> Bool = { false }
+        isCancelled: @Sendable () -> Bool = { false }
     ) throws -> Bool? {
         // Asked with the caller's flag, where there is one: a file on a server that has stopped
         // answering must not hold the comparison once it is cancelled.

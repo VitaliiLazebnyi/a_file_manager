@@ -4,7 +4,7 @@ import Foundation
 /// What happens to a file whose name is taken at the target, for the whole job (spec 07 ›
 /// Default overwrite mode). The first nine are the spec's `CopyOverwriteDefault` list in its
 /// order; the tenth exists only in the Overwrite dialog.
-public enum OverwriteMode: Int, CaseIterable {
+public enum OverwriteMode: Int, CaseIterable, Sendable {
     case ask, overwriteAll, skipAll, overwriteOlder, autoRenameCopied, autoRenameExisting, copyLarger, copySmaller
     case renameOlderSkipNewer, overwriteOlderOrSame
 
@@ -25,7 +25,7 @@ public enum OverwriteMode: Int, CaseIterable {
 }
 
 /// What a copy does with a symbolic link (spec 07 › Other copy settings, `CopyLinks`).
-public enum LinkHandling: Int {
+public enum LinkHandling: Int, Sendable {
     /// The link itself is copied and points where it pointed.
     case copyLinks
     /// The file or folder the link points to is copied in its place.
@@ -35,7 +35,7 @@ public enum LinkHandling: Int {
 /// The choices of the Copy and Move dialogs and of the Copy/Delete configuration page that
 /// the engine acts on (spec 07 › Copy dialog, Advanced options; 13 › Operation › Copy/Delete).
 /// The defaults are the behaviour without any dialog.
-public struct TransferOptions {
+public struct TransferOptions: Sendable {
     public var overwrite = OverwriteMode.ask
     /// "Only files of this type".
     public var filter = CopyFilter()
