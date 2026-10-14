@@ -109,3 +109,7 @@ enum DisplayText {
         return String(result)
     }
 }
+
+/// Stands for what questions are asked of in `BlockingCalls`, which counts them by their owner:
+/// only its identity is used.
+final class CallOwner: Sendable {}

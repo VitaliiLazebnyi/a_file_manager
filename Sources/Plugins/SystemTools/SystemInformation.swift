@@ -142,7 +142,7 @@ struct SystemInformation: Equatable {
     }
 
     /// Stands for the volumes in `BlockingCalls`.
-    private static let volumeCalls = NSObject()
+    private static let volumeCalls = CallOwner()
 
     /// The mounted volumes with their free space. Each volume is asked on its own core,
     /// because a network share may take its time to answer.
@@ -160,8 +160,17 @@ struct SystemInformation: Equatable {
             ?? []
         return Parallel.map(urls) { url in
             let answer = BlockingCalls.answer(from: volumeCalls, to: "space " + url.path, cancellation: cancellation) {
-                _ in
-                try? url.resourceValues(forKeys: keys)
+                _ -> (
+                    volumeName: String?, volumeLocalizedFormatDescription: String?, volumeAvailableCapacity: Int?,
+                    volumeTotalCapacity: Int?
+                )? in
+                // The values are taken out here: the set of them cannot be handed to another thread.
+                (try? url.resourceValues(forKeys: keys)).map {
+                    (
+                        $0.volumeName, $0.volumeLocalizedFormatDescription, $0.volumeAvailableCapacity,
+                        $0.volumeTotalCapacity
+                    )
+                }
             }
             guard let values = answer else {
                 return Row(label: url.lastPathComponent, value: "\(url.path): not answering")
