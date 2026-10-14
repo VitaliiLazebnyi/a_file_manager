@@ -508,7 +508,12 @@ public enum TreeRoots {
 /// on the calling thread, one call at a time. `cancellation` may be set from any thread.
 /// `paths` and `unscanned` belong to the thread that runs the scan and are read after `run`
 /// has returned.
-public final class TreeScanner {
+///
+/// Used by one thread at a time: the limits are set before `run`, and `paths`, `unscanned`
+/// and `reachedLimit` are only touched by the thread that runs it. The threads that read
+/// folders side by side use only what is fixed in `init`, and `cancellation`, which is safe
+/// from any thread.
+public final class TreeScanner: @unchecked Sendable {
     /// A folder that was read: its path relative to the root and the names of its subfolders,
     /// in display order (sorted off the main thread, where the scan runs).
     public struct Level: Equatable {
@@ -540,7 +545,7 @@ public final class TreeScanner {
     private let root: URL
     private let provider: any FileSystemProvider
     private let showHidden: Bool
-    private let isExcluded: (URL) -> Bool
+    private let isExcluded: @Sendable (URL) -> Bool
     /// How many folders are read before their results are handed over.
     private let batchSize: Int
     /// Every folder found so far as a relative path, parents before their children: the form
@@ -555,7 +560,7 @@ public final class TreeScanner {
     /// themselves are left unread as well, whatever `isExcluded` says. It is called on several threads at once.
     public init(
         root: URL, provider: any FileSystemProvider, showHidden: Bool = false, batchSize: Int = 256,
-        isExcluded: @escaping (URL) -> Bool = { _ in false }
+        isExcluded: @escaping @Sendable (URL) -> Bool = { _ in false }
     ) {
         self.root = root
         self.provider = provider
@@ -606,11 +611,12 @@ public final class TreeScanner {
     /// so does the disk work of these threads); a file system that may wait for a server uses
     /// the pool, which adds threads while some wait.
     private func readFolders(_ batch: [(path: String, url: URL)]) -> [[Subfolder]] {
-        func read(_ folder: (path: String, url: URL)) -> [Subfolder] {
+        @Sendable func read(_ folder: (path: String, url: URL)) -> [Subfolder] {
             Self.gently { Sorter.sorted(folders(of: folder.url, isScan: true), numeric: true, byName: \.name) }
         }
         guard provider.scheme == "file", root.isFileURL else { return Parallel.map(batch, read) }
-        let results = UnsafeMutableBufferPointer<[Subfolder]>.allocate(capacity: batch.count)
+        /// Each piece writes its own place.
+        nonisolated(unsafe) let results = UnsafeMutableBufferPointer<[Subfolder]>.allocate(capacity: batch.count)
         results.initialize(repeating: [])
         defer { results.deallocate() }
         DispatchQueue.concurrentPerform(iterations: batch.count) { index in

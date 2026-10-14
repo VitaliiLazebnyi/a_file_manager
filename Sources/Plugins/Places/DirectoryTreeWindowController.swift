@@ -105,7 +105,8 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
     private var isLinking = false
 
     /// Numbers the scans of each tree (by location key) and lets only the latest store its result.
-    private final class StoreTickets {
+    /// All state is guarded by `lock`.
+    private final class StoreTickets: @unchecked Sendable {
         private let lock = NSLock()
         private var latest: [String: Int] = [:]
         private var counter = 0
@@ -290,10 +291,11 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
         reading.async { [weak self, cache] in
             // Reading the cache file and building the tree both take a while for a large disk.
             let entry = cache.entry(for: root, showHidden: showHidden)
-            let cached = entry.map { DirectoryTree(rootURL: root, paths: $0.paths, unscanned: $0.unscanned) }
+            // The tree is built here and let go of: from now on it belongs to the main thread.
+            let built = Handover(entry.map { DirectoryTree(rootURL: root, paths: $0.paths, unscanned: $0.unscanned) })
             DispatchQueue.main.async { [weak self] in
                 guard let self, self.generation == generation else { return }
-                guard let cached, let entry else {
+                guard let cached = built.value, let entry else {
                     return scan(root, selecting: directory, generation: generation, rescanning: false)
                 }
                 // The folder the panel shows is in the tree even if the cache is older than it.
@@ -315,7 +317,9 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
         // The nodes of a tree of millions of folders are freed away from the main thread, also
         // those that were made and not linked yet.
         if old != nil || !unlinked.isEmpty || !unreloaded.isEmpty {
-            reading.async { withExtendedLifetime((old, unlinked, unreloaded)) {} }
+            // The main thread has let go of them; they are only freed there.
+            let released = Handover((old, unlinked, unreloaded))
+            reading.async { withExtendedLifetime(released) {} }
         }
     }
 
@@ -359,9 +363,11 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
         scanKey = key
         scanning.async { [weak self, cache] in
             let completed = scanner.run { levels in
+                // The scan made the levels and their nodes for the main thread and lets go of them.
+                let levels = Handover(levels)
                 DispatchQueue.main.async { [weak self] in
                     guard let self, self.generation == generation else { return }
-                    waiting += levels.map { ($0, generation) }
+                    waiting += levels.value.map { ($0, generation) }
                     linkWaiting()
                 }
             }
@@ -415,13 +421,13 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
     /// Folders that are shown but not read with the rest: other disks mounted inside this one.
     /// On the start-up disk these are `/Volumes` and the system's own mount points, which show
     /// the same files a second time. The answer is a fixed set, so any thread may ask.
-    private func exclusions(for root: URL) -> (URL) -> Bool {
+    private func exclusions(for root: URL) -> @Sendable (URL) -> Bool {
         var excluded = Set(roots.filter { $0.kind != .home && $0.url.isInside(root) }.map(\.url.locationKey))
         if root.isFileURL, root.path == "/" {
             excluded.formUnion(
                 ["/Volumes", "/System/Volumes", "/dev"].map { URL(fileURLWithPath: $0, isDirectory: true).locationKey })
         }
-        return { excluded.contains($0.locationKey) }
+        return { [excluded] in excluded.contains($0.locationKey) }
     }
 
     /// Links the waiting folders into the tree and loads their rows again, for `turnBudget`
@@ -528,11 +534,15 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
         let reader = TreeScanner(root: url, provider: provider, showHidden: showHidden)
         let id = ObjectIdentifier(node)
         guard demanded.insert(id).inserted else { return }
+        // Only carried through the background thread: they are used on the main thread again.
+        let shown = Handover((tree, node))
         demand.async { [weak self] in
             let names = TreeScanner.sorted(reader.subfolders(of: url)).map(\.name)
-            // The nodes are made here, not on the main thread.
-            let level = TreeScanner.Level(path: path, children: names, isSorted: true)
+            // The nodes are made here, not on the main thread, and handed over.
+            let level = Handover(TreeScanner.Level(path: path, children: names, isSorted: true))
             DispatchQueue.main.async { [weak self] in
+                let (tree, node) = shown.value
+                let level = level.value
                 self?.demanded.remove(id)
                 // A scan that got here first has the same answer.
                 guard let self, self.generation == generation || self.tree === tree, !node.isScanned else { return }

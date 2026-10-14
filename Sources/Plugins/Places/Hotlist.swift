@@ -3,8 +3,8 @@ public import Foundation
 
 /// One line of the directory hotlist (spec 12 › Directory hotlist editor): a place to go to,
 /// a submenu of further entries, or a separator line.
-public struct HotlistEntry: Codable, Equatable {
-    public enum Kind: String, Codable {
+public struct HotlistEntry: Codable, Equatable, Sendable {
+    public enum Kind: String, Codable, Sendable {
         case item, submenu, separator
     }
 

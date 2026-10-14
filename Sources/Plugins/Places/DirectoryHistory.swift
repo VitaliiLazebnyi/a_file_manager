@@ -191,6 +191,7 @@ public struct HistoryMenu {
 
 /// Follows the panels and keeps their histories (spec 13 › Operation › History). Main thread
 /// only; it is fed from `PanelEvents` and never touches a file system.
+@MainActor
 public final class DirectoryHistoryTracker {
     public enum Side: String, CaseIterable {
         case left, right
@@ -270,7 +271,8 @@ public final class DirectoryHistoryTracker {
         guard !writeIsScheduled else { return }
         writeIsScheduled = true
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.writeDelay) { [weak self] in
-            self?.writeChanges()
+            // The main queue runs its blocks on the main thread.
+            MainActor.assumeIsolated { self?.writeChanges() }
         }
     }
 
