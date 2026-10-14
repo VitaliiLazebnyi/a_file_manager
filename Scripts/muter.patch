@@ -1,0 +1,195 @@
+diff --git a/Sources/muterCore/MutationOperators/RemoveSideEffectsOperator.swift b/Sources/muterCore/MutationOperators/RemoveSideEffectsOperator.swift
+index 73c26e2..1da2785 100644
+--- a/Sources/muterCore/MutationOperators/RemoveSideEffectsOperator.swift
++++ b/Sources/muterCore/MutationOperators/RemoveSideEffectsOperator.swift
+@@ -86,10 +86,10 @@ enum RemoveSideEffectsOperator {
+ 
+         private func removeSideEffectAt(_ body: CodeBlockSyntax) {
+             let statements = body.statements
+-            for statement in body.statements where statementContainsMutableToken(statement) {
+-                let mutatedFunctionStatements = body
+-                    .statements
+-                    .exclude { $0.description == statement.description }
++            for (index, statement) in body.statements.enumerated() where statementContainsMutableToken(statement) {
++                // This statement only, not every statement that reads the same.
++                var mutatedFunctionStatements = Array(body.statements)
++                mutatedFunctionStatements.remove(at: index)
+ 
+                 let newCodeBlockItemList = CodeBlockItemListSyntax(mutatedFunctionStatements)
+ 
+@@ -112,6 +112,12 @@ enum RemoveSideEffectsOperator {
+         }
+ 
+         private func statementContainsMutableToken(_ statement: CodeBlockItemListSyntax.Element) -> Bool {
++            // Only an expression statement (a call, `_ = call()`) is a side effect to remove. Without
++            // a declaration, a `return`, or an `if` that returns, the code does not compile.
++            guard case .expr = statement.item else {
++                return false
++            }
++
+             let doesntContainVariableAssignment = doesntContainVariableAssignment(statement.allChildren)
+             let containsDiscardedResult = statement.description.contains("_ = ")
+ 
+diff --git a/Sources/muterCore/MutationOperators/SwapTernaryOperator.swift b/Sources/muterCore/MutationOperators/SwapTernaryOperator.swift
+index 09508bd..2f36e34 100644
+--- a/Sources/muterCore/MutationOperators/SwapTernaryOperator.swift
++++ b/Sources/muterCore/MutationOperators/SwapTernaryOperator.swift
+@@ -88,7 +88,10 @@ enum SwapTernaryOperator {
+                 return node
+             }
+ 
+-            let secondChoice = children[index + 1]
++            // The second choice is everything after the colon, which is more than one element when
++            // it holds operators of its own (`c ? a : b..<d`); it moves as one, in parentheses.
++            let tail = Array(children[(index + 1)...])
++            let secondChoice = (tail.count == 1 ? tail[0] : parenthesized(tail))
+                 .withTrailingTrivia(.spaces(1))
+                 .withLeadingTrivia(.spaces(1))
+             let firstChoice = ternary.thenExpression
+@@ -100,11 +103,27 @@ enum SwapTernaryOperator {
+                     .withTrailingTrivia(.spaces(1))
+                     .withLeadingTrivia(.spaces(1))
+             )
+-            children[index + 1] = firstChoice
++            children.removeSubrange((index + 1)...)
++            children.append(firstChoice)
+ 
+             return ExprListSyntax(children)
+         }
+ 
++        private func parenthesized(_ elements: [ExprSyntax]) -> ExprSyntax {
++            ExprSyntax(
++                TupleExprSyntax(
++                    elements: LabeledExprListSyntax([
++                        LabeledExprSyntax(
++                            // Spaces between the elements stay: `a ?? b` must not become `a??b`.
++                            expression: SequenceExprSyntax(
++                                elements: ExprListSyntax(elements)
++                            ).trimmed
++                        )
++                    ])
++                )
++            )
++        }
++
+         private func ternaryIndex(_ node: ExprListSyntax) -> Int? {
+             for (index, child) in node.allChildren.enumerated() {
+                 if child.is(UnresolvedTernaryExprSyntax.self) {
+diff --git a/Sources/muterCore/MutationSchemata/SchemataMutationMapping.swift b/Sources/muterCore/MutationSchemata/SchemataMutationMapping.swift
+index f0a9756..88bbd5d 100644
+--- a/Sources/muterCore/MutationSchemata/SchemataMutationMapping.swift
++++ b/Sources/muterCore/MutationSchemata/SchemataMutationMapping.swift
+@@ -42,26 +42,44 @@ final class SchemataMutationMapping {
+     ) {
+         self.filePath = filePath
+         self.mappings = mappings
++        for block in mappings.keys {
++            blocksByRange[Self.range(of: block)] = block
++        }
++    }
++
++    /// The code blocks by their place in the file. Node identity does not survive parsing the file
++    /// again or rewriting an enclosing block; the place does.
++    fileprivate var blocksByRange: [Range<Int>: CodeBlockItemListSyntax] = [:]
++
++    private static func range(of block: CodeBlockItemListSyntax) -> Range<Int> {
++        block.position.utf8Offset ..< block.endPosition.utf8Offset
++    }
++
++    private func block(for codeBlockSyntax: CodeBlockItemListSyntax) -> CodeBlockItemListSyntax {
++        let range = Self.range(of: codeBlockSyntax)
++        let block = blocksByRange[range, default: codeBlockSyntax]
++        blocksByRange[range] = block
++        return block
+     }
+ 
+     func add(
+         _ codeBlockSyntax: CodeBlockItemListSyntax,
+         _ schemata: MutationSchema
+     ) {
+-        mappings[codeBlockSyntax, default: []].append(schemata)
++        mappings[block(for: codeBlockSyntax), default: []].append(schemata)
+     }
+ 
+     func add(
+         _ codeBlockSyntax: CodeBlockItemListSyntax,
+         _ schemata: MutationSchemata
+     ) {
+-        mappings[codeBlockSyntax, default: []].append(contentsOf: schemata)
++        mappings[block(for: codeBlockSyntax), default: []].append(contentsOf: schemata)
+     }
+ 
+     func schemata(
+         _ codeBlockSyntax: CodeBlockItemListSyntax
+     ) -> MutationSchemata? {
+-        mappings[codeBlockSyntax]
++        blocksByRange[Self.range(of: codeBlockSyntax)].flatMap { mappings[$0] }
+     }
+ }
+ 
+@@ -120,14 +138,15 @@ func + (
+ }
+ 
+ extension [SchemataMutationMapping] {
++    /// Merges the mappings of each file, by path: two files of the same name are two files.
+     func mergeByFileName() -> Self {
+-        var result = [FileName: SchemataMutationMapping]()
++        var result = [FilePath: SchemataMutationMapping]()
+ 
+         for map in self {
+-            if let exists = result[map.fileName] {
+-                result[map.fileName] = exists + map
++            if let exists = result[map.filePath] {
++                result[map.filePath] = exists + map
+             } else {
+-                result[map.fileName] = map
++                result[map.filePath] = map
+             }
+         }
+ 
+diff --git a/Sources/muterCore/Rewriters/MuterRewriter.swift b/Sources/muterCore/Rewriters/MuterRewriter.swift
+index f4b4d50..893d3f1 100644
+--- a/Sources/muterCore/Rewriters/MuterRewriter.swift
++++ b/Sources/muterCore/Rewriters/MuterRewriter.swift
+@@ -8,15 +8,17 @@ final class MuterRewriter: SyntaxRewriter {
+     }
+ 
+     override func visit(_ node: CodeBlockItemListSyntax) -> CodeBlockItemListSyntax {
+-        guard let mutationSchemata = schemataMappings.schemata(node) else {
+-            return super.visit(node)
++        // Inner blocks first, so that their mutants are switched in too: the original branch of
++        // this block keeps them, each mutated branch holds this block's own mutant only.
++        let mutationSchemata = schemataMappings.schemata(node)
++        let visited = super.visit(node)
++        guard let mutationSchemata else {
++            return visited
+         }
+ 
+-        let newNode = MutationSwitch.apply(
++        return MutationSwitch.apply(
+             mutationSchemata: mutationSchemata,
+-            with: node
++            with: visited
+         )
+-
+-        return super.visit(newNode)
+     }
+ }
+diff --git a/Sources/muterCore/Visitors/MuterVisitor.swift b/Sources/muterCore/Visitors/MuterVisitor.swift
+index 376d612..3311467 100644
+--- a/Sources/muterCore/Visitors/MuterVisitor.swift
++++ b/Sources/muterCore/Visitors/MuterVisitor.swift
+@@ -195,6 +195,13 @@ class MuterVisitor: SyntaxAnyVisitor {
+             return
+         }
+ 
++        // A mutant whose nearest code block is the file itself (a stored property's initial
++        // value) cannot be switched on with an `if` there: only main.swift may hold statements.
++        if syntax.codeBlockItemListSyntax.parent?.is(SourceFileSyntax.self) == true,
++           !sourceCodeInfo.path.hasSuffix("/main.swift") {
++            return
++        }
++
+         let schemata = makeSchemata(
+             with: syntax,
+             mutation: mutation,
