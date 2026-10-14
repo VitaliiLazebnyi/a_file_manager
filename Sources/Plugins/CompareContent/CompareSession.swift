@@ -403,7 +403,7 @@ final class CompareSession {
 
     /// The same away from the main thread, so that a large file does not freeze the window; a
     /// newer search (or `cancel`) makes the older one stop and drops its answer.
-    func find(_ needle: String, from row: Int, forward: Bool, completion: @escaping (Int?) -> Void) {
+    func find(_ needle: String, from row: Int, forward: Bool, completion: @escaping @MainActor (Int?) -> Void) {
         findGeneration += 1
         let generation = findGeneration
         let (content, cancellation) = (self.content, CancellationFlag())
@@ -413,8 +413,6 @@ final class CompareSession {
             completion(Self.search(content, needle, from: row, forward: forward, cancellation: nil))
             return
         }
-        /// Made on the main thread and called there only; the worker only carries it.
-        nonisolated(unsafe) let completion = completion
         CompareWorker.run("Compare find") { [weak self] in
             let found = Self.search(content, needle, from: row, forward: forward, cancellation: cancellation)
             DispatchQueue.main.async { [weak self] in
