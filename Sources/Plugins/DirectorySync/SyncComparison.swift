@@ -35,8 +35,8 @@ public struct SyncResult: Sendable {
 /// `progress` is called from whichever thread has news, one call at a time. An instance runs
 /// once; `cancellation` may be set from any thread.
 ///
-/// `counters`, `errors` and `topEntries` are guarded by `lock`. `report` and `classifying` are
-/// set at the start of `run`, before any other thread looks at them, and only read afterwards.
+/// `counters`, `errors`, `topEntries` and `report` are guarded by `lock`; everything else is
+/// fixed in `init`. The options the pairs are classified with are handed down the walk.
 public final class SyncComparison: @unchecked Sendable {
     public let options: SyncOptions
     public let cancellation: CancellationFlag
@@ -53,8 +53,6 @@ public final class SyncComparison: @unchecked Sendable {
     private var report: @Sendable (SyncProgress) -> Void = { _ in }
     /// The unfiltered sizes of the two start directories' listings (under `lock`).
     private var topEntries: [Int?] = [nil, nil]
-    /// The options the pairs are classified with: the tolerance only as large as the file systems need.
-    private var classifying: SyncOptions
 
     /// The size of the blocks files are compared in.
     static let blockSize = 256 * 1_024
@@ -65,7 +63,6 @@ public final class SyncComparison: @unchecked Sendable {
         self.options = options
         self.fileSystems = fileSystems
         self.cancellation = cancellation
-        classifying = options
         mask = SyncMask(options.mask)
         onlyNames = options.onlyNames.map { Set($0.map { Array($0.utf8) }) }
         onlyAlike = Set(options.onlyNames ?? [])
@@ -74,13 +71,18 @@ public final class SyncComparison: @unchecked Sendable {
     public func run(left: URL, right: URL, progress: @escaping @Sendable (SyncProgress) -> Void = { _ in })
         -> SyncResult
     {
+        lock.lock()
         report = progress
-        // The dates of two file systems that keep them exactly are compared exactly; the tolerance
-        // is for the ones that round (see `toleranceSeconds`). Otherwise a file changed two seconds
-        // after its copy would count as unchanged.
+        lock.unlock()
+        // The options the pairs are classified with. The dates of two file systems that keep them
+        // exactly are compared exactly; the tolerance is for the ones that round (see
+        // `toleranceSeconds`). Otherwise a file changed two seconds after its copy would count as unchanged.
+        var classifying = options
         classifying.toleranceSeconds =
             Self.needsTolerance(left, right, fileSystems: fileSystems) ? options.toleranceSeconds : 0
-        var rows = walk(Side(url: left, exists: true), Side(url: right, exists: true), relative: "", isTop: true)
+        var rows = walk(
+            Side(url: left, exists: true), Side(url: right, exists: true), relative: "", classifying: classifying,
+            isTop: true)
         compareContents(of: &rows)
         lock.lock()
         defer { lock.unlock() }
@@ -187,7 +189,9 @@ public final class SyncComparison: @unchecked Sendable {
         }
     }
 
-    private func walk(_ left: Side, _ right: Side, relative: String, isTop: Bool = false) -> [SyncRow] {
+    private func walk(_ left: Side, _ right: Side, relative: String, classifying: SyncOptions, isTop: Bool = false)
+        -> [SyncRow]
+    {
         guard !cancellation.isCancelled else { return [] }
         let listings = Parallel.map([(left, 0), (right, 1)]) { self.list($0.0, isTop: isTop, index: $0.1) }
         guard let leftItems = listings[0], let rightItems = listings[1] else { return [] }
@@ -238,7 +242,9 @@ public final class SyncComparison: @unchecked Sendable {
                 rows.append(row(pair.collides ? .excluded : pair.left == nil ? .rightOnly : .leftOnly))
             }
         }
-        let below = Parallel.map(folders) { self.walk($0.left, $0.right, relative: relative + $0.name + "/") }
+        let below = Parallel.map(folders) {
+            self.walk($0.left, $0.right, relative: relative + $0.name + "/", classifying: classifying)
+        }
         return rows + folderRows + below.flatMap { $0 }
     }
 
