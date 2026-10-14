@@ -17,6 +17,8 @@
 #   complexity  lizard: complexity, length and parameter limits per function
 #   duplicates  jscpd: no copied blocks
 #   architecture  the module rules of Package.swift's header, on the manifest and every import
+#   api         no break of the plugin API (AFMKernel, AFMContracts) against origin/main that
+#               Scripts/api-breaks.txt does not acknowledge
 #   test        the tests, with coverage; Scripts/coverage-gate.py demands 100%
 #   docs        DocC builds every module's documentation without a warning
 #   sanitizers  the tests again under the address, thread and undefined-behaviour sanitizers (slow)
@@ -28,7 +30,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 mkdir -p .build-tools
 
-fast=(format lint docs-lint scripts secrets security deadcode complexity duplicates architecture test docs leaks)
+fast=(format lint docs-lint scripts secrets security deadcode complexity duplicates architecture api test docs leaks)
 gates=("$@")
 [[ ${#gates[@]} -eq 0 ]] && gates=("${fast[@]}")
 
@@ -118,6 +120,10 @@ for gate in "${gates[@]}"; do
     architecture)
       step "architecture"
       python3 Scripts/architecture.py
+      ;;
+    api)
+      step "plugin API against the baseline"
+      Scripts/api-check.sh
       ;;
     test)
       step "tests with coverage"
