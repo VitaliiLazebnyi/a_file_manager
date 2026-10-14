@@ -16,7 +16,10 @@ import Foundation
 /// transfer waits for a free slot, so the number of logins stays within what servers with a
 /// limit per client allow. Downloads and uploads wait separately because a copy between two
 /// folders of one server holds a download while it waits for an upload.
-final class FTPSession: RemoteSession {
+///
+/// The pool's state is guarded by `condition` and the link observer by `observerLock`;
+/// `returnGrace` and `stallLimit` are set by tests before the session is used.
+final class FTPSession: RemoteSession, @unchecked Sendable {
     /// What a connection is held for while a file is open.
     fileprivate enum TransferKind { case read, write }
 
@@ -50,7 +53,7 @@ final class FTPSession: RemoteSession {
     /// The names of this server that are written back as they came, for all connections.
     private let names = NameMemory()
     private let observerLock = NSLock()
-    private var linkObserver: ((String, Bool) -> Void)?
+    private var linkObserver: (@Sendable (String, Bool) -> Void)?
     /// When the user last refused to give a password, to trust the certificate or to connect.
     private var declined: (error: any Error, at: Date)?
     /// Held while the first connection is made, and whenever the user is asked something, so
@@ -709,7 +712,7 @@ final class FTPSession: RemoteSession {
         if !unresolved.isEmpty, cancellation?.isCancelled != true { resolveLinksLater(unresolved) }
     }
 
-    func onLinkResolved(_ handler: @escaping (String, Bool) -> Void) {
+    func onLinkResolved(_ handler: @escaping @Sendable (String, Bool) -> Void) {
         observerLock.withLock { linkObserver = handler }
     }
 
@@ -960,7 +963,10 @@ final class FTPSession: RemoteSession {
 /// Used by one thread at a time; only `close` and `interrupt` may also be called from another
 /// thread, to end a read that waits for a server which does not answer. The read then fails,
 /// and its thread gives the connection back. After `interrupt` every read and seek fails.
-private final class FTPReader: FileReader {
+///
+/// Used by one thread at a time, as `FileReader` allows; what `close` and `interrupt` touch is
+/// guarded by `stateLock` (see there).
+private final class FTPReader: FileReader, @unchecked Sendable {
     private let session: FTPSession
     private let path: String
     private let asText: Bool
@@ -1143,7 +1149,10 @@ private final class FTPReader: FileReader {
 
 /// A file being uploaded (`STOR`, or `APPE` to continue one). Used by one thread; `interrupt` may
 /// be called from another thread to end a write that waits for a server which does not answer.
-private final class FTPWriter: FileWriter {
+///
+/// Used by one thread at a time, as `FileWriter` allows; `interrupt` touches only the flag and
+/// the connection, the latter under `holdLock`.
+private final class FTPWriter: FileWriter, @unchecked Sendable {
     private let session: FTPSession
     private let path: String
     private let asText: Bool

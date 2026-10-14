@@ -3,7 +3,7 @@ public import Foundation
 
 /// The program that carries the SFTP dialogue instead of `/usr/bin/ssh`: tests run the
 /// system's own `sftp-server` on a sandbox folder this way, without a network or a login.
-public struct SFTPTransport {
+public struct SFTPTransport: Sendable {
     public var executable: String
     public var arguments: [String]
     /// True when the program is an `ssh` that may have questions, which are then answered
@@ -18,7 +18,7 @@ public struct SFTPTransport {
 }
 
 /// An error status of the SFTP server.
-public struct SFTPError: LocalizedError {
+public struct SFTPError: LocalizedError, Sendable {
     public let code: UInt32
     public let message: String
 
@@ -356,7 +356,11 @@ final class AskpassHelper {
 /// **Threading.** Requests carry numbers and the answers name them, so any number of threads
 /// may have requests under way at once: each sends under `writeLock` and waits for its own
 /// answer, which the reading thread hands over. No pool of connections is needed.
-final class SFTPChannel {
+///
+/// The state is guarded by `lock` (the error text also by `errorReading`); `writeTimeout` and
+/// `names` are set before the channel starts, and `extensions` is written by `start` before
+/// anyone else uses the channel.
+final class SFTPChannel: @unchecked Sendable {
     private let process = Process()
     private let toServer = Pipe()
     private let fromServer = Pipe()

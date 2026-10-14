@@ -7,7 +7,7 @@ public import Foundation
 /// A list is a script: its lines say what is copied where, and the file may come from
 /// anybody. Nothing here runs a list; whoever does shows the user what it says first.
 public enum DownloadList {
-    public enum Action: Equatable {
+    public enum Action: Equatable, Sendable {
         /// A plain line, `source` or `source -> target`: something to fetch from a server.
         case download(source: String, target: String?)
         /// `put:` or `copy:`: from one location to another, also from this Mac to a server.

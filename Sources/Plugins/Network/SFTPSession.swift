@@ -71,7 +71,9 @@ enum SSHQuestion: Equatable {
 ///
 /// **Threading.** Safe from any thread. One `SFTPChannel` serves all threads at once; it is
 /// opened on first use and opened again when it broke.
-final class SFTPSession: RemoteSession {
+///
+/// All mutable state is guarded by `lock`.
+final class SFTPSession: RemoteSession, @unchecked Sendable {
     private let environment: SessionEnvironment
     private let transport: SFTPTransport?
     private let lock = NSLock()
@@ -653,7 +655,10 @@ private struct TransferWindow {
 /// from the second read in a row on, the window grows, up to what the line carries
 /// (`TransferWindow`). Seeking discards what was read ahead. Used by one thread; `close` and
 /// `interrupt` never wait for the server.
-private final class SFTPFileReader: FileReader {
+///
+/// Used by one thread at a time, as `FileReader` allows; `interrupt` only sets the flag, which is
+/// safe from any thread.
+private final class SFTPFileReader: FileReader, @unchecked Sendable {
     /// One read request: the bytes `offset ..< offset + length` of the file.
     private struct Chunk {
         let offset: UInt64
@@ -865,8 +870,9 @@ private final class SFTPFileReader: FileReader {
 /// start of the file, and continuing it later is safe. `close` reports success only when every
 /// write was confirmed, the server's length is the length written, and the server confirmed
 /// the closing itself (which is where a full disk or a quota shows on some servers).
-/// Used by one thread.
-private final class SFTPFileWriter: FileWriter {
+/// Used by one thread at a time, as `FileWriter` allows; `interrupt` only sets the flag, which is
+/// safe from any thread.
+private final class SFTPFileWriter: FileWriter, @unchecked Sendable {
     /// One write request that is not confirmed yet.
     private struct Piece {
         let ticket: SFTPChannel.Ticket

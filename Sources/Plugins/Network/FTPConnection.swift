@@ -2,7 +2,7 @@ import AFMKernel
 public import Foundation
 
 /// How file names travel on the control connection (spec 11 › File-name encoding).
-public enum NameEncoding: Int, Codable, CaseIterable {
+public enum NameEncoding: Int, Codable, CaseIterable, Sendable {
     /// UTF-8 when the server offers it or the names are valid UTF-8, else Western Latin 1.
     case automatic = 0
     case utf8, windowsLatin1, isoLatin1, windowsLatin2, windowsCyrillic, koi8R, macRoman, dosLatinUS, shiftJIS, gb18030,
@@ -101,8 +101,8 @@ public enum NameEncoding: Int, Codable, CaseIterable {
 /// form on a server that compares bytes, and names in another encoding than the one in use.
 /// Each is kept, by its exact spelling, with the encoding that read it; a command that names
 /// it writes it back unchanged in that encoding. Shared by the connections of a session.
-/// Safe from any thread.
-final class NameMemory {
+/// Safe from any thread: all state is guarded by `lock`.
+final class NameMemory: @unchecked Sendable {
     private let lock = NSLock()
     private var spellings: [Data: String.Encoding] = [:]
     private static let capacity = 65_536
@@ -137,7 +137,7 @@ final class NameMemory {
 }
 
 /// Everything needed to log in to one FTP server.
-public struct FTPServerConfig {
+public struct FTPServerConfig: Sendable {
     public var host: String
     public var port: Int
     public var tls: TLSMode
@@ -184,8 +184,8 @@ public struct FTPServerConfig {
 
 /// What is known of the links of one server: whether each leads to a directory, by path. Shared
 /// by the connections of a session, so that what one found, in the background or while listing,
-/// spares the others the question. Safe from any thread.
-final class LinkMemory {
+/// spares the others the question. Safe from any thread: all state is guarded by `lock`.
+final class LinkMemory: @unchecked Sendable {
     private let lock = NSLock()
     private var kinds: [String: Bool] = [:]
     private static let capacity = 2_048
@@ -216,7 +216,8 @@ final class LinkMemory {
 ///
 /// **Threading.** A connection belongs to one thread at a time; `FTPSession` hands it out and
 /// takes it back. Every call blocks until the server has answered or the time is up.
-final class FTPConnection {
+/// `interrupt`, the one call from another thread, touches only the two streams, under `streamsLock`.
+final class FTPConnection: @unchecked Sendable {
     let config: FTPServerConfig
     private let trust: CertificateTrust
     private var control: NetStream?
@@ -237,7 +238,7 @@ final class FTPConnection {
     var knownNames = NameMemory()
     /// Called whenever the server showed a sign of life on this connection, from the thread
     /// that uses it: whoever waits for a connection of the pool waits on while this is called.
-    var onActivity: (() -> Void)?
+    var onActivity: (@Sendable () -> Void)?
     /// The links (full paths) the last listing left unanswered for lack of time.
     private(set) var unresolvedLinks: [String] = []
     private var workingDirectory: String?
@@ -253,7 +254,7 @@ final class FTPConnection {
     /// When the connection was last used; the pool reads it while it holds the connection.
     var lastUsed = Date()
     /// Called with every line sent and received, for the log.
-    var log: ((String) -> Void)?
+    var log: (@Sendable (String) -> Void)?
 
     init(config: FTPServerConfig, trust: CertificateTrust) {
         self.config = config

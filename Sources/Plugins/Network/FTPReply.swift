@@ -1,7 +1,7 @@
 public import Foundation
 
 /// One answer of an FTP server: a three-digit code and the text lines that came with it.
-public struct FTPReply: Equatable {
+public struct FTPReply: Equatable, Sendable {
     public let code: Int
     /// The text of every line, without the code and without the line ends.
     public let lines: [String]

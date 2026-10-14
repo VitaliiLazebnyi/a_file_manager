@@ -4,7 +4,7 @@ import NetFS
 
 /// Mounting and ejecting network volumes, the Mac's form of mapping and disconnecting network
 /// drives (spec 11 › Windows network functions). Both calls block and are made from a job.
-public protocol VolumeMounter: AnyObject {
+public protocol VolumeMounter: AnyObject, Sendable {
     /// Mounts the share at `url` (smb, afp, nfs, http/https for WebDAV) and returns where it
     /// appeared under /Volumes. The system asks for a name and password when it needs them.
     func mount(_ url: URL) throws -> [URL]
@@ -21,7 +21,7 @@ extension VolumeMounter {
     }
 }
 
-public struct VolumeError: LocalizedError {
+public struct VolumeError: LocalizedError, Sendable {
     public let message: String
 
     public init(message: String) {
@@ -37,22 +37,26 @@ public final class SystemVolumeMounter: VolumeMounter {
     struct Calls {
         /// Asks for the mount without waiting. Returns the status of asking and what to cancel
         /// the request with; `answer` gets the status and the mount points, on any thread.
-        var mount: (_ url: URL, _ answer: @escaping (Int32, [String]) -> Void) -> (status: Int32, request: AnyObject?) =
-            { url, answer in
-                var request: AsyncRequestID?
-                // No mount path: the system picks a folder under /Volumes. No options: it shows its
-                // own dialog for the name and password and may use the Keychain.
-                let status = NetFSMountURLAsync(
-                    url as CFURL, nil, nil, nil, nil, nil, &request, DispatchQueue.global(qos: .userInitiated)
-                ) { status, _, mountPoints in
-                    answer(status, (mountPoints as? [String]) ?? [])
+        var mount:
+            @Sendable (_ url: URL, _ answer: @escaping @Sendable (Int32, [String]) -> Void) -> (
+                status: Int32, request: AnyObject?
+            ) =
+                { url, answer in
+                    var request: AsyncRequestID?
+                    // No mount path: the system picks a folder under /Volumes. No options: it shows its
+                    // own dialog for the name and password and may use the Keychain.
+                    let status = NetFSMountURLAsync(
+                        url as CFURL, nil, nil, nil, nil, nil, &request, DispatchQueue.global(qos: .userInitiated)
+                    ) { status, _, mountPoints in
+                        answer(status, (mountPoints as? [String]) ?? [])
+                    }
+                    return (status, request.map { Request(id: $0) })
                 }
-                return (status, request.map { Request(id: $0) })
-            }
-        var cancel: (_ request: AnyObject) -> Void = { request in
+        var cancel: @Sendable (_ request: AnyObject) -> Void = { request in
             if let request = request as? Request { NetFSMountURLCancel(request.id) }
         }
-        var unmount: (_ volume: URL, _ answer: @escaping (any Error?) -> Void) -> Void = { volume, answer in
+        var unmount: @Sendable (_ volume: URL, _ answer: @escaping @Sendable (any Error?) -> Void) -> Void = {
+            volume, answer in
             FileManager.default.unmountVolume(at: volume, options: [.withoutUI], completionHandler: answer)
         }
     }
@@ -82,14 +86,16 @@ public final class SystemVolumeMounter: VolumeMounter {
     }
 
     /// What the system's answer is delivered into; it may come after the waiting thread left.
-    private final class Outcome {
+    /// `result` and `failure` are guarded by `lock`.
+    private final class Outcome: @unchecked Sendable {
         let done = DispatchSemaphore(value: 0)
         private let lock = NSLock()
         private var result: (status: Int32, paths: [String])?
+        private var failure: (any Error)?
 
-        func set(_ status: Int32, _ paths: [String]) {
+        func set(_ status: Int32, _ paths: [String], failure error: (any Error)? = nil) {
             lock.lock()
-            if result == nil { result = (status, paths) }
+            if result == nil { (result, failure) = ((status, paths), error) }
             lock.unlock()
             done.signal()
         }
@@ -98,6 +104,12 @@ public final class SystemVolumeMounter: VolumeMounter {
             lock.lock()
             defer { lock.unlock() }
             return result
+        }
+
+        var error: (any Error)? {
+            lock.lock()
+            defer { lock.unlock() }
+            return failure
         }
     }
 
@@ -131,14 +143,7 @@ public final class SystemVolumeMounter: VolumeMounter {
 
     public func unmount(_ volume: URL) throws {
         let outcome = Outcome()
-        var failure: any Error?
-        let lock = NSLock()
-        calls.unmount(volume) { error in
-            lock.lock()
-            failure = error
-            lock.unlock()
-            outcome.set(error == nil ? 0 : EIO, [])
-        }
+        calls.unmount(volume) { error in outcome.set(error == nil ? 0 : EIO, [], failure: error) }
         // The system's answer may never come (a server that is gone); the job does not wait for ever.
         guard outcome.done.wait(timeout: .now() + patience) == .success else {
             throw VolumeError(
@@ -146,10 +151,7 @@ public final class SystemVolumeMounter: VolumeMounter {
                     "\(volume.lastPathComponent) did not answer to being ejected within \(Int(patience.rounded(.up))) seconds."
             )
         }
-        lock.lock()
-        let error = failure
-        lock.unlock()
-        if let error { throw error }
+        if let error = outcome.error { throw error }
     }
 }
 

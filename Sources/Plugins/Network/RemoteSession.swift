@@ -2,7 +2,7 @@ import AFMKernel
 public import Foundation
 
 /// How file contents travel (spec 11 › Transfer modes).
-public enum TransferMode: Int, CaseIterable {
+public enum TransferMode: Int, CaseIterable, Sendable {
     /// Byte for byte.
     case binary = 0
     /// Line ends are converted between the server's and the Mac's.
@@ -22,8 +22,10 @@ public enum TransferMode: Int, CaseIterable {
 /// The user's network preferences as the connections need them. The settings store belongs to
 /// the main thread, so its values are copied here whenever they change; this copy is read from
 /// any thread.
-public final class NetworkOptions {
-    public struct Values {
+///
+/// All state is guarded by `lock`.
+public final class NetworkOptions: @unchecked Sendable {
+    public struct Values: Sendable {
         public var passiveByDefault = true
         /// Seconds between two NOOPs on an idle connection; 0 sends none.
         public var keepAliveInterval: TimeInterval = 60
@@ -71,7 +73,7 @@ public final class NetworkOptions {
 
 /// How to reach and log in to one server: a saved connection, a quick connection, or what a
 /// typed URL said.
-public struct ConnectionProfile {
+public struct ConnectionProfile: Sendable {
     public var key: ServerKey
     /// The name of the saved connection this came from.
     public var name: String?
@@ -119,7 +121,7 @@ public struct ConnectionProfile {
 }
 
 /// A user name and password the user typed while connecting.
-public struct Credentials {
+public struct Credentials: Sendable {
     public var user: String
     public var password: String
     /// The user wants the password kept for the saved connection. It is stored once the
@@ -136,33 +138,43 @@ public struct Credentials {
 /// What connections need from the program around them: the preferences, the certificates the
 /// user accepted, and a way to ask the user. The questions may be asked from any thread and
 /// block until they are answered.
-public final class SessionEnvironment {
+///
+/// The questions and the other settings are set while the plugin starts (tests set them before
+/// they connect) and only read afterwards, from any thread.
+public final class SessionEnvironment: @unchecked Sendable {
     public let options: NetworkOptions
     public let trust: CertificateTrust
     /// Asks for the user name and password of a server; `message` says why (the first time, or
     /// what the server answered to the last attempt). Nil when the user gives up.
-    public var askCredentials: (_ profile: ConnectionProfile, _ message: String) -> Credentials? = { _, _ in nil }
+    public var askCredentials: @Sendable (_ profile: ConnectionProfile, _ message: String) -> Credentials? = { _, _ in
+        nil
+    }
     /// Shows a certificate the system does not trust; true when the user accepts it. The
     /// answer is recorded in `trust` by whoever asks.
-    public var askToTrust: (_ profile: ConnectionProfile, _ certificate: CertificateInfo) -> Bool = { _, _ in false }
+    public var askToTrust: @Sendable (_ profile: ConnectionProfile, _ certificate: CertificateInfo) -> Bool = { _, _ in
+        false
+    }
     /// Shows a certificate that differs from the ones accepted for this server before
     /// (`known`, their fingerprints): the sign of somebody in the middle, or of a server that
     /// renewed its certificate. True when the user accepts the new one in place of the old;
     /// whoever asks records that with `CertificateTrust.replace`. Refused unless set.
     public var askToTrustChanged:
-        (_ profile: ConnectionProfile, _ certificate: CertificateInfo, _ known: [String]) -> Bool = { _, _, _ in false }
+        @Sendable (_ profile: ConnectionProfile, _ certificate: CertificateInfo, _ known: [String]) -> Bool = {
+            _, _, _ in false
+        }
     /// Asks whether to connect to a server nobody chose (`ConnectionProfile.asksBeforeConnecting`).
-    public var askToConnect: (_ profile: ConnectionProfile) -> Bool = { _ in true }
+    public var askToConnect: @Sendable (_ profile: ConnectionProfile) -> Bool = { _ in true }
     /// Asks whether to send a password over a connection that is not encrypted (plain FTP).
-    public var askToSendPasswordUnprotected: (_ profile: ConnectionProfile) -> Bool = { _ in true }
+    public var askToSendPasswordUnprotected: @Sendable (_ profile: ConnectionProfile) -> Bool = { _ in true }
     /// A server on this machine itself (`localhost`, `127.0.0.1`) is not asked about: nothing
     /// sent there crosses a network. Tests set this to ask all the same.
     public var asksAboutUnprotectedLoopback = false
     /// Stores the password the user asked to keep, after the server accepted it. Called on the
     /// connecting thread.
-    public var rememberPassword: (_ profile: ConnectionProfile, _ password: String) -> Void = { _, _ in }
+    public var rememberPassword: @Sendable (_ profile: ConnectionProfile, _ password: String) -> Void = { _, _ in }
     /// Asks a question of the secure shell (a host key to confirm, the passphrase of a key).
-    public var askSecret: (_ profile: ConnectionProfile, _ question: String, _ isSecret: Bool) -> String? = { _, _, _ in
+    public var askSecret: @Sendable (_ profile: ConnectionProfile, _ question: String, _ isSecret: Bool) -> String? = {
+        _, _, _ in
         nil
     }
     /// After the user refused a password or a certificate, further attempts to connect to that
@@ -170,7 +182,7 @@ public final class SessionEnvironment {
     /// several questions to the file system, and the user answered once.
     public var declineMemory: TimeInterval = 5
     /// Receives the dialogue with the servers, line by line, from any thread.
-    public var log: (String) -> Void = { _ in }
+    public var log: @Sendable (String) -> Void = { _ in }
 
     public init(options: NetworkOptions = NetworkOptions(), trust: CertificateTrust = CertificateTrust()) {
         self.options = options
@@ -183,7 +195,7 @@ public final class SessionEnvironment {
 ///
 /// **Threading.** Every method may be called from several threads at once and blocks until
 /// the server has answered.
-protocol RemoteSession: AnyObject {
+protocol RemoteSession: AnyObject, Sendable {
     var profile: ConnectionProfile { get }
     /// Connects if necessary and returns the directory the login leads to.
     func connect(cancellation: CancellationFlag?) throws -> String
@@ -213,7 +225,7 @@ protocol RemoteSession: AnyObject {
     /// `handler` is called, from any thread, when the session finds out after a listing where a
     /// link of it leads: the path of the link, and whether it leads to a folder. A session that
     /// tells at once ignores it.
-    func onLinkResolved(_ handler: @escaping (_ path: String, _ isDirectory: Bool) -> Void)
+    func onLinkResolved(_ handler: @escaping @Sendable (_ path: String, _ isDirectory: Bool) -> Void)
     /// The four calls that change something take the caller's flag as well: the wait for a
     /// connection, for another thread's login and for the server's reply ends when it is set
     /// (Cancel in the progress window), with `NetworkError.cancelled`. A command that was
@@ -251,7 +263,7 @@ extension RemoteSession {
         try setAttributes(attributes, of: path, cancellation: nil)
     }
     func canAppend(_: String) -> Bool { false }
-    func onLinkResolved(_: @escaping (_ path: String, _ isDirectory: Bool) -> Void) {}
+    func onLinkResolved(_: @escaping @Sendable (_ path: String, _ isDirectory: Bool) -> Void) {}
     func openAppend(_: String, at _: Int64?, cancellation _: CancellationFlag?) throws -> (
         writer: any FileWriter, size: Int64
     ) {
@@ -284,20 +296,26 @@ extension RemoteSession {
 enum Background {
     private struct Piece {
         let lane: ObjectIdentifier?
-        let work: () -> Void
+        let work: @Sendable () -> Void
     }
 
     private static let condition = NSCondition()
-    private static var waiting: [Piece] = []
-    private static var threads = 0
-    private static var idle = 0
-    private static var running = 0
-    private static var runningIn: [ObjectIdentifier: Int] = [:]
-    private static var waitingIn: [ObjectIdentifier: Int] = [:]
+    /// Guarded by `condition`.
+    nonisolated(unsafe) private static var waiting: [Piece] = []
+    /// Guarded by `condition`.
+    nonisolated(unsafe) private static var threads = 0
+    /// Guarded by `condition`.
+    nonisolated(unsafe) private static var idle = 0
+    /// Guarded by `condition`.
+    nonisolated(unsafe) private static var running = 0
+    /// Guarded by `condition`.
+    nonisolated(unsafe) private static var runningIn: [ObjectIdentifier: Int] = [:]
+    /// Guarded by `condition`.
+    nonisolated(unsafe) private static var waitingIn: [ObjectIdentifier: Int] = [:]
     static let mostThreads = 24
     static let mostPerLane = 3
 
-    static func run(lane: AnyObject? = nil, _ work: @escaping () -> Void) {
+    static func run(lane: AnyObject? = nil, _ work: @escaping @Sendable () -> Void) {
         let lane = lane.map(ObjectIdentifier.init)
         condition.lock()
         waiting.append(Piece(lane: lane, work: work))
