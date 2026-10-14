@@ -7,7 +7,8 @@
 #
 # Gates:
 #   format      swift-format and Prettier leave every file as it is
-#   lint        SwiftLint (--strict, every rule but the conflicting ones) and its analyzer rules
+#   lint        SwiftLint (--strict, every rule but the conflicting ones) and its analyzer rules over
+#               every Swift file (the packages, the fuzz and stress packages, the UI tests, the manifests)
 #   docs-lint   markdownlint, typos
 #   scripts     ShellCheck, actionlint, zizmor
 #   secrets     gitleaks over the whole history
@@ -20,6 +21,8 @@
 #   docs        DocC builds every module's documentation without a warning
 #   sanitizers  the tests again under the address, thread and undefined-behaviour sanitizers (slow)
 #   leaks       the tests under `leaks`: no leaked memory
+#   fuzz-smoke  the fuzz drivers: saved reproducers, then a fixed number of seeded inputs per target
+#   stress-smoke  the stress harnesses: each scenario once, small and seeded
 #   mutation    Muter on the files changed since origin/main (slow)
 #   sbom        writes build/sbom.spdx.json
 #   uitest      the UI tests (UITests/run.sh, XCUITest); only in the logged-in session, not over SSH
@@ -49,6 +52,64 @@ swiftlint_env() {
   fi
 }
 
+# analyzer_log <log>: the compiler invocations `swiftlint analyze` reads. SwiftPM prints an invocation
+# only for a module it compiles, so each package is built from nothing in a folder of its own: the
+# root package, the fuzz and the stress packages (their drivers; the project's sources they reach
+# through links are analysed where they live). The manifests and the standalone demo programs get
+# invocations of their own.
+#
+# Swift Testing's macros (@Suite, @Test, #expect) are then moved out of SourceKit's process: with
+# `-plugin-path` they run in its in-process plugin server, and when several analyzer rules expand
+# them at once SwiftLint 0.65.1 dies (SIGSEGV/SIGABRT, "Attempted to read an unowned reference but
+# object ... was already destroyed"; Xcode 27). Through swift-plugin-server, a process per
+# compilation, the same macros expand without a crash. See documentation/quality-gates-handover.md.
+analyzer_log() {
+  local log=$1 package scratch toolchain sdk platform manifest
+  : > "$log"
+  for package in . Tests/Fuzz/pkg Tests/Stress/harness; do
+    scratch="$PWD/.build-tools/analyze/$(basename "$(cd "$package" && pwd)")"
+    rm -rf "$scratch"
+    (cd "$package" && swift build --build-tests -v --scratch-path "$scratch") >> "$log" 2>&1 \
+      || { grep -E 'error:' "$log" | sort -u | head -40 >&2; return 1; }
+  done
+  # The UI tests are an Xcode project (UITests/project.yml); xcodebuild prints the same invocations.
+  rm -rf .build-tools/analyze/uitests
+  xcodegen generate --quiet --spec UITests/project.yml
+  xcodebuild build-for-testing -project UITests/AFileManagerUITests.xcodeproj -scheme AFileManagerUITests \
+    -destination "platform=macOS,arch=$(uname -m)" -derivedDataPath .build-tools/analyze/uitests >> "$log" 2>&1 \
+    || { grep -E 'error:' "$log" | sort -u | head -40 >&2; return 1; }
+  toolchain=$(dirname "$(dirname "$(xcrun --find swift)")")
+  sdk=$(xcrun --show-sdk-path)
+  platform=$(xcrun --show-sdk-platform-path)
+  for manifest in Package.swift Tests/Fuzz/pkg/Package.swift Tests/Stress/harness/Package.swift; do
+    echo "swiftc -module-name main -swift-version 6 -sdk $sdk -target arm64-apple-macosx14.0" \
+      "-I $toolchain/lib/swift/pm/ManifestAPI -I $platform/Developer/usr/lib" \
+      "-F $platform/Developer/Library/Frameworks $PWD/$manifest" >> "$log"
+  done
+  for program in Tests/Fuzz/repro/misc/cf/*.swift; do
+    echo "swiftc -module-name main -swift-version 6 -sdk $sdk -target arm64-apple-macosx14.0 $PWD/$program" >> "$log"
+  done
+  sed -i '' "s|-plugin-path $toolchain/lib/swift/host/plugins/testing|-external-plugin-path $toolchain/lib/swift/host/plugins/testing#$toolchain/bin/swift-plugin-server|g" "$log"
+}
+
+# analyzer_coverage <log>: fails, naming them, when Swift files git knows of have no invocation in the
+# log. `swiftlint analyze` skips such files without a word.
+analyzer_coverage() {
+  local missing
+  missing=$(comm -23 \
+    <(swift_files | tr '\0' '\n' | sed "s|^|$PWD/|" | sort -u) \
+    <(grep -E 'swiftc .* -module-name ' "$1" | tr ' ' '\n' | while read -r argument; do
+        case $argument in
+          @*) cat "${argument#@}"; echo ;;
+          *.swift) echo "$argument" ;;
+        esac
+      done | sort -u))
+  if [[ -n "$missing" ]]; then
+    printf 'no compiler invocation, cannot be analysed:\n%s\n' "$missing" >&2
+    return 1
+  fi
+}
+
 for gate in "${gates[@]}"; do
   case "$gate" in
     format)
@@ -62,7 +123,8 @@ for gate in "${gates[@]}"; do
       swiftlint_env
       swiftlint lint --strict --quiet
       step "SwiftLint analyzer rules"
-      swift build --build-tests -v > .build-tools/compile.log 2>&1
+      analyzer_log .build-tools/compile.log
+      analyzer_coverage .build-tools/compile.log
       swiftlint analyze --strict --quiet --compiler-log-path .build-tools/compile.log
       ;;
     docs-lint)
@@ -132,6 +194,14 @@ for gate in "${gates[@]}"; do
     leaks)
       step "tests under leaks"
       Scripts/leak-check.sh
+      ;;
+    fuzz-smoke)
+      step "fuzz drivers, short and seeded"
+      Tests/Fuzz/smoke.sh
+      ;;
+    stress-smoke)
+      step "stress harnesses, short and seeded"
+      Tests/Stress/smoke.sh
       ;;
     mutation)
       step "Muter on changed files"
