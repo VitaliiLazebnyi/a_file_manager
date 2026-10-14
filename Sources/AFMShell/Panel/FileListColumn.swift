@@ -294,11 +294,9 @@ final class IconStore {
         let source = source
         Background.storage(
             "icons", at: URL(fileURLWithPath: folder, isDirectory: true), qos: .utility,
-            // An image may go from thread to thread once it is made.
-            work: { Handover(batch.map { source($0.path) }) },
+            work: { batch.map { source($0.path) } },
             then: { [weak self] fetched in
                 guard let self else { return }
-                let fetched = fetched.value
                 busy.remove(folder)
                 for (key, icon) in zip(batch, fetched) {
                     asked.remove(key)

@@ -38,7 +38,7 @@ let pluginDependencies = plugins.map { Target.Dependency(stringLiteral: $0.name)
 
 let package = Package(
     name: "AFMStress",
-    platforms: [.macOS(.v13)],
+    platforms: [.macOS(.v14)],
     targets: [
         .target(name: "AFMKernel"),
         .target(name: "AFMContracts", dependencies: ["AFMKernel"]),

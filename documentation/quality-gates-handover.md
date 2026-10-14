@@ -56,8 +56,8 @@ from the host Mac into the test VM. Branch: `quality-gates`.
      Lock-guarded classes are `@unchecked Sendable` with a doc line naming the lock or the rule that makes them safe.
    - Closures that cross threads are `@Sendable`; those run on the main thread `@MainActor`. `JobMonitor.ask` and
      `Kernel.askUser` take `@MainActor @Sendable` questions; `Plugin.prepareToQuit` a `@Sendable` completion.
-   - Kernel `Handover<Value>`: a documented box for values safe to hand over but not marked `Sendable` on macOS 13
-     (`NSImage`, `NWConnection`). Raising the deployment target to macOS 14 would remove most uses.
+   - Kernel `Handover<Value>`: a documented box for values that are safe to hand over but not marked `Sendable`
+     (a pasteboard read on a job's thread, values one thread at a time uses). Deployment target: macOS 14.
    - Shell `MainLoop.queue`: a main-thread block run later from the run loop; `MainLoop`/`MainOwned` are internal
      to the shell (Places and Selection keep a small `performOnMainLoop` of their own).
 

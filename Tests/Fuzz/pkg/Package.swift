@@ -27,7 +27,7 @@ func fuzz(_ name: String, _ deps: [String]) -> Target {
 }
 let package = Package(
     name: "AFMFuzz",
-    platforms: [.macOS(.v13)],
+    platforms: [.macOS(.v14)],
     targets: [
         .target(name: "AFMKernel"),
         .target(name: "AFMContracts", dependencies: ["AFMKernel"]),

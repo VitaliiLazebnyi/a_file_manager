@@ -709,8 +709,7 @@ final class DataListener {
     private var listener: NWListener
     private var isBound: Bool
     private let queue = DispatchQueue(label: "afm.network.listener")
-    /// `NWConnection` is `Sendable` only from macOS 14; it is safe from any thread before that too.
-    private let accepted = Pending<Handover<NWConnection>>()
+    private let accepted = Pending<NWConnection>()
     private let peer: String
 
     /// The text of an address without what differs between two spellings of the same one: the
@@ -759,7 +758,7 @@ final class DataListener {
                 connection.cancel()
                 return
             }
-            accepted.fulfill(Handover(connection))
+            accepted.fulfill(connection)
         }
         listener.stateUpdateHandler = { state in
             switch state {
@@ -778,7 +777,7 @@ final class DataListener {
         guard let connection = try accepted.wait(timeout: timeout, cancellation: cancellation) else {
             throw NetworkError.timedOut("waiting for the server's data connection")
         }
-        let stream = NetStream(accepted: connection.value)
+        let stream = NetStream(accepted: connection)
         stream.start()
         return stream
     }

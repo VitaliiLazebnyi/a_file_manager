@@ -81,10 +81,7 @@ final class ThumbnailStore {
         lastToken += 1
         let token = lastToken
         let cancel = source.thumbnail(for: item.url, side: side, scale: scale) { [weak self] image in
-            // An image may go from thread to thread once it is made.
-            let image = Handover(image)
             MainLoop.perform { [weak self] in
-                let image = image.value
                 // An answer for a request that was given up (or given up and made again) is of no interest.
                 guard let self, self.running[key]?.token == token else { return }
                 self.running[key] = nil

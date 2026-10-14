@@ -97,7 +97,7 @@ let testTargets: [Target] = [
 
 let package = Package(
     name: "AFileManager",
-    platforms: [.macOS(.v13)],
+    platforms: [.macOS(.v14)],
     dependencies: [
         // `swift package generate-documentation`, used by the docs gate of Scripts/check.sh.
         .package(url: "https://github.com/swiftlang/swift-docc-plugin", from: "1.4.0")

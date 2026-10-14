@@ -125,10 +125,10 @@ enum ImageDecoder {
     private static func isAnimation(_ source: CGImageSource) -> Bool {
         let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any] ?? [:]
         let containers = CGImageSourceCopyProperties(source, nil) as? [CFString: Any] ?? [:]
-        var keys: [CFString] = [
-            kCGImagePropertyGIFDictionary, kCGImagePropertyPNGDictionary, kCGImagePropertyHEICSDictionary
+        let keys: [CFString] = [
+            kCGImagePropertyGIFDictionary, kCGImagePropertyPNGDictionary, kCGImagePropertyHEICSDictionary,
+            kCGImagePropertyWebPDictionary
         ]
-        if #available(macOS 14, *) { keys.append(kCGImagePropertyWebPDictionary) }
         for key in keys {
             if let values = properties[key] as? [CFString: Any] ?? containers[key] as? [CFString: Any] {
                 // An animation names a delay or a loop count (a PNG dictionary alone is not one).
@@ -136,10 +136,11 @@ enum ImageDecoder {
                     kCGImagePropertyGIFDelayTime, kCGImagePropertyGIFUnclampedDelayTime, kCGImagePropertyAPNGDelayTime,
                     kCGImagePropertyAPNGUnclampedDelayTime, kCGImagePropertyGIFLoopCount, kCGImagePropertyAPNGLoopCount
                 ]
-                if names.contains(where: { values[$0] != nil }) || key == kCGImagePropertyHEICSDictionary {
+                if names.contains(where: { values[$0] != nil }) || key == kCGImagePropertyHEICSDictionary
+                    || key == kCGImagePropertyWebPDictionary
+                {
                     return true
                 }
-                if #available(macOS 14, *), key == kCGImagePropertyWebPDictionary { return true }
             }
         }
         return false
