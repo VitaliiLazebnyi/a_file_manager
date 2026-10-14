@@ -5,6 +5,7 @@ import AppKit
 
 /// What the configuration windows and commands share: the user's commands and Start menu, the
 /// key bindings, and the settings as a whole. Main thread only.
+@MainActor
 final class ConfigurationCenter {
     unowned let kernel: Kernel
     let store: ConfigurationStore
@@ -301,8 +302,16 @@ final class ConfigurationCenter {
             schema.preferences[preference.key] = preference.kind
         }
         schema.known = Set(settingsKeys())
-        let declared = kernel.settingsKeys
-        schema.declaredKind = { declared.kind(of: $0) }
+        // Copied here, on the main thread where the registry lives: the schema is used on any thread.
+        let declared = kernel.settingsKeys.all
+        let exact = Dictionary(declared.filter { !$0.isPrefix }.map { ($0.key, $0.kind) }, uniquingKeysWith: { $1 })
+        let families = declared.filter(\.isPrefix)
+        schema.declaredKind = { key in
+            // As the registry answers: the key itself, else the longest family it belongs to.
+            exact[key]
+                ?? families.filter { key.utf8.starts(with: $0.key.utf8) }.max { $0.key.utf8.count < $1.key.utf8.count }?
+                .kind
+        }
         return schema
     }
 
@@ -365,7 +374,9 @@ final class ConfigurationCenter {
                         current[key] = kernel.settings.data(forKey: key)
                     }
                     runner.offMain(
-                        { SettingsImportPlan(checked, current: current, knownKeys: knownKeys, schema: schema) },
+                        { [current] in
+                            SettingsImportPlan(checked, current: current, knownKeys: knownKeys, schema: schema)
+                        },
                         then: { [self] plan in
                             confirmAndApply(plan, fileName: url.lastPathComponent)
                         })

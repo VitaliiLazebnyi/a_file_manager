@@ -20,6 +20,7 @@ final class ActionButton: NSButton {
 
 /// A stack whose parts fill it: across, every part is as wide (or as high) as the stack, and
 /// along it the parts without a size of their own (lists, spacers) take the room that is left.
+@MainActor
 func filledStack(_ views: [NSView], vertical: Bool, spacing: CGFloat = 8) -> NSStackView {
     let stack = NSStackView(views: views)
     stack.orientation = vertical ? .vertical : .horizontal
@@ -37,6 +38,7 @@ func filledStack(_ views: [NSView], vertical: Bool, spacing: CGFloat = 8) -> NSS
 }
 
 /// A view with a margin around it, as the content of a window.
+@MainActor
 func padded(_ view: NSView, by margin: CGFloat = 14) -> NSView {
     let holder = NSView()
     view.translatesAutoresizingMaskIntoConstraints = false
@@ -51,6 +53,7 @@ func padded(_ view: NSView, by margin: CGFloat = 14) -> NSView {
 }
 
 /// Takes the room nothing else wants.
+@MainActor
 func spacer() -> NSView {
     let view = NSView()
     view.setContentHuggingPriority(.init(1), for: .horizontal)
@@ -204,6 +207,7 @@ final class TextWindowController: NSWindowController {
 }
 
 /// Runs the entries of the Start menu after the menu was rebuilt while the program runs.
+@MainActor
 final class StartMenuTarget: NSObject, NSMenuItemValidation {
     private unowned let kernel: Kernel
 
@@ -226,6 +230,7 @@ final class StartMenuTarget: NSObject, NSMenuItemValidation {
 
 /// Changes to the menu bar while the program runs. The shell builds its menus once, from the
 /// registries; its items carry the name of their command, which is all that is relied on here.
+@MainActor
 enum LiveMenus {
     private static let slotPrefix = "cm_UserMenu"
 

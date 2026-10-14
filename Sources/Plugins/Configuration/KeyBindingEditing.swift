@@ -33,6 +33,7 @@ enum KeyMap {
 ///
 /// Unlike Total Commander's dialog, this one knows every key of every command, so it can say
 /// which command a key belongs to before it is taken away.
+@MainActor
 final class KeyBindingEditor {
     private var commands: [Command]
     private var stored: [String: [String]]
