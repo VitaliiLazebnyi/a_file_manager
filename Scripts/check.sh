@@ -22,6 +22,8 @@
 #   test        the tests, with coverage; Scripts/coverage-gate.py demands 100%
 #   memory      long loops (panels, folders, jobs, viewers, archives, a server) must not make the
 #               memory footprint grow (Tests/PluginTests/MemoryGrowth)
+#   benchmarks  the hot paths within the time and memory limits recorded for this machine
+#               (Scripts/benchmarks.sh; slow, and only on a quiet machine)
 #   docs      DocC builds every module's documentation without a warning
 #   sanitizers  the tests again under the address, thread and undefined-behaviour sanitizers (slow)
 #   leaks       the tests under `leaks`: no leaked memory
@@ -141,6 +143,10 @@ for gate in "${gates[@]}"; do
     memory)
       step "memory growth"
       AFM_MEMORY_GROWTH=1 swift test --filter MemoryGrowth
+      ;;
+    benchmarks)
+      step "benchmarks"
+      Scripts/benchmarks.sh
       ;;
     docs)
       step "DocC"
