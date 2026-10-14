@@ -27,7 +27,8 @@ enum ExistingFileChoice {
 /// from the job's own thread.
 ///
 /// Unchecked `Sendable`: what several threads touch is guarded by `lock` (the reports also by
-/// `reportLock`); `carriesOrigin` is set before any file is read.
+/// `reportLock`); `overwritesAll` and `journal` are used by the job's thread only (`create`,
+/// `transaction`).
 final class ToolRun: @unchecked Sendable {
     /// Files are read and written in blocks of this size, never as a whole.
     static let blockSize = 1 << 20
@@ -80,7 +81,12 @@ final class ToolRun: @unchecked Sendable {
     /// server, a download), as a copy of it would. A program that was split, sent and put
     /// together again is still checked by the system when it is first opened. Not set by
     /// tools that write something about their sources (a list of checksums).
-    var carriesOrigin = false
+    var carriesOrigin: Bool {
+        get { lock.withLock { carries } }
+        set { lock.withLock { carries = newValue } }
+    }
+    /// Guarded by `lock`, like `origin`.
+    private var carries = false
     private var origin: Data?
 
     /// The mark outputs get, once a source that has one was opened.
