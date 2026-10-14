@@ -16,7 +16,7 @@ import Testing
     let settings = MemorySettings()
     let bench: TestBench
     let early = Date(timeIntervalSince1970: 1_000_000)
-    var ui: ScriptedInteraction { bench.ui }
+    var ui: ScriptedInteraction { bench.interaction }
 
     init() {
         memory.addDirectory("/A")

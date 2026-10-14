@@ -22,7 +22,7 @@ import Testing
     let count: Int
 
     var commands: CommandRegistry { bench.commands }
-    var ui: ScriptedInteraction { bench.ui }
+    var ui: ScriptedInteraction { bench.interaction }
 
     init() throws {
         box = try Sandbox()

@@ -83,17 +83,17 @@ import Testing
 
     @Test func customColumnsAreChosenInAForm() {
         left.viewMode = .brief
-        bench.ui.formAnswers = [.values(["length": .flag(true)])]
+        bench.interaction.formAnswers = [.values(["length": .flag(true)])]
         commands.perform("cm_CustomColumnConfig")
-        #expect(bench.ui.forms[0].map(\.key) == ["", "upper", "length"])
+        #expect(bench.interaction.forms[0].map(\.key) == ["", "upper", "length"])
         // Columns are seen in the Full view only, so the panel goes there.
         #expect(left.extraColumns == ["length"] && left.viewMode == .full && right.extraColumns.isEmpty)
         // A column that stays keeps its place; a new one goes to the end. The form shows what is on.
-        bench.ui.formAnswers = [.values(["upper": .flag(true)])]
+        bench.interaction.formAnswers = [.values(["upper": .flag(true)])]
         commands.perform("cm_CustomColumnConfig")
-        #expect(bench.ui.forms[1].map(\.initialValue) == [nil, .flag(false), .flag(true)])
+        #expect(bench.interaction.forms[1].map(\.initialValue) == [nil, .flag(false), .flag(true)])
         #expect(left.extraColumns == ["length", "upper"])
-        bench.ui.formAnswers = [.cancel, .values(["length": .flag(false)])]
+        bench.interaction.formAnswers = [.cancel, .values(["length": .flag(false)])]
         commands.perform("cm_CustomColumnConfig")
         #expect(left.extraColumns == ["length", "upper"])
         // A column of a plugin that is not loaded is not in the form and is left alone.
@@ -135,9 +135,9 @@ import Testing
 
     @Test func aCustomFilterIsAskedForRememberedAndReset() {
         #expect(!commands.isEnabled("cm_SrcUserSpec"))
-        bench.ui.promptAnswers = [.text("*.txt *.md")]
+        bench.interaction.promptAnswers = [.text("*.txt *.md")]
         commands.perform("cm_SrcUserDef")
-        #expect(bench.ui.log == ["prompt: Enter file types (e.g. *.doc *.txt) [*.*]"])
+        #expect(bench.interaction.log == ["prompt: Enter file types (e.g. *.doc *.txt) [*.*]"])
         #expect(
             left.names == ["docs", "one.txt", "two.md"] && commands.isChecked("cm_SrcUserDef")
                 && left.model.filter?.title == "*.txt *.md")
@@ -145,9 +145,9 @@ import Testing
         commands.perform("cm_SrcUserDef", .text("*.*"))
         #expect(
             left.model.filter == nil && commands.isChecked("cm_SrcAllFiles") && !commands.isChecked("cm_SrcUserDef"))
-        bench.ui.promptAnswers = [.cancel]
+        bench.interaction.promptAnswers = [.cancel]
         commands.perform("cm_SrcUserDef")
-        #expect(bench.ui.log.last == "prompt: Enter file types (e.g. *.doc *.txt) [*.*]" && left.model.filter == nil)
+        #expect(bench.interaction.log.last == "prompt: Enter file types (e.g. *.doc *.txt) [*.*]" && left.model.filter == nil)
         commands.perform("cm_SrcUserDef", .text("*.* | *.md docs/"))
         #expect(left.names == ["one.txt", "run.sh", "tool"])
         commands.perform("cm_SrcAllFiles")

@@ -1,0 +1,66 @@
+{
+  "machines" : {
+    "VirtualMac2,1 arm64 8 cores 32 GB" : {
+      "archive-list-100k" : {
+        "cpuSeconds" : 0.66,
+        "peakMegabytes" : 210,
+        "wallSeconds" : 0.75
+      },
+      "batches-1m" : {
+        "cpuSeconds" : 12,
+        "peakMegabytes" : 4100,
+        "wallSeconds" : 13
+      },
+      "collation-100k" : {
+        "cpuSeconds" : 0.16,
+        "peakMegabytes" : 53,
+        "wallSeconds" : 0.18
+      },
+      "copy-memory-512mb" : {
+        "cpuSeconds" : 0.21,
+        "peakMegabytes" : 1900,
+        "wallSeconds" : 0.24
+      },
+      "filter-1m" : {
+        "cpuSeconds" : 0.74,
+        "peakMegabytes" : 710,
+        "wallSeconds" : 0.23
+      },
+      "load-local-100k" : {
+        "cpuSeconds" : 0.7000000000000001,
+        "peakMegabytes" : 140,
+        "wallSeconds" : 0.48
+      },
+      "mark-1m" : {
+        "cpuSeconds" : 0.97,
+        "peakMegabytes" : 820,
+        "wallSeconds" : 0.23
+      },
+      "parallel-map-1m" : {
+        "cpuSeconds" : 0.17,
+        "peakMegabytes" : 53,
+        "wallSeconds" : 0.07
+      },
+      "resort-reverse-1m" : {
+        "cpuSeconds" : 0.24,
+        "peakMegabytes" : 810,
+        "wallSeconds" : 0.22
+      },
+      "sort-ext-1m" : {
+        "cpuSeconds" : 1.8,
+        "peakMegabytes" : 810,
+        "wallSeconds" : 0.45
+      },
+      "sort-name-1m" : {
+        "cpuSeconds" : 1.5,
+        "peakMegabytes" : 810,
+        "wallSeconds" : 0.35000000000000003
+      },
+      "sort-size-1m" : {
+        "cpuSeconds" : 0.98,
+        "peakMegabytes" : 810,
+        "wallSeconds" : 0.27
+      }
+    }
+  }
+}

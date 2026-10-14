@@ -207,7 +207,7 @@ extension Int {
         #expect(first?.contains("[activetabs]") == true)
         // Saving again replaces the file, and nothing temporary is left beside it.
         bench.left.tabs.openTab(showing: memory.url("/A/docs"), activate: true)
-        bench.ui.choiceAnswers = [0]
+        bench.interaction.choiceAnswers = [0]
         bench.commands.perform("SAVETABS", .location(memory.url("/A/my.tab")))
         #expect(memory.contents("/A/my.tab") != first && memory.contents("/A/my.tab")?.contains("docs") == true)
         #expect(
@@ -218,14 +218,14 @@ extension Int {
         memory.addDirectory("/A/folder.tab")
         bench.commands.perform("SAVETABS", .location(memory.url("/A/folder.tab")))
         #expect(memory.item(at: memory.url("/A/folder.tab"))?.isDirectory == true)
-        #expect(bench.ui.log.last?.contains("could not be saved") == true)
+        #expect(bench.interaction.log.last?.contains("could not be saved") == true)
     }
 
     @Test func aFileTooLargeToBeATabFileIsNotLoaded() {
         memory.addFile("/A/huge.tab", String(repeating: "x", count: FolderTabsPlugin.tabFileLimit + 10))
         let before = bench.left.tabs.count
         bench.commands.perform("OPENTABS", .location(memory.url("/A/huge.tab")))
-        #expect(bench.left.tabs.count == before && bench.ui.log.last?.contains("could not be loaded") == true)
+        #expect(bench.left.tabs.count == before && bench.interaction.log.last?.contains("could not be loaded") == true)
     }
 
     @Test func theClipboardCommandIsOfferedForAnyTextAndReadsOnlyTheFirstLine() {

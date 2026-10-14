@@ -46,11 +46,11 @@ import Testing
         define(plugin, "em_a", "cm_wait 1, em_b")
         define(plugin, "em_b", "cm_wait 1, em_a")
         bench.commands.perform("em_a")
-        await wait { bench.ui.log.contains { $0.contains("calls itself") } }
-        #expect(bench.ui.log == ["inform: “a” calls itself"])
+        await wait { bench.interaction.log.contains { $0.contains("calls itself") } }
+        #expect(bench.interaction.log == ["inform: “a” calls itself"])
         // Nothing is left waiting: the loop has ended.
         await wait { !plugin.center!.runner.isWaiting }
-        #expect(!plugin.center!.runner.isWaiting && bench.ui.log.count == 1)
+        #expect(!plugin.center!.runner.isWaiting && bench.interaction.log.count == 1)
     }
 
     @Test func aStartMenuEntryThatCallsItselfIsStoppedToo() async {
@@ -62,8 +62,8 @@ import Testing
             after: nil)
         plugin.center!.commit(draft)
         bench.commands.perform("cm_UserMenu1")
-        await wait { bench.ui.log.contains { $0.contains("calls itself") } }
-        #expect(bench.ui.log == ["inform: “Loop” calls itself"])
+        await wait { bench.interaction.log.contains { $0.contains("calls itself") } }
+        #expect(bench.interaction.log == ["inform: “Loop” calls itself"])
     }
 
     @Test func aRunHasABoundedNumberOfSteps() {
@@ -74,11 +74,11 @@ import Testing
             plugin, "em_many",
             Array(repeating: "cm_ConfigProbe", count: CommandRunner.stepLimit + 50).joined(separator: ","))
         bench.commands.perform("em_many")
-        #expect(probes == CommandRunner.stepLimit && bench.ui.log == ["inform: “many” was stopped"])
+        #expect(probes == CommandRunner.stepLimit && bench.interaction.log == ["inform: “many” was stopped"])
         // Commands nested deeper than the limit are refused, not run.
         for level in 0..<(CommandRunner.depthLimit + 4) { define(plugin, "em_n\(level)", "em_n\(level + 1)") }
         bench.commands.perform("em_n0")
-        #expect(bench.ui.log.last?.contains("is nested too deeply") == true)
+        #expect(bench.interaction.log.last?.contains("is nested too deeply") == true)
     }
 
     @Test func aWaitingChainCanBeStopped() async {
@@ -123,18 +123,18 @@ import Testing
         bench.left.moveCursor(toName: "one.txt")
         for name in ["em_tick", "em_ansi", "em_here"] {
             bench.commands.perform(CommandID(rawValue: name))
-            #expect(bench.ui.log.last == "inform: “\(name.dropFirst(3))” was not run")
+            #expect(bench.interaction.log.last == "inform: “\(name.dropFirst(3))” was not run")
         }
         #expect(plugin.launched.isEmpty)
         bench.commands.perform("em_fine")
-        #expect(plugin.launched == ["echo \"$(basename one.txt)\""] && bench.ui.log.count == 3)
+        #expect(plugin.launched == ["echo \"$(basename one.txt)\""] && bench.interaction.log.count == 3)
         // A list with a name of two lines is not written, and the command is not run.
         _ = try? box.file("A/two\nlines.txt")
         bench.left.reload()
         define(plugin, "em_list", "cat", "%L")
         bench.commands.perform(.selectAll)
         bench.commands.perform("em_list")
-        #expect(bench.ui.log.last == "inform: “list” was not run" && plugin.launched.count == 1)
+        #expect(bench.interaction.log.last == "inform: “list” was not run" && plugin.launched.count == 1)
         #expect(!FileManager.default.fileExists(atPath: box.url("lists").path))
     }
 
@@ -270,7 +270,7 @@ import Testing
         let created = try FileManager.default.contentsOfDirectory(atPath: box.url("A").path).filter {
             $0.hasPrefix("PWNED")
         }
-        #expect(created.isEmpty && bench.ui.log.isEmpty)
+        #expect(created.isEmpty && bench.interaction.log.isEmpty)
     }
 
     @Test func aProgramTheShellDoesNotFindIsReported() async {
@@ -279,8 +279,8 @@ import Testing
                 name: "em_missing", title: "",
                 action: CommandAction(command: "afm-no-such-program-\(UUID().uuidString)")))
         bench.commands.perform("em_missing")
-        await wait { bench.ui.log.contains { $0.hasPrefix("inform:") } }
-        #expect(bench.ui.log.count == 1 && bench.ui.log[0].contains("cannot be started"))
+        await wait { bench.interaction.log.contains { $0.hasPrefix("inform:") } }
+        #expect(bench.interaction.log.count == 1 && bench.interaction.log[0].contains("cannot be started"))
     }
 
     @Test func aChainStopsWhenItsProgramCouldNotBeStarted() async {
@@ -296,7 +296,7 @@ import Testing
         center.save(
             UserCommand(name: "em_chain2", title: "", action: CommandAction(command: "em_good, cm_ConfigProbe")))
         bench.commands.perform("em_chain")
-        await wait { bench.ui.log.contains { $0.contains("cannot be started") } }
+        await wait { bench.interaction.log.contains { $0.contains("cannot be started") } }
         bench.commands.perform("em_chain2")
         await wait { probes == 1 }
         // Only the chain whose program ran went on.

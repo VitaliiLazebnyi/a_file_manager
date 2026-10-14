@@ -190,7 +190,7 @@ import Testing
         bench.left.model.cursor = 0
         if bench.left.model.cursorItem == nil {
             bench.commands.perform("em_rm")
-            #expect(plugin.launched.count == 1 && bench.ui.log.last == "inform: “rm” needs a file")
+            #expect(plugin.launched.count == 1 && bench.interaction.log.last == "inform: “rm” needs a file")
         }
     }
 
@@ -272,7 +272,7 @@ import Testing
                 name: "em_nowhere", title: "",
                 action: CommandAction(command: "true", startPath: "/nonexistent-folder-afm")))
         bench.commands.perform("em_nowhere")
-        await wait { bench.ui.log.contains { $0.hasPrefix("inform:") } }
-        #expect(bench.ui.log.contains { $0.hasPrefix("inform:") && $0.contains("cannot be started") })
+        await wait { bench.interaction.log.contains { $0.hasPrefix("inform:") } }
+        #expect(bench.interaction.log.contains { $0.hasPrefix("inform:") && $0.contains("cannot be started") })
     }
 }

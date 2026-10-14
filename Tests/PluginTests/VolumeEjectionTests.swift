@@ -79,7 +79,7 @@ private final class StandInDrive: VolumeAccess, @unchecked Sendable {
                 && bench.right.model.directory.isSameLocation(as: box.url("B")))
         #expect(released.count == 1 && released.first?.isSameLocation(as: stick) == true && drive.ejects == 1)
         #expect(
-            bench.ui.log.last == "notice: “STICK” can now be removed safely."
+            bench.interaction.log.last == "notice: “STICK” can now be removed safely."
                 && tools.log.last == "eject: \(stick.path)")
     }
 
@@ -97,7 +97,7 @@ private final class StandInDrive: VolumeAccess, @unchecked Sendable {
         bench.left.show(box.url("Stick/photos"))
         bench.commands.perform(SystemToolsCommands.ejectVolume)
         #expect(bench.left.model.directory.isSameLocation(as: box.url("Stick/photos")))
-        #expect(bench.ui.log.last == "inform: “STICK” cannot be ejected" && tools.log.isEmpty && drive.ejects == 1)
+        #expect(bench.interaction.log.last == "inform: “STICK” cannot be ejected" && tools.log.isEmpty && drive.ejects == 1)
     }
 
     @Test func whatThisProgramLetGoOfIsGivenAMoment() {
@@ -106,7 +106,7 @@ private final class StandInDrive: VolumeAccess, @unchecked Sendable {
         let (bench, _) = bench(drive)
         bench.left.show(stick)
         bench.commands.perform(SystemToolsCommands.ejectVolume)
-        #expect(drive.ejects == 2 && bench.ui.log.last == "notice: “STICK” can now be removed safely.")
+        #expect(drive.ejects == 2 && bench.interaction.log.last == "notice: “STICK” can now be removed safely.")
     }
 
     @Test func aWriteThatFailsKeepsTheDrive() {
@@ -117,7 +117,7 @@ private final class StandInDrive: VolumeAccess, @unchecked Sendable {
         bench.kernel.fileSystems.addFlusher { url, _ in if url.isSameLocation(as: volume) { throw Unwritable() } }
         bench.left.show(stick)
         bench.commands.perform(SystemToolsCommands.ejectVolume)
-        #expect(drive.ejects == 0 && bench.ui.log.last == "inform: “STICK” was not ejected")
+        #expect(drive.ejects == 0 && bench.interaction.log.last == "inform: “STICK” was not ejected")
         #expect(bench.left.model.directory.isSameLocation(as: stick))
     }
 
@@ -125,7 +125,7 @@ private final class StandInDrive: VolumeAccess, @unchecked Sendable {
         let drive = StandInDrive(stick)
         let (bench, _) = bench(drive)
         bench.commands.perform(SystemToolsCommands.ejectVolume)
-        #expect(drive.ejects == 0 && bench.ui.log.last == "inform: Macintosh HD cannot be ejected.")
+        #expect(drive.ejects == 0 && bench.interaction.log.last == "inform: Macintosh HD cannot be ejected.")
         #expect(bench.left.model.directory.isSameLocation(as: box.url("A")))
     }
 
