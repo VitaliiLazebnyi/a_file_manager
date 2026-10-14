@@ -12,5 +12,13 @@ Tests/Stress/out/
 # Temporary working files
 scratchpad/
 
+# Build folders of the quality gates (Scripts/check.sh)
+.build-tools/
+.build-native/
+.build-codeql/
+.build-address/
+.build-thread/
+.build-undefined/
+
 # macOS
 .DS_Store

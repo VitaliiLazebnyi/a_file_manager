@@ -1,0 +1,45 @@
+# SwiftLint: every rule is on, and `swiftlint lint --strict` turns every warning into an error.
+# Layout is swift-format's job (.swift-format); the rules below are off only because they contradict
+# another enabled rule or swift-format, so no code can satisfy both. Each says what it conflicts with.
+
+opt_in_rules:
+  - all
+analyzer_rules:
+  - all
+
+disabled_rules:
+  # Requires `{` on the next line; contradicts `opening_brace` and swift-format (same line).
+  - contrasted_opening_brace
+  # Requires a type on every declaration; contradicts `redundant_type_annotation`.
+  - explicit_type_interface
+  # Requires `self.` everywhere; contradicts `redundant_self`.
+  - explicit_self
+  # Requires `public extension`; contradicts swift-format's NoAccessLevelOnExtensionDeclaration.
+  - extension_access_modifier
+  # Requires a deinit in every class, which is empty in most; contradicts `no_empty_block`.
+  - required_deinit
+  # Import order is swift-format's OrderedImports, which groups @testable imports differently.
+  - sorted_imports
+  # Flags every literal but 0 and 1 (sizes, offsets, test data); agreed to leave off.
+  - no_magic_numbers
+
+excluded:
+  - .build
+  - .build-native
+  - build
+  - scratchpad
+  - Tests/Fuzz/out
+  - Tests/Fuzz/pkg/.build
+
+line_length:
+  warning: 120
+  ignores_urls: true
+
+trailing_comma:
+  mandatory_comma: false
+
+missing_docs:
+  warning: [open, public, package, internal]
+  excludes_extensions: false
+  excludes_inherited_types: false
+  excludes_trivial_init: false

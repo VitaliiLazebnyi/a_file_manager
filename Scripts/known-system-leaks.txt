@@ -1,0 +1,3 @@
+# Leaks whose root object lives in an Apple library, not in this project. One type name per line;
+# lines are matched as fixed strings against the root type reported by `leaks`.
+icu::RuleBasedCollator

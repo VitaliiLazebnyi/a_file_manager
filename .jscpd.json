@@ -1,0 +1,10 @@
+{
+  "threshold": 0,
+  "minTokens": 50,
+  "minLines": 5,
+  "format": ["swift"],
+  "ignore": ["**/.build/**", "**/.build-*/**", "**/build/**"],
+  "reporters": ["console"],
+  "absolute": false,
+  "gitignore": true
+}

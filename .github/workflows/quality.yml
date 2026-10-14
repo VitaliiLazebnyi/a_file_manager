@@ -1,0 +1,94 @@
+# The quality gates of Scripts/check.sh on GitHub's macOS machines: every push to main and every pull
+# request runs the fast gates; a nightly run adds the slow ones (sanitizers, CodeQL, mutation testing
+# of the files changed in the last day). The same script runs locally in the test VM.
+name: Quality
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "41 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  HOMEBREW_NO_AUTO_UPDATE: "1"
+  HOMEBREW_NO_ANALYTICS: "1"
+
+jobs:
+  gates:
+    runs-on: macos-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        gates:
+          - format lint docs-lint scripts secrets
+          - security deadcode complexity duplicates
+          - test docs leaks
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Select the newest stable Xcode
+        uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
+        with:
+          xcode-version: latest-stable
+
+      - name: Install the tools
+        run: Scripts/install-tools.sh
+
+      - name: Gates
+        env:
+          GATES: ${{ matrix.gates }}
+        run: |
+          read -ra gates <<< "$GATES"
+          Scripts/check.sh "${gates[@]}"
+
+  nightly:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: macos-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Select the newest stable Xcode
+        uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
+        with:
+          xcode-version: latest-stable
+
+      - name: Install the tools
+        run: Scripts/install-tools.sh
+
+      - name: Sanitizers and CodeQL
+        run: Scripts/check.sh sanitizers codeql
+
+      - name: Mutation testing of the last day's changes
+        run: |
+          base="$(git rev-list -n1 --before='25 hours ago' HEAD)"
+          files="$(git diff --name-only --diff-filter=AM "$base" -- 'Sources/*.swift')"
+          if [[ -n "$files" ]]; then
+            # shellcheck disable=SC2086
+            Scripts/mutation.sh $files
+          fi
+
+      - name: SBOM
+        run: Scripts/check.sh sbom
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: sbom-${{ github.sha }}
+          path: build/sbom.spdx.json
+          retention-days: 90

@@ -1,0 +1,4 @@
+#!/bin/bash
+# Before each commit: the fast gates, run in the test VM. Enable once per clone with
+#   git config core.hooksPath .githooks
+exec "$(git rev-parse --show-toplevel)/Scripts/vm-check.sh" format lint docs-lint scripts secrets
