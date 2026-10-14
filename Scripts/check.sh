@@ -155,7 +155,13 @@ for gate in "${gates[@]}"; do
     sbom)
       step "SBOM"
       mkdir -p build
-      syft scan dir:. --quiet -o spdx-json=build/sbom.spdx.json
+      # What the project itself declares: its manifests, lock file and workflows; never build
+      # output, the checkouts SwiftPM makes there, or agent worktrees (each a copy of the project).
+      syft scan dir:. --quiet --source-name "A File Manager" --source-version "$(git describe --always --dirty)" \
+        --exclude './.build*' --exclude './.claude' --exclude './.swiftpm' --exclude './build' \
+        --exclude './Tests/*/out' --exclude './Tests/*/*/.build' -o spdx-json=build/sbom.spdx.json
+      # Every resolved Swift package is in it.
+      python3 Scripts/sbom-check.py build/sbom.spdx.json Package.resolved
       ;;
     *)
       echo "unknown gate: $gate" >&2
