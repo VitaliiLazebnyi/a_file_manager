@@ -20,7 +20,9 @@
 #   api         no break of the plugin API (AFMKernel, AFMContracts) against origin/main that
 #               Scripts/api-breaks.txt does not acknowledge
 #   test        the tests, with coverage; Scripts/coverage-gate.py demands 100%
-#   docs        DocC builds every module's documentation without a warning
+#   memory      long loops (panels, folders, jobs, viewers, archives, a server) must not make the
+#               memory footprint grow (Tests/PluginTests/MemoryGrowth)
+#   docs      DocC builds every module's documentation without a warning
 #   sanitizers  the tests again under the address, thread and undefined-behaviour sanitizers (slow)
 #   leaks       the tests under `leaks`: no leaked memory
 #   mutation    Muter on the files changed since origin/main (slow)
@@ -30,7 +32,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 mkdir -p .build-tools
 
-fast=(format lint docs-lint scripts secrets security deadcode complexity duplicates architecture api test docs leaks)
+fast=(format lint docs-lint scripts secrets security deadcode complexity duplicates architecture api test memory docs leaks)
 gates=("$@")
 [[ ${#gates[@]} -eq 0 ]] && gates=("${fast[@]}")
 
@@ -96,9 +98,15 @@ for gate in "${gates[@]}"; do
       ;;
     codeql)
       step "CodeQL"
+      if ! arch -x86_64 /usr/bin/true 2>/dev/null; then
+        echo "CodeQL's Swift extractor is an Intel program and needs Rosetta:" >&2
+        echo "  sudo softwareupdate --install-rosetta --agree-to-license" >&2
+        exit 1
+      fi
       db=".build-codeql/db"
       rm -rf "$db"
-      codeql database create "$db" --language=swift --overwrite --command="swift build --build-tests --scratch-path .build-codeql/build"
+      mkdir -p "$(dirname "$db")"
+      codeql database create "$db" --language=swift --overwrite --command="swift build --build-tests --build-system native --disable-sandbox --scratch-path .build-codeql/build"
       codeql database analyze "$db" codeql/swift-queries:codeql-suites/swift-security-and-quality.qls \
         --format=sarif-latest --output=.build-codeql/results.sarif --download
       python3 -c 'import json,sys; r=[x for run in json.load(open(sys.argv[1]))["runs"] for x in run["results"]]; [print(x["ruleId"], x["locations"][0]["physicalLocation"]["artifactLocation"]["uri"], x["locations"][0]["physicalLocation"]["region"]["startLine"], x["message"]["text"][:120]) for x in r]; sys.exit(1 if r else 0)' .build-codeql/results.sarif
@@ -129,6 +137,10 @@ for gate in "${gates[@]}"; do
       step "tests with coverage"
       swift test --enable-code-coverage
       python3 Scripts/coverage-gate.py
+      ;;
+    memory)
+      step "memory growth"
+      AFM_MEMORY_GROWTH=1 swift test --filter MemoryGrowth
       ;;
     docs)
       step "DocC"

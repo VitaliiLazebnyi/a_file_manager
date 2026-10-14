@@ -1,6 +1,8 @@
 # The quality gates of Scripts/check.sh on GitHub's macOS machines: every push to main and every pull
 # request runs the fast gates; a nightly run adds the slow ones (sanitizers, CodeQL, mutation testing
-# of the files changed in the last day). The same script runs locally in the test VM.
+# of the files changed in the last day). The same script runs locally in the test VM. The benchmarks
+# are not run here: their limits are recorded per kind of machine, and shared runners are too noisy
+# for limits on time.
 name: Quality
 
 on:
@@ -31,8 +33,8 @@ jobs:
       matrix:
         gates:
           - format lint docs-lint scripts secrets
-          - security deadcode complexity duplicates
-          - test docs leaks
+          - security deadcode complexity duplicates architecture api
+          - test memory docs leaks
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
