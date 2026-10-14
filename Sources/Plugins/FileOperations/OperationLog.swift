@@ -135,22 +135,26 @@ public final class OperationLog: @unchecked Sendable {
     /// `cancellation` is set (the user does not want to wait for a disk that is not
     /// answering). The writing itself goes on on the log's queue either way. Any thread.
     public func flush(cancellation: CancellationFlag, completion: @escaping @Sendable () -> Void) {
-        /// Unchecked `Sendable`: all state is guarded by `lock`.
+        /// Unchecked `Sendable`: all state is guarded by `lock`. What it lets go of (the
+        /// registration, whose release takes the flag's lock) is released outside the lock.
         final class Once: @unchecked Sendable {
             private let lock = NSLock()
             private var completion: (@Sendable () -> Void)?
             private var token: AnyObject?
             init(_ completion: @escaping @Sendable () -> Void) { self.completion = completion }
+            /// Holds the registration until `fire`; one that comes after it (the flag was set
+            /// already, or the log was quicker) is let go of at once.
             func keep(_ token: AnyObject) {
                 lock.lock()
-                self.token = token
+                if completion != nil { self.token = token }
                 lock.unlock()
             }
             func fire() {
                 lock.lock()
-                let call = completion
+                let (call, registration) = (completion, token)
                 (completion, token) = (nil, nil)
                 lock.unlock()
+                withExtendedLifetime(registration) {}
                 call?()
             }
         }
