@@ -25,14 +25,17 @@ enum ExistingFileChoice {
 /// **Threading.** A run belongs to its job, but `advance` and `isCancelled` may be called
 /// from several threads at once (files are hashed side by side); everything else is used
 /// from the job's own thread.
-final class ToolRun {
+///
+/// Unchecked `Sendable`: what several threads touch is guarded by `lock` (the reports also by
+/// `reportLock`); `carriesOrigin` is set before any file is read.
+final class ToolRun: @unchecked Sendable {
     /// Files are read and written in blocks of this size, never as a whole.
     static let blockSize = 1 << 20
 
     let fileSystems: FileSystemRegistry
     let cancellation: CancellationFlag
-    private let report: (JobProgress) -> Void
-    private let askExisting: (URL) -> ExistingFileChoice
+    private let report: @Sendable (JobProgress) -> Void
+    private let askExisting: @Sendable (URL) -> ExistingFileChoice
     private let lock = NSLock()
     /// Held while a report is made, so reports reach the window one at a time and in order.
     private let reportLock = NSLock()
@@ -48,8 +51,8 @@ final class ToolRun {
     /// files are overwritten.
     init(
         fileSystems: FileSystemRegistry, cancellation: CancellationFlag = CancellationFlag(),
-        report: @escaping (JobProgress) -> Void = { _ in },
-        askExisting: @escaping (URL) -> ExistingFileChoice = { _ in .overwrite }
+        report: @escaping @Sendable (JobProgress) -> Void = { _ in },
+        askExisting: @escaping @Sendable (URL) -> ExistingFileChoice = { _ in .overwrite }
     ) {
         self.fileSystems = fileSystems
         self.cancellation = cancellation
@@ -59,11 +62,12 @@ final class ToolRun {
 
     /// A run inside a job: progress goes to its window, questions through `ask`.
     convenience init(
-        fileSystems: FileSystemRegistry, monitor: any JobMonitor, askExisting: @escaping (URL) -> ExistingFileChoice
+        fileSystems: FileSystemRegistry, monitor: any JobMonitor,
+        askExisting: @escaping @MainActor @Sendable (URL) -> ExistingFileChoice
     ) {
         self.init(
-            fileSystems: fileSystems, cancellation: monitor.cancellation, report: monitor.report,
-            askExisting: { url in monitor.ask { askExisting(url) } })
+            fileSystems: fileSystems, cancellation: monitor.cancellation, report: { monitor.report($0) },
+            askExisting: { url in monitor.ask { @MainActor @Sendable in askExisting(url) } })
     }
 
     var isCancelled: Bool { cancellation.isCancelled }

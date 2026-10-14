@@ -70,6 +70,7 @@ public final class FileToolsPlugin: Plugin {
 /// **Threading.** A command starts on the main thread, where it reads the panel and asks its
 /// dialog. All reading, writing and hashing happens inside a job on the job's thread (hashing
 /// on all cores); the job's completion returns to the main thread to report and refresh.
+@MainActor
 final class FileTools {
     /// The settings keys; the spec's names are given where it has them.
     enum Keys {
@@ -132,16 +133,16 @@ final class FileTools {
     /// `title`; a cancelled run says nothing. The folders in `refreshing` are read again; it
     /// gets the result of the work (nil when it failed or was cancelled), which was made on the
     /// job's thread and reaches the main thread with the completion.
-    private func run<Value>(
-        _ title: String, job: String, refreshing folders: @escaping (Value?) -> [URL],
-        _ work: @escaping (ToolRun) throws -> Value,
-        then done: @escaping (Value) -> Void
+    private func run<Value: Sendable>(
+        _ title: String, job: String, refreshing folders: @escaping @MainActor (Value?) -> [URL],
+        _ work: @escaping @Sendable (ToolRun) throws -> Value,
+        then done: @escaping @MainActor (Value) -> Void
     ) {
         let (fileSystems, ui) = (self.fileSystems, self.ui)
         kernel.jobs.run(
             title: job,
             work: { monitor -> Result<Value, any Error> in
-                let run = ToolRun(fileSystems: fileSystems, monitor: monitor) { url in
+                let run = ToolRun(fileSystems: fileSystems, monitor: monitor) { @MainActor @Sendable url in
                     ui.pick(
                         "Overwrite:", detail: fileSystems.displayPath(url),
                         [
@@ -166,7 +167,7 @@ final class FileTools {
     }
 
     /// Creates the target folder of a tool that, like Copy, makes it when it is missing.
-    private static func prepare(_ folder: URL, _ run: ToolRun) throws {
+    nonisolated private static func prepare(_ folder: URL, _ run: ToolRun) throws {
         do {
             try run.provider(for: folder).createDirectory(at: folder)
         } catch {
@@ -314,12 +315,15 @@ final class FileTools {
 
     /// The proposal of "Save CRC file(s) to": next to the one file under its name, or, for
     /// several items, in the source folder under the folder's name.
-    static func checksumProposal(for operands: [FileItem], in directory: URL, method: ChecksumMethod) -> URL {
+    nonisolated static func checksumProposal(for operands: [FileItem], in directory: URL, method: ChecksumMethod) -> URL
+    {
         checksumProposal(count: operands.count, firstName: operands.first?.name, in: directory, method: method)
     }
 
     /// The same from how many items there are and the name of the first, which is all it needs.
-    static func checksumProposal(count: Int, firstName: String?, in directory: URL, method: ChecksumMethod) -> URL {
+    nonisolated static func checksumProposal(count: Int, firstName: String?, in directory: URL, method: ChecksumMethod)
+        -> URL
+    {
         let name =
             count == 1
             ? firstName ?? "" : (directory.lastPathComponent == "/" ? "checksums" : directory.lastPathComponent)
@@ -399,7 +403,7 @@ final class FileTools {
                 let shown = Set(kernel.panels.all.map { $0.model.directory.locationKey })
                 return [directory] + folders.filter { shown.contains($0.key) }.map(\.url)
             },
-            { run in
+            { [target, options] run in
                 let written = try ChecksumRun.create(for: operands.items(), target: target, options: options, run: run)
                 var seen = Set<String>()
                 var folders: [(url: URL, key: String)] = []
@@ -430,7 +434,8 @@ final class FileTools {
         let cursor = model.cursorItem
         let extraMasks = settings.text(Keys.extraTypes, default: "")
         let onlyErrors = settings.flag(Keys.onlyErrors, default: false)
-        let pasteboard = self.pasteboard
+        // Read in the job, as the clipboard may be slow to answer; nothing else uses it meanwhile.
+        let pasteboard = Handover(self.pasteboard)
         let title = "Verify checksums"
         // The sorting out of what the operands are (a mask test per name, the clipboard) and the work
         // itself happen in the job: with a large selection none of it belongs on the main thread.
@@ -440,7 +445,8 @@ final class FileTools {
             let checksumFiles = operands.filter { !$0.isDirectory && isChecksumFile($0.name) }
             if !checksumFiles.isEmpty { return try ChecksumRun.verify(checksumFiles: checksumFiles, run: run) }
             if let cursor, !cursor.isDirectory,
-                let digest = ChecksumRun.checksum(fromClipboard: (pasteboard ?? .general).string(forType: .string))
+                let digest = ChecksumRun.checksum(
+                    fromClipboard: (pasteboard.value ?? .general).string(forType: .string))
             {
                 return try ChecksumRun.verify([(cursor, digest)], title: "Checksum from the clipboard", run: run)
             }
@@ -453,7 +459,8 @@ final class FileTools {
     }
 
     private func verify(
-        _ title: String, in model: PanelModel, onlyErrors: Bool, _ work: @escaping (ToolRun) throws -> VerifyReport?
+        _ title: String, in model: PanelModel, onlyErrors: Bool,
+        _ work: @escaping @Sendable (ToolRun) throws -> VerifyReport?
     ) {
         let directory = model.directory
         run(
