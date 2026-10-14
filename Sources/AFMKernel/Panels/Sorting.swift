@@ -741,18 +741,20 @@ final class NameCollator: @unchecked Sendable {
         @convention(c) (OpaquePointer, UnsafePointer<UInt16>?, Int32, UnsafeMutablePointer<UInt8>?, Int32) -> Int32
     private typealias Open = @convention(c) (UnsafePointer<CChar>, UnsafeMutablePointer<Int32>) -> OpaquePointer?
     private typealias SetAttribute = @convention(c) (OpaquePointer, Int32, Int32, UnsafeMutablePointer<Int32>) -> Void
+    private typealias Close = @convention(c) (OpaquePointer) -> Void
 
     /// Making keys with one collator from several threads is safe as long as nobody changes
     /// its settings, which nothing does after `init`.
     let collator: (handle: OpaquePointer, sortKey: SortKey)?
 
-    private static let library: (open: Open, setAttribute: SetAttribute, sortKey: SortKey)? = {
+    private static let library: (open: Open, setAttribute: SetAttribute, sortKey: SortKey, close: Close)? = {
         guard let handle = dlopen("/usr/lib/libicucore.A.dylib", RTLD_LAZY), let open = dlsym(handle, "ucol_open"),
-            let setAttribute = dlsym(handle, "ucol_setAttribute"), let sortKey = dlsym(handle, "ucol_getSortKey")
+            let setAttribute = dlsym(handle, "ucol_setAttribute"), let sortKey = dlsym(handle, "ucol_getSortKey"),
+            let close = dlsym(handle, "ucol_close")
         else { return nil }
         return (
             unsafeBitCast(open, to: Open.self), unsafeBitCast(setAttribute, to: SetAttribute.self),
-            unsafeBitCast(sortKey, to: SortKey.self)
+            unsafeBitCast(sortKey, to: SortKey.self), unsafeBitCast(close, to: Close.self)
         )
     }()
 
@@ -799,7 +801,7 @@ final class NameCollator: @unchecked Sendable {
 
     init(identifier: String, numeric: Bool) {
         var status: Int32 = 0
-        guard let library = Self.library, let handle = library.open(identifier, &status), status <= 0 else {
+        guard let library = Self.library, let handle = library.open(identifier, &status) else {
             collator = nil
             return
         }
@@ -814,6 +816,7 @@ final class NameCollator: @unchecked Sendable {
             library.setAttribute(handle, numericCollation, on, &status)
         }
         guard status <= 0 else {
+            library.close(handle)
             collator = nil
             return
         }
@@ -863,5 +866,9 @@ final class NameCollator: @unchecked Sendable {
                 if let result { return result }
             }
         }
+    }
+
+    deinit {
+        if let (handle, _) = collator { Self.library?.close(handle) }
     }
 }
