@@ -193,8 +193,10 @@ public enum PathSafety: Sendable {
         return names
     }
 
-    /// Whether `url` lies below `root` once both are written out in full (`.` and `..`
-    /// resolved): the paths are compared byte for byte, component by component. With
+    /// Whether `url` lies below `root` once both are written out in full: the paths are read
+    /// the way the file system reads them (an empty name is no name, so `a//..` is the folder
+    /// above `a`; `.` is the folder itself, `..` the one above) and compared byte for byte,
+    /// component by component. A path whose `..` leads above its start lies nowhere. With
     /// `resolvingLinks`, symbolic links on the way are followed first, for both, which asks
     /// the disk and is for local files only: a link inside the folder that points out of it
     /// is then seen for what it is, also when the file at the end does not exist yet.
@@ -202,31 +204,45 @@ public enum PathSafety: Sendable {
         guard (url.scheme ?? "file") == (root.scheme ?? "file"), url.host == root.host, url.port == root.port else {
             return false
         }
-        func bytes(_ url: URL) -> [UInt8] {
-            var path = Array((resolvingLinks && url.isFileURL ? resolved(url) : url.standardized.path).utf8)
-            while path.count > 1, path.last == 0x2F { path.removeLast() }
-            return path
+        func bytes(_ url: URL) -> [UInt8]? {
+            written(Array((resolvingLinks && url.isFileURL ? resolved(url.path) : url.path).utf8))
         }
-        let (own, above) = (bytes(url), bytes(root))
-        // A path that still names a way up after being written out in full starts above its root.
-        if own.split(separator: 0x2F).contains(where: { $0.elementsEqual([0x2E, 0x2E]) }) { return false }
-        guard own.count > above.count, own.starts(with: above) else { return false }
+        guard let own = bytes(url), let above = bytes(root), own.count > above.count, own.starts(with: above) else {
+            return false
+        }
         return above.last == 0x2F || own[above.count] == 0x2F
     }
 
-    /// The path of a local file with every link on the way followed: the part of the path
-    /// that exists is resolved by the system, and what does not exist yet follows it as written.
-    private static func resolved(_ url: URL) -> String {
-        var existing = url.standardizedFileURL
-        var rest: [String] = []
-        while true {
-            if let real = realpath(existing.path, nil) {
-                defer { free(real) }
-                return rest.reversed().reduce(String(cString: real)) { $0 == "/" ? "/" + $1 : $0 + "/" + $1 }
+    /// A path written out in full, by its text alone: empty names and `.` left out, each `..`
+    /// taking away the name before it. Nil when a `..` has nothing left to take away.
+    private static func written(_ path: [UInt8]) -> [UInt8]? {
+        var names: [ArraySlice<UInt8>] = []
+        for name in path.split(separator: 0x2F) where !name.elementsEqual([0x2E]) {
+            if name.elementsEqual([0x2E, 0x2E]) {
+                guard names.popLast() != nil else { return nil }
+            } else {
+                names.append(name)
             }
-            guard existing.pathComponents.count > 1 else { return url.standardizedFileURL.path }
-            rest.append(existing.lastPathComponent)
-            existing = existing.deletingLastPathComponent()
         }
+        let joined = Array(names.joined(separator: [0x2F]))
+        return path.first == 0x2F ? [0x2F] + joined : joined
+    }
+
+    /// The path of a local file (which starts at the root) with every link on the way
+    /// followed: the longest start of the path that exists is resolved by the system (links
+    /// and `..` as the disk has them), and what does not exist yet follows it as written.
+    private static func resolved(_ path: String) -> String {
+        let names = Array(path.utf8).split(separator: 0x2F)
+        for count in stride(from: names.count, to: 0, by: -1) {
+            let start = "/" + names[..<count].map { String(decoding: $0, as: UTF8.self) }.joined(separator: "/")
+            guard let real = realpath(start, nil) else { continue }
+            defer { free(real) }
+            return names[count...]
+                .reduce(String(cString: real)) { text, name in
+                    text + "/" + String(decoding: name, as: UTF8.self)
+                }
+        }
+        // Nothing but the root exists, and the root is itself.
+        return path
     }
 }
