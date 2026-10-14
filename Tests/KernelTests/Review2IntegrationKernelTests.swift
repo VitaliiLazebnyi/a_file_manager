@@ -17,7 +17,11 @@ private func entry(_ name: String, in folder: URL, size: Int64 = 1, folder isFol
 
 private func listing(_ folder: URL, _ items: [FileItem]) -> Listing {
     Listing(
-        directory: folder, items: items, parent: folder.deletingLastPathComponent(), root: URL(fileURLWithPath: "/"))
+        directory: folder,
+        items: items,
+        parent: folder.deletingLastPathComponent(),
+        root: URL(fileURLWithPath: "/")
+    )
 }
 
 private func elsewhere<Value>(_ work: @escaping @Sendable () -> Value) -> Value {
@@ -82,7 +86,8 @@ private func elsewhere<Value>(_ work: @escaping @Sendable () -> Value) -> Value 
         #expect(model.update(with: listing(other, arrival + [entry("new.txt", in: other, size: 9)])))
         #expect(
             model.isComplete && !model.isRefreshing
-                && model.items.map(\.name) == ["Docs", "new.txt", "mid.txt", "zeta.txt"])
+                && model.items.map(\.name) == ["Docs", "new.txt", "mid.txt", "zeta.txt"]
+        )
     }
 
     @Test func aPanelThatChangedMeanwhileRefusesTheEnteringAndTakesTheNextOne() {
@@ -143,7 +148,8 @@ private func elsewhere<Value>(_ work: @escaping @Sendable () -> Value) -> Value 
                     // The keys say what the comparison says.
                     let (x, y) = (Sorter.key(of: a, numeric: numeric), Sorter.key(of: b, numeric: numeric))
                     #expect(
-                        (x < y) == (forward == .orderedAscending) && (x == y) == (forward == .orderedSame), "\(a) \(b)"
+                        (x < y) == (forward == .orderedAscending) && (x == y) == (forward == .orderedSame),
+                        "\(a) \(b)"
                     )
                     for c in names
                     where forward == .orderedAscending && Sorter.compare(b, c, numeric: numeric) == .orderedAscending {
@@ -159,12 +165,14 @@ private func elsewhere<Value>(_ work: @escaping @Sendable () -> Value) -> Value 
         #expect(
             Sorter.sorted(names, numeric: true) { $0 } == [
                 "File1.txt", "file2.txt", "file9.txt", "file10.txt", "file1000000000000000000000.txt"
-            ])
+            ]
+        )
         // As the panels' lists have names: character by character.
         #expect(
             Sorter.sorted(names) { $0 } == [
                 "File1.txt", "file10.txt", "file1000000000000000000000.txt", "file2.txt", "file9.txt"
-            ])
+            ]
+        )
         // Items of one name keep the order they came in.
         let pairs = [("b", 1), ("a", 2), ("b", 3), ("a", 4)]
         #expect(Sorter.sorted(pairs) { $0.0 }.map(\.1) == [2, 4, 1, 3])

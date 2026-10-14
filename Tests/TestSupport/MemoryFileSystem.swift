@@ -172,7 +172,9 @@ public final class MemoryFileSystem: FileSystemProvider, @unchecked Sendable {
 
     @discardableResult
     public func addFile(
-        _ path: String, _ content: String = "x", modified: Date = Date(timeIntervalSince1970: 1_000_000),
+        _ path: String,
+        _ content: String = "x",
+        modified: Date = Date(timeIntervalSince1970: 1_000_000),
         permissions: UInt16 = 0o644
     ) -> URL {
         let url = url(path)
@@ -291,8 +293,10 @@ public final class MemoryFileSystem: FileSystemProvider, @unchecked Sendable {
 
     private func makeStall() -> Stall {
         Stall(
-            stall, isReleased: { [unowned self] in stallsReleased },
-            onInterrupt: { [weak self] in self?.synchronized { self?.interrupted += 1 } })
+            stall,
+            isReleased: { [unowned self] in stallsReleased },
+            onInterrupt: { [weak self] in self?.synchronized { self?.interrupted += 1 } }
+        )
     }
 
     /// The largest number of such listings that were ever under way at the same time.
@@ -352,12 +356,23 @@ public final class MemoryFileSystem: FileSystemProvider, @unchecked Sendable {
         switch node {
         case .directory:
             return FileItem(
-                url: url(key), name: name, isDirectory: true, isHidden: name.hasPrefix("."), permissions: 0o755)
+                url: url(key),
+                name: name,
+                isDirectory: true,
+                isHidden: name.hasPrefix("."),
+                permissions: 0o755
+            )
 
         case .file(let data, let modified, let permissions):
             return FileItem(
-                url: url(key), name: name, isDirectory: false, isHidden: name.hasPrefix("."),
-                size: Int64(data.count), modified: modified, permissions: permissions)
+                url: url(key),
+                name: name,
+                isDirectory: false,
+                isHidden: name.hasPrefix("."),
+                size: Int64(data.count),
+                modified: modified,
+                permissions: permissions
+            )
         }
     }
 
@@ -391,7 +406,10 @@ public final class MemoryFileSystem: FileSystemProvider, @unchecked Sendable {
     /// With a flag, a listing that stalls or pauses ends as soon as the flag is set, having
     /// delivered what it had: quietly, as a file system may.
     private func list(
-        _ directory: URL, showHidden: Bool, cancellation: CancellationFlag?, receive: ([FileItem]) -> Bool
+        _ directory: URL,
+        showHidden: Bool,
+        cancellation: CancellationFlag?,
+        receive: ([FileItem]) -> Bool
     ) throws {
         synchronized {
             listed.append(decoded(key(directory)))
@@ -547,9 +565,10 @@ public final class MemoryFileSystem: FileSystemProvider, @unchecked Sendable {
             nodes[path] = .file(Data(), Date(), 0o644)
         }
         return Writer(stall: makeStall(), stalls: stallsWrites) { [weak self] data, attributes in
-            self?.synchronized {
-                self?.nodes[path] = .file(data, attributes.modified ?? Date(), attributes.permissions ?? 0o644)
-            }
+            self?
+                .synchronized {
+                    self?.nodes[path] = .file(data, attributes.modified ?? Date(), attributes.permissions ?? 0o644)
+                }
         }
     }
 
@@ -570,9 +589,14 @@ public final class MemoryFileSystem: FileSystemProvider, @unchecked Sendable {
             return (data.prefix(Int(offset)), modified, permissions)
         }
         return Writer(head, stall: makeStall(), stalls: stallsWrites) { [weak self] data, attributes in
-            self?.synchronized {
-                self?.nodes[path] = .file(data, attributes.modified ?? modified, attributes.permissions ?? permissions)
-            }
+            self?
+                .synchronized {
+                    self?.nodes[path] = .file(
+                        data,
+                        attributes.modified ?? modified,
+                        attributes.permissions ?? permissions
+                    )
+                }
         }
     }
 

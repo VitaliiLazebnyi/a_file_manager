@@ -12,7 +12,8 @@ import Testing
             Command("cd", "Change Directory"),
             parameterized: { argument in
                 log.append("cd \(argument.location?.path ?? argument.text ?? "-")")
-            })
+            }
+        )
         #expect(commands.perform("plain"))
         #expect(commands.perform("cd", .location(URL(fileURLWithPath: "/tmp"))))
         #expect(commands.perform("cd", .text("docs")))
@@ -79,7 +80,8 @@ import Testing
         #expect(Shortcut(notation: "cmd+shift+c") == Shortcut(notation: "shift+cmd+c"))
         #expect(
             Shortcut(notation: "f13") == nil && Shortcut(notation: "") == nil
-                && Shortcut(notation: "cmd+nonsense") == nil)
+                && Shortcut(notation: "cmd+nonsense") == nil
+        )
     }
 
     @Test func commandsBringTheirDefaultKeys() {
@@ -180,7 +182,8 @@ import Testing
         var runs = 0
         // The enabled check would crash on kernel.panels; a blocked registry never asks it.
         kernel.commands.register(
-            Command("copy", "Copy"), enabled: { [weak kernel] in kernel?.panels.source.model.hasOperands == true }
+            Command("copy", "Copy"),
+            enabled: { [weak kernel] in kernel?.panels.source.model.hasOperands == true }
         ) {
             runs += 1
         }
@@ -194,7 +197,11 @@ import Testing
         do {
             let memory = MemoryFileSystem()
             let bench = TestBench(
-                plugins: [MemoryPlugin()], fileSystems: [], left: memory.url("/"), right: memory.url("/"))
+                plugins: [MemoryPlugin()],
+                fileSystems: [],
+                left: memory.url("/"),
+                right: memory.url("/")
+            )
             (kernel, shell) = (bench.kernel, bench)
             #expect(bench.commands.isEnabled("mem_Hello"))
         }
@@ -206,11 +213,16 @@ import Testing
         let settings = MemorySettings()
         settings.set(["mem_Hello": ["f10"]], forKey: KeyBindings.settingsKey)
         let bench = TestBench(
-            plugins: [MemoryPlugin()], fileSystems: [], left: memory.url("/"), right: memory.url("/"),
-            settings: settings)
+            plugins: [MemoryPlugin()],
+            fileSystems: [],
+            left: memory.url("/"),
+            right: memory.url("/"),
+            settings: settings
+        )
         #expect(
             bench.kernel.keyBindings.command(for: .f(10)) == "mem_Hello"
-                && bench.kernel.keyBindings.command(for: .f(9)) == nil)
+                && bench.kernel.keyBindings.command(for: .f(9)) == nil
+        )
         #expect(bench.commands.isEnabled("mem_Hello"))
     }
 
@@ -246,14 +258,20 @@ import Testing
         fileSystems.register(memory)
         let base = memory.url("/work/docs")
         #expect(
-            fileSystems.location(from: "sub/a.txt", relativeTo: base).isSameLocation(
-                as: memory.url("/work/docs/sub/a.txt")))
+            fileSystems.location(from: "sub/a.txt", relativeTo: base)
+                .isSameLocation(
+                    as: memory.url("/work/docs/sub/a.txt")
+                )
+        )
         #expect(fileSystems.location(from: "..", relativeTo: base).isSameLocation(as: memory.url("/work")))
         #expect(fileSystems.location(from: "/top", relativeTo: base).isSameLocation(as: memory.url("/top")))
         #expect(fileSystems.location(from: "", relativeTo: base).isSameLocation(as: base))
         #expect(
-            fileSystems.location(from: "mem:///other/place", relativeTo: URL(fileURLWithPath: "/tmp")).isSameLocation(
-                as: memory.url("/other/place")))
+            fileSystems.location(from: "mem:///other/place", relativeTo: URL(fileURLWithPath: "/tmp"))
+                .isSameLocation(
+                    as: memory.url("/other/place")
+                )
+        )
         let local = URL(fileURLWithPath: "/tmp")
         #expect(fileSystems.location(from: "/usr/bin", relativeTo: local).path == "/usr/bin")
         #expect(fileSystems.location(from: "~/x", relativeTo: local).path == NSHomeDirectory() + "/x")
@@ -263,7 +281,8 @@ import Testing
         // What a file system writes for the user, it reads back: dialogs propose targets this way.
         #expect(
             fileSystems.location(from: fileSystems.displayPath(base) + "/new.txt", relativeTo: local)
-                .isSameLocation(as: memory.url("/work/docs/new.txt")))
+                .isSameLocation(as: memory.url("/work/docs/new.txt"))
+        )
         #expect(fileSystems.location(from: "mem:/top/*.*", relativeTo: local).path == "/top/*.*")
     }
 
@@ -327,13 +346,20 @@ import Testing
 
     @Test func jobProgressChoosesBytesOrItems() {
         let copying = JobProgress(
-            lines: ["From: a", "To: b"], itemsDone: 1, itemsTotal: 4, bytesDone: 250, bytesTotal: 1_000)
+            lines: ["From: a", "To: b"],
+            itemsDone: 1,
+            itemsTotal: 4,
+            bytesDone: 250,
+            bytesTotal: 1_000
+        )
         #expect(
             copying.measuresBytes && copying.amountDone == 250 && copying.amountTotal == 1_000
-                && copying.fraction == 0.25)
+                && copying.fraction == 0.25
+        )
         let deleting = JobProgress(lines: ["Deleting: a"], itemsDone: 1, itemsTotal: 4)
         #expect(
             !deleting.measuresBytes && deleting.amountDone == 1 && deleting.amountTotal == 4
-                && deleting.fraction == 0.25)
+                && deleting.fraction == 0.25
+        )
     }
 }

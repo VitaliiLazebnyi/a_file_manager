@@ -41,8 +41,11 @@ func plugin(_ name: String, needsShell: Bool = false) -> Target {
         dependencies.append("AFMShell")
     }
     return .target(
-        name: name + "Plugin", dependencies: dependencies, path: "Sources/Plugins/" + name,
-        swiftSettings: strict)
+        name: name + "Plugin",
+        dependencies: dependencies,
+        path: "Sources/Plugins/" + name,
+        swiftSettings: strict
+    )
 }
 
 let plugins: [Target] = [
@@ -79,20 +82,25 @@ let coreTargets: [Target] = [
     .target(name: "AFMShell", dependencies: kernelAndContracts, swiftSettings: strict),
     .target(name: "StandardPlugins", dependencies: kernel + pluginDependencies, swiftSettings: strict),
     .executableTarget(
-        name: "AFileManager", dependencies: ["AFMKernel", "AFMShell", "StandardPlugins"],
-        swiftSettings: strict)
+        name: "AFileManager",
+        dependencies: ["AFMKernel", "AFMShell", "StandardPlugins"],
+        swiftSettings: strict
+    )
 ]
 
 let testTargets: [Target] = [
     .target(name: "TestSupport", dependencies: kernel, path: "Tests/TestSupport", swiftSettings: strict),
     .testTarget(name: "KernelTests", dependencies: ["AFMKernel", "TestSupport"], swiftSettings: testSettings),
     .testTarget(
-        name: "PluginTests", dependencies: kernelAndContracts + ["TestSupport"] + pluginDependencies,
-        swiftSettings: testSettings),
+        name: "PluginTests",
+        dependencies: kernelAndContracts + ["TestSupport"] + pluginDependencies,
+        swiftSettings: testSettings
+    ),
     .testTarget(
         name: "ShellTests",
         dependencies: ["AFMKernel", "AFMContracts", "AFMShell", "StandardPlugins", "TestSupport"],
-        swiftSettings: testSettings)
+        swiftSettings: testSettings
+    )
 ]
 
 let package = Package(

@@ -113,7 +113,10 @@ public final class FakePanel: PanelHandle {
     }
 
     public func show(
-        _ location: URL, focus: String?, history: PanelModel.HistoryEffect, completion: (@MainActor (Bool) -> Void)?
+        _ location: URL,
+        focus: String?,
+        history: PanelModel.HistoryEffect,
+        completion: (@MainActor (Bool) -> Void)?
     ) {
         do {
             let result = try PanelLoader.load(location, showHidden: model.showHidden, fileSystems: fileSystems)
@@ -127,8 +130,11 @@ public final class FakePanel: PanelHandle {
 
     public func reload(focus: String?, quietly _: Bool, completion: (@MainActor () -> Void)?) {
         if let result = try? PanelLoader.load(
-            model.directory, showHidden: model.showHidden, fileSystems: fileSystems, climbing: true)
-        {
+            model.directory,
+            showHidden: model.showHidden,
+            fileSystems: fileSystems,
+            climbing: true
+        ) {
             model.update(with: result.listing, focus: focus)
         }
         completion?()
@@ -198,7 +204,8 @@ public final class ImmediateJobService: JobService {
 
     @discardableResult
     public func run<Result: Sendable>(
-        title: String, work: @escaping @Sendable (any JobMonitor) -> Result,
+        title: String,
+        work: @escaping @Sendable (any JobMonitor) -> Result,
         completion: @escaping @MainActor (Result) -> Void
     ) -> any JobHandle {
         titles.append(title)
@@ -232,7 +239,10 @@ public final class TestBench: ShellServices {
 
     /// `fileSystems` are registered before the plugins start, like a file-system plugin would.
     public init(
-        plugins: [any Plugin], fileSystems: [any FileSystemProvider], left: URL, right: URL,
+        plugins: [any Plugin],
+        fileSystems: [any FileSystemProvider],
+        left: URL,
+        right: URL,
         settings: any SettingsStore = MemorySettings()
     ) {
         kernel = Kernel(productName: "Test", settings: settings, ui: ui)
@@ -240,7 +250,8 @@ public final class TestBench: ShellServices {
         kernel.load(plugins)
         panelSet = FakePanelSet(
             left: FakePanel(showing: left, fileSystems: kernel.fileSystems),
-            right: FakePanel(showing: right, fileSystems: kernel.fileSystems))
+            right: FakePanel(showing: right, fileSystems: kernel.fileSystems)
+        )
         kernel.attach(self)
     }
 }
