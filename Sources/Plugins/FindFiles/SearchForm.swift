@@ -4,6 +4,7 @@ import AppKit
 /// The four tabs of the Find Files window (spec 09 › General tab, Advanced tab, Plugins tab,
 /// Load/Save tab). It only holds controls: `settings` reads them out as a `SearchSettings`
 /// and writes one back, and that is all the rest of the window knows of them. Main thread only.
+@MainActor
 final class SearchForm: NSObject, NSTableViewDataSource, NSTableViewDelegate {
     let tabView = NSTabView()
     let searchForField = NSComboBox()
@@ -57,7 +58,7 @@ final class SearchForm: NSObject, NSTableViewDataSource, NSTableViewDelegate {
     private let sameContentsBox = SearchForm.box("same contents")
 
     // Plugins
-    private struct RuleRow {
+    @MainActor private struct RuleRow {
         let field = NSPopUpButton()
         let comparison = NSPopUpButton()
         let value = NSTextField()

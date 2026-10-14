@@ -3,7 +3,7 @@ public import AFMKernel
 public import Foundation
 
 /// A state of the Advanced tab's attribute boxes: must be set, must not be set, or either.
-public enum TriState: Int, Codable {
+public enum TriState: Int, Codable, Sendable {
     case any, yes, no
 
     func accepts(_ value: Bool) -> Bool {
@@ -12,8 +12,8 @@ public enum TriState: Int, Codable {
 }
 
 /// "Not older than 3 days" (spec 09 › Advanced tab).
-public struct Age: Codable, Equatable {
-    public enum Unit: Int, Codable, CaseIterable {
+public struct Age: Codable, Equatable, Sendable {
+    public enum Unit: Int, Codable, CaseIterable, Sendable {
         case minutes, hours, days, weeks, months, years
 
         public var title: String { ["minute(s)", "hour(s)", "day(s)", "week(s)", "month(s)", "year(s)"][rawValue] }
@@ -51,14 +51,14 @@ public struct Age: Codable, Equatable {
 }
 
 /// "File size > 1.5 Mbytes" (spec 09 › Advanced tab).
-public struct SizeRule: Codable, Equatable {
-    public enum Comparison: Int, Codable, CaseIterable {
+public struct SizeRule: Codable, Equatable, Sendable {
+    public enum Comparison: Int, Codable, CaseIterable, Sendable {
         case equal, greater, less
 
         public var title: String { ["=", ">", "<"][rawValue] }
     }
 
-    public enum Unit: Int, Codable, CaseIterable {
+    public enum Unit: Int, Codable, CaseIterable, Sendable {
         case bytes, kilobytes, megabytes, gigabytes
 
         public var title: String { ["bytes", "kbytes", "Mbytes", "Gbytes"][rawValue] }
@@ -105,7 +105,7 @@ public struct SizeRule: Codable, Equatable {
 
 /// The criteria of the Advanced tab except the duplicate finder; all that are set must hold
 /// (spec 09 › Advanced tab). The Windows attributes are replaced by what a Mac's files have.
-public struct FileCriteria: Codable, Equatable {
+public struct FileCriteria: Codable, Equatable, Sendable {
     /// "Date between": either bound may be missing. `dateTo` is the last moment that counts.
     public var dateFrom: Date?
     public var dateTo: Date?
@@ -210,8 +210,8 @@ public struct SearchField {
 }
 
 /// One row of the Plugins tab: field, operator, value.
-public struct FieldRule: Codable, Equatable {
-    public enum Operator: Int, Codable, CaseIterable {
+public struct FieldRule: Codable, Equatable, Sendable {
+    public enum Operator: Int, Codable, CaseIterable, Sendable {
         case contains, notContains, containsCase, notContainsCase, equals, notEquals, equalsCase, notEqualsCase, regex,
             notRegex
         case greater, less, greaterOrEqual, lessOrEqual
@@ -296,7 +296,7 @@ public struct FieldRule: Codable, Equatable {
 }
 
 /// The rule list of the Plugins tab (spec 09 › Plugins tab).
-public struct FieldRules: Codable, Equatable {
+public struct FieldRules: Codable, Equatable, Sendable {
     /// Switches the whole list on or off without clearing it.
     public var isEnabled: Bool
     /// AND (all rules match) or OR (any rule matches).

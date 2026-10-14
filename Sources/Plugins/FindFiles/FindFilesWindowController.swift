@@ -77,7 +77,7 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
     /// The most hits a search of the window lists; it stops there and says so.
     static let resultLimit = 2_000_000
     /// The most rows handed to the list in one piece.
-    private static let batchSize = 2_000
+    private nonisolated static let batchSize = 2_000
     /// Lists up to this many rows are worked on the main thread where that is simpler.
     private static let smallList = 20_000
 
@@ -393,7 +393,7 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
                 let batch = pending
                 pending = []
                 lastFlush = Date()
-                DispatchQueue.main.async {
+                DispatchQueue.main.async { [weak self] in
                     guard let self, self.search === search else { return }
                     self.append(batch)
                     if let directory { self.statusLabel.stringValue = self.kernel.fileSystems.displayPath(directory) }
@@ -412,7 +412,7 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
                     }
                 })
             flush(nil)
-            DispatchQueue.main.async {
+            DispatchQueue.main.async { [weak self] in
                 guard let self, self.search === search else { return }
                 self.finish(built: nil, notes: self.notes(of: search))
             }
@@ -431,22 +431,25 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
     /// listed before the end; the status line tells how far the work is.
     private func walkForDuplicates(_ search: FileSearch) {
         let fileSystems = kernel.fileSystems
+        let show: @MainActor @Sendable (String) -> Void = { [weak self] text in
+            guard let self, self.search === search else { return }
+            self.statusLabel.stringValue = text
+        }
         BlockingCalls.run { [weak self] in
-            var lastReport = Date.distantPast
-            func status(_ text: @autoclosure () -> String) {
+            /// Used by one thread at a time: the walk reports its folders first, and the comparing
+            /// that follows reports under the lock of `DuplicateFinder`.
+            nonisolated(unsafe) var lastReport = Date.distantPast
+            @Sendable func status(_ text: @autoclosure () -> String) {
                 guard Date().timeIntervalSince(lastReport) > 0.1 else { return }
                 lastReport = Date()
                 let text = text()
-                DispatchQueue.main.async {
-                    guard let self, self.search === search else { return }
-                    self.statusLabel.stringValue = text
-                }
+                DispatchQueue.main.async { show(text) }
             }
             let groups = search.runForDuplicates(
                 onDirectory: { directory in status(fileSystems.displayPath(directory)) },
                 onHashing: { done, total in status("Comparing contents: \(done) of \(total)") })
             let built = Built.make(groups: groups)
-            DispatchQueue.main.async {
+            DispatchQueue.main.async { [weak self] in
                 guard let self, self.search === search else { return }
                 self.finish(built: built, notes: self.notes(of: search))
             }
@@ -470,7 +473,7 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
                         cancellation: search.cancellation)
                     : nil
                 let built = groups.map(Built.make(groups:)) ?? Built.make(items: items)
-                DispatchQueue.main.async {
+                DispatchQueue.main.async { [weak self] in
                     guard let self, self.search === search else { return }
                     var notes = self.notes(of: search)
                     if truncated {
@@ -575,7 +578,9 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
         }
     }
 
-    private static func text(of item: FileItem, showsDuplicates: Bool, fileSystems: FileSystemRegistry) -> String {
+    private nonisolated static func text(of item: FileItem, showsDuplicates: Bool, fileSystems: FileSystemRegistry)
+        -> String
+    {
         guard showsDuplicates else { return fileSystems.displayPath(item.url) }
         // Duplicates read `name  -  folder/` (spec 09 › Duplicate finder, Output).
         let folder = fileSystems.displayPath(item.url.deletingLastPathComponent())
@@ -686,7 +691,9 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
         Self.copyText(of: rows, showsDuplicates: showsDuplicates, fileSystems: kernel.fileSystems)
     }
 
-    private static func copyText(of rows: [Row], showsDuplicates: Bool, fileSystems: FileSystemRegistry) -> String {
+    private nonisolated static func copyText(of rows: [Row], showsDuplicates: Bool, fileSystems: FileSystemRegistry)
+        -> String
+    {
         var lines: [String] = []
         lines.reserveCapacity(rows.count)
         for row in rows {
@@ -710,7 +717,7 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
         copyRequest += 1
         let request = copyRequest
         let (rows, showsDuplicates, fileSystems) = (self.rows, self.showsDuplicates, kernel.fileSystems)
-        func put(_ text: String) {
+        let put: @MainActor @Sendable (String) -> Void = { text in
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(text, forType: .string)
         }
@@ -722,7 +729,7 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             let text = Self.copyText(
                 of: rows, showsDuplicates: showsDuplicates, fileSystems: fileSystems)
-            DispatchQueue.main.async {
+            DispatchQueue.main.async { [weak self] in
                 guard let self, self.copyRequest == request else { return }
                 put(text)
                 if case .summary(let summary)? = self.rows.first, !self.isSearching {

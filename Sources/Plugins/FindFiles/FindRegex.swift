@@ -4,8 +4,8 @@ import Foundation
 /// Counts the regular expressions that ran out of time, so that a pattern which is too slow
 /// for every name does not cost its time budget again for each of a million files: after a few
 /// timeouts the pattern is taken as unusable and the rest answer at once. Shared by the
-/// threads of one search.
-final class RegexTrip {
+/// threads of one search. All state is guarded by `lock`.
+final class RegexTrip: @unchecked Sendable {
     private let lock = NSLock()
     private var timeouts = 0
     private let limit: Int

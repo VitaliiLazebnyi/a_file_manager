@@ -4,7 +4,7 @@ public import Foundation
 /// The encodings "Find text" can look for a text in (spec 09 › "Find text"). The Windows
 /// pair "ANSI" and "ASCII (DOS)" is kept for files that come from there; UTF-8 is what a Mac
 /// writes and therefore the default.
-public enum TextEncoding: String, Codable, CaseIterable {
+public enum TextEncoding: String, Codable, CaseIterable, Sendable {
     case utf8, western, dos, utf16
 
     public var title: String {
@@ -34,7 +34,7 @@ public enum TextEncoding: String, Codable, CaseIterable {
 
 /// The check boxes under "Find text" (spec 09 › "Find text"). "Case sensitive" is a member of
 /// `SearchQuery`, where it has always been.
-public struct TextSearchOptions: Codable, Equatable {
+public struct TextSearchOptions: Codable, Equatable, Sendable {
     public var wholeWords: Bool
     /// The text is a regular expression, matched line by line.
     public var regex: Bool
@@ -593,7 +593,9 @@ public struct TextPattern {
         }
     }
 
-    private final class DataReader: FileReader {
+    /// Used by one thread at a time, as `FileReader` allows; `interrupt` (which does nothing)
+    /// is the only call from another thread.
+    private final class DataReader: FileReader, @unchecked Sendable {
         private let data: Data
         private var position = 0
 

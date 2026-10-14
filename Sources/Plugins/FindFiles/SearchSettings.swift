@@ -3,7 +3,7 @@ public import Foundation
 
 /// Everything the Find Files window holds in its four tabs, as the user entered it. This is
 /// what a saved search stores and what a search is made from (spec 09 › Load/Save tab).
-public struct SearchSettings: Codable, Equatable {
+public struct SearchSettings: Codable, Equatable, Sendable {
     public var searchFor = ""
     /// One or more start directories, separated by `;`, as typed; empty means the panel's.
     public var searchIn = ""
@@ -85,7 +85,7 @@ public struct SearchSettings: Codable, Equatable {
     }
 }
 
-public struct SavedSearch: Codable, Equatable {
+public struct SavedSearch: Codable, Equatable, Sendable {
     public var name: String
     public var settings: SearchSettings
 

@@ -45,7 +45,8 @@ struct FileIdentity: Hashable {
 /// Reads a local file through a descriptor that was checked after it was opened: the file is
 /// opened without waiting (a FIFO that took the place of the file since it was looked at
 /// would block an `open` for good), and only a regular file that is not a cloud stub is kept.
-final class LocalFileReader: FileReader {
+/// The descriptor is guarded by `lock`.
+final class LocalFileReader: FileReader, @unchecked Sendable {
     private var descriptor: Int32
     private let lock = NSLock()
 

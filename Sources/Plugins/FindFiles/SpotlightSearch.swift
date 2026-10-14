@@ -127,14 +127,17 @@ public enum SpotlightQuery {
 /// out of the result (a million of them take seconds), and `completion` is called on the main
 /// thread with the paths found. Reading and checking the files afterwards is the caller's
 /// business and belongs in the background.
-final class SpotlightSearch: NSObject {
+///
+/// `completion` and `isStopped` are guarded by `lock`. The metadata query is set up in `init`
+/// and started on the main thread; after that only `queue` touches it.
+final class SpotlightSearch: NSObject, @unchecked Sendable {
     /// The most paths read out of one answer.
     static let resultLimit = 1_000_000
 
     private let metadataQuery = NSMetadataQuery()
     private let queue = OperationQueue()
     private let lock = NSLock()
-    private var completion: (([String], Bool) -> Void)?
+    private var completion: (@MainActor @Sendable ([String], Bool) -> Void)?
     private var isStopped = false
 
     /// Nil when Spotlight does not understand the question.
@@ -150,7 +153,7 @@ final class SpotlightSearch: NSObject {
     }
 
     /// `completion` gets the paths and whether the answer was cut at `resultLimit`.
-    func start(completion: @escaping ([String], Bool) -> Void) {
+    func start(completion: @escaping @MainActor @Sendable ([String], Bool) -> Void) {
         lock.lock()
         self.completion = completion
         lock.unlock()
@@ -168,7 +171,9 @@ final class SpotlightSearch: NSObject {
         lock.unlock()
         NotificationCenter.default.removeObserver(self)
         // On the queue the answer is read on, after any reading in progress.
-        queue.addOperation { [metadataQuery] in metadataQuery.stop() }
+        // Handed to `queue`, the only one that touches the query once it has started.
+        let metadataQuery = Handover(metadataQuery)
+        queue.addOperation { metadataQuery.value.stop() }
     }
 
     private var stopped: Bool {
@@ -206,6 +211,6 @@ final class SpotlightSearch: NSObject {
         NotificationCenter.default.removeObserver(self)
         metadataQuery.stop()
         guard let completion else { return }
-        DispatchQueue.main.async { completion(paths, total > count) }
+        DispatchQueue.main.async { [paths] in completion(paths, total > count) }
     }
 }
