@@ -434,8 +434,9 @@ final class FileTools {
         let cursor = model.cursorItem
         let extraMasks = settings.text(Keys.extraTypes, default: "")
         let onlyErrors = settings.flag(Keys.onlyErrors, default: false)
-        // Read in the job, as the clipboard may be slow to answer; nothing else uses it meanwhile.
-        let pasteboard = Handover(self.pasteboard)
+        // Asked for in the job, and only when it is needed: the clipboard may be slow to answer.
+        // It is read on the main thread all the same (`clipboardText`), which the job waits for.
+        let kernel = self.kernel
         let title = "Verify checksums"
         // The sorting out of what the operands are (a mask test per name, the clipboard) and the work
         // itself happen in the job: with a large selection none of it belongs on the main thread.
@@ -445,8 +446,7 @@ final class FileTools {
             let checksumFiles = operands.filter { !$0.isDirectory && isChecksumFile($0.name) }
             if !checksumFiles.isEmpty { return try ChecksumRun.verify(checksumFiles: checksumFiles, run: run) }
             if let cursor, !cursor.isDirectory,
-                let digest = ChecksumRun.checksum(
-                    fromClipboard: (pasteboard.value ?? .general).string(forType: .string))
+                let digest = ChecksumRun.checksum(fromClipboard: kernel.askUser { _ in self.clipboardText() })
             {
                 return try ChecksumRun.verify([(cursor, digest)], title: "Checksum from the clipboard", run: run)
             }
@@ -456,6 +456,11 @@ final class FileTools {
             }
             return nil
         }
+    }
+
+    /// The text on the clipboard. Main thread: `NSPasteboard` is not made for other threads.
+    private func clipboardText() -> String? {
+        (pasteboard ?? .general).string(forType: .string)
     }
 
     private func verify(
