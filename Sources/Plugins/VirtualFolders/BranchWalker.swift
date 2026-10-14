@@ -8,10 +8,10 @@ public import Foundation
 /// read as fast as the file system answers. `receive` is called on the calling thread only,
 /// one batch at a time. The walker holds no state of its own and may be used from several
 /// threads at once.
-public struct BranchWalker {
+public struct BranchWalker: Sendable {
     /// A directory to walk, and what is written in front of the names found in it: empty for
     /// the branch root, `docs/` for its folder `docs`.
-    public struct Start {
+    public struct Start: Sendable {
         public let directory: URL
         public let prefix: String
         /// The disk the walk of this tree began on; set by `walk`.

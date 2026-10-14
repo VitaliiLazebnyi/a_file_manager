@@ -13,8 +13,10 @@ public import Foundation
 /// **Threading.** Like every provider it is called from several threads at once. The registered
 /// lists, the options and what was learned on the last walk are guarded by one lock; the walk
 /// itself holds no lock and reads the directories of a level on all cores.
-public final class VirtualFileSystem: FileSystemProvider {
-    public struct Options: Equatable {
+///
+/// All mutable state is guarded by `lock`.
+public final class VirtualFileSystem: FileSystemProvider, @unchecked Sendable {
+    public struct Options: Equatable, Sendable {
         /// Branch view also lists the folders themselves.
         public var listsFolders = false
         /// Branch view walks into packages (`.app`) instead of listing them as one item.
@@ -31,7 +33,9 @@ public final class VirtualFileSystem: FileSystemProvider {
     /// The files are registered as they come, which takes no time however many there are; what
     /// has to look at each of them (leaving out a file named twice, finding the folders to
     /// watch) is done once by `prepared`, off the main thread for a long list.
-    private final class FileList {
+    ///
+    /// `result` is guarded by `lock`, `stamp` by the file system's lock; the rest is fixed in `init`.
+    private final class FileList: @unchecked Sendable {
         /// What was worked out from all the files of a list.
         struct Prepared {
             /// The files, each once.
@@ -650,8 +654,10 @@ public final class VirtualFileSystem: FileSystemProvider {
     /// directories read on the last walk of a branch (up to `watchLimit`), and the folders of
     /// the files of a list. Any change in them is reported as a change of the virtual folder,
     /// on the main thread.
-    public func watch(_ directories: [URL], onChange: @escaping ([URL]) -> Void) -> AnyObject? {
-        var watchers: [AnyObject] = []
+    public func watch(_ directories: [URL], onChange: @escaping @MainActor @Sendable ([URL]) -> Void) -> (
+        any WatchToken
+    )? {
+        var watchers: [any WatchToken] = []
         var coalescers: [Coalescer] = []
         var shownLists: [Int] = []
         for virtual in directories {
@@ -695,7 +701,7 @@ public final class VirtualFileSystem: FileSystemProvider {
             return nil
         }
         synchronized { for id in shownLists { watchedLists[id, default: 0] += 1 } }
-        return Watchers(watchers, coalescers: coalescers) { [weak self] in
+        return Watchers(watchers, coalescers: coalescers) { [weak self, shownLists] in
             guard let self else { return }
             synchronized {
                 for id in shownLists {
@@ -725,7 +731,9 @@ public final class VirtualFileSystem: FileSystemProvider {
     /// file system reports on, and none goes out once `cancel` was called. A folder that keeps
     /// changing is reported ever less often (up to `longestWindow` apart), so that the virtual
     /// folder is not walked again all the time.
-    private final class Coalescer {
+    ///
+    /// All mutable state is guarded by `lock`.
+    private final class Coalescer: @unchecked Sendable {
         static let window: TimeInterval = 0.5
         static let longestWindow: TimeInterval = 8
         private let lock = NSLock()
@@ -733,9 +741,9 @@ public final class VirtualFileSystem: FileSystemProvider {
         private var isDirty = false
         private var isCancelled = false
         private var wait = Coalescer.window
-        private let fire: () -> Void
+        private let fire: @MainActor @Sendable () -> Void
 
-        init(_ fire: @escaping () -> Void) { self.fire = fire }
+        init(_ fire: @escaping @MainActor @Sendable () -> Void) { self.fire = fire }
 
         func cancel() {
             lock.lock()
@@ -762,7 +770,7 @@ public final class VirtualFileSystem: FileSystemProvider {
             schedule(after: delay)
         }
 
-        /// Called on the main thread only.
+        @MainActor
         private func settle() {
             lock.lock()
             guard !isCancelled else {
@@ -786,28 +794,30 @@ public final class VirtualFileSystem: FileSystemProvider {
 
         private func deliver() {
             if Thread.isMainThread {
-                fire()
+                MainActor.assumeIsolated { fire() }
             } else {
                 DispatchQueue.main.async { [self] in
                     lock.lock()
                     let cancelled = isCancelled
                     lock.unlock()
-                    if !cancelled { fire() }
+                    // The main queue runs its blocks on the main thread.
+                    if !cancelled { MainActor.assumeIsolated { fire() } }
                 }
             }
         }
 
         private func schedule(after delay: TimeInterval) {
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [self] in settle() }
+            // The main queue runs its blocks on the main thread.
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [self] in MainActor.assumeIsolated { settle() } }
         }
     }
 
     /// Keeps the real file systems' watchers alive for as long as the caller keeps this.
-    private final class Watchers {
-        let watchers: [AnyObject]
+    private final class Watchers: Sendable {
+        let watchers: [any WatchToken]
         private let coalescers: [Coalescer]
-        private let release: () -> Void
-        init(_ watchers: [AnyObject], coalescers: [Coalescer], release: @escaping () -> Void) {
+        private let release: @Sendable () -> Void
+        init(_ watchers: [any WatchToken], coalescers: [Coalescer], release: @escaping @Sendable () -> Void) {
             self.watchers = watchers
             self.coalescers = coalescers
             self.release = release
