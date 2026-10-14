@@ -542,7 +542,7 @@ enum ListWork {
 ///
 /// Unchecked: `lists` is changed only in `deinit`, when nobody else holds the object.
 final class Remains: @unchecked Sendable {
-    var lists: [[FileItem]]
+    private(set) var lists: [[FileItem]]
 
     init(_ lists: [FileItem]...) {
         self.lists = lists
