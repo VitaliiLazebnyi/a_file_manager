@@ -72,7 +72,7 @@ public final class ListingCache: @unchecked Sendable {
     }
 
     private let lock = NSLock()
-    private let now: () -> Date
+    private let now: @Sendable () -> Date
     // Protected by `lock`.
     private var slots: [Key: Slot] = [:]
     private var clock: UInt64 = 0
@@ -81,7 +81,7 @@ public final class ListingCache: @unchecked Sendable {
     private var enabled = true
 
     /// `now` is the clock ages are measured with; tests pass their own.
-    public init(limits: Limits = Limits(), now: @escaping () -> Date = Date.init) {
+    public init(limits: Limits = Limits(), now: @escaping @Sendable () -> Date = { Date() }) {
         self.limits = limits
         self.now = now
     }

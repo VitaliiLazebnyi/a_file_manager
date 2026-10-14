@@ -7,8 +7,14 @@ import Testing
 /// several threads at once.
 @Suite struct RememberedListings {
     /// A clock the test moves by hand. Used from one thread at a time.
-    final class Clock {
-        var time = Date(timeIntervalSince1970: 1_000_000)
+    /// The cache's clock, moved by the test. Unchecked: the time is guarded by `lock`.
+    final class Clock: @unchecked Sendable {
+        private let lock = NSLock()
+        private var stored = Date(timeIntervalSince1970: 1_000_000)
+        var time: Date {
+            get { lock.withLock { stored } }
+            set { lock.withLock { stored = newValue } }
+        }
     }
 
     let clock = Clock()

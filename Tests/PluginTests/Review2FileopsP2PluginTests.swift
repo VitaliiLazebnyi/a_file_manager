@@ -283,16 +283,16 @@ final class P2Bench: ShellServices {
         for index in 0..<60 { memory.addFile("/many/f\(index).txt") }
         let bench = bench(left: memory.url("/many"))
         bench.left.model.selectAll()
-        var asked = 0
+        let asked = Shared(0)
         memory.capabilitiesAt = { _ in
-            asked += 1
+            asked.modify { $0 += 1 }
             return [.write]
         }
         ui.answer = { _ in 0 }
         #expect(bench.commands.perform(.deleteDirectly))
         #expect(memory.allPaths.filter { $0.hasPrefix("/many/") }.isEmpty)
         // The command's own check, the question, the job: a handful, not one per file.
-        #expect(asked > 0 && asked < 10, "\(asked)")
+        #expect(asked.value > 0 && asked.value < 10, "\(asked.value)")
     }
 
     // F027: the log's last lines at the end of the program.

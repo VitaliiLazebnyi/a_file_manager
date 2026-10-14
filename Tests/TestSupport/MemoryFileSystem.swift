@@ -75,11 +75,11 @@ public final class MemoryFileSystem: FileSystemProvider, @unchecked Sendable {
     }
     private var _isLocal: Bool = true
     /// What `capabilities(for:)` answers; nil gives `capabilities` everywhere.
-    public var capabilitiesAt: ((URL) -> FileSystemCapabilities)? {
+    public var capabilitiesAt: (@Sendable (URL) -> FileSystemCapabilities)? {
         get { settings.withLock { _capabilitiesAt } }
         set { settings.withLock { _capabilitiesAt = newValue } }
     }
-    private var _capabilitiesAt: ((URL) -> FileSystemCapabilities)?
+    private var _capabilitiesAt: (@Sendable (URL) -> FileSystemCapabilities)?
     /// When true, a listing that was given a cancellation flag does not answer until the flag
     /// is set (or `releaseStalls()` is called), like a server that has stopped talking…
     public var stallsListings: Bool {
