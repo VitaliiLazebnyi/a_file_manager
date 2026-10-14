@@ -126,6 +126,7 @@ final class ViewerWindowController: NSWindowController, NSWindowDelegate {
 /// source panel changes it reports, a moment later, what the cursor is on. Events that follow
 /// each other quickly (holding an arrow key) are answered once, for the last one. Main thread
 /// only.
+@MainActor
 final class CursorFollower {
     private let delay: TimeInterval
     private let panel: () -> any PanelHandle?

@@ -16,7 +16,9 @@ import WebKit
 /// again), and is kept for as long as a pane that asked for it shows it (`release`), then for a
 /// little while in case it is shown again. `removeAll` (the plugin stopping) and the object going
 /// away delete the lot; what a crash left behind is swept at the next launch.
-final class TemporaryCopies {
+///
+/// What changes is guarded by `lock`; `directory` is immutable.
+final class TemporaryCopies: @unchecked Sendable {
     private struct Copy {
         var folder: URL
         var file: URL
@@ -246,7 +248,7 @@ final class TemporaryCopies {
         lock.unlock()
         guard !doomed.isEmpty else { return }
         group.enter()
-        ViewerCleanup.async { [group] in
+        ViewerCleanup.async { [group, doomed] in
             for folder in doomed { try? FileManager.default.removeItem(at: folder) }
             group.leave()
         }
@@ -265,7 +267,7 @@ final class TemporaryCopies {
     ///
     /// With `waiting` off it does not wait at all; `done` is called, on whatever thread, once the
     /// deletion has been carried out (at once when there was nothing to delete).
-    func removeAll(waiting: Bool = true, then done: (() -> Void)? = nil) {
+    func removeAll(waiting: Bool = true, then done: (@Sendable () -> Void)? = nil) {
         lock.lock()
         let folder = root
         root = nil
@@ -345,7 +347,8 @@ final class TemporaryCopies {
 final class MediaView: NSView {
     private let playerView = AVPlayerView()
     private let player = AVPlayer()
-    private var endObserver: any NSObjectProtocol?
+    /// Set on the main thread, read in `deinit`.
+    nonisolated(unsafe) private var endObserver: any NSObjectProtocol?
     /// Called when the track has played to its end (a playlist then moves on).
     var onEnd: () -> Void = {}
     /// Called with "track – artist" when the file's tags name them.
@@ -372,7 +375,8 @@ final class MediaView: NSView {
         endObserver = NotificationCenter.default.addObserver(
             forName: .AVPlayerItemDidPlayToEndTime, object: item, queue: .main
         ) { [weak self] _ in
-            self?.onEnd()
+            // Delivered on the main queue.
+            MainActor.assumeIsolated { self?.onEnd() }
         }
         player.replaceCurrentItem(with: item)
         player.volume = volume
@@ -485,7 +489,7 @@ final class WebContentView: NSView, WKNavigationDelegate {
 
     func webView(
         _: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
-        decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
+        decisionHandler: @escaping @MainActor @Sendable (WKNavigationActionPolicy) -> Void
     ) {
         let decision = Self.decide(
             isMainFrame: navigationAction.targetFrame?.isMainFrame ?? false,
@@ -547,7 +551,8 @@ enum LinkPolicy {
 
 /// The delegate of the views that show RTF and PDF: a click on a link opens a web page or a
 /// mail and nothing else (the framework would open any URL, a file or a share included).
-final class LinkGate: NSObject, NSTextViewDelegate, PDFViewDelegate {
+@MainActor
+final class LinkGate: NSObject, NSTextViewDelegate, @preconcurrency PDFViewDelegate {
     private static var key = 0
 
     /// What is done with a link that may be opened (tests put their own in).
@@ -579,6 +584,7 @@ final class LinkGate: NSObject, NSTextViewDelegate, PDFViewDelegate {
 }
 
 /// Factories for the views that need no class of their own.
+@MainActor
 enum RichViews {
     /// A read-only text view in a scroll view: RTF (spec 10 › RTF) and printing.
     static func textView(_ text: NSAttributedString) -> (scroll: NSScrollView, text: NSTextView) {

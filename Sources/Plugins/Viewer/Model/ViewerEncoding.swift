@@ -157,7 +157,7 @@ struct DecodedText {
 
 /// The conversion tables of a code page, built once from the system's converter. Immutable
 /// after creation, so every thread may read them.
-final class CodeTable {
+final class CodeTable: Sendable {
     static let leadByte: UInt16 = 0xFFFF
     static let replacement: UInt16 = 0xFFFD
 
@@ -173,7 +173,8 @@ final class CodeTable {
     let longestCharacter: Int
 
     private static let lock = NSLock()
-    private static var tables: [Int: CodeTable] = [:]
+    /// Guarded by `lock`.
+    nonisolated(unsafe) private static var tables: [Int: CodeTable] = [:]
 
     static func table(for encoding: ViewerEncoding) -> CodeTable {
         lock.lock()

@@ -103,7 +103,7 @@ final class ListerSettings {
     var gifMinimumDelay: Double { Double(number(Key.gifDelay, default: 80, in: 10...5_000)) / 1_000 }
 
     /// The page of the configuration dialog; `onChange` runs after the user changed something.
-    static func preferencePage(onChange: @escaping () -> Void) -> PreferencePage {
+    static func preferencePage(onChange: @escaping @MainActor @Sendable () -> Void) -> PreferencePage {
         PreferencePage(
             title: "Lister",
             preferences: [

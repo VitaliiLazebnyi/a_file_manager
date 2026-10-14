@@ -89,8 +89,9 @@ struct HexFormat: Equatable {
 /// A file as rows of text in one encoding and one layout: what a text view pages through. It
 /// reads only the blocks a request needs. Everything here may block on the file system and is
 /// safe to call from several threads; nothing is meant for the main thread except the plain
-/// properties and the geometry functions, which touch no file.
-final class TextDocument {
+/// properties and the geometry functions, which touch no file. What changes is guarded by a
+/// lock each (`tableLock`, `boundariesLock`, `errorLock`); the rest is immutable.
+final class TextDocument: @unchecked Sendable {
     let source: any ByteSource
     let encoding: ViewerEncoding
     let layout: ViewerLayout
@@ -176,7 +177,7 @@ final class TextDocument {
     /// layouts need no index and return at once. `progress` is called from working threads.
     func buildIndex(
         parallel: Bool, segmentSize: Int = 4 << 20, chunkSize: Int = 1 << 20, rawScan: Bool = true,
-        progress: @escaping () -> Void = {}
+        progress: @escaping @Sendable () -> Void = {}
     ) {
         guard let index, case .text(let options) = layout else { return }
         index.build(

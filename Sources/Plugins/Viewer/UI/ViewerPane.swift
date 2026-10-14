@@ -87,7 +87,8 @@ final class ViewerPane: NSView, NSMenuDelegate {
     private let temporaryCopies: TemporaryCopies
     /// The text of an HTML file with its tags removed, kept while the file is shown.
     private var strippedHTML: (links: [String], source: any ByteSource)?
-    private var resizeWork: DispatchWorkItem?
+    /// Set on the main thread, read in `deinit`.
+    nonisolated(unsafe) private var resizeWork: DispatchWorkItem?
 
     // MARK: Search state (see ViewerPane+Actions)
 
@@ -115,7 +116,8 @@ final class ViewerPane: NSView, NSMenuDelegate {
     private let statusLabel = NSTextField(labelWithString: "")
     private let progressBar = NSProgressIndicator()
     private let cancelButton = NSButton(title: "Cancel", target: nil, action: nil)
-    private var keyMonitor: Any?
+    /// Set on the main thread, read in `deinit`.
+    nonisolated(unsafe) private var keyMonitor: Any?
     static let menuTitles = ["File", "Edit", "Options", "Encoding"]
 
     init(kernel: Kernel, settings: ListerSettings, temporaryCopies: TemporaryCopies, isEmbedded: Bool) {
@@ -279,7 +281,7 @@ final class ViewerPane: NSView, NSMenuDelegate {
             guard !cancellation.isCancelled else { return }
             /// Opens and samples the file. `flag` ends it: the pane's own, or, for a file system, the one
             /// `BlockingCalls` hands over once nobody waits for the answer.
-            func open(_ item: ViewerItem, _ flag: CancellationFlag) -> Result<Loaded, any Error> {
+            @Sendable func open(_ item: ViewerItem, _ flag: CancellationFlag) -> Result<Loaded, any Error> {
                 Result { () -> Loaded in
                     switch item.source {
                     case .text(let text):
@@ -334,7 +336,7 @@ final class ViewerPane: NSView, NSMenuDelegate {
             } else {
                 result = open(item, cancellation)
             }
-            DispatchQueue.main.async {
+            DispatchQueue.main.async { [weak self] in
                 guard let self, self.loadGeneration == generation, !cancellation.isCancelled else {
                     ViewerCleanup.close((try? result.get())?.source)
                     return
@@ -400,7 +402,7 @@ final class ViewerPane: NSView, NSMenuDelegate {
             let summary = FolderSummary.measure(
                 url, provider: provider, cancellation: cancellation,
                 limit: isLocal ? nil : Self.remoteFolderEntryLimit)
-            DispatchQueue.main.async {
+            DispatchQueue.main.async { [weak self] in
                 guard let self, self.loadGeneration == generation, !cancellation.isCancelled else { return }
                 self.folderSummary = summary
                 self.showMessage("\(name)\n\n\(summary.text)")
@@ -569,7 +571,7 @@ final class ViewerPane: NSView, NSMenuDelegate {
                 if Int64(data.count) < range.upperBound - range.lowerBound { throw ViewerError.fileChanged }
             } catch {
                 guard !cancel.isCancelled else { return }
-                DispatchQueue.main.async {
+                DispatchQueue.main.async { [weak self] in
                     guard let self, self.loadGeneration == generation, self.presentGeneration == token,
                         self.mode == .html
                     else { return }
@@ -583,7 +585,7 @@ final class ViewerPane: NSView, NSMenuDelegate {
                     units: encoding.units(from: data), linkBraces: braces, cancellation: cancel)
             else { return }
             let stripped = DataByteSource(Data(result.text.utf8))
-            DispatchQueue.main.async {
+            DispatchQueue.main.async { [weak self] in
                 // The mode may have been changed while the tags were removed: then this is not wanted.
                 guard let self, self.loadGeneration == generation, self.presentGeneration == token, self.mode == .html
                 else { return }
@@ -603,14 +605,14 @@ final class ViewerPane: NSView, NSMenuDelegate {
     var htmlLinks: [String] { mode == .html ? strippedHTML?.links ?? [] : [] }
 
     /// The most entries the quick view counts in a folder on a server.
-    static let remoteFolderEntryLimit = 20_000
+    nonisolated static let remoteFolderEntryLimit = 20_000
     /// Files up to this size are read whole where a mode needs all of a file at once.
-    static let wholeFileLimit: Int64 = 1 << 30
+    nonisolated static let wholeFileLimit: Int64 = 1 << 30
     /// An HTML file is shown as a page up to this size (it is handed to the web view, a string
     /// of twice the size, on the main thread); beyond it the text modes show it.
-    static let htmlPageLimit: Int64 = 8 << 20
+    nonisolated static let htmlPageLimit: Int64 = 8 << 20
     /// An RTF file is shown formatted up to this size (its layout is done on the main thread).
-    static let rtfLimit: Int64 = 4 << 20
+    nonisolated static let rtfLimit: Int64 = 4 << 20
     /// An HTML file is shown with its tags removed up to this size; beyond it the tags are
     /// text, as in the plain text modes (removing them takes memory and time in proportion).
     static let htmlTextLimit: Int64 = 32 << 20
@@ -646,7 +648,7 @@ final class ViewerPane: NSView, NSMenuDelegate {
         let length = loaded.source.length
         let owner = ObjectIdentifier(self)
         /// Whether what a job brings back is still wanted.
-        func isCurrent(_ pane: ViewerPane) -> Bool {
+        let isCurrent: @MainActor @Sendable (ViewerPane) -> Bool = { pane in
             pane.loadGeneration == generation && pane.presentGeneration == token && !cancellation.isCancelled
                 && !presentCancel.isCancelled && !pane.mode.isTextual
         }
@@ -663,7 +665,7 @@ final class ViewerPane: NSView, NSMenuDelegate {
             case .image:
                 // An animation shows its first frame while the others are still being decoded.
                 let early: (DecodedImage) -> Void = { first in
-                    DispatchQueue.main.async {
+                    DispatchQueue.main.async { [weak self] in
                         guard let self, isCurrent(self), self.imageView == nil else { return }
                         self.showImage(first)
                     }
@@ -702,9 +704,11 @@ final class ViewerPane: NSView, NSMenuDelegate {
                 case .failure(let refusal): ready = refusal.isCancelled ? ready : .failed(refusal.message)
                 }
             }
-            DispatchQueue.main.async {
+            // Made on this thread, which does not touch it again.
+            let made = Handover(ready)
+            DispatchQueue.main.async { [weak self] in
                 guard let self, isCurrent(self) else { return }
-                switch ready {
+                switch made.value {
                 case .image(let image):
                     if let view = self.imageView {
                         view.replaceFrames(with: image)

@@ -39,8 +39,9 @@ struct FolderSummary: Equatable {
         return result
     }
 
-    /// The entries still to be counted, shared by all the threads of a walk.
-    private final class Budget {
+    /// The entries still to be counted, shared by all the threads of a walk. All state is
+    /// guarded by `lock`.
+    private final class Budget: @unchecked Sendable {
         private let lock = NSLock()
         private var left: Int
         private(set) var isExhausted = false

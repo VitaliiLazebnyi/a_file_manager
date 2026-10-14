@@ -11,7 +11,9 @@ import Foundation
 /// - A cancelled job whose thread is still inside a read is not live any more, but it holds its
 ///   thread. When `stuck` threads are held like that, a new job is refused (`refused` is called
 ///   instead of the work) instead of making one thread more.
-final class ViewerWorkGate {
+///
+/// All state is guarded by `lock`.
+final class ViewerWorkGate: @unchecked Sendable {
     /// Index builds of text documents.
     static let indexBuilds = ViewerWorkGate(
         live: max(2, min(4, ProcessInfo.processInfo.activeProcessorCount / 2)), stuck: 8)
@@ -21,8 +23,8 @@ final class ViewerWorkGate {
     private let lock = NSLock()
     private struct Waiting {
         let flag: CancellationFlag
-        let work: () -> Void
-        let refused: () -> Void
+        let work: @Sendable () -> Void
+        let refused: @Sendable () -> Void
     }
     private struct Running {
         let flag: CancellationFlag
@@ -54,7 +56,10 @@ final class ViewerWorkGate {
     /// Runs `work` on a background thread as soon as the limits allow, unless `flag` is set
     /// before; or calls `refused` (on this thread) when `stuck` threads are held by cancelled
     /// jobs that have not come back. Any thread.
-    func submit(cancellation flag: CancellationFlag, refused: @escaping () -> Void = {}, _ work: @escaping () -> Void) {
+    func submit(
+        cancellation flag: CancellationFlag, refused: @escaping @Sendable () -> Void = {},
+        _ work: @escaping @Sendable () -> Void
+    ) {
         lock.lock()
         waiting.removeAll { $0.flag.isCancelled }
         if running.values.reduce(0, { $0 + ($1.flag.isCancelled ? 1 : 0) }) >= stuck {

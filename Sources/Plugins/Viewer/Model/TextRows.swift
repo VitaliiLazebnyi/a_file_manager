@@ -216,8 +216,9 @@ struct RowSplitter {
 /// Segments are published in file order as they finish, so the start of the file can be shown
 /// while the rest is still being read. A new layout of the same text (another width) takes over
 /// the segments of the one before wherever every line took one row and still does
-/// (`Segment.widest`), and reads only the others. All members are safe to use from any thread.
-final class TextRowIndex {
+/// (`Segment.widest`), and reads only the others. All members are safe to use from any thread:
+/// the state is guarded by `lock`, and `overview` has a lock of its own.
+final class TextRowIndex: @unchecked Sendable {
     static let stride = 64
     /// Checkpoints are at least this many bytes apart on average: a file of nothing but line
     /// ends would need one per 64 bytes otherwise.
@@ -364,7 +365,9 @@ final class TextRowIndex {
     /// What the main thread asks for all the time (the scroller, the status line): a copy kept
     /// behind a lock of its own that is held for a few stores only, so the view never waits for a
     /// thread that is publishing a segment, or that has been preempted holding the index lock.
-    private final class Overview {
+    ///
+    /// All state is guarded by `guarded`.
+    private final class Overview: @unchecked Sendable {
         private let guarded = UnsafeMutablePointer<os_unfair_lock>.allocate(capacity: 1)
         private var rows = 0, lines = 0, covered: Int64 = 0, complete = false, failure: any Error?, reused = 0
 
@@ -451,7 +454,7 @@ final class TextRowIndex {
         source: any ByteSource, content: Range<Int64>, encoding: ViewerEncoding, options: TextLayoutOptions,
         parallel: Bool,
         segmentSize: Int = 4 << 20, chunkSize: Int = 1 << 20, rawScan: Bool = true, cancellation: CancellationFlag,
-        progress: @escaping () -> Void = {}
+        progress: @escaping @Sendable () -> Void = {}
     ) {
         let unit = Int64(encoding.unitSize)
         let size = max(unit, Int64(segmentSize) / unit * unit)
@@ -462,17 +465,18 @@ final class TextRowIndex {
             guard let before = previous, rawScan else { return nil }
             return before.takeOverable(for: now)
         }
-        var bounds: [Range<Int64>] = []
+        var cuts: [Range<Int64>] = []
         var lower = content.lowerBound
         while lower < content.upperBound {
             let upper = min(content.upperBound, lower + size)
-            bounds.append(lower..<upper)
+            cuts.append(lower..<upper)
             lower = upper
         }
+        let bounds = cuts
         let reused = Locked(0)
         /// `lineStart`: where the first line begins that the segments before this one do not own,
         /// when they were read in file order (nil otherwise).
-        func work(_ number: Int, lineStart: Int64? = nil) {
+        @Sendable func work(_ number: Int, lineStart: Int64? = nil) {
             // Each piece of work frees what the reads and the decoding left for the pool of the
             // thread: the threads of a parallel loop live on, and a search or an index build of
             // a big file would otherwise keep every buffer until they are idle.
@@ -550,7 +554,8 @@ final class TextRowIndex {
         }
     }
 
-    private final class Locked<Value: AdditiveArithmetic> {
+    /// A number shared by the threads of a build. Guarded by `lock`.
+    private final class Locked<Value: AdditiveArithmetic>: @unchecked Sendable {
         private let lock = NSLock()
         private var stored: Value
 
