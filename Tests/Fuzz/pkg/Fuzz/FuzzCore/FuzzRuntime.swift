@@ -22,3 +22,14 @@ public func fzCheck(_ condition: @autoclosure () -> Bool, _ key: String, _ detai
         fzFail(key, detail())
     }
 }
+
+/// Fuzz bytes as UTF-8 text, every malformed sequence replaced with U+FFFD.
+///
+/// The inputs are not text, and the targets want a string whatever they hold.
+public func fzText(_ bytes: some Sequence<UInt8>) -> String {
+    var scalars = String.UnicodeScalarView()
+    _ = transcode(bytes.makeIterator(), from: UTF8.self, to: UTF32.self, stoppingOnError: false) { unit in
+        scalars.append(Unicode.Scalar(unit) ?? "\u{FFFD}")
+    }
+    return String(scalars)
+}
