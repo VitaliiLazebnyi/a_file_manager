@@ -1,3 +1,11 @@
-# Leaks whose root object lives in an Apple library, not in this project. One type name per line;
-# lines are matched as fixed strings against the root type reported by `leaks`.
-icu::RuleBasedCollator
+# Leaks whose root object lives in an Apple library, not in this project. One extended regular
+# expression per line, matched against what `leaks` says about the root of a leaked group, without
+# addresses: `<Type> [size]  details` (see leak-check.sh). Each entry says why it is Apple's and
+# how that was checked; a pattern names the object as closely as the report allows.
+
+# AppKit's App Intents support opens three connections to the linkd daemon
+# (-[LNProcessInstanceRegistryClient makeXPCConnection]) that hold each other and are never
+# closed. Reproduced without any code of ours: a program that only touches NSApplication.shared
+# and turns the run loop for five seconds, run under `leaks --atExit`, leaks the same three
+# NSXPCConnection cycles (macOS 27.0.1).
+^<NSXPCConnection> .*Protocol: LNDaemonApplicationInterface
