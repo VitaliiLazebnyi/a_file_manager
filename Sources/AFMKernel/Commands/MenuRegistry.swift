@@ -1,0 +1,92 @@
+import Foundation
+
+/// A menu of the menu bar. Menus are shown in the order of their `order` values.
+public struct MenuID: Hashable {
+    public let title: String
+    public let order: Int
+
+    public init(_ title: String, order: Int) {
+        self.title = title
+        self.order = order
+    }
+}
+
+/// A group of entries inside a menu; groups are shown in the order of their `order` values,
+/// with a separator between them. Plugins that share a section share one constant.
+public struct MenuSection: Hashable {
+    public let menu: MenuID
+    public let order: Int
+
+    public init(_ menu: MenuID, order: Int) {
+        self.menu = menu
+        self.order = order
+    }
+}
+
+/// A group of entries in the context menu of the file list.
+public struct ContextMenuSection: Hashable {
+    public let order: Int
+
+    public init(order: Int) {
+        self.order = order
+    }
+}
+
+/// Where plugins say in which menus their commands appear. The shell builds the menu bar and
+/// the context menu from this; it has no menu layout of its own.
+public final class MenuRegistry {
+    public struct Menu {
+        public let title: String
+        /// Commands in display order; `nil` is a separator between sections.
+        public let items: [CommandID?]
+    }
+
+    private struct ContextEntry {
+        let section: ContextMenuSection
+        let items: [CommandID]
+        let onItemOnly: Bool
+    }
+
+    private var menus_: [String: MenuID] = [:]
+    private var entries: [(section: MenuSection, items: [CommandID])] = []
+    private var contextEntries: [ContextEntry] = []
+
+    public init() {}
+
+    /// Adds commands to a section of the menu bar. Inside a section, commands appear in the
+    /// order they were added (the order the plugins were loaded in).
+    public func add(_ items: [CommandID], to section: MenuSection) {
+        let menu = section.menu
+        precondition(menus_[menu.title] == nil || menus_[menu.title] == menu,
+                     "Two different menus are called \(menu.title); plugins must share one MenuID")
+        menus_[menu.title] = menu
+        entries.append((section, items))
+    }
+
+    /// Adds commands to the context menu of the file list. `onItemOnly` entries are left out
+    /// when the menu is opened on empty space or on `[..]`.
+    public func addToContextMenu(_ items: [CommandID], in section: ContextMenuSection, onItemOnly: Bool = false) {
+        contextEntries.append(ContextEntry(section: section, items: items, onItemOnly: onItemOnly))
+    }
+
+    /// The menus of the menu bar, in order.
+    public var menus: [Menu] {
+        menus_.values.sorted { ($0.order, $0.title) < ($1.order, $1.title) }.map { menu in
+            Menu(title: menu.title, items: MenuRegistry.flatten(entries.filter { $0.section.menu == menu }.map { ($0.section.order, $0.items) }))
+        }
+    }
+
+    public func contextMenu(onItem: Bool) -> [CommandID?] {
+        MenuRegistry.flatten(contextEntries.filter { onItem || !$0.onItemOnly }.map { ($0.section.order, $0.items) })
+    }
+
+    private static func flatten(_ contributions: [(order: Int, items: [CommandID])]) -> [CommandID?] {
+        let groups = Dictionary(grouping: contributions, by: \.order)
+        var items: [CommandID?] = []
+        for order in groups.keys.sorted() {
+            if !items.isEmpty { items.append(nil) }
+            items += groups[order]!.flatMap(\.items).map(Optional.some)
+        }
+        return items
+    }
+}
