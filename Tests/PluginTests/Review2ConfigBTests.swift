@@ -65,6 +65,16 @@ private final class Review2WatchFileSystem: FileSystemProvider, @unchecked Senda
 }
 
 @Suite struct Review2ConfigBVirtualFileSystem {
+    @Test func theRegistryGoesWithTheFileSystemsInIt() {
+        weak var gone: FileSystemRegistry?
+        do {
+            let registry = FileSystemRegistry()
+            registry.register(VirtualFileSystem(fileSystems: registry))
+            gone = registry
+        }
+        #expect(gone == nil)
+    }
+
     @Test func watcherReportsReachTheCallerOnTheMainThreadWhicheverThreadFiresThem() async {
         let provider = Review2WatchFileSystem()
         let registry = FileSystemRegistry()

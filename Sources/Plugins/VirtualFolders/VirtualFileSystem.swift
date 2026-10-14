@@ -97,7 +97,8 @@ public final class VirtualFileSystem: FileSystemProvider, @unchecked Sendable {
     static let entriesPerBatch = 256
 
     public let scheme = VirtualLocation.scheme
-    private let fileSystems: FileSystemRegistry
+    /// Unowned: the registry holds this file system.
+    private unowned let fileSystems: FileSystemRegistry
     private let lock = NSLock()
     private var lists: [Int: FileList] = [:]
     /// Ids are numbered from a random start, so the location of a list from an earlier run of
