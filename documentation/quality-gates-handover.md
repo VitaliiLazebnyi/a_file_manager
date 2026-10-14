@@ -144,9 +144,8 @@ initializer called from a nonisolated context under their Swift 5 settings), so 
 5. **Coverage to 100%** (89.4% lines at the start; lowest: Places 62%, MacIntegration 78%, DirectorySync 82%,
    SystemTools 82%, AFMShell 84%). UI tests for the AppKit code need an Xcode project (SwiftPM cannot host UI tests);
    generate it.
-6. **Mutation testing.** `Scripts/mutation-gate.py` is still to be written (parse Muter's JSON report, fail on survivors
-   not listed as equivalent). A first run on `KeyBindings.swift` scored 50% (survivors at lines 33 and 52). A full run
-   takes days: split the files over VM clones.
+6. **Mutation testing.** The gate works (see "Mutation testing" below); the tests that kill the survivors are still to
+   be written, module by module. A full run: 11,884 mutants, about 500 hours on one VM; split over VM clones.
 7. **Extras** listed above; then switch every gate on (CI, `git config core.hooksPath .githooks`).
 
 ## UI tests, accessibility audit, snapshot tests
@@ -165,8 +164,8 @@ initializer called from a nonisolated context under their Swift 5 settings), so 
 - **Waits:** condition-based only (`Wait`), at most 30 s; no fixed pauses.
 - **Coverage:** the program writes `.build/uitest/codecov/ui-*.profraw` (`LLVM_PROFILE_FILE`), merged into
   `ui.profdata`. The counts merge with those of `swift test --enable-code-coverage` (same compiler flags, same function
-  hashes; checked: no mismatch warnings, +142 lines). `Scripts/coverage-gate.py` does not read them yet: it needs to
-  merge `ui.profdata` with the other profiles and pass the program's binary as one more `-object`.
+  hashes; checked: no mismatch warnings, +142 lines). `Scripts/coverage-gate.py` merges `ui.profdata` with the other
+  profiles and passes the program's binary as one more `-object` when a UI run left them.
 - **Audit findings (open):** the file lists have no accessibility label; the empty cells of the `[..]` row are static
   texts without a value; the Attr column, partly outside the visible panel, fails the contrast check; one element in the
   menu bar area (type 81) has no description. The audit test fails until they are fixed in `AFMShell`.
@@ -174,6 +173,40 @@ initializer called from a nonisolated context under their Swift 5 settings), so 
   compares it with `Tests/Snapshots/<name>.png` (a channel may be 24 of 255 off, 0.2% of the pixels may differ).
   `AFM_RECORD_SNAPSHOTS=1 swift test --filter Snapshots` records; a recording counts as a failure. A mismatch writes
   what was drawn to `.build/snapshots/`. Views in the user's accent colour make poor references.
+
+## Mutation testing
+
+- **Muter is built from source:** `Scripts/build-muter.sh` installs `~/.afm-tools/bin/muter` (Muter's development branch
+  at a fixed commit, plus `Scripts/muter.patch`). Homebrew's Muter 16 must not be used: its old parser crashes on Swift
+  6 code (`Shell.swift`), and it loses every mutant inside a block that holds a mutant itself (22% of them); a lost
+  mutant "survives" without having been tested (the 50% of the first `KeyBindings.swift` run was partly that). The
+  development branch writes no mutant into the sources at all. The patch fixes both, keeps files of the same name apart,
+  swaps a ternary with operators in its second choice as a whole, removes only call statements (not declarations,
+  `return` or `if`), and leaves out mutants in stored-property initial values (they cannot be switched at file scope).
+  With it, the whole tree with all 11,884 mutants compiles.
+- **Running:** `Scripts/mutation.sh` (files changed since the branch left `origin/main`), `Scripts/mutation.sh <files>`
+  or `--all`. It copies the checkout to `.build/mutation/project` (warnings are not errors in that copy only: a mutant
+  may leave a value unused), and Muter runs `Scripts/mutation.sh --run-tests` per mutant: the test target of the mutated
+  module first (Kernel and Contracts: KernelTests; plugins: PluginTests; shell and app: ShellTests), the others only if
+  it passes, each stopped after 3 × its baseline time + 60 s (a hang counts as a kill). Reports in
+  `.build/mutation/report`: Muter's `muter.json`, `mutants.json` (one record per mutant with its source text),
+  per-mutant test logs in `logs/`.
+- **The gate:** `Scripts/mutation-gate.py check <mutants.json>...` fails on every survivor not in
+  `Tests/Mutation/equivalent-mutants.txt`, on outcomes that are not a kill, on listed mutants a test kills and on stale
+  entries. An entry names file, operator, enclosing declaration and the statement before and after (no line number),
+  with a mandatory reason; the gate prints a ready entry per survivor. Its source-text reading agrees with Muter's own
+  snapshot on all 11,884 mutants.
+- **Cost:** a mutant killed by its first target takes about 35 s (kernel), 125 s (shell) or 165 s (plugins); a survivor
+  runs all three targets (about 300 s). Plugins hold 9,762 of the mutants, so the whole tree takes about 500 hours on
+  one VM while survivors are rare, more before.
+- **Split runs:** `Scripts/mutation-shard.sh plan <n>` counts every file's mutants (Muter's own count, a few minutes)
+  and splits the files into `n` shards of equal estimated time; every machine computes the same plan at the same commit.
+  On each of `n` linked clones of the snapshot "03 base: tools complete" (one per VM, 8 cores each; the clones need the
+  same commit checked out and `Scripts/build-muter.sh` run once): `Scripts/mutation-shard.sh run <i> <n>`. A shard runs
+  in chunks of about 2 hours (`MUTATION_CHUNK_HOURS`) and skips chunks done before, so after a restart the same command
+  continues. When all are done, copy each clone's `.build/mutation/shard-<i>-of-<n>` to one checkout at that commit and
+  run `Scripts/mutation-shard.sh merge <folders>`: it checks that every file under `Sources` was mutated and runs the
+  gate over all reports. With 8 clones a full run takes about 62 hours per clone (4: about 125).
 
 ## Gotchas met so far
 
