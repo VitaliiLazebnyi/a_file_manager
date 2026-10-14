@@ -202,6 +202,8 @@ struct ProcessRunner {
             try process.run()
         } catch {
             pipe?.fileHandleForReading.readabilityHandler = nil
+            // Foundation does not let go of the handler of a process that did not start.
+            process.terminationHandler = nil
             return ProcessOutcome(failure: error.localizedDescription)
         }
         // The parent's copy of the writing end must go, or the end of the output never comes.
