@@ -129,14 +129,6 @@ public final class PanelTabs {
         onChange?()
     }
 
-    /// Closes every tab but the active one and the locked ones.
-    public func closeOtherTabs() {
-        let activeTab = active
-        tabs.removeAll { $0 !== activeTab && !$0.isLocked }
-        activeIndex = tabs.firstIndex { $0 === activeTab } ?? 0
-        onChange?()
-    }
-
     /// Closes a tab; the last remaining tab and locked tabs cannot be closed.
     @discardableResult
     public func closeTab(at index: Int) -> Bool {

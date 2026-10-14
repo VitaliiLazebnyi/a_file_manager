@@ -18,14 +18,18 @@ private func entry(_ name: String, folder: Bool = false, size: Int64 = 0) -> Fil
             String(repeating: "\u{15}", count: 300)
         ]
         for (a, b) in names.flatMap({ a in names.map { (a, $0) } }) {
-            let (forth, back) = (Sorter.compareNames(a, b), Sorter.compareNames(b, a))
+            let forth = Sorter.compareNames(a, b, collator: .current)
+            let back = Sorter.compareNames(b, a, collator: .current)
             #expect(forth.rawValue == -back.rawValue)
         }
         for order in [ListOrder(key: .name), ListOrder(key: .ext, descending: true), ListOrder(key: .size)] {
             let items = names.map { entry($0) } + names.map { entry($0 + ".x", folder: true) }
             let sorted = Sorter.sort(items, by: order)
             #expect(sorted.count == items.count)
-            #expect(zip(sorted, sorted.dropFirst()).allSatisfy { !Sorter.areInOrder($1, $0, by: order) })
+            #expect(
+                zip(sorted, sorted.dropFirst()).allSatisfy {
+                    Sorter.exactOrder($1, $0, by: order, collator: .current) >= 0
+                })
             #expect(Sorter.sort(items.reversed(), by: order).map(\.name) == sorted.map(\.name))
         }
     }
@@ -73,7 +77,7 @@ private func entry(_ name: String, folder: Bool = false, size: Int64 = 0) -> Fil
             let sorted = Sorter.sort(items, by: ListOrder(key: .name), collator: collator)
             #expect(
                 zip(sorted, sorted.dropFirst()).allSatisfy {
-                    Sorter.areInOrder($0, $1, by: ListOrder(key: .name), collator: collator)
+                    Sorter.exactOrder($0, $1, by: ListOrder(key: .name), collator: collator) < 0
                 }, "\(identifier)")
         }
     }
@@ -81,10 +85,10 @@ private func entry(_ name: String, folder: Bool = false, size: Int64 = 0) -> Fil
     @Test func namesThatDifferOnlyInWritingAreOrderedByTheirBytes() {
         let (composed, decomposed) = ("caf\u{E9}", "cafe\u{301}")
         #expect(composed == decomposed)
-        let forth = Sorter.compareNames(composed, decomposed)
-        let back = Sorter.compareNames(decomposed, composed)
+        let forth = Sorter.compareNames(composed, decomposed, collator: .current)
+        let back = Sorter.compareNames(decomposed, composed, collator: .current)
         #expect(forth != .orderedSame && forth.rawValue == -back.rawValue)
-        #expect(Sorter.compareNames(composed, composed) == .orderedSame)
+        #expect(Sorter.compareNames(composed, composed, collator: .current) == .orderedSame)
         let a = Sorter.sort([entry(composed), entry(decomposed)], by: ListOrder()).map { Array($0.name.utf8) }
         let b = Sorter.sort([entry(decomposed), entry(composed)], by: ListOrder()).map { Array($0.name.utf8) }
         #expect(a == b)
@@ -109,18 +113,24 @@ private func entry(_ name: String, folder: Bool = false, size: Int64 = 0) -> Fil
             let sorted = Sorter.sort(items, by: order)
             #expect(sorted.count == items.count)
             #expect(
-                zip(sorted, sorted.dropFirst()).allSatisfy { !Sorter.areInOrder($1, $0, by: order) }, "by \(order)")
+                zip(sorted, sorted.dropFirst()).allSatisfy {
+                    Sorter.exactOrder($1, $0, by: order, collator: .current) >= 0
+                },
+                "by \(order)")
             // Turning the direction round is the same list as sorting the other way.
             let turned = ListOrder(key: order.key, descending: !order.descending)
             #expect(
                 Sorter.resort(sorted, from: order, to: turned).map(\.name)
                     == Sorter.sort(sorted, by: turned).map(\.name), "\(order) turned")
             // Merging two sorted halves is the sorted whole.
-            let merged = Sorter.merge(
-                Sorter.sort(Array(items[..<10_000]), by: order), with: Sorter.sort(Array(items[10_000...]), by: order),
-                by: order)
+            var halves = SortedFileList(order: order)
+            halves.add(Array(items[..<10_000]))
+            halves.add(Array(items[10_000...]))
+            let merged = halves.items
             #expect(
-                zip(merged, merged.dropFirst()).allSatisfy { !Sorter.areInOrder($1, $0, by: order) },
+                zip(merged, merged.dropFirst()).allSatisfy {
+                    Sorter.exactOrder($1, $0, by: order, collator: .current) >= 0
+                },
                 "merged by \(order)")
         }
     }
@@ -129,7 +139,10 @@ private func entry(_ name: String, folder: Bool = false, size: Int64 = 0) -> Fil
         let long = String(repeating: "я", count: 20_000)
         let items = [entry(long + "b"), entry("я"), entry(long + "a"), entry("яя"), entry(long), entry("a")]
         let sorted = Sorter.sort(items, by: ListOrder())
-        #expect(zip(sorted, sorted.dropFirst()).allSatisfy { Sorter.areInOrder($0, $1, by: ListOrder()) })
+        #expect(
+            zip(sorted, sorted.dropFirst()).allSatisfy {
+                Sorter.exactOrder($0, $1, by: ListOrder(), collator: .current) < 0
+            })
         #expect(sorted.first?.name == "a")
     }
 }

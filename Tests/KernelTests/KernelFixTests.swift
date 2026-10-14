@@ -47,9 +47,9 @@ private let everyOrder = [SortKey.name, .ext, .size, .date, .unsorted].flatMap {
 }
 
 @Suite struct SortingByKeys {
-    /// The order is defined by `areInOrder`; a stable sort with it is what sorting has to give.
+    /// The order is defined by `exactOrder`; a stable sort with it is what sorting has to give.
     private func reference(_ items: [FileItem], _ order: ListOrder) -> [FileItem] {
-        items.sorted { Sorter.areInOrder($0, $1, by: order) }
+        items.sorted { Sorter.exactOrder($0, $1, by: order, collator: .current) < 0 }
     }
 
     @Test func sortingGivesTheOrderOfTheComparisonForEveryKindOfName() {
@@ -88,13 +88,14 @@ private let everyOrder = [SortKey.name, .ext, .size, .date, .unsorted].flatMap {
                 + String(random.next(50)) + "-\(index)"
             return entry(index % 3 == 0 ? name + ".txt" : name, folder: index % 11 == 0, size: Int64(random.next(9)))
         }
+        let languages = ["da", "sv", "de@collation=phonebook", "es@collation=traditional", "cs"]
+        let collators = languages.map { NameCollator(identifier: $0) } + [NameCollator(identifier: "", library: nil)]
         for order in [ListOrder(key: .name), ListOrder(key: .ext, descending: true), ListOrder(key: .size)] {
-            for collator in ["da", "sv", "de@collation=phonebook", "es@collation=traditional", "cs"].map(
-                NameCollator.init(identifier:)) + [.unavailable]
-            {
+            for collator in collators {
                 let sorted = Sorter.sort(items, by: order, collator: collator)
                 #expect(
-                    sorted == items.sorted { Sorter.areInOrder($0, $1, by: order, collator: collator) }, "by \(order)"
+                    sorted == items.sorted { Sorter.exactOrder($0, $1, by: order, collator: collator) < 0 },
+                    "by \(order)"
                 )
                 #expect(
                     Sorter.sort(items.reversed(), by: order, collator: collator) == sorted, "shuffled, by \(order)")
@@ -120,15 +121,17 @@ private let everyOrder = [SortKey.name, .ext, .size, .date, .unsorted].flatMap {
         let items = variedItems(1_500, seed: 7)
         for order in everyOrder {
             let (first, second) = (Array(items[..<900]), Array(items[900...]))
-            let merged = Sorter.merge(Sorter.sort(first, by: order), with: Sorter.sort(second, by: order), by: order)
-            #expect(merged == reference(first + second, order), "merge by \(order)")
+            var halves = SortedFileList(order: order)
+            halves.add(first)
+            halves.add(second)
+            #expect(halves.items == reference(first + second, order), "merge by \(order)")
             var list = SortedFileList(order: order)
             var added: [FileItem] = []
             for start in stride(from: 0, to: items.count, by: 400) {
                 let batch = Array(items[start..<min(start + 400, items.count)])
                 list.add(batch)
                 added += batch
-                #expect(list.count == added.count)
+                #expect(list.items.count == added.count)
             }
             #expect(list.items == reference(items, order), "batches by \(order)")
         }
@@ -364,12 +367,14 @@ private let everyOrder = [SortKey.name, .ext, .size, .date, .unsorted].flatMap {
         #expect(model.totals == counted(model))
         model.setSelected(false, names: ["file7.txt", "file12.txt"])
         #expect(model.totals == counted(model))
-        model.setComputedSize(5_000, forName: "folder0")
+        model.setComputedSizes([(name: "folder0", size: 5_000)])
         #expect(model.totals == counted(model) && model.totals.selectedBytes >= 5_000)
-        model.setComputedSize(70, forName: "folder0")
-        model.setComputedSize(9, forName: "folder10")
+        model.setComputedSizes([(name: "folder0", size: 70)])
+        model.setComputedSizes([(name: "folder10", size: 9)])
         #expect(model.totals == counted(model))
-        model.setComputedSizes(["folder20": 11, "folder30": 12, "missing": 13])
+        model.setComputedSizes([
+            (name: "folder20", size: 11), (name: "folder30", size: 12), (name: "missing", size: 13)
+        ])
         #expect(model.totals == counted(model))
         #expect(
             model.items.first { $0.name == "folder30" }?.computedSize == 12
@@ -380,7 +385,7 @@ private let everyOrder = [SortKey.name, .ext, .size, .date, .unsorted].flatMap {
         #expect(model.totals == counted(model))
         model.setFilter(.mask("*1.txt"))
         #expect(model.totals == counted(model))
-        model.setComputedSize(8, forName: "folder40")
+        model.setComputedSizes([(name: "folder40", size: 8)])
         #expect(model.totals == counted(model) && model.listedItems.first { $0.name == "folder40" }?.computedSize == 8)
         model.setFilter(nil)
         model.selectAll()
@@ -393,12 +398,12 @@ private let everyOrder = [SortKey.name, .ext, .size, .date, .unsorted].flatMap {
         let model = model(sample)
         var changes = 0
         model.onChange = { _ in changes += 1 }
-        model.setComputedSizes(["folder0": 1, "folder10": 2, "folder20": 3])
+        model.setComputedSizes([(name: "folder0", size: 1), (name: "folder10", size: 2), (name: "folder20", size: 3)])
         #expect(changes == 1)
         model.setSelected(true, names: ["file1.txt", "file2.txt", "file3.txt"])
         #expect(changes == 2 && model.selection.count == 3)
-        model.setComputedSizes(["missing": 1])
-        model.setComputedSizes([:])
+        model.setComputedSizes([(name: "missing", size: 1)])
+        model.setComputedSizes([])
         #expect(changes == 2)
     }
 
@@ -477,7 +482,7 @@ private let everyOrder = [SortKey.name, .ext, .size, .date, .unsorted].flatMap {
         model.toggleSelection(row: model.row(ofName: "a.bin")!)
         model.toggleSelection(row: model.row(ofName: "b.bin")!)
         #expect(model.totals.selectedBytes == .max)
-        model.setComputedSize(.max, forName: "d")
+        model.setComputedSizes([(name: "d", size: .max)])
         #expect(model.totals.selectedBytes == .max && model.totals.totalBytes == .max)
         #expect(
             Int64.max.addingSaturated(1) == .max && Int64.min.addingSaturated(-1) == .min
@@ -488,26 +493,6 @@ private let everyOrder = [SortKey.name, .ext, .size, .date, .unsorted].flatMap {
         memory.addFile("/big/b/two.bin", "x")
         let inflated = HugeSizes(memory)
         #expect(inflated.totalSize(of: memory.url("/big")) == .max)
-    }
-
-    @Test func aPresortedListIsTakenAsItIs() {
-        let model = model(sample)
-        model.moveCursor(to: model.row(ofName: "file7.txt")!)
-        let order = ListOrder(key: .size, descending: true)
-        let version = model.listVersion
-        let sorted = Sorter.resort(model.listedItems, from: model.sort, to: order)
-        #expect(model.listVersion == version)
-        model.setSort(order, presorted: sorted)
-        #expect(
-            model.sort == order && model.items == Sorter.sort(sample, by: order)
-                && model.cursorItem?.name == "file7.txt")
-        #expect(model.listVersion != version)
-        // A list of another length cannot be this list in another order.
-        model.setSort(ListOrder(key: .name), presorted: Array(sorted.dropLast()))
-        #expect(model.items == Sorter.sort(sample, by: ListOrder(key: .name)))
-        // Turning the direction round is the same as sorting.
-        model.setSort(ListOrder(key: .name, descending: true))
-        #expect(model.items == Sorter.sort(sample, by: ListOrder(key: .name, descending: true)))
     }
 
     @Test func aRefreshThatOnlyEndsTheWaitingIsAnnounced() {

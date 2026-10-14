@@ -1,7 +1,8 @@
-import AFMKernel
 import Foundation
 import TestSupport
 import Testing
+
+@testable import AFMKernel
 
 @Suite struct Names {
     @Test func splitsNameAndExtension() {
@@ -77,21 +78,21 @@ import Testing
         #expect(Sorter.sort(items, by: ListOrder(key: .unsorted)).map(\.name) == ["m", "z", "b.txt", "a.txt"])
     }
 
-    @Test func headerClickReversesOrStartsInOwnDirection() {
-        let byName = ListOrder()
-        #expect(byName.clicked(.name) == ListOrder(key: .name, descending: true))
-        #expect(byName.clicked(.date) == ListOrder(key: .date, descending: true))
-        #expect(byName.clicked(.ext) == ListOrder(key: .ext, descending: false))
+    @Test func timeAndSizeStartDescending() {
+        #expect(SortKey.date.startsDescending && SortKey.size.startsDescending)
+        #expect(!SortKey.name.startsDescending && !SortKey.ext.startsDescending && !SortKey.unsorted.startsDescending)
     }
 
     @Test func mergingABatchEqualsSortingEverything() {
         let order = ListOrder(key: .size, descending: true)
         let first = (0..<40).map { item("a\($0).txt", folder: $0 % 7 == 0, size: Int64($0 * 37 % 11)) }
         let second = (0..<25).map { item("b\($0).txt", folder: $0 % 5 == 0, size: Int64($0 * 13 % 11)) }
-        let merged = Sorter.merge(Sorter.sort(first, by: order), with: Sorter.sort(second, by: order), by: order)
-        #expect(merged.map(\.name) == Sorter.sort(first + second, by: order).map(\.name))
-        #expect(Sorter.merge([], with: second, by: order).count == 25)
-        #expect(Sorter.merge(first, with: [], by: order).count == 40)
+        var list = SortedFileList(order: order)
+        list.add([])
+        #expect(list.items.isEmpty)
+        list.add(first)
+        list.add(second)
+        #expect(list.items.map(\.name) == Sorter.sort(first + second, by: order).map(\.name))
     }
 
     @Test func aListCollectedInBatchesIsAlwaysSorted() {
@@ -110,7 +111,7 @@ import Testing
                 all += items
                 #expect(list.items.map(\.name) == Sorter.sort(all, by: order).map(\.name))
             }
-            #expect(list.count == 180)
+            #expect(list.items.count == 180)
         }
     }
 
@@ -126,7 +127,7 @@ import Testing
         for order in [
             ListOrder(), ListOrder(key: .size, descending: true), ListOrder(key: .date), ListOrder(key: .unsorted)
         ] {
-            let simple = items.sorted { Sorter.areInOrder($0, $1, by: order) }
+            let simple = items.sorted { Sorter.exactOrder($0, $1, by: order, collator: .current) < 0 }
             #expect(Sorter.sort(items, by: order).map(\.name) == simple.map(\.name))
         }
     }
@@ -218,7 +219,7 @@ import Testing
         #expect(panel.selection == ["a.txt"])
         panel.setSelected(true, rows: 1...2)
         #expect(panel.selection == ["a.txt", "bin", "docs"])
-        panel.setComputedSize(4_096, forName: "docs")
+        panel.setComputedSizes([(name: "docs", size: 4_096)])
         #expect(panel.totals.totalBytes == 3_072 + 4_096 && panel.totals.selectedBytes == 2_048 + 4_096)
     }
 
@@ -244,7 +245,7 @@ import Testing
     @Test func updateKeepsCursorSelectionAndFolderSizes() throws {
         panel.moveCursor(to: panel.row(ofName: "b.md")!)
         panel.toggleSelection(row: panel.row(ofName: "a.txt")!)
-        panel.setComputedSize(4_096, forName: "docs")
+        panel.setComputedSizes([(name: "docs", size: 4_096)])
         #expect(!panel.update(with: try listing("/work")))
         memory.addFile("/work/0-new.txt")
         #expect(panel.update(with: try listing("/work")))

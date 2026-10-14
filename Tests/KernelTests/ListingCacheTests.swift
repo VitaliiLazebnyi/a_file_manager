@@ -45,6 +45,16 @@ import Testing
 
     func files(_ count: Int) -> [String] { (0..<count).map { "f\($0).txt" } }
 
+    /// Whether the cache remembers each of these folders (read without hidden files).
+    func remembers(_ cache: ListingCache, _ paths: String...) -> Bool {
+        paths.allSatisfy { cache.age(of: url($0), showHidden: false) != nil }
+    }
+
+    /// Whether the cache remembers none of these folders (read without hidden files).
+    func forgot(_ cache: ListingCache, _ paths: String...) -> Bool {
+        paths.allSatisfy { cache.age(of: url($0), showHidden: false) == nil }
+    }
+
     @Test func hitAndMiss() {
         let cache = cache()
         #expect(cache.entry(for: url("/a"), showHidden: false) == nil)
@@ -59,7 +69,7 @@ import Testing
         // The same place written with a trailing slash; another place.
         #expect(cache.entry(for: url("/a/"), showHidden: false) != nil)
         #expect(cache.entry(for: url("/b"), showHidden: false) == nil)
-        #expect(cache.folderCount == 1 && cache.entryCount == 2)
+        #expect(cache.age(of: url("/a"), showHidden: true) == nil)
     }
 
     @Test func localFoldersAreKeptOnlyWhenTheyWereSlowToRead() {
@@ -77,7 +87,7 @@ import Testing
             cache.store(
                 listing("/share", ["x"], volume: share), sortedBy: name, showHidden: false, readTime: 0.001,
                 since: cache.startReading()))
-        #expect(cache.folderCount == 2)
+        #expect(forgot(cache, "/quick") && remembers(cache, "/slow", "/share"))
         // A folder that is remembered is brought up to date by every later reading, also a quick one.
         clock.time += 5
         #expect(
@@ -97,7 +107,6 @@ import Testing
         // /1 is used again, so /2 is the one that makes room.
         #expect(cache.entry(for: url("/1"), showHidden: false) != nil)
         cache.store(listing("/4", ["x"]), sortedBy: name, showHidden: false, readTime: 0, since: cache.startReading())
-        #expect(cache.folderCount == 3)
         #expect(cache.age(of: url("/2"), showHidden: false) == nil)
         #expect(["/1", "/3", "/4"].allSatisfy { cache.age(of: url($0), showHidden: false) != nil })
     }
@@ -108,30 +117,30 @@ import Testing
             listing("/1", files(40)), sortedBy: name, showHidden: false, readTime: 0, since: cache.startReading())
         cache.store(
             listing("/2", files(40)), sortedBy: name, showHidden: false, readTime: 0, since: cache.startReading())
-        #expect(cache.entryCount == 80)
+        #expect(remembers(cache, "/1", "/2"))
         // 40 more do not fit: the oldest folder goes.
         cache.store(
             listing("/3", files(40)), sortedBy: name, showHidden: false, readTime: 0, since: cache.startReading())
-        #expect(cache.entryCount == 80 && cache.age(of: url("/1"), showHidden: false) == nil)
+        #expect(forgot(cache, "/1") && remembers(cache, "/2", "/3"))
         // A folder that is larger than the whole limit is not remembered, and what was
         // remembered of it before is dropped rather than left out of date.
         #expect(
             !cache.store(
                 listing("/huge", files(101)), sortedBy: name, showHidden: false, readTime: 0,
                 since: cache.startReading()))
-        #expect(cache.folderCount == 2)
+        #expect(forgot(cache, "/huge") && remembers(cache, "/2", "/3"))
         #expect(
             !cache.store(
                 listing("/2", files(101)), sortedBy: name, showHidden: false, readTime: 0, since: cache.startReading()
             )
         )
-        #expect(cache.age(of: url("/2"), showHidden: false) == nil && cache.entryCount == 40)
+        #expect(forgot(cache, "/2") && remembers(cache, "/3"))
         // Exactly the limit fits, alone.
         #expect(
             cache.store(
                 listing("/full", files(100)), sortedBy: name, showHidden: false, readTime: 0,
                 since: cache.startReading()))
-        #expect(cache.folderCount == 1 && cache.entryCount == 100)
+        #expect(remembers(cache, "/full") && forgot(cache, "/3"))
     }
 
     @Test func anotherOrderIsSortedOnRequestAndKept() {
@@ -165,7 +174,7 @@ import Testing
             since: cache.startReading())
         #expect(cache.entry(for: url("/a"), showHidden: false)?.listing.items.count == 1)
         #expect(cache.entry(for: url("/a"), showHidden: true)?.listing.items.count == 2)
-        #expect(cache.entry(for: url("/a"), showHidden: true)?.showHidden == true && cache.folderCount == 2)
+        #expect(cache.entry(for: url("/a"), showHidden: true)?.listing.items.first?.name == ".secret")
     }
 
     @Test func anOldListingIsNotHandedOut() {
@@ -177,7 +186,7 @@ import Testing
         clock.time += 1
         #expect(cache.entry(for: url("/a"), showHidden: false) == nil)
         // It is gone for good, not only hidden.
-        #expect(cache.folderCount == 0)
+        #expect(forgot(cache, "/a"))
         clock.time -= 60
         #expect(cache.entry(for: url("/a"), showHidden: false) == nil)
     }
@@ -201,7 +210,7 @@ import Testing
         cache.forget(url("/work/inside"))
         #expect(!isKept("/work/inside") && isKept("/"))
         cache.invalidate([url("/")])
-        #expect(cache.folderCount == 0)
+        #expect(!isKept("/") && !isKept("/other"))
     }
 
     @Test func aReadingThatWasOvertakenIsNotKept() {
@@ -216,7 +225,7 @@ import Testing
         let before = cache.startReading()
         cache.invalidate([url("/a")])
         #expect(!cache.store(listing("/a", ["stale"]), sortedBy: name, showHidden: false, readTime: 0, since: before))
-        #expect(cache.folderCount == 0)
+        #expect(forgot(cache, "/a"))
         #expect(
             cache.store(
                 listing("/a", ["fresh"]), sortedBy: name, showHidden: false, readTime: 0, since: cache.startReading())
@@ -227,7 +236,7 @@ import Testing
         let cache = cache()
         cache.store(listing("/a", ["x"]), sortedBy: name, showHidden: false, readTime: 0, since: cache.startReading())
         cache.isEnabled = false
-        #expect(cache.folderCount == 0)
+        #expect(forgot(cache, "/a"))
         #expect(
             !cache.store(
                 listing("/a", ["x"]), sortedBy: name, showHidden: false, readTime: 0, since: cache.startReading()))
@@ -235,8 +244,6 @@ import Testing
         #expect(
             cache.store(
                 listing("/a", ["x"]), sortedBy: name, showHidden: false, readTime: 0, since: cache.startReading()))
-        cache.removeAll()
-        #expect(cache.folderCount == 0)
     }
 
     @MainActor @Test func theKernelSwitchesItFromTheSettings() {
@@ -284,13 +291,12 @@ import Testing
                 if let entry = cache.entry(for: listing.directory, showHidden: index % 2 == 0, sortedBy: order) {
                     let items = entry.listing.items
                     check(entry.order == order && items.count == listing.items.count)
-                    check(zip(items, items.dropFirst()).allSatisfy { !Sorter.areInOrder($1, $0, by: order) })
+                    check(Sorter.sort(items, by: order) == items)
                 }
 
             case 5: cache.invalidate([listing.directory])
             default: _ = cache.age(of: listing.directory, showHidden: false)
             }
-            check(cache.folderCount <= 8 && cache.entryCount <= 2_000)
         }
         #expect(mistakes == 0)
     }

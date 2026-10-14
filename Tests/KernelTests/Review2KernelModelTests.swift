@@ -87,9 +87,7 @@ private func elsewhere<Value>(_ work: @escaping @Sendable () -> Value) -> Value 
         // Calculated sizes, filters, marks.
         model.setComputedSizes([(name: "dir0", size: 500), (name: "dir10", size: 7)])
         model.setFilter(PanelFilter.mask("*.txt"))
-        _ = model.setFilter(
-            PanelFilter.mask("*.md"), prefiltered: PanelModel.filtered(model.listedItems, by: .mask("*.md")),
-            listVersion: version)
+        model.setFilter(PanelFilter.mask("*.md"))
         model.setFilter(nil)
         model.selectAll()
         #expect(model.listVersion == version)
@@ -169,9 +167,6 @@ private func elsewhere<Value>(_ work: @escaping @Sendable () -> Value) -> Value 
         model.onChange = { _ in announced += 1 }
         for prepared in stale { #expect(model.apply(prepared) == .stale) }
         #expect(!model.setSelection(rows))
-        #expect(
-            !model.setSort(
-                ListOrder(), presorted: Sorter.sort(items, by: ListOrder()), listVersion: model.listVersion - 1))
         #expect(state(model) == before && announced == 0)
         // What only touches marks, the cursor or sizes does not make a prepared change stale.
         let basis = model.basis
@@ -234,11 +229,12 @@ private func elsewhere<Value>(_ work: @escaping @Sendable () -> Value) -> Value 
         // A set of rows found on another thread.
         let basis = model.basis
         let rows = elsewhere { PanelModel.rows(of: basis) { !$0.isFolder && $0.size > 50 } }
-        #expect(model.setSelection(rows) && model.selectionCount == rows.count && rows.count > 0)
+        let wanted = model.items.filter { !$0.isFolder && $0.size > 50 }.count
+        #expect(model.setSelection(rows) && model.selectionCount == wanted && wanted > 0)
         #expect(
             model.operands().allSatisfy { $0.size > 50 && $0.name.hasSuffix(".txt") } && model.totals == counted(model))
         #expect(model.setSelection(rows, .remove) && model.selectionCount == 0)
-        #expect(model.setSelection(rows, .add) && model.selectionCount == rows.count)
+        #expect(model.setSelection(rows, .add) && model.selectionCount == wanted)
     }
 
     @Test func theSameNameTwiceIsTwoEntriesEverywhere() {
@@ -340,12 +336,7 @@ private func elsewhere<Value>(_ work: @escaping @Sendable () -> Value) -> Value 
         #expect(
             model.listedItems.first { $0.name == "dir0" }?.computedSize == 5
                 && model.listedItems.first { $0.name == "dir290" }?.computedSize == 9)
-        model.setSort(
-            ListOrder(key: .date),
-            presorted: Sorter.sort(
-                model.listedItems.map {
-                    FileItem(url: $0.url, name: $0.name, isDirectory: $0.isDirectory, size: $0.size)
-                }, by: ListOrder(key: .date)))
+        model.setSort(ListOrder(key: .date))
         #expect(model.listedItems.filter { $0.computedSize != nil }.map(\.name).sorted() == ["dir0", "dir290"])
         #expect(model.totals == counted(model))
     }
@@ -398,7 +389,6 @@ private func elsewhere<Value>(_ work: @escaping @Sendable () -> Value) -> Value 
         let model = panel(sample(100))
         model.setSelected(true, names: ["file1.md", "file2.md", "dir10"])
         model.saveSelection()
-        #expect(model.savedSelection == ["file1.md", "file2.md", "dir10"])
         let other = URL(fileURLWithPath: "/review2/other")
         model.show(
             listing(
@@ -406,7 +396,6 @@ private func elsewhere<Value>(_ work: @escaping @Sendable () -> Value) -> Value 
                     file("file2.md", in: other), file("zzz", in: other),
                     FileItem(url: other.appendingPathComponent("dir10"), name: "dir10", isDirectory: true)
                 ], at: other))
-        #expect(model.savedSelection == ["file1.md", "file2.md", "dir10"])
         model.restoreSelection()
         #expect(model.selectedNames.sorted() == ["dir10", "file2.md"])
         // A long saved selection is kept without making its names on the way out.

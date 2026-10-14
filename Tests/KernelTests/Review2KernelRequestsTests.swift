@@ -182,10 +182,7 @@ private final class PlainPlugin: Plugin {
         ]
         let model = panel(items)
         let filter = PanelFilter(title: "big") { $0.size > 1 }
-        #expect(
-            model.setFilter(
-                filter, prefiltered: PanelModel.filtered(model.listedItems, by: filter), listVersion: model.listVersion
-            ))
+        model.setFilter(filter)
         #expect(
             model.items.map(\.size) == model.listedItems.filter(filter.matches).map(\.size) && model.items.count == 3)
         model.selectAll()

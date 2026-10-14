@@ -372,37 +372,6 @@ enum ListWork {
         return (kept, places.map { places in among.map { places[Int($0)] } } ?? among)
     }
 
-    /// The places of the entries of `shown` in `listed`, of which they are meant to be a part
-    /// in the same order; nil when they are not. An entry is found by everything that tells
-    /// it from another of the same name (a list gathered from several folders can hold a
-    /// name twice): its location and what the list says about it.
-    static func places(of shown: [FileItem], in listed: [FileItem]) -> [UInt32]? {
-        guard shown.count <= listed.count else { return nil }
-        @Sendable func isSame(_ a: FileItem, _ b: FileItem) -> Bool {
-            guard ExactName.areSame(a.name, b.name), a.size == b.size, a.isDirectory == b.isDirectory,
-                a.isSymlink == b.isSymlink,
-                a.modified == b.modified
-                    || (a.modified.timeIntervalSinceReferenceDate.isNaN
-                        && b.modified.timeIntervalSinceReferenceDate.isNaN)
-            else { return false }
-            // A copy of an entry holds the very same location; only otherwise are the two compared.
-            let isSameObject = withUnsafeBytes(of: a.url) { first in
-                withUnsafeBytes(of: b.url) { first.elementsEqual($0) }
-            }
-            return isSameObject || a.url == b.url
-        }
-        var places: [UInt32] = []
-        places.reserveCapacity(shown.count)
-        var next = 0
-        for item in shown {
-            while next < listed.count, !isSame(listed[next], item) { next += 1 }
-            guard next < listed.count else { return nil }
-            places.append(UInt32(next))
-            next += 1
-        }
-        return places
-    }
-
     /// The entries at the given places.
     static func picked(_ items: [FileItem], at places: [UInt32]) -> [FileItem] {
         Sorter.permute(items, by: places)

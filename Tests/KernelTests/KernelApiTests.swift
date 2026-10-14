@@ -438,19 +438,16 @@ private func onThread(_ work: @escaping @Sendable () -> Void) {
         var announced = 0
         handed.onChange = { if $0 == .contents { announced += 1 } }
         // Worked out on another thread, as a panel does it, and applied here.
-        let done = Signal<[FileItem]>()
-        let listed = handed.listedItems
-        onThread { done.set(PanelModel.filtered(listed, by: filter)) }
-        let shown = done.wait() ?? []
-        #expect(handed.setFilter(filter, prefiltered: shown, listVersion: version))
+        let done = Signal<PanelModel.Prepared>()
+        let basis = handed.basis
+        onThread { done.set(PanelModel.prepare(basis, filter: filter)) }
+        #expect(done.wait().map(handed.apply) == .changed)
         direct.setFilter(filter)
         // A filter is not another list: the version of the list stays.
         #expect(isSame(direct, handed) && announced == 1 && handed.listVersion == version)
         #expect(handed.selection == ["file3.txt", "dir7", "file13.txt"] && handed.cursorItem?.name == "file23.txt")
         // Taking the filter off again, the same way.
-        let off = handed.listVersion
-        #expect(
-            handed.setFilter(nil, prefiltered: PanelModel.filtered(handed.listedItems, by: nil), listVersion: off))
+        #expect(handed.apply(PanelModel.prepare(handed.basis, filter: nil)) == .changed)
         direct.setFilter(nil)
         #expect(isSame(direct, handed) && handed.items.count == count)
     }
@@ -459,17 +456,17 @@ private func onThread(_ work: @escaping @Sendable () -> Void) {
         let filter = PanelFilter(title: "1") { $0.name.contains("1") }
         let all = items(200)
         let (direct, handed) = (model(all), model(all))
-        let version = handed.listVersion
-        let stale = PanelModel.filtered(handed.listedItems, by: filter)
+        let stale = PanelModel.prepare(handed.basis, filter: filter)
         // The directory was read again before the filtered list came back.
         let fresh = Listing(
             directory: directory, items: Array(all.dropFirst(20)), parent: URL(fileURLWithPath: "/"),
             root: URL(fileURLWithPath: "/"))
         handed.update(with: fresh)
         direct.update(with: fresh)
-        #expect(!handed.setFilter(filter, prefiltered: stale, listVersion: version))
+        #expect(handed.apply(stale) == .stale)
+        handed.setFilter(filter)
         direct.setFilter(filter)
-        #expect(isSame(direct, handed) && handed.items.count < stale.count)
+        #expect(isSame(direct, handed) && handed.items.count < PanelModel.filtered(all, by: filter).count)
     }
 
     @Test func aNewVolumeFigureIsAnnounced() {
@@ -615,7 +612,7 @@ private func onThread(_ work: @escaping @Sendable () -> Void) {
         #expect(model.item(atRow: one)?.computedSize == 100 && model.item(atRow: two)?.computedSize == 7)
         #expect(model.totals.selectedBytes == 7 && model.totals.totalBytes == 107 + 5 + Int64(others) * 7)
         // By one name alone, the folder written like it.
-        model.setComputedSize(9, forName: decomposed)
+        model.setComputedSizes([(name: decomposed, size: 9)])
         #expect(
             model.item(atRow: one)?.computedSize == 100 && model.item(atRow: two)?.computedSize == 9
                 && model.totals.selectedBytes == 9)

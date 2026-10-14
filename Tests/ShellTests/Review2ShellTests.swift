@@ -894,7 +894,7 @@ extension Application {
         defer { ahead.shutDown() }
         ahead.cursorRests(on: ReadAhead.Target(location: server.url("/big"), showHidden: false, order: ListOrder()))
         let read = await wait { server.listRequests(for: "/big") == 1 && !ahead.isReading && ahead.pausedCount == 1 }
-        #expect(read && cache.folderCount == 0)
+        #expect(read && cache.age(of: server.url("/big"), showHidden: false) == nil)
         // The cursor stays where it is for several rests' time: the folder is left alone.
         _ = await wait(upTo: ReadAhead.dwell * 4) { server.listRequests(for: "/big") > 1 }
         #expect(server.listRequests(for: "/big") == 1)
@@ -905,7 +905,7 @@ extension Application {
         #expect(server.listRequests(for: "/big") == 1)
         // A folder that fits is read once and remembered.
         ahead.cursorRests(on: ReadAhead.Target(location: server.url("/small"), showHidden: false, order: ListOrder()))
-        let kept = await wait { cache.folderCount == 1 && !ahead.isReading }
+        let kept = await wait { cache.age(of: server.url("/small"), showHidden: false) != nil && !ahead.isReading }
         #expect(kept && server.listRequests(for: "/small") == 1 && ahead.pausedCount == 1)
     }
 

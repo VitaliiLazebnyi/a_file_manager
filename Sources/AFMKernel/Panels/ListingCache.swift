@@ -42,7 +42,6 @@ public final class ListingCache: @unchecked Sendable {
         /// The folder with its items sorted by `order`.
         public let listing: Listing
         public let order: ListOrder
-        public let showHidden: Bool
         /// When the reading was finished.
         public let readAt: Date
     }
@@ -60,6 +59,13 @@ public final class ListingCache: @unchecked Sendable {
     private struct Key: Hashable {
         let location: String
         let showHidden: Bool
+
+        static func == (a: Self, b: Self) -> Bool { a.location == b.location && a.showHidden == b.showHidden }
+
+        func hash(into hasher: inout Hasher) {
+            hasher.combine(location)
+            hasher.combine(showHidden)
+        }
     }
 
     private struct Slot {
@@ -123,12 +129,6 @@ public final class ListingCache: @unchecked Sendable {
         }
     }
 
-    /// The number of remembered folders.
-    public var folderCount: Int { locked { slots.count } }
-
-    /// The number of entries in all remembered folders together.
-    public var entryCount: Int { locked { totalEntries() } }
-
     private func totalEntries() -> Int {
         slots.values.reduce(0) { $0 + $1.entry.listing.items.count }
     }
@@ -159,7 +159,7 @@ public final class ListingCache: @unchecked Sendable {
     ) -> Bool {
         let key = Key(location: listing.directory.locationKey, showHidden: showHidden)
         let isRemote = listing.volume.map { !$0.isLocal } ?? false
-        let entry = Entry(listing: listing, order: order, showHidden: showHidden, readAt: now())
+        let entry = Entry(listing: listing, order: order, readAt: now())
         var dropped: [Slot] = []
         defer { release(&dropped) }
         return locked {
@@ -222,7 +222,7 @@ public final class ListingCache: @unchecked Sendable {
             listing: Listing(
                 directory: old.directory, items: Sorter.sort(old.items, by: order), parent: old.parent,
                 root: old.root, volume: old.volume),
-            order: order, showHidden: showHidden, readAt: found.readAt)
+            order: order, readAt: found.readAt)
         locked {
             // Kept only if nobody stored a newer reading or dropped the entry meanwhile.
             if slots[key]?.started == slot.started { slots[key]?.entry = sorted }
@@ -265,15 +265,6 @@ public final class ListingCache: @unchecked Sendable {
         let parents = Set(directories.map { $0.deletingLastPathComponent().locationKey })
         var dropped = locked {
             keys.flatMap(forget(key:)) + remove { parents.contains($0.location) }
-        }
-        release(&dropped)
-    }
-
-    public func removeAll() {
-        var dropped = locked {
-            clock += 1
-            lastChange = clock
-            return remove { _ in true }
         }
         release(&dropped)
     }

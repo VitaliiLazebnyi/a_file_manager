@@ -20,13 +20,6 @@ public struct ListOrder: Equatable, Sendable {
         self.key = key
         self.descending = descending
     }
-
-    /// A header click: the same column reverses, another column starts in its own direction.
-    public func clicked(_ key: SortKey) -> Self {
-        key == self.key
-            ? Self(key: key, descending: !descending)
-            : Self(key: key, descending: key.startsDescending)
-    }
 }
 
 /// Puts a file list in order. Pure functions, safe on any thread: large lists are sorted in
@@ -48,7 +41,6 @@ public enum Sorter: Sendable {
     /// An item with the parts of its name the comparison needs: the first decides, the
     /// second decides between items whose first parts are the same bytes.
     fileprivate struct Keyed {
-        let item: FileItem
         let first: String
         let second: String
 
@@ -56,7 +48,6 @@ public enum Sorter: Sendable {
         /// then the name without it when sorting by extension, otherwise the name without
         /// the extension and then the rest (the dot with the extension).
         init(_ item: FileItem, _ key: SortKey) {
-            self.item = item
             if item.isFolder {
                 (first, second) = (item.name, "")
             } else {
@@ -71,10 +62,6 @@ public enum Sorter: Sendable {
     }
 
     /// Two names in the order of names (see the type): by collation key, then by bytes.
-    static func compareNames(_ a: String, _ b: String) -> ComparisonResult {
-        compareNames(a, b, collator: .current)
-    }
-
     static func compareNames(_ a: String, _ b: String, collator: NameCollator) -> ComparisonResult {
         if ExactName.areSame(a, b) { return .orderedSame }
         var result = collator.withKey(of: a) { first in collator.withKey(of: b) { SortKeys.bytewise(first, $0) } }
@@ -139,20 +126,10 @@ public enum Sorter: Sendable {
         return order.map { items[$0] }
     }
 
-    /// Whether `a` belongs before `b`: folders first and always by name; files by the chosen
-    /// key (03 › Directories). Unsorted keeps files in the order they came.
-    public static func areInOrder(_ a: FileItem, _ b: FileItem, by order: ListOrder) -> Bool {
-        exactOrder(a, b, by: order, collator: .current) < 0
-    }
-
-    static func areInOrder(_ a: FileItem, _ b: FileItem, by order: ListOrder, collator: NameCollator) -> Bool {
-        exactOrder(a, b, by: order, collator: collator) < 0
-    }
-
     /// The comparison that defines the order, for two items without records: negative when
     /// `a` belongs before `b`, zero when neither has to come first (two files in the order
     /// they came, or two items of the same name, byte for byte).
-    fileprivate static func exactOrder(_ a: FileItem, _ b: FileItem, by order: ListOrder, collator: NameCollator) -> Int
+    static func exactOrder(_ a: FileItem, _ b: FileItem, by order: ListOrder, collator: NameCollator) -> Int
     {
         if a.isFolder != b.isFolder { return a.isFolder ? -1 : 1 }
         if !a.isFolder {
@@ -221,14 +198,6 @@ public enum Sorter: Sendable {
             for index in folderCount..<items.count { buffer[index] = UInt32(items.count - 1 - (index - folderCount)) }
             count = items.count
         }
-    }
-
-    /// Merges a sorted batch into a sorted list in one pass. Items of the list stay ahead of
-    /// equal items of the batch.
-    public static func merge(_ list: [FileItem], with batch: [FileItem], by order: ListOrder) -> [FileItem] {
-        guard !batch.isEmpty else { return list }
-        guard !list.isEmpty else { return batch }
-        return merge(list, SortKeys(list, order: order), with: batch, SortKeys(batch, order: order)).items
     }
 
     // MARK: Sorting by keys
@@ -375,76 +344,81 @@ public enum Sorter: Sendable {
             count = indexes.count
         }
     }
-
-    // MARK: Merging
-
-    /// Both lists are sorted; their keys speak for their items.
-    fileprivate static func merge(
-        _ list: [FileItem], _ listKeys: SortKeys, with batch: [FileItem], _ batchKeys: SortKeys
-    )
-        -> (items: [FileItem], keys: SortKeys)
-    {
-        guard !batch.isEmpty else { return (list, listKeys) }
-        guard !list.isEmpty else { return (batch, batchKeys) }
-        let order = listKeys.order
-        // Which list each place of the result is filled from.
-        var fromBatch: [Bool] = []
-        fromBatch.reserveCapacity(list.count + batch.count)
-        var (i, j) = (0, 0)
-        while i < list.count, j < batch.count {
-            var result = SortKeys.quick(batchKeys.records[j], listKeys.records[i], order)
-            if result == SortKeys.unknown {
-                result = exactOrder(batch[j], list[i], by: order, collator: listKeys.collator)
-            }
-            if result < 0 {
-                fromBatch.append(true)
-                j += 1
-            } else {
-                fromBatch.append(false)
-                i += 1
-            }
-        }
-        fromBatch.append(contentsOf: repeatElement(false, count: list.count - i))
-        fromBatch.append(contentsOf: repeatElement(true, count: batch.count - j))
-
-        var merged: [FileItem] = []
-        merged.reserveCapacity(fromBatch.count)
-        (i, j) = (0, 0)
-        for isBatch in fromBatch {
-            if isBatch {
-                merged.append(batch[j])
-                j += 1
-            } else {
-                merged.append(list[i])
-                i += 1
-            }
-        }
-        return (merged, SortKeys(merging: listKeys, batchKeys, fromSecond: fromBatch))
-    }
 }
 
 /// A list that stays sorted while batches are added to it: what a directory that arrives in
 /// pieces is collected in, on a background thread. Each batch is sorted on its own and merged
 /// in, so adding costs one pass instead of a new sort.
 public struct SortedFileList: Sendable {
+    /// A sorted part of the list: the places of its items in `arrived`, in order, with their keys
+    /// in the same order.
+    private struct Run: Sendable {
+        let places: [UInt32]
+        let keys: SortKeys
+    }
+
     public let order: ListOrder
-    /// The items in order.
-    public private(set) var items: [FileItem] = []
-    private var keys: SortKeys
+    /// Every item added, in the order they came.
+    private var arrived: [FileItem] = []
+    /// The sorted parts, in the order they came, each longer than the one after it. A batch is
+    /// merged only with parts of its own length or shorter, so every item takes part in a number
+    /// of merges that grows with the logarithm of the list, not with the number of batches. A
+    /// merge moves keys and places, never the items themselves.
+    private var runs: [Run] = []
+
+    /// The items in order: the parts merged, the earlier ones ahead of equal items of later ones.
+    public var items: [FileItem] {
+        guard var merged = runs.last else { return [] }
+        for run in runs.dropLast().reversed() { merged = self.merged(run, merged) }
+        return Sorter.permute(arrived, by: merged.places)
+    }
 
     public init(order: ListOrder) {
         self.order = order
-        keys = SortKeys([], order: order)
     }
-
-    public var count: Int { items.count }
 
     public mutating func add(_ batch: [FileItem]) {
         guard !batch.isEmpty else { return }
-        let batchKeys = SortKeys(batch, order: order)
-        let indexes = Sorter.sortedIndexes(of: batch, keys: batchKeys)
-        (items, keys) = Sorter.merge(
-            items, keys, with: Sorter.permute(batch, by: indexes), batchKeys.permuted(by: indexes))
+        let keys = SortKeys(batch, order: order)
+        let indexes = Sorter.sortedIndexes(of: batch, keys: keys)
+        let start = UInt32(arrived.count)
+        arrived += batch
+        runs.append(Run(places: indexes.map { $0 + start }, keys: keys.permuted(by: indexes)))
+        while runs.count > 1, runs[runs.count - 2].places.count <= runs[runs.count - 1].places.count {
+            let last = runs.removeLast()
+            runs[runs.count - 1] = merged(runs[runs.count - 1], last)
+        }
+    }
+
+    /// Two sorted parts as one, in one pass; items of `first` stay ahead of equal items of `second`.
+    private func merged(_ first: Run, _ second: Run) -> Run {
+        let (x, y) = (first.keys.records, second.keys.records)
+        var fromSecond: [Bool] = []
+        var places: [UInt32] = []
+        fromSecond.reserveCapacity(x.count + y.count)
+        places.reserveCapacity(x.count + y.count)
+        var (i, j) = (0, 0)
+        while i < x.count, j < y.count {
+            var result = SortKeys.quick(y[j], x[i], order)
+            if result == SortKeys.unknown {
+                result = Sorter.exactOrder(
+                    arrived[Int(second.places[j])], arrived[Int(first.places[i])], by: order,
+                    collator: first.keys.collator)
+            }
+            fromSecond.append(result < 0)
+            if result < 0 {
+                places.append(second.places[j])
+                j += 1
+            } else {
+                places.append(first.places[i])
+                i += 1
+            }
+        }
+        fromSecond.append(contentsOf: repeatElement(false, count: x.count - i))
+        places.append(contentsOf: first.places[i...])
+        fromSecond.append(contentsOf: repeatElement(true, count: y.count - j))
+        places.append(contentsOf: second.places[j...])
+        return Run(places: places, keys: SortKeys(merging: first.keys, second.keys, fromSecond: fromSecond))
     }
 }
 
@@ -745,26 +719,39 @@ struct SortKeys: @unchecked Sendable {
 ///
 /// Immutable after `init`, and the collator may make keys on several threads at once.
 final class NameCollator: @unchecked Sendable {
-    typealias SortKey =
-        @convention(c) (OpaquePointer, UnsafePointer<UInt16>?, Int32, UnsafeMutablePointer<UInt8>?, Int32) -> Int32
-    private typealias Open = @convention(c) (UnsafePointer<CChar>, UnsafeMutablePointer<Int32>) -> OpaquePointer?
-    private typealias SetAttribute = @convention(c) (OpaquePointer, Int32, Int32, UnsafeMutablePointer<Int32>) -> Void
-    private typealias Close = @convention(c) (OpaquePointer) -> Void
+    /// The functions of the system's collation library (ICU) that a collator uses.
+    struct Library {
+        typealias Open = @convention(c) (UnsafePointer<CChar>, UnsafeMutablePointer<Int32>) -> OpaquePointer?
+        typealias SetAttribute = @convention(c) (OpaquePointer, Int32, Int32, UnsafeMutablePointer<Int32>) -> Void
+        typealias SortKey =
+            @convention(c) (OpaquePointer, UnsafePointer<UInt16>?, Int32, UnsafeMutablePointer<UInt8>?, Int32) -> Int32
+        typealias Close = @convention(c) (OpaquePointer) -> Void
 
-    /// Making keys with one collator from several threads is safe as long as nobody changes
-    /// its settings, which nothing does after `init`.
-    let collator: (handle: OpaquePointer, sortKey: SortKey)?
+        let open: Open
+        let setAttribute: SetAttribute
+        let sortKey: SortKey
+        let close: Close
 
-    private static let library: (open: Open, setAttribute: SetAttribute, sortKey: SortKey, close: Close)? = {
-        guard let handle = dlopen("/usr/lib/libicucore.A.dylib", RTLD_LAZY), let open = dlsym(handle, "ucol_open"),
-            let setAttribute = dlsym(handle, "ucol_setAttribute"), let sortKey = dlsym(handle, "ucol_getSortKey"),
-            let close = dlsym(handle, "ucol_close")
-        else { return nil }
-        return (
-            unsafeBitCast(open, to: Open.self), unsafeBitCast(setAttribute, to: SetAttribute.self),
-            unsafeBitCast(sortKey, to: SortKey.self), unsafeBitCast(close, to: Close.self)
-        )
-    }()
+        /// The system's library; nil when it cannot be reached.
+        static let system: Self? = {
+            guard let handle = dlopen("/usr/lib/libicucore.A.dylib", RTLD_LAZY),
+                let open = dlsym(handle, "ucol_open"),
+                let setAttribute = dlsym(handle, "ucol_setAttribute"),
+                let sortKey = dlsym(handle, "ucol_getSortKey"),
+                let close = dlsym(handle, "ucol_close")
+            else { return nil }
+            return Self(
+                open: unsafeBitCast(open, to: Open.self),
+                setAttribute: unsafeBitCast(setAttribute, to: SetAttribute.self),
+                sortKey: unsafeBitCast(sortKey, to: SortKey.self),
+                close: unsafeBitCast(close, to: Close.self))
+        }()
+    }
+
+    /// The library's collator and the library; nil when there is none, and names are ordered
+    /// by their lowercase forms. Making keys with one collator from several threads is safe as
+    /// long as nobody changes its settings, which nothing does after `init`.
+    private let collator: (handle: OpaquePointer, library: Library)?
 
     private static let lock = NSLock()
     /// Guarded by `lock`.
@@ -796,20 +783,12 @@ final class NameCollator: @unchecked Sendable {
     /// Guarded by `lock`.
     nonisolated(unsafe) private static var numericCache: [String: NameCollator] = [:]
 
-    /// No collator: what sorting falls back on when the system's cannot be reached.
-    static let unavailable = NameCollator()
-
-    private init() {
-        collator = nil
-    }
-
-    convenience init(identifier: String) {
-        self.init(identifier: identifier, numeric: false)
-    }
-
-    init(identifier: String, numeric: Bool) {
+    /// The collator of a language (an ICU collator identifier such as `ru`), from `library`.
+    /// Without the library, or when it cannot make the collator, names are ordered by their
+    /// lowercase forms.
+    init(identifier: String, numeric: Bool = false, library: Library? = .system) {
         var status: Int32 = 0
-        guard let library = Self.library, let handle = library.open(identifier, &status) else {
+        guard let library, let handle = library.open(identifier, &status) else {
             collator = nil
             return
         }
@@ -828,7 +807,7 @@ final class NameCollator: @unchecked Sendable {
             collator = nil
             return
         }
-        collator = (handle, library.sortKey)
+        collator = (handle, library)
     }
 
     /// Writes the key of a text given in UTF-16 into `buffer` and returns the key's length. A
@@ -837,8 +816,8 @@ final class NameCollator: @unchecked Sendable {
     func writeKey(
         of text: UnsafePointer<UInt16>, _ count: Int, into buffer: UnsafeMutablePointer<UInt8>, capacity: Int
     ) -> Int {
-        if let (handle, sortKey) = collator {
-            return Int(sortKey(handle, text, Int32(clamping: count), buffer, Int32(min(capacity, Int(Int32.max)))))
+        if let (handle, library) = collator {
+            return Int(library.sortKey(handle, text, Int32(clamping: count), buffer, Int32(min(capacity, Int(Int32.max)))))
         }
         // Without the system's collator: the lowercase form, which at least ignores case.
         let lowercase = Array(
@@ -877,6 +856,6 @@ final class NameCollator: @unchecked Sendable {
     }
 
     deinit {
-        if let (handle, _) = collator { Self.library?.close(handle) }
+        if let (handle, library) = collator { library.close(handle) }
     }
 }

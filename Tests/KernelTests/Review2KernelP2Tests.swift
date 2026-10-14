@@ -164,8 +164,8 @@ private final class RootedFileSystem: FileSystemProvider, @unchecked Sendable {
             // The list is not another list for it.
             #expect(model.listVersion == version && model.shownVersion == shown && announced.count == 1)
             // A size set later, by either route, lands on top of these.
-            plain.setComputedSize(11, forName: "dir6")
-            model.setComputedSize(11, forName: "dir6")
+            plain.setComputedSizes([(name: "dir6", size: 11)])
+            model.setComputedSizes([(name: "dir6", size: 11)])
             #expect(model.listedItems == plain.listedItems && model.totals == plain.totals)
         }
     }
@@ -175,7 +175,7 @@ private final class RootedFileSystem: FileSystemProvider, @unchecked Sendable {
         let model = panel(items)
         // Another size was set meanwhile: taking the prepared list would lose it.
         var prepared = PanelModel.prepare(model.basis, computedSizes: [(name: "dir1", size: 10)])
-        model.setComputedSize(5, forName: "dir2")
+        model.setComputedSizes([(name: "dir2", size: 5)])
         #expect(model.apply(prepared) == .stale)
         #expect(
             model.listedItems.first { $0.name == "dir2" }?.computedSize == 5
@@ -460,27 +460,6 @@ private final class RootedFileSystem: FileSystemProvider, @unchecked Sendable {
     }
 
     // MARK: Rows by index
-
-    @Test func rowsWorkedOutAsIndexesBecomeASelectionInOneStep() {
-        let items = (0..<200).map { file("f\($0).txt", size: Int64($0)) }
-        for filtered in [false, true] {
-            let model = panel(items)
-            if filtered { model.setFilter(PanelFilter(title: "even") { $0.size % 2 == 0 }) }
-            let basis = model.basis
-            // Every third shown row, as a command that pairs or counts rows finds them.
-            let indices = Array(stride(from: 0, to: basis.items.count, by: 3))
-            let rows = elsewhere { PanelModel.rows(of: basis, indices: indices + [-1, 1_000_000]) }
-            #expect(rows.count == indices.count && model.setSelection(rows))
-            #expect(model.selectedNames == indices.map { model.items[$0].name })
-            // Added to and taken from what is marked, like any other set of rows.
-            let more = PanelModel.rows(of: model.basis, indices: [1, 2])
-            #expect(model.setSelection(more, .add) && model.selectionCount == indices.count + 2)
-            #expect(model.setSelection(more, .remove) && model.selectionCount == indices.count)
-            // Stale once what is shown has changed.
-            model.setSort(ListOrder(key: .size, descending: true))
-            #expect(!model.setSelection(rows))
-        }
-    }
 
     // MARK: A commit that reports
 

@@ -21,15 +21,14 @@ public import Foundation
 ///
 /// | Plain call (main thread) | For a long list |
 /// | --- | --- |
-/// | `setSort(_:)`, `setSort(_:presorted:)` | `prepare(_:sort:)` + `apply` |
-/// | `setFilter(_:narrowing:)`, `setFilter(_:prefiltered:listVersion:)` | `prepare(_:filter:)` + `apply` |
+/// | `setSort(_:)` | `prepare(_:sort:)` + `apply` |
+/// | `setFilter(_:narrowing:)` | `prepare(_:filter:)` + `apply` |
 /// | `update(with:focus:presorted:)` | `prepare(_:update:focus:presorted:)` + `apply` |
 /// | `extend(to:sortedBy:)` | `prepare(_:extendingTo:sortedBy:)` + `apply` |
 /// | `setComputedSizes` on a list somebody else holds | `prepare(_:computedSizes:)` + `apply` |
 /// | `select(mask:)`, `select(where:)` | `rows(of:where:)` + `setSelection(_:_:)` |
 /// | `setSelected(_:names:)`, `setSelection(names:)`, `deselect(_:)` | the same, or `setSelected(_:indices:shownVersion:)` |
 /// | `operands()` | `operandsSnapshot()`, then `items()` on any thread |
-/// | `selection`, `savedSelection` | `hasSelection`, `selectionCount`, `isSelected`, `operandsSnapshot()` |
 ///
 /// `selectAll`, `invertSelection`, `clearSelection`, `saveSelection`, `totals` after those,
 /// `hasOperandFile`, `snapshot`, `open`, `basis` and `apply` cost next to nothing at any length.
@@ -116,65 +115,14 @@ public final class PanelModel {
     /// Row of the cursor; row 0 is `[..]` when there is a parent row. Setting it directly is
     /// for the view that owns the cursor; commands use `moveCursor(to:)`.
     public var cursor = 0
-    /// Names of the selected (marked) items. `[..]` can never be selected.
-    ///
-    /// The marks themselves belong to the entries, one by one (a mark is a place in the
-    /// list), while two `String`s are equal as soon as they read the same: `é` in one
-    /// character and `e` with an accent after it are one member of this set, though a volume
-    /// that is not the Mac's own may hold a file of each name, and a list gathered from
-    /// several folders may hold the same name twice. So this set is for asking about names
-    /// that are known to be single; whether one particular entry is marked is asked with
-    /// `isSelected(_:)` or `isSelected(row:)`, whether anything is with `hasSelection`, how
-    /// many are with `selectionCount`, and the names as they are written are `selectedNames`.
-    /// Made from the marks when asked for (one pass over the marked entries) and kept until
-    /// they change. **Not for the main thread on long lists**: with a million marks the set
-    /// takes a tenth of a second to make; none of the questions named above needs it.
-    public var selection: Set<String> {
-        if let names = selectionNames { return names }
-        var names = Set<String>(minimumCapacity: marks.count)
-        marks.forEach { names.insert(listedItems[$0].name) }
-        selectionNames = names
-        return names
-    }
-
-    /// The names of the marked items as they are written, in the order of the list: one for
-    /// every marked entry, also where two names read the same or are the same.
-    public var selectedNames: [String] {
-        var names: [String] = []
-        names.reserveCapacity(marks.count)
-        marks.forEach { names.append(listedItems[$0].name) }
-        return names
-    }
-
-    /// The names Save Selection kept. Made anew at every call, one pass over the saved
-    /// marks: **not for the main thread on long lists**.
-    public var savedSelection: Set<String> {
-        switch saved {
-        case .none: return []
-
-        case .places(let places):
-            var names = Set<String>(minimumCapacity: places.count)
-            places.forEach { names.insert(listedItems[$0].name) }
-            return names
-
-        case .names(let names): return Set(names.lazy.map(\.name))
-
-        case .remains(let remains, let places):
-            var names = Set<String>(minimumCapacity: places.count)
-            places.forEach { names.insert(remains.lists[0][$0].name) }
-            return names
-        }
-    }
-
-    /// The number of marked items; unlike `selection.count`, right for names that read the same.
+    /// The number of marked items, one for every marked entry, also where two names read the same.
     public var selectionCount: Int { marks.count }
-    /// Whether anything is marked. Costs nothing, unlike `selection.isEmpty` after a change.
+    /// Whether anything is marked. Costs nothing.
     public var hasSelection: Bool { !marks.isEmpty }
 
     /// The marked entries, by their places in `listedItems`: always as long as that list, and
     /// never holding an entry that is not shown.
-    private var marks = Bitset() { didSet { (selectionNames, markedFile) = (nil, nil) } }
-    private var selectionNames: Set<String>?
+    private var marks = Bitset() { didSet { markedFile = nil } }
     /// Whether a file is among the marked entries; nil until asked, and after every change
     /// of the marks (the list cannot change without them being set).
     private var markedFile: Bool?
@@ -817,8 +765,6 @@ public final class PanelModel {
     ///
     /// Unchecked: the lists are changed only in `deinit`, when nobody else holds the basis.
     public final class Basis: @unchecked Sendable {
-        /// `PanelModel.listVersion` when the basis was taken.
-        public let listVersion: Int
         public let directory: URL
         public private(set) var listedItems: [FileItem]
         public private(set) var items: [FileItem]
@@ -836,9 +782,7 @@ public final class PanelModel {
         private let discards: Bool
 
         @MainActor fileprivate init(_ model: PanelModel, discards: Bool) {
-            (listVersion, directory, listedItems, items) = (
-                model.listVersion, model.directory, model.listedItems, model.items
-            )
+            (directory, listedItems, items) = (model.directory, model.listedItems, model.items)
             (filter, sort, stamp, places) = (model.filter, model.sort, model.stamp, model.shownPlaces)
             (sizeStamp, requestedSort) = (model.sizeStamp, model.requestedSort)
             (index, sized) = (model.nameIndex, model.sized.flatMap { $0.size == model.listedItems.count ? $0 : nil })
@@ -928,8 +872,6 @@ public final class PanelModel {
         case unchanged
         /// Applied; `onChange` was called.
         case changed
-
-        public var wasApplied: Bool { self != .stale }
     }
 
     /// The list in another order. **For any thread.** Turning the direction round is one
@@ -1327,40 +1269,6 @@ public final class PanelModel {
         _ = take(Self.prepare(Basis(self, discards: false), sort: order, indexing: false))
     }
 
-    /// Takes a new order together with the list already in that order: `listedItems` as they
-    /// were when `listVersion` was noted, sorted by `order` off the main thread. The caller
-    /// checks that `listVersion` is still the same; a list of another length is not taken
-    /// and the model sorts by itself. What the filter shows of the list and where the marked
-    /// entries are in it is worked out here, on the calling thread: **not for the main
-    /// thread on long lists**; `prepare(_:sort:)` and `apply` leave nothing of that to it.
-    public func setSort(_ order: ListOrder, presorted sorted: [FileItem]) {
-        guard sorted.count == listedItems.count else {
-            setSort(order)
-            return
-        }
-        let cursorName = cursorItem?.name
-        requestedSort = nil
-        sort = order
-        if order.key != .unsorted { isInArrivalOrder = false }
-        var listed = sorted
-        var (shown, places) = ListWork.arrange(listed, by: filter)
-        replace(
-            listed: &listed, shown: &shown, places: places, moves: .byName, index: nil, tally: nil, keepsTotals: false,
-            isNewReading: false)
-        if let cursorName, let row = row(ofName: cursorName) { cursor = row }
-        changed(.contents)
-    }
-
-    /// The same, with the check: `sorted` is taken only if `listVersion` is still `version`
-    /// (and the list as long as it was). Otherwise nothing happens and the answer is false;
-    /// the caller sorts again, in the background.
-    @discardableResult
-    public func setSort(_ order: ListOrder, presorted sorted: [FileItem], listVersion version: Int) -> Bool {
-        guard version == listVersion, sorted.count == listedItems.count else { return false }
-        setSort(order, presorted: sorted)
-        return true
-    }
-
     /// Shows only the entries that pass `filter`; nil shows all again. The cursor stays on its
     /// item when that is still shown, and items that are no longer shown lose their mark.
     ///
@@ -1385,38 +1293,10 @@ public final class PanelModel {
     }
 
     /// What `setFilter` shows of a list: the entries that pass `filter`, in the list's order.
-    /// **For any thread**: a caller with a long list notes `listVersion`, takes `listedItems`,
-    /// works this out in the background and hands it to `setFilter(_:prefiltered:listVersion:)`.
-    /// A long list is filtered on all cores, so `filter.matches` is then called from several
-    /// threads at once and must be a function of the entry alone.
+    /// **For any thread**: a long list is filtered on all cores, so `filter.matches` is then
+    /// called from several threads at once and must be a function of the entry alone.
     public nonisolated static func filtered(_ listed: [FileItem], by filter: PanelFilter?) -> [FileItem] {
         ListWork.arrange(listed, by: filter).shown
-    }
-
-    /// Takes a filter together with what it shows: `PanelModel.filtered(listedItems, by:
-    /// filter)`, worked out off the main thread from the list as it was when `listVersion`
-    /// was `version`. If the list has changed since, `shown` is not taken and the model
-    /// filters by itself, as `setFilter(_:)` does; returns whether `shown` was taken. Either
-    /// way the model ends up exactly as after `setFilter(filter)`.
-    ///
-    /// A caller that would rather filter again in the background than have the model do it
-    /// here uses `prepare(_:filter:)` and `apply`, which never falls back. Because of that
-    /// fall-back, and because the places of `shown` in the list are looked for here, this is
-    /// **not for the main thread on long lists** either.
-    @discardableResult
-    public func setFilter(_ filter: PanelFilter?, prefiltered shown: [FileItem], listVersion version: Int) -> Bool {
-        guard version == listVersion, filter != nil, shown.count != listedItems.count,
-            let places = ListWork.places(of: shown, in: listedItems)
-        else {
-            setFilter(filter)
-            return version == listVersion
-        }
-        _ = take(
-            Prepared(
-                .filter, from: Basis(self, discards: false), listed: listedItems, shown: shown, places: places,
-                index: nameIndex,
-                tally: nil, sort: sort, filter: filter, moves: .same))
-        return true
     }
 
     /// Takes what the file system now says about the volume (its free space has changed)
@@ -1557,8 +1437,6 @@ public final class PanelModel {
     public struct RowSet: Sendable {
         fileprivate let stamp: Int
         fileprivate let bits: Bitset
-        /// How many rows are in the set.
-        public var count: Int { bits.count }
     }
 
     /// The shown rows `matches` holds for. **For any thread**; a long list is looked through
@@ -1571,21 +1449,6 @@ public final class PanelModel {
             shown = bits
         }
         return RowSet(stamp: basis.stamp, bits: ListWork.matching(basis.listedItems, among: shown, where: matches))
-    }
-
-    /// The shown rows at these indexes of `basis.items`, for a caller that worked the indexes
-    /// out itself (rows that are found by comparing entries with each other, or with another
-    /// list, which a test of one item cannot do). **For any thread.** Indexes outside the list
-    /// are left out.
-    public nonisolated static func rows(of basis: Basis, indices: some Sequence<Int>) -> RowSet {
-        var bits = Bitset(size: basis.listedItems.count)
-        let count = basis.items.count
-        if let places = basis.places {
-            for index in indices where index >= 0 && index < count { bits.insert(Int(places[index])) }
-        } else {
-            for index in indices where index >= 0 && index < count { bits.insert(index) }
-        }
-        return RowSet(stamp: basis.stamp, bits: bits)
     }
 
     public enum SelectionChange: Sendable {
@@ -1809,17 +1672,9 @@ public final class PanelModel {
 
     // MARK: Calculated sizes and totals
 
-    public func setComputedSize(_ size: Int64, forName name: String) {
-        setComputedSizes([(name: name, size: size)])
-    }
-
-    /// Sets the calculated sizes of several items, by name, and announces it once.
-    public func setComputedSizes(_ sizes: [String: Int64]) {
-        setComputedSizes(sizes.map { (name: $0.key, size: $0.value) })
-    }
-
-    /// The same for names as they are written: a dictionary holds only one of two names that
-    /// read the same, this list holds both, and each finds its own item. The list is not
+    /// Sets the calculated sizes of items, by their names as they are written, and announces
+    /// it once. Of two names that read the same, each finds its own item; a name written
+    /// differently from every item finds one that reads the same. The list is not
     /// another list for it (`listVersion` stays), and the time taken grows with the number
     /// of sizes, not with the length of the list, whether a filter is on or not.
     ///

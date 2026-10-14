@@ -6,8 +6,6 @@ public import Foundation
 @MainActor
 public protocol PanelHandle: AnyObject {
     var tabs: PanelTabs { get }
-    /// True while a directory is being read for this panel.
-    var isLoading: Bool { get }
 
     /// Shows a location in the active tab. The location of a file leads to its folder, with
     /// the cursor on the file; otherwise the cursor goes to `focus`. A failure is reported to
