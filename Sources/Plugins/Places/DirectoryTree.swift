@@ -618,7 +618,11 @@ public final class TreeScanner: @unchecked Sendable {
         /// Each piece writes its own place.
         nonisolated(unsafe) let results = UnsafeMutableBufferPointer<[Subfolder]>.allocate(capacity: batch.count)
         results.initialize(repeating: [])
-        defer { results.deallocate() }
+        defer {
+            // The lists that were read are let go before the memory they are in.
+            _ = results.deinitialize()
+            results.deallocate()
+        }
         DispatchQueue.concurrentPerform(iterations: batch.count) { index in
             autoreleasepool { results[index] = read(batch[index]) }
         }
