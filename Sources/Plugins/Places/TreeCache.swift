@@ -19,9 +19,12 @@ public import Foundation
 /// but `noteFolder` is meant for a background thread. The files for folders added by
 /// `noteFolder` are written a little later, on the cache's own queue, one write for a burst of
 /// additions.
-public final class TreeCache {
+///
+/// All state is guarded by `lock` (the slots too: they are only touched while it is held);
+/// `writeLock` keeps two writes of the files from running at once.
+public final class TreeCache: @unchecked Sendable {
     /// What the cache holds for one root.
-    public struct Entry: Equatable {
+    public struct Entry: Equatable, Sendable {
         /// The folders below the root as relative paths, parents before their children.
         public var paths: [String]
         /// The folders among them whose subfolders are not known.
@@ -177,7 +180,7 @@ public final class TreeCache {
 
     /// The same for a folder whose root is worked out on the cache's queue (asking the disks
     /// for it takes a while): `resolve` gives the path below the root, or nil.
-    public func noteFolder(resolving resolve: @escaping () -> (path: String, root: URL)?) {
+    public func noteFolder(resolving resolve: @escaping @Sendable () -> (path: String, root: URL)?) {
         updates.async { [self] in
             if let found = resolve() { note(found.path, below: found.root) }
         }

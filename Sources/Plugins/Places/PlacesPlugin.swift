@@ -154,6 +154,8 @@ public final class PlacesPlugin: Plugin {
     /// millions of folders is a file of many megabytes). `stop` then finds nothing left to write.
     public func prepareToQuit(cancellation _: CancellationFlag, completion: @escaping () -> Void) {
         let cache = treeCache
+        /// The kernel lets `completion` be called on any thread (`Plugin.prepareToQuit`).
+        nonisolated(unsafe) let completion = completion
         BlockingCalls.run {
             cache.flush()
             completion()
@@ -419,7 +421,8 @@ public final class PlacesPlugin: Plugin {
 /// Hands a block to the main thread through the run loop (all modes that count), not through the
 /// main dispatch queue: a block that asks the user something runs a modal dialog, and a dialog
 /// started from inside a block of the main queue keeps every later block of the queue waiting.
-func performOnMainLoop(_ block: @escaping () -> Void) {
-    RunLoop.main.perform(inModes: [.common], block: block)
+func performOnMainLoop(_ block: @escaping @MainActor @Sendable () -> Void) {
+    // The main run loop runs its blocks on the main thread.
+    RunLoop.main.perform(inModes: [.common]) { MainActor.assumeIsolated(block) }
     CFRunLoopWakeUp(CFRunLoopGetMain())
 }

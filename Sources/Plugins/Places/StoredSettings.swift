@@ -2,7 +2,9 @@ import AFMKernel
 import Foundation
 
 /// Counts what a lenient decode had to leave out, so whoever loads can tell the user.
-final class DecodeReport {
+///
+/// Made for one decode and used only by the thread that runs it.
+final class DecodeReport: @unchecked Sendable {
     static let key = CodingUserInfoKey(rawValue: "afm.places.decodeReport")!
     var skipped = 0
 }
