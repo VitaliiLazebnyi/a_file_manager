@@ -663,9 +663,11 @@ extension FileSystemProvider {
 }
 
 /// The file systems the plugins provide, found by URL scheme. Filled while the plugins start
-/// and only read afterwards, so it may be read from any thread. (The lists of flushers,
-/// releasers and closers are guarded by `flushLock`.)
+/// and read from any thread. Unchecked: `providers` is guarded by `lock` (a plugin that starts
+/// may already have work in the background while a later one registers), and the lists of
+/// flushers, releasers and closers by `flushLock`.
 public final class FileSystemRegistry: @unchecked Sendable {
+    private let lock = NSLock()
     private var providers: [any FileSystemProvider] = []
     private var flushers: [@Sendable (URL, CancellationFlag) throws -> Void] = []
     private var releasers: [@MainActor (URL) -> Void] = []
@@ -674,6 +676,8 @@ public final class FileSystemRegistry: @unchecked Sendable {
     public init() {}
 
     public func register(_ provider: any FileSystemProvider) {
+        lock.lock()
+        defer { lock.unlock() }
         precondition(
             !providers.contains { $0.scheme == provider.scheme },
             "A file system for \(provider.scheme): is registered twice")
@@ -681,10 +685,11 @@ public final class FileSystemRegistry: @unchecked Sendable {
     }
 
     /// Every provider, in registration order.
-    public var all: [any FileSystemProvider] { providers }
+    public var all: [any FileSystemProvider] { lock.withLock { providers } }
 
     public func provider(for url: URL) throws -> any FileSystemProvider {
-        guard let provider = providers.first(where: { $0.scheme == (url.scheme ?? "file") }) else {
+        let scheme = url.scheme ?? "file"
+        guard let provider = lock.withLock({ providers.first(where: { $0.scheme == scheme }) }) else {
             throw FileSystemError.noProvider(url)
         }
         return provider
@@ -806,7 +811,7 @@ public final class FileSystemRegistry: @unchecked Sendable {
     public func location(from text: String, relativeTo base: URL) -> URL {
         let text = text.trimmingCharacters(in: .whitespaces)
         // A location written out in full, in the notation of one of the file systems.
-        if let url = providers.lazy.compactMap({ $0.location(from: text) }).first {
+        if let url = all.lazy.compactMap({ $0.location(from: text) }).first {
             return url.standardized
         }
         if text == "~" || text.hasPrefix("~/") {
@@ -814,7 +819,7 @@ public final class FileSystemRegistry: @unchecked Sendable {
         }
         if text.hasPrefix("/") {
             let baseReadsIt = (try? provider(for: base))?.readsRootedPaths ?? true
-            if !baseReadsIt, providers.contains(where: { $0.scheme == "file" }) {
+            if !baseReadsIt, all.contains(where: { $0.scheme == "file" }) {
                 return URL(fileURLWithPath: text, isDirectory: false).standardized
             }
             var components = URLComponents(url: base, resolvingAgainstBaseURL: false) ?? URLComponents()

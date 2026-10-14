@@ -250,7 +250,10 @@ final class CallBook: @unchecked Sendable {
 
     private func launch(_ call: Call) {
         KernelThreads.shared.run { [self] in
-            let answer = call.work.map { $0(call.flag) }
+            lock.lock()
+            let work = call.work
+            lock.unlock()
+            let answer = work.map { $0(call.flag) }
             finish(call, answer)
         }
     }

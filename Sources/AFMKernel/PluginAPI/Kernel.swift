@@ -189,7 +189,7 @@ public final class Kernel {
         let hop = MainThreadHop()
         var answer: Answer?
         withoutActuallyEscaping(question) { question in
-            hop.work = { answer = MainActor.assumeIsolated { question(ui) } }
+            hop.offer { answer = MainActor.assumeIsolated { question(ui) } }
             let block: @Sendable () -> Void = { hop.run() }
             CFRunLoopPerformBlock(CFRunLoopGetMain(), CFRunLoopMode.commonModes.rawValue, block)
             CFRunLoopWakeUp(CFRunLoopGetMain())
@@ -208,8 +208,15 @@ public final class Kernel {
 /// `done` until it has run.
 private final class MainThreadHop: @unchecked Sendable {
     private let lock = NSLock()
-    var work: (() -> Void)?
+    private var work: (() -> Void)?
     let done = DispatchSemaphore(value: 0)
+
+    /// Sets the work, before the hop is handed to the main thread.
+    func offer(_ work: @escaping () -> Void) {
+        lock.lock()
+        self.work = work
+        lock.unlock()
+    }
 
     /// Does the work unless it was done; whoever waits is woken after the work has been let go of.
     func run() {
