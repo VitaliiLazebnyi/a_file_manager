@@ -33,9 +33,9 @@ private final class RecordedEjects: VolumeAccess {
 public final class SystemToolsPlugin: Plugin {
     public let name = "SystemTools"
     /// Settings keys of the preferences page.
-    public static let terminalKey = "systemTools.terminal"
-    public static let showOutputKey = "systemTools.showOutput"
-    public static let recordHistoryKey = "systemTools.recordHistory"
+    nonisolated public static let terminalKey = "systemTools.terminal"
+    nonisolated public static let showOutputKey = "systemTools.showOutput"
+    nonisolated public static let recordHistoryKey = "systemTools.recordHistory"
 
     private let launchesApplications: Bool
     private let volumes: any VolumeAccess?
@@ -169,6 +169,7 @@ public final class SystemToolsPlugin: Plugin {
 /// panel's state and ask the user. Child processes, the file systems, the volumes and the
 /// list of applications are used inside jobs, on the job's thread; completions return to the
 /// main thread. `log` and the settings belong to the main thread.
+@MainActor
 final class SystemTools {
     static let printHeaderKey = "systemTools.printHeader"
     static let printLinesKey = "systemTools.printLines"
@@ -256,7 +257,7 @@ final class SystemTools {
         let directory = model.directory.isFileURL ? model.directory : home
         let shown = kernel.panels.all.map(\.model.directory)
         let shell = self.shell
-        var runner = ProcessRunner(
+        let runner = ProcessRunner(
             executable: shell.executable,
             arguments: shell.arguments + [typed.isDetached ? typed.command + " &" : typed.command],
             directory: directory, collectsOutput: !typed.isDetached)
@@ -264,7 +265,8 @@ final class SystemTools {
         let shownCommand = DisplayText.oneLine(typed.command)
         kernel.jobs.run(
             title: "Running: \(shownCommand)",
-            work: { monitor -> RunResult in
+            work: { [runner] monitor -> RunResult in
+                var runner = runner
                 if opensApplications {
                     // What is a program is decided with the PATH of the login shell, not with the
                     // short one this process was started with.
@@ -309,7 +311,7 @@ final class SystemTools {
     }
 
     /// The arguments of a line as locations, for handing them to an application.
-    static func files(in arguments: String, relativeTo directory: URL) -> [URL] {
+    nonisolated static func files(in arguments: String, relativeTo directory: URL) -> [URL] {
         var urls: [URL] = []
         var rest = arguments
         while !rest.isEmpty {
@@ -363,7 +365,7 @@ final class SystemTools {
     // MARK: Terminal
 
     /// Finds an application by path, bundle identifier or name. Asks the disk: background only.
-    static func application(named name: String) -> URL? {
+    nonisolated static func application(named name: String) -> URL? {
         let fm = FileManager.default
         if name.contains("/") {
             let path = NSString(string: name).expandingTildeInPath
@@ -435,14 +437,14 @@ final class SystemTools {
     // MARK: Volumes
 
     /// Stands for the volumes in `BlockingCalls`: the questions to them are counted together.
-    private static let volumes = NSObject()
+    nonisolated private static let volumes = CallOwner()
 
     /// Asks something of a volume from a job. A volume that has stopped answering (a share
     /// whose server is gone) may never return: the question then goes on alone on a thread
     /// of the kernel's, and the job ends, with nil, as soon as it is cancelled, so the
     /// commands of the program are not held up by it.
-    private static func ask<Answer>(
-        _ question: String, of url: URL, _ monitor: any JobMonitor, _ work: @escaping () -> Answer
+    nonisolated private static func ask<Answer: Sendable>(
+        _ question: String, of url: URL, _ monitor: any JobMonitor, _ work: @escaping @Sendable () -> Answer
     ) -> Answer? {
         BlockingCalls.answer(from: volumes, to: question + " " + url.path, cancellation: monitor.cancellation) { _ in
             work()
@@ -536,7 +538,7 @@ final class SystemTools {
         let operands = model.operandsSnapshot()
         let marked = operands.markedCount
         let count = marked > 0 ? marked : (operands.cursorItem != nil ? 1 : operands.shownItems.count)
-        let gather: (any JobMonitor) -> [FileItem] = { _ in
+        let gather: @Sendable (any JobMonitor) -> [FileItem] = { _ in
             marked > 0 || operands.cursorItem != nil ? operands.items() : operands.shownItems
         }
         var depth = 0
@@ -599,7 +601,10 @@ final class SystemTools {
         let showHidden = model.showHidden
         kernel.jobs.run(
             title: "Reading file list:",
-            work: { monitor -> (pages: [[String]], longest: Int, text: String, error: any Error?, cancelled: Bool) in
+            work: {
+                [depth, mask, formatter, file] monitor -> (
+                    pages: [[String]], longest: Int, text: String, error: (any Error)?, cancelled: Bool
+                ) in
                 let items = gather(monitor)
                 let rows =
                     withSubfolders
@@ -619,7 +624,7 @@ final class SystemTools {
                     let provider = try fileSystems.provider(for: file)
                     let exists = provider.item(at: file) != nil
                     if exists {
-                        let replace = monitor.ask {
+                        let replace = monitor.ask { @MainActor @Sendable in
                             ui.choose(
                                 "Overwrite:", detail: fileSystems.displayPath(file), buttons: ["Overwrite", "Cancel"],
                                 style: .warning) == 0

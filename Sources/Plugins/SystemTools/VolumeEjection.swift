@@ -3,7 +3,7 @@ public import AppKit
 import Darwin
 
 /// What is known of the volume a folder is on.
-public struct VolumeFacts: Equatable {
+public struct VolumeFacts: Equatable, Sendable {
     public var url: URL?
     public var name = ""
     public var canBeEjected = false
@@ -31,7 +31,7 @@ public struct EjectRefusal: Error, Equatable {
 
 /// How volumes are looked at and ejected. Both calls ask the volume and may wait on it: they
 /// run on a job's thread. Tests put a stand-in in place of the system.
-public protocol VolumeAccess: AnyObject {
+public protocol VolumeAccess: AnyObject, Sendable {
     func facts(of directory: URL) -> VolumeFacts
     /// Ejects gently: the system writes what is pending and refuses while any program has a
     /// file of the volume open. Nil when the volume is gone.
@@ -63,7 +63,8 @@ final class SystemVolumes: VolumeAccess {
         // goes as a whole, with its other volumes, so that it can be taken out.
         let options: FileManager.UnmountOptions = volume.isNetwork ? [] : [.allPartitionsAndEjectDisk]
         let done = DispatchSemaphore(value: 0)
-        var failure: any Error?
+        /// Set by the callback before `done` is signalled, and read only after the wait.
+        nonisolated(unsafe) var failure: (any Error)?
         FileManager.default.unmountVolume(at: url, options: options) { error in
             failure = error
             done.signal()
@@ -102,14 +103,15 @@ final class SystemVolumes: VolumeAccess {
 ///    they were on the drive, and the user is told which program uses it.
 ///
 /// Main thread, except what runs inside the jobs.
+@MainActor
 final class VolumeEjection {
     private let kernel: Kernel
     private let access: any VolumeAccess
     private let home: () -> URL
     private let note: (String) -> Void
     /// How often, and how long apart, an eject that this program itself refused is tried again.
-    static let ownRefusalRetries = 4
-    static let retryDelay: TimeInterval = 0.5
+    nonisolated static let ownRefusalRetries = 4
+    nonisolated static let retryDelay: TimeInterval = 0.5
 
     init(kernel: Kernel, access: any VolumeAccess, home: @escaping () -> URL, note: @escaping (String) -> Void) {
         self.kernel = kernel
@@ -266,12 +268,12 @@ final class VolumeEjection {
     }
 
     /// Stands for the volumes in `BlockingCalls`: the questions to them are counted together.
-    private static let volumes = NSObject()
+    nonisolated private static let volumes = CallOwner()
 
     /// Asks something of a volume from a job. A volume that has stopped answering may never
     /// return: the question then goes on alone, and the job ends, with nil, once cancelled.
-    private static func ask<Answer>(
-        _ question: String, of url: URL, _ monitor: any JobMonitor, _ work: @escaping () -> Answer
+    nonisolated private static func ask<Answer: Sendable>(
+        _ question: String, of url: URL, _ monitor: any JobMonitor, _ work: @escaping @Sendable () -> Answer
     ) -> Answer? {
         BlockingCalls.answer(from: volumes, to: question + " " + url.path, cancellation: monitor.cancellation) { _ in
             work()

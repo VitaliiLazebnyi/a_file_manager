@@ -139,7 +139,8 @@ struct ProcessRunner {
     /// The child's environment; nil gives it this program's.
     var environment: [String: String]?
 
-    private final class Buffer {
+    /// All state is guarded by `lock`.
+    private final class Buffer: @unchecked Sendable {
         private let lock = NSLock()
         private var data = Data()
         private var truncated = false
