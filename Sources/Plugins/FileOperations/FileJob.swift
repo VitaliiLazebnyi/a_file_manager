@@ -191,13 +191,18 @@ public enum FileJobError: LocalizedError {
 /// copied by a bounded pool of workers meanwhile (a delete uses a smaller one for the files of
 /// a folder); `run()` returns only when they are done.
 /// The answers that hold "for all" are guarded by `decisions`, which also lets only one
-/// question be open at a time; the counters are guarded by `counters`. Set `options`,
-/// `delegate` and `onRecord` before `run()`; only `cancel()` may be called from elsewhere.
+/// question be open at a time; the counters are guarded by `counters`. Set the public
+/// settings (`options`, `delegate`, `onRecord`, …) before `run()`; only `cancel()` may be
+/// called from elsewhere.
 ///
-/// Unchecked `Sendable`: the job goes to its own thread and to the workers of the pool, and
-/// its state is guarded as said above (by `decisions`, `counters`, `delivery`, `remembered` and
-/// `pendingRemovals`, or used by the job thread only); the settings do not change once `run()`
-/// has started.
+/// Unchecked `Sendable`: the job goes to its own thread and to the workers of the pool. Its
+/// state is guarded by `decisions` (the answers, `grains`), `counters` (progress, failures,
+/// `createdFolders`), `delivery` (the order of the reports), `remembered` (`measures`) and
+/// `pendingRemovals` (`deferred`, `kept`), or used by the job thread only (`topItems`,
+/// `predictedRenames`, `enteredTargets`, `origins`, `pool`, `deletePool`, a batch's own
+/// fields). The settings, `target` and `defersRemovals` do not change once a worker has
+/// started: the settings are set before `run()`, the other two by the job thread before the
+/// first worker. `delegate` is weak and only read.
 public final class FileJob: @unchecked Sendable {
     public let kind: JobKind
     public let sources: [URL]
