@@ -30,7 +30,9 @@ fast=(format lint docs-lint scripts secrets security deadcode complexity duplica
 gates=("$@")
 [[ ${#gates[@]} -eq 0 ]] && gates=("${fast[@]}")
 
-swift_dirs=(Sources Tests)
+# Every Swift file git knows of (tracked, or new and not ignored): sources, tests, the fuzz and stress
+# packages and the manifests; never build output or agent worktrees (.claude, ignored).
+swift_files() { git ls-files -z --cached --others --exclude-standard -- '*.swift'; }
 step() { printf '\n== %s\n' "$*"; }
 
 # SwiftLint 0.65 loads sourcekitdInProc from the nested framework layout (Versions/A); Xcode 27
@@ -50,7 +52,7 @@ for gate in "${gates[@]}"; do
   case "$gate" in
     format)
       step "swift-format"
-      swift format lint --recursive --parallel --strict "${swift_dirs[@]}"
+      swift_files | xargs -0 swift format lint --parallel --strict
       step "Prettier (Markdown)"
       prettier --check --log-level warn "**/*.md"
       ;;

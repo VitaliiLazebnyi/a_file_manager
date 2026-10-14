@@ -22,3 +22,6 @@ scratchpad/
 
 # macOS
 .DS_Store
+
+# Claude Code: agent worktrees (each a copy of the whole project) and local settings
+.claude/

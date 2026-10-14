@@ -3,7 +3,7 @@
   "minTokens": 50,
   "minLines": 5,
   "format": ["swift"],
-  "ignore": ["**/.build/**", "**/.build-*/**", "**/build/**"],
+  "ignore": ["**/.build/**", "**/.build-*/**", "**/build/**", "**/.claude/**"],
   "reporters": ["console"],
   "absolute": false,
   "gitignore": true
