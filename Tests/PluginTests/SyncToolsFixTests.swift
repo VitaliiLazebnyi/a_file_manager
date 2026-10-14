@@ -346,7 +346,9 @@ private func fixDigest(_ method: ChecksumMethod, _ data: Data, pieces: Int = 1) 
     @Test func neitherSynchronizeNorCompareStartsWhileTheJobRuns() {
         let session = opened()
         var phases: [SyncSession.Phase] = []
-        session.onChange = { phases.append(session.phase) }
+        session.onChange = { [weak session] in
+            if let session { phases.append(session.phase) }
+        }
         bench.ui.formAnswers = [.accept]
         bench.ui.choiceAnswers = [1]
         session.synchronize()

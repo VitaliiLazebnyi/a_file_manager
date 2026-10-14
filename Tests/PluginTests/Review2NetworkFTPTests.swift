@@ -579,8 +579,8 @@ private final class Notes: @unchecked Sendable {
 
         // A connection the user made in a dialog of the program is not asked about.
         let chosen = try FTPFixture()
-        chosen.environment.askToConnect = { _ in
-            asked.append(ConnectionProfile(key: chosen.key))
+        chosen.environment.askToConnect = { [key = chosen.key] _ in
+            asked.append(ConnectionProfile(key: key))
             return false
         }
         chosen.center.announce(ConnectionProfile(key: chosen.key, anonymous: true), chosen: true)
@@ -714,14 +714,14 @@ private final class Notes: @unchecked Sendable {
         nonisolated(unsafe) var firstUse: [String] = []
         nonisolated(unsafe) var changed: [(new: String, known: [String])] = []
         let acceptsChange = Shared(false)
-        environment.askToTrust = { profile, certificate in
+        environment.askToTrust = { [trust = environment.trust] profile, certificate in
             firstUse.append(certificate.fingerprint)
-            environment.trust.accept(certificate.fingerprint, for: profile.key.host)
+            trust.accept(certificate.fingerprint, for: profile.key.host)
             return true
         }
-        environment.askToTrustChanged = { profile, certificate, known in
+        environment.askToTrustChanged = { [trust = environment.trust] profile, certificate, known in
             changed.append((certificate.fingerprint, known))
-            if acceptsChange.value { environment.trust.replace(with: certificate.fingerprint, for: profile.key.host) }
+            if acceptsChange.value { trust.replace(with: certificate.fingerprint, for: profile.key.host) }
             return acceptsChange.value
         }
         #expect(try fileSystem.list(key(first).url(), showHidden: true).map(\.name) == ["first.txt"])

@@ -13,7 +13,8 @@ import Testing
 /// (spec 07 › File clipboard and name lists).
 @MainActor @Suite struct ClipboardMore {
     let memory = MemoryFileSystem()
-    let pasteboard = NSPasteboard.withUniqueName()
+    private let scratch = ScratchPasteboard()
+    var pasteboard: NSPasteboard { scratch.pasteboard }
     let bench: TestBench
     let modified = Date(timeIntervalSince1970: 1_000_000)
 
@@ -27,7 +28,7 @@ import Testing
         memory.addFile("/A/docs/in.txt", "inside")
         memory.addDirectory("/B")
         bench = TestBench(
-            plugins: [FileOperationsPlugin(), ClipboardPlugin(pasteboard: pasteboard), SelectionPlugin()],
+            plugins: [FileOperationsPlugin(), ClipboardPlugin(pasteboard: scratch.pasteboard), SelectionPlugin()],
             fileSystems: [LocalFileSystem(), memory], left: memory.url("/A"), right: memory.url("/B"))
     }
 

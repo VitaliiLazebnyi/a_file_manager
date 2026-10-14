@@ -613,6 +613,7 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
         try box.file("A/one.txt", "1")
         try box.folder("B")
         let pasteboard = NSPasteboard.withUniqueName()
+        defer { pasteboard.releaseGlobally() }
         let bench = TestBench(
             plugins: [FileOperationsPlugin(), ClipboardPlugin(pasteboard: pasteboard)],
             fileSystems: [LocalFileSystem()],
@@ -627,8 +628,10 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
         let box = try Sandbox()
         for index in 0..<2_000 { try box.file("A/f\(index).txt", "x") }
         try box.folder("B")
+        let pasteboard = NSPasteboard.withUniqueName()
+        defer { pasteboard.releaseGlobally() }
         let mac = MacIntegrationPlugin(
-            launchesApplications: false, pasteboard: NSPasteboard.withUniqueName(), applications: { _ in [] })
+            launchesApplications: false, pasteboard: pasteboard, applications: { _ in [] })
         let bench = TestBench(
             plugins: [SelectionPlugin(), mac], fileSystems: [LocalFileSystem()], left: box.url("A"),
             right: box.url("B"))
@@ -649,8 +652,10 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
         try box.file("A/one.txt", "1")
         try box.folder("A/details.txt")
         try box.file("A/details.txt/inside", "precious")
+        let pasteboard = NSPasteboard.withUniqueName()
+        defer { pasteboard.releaseGlobally() }
         let bench = TestBench(
-            plugins: [ClipboardPlugin(pasteboard: NSPasteboard.withUniqueName())], fileSystems: [LocalFileSystem()],
+            plugins: [ClipboardPlugin(pasteboard: pasteboard)], fileSystems: [LocalFileSystem()],
             left: box.url("A"), right: box.url("A"))
         bench.left.moveCursor(toName: "one.txt")
         bench.commands.perform(ClipboardCommands.saveDetails, .text("details.txt"))
@@ -671,8 +676,10 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
         let box = try Sandbox()
         try box.file("A/notes.txt", "n")
         try box.folder("B")
+        let pasteboard = NSPasteboard.withUniqueName()
+        defer { pasteboard.releaseGlobally() }
         let mac = MacIntegrationPlugin(
-            launchesApplications: false, pasteboard: NSPasteboard.withUniqueName(), applications: { _ in [] })
+            launchesApplications: false, pasteboard: pasteboard, applications: { _ in [] })
         let bench = TestBench(
             plugins: [SelectionPlugin(), mac], fileSystems: [LocalFileSystem()], left: box.url("A"),
             right: box.url("B"))

@@ -515,14 +515,16 @@ private final class Review2WatchFileSystem: FileSystemProvider, @unchecked Senda
 
 @MainActor @Suite struct Review2ConfigBNavigation {
     let memory = MemoryFileSystem()
-    let pasteboard = NSPasteboard.withUniqueName()
+    private let scratch = ScratchPasteboard()
+    var pasteboard: NSPasteboard { scratch.pasteboard }
     let bench: TestBench
 
     init() {
         memory.addFile("/A/docs/in.txt")
         memory.addFile("/B/other.txt")
         bench = TestBench(
-            plugins: [NavigationPlugin(pasteboard: pasteboard, home: memory.url("/home"))], fileSystems: [memory],
+            plugins: [NavigationPlugin(pasteboard: scratch.pasteboard, home: memory.url("/home"))],
+            fileSystems: [memory],
             left: memory.url("/A"), right: memory.url("/B"))
     }
 

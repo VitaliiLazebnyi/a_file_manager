@@ -227,7 +227,8 @@ final class P2RacingLocalFileSystem: FileSystemProvider, @unchecked Sendable {
 final class P2ViewFileSystem: FileSystemProvider {
     let scheme = "p2view"
     let capabilities: FileSystemCapabilities = [.write]
-    let fileSystems: FileSystemRegistry
+    /// Unowned: the registry holds this file system.
+    unowned let fileSystems: FileSystemRegistry
 
     init(fileSystems: FileSystemRegistry) { self.fileSystems = fileSystems }
 

@@ -379,7 +379,8 @@ final class P2Bench: ShellServices {
 
 @MainActor @Suite struct Review2FileopsP2Clipboard {
     let box: Sandbox
-    let pasteboard = NSPasteboard.withUniqueName()
+    private let scratch = ScratchPasteboard()
+    var pasteboard: NSPasteboard { scratch.pasteboard }
     let probe = P2ProbeFileSystem()
     let bench: TestBench
 
@@ -390,7 +391,7 @@ final class P2Bench: ShellServices {
         try box.folder("t")
         probe.base.addFile("/A/one.txt")
         bench = TestBench(
-            plugins: [FileOperationsPlugin(), ClipboardPlugin(pasteboard: pasteboard), SelectionPlugin()],
+            plugins: [FileOperationsPlugin(), ClipboardPlugin(pasteboard: scratch.pasteboard), SelectionPlugin()],
             fileSystems: [LocalFileSystem(), probe], left: probe.base.url("/A"), right: box.url("t"))
     }
 

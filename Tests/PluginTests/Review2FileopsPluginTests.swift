@@ -17,7 +17,8 @@ import VirtualFoldersPlugin
 
 @MainActor @Suite struct Review2FileopsCommands {
     let box: Sandbox
-    let pasteboard = NSPasteboard.withUniqueName()
+    private let scratch = ScratchPasteboard()
+    var pasteboard: NSPasteboard { scratch.pasteboard }
     let virtual = VirtualFoldersPlugin()
     let bench: TestBench
 
@@ -31,7 +32,9 @@ import VirtualFoldersPlugin
         try box.file("d/sub/c.txt", "deep")
         try box.folder("t")
         bench = TestBench(
-            plugins: [virtual, FileOperationsPlugin(), ClipboardPlugin(pasteboard: pasteboard), SelectionPlugin()],
+            plugins: [
+                virtual, FileOperationsPlugin(), ClipboardPlugin(pasteboard: scratch.pasteboard), SelectionPlugin()
+            ],
             fileSystems: [LocalFileSystem()], left: box.url("d"), right: box.url("t"))
     }
 

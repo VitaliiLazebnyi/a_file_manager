@@ -13,7 +13,8 @@ import Testing
 /// and its log. Nothing is started and no system panel is shown.
 @MainActor @Suite struct MacIntegrationMore {
     let box: Sandbox
-    let pasteboard = NSPasteboard.withUniqueName()
+    private let scratch = ScratchPasteboard()
+    var pasteboard: NSPasteboard { scratch.pasteboard }
     let mac: MacIntegrationPlugin
     let memory = MemoryFileSystem()
     let bench: TestBench
@@ -31,7 +32,7 @@ import Testing
         let apps = [
             URL(fileURLWithPath: "/Applications/First Editor.app"), URL(fileURLWithPath: "/Applications/Second.app")
         ]
-        mac = MacIntegrationPlugin(launchesApplications: false, pasteboard: pasteboard) {
+        mac = MacIntegrationPlugin(launchesApplications: false, pasteboard: scratch.pasteboard) {
             $0.pathExtension == "txt" ? apps : []
         }
         bench = TestBench(

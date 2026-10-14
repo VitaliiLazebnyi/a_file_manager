@@ -11,7 +11,8 @@ import Testing
 @MainActor @Suite struct NavigationPlaces {
     let memory = MemoryFileSystem()
     let other = MemoryFileSystem(scheme: "disk")
-    let pasteboard = NSPasteboard.withUniqueName()
+    private let scratch = ScratchPasteboard()
+    var pasteboard: NSPasteboard { scratch.pasteboard }
     let bench: TestBench
 
     var commands: CommandRegistry { bench.commands }
@@ -28,7 +29,7 @@ import Testing
         memory.addFile("/B/other.txt")
         other.addFile("/data/x.bin")
         bench = TestBench(
-            plugins: [NavigationPlugin(pasteboard: pasteboard, home: memory.url("/home"))],
+            plugins: [NavigationPlugin(pasteboard: scratch.pasteboard, home: memory.url("/home"))],
             fileSystems: [memory, other],
             left: memory.url("/A"), right: memory.url("/B"))
     }

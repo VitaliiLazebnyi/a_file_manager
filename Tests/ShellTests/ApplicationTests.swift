@@ -15,6 +15,7 @@ import Testing
     let memory = MemoryFileSystem()
     let ui = ScriptedInteraction()
     let settings = MemorySettings()
+    let scratch = ScratchPasteboard()
 
     init() throws {
         _ = NSApplication.shared
@@ -70,7 +71,7 @@ import Testing
     func start() async -> Running {
         let kernel = Kernel(productName: StandardPlugins.productName, settings: settings, ui: ui)
         kernel.fileSystems.register(memory)
-        kernel.load(StandardPlugins.make(pasteboard: .withUniqueName(), launchesApplications: false))
+        kernel.load(StandardPlugins.make(pasteboard: scratch.pasteboard, launchesApplications: false))
         let running = Running(kernel: kernel, shell: Shell(kernel: kernel, home: box.url("home")))
         await settle(running)
         return running

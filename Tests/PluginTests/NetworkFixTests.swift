@@ -461,8 +461,8 @@ final class FailureBox: @unchecked Sendable {
         var values = NetworkOptions.Values()
         (values.timeout, values.keepAliveInterval) = (10, 0)
         environment.options.values = values
-        environment.askToTrust = { profile, certificate in
-            environment.trust.accept(certificate.fingerprint, for: profile.key.host)
+        environment.askToTrust = { [trust = environment.trust] profile, certificate in
+            trust.accept(certificate.fingerprint, for: profile.key.host)
             return true
         }
         let center = ConnectionCenter(environment: environment)

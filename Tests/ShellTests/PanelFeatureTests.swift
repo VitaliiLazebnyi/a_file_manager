@@ -15,6 +15,7 @@ import Testing
     let memory = MemoryFileSystem()
     let ui = ScriptedInteraction()
     let settings = MemorySettings()
+    let scratch = ScratchPasteboard()
     let probe = PanelStores.Probe()
 
     init() throws {
@@ -93,7 +94,7 @@ import Testing
     func start() async -> Running {
         let kernel = Kernel(productName: StandardPlugins.productName, settings: settings, ui: ui)
         kernel.fileSystems.register(memory)
-        kernel.load(CorePlugins.make() + [ColumnsPlugin(probe: probe)])
+        kernel.load(CorePlugins.make(pasteboard: scratch.pasteboard) + [ColumnsPlugin(probe: probe)])
         let running = Running(kernel: kernel, shell: Shell(kernel: kernel, home: box.url("home")))
         await settle(running)
         return running

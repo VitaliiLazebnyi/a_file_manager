@@ -19,7 +19,8 @@ import ViewerPlugin
 @MainActor @Suite struct PluginCommands {
     let memory = MemoryFileSystem()
     let mac = MacIntegrationPlugin(launchesApplications: false)
-    let pasteboard = NSPasteboard.withUniqueName()
+    private let scratch = ScratchPasteboard()
+    var pasteboard: NSPasteboard { scratch.pasteboard }
     let bench: TestBench
 
     var commands: CommandRegistry { bench.commands }
@@ -35,7 +36,8 @@ import ViewerPlugin
         bench = TestBench(
             plugins: [
                 NavigationPlugin(), ViewerPlugin(), mac, FileOperationsPlugin(), FindFilesPlugin(),
-                ClipboardPlugin(pasteboard: pasteboard), SelectionPlugin(), ViewOptionsPlugin(), FolderTabsPlugin()
+                ClipboardPlugin(pasteboard: scratch.pasteboard), SelectionPlugin(), ViewOptionsPlugin(),
+                FolderTabsPlugin()
             ],
             fileSystems: [LocalFileSystem(), memory], left: memory.url("/A"), right: memory.url("/B"))
     }

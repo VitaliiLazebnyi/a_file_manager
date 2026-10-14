@@ -186,6 +186,8 @@ import Testing
     var right: FakePanel { bench.right }
     var fileSystem: VirtualFileSystem { plugin.fileSystem! }
 
+    private let scratch = ScratchPasteboard()
+
     init() {
         memory.addFile("/A/one.txt", "1")
         memory.addFile("/A/docs/in.txt", "inside")
@@ -194,7 +196,7 @@ import Testing
         memory.addFile("/B/other.txt", "o")
         bench = TestBench(
             plugins: [
-                plugin, NavigationPlugin(pasteboard: .withUniqueName(), home: memory.url("/A")), FileOperationsPlugin()
+                plugin, NavigationPlugin(pasteboard: scratch.pasteboard, home: memory.url("/A")), FileOperationsPlugin()
             ],
             fileSystems: [LocalFileSystem(), memory], left: memory.url("/A"), right: memory.url("/B"))
     }
