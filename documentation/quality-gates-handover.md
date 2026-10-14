@@ -56,13 +56,13 @@ from the host Mac into the test VM. Branch: `quality-gates`.
      Lock-guarded classes are `@unchecked Sendable` with a doc line naming the lock or the rule that makes them safe.
    - Closures that cross threads are `@Sendable`; those run on the main thread `@MainActor`. `JobMonitor.ask` and
      `Kernel.askUser` take `@MainActor @Sendable` questions; `Plugin.prepareToQuit` a `@Sendable` completion.
-   - Kernel `Handover<Value>`: a documented box for values that are safe to hand over but not marked `Sendable`
-     (values built on one thread and handed over whole, values one thread at a time uses). Deployment target:
-     macOS 14. The pasteboard is read on the main thread only.
-   - Every `@unchecked Sendable` and `nonisolated(unsafe)` was audited on 2026-10-15; the races found were fixed
-     (lock or `let` via `init`), and each remaining one names the lock or the rule that makes it safe.
-   - Shell `MainLoop.queue`: a main-thread block run later from the run loop; `MainLoop`/`MainOwned` are internal
-     to the shell (Places and Selection keep a small `performOnMainLoop` of their own).
+   - Kernel `Handover<Value>`: a documented box for values that are safe to hand over but not marked `Sendable` (values
+     built on one thread and handed over whole, values one thread at a time uses). Deployment target: macOS 14. The
+     pasteboard is read on the main thread only.
+   - Every `@unchecked Sendable` and `nonisolated(unsafe)` was audited on 2026-10-15; the races found were fixed (lock
+     or `let` via `init`), and each remaining one names the lock or the rule that makes it safe.
+   - Shell `MainLoop.queue`: a main-thread block run later from the run loop; `MainLoop`/`MainOwned` are internal to the
+     shell (Places and Selection keep a small `performOnMainLoop` of their own).
 
 ## Next steps, in order
 
@@ -75,18 +75,52 @@ from the host Mac into the test VM. Branch: `quality-gates`.
 4. **Leaks** found by `leaks` on the test suites: Kernel ↔ CommandRegistry retain cycle (command closures capture the
    kernel strongly), FileJob cycle, Places `TreeScanner` subfolder arrays, QuitProgress, FileSystemRegistry, ToolRun,
    VirtualFileSystem, ViewerPlugin cycles; NSPasteboard, SyncComparison, SessionEnvironment leaks.
-5. **Coverage to 100%** (89.4% lines at the start; lowest: Places 62%, MacIntegration 78%, DirectorySync 82%, SystemTools
-   82%, AFMShell 84%). UI tests for the AppKit code need an Xcode project (SwiftPM cannot host UI tests); generate it.
-6. **Mutation testing.** `Scripts/mutation-gate.py` is still to be written (parse Muter's JSON report, fail on survivors
-   not listed as equivalent). A first run on `KeyBindings.swift` scored 50% (survivors at lines 33 and 52). A full run
-   takes days: split the files over VM clones.
+5. **Coverage to 100%** (89.4% lines at the start; lowest: Places 62%, MacIntegration 78%, DirectorySync 82%,
+   SystemTools 82%, AFMShell 84%). UI tests for the AppKit code need an Xcode project (SwiftPM cannot host UI tests);
+   generate it.
+6. **Mutation testing.** The gate works (see "Mutation testing" below); the tests that kill the survivors are still to
+   be written, module by module. A full run: 11,884 mutants, about 500 hours on one VM; split over VM clones.
 7. **Extras** listed above; then switch every gate on (CI, `git config core.hooksPath .githooks`).
+
+## Mutation testing
+
+- **Muter is built from source:** `Scripts/build-muter.sh` installs `~/.afm-tools/bin/muter` (Muter's development branch
+  at a fixed commit, plus `Scripts/muter.patch`). Homebrew's Muter 16 must not be used: its old parser crashes on Swift
+  6 code (`Shell.swift`), and it loses every mutant inside a block that holds a mutant itself (22% of them); a lost
+  mutant "survives" without having been tested (the 50% of the first `KeyBindings.swift` run was partly that). The
+  development branch writes no mutant into the sources at all. The patch fixes both, keeps files of the same name apart,
+  swaps a ternary with operators in its second choice as a whole, removes only call statements (not declarations,
+  `return` or `if`), and leaves out mutants in stored-property initial values (they cannot be switched at file scope).
+  With it, the whole tree with all 11,884 mutants compiles.
+- **Running:** `Scripts/mutation.sh` (files changed since the branch left `origin/main`), `Scripts/mutation.sh <files>`
+  or `--all`. It copies the checkout to `.build/mutation/project` (warnings are not errors in that copy only: a mutant
+  may leave a value unused), and Muter runs `Scripts/mutation.sh --run-tests` per mutant: the test target of the mutated
+  module first (Kernel and Contracts: KernelTests; plugins: PluginTests; shell and app: ShellTests), the others only if
+  it passes, each stopped after 3 × its baseline time + 60 s (a hang counts as a kill). Reports in
+  `.build/mutation/report`: Muter's `muter.json`, `mutants.json` (one record per mutant with its source text),
+  per-mutant test logs in `logs/`.
+- **The gate:** `Scripts/mutation-gate.py check <mutants.json>...` fails on every survivor not in
+  `Tests/Mutation/equivalent-mutants.txt`, on outcomes that are not a kill, on listed mutants a test kills and on stale
+  entries. An entry names file, operator, enclosing declaration and the statement before and after (no line number),
+  with a mandatory reason; the gate prints a ready entry per survivor. Its source-text reading agrees with Muter's own
+  snapshot on all 11,884 mutants.
+- **Cost:** a mutant killed by its first target takes about 35 s (kernel), 125 s (shell) or 165 s (plugins); a survivor
+  runs all three targets (about 300 s). Plugins hold 9,762 of the mutants, so the whole tree takes about 500 hours on
+  one VM while survivors are rare, more before.
+- **Split runs:** `Scripts/mutation-shard.sh plan <n>` counts every file's mutants (Muter's own count, a few minutes)
+  and splits the files into `n` shards of equal estimated time; every machine computes the same plan at the same commit.
+  On each of `n` linked clones of the snapshot "03 base: tools complete" (one per VM, 8 cores each; the clones need the
+  same commit checked out and `Scripts/build-muter.sh` run once): `Scripts/mutation-shard.sh run <i> <n>`. A shard runs
+  in chunks of about 2 hours (`MUTATION_CHUNK_HOURS`) and skips chunks done before, so after a restart the same command
+  continues. When all are done, copy each clone's `.build/mutation/shard-<i>-of-<n>` to one checkout at that commit and
+  run `Scripts/mutation-shard.sh merge <folders>`: it checks that every file under `Sources` was mutated and runs the
+  gate over all reports. With 8 clones a full run takes about 62 hours per clone (4: about 125).
 
 ## Gotchas met so far
 
 - Changing a protocol requirement that has a default implementation (`watch`, `prepareToQuit`) silently leaves
-  implementations with the old signature behind: they stop implementing it and the default takes over. Grep for the
-  old signature after such a change.
+  implementations with the old signature behind: they stop implementing it and the default takes over. Grep for the old
+  signature after such a change.
 - The build cache goes by file content: `touch` does not force a recompile. Use `swift package clean` (or delete the
   target's folder under `.build/out/Intermediates.noindex`) to see every diagnostic; an incremental build reports only
   the files it compiled, and errors stop the build at the first module.
