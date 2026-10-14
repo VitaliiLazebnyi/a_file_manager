@@ -1,0 +1,19 @@
+# Equivalent mutants: changes Muter makes that no test can tell apart from the original code,
+# because the changed code behaves the same. Scripts/mutation-gate.py accepts a surviving mutant
+# only if it is listed here; every other survivor needs a test that kills it.
+#
+# One entry per mutant, entries separated by a blank line. The gate prints a ready entry for each
+# survivor; copy it and write the reason. Keys:
+#
+#   file:        the source file, relative to the repository
+#   operator:    Muter's operator (RelationalOperatorReplacement, ChangeLogicalConnector,
+#                SwapTernary, RemoveSideEffects)
+#   in:          the declaration the mutant is in, as the gate prints it (may be empty)
+#   before:      the statement before the change, on one line, as the gate prints it
+#   after:       the statement after the change ("(statement removed)" for a removed call)
+#   occurrence:  optional; which one, when the same change appears more than once in `in`
+#   reason:      why no test can tell the mutant apart (at least 20 characters); a line that
+#                starts with spaces continues it
+#
+# Line numbers are not part of an entry, so edits elsewhere in the file do not disturb it. An entry
+# whose mutant a test kills, or that no longer matches any mutant of its file, fails the gate.
