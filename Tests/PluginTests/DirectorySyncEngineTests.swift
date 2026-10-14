@@ -267,6 +267,21 @@ private func describe(_ rows: [SyncRow]) -> [String] {
         #expect(afterWalk.wasCancelled && afterWalk.rows.contains { $0.state == .pending && $0.action == .none })
     }
 
+    @Test func aFinishedComparisonIsLetGo() {
+        makeTree()
+        weak var finished: SyncComparison?
+        do {
+            let comparison = SyncComparison(options: SyncOptions(), fileSystems: fileSystems)
+            // The progress holds the comparison, as that of a caller who may cancel it does.
+            let result = comparison.run(left: memory.url("/L"), right: memory.url("/R")) { _ in
+                _ = comparison.cancellation.isCancelled
+            }
+            #expect(!result.rows.isEmpty)
+            finished = comparison
+        }
+        #expect(finished == nil)
+    }
+
     @Test func everyCombinationOfOptionsKeepsItsPromises() {
         makeTree()
         memory.addDirectory("/L/hollow")

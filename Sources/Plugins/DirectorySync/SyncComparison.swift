@@ -50,7 +50,7 @@ public final class SyncComparison: @unchecked Sendable {
     private let lock = NSLock()
     private var counters = SyncProgress()
     private var errors: [String] = []
-    private var report: @Sendable (SyncProgress) -> Void = { _ in }
+    private var report: (@Sendable (SyncProgress) -> Void)?
     /// The unfiltered sizes of the two start directories' listings (under `lock`).
     private var topEntries: [Int?] = [nil, nil]
 
@@ -86,6 +86,8 @@ public final class SyncComparison: @unchecked Sendable {
         compareContents(of: &rows)
         lock.lock()
         defer { lock.unlock() }
+        // The comparison runs once: whatever the caller's closure holds is let go.
+        report = nil
         var result = SyncResult(
             rows: rows, leftDirectories: counters.leftDirectories, rightDirectories: counters.rightDirectories,
             errors: errors, wasCancelled: cancellation.isCancelled)
@@ -145,7 +147,7 @@ public final class SyncComparison: @unchecked Sendable {
         change(&counters)
         let snapshot = counters
         // Reported under the lock, so the calls arrive one at a time and in order.
-        report(snapshot)
+        report?(snapshot)
         lock.unlock()
     }
 
