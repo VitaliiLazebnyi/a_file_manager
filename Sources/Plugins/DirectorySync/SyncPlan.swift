@@ -5,8 +5,8 @@ public import Foundation
 /// What Synchronize is about to do, worked out from the rows and their actions
 /// (spec 09 › The "Synchronize" dialog and the run). A value without behaviour: the dialog
 /// shows its counts, the executor carries it out.
-public struct SyncPlan: Equatable {
-    public struct Copy: Equatable {
+public struct SyncPlan: Equatable, Sendable {
+    public struct Copy: Equatable, Sendable {
         public let source: URL
         public var target: URL
         /// The path below the start directories, for sending the copy to another folder.
@@ -20,7 +20,7 @@ public struct SyncPlan: Equatable {
         public let permissions: UInt16
     }
 
-    public struct Deletion: Equatable {
+    public struct Deletion: Equatable, Sendable {
         public let url: URL
         public let isDirectory: Bool
     }
@@ -90,7 +90,7 @@ public struct SyncPlan: Equatable {
     }
 }
 
-public struct SyncRunOptions {
+public struct SyncRunOptions: Sendable {
     public var copyToRight = true
     public var copyToLeft = true
     public var deleteLeft = true
@@ -111,15 +111,15 @@ public struct SyncRunOptions {
     public init() {}
 }
 
-public enum SyncOverwriteAnswer {
+public enum SyncOverwriteAnswer: Sendable {
     case overwrite, overwriteAll, skip, skipAll, cancel
 }
 
-public enum SyncErrorAnswer {
+public enum SyncErrorAnswer: Sendable {
     case retry, skip, skipAll, cancel
 }
 
-public struct SyncOutcome {
+public struct SyncOutcome: Sendable {
     public var copied = 0
     public var deleted = 0
     public var skipped = 0

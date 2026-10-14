@@ -5,7 +5,7 @@ public import Foundation
 /// The wildcard field of Synchronize directories (spec 09 › Filter, 18 › File masks): masks
 /// separated by spaces or semicolons, masks to leave out after `|`. An excluded mask that ends
 /// in `/` names folders: such folders are not entered at all.
-public struct SyncMask {
+public struct SyncMask: Sendable {
     private let include: FileMask?
     private let exclude: FileMask?
     private let excludedFolders: FileMask?
@@ -36,7 +36,7 @@ public struct SyncMask {
 }
 
 /// What is compared and how (spec 09 › Compare options).
-public struct SyncOptions: Codable, Equatable {
+public struct SyncOptions: Codable, Equatable, Sendable {
     /// Recurse into subdirectories.
     public var subdirectories = true
     /// Pairs that look equal by size and date are also read and compared byte by byte.
@@ -67,7 +67,7 @@ public struct SyncOptions: Codable, Equatable {
 }
 
 /// What the comparison found out about a row (spec 09 › Comparison algorithm).
-public enum SyncState: Equatable {
+public enum SyncState: Equatable, Sendable {
     case leftOnly, rightOnly
     case leftNewer, rightNewer
     case equal
@@ -80,7 +80,7 @@ public enum SyncState: Equatable {
 }
 
 /// What Synchronize will do with a row.
-public enum SyncAction: Equatable {
+public enum SyncAction: Equatable, Sendable {
     case none
     case copyToRight, copyToLeft
     case deleteLeft, deleteRight, deleteBoth
@@ -100,7 +100,7 @@ public enum SyncAction: Equatable {
 
 /// One line of the result list: a file (or, with "Empty directories", a folder) on the left,
 /// on the right, or on both sides.
-public struct SyncRow: Equatable {
+public struct SyncRow: Equatable, Sendable {
     /// The folder of the row relative to the start directories, with a trailing slash; empty
     /// for the start directories themselves. This is the caption of the row's group.
     public let directory: String
@@ -187,7 +187,7 @@ public struct SyncRow: Equatable {
 }
 
 /// The Show buttons (spec 09 › Show filter); the raw values are the `SyncButtons` bits.
-public struct SyncShow: OptionSet, Codable, Equatable {
+public struct SyncShow: OptionSet, Codable, Equatable, Sendable {
     public let rawValue: Int
     public init(rawValue: Int) { self.rawValue = rawValue }
 
@@ -213,7 +213,7 @@ public struct SyncShow: OptionSet, Codable, Equatable {
 }
 
 /// The footer after a comparison (spec 09 › Status line). Directories are not counted.
-public struct SyncSummary: Equatable {
+public struct SyncSummary: Equatable, Sendable {
     public var files = 0, identical = 0, different = 0, uniqueLeft = 0, uniqueRight = 0
 
     public init(_ rows: [SyncRow]) {
@@ -236,7 +236,7 @@ public struct SyncSummary: Equatable {
 }
 
 /// Directories and options under a name (spec 09 › Saved sync sets).
-public struct SyncSet: Codable, Equatable {
+public struct SyncSet: Codable, Equatable, Sendable {
     public var name: String
     /// The two directories as the user sees and types them.
     public var left: String

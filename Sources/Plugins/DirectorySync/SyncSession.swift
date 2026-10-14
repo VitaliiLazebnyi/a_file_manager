@@ -39,6 +39,7 @@ enum SyncSettingsKey {
 /// cancellation flag is touched from here. Synchronizing runs as a job of the kernel's job
 /// service, with the progress window. With `runsInline` (tests) the comparison runs on the
 /// calling thread instead.
+@MainActor
 final class SyncSession {
     enum Phase {
         /// `synchronizing`: the job that carries out the plan runs; neither Compare nor Synchronize may start.
@@ -102,7 +103,7 @@ final class SyncSession {
     private var selectionEpoch = 0
 
     /// The sorted names of the marked entries of the panels the snapshots were taken of.
-    static func names(of snapshots: [PanelModel.Operands]) -> [String] {
+    nonisolated static func names(of snapshots: [PanelModel.Operands]) -> [String] {
         snapshots.flatMap { $0.markedItems().map(\.name) }.sorted()
     }
 
@@ -142,7 +143,7 @@ final class SyncSession {
             let snapshots = marked.map { $0.operandsSnapshot() }
             DispatchQueue.global(qos: .userInitiated).async { [weak self] in
                 let names = Self.names(of: snapshots)
-                DispatchQueue.main.async {
+                DispatchQueue.main.async { [weak self] in
                     guard let self, self.selectionEpoch == epoch else { return }
                     self.selectedNames = names
                     self.changed()
@@ -205,17 +206,17 @@ final class SyncSession {
         // A thread of its own: listing a share that does not answer can block for as long as the server
         // takes to give up, and a few such comparisons must not use up the workers of the shared pool.
         SyncWorker.run("Synchronize directories: compare") { [weak self] in
-            // Belongs to the comparison's progress calls, which arrive one at a time.
-            var lastReport = Date.distantPast
-            let result = comparison.run(left: left, right: right) { progress in
+            /// Belongs to the comparison's progress calls, which arrive one at a time.
+            nonisolated(unsafe) var lastReport = Date.distantPast
+            let result = comparison.run(left: left, right: right) { [weak self] progress in
                 guard Date().timeIntervalSince(lastReport) > 0.1 else { return }
                 lastReport = Date()
-                DispatchQueue.main.async {
+                DispatchQueue.main.async { [weak self] in
                     guard let self, self.running === comparison else { return }
                     self.show(progress)
                 }
             }
-            DispatchQueue.main.async {
+            DispatchQueue.main.async { [weak self] in
                 guard let self, self.running === comparison else { return }
                 self.finish(comparison, result, left, right)
             }
@@ -283,7 +284,9 @@ final class SyncSession {
     }
 
     private func isActionable(_ row: SyncRow) -> Bool { Self.isActionable(row) }
-    private static func isActionable(_ row: SyncRow) -> Bool { row.action != .none && row.accepts(row.action) }
+    nonisolated private static func isActionable(_ row: SyncRow) -> Bool {
+        row.action != .none && row.accepts(row.action)
+    }
 
     /// The list as it is shown, worked out from the rows alone (so it can be made on any thread).
     struct Layout {
@@ -295,7 +298,9 @@ final class SyncSession {
     }
 
     /// Filters by the Show buttons, sorts inside each subdirectory and puts the captions in.
-    static func layout(rows: [SyncRow], show: SyncShow, sort: (key: SyncSortKey, side: SyncSide, ascending: Bool))
+    nonisolated static func layout(
+        rows: [SyncRow], show: SyncShow, sort: (key: SyncSortKey, side: SyncSide, ascending: Bool)
+    )
         -> Layout
     {
         // The comparison delivers the rows grouped by folder, so a row mostly belongs to the group of the one before.
@@ -359,7 +364,7 @@ final class SyncSession {
         changed()
         SyncWorker.run("Synchronize directories: list") { [weak self] in
             let layout = Self.layout(rows: rows, show: show, sort: sort)
-            DispatchQueue.main.async {
+            DispatchQueue.main.async { [weak self] in
                 guard let self, self.layoutGeneration == generation else { return }
                 // Actions set while the list was made are counted again.
                 self.apply(layout, recount: self.actionEpoch != epoch)
@@ -393,7 +398,7 @@ final class SyncSession {
 
     /// Orders the rows of one folder. The keys (a size, a date) are taken out once, and the pairs of key and
     /// row are sorted: sorting the rows by looking into their files on every comparison takes seconds at a million.
-    private static func sorted(
+    nonisolated private static func sorted(
         _ indexes: [Int], rows: [SyncRow], by sort: (key: SyncSortKey, side: SyncSide, ascending: Bool)
     ) -> [Int] {
         // The comparison delivers the rows by name already.
@@ -544,7 +549,7 @@ final class SyncSession {
             visible.reserveCapacity(entries.count)
             for case .row(let index) in entries where rows.indices.contains(index) { visible.append(rows[index]) }
             let plan = SyncPlan(rows: visible, timeOffsetHours: offset)
-            DispatchQueue.main.async {
+            DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
                 self.isPlanning = false
                 self.apply(self.currentLayout)
@@ -640,12 +645,12 @@ final class SyncSession {
         changed()
         kernel.jobs.run(
             title: "Synchronize",
-            work: { monitor -> SyncOutcome in
+            work: { [plan, run] monitor -> SyncOutcome in
                 let executor = SyncExecutor(
                     plan: plan, options: run, fileSystems: fileSystems, cancellation: monitor.cancellation)
                 executor.onProgress = monitor.report
                 executor.onOverwrite = { target, copy in
-                    monitor.ask {
+                    monitor.ask { @MainActor @Sendable in
                         ui.pick(
                             "Overwrite \(fileSystems.displayPath(target.url))?",
                             detail:
@@ -659,7 +664,7 @@ final class SyncSession {
                     }
                 }
                 executor.onError = { url, error in
-                    monitor.ask {
+                    monitor.ask { @MainActor @Sendable in
                         ui.pick(
                             "Error with \(fileSystems.displayPath(url))", detail: error.localizedDescription,
                             [
@@ -753,7 +758,7 @@ final class SyncSession {
 /// Where the session's comparison, list and plan are made: a thread of their own for each, not a worker
 /// of the shared pool (see `SyncSession.compare`).
 enum SyncWorker {
-    static func run(_ name: String, _ body: @escaping () -> Void) {
+    static func run(_ name: String, _ body: @escaping @Sendable () -> Void) {
         let thread = Thread(block: body)
         thread.name = name
         thread.qualityOfService = .userInitiated

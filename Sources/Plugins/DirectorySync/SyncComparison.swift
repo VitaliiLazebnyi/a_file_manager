@@ -2,13 +2,13 @@ public import AFMKernel
 public import Foundation
 
 /// How far a comparison is (spec 09 › Status line).
-public struct SyncProgress: Equatable {
+public struct SyncProgress: Equatable, Sendable {
     public var leftDirectories = 0, rightDirectories = 0
     public var filesCompared = 0, filesToCompare = 0
     public var bytesCompared: Int64 = 0, bytesToCompare: Int64 = 0
 }
 
-public struct SyncResult {
+public struct SyncResult: Sendable {
     public var rows: [SyncRow] = []
     public var leftDirectories = 0, rightDirectories = 0
     /// Folders that could not be read and files that could not be compared. A folder that
@@ -34,7 +34,10 @@ public struct SyncResult {
 /// with its own two readers. The counters shared by those threads are behind a lock.
 /// `progress` is called from whichever thread has news, one call at a time. An instance runs
 /// once; `cancellation` may be set from any thread.
-public final class SyncComparison {
+///
+/// `counters`, `errors` and `topEntries` are guarded by `lock`. `report` and `classifying` are
+/// set at the start of `run`, before any other thread looks at them, and only read afterwards.
+public final class SyncComparison: @unchecked Sendable {
     public let options: SyncOptions
     public let cancellation: CancellationFlag
     private let fileSystems: FileSystemRegistry
@@ -47,7 +50,7 @@ public final class SyncComparison {
     private let lock = NSLock()
     private var counters = SyncProgress()
     private var errors: [String] = []
-    private var report: (SyncProgress) -> Void = { _ in }
+    private var report: @Sendable (SyncProgress) -> Void = { _ in }
     /// The unfiltered sizes of the two start directories' listings (under `lock`).
     private var topEntries: [Int?] = [nil, nil]
     /// The options the pairs are classified with: the tolerance only as large as the file systems need.
@@ -68,7 +71,9 @@ public final class SyncComparison {
         onlyAlike = Set(options.onlyNames ?? [])
     }
 
-    public func run(left: URL, right: URL, progress: @escaping (SyncProgress) -> Void = { _ in }) -> SyncResult {
+    public func run(left: URL, right: URL, progress: @escaping @Sendable (SyncProgress) -> Void = { _ in })
+        -> SyncResult
+    {
         report = progress
         // The dates of two file systems that keep them exactly are compared exactly; the tolerance
         // is for the ones that round (see `toleranceSeconds`). Otherwise a file changed two seconds
