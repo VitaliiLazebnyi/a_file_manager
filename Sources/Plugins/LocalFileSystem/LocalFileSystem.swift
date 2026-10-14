@@ -7,17 +7,22 @@ public import Foundation
 /// about volumes and kinds of folders, the locked copies it made) is guarded by locks.
 ///
 /// Unchecked: every table is guarded by the lock named beside it (`packageLock`,
-/// `lockedLock`, `placesLock`, `volumeLock`, `spareLock`); `probes` is set by tests before the
-/// file system is used and only read afterwards; `mountObservers` is set in `init` and read in
-/// `deinit`; the default file manager may be used from any thread.
+/// `lockedLock`, `placesLock`, `volumeLock`, `spareLock`); `mountObservers` is set in `init`
+/// and read in `deinit`; the default file manager may be used from any thread.
 public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
     public let scheme = "file"
     public let capabilities: FileSystemCapabilities = [.write, .trash, .append]
     private let fm = FileManager.default
     /// Nil everywhere unless a test stands in for the system (`LocalProbes`).
-    var probes = LocalProbes()
+    let probes: LocalProbes
 
-    public init() {
+    public convenience init() {
+        self.init(probes: LocalProbes())
+    }
+
+    /// Tests stand in for the system with `probes`.
+    init(probes: LocalProbes) {
+        self.probes = probes
         // Disks that come and go change the list of places; it is read again behind the scenes.
         let workspace = NSWorkspace.shared.notificationCenter
         let names = [
