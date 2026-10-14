@@ -71,7 +71,8 @@ public final class Kernel {
     /// have no business with it (they report changed folders through `panels.refresh`).
     nonisolated public let listingCache = ListingCache()
     public private(set) var plugins: [any Plugin] = []
-    private var shell: any ShellServices?
+    /// Weak: the shell owns the kernel.
+    private weak var shell: (any ShellServices)?
 
     public init(productName: String, settings: any SettingsStore, ui: any UserInteraction) {
         self.productName = productName
@@ -120,7 +121,7 @@ public final class Kernel {
     public func attach(_ shell: any ShellServices) {
         self.shell = shell
         keyBindings.load(from: settings)
-        commands.isBlocked = { [unowned shell] in shell.jobs.isBusy }
+        commands.isBlocked = { [weak shell] in shell?.jobs.isBusy ?? true }
     }
 
     /// Stops the plugins when the program quits.
@@ -161,7 +162,7 @@ public final class Kernel {
 
     private var attachedShell: any ShellServices {
         guard let shell else {
-            preconditionFailure("The shell is not attached yet; use panels and jobs inside command handlers only.")
+            preconditionFailure("No shell is attached; use panels and jobs inside command handlers only.")
         }
         return shell
     }
