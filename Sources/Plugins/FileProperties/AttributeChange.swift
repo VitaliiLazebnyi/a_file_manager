@@ -299,8 +299,7 @@ struct AttributeChange: Equatable {
 /// provider, so they work wherever the provider supports them; flags and owners are POSIX
 /// calls and exist for `file:` URLs only.
 ///
-/// `outcome` is guarded by `lock`. `ownerID` and `groupID` are set on the job's thread before
-/// the parallel work starts, and only read afterwards.
+/// `outcome`, `ownerID` and `groupID` are guarded by `lock`; everything else is fixed in `init`.
 final class AttributeJob: @unchecked Sendable {
     struct Outcome {
         var changed = 0
@@ -317,7 +316,7 @@ final class AttributeJob: @unchecked Sendable {
     private let now = Date()
     private let lock = NSLock()
     private var outcome = Outcome()
-    /// Looked up once, on the job's thread, before the parallel work starts.
+    /// Looked up once, on the job's thread, before the parallel work starts (under `lock`).
     private var ownerID: uid_t?
     private var groupID: gid_t?
 
@@ -336,15 +335,17 @@ final class AttributeJob: @unchecked Sendable {
             guard let id = LocalInfo.userID(owner) else {
                 return Outcome(failed: items.count, failures: ["There is no user called \(owner)."])
             }
-            ownerID = id
+            lock.withLock { ownerID = id }
         }
         if let group = change.group {
             guard let id = LocalInfo.groupID(group) else {
                 return Outcome(failed: items.count, failures: ["There is no group called \(group)."])
             }
-            groupID = id
+            lock.withLock { groupID = id }
         }
         each(items) { self.process($0) }
+        lock.lock()
+        defer { lock.unlock() }
         outcome.cancelled = cancellation.isCancelled
         return outcome
     }
@@ -442,6 +443,7 @@ final class AttributeJob: @unchecked Sendable {
                 try provider.setAttributes(attributes, of: url, cancellation: cancellation)
             }
         }
+        let (ownerID, groupID) = lock.withLock { (self.ownerID, self.groupID) }
         if ownerID != nil || groupID != nil { try LocalInfo.setOwner(ownerID, group: groupID, of: url) }
         if let hidden = change.hidden { try LocalInfo.setFlag(UInt32(UF_HIDDEN), hidden, of: url) }
         if change.locked == true { try LocalInfo.setFlag(UInt32(UF_IMMUTABLE), true, of: url) }
