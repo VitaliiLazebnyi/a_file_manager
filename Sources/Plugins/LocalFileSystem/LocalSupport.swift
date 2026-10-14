@@ -1,0 +1,471 @@
+import AFMKernel
+import Foundation
+
+/// Lets another thread end a system call this thread is blocked in (an `open`, `read` or
+/// `write` on a share that has stopped answering), by a signal that does nothing except
+/// interrupt the call. Used by the local readers and writers for `interrupt()`, and by the
+/// opening calls for the `CancellationFlag` they are given.
+///
+/// The signal is only ever sent to a thread that has announced, with `begin()`, that it is
+/// inside one call; a signal that comes a moment too early is sent again until the call is
+/// over. **Thread-safe**; `interrupt()` returns at once.
+final class Interruption {
+    private let lock = NSLock()
+    private var thread: pthread_t?
+    private var interrupted = false
+
+    /// A handler that does nothing, installed without `SA_RESTART`: the call it interrupts
+    /// returns `EINTR` instead of carrying on.
+    private static let installed: Int32 = {
+        var action = sigaction()
+        action.__sigaction_u.__sa_handler = { _ in }
+        sigemptyset(&action.sa_mask)
+        action.sa_flags = 0
+        return sigaction(SIGURG, &action, nil)
+    }()
+
+    var isInterrupted: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return interrupted
+    }
+
+    /// The calling thread is about to make a call that may wait. False when `interrupt` was
+    /// called already: the call is not to be made.
+    func begin() -> Bool {
+        // Without the handler the signal would do nothing: the thread is not announced then.
+        let canBeInterrupted = Interruption.installed == 0
+        if canBeInterrupted {
+            // Some threads (those of Swift's concurrency pool) have it blocked, and then it would not arrive.
+            var signals = sigset_t()
+            sigemptyset(&signals)
+            sigaddset(&signals, SIGURG)
+            pthread_sigmask(SIG_UNBLOCK, &signals, nil)
+        }
+        lock.lock()
+        defer { lock.unlock() }
+        if interrupted { return false }
+        guard canBeInterrupted else { return true }
+        thread = pthread_self()
+        return true
+    }
+
+    func end() {
+        lock.lock()
+        thread = nil
+        lock.unlock()
+    }
+
+    func interrupt() {
+        lock.lock()
+        interrupted = true
+        let target = thread
+        if let target { pthread_kill(target, SIGURG) }
+        lock.unlock()
+        if target != nil { resend(attempt: 1) }
+    }
+
+    /// The call may not have been entered yet when the first signal arrived.
+    private func resend(attempt: Int) {
+        guard attempt <= 50 else { return }
+        LocalClock.queue.asyncAfter(deadline: .now() + 0.1) { [self] in
+            lock.lock()
+            let target = thread
+            if let target { pthread_kill(target, SIGURG) }
+            lock.unlock()
+            if target != nil { resend(attempt: attempt + 1) }
+        }
+    }
+
+    /// Runs `call` (one system call, returning a negative number and setting `errno` on
+    /// failure), again after an `EINTR` that nobody asked for. Throws `userCancelled` once
+    /// interrupted. Returns the result, or a negative number with `errno` set.
+    func run(_ call: () -> Int) throws -> Int {
+        while true {
+            guard begin() else { throw CocoaError(.userCancelled) }
+            let result = call()
+            let code = errno
+            end()
+            if result >= 0 { return result }
+            if code == EINTR {
+                if isInterrupted { throw CocoaError(.userCancelled) }
+                continue
+            }
+            errno = code
+            return result
+        }
+    }
+}
+
+/// The mounted file systems, as the kernel lists them. Reading the list never touches a
+/// mounted disk (`MNT_NOWAIT`), so it is safe to ask on any thread about a path on a share
+/// that has stopped answering. Kept for a moment and then read again.
+final class MountTable {
+    static let shared = MountTable()
+
+    struct Mount {
+        let path: String
+        /// A disk of this Mac. False for shares, and for automounted paths, which look local
+        /// and fetch their contents from a server on first use.
+        let isLocal: Bool
+        /// The number of the mounted volume, which is what `stat` gives as `st_dev` for
+        /// everything on it.
+        let device: Int64
+    }
+
+    private let lock = NSLock()
+    private var mounts: [Mount] = []
+    /// Folder → the mounts that sit directly in it, by name.
+    private var below: [String: [String: Int64]] = [:]
+    private var read: UInt64 = 0
+    private static let lifetime: UInt64 = 2_000_000_000
+
+    /// Called with the lock held.
+    private func refresh() {
+        let now = DispatchTime.now().uptimeNanoseconds
+        guard read == 0 || now &- read > MountTable.lifetime else { return }
+        mounts = MountTable.readMounts()
+        below = [:]
+        for mount in mounts where mount.path != "/" {
+            let cut = mount.path.utf8.lastIndex(of: 0x2F) ?? mount.path.utf8.startIndex
+            let parent = cut == mount.path.utf8.startIndex ? "/" : String(mount.path[..<cut])
+            below[parent, default: [:]][String(mount.path[mount.path.index(after: cut)...])] = mount.device
+        }
+        read = now
+    }
+
+    /// The mount a path lies on (by its text: the path is not looked at on disk).
+    func mount(containing path: String) -> Mount? {
+        lock.lock()
+        refresh()
+        let current = mounts
+        lock.unlock()
+        return current.first { mount in
+            mount.path == "/" || path == mount.path || path.hasPrefix(mount.path + "/")
+        }
+    }
+
+    /// The volumes mounted directly in the folder at `path` (written out in full, links
+    /// resolved, as the system writes mount points): name → device. Empty nearly everywhere.
+    func mounts(directlyIn path: String) -> [String: Int64] {
+        lock.lock()
+        defer { lock.unlock() }
+        refresh()
+        return below.isEmpty ? [:] : (below[path] ?? [:])
+    }
+
+    /// Nil when the table has nothing on the path.
+    func isLocal(_ path: String) -> Bool? { mount(containing: path)?.isLocal }
+
+    private static func readMounts() -> [Mount] {
+        let count = getfsstat(nil, 0, MNT_NOWAIT)
+        guard count > 0 else { return [] }
+        var buffer = [Darwin.statfs](repeating: Darwin.statfs(), count: Int(count) + 8)
+        let size = Int32(buffer.count * MemoryLayout<statfs>.stride)
+        let filled = getfsstat(&buffer, size, MNT_NOWAIT)
+        guard filled > 0 else { return [] }
+        let mounts = buffer.prefix(Int(filled)).map { info -> Mount in
+            var info = info
+            let path = withUnsafeBytes(of: &info.f_mntonname) { String(cString: $0.bindMemory(to: CChar.self).baseAddress!) }
+            let type = withUnsafeBytes(of: &info.f_fstypename) { String(cString: $0.bindMemory(to: CChar.self).baseAddress!) }
+            let isLocal = info.f_flags & UInt32(MNT_LOCAL) != 0 && info.f_flags & UInt32(MNT_AUTOMOUNTED) == 0 && type != "autofs"
+            return Mount(path: path, isLocal: isLocal, device: Int64(info.f_fsid.val.0))
+        }
+        // The deepest mount first, so that the first that contains a path is the one it is on.
+        return mounts.sorted { $0.path.utf8.count > $1.path.utf8.count }
+    }
+}
+
+/// What a symbolic link leads to.
+struct LinkTarget {
+    var isDirectory = false
+    var isRegular = false
+    /// The size of the target when it is a regular file.
+    var size: Int64 = 0
+    var isSpecial: Bool { !isDirectory && !isRegular }
+}
+
+/// Finds out where links lead without letting a link into a share that does not answer hold
+/// up a listing. A target on a disk of this Mac is asked for at once; one anywhere else is
+/// asked for on a thread of its own and waited for for a moment only. A few such questions
+/// may be stuck for good (each holds a thread until the share answers); past that limit links
+/// into places that are not local are no longer followed.
+final class LinkResolver {
+    static let shared = LinkResolver()
+
+    private let lock = NSLock()
+    private var inFlight = 0
+    private static let limit = 8
+    private static let patience: TimeInterval = 1.5
+
+    /// Nil when the target does not exist (a dangling link) or did not answer in time.
+    func resolve(_ path: String) -> LinkTarget? {
+        if let target = LinkResolver.absoluteTarget(of: path), MountTable.shared.isLocal(target) == true {
+            return LinkResolver.lookup(path)
+        }
+        lock.lock()
+        guard inFlight < LinkResolver.limit else {
+            lock.unlock()
+            return nil
+        }
+        inFlight += 1
+        lock.unlock()
+        final class Answer {
+            let lock = NSLock()
+            var target: LinkTarget?
+        }
+        let answer = Answer()
+        let done = DispatchSemaphore(value: 0)
+        // A thread of the kernel's own: one that never comes back is not one of a dispatch queue's few.
+        BlockingCalls.run {
+            let target = LinkResolver.lookup(path)
+            answer.lock.lock()
+            answer.target = target
+            answer.lock.unlock()
+            self.lock.lock()
+            self.inFlight -= 1
+            self.lock.unlock()
+            done.signal()
+        }
+        guard done.wait(timeout: .now() + LinkResolver.patience) == .success else { return nil }
+        answer.lock.lock()
+        defer { answer.lock.unlock() }
+        return answer.target
+    }
+
+    private static func lookup(_ path: String) -> LinkTarget? {
+        var st = stat()
+        guard stat(path, &st) == 0 else { return nil }
+        let type = st.st_mode & S_IFMT
+        return LinkTarget(isDirectory: type == S_IFDIR, isRegular: type == S_IFREG, size: type == S_IFREG ? Int64(st.st_size) : 0)
+    }
+
+    /// Where the link says it points, as an absolute path, worked out from the text of the
+    /// link alone (the target is not looked at). Nil when the link cannot be read.
+    private static func absoluteTarget(of path: String) -> String? {
+        let text: String? = withUnsafeTemporaryAllocation(of: CChar.self, capacity: Int(PATH_MAX) + 1) { buffer in
+            let length = readlink(path, buffer.baseAddress, Int(PATH_MAX))
+            guard length > 0 else { return nil }
+            buffer[length] = 0
+            return String(validatingUTF8: buffer.baseAddress!)
+        }
+        guard let text else { return nil }
+        var absolute = text
+        // By bytes, as the file system reads a path: a `/` with a combining mark after it is
+        // one character that is not `/`, and a cut by characters would not see it.
+        if text.utf8.first != 0x2F {
+            let directory = path.utf8.lastIndex(of: 0x2F).map { String(decoding: path.utf8[..<$0], as: UTF8.self) } ?? ""
+            absolute = directory + "/" + text
+        }
+        var parts: [ArraySlice<UInt8>] = []
+        for part in Array(absolute.utf8).split(separator: 0x2F) {
+            if part.elementsEqual([0x2E]) { continue }
+            if part.elementsEqual([0x2E, 0x2E]) { _ = parts.popLast() } else { parts.append(part) }
+        }
+        return "/" + parts.map { String(decoding: $0, as: UTF8.self) }.joined(separator: "/")
+    }
+}
+
+extension LocalFileSystem {
+    /// Runs `body` with the materialising of files that are only on a server (iCloud Drive,
+    /// File Provider) switched off for this thread: a walk that measures a tree must not
+    /// make the system download it. A folder that is not there yet then counts as nothing.
+    static func withoutMaterializing<T>(_ body: () -> T) -> T {
+        // IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES = 3, IOPOL_MATERIALIZE_DATALESS_FILES_OFF = 1, _DEFAULT = 0
+        let kind: Int32 = 3
+        let scope = IOPOL_SCOPE_THREAD
+        let previous = getiopolicy_np(kind, scope)
+        guard previous >= 0 else { return body() }
+        setiopolicy_np(kind, scope, 1)
+        defer { setiopolicy_np(kind, scope, previous) }
+        return body()
+    }
+
+    /// The device a location is on; two items with different numbers lie on different
+    /// volumes, so a walk that must not cross a mount point compares them. The item itself is
+    /// looked at, not what a link points to. Nil when nothing is there.
+    public func deviceID(of url: URL) -> Int64? {
+        var st = stat()
+        guard lstat(url.path, &st) == 0 else { return nil }
+        return Int64(st.st_dev)
+    }
+
+    /// Whether the folder at `url` is where another volume is mounted (it is on another
+    /// device than the folder above it).
+    public func isMountPoint(_ url: URL) -> Bool {
+        guard let own = deviceID(of: url), let above = deviceID(of: url.deletingLastPathComponent()) else { return false }
+        return own != above || url.path == "/"
+    }
+}
+
+/// Stand-ins for what the system says about a volume, so that tests can put a volume that
+/// has stopped answering, or a disk of a known size, in the place of a real one. Set before
+/// the file system is used, never afterwards; nil everywhere in the program itself.
+struct LocalProbes {
+    /// Called with a path just before the system is asked about it in a way that can wait on
+    /// the volume: a test blocks here for the paths of its "dead" volume.
+    var willAsk: ((String) -> Void)?
+    /// Whether a path is on a disk of this Mac; nil (the closure or its answer) asks the
+    /// mount table.
+    var isLocal: ((String) -> Bool?)?
+    /// The free space of the volume at a path, plainly free and free for important uses;
+    /// nil asks the system.
+    var freeSpace: ((String) -> (available: Int64?, important: Int64?))?
+    /// How long a change on a volume that is not a disk of this Mac is waited for after it
+    /// was cancelled, in seconds, before the caller goes on without it.
+    var patienceAfterCancel: TimeInterval = 2
+    /// How long a question about a volume (its name, its free space) is waited for before it
+    /// is answered from what was last known.
+    var volumePatience: TimeInterval = 3
+}
+
+/// One call of the file system that changes something, and the system calls it is made of.
+/// Each system call that may wait on the volume goes through `run`: it can then be ended by
+/// `interruption` (from another thread, when the caller's flag is set), and none is begun
+/// once that has happened. What must be done whatever happens (putting a lock back) is
+/// called directly instead.
+final class LocalCall {
+    let interruption = Interruption()
+    private let willAsk: ((String) -> Void)?
+
+    init(_ probes: LocalProbes) {
+        willAsk = probes.willAsk
+    }
+
+    /// Runs one system call on `path` that returns a negative number and sets `errno` on
+    /// failure. Returns its result, with `errno` set on failure; throws `userCancelled` once
+    /// interrupted.
+    func run(_ path: String, _ call: () -> Int32) throws -> Int32 {
+        willAsk?(path)
+        return Int32(try interruption.run { Int(call()) })
+    }
+
+    /// The same for a call that must not be made a second time when a signal nobody sent
+    /// ends it early (a copy that has made its file already): the `EINTR` is the caller's.
+    func runOnce(_ path: String, _ call: () -> Int32) throws -> Int32 {
+        willAsk?(path)
+        guard interruption.begin() else { throw CocoaError(.userCancelled) }
+        let result = call()
+        let code = errno
+        interruption.end()
+        errno = code
+        return result
+    }
+}
+
+/// Changes on volumes that are not disks of this Mac (shares, automounted folders), for
+/// callers that hold a `CancellationFlag`.
+///
+/// A system call into a share whose server has gone can wait for as long as the system
+/// likes, and a signal ends it only where the volume was mounted to allow that. So such a
+/// change is made on a thread of the kernel's own while the caller waits for it: when the
+/// flag is set, the call is sent the signal, waited for for a moment more, and then left
+/// behind. The caller gets `userCancelled` and is free; the thread stays with the call until
+/// the system lets it go.
+///
+/// **What that means for the change:** a call that was left behind is not known to have
+/// failed. It makes no further system call once it comes back, but the one it was in may
+/// still take effect when the server answers again. Whoever cancels takes nothing for done
+/// and nothing for undone, as with any cancelled call.
+///
+/// A volume with several calls left behind is not asked again until one of them returns:
+/// further changes there fail at once (`ETIMEDOUT`), instead of costing a thread each.
+final class RemoteChanges {
+    static let shared = RemoteChanges()
+
+    /// The most calls on one volume that may be left behind at a time.
+    static let limit = 4
+
+    private let lock = NSLock()
+    /// Volume → the calls that were left behind and have not come back.
+    private var stranded: [String: Int] = [:]
+
+    func strandedCalls(on volume: String) -> Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return stranded[volume] ?? 0
+    }
+
+    /// Where the call's thread leaves its result, and learns that nobody waits for it.
+    private final class Outcome<Value> {
+        let lock = NSLock()
+        var result: Result<Value, Error>?
+        var isLeftBehind = false
+    }
+
+    func run<Value>(on volume: String, patience: TimeInterval, cancellation: CancellationFlag, _ call: LocalCall,
+                    _ body: @escaping (LocalCall) throws -> Value) throws -> Value {
+        lock.lock()
+        let isDead = (stranded[volume] ?? 0) >= RemoteChanges.limit
+        lock.unlock()
+        if isDead {
+            throw NSError(domain: NSPOSIXErrorDomain, code: Int(ETIMEDOUT),
+                          userInfo: [NSLocalizedDescriptionKey: "The volume at \(volume) does not answer."])
+        }
+        let box = Outcome<Value>()
+        let done = DispatchSemaphore(value: 0)
+        BlockingCalls.run { [self] in
+            let result = Result { try body(call) }
+            box.lock.lock()
+            box.result = result
+            let wasLeftBehind = box.isLeftBehind
+            box.lock.unlock()
+            if wasLeftBehind {
+                lock.lock()
+                if let count = stranded[volume] { stranded[volume] = count > 1 ? count - 1 : nil }
+                lock.unlock()
+            }
+            done.signal()
+        }
+        func finished() -> Result<Value, Error>? {
+            box.lock.lock()
+            defer { box.lock.unlock() }
+            return box.result
+        }
+        // Woken by the end of the call, or by the flag.
+        let registration = cancellation.onCancel { done.signal() }
+        defer { withExtendedLifetime(registration) {} }
+        done.wait()
+        if let result = finished() { return try result.get() }
+        // Cancelled. The call has been sent its signal; it gets a moment to come back.
+        call.interruption.interrupt()
+        _ = done.wait(timeout: .now() + patience)
+        box.lock.lock()
+        if let result = box.result {
+            box.lock.unlock()
+            return try result.get()
+        }
+        // Counted before the call can see that it was left behind, so that its return takes
+        // the count down again and never comes first.
+        box.isLeftBehind = true
+        lock.lock()
+        stranded[volume, default: 0] += 1
+        lock.unlock()
+        box.lock.unlock()
+        throw CocoaError(.userCancelled)
+    }
+}
+
+/// A value that several threads share, behind a lock.
+final class Locked<Value> {
+    private let lock = NSLock()
+    private var value: Value
+
+    init(_ value: Value) { self.value = value }
+
+    @discardableResult
+    func withValue<Result>(_ body: (inout Value) -> Result) -> Result {
+        lock.lock()
+        defer { lock.unlock() }
+        return body(&value)
+    }
+}
+
+/// The local file system's own clock: what has to happen "a moment later" whatever else the
+/// program is doing (the second signal to a call that is to be ended, giving up on a
+/// question nobody answers). Not the system's shared queues: when all their threads are
+/// taken by work that waits, nothing put on them runs, and these are the steps that free
+/// such threads. Nothing on this queue ever waits for anything.
+enum LocalClock {
+    static let queue = DispatchQueue(label: "AFM.LocalFileSystem.clock", qos: .userInitiated)
+}
