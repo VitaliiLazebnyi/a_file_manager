@@ -3,6 +3,7 @@ import Foundation
 
 /// A page of the Options window while it is open (spec 13 › The dialog framework): the values
 /// the user sees, which reach the settings only with Apply or OK. Main thread only.
+@MainActor
 final class PreferencePageModel {
     let page: PreferencePage
     private let settings: any SettingsStore
@@ -91,7 +92,7 @@ final class ConfigurationStore {
     private var userCommandPlaces: [String: Int]?
     private var cachedStartMenu: [StartMenuEntry]?
     /// Told, on the main thread, that stored data could not be read in full and was kept aside.
-    var onProblem: ((String) -> Void)?
+    var onProblem: (@MainActor @Sendable (String) -> Void)?
 
     init(settings: any SettingsStore) {
         self.settings = settings.scoped(to: Self.owner)
@@ -183,6 +184,7 @@ final class ConfigurationStore {
 ///
 /// The bar holds commands of the program only; a program with parameters goes on the bar as a
 /// user command, which is what Total Commander's `em_` commands are for.
+@MainActor
 final class ToolbarEditor {
     private let toolbar: ToolbarRegistry
     private let settings: any SettingsStore

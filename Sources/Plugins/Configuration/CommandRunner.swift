@@ -9,6 +9,7 @@ import Foundation
 ///
 /// A line for the shell never has a file name, a path or another value in its text: the
 /// values are handed to the shell as data and the line refers to them (`ShellLine.script`).
+@MainActor
 final class CommandRunner {
     private unowned let kernel: Kernel
     private let launchesApplications: Bool
@@ -47,7 +48,8 @@ final class CommandRunner {
     private var waiting = 0
     private let children = ChildTable()
 
-    /// What one run counts with everything it calls.
+    /// What one run counts with everything it calls. Main thread only.
+    @MainActor
     private final class Budget {
         var steps = 0
         var isSpent = false
@@ -82,7 +84,9 @@ final class CommandRunner {
     }
 
     /// Runs `work` away from the main thread and `completion` on it.
-    func offMain<Result>(_ work: @escaping () -> Result, then completion: @escaping (Result) -> Void) {
+    func offMain<Result: Sendable>(
+        _ work: @escaping @Sendable () -> Result, then completion: @escaping @MainActor @Sendable (Result) -> Void
+    ) {
         guard let background else {
             completion(work())
             return
@@ -94,7 +98,9 @@ final class CommandRunner {
     }
 
     /// The same for list files, which are handled in the order they were asked for.
-    private func onListQueue<Result>(_ work: @escaping () -> Result, then completion: @escaping (Result) -> Void) {
+    private func onListQueue<Result: Sendable>(
+        _ work: @escaping @Sendable () -> Result, then completion: @escaping @MainActor @Sendable (Result) -> Void
+    ) {
         guard let listQueue else {
             completion(work())
             return
@@ -135,7 +141,7 @@ final class CommandRunner {
 
     /// Removes the folders of earlier runs of the program that are no longer running. Folders
     /// are named by process number; another running instance keeps its own.
-    static func removeStaleListFolders(in parent: URL) {
+    nonisolated static func removeStaleListFolders(in parent: URL) {
         let fm = FileManager.default
         for url in (try? fm.contentsOfDirectory(at: parent, includingPropertiesForKeys: nil)) ?? [] {
             guard let pid = Int32(url.lastPathComponent) else { continue }
@@ -153,13 +159,15 @@ final class CommandRunner {
     /// A panel as the placeholders see it, and, when its marked names are many, how to gather
     /// them away from the main thread.
     private func snapshot(of panel: any PanelHandle, withSelection: Bool) -> (
-        snapshot: PanelSnapshot, gather: (() -> [String])?
+        snapshot: PanelSnapshot, gather: (@Sendable () -> [String])?
     ) {
         let model = panel.model
         // A branch view or a file list shows real files under display paths and relative
         // names; its items are given by their real paths, and the panel has no path of its own.
         let showsFiles = !model.directory.isFileURL && model.items.first?.url.isFileURL == true
-        func name(of item: FileItem) -> String { showsFiles && item.url.isFileURL ? item.url.path : item.name }
+        @Sendable func name(of item: FileItem) -> String {
+            showsFiles && item.url.isFileURL ? item.url.path : item.name
+        }
         var path =
             showsFiles
             ? "" : model.directory.isFileURL ? model.directory.path : kernel.fileSystems.displayPath(model.directory)
@@ -182,7 +190,7 @@ final class CommandRunner {
     /// from the main thread; `completion` is called on it either way.
     private func expand(
         _ template: [ExpandedPiece], arguments: [ExpandedPiece],
-        then completion: @escaping (ExpandedParameters) -> Void
+        then completion: @escaping @MainActor @Sendable (ExpandedParameters) -> Void
     ) {
         let panels = kernel.panels
         let needsSelection = ParameterExpander.usesSelection(template)
@@ -237,7 +245,7 @@ final class CommandRunner {
     /// for another reason than calling itself.
     func run(
         _ action: CommandAction, arguments: String = "", as name: String? = nil, title: String,
-        completion: (() -> Void)? = nil
+        completion: (@MainActor @Sendable () -> Void)? = nil
     ) {
         // Started from inside a running user command, this one is a call of that one.
         run(
@@ -247,7 +255,7 @@ final class CommandRunner {
 
     private func run(
         _ action: CommandAction, arguments: [ExpandedPiece], as name: String?, title: String, call: Call,
-        completion: (() -> Void)?
+        completion: (@MainActor @Sendable () -> Void)?
     ) {
         let title = DisplayText.oneLine(title, limit: 80)
         if let name, call.names.contains(name) {
@@ -287,7 +295,7 @@ final class CommandRunner {
     private func start(
         _ steps: [CommandStep], _ action: CommandAction, arguments: [ExpandedPiece], expanded: ExpandedParameters,
         as name: String?,
-        title: String, call: Call, completion: (() -> Void)?
+        title: String, call: Call, completion: (@MainActor @Sendable () -> Void)?
     ) {
         guard call.generation == generation else { return }
         var pieces = expanded.pieces
@@ -368,7 +376,9 @@ final class CommandRunner {
     /// Runs the steps in the written order. A `cm_wait` hands the rest to a timer, so the
     /// main thread never sleeps; so does a program that later steps have to wait for. The
     /// chain carries the names of the commands it is inside of through every such wait.
-    private func perform(_ steps: ArraySlice<CommandStep>, _ chain: Chain, then done: (() -> Void)? = nil) {
+    private func perform(
+        _ steps: ArraySlice<CommandStep>, _ chain: Chain, then done: (@MainActor @Sendable () -> Void)? = nil
+    ) {
         guard chain.call.generation == generation, !chain.call.budget.isSpent else { return }
         let outer = active
         active = chain.call.names
@@ -461,7 +471,9 @@ final class CommandRunner {
     /// the command-line history. `completion` is called on the main thread when the process
     /// has ended (with `waits` only), telling whether it could be started; a start that fails
     /// is reported. No thread waits for the process: its end is reported by the system.
-    private func launch(_ line: [ExpandedPiece], _ chain: Chain, waits: Bool, completion: @escaping (Bool) -> Void) {
+    private func launch(
+        _ line: [ExpandedPiece], _ chain: Chain, waits: Bool, completion: @escaping @MainActor @Sendable (Bool) -> Void
+    ) {
         let folder = chain.startPath.isEmpty ? nil : NSString(string: chain.startPath).expandingTildeInPath
         guard launchesApplications else {
             let text = ShellLine.display(line)
@@ -475,8 +487,8 @@ final class CommandRunner {
         )
         let program = DisplayText.oneLine(ShellWords.unquoted(ShellWords.firstWord(of: line).word), limit: 80)
         if waits { waiting += 1 }
-        let finished = { [weak self] (failure: String?) in
-            MainLoop.perform {
+        let finished: @Sendable (String?) -> Void = { [weak self] failure in
+            MainLoop.perform { [weak self] in
                 guard let self else { return }
                 self.removeListFile(listURL, after: grace)
                 if let failure {
@@ -526,7 +538,7 @@ final class CommandRunner {
     /// application) is opened with `open`. Nil for any other line. For a bare name the shell
     /// decides: a program of that name on the user's PATH, which only the login shell knows,
     /// comes first. Asks the disk: background only.
-    static func applicationLine(for line: [ExpandedPiece]) -> [ExpandedPiece]? {
+    nonisolated static func applicationLine(for line: [ExpandedPiece]) -> [ExpandedPiece]? {
         // The first word as a whole, also when it is quoted and has a space in it.
         let (word, rest) = ShellWords.firstWord(of: line)
         let first = ShellWords.unquoted(word)
@@ -554,11 +566,11 @@ final class CommandRunner {
     }
 
     /// The same for a line as text, as text; nil for a line that is no application.
-    static func applicationLine(for line: String) -> String? {
+    nonisolated static func applicationLine(for line: String) -> String? {
         applicationLine(for: [.text(line)]).map(ShellLine.display)
     }
 
-    private static let applicationFolders: [URL] = [
+    nonisolated private static let applicationFolders: [URL] = [
         "/Applications", "/System/Applications", "/System/Applications/Utilities", "/Applications/Utilities",
         NSHomeDirectory() + "/Applications"
     ].map { URL(fileURLWithPath: $0) }
@@ -569,8 +581,9 @@ final class CommandRunner {
 /// dialog started from inside a block of the main queue keeps every later block of the queue
 /// (directory pieces, progress) waiting until it is closed.
 enum MainLoop {
-    static func perform(_ block: @escaping () -> Void) {
-        RunLoop.main.perform(inModes: [.common], block: block)
+    static func perform(_ block: @escaping @MainActor @Sendable () -> Void) {
+        // The main run loop runs the block on the main thread.
+        RunLoop.main.perform(inModes: [.common]) { MainActor.assumeIsolated(block) }
         CFRunLoopWakeUp(CFRunLoopGetMain())
     }
 }

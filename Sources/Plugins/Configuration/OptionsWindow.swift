@@ -4,6 +4,7 @@ import AFMShell
 import AppKit
 
 /// A page of the Options window. What the user changes on it is pending until `commit`.
+@MainActor
 protocol OptionsPage: AnyObject {
     var title: String { get }
     var view: NSView { get }
@@ -17,12 +18,14 @@ protocol OptionsPage: AnyObject {
 }
 
 /// A list with a column of buttons to its right, the shape of the editors of spec 14.
+@MainActor
 private func editorView(_ list: NSView, buttons: [NSView], below: [NSView] = []) -> NSView {
     let column = filledStack(buttons + [spacer()], vertical: true, spacing: 6)
     column.setHuggingPriority(.required, for: .horizontal)
     return filledStack([filledStack([list, column], vertical: false, spacing: 10)] + below, vertical: true)
 }
 
+@MainActor
 private func note(_ text: String) -> NSTextField {
     let label = NSTextField(wrappingLabelWithString: text)
     label.textColor = .secondaryLabelColor

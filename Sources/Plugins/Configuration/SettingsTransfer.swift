@@ -12,7 +12,7 @@ struct SettingsSchema {
     /// What the plugin a key belongs to has said about it (`Kernel.settingsKeys`), nil for a
     /// key nobody declared. Asked before the names are looked at: a plugin knows what its
     /// key does, and a name gives it away only when it happens to hold the right word.
-    var declaredKind: (String) -> SettingsKeyKind? = { _ in nil }
+    var declaredKind: @Sendable (String) -> SettingsKeyKind? = { _ in nil }
 
     /// The corners of the settings the parts of the program keep their values in. A key of
     /// none of them is nobody's and is not imported.
@@ -113,7 +113,10 @@ struct SettingsSchema {
 }
 
 /// A settings file read, checked and made harmless, before anything of it is stored.
-struct CheckedSettings {
+///
+/// Unchecked: `objects` holds only JSON values (texts, numbers, lists and dictionaries, as
+/// `JSONSerialization` reads them), which nobody changes once the file is checked.
+struct CheckedSettings: @unchecked Sendable {
     /// The values that may be stored, as the JSON they are stored as.
     var values: [String: Data] = [:]
     /// The same as objects, for describing them.
