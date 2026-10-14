@@ -1,5 +1,6 @@
 import AFMContracts
 import AFMKernel
+import AppKit
 import Foundation
 
 /// Compare by content (spec 09 › Compare by content).

@@ -42,9 +42,9 @@ enum ImageFit: Int {
 /// viewer remembers by itself (wrap, text cursor, fonts, window size). They live in the
 /// settings store under `viewer.…`. Main thread only.
 final class ListerSettings {
-    private let store: SettingsStore
+    private let store: any SettingsStore
 
-    init(_ store: SettingsStore) {
+    init(_ store: any SettingsStore) {
         self.store = store
     }
 

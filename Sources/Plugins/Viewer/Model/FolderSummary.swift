@@ -31,7 +31,7 @@ struct FolderSummary: Equatable {
     /// `limit`, counting stops after that many entries, as it does for a tree on a server,
     /// where every folder is a trip; `isPartial` is then set.
     static func measure(
-        _ directory: URL, provider: FileSystemProvider, cancellation: CancellationFlag, limit: Int? = nil
+        _ directory: URL, provider: any FileSystemProvider, cancellation: CancellationFlag, limit: Int? = nil
     ) -> Self {
         let budget = limit.map { Budget($0) }
         var result = measure(directory, provider: provider, cancellation: cancellation, budget: budget)
@@ -68,7 +68,7 @@ struct FolderSummary: Equatable {
     }
 
     private static func measure(
-        _ directory: URL, provider: FileSystemProvider, cancellation: CancellationFlag, budget: Budget?
+        _ directory: URL, provider: any FileSystemProvider, cancellation: CancellationFlag, budget: Budget?
     ) -> Self {
         guard !cancellation.isCancelled, budget?.exhausted != true,
             let items = try? provider.list(directory, showHidden: true, cancellation: cancellation),

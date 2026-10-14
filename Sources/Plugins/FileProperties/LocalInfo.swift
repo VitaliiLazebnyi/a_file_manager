@@ -35,7 +35,7 @@ enum LocalInfo {
         Date(timeIntervalSince1970: TimeInterval(time.tv_sec) + TimeInterval(time.tv_nsec) / 1_000_000_000)
     }
 
-    static func posixError(_ code: Int32, _ url: URL) -> Error {
+    static func posixError(_ code: Int32, _ url: URL) -> any Error {
         NSError(
             domain: NSPOSIXErrorDomain, code: Int(code),
             userInfo: [NSLocalizedDescriptionKey: String(cString: strerror(code)) + ": " + url.path])

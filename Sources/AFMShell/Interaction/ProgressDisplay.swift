@@ -14,7 +14,7 @@ final class ProgressDisplay {
     private let content = ProgressContentView()
     /// The count shows what is left instead of what is done (toggled by a click on it).
     private var showsRemaining = false
-    private var observers: [NSObjectProtocol] = []
+    private var observers: [any NSObjectProtocol] = []
 
     init() {
         content.pauseButton.target = self

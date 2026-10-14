@@ -91,8 +91,8 @@ final class ProgressJobService: JobService {
     }
 
     @discardableResult
-    func run<Result>(title: String, work: @escaping (JobMonitor) -> Result, completion: @escaping (Result) -> Void)
-        -> JobHandle
+    func run<Result>(title: String, work: @escaping (any JobMonitor) -> Result, completion: @escaping (Result) -> Void)
+        -> any JobHandle
     {
         MainThread.assert("The job service")
         let job = QueuedJob(title: title)

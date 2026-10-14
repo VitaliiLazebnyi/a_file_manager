@@ -52,7 +52,7 @@ public final class SystemVolumeMounter: VolumeMounter {
         var cancel: (_ request: AnyObject) -> Void = { request in
             if let request = request as? Request { NetFSMountURLCancel(request.id) }
         }
-        var unmount: (_ volume: URL, _ answer: @escaping (Error?) -> Void) -> Void = { volume, answer in
+        var unmount: (_ volume: URL, _ answer: @escaping (any Error?) -> Void) -> Void = { volume, answer in
             FileManager.default.unmountVolume(at: volume, options: [.withoutUI], completionHandler: answer)
         }
     }
@@ -131,7 +131,7 @@ public final class SystemVolumeMounter: VolumeMounter {
 
     public func unmount(_ volume: URL) throws {
         let outcome = Outcome()
-        var failure: Error?
+        var failure: any Error?
         let lock = NSLock()
         calls.unmount(volume) { error in
             lock.lock()

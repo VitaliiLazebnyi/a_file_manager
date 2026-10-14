@@ -311,7 +311,7 @@ final class CommentStore {
         let url = directory.appending(name: DescriptIon.fileName)
         let provider = try fileSystems.provider(for: url)
         guard LocalInfo.canBeRead(url) else { throw CommentFileError.unreadable }
-        let reader: FileReader
+        let reader: any FileReader
         do {
             reader = try provider.read(url, cancellation: cancellation)
         } catch {

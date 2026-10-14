@@ -36,7 +36,7 @@ enum NetworkSettings {
     static let parallelChoices = ["1", "2", "3", "4", "6", "8"]
 
     /// Reads the preferences into the form the connections use. Main thread.
-    static func values(from settings: SettingsStore) -> NetworkOptions.Values {
+    static func values(from settings: any SettingsStore) -> NetworkOptions.Values {
         var values = NetworkOptions.Values()
         values.passiveByDefault = settings.flag(passiveMode, default: true)
         values.keepAliveInterval = max(0, TimeInterval(settings.text(keepAlive, default: "60")) ?? 60)
@@ -76,8 +76,8 @@ final class TypedAddresses: ServerConsentService {
 public final class NetworkPlugin: Plugin {
     public let name = "Network"
     private let launchesApplications: Bool
-    private let passwords: PasswordStore?
-    private let mounter: VolumeMounter?
+    private let passwords: any PasswordStore?
+    private let mounter: any VolumeMounter?
     private let sftpTransport: SFTPTransport?
     /// The live connections; tests look at them.
     public private(set) var center = ConnectionCenter()
@@ -92,7 +92,7 @@ public final class NetworkPlugin: Plugin {
     /// pass a password store of their own, so the Keychain is not touched. Without a store the
     /// Keychain is used when applications may be launched, and memory otherwise.
     public init(
-        launchesApplications: Bool = true, passwords: PasswordStore? = nil, mounter: VolumeMounter? = nil,
+        launchesApplications: Bool = true, passwords: any PasswordStore? = nil, mounter: any VolumeMounter? = nil,
         sftpTransport: SFTPTransport? = nil
     ) {
         self.launchesApplications = launchesApplications
@@ -146,7 +146,7 @@ public final class NetworkPlugin: Plugin {
         // "Connect to X?" about an address typed a moment ago.
         let consent = TypedAddresses(center: center)
         self.consent = consent
-        kernel.services.register(ServerConsentService.self, consent)
+        kernel.services.register((any ServerConsentService).self, consent)
 
         let mounter = self.mounter ?? (launchesApplications ? SystemVolumeMounter() : nil)
         let network = NetworkCommands(kernel: kernel, center: center, store: store, mounter: mounter)

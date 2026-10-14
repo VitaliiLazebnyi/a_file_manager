@@ -1,5 +1,6 @@
 import AFMContracts
 import AFMKernel
+import AppKit
 import Foundation
 
 /// Synchronize directories (spec 09 › Synchronize directories).

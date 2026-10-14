@@ -288,7 +288,7 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
         let hasResult = selectedResult != nil
         resultButtons.forEach { $0.isEnabled = hasResult }
         let hasItems = !isSearching && foundFiles + foundDirectories > 0
-        feedButton.isEnabled = hasItems && kernel.services.find(FileListService.self) != nil
+        feedButton.isEnabled = hasItems && kernel.services.find((any FileListService).self) != nil
         newSearchButton.isEnabled = !isSearching && !rows.isEmpty
         inFoundBox.isEnabled = hasItems
         if !hasItems { inFoundBox.state = .off }
@@ -645,7 +645,7 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
     /// The window closes and does not keep these results.
     @objc func feedToListbox() {
         let urls = resultURLs
-        guard !isSearching, !urls.isEmpty, let lists = kernel.services.find(FileListService.self) else { return }
+        guard !isSearching, !urls.isEmpty, let lists = kernel.services.find((any FileListService).self) else { return }
         let inNewTab = shiftIsDown
         close()
         let panel = kernel.panels.source

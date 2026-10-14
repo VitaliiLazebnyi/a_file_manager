@@ -92,7 +92,7 @@ final class InflateStream: ByteStream {
         case raw, gzip
     }
 
-    private let source: ByteStream
+    private let source: any ByteStream
     private let wrapping: Wrapping
     private let stream = UnsafeMutablePointer<z_stream>.allocate(capacity: 1)
     private let input = UnsafeMutablePointer<UInt8>.allocate(capacity: InflateStream.inputSize)
@@ -101,7 +101,7 @@ final class InflateStream: ByteStream {
     private var sourceEnded = false
     private let control: StreamInterrupt?
 
-    init(_ source: ByteStream, wrapping: Wrapping, control: StreamInterrupt? = nil) {
+    init(_ source: any ByteStream, wrapping: Wrapping, control: StreamInterrupt? = nil) {
         self.source = source
         self.wrapping = wrapping
         self.control = control
@@ -256,7 +256,7 @@ final class XZCoder {
 
 /// Decompresses an `.xz` file; several streams in a row are read as one.
 final class XZStream: ByteStream {
-    private let source: ByteStream
+    private let source: any ByteStream
     private let coder: XZCoder
     private var pending = Data()
     private var sourceEnded = false
@@ -266,7 +266,7 @@ final class XZStream: ByteStream {
     private var readyOffset = 0
     private let control: StreamInterrupt?
 
-    init(_ source: ByteStream, control: StreamInterrupt? = nil) throws {
+    init(_ source: any ByteStream, control: StreamInterrupt? = nil) throws {
         self.source = source
         self.control = control
         coder = try XZCoder(encoding: false)
@@ -561,7 +561,7 @@ enum CompressedSize {
 extension ArchiveFormat.Codec {
     /// Decompresses the local file at `url`.
     /// With a `control`, the stream ends with an error once the request is set.
-    func decompressing(_ file: RandomAccessFile, control: StreamInterrupt? = nil) throws -> ByteStream {
+    func decompressing(_ file: RandomAccessFile, control: StreamInterrupt? = nil) throws -> any ByteStream {
         switch self {
         case .gzip: return InflateStream(FileRangeStream(file), wrapping: .gzip, control: control)
         case .xz: return try XZStream(FileRangeStream(file), control: control)
@@ -652,7 +652,7 @@ final class ParallelCompressor {
         let method = self.method
         let lastIndex = pieces.count - 1
         let results = Parallel.map(Array(pieces.enumerated()), serialBelow: 2) {
-            index, piece -> Result<(Data, UInt32), Error> in
+            index, piece -> Result<(Data, UInt32), any Error> in
             Result {
                 switch method {
                 case .gzip(let level):

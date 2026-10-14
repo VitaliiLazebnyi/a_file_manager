@@ -183,11 +183,11 @@ public final class PlacesPlugin: Plugin {
 
     // MARK: Following the panels
 
-    private func side(of panel: PanelHandle, in kernel: Kernel) -> DirectoryHistoryTracker.Side {
+    private func side(of panel: any PanelHandle, in kernel: Kernel) -> DirectoryHistoryTracker.Side {
         panel === kernel.panels.right ? .right : .left
     }
 
-    private func noteLocation(of panel: PanelHandle, in kernel: Kernel) {
+    private func noteLocation(of panel: any PanelHandle, in kernel: Kernel) {
         let directory = panel.model.directory
         tracker?.visited(directory, on: side(of: panel, in: kernel))
         // A folder a panel shows exists: a cached tree that lacks it learns of it. The disks are

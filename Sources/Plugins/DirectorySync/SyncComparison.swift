@@ -347,7 +347,7 @@ public final class SyncComparison {
         progress: (Int) -> Void = { _ in }
     ) throws -> Bool? {
         if cancellation.isCancelled { return nil }
-        var readers: [FileReader] = []
+        var readers: [any FileReader] = []
         // A read blocked on a server ends as soon as the flag is set.
         var tokens: [AnyObject] = []
         defer {

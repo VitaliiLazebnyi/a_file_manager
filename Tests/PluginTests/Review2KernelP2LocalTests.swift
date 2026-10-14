@@ -18,7 +18,7 @@ private func waitUntil(seconds: TimeInterval = 60, _ condition: () -> Bool) -> B
 /// Runs `body` on a thread of its own and hands back what it returned or threw, when it is over.
 private final class Running<Value> {
     private let condition = NSCondition()
-    private var result: Result<Value, Error>?
+    private var result: Result<Value, any Error>?
 
     init(_ body: @escaping () throws -> Value) {
         Thread.detachNewThread { [self] in
@@ -37,7 +37,7 @@ private final class Running<Value> {
     }
 
     /// Nil when it did not end for a very long time: a hang, reported as a failure.
-    func wait(seconds: TimeInterval = 60) -> Result<Value, Error>? {
+    func wait(seconds: TimeInterval = 60) -> Result<Value, any Error>? {
         let end = Date(timeIntervalSinceNow: seconds)
         condition.lock()
         defer { condition.unlock() }
@@ -46,7 +46,7 @@ private final class Running<Value> {
     }
 }
 
-private func wasCancelled<Value>(_ result: Result<Value, Error>?) -> Bool {
+private func wasCancelled<Value>(_ result: Result<Value, any Error>?) -> Bool {
     guard case .failure(let error)? = result else { return false }
     return (error as? CocoaError)?.code == .userCancelled
 }
@@ -216,7 +216,7 @@ private final class DeadVolume {
         let inside = try FileManager.default.contentsOfDirectory(atPath: outside.path)
         #expect(!box.exists("elsewhere") && inside.isEmpty)
         // Through the protocol, with a flag.
-        let provider: FileSystemProvider = local
+        let provider: any FileSystemProvider = local
         try provider.createDirectory(at: box.url("c/new"), exclusive: true, cancellation: CancellationFlag())
         #expect(throws: FileSystemError.self) {
             try provider.createDirectory(at: box.url("c/new"), exclusive: true, cancellation: CancellationFlag())
@@ -436,7 +436,7 @@ private final class DeadVolume {
             // 1: looking at the item, 2: taking the lock off, 3: setting the date.
             if steps == 3 { flag.cancel() }
         }
-        var failure: Error?
+        var failure: (any Error)?
         do {
             try stopping.setAttributes(
                 FileAttributes(modified: Date(timeIntervalSince1970: 1_000_000), permissions: 0o644), of: file,
@@ -457,7 +457,7 @@ private final class DeadVolume {
         try data.write(to: source)
         let flag = CancellationFlag()
         var reports = 0
-        var failure: Error?
+        var failure: (any Error)?
         do {
             try local.copy(source, to: box.url("copy.bin"), cancellation: flag) { _ in
                 reports += 1

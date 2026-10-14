@@ -426,7 +426,7 @@ private func quarantine(of url: URL) -> String? {
         let changed = DispatchSemaphore(value: 0)
         bench.environment.contentsChanged = { _ in changed.signal() }
         // Opened outside the store, and no reference kept beyond the writer's.
-        var writer: FileWriter? = try OpenArchive(
+        var writer: (any FileWriter)? = try OpenArchive(
             archiveURL: archive, localURL: archive, fetchedCopy: nil, remoteStamp: nil,
             environment: bench.environment
         ).write("tree/kept.txt")

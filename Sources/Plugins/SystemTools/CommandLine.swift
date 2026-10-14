@@ -237,7 +237,7 @@ struct CommandHistory {
     static let limit = 20
     static let key = "history"
 
-    static func load(from settings: SettingsStore) -> [String] {
+    static func load(from settings: any SettingsStore) -> [String] {
         settings.value([String].self, forKey: key) ?? []
     }
 

@@ -102,8 +102,8 @@ final class FileTools {
     }
 
     private var source: PanelModel { kernel.panels.source.model }
-    private var ui: UserInteraction { kernel.ui }
-    private var settings: SettingsStore { kernel.settings }
+    private var ui: any UserInteraction { kernel.ui }
+    private var settings: any SettingsStore { kernel.settings }
     private var fileSystems: FileSystemRegistry { kernel.fileSystems }
 
     // MARK: Common
@@ -140,7 +140,7 @@ final class FileTools {
         let (fileSystems, ui) = (self.fileSystems, self.ui)
         kernel.jobs.run(
             title: job,
-            work: { monitor -> Result<Value, Error> in
+            work: { monitor -> Result<Value, any Error> in
                 let run = ToolRun(fileSystems: fileSystems, monitor: monitor) { url in
                     ui.pick(
                         "Overwrite:", detail: fileSystems.displayPath(url),
@@ -471,7 +471,7 @@ final class FileTools {
                 if verified.errors > 0, model.directory.isSameLocation(as: directory) {
                     model.setSelection(names: verified.failedNames)
                 }
-                if let viewer = kernel.services.find(ViewerService.self) {
+                if let viewer = kernel.services.find((any ViewerService).self) {
                     viewer.view(text: verified.text, title: verified.title)
                 } else {
                     _ = kernel.ui.form(

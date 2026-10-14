@@ -7,7 +7,7 @@ import AppKit
 /// has: the application menu, the standard editing actions and the Window menu.
 enum MenuBuilder {
     /// Menu items send this action along the responder chain; the main window answers it.
-    static let action = #selector(CommandResponder.performCommand(_:))
+    static let action = #selector((any CommandResponder).performCommand(_:))
 
     /// A command whose title is written `Sort ▸ By Name` appears as *By Name* in a submenu
     /// *Sort* of its menu. The submenu stands where its first command would have stood.
@@ -388,8 +388,10 @@ final class MenuKeys: NSObject, NSMenuDelegate {
         guard let action = item.action, let responder = NSApp.target(forAction: action, to: item.target, from: item)
         else { return false }
         let object = responder as AnyObject
-        if let validator = object as? NSMenuItemValidation { return validator.validateMenuItem(item) }
-        if let validator = object as? NSUserInterfaceValidations { return validator.validateUserInterfaceItem(item) }
+        if let validator = object as? (any NSMenuItemValidation) { return validator.validateMenuItem(item) }
+        if let validator = object as? (any NSUserInterfaceValidations) {
+            return validator.validateUserInterfaceItem(item)
+        }
         return true
     }
 }

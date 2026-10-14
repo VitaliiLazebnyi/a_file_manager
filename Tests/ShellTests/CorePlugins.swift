@@ -12,7 +12,7 @@ enum CorePlugins {
         "ClipboardPlugin", "SelectionPlugin", "ViewOptionsPlugin", "FolderTabsPlugin"
     ]
 
-    static func make() -> [Plugin] {
+    static func make() -> [any Plugin] {
         StandardPlugins.make(pasteboard: .withUniqueName(), launchesApplications: false)
             .filter { names.contains(String(describing: type(of: $0))) }
     }

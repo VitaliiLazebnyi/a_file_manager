@@ -736,7 +736,7 @@ private final class Collected<Value> {
             return path == scratch.deletingLastPathComponent().path ? 1 : 2
         }
         // (Not kept beyond its closing: a writer holds on to its temporary file.)
-        var writer: FileWriter? = try bench.zip.write(bench.inside(archive, "tree/large.bin"))
+        var writer: (any FileWriter)? = try bench.zip.write(bench.inside(archive, "tree/large.bin"))
         try writer?.write(Data(repeating: 7, count: 100_000))
         let folders = try FileManager.default.contentsOfDirectory(atPath: box.root.path).filter {
             $0.hasPrefix(".afm-spool-")

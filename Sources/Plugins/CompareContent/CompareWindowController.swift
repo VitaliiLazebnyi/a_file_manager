@@ -10,7 +10,7 @@ import AppKit
 final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTableViewDataSource, NSTableViewDelegate {
     private let session: CompareSession
     private let kernel: Kernel
-    private let settings: SettingsStore
+    private let settings: any SettingsStore
     private let onClose: (CompareWindowController) -> Void
 
     private let leftField = NSTextField()

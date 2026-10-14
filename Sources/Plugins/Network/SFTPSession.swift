@@ -85,7 +85,7 @@ final class SFTPSession: RemoteSession {
     private var isClosed = false
     private var isAsking = false
     private var home = "/"
-    private var declined: (error: Error, at: Date)?
+    private var declined: (error: any Error, at: Date)?
     private var mayConnect = false
     /// Set by `disconnect`: ends the waits of this session that have no flag of their own.
     fileprivate let closing = CancellationFlag()
@@ -219,7 +219,7 @@ final class SFTPSession: RemoteSession {
             }
             return question()
         }
-        func decline(_ error: Error) -> Error {
+        func decline(_ error: any Error) -> any Error {
             lock.lock()
             declined = (error, Date())
             lock.unlock()
@@ -558,7 +558,7 @@ final class SFTPSession: RemoteSession {
         }
     }
 
-    func openRead(_ path: String, cancellation: CancellationFlag?) throws -> FileReader {
+    func openRead(_ path: String, cancellation: CancellationFlag?) throws -> any FileReader {
         try perform(cancellation: cancellation) { channel in
             let handle = try openHandle(.open, on: channel, cancellation: cancellation) {
                 $0.string(path)
@@ -569,7 +569,7 @@ final class SFTPSession: RemoteSession {
         }
     }
 
-    func openWrite(_ path: String, cancellation: CancellationFlag?) throws -> FileWriter {
+    func openWrite(_ path: String, cancellation: CancellationFlag?) throws -> any FileWriter {
         try perform(cancellation: cancellation) { channel in
             // Write, create, and fail if the file exists.
             let handle = try openHandle(.open, on: channel, cancellation: cancellation) {
@@ -587,7 +587,7 @@ final class SFTPSession: RemoteSession {
     /// Opens the file for writing without creating or emptying it, cuts it to `offset` when it is
     /// longer (`fsetstat` with a size), and writes from there.
     func openAppend(_ path: String, at offset: Int64?, cancellation: CancellationFlag?) throws -> (
-        writer: FileWriter, size: Int64
+        writer: any FileWriter, size: Int64
     ) {
         try perform(cancellation: cancellation) { channel in
             let handle = try openHandle(.open, on: channel, cancellation: cancellation) {
@@ -880,7 +880,7 @@ private final class SFTPFileWriter: FileWriter {
     private var position: UInt64 = 0
     /// The requests whose answers are still to come, oldest first.
     private var outstanding: [Piece] = []
-    private var failure: Error?
+    private var failure: any Error?
     private var window = TransferWindow()
     private var depth = 4
     /// Set by `interrupt`; see `SFTPFileReader`.
@@ -903,7 +903,7 @@ private final class SFTPFileWriter: FileWriter {
     /// Records the first failure, gives up the requests under way, and has the server cut the
     /// file back to `firstUnconfirmed`. The cut is put in line behind the writes that are under
     /// way and is not waited for: the server may not be answering.
-    private func fail(_ error: Error, firstUnconfirmed: UInt64) {
+    private func fail(_ error: any Error, firstUnconfirmed: UInt64) {
         guard failure == nil else { return }
         failure = error
         outstanding.forEach { channel.abandon($0.ticket) }

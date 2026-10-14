@@ -91,7 +91,7 @@ struct HexFormat: Equatable {
 /// safe to call from several threads; nothing is meant for the main thread except the plain
 /// properties and the geometry functions, which touch no file.
 final class TextDocument {
-    let source: ByteSource
+    let source: any ByteSource
     let encoding: ViewerEncoding
     let layout: ViewerLayout
     /// The bytes that are shown: for text, everything after a byte-order mark.
@@ -119,7 +119,7 @@ final class TextDocument {
     /// `reusing` is a document of the same bytes laid out otherwise (another width): what is
     /// the same in both is not read again.
     init(
-        source: ByteSource, encoding: ViewerEncoding, bomLength: Int = 0, layout: ViewerLayout,
+        source: any ByteSource, encoding: ViewerEncoding, bomLength: Int = 0, layout: ViewerLayout,
         reusing previous: TextDocument? = nil
     ) {
         self.source = source
@@ -211,10 +211,10 @@ final class TextDocument {
     // MARK: Read errors
 
     private let errorLock = NSLock()
-    private var fetchFailure: Error?
+    private var fetchFailure: any Error?
 
     /// Keeps the first error met while reading rows (the index keeps its own).
-    func record(_ error: Error) {
+    func record(_ error: any Error) {
         errorLock.lock()
         if fetchFailure == nil { fetchFailure = error }
         errorLock.unlock()
@@ -222,7 +222,7 @@ final class TextDocument {
 
     /// The first error that kept a part of the file from being read, if any: what is shown
     /// is then incomplete.
-    var readError: Error? {
+    var readError: any Error? {
         errorLock.lock()
         defer { errorLock.unlock() }
         return index?.failure ?? fetchFailure

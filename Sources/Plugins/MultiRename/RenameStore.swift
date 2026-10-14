@@ -30,7 +30,7 @@ final class RenameStore {
     /// history of a big run is encoded on a background queue and handed to the settings from
     /// the main thread.
     private final class Memory {
-        weak var settings: SettingsStore?
+        weak var settings: any SettingsStore?
         var histories: [History: [String]] = [:]
         var saved: [String: RenameSettings]?
         var undo: [[RenamedItem]]?
@@ -38,7 +38,7 @@ final class RenameStore {
         var revision = 0
         var undoWrite = 0
 
-        init(_ settings: SettingsStore) {
+        init(_ settings: any SettingsStore) {
             self.settings = settings
         }
     }
@@ -49,7 +49,7 @@ final class RenameStore {
     private static let backgroundWriteThreshold = 2_000
     private static let writer = DispatchQueue(label: "multirename.store", qos: .utility)
 
-    private static func memory(for settings: SettingsStore) -> Memory {
+    private static func memory(for settings: any SettingsStore) -> Memory {
         memoriesLock.lock()
         defer { memoriesLock.unlock() }
         memories = memories.filter { $0.value.settings != nil }
@@ -59,11 +59,11 @@ final class RenameStore {
         return created
     }
 
-    private let all: SettingsStore
-    private let own: SettingsStore
+    private let all: any SettingsStore
+    private let own: any SettingsStore
     private let memory: Memory
 
-    init(settings: SettingsStore) {
+    init(settings: any SettingsStore) {
         all = settings
         own = settings.scoped(to: Self.scope)
         memory = Self.memory(for: settings)

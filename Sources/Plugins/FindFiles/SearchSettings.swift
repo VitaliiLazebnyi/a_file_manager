@@ -102,10 +102,10 @@ public final class SearchStore {
         case searchFor, searchIn, text
     }
 
-    private let settings: SettingsStore
+    private let settings: any SettingsStore
     private static let searchesKey = "searches"
 
-    public init(settings: SettingsStore) {
+    public init(settings: any SettingsStore) {
         self.settings = settings.scoped(to: "findFiles")
     }
 

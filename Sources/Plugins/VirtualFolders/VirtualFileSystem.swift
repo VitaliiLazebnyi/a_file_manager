@@ -254,7 +254,7 @@ public final class VirtualFileSystem: FileSystemProvider {
             var isLocal = true
             var parents: [URL] = []
             var parentKeys = Set<[UInt8]>()
-            var providers: [String: FileSystemProvider?] = [:]
+            var providers: [String: any FileSystemProvider?] = [:]
             for url in raw where list.isUnique || seen.insert(Self.identity(of: url)).inserted {
                 if !list.isUnique { entries.append(url) }
                 let scheme = url.scheme ?? "file"
@@ -486,7 +486,7 @@ public final class VirtualFileSystem: FileSystemProvider {
     // A location below a branch view has the path of a real location. Whatever is created in
     // a branch view (a new folder, a pasted file) therefore lands in the real directory.
 
-    private func real(_ url: URL) throws -> (provider: FileSystemProvider, url: URL) {
+    private func real(_ url: URL) throws -> (provider: any FileSystemProvider, url: URL) {
         switch VirtualLocation(url) {
         case .branch(let real), .picked(_, let real): return (try fileSystems.provider(for: real), real)
         case .list: throw FileSystemError.notSupported("Changing a list of files")
@@ -494,12 +494,12 @@ public final class VirtualFileSystem: FileSystemProvider {
         }
     }
 
-    public func read(_ url: URL) throws -> FileReader {
+    public func read(_ url: URL) throws -> any FileReader {
         let target = try real(url)
         return try target.provider.read(target.url)
     }
 
-    public func read(_ url: URL, cancellation: CancellationFlag) throws -> FileReader {
+    public func read(_ url: URL, cancellation: CancellationFlag) throws -> any FileReader {
         let target = try real(url)
         return try target.provider.read(target.url, cancellation: cancellation)
     }
@@ -509,17 +509,17 @@ public final class VirtualFileSystem: FileSystemProvider {
         try target.provider.createDirectory(at: target.url)
     }
 
-    public func write(_ url: URL) throws -> FileWriter {
+    public func write(_ url: URL) throws -> any FileWriter {
         let target = try real(url)
         return try target.provider.write(target.url)
     }
 
-    public func write(_ url: URL, cancellation: CancellationFlag) throws -> FileWriter {
+    public func write(_ url: URL, cancellation: CancellationFlag) throws -> any FileWriter {
         let target = try real(url)
         return try target.provider.write(target.url, cancellation: cancellation)
     }
 
-    public func append(to url: URL, at offset: Int64?, cancellation: CancellationFlag) throws -> FileWriter {
+    public func append(to url: URL, at offset: Int64?, cancellation: CancellationFlag) throws -> any FileWriter {
         let target = try real(url)
         return try target.provider.append(to: target.url, at: offset, cancellation: cancellation)
     }

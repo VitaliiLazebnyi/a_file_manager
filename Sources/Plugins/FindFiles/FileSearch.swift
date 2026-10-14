@@ -200,7 +200,7 @@ public final class FileSearch {
     public let cancellation = CancellationFlag()
     /// Why the search cannot run as asked (a text that is no hex string, a broken regular
     /// expression); `run` then finds nothing. Whoever starts a search shows it first.
-    public let problem: Error?
+    public let problem: any Error?
     private let fileSystems: FileSystemRegistry
     private let mask: SearchMask
     private let pattern: TextPattern?
@@ -238,7 +238,7 @@ public final class FileSearch {
             SearchField.all(fileSystems: fileSystems, columns: columns).map { ($0.id, $0) },
             uniquingKeysWith: { first, _ in first })
         fieldRules = query.fieldRules.prepared(trip: fieldTrip)
-        var problem: Error? = mask.isValid ? nil : TextPattern.Problem.badRegex(query.names)
+        var problem: any Error? = mask.isValid ? nil : TextPattern.Problem.badRegex(query.names)
         if problem == nil, let rule = query.fieldRules.unusableRule {
             problem = TextPattern.Problem.badRegex(rule.value)
         }
@@ -819,7 +819,7 @@ public final class FileSearch {
 
     /// Where the contents of an archive file are listed: the location another file system
     /// reads out of the file's own, if any does. Works on the text alone.
-    private func archiveRoot(of file: FileItem, in provider: FileSystemProvider) -> URL? {
+    private func archiveRoot(of file: FileItem, in provider: any FileSystemProvider) -> URL? {
         guard Self.archiveExtensions.contains(FileItem.split(file.name).ext.lowercased()) else { return nil }
         let notations = [provider.displayPath(file.url), file.url.absoluteString]
         for other in fileSystems.all where other !== provider {

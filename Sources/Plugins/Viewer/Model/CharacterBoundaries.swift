@@ -13,7 +13,7 @@ import Foundation
 /// `spacing` bytes is kept once found, so a search through a long run reads each part of it
 /// once. Safe to use from several threads.
 final class CharacterBoundaries {
-    private let source: ByteSource
+    private let source: any ByteSource
     private let content: Range<Int64>
     private let table: CodeTable
     private let spacing: Int64
@@ -22,7 +22,7 @@ final class CharacterBoundaries {
     private var known: [Int64: Int64] = [:]
     private let computing = NSLock()
 
-    init(source: ByteSource, content: Range<Int64>, encoding: ViewerEncoding, spacing: Int = 16 << 10) {
+    init(source: any ByteSource, content: Range<Int64>, encoding: ViewerEncoding, spacing: Int = 16 << 10) {
         self.source = source
         self.content = content
         table = CodeTable.table(for: encoding)

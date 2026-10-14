@@ -63,7 +63,7 @@ final class SystemVolumes: VolumeAccess {
         // goes as a whole, with its other volumes, so that it can be taken out.
         let options: FileManager.UnmountOptions = volume.isNetwork ? [] : [.allPartitionsAndEjectDisk]
         let done = DispatchSemaphore(value: 0)
-        var failure: Error?
+        var failure: any Error?
         FileManager.default.unmountVolume(at: url, options: options) { error in
             failure = error
             done.signal()
@@ -104,25 +104,25 @@ final class SystemVolumes: VolumeAccess {
 /// Main thread, except what runs inside the jobs.
 final class VolumeEjection {
     private let kernel: Kernel
-    private let access: VolumeAccess
+    private let access: any VolumeAccess
     private let home: () -> URL
     private let note: (String) -> Void
     /// How often, and how long apart, an eject that this program itself refused is tried again.
     static let ownRefusalRetries = 4
     static let retryDelay: TimeInterval = 0.5
 
-    init(kernel: Kernel, access: VolumeAccess, home: @escaping () -> URL, note: @escaping (String) -> Void) {
+    init(kernel: Kernel, access: any VolumeAccess, home: @escaping () -> URL, note: @escaping (String) -> Void) {
         self.kernel = kernel
         self.access = access
         self.home = home
         self.note = note
     }
 
-    private var ui: UserInteraction { kernel.ui }
+    private var ui: any UserInteraction { kernel.ui }
 
     /// A tab that left the drive, and where it went.
     private struct Departure {
-        weak var panel: PanelHandle?
+        weak var panel: any PanelHandle?
         weak var tab: PanelModel?
         let from: URL
         var to: URL
@@ -155,8 +155,8 @@ final class VolumeEjection {
         let fileSystems = kernel.fileSystems
         kernel.jobs.run(
             title: "Ejecting \(name):",
-            work: { monitor -> Result<Void, Error>? in
-                Self.ask("eject", of: volume, monitor) { () -> Result<Void, Error> in
+            work: { monitor -> Result<Void, any Error>? in
+                Self.ask("eject", of: volume, monitor) { () -> Result<Void, any Error> in
                     do {
                         try fileSystems.closeFiles(on: volume, cancellation: monitor.cancellation)
                     } catch {
@@ -271,7 +271,7 @@ final class VolumeEjection {
     /// Asks something of a volume from a job. A volume that has stopped answering may never
     /// return: the question then goes on alone, and the job ends, with nil, once cancelled.
     private static func ask<Answer>(
-        _ question: String, of url: URL, _ monitor: JobMonitor, _ work: @escaping () -> Answer
+        _ question: String, of url: URL, _ monitor: any JobMonitor, _ work: @escaping () -> Answer
     ) -> Answer? {
         BlockingCalls.answer(from: volumes, to: question + " " + url.path, cancellation: monitor.cancellation) { _ in
             work()

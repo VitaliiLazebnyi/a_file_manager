@@ -2,6 +2,7 @@ import AFMContracts
 import AFMKernel
 import AFMShell
 import AppKit
+import PDFKit
 
 /// One entry of the Lister's menus: what it is called, its keys, whether it applies right now
 /// and what it does. The menus and the keyboard are both driven by the same list, so a key
@@ -734,7 +735,7 @@ extension ViewerPane {
         let source = loaded.source
         kernel.jobs.run(
             title: "Save as",
-            work: { monitor -> Error? in
+            work: { monitor -> any Error? in
                 do {
                     try ViewerSave.save(source, to: target, cancellation: monitor.cancellation) { offset in
                         monitor.report(

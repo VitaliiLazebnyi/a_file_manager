@@ -110,9 +110,9 @@ final class WatchedFileSystem: FileSystemProvider {
     func volume(of url: URL) -> VolumeInfo? { inner.volume(of: url) }
     func item(at url: URL) -> FileItem? { inner.item(at: url) }
     func parent(of directory: URL) -> URL? { inner.parent(of: directory) }
-    func read(_ url: URL) throws -> FileReader { try inner.read(url) }
+    func read(_ url: URL) throws -> any FileReader { try inner.read(url) }
     func createDirectory(at url: URL) throws { try inner.createDirectory(at: url) }
-    func write(_ url: URL) throws -> FileWriter { try inner.write(url) }
+    func write(_ url: URL) throws -> any FileWriter { try inner.write(url) }
     func remove(_ url: URL) throws { try inner.remove(url) }
     func move(_ source: URL, to destination: URL, replacing: Bool) throws {
         try inner.move(source, to: destination, replacing: replacing)
@@ -153,7 +153,7 @@ final class Shared<Value>: @unchecked Sendable {
 /// the main thread, a folder that is merely read again disturbs nobody, and a job or a share
 /// that does not answer holds up only itself.
 extension Application {
-    func start(with extra: FileSystemProvider) async -> Running {
+    func start(with extra: any FileSystemProvider) async -> Running {
         let kernel = Kernel(productName: StandardPlugins.productName, settings: settings, ui: ui)
         kernel.fileSystems.register(memory)
         kernel.fileSystems.register(extra)

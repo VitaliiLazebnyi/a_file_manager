@@ -538,7 +538,7 @@ public final class TreeScanner {
     /// True when the last `run` ended because of `timeLimit` or `folderLimit`.
     public private(set) var reachedLimit = false
     private let root: URL
-    private let provider: FileSystemProvider
+    private let provider: any FileSystemProvider
     private let showHidden: Bool
     private let isExcluded: (URL) -> Bool
     /// How many folders are read before their results are handed over.
@@ -554,7 +554,7 @@ public final class TreeScanner {
     /// volumes mounted inside this one). Folders on the local disk that are a mount point
     /// themselves are left unread as well, whatever `isExcluded` says. It is called on several threads at once.
     public init(
-        root: URL, provider: FileSystemProvider, showHidden: Bool = false, batchSize: Int = 256,
+        root: URL, provider: any FileSystemProvider, showHidden: Bool = false, batchSize: Int = 256,
         isExcluded: @escaping (URL) -> Bool = { _ in false }
     ) {
         self.root = root

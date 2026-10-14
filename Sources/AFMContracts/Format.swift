@@ -14,7 +14,7 @@ public enum Format {
     private final class Dates {
         private let lock = NSLock()
         private var formatter: DateFormatter?
-        private var observers: [NSObjectProtocol] = []
+        private var observers: [any NSObjectProtocol] = []
 
         init() {
             let names = [NSLocale.currentLocaleDidChangeNotification, .NSSystemTimeZoneDidChange]

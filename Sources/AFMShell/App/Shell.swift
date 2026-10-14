@@ -13,8 +13,8 @@ public final class Shell: ShellServices {
     let layout: WindowLayout
     private(set) var mainWindow: MainWindowController!
 
-    public var panels: PanelSet { panelCoordinator }
-    public var jobs: JobService { jobService }
+    public var panels: any PanelSet { panelCoordinator }
+    public var jobs: any JobService { jobService }
 
     /// Call after the plugins are loaded: the panels need the file systems, the menus and the
     /// function-key bar the commands.
@@ -189,12 +189,12 @@ public final class Shell: ShellServices {
 /// Runs the program: a kernel, the given plugins, and the shell on top.
 public final class ShellApplication: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private let productName: String
-    private let plugins: [Plugin]
+    private let plugins: [any Plugin]
     private var kernel: Kernel?
     private var shell: Shell?
     private var settings: UserDefaultsSettings?
 
-    public init(productName: String, plugins: [Plugin]) {
+    public init(productName: String, plugins: [any Plugin]) {
         self.productName = productName
         self.plugins = plugins
     }

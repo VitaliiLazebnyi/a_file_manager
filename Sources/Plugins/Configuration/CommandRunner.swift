@@ -152,7 +152,7 @@ final class CommandRunner {
 
     /// A panel as the placeholders see it, and, when its marked names are many, how to gather
     /// them away from the main thread.
-    private func snapshot(of panel: PanelHandle, withSelection: Bool) -> (
+    private func snapshot(of panel: any PanelHandle, withSelection: Bool) -> (
         snapshot: PanelSnapshot, gather: (() -> [String])?
     ) {
         let model = panel.model

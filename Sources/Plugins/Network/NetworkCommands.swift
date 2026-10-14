@@ -13,12 +13,12 @@ final class NetworkCommands {
     private let kernel: Kernel
     private let center: ConnectionCenter
     private let store: ConnectionStore
-    private let mounter: VolumeMounter?
+    private let mounter: any VolumeMounter?
     /// Where each panel was before it showed a server, to return there on Disconnect.
     private var lastLocal: [ObjectIdentifier: URL] = [:]
     private var panelSubscription: AnyObject?
 
-    init(kernel: Kernel, center: ConnectionCenter, store: ConnectionStore, mounter: VolumeMounter?) {
+    init(kernel: Kernel, center: ConnectionCenter, store: ConnectionStore, mounter: any VolumeMounter?) {
         self.kernel = kernel
         self.center = center
         self.store = store
@@ -29,8 +29,8 @@ final class NetworkCommands {
         }
     }
 
-    private var ui: UserInteraction { kernel.ui }
-    private var source: PanelHandle { kernel.panels.source }
+    private var ui: any UserInteraction { kernel.ui }
+    private var source: any PanelHandle { kernel.panels.source }
     var canEject: Bool { mounter != nil }
 
     // MARK: Questions asked by connections
@@ -215,7 +215,7 @@ final class NetworkCommands {
         if !center.isConnected(key) { center.announce(profile, chosen: true) }
         kernel.jobs.run(
             title: "Connect to \(profile.title)",
-            work: { monitor -> Result<String, Error> in
+            work: { monitor -> Result<String, any Error> in
                 monitor.report(
                     JobProgress(
                         lines: [
@@ -560,7 +560,7 @@ final class NetworkCommands {
         let targetDirectory = kernel.panels.target.model.directory
         kernel.jobs.run(
             title: "Download list:",
-            work: { monitor -> Result<Int, Error> in
+            work: { monitor -> Result<Int, any Error> in
                 Result {
                     var text =
                         FileManager.default.fileExists(atPath: list.path) ? try Self.readList(list) : ""
@@ -610,7 +610,7 @@ final class NetworkCommands {
     /// before the user has seen what the list would do and agreed (`ListPlan.preview`).
     func downloadFromList() {
         guard let list = askForList("File name of download list:") else { return }
-        guard let transfers = kernel.services.find(FileTransferService.self) else {
+        guard let transfers = kernel.services.find((any FileTransferService).self) else {
             ui.inform("Copying files is not available.", detail: "", style: .warning)
             return
         }
@@ -847,14 +847,14 @@ struct ListPlan {
 private final class ListRun {
     private var items: ArraySlice<ListPlan.Item>
     private let kernel: Kernel
-    private let transfers: FileTransferService
+    private let transfers: any FileTransferService
     private var skipped: [String]
     /// A completion that comes back at once does not call into the next line from inside
     /// this one: with many lines that would be a call inside a call for each of them.
     private var isStepping = false
     private var stepsAgain = false
 
-    init(plan: ListPlan, kernel: Kernel, transfers: FileTransferService) {
+    init(plan: ListPlan, kernel: Kernel, transfers: any FileTransferService) {
         items = plan.items[...]
         skipped = plan.skipped
         self.kernel = kernel
@@ -906,7 +906,7 @@ private final class ListRun {
         let fileSystems = kernel.fileSystems
         kernel.jobs.run(
             title: "Renaming:",
-            work: { _ -> Error? in
+            work: { _ -> any Error? in
                 do {
                     try fileSystems.provider(for: arrived).move(arrived, to: to, replacing: replacing)
                     return nil

@@ -28,7 +28,7 @@ public enum StandardPlugins {
 
     /// The order decides where entries appear inside a menu section; nothing else depends on it.
     /// Tests pass a pasteboard of their own and keep other applications from being started.
-    public static func make(pasteboard: NSPasteboard = .general, launchesApplications: Bool = true) -> [Plugin] {
+    public static func make(pasteboard: NSPasteboard = .general, launchesApplications: Bool = true) -> [any Plugin] {
         [
             LocalFileSystemPlugin(),
             ArchivesPlugin(launchesApplications: launchesApplications),

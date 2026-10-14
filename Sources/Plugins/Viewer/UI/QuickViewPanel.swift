@@ -12,10 +12,10 @@ import AppKit
 final class QuickViewPanel {
     let pane: ViewerPane
     /// The panel whose list is covered.
-    private(set) weak var covered: PanelHandle?
+    private(set) weak var covered: any PanelHandle?
     /// The panel whose cursor is followed.
-    private(set) weak var followed: PanelHandle?
-    private weak var host: PanelOverlayHost?
+    private(set) weak var followed: any PanelHandle?
+    private weak var host: any PanelOverlayHost?
     private let container = NSView()
     private let header = NSTextField(labelWithString: "")
     private var follower: CursorFollower?
@@ -27,9 +27,9 @@ final class QuickViewPanel {
     private(set) var shownItem: FileItem?
 
     init(
-        kernel: Kernel, settings: ListerSettings, temporaryCopies: TemporaryCopies, host: PanelOverlayHost,
-        covering covered: PanelHandle,
-        following followed: PanelHandle, internalOnly: Bool, delay: TimeInterval, onDismiss: @escaping () -> Void
+        kernel: Kernel, settings: ListerSettings, temporaryCopies: TemporaryCopies, host: any PanelOverlayHost,
+        covering covered: any PanelHandle,
+        following followed: any PanelHandle, internalOnly: Bool, delay: TimeInterval, onDismiss: @escaping () -> Void
     ) {
         self.kernel = kernel
         self.host = host

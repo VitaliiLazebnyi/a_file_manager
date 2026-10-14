@@ -66,7 +66,7 @@ private final class Record<Value>: @unchecked Sendable {
         try stalled.box.file("srv/f.bin", "zzzz")
         var abandoned: [AdoptOutcome] = []
         for _ in 0..<8 {
-            var reader: FileReader? = try stalled.fileSystem.read(stalled.url("/f.bin"))
+            var reader: (any FileReader)? = try stalled.fileSystem.read(stalled.url("/f.bin"))
             let pending = reader
             abandoned.append(AdoptOutcome { _ = try pending?.read(upToCount: 10) })
             #expect(adoptWait(120) { stalled.server.commands.filter { $0.hasPrefix("RETR") }.count == abandoned.count })
@@ -509,7 +509,7 @@ private final class Record<Value>: @unchecked Sendable {
     }
 
     @Test func anEjectThatIsNeverAnsweredIsGivenUpAfterItsTime() throws {
-        let answers = Record<(Error?) -> Void>()
+        let answers = Record<((any Error)?) -> Void>()
         var calls = SystemVolumeMounter.Calls()
         calls.unmount = { _, answer in answers.add(answer) }
         // The time is the mounter's own, shortened here; the real one is a minute.

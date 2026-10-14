@@ -157,7 +157,7 @@ struct PackOptions {
 struct PackResult {
     /// The archives that were written.
     var archives: [URL] = []
-    var failure: Error?
+    var failure: any Error?
     var cancelled = false
     /// The operands that were packed completely.
     var completed: [URL] = []
@@ -177,7 +177,7 @@ final class Packer {
 
     private let fileSystems: FileSystemRegistry
     private let store: ArchiveStore
-    private let monitor: JobMonitor
+    private let monitor: any JobMonitor
     private let options: PackOptions
     private var done = (items: 0, bytes: Int64(0))
     private var total = (items: 0, bytes: Int64(0))
@@ -189,7 +189,7 @@ final class Packer {
     /// false cancels. Called on the job's thread.
     var confirmReplace: ((URL) -> Bool)?
 
-    init(fileSystems: FileSystemRegistry, store: ArchiveStore, monitor: JobMonitor, options: PackOptions) {
+    init(fileSystems: FileSystemRegistry, store: ArchiveStore, monitor: any JobMonitor, options: PackOptions) {
         self.fileSystems = fileSystems
         self.store = store
         self.monitor = monitor

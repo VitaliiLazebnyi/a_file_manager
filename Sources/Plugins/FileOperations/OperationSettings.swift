@@ -88,7 +88,7 @@ enum OperationSettings {
     }
 
     /// The options of a job as the configuration has them.
-    static func options(from settings: SettingsStore) -> TransferOptions {
+    static func options(from settings: any SettingsStore) -> TransferOptions {
         var options = TransferOptions()
         options.overwrite = OverwriteMode(rawValue: settings.index(overwrite, default: 0)) ?? .ask
         options.preservesAttributes = settings.flag(attributes, default: true)
@@ -105,7 +105,7 @@ enum OperationSettings {
         return options
     }
 
-    static func logConfiguration(from settings: SettingsStore) -> OperationLog.Configuration {
+    static func logConfiguration(from settings: any SettingsStore) -> OperationLog.Configuration {
         var configuration = OperationLog.Configuration()
         configuration.isEnabled = settings.flag(logEnabled, default: false)
         let path = settings.text(logFile, default: defaultLogFile).trimmingCharacters(in: .whitespaces)

@@ -28,7 +28,7 @@ private final class FakeMounter: VolumeMounter {
     var mounted: [URL] = []
     var ejected: [URL] = []
     var mountPoint = URL(fileURLWithPath: "/")
-    var failure: Error?
+    var failure: (any Error)?
 
     func mount(_ url: URL) throws -> [URL] {
         if let failure { throw failure }
@@ -264,7 +264,7 @@ private final class FakeMounter: VolumeMounter {
             return true
         }
         // The plugin offers the service whoever takes a location from the keyboard calls.
-        let consent = try #require(bench.kernel.services.find(ServerConsentService.self))
+        let consent = try #require(bench.kernel.services.find((any ServerConsentService).self))
         consent.userChose(url("/pub/sub"))
         commands.perform(.changeDirectory, .text("ftp://\(address)/pub/sub"))
         #expect(asked.isEmpty)

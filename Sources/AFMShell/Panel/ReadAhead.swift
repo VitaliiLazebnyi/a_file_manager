@@ -57,7 +57,7 @@ final class ReadAhead {
         }
     }
 
-    typealias Outcome = Result<PanelLoading.Whole, Error>
+    typealias Outcome = Result<PanelLoading.Whole, any Error>
 
     /// A reading a panel has taken over (`join`).
     struct Joined {

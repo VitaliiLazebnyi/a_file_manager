@@ -118,10 +118,10 @@ import UniformTypeIdentifiers
     // MARK: A sequential scan reads a giant line once (V069)
 
     private final class CountingSource: ByteSource {
-        let base: ByteSource
+        let base: any ByteSource
         private let lock = NSLock()
         private var total: Int64 = 0
-        init(_ base: ByteSource) { self.base = base }
+        init(_ base: any ByteSource) { self.base = base }
         var length: Int64 { base.length }
         var bytesRead: Int64 {
             lock.lock()
@@ -577,12 +577,12 @@ import UniformTypeIdentifiers
         func list(_: URL, showHidden _: Bool) -> [FileItem] { [] }
         func parent(of _: URL) -> URL? { nil }
         func createDirectory(at _: URL) {}
-        func write(_: URL) throws -> FileWriter { throw FileSystemError.notSupported("x") }
+        func write(_: URL) throws -> any FileWriter { throw FileSystemError.notSupported("x") }
         func remove(_: URL) {}
         func move(_: URL, to _: URL, replacing _: Bool) {}
         func copy(_: URL, to _: URL, progress _: (Int64) -> Bool) {}
         func item(at _: URL) -> FileItem? { entry }
-        func read(_: URL) throws -> FileReader {
+        func read(_: URL) throws -> any FileReader {
             throw FileSystemError.notSupported("a link whose target size is known is not read to be measured")
         }
     }
@@ -649,7 +649,7 @@ import UniformTypeIdentifiers
         try FileManager.default.removeItem(at: url)
         #expect(mkfifo(url.path, 0o600) == 0)
         let done = DispatchSemaphore(value: 0)
-        let outcome = Locked<Result<Data, Error>?>(nil)
+        let outcome = Locked<Result<Data, any Error>?>(nil)
         let thread = Thread {
             outcome.withValue { $0 = Result { try source.read(at: 0, count: 10) } }
             done.signal()

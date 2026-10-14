@@ -38,7 +38,7 @@ public final class SystemToolsPlugin: Plugin {
     public static let recordHistoryKey = "systemTools.recordHistory"
 
     private let launchesApplications: Bool
-    private let volumes: VolumeAccess?
+    private let volumes: any VolumeAccess?
     private var tools: SystemTools?
 
     /// What the plugin started or, where tests keep it from acting, would have started:
@@ -50,7 +50,7 @@ public final class SystemToolsPlugin: Plugin {
     /// only harmless lines such as `echo` are really run (by `/bin/sh`, without the user's
     /// profile); nothing is printed, opened, renamed, ejected or quit. `volumes` stands in for
     /// the volumes of the Mac when a test ejects one.
-    public init(launchesApplications: Bool = true, volumes: VolumeAccess? = nil) {
+    public init(launchesApplications: Bool = true, volumes: any VolumeAccess? = nil) {
         self.launchesApplications = launchesApplications
         self.volumes = volumes
     }
@@ -194,7 +194,7 @@ final class SystemTools {
 
     private var ejection: VolumeEjection!
 
-    init(_ kernel: Kernel, launchesApplications: Bool, volumes: VolumeAccess? = nil) {
+    init(_ kernel: Kernel, launchesApplications: Bool, volumes: any VolumeAccess? = nil) {
         self.kernel = kernel
         self.launchesApplications = launchesApplications
         let access = volumes ?? (launchesApplications ? SystemVolumes() : RecordedEjects())
@@ -203,9 +203,9 @@ final class SystemTools {
             note: { [unowned self] in note($0) })
     }
 
-    private var ui: UserInteraction { kernel.ui }
+    private var ui: any UserInteraction { kernel.ui }
     private var model: PanelModel { kernel.panels.source.model }
-    private var settings: SettingsStore { kernel.settings }
+    private var settings: any SettingsStore { kernel.settings }
     private var home: URL { FileManager.default.homeDirectoryForCurrentUser }
 
     // MARK: Command line
@@ -353,7 +353,7 @@ final class SystemTools {
     }
 
     private func show(text: String, title: String) {
-        if let viewer = kernel.services.find(ViewerService.self) {
+        if let viewer = kernel.services.find((any ViewerService).self) {
             viewer.view(text: text, title: title)
         } else {
             _ = ui.form(title, detail: "", fields: [.lines("output", "", text)], buttons: ["OK"])
@@ -442,7 +442,7 @@ final class SystemTools {
     /// of the kernel's, and the job ends, with nil, as soon as it is cancelled, so the
     /// commands of the program are not held up by it.
     private static func ask<Answer>(
-        _ question: String, of url: URL, _ monitor: JobMonitor, _ work: @escaping () -> Answer
+        _ question: String, of url: URL, _ monitor: any JobMonitor, _ work: @escaping () -> Answer
     ) -> Answer? {
         BlockingCalls.answer(from: volumes, to: question + " " + url.path, cancellation: monitor.cancellation) { _ in
             work()
@@ -481,8 +481,8 @@ final class SystemTools {
                 }
                 kernel.jobs.run(
                     title: "Renaming volume:",
-                    work: { monitor -> Error?? in
-                        Self.ask("rename to \(name)", of: volume, monitor) { () -> Error? in
+                    work: { monitor -> any Error?? in
+                        Self.ask("rename to \(name)", of: volume, monitor) { () -> any Error? in
                             do {
                                 try (volume as NSURL).setResourceValue(name, forKey: .volumeNameKey)
                                 return nil
@@ -536,7 +536,7 @@ final class SystemTools {
         let operands = model.operandsSnapshot()
         let marked = operands.markedCount
         let count = marked > 0 ? marked : (operands.cursorItem != nil ? 1 : operands.shownItems.count)
-        let gather: (JobMonitor) -> [FileItem] = { _ in
+        let gather: (any JobMonitor) -> [FileItem] = { _ in
             marked > 0 || operands.cursorItem != nil ? operands.items() : operands.shownItems
         }
         var depth = 0
@@ -599,7 +599,7 @@ final class SystemTools {
         let showHidden = model.showHidden
         kernel.jobs.run(
             title: "Reading file list:",
-            work: { monitor -> (pages: [[String]], longest: Int, text: String, error: Error?, cancelled: Bool) in
+            work: { monitor -> (pages: [[String]], longest: Int, text: String, error: any Error?, cancelled: Bool) in
                 let items = gather(monitor)
                 let rows =
                     withSubfolders

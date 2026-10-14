@@ -26,7 +26,7 @@ extension CommandID {
 /// reads files runs in the background (see `ViewerPane`).
 public final class ViewerPlugin: Plugin, ViewerService {
     public let name = "Viewer"
-    private let overlayHost: (PanelHandle) -> PanelOverlayHost?
+    private let overlayHost: (any PanelHandle) -> any PanelOverlayHost?
     private let quickViewDelay: TimeInterval
     private let showsWindows: Bool
     private var kernel: Kernel?
@@ -40,7 +40,7 @@ public final class ViewerPlugin: Plugin, ViewerService {
     /// loads a file; with `showsWindows` off, Lister windows are created but not put on
     /// screen (for tests).
     public init(
-        overlayHost: @escaping (PanelHandle) -> PanelOverlayHost? = { $0 as? PanelOverlayHost },
+        overlayHost: @escaping (any PanelHandle) -> any PanelOverlayHost? = { $0 as? (any PanelOverlayHost) },
         quickViewDelay: TimeInterval = 0.12,
         showsWindows: Bool = true
     ) {
@@ -138,7 +138,7 @@ public final class ViewerPlugin: Plugin, ViewerService {
         kernel.toolbar.setSymbol("macwindow.on.rectangle", for: .separateQuickView)
         kernel.toolbar.setSymbol("gearshape", for: .configureLister)
         kernel.preferences.add(ListerSettings.preferencePage { [weak self] in self?.settingsChanged() })
-        kernel.services.register(ViewerService.self, self)
+        kernel.services.register((any ViewerService).self, self)
     }
 
     public func stop() {

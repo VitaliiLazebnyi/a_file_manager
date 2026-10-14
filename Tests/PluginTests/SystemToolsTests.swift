@@ -13,7 +13,7 @@ private final class RecordingViewer: Plugin, ViewerService {
     let name = "Recording viewer"
     var texts: [(text: String, title: String)] = []
 
-    func start(in kernel: Kernel) { kernel.services.register(ViewerService.self, self) }
+    func start(in kernel: Kernel) { kernel.services.register((any ViewerService).self, self) }
     func view(_: URL) {}
     func view(text: String, title: String) { texts.append((text, title)) }
 }

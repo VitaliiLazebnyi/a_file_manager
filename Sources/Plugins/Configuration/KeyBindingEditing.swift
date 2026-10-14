@@ -117,7 +117,7 @@ final class KeyBindingEditor {
     /// Gives a key to a command the way the editors do: when another command has it, the user
     /// is told which one and decides. Returns false when the key stayed where it was.
     @discardableResult
-    func assign(_ shortcut: Shortcut, to command: CommandID, adding: Bool, asking ui: UserInteraction) -> Bool {
+    func assign(_ shortcut: Shortcut, to command: CommandID, adding: Bool, asking ui: any UserInteraction) -> Bool {
         if let owner = owner(of: shortcut), owner != command {
             let title = commands.first { $0.id == owner }?.title ?? owner.rawValue
             let answer = ui.choose(
@@ -148,7 +148,7 @@ final class KeyBindingEditor {
 
     /// Stores the bindings and applies them to the running program: every command is given
     /// its final keys, so the state is the one the next start arrives at.
-    func commit(to settings: SettingsStore, keyBindings: KeyBindings) {
+    func commit(to settings: any SettingsStore, keyBindings: KeyBindings) {
         if overrides.isEmpty {
             settings.set(nil as Data?, forKey: KeyBindings.settingsKey)
         } else {

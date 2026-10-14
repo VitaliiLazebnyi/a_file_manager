@@ -165,8 +165,8 @@ final class PropertyActions {
         self.showFinderInfo = showFinderInfo
     }
 
-    private var source: PanelHandle { kernel.panels.source }
-    private var ui: UserInteraction { kernel.ui }
+    private var source: any PanelHandle { kernel.panels.source }
+    private var ui: any UserInteraction { kernel.ui }
     private var fileSystems: FileSystemRegistry { kernel.fileSystems }
 
     /// The folders whose listings an operation on `items` may have changed. Grows with the
@@ -495,7 +495,7 @@ final class PropertyActions {
         let hidden = kernel.settings.flag(FilePropertiesPlugin.Settings.hideCommentFile, default: true)
         kernel.jobs.run(
             title: "Saving comment:",
-            work: { monitor -> Error? in
+            work: { monitor -> any Error? in
                 do {
                     try comments.setComment(
                         comment, for: name, in: folder, hidden: hidden, cancellation: monitor.cancellation)

@@ -29,8 +29,8 @@ final class IntegrationHookedMemory: FileSystemProvider {
     }
     func item(at url: URL) -> FileItem? { base.item(at: url) }
     func parent(of directory: URL) -> URL? { base.parent(of: directory) }
-    func read(_ url: URL) throws -> FileReader { try base.read(url) }
-    func write(_ url: URL) throws -> FileWriter { try base.write(url) }
+    func read(_ url: URL) throws -> any FileReader { try base.read(url) }
+    func write(_ url: URL) throws -> any FileWriter { try base.write(url) }
     func remove(_ url: URL) throws { try base.remove(url) }
     func move(_ source: URL, to destination: URL, replacing: Bool) throws {
         try base.move(source, to: destination, replacing: replacing)

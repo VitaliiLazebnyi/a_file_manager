@@ -502,7 +502,7 @@ final class OptionsWindowController: NSWindowController, NSWindowDelegate {
         case first, keyboard, buttonBar, startMenu, settingsFile
     }
 
-    private let pages: [OptionsPage]
+    private let pages: [any OptionsPage]
     private let firstOwnPage: Int
     private let pageList = RowsTable(columns: [("", 150)])
     private let caption = NSTextField(labelWithString: "")
@@ -510,7 +510,7 @@ final class OptionsWindowController: NSWindowController, NSWindowDelegate {
     private var applyButton = NSButton()
 
     init(center: ConfigurationCenter) {
-        let registered: [OptionsPage] = center.kernel.preferences.pages.filter { !$0.preferences.isEmpty }.map {
+        let registered: [any OptionsPage] = center.kernel.preferences.pages.filter { !$0.preferences.isEmpty }.map {
             PreferencesPage(model: PreferencePageModel(page: $0, settings: center.kernel.settings))
         }
         firstOwnPage = registered.count

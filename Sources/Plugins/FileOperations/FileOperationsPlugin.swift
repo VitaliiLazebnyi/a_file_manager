@@ -181,7 +181,7 @@ public final class FileOperationsPlugin: Plugin {
         kernel.preferences.add(OperationSettings.copyDeletePage)
         kernel.preferences.add(OperationSettings.logPage)
 
-        kernel.services.register(FileTransferService.self, operations)
+        kernel.services.register((any FileTransferService).self, operations)
     }
 }
 
@@ -231,9 +231,9 @@ final class FileOperations: FileTransferService {
         self.kernel = kernel
     }
 
-    private var source: PanelHandle { kernel.panels.source }
-    private var target: PanelHandle { kernel.panels.target }
-    private var ui: UserInteraction { kernel.ui }
+    private var source: any PanelHandle { kernel.panels.source }
+    private var target: any PanelHandle { kernel.panels.target }
+    private var ui: any UserInteraction { kernel.ui }
     private var fileSystems: FileSystemRegistry { kernel.fileSystems }
 
     // MARK: Jobs
@@ -661,11 +661,11 @@ final class FileOperations: FileTransferService {
     /// error, if any.
     private func change(
         _ title: String, _ work: @escaping (CancellationFlag) throws -> Void,
-        then completion: @escaping (Error?) -> Void
+        then completion: @escaping (any Error?) -> Void
     ) {
         kernel.jobs.run(
             title: title,
-            work: { monitor -> Error? in
+            work: { monitor -> any Error? in
                 do {
                     try work(monitor.cancellation)
                     return nil
@@ -796,7 +796,7 @@ final class FileOperations: FileTransferService {
 
     /// What the placeholders of a new name refer to (spec 18 › Rename and new-folder
     /// placeholders): the item under the cursor, the folder, the moment the dialog opened.
-    private func nameContext(for panel: PanelHandle, typed _: String, openedAt: Date) -> NameTemplate.Context {
+    private func nameContext(for panel: any PanelHandle, typed _: String, openedAt: Date) -> NameTemplate.Context {
         let model = panel.model
         var context = NameTemplate.Context()
         if let item = source.model.cursorItem {
@@ -818,7 +818,7 @@ final class FileOperations: FileTransferService {
 
     /// F7 and Shift+F7 (spec 07 › New folder). `names` given: no dialog; it is the text of the
     /// dialog or the command's switches (`N="a|b"`).
-    func makeDirectory(in panel: PanelHandle, names given: String?) {
+    func makeDirectory(in panel: any PanelHandle, names given: String?) {
         let directory = panel.model.directory
         let openedAt = Date()
         let typed: String
@@ -841,14 +841,14 @@ final class FileOperations: FileTransferService {
         let record = recorder()
         kernel.jobs.run(
             title: "New folder:",
-            work: { monitor -> (created: URL?, failures: [(String, Error)]) in
+            work: { monitor -> (created: URL?, failures: [(String, any Error)]) in
                 let cancellation = monitor.cancellation
                 /// Whether something is at a location, asked so that the question ends with the job.
                 func exists(_ url: URL) -> Bool {
                     (try? fileSystems.provider(for: url))?.item(at: url, cancellation: cancellation) != nil
                 }
                 var created: URL?
-                var failures: [(String, Error)] = []
+                var failures: [(String, any Error)] = []
                 context.clipboard = Self.clipboardText(for: typed)
                 context.exists = { exists(fileSystems.location(from: $0, relativeTo: directory)) }
                 let names: [String]
@@ -908,7 +908,7 @@ final class FileOperations: FileTransferService {
         let record = recorder()
         kernel.jobs.run(
             title: "New file:",
-            work: { monitor -> (urls: [URL], failure: (String, Error)?) in
+            work: { monitor -> (urls: [URL], failure: (String, any Error)?) in
                 let cancellation = monitor.cancellation
                 func exists(_ url: URL) -> Bool {
                     (try? fileSystems.provider(for: url))?.item(at: url, cancellation: cancellation) != nil

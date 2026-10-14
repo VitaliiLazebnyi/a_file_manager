@@ -185,10 +185,10 @@ final class SelectionStore {
     static let marksFoldersKey = scope + ".markDirectories"
     static let oneHourKey = scope + ".oneHourDifference"
 
-    private let settings: SettingsStore
-    private let scoped: SettingsStore
+    private let settings: any SettingsStore
+    private let scoped: any SettingsStore
 
-    init(settings: SettingsStore) {
+    init(settings: any SettingsStore) {
         self.settings = settings
         scoped = settings.scoped(to: Self.scope)
     }

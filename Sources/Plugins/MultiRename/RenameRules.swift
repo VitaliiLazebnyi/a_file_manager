@@ -356,7 +356,7 @@ struct RenameEngine {
     /// Ends a regular expression that is still working on a name (the preview was overtaken, the run cancelled).
     private let cancelled: () -> Bool
     /// What is wrong with the settings as a whole, if anything: then no item gets a name.
-    let problem: Error?
+    let problem: any Error?
 
     init(_ settings: RenameSettings, context: RenameContext, cancelled: @escaping () -> Bool = { false }) {
         self.settings = settings
@@ -377,7 +377,7 @@ struct RenameEngine {
     }
 
     /// Set once names were computed: a regular expression that took too long for some of them.
-    var tooSlow: Error? {
+    var tooSlow: any Error? {
         searchReplace?.timedOut == true ? SearchReplace.Problem.tooSlow(settings.search) : nil
     }
 

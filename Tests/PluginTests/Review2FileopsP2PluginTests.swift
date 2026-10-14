@@ -79,8 +79,8 @@ final class P2DeferredJobs: JobService {
     }
 
     @discardableResult
-    func run<Result>(title: String, work: @escaping (JobMonitor) -> Result, completion: @escaping (Result) -> Void)
-        -> JobHandle
+    func run<Result>(title: String, work: @escaping (any JobMonitor) -> Result, completion: @escaping (Result) -> Void)
+        -> any JobHandle
     {
         titles.append(title)
         let result = work(Monitor())
@@ -102,17 +102,17 @@ final class P2DeferredJobs: JobService {
 final class P2Bench: ShellServices {
     let kernel: Kernel
     let panelSet: FakePanelSet
-    let jobs: JobService
+    let jobs: any JobService
 
-    var panels: PanelSet { panelSet }
+    var panels: any PanelSet { panelSet }
     var left: FakePanel { panelSet.leftPanel }
     var right: FakePanel { panelSet.rightPanel }
     var commands: CommandRegistry { kernel.commands }
 
     init(
-        plugins: [Plugin], fileSystems: [FileSystemProvider], left: URL, right: URL, ui: UserInteraction,
-        jobs: JobService = ImmediateJobService(),
-        settings: SettingsStore = MemorySettings()
+        plugins: [any Plugin], fileSystems: [any FileSystemProvider], left: URL, right: URL, ui: any UserInteraction,
+        jobs: any JobService = ImmediateJobService(),
+        settings: any SettingsStore = MemorySettings()
     ) {
         kernel = Kernel(productName: "Test", settings: settings, ui: ui)
         fileSystems.forEach(kernel.fileSystems.register)
@@ -141,8 +141,8 @@ final class P2Bench: ShellServices {
     }
 
     private func bench(
-        _ plugins: [Plugin] = [FileOperationsPlugin(), SelectionPlugin()], left: URL? = nil,
-        settings: SettingsStore = MemorySettings()
+        _ plugins: [any Plugin] = [FileOperationsPlugin(), SelectionPlugin()], left: URL? = nil,
+        settings: any SettingsStore = MemorySettings()
     )
         -> P2Bench
     {

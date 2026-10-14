@@ -30,11 +30,11 @@ final class FlakyFileSystem: FileSystemProvider {
     func failNextReads(_ count: Int) { lock.withLock { failures = count } }
 
     private final class Reader: FileReader {
-        let inner: FileReader
+        let inner: any FileReader
         let fails: Bool
         let hook: (() -> Void)?
         var blocks = 0
-        init(_ inner: FileReader, fails: Bool, hook: (() -> Void)?) {
+        init(_ inner: any FileReader, fails: Bool, hook: (() -> Void)?) {
             (self.inner, self.fails, self.hook) = (inner, fails, hook)
         }
         func read(upToCount count: Int) throws -> Data? {
@@ -55,7 +55,7 @@ final class FlakyFileSystem: FileSystemProvider {
     }
     func item(at url: URL) -> FileItem? { base.item(at: url) }
     func parent(of directory: URL) -> URL? { base.parent(of: directory) }
-    func read(_ url: URL) throws -> FileReader {
+    func read(_ url: URL) throws -> any FileReader {
         let (fails, hook): (Bool, (() -> Void)?) = lock.withLock {
             defer { afterFirstBlock = nil }
             if failures > 0 {
@@ -67,7 +67,7 @@ final class FlakyFileSystem: FileSystemProvider {
         return Reader(try base.read(url), fails: fails, hook: hook)
     }
     func createDirectory(at url: URL) throws { try base.createDirectory(at: url) }
-    func write(_ url: URL) throws -> FileWriter { try base.write(url) }
+    func write(_ url: URL) throws -> any FileWriter { try base.write(url) }
     func remove(_ url: URL) throws { try base.remove(url) }
     func move(_ source: URL, to destination: URL, replacing: Bool) throws {
         try base.move(source, to: destination, replacing: replacing)
@@ -101,7 +101,7 @@ final class Review2Replies: FileJobDelegate {
         lock.withLock { conflicts.append(target.name) }
         return conflict
     }
-    func job(_: FileJob, failedAt _: URL, error: Error) -> ErrorChoice {
+    func job(_: FileJob, failedAt _: URL, error: any Error) -> ErrorChoice {
         lock.withLock {
             errors.append(error.localizedDescription)
             return failureAnswers.count > 1 ? failureAnswers.removeFirst() : failureAnswers[0]
@@ -754,9 +754,9 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
                 return base.item(at: url)
             }
             func parent(of directory: URL) -> URL? { base.parent(of: directory) }
-            func read(_ url: URL) throws -> FileReader { try base.read(url) }
+            func read(_ url: URL) throws -> any FileReader { try base.read(url) }
             func createDirectory(at url: URL) throws { try base.createDirectory(at: url) }
-            func write(_ url: URL) throws -> FileWriter { try base.write(url) }
+            func write(_ url: URL) throws -> any FileWriter { try base.write(url) }
             func remove(_ url: URL) throws { try base.remove(url) }
             func move(_ source: URL, to destination: URL, replacing: Bool) throws {
                 try base.move(source, to: destination, replacing: replacing)

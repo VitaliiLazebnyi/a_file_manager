@@ -133,7 +133,7 @@ import Testing
         let byListing = local.totalSizeByListing(of: box.root, cancellation: CancellationFlag())
         #expect(byListing == (0..<12).reduce(5) { sum, folder in (0..<20).reduce(sum) { $0 + folder * 10 + $1 } }.int64)
         #expect(local.totalSize(of: box.root) == byListing)
-        let provider: FileSystemProvider = local
+        let provider: any FileSystemProvider = local
         #expect(
             provider.totalSize(of: box.root, cancellation: CancellationFlag()) == byListing
                 && provider.totalSize(of: box.root) == byListing)

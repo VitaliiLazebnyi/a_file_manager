@@ -14,7 +14,7 @@ enum BarButton {
     static let iconSizes: [CGFloat] = [13, 20, 28, 36]
     static let defaultIconSize = 2
 
-    static func iconSize(from settings: SettingsStore) -> CGFloat {
+    static func iconSize(from settings: any SettingsStore) -> CGFloat {
         iconSizes[min(max(settings.index(iconSizeKey, default: defaultIconSize), 0), iconSizes.count - 1)]
     }
 
@@ -521,21 +521,21 @@ final class ButtonBarView: NSView, NSDraggingSource {
         indicator.isHidden = false
     }
 
-    private func isOurs(_ info: NSDraggingInfo) -> Bool {
+    private func isOurs(_ info: any NSDraggingInfo) -> Bool {
         (info.draggingSource as? ButtonBarView) === self && dragged != nil
     }
 
-    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation { draggingUpdated(sender) }
+    override func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation { draggingUpdated(sender) }
 
-    override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
+    override func draggingUpdated(_ sender: any NSDraggingInfo) -> NSDragOperation {
         guard isOurs(sender), let dragged else { return [] }
         showIndicator(for: dropTarget(for: dragged, at: convert(sender.draggingLocation, from: nil)))
         return .move
     }
 
-    override func draggingExited(_: NSDraggingInfo?) { indicator.isHidden = true }
+    override func draggingExited(_: any NSDraggingInfo?) { indicator.isHidden = true }
 
-    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+    override func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {
         indicator.isHidden = true
         guard isOurs(sender), let item = dragged else { return false }
         dragged = nil

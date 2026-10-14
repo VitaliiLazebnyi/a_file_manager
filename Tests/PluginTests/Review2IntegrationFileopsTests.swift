@@ -34,8 +34,8 @@ final class IntegrationRacingLocalFileSystem: FileSystemProvider {
     }
     func item(at url: URL) -> FileItem? { local.item(at: url) }
     func parent(of directory: URL) -> URL? { local.parent(of: directory) }
-    func read(_ url: URL) throws -> FileReader { try local.read(url) }
-    func write(_ url: URL) throws -> FileWriter { try local.write(url) }
+    func read(_ url: URL) throws -> any FileReader { try local.read(url) }
+    func write(_ url: URL) throws -> any FileWriter { try local.write(url) }
     func move(_ source: URL, to destination: URL, replacing: Bool) throws {
         try local.move(source, to: destination, replacing: replacing)
     }
@@ -85,7 +85,7 @@ final class IntegrationReplies: FileJobDelegate {
         onProgress?(progress)
     }
     func job(_: FileJob, conflictAt _: FileItem, source _: FileItem) -> ConflictChoice { .overwrite }
-    func job(_: FileJob, failedAt _: URL, error: Error) -> ErrorChoice {
+    func job(_: FileJob, failedAt _: URL, error: any Error) -> ErrorChoice {
         lock.withLock { messages.append(error.localizedDescription) }
         return .skip
     }

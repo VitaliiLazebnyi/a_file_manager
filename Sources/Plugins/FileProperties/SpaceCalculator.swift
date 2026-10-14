@@ -31,7 +31,7 @@ struct SpaceTotals: Equatable {
 /// comes by reports, because the job's own thread may be waiting for the others or deep in one
 /// slow folder; a paused job then stops the threads that come by, which is what Pause is for.
 final class ProgressMeter {
-    private let monitor: JobMonitor
+    private let monitor: any JobMonitor
     private let title: String
     private let total: Int
     private let lock = NSLock()
@@ -39,7 +39,7 @@ final class ProgressMeter {
     private var lastReport = Date.distantPast
 
     /// `total` is 0 when the number of items is not known in advance.
-    init(_ monitor: JobMonitor, title: String, total: Int = 0) {
+    init(_ monitor: any JobMonitor, title: String, total: Int = 0) {
         self.monitor = monitor
         self.title = title
         self.total = total

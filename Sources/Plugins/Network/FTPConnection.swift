@@ -637,7 +637,7 @@ final class FTPConnection {
 
     /// The error for a reply that refused a command; a server that insists on TLS session reuse
     /// on the data connections gets its own, so the user is told what is wrong.
-    private func refusal(_ reply: FTPReply, otherwise: Error? = nil) -> Error {
+    private func refusal(_ reply: FTPReply, otherwise: any Error? = nil) -> any Error {
         if protectsData, Self.requiresSessionReuse(reply) {
             return NetworkError.sessionReuseRequired(reply.message)
         }

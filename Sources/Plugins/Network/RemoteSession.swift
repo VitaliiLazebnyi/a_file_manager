@@ -199,16 +199,16 @@ protocol RemoteSession: AnyObject {
     func entry(at path: String, cancellation: CancellationFlag?) throws -> RemoteEntry?
     /// The flag of the three calls that open a file covers the opening only; the reader or writer
     /// is ended with its own `interrupt`.
-    func openRead(_ path: String, cancellation: CancellationFlag?) throws -> FileReader
+    func openRead(_ path: String, cancellation: CancellationFlag?) throws -> any FileReader
     /// Starts writing a file that does not exist yet.
-    func openWrite(_ path: String, cancellation: CancellationFlag?) throws -> FileWriter
+    func openWrite(_ path: String, cancellation: CancellationFlag?) throws -> any FileWriter
     /// Whether a file of this name can be continued with `openAppend`. Answers at once, from what
     /// is known; a server that is not known yet is believed to.
     func canAppend(_ path: String) -> Bool
     /// Continues an existing file: cut to `offset` bytes when given (throws when it is shorter),
     /// else at its end. `size` is the length the file has when the writer starts.
     func openAppend(_ path: String, at offset: Int64?, cancellation: CancellationFlag?) throws -> (
-        writer: FileWriter, size: Int64
+        writer: any FileWriter, size: Int64
     )
     /// `handler` is called, from any thread, when the session finds out after a listing where a
     /// link of it leads: the path of the link, and whether it leads to a folder. A session that
@@ -253,7 +253,7 @@ extension RemoteSession {
     func canAppend(_: String) -> Bool { false }
     func onLinkResolved(_: @escaping (_ path: String, _ isDirectory: Bool) -> Void) {}
     func openAppend(_: String, at _: Int64?, cancellation _: CancellationFlag?) throws -> (
-        writer: FileWriter, size: Int64
+        writer: any FileWriter, size: Int64
     ) {
         throw FileSystemError.notSupported("Continuing a file on this server")
     }
@@ -262,8 +262,8 @@ extension RemoteSession {
         try list(path, showHidden: showHidden, cancellation: nil, receive: receive)
     }
     func entry(at path: String) throws -> RemoteEntry? { try entry(at: path, cancellation: nil) }
-    func openRead(_ path: String) throws -> FileReader { try openRead(path, cancellation: nil) }
-    func openWrite(_ path: String) throws -> FileWriter { try openWrite(path, cancellation: nil) }
+    func openRead(_ path: String) throws -> any FileReader { try openRead(path, cancellation: nil) }
+    func openWrite(_ path: String) throws -> any FileWriter { try openWrite(path, cancellation: nil) }
 }
 
 /// Where the work runs that waits for a server and that nobody waits for: the clean-up of an
@@ -407,7 +407,7 @@ func withEither<Result>(
 /// when `shouldGiveUp` says so (it returns the error to throw), and at once on the main thread,
 /// which must never wait behind a login that may be asking the user something (the question is
 /// answered on the main thread).
-func lockPatiently(_ lock: NSLock, cancellation: CancellationFlag?, shouldGiveUp: () -> Error?) throws {
+func lockPatiently(_ lock: NSLock, cancellation: CancellationFlag?, shouldGiveUp: () -> any Error?) throws {
     if lock.try() { return }
     if Thread.isMainThread { throw NetworkError.busy("The connection is busy logging in.") }
     while !lock.lock(before: Date().addingTimeInterval(0.1)) {

@@ -301,7 +301,7 @@ extension PanelViewController {
 
     /// What the drag over this panel carries, read from the pasteboard once per drag and not
     /// on every move of the mouse, nor once for each panel it passes.
-    func dropSession(for info: NSDraggingInfo) -> DropSession {
+    func dropSession(for info: any NSDraggingInfo) -> DropSession {
         PanelDrop.session(for: info)
     }
 
@@ -320,7 +320,7 @@ extension PanelViewController {
         session: DropSession? = nil
     ) -> DropPlan? {
         guard !commands.isBlocked(), model.isListed, let first = sources.first,
-            kernel.services.find(FileTransferService.self) != nil
+            kernel.services.find((any FileTransferService).self) != nil
         else { return nil }
         let target = dropDestination(forRow: row)
         guard kernel.fileSystems.capabilities(for: target.location).contains(.write) else { return nil }
@@ -335,7 +335,7 @@ extension PanelViewController {
 
     /// The mouse drags something over a row (-1: over no row). Returns what a drop would do
     /// and the row to frame.
-    func validateDrop(_ info: NSDraggingInfo, row: Int) -> (operation: NSDragOperation, row: Int?) {
+    func validateDrop(_ info: any NSDraggingInfo, row: Int) -> (operation: NSDragOperation, row: Int?) {
         let allowed = info.draggingSourceOperationMask
         let session = dropSession(for: info)
         guard
@@ -349,7 +349,7 @@ extension PanelViewController {
 
     /// Something was dropped. The drop is carried out after the drag has ended, so the program
     /// the files came from is not kept waiting while a question is on screen.
-    func acceptDrop(_ info: NSDraggingInfo, row: Int) -> Bool {
+    func acceptDrop(_ info: any NSDraggingInfo, row: Int) -> Bool {
         let session = dropSession(for: info)
         // Dropped before the drag's items were all put together: they are now.
         session.finishNow()
@@ -367,7 +367,7 @@ extension PanelViewController {
     /// Copies or moves what was dropped, through the file-transfer service, which shows the
     /// progress and asks the usual questions. Asks first when the user wants that.
     func carryOut(_ plan: DropPlan) {
-        guard !commands.isBlocked(), let transfers = kernel.services.find(FileTransferService.self) else {
+        guard !commands.isBlocked(), let transfers = kernel.services.find((any FileTransferService).self) else {
             commands.onRejected()
             return
         }
@@ -388,7 +388,7 @@ extension PanelViewController {
 
     // The table of the Full view drags and takes drops through its data source.
 
-    func tableView(_: NSTableView, pasteboardWriterForRow row: Int) -> NSPasteboardWriting? {
+    func tableView(_: NSTableView, pasteboardWriterForRow row: Int) -> any NSPasteboardWriting? {
         // The table drags the row that was grabbed; when that row is marked, all marked items
         // go along: in the program through the drag's ticket, for other programs in `willBeginAt`.
         pendingDragItems = draggingItems(forRow: row)
@@ -418,7 +418,7 @@ extension PanelViewController {
     }
 
     func tableView(
-        _ tableView: NSTableView, validateDrop info: NSDraggingInfo, proposedRow _: Int,
+        _ tableView: NSTableView, validateDrop info: any NSDraggingInfo, proposedRow _: Int,
         proposedDropOperation _: NSTableView.DropOperation
     ) -> NSDragOperation {
         let (operation, target) = validateDrop(
@@ -428,7 +428,7 @@ extension PanelViewController {
     }
 
     func tableView(
-        _ tableView: NSTableView, acceptDrop info: NSDraggingInfo, row _: Int,
+        _ tableView: NSTableView, acceptDrop info: any NSDraggingInfo, row _: Int,
         dropOperation _: NSTableView.DropOperation
     ) -> Bool {
         acceptDrop(info, row: tableView.row(at: tableView.convert(info.draggingLocation, from: nil)))

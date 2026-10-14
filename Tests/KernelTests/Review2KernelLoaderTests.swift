@@ -67,9 +67,9 @@ private final class StalledFileSystem: FileSystemProvider {
     }
     func item(at url: URL) -> FileItem? { inner.item(at: url) }
     func parent(of directory: URL) -> URL? { inner.parent(of: directory) }
-    func read(_ url: URL) throws -> FileReader { try inner.read(url) }
+    func read(_ url: URL) throws -> any FileReader { try inner.read(url) }
     func createDirectory(at url: URL) throws { try inner.createDirectory(at: url) }
-    func write(_ url: URL) throws -> FileWriter { try inner.write(url) }
+    func write(_ url: URL) throws -> any FileWriter { try inner.write(url) }
     func remove(_ url: URL) throws { try inner.remove(url) }
     func move(_ source: URL, to destination: URL, replacing: Bool) throws {
         try inner.move(source, to: destination, replacing: replacing)
@@ -243,9 +243,9 @@ private final class DeepFileSystem: FileSystemProvider {
     func parent(of directory: URL) -> URL? {
         directory.pathComponents.count > 1 ? directory.deletingLastPathComponent() : nil
     }
-    func read(_: URL) throws -> FileReader { throw FileSystemError.notSupported("Reading") }
+    func read(_: URL) throws -> any FileReader { throw FileSystemError.notSupported("Reading") }
     func createDirectory(at _: URL) {}
-    func write(_: URL) throws -> FileWriter { throw FileSystemError.notSupported("Writing") }
+    func write(_: URL) throws -> any FileWriter { throw FileSystemError.notSupported("Writing") }
     func remove(_: URL) {}
     func move(_: URL, to _: URL, replacing _: Bool) {}
     func copy(_: URL, to _: URL, progress _: (Int64) -> Bool) {}

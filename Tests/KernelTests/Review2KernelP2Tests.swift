@@ -61,9 +61,9 @@ private final class RootedFileSystem: FileSystemProvider {
         lock.unlock()
         return directory.path == "/" ? nil : directory.deletingLastPathComponent()
     }
-    func read(_: URL) throws -> FileReader { throw FileSystemError.notSupported("Reading") }
+    func read(_: URL) throws -> any FileReader { throw FileSystemError.notSupported("Reading") }
     func createDirectory(at _: URL) {}
-    func write(_: URL) throws -> FileWriter { throw FileSystemError.notSupported("Writing") }
+    func write(_: URL) throws -> any FileWriter { throw FileSystemError.notSupported("Writing") }
     func remove(_: URL) {}
     func move(_: URL, to _: URL, replacing _: Bool) {}
     func copy(_: URL, to _: URL, progress _: (Int64) -> Bool) {}
@@ -300,7 +300,7 @@ private final class RootedFileSystem: FileSystemProvider {
         let memory = MemoryFileSystem()
         #expect(memory.root(of: memory.url("/a/b/c")).path == "/")
         // Through the protocol, which is how the loader asks.
-        let provider: FileSystemProvider = memory
+        let provider: any FileSystemProvider = memory
         #expect(provider.root(of: memory.url("/a/b/c")).isSameLocation(as: memory.url("/")))
     }
 
@@ -319,16 +319,16 @@ private final class RootedFileSystem: FileSystemProvider {
             func list(_: URL, showHidden _: Bool) -> [FileItem] { [] }
             func item(at _: URL) -> FileItem? { nil }
             func parent(of _: URL) -> URL? { nil }
-            func read(_: URL) throws -> FileReader { throw FileSystemError.notSupported("Reading") }
+            func read(_: URL) throws -> any FileReader { throw FileSystemError.notSupported("Reading") }
             func createDirectory(at _: URL) {}
-            func write(_: URL) throws -> FileWriter { throw FileSystemError.notSupported("Writing") }
+            func write(_: URL) throws -> any FileWriter { throw FileSystemError.notSupported("Writing") }
             func remove(_: URL) {}
             func move(_: URL, to _: URL, replacing _: Bool) {}
             func copy(_ source: URL, to destination: URL, progress: (Int64) -> Bool) throws {
                 try memory.copy(memory.url(source.path), to: memory.url(destination.path), progress: progress)
             }
         }
-        let provider: FileSystemProvider = Plain(memory)
+        let provider: any FileSystemProvider = Plain(memory)
         let (from, to) = (URL(string: "plain:///a.bin")!, URL(string: "plain:///b.bin")!)
         // Set before the call: nothing is begun.
         let set = CancellationFlag()
@@ -359,7 +359,7 @@ private final class RootedFileSystem: FileSystemProvider {
 
     @Test func aFolderThatMustBeNewIsRefusedWhenSomethingHasItsName() throws {
         let memory = MemoryFileSystem()
-        let provider: FileSystemProvider = memory
+        let provider: any FileSystemProvider = memory
         try provider.createDirectory(at: memory.url("/new/inner"), exclusive: true, cancellation: CancellationFlag())
         #expect(memory.exists("/new/inner"))
         #expect(throws: FileSystemError.self) {
@@ -485,7 +485,7 @@ private final class RootedFileSystem: FileSystemProvider {
     @Test func aCommitAsksItsProgressOnceWhereAFileSystemSaysNoMore() throws {
         let memory = MemoryFileSystem()
         memory.addFile("/a.txt")
-        let provider: FileSystemProvider = memory
+        let provider: any FileSystemProvider = memory
         var reports: [(Int64, Int64)] = []
         try provider.commit(memory.url("/"), cancellation: CancellationFlag()) { done, total in
             reports.append((done, total))
@@ -517,7 +517,7 @@ private final class RootedFileSystem: FileSystemProvider {
         memory.stallsChanges = true
         let flag = CancellationFlag()
         let ended = DispatchSemaphore(value: 0)
-        var failure: Error?
+        var failure: (any Error)?
         Thread.detachNewThread {
             do { try memory.remove(memory.url("/a.txt"), cancellation: flag) } catch { failure = error }
             ended.signal()

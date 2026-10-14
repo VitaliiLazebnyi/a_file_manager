@@ -28,9 +28,9 @@ final class P2ProbeFileSystem: FileSystemProvider {
     /// What `readOrder(of:)` answers; nil leaves the order.
     var order: (([URL]) -> [URL])?
     /// When set, `setQuarantine` fails with it.
-    var quarantineFailure: Error?
+    var quarantineFailure: (any Error)?
     /// When set, every writer fails with it when it is closed with contents.
-    var writeFailure: Error?
+    var writeFailure: (any Error)?
     /// A removal that was given a flag does not come back until the flag is set.
     var stallsRemovals = false
     /// Called when such a removal starts to wait.
@@ -64,20 +64,20 @@ final class P2ProbeFileSystem: FileSystemProvider {
     }
     func item(at url: URL) -> FileItem? { base.item(at: url) }
     func parent(of directory: URL) -> URL? { base.parent(of: directory) }
-    func read(_ url: URL) throws -> FileReader {
+    func read(_ url: URL) throws -> any FileReader {
         lock.withLock { readPaths.append(url.path) }
         return try base.read(url)
     }
-    func read(_ url: URL, cancellation: CancellationFlag) throws -> FileReader {
+    func read(_ url: URL, cancellation: CancellationFlag) throws -> any FileReader {
         lock.withLock { readPaths.append(url.path) }
         return try base.read(url, cancellation: cancellation)
     }
 
     private final class FailingWriter: FileWriter {
-        let inner: FileWriter
-        let failure: Error
+        let inner: any FileWriter
+        let failure: any Error
         var wrote = false
-        init(_ inner: FileWriter, _ failure: Error) { (self.inner, self.failure) = (inner, failure) }
+        init(_ inner: any FileWriter, _ failure: any Error) { (self.inner, self.failure) = (inner, failure) }
         func write(_ data: Data) throws {
             wrote = true
             try inner.write(data)
@@ -91,11 +91,11 @@ final class P2ProbeFileSystem: FileSystemProvider {
         }
     }
 
-    func write(_ url: URL) throws -> FileWriter {
+    func write(_ url: URL) throws -> any FileWriter {
         let writer = try base.write(url)
         return writeFailure.map { FailingWriter(writer, $0) } ?? writer
     }
-    func append(to url: URL, at offset: Int64?, cancellation: CancellationFlag) throws -> FileWriter {
+    func append(to url: URL, at offset: Int64?, cancellation: CancellationFlag) throws -> any FileWriter {
         try base.append(to: url, at: offset, cancellation: cancellation)
     }
     func copy(_ source: URL, to destination: URL, progress: (Int64) -> Bool) throws {
@@ -186,8 +186,8 @@ final class P2RacingLocalFileSystem: FileSystemProvider {
     }
     func item(at url: URL) -> FileItem? { local.item(at: url) }
     func parent(of directory: URL) -> URL? { local.parent(of: directory) }
-    func read(_ url: URL) throws -> FileReader { try local.read(url) }
-    func write(_ url: URL) throws -> FileWriter { try local.write(url) }
+    func read(_ url: URL) throws -> any FileReader { try local.read(url) }
+    func write(_ url: URL) throws -> any FileWriter { try local.write(url) }
     func remove(_ url: URL) throws { try local.remove(url) }
     func move(_ source: URL, to destination: URL, replacing: Bool) throws {
         try local.move(source, to: destination, replacing: replacing)
@@ -237,9 +237,9 @@ final class P2ViewFileSystem: FileSystemProvider {
     func list(_: URL, showHidden _: Bool) throws -> [FileItem] { throw Unused() }
     func item(at _: URL) -> FileItem? { nil }
     func parent(of _: URL) -> URL? { nil }
-    func read(_: URL) throws -> FileReader { throw Unused() }
+    func read(_: URL) throws -> any FileReader { throw Unused() }
     func createDirectory(at _: URL) throws { throw Unused() }
-    func write(_: URL) throws -> FileWriter { throw Unused() }
+    func write(_: URL) throws -> any FileWriter { throw Unused() }
     func remove(_: URL) throws { throw Unused() }
     func move(_: URL, to _: URL, replacing _: Bool) throws { throw Unused() }
     func copy(_: URL, to _: URL, progress _: (Int64) -> Bool) throws { throw Unused() }
@@ -263,7 +263,7 @@ final class P2Replies: FileJobDelegate {
         lock.withLock { reports.append((progress.lines, tag)) }
     }
     func job(_: FileJob, conflictAt _: FileItem, source _: FileItem) -> ConflictChoice { conflict }
-    func job(_: FileJob, failedAt _: URL, error: Error) -> ErrorChoice {
+    func job(_: FileJob, failedAt _: URL, error: any Error) -> ErrorChoice {
         lock.withLock { messages.append(error.localizedDescription) }
         return .skip
     }

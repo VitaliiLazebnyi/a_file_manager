@@ -55,7 +55,7 @@ private final class ConsentPlugin: Plugin, ServerConsentService {
     var ranLines: [String] = []
 
     func start(in kernel: Kernel) {
-        kernel.services.register(ServerConsentService.self, self)
+        kernel.services.register((any ServerConsentService).self, self)
         kernel.commands.register(
             Command(.runCommandLine, "Run Command Line"), parameterized: { [self] in ranLines.append($0.text ?? "?") }
         )
@@ -79,9 +79,9 @@ private final class ServerFileSystem: FileSystemProvider {
     }
     func item(at url: URL) -> FileItem? { inner.item(at: url) }
     func parent(of directory: URL) -> URL? { inner.parent(of: directory) }
-    func read(_ url: URL) throws -> FileReader { try inner.read(url) }
+    func read(_ url: URL) throws -> any FileReader { try inner.read(url) }
     func createDirectory(at url: URL) throws { try inner.createDirectory(at: url) }
-    func write(_ url: URL) throws -> FileWriter { try inner.write(url) }
+    func write(_ url: URL) throws -> any FileWriter { try inner.write(url) }
     func remove(_ url: URL) throws { try inner.remove(url) }
     func move(_ source: URL, to destination: URL, replacing: Bool) throws {
         try inner.move(source, to: destination, replacing: replacing)
@@ -119,7 +119,7 @@ private final class FilterProbe: @unchecked Sendable {
 /// waits for them where the user can see it, and a drag of very many marked items starts
 /// without a pass over the list.
 extension Application {
-    fileprivate func start(plugins extra: [Plugin], fileSystems: [FileSystemProvider] = []) async -> Running {
+    fileprivate func start(plugins extra: [any Plugin], fileSystems: [any FileSystemProvider] = []) async -> Running {
         let kernel = Kernel(productName: StandardPlugins.productName, settings: settings, ui: ui)
         kernel.fileSystems.register(memory)
         fileSystems.forEach(kernel.fileSystems.register)

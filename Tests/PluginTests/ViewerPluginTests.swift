@@ -140,7 +140,7 @@ private final class FakeOverlayHost: PanelOverlayHost {
         #expect(bench.kernel.menus.contextMenu(onItem: true) == [.view])
         #expect(bench.kernel.toolbar.defaultLayout.compactMap { $0?.command } == [.view, .quickView])
         #expect(bench.kernel.preferences.pages.map(\.title) == ["Lister"])
-        #expect(bench.kernel.services.find(ViewerService.self) != nil)
+        #expect(bench.kernel.services.find((any ViewerService).self) != nil)
         #expect(commands[.view]?.barLabel == "View" && commands[.view]?.runsDuringJobs == true)
     }
 
@@ -157,7 +157,7 @@ private final class FakeOverlayHost: PanelOverlayHost {
     // MARK: Lister windows
 
     @Test func theServiceShowsFilesOfAnyFileSystemAndTexts() async throws {
-        let service = try #require(bench.kernel.services.find(ViewerService.self))
+        let service = try #require(bench.kernel.services.find((any ViewerService).self))
         service.view(memory.url("/A/short.txt"))
         let file = try #require(plugin.windows.last)
         #expect(

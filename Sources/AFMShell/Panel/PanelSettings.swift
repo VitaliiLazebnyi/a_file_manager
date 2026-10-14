@@ -45,7 +45,7 @@ struct PanelSettings {
 
     init() {}
 
-    init(from settings: SettingsStore) {
+    init(from settings: any SettingsStore) {
         let limit = CGFloat(Double(settings.text(Self.briefWidthLimitKey, default: "200")) ?? 200)
         briefWidthLimit = settings.flag(Self.limitsBriefWidthKey, default: true) ? max(60, limit) : nil
         let sizes = Self.thumbnailSizes

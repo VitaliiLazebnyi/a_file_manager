@@ -175,7 +175,7 @@ public enum CompareLoader {
         let lock = NSLock()
         var next = 0
         var differs = false
-        var failure: Error?
+        var failure: any Error?
         func take() -> Int? {
             lock.lock()
             defer { lock.unlock() }
@@ -187,7 +187,7 @@ public enum CompareLoader {
         // `concurrentPerform` would have its few threads stuck there.
         _ = Parallel.map(Array(0..<min(stretches, ProcessInfo.processInfo.activeProcessorCount))) { _ in
             // Every worker has its own two readers and moves them to the stretches it takes.
-            var readers: [FileReader] = []
+            var readers: [any FileReader] = []
             var tokens: [AnyObject] = []
             defer {
                 readers.forEach { $0.close() }
@@ -223,7 +223,7 @@ public enum CompareLoader {
     }
 
     /// Reads until `count` bytes are there or the file ends; readers may hand out less at a time.
-    private static func exactly(_ count: Int, from reader: FileReader) throws -> Data {
+    private static func exactly(_ count: Int, from reader: any FileReader) throws -> Data {
         var data = Data()
         while try autoreleasepool(invoking: { () throws -> Bool in
             guard data.count < count, let block = try reader.read(upToCount: count - data.count), !block.isEmpty else {
@@ -237,9 +237,9 @@ public enum CompareLoader {
 
     /// Reads the two files once, side by side, and stops at the first difference.
     private static func sameStream(
-        _ first: URL, _ second: URL, systems: [FileSystemProvider], cancellation: CancellationFlag
+        _ first: URL, _ second: URL, systems: [any FileSystemProvider], cancellation: CancellationFlag
     ) throws -> Bool? {
-        var readers: [FileReader] = []
+        var readers: [any FileReader] = []
         var tokens: [AnyObject] = []
         defer {
             readers.forEach { $0.close() }

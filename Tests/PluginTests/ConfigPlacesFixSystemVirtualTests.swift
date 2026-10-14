@@ -162,9 +162,9 @@ private final class WatchedSystem: FileSystemProvider {
     func list(_: URL, showHidden _: Bool) -> [FileItem] { [] }
     func item(at url: URL) -> FileItem? { FileItem(url: url, name: url.lastPathComponent, isDirectory: false) }
     func parent(of directory: URL) -> URL? { directory.path == "/" ? nil : directory.deletingLastPathComponent() }
-    func read(_: URL) throws -> FileReader { throw FileSystemError.notSupported("Reading") }
+    func read(_: URL) throws -> any FileReader { throw FileSystemError.notSupported("Reading") }
     func createDirectory(at _: URL) throws { throw FileSystemError.notSupported("Writing") }
-    func write(_: URL) throws -> FileWriter { throw FileSystemError.notSupported("Writing") }
+    func write(_: URL) throws -> any FileWriter { throw FileSystemError.notSupported("Writing") }
     func remove(_: URL) throws { throw FileSystemError.notSupported("Writing") }
     func move(_: URL, to _: URL, replacing _: Bool) throws {
         throw FileSystemError.notSupported("Writing")

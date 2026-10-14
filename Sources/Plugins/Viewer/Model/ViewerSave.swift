@@ -21,7 +21,7 @@ enum ViewerSave {
     /// shorter, the disk is full, the job is cancelled), never leaves a half-written file in
     /// place of a whole one. Blocks. `progress` is given the bytes written.
     static func save(
-        _ source: ByteSource, to target: URL, cancellation: CancellationFlag, progress: (Int64) -> Void = { _ in }
+        _ source: any ByteSource, to target: URL, cancellation: CancellationFlag, progress: (Int64) -> Void = { _ in }
     ) throws {
         let folder = target.deletingLastPathComponent()
         let temporary = folder.appendingPathComponent(

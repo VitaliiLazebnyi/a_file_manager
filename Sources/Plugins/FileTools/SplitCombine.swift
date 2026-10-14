@@ -221,7 +221,8 @@ enum PartSeries {
 
     /// `first` and the files that follow it in its folder, until a name is missing.
     static func parts(
-        startingAt first: FileItem, provider: FileSystemProvider, cancellation: CancellationFlag = CancellationFlag()
+        startingAt first: FileItem, provider: any FileSystemProvider,
+        cancellation: CancellationFlag = CancellationFlag()
     ) -> [FileItem] {
         var parts = [first]
         let directory = first.url.deletingLastPathComponent()

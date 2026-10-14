@@ -49,12 +49,12 @@ extension PanelHandle {
 
 /// The two panels of the main window (spec 01 › Two panels: source and target).
 public protocol PanelSet: AnyObject {
-    var left: PanelHandle { get }
-    var right: PanelHandle { get }
+    var left: any PanelHandle { get }
+    var right: any PanelHandle { get }
     /// The active panel; almost every command acts on it.
-    var source: PanelHandle { get }
+    var source: any PanelHandle { get }
     /// The other panel; the default destination of two-sided operations.
-    var target: PanelHandle { get }
+    var target: any PanelHandle { get }
     /// The contents of these directories were changed by an operation, whether or not a panel
     /// shows them. Called by `refresh`, for whoever keeps directory contents in memory;
     /// operations themselves only ever call `refresh`.
@@ -62,7 +62,7 @@ public protocol PanelSet: AnyObject {
 }
 
 extension PanelSet {
-    public var all: [PanelHandle] { [left, right] }
+    public var all: [any PanelHandle] { [left, right] }
 
     public func contentsChanged(in _: [URL]) {}
 

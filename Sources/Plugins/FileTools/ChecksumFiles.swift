@@ -310,10 +310,10 @@ enum ChecksumRun {
     /// computed in a first pass over the file; the others, all in one further pass, only when
     /// it does not match. The digests of methods not computed are empty.
     static func digests(of files: [(url: URL, methods: [ChecksumMethod], expected: String?)], run: ToolRun) -> [Result<
-        [[UInt8]], Error
+        [[UInt8]], any Error
     >] {
         let busy = BusyFiles()
-        return Parallel.map(files) { file -> Result<[[UInt8]], Error> in
+        return Parallel.map(files) { file -> Result<[[UInt8]], any Error> in
             busy.enter()
             defer { busy.leave() }
             return Result {
@@ -390,7 +390,7 @@ enum ChecksumRun {
     static let serialPiece = 8 << 10
 
     /// Gives `block` to `hasher`; to a BLAKE3 hasher that must not spread it, piece by piece.
-    static func feed(_ hasher: StreamHasher, _ block: Data, spread: Bool) {
+    static func feed(_ hasher: any StreamHasher, _ block: Data, spread: Bool) {
         guard hasher is BLAKE3Hasher, !spread, block.count > serialPiece else {
             hasher.update(block)
             return
@@ -403,7 +403,9 @@ enum ChecksumRun {
         }
     }
 
-    static func digests(of files: [(url: URL, methods: [ChecksumMethod])], run: ToolRun) -> [Result<[[UInt8]], Error>] {
+    static func digests(of files: [(url: URL, methods: [ChecksumMethod])], run: ToolRun) -> [Result<
+        [[UInt8]], any Error
+    >] {
         digests(of: files.map { ($0.url, $0.methods, nil) }, run: run)
     }
 

@@ -33,7 +33,7 @@ enum ArchiveSettings {
     static let defaultExtensions = "zip 7z rar tar gz tgz bz2 tbz tbz2 xz txz jar war cab cpio lha lzh arj z taz"
     static let levels = ["0 (store)", "1 (fastest)", "2", "3", "4", "5", "6 (normal)", "7", "8", "9 (best)"]
 
-    static func options(from settings: SettingsStore) -> ArchiveOptions {
+    static func options(from settings: any SettingsStore) -> ArchiveOptions {
         var options = ArchiveOptions()
         options.compressionLevel = max(0, min(settings.index(level, default: 6), 9))
         options.opensAsFolders = settings.flag(opensAsFolders, default: true)
@@ -67,11 +67,11 @@ final class ArchiveCommands {
         self.launchesApplications = launchesApplications
     }
 
-    private var ui: UserInteraction { kernel.ui }
+    private var ui: any UserInteraction { kernel.ui }
     private var fileSystems: FileSystemRegistry { kernel.fileSystems }
-    private var settings: SettingsStore { kernel.settings }
-    private var source: PanelHandle { kernel.panels.source }
-    private var target: PanelHandle { kernel.panels.target }
+    private var settings: any SettingsStore { kernel.settings }
+    private var source: any PanelHandle { kernel.panels.source }
+    private var target: any PanelHandle { kernel.panels.target }
 
     /// Copies the settings for the working threads; called on the main thread.
     func refreshOptions() {
@@ -101,7 +101,7 @@ final class ArchiveCommands {
     }
 
     /// The opener for Enter: archives are entered like folders.
-    func open(_ file: FileItem, in panel: PanelHandle) -> Bool {
+    func open(_ file: FileItem, in panel: any PanelHandle) -> Bool {
         let options = environment.options
         guard !file.isDirectory else { return false }
         let known = options.opensAsFolders && options.extensions.contains(file.ext.lowercased())
@@ -112,7 +112,7 @@ final class ArchiveCommands {
 
     /// Enter on a file inside an archive shows what the archive knows about it
     /// (spec 08 › Enter on a file inside an archive).
-    func showMember(_ file: FileItem, in _: PanelHandle) -> Bool {
+    func showMember(_ file: FileItem, in _: any PanelHandle) -> Bool {
         guard let location = ArchiveURL.location(of: file.url), !file.isDirectory else { return false }
         let store = self.store
         kernel.jobs.run(
@@ -151,7 +151,7 @@ final class ArchiveCommands {
         let (fileSystems, scratch, store) = (self.fileSystems, environment.scratch, self.store)
         kernel.jobs.run(
             title: "Unpacking:",
-            work: { monitor -> Result<URL, Error> in
+            work: { monitor -> Result<URL, any Error> in
                 Result {
                     let folder = try scratch.newFile("open")
                     try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)

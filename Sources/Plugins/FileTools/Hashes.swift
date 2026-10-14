@@ -84,7 +84,7 @@ enum ChecksumMethod: Int, CaseIterable, Codable {
             .filter { $0.digestLength * 2 == hexDigits }
     }
 
-    func makeHasher() -> StreamHasher {
+    func makeHasher() -> any StreamHasher {
         switch self {
         case .crc32: return CRC32Hasher()
         case .md5: return CryptoHasher<Insecure.MD5>()

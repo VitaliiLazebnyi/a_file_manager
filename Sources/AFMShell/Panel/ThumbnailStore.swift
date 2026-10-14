@@ -33,7 +33,7 @@ final class QuickLookThumbnails: ThumbnailSource {
 ///
 /// **Threading.** Main thread only; the source's answer is brought back to the main thread.
 final class ThumbnailStore {
-    var source: ThumbnailSource
+    var source: any ThumbnailSource
     private let cache = NSCache<NSString, NSImage>()
     /// The requests under way, by key. Each has a token of its own: the answer of a request that
     /// was given up must not be taken for the answer of a newer request for the same file.
@@ -48,7 +48,7 @@ final class ThumbnailStore {
     /// Retina screen is 1 MB, so the count alone would allow gigabytes.
     static let costLimit = 192 * 1_024 * 1_024
 
-    init(source: ThumbnailSource = QuickLookThumbnails()) {
+    init(source: any ThumbnailSource = QuickLookThumbnails()) {
         self.source = source
         cache.countLimit = 3_000
         cache.totalCostLimit = Self.costLimit

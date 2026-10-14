@@ -83,7 +83,7 @@ public final class KeychainPasswords: PasswordStore {
 /// a connecting thread that needs the answer: changes are queued, in order, and reads wait
 /// for the changes before them. The main thread only ever queues.
 public final class PasswordVault {
-    private let store: PasswordStore
+    private let store: any PasswordStore
     private let queue = DispatchQueue(label: "afm.network.keychain", qos: .userInitiated)
     private let lock = NSLock()
     /// The name the password of each saved connection is kept under, as the connections are now.
@@ -93,7 +93,7 @@ public final class PasswordVault {
     /// Present once the passwords of an earlier version, kept by identifier alone, were moved.
     public static let boundAccount = "passwords-are-bound-to-servers"
 
-    public init(store: PasswordStore) {
+    public init(store: any PasswordStore) {
         self.store = store
     }
 
@@ -305,7 +305,7 @@ public struct SavedConnection: Codable, Equatable {
     /// Reads a connection from the settings, which a damaged or foreign file may have filled
     /// with anything: a member that is missing or of the wrong kind takes its usual value, and
     /// a port that is none (`-2`, `70000`) is the usual port. Only the identifier must be there.
-    public init(from decoder: Decoder) throws {
+    public init(from decoder: any Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         func read<Value: Decodable>(_ key: CodingKeys, _ fallback: Value) -> Value {
             (try? values.decodeIfPresent(Value.self, forKey: key)) ?? fallback
@@ -368,8 +368,8 @@ public struct SavedConnection: Codable, Equatable {
 /// The saved connections and what else the connection dialogs remember, in the plugin's corner
 /// of the settings (`network.`). Passwords go to the `PasswordStore`. Main thread only.
 public final class ConnectionStore {
-    private let settings: SettingsStore
-    public let passwords: PasswordStore
+    private let settings: any SettingsStore
+    public let passwords: any PasswordStore
     /// The passwords and accepted certificates, by server; everything goes through it.
     public let vault: PasswordVault
     /// Called after the list changed.
@@ -380,7 +380,7 @@ public final class ConnectionStore {
     private static let historyKey = "history"
     private static let historyLimit = 12
 
-    public init(settings: SettingsStore, passwords: PasswordStore) {
+    public init(settings: any SettingsStore, passwords: any PasswordStore) {
         self.settings = settings.scoped(to: "network")
         self.passwords = passwords
         vault = PasswordVault(store: passwords)

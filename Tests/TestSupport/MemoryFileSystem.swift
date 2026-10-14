@@ -119,11 +119,11 @@ public final class MemoryFileSystem: FileSystemProvider {
     }
     private var _quarantineValue: Data?
     /// When set, `commit` fails with it.
-    public var commitFailure: Error? {
+    public var commitFailure: any Error? {
         get { settings.withLock { _commitFailure } }
         set { settings.withLock { _commitFailure = newValue } }
     }
-    private var _commitFailure: Error?
+    private var _commitFailure: any Error?
     /// False makes `copyMetadata` unsupported, as it is by default.
     public var keepsMetadata: Bool {
         get { settings.withLock { _keepsMetadata } }
@@ -493,7 +493,7 @@ public final class MemoryFileSystem: FileSystemProvider {
         func close() {}
     }
 
-    public func read(_ url: URL) throws -> FileReader {
+    public func read(_ url: URL) throws -> any FileReader {
         try synchronized {
             guard case .file(let data, _, _)? = nodes[key(url)] else { throw NotFound(path: decoded(key(url))) }
             return Reader(data, stall: makeStall(), stalls: stallsReads)
@@ -533,7 +533,7 @@ public final class MemoryFileSystem: FileSystemProvider {
         func close(attributes: FileAttributes) { store(data, attributes) }
     }
 
-    public func write(_ url: URL) throws -> FileWriter {
+    public func write(_ url: URL) throws -> any FileWriter {
         let path = key(url)
         try synchronized {
             guard case .directory? = nodes[parentKey(path)] else { throw NotFound(path: decoded(parentKey(path))) }
@@ -549,7 +549,7 @@ public final class MemoryFileSystem: FileSystemProvider {
 
     /// Offered when `capabilities` holds `.append`; what has been written shows when the
     /// writer is closed, with the date and permissions the file had unless others are given.
-    public func append(to url: URL, at offset: Int64?, cancellation _: CancellationFlag) throws -> FileWriter {
+    public func append(to url: URL, at offset: Int64?, cancellation _: CancellationFlag) throws -> any FileWriter {
         guard capabilities(for: url).contains(.append) else { throw FileSystemError.notSupported("Continuing a file") }
         let path = key(url)
         let (head, modified, permissions): (Data, Date, UInt16) = try synchronized {

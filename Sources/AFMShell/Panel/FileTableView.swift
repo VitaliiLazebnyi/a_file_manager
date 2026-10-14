@@ -24,12 +24,12 @@ final class FileTableView: NSTableView {
 
     // What was read of a drag is let go of when the drag is over or has left.
 
-    override func draggingExited(_ sender: NSDraggingInfo?) {
+    override func draggingExited(_ sender: any NSDraggingInfo?) {
         super.draggingExited(sender)
         if PanelDrop.current == nil { PanelDrop.endSession(sender?.draggingSequenceNumber) }
     }
 
-    override func draggingEnded(_ sender: NSDraggingInfo) {
+    override func draggingEnded(_ sender: any NSDraggingInfo) {
         super.draggingEnded(sender)
         PanelDrop.endSession(sender.draggingSequenceNumber)
     }
@@ -66,7 +66,7 @@ final class FileTableView: NSTableView {
     @objc func cut(_: Any?) { panel?.perform(.cut) }
     @objc func paste(_: Any?) { panel?.perform(.paste) }
 
-    override func validateUserInterfaceItem(_ item: NSValidatedUserInterfaceItem) -> Bool {
+    override func validateUserInterfaceItem(_ item: any NSValidatedUserInterfaceItem) -> Bool {
         if let menuItem = item as? NSMenuItem, let id = MenuBuilder.command(of: menuItem) {
             return panel?.commands.isEnabled(id) ?? false
         }

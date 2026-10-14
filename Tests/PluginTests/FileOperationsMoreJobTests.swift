@@ -46,7 +46,7 @@ final class Replies: FileJobDelegate {
         }
     }
 
-    func job(_: FileJob, failedAt _: URL, error: Error) -> ErrorChoice {
+    func job(_: FileJob, failedAt _: URL, error: any Error) -> ErrorChoice {
         lock.withLock { failureTexts.append(error.localizedDescription) }
         return failure
     }
@@ -95,11 +95,11 @@ final class WrappedFileSystem: FileSystemProvider {
     private func ended() { lock.withLock { running -= 1 } }
 
     private final class Writer: FileWriter {
-        let inner: FileWriter
+        let inner: any FileWriter
         let owner: WrappedFileSystem
         var first = true
 
-        init(_ inner: FileWriter, _ owner: WrappedFileSystem) {
+        init(_ inner: any FileWriter, _ owner: WrappedFileSystem) {
             self.inner = inner
             self.owner = owner
         }
@@ -123,9 +123,9 @@ final class WrappedFileSystem: FileSystemProvider {
     }
     func item(at url: URL) -> FileItem? { base.item(at: url) }
     func parent(of directory: URL) -> URL? { base.parent(of: directory) }
-    func read(_ url: URL) throws -> FileReader { try base.read(url) }
+    func read(_ url: URL) throws -> any FileReader { try base.read(url) }
     func createDirectory(at url: URL) throws { try base.createDirectory(at: url) }
-    func write(_ url: URL) throws -> FileWriter {
+    func write(_ url: URL) throws -> any FileWriter {
         let writer = Writer(try base.write(url), self)
         began()
         return writer
@@ -162,7 +162,7 @@ func runJob(
     configure: ((FileJob) -> Void)? = nil
 ) -> JobResult {
     let job = FileJob(kind: kind, sources: sources, target: target, fileSystems: fileSystems)
-    let delegate: FileJobDelegate = replies
+    let delegate: any FileJobDelegate = replies
     job.delegate = delegate
     configure?(job)
     // The job holds its delegate weakly.

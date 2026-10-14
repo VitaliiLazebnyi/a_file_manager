@@ -267,7 +267,7 @@ final class ViewerRemoteLike: ByteSource {
         memory.stallsReads = true
         for attempt in 1...5 {
             let flag = CancellationFlag()
-            let outcome = ViewerAdoptBox<Result<Data, Error>?>(nil)
+            let outcome = ViewerAdoptBox<Result<Data, any Error>?>(nil)
             let worker = ViewerAdoptWorker {
                 outcome.value = Result { try source.read(at: 10, count: 5_000, cancellation: flag) }
             }
@@ -326,7 +326,7 @@ final class ViewerRemoteLike: ByteSource {
         source.close()
         memory.stallsReads = true
         let fetch = LinkedCancellation(document.cancellation)
-        let outcome = ViewerAdoptBox<Result<[DisplayRow], Error>?>(nil)
+        let outcome = ViewerAdoptBox<Result<[DisplayRow], any Error>?>(nil)
         let worker = ViewerAdoptWorker {
             outcome.value = Result { try document.rows(from: 3_000, count: 20, cancellation: fetch.flag) }
         }
@@ -339,7 +339,7 @@ final class ViewerRemoteLike: ByteSource {
         #expect(document.readError == nil)
         // A fetch tied to the document ends with it.
         let tied = LinkedCancellation(document.cancellation)
-        let second = ViewerAdoptBox<Result<Int?, Error>?>(nil)
+        let second = ViewerAdoptBox<Result<Int?, any Error>?>(nil)
         let again = ViewerAdoptWorker {
             second.value = Result { try document.row(containing: 90_000, cancellation: tied.flag) }
         }
@@ -356,7 +356,7 @@ final class ViewerRemoteLike: ByteSource {
         memory.stallsReads = true
         let flag = CancellationFlag()
         let pattern = try SearchPattern("nothing like this", options: SearchOptions(), encoding: .utf8)
-        let outcome = ViewerAdoptBox<Result<Range<Int64>?, Error>?>(nil)
+        let outcome = ViewerAdoptBox<Result<Range<Int64>?, any Error>?>(nil)
         let worker = ViewerAdoptWorker {
             outcome.value = Result {
                 try ViewerSearch.find(

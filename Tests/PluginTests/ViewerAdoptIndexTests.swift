@@ -240,7 +240,7 @@ import Testing
         let first = TextDocument(
             source: source, encoding: .utf8, layout: .text(TextLayoutOptions(columns: 80, wordWrap: true)))
         first.buildIndex(parallel: false, segmentSize: 4_000)
-        func relaid(_ source: ByteSource, _ encoding: ViewerEncoding, _ options: TextLayoutOptions, bom: Int = 0)
+        func relaid(_ source: any ByteSource, _ encoding: ViewerEncoding, _ options: TextLayoutOptions, bom: Int = 0)
             -> TextDocument
         {
             let document = TextDocument(

@@ -46,15 +46,15 @@ private final class ProbingFileSystem: FileSystemProvider {
         memory.item(at: url, cancellation: cancellation)
     }
     func parent(of directory: URL) -> URL? { memory.parent(of: directory) }
-    func read(_ url: URL) throws -> FileReader { try memory.read(url) }
-    func read(_ url: URL, cancellation: CancellationFlag) throws -> FileReader {
+    func read(_ url: URL) throws -> any FileReader { try memory.read(url) }
+    func read(_ url: URL, cancellation: CancellationFlag) throws -> any FileReader {
         let reader = try memory.read(url, cancellation: cancellation)
         reading.signal()
         return reader
     }
     func createDirectory(at url: URL) throws { try memory.createDirectory(at: url) }
-    func write(_ url: URL) throws -> FileWriter { try memory.write(url) }
-    func write(_ url: URL, cancellation: CancellationFlag) throws -> FileWriter {
+    func write(_ url: URL) throws -> any FileWriter { try memory.write(url) }
+    func write(_ url: URL, cancellation: CancellationFlag) throws -> any FileWriter {
         let writer = try memory.write(url, cancellation: cancellation)
         writing.signal()
         return writer
@@ -336,7 +336,7 @@ extension MemoryFileSystem {
 @Suite struct ToolsAdoptDirectorySync {
     let early = Date(timeIntervalSince1970: 1_000_000)
 
-    func registry(_ providers: FileSystemProvider...) -> FileSystemRegistry {
+    func registry(_ providers: any FileSystemProvider...) -> FileSystemRegistry {
         let registry = FileSystemRegistry()
         providers.forEach(registry.register)
         return registry
@@ -753,7 +753,7 @@ extension MemoryFileSystem {
         defer { memory.releaseStalls() }
         let flag = CancellationFlag()
         let run = ToolRun(fileSystems: registry, cancellation: flag)
-        let results = Outcome<[Result<[[UInt8]], Error>]>()
+        let results = Outcome<[Result<[[UInt8]], any Error>]>()
         let done = background { results.value = ChecksumRun.digests(of: [(memory.url("/h/a"), [.sha1])], run: run) }
         #expect(probe.reading.wait(timeout: .now() + adoptWait) == .success)
         cancelFromThread(flag)
@@ -778,7 +778,7 @@ extension MemoryFileSystem {
         let flag = CancellationFlag()
         let run = ToolRun(fileSystems: registry, cancellation: flag)
         let item = memory.item(at: source)!
-        let error = Outcome<Error>()
+        let error = Outcome<any Error>()
         let done = background {
             do { try Splitter.split(item, into: memory.url("/out"), partSize: 40, run: run) } catch let thrown {
                 error.value = thrown
@@ -803,7 +803,7 @@ extension MemoryFileSystem {
         let flag = CancellationFlag()
         let run = ToolRun(fileSystems: registry, cancellation: flag)
         let item = memory.item(at: source)!
-        let error = Outcome<Error>()
+        let error = Outcome<any Error>()
         let done = background {
             do { try Encoder.encode(item, into: memory.url("/out"), method: .uue, run: run) } catch let thrown {
                 error.value = thrown

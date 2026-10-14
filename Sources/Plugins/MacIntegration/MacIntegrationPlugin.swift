@@ -436,8 +436,8 @@ public final class MacIntegrationPlugin: Plugin {
                 let tags = Self.tags(from: text)
                 kernel.jobs.run(
                     title: "Setting tags",
-                    work: { monitor -> (error: Error?, folders: [URL]) in
-                        var failure: Error?
+                    work: { monitor -> (error: any Error?, folders: [URL]) in
+                        var failure: any Error?
                         for url in urls where !monitor.cancellation.isCancelled {
                             do { try Self.setTags(tags, of: url) } catch {
                                 failure = error

@@ -44,7 +44,7 @@ final class FTPFixture {
     /// Waits until the background work of this fixture's session is done (connections given
     /// back, goodbyes said). Of this session only: the tests run side by side, and the work of
     /// another test's server, which may be one that never answers, is not waited for.
-    func settle(_ session: RemoteSession? = nil, timeout: TimeInterval = 300) -> Bool {
+    func settle(_ session: (any RemoteSession)? = nil, timeout: TimeInterval = 300) -> Bool {
         guard let session = session ?? center.existingSession(for: key) else { return true }
         return Background.waitUntilIdle(lane: session, timeout: timeout)
     }

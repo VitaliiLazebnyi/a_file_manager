@@ -1,5 +1,6 @@
 import AFMContracts
 import AFMKernel
+import AppKit
 import FileOperationsPlugin
 import Foundation
 import LocalFileSystemPlugin
@@ -200,7 +201,7 @@ import Testing
 
     @Test func registersItsFileSystemServiceCommandsAndOptions() {
         #expect(bench.kernel.fileSystems.all.contains { $0.scheme == "vfolder" })
-        #expect(bench.kernel.services.find(FileListService.self) != nil)
+        #expect(bench.kernel.services.find((any FileListService).self) != nil)
         #expect(bench.kernel.keyBindings.command(for: Shortcut(.character("b"), .control)) == .branchView)
         #expect(
             bench.kernel.keyBindings.command(for: Shortcut(.character("b"), [.control, .shift])) == "cm_DirBranchSel")
@@ -284,7 +285,7 @@ import Testing
     }
 
     @Test func aFileListKeepsRealLocationsAndFullPathsAsNames() throws {
-        let service = try #require(bench.kernel.services.find(FileListService.self))
+        let service = try #require(bench.kernel.services.find((any FileListService).self))
         let files = [
             memory.url("/A/docs/in.txt"), memory.url("/B/other.txt"), memory.url("/A/gone.txt"),
             memory.url("/B/other.txt")
@@ -384,9 +385,9 @@ private final class WatchableFileSystem: FileSystemProvider {
         FileItem(url: url, name: url.lastPathComponent, isDirectory: url.pathExtension.isEmpty)
     }
     func parent(of directory: URL) -> URL? { directory.path == "/" ? nil : directory.deletingLastPathComponent() }
-    func read(_: URL) throws -> FileReader { throw FileSystemError.notSupported("Reading") }
+    func read(_: URL) throws -> any FileReader { throw FileSystemError.notSupported("Reading") }
     func createDirectory(at _: URL) throws { throw FileSystemError.notSupported("Writing") }
-    func write(_: URL) throws -> FileWriter { throw FileSystemError.notSupported("Writing") }
+    func write(_: URL) throws -> any FileWriter { throw FileSystemError.notSupported("Writing") }
     func remove(_: URL) throws { throw FileSystemError.notSupported("Writing") }
     func move(_: URL, to _: URL, replacing _: Bool) throws {
         throw FileSystemError.notSupported("Writing")

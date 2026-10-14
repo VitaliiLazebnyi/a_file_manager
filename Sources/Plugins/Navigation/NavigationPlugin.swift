@@ -179,7 +179,7 @@ public final class NavigationPlugin: Plugin {
             }
             let location = kernel.fileSystems.location(from: text, relativeTo: current)
             // An address typed into the field is one the user chose: a server need not be asked about again.
-            kernel.services.find(ServerConsentService.self)?.userChose(location)
+            kernel.services.find((any ServerConsentService).self)?.userChose(location)
             source().show(location)
         }
         // `cd <location>`, for other plugins and later the command line.
@@ -218,7 +218,7 @@ public final class NavigationPlugin: Plugin {
         /// Ctrl+← / Ctrl+→: the folder under the cursor is shown in the panel on that side; when
         /// the cursor is not on a folder, the current directory is. Pressed in the panel of that
         /// very side, the panel takes the other panel's directory.
-        func transfer(to panel: PanelHandle) {
+        func transfer(to panel: any PanelHandle) {
             let from = source()
             if from === panel {
                 panel.show(target().model.directory)

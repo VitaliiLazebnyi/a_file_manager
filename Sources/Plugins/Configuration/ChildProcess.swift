@@ -122,7 +122,7 @@ enum ChildProcess {
     final class Watch {
         private let pid: pid_t
         private let handler: (Ending) -> Void
-        private let source: DispatchSourceProcess
+        private let source: any DispatchSourceProcess
         private let lock = NSLock()
         private var reported = false
 

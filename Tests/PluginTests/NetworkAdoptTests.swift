@@ -11,7 +11,7 @@ import Testing
 final class AdoptOutcome: @unchecked Sendable {
     private let lock = NSLock()
     private let done = DispatchSemaphore(value: 0)
-    private var error: Error?
+    private var error: (any Error)?
     private var finished = false
 
     init(_ work: @escaping () throws -> Void) {

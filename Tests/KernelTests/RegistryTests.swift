@@ -152,7 +152,7 @@ import Testing
             kernel.fileSystems.register(MemoryFileSystem())
             kernel.commands.register(Command("mem_Hello", "Hello", [.f(9)])) {}
             kernel.menus.add(["mem_Hello"], to: MenuSection(MenuID("Tools", order: 60), order: 10))
-            kernel.services.register(Greeting.self, English())
+            kernel.services.register((any Greeting).self, English())
             kernel.openers.add { file, _ in file.name.hasSuffix(".txt") }
         }
 
@@ -170,7 +170,7 @@ import Testing
         #expect(try kernel.fileSystems.provider(for: URL(string: "mem:///x")!).scheme == "mem")
         #expect(kernel.commands["mem_Hello"] != nil && kernel.keyBindings.command(for: .f(9)) == "mem_Hello")
         #expect(kernel.menus.menus.map(\.title) == ["Tools"])
-        #expect(kernel.services.find(Greeting.self)?.text == "hello")
+        #expect(kernel.services.find((any Greeting).self)?.text == "hello")
         kernel.shutdown()
         #expect(plugin.log == ["start", "stop"])
     }

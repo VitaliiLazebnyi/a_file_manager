@@ -275,9 +275,9 @@ private final class ArchiveFake: FileSystemProvider {
     }
     func item(at url: URL) -> FileItem? { inner.item(at: url) }
     func parent(of directory: URL) -> URL? { inner.parent(of: directory) }
-    func read(_ url: URL) throws -> FileReader { try inner.read(url) }
+    func read(_ url: URL) throws -> any FileReader { try inner.read(url) }
     func createDirectory(at _: URL) throws { throw FileSystemError.notSupported("Writing") }
-    func write(_: URL) throws -> FileWriter { throw FileSystemError.notSupported("Writing") }
+    func write(_: URL) throws -> any FileWriter { throw FileSystemError.notSupported("Writing") }
     func remove(_: URL) throws { throw FileSystemError.notSupported("Writing") }
     func move(_: URL, to _: URL, replacing _: Bool) throws {
         throw FileSystemError.notSupported("Writing")
@@ -742,8 +742,8 @@ private final class ArchiveFake: FileSystemProvider {
 /// the buttons below the list do.
 @MainActor @Suite struct FindFilesWindow {
     final class Lists: FileListService {
-        var shown: [(files: [URL], title: String, panel: PanelHandle)] = []
-        func show(_ files: [URL], title: String, in panel: PanelHandle) { shown.append((files, title, panel)) }
+        var shown: [(files: [URL], title: String, panel: any PanelHandle)] = []
+        func show(_ files: [URL], title: String, in panel: any PanelHandle) { shown.append((files, title, panel)) }
     }
 
     let memory = MemoryFileSystem()
@@ -876,7 +876,7 @@ private final class ArchiveFake: FileSystemProvider {
         window.feedToListbox()
         #expect(window.resultItems.count == 2)
         let lists = Lists()
-        bench.kernel.services.register(FileListService.self, lists)
+        bench.kernel.services.register((any FileListService).self, lists)
         bench.right.focus()
         window.feedToListbox()
         #expect(

@@ -176,7 +176,7 @@ enum PanelDrop {
     /// What a drag over a panel carries, read once per drag and shared by both panels.
     private static var session: DropSession?
 
-    static func session(for info: NSDraggingInfo) -> DropSession {
+    static func session(for info: any NSDraggingInfo) -> DropSession {
         if let session, session.sequence == info.draggingSequenceNumber { return session }
         let session: DropSession
         if let own = ownPayload(on: info.draggingPasteboard) {

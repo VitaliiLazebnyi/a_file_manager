@@ -14,9 +14,9 @@ private final class PlainFileSystem: FileSystemProvider {
     }
     func item(at url: URL) -> FileItem? { inner.item(at: url) }
     func parent(of directory: URL) -> URL? { inner.parent(of: directory) }
-    func read(_ url: URL) throws -> FileReader { PlainReader(try inner.read(url)) }
+    func read(_ url: URL) throws -> any FileReader { PlainReader(try inner.read(url)) }
     func createDirectory(at url: URL) throws { try inner.createDirectory(at: url) }
-    func write(_ url: URL) throws -> FileWriter { PlainWriter(try inner.write(url)) }
+    func write(_ url: URL) throws -> any FileWriter { PlainWriter(try inner.write(url)) }
     func remove(_ url: URL) throws { try inner.remove(url) }
     func move(_ source: URL, to destination: URL, replacing: Bool) throws {
         try inner.move(source, to: destination, replacing: replacing)
@@ -26,16 +26,16 @@ private final class PlainFileSystem: FileSystemProvider {
     }
 
     private final class PlainReader: FileReader {
-        let inner: FileReader
-        init(_ inner: FileReader) { self.inner = inner }
+        let inner: any FileReader
+        init(_ inner: any FileReader) { self.inner = inner }
         func read(upToCount count: Int) throws -> Data? { try inner.read(upToCount: count) }
         func seek(to offset: UInt64) throws { try inner.seek(to: offset) }
         func close() { inner.close() }
     }
 
     private final class PlainWriter: FileWriter {
-        let inner: FileWriter
-        init(_ inner: FileWriter) { self.inner = inner }
+        let inner: any FileWriter
+        init(_ inner: any FileWriter) { self.inner = inner }
         func write(_ data: Data) throws { try inner.write(data) }
         func close(attributes: FileAttributes) throws { try inner.close(attributes: attributes) }
     }
@@ -337,7 +337,7 @@ private func onThread(_ work: @escaping () -> Void) {
         // The tie does not keep a reader alive, and a released tie no longer interrupts.
         memory.stallsReads = false
         let other = CancellationFlag()
-        var next: FileReader? = try memory.read(memory.url("/far/a.txt"))
+        var next: (any FileReader)? = try memory.read(memory.url("/far/a.txt"))
         weak let gone = next
         var tie: AnyObject? = other.interrupting(next!)
         next = nil

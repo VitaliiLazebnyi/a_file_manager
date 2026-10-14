@@ -134,7 +134,7 @@ final class PanelLoading {
     /// the same location that has not come back yet; a reading that is overtaken returns at
     /// once, whatever its file system is doing (`PanelLoader.stream`). The callbacks, which hold
     /// the panel, stay with the main thread and are let go of there.
-    func start(onPiece: @escaping (Piece) -> Void, onEnd: @escaping (Error?) -> Void) {
+    func start(onPiece: @escaping (Piece) -> Void, onEnd: @escaping (any Error?) -> Void) {
         let (location, showHidden, order, fileSystems, cache, cancellation) = (
             location, showHidden, order, fileSystems, cache, cancellation
         )
@@ -186,7 +186,7 @@ final class PanelLoading {
                 return piece
             }
 
-            var failure: Error?
+            var failure: any Error?
             do {
                 try PanelLoader.stream(
                     location, showHidden: showHidden, fileSystems: fileSystems, cancellation: cancellation

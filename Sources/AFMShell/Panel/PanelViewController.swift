@@ -59,7 +59,7 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
 {
     let tabs: PanelTabs
     let kernel: Kernel
-    weak var host: PanelHost?
+    weak var host: any PanelHost?
 
     var commands: CommandRegistry { kernel.commands }
 
@@ -165,8 +165,8 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
     var filterJobs: [ObjectIdentifier: Int] = [:]
     var filterJobCount = 0
     /// Waits for the file systems to report new figures of a volume (free space).
-    private var volumeObserver: NSObjectProtocol?
-    private var iconObserver: NSObjectProtocol?
+    private var volumeObserver: any NSObjectProtocol?
+    private var iconObserver: any NSObjectProtocol?
     /// The tabs whose volume is being asked about, and those that have to be asked again when
     /// the answer is there: one question at a time per tab, however often the figures change
     /// and however long the file system takes to answer.
@@ -251,7 +251,7 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
     /// A file system reports new figures for a volume: every tab that shows a place at or below its
     /// root asks for them again, in the background, and takes the answer unless it moved on.
     private func volumeInfoChanged(_ note: Notification) {
-        guard let provider = note.object as? FileSystemProvider else { return }
+        guard let provider = note.object as? (any FileSystemProvider) else { return }
         let root = note.userInfo?[FileSystemRegistry.volumeRootKey] as? URL
         for tab in tabs.tabs {
             let directory = tab.directory
@@ -269,7 +269,7 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
     /// tab is closed or the window goes. While a question is out, no second one is sent for
     /// the tab: it is asked about again when the answer has come, so the last figures always
     /// win and a file system that does not answer holds one thread, not one per report.
-    private func askVolume(of tab: PanelModel, from provider: FileSystemProvider) {
+    private func askVolume(of tab: PanelModel, from provider: any FileSystemProvider) {
         let id = ObjectIdentifier(tab)
         guard volumeAsking[id] == nil else {
             volumeAskAgain.insert(id)
@@ -828,7 +828,7 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
         let load = beginLoad(for: tab, movingTo: location, completion: completion)
         let flag = load.flag
         let previousDirectory = tab.directory
-        let start: (@escaping (PanelLoading.Piece) -> Void, @escaping (Error?) -> Void) -> Void
+        let start: (@escaping (PanelLoading.Piece) -> Void, @escaping (any Error?) -> Void) -> Void
         if let joined {
             leave(joined, whenOvertaken: load)
             start = { [weak self] onPiece, onEnd in
@@ -965,7 +965,7 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
                 if piece.isLast { tab.finishLoading() }
             }
         }
-        func end(_ error: Error?) {
+        func end(_ error: any Error?) {
             guard self.loads[id] === load else { return }
             self.loads[id] = nil
             nothingArrivedYet = false
@@ -993,7 +993,7 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
     /// Tells the user a folder could not be read, once the code that found out has finished,
     /// from the run loop and after any message that is still on screen (`MainLoop.dialog`): the
     /// alert is modal and runs its own event loop.
-    private func report(_ error: Error) {
+    private func report(_ error: any Error) {
         let ui = kernel.ui
         MainLoop.dialog { ui.report(error, title: "The folder cannot be read!") }
     }
@@ -1108,9 +1108,9 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
         }
 
         /// Main thread: the fresh reading has ended.
-        func finish(_ outcome: Result<PanelLoading.Whole?, Error>) {
+        func finish(_ outcome: Result<PanelLoading.Whole?, any Error>) {
             guard loads[id] === load else { return }
-            func end(_ error: Error?) {
+            func end(_ error: any Error?) {
                 loads[id] = nil
                 hasEnded = true
                 readingEnded(of: tab, load, succeeded: error == nil)
@@ -1180,7 +1180,7 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
         } else {
             Background.storage(
                 "list", at: location,
-                work: { () -> Result<PanelLoading.Whole?, Error> in
+                work: { () -> Result<PanelLoading.Whole?, any Error> in
                     // Overtaken while it waited for its turn: the file system is not asked.
                     guard !flag.isCancelled else { return .success(nil) }
                     return Result {
@@ -1300,7 +1300,7 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
         )
         Background.storage(
             "list", at: directory,
-            work: { () -> Result<PanelLoading.Whole?, Error> in
+            work: { () -> Result<PanelLoading.Whole?, any Error> in
                 guard !flag.isCancelled else { return .success(nil) }
                 // A folder that vanished is replaced by its nearest readable parent. The listing is
                 // sorted here and, like every complete one, handed to the cache.

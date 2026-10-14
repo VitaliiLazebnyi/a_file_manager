@@ -345,7 +345,7 @@ final class TemporaryCopies {
 final class MediaView: NSView {
     private let playerView = AVPlayerView()
     private let player = AVPlayer()
-    private var endObserver: NSObjectProtocol?
+    private var endObserver: any NSObjectProtocol?
     /// Called when the track has played to its end (a playlist then moves on).
     var onEnd: () -> Void = {}
     /// Called with "track – artist" when the file's tags name them.

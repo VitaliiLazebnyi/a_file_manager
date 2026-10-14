@@ -92,7 +92,7 @@ public struct OperationRecord {
 public protocol FileJobDelegate: AnyObject {
     func job(_ job: FileJob, progress: JobProgress)
     func job(_ job: FileJob, conflictAt target: FileItem, source: FileItem) -> ConflictChoice
-    func job(_ job: FileJob, failedAt url: URL, error: Error) -> ErrorChoice
+    func job(_ job: FileJob, failedAt url: URL, error: any Error) -> ErrorChoice
     func job(_ job: FileJob, confirmDeleteNonEmpty directory: URL) -> FolderDeleteChoice
     func job(_ job: FileJob, confirm question: ProtectionQuestion) -> ProtectionChoice
     func job(_ job: FileJob, mergeInto existing: FileItem, source: FileItem) -> MergeChoice
@@ -209,7 +209,7 @@ public final class FileJob {
     public var options = TransferOptions()
     /// Held weakly; whoever starts the job keeps the delegate alive while it runs. A job whose
     /// delegate is gone stops at its first question instead of guessing an answer.
-    public weak var delegate: FileJobDelegate?
+    public weak var delegate: any FileJobDelegate?
     /// Receives what was done to every item, for the operation log. Called on the job's
     /// threads, several at once during a parallel copy, so it must be safe for that.
     public var onRecord: ((OperationRecord) -> Void)?
@@ -474,7 +474,7 @@ public final class FileJob {
     /// stopped it would end the very call that removes what the stopped step left behind. A
     /// local disk answers; a server that has stopped answering is waited for `cleanupPatience`
     /// and no longer, so that neither Cancel nor the end of the program hangs on it.
-    private func patience(with provider: FileSystemProvider) -> CancellationFlag {
+    private func patience(with provider: any FileSystemProvider) -> CancellationFlag {
         let flag = CancellationFlag()
         guard provider.scheme != "file" else { return flag }
         Self.patienceClock.asyncAfter(deadline: .now() + cleanupPatience) { flag.cancel() }
@@ -708,7 +708,7 @@ public final class FileJob {
 
     /// The entries of one source folder in the order their file system reads them best; see
     /// `slotsInReadOrder`. The order by name stays wherever the file system has no other.
-    private func inReadOrder(_ items: [FileItem], from: FileSystemProvider) -> [FileItem] {
+    private func inReadOrder(_ items: [FileItem], from: any FileSystemProvider) -> [FileItem] {
         guard items.count > 1 else { return items }
         let urls = items.map(\.url)
         let ordered = from.readOrder(of: urls)
@@ -1200,7 +1200,7 @@ public final class FileJob {
     /// Removes the temporary file of a failed transfer. A copy of a locked file is locked too,
     /// and the system refuses to remove or rename such a file; it is unlocked the way a locked
     /// item is when the user agrees to delete it (`removing`), and removed again.
-    private func discard(_ temporary: URL, in provider: FileSystemProvider) {
+    private func discard(_ temporary: URL, in provider: any FileSystemProvider) {
         // Tidying up: the job may be stopped already, which must not keep the file from going.
         let tidying = patience(with: provider)
         do {
@@ -1273,7 +1273,8 @@ public final class FileJob {
     /// Copies to a free name. A cancelled or failed copy within one file system leaves nothing
     /// behind; of a stream the caller removes what arrived.
     private func copyContents(
-        of item: FileItem, to destination: URL, from: FileSystemProvider, to: FileSystemProvider, _ flight: Flight
+        of item: FileItem, to destination: URL, from: any FileSystemProvider, to: any FileSystemProvider,
+        _ flight: Flight
     ) throws {
         // A link that is followed is read through, which only a stream does.
         // (A link that was not followed, because it leads back into its own folder, comes
@@ -1323,11 +1324,11 @@ public final class FileJob {
 
     /// Ties a stream to the job's two stop signals: while the returned objects live, a cancel
     /// or an abort ends a read or write of `reader` that waits.
-    private func interrupting(_ reader: FileReader) -> [AnyObject] {
+    private func interrupting(_ reader: any FileReader) -> [AnyObject] {
         [cancellation.interrupting(reader), stop.interrupting(reader)]
     }
 
-    private func interrupting(_ writer: FileWriter) -> [AnyObject] {
+    private func interrupting(_ writer: any FileWriter) -> [AnyObject] {
         [cancellation.interrupting(writer), stop.interrupting(writer)]
     }
 
@@ -1335,7 +1336,9 @@ public final class FileJob {
     /// server) were chosen by somebody else: set-user-ID, set-group-ID and the sticky bit
     /// never come along, and on the local disk the rest is cut by the user's umask, the way
     /// `tar` and `unzip` unpack.
-    private func attributes(for item: FileItem, from: FileSystemProvider, to: FileSystemProvider) -> FileAttributes {
+    private func attributes(for item: FileItem, from: any FileSystemProvider, to: any FileSystemProvider)
+        -> FileAttributes
+    {
         guard options.preservesAttributes else { return FileAttributes() }
         var permissions = item.permissions
         if from !== to {
@@ -1354,7 +1357,7 @@ public final class FileJob {
     /// Puts the origin mark on what was copied. A file system that cannot keep marks does
     /// nothing; one that can and fails says so, and the user hears of it: the copy is there,
     /// but without the mark that it came from elsewhere.
-    private func mark(_ url: URL, with origin: Data, in provider: FileSystemProvider, shownAs shown: URL) {
+    private func mark(_ url: URL, with origin: Data, in provider: any FileSystemProvider, shownAs shown: URL) {
         do {
             try provider.setQuarantine(origin, of: url, cancellation: cancellation)
         } catch {
@@ -1368,7 +1371,9 @@ public final class FileJob {
 
     /// Every block lives in a pool of its own: the buffers a reader hands out are otherwise
     /// kept until the thread ends, which for a job is after its last file.
-    private func stream(_ reader: FileReader, into writer: FileWriter, _ flight: Flight, alreadyCopied: Int64) throws {
+    private func stream(_ reader: any FileReader, into writer: any FileWriter, _ flight: Flight, alreadyCopied: Int64)
+        throws
+    {
         var copied = alreadyCopied
         while try autoreleasepool(invoking: { () throws -> Bool in
             guard let block = try reader.read(upToCount: 1 << 20) else { return false }
@@ -1465,7 +1470,8 @@ public final class FileJob {
     /// rest. A failed or cancelled continuation leaves the file as long as it got, as any
     /// partial file is.
     private func resumeInPlace(
-        _ destination: URL, partial: FileItem, with item: FileItem, from: FileSystemProvider, to: FileSystemProvider,
+        _ destination: URL, partial: FileItem, with item: FileItem, from: any FileSystemProvider,
+        to: any FileSystemProvider,
         _ flight: Flight
     ) throws -> Bool {
         let kept = partial.size
@@ -1505,7 +1511,7 @@ public final class FileJob {
     /// Whether the first `length` bytes of `partial` are the first bytes of the source, which
     /// `reader` is then left at the end of. Without `fully` only the last block is compared.
     private func startsWithPartial(
-        _ reader: FileReader, _ partial: URL, in provider: FileSystemProvider, length: Int64, fully: Bool,
+        _ reader: any FileReader, _ partial: URL, in provider: any FileSystemProvider, length: Int64, fully: Bool,
         _ flight: Flight
     ) throws -> Bool {
         let head = try provider.read(partial, cancellation: cancellation)
@@ -1533,7 +1539,7 @@ public final class FileJob {
     }
 
     /// Exactly `count` bytes, or nil when the file ends first.
-    private static func read(_ count: Int, from reader: FileReader) throws -> Data? {
+    private static func read(_ count: Int, from reader: any FileReader) throws -> Data? {
         var data = Data()
         while data.count < count {
             guard let block = try reader.read(upToCount: count - data.count), !block.isEmpty else { return nil }
@@ -1769,7 +1775,7 @@ public final class FileJob {
 
     /// Creates a target folder that the walk did not create (a filter was in the way, or the
     /// target of the whole job is new), once.
-    private func ensureFolder(_ folder: URL, in provider: FileSystemProvider) throws {
+    private func ensureFolder(_ folder: URL, in provider: any FileSystemProvider) throws {
         guard !options.filter.isEmpty else { return }
         let key = folder.locationKey
         if counters.withLock({ createdFolders.contains(key) }) { return }
@@ -1785,7 +1791,7 @@ public final class FileJob {
     /// (a link somebody put there, which would lead everything copied into the folder
     /// somewhere else) is "already exists", and the step is asked about like any other that
     /// failed.
-    private func createFolder(_ folder: URL, in provider: FileSystemProvider) throws {
+    private func createFolder(_ folder: URL, in provider: any FileSystemProvider) throws {
         try provider.createDirectory(at: folder, exclusive: true, cancellation: cancellation)
     }
 
@@ -1917,7 +1923,7 @@ public final class FileJob {
         report(["Deleting: \(display(source))"])
         defer { add(Measure(items: 1)) }
         let item = try entry(at: source)
-        var unsupported: Error?
+        var unsupported: any Error?
         let trashed = try attempt(.trash, at: source) {
             do {
                 try self.flushBeforeRemoving(source, item)
@@ -1944,14 +1950,14 @@ public final class FileJob {
 
     /// What the system answers when a place has no Trash at all, as opposed to a failure of
     /// this one item (no permission, the item vanished), which is the user's to deal with.
-    private static func isNoTrash(_ error: Error) -> Bool {
+    private static func isNoTrash(_ error: any Error) -> Bool {
         if case .notSupported? = error as? FileSystemError { return true }
         let error = error as NSError
         if error.domain == NSCocoaErrorDomain, error.code == CocoaError.featureUnsupported.rawValue { return true }
         if error.domain == NSPOSIXErrorDomain, error.code == Int(ENOTSUP) || error.code == Int(EOPNOTSUPP) {
             return true
         }
-        return (error.userInfo[NSUnderlyingErrorKey] as? Error).map(isNoTrash) ?? false
+        return (error.userInfo[NSUnderlyingErrorKey] as? (any Error)).map(isNoTrash) ?? false
     }
 
     /// Deletes an item and everything below it, one entry at a time, so every entry is counted,
@@ -2066,7 +2072,7 @@ public final class FileJob {
         final class Tally {
             let lock = NSLock()
             var kept = false
-            var failure: Error?
+            var failure: any Error?
         }
         let tally = Tally()
         let group = DispatchGroup()
@@ -2164,15 +2170,15 @@ public final class FileJob {
 
     /// "Operation not permitted": what the system answers for a locked item, as opposed to a
     /// folder one has no right to change.
-    private static func isRefusedAsLocked(_ error: Error) -> Bool {
+    private static func isRefusedAsLocked(_ error: any Error) -> Bool {
         let error = error as NSError
         if error.domain == NSPOSIXErrorDomain { return error.code == Int(EPERM) }
-        return (error.userInfo[NSUnderlyingErrorKey] as? Error).map(isRefusedAsLocked) ?? false
+        return (error.userInfo[NSUnderlyingErrorKey] as? (any Error)).map(isRefusedAsLocked) ?? false
     }
 
     // MARK: Helpers
 
-    private func delegateOrStop() throws -> FileJobDelegate {
+    private func delegateOrStop() throws -> any FileJobDelegate {
         guard let delegate else { throw Cancelled() }
         return delegate
     }

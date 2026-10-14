@@ -96,10 +96,10 @@ final class PanelCoordinator: PanelSet, PanelHost {
 
     // MARK: PanelSet
 
-    var left: PanelHandle { leftPanel }
-    var right: PanelHandle { rightPanel }
-    var source: PanelHandle { sourcePanel }
-    var target: PanelHandle { targetPanel }
+    var left: any PanelHandle { leftPanel }
+    var right: any PanelHandle { rightPanel }
+    var source: any PanelHandle { sourcePanel }
+    var target: any PanelHandle { targetPanel }
 
     var targetPanel: PanelViewController { sourcePanel === leftPanel ? rightPanel : leftPanel }
     private var panels: [PanelViewController] { [leftPanel, rightPanel] }
@@ -276,7 +276,7 @@ final class PanelCoordinator: PanelSet, PanelHost {
         }
     }
 
-    private func start(_ watch: Watch, at key: String, with provider: FileSystemProvider) {
+    private func start(_ watch: Watch, at key: String, with provider: any FileSystemProvider) {
         let directory = watch.directory
         let began = ProcessInfo.processInfo.systemUptime
         // The background takes nothing along that belongs to the main thread, only two weak
@@ -370,12 +370,12 @@ final class PlacesStore {
     /// Posted by a file system (the object) when its places are no longer what it answered.
     static let placesDidChange = Notification.Name("AFMPlacesDidChange")
 
-    private let providers: [FileSystemProvider]
+    private let providers: [any FileSystemProvider]
     private var answers: [[Place]]
     private var asking: Set<Int> = []
     private var askAgain: Set<Int> = []
     private var handlers: [() -> Void] = []
-    private var observers: [(center: NotificationCenter, token: NSObjectProtocol)] = []
+    private var observers: [(center: NotificationCenter, token: any NSObjectProtocol)] = []
     /// Every place, in the order of the file systems.
     private(set) var all: [Place] = []
     /// True once every file system has answered at least once.

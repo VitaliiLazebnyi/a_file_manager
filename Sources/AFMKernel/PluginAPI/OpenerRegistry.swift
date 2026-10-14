@@ -5,7 +5,7 @@ import Foundation
 /// ahead of the plugin that hands files to their applications.
 public final class OpenerRegistry {
     /// Returns true when it took care of the file.
-    public typealias Opener = (_ file: FileItem, _ panel: PanelHandle) -> Bool
+    public typealias Opener = (_ file: FileItem, _ panel: any PanelHandle) -> Bool
 
     private var openers: [(priority: Int, open: Opener)] = []
 
@@ -20,7 +20,7 @@ public final class OpenerRegistry {
 
     /// False when no plugin opens this file.
     @discardableResult
-    public func open(_ file: FileItem, in panel: PanelHandle) -> Bool {
+    public func open(_ file: FileItem, in panel: any PanelHandle) -> Bool {
         openers.contains { $0.open(file, panel) }
     }
 }

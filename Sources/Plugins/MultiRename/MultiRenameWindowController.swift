@@ -368,7 +368,7 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
         table.selectRowIndexes(selection.filteredIndexSet { $0 < session.rowCount }, byExtendingSelection: false)
     }
 
-    private static func describe(_ problem: Error) -> String {
+    private static func describe(_ problem: any Error) -> String {
         switch problem {
         case RenameMaskError.invalidPlaceholder(let text): return "Invalid placeholder: \(text)"
         case RenameMaskError.contentPluginsUnavailable: return "Content-plugin fields [=…] are not available."
@@ -707,21 +707,22 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
         session.sort(by: key, ascending: sortAscending)
     }
 
-    func tableView(_: NSTableView, pasteboardWriterForRow row: Int) -> NSPasteboardWriting? {
+    func tableView(_: NSTableView, pasteboardWriterForRow row: Int) -> any NSPasteboardWriting? {
         let item = NSPasteboardItem()
         item.setString(String(row), forType: Self.rowType)
         return item
     }
 
     func tableView(
-        _: NSTableView, validateDrop info: NSDraggingInfo, proposedRow _: Int,
+        _: NSTableView, validateDrop info: any NSDraggingInfo, proposedRow _: Int,
         proposedDropOperation dropOperation: NSTableView.DropOperation
     ) -> NSDragOperation {
         (info.draggingSource as? NSTableView) === table && dropOperation == .above ? .move : []
     }
 
     func tableView(
-        _ tableView: NSTableView, acceptDrop info: NSDraggingInfo, row: Int, dropOperation _: NSTableView.DropOperation
+        _ tableView: NSTableView, acceptDrop info: any NSDraggingInfo, row: Int,
+        dropOperation _: NSTableView.DropOperation
     ) -> Bool {
         let rows = (info.draggingPasteboard.pasteboardItems ?? []).compactMap {
             $0.string(forType: Self.rowType).flatMap(Int.init)

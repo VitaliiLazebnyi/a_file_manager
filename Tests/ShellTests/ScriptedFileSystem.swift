@@ -23,7 +23,7 @@ final class ScriptedFileSystem: FileSystemProvider {
     /// is called or its cancellation flag is set. Nil never waits.
     var holdBefore: Int?
     /// Thrown when the listing is let go from its hold (the hold must be set for this).
-    var failure: Error?
+    var failure: (any Error)?
     /// The second batch is not delivered before this long after the listing began, so that the
     /// panel shows the first batches as a first piece while the rest is held.
     var pauseBeforeSecondBatch: TimeInterval = 0
@@ -121,9 +121,9 @@ final class ScriptedFileSystem: FileSystemProvider {
 
     func item(at url: URL) -> FileItem? { inner.item(at: url) }
     func parent(of directory: URL) -> URL? { inner.parent(of: directory) }
-    func read(_ url: URL) throws -> FileReader { try inner.read(url) }
+    func read(_ url: URL) throws -> any FileReader { try inner.read(url) }
     func createDirectory(at url: URL) throws { try inner.createDirectory(at: url) }
-    func write(_ url: URL) throws -> FileWriter { try inner.write(url) }
+    func write(_ url: URL) throws -> any FileWriter { try inner.write(url) }
     func remove(_ url: URL) throws { try inner.remove(url) }
     func move(_ source: URL, to destination: URL, replacing: Bool) throws {
         try inner.move(source, to: destination, replacing: replacing)

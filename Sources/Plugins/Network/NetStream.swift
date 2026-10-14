@@ -370,7 +370,7 @@ final class NetStream {
     private let queue = DispatchQueue(label: "afm.network.stream")
     private let condition = NSCondition()
     private var isReady = false
-    private var failure: Error?
+    private var failure: any Error?
     /// What arrived and was not read yet starts at `readOffset`; reading moves the offset and
     /// the front is cut off now and then, instead of copying the whole rest on every read.
     private var buffer = Data()
@@ -378,7 +378,7 @@ final class NetStream {
     private var atEnd = false
     /// Why the connection stopped receiving, when it was not an orderly end. Thrown once
     /// everything that arrived before has been read.
-    private var receiveFailure: Error?
+    private var receiveFailure: any Error?
     private var isReceiving = false
     private var isClosed = false
     private var hasFinishedWriting = false

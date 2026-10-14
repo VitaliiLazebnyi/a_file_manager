@@ -59,7 +59,7 @@ final class ToolRun {
 
     /// A run inside a job: progress goes to its window, questions through `ask`.
     convenience init(
-        fileSystems: FileSystemRegistry, monitor: JobMonitor, askExisting: @escaping (URL) -> ExistingFileChoice
+        fileSystems: FileSystemRegistry, monitor: any JobMonitor, askExisting: @escaping (URL) -> ExistingFileChoice
     ) {
         self.init(
             fileSystems: fileSystems, cancellation: monitor.cancellation, report: monitor.report,
@@ -86,7 +86,7 @@ final class ToolRun {
         return origin
     }
 
-    private func noteOrigin(of url: URL, in provider: FileSystemProvider) {
+    private func noteOrigin(of url: URL, in provider: any FileSystemProvider) {
         guard carriesOrigin, originMark == nil, let mark = provider.quarantine(of: url) else { return }
         lock.lock()
         if origin == nil { origin = mark }
@@ -145,7 +145,7 @@ final class ToolRun {
 
     // MARK: Reading and writing
 
-    func provider(for url: URL) throws -> FileSystemProvider { try fileSystems.provider(for: url) }
+    func provider(for url: URL) throws -> any FileSystemProvider { try fileSystems.provider(for: url) }
 
     /// Hands a file to `body` block by block, counting the bytes as progress.
     func read(_ url: URL, counted: Bool = true, blockSize: Int = ToolRun.blockSize, _ body: (Data) throws -> Void)
@@ -157,7 +157,7 @@ final class ToolRun {
     /// Opens a file for reading; hand it to `read(_:counted:_:)`, which closes it. Tools open
     /// their source before they create anything, so that a source that cannot be read costs
     /// no output file.
-    func openReader(_ url: URL) throws -> FileReader {
+    func openReader(_ url: URL) throws -> any FileReader {
         do {
             // What a plugin still holds back for this file (an archive written after a delay) is written first.
             try fileSystems.flushPendingWrites(to: url, cancellation: cancellation)
@@ -172,7 +172,8 @@ final class ToolRun {
     }
 
     func read(
-        _ reader: FileReader, counted: Bool = true, blockSize: Int = ToolRun.blockSize, _ body: (Data) throws -> Void
+        _ reader: any FileReader, counted: Bool = true, blockSize: Int = ToolRun.blockSize,
+        _ body: (Data) throws -> Void
     ) throws {
         defer { reader.close() }
         // A read blocked on a server ends as soon as the run is cancelled.
@@ -295,7 +296,7 @@ final class ToolRun {
         }
     }
 
-    private func openWriter(_ url: URL, in provider: FileSystemProvider) throws -> FileWriter {
+    private func openWriter(_ url: URL, in provider: any FileSystemProvider) throws -> any FileWriter {
         do {
             return try provider.write(url, cancellation: cancellation)
         } catch {
@@ -305,7 +306,7 @@ final class ToolRun {
     }
 
     /// `name(2).ext`, `name(3).ext`, …: the first that is free (spec 08 › Decode).
-    static func freeName(for url: URL, provider: FileSystemProvider) -> URL {
+    static func freeName(for url: URL, provider: any FileSystemProvider) -> URL {
         let (base, ext) = FileItem.split(url.lastPathComponent)
         var number = 2
         while true {
@@ -341,8 +342,8 @@ final class ToolRun {
 /// tool leaves no half-written files.
 final class ToolOutput {
     let url: URL
-    private let writer: FileWriter
-    private let provider: FileSystemProvider
+    private let writer: any FileWriter
+    private let provider: any FileSystemProvider
     /// Where the data goes while it replaces an existing file at `url`; nil when it is written to `url` itself.
     private let temporary: URL?
     /// Whether the replacement waits for `commit` (see `ToolRun.transaction`).
@@ -357,7 +358,7 @@ final class ToolOutput {
     private let origin: () -> Data?
 
     init(
-        url: URL, writer: FileWriter, provider: FileSystemProvider, temporary: URL? = nil,
+        url: URL, writer: any FileWriter, provider: any FileSystemProvider, temporary: URL? = nil,
         cancellation: CancellationFlag? = nil,
         deferred: Bool = false, origin: @escaping () -> Data? = { nil }
     ) {

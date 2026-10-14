@@ -204,7 +204,7 @@ public final class FolderTabsPlugin: Plugin {
         ) {
             tabs().activateNeighbour(-1)
         }
-        let sides: [(String, String, () -> PanelHandle)] = [
+        let sides: [(String, String, () -> any PanelHandle)] = [
             ("Src", "Source", source), ("Trg", "Target", target), ("Left", "Left", { kernel.panels.left }),
             ("Right", "Right", { kernel.panels.right })
         ]
@@ -218,7 +218,7 @@ public final class FolderTabsPlugin: Plugin {
                     })
             }
         }
-        let lists: [(CommandID, String, [Shortcut], () -> PanelHandle)] = [
+        let lists: [(CommandID, String, [Shortcut], () -> any PanelHandle)] = [
             (.sourceTabsList, "List of Open Tabs…", [Shortcut(.character("a"), [.control, .shift])], source),
             (.targetTabsList, "Target: List of Open Tabs…", [], target),
             (.leftTabsList, "Left: List of Open Tabs…", [], { kernel.panels.left }),
@@ -482,7 +482,7 @@ public final class FolderTabsPlugin: Plugin {
 
     private enum SaveOutcome {
         case saved, declined
-        case failed(Error)
+        case failed(any Error)
     }
 
     private func save(_ argument: CommandArgument, bothSides: Bool, kernel: Kernel) {

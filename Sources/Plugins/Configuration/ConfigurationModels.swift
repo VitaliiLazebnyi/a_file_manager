@@ -5,11 +5,11 @@ import Foundation
 /// the user sees, which reach the settings only with Apply or OK. Main thread only.
 final class PreferencePageModel {
     let page: PreferencePage
-    private let settings: SettingsStore
+    private let settings: any SettingsStore
     private var stored: [String: FormValues.Value] = [:]
     private var pending: [String: FormValues.Value] = [:]
 
-    init(page: PreferencePage, settings: SettingsStore) {
+    init(page: PreferencePage, settings: any SettingsStore) {
         self.page = page
         self.settings = settings
         discard()
@@ -49,12 +49,12 @@ final class PreferencePageModel {
 /// A stored list read element by element: an element that cannot be decoded is counted and
 /// skipped, so one bad entry (or a field a later version added) does not take the rest along.
 struct LenientList<Element: Decodable>: Decodable {
-    private struct Ignored: Decodable { init(from _: Decoder) {} }
+    private struct Ignored: Decodable { init(from _: any Decoder) {} }
 
     var elements: [Element] = []
     var skipped = 0
 
-    init(from decoder: Decoder) throws {
+    init(from decoder: any Decoder) throws {
         var container = try decoder.unkeyedContainer()
         while !container.isAtEnd {
             if let element = try? container.decode(Element.self) {
@@ -80,7 +80,7 @@ final class ConfigurationStore {
     static let startMenuLimit = 500
     static let userCommandLimit = 2_000
 
-    private let settings: SettingsStore
+    private let settings: any SettingsStore
     /// What was decoded last, until the stored value is written or replaced: user commands are
     /// looked up per row and keystroke of the command browser.
     private var cachedUserCommands: [UserCommand]? {
@@ -93,7 +93,7 @@ final class ConfigurationStore {
     /// Told, on the main thread, that stored data could not be read in full and was kept aside.
     var onProblem: ((String) -> Void)?
 
-    init(settings: SettingsStore) {
+    init(settings: any SettingsStore) {
         self.settings = settings.scoped(to: Self.owner)
     }
 
@@ -185,7 +185,7 @@ final class ConfigurationStore {
 /// user command, which is what Total Commander's `em_` commands are for.
 final class ToolbarEditor {
     private let toolbar: ToolbarRegistry
-    private let settings: SettingsStore
+    private let settings: any SettingsStore
     private let store: ConfigurationStore
     /// The bar in order; nil is a separator.
     private(set) var items: [CommandID?] = []
@@ -195,7 +195,7 @@ final class ToolbarEditor {
     private(set) var isDefault = true
     private(set) var isChanged = false
 
-    init(toolbar: ToolbarRegistry, settings: SettingsStore, store: ConfigurationStore) {
+    init(toolbar: ToolbarRegistry, settings: any SettingsStore, store: ConfigurationStore) {
         self.toolbar = toolbar
         self.settings = settings
         self.store = store
@@ -314,7 +314,7 @@ struct SettingsArchive: Equatable {
     var values: [String: Data] = [:]
 
     /// What the store holds under the given keys; keys without a value are left out.
-    static func capture(from settings: SettingsStore, keys: [String]) -> Self {
+    static func capture(from settings: any SettingsStore, keys: [String]) -> Self {
         var archive = Self()
         for key in keys { archive.values[key] = settings.data(forKey: key) }
         return archive
@@ -322,7 +322,7 @@ struct SettingsArchive: Equatable {
 
     /// Makes the store hold what the archive holds. Of `knownKeys`, those the archive lacks
     /// are removed, so an import brings back the state at export, not a mixture.
-    func restore(into settings: SettingsStore, replacing knownKeys: [String]) {
+    func restore(into settings: any SettingsStore, replacing knownKeys: [String]) {
         for key in knownKeys where values[key] == nil { settings.set(nil as Data?, forKey: key) }
         for (key, value) in values { settings.set(value as Data?, forKey: key) }
     }

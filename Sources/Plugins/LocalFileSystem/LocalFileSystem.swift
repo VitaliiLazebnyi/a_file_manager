@@ -490,13 +490,13 @@ public final class LocalFileSystem: FileSystemProvider {
 
     // MARK: Reading a file
 
-    public func read(_ url: URL) throws -> FileReader {
+    public func read(_ url: URL) throws -> any FileReader {
         try read(url, cancellation: CancellationFlag())
     }
 
     /// Opened without waiting (`O_NONBLOCK`) and looked at before anything is read: a pipe or
     /// a device is refused with an error, where opening it would hang the caller.
-    public func read(_ url: URL, cancellation: CancellationFlag) throws -> FileReader {
+    public func read(_ url: URL, cancellation: CancellationFlag) throws -> any FileReader {
         let descriptor = try openFile(url, O_RDONLY | O_NONBLOCK, cancellation: cancellation)
         try requireRegularFile(descriptor, url)
         return Reader(descriptor, url: url)
@@ -639,14 +639,14 @@ public final class LocalFileSystem: FileSystemProvider {
         }
     }
 
-    public func write(_ url: URL) throws -> FileWriter {
+    public func write(_ url: URL) throws -> any FileWriter {
         try write(url, cancellation: CancellationFlag())
     }
 
     /// The file is made with the rights of its owner alone and gets the ones it is meant to
     /// have when it is closed: what is written is not readable by others while it arrives (a
     /// 0600 file streamed from an archive or a server), nor if the transfer fails half way.
-    public func write(_ url: URL, cancellation: CancellationFlag) throws -> FileWriter {
+    public func write(_ url: URL, cancellation: CancellationFlag) throws -> any FileWriter {
         // O_EXCL: the name must be free, and an existing file is never opened for writing.
         let descriptor: Int32
         do {
@@ -669,7 +669,7 @@ public final class LocalFileSystem: FileSystemProvider {
     /// nothing can come between. A link at the end of the name is not followed (it is
     /// reported), and neither is anything but a regular file opened: a pipe without a reader
     /// would hold the opening for ever.
-    public func append(to url: URL, at offset: Int64?, cancellation: CancellationFlag) throws -> FileWriter {
+    public func append(to url: URL, at offset: Int64?, cancellation: CancellationFlag) throws -> any FileWriter {
         let descriptor: Int32
         do {
             descriptor = try openFile(url, O_WRONLY | O_NONBLOCK | O_NOFOLLOW, cancellation: cancellation)
@@ -748,7 +748,7 @@ public final class LocalFileSystem: FileSystemProvider {
 
         func close(attributes: FileAttributes) throws {
             guard descriptor >= 0 else { return }
-            var failure: Error?
+            var failure: any Error?
             if let modified = attributes.modified {
                 let seconds = modified.timeIntervalSince1970.rounded(.down)
                 let nanoseconds = ((modified.timeIntervalSince1970 - seconds) * 1e9).rounded(.down)
@@ -800,7 +800,7 @@ public final class LocalFileSystem: FileSystemProvider {
                 domain: NSPOSIXErrorDomain, code: Int(EINVAL),
                 userInfo: [NSLocalizedDescriptionKey: "\(url.path) is not below \(root.path) and is not removed."])
         }
-        func changed(_ code: Int32, _ name: String) -> Error {
+        func changed(_ code: Int32, _ name: String) -> any Error {
             // ELOOP and ENOTDIR are what the system says to a link or a file where a folder was.
             guard code == ELOOP || code == ENOTDIR else { return Self.posixError(code, url) }
             return NSError(
@@ -1277,7 +1277,7 @@ public final class LocalFileSystem: FileSystemProvider {
                     ])
             }
         }
-        var failure: Error?
+        var failure: any Error?
         // Attributes that are there already are written again, so the call may be made twice.
         if try call.run(
             destination.path,
@@ -1355,7 +1355,7 @@ public final class LocalFileSystem: FileSystemProvider {
         return setattrlist(path, &request, &created, MemoryLayout<timespec>.size, UInt32(FSOPT_NOFOLLOW)) == 0
     }
 
-    static func posixError(_ code: Int32, _ url: URL) -> Error {
+    static func posixError(_ code: Int32, _ url: URL) -> any Error {
         NSError(
             domain: NSPOSIXErrorDomain, code: Int(code),
             userInfo: [NSLocalizedDescriptionKey: String(cString: strerror(code)) + ": " + url.path])
@@ -1392,7 +1392,7 @@ public final class LocalFileSystem: FileSystemProvider {
     /// `places()` last answered. The object is the file system.
     public static let placesDidChange = Notification.Name("AFMPlacesDidChange")
 
-    private var mountObservers: [NSObjectProtocol] = []
+    private var mountObservers: [any NSObjectProtocol] = []
     /// Guards everything below.
     private let placesLock = NSLock()
     private var knownPlaces: [Place] = LocalFileSystem.fixedPlaces()

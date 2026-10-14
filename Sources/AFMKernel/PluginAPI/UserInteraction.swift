@@ -63,7 +63,7 @@ extension UserInteraction {
         inform(message)
     }
 
-    public func report(_ error: Error, title: String) {
+    public func report(_ error: any Error, title: String) {
         inform(title, detail: error.localizedDescription, style: .warning)
     }
 

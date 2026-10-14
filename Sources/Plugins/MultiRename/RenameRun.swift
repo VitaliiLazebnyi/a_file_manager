@@ -42,7 +42,7 @@ struct RenamePreview {
     /// The keys of everything that is in the target folders now.
     var existing: Set<String>
     /// What is wrong with the settings as a whole (an invalid mask or expression).
-    var problem: Error?
+    var problem: any Error?
 
     var conflicts: [Int] { statuses.indices.filter { statuses[$0].isConflict } }
 
@@ -216,7 +216,7 @@ enum RenameComputation {
         _ entries: [RenameEntry], settings: RenameSettings, context: RenameContext, given: [String]?,
         fileSystems: FileSystemRegistry, subjects: [RenameSubject]? = nil,
         isCancelled: () -> Bool = { false }
-    ) -> (names: [String?], problem: Error?) {
+    ) -> (names: [String?], problem: any Error?) {
         var context = context
         context.count = entries.count
         return withoutActuallyEscaping(isCancelled) { cancelled in
@@ -501,7 +501,7 @@ final class RenameRunner {
         var madeFolders = Set<String>()
         var done = 0
 
-        func fail(_ item: Int, _ error: Error) {
+        func fail(_ item: Int, _ error: any Error) {
             guard failed.insert(item).inserted else { return }
             result.failures.append((item, error.localizedDescription))
         }

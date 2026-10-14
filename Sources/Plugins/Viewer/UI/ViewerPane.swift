@@ -57,7 +57,7 @@ final class ViewerPane: NSView, NSMenuDelegate {
     /// What is known about the loaded file.
     struct Loaded {
         let item: ViewerItem
-        let source: ByteSource
+        let source: any ByteSource
         let sample: Data
         let guess: ViewerDetection.TextGuess
         let content: ViewerDetection.Content
@@ -86,7 +86,7 @@ final class ViewerPane: NSView, NSMenuDelegate {
     let workQueue = DispatchQueue(label: "viewer.work", qos: .userInitiated, attributes: .concurrent)
     private let temporaryCopies: TemporaryCopies
     /// The text of an HTML file with its tags removed, kept while the file is shown.
-    private var strippedHTML: (links: [String], source: ByteSource)?
+    private var strippedHTML: (links: [String], source: any ByteSource)?
     private var resizeWork: DispatchWorkItem?
 
     // MARK: Search state (see ViewerPane+Actions)
@@ -279,7 +279,7 @@ final class ViewerPane: NSView, NSMenuDelegate {
             guard !cancellation.isCancelled else { return }
             /// Opens and samples the file. `flag` ends it: the pane's own, or, for a file system, the one
             /// `BlockingCalls` hands over once nobody waits for the answer.
-            func open(_ item: ViewerItem, _ flag: CancellationFlag) -> Result<Loaded, Error> {
+            func open(_ item: ViewerItem, _ flag: CancellationFlag) -> Result<Loaded, any Error> {
                 Result { () -> Loaded in
                     switch item.source {
                     case .text(let text):
@@ -322,7 +322,7 @@ final class ViewerPane: NSView, NSMenuDelegate {
             // A file system that does not answer must not hold this thread: the work is asked of a
             // kernel thread (at most 64 per file system), and this thread goes on once the file is no
             // longer wanted, whatever the file system does.
-            let result: Result<Loaded, Error>
+            let result: Result<Loaded, any Error>
             if case .file(let url) = item.source, let provider = try? fileSystems.provider(for: url) {
                 let answer = BlockingCalls.answer(
                     from: provider, to: "view " + url.absoluteString, sharing: false, cancellation: cancellation

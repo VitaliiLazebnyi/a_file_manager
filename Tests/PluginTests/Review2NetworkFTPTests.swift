@@ -376,7 +376,7 @@ private final class Notes: @unchecked Sendable {
         let session = try #require(try fixture.center.session(for: fixture.key) as? FTPSession)
         session.stallLimit = 1
         // Two viewers that paused: all the connections downloads may have.
-        let held = try (0..<2).map { index -> FileReader in
+        let held = try (0..<2).map { index -> any FileReader in
             let reader = try fixture.fileSystem.read(fixture.url("/f\(index).bin"))
             #expect(try reader.read(upToCount: 10)?.count == 10)
             return reader
@@ -492,7 +492,7 @@ private final class Notes: @unchecked Sendable {
         // A server that stopped answering, and a viewer that steps through files: every reader
         // is dropped without being closed while its transfer hangs.
         for _ in 0..<24 {
-            var reader: FileReader? = try fixture.fileSystem.read(fixture.url("/f.bin"))
+            var reader: (any FileReader)? = try fixture.fileSystem.read(fixture.url("/f.bin"))
             let pending = reader
             let read = AdoptOutcome { _ = try pending?.read(upToCount: 10) }
             reader?.interrupt()

@@ -1,3 +1,4 @@
+import AFMContracts
 import AFMKernel
 import AppKit
 
@@ -570,7 +571,7 @@ final class FileGridView: NSView, NSDraggingSource, NSUserInterfaceValidations {
         return panel?.contextMenu(forRow: row(at: convert(event.locationInWindow, from: nil)))
     }
 
-    func validateUserInterfaceItem(_ item: NSValidatedUserInterfaceItem) -> Bool {
+    func validateUserInterfaceItem(_ item: any NSValidatedUserInterfaceItem) -> Bool {
         if let menuItem = item as? NSMenuItem, let id = MenuBuilder.command(of: menuItem) {
             return panel?.commands.isEnabled(id) ?? false
         }
@@ -590,9 +591,9 @@ final class FileGridView: NSView, NSDraggingSource, NSUserInterfaceValidations {
         PanelDrop.endSession()
     }
 
-    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation { draggingUpdated(sender) }
+    override func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation { draggingUpdated(sender) }
 
-    override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
+    override func draggingUpdated(_ sender: any NSDraggingInfo) -> NSDragOperation {
         guard let panel else { return [] }
         let row = self.row(at: convert(sender.draggingLocation, from: nil))
         let (operation, target) = panel.validateDrop(sender, row: row)
@@ -600,19 +601,19 @@ final class FileGridView: NSView, NSDraggingSource, NSUserInterfaceValidations {
         return operation
     }
 
-    override func draggingExited(_ sender: NSDraggingInfo?) {
+    override func draggingExited(_ sender: any NSDraggingInfo?) {
         dropRow = nil
         // What was read of another program's drag is not kept while it is elsewhere; the
         // program's own drag stays known until it ends.
         if PanelDrop.current == nil { PanelDrop.endSession(sender?.draggingSequenceNumber) }
     }
 
-    override func draggingEnded(_ sender: NSDraggingInfo) {
+    override func draggingEnded(_ sender: any NSDraggingInfo) {
         dropRow = nil
         PanelDrop.endSession(sender.draggingSequenceNumber)
     }
 
-    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+    override func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {
         dropRow = nil
         return panel?.acceptDrop(sender, row: row(at: convert(sender.draggingLocation, from: nil))) ?? false
     }

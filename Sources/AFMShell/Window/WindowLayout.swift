@@ -39,11 +39,11 @@ final class WindowLayout {
     static let fullScreenKey = "window.fullScreen"
     static let titleExtraKey = "window.titleExtraText"
 
-    private let settings: SettingsStore
+    private let settings: any SettingsStore
     /// Called after a value that changes the look of the window was set.
     var onChange: (() -> Void)?
 
-    init(settings: SettingsStore) {
+    init(settings: any SettingsStore) {
         self.settings = settings
     }
 

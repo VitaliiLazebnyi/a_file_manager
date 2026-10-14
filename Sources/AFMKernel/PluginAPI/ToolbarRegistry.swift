@@ -61,7 +61,7 @@ public final class ToolbarRegistry {
     }
 
     /// The bar as it is to be drawn: the user's layout when there is one, else the proposal.
-    public func layout(from settings: SettingsStore) -> [Button?] {
+    public func layout(from settings: any SettingsStore) -> [Button?] {
         guard let names = settings.value([String].self, forKey: Self.settingsKey) else {
             return defaultLayout
         }
@@ -74,12 +74,12 @@ public final class ToolbarRegistry {
     }
 
     /// Whether the user has a layout of their own, rather than the plugins' proposal.
-    public func hasUserLayout(in settings: SettingsStore) -> Bool {
+    public func hasUserLayout(in settings: any SettingsStore) -> Bool {
         settings.data(forKey: Self.settingsKey) != nil
     }
 
     /// Stores the user's layout (nil goes back to the proposal) and has the bar redrawn.
-    public func setLayout(_ layout: [CommandID?]?, in settings: SettingsStore) {
+    public func setLayout(_ layout: [CommandID?]?, in settings: any SettingsStore) {
         if let layout {
             settings.set(layout.map { $0?.rawValue ?? "" }, forKey: Self.settingsKey)
         } else {

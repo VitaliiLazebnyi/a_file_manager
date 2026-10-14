@@ -184,7 +184,7 @@ public final class ArchivesPlugin: Plugin {
         let deadline = Date(timeIntervalSinceNow: environment.quitTimeout)
         Thread.detachNewThread {
             let failures = store.flushAll(cancellation: environment.quitting)
-            var reports: [(error: Error, name: String)] = []
+            var reports: [(error: any Error, name: String)] = []
             if !failures.isEmpty {
                 // Out of time, the members are kept as they lie; otherwise they are saved in
                 // an archive of their own. By archive, not by name: two may be called the same.
@@ -233,15 +233,15 @@ public final class ArchivesPlugin: Plugin {
     /// What the stop's background thread hands back.
     private final class StopState {
         private let lock = NSLock()
-        private var result: [(error: Error, name: String)]?
+        private var result: [(error: any Error, name: String)]?
 
-        var reports: [(error: Error, name: String)]? {
+        var reports: [(error: any Error, name: String)]? {
             lock.lock()
             defer { lock.unlock() }
             return result
         }
 
-        func finish(_ reports: [(error: Error, name: String)]) {
+        func finish(_ reports: [(error: any Error, name: String)]) {
             lock.lock()
             result = reports
             lock.unlock()

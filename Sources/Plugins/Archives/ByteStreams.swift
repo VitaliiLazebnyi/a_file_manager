@@ -30,7 +30,7 @@ extension ByteStream {
     }
 }
 
-func posixError(_ code: Int32, _ path: String) -> Error {
+func posixError(_ code: Int32, _ path: String) -> any Error {
     NSError(
         domain: NSPOSIXErrorDomain, code: Int(code),
         userInfo: [NSLocalizedDescriptionKey: String(cString: strerror(code)) + ": " + path])
@@ -256,11 +256,11 @@ extension UInt64 {
 /// directory entry declares is damaged or made to fill the disk; it is stopped at the first
 /// byte too many instead of after the last.
 final class SizeGuardStream: ByteStream {
-    private let source: ByteStream
+    private let source: any ByteStream
     private var left: UInt64
     private let name: String
 
-    init(_ source: ByteStream, limit: UInt64, name: String) {
+    init(_ source: any ByteStream, limit: UInt64, name: String) {
         self.source = source
         left = limit
         self.name = name
@@ -281,7 +281,7 @@ final class SizeGuardStream: ByteStream {
 /// Passes a stream on and keeps a copy of what was read in a file, for as long as the copy
 /// stays below `limit` (and the disk takes it). Used by one thread.
 final class TeeStream: ByteStream {
-    private let source: ByteStream
+    private let source: any ByteStream
     private let output: OutputFile
     private let limit: UInt64
     /// False once the copy was given up; what the file holds is then worthless.
@@ -289,7 +289,7 @@ final class TeeStream: ByteStream {
 
     private let room: SpaceWatch?
 
-    init(_ source: ByteStream, to output: OutputFile, limit: UInt64, room: SpaceWatch? = nil) {
+    init(_ source: any ByteStream, to output: OutputFile, limit: UInt64, room: SpaceWatch? = nil) {
         self.source = source
         self.output = output
         self.limit = limit
@@ -315,11 +315,11 @@ final class TeeStream: ByteStream {
 
 /// No more than `length` bytes of another stream.
 final class LimitedStream: ByteStream {
-    private let source: ByteStream
+    private let source: any ByteStream
     private var left: UInt64
     private let closesSource: Bool
 
-    init(_ source: ByteStream, length: UInt64, closesSource: Bool = true) {
+    init(_ source: any ByteStream, length: UInt64, closesSource: Bool = true) {
         self.source = source
         left = length
         self.closesSource = closesSource

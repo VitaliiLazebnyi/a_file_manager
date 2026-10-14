@@ -46,7 +46,7 @@ final class SyncSession {
     }
 
     let kernel: Kernel
-    private let settings: SettingsStore
+    private let settings: any SettingsStore
 
     var leftPath = ""
     var rightPath = ""

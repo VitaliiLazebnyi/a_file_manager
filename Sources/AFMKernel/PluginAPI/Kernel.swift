@@ -32,8 +32,8 @@ extension Plugin {
 
 /// What the window shell provides to plugins once it exists.
 public protocol ShellServices: AnyObject {
-    var panels: PanelSet { get }
-    var jobs: JobService { get }
+    var panels: any PanelSet { get }
+    var jobs: any JobService { get }
 }
 
 /// The kernel has no features of its own. It holds the registries plugins fill and the
@@ -59,16 +59,16 @@ public final class Kernel {
     public let settingsKeys = SettingsKeyRegistry()
     /// What happens in the panels, for plugins that follow them.
     public let panelEvents = PanelEvents()
-    public let settings: SettingsStore
-    public let ui: UserInteraction
+    public let settings: any SettingsStore
+    public let ui: any UserInteraction
     /// Listings of slow folders, remembered so that returning to one is immediate. Unlike the
     /// rest of the kernel it is used from any thread. The panels fill and empty it; plugins
     /// have no business with it (they report changed folders through `panels.refresh`).
     public let listingCache = ListingCache()
-    public private(set) var plugins: [Plugin] = []
-    private var shell: ShellServices?
+    public private(set) var plugins: [any Plugin] = []
+    private var shell: any ShellServices?
 
-    public init(productName: String, settings: SettingsStore, ui: UserInteraction) {
+    public init(productName: String, settings: any SettingsStore, ui: any UserInteraction) {
         self.productName = productName
         self.settings = settings
         self.ui = ui
@@ -103,7 +103,7 @@ public final class Kernel {
 
     /// Starts the plugins in the given order. The order decides where their entries appear
     /// inside a menu section and which plugin's file system is listed first.
-    public func load(_ plugins: [Plugin]) {
+    public func load(_ plugins: [any Plugin]) {
         for plugin in plugins {
             self.plugins.append(plugin)
             plugin.start(in: self)
@@ -112,7 +112,7 @@ public final class Kernel {
 
     /// Called by the shell when its panels exist. The user's key bindings are applied on top
     /// of the plugins' defaults, and commands may run from then on.
-    public func attach(_ shell: ShellServices) {
+    public func attach(_ shell: any ShellServices) {
         self.shell = shell
         keyBindings.load(from: settings)
         commands.isBlocked = { [unowned shell] in shell.jobs.isBusy }
@@ -152,7 +152,7 @@ public final class Kernel {
         group.notify(queue: .main, execute: completion)
     }
 
-    private var attachedShell: ShellServices {
+    private var attachedShell: any ShellServices {
         guard let shell else {
             preconditionFailure("The shell is not attached yet; use panels and jobs inside command handlers only.")
         }
@@ -160,14 +160,14 @@ public final class Kernel {
     }
 
     /// The two file panels. Available to command handlers, not while a plugin starts.
-    public var panels: PanelSet { attachedShell.panels }
+    public var panels: any PanelSet { attachedShell.panels }
     /// Runs long work with a progress window.
-    public var jobs: JobService { attachedShell.jobs }
+    public var jobs: any JobService { attachedShell.jobs }
 
     /// Asks the user something from any thread and waits for the answer: the route for a file
     /// system that needs, say, a password in the middle of a job. Inside a job prefer
     /// `JobMonitor.ask`, which also keeps the progress window correct.
-    public func askUser<Answer>(_ question: (UserInteraction) -> Answer) -> Answer {
+    public func askUser<Answer>(_ question: (any UserInteraction) -> Answer) -> Answer {
         if Thread.isMainThread { return question(ui) }
         // Work that the main thread itself is waiting for must not wait for it.
         Parallel.assertMayWaitForMainThread()
@@ -318,16 +318,16 @@ extension SettingsStore {
     }
 
     /// A plugin's own corner of the settings: its keys cannot clash with anyone else's.
-    public func scoped(to owner: String) -> SettingsStore {
+    public func scoped(to owner: String) -> any SettingsStore {
         ScopedSettings(base: self, prefix: owner + ".")
     }
 }
 
 private final class ScopedSettings: SettingsStore {
-    private let base: SettingsStore
+    private let base: any SettingsStore
     private let prefix: String
 
-    init(base: SettingsStore, prefix: String) {
+    init(base: any SettingsStore, prefix: String) {
         self.base = base
         self.prefix = prefix
     }

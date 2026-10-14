@@ -36,7 +36,7 @@ final class Answers: FileJobDelegate {
         return conflict
     }
 
-    func job(_: FileJob, failedAt _: URL, error: Error) -> ErrorChoice {
+    func job(_: FileJob, failedAt _: URL, error: any Error) -> ErrorChoice {
         errors.append(error.localizedDescription)
         return failure
     }

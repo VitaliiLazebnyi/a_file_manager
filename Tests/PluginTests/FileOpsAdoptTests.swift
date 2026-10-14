@@ -38,8 +38,8 @@ final class ProbeFileSystem: FileSystemProvider {
     func count(of name: String) -> Int { lock.withLock { calls[name] ?? 0 } }
 
     private final class Reader: FileReader {
-        let inner: FileReader, owner: ProbeFileSystem
-        init(_ inner: FileReader, _ owner: ProbeFileSystem) { (self.inner, self.owner) = (inner, owner) }
+        let inner: any FileReader, owner: ProbeFileSystem
+        init(_ inner: any FileReader, _ owner: ProbeFileSystem) { (self.inner, self.owner) = (inner, owner) }
         func read(upToCount count: Int) throws -> Data? {
             owner.onRead?()
             return try inner.read(upToCount: count)
@@ -50,8 +50,8 @@ final class ProbeFileSystem: FileSystemProvider {
     }
 
     private final class Writer: FileWriter {
-        let inner: FileWriter, owner: ProbeFileSystem
-        init(_ inner: FileWriter, _ owner: ProbeFileSystem) { (self.inner, self.owner) = (inner, owner) }
+        let inner: any FileWriter, owner: ProbeFileSystem
+        init(_ inner: any FileWriter, _ owner: ProbeFileSystem) { (self.inner, self.owner) = (inner, owner) }
         func write(_ data: Data) throws {
             owner.onWrite?()
             try inner.write(data)
@@ -72,20 +72,20 @@ final class ProbeFileSystem: FileSystemProvider {
     }
     func item(at url: URL) -> FileItem? { base.item(at: url) }
     func parent(of directory: URL) -> URL? { base.parent(of: directory) }
-    func read(_ url: URL) throws -> FileReader { Reader(try base.read(url), self) }
-    func read(_ url: URL, cancellation: CancellationFlag) throws -> FileReader {
+    func read(_ url: URL) throws -> any FileReader { Reader(try base.read(url), self) }
+    func read(_ url: URL, cancellation: CancellationFlag) throws -> any FileReader {
         Reader(try base.read(url, cancellation: cancellation), self)
     }
     func createDirectory(at url: URL) throws { try base.createDirectory(at: url) }
-    func write(_ url: URL) throws -> FileWriter {
+    func write(_ url: URL) throws -> any FileWriter {
         count("write")
         return Writer(try base.write(url), self)
     }
-    func write(_ url: URL, cancellation: CancellationFlag) throws -> FileWriter {
+    func write(_ url: URL, cancellation: CancellationFlag) throws -> any FileWriter {
         count("write")
         return Writer(try base.write(url, cancellation: cancellation), self)
     }
-    func append(to url: URL, at offset: Int64?, cancellation: CancellationFlag) throws -> FileWriter {
+    func append(to url: URL, at offset: Int64?, cancellation: CancellationFlag) throws -> any FileWriter {
         count("append")
         return Writer(try base.append(to: url, at: offset, cancellation: cancellation), self)
     }
@@ -114,7 +114,7 @@ final class ProbeFileSystem: FileSystemProvider {
     func volume(of url: URL) -> VolumeInfo? { base.volume(of: url) }
 }
 
-private func registry(_ providers: FileSystemProvider...) -> FileSystemRegistry {
+private func registry(_ providers: any FileSystemProvider...) -> FileSystemRegistry {
     let fileSystems = FileSystemRegistry()
     fileSystems.register(LocalFileSystem())
     providers.forEach(fileSystems.register)

@@ -355,13 +355,16 @@ public struct TextPattern {
 
     /// Whether the file passes the text criterion: the text is in it, or, with "NOT
     /// containing", is not. A file that cannot be read never passes.
-    public func accepts(_ reader: FileReader, cancellation: CancellationFlag? = nil, blockSize: Int = 1 << 20) -> Bool {
+    public func accepts(_ reader: any FileReader, cancellation: CancellationFlag? = nil, blockSize: Int = 1 << 20)
+        -> Bool
+    {
         guard let found = search(reader, cancellation: cancellation, blockSize: blockSize) else { return false }
         return found != notContaining
     }
 
     /// Whether the text occurs in the bytes the reader delivers.
-    public func isFound(in reader: FileReader, cancellation: CancellationFlag? = nil, blockSize: Int = 1 << 20) -> Bool
+    public func isFound(in reader: any FileReader, cancellation: CancellationFlag? = nil, blockSize: Int = 1 << 20)
+        -> Bool
     {
         search(reader, cancellation: cancellation, blockSize: blockSize) ?? false
     }
@@ -371,7 +374,7 @@ public struct TextPattern {
     }
 
     /// Nil when the search was cancelled or the file could not be read to its end.
-    private func search(_ reader: FileReader, cancellation: CancellationFlag?, blockSize: Int) -> Bool? {
+    private func search(_ reader: any FileReader, cancellation: CancellationFlag?, blockSize: Int) -> Bool? {
         switch matcher {
         case .bytes(let needles): return Self.search(needles, reader, cancellation, blockSize)
 
@@ -383,7 +386,7 @@ public struct TextPattern {
     /// Reads block by block. The end of each block is looked at again together with the next
     /// one, so a hit across a block border is found, with the characters around it.
     private static func search(
-        _ needles: [Needle], _ reader: FileReader, _ cancellation: CancellationFlag?, _ blockSize: Int
+        _ needles: [Needle], _ reader: any FileReader, _ cancellation: CancellationFlag?, _ blockSize: Int
     ) -> Bool? {
         let overlap = (needles.map(\.maxLength).max() ?? 1) + 2
         var carry = Data()
@@ -421,7 +424,7 @@ public struct TextPattern {
     /// text into lines. A piece that takes the expression too long ends the search of the file
     /// (it is not found in it), and a cancelled search ends at once, also in the middle of a piece.
     private static func search(
-        _ regex: NSRegularExpression, _ encodings: [TextEncoding], _ reader: FileReader,
+        _ regex: NSRegularExpression, _ encodings: [TextEncoding], _ reader: any FileReader,
         _ cancellation: CancellationFlag?, _ blockSize: Int, _ trip: RegexTrip
     ) -> Bool? {
         var decoders = encodings.map { LineDecoder(encoding: $0) }

@@ -26,7 +26,7 @@ final class OddFileSystem: FileSystemProvider {
     private var removedURLs: [URL] = []
     private var trashed: [URL] = []
     /// What `trash` throws; nil trashes for real.
-    var trashError: Error?
+    var trashError: (any Error)?
 
     func addHostile(names: [String], in directory: String) { lock.withLock { hostile[directory] = names } }
     func failNextRemovals(_ count: Int) { lock.withLock { failures = count } }
@@ -50,12 +50,12 @@ final class OddFileSystem: FileSystemProvider {
         return base.item(at: url)
     }
     func parent(of directory: URL) -> URL? { base.parent(of: directory) }
-    func read(_ url: URL) throws -> FileReader {
+    func read(_ url: URL) throws -> any FileReader {
         if url.lastPathComponent.hasPrefix("hostile") { return try base.read(base.addFile("/hostile-data", "evil")) }
         return try base.read(url)
     }
     func createDirectory(at url: URL) throws { try base.createDirectory(at: url) }
-    func write(_ url: URL) throws -> FileWriter { try base.write(url) }
+    func write(_ url: URL) throws -> any FileWriter { try base.write(url) }
     func remove(_ url: URL) throws {
         let fails: Bool = lock.withLock {
             removedURLs.append(url)
@@ -90,7 +90,7 @@ final class RetryOnce: FileJobDelegate {
     private(set) var errors: [String] = []
     func job(_: FileJob, progress _: JobProgress) {}
     func job(_: FileJob, conflictAt _: FileItem, source _: FileItem) -> ConflictChoice { .overwrite }
-    func job(_: FileJob, failedAt _: URL, error: Error) -> ErrorChoice {
+    func job(_: FileJob, failedAt _: URL, error: any Error) -> ErrorChoice {
         lock.withLock {
             errors.append(error.localizedDescription)
             return errors.count == 1 ? .retry : .skip

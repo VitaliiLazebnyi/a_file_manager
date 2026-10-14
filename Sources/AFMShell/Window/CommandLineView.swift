@@ -148,7 +148,7 @@ final class CommandLineView: NSView, NSComboBoxDelegate {
     /// address is the user's own choice (`ServerConsentService`), which an address read from
     /// a tab file, a list or a link never is.
     private func noteTypedLocation(_ path: String) {
-        guard let consent = kernel.services.find(ServerConsentService.self) else { return }
+        guard let consent = kernel.services.find((any ServerConsentService).self) else { return }
         let location = kernel.fileSystems.location(from: path, relativeTo: panels.sourcePanel.model.directory)
         guard (try? kernel.fileSystems.provider(for: location))?.connectsToServer == true else { return }
         consent.userChose(location)

@@ -41,7 +41,7 @@ import VirtualFoldersPlugin
 
     // F001, F018: what Paste after Cut does in a branch view.
     @Test func movingFilesIntoTheBranchViewTheyAreShownInChangesNothing() throws {
-        let transfers = try #require(bench.kernel.services.find(FileTransferService.self))
+        let transfers = try #require(bench.kernel.services.find((any FileTransferService).self))
         var ended = false
         transfers.transfer(
             .move, [box.url("d/a.txt"), box.url("d/b.txt")], into: try branch(of: "d"), renamingSelfCopies: false
@@ -57,14 +57,14 @@ import VirtualFoldersPlugin
     }
 
     @Test func pastingACopyIntoABranchViewGivesItANewNameInTheRealFolder() throws {
-        let transfers = try #require(bench.kernel.services.find(FileTransferService.self))
+        let transfers = try #require(bench.kernel.services.find((any FileTransferService).self))
         transfers.transfer(.copy, [box.url("d/a.txt")], into: try branch(of: "d"), renamingSelfCopies: true) { _ in }
         #expect(
             namesOnDisk(box.url("d")) == ["a (2).txt", "a.txt", "b.txt", "sub"] && box.read("d/a.txt") == "precious")
     }
 
     @Test func nothingCanBePastedIntoAListOfFiles() throws {
-        let transfers = try #require(bench.kernel.services.find(FileTransferService.self))
+        let transfers = try #require(bench.kernel.services.find((any FileTransferService).self))
         let list = try #require(virtual.fileSystem).register(
             files: [box.url("d/a.txt")], title: "Found", origin: box.url("d"))
         transfers.transfer(.copy, [box.url("d/b.txt")], into: list, renamingSelfCopies: false) { _ in }
@@ -391,7 +391,7 @@ final class GatedFileSystem: FileSystemProvider {
     }
     func item(at url: URL) -> FileItem? { base.item(at: url) }
     func parent(of directory: URL) -> URL? { base.parent(of: directory) }
-    func read(_ url: URL) throws -> FileReader {
+    func read(_ url: URL) throws -> any FileReader {
         // The contents as they are now; handed out only after the gate opens.
         let reader = try base.read(url)
         let held: Bool = lock.withLock {
@@ -406,7 +406,7 @@ final class GatedFileSystem: FileSystemProvider {
         return reader
     }
     func createDirectory(at url: URL) throws { try base.createDirectory(at: url) }
-    func write(_ url: URL) throws -> FileWriter { try base.write(url) }
+    func write(_ url: URL) throws -> any FileWriter { try base.write(url) }
     func remove(_ url: URL) throws { try base.remove(url) }
     func move(_ source: URL, to destination: URL, replacing: Bool) throws {
         try base.move(source, to: destination, replacing: replacing)

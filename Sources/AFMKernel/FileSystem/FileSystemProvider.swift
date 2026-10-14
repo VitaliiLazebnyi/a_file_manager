@@ -143,11 +143,11 @@ extension FileWriter {
 extension CancellationFlag {
     /// Interrupts `reader` when the flag is set, until the returned object is released: what
     /// a transfer does for the time it reads. The reader is not kept alive by it.
-    public func interrupting(_ reader: FileReader) -> AnyObject {
+    public func interrupting(_ reader: any FileReader) -> AnyObject {
         onCancel { [weak reader] in reader?.interrupt() }
     }
 
-    public func interrupting(_ writer: FileWriter) -> AnyObject {
+    public func interrupting(_ writer: any FileWriter) -> AnyObject {
         onCancel { [weak writer] in writer?.interrupt() }
     }
 }
@@ -226,22 +226,22 @@ public protocol FileSystemProvider: AnyObject {
     func item(at url: URL, cancellation: CancellationFlag) -> FileItem?
     /// The directory above; nil for a root. Works on the URL alone.
     func parent(of directory: URL) -> URL?
-    func read(_ url: URL) throws -> FileReader
+    func read(_ url: URL) throws -> any FileReader
     /// `read(_:)`, where opening itself can take long (a connection, the way to a member of
     /// a compressed archive): opening ends early, by throwing, once `cancellation` is set.
     /// The flag is the opening's only; a read of the reader that waits is ended with
     /// `FileReader.interrupt()` (`CancellationFlag.interrupting(_:)` ties the two together).
-    func read(_ url: URL, cancellation: CancellationFlag) throws -> FileReader
+    func read(_ url: URL, cancellation: CancellationFlag) throws -> any FileReader
 
     // Changing
     /// Creates the directory with any missing parents.
     func createDirectory(at url: URL) throws
     /// Creates a new file. Throws `FileSystemError.alreadyExists` when the name is taken; an
     /// existing file is never overwritten this way.
-    func write(_ url: URL) throws -> FileWriter
+    func write(_ url: URL) throws -> any FileWriter
     /// `write(_:)`, whose opening ends early, by throwing, once `cancellation` is set. As with
     /// `read(_:cancellation:)`, the writer itself is ended with `FileWriter.interrupt()`.
-    func write(_ url: URL, cancellation: CancellationFlag) throws -> FileWriter
+    func write(_ url: URL, cancellation: CancellationFlag) throws -> any FileWriter
     /// Opens an existing file to continue it. With an `offset`, the file is first cut to that
     /// many bytes and what is written follows them (Resume: the caller has checked that those
     /// bytes are the start of what it writes); throws when the file is shorter. With nil,
@@ -250,7 +250,7 @@ public protocol FileSystemProvider: AnyObject {
     /// long as it got. Throws `FileSystemError.notSupported`, the default, where files cannot
     /// be continued; `capabilities(for:)` then lacks `.append`, and the caller writes the
     /// whole file again. Opening ends early once `cancellation` is set.
-    func append(to url: URL, at offset: Int64?, cancellation: CancellationFlag) throws -> FileWriter
+    func append(to url: URL, at offset: Int64?, cancellation: CancellationFlag) throws -> any FileWriter
     /// Deletes one file, one link, or one **empty** directory. Whoever deletes a tree walks
     /// it, so that every item can be counted, skipped or cancelled.
     func remove(_ url: URL) throws
@@ -458,17 +458,17 @@ extension FileSystemProvider {
         cancellation.isCancelled ? nil : item(at: url)
     }
 
-    public func read(_ url: URL, cancellation: CancellationFlag) throws -> FileReader {
+    public func read(_ url: URL, cancellation: CancellationFlag) throws -> any FileReader {
         if cancellation.isCancelled { throw CocoaError(.userCancelled) }
         return try read(url)
     }
 
-    public func write(_ url: URL, cancellation: CancellationFlag) throws -> FileWriter {
+    public func write(_ url: URL, cancellation: CancellationFlag) throws -> any FileWriter {
         if cancellation.isCancelled { throw CocoaError(.userCancelled) }
         return try write(url)
     }
 
-    public func append(to _: URL, at _: Int64?, cancellation _: CancellationFlag) throws -> FileWriter {
+    public func append(to _: URL, at _: Int64?, cancellation _: CancellationFlag) throws -> any FileWriter {
         throw FileSystemError.notSupported("Continuing a file")
     }
 
@@ -638,7 +638,7 @@ extension FileSystemProvider {
     }
 
     /// Continues a file without a way to stop the opening.
-    public func append(to url: URL, at offset: Int64?) throws -> FileWriter {
+    public func append(to url: URL, at offset: Int64?) throws -> any FileWriter {
         try append(to: url, at: offset, cancellation: CancellationFlag())
     }
 
@@ -657,14 +657,14 @@ extension FileSystemProvider {
 /// The file systems the plugins provide, found by URL scheme. Filled while the plugins start
 /// and only read afterwards, so it may be read from any thread.
 public final class FileSystemRegistry {
-    private var providers: [FileSystemProvider] = []
+    private var providers: [any FileSystemProvider] = []
     private var flushers: [(URL, CancellationFlag) throws -> Void] = []
     private var releasers: [(URL) -> Void] = []
     private var closers: [(URL, CancellationFlag) -> Void] = []
 
     public init() {}
 
-    public func register(_ provider: FileSystemProvider) {
+    public func register(_ provider: any FileSystemProvider) {
         precondition(
             !providers.contains { $0.scheme == provider.scheme },
             "A file system for \(provider.scheme): is registered twice")
@@ -672,9 +672,9 @@ public final class FileSystemRegistry {
     }
 
     /// Every provider, in registration order.
-    public var all: [FileSystemProvider] { providers }
+    public var all: [any FileSystemProvider] { providers }
 
-    public func provider(for url: URL) throws -> FileSystemProvider {
+    public func provider(for url: URL) throws -> any FileSystemProvider {
         guard let provider = providers.first(where: { $0.scheme == (url.scheme ?? "file") }) else {
             throw FileSystemError.noProvider(url)
         }

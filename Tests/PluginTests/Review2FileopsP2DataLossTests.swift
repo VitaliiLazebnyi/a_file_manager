@@ -27,7 +27,7 @@ private final class OldAnswers: FileJobDelegate {
 
     func job(_: FileJob, progress _: JobProgress) {}
     func job(_: FileJob, conflictAt _: FileItem, source _: FileItem) -> ConflictChoice { conflict }
-    func job(_: FileJob, failedAt _: URL, error: Error) -> ErrorChoice {
+    func job(_: FileJob, failedAt _: URL, error: any Error) -> ErrorChoice {
         lock.withLock { messages.append(error.localizedDescription) }
         return .skip
     }

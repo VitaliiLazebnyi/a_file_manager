@@ -354,7 +354,7 @@ final class TextRowIndex {
     /// Whether the last published segment is the unfinished frontier one, to be replaced by
     /// its next state.
     private var hasPartial = false
-    private var firstFailure: Error?
+    private var firstFailure: any Error?
     private var parameters: Parameters?
     /// Every segment as it was scanned, by number: what a later layout can take over.
     private var scanned: [Int: Segment] = [:]
@@ -366,7 +366,7 @@ final class TextRowIndex {
     /// thread that is publishing a segment, or that has been preempted holding the index lock.
     private final class Overview {
         private let guarded = UnsafeMutablePointer<os_unfair_lock>.allocate(capacity: 1)
-        private var rows = 0, lines = 0, covered: Int64 = 0, complete = false, failure: Error?, reused = 0
+        private var rows = 0, lines = 0, covered: Int64 = 0, complete = false, failure: any Error?, reused = 0
 
         init(covered: Int64) {
             guarded.initialize(to: os_unfair_lock())
@@ -377,7 +377,7 @@ final class TextRowIndex {
             guarded.deallocate()
         }
 
-        func store(rows: Int, lines: Int, covered: Int64, complete: Bool, failure: Error?, reused: Int) {
+        func store(rows: Int, lines: Int, covered: Int64, complete: Bool, failure: any Error?, reused: Int) {
             os_unfair_lock_lock(guarded)
             self.rows = rows
             self.lines = lines
@@ -398,7 +398,7 @@ final class TextRowIndex {
         var lineCount: Int { read { $0.lines } }
         var coveredEnd: Int64 { read { $0.covered } }
         var isComplete: Bool { read { $0.complete } }
-        var failed: Error? { read { $0.failure } }
+        var failed: any Error? { read { $0.failure } }
         var reusedCount: Int { read { $0.reused } }
     }
 
@@ -434,7 +434,7 @@ final class TextRowIndex {
     var indexedThrough: Int64 { overview.coveredEnd }
     var isComplete: Bool { overview.isComplete }
     /// The first error that made a part of the file unreadable; its rows are missing.
-    var failure: Error? { overview.failed }
+    var failure: any Error? { overview.failed }
     /// How many segments the last build took over from the layout before (for tests).
     var segmentsReused: Int { overview.reusedCount }
     /// How many checkpoints the index holds (for tests, and to see what a file costs).
@@ -448,7 +448,8 @@ final class TextRowIndex {
     /// from the working threads whenever more of the start of the file is known. `rawScan`
     /// off decodes every byte (the reference the fast scan is tested against).
     func build(
-        source: ByteSource, content: Range<Int64>, encoding: ViewerEncoding, options: TextLayoutOptions, parallel: Bool,
+        source: any ByteSource, content: Range<Int64>, encoding: ViewerEncoding, options: TextLayoutOptions,
+        parallel: Bool,
         segmentSize: Int = 4 << 20, chunkSize: Int = 1 << 20, rawScan: Bool = true, cancellation: CancellationFlag,
         progress: @escaping () -> Void = {}
     ) {
@@ -568,7 +569,7 @@ final class TextRowIndex {
         }
     }
 
-    private func recordFailure(_ error: Error) {
+    private func recordFailure(_ error: any Error) {
         synchronized {
             if firstFailure == nil { firstFailure = error }
             mirror()
@@ -747,7 +748,7 @@ final class TextRowIndex {
     /// for the first line start behind its lower bound and reads on past its upper bound to
     /// the end of its last line. `partial` is handed what is found so far, every few megabytes.
     static func scan(
-        source: ByteSource, content: Range<Int64>, segment: Range<Int64>, isFirst: Bool, encoding: ViewerEncoding,
+        source: any ByteSource, content: Range<Int64>, segment: Range<Int64>, isFirst: Bool, encoding: ViewerEncoding,
         options: TextLayoutOptions, chunkSize: Int, rawScan: Bool = true, cancellation: CancellationFlag,
         from lineStart: Int64? = nil, partial: ((Segment, Int64) -> Void)? = nil, changed: (() -> Void)? = nil
     ) throws -> Segment {

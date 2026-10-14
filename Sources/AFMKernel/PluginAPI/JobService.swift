@@ -57,8 +57,8 @@ public protocol JobService: AnyObject {
     /// `work` runs on a background thread; `completion` on the main thread with its result,
     /// also when the job was cancelled (the work then returns early with what it has).
     @discardableResult
-    func run<Result>(title: String, work: @escaping (JobMonitor) -> Result, completion: @escaping (Result) -> Void)
-        -> JobHandle
+    func run<Result>(title: String, work: @escaping (any JobMonitor) -> Result, completion: @escaping (Result) -> Void)
+        -> any JobHandle
     /// Cancels every job; `completion` runs on the main thread once none is left.
     func cancelAll(then completion: @escaping () -> Void)
 }

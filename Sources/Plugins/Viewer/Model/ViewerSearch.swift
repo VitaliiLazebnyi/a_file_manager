@@ -149,7 +149,7 @@ enum ViewerSearch {
     /// is cut into characters with; a search that is repeated keeps it between the calls.
     /// `rawBytes` off decodes every chunk (the reference the raw searches are tested against).
     static func find(
-        _ pattern: SearchPattern, in source: ByteSource, content: Range<Int64>, from start: Int64, backwards: Bool,
+        _ pattern: SearchPattern, in source: any ByteSource, content: Range<Int64>, from start: Int64, backwards: Bool,
         encoding: ViewerEncoding, chunkSize: Int = 1 << 20,
         parallelism: Int = ProcessInfo.processInfo.activeProcessorCount,
         cancellation: CancellationFlag = CancellationFlag(), boundaries: CharacterBoundaries? = nil,
@@ -174,7 +174,7 @@ enum ViewerSearch {
         var next = 0
         while next < chunkCount, !cancellation.isCancelled {
             let wave = Array(next..<min(chunkCount, next + max(1, parallelism)))
-            let results: [Result<Range<Int64>?, Error>] = Parallel.map(wave) { number in
+            let results: [Result<Range<Int64>?, any Error>] = Parallel.map(wave) { number in
                 let owned: Range<Int64> =
                     backwards
                     ? max(content.lowerBound, origin - Int64(number + 1) * size)..<origin - Int64(number) * size
@@ -203,7 +203,7 @@ enum ViewerSearch {
 
     /// What a search of one chunk needs besides the pattern.
     private struct Context {
-        let source: ByteSource
+        let source: any ByteSource
         let content: Range<Int64>
         let encoding: ViewerEncoding
         let cancellation: CancellationFlag

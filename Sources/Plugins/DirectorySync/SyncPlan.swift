@@ -148,7 +148,7 @@ public final class SyncExecutor {
 
     /// Asked when a copy would replace `target`, if overwrites are to be confirmed.
     public var onOverwrite: (_ target: FileItem, _ copy: SyncPlan.Copy) -> SyncOverwriteAnswer = { _, _ in .overwrite }
-    public var onError: (_ url: URL, _ error: Error) -> SyncErrorAnswer = { _, _ in .skip }
+    public var onError: (_ url: URL, _ error: any Error) -> SyncErrorAnswer = { _, _ in .skip }
     public var onProgress: (JobProgress) -> Void = { _ in }
 
     private var outcome = SyncOutcome()
@@ -164,7 +164,7 @@ public final class SyncExecutor {
     private var directoryDates: [(url: URL, modified: Date, source: URL)] = []
     /// The roots of the file systems with deferred writes that something was written to, by
     /// location, still to be committed.
-    private var uncommitted: [String: (provider: FileSystemProvider, root: URL)] = [:]
+    private var uncommitted: [String: (provider: any FileSystemProvider, root: URL)] = [:]
     /// What the progress window says about the item being worked on.
     private var currentLines: [String] = []
 
@@ -367,7 +367,7 @@ public final class SyncExecutor {
     }
 
     /// `base`, or `base-2`, `base-3`, … : the first name in `folder` that nothing has.
-    private func freeName(_ folder: URL, _ base: String, in provider: FileSystemProvider) -> URL {
+    private func freeName(_ folder: URL, _ base: String, in provider: any FileSystemProvider) -> URL {
         var candidate = folder.appending(name: base)
         var number = 2
         while provider.item(at: candidate) != nil {
@@ -378,7 +378,7 @@ public final class SyncExecutor {
     }
 
     /// Remembers that something was written to a file system that keeps writes back.
-    private func noteWrite(to url: URL, in provider: FileSystemProvider) {
+    private func noteWrite(to url: URL, in provider: any FileSystemProvider) {
         guard provider.capabilities(for: url).contains(.deferredWrites) else { return }
         let root = provider.root(of: url)
         uncommitted[root.locationKey] = (provider, root)
@@ -407,7 +407,7 @@ public final class SyncExecutor {
 
     /// Copies the file to a free name: inside one file system by the file system itself,
     /// otherwise by reading from one and writing to the other. Nothing stays behind on failure.
-    private func transfer(_ copy: SyncPlan.Copy, to destination: URL, in targetSystem: FileSystemProvider) throws {
+    private func transfer(_ copy: SyncPlan.Copy, to destination: URL, in targetSystem: any FileSystemProvider) throws {
         let sourceSystem = try fileSystems.provider(for: copy.source)
         let report = { (bytes: Int64) in
             self.onProgress(
@@ -467,7 +467,7 @@ public final class SyncExecutor {
     /// comparison. The target's date is set; where that is not possible, the source takes
     /// the target's date (spec 09 › Synchronizing with FTP, the timestamp problem), moved by the
     /// same amount the target's was.
-    private func adjustDate(of copy: SyncPlan.Copy, in targetSystem: FileSystemProvider) {
+    private func adjustDate(of copy: SyncPlan.Copy, in targetSystem: any FileSystemProvider) {
         guard let arrived = targetSystem.item(at: copy.target), !arrived.isSymlink,
             abs(arrived.modified.timeIntervalSince(copy.targetModified)) > Double(options.toleranceSeconds)
         else { return }
@@ -500,7 +500,7 @@ public final class SyncExecutor {
         return true
     }
 
-    private func remove(_ url: URL, in fileSystem: FileSystemProvider) throws {
+    private func remove(_ url: URL, in fileSystem: any FileSystemProvider) throws {
         if options.useTrash, fileSystem.capabilities(for: url).contains(.trash) {
             try fileSystem.trash(url)
         } else {

@@ -12,7 +12,7 @@ final class SearchForm: NSObject, NSTableViewDataSource, NSTableViewDelegate {
 
     private let fields: [SearchField]
     private let store: SearchStore
-    private let ui: UserInteraction
+    private let ui: any UserInteraction
 
     // General
     private let searchInField = NSComboBox()
@@ -77,7 +77,7 @@ final class SearchForm: NSObject, NSTableViewDataSource, NSTableViewDelegate {
         NSButton(checkboxWithTitle: title, target: nil, action: nil)
     }
 
-    init(fields: [SearchField], store: SearchStore, ui: UserInteraction) {
+    init(fields: [SearchField], store: SearchStore, ui: any UserInteraction) {
         self.fields = fields
         self.store = store
         self.ui = ui

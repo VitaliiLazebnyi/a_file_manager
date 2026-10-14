@@ -31,7 +31,7 @@ final class Review2HookProvider: FileSystemProvider {
     func list(_: URL, showHidden _: Bool) -> [FileItem] { [] }
     func parent(of directory: URL) -> URL? { directory.deletingLastPathComponent() }
     func createDirectory(at _: URL) throws { throw FileSystemError.notSupported("x") }
-    func write(_: URL) throws -> FileWriter { throw FileSystemError.notSupported("x") }
+    func write(_: URL) throws -> any FileWriter { throw FileSystemError.notSupported("x") }
     func remove(_: URL) {}
     func move(_: URL, to _: URL, replacing _: Bool) {}
     func copy(_: URL, to _: URL, progress _: (Int64) -> Bool) {}
@@ -70,7 +70,7 @@ final class Review2HookProvider: FileSystemProvider {
         }
     }
 
-    func read(_ url: URL) -> FileReader {
+    func read(_ url: URL) -> any FileReader {
         Reader(
             self, data: endless.contains(url.path) ? nil : contents[url.path] ?? Data(count: Int(sizes[url.path] ?? 0))
         )
@@ -142,7 +142,7 @@ final class Review2HookProvider: FileSystemProvider {
         let registry = FileSystemRegistry()
         registry.register(provider)
         let flag = CancellationFlag()
-        let outcome = ViewerAdoptBox<Result<ByteSource, Error>?>(nil)
+        let outcome = ViewerAdoptBox<Result<any ByteSource, any Error>?>(nil)
         let worker = ViewerAdoptWorker {
             outcome.value = Result {
                 try ProviderByteSource.open(URL(string: "hook:///stream")!, fileSystems: registry, cancellation: flag)

@@ -32,7 +32,7 @@ final class ArchiveStore {
         var archive: OpenArchive?
         /// Why the file could not be opened, and the state of the file that goes with it:
         /// a broken archive is not parsed again for every question about it.
-        var failure: (error: Error, signature: FileSignature?, time: Date)?
+        var failure: (error: any Error, signature: FileSignature?, time: Date)?
         var lastUsed = 0
     }
 
@@ -119,7 +119,7 @@ final class ArchiveStore {
         }
     }
 
-    private static func isAboutTheFile(_ error: Error) -> Bool {
+    private static func isAboutTheFile(_ error: any Error) -> Bool {
         switch error {
         case ArchiveError.notAnArchive, ArchiveError.damaged, ArchiveError.unsupported: return true
         default: return false
@@ -262,8 +262,8 @@ final class ArchiveStore {
     /// whole round has written nothing. With a `cancellation` the writes end soon after it
     /// is set. Blocks for as long as the writes take; not for the main thread.
     @discardableResult
-    func flushAll(cancellation: CancellationFlag? = nil) -> [(name: String, error: Error, archive: OpenArchive)] {
-        var failed: [ObjectIdentifier: (name: String, error: Error, archive: OpenArchive)] = [:]
+    func flushAll(cancellation: CancellationFlag? = nil) -> [(name: String, error: any Error, archive: OpenArchive)] {
+        var failed: [ObjectIdentifier: (name: String, error: any Error, archive: OpenArchive)] = [:]
         for _ in 0..<(2 * environment.maxNesting + 4) {
             let pending = openArchives.filter(\.hasPendingChanges)
                 .sorted { ArchiveURL.nesting(of: $0.archiveURL) > ArchiveURL.nesting(of: $1.archiveURL) }
@@ -399,12 +399,12 @@ final class ArchiveFileSystem: FileSystemProvider {
     private enum Target {
         case inside(OpenArchive, path: String, location: ArchiveLocation)
         /// A place on the file system the archive lies on.
-        case outside(FileSystemProvider, URL)
+        case outside(any FileSystemProvider, URL)
     }
 
     private var fileSystems: FileSystemRegistry? { store.environment.fileSystems() }
 
-    private func outerProvider(for url: URL) throws -> FileSystemProvider {
+    private func outerProvider(for url: URL) throws -> any FileSystemProvider {
         guard let fileSystems else { throw FileSystemError.noProvider(url) }
         return try fileSystems.provider(for: url)
     }
@@ -559,18 +559,18 @@ final class ArchiveFileSystem: FileSystemProvider {
         return current
     }
 
-    func read(_ url: URL) throws -> FileReader {
+    func read(_ url: URL) throws -> any FileReader {
         try reading(url, cancellation: nil)
     }
 
     /// Opening a member that lies behind a long stretch of decompression ends when the flag is
     /// set; so does the opening of the archive. The reader that is returned is ended with its
     /// `interrupt()`.
-    func read(_ url: URL, cancellation: CancellationFlag) throws -> FileReader {
+    func read(_ url: URL, cancellation: CancellationFlag) throws -> any FileReader {
         try reading(url, cancellation: cancellation)
     }
 
-    private func reading(_ url: URL, cancellation: CancellationFlag?) throws -> FileReader {
+    private func reading(_ url: URL, cancellation: CancellationFlag?) throws -> any FileReader {
         switch try resolve(url, cancellation: cancellation) {
         case .outside(let provider, let outer):
             guard let cancellation else { return try provider.read(outer) }
@@ -629,7 +629,7 @@ final class ArchiveFileSystem: FileSystemProvider {
         if cancellation?.isCancelled == true { throw ArchiveError.cancelled }
     }
 
-    func write(_ url: URL) throws -> FileWriter {
+    func write(_ url: URL) throws -> any FileWriter {
         try changing {
             switch try resolve(url) {
             case .outside(let provider, let outer): return try provider.write(outer)
@@ -638,7 +638,7 @@ final class ArchiveFileSystem: FileSystemProvider {
         }
     }
 
-    func write(_ url: URL, cancellation: CancellationFlag) throws -> FileWriter {
+    func write(_ url: URL, cancellation: CancellationFlag) throws -> any FileWriter {
         try changing {
             switch try resolve(url, cancellation: cancellation) {
             case .outside(let provider, let outer): return try provider.write(outer, cancellation: cancellation)
@@ -651,7 +651,7 @@ final class ArchiveFileSystem: FileSystemProvider {
     }
 
     /// A place outside the archive may allow it; a member of an archive cannot be continued.
-    func append(to url: URL, at offset: Int64?, cancellation: CancellationFlag) throws -> FileWriter {
+    func append(to url: URL, at offset: Int64?, cancellation: CancellationFlag) throws -> any FileWriter {
         switch try resolve(url, cancellation: cancellation) {
         case .outside(let provider, let outer):
             return try provider.append(to: outer, at: offset, cancellation: cancellation)

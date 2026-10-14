@@ -35,7 +35,7 @@ final class CompareSession {
     }
 
     let kernel: Kernel
-    private let settings: SettingsStore
+    private let settings: any SettingsStore
 
     var leftURL: URL?
     var rightURL: URL?
@@ -618,7 +618,7 @@ final class CompareSession {
     /// What the save job reports for one file.
     private struct Saved {
         var side: CompareSide
-        var error: Error?
+        var error: any Error?
         /// The file as it is after saving; what the next save is checked against.
         var item: FileItem?
     }

@@ -120,7 +120,7 @@ final class LocalFileReader: FileReader {
 extension FileSystemRegistry {
     /// A reader for a file a search or comparison is about to read through: local files by
     /// way of `LocalFileReader`, others through their file system.
-    func searchReader(for url: URL, cancellation: CancellationFlag) -> FileReader? {
+    func searchReader(for url: URL, cancellation: CancellationFlag) -> any FileReader? {
         if url.isFileURL { return LocalFileReader.open(url) }
         return try? provider(for: url).read(url, cancellation: cancellation)
     }

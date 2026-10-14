@@ -289,7 +289,7 @@ final class Selections {
     }
 
     private var source: PanelModel { kernel.panels.source.model }
-    private var ui: UserInteraction { kernel.ui }
+    private var ui: any UserInteraction { kernel.ui }
 
     /// What Num +, Ctrl+Num + and Num * affect, and the choice their Shift variants make.
     var configured: SelectionScope { store.marksFolders ? .both : .files }
@@ -677,7 +677,7 @@ final class Selections {
 
     private enum FileOutcome {
         case done, cancelled
-        case failed(Error)
+        case failed(any Error)
     }
 
     /// The file a command names in its argument, or the one the user types; plain names are
@@ -788,7 +788,7 @@ final class Selections {
         let items = model.items
         kernel.jobs.run(
             title: "Loading selection:",
-            work: { monitor -> Result<ListedNames?, Error> in
+            work: { monitor -> Result<ListedNames?, any Error> in
                 Result {
                     let reader = try fileSystems.provider(for: url).read(url, cancellation: monitor.cancellation)
                     defer { reader.close() }

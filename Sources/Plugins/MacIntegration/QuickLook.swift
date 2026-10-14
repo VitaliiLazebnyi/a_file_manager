@@ -1,3 +1,4 @@
+import AFMKernel
 import AppKit
 import Quartz
 
@@ -69,7 +70,7 @@ final class QuickLookController: NSResponder, QLPreviewPanelDataSource, QLPrevie
 
     func numberOfPreviewItems(in _: QLPreviewPanel!) -> Int { urls.count }
 
-    func previewPanel(_: QLPreviewPanel!, previewItemAt index: Int) -> QLPreviewItem! {
+    func previewPanel(_: QLPreviewPanel!, previewItemAt index: Int) -> any QLPreviewItem! {
         urls.indices.contains(index) ? urls[index] as NSURL : nil
     }
 

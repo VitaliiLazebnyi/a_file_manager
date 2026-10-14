@@ -69,7 +69,7 @@ private final class BreakingAnswers: FileJobDelegate {
 
     func job(_: FileJob, progress: JobProgress) { onLines?(progress.lines) }
     func job(_: FileJob, conflictAt _: FileItem, source _: FileItem) -> ConflictChoice { .overwrite }
-    func job(_: FileJob, failedAt _: URL, error: Error) -> ErrorChoice {
+    func job(_: FileJob, failedAt _: URL, error: any Error) -> ErrorChoice {
         errors.append(error.localizedDescription)
         return .skip
     }
@@ -298,7 +298,7 @@ private final class BreakingAnswers: FileJobDelegate {
         let source = try ProviderByteSource.open(virtual.branch(of: memory.url("/far/big.txt")), fileSystems: registry)
         memory.stallsReads = true
         let flag = CancellationFlag()
-        let outcome = SharedBox<Result<Data, Error>?>(nil)
+        let outcome = SharedBox<Result<Data, any Error>?>(nil)
         let finished = DispatchSemaphore(value: 0)
         Thread {
             outcome.value = Result { try source.read(at: 10, count: 5_000, cancellation: flag) }

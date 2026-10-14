@@ -685,7 +685,7 @@ private final class WindowTestPlugin: Plugin {
         var count: Int { lock.withLock { reports } }
         func end() { lock.withLock { finished = true } }
 
-        func work(_ monitor: JobMonitor) -> String {
+        func work(_ monitor: any JobMonitor) -> String {
             while !monitor.cancellation.isCancelled, !lock.withLock({ finished }) {
                 monitor.report(JobProgress(lines: ["Working"], itemsDone: count, itemsTotal: 1_000_000))
                 lock.withLock { reports += 1 }

@@ -1,3 +1,4 @@
+import AFMContracts
 import AFMKernel
 import Foundation
 import LocalFileSystemPlugin
@@ -230,7 +231,7 @@ import Testing
 
     // MARK: R024, the marks of a long selection
 
-    func benchOf(_ memory: MemoryFileSystem, plugins: [Plugin] = []) -> TestBench {
+    func benchOf(_ memory: MemoryFileSystem, plugins: [any Plugin] = []) -> TestBench {
         TestBench(
             plugins: plugins, fileSystems: [LocalFileSystem(), memory], left: memory.url("/A"), right: memory.url("/B"),
             settings: MemorySettings())

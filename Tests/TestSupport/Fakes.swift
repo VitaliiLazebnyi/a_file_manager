@@ -123,7 +123,7 @@ public final class FakePanel: PanelHandle {
 public final class FakePanelSet: PanelSet {
     public let leftPanel: FakePanel
     public let rightPanel: FakePanel
-    public var source: PanelHandle
+    public var source: any PanelHandle
 
     public init(left: FakePanel, right: FakePanel) {
         leftPanel = left
@@ -133,9 +133,9 @@ public final class FakePanelSet: PanelSet {
         right.owner = self
     }
 
-    public var left: PanelHandle { leftPanel }
-    public var right: PanelHandle { rightPanel }
-    public var target: PanelHandle { source === leftPanel ? rightPanel : leftPanel }
+    public var left: any PanelHandle { leftPanel }
+    public var right: any PanelHandle { rightPanel }
+    public var target: any PanelHandle { source === leftPanel ? rightPanel : leftPanel }
 }
 
 /// Runs each job at once on the calling thread; `run` returns when the job is done.
@@ -162,8 +162,8 @@ public final class ImmediateJobService: JobService {
 
     @discardableResult
     public func run<Result>(
-        title: String, work: @escaping (JobMonitor) -> Result, completion: @escaping (Result) -> Void
-    ) -> JobHandle {
+        title: String, work: @escaping (any JobMonitor) -> Result, completion: @escaping (Result) -> Void
+    ) -> any JobHandle {
         titles.append(title)
         let monitor = Monitor()
         isBusy = true
@@ -187,16 +187,16 @@ public final class TestBench: ShellServices {
     public let jobService = ImmediateJobService()
     public let panelSet: FakePanelSet
 
-    public var panels: PanelSet { panelSet }
-    public var jobs: JobService { jobService }
+    public var panels: any PanelSet { panelSet }
+    public var jobs: any JobService { jobService }
     public var left: FakePanel { panelSet.leftPanel }
     public var right: FakePanel { panelSet.rightPanel }
     public var commands: CommandRegistry { kernel.commands }
 
     /// `fileSystems` are registered before the plugins start, like a file-system plugin would.
     public init(
-        plugins: [Plugin], fileSystems: [FileSystemProvider], left: URL, right: URL,
-        settings: SettingsStore = MemorySettings()
+        plugins: [any Plugin], fileSystems: [any FileSystemProvider], left: URL, right: URL,
+        settings: any SettingsStore = MemorySettings()
     ) {
         kernel = Kernel(productName: "Test", settings: settings, ui: ui)
         fileSystems.forEach(kernel.fileSystems.register)

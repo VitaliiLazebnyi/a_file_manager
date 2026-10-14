@@ -16,8 +16,8 @@ public enum PanelEvent {
 /// Where the window shell announces panel events and plugins listen. Main thread only.
 public final class PanelEvents {
     private final class Subscription {
-        let handler: (PanelEvent, PanelHandle) -> Void
-        init(_ handler: @escaping (PanelEvent, PanelHandle) -> Void) { self.handler = handler }
+        let handler: (PanelEvent, any PanelHandle) -> Void
+        init(_ handler: @escaping (PanelEvent, any PanelHandle) -> Void) { self.handler = handler }
     }
 
     private var subscriptions: [() -> Subscription?] = []
@@ -26,14 +26,14 @@ public final class PanelEvents {
 
     /// `handler` is called on the main thread for every event until the returned object is
     /// released; whoever subscribes keeps it.
-    public func subscribe(_ handler: @escaping (PanelEvent, PanelHandle) -> Void) -> AnyObject {
+    public func subscribe(_ handler: @escaping (PanelEvent, any PanelHandle) -> Void) -> AnyObject {
         let subscription = Subscription(handler)
         subscriptions.append { [weak subscription] in subscription }
         return subscription
     }
 
     /// Called by the shell.
-    public func post(_ event: PanelEvent, from panel: PanelHandle) {
+    public func post(_ event: PanelEvent, from panel: any PanelHandle) {
         MainThread.assert("Panel events")
         subscriptions.removeAll { $0() == nil }
         for subscription in subscriptions.compactMap({ $0() }) { subscription.handler(event, panel) }

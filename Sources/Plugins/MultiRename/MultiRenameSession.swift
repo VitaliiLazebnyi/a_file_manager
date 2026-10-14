@@ -135,7 +135,7 @@ final class MultiRenameSession {
     /// Names loaded from a file or typed by the user; they take the place of the masks.
     var givenNames: [String]? { givenNamesStorage }
     /// What is wrong with the masks or the expression, if anything.
-    private(set) var problem: Error?
+    private(set) var problem: any Error?
     private(set) var isComputing = false
     /// A run or an Undo is under way: the list stays as it is until it is over.
     private(set) var isBusy = false
@@ -450,7 +450,7 @@ final class MultiRenameSession {
     func loadNames(from url: URL, completion: (() -> Void)? = nil) {
         guard !isBusy else { return }
         let fileSystems = kernel.fileSystems
-        func read() -> Result<[String], Error> {
+        func read() -> Result<[String], any Error> {
             Result {
                 let reader = try fileSystems.provider(for: url).read(url)
                 defer { reader.close() }
@@ -460,7 +460,7 @@ final class MultiRenameSession {
                 return RenameNameList.names(in: RenameNameList.text(from: data))
             }
         }
-        func finish(_ result: Result<[String], Error>) {
+        func finish(_ result: Result<[String], any Error>) {
             switch result {
             case .success(let names): applyGivenNames(names)
             case .failure(let error): kernel.ui.report(error, title: "The names cannot be loaded!")
@@ -833,7 +833,7 @@ final class MultiRenameSession {
     /// Shows the log of the last run in the viewer.
     func showResultList() {
         guard hasResultList else { return }
-        if let viewer = kernel.services.find(ViewerService.self) {
+        if let viewer = kernel.services.find((any ViewerService).self) {
             viewer.view(logURL)
         } else if kernel.commands[.view] != nil {
             kernel.commands.perform(.view, .location(logURL))

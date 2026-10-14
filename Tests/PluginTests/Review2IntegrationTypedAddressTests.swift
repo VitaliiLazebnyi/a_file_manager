@@ -28,7 +28,7 @@ final class IntegrationConsent: ServerConsentService {
         bench = TestBench(
             plugins: [FileOperationsPlugin()], fileSystems: [memory, server], left: memory.url("/A"),
             right: memory.url("/B"))
-        bench.kernel.services.register(ServerConsentService.self, consent)
+        bench.kernel.services.register((any ServerConsentService).self, consent)
     }
 
     @Test func onlyTextWithAnAddressThatWasNotTheProposalIsReported() {

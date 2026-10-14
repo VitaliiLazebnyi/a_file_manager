@@ -39,12 +39,12 @@ enum ViewerCleanup {
     }
 
     /// Closes the source off the calling thread.
-    static func close(_ source: ByteSource?) {
+    static func close(_ source: any ByteSource?) {
         guard let source else { return }
         queue.async { source.close() }
     }
 
-    static func close(_ readers: [FileReader]) {
+    static func close(_ readers: [any FileReader]) {
         guard !readers.isEmpty else { return }
         queue.async { readers.forEach { $0.close() } }
     }
@@ -104,7 +104,7 @@ extension CancellationFlag {
     }
 
     /// Runs `body` with `reader` interrupted should the flag be set meanwhile.
-    func whileReading<T>(_ reader: FileReader, _ body: () throws -> T) rethrows -> T {
+    func whileReading<T>(_ reader: any FileReader, _ body: () throws -> T) rethrows -> T {
         let token = interrupting(reader)
         defer { withExtendedLifetime(token) {} }
         return try body()
@@ -148,14 +148,14 @@ final class DataByteSource: ByteSource {
 final class ProviderByteSource: ByteSource {
     let url: URL
     let length: Int64
-    private let provider: FileSystemProvider
+    private let provider: any FileSystemProvider
     private let lock = NSLock()
-    private var idle: [FileReader] = []
+    private var idle: [any FileReader] = []
     /// How often the source was closed.
     private var closes = 0
     private let idleLimit = ProcessInfo.processInfo.activeProcessorCount
 
-    init(url: URL, provider: FileSystemProvider, length: Int64) {
+    init(url: URL, provider: any FileSystemProvider, length: Int64) {
         self.url = url
         self.provider = provider
         self.length = length
@@ -167,7 +167,7 @@ final class ProviderByteSource: ByteSource {
     /// points to; pipes, devices and sockets are refused. Blocks; ends early (throwing) once
     /// `cancellation` is set.
     static func open(_ url: URL, fileSystems: FileSystemRegistry, cancellation: CancellationFlag = CancellationFlag())
-        throws -> ByteSource
+        throws -> any ByteSource
     {
         let provider = try fileSystems.provider(for: url)
         let entry = provider.item(at: url, cancellation: cancellation)
@@ -259,12 +259,12 @@ final class ProviderByteSource: ByteSource {
         }
     }
 
-    private static func reading(_ reader: FileReader, _ flag: CancellationFlag?, _ body: () throws -> Void) throws {
+    private static func reading(_ reader: any FileReader, _ flag: CancellationFlag?, _ body: () throws -> Void) throws {
         if let flag { try flag.whileReading(reader, body) } else { try body() }
     }
 
     /// A reader and the number of `close`s there were when it was taken.
-    private func checkOut(_ flag: CancellationFlag?) throws -> (FileReader, Int) {
+    private func checkOut(_ flag: CancellationFlag?) throws -> (any FileReader, Int) {
         lock.lock()
         let reader = idle.popLast()
         let epoch = closes
@@ -273,7 +273,7 @@ final class ProviderByteSource: ByteSource {
         return (try flag.map { try provider.read(url, cancellation: $0) } ?? provider.read(url), epoch)
     }
 
-    private func checkIn(_ reader: FileReader, epoch: Int) {
+    private func checkIn(_ reader: any FileReader, epoch: Int) {
         lock.lock()
         // A reader that was in use when the source was closed is not kept: closing means it all.
         let keep = idle.count < idleLimit && epoch == closes
@@ -455,7 +455,7 @@ final class DiskBlockCache {
 /// bigger file of such a source is kept on disk with `spillsToDisk` (`DiskBlockCache`): long
 /// reads fetch only the blocks the disk does not have, and the rest comes from the disk.
 final class CachedByteSource: ByteSource {
-    let base: ByteSource
+    let base: any ByteSource
     let blockSize: Int
     private let capacity: Int
     private let keepsWholeFile: Bool
@@ -466,7 +466,7 @@ final class CachedByteSource: ByteSource {
     private var order: [Int64] = []
 
     init(
-        _ base: ByteSource, blockSize: Int = 128 * 1_024, capacity: Int = 48, wholeFileLimit: Int64 = 0,
+        _ base: any ByteSource, blockSize: Int = 128 * 1_024, capacity: Int = 48, wholeFileLimit: Int64 = 0,
         spillsToDisk: Bool = false,
         diskLimit: Int64 = 1 << 30
     ) {

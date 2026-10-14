@@ -209,7 +209,7 @@ public final class ClipboardPlugin: Plugin {
     }
 
     /// Puts the operands on the clipboard; the selection stays and nothing visible happens.
-    private func place(_ operands: PanelModel.Operands, cut: Bool, ui: UserInteraction) {
+    private func place(_ operands: PanelModel.Operands, cut: Bool, ui: any UserInteraction) {
         let count = Self.count(of: operands)
         guard count > 0 else { return }
         var forOthers = true
@@ -283,7 +283,7 @@ public final class ClipboardPlugin: Plugin {
                 if hasContent(in: kernel) { pasteContent(into: directory, in: kernel) }
                 return
             }
-            guard let transfers = kernel.services.find(FileTransferService.self) else {
+            guard let transfers = kernel.services.find((any FileTransferService).self) else {
                 return kernel.commands.onRejected()
             }
             // A copy pasted next to its original gets a new name: "report (2).txt". Files that are
@@ -376,7 +376,7 @@ public final class ClipboardPlugin: Plugin {
         let pasteboard = self.pasteboard
         kernel.jobs.run(
             title: "Paste:",
-            work: { monitor -> Result<URL, Error> in
+            work: { monitor -> Result<URL, any Error> in
                 let cancellation = monitor.cancellation
                 return Result {
                     guard let content = Self.content(of: pasteboard) else { throw NothingToPaste() }
@@ -501,7 +501,7 @@ public final class ClipboardPlugin: Plugin {
         let url = fileSystems.location(from: text, relativeTo: directory)
         kernel.jobs.run(
             title: "Saving details:",
-            work: { monitor -> Error? in
+            work: { monitor -> any Error? in
                 do {
                     let provider = try fileSystems.provider(for: url)
                     let cancellation = monitor.cancellation

@@ -27,7 +27,7 @@ final class ArchiveEnvironment {
     var askPassword: (_ archiveName: String, _ retry: Bool) -> String? = { _, _ in nil }
     /// Tells the user that changes could not be written into an archive. Must not wait for
     /// the user: it is called on the thread that writes.
-    var reportFailure: (_ error: Error, _ archiveName: String) -> Void = { _, _ in }
+    var reportFailure: (_ error: any Error, _ archiveName: String) -> Void = { _, _ in }
     /// The directories whose contents changed behind the panels' backs.
     var contentsChanged: (_ archive: URL) -> Void = { _ in }
 
@@ -427,7 +427,7 @@ final class OpenArchive {
     /// A stream archive unpacked into a temporary TAR (or a compressed file into its content).
     private var unpacked: (file: RandomAccessFile, temporary: TemporaryFile)?
     /// Starts reading the archive as a TAR stream, for formats without random access.
-    private var memberSource: ((StreamInterrupt?) throws -> ByteStream)?
+    private var memberSource: ((StreamInterrupt?) throws -> any ByteStream)?
     /// Readers of such a stream that stand behind a member and can go on from there.
     private var parked: [(reader: TarReader, next: Int, since: DispatchTime)] = []
     private var reaperArmed = false
@@ -582,7 +582,7 @@ final class OpenArchive {
 
             case .compressedTar:
                 // The old `compress` format, which gzip unpacks; what comes out is read here.
-                let source: (StreamInterrupt?) throws -> ByteStream = {
+                let source: (StreamInterrupt?) throws -> any ByteStream = {
                     guard file.isStillAtItsPath else { throw ArchiveError.changedOutside(name) }
                     return try ProcessStream(Tool.gzip, ["-dc", "--", file.path], control: $0)
                 }
@@ -680,7 +680,7 @@ final class OpenArchive {
     /// With `toTheEnd` the stream is read on behind the last member: a decompressor checks
     /// its data only then, and a child process says only then that it failed.
     private func indexTar(
-        _ stream: ByteStream, toTheEnd: Bool = true, control: StreamInterrupt? = nil, seekable: () -> Bool
+        _ stream: any ByteStream, toTheEnd: Bool = true, control: StreamInterrupt? = nil, seekable: () -> Bool
     ) throws {
         let reader = TarReader(stream, control: control)
         defer { reader.close() }
@@ -757,7 +757,7 @@ final class OpenArchive {
     /// serves every read. A large archive, one that unpacks to more than the copy may hold,
     /// or one for whose copy the temporary folder's volume has no room to spare has no copy;
     /// its members are read from the stream.
-    private func loadStream(control: StreamInterrupt?, _ source: @escaping (StreamInterrupt?) throws -> ByteStream)
+    private func loadStream(control: StreamInterrupt?, _ source: @escaping (StreamInterrupt?) throws -> any ByteStream)
         throws
     {
         memberSource = source
@@ -808,7 +808,7 @@ final class OpenArchive {
         case .bzip2: break
         }
         var counted: UInt64 = 0
-        var counter: ByteStream?
+        var counter: any ByteStream?
         defer { counter?.close() }
         if file.size <= environment.materializeLimit {
             let url = try environment.scratch.newFile("bin")
@@ -975,7 +975,7 @@ final class OpenArchive {
     /// archive was rewritten still reads the right bytes. Through a `slot` the reading ends
     /// early, with an error, when its owner interrupts: where the member lies behind a long
     /// stretch of decompression, opening itself is that long.
-    func open(_ entry: ArchiveEntry, slot: InterruptSlot? = nil) throws -> ByteStream {
+    func open(_ entry: ArchiveEntry, slot: InterruptSlot? = nil) throws -> any ByteStream {
         let (file, unpacked, source, format) = locked { (self.file, self.unpacked?.file, memberSource, self.format) }
         switch entry.content {
         case .none:
@@ -1098,7 +1098,7 @@ final class OpenArchive {
     /// `body` must then read (or leave) each stream before it returns.
     func readInOnePass(
         _ wanted: [ArchiveEntry], cancellation: CancellationFlag? = nil,
-        _ body: (ArchiveEntry, ByteStream) throws -> Void
+        _ body: (ArchiveEntry, any ByteStream) throws -> Void
     ) throws {
         // One name per member goes through the pass; further names of the same member (hard
         // links) are read by themselves afterwards.
@@ -1139,7 +1139,7 @@ final class OpenArchive {
         locked { memberSource == nil || unpacked != nil }
     }
 
-    private func openZip(_ record: ZipRecord, path: String) throws -> ByteStream {
+    private func openZip(_ record: ZipRecord, path: String) throws -> any ByteStream {
         var method = record.method
         var aes: ZipAES.Field?
         if record.method == ZipAES.method {
@@ -1149,7 +1149,7 @@ final class OpenArchive {
         guard method == ZipRecord.methodStored || method == ZipRecord.methodDeflate else {
             throw ArchiveError.unsupported("The compression method \(method) of \(path)")
         }
-        func raw() throws -> ByteStream {
+        func raw() throws -> any ByteStream {
             switch record.source {
             case .archive(let headerOffset, let file):
                 let dataOffset = try ZipDirectory.localHeader(of: record, at: headerOffset, in: file).dataOffset
@@ -1162,7 +1162,7 @@ final class OpenArchive {
                 return DataStream(Data())
             }
         }
-        var stream: ByteStream
+        var stream: any ByteStream
         var used: String?
         if record.isEncrypted {
             // The byte that proves the password: from the CRC, or from the time when the CRC
@@ -1170,7 +1170,7 @@ final class OpenArchive {
             let check =
                 record.flags & ZipRecord.flagDescriptor != 0 ? UInt8(record.dosTime >> 8) : UInt8(record.crc >> 24)
             let name = self.name
-            let opened = try unlocked { [weak self] password -> ByteStream in
+            let opened = try unlocked { [weak self] password -> (any ByteStream) in
                 if let aes {
                     return try ZipAESDecryptStream(
                         try raw(), length: record.compressedSize, field: aes, password: password, name: name
@@ -1235,9 +1235,9 @@ final class OpenArchive {
     /// question to be answered tries the answer before asking again. A refusal (no answer, or
     /// three wrong ones) is remembered for the operation under way (`withPasswordScope`) and
     /// for `passwordRefusalMemory`, so that the members that follow fail without a question.
-    private func unlocked(_ make: (String) throws -> ByteStream) throws -> (ByteStream, String) {
+    private func unlocked(_ make: (String) throws -> any ByteStream) throws -> (any ByteStream, String) {
         var tried = Set<String>()
-        func tryKnown() throws -> (ByteStream, String)? {
+        func tryKnown() throws -> (any ByteStream, String)? {
             for candidate in locked({ passwords }) where tried.insert(candidate).inserted {
                 do { return (try make(candidate), candidate) } catch ArchiveError.wrongPassword {}
             }
@@ -1316,7 +1316,7 @@ final class OpenArchive {
     /// the lock: the disk, and the file system an archive was fetched from, are never asked
     /// while the directory is locked.
     private func requireWritable() throws {
-        var refusal: Error?
+        var refusal: any Error?
         if fetchedCopy != nil {
             if environment.fileSystems()?.capabilities(for: archiveURL).contains(.write) != true {
                 refusal = ArchiveError.readOnly(name)
@@ -1587,7 +1587,7 @@ final class OpenArchive {
     /// Starts a new member. Its data is compressed into a temporary file while it is written
     /// and joins the archive's directory when the writer is closed. `level` overrides the
     /// compression rate of the settings; with a `password` the member is encrypted (AES-256).
-    func write(_ path: String, level: Int? = nil, password: String? = nil) throws -> FileWriter {
+    func write(_ path: String, level: Int? = nil, password: String? = nil) throws -> any FileWriter {
         try requireWritable()
         try locked {
             try requireEditable()

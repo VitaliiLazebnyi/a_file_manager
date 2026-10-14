@@ -52,10 +52,10 @@ final class LocalProbe: FileSystemProvider {
     }
     func item(at url: URL) -> FileItem? { local.item(at: url) }
     func parent(of directory: URL) -> URL? { local.parent(of: directory) }
-    func read(_ url: URL) throws -> FileReader { try local.read(url) }
+    func read(_ url: URL) throws -> any FileReader { try local.read(url) }
     func createDirectory(at url: URL) throws { try local.createDirectory(at: url) }
-    func write(_ url: URL) throws -> FileWriter { try local.write(url) }
-    func append(to url: URL, at offset: Int64?, cancellation: CancellationFlag) throws -> FileWriter {
+    func write(_ url: URL) throws -> any FileWriter { try local.write(url) }
+    func append(to url: URL, at offset: Int64?, cancellation: CancellationFlag) throws -> any FileWriter {
         try local.append(to: url, at: offset, cancellation: cancellation)
     }
     func remove(_ url: URL) throws {

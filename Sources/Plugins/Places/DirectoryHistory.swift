@@ -79,7 +79,7 @@ public struct DirectoryHistory: Codable, Equatable {
 
 // Stored histories are read leniently (see `StoredSettings`).
 extension DirectoryHistory.Visit {
-    public init(from decoder: Decoder) throws {
+    public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.init(
             location: try container.decode(String.self, forKey: .location),
@@ -90,7 +90,7 @@ extension DirectoryHistory.Visit {
 extension DirectoryHistory {
     private enum Keys: String, CodingKey { case visits }
 
-    public init(from decoder: Decoder) throws {
+    public init(from decoder: any Decoder) throws {
         self.init()
         let container = try decoder.container(keyedBy: Keys.self)
         visits = Array(
@@ -102,7 +102,7 @@ extension DirectoryHistory {
 extension FrequentFolders {
     private enum Keys: String, CodingKey { case counts }
 
-    public init(from decoder: Decoder) throws {
+    public init(from decoder: any Decoder) throws {
         self.init()
         let container = try decoder.container(keyedBy: Keys.self)
         let stored = try container.decodeIfPresent([String: Int].self, forKey: .counts) ?? [:]
@@ -199,7 +199,7 @@ public final class DirectoryHistoryTracker {
     /// A stay at least this long makes a folder more than "passed through" (`HistoryThinningDelta`).
     public static let thinningDelta: TimeInterval = 5
 
-    private let settings: SettingsStore
+    private let settings: any SettingsStore
     private let now: () -> Date
     /// Whether changes are written to the settings as they happen ("Save history on exit").
     public var savesChanges: () -> Bool = { true }
@@ -215,7 +215,9 @@ public final class DirectoryHistoryTracker {
 
     /// `settings` is the plugin's own corner of the settings store. `problem` is told when
     /// stored data could not be read in full; the original is kept aside (`StoredSettings`).
-    public init(settings: SettingsStore, now: @escaping () -> Date = Date.init, problem: (String) -> Void = { _ in }) {
+    public init(
+        settings: any SettingsStore, now: @escaping () -> Date = Date.init, problem: (String) -> Void = { _ in }
+    ) {
         self.settings = settings
         self.now = now
         for side in Side.allCases {

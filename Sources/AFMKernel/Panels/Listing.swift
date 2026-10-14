@@ -145,7 +145,7 @@ public enum PanelLoader {
     /// A question that may block, asked on a kernel thread and shared with whoever asks the
     /// same; nil when `cancellation` was set before the answer came.
     private static func ask<Answer>(
-        _ provider: FileSystemProvider, _ question: String, _ cancellation: CancellationFlag,
+        _ provider: any FileSystemProvider, _ question: String, _ cancellation: CancellationFlag,
         _ work: @escaping (CancellationFlag) -> Answer?
     ) -> Answer? {
         if Thread.isMainThread { return work(cancellation) }
@@ -157,7 +157,7 @@ public enum PanelLoader {
     /// when `receive` wanted no more, or, without a word, when `cancellation` is set; the
     /// file system's thread is then left to come back in its own time.
     private static func listing(
-        of directory: URL, showHidden: Bool, in provider: FileSystemProvider, cancellation: CancellationFlag,
+        of directory: URL, showHidden: Bool, in provider: any FileSystemProvider, cancellation: CancellationFlag,
         receive: ([FileItem]) -> Bool
     ) throws {
         if cancellation.isCancelled { return }
@@ -169,10 +169,10 @@ public enum PanelLoader {
         let ticket = CallBook.shared.ask(
             owner: provider, question: "list \(showHidden ? "all" : "shown") " + directory.locationKey, shares: false,
             work: { flag -> Any in
-                Swift.Result<Void, Error> {
+                Swift.Result<Void, any Error> {
                     try provider.list(directory, showHidden: showHidden, cancellation: flag) { relay.offer($0) }
                 }
-            }, listener: { relay.finish($0 as? Swift.Result<Void, Error>) })
+            }, listener: { relay.finish($0 as? Swift.Result<Void, any Error>) })
         let registration = cancellation.onCancel {
             ticket.cancel()
             relay.abandon()
@@ -204,14 +204,14 @@ public enum PanelLoader {
     private final class Relay {
         enum Event {
             case batch([FileItem])
-            case finished(Swift.Result<Void, Error>?)
+            case finished(Swift.Result<Void, any Error>?)
             case abandoned
         }
 
         private let condition = NSCondition()
         private var pending: [FileItem]?
         private var answer: Bool?
-        private var result: Swift.Result<Void, Error>?
+        private var result: Swift.Result<Void, any Error>?
         private var isFinished = false
         /// Nobody takes batches any more: the asker has left, or wanted no more.
         private var isClosed = false
@@ -249,7 +249,7 @@ public enum PanelLoader {
             condition.unlock()
         }
 
-        func finish(_ result: Swift.Result<Void, Error>?) {
+        func finish(_ result: Swift.Result<Void, any Error>?) {
             condition.lock()
             (self.result, isFinished) = (result, true)
             condition.broadcast()
@@ -282,7 +282,7 @@ public enum PanelLoader {
         /// tree, short enough for a file system whose tops can change.
         private let lifetime: TimeInterval = 30
 
-        private func key(_ directory: URL, _ provider: FileSystemProvider) -> String {
+        private func key(_ directory: URL, _ provider: any FileSystemProvider) -> String {
             "\(UInt(bitPattern: ObjectIdentifier(provider).hashValue)) " + directory.absoluteString
         }
 
@@ -293,7 +293,7 @@ public enum PanelLoader {
             return entry.root
         }
 
-        func root(of directory: URL, parent: URL?, in provider: FileSystemProvider) -> URL {
+        func root(of directory: URL, parent: URL?, in provider: any FileSystemProvider) -> URL {
             var root = directory
             if let parent {
                 // The directory above was nearly always read a moment ago. Otherwise the file

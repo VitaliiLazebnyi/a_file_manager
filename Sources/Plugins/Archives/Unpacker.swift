@@ -239,7 +239,7 @@ enum ArchiveTester {
     }
 
     private static func readThrough(
-        _ stream: ByteStream, expecting size: Int64?, cancellation: CancellationFlag, counter: SharedCounter?
+        _ stream: any ByteStream, expecting size: Int64?, cancellation: CancellationFlag, counter: SharedCounter?
     ) throws {
         var read: Int64 = 0
         while let block = try stream.read(upToCount: 1 << 20) {
@@ -266,7 +266,7 @@ enum ArchiveTester {
     ) -> [String] {
         do { try unlock(archive, only: only) } catch { return [error.localizedDescription] }
         let members = archive.entries.filter { !$0.isDirectory && only?.contains($0.path) != false }
-        func check(_ entry: ArchiveEntry, _ stream: ByteStream) -> String? {
+        func check(_ entry: ArchiveEntry, _ stream: any ByteStream) -> String? {
             do {
                 try readThrough(
                     stream, expecting: entry.sizeIsExact ? entry.size : nil, cancellation: cancellation,
@@ -362,7 +362,7 @@ final class Unpacker {
     }
 
     private let fileSystems: FileSystemRegistry
-    private let monitor: JobMonitor
+    private let monitor: any JobMonitor
     private let options: UnpackOptions
     private let askConflict: (_ existing: FileItem, _ entry: ArchiveEntry) -> UnpackConflictChoice
     private var overwriteAll: Bool
@@ -377,7 +377,7 @@ final class Unpacker {
     var whileUnpacking: ((ArchiveEntry) -> Void)?
 
     init(
-        fileSystems: FileSystemRegistry, monitor: JobMonitor, options: UnpackOptions,
+        fileSystems: FileSystemRegistry, monitor: any JobMonitor, options: UnpackOptions,
         askConflict: @escaping (_ existing: FileItem, _ entry: ArchiveEntry) -> UnpackConflictChoice
     ) {
         self.fileSystems = fileSystems
@@ -705,7 +705,7 @@ final class Unpacker {
     /// archive's mark, which the file gets before it appears under its name. With a `root`
     /// (a target on a disk of this machine) the member is written from that folder's
     /// descriptor down and through no link; without, by path through the target's file system.
-    private func write(_ task: Task, into root: UnpackFolder?, from stream: ByteStream, quarantine: Data?) throws {
+    private func write(_ task: Task, into root: UnpackFolder?, from stream: any ByteStream, quarantine: Data?) throws {
         let (entry, target) = (task.entry, task.target)
         if let root {
             if entry.isSymbolicLink {

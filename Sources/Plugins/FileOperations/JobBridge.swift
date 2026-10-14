@@ -8,11 +8,11 @@ import Foundation
 /// `JobMonitor.ask`, which takes it to the main thread and waits. What needs to read files
 /// (comparing two files) runs on the calling job thread, between two dialogs.
 final class JobBridge: FileJobDelegate {
-    private let monitor: JobMonitor
-    private let ui: UserInteraction
+    private let monitor: any JobMonitor
+    private let ui: any UserInteraction
     private let fileSystems: FileSystemRegistry
 
-    init(monitor: JobMonitor, ui: UserInteraction, fileSystems: FileSystemRegistry) {
+    init(monitor: any JobMonitor, ui: any UserInteraction, fileSystems: FileSystemRegistry) {
         self.monitor = monitor
         self.ui = ui
         self.fileSystems = fileSystems
@@ -141,7 +141,7 @@ final class JobBridge: FileJobDelegate {
         return text
     }
 
-    func job(_: FileJob, failedAt url: URL, error: Error) -> ErrorChoice {
+    func job(_: FileJob, failedAt url: URL, error: any Error) -> ErrorChoice {
         monitor.ask {
             ui.pick(
                 "Error with \(DisplayName.escaped(url.lastPathComponent))", detail: error.localizedDescription,

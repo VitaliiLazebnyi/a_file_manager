@@ -272,7 +272,7 @@ import Testing
         #expect(try reader.read(upToCount: 100) == Data("needle".utf8))
         #expect(try reader.read(upToCount: 100) == nil)
         reader.close()
-        var opened: FileReader?
+        var opened: (any FileReader)?
         #expect(finishes { opened = LocalFileReader.open(box.url("pipe")) })
         #expect(opened == nil)
         #expect(LocalFileReader.open(box.url("missing")) == nil)

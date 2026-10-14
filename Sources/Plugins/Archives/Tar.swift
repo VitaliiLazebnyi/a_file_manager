@@ -221,7 +221,7 @@ struct TarHeader {
 /// be read to its end or skipped before the next call. `position` is where the stream stands,
 /// so a caller that reads from a file can note where each member's data lies.
 final class TarReader {
-    private let stream: ByteStream
+    private let stream: any ByteStream
     private(set) var position: UInt64 = 0
     private var pendingData: UInt64 = 0
     private var pendingPadding: UInt64 = 0
@@ -229,7 +229,7 @@ final class TarReader {
     /// when this is kept for the next member.
     let control: StreamInterrupt?
 
-    init(_ stream: ByteStream, control: StreamInterrupt? = nil) {
+    init(_ stream: any ByteStream, control: StreamInterrupt? = nil) {
         self.stream = stream
         self.control = control
     }

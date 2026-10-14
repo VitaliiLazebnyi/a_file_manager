@@ -75,10 +75,10 @@ final class CommandLineHistory {
     static let recordKey = "systemTools.recordHistory"
     static let limit = 20
 
-    private let settings: SettingsStore
+    private let settings: any SettingsStore
     private(set) var entries: [String]
 
-    init(settings: SettingsStore) {
+    init(settings: any SettingsStore) {
         self.settings = settings
         entries = Array(
             (settings.value([String].self, forKey: Self.settingsKey) ?? []).prefix(

@@ -57,7 +57,7 @@ import ViewerPlugin
         // The names the window shell provides are the only ones without a handler here.
         #expect(inMenus.allSatisfy { commands[$0] != nil })
         #expect(bench.kernel.keyBindings.conflicts.isEmpty)
-        #expect(bench.kernel.services.find(FileTransferService.self) != nil)
+        #expect(bench.kernel.services.find((any FileTransferService).self) != nil)
         // The Files menu keeps its order: open, transfer, create, delete, tools.
         let files = bench.kernel.menus.menus[0].items
         let expected: [CommandID] = [

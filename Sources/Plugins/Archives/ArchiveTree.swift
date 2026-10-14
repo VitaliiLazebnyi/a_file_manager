@@ -376,13 +376,13 @@ struct ArchiveTree {
 /// decompression is a long way off. Used by one thread; only `interrupt()` may be called from
 /// another, which ends the read or seek that is under way and every later one.
 final class ArchiveMemberReader: FileReader {
-    private let open: (InterruptSlot) throws -> ByteStream
+    private let open: (InterruptSlot) throws -> any ByteStream
     private let slot = InterruptSlot()
-    private var stream: ByteStream?
+    private var stream: any ByteStream?
     private var position: UInt64 = 0
 
     /// `cancellation` ends the opening (and only that) once it is set.
-    init(cancellation: CancellationFlag? = nil, _ open: @escaping (InterruptSlot) throws -> ByteStream) throws {
+    init(cancellation: CancellationFlag? = nil, _ open: @escaping (InterruptSlot) throws -> any ByteStream) throws {
         self.open = open
         let slot = self.slot
         let registration = cancellation?.onCancel { [weak slot] in slot?.interrupt() }
@@ -418,7 +418,7 @@ final class ArchiveMemberReader: FileReader {
             position = 0
         }
         // A member that lies in a file as it is (TAR, an unpacked copy) is read at any place.
-        if let seekable = stream as? SeekableStream {
+        if let seekable = stream as? (any SeekableStream) {
             seekable.seek(to: offset)
             position = offset
             return

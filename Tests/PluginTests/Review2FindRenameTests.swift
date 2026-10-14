@@ -87,7 +87,7 @@ import Testing
         #expect(result == nil && replace.timedOut)
         // In the engine that is the error marker, and the preview says why.
         var names: [String?] = []
-        var problem: Error?
+        var problem: (any Error)?
         let subjects = (0..<5).map { _ in
             RenameEntry(FileItem(url: URL(string: "mem:///d/" + name)!, name: name, isDirectory: false))
         }

@@ -276,7 +276,7 @@ import Testing
         let fixture = try FTPFixture(options)
         _ = try fixture.center.connect(fixture.key)
         _ = try fixture.names("/")
-        var writer: FileWriter? = try fixture.fileSystem.write(fixture.url("/partial.bin"))
+        var writer: (any FileWriter)? = try fixture.fileSystem.write(fixture.url("/partial.bin"))
         try writer?.write(Data(repeating: 1, count: 100))
         // Dropped without close: what the folder holds is not known any more.
         writer = nil

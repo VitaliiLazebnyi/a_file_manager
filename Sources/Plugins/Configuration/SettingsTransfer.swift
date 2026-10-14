@@ -486,7 +486,7 @@ struct SettingsImportPlan {
     }
 
     /// Stores the plan. Of the parts, only those in `accepted`.
-    func apply(to settings: SettingsStore, accepting accepted: Set<SettingsSchema.Group>) {
+    func apply(to settings: any SettingsStore, accepting accepted: Set<SettingsSchema.Group>) {
         for key in removed { settings.set(nil as Data?, forKey: key) }
         for (key, value) in ordinary { settings.set(value as Data?, forKey: key) }
         for part in parts where accepted.contains(part.group) {

@@ -128,7 +128,7 @@ final class ViewerWindowController: NSWindowController, NSWindowDelegate {
 /// only.
 final class CursorFollower {
     private let delay: TimeInterval
-    private let panel: () -> PanelHandle?
+    private let panel: () -> any PanelHandle?
     private let show: (FileItem?) -> Void
     private var subscription: AnyObject?
     private var generation = 0
@@ -136,8 +136,10 @@ final class CursorFollower {
 
     /// `panel` names the panel to follow at the time of each event; `show` receives the item
     /// under its cursor (nil on `[..]` or in an empty folder).
-    init(kernel: Kernel, delay: TimeInterval, panel: @escaping () -> PanelHandle?, show: @escaping (FileItem?) -> Void)
-    {
+    init(
+        kernel: Kernel, delay: TimeInterval, panel: @escaping () -> any PanelHandle?,
+        show: @escaping (FileItem?) -> Void
+    ) {
         self.delay = delay
         self.panel = panel
         self.show = show

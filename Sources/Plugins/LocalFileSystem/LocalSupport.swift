@@ -398,7 +398,7 @@ final class RemoteChanges {
     /// Where the call's thread leaves its result, and learns that nobody waits for it.
     private final class Outcome<Value> {
         let lock = NSLock()
-        var result: Result<Value, Error>?
+        var result: Result<Value, any Error>?
         var isLeftBehind = false
     }
 
@@ -429,7 +429,7 @@ final class RemoteChanges {
             }
             done.signal()
         }
-        func finished() -> Result<Value, Error>? {
+        func finished() -> Result<Value, any Error>? {
             box.lock.lock()
             defer { box.lock.unlock() }
             return box.result

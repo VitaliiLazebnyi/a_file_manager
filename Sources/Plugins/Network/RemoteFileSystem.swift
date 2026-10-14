@@ -12,12 +12,12 @@ import Foundation
 public final class ConnectionCenter {
     public let environment: SessionEnvironment
     private let lock = NSLock()
-    private var sessions: [ServerKey: RemoteSession] = [:]
+    private var sessions: [ServerKey: any RemoteSession] = [:]
     private var announced: [ServerKey: ConnectionProfile] = [:]
     private var saved: [ConnectionProfile] = []
     private var lastPaths: [ServerKey: String] = [:]
     /// Builds the session for a profile; the plugin sets it for the protocols it speaks.
-    var makeSession: (ConnectionProfile, SessionEnvironment) -> RemoteSession? = { _, _ in nil }
+    var makeSession: (ConnectionProfile, SessionEnvironment) -> any RemoteSession? = { _, _ in nil }
     /// The stored password of a saved connection: of this very server and login, not of
     /// whatever connection carries the same identifier. Called on the thread that connects.
     public var storedPassword: (ConnectionProfile) -> String? = { _ in nil }
@@ -69,7 +69,7 @@ public final class ConnectionCenter {
     /// Takes out the sessions of these servers that never got as far as a login, so the next
     /// attempt starts with what is known now. A session that is in the middle of its login is
     /// left alone: the user may be answering its question. Called with the lock held.
-    private func dropUnconnected(_ keys: [ServerKey]) -> [RemoteSession] {
+    private func dropUnconnected(_ keys: [ServerKey]) -> [any RemoteSession] {
         keys.compactMap { key in
             guard let session = sessions[key], !session.isConnected, !session.isConnecting else { return nil }
             sessions[key] = nil
@@ -105,7 +105,7 @@ public final class ConnectionCenter {
         return profile
     }
 
-    func session(for key: ServerKey) throws -> RemoteSession {
+    func session(for key: ServerKey) throws -> any RemoteSession {
         lock.lock()
         if let session = sessions[key] {
             lock.unlock()
@@ -125,7 +125,7 @@ public final class ConnectionCenter {
     }
 
     /// The session of a server when there is one.
-    func existingSession(for key: ServerKey) -> RemoteSession? {
+    func existingSession(for key: ServerKey) -> any RemoteSession? {
         lock.lock()
         defer { lock.unlock() }
         return sessions[key]
@@ -393,7 +393,7 @@ public final class RemoteFileSystem: FileSystemProvider {
     }
 
     private func resolve(_ url: URL, cancellation: CancellationFlag? = nil) throws -> (
-        session: RemoteSession, key: ServerKey, path: String
+        session: any RemoteSession, key: ServerKey, path: String
     ) {
         if cancellation?.isCancelled == true { throw NetworkError.cancelled }
         guard let key = ServerKey(url), key.scheme == scheme else { throw FileSystemError.noProvider(url) }
@@ -541,12 +541,12 @@ public final class RemoteFileSystem: FileSystemProvider {
         return key.url()
     }
 
-    public func read(_ url: URL) throws -> FileReader {
+    public func read(_ url: URL) throws -> any FileReader {
         let (session, _, path) = try resolve(url)
         return try session.openRead(path, cancellation: nil)
     }
 
-    public func read(_ url: URL, cancellation: CancellationFlag) throws -> FileReader {
+    public func read(_ url: URL, cancellation: CancellationFlag) throws -> any FileReader {
         let (session, _, path) = try resolve(url, cancellation: cancellation)
         return try session.openRead(path, cancellation: cancellation)
     }
@@ -584,22 +584,22 @@ public final class RemoteFileSystem: FileSystemProvider {
         cache.insert(RemoteEntry(name: RemotePath.name(of: path), isDirectory: true, modified: Date()), in: parentURL)
     }
 
-    public func write(_ url: URL) throws -> FileWriter {
+    public func write(_ url: URL) throws -> any FileWriter {
         try write(url, cancellation: Optional<CancellationFlag>.none)
     }
 
-    public func write(_ url: URL, cancellation: CancellationFlag) throws -> FileWriter {
+    public func write(_ url: URL, cancellation: CancellationFlag) throws -> any FileWriter {
         try write(url, cancellation: Optional(cancellation))
     }
 
-    private func write(_ url: URL, cancellation: CancellationFlag?) throws -> FileWriter {
+    private func write(_ url: URL, cancellation: CancellationFlag?) throws -> any FileWriter {
         let (session, _, path) = try resolve(url, cancellation: cancellation)
         if try entry(at: url, cancellation: cancellation, beforeOverwriting: true) != nil {
             throw FileSystemError.alreadyExists(displayPath(url))
         }
         let directory = parentURL(url)
         let name = RemotePath.name(of: path)
-        let writer: FileWriter
+        let writer: any FileWriter
         do {
             writer = try session.openWrite(path, cancellation: cancellation)
         } catch {
@@ -613,11 +613,11 @@ public final class RemoteFileSystem: FileSystemProvider {
 
     /// Continues an existing file (Resume, Append). The server has it at the new length at once,
     /// so the cached listing follows; what is written later is entered when the file is closed.
-    public func append(to url: URL, at offset: Int64?, cancellation: CancellationFlag) throws -> FileWriter {
+    public func append(to url: URL, at offset: Int64?, cancellation: CancellationFlag) throws -> any FileWriter {
         let (session, _, path) = try resolve(url, cancellation: cancellation)
         guard session.canAppend(path) else { throw FileSystemError.notSupported("Continuing a file on this server") }
         let (directory, name) = (parentURL(url), RemotePath.name(of: path))
-        let opened: (writer: FileWriter, size: Int64)
+        let opened: (writer: any FileWriter, size: Int64)
         do {
             opened = try session.openAppend(path, at: offset, cancellation: cancellation)
         } catch {
@@ -729,7 +729,7 @@ public final class RemoteFileSystem: FileSystemProvider {
 
     /// True for an answer of the server that says no to a request, as opposed to a connection
     /// that broke or a wait that was ended: only the former says anything about the files.
-    private static func isRefusal(_ error: Error) -> Bool {
+    private static func isRefusal(_ error: any Error) -> Bool {
         if error is SFTPError { return true }
         if case NetworkError.refused(let reply) = error { return reply.code != 421 }
         return false
@@ -742,7 +742,8 @@ public final class RemoteFileSystem: FileSystemProvider {
     /// rest is seen through whatever the flag says (it still ends with the session and at the
     /// time limits): a Cancel between the two renames would leave the name without a file.
     private func replace(
-        _ to: String, with from: String, on session: RemoteSession, refusal: Error, cancellation: CancellationFlag?
+        _ to: String, with from: String, on session: any RemoteSession, refusal: any Error,
+        cancellation: CancellationFlag?
     ) throws {
         let directory = RemotePath.parent(of: to) ?? "/"
         let aside = RemotePath.join(directory, Self.asideName(for: RemotePath.name(of: to)))
@@ -874,14 +875,14 @@ public final class RemoteFileSystem: FileSystemProvider {
 /// right: the entry gets its size and date when the file is finished, and the directory is
 /// forgotten when the file is not (a failed or abandoned upload leaves an unknown state).
 private final class CachingWriter: FileWriter {
-    private let writer: FileWriter
+    private let writer: any FileWriter
     private let cache: EntryCache
     private let directory: URL
     private let name: String
     private var written: Int64
     private var isDone = false
 
-    init(_ writer: FileWriter, cache: EntryCache, directory: URL, name: String, written: Int64 = 0) {
+    init(_ writer: any FileWriter, cache: EntryCache, directory: URL, name: String, written: Int64 = 0) {
         self.written = written
         self.writer = writer
         self.cache = cache

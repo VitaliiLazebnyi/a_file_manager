@@ -514,7 +514,7 @@ extension ZipRecord {
 
 /// Decrypts an AES member while it is read, and checks its authentication code at the end.
 final class ZipAESDecryptStream: ByteStream {
-    private let source: ByteStream
+    private let source: any ByteStream
     private let cipher: ZipAES.Cipher
     private var left: UInt64
     private var checked = false
@@ -525,7 +525,7 @@ final class ZipAESDecryptStream: ByteStream {
     /// stored size. `onFailure` is told when the data turns out not to be what was encrypted
     /// with this password, before the error is thrown.
     init(
-        _ source: ByteStream, length: UInt64, field: ZipAES.Field, password: String, name: String,
+        _ source: any ByteStream, length: UInt64, field: ZipAES.Field, password: String, name: String,
         onFailure: (() -> Void)? = nil
     ) throws {
         self.source = source
@@ -637,11 +637,11 @@ struct ZipCrypto {
 
 /// Decrypts a member while it is read.
 final class ZipDecryptStream: ByteStream {
-    private let source: ByteStream
+    private let source: any ByteStream
     private var crypto: ZipCrypto
 
     /// Reads and checks the encryption header. `check` is the byte the header must end in.
-    init(_ source: ByteStream, password: String, check: UInt8, name: String) throws {
+    init(_ source: any ByteStream, password: String, check: UInt8, name: String) throws {
         self.source = source
         crypto = ZipCrypto(password: password)
         let header = crypto.decrypt(try source.readFully(ZipCrypto.headerSize))
@@ -662,7 +662,7 @@ final class ZipDecryptStream: ByteStream {
 
 /// Checks the CRC of what passes through, at the end of the stream.
 final class CRCCheckStream: ByteStream {
-    private let source: ByteStream
+    private let source: any ByteStream
     private let expected: UInt32
     private let name: String
     private var crc: UInt32 = 0
@@ -671,7 +671,7 @@ final class CRCCheckStream: ByteStream {
 
     /// `onFailure` is told when the data turns out wrong, whether it cannot be decoded or
     /// has the wrong checksum, before the error is thrown.
-    init(_ source: ByteStream, expected: UInt32, name: String, onFailure: (() -> Void)? = nil) {
+    init(_ source: any ByteStream, expected: UInt32, name: String, onFailure: (() -> Void)? = nil) {
         self.source = source
         self.expected = expected
         self.name = name
@@ -1070,7 +1070,7 @@ extension ZipWriter {
     @discardableResult
     func copyMember(_ record: ZipRecord, check: (() throws -> Void)? = nil) throws -> UInt64 {
         var localExtra = record.extra
-        var data: ByteStream?
+        var data: any ByteStream?
         switch record.source {
         case .archive(let headerOffset, let file):
             let header = try ZipDirectory.localHeader(of: record, at: headerOffset, in: file)

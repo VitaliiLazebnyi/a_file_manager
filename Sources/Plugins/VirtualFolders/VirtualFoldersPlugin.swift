@@ -36,13 +36,13 @@ public final class VirtualFoldersPlugin: Plugin, FileListService {
         let fileSystem = VirtualFileSystem(fileSystems: kernel.fileSystems)
         self.fileSystem = fileSystem
         kernel.fileSystems.register(fileSystem)
-        kernel.services.register(FileListService.self, self)
+        kernel.services.register((any FileListService).self, self)
         applyOptions()
 
         let commands = kernel.commands
         let source = { kernel.panels.source }
-        let isVirtual = { (panel: PanelHandle) in VirtualLocation(panel.model.directory) != nil }
-        let isBranch = { (panel: PanelHandle) -> Bool in
+        let isVirtual = { (panel: (any PanelHandle)) in VirtualLocation(panel.model.directory) != nil }
+        let isBranch = { (panel: (any PanelHandle)) -> Bool in
             switch VirtualLocation(panel.model.directory) {
             case .branch, .picked: return true
             default: return false
@@ -107,12 +107,12 @@ public final class VirtualFoldersPlugin: Plugin, FileListService {
     // MARK: FileListService
 
     /// Shows `files` in `panel`. `[..]` leads back to the real directory the panel showed.
-    public func show(_ files: [URL], title: String, in panel: PanelHandle) {
+    public func show(_ files: [URL], title: String, in panel: any PanelHandle) {
         show(files, title: title, in: panel, isUnique: false)
     }
 
     /// With `isUnique` the list is not looked through for doubles (see `register(files:…isUnique:)`).
-    public func show(_ files: [URL], title: String, in panel: PanelHandle, isUnique: Bool) {
+    public func show(_ files: [URL], title: String, in panel: any PanelHandle, isUnique: Bool) {
         guard let fileSystem else { return }
         let directory = panel.model.directory
         let origin = VirtualLocation(directory).map(\.realDirectory) ?? directory
@@ -123,7 +123,7 @@ public final class VirtualFoldersPlugin: Plugin, FileListService {
 
     /// The commands take the specification's tri-state parameter (17 › Command parameters):
     /// none or 0 toggles, 1 switches on, 2 or -1 off.
-    private func setBranchView(_ argument: CommandArgument, in panel: PanelHandle, selectedOnly: Bool) {
+    private func setBranchView(_ argument: CommandArgument, in panel: any PanelHandle, selectedOnly: Bool) {
         let isOn = VirtualLocation(panel.model.directory) != nil
         let wanted: Bool
         switch argument.index ?? argument.text.flatMap({ Int($0.trimmingCharacters(in: .whitespaces)) }) ?? 0 {
@@ -135,7 +135,7 @@ public final class VirtualFoldersPlugin: Plugin, FileListService {
         if wanted { enter(panel, selectedOnly: selectedOnly) } else { leave(panel) }
     }
 
-    private func enter(_ panel: PanelHandle, selectedOnly: Bool) {
+    private func enter(_ panel: any PanelHandle, selectedOnly: Bool) {
         guard let fileSystem else { return }
         let model = panel.model
         if selectedOnly {
@@ -151,7 +151,7 @@ public final class VirtualFoldersPlugin: Plugin, FileListService {
     /// it (spec 03 › Branch view, "Leaving with Ctrl+B"). On `[..]` the panel goes back to the
     /// directory the view was made from; after a selected branch, the items it was made from
     /// are selected again.
-    private func leave(_ panel: PanelHandle) {
+    private func leave(_ panel: any PanelHandle) {
         guard let kernel, let location = VirtualLocation(panel.model.directory) else { return }
         let tab = panel.model
         if let item = tab.cursorItem,

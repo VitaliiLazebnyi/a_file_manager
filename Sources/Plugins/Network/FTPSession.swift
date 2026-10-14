@@ -43,7 +43,7 @@ final class FTPSession: RemoteSession {
     /// Counts the first logins that ended, and keeps the error of the last one that failed:
     /// threads that waited behind a login the user gave up get its error instead of a dialog.
     private var loginRounds = 0
-    private var loginFailure: Error?
+    private var loginFailure: any Error?
     private var refusesChmod = false
     /// Where the links of this server lead, for all connections.
     private let links = LinkMemory()
@@ -52,11 +52,11 @@ final class FTPSession: RemoteSession {
     private let observerLock = NSLock()
     private var linkObserver: ((String, Bool) -> Void)?
     /// When the user last refused to give a password, to trust the certificate or to connect.
-    private var declined: (error: Error, at: Date)?
+    private var declined: (error: any Error, at: Date)?
     /// Held while the first connection is made, and whenever the user is asked something, so
     /// the user is asked once and the threads behind use the answer.
     private let loginLock = NSLock()
-    private var keepAlive: DispatchSourceTimer?
+    private var keepAlive: any DispatchSourceTimer?
     private let keepAliveQueue = DispatchQueue(label: "afm.network.keepalive")
     /// Set by `disconnect`: ends every wait of this session that has no flag of its own.
     private let closing = CancellationFlag()
@@ -157,7 +157,7 @@ final class FTPSession: RemoteSession {
 
     /// The error for a wait that nothing ended: nil while things move or a question is open.
     /// Called with the lock held.
-    private func stalled(since began: Date, _ what: String) -> Error? {
+    private func stalled(since began: Date, _ what: String) -> any Error? {
         guard asking == 0, Date().timeIntervalSince(max(began, lastProgress)) > patience else { return nil }
         return NetworkError.busy(what)
     }
@@ -175,7 +175,7 @@ final class FTPSession: RemoteSession {
 
     /// The user said no to a question; the connection is not made.
     private struct Refusal: Error {
-        let error: Error
+        let error: any Error
     }
 
     private func takeLoginLock(cancellation: CancellationFlag?) throws {
@@ -423,7 +423,7 @@ final class FTPSession: RemoteSession {
             var candidate: FTPConnection?
             var mayOpen = false
             if transfer == nil, !background { commandWaiters += 1 }
-            func leave(_ error: Error) -> Error {
+            func leave(_ error: any Error) -> any Error {
                 if transfer == nil, !background { commandWaiters -= 1 }
                 condition.broadcast()
                 condition.unlock()
@@ -852,14 +852,14 @@ final class FTPSession: RemoteSession {
         }
     }
 
-    func openRead(_ path: String, cancellation: CancellationFlag?) throws -> FileReader {
+    func openRead(_ path: String, cancellation: CancellationFlag?) throws -> any FileReader {
         if cancellation?.isCancelled == true { throw NetworkError.cancelled }
         return FTPReader(
             session: self, path: RemotePath.normalized(path),
             asText: environment.options.transfersAsText(RemotePath.name(of: path)))
     }
 
-    func openWrite(_ path: String, cancellation: CancellationFlag?) throws -> FileWriter {
+    func openWrite(_ path: String, cancellation: CancellationFlag?) throws -> any FileWriter {
         let path = RemotePath.normalized(path)
         let asText = environment.options.transfersAsText(RemotePath.name(of: path))
         let (stream, connection) = try perform(transfer: .write, cancellation: cancellation) {
@@ -880,7 +880,7 @@ final class FTPSession: RemoteSession {
     /// does not cut a file there, and one that does not know `APPE` may start the file anew, so
     /// the length is checked when the file is closed, as after every upload.
     func openAppend(_ path: String, at offset: Int64?, cancellation: CancellationFlag?) throws -> (
-        writer: FileWriter, size: Int64
+        writer: any FileWriter, size: Int64
     ) {
         let path = RemotePath.normalized(path)
         if environment.options.transfersAsText(RemotePath.name(of: path)) {

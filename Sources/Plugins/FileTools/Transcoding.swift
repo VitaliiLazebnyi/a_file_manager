@@ -296,7 +296,7 @@ final class DecodeMachine {
         var fullCount: Int?
     }
 
-    private let sink: DecodeSink
+    private let sink: any DecodeSink
     private var state = State.searching
     private var sextets: [UInt8] = []
     private(set) var filesDecoded = 0
@@ -323,7 +323,7 @@ final class DecodeMachine {
     private var yPartLength: Int64?
     private var yHasPart = false
 
-    init(sink: DecodeSink) {
+    init(sink: any DecodeSink) {
         self.sink = sink
     }
 
