@@ -29,6 +29,7 @@ enum CompareSettingsKey {
 /// background queue and come back to the main thread with a finished value; a newer request
 /// cancels the older one, whose result is then dropped. Saving runs as a job of the kernel's
 /// job service. With `runsInline` (tests) the background work runs on the calling thread.
+@MainActor
 final class CompareSession {
     enum Phase {
         case empty, working, ready
@@ -109,8 +110,9 @@ final class CompareSession {
 
     /// Runs `work` away from the main thread and hands its result to `finish` on it, unless a
     /// newer request has come in meanwhile.
-    private func background<Value>(
-        _ work: @escaping (CancellationFlag) -> Value, finish: @escaping (Value, _ wasCancelled: Bool) -> Void
+    private func background<Value: Sendable>(
+        _ work: @escaping @Sendable (CancellationFlag) -> Value,
+        finish: @escaping @MainActor (Value, _ wasCancelled: Bool) -> Void
     ) {
         running?.cancel()
         // A search in progress belongs to the texts and rows that are about to change.
@@ -124,11 +126,13 @@ final class CompareSession {
             finish(work(cancellation), cancellation.isCancelled)
             return
         }
+        /// Made on the main thread and called there only; the worker only carries it.
+        nonisolated(unsafe) let finish = finish
         // A thread of its own, not a worker of the shared pool: loading from a share that does not
         // answer can block for a long time, and a few such loads must not use up the pool.
         CompareWorker.run("Compare") { [weak self] in
             let value = work(cancellation)
-            DispatchQueue.main.async {
+            DispatchQueue.main.async { [weak self] in
                 guard let self, self.running === cancellation else { return }
                 finish(value, cancellation.isCancelled)
             }
@@ -211,7 +215,7 @@ final class CompareSession {
 
         case .text(let left, let right, _, let width):
             let (options, anchors) = (self.options, self.anchors)
-            let work = { (cancellation: CancellationFlag?) in
+            let work: @Sendable (CancellationFlag?) -> CompareContent = { cancellation in
                 CompareLoader.text(
                     left: left, right: right, options: options, anchors: anchors, cancellation: cancellation)
             }
@@ -411,9 +415,11 @@ final class CompareSession {
             completion(Self.search(content, needle, from: row, forward: forward, cancellation: nil))
             return
         }
+        /// Made on the main thread and called there only; the worker only carries it.
+        nonisolated(unsafe) let completion = completion
         CompareWorker.run("Compare find") { [weak self] in
             let found = Self.search(content, needle, from: row, forward: forward, cancellation: cancellation)
-            DispatchQueue.main.async {
+            DispatchQueue.main.async { [weak self] in
                 // Stale when another search started, or the texts changed, meanwhile.
                 guard let self, !cancellation.isCancelled, self.findGeneration == generation else { return }
                 self.searching = nil
@@ -424,7 +430,7 @@ final class CompareSession {
 
     private var searching: CancellationFlag?
 
-    private static func search(
+    nonisolated private static func search(
         _ content: CompareContent, _ needle: String, from row: Int, forward: Bool, cancellation: CancellationFlag?
     ) -> Int? {
         let count: Int
@@ -644,7 +650,7 @@ final class CompareSession {
         let generation = editGeneration
         kernel.jobs.run(
             title: "Save",
-            work: { monitor -> [Saved] in
+            work: { [files] monitor -> [Saved] in
                 files.enumerated().map { index, file in
                     monitor.report(
                         JobProgress(
@@ -711,7 +717,7 @@ final class CompareSession {
 /// a worker of the shared pool. Reading from a share that does not answer can block for as long as the
 /// server takes to give up; a handful of those must not use up the workers that everything else needs.
 enum CompareWorker {
-    static func run(_ name: String, _ body: @escaping () -> Void) {
+    static func run(_ name: String, _ body: @escaping @Sendable () -> Void) {
         let thread = Thread(block: body)
         thread.name = name
         thread.qualityOfService = .userInitiated

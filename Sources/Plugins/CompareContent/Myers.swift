@@ -4,7 +4,7 @@ import Foundation
 /// A stretch of two sequences that is either the same in both or differs: `a` is deleted and
 /// `b` inserted in its place (either may be empty). The segments of a diff cover both
 /// sequences completely, in order.
-public struct DiffSegment: Equatable {
+public struct DiffSegment: Equatable, Sendable {
     public let a: Range<Int>
     public let b: Range<Int>
     public let isEqual: Bool

@@ -130,7 +130,7 @@ enum CompareOperands {
     /// file of the target panel, else with the file of the same name there; or, with nothing
     /// selected, the file under the cursor with the file of the same name in the target panel.
     /// The target panel's cursor is never used. Works on what the panels list.
-    static func choose(source: PanelModel, target: PanelModel) -> (left: URL?, right: URL?) {
+    @MainActor static func choose(source: PanelModel, target: PanelModel) -> (left: URL?, right: URL?) {
         /// The first `limit` marked files in list order. Nothing marked is known at once, and the walk over the
         /// marks (a bit each) stops at the limit, so a selection of 300,000 does not cost a pass over them.
         func selectedFiles(_ model: PanelModel, limit: Int) -> [FileItem] {

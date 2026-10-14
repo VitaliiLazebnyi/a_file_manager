@@ -3,7 +3,7 @@ public import Foundation
 
 /// When two lines count as equal (spec 09 › Comparison rules). The options only decide
 /// equality; inside a line that differs, the characters are compared exactly.
-public struct DiffOptions: Equatable, Codable {
+public struct DiffOptions: Equatable, Codable, Sendable {
     /// Lines that differ only in upper and lower case are equal ("Case sensitive" off).
     public var ignoreCase = true
     /// Runs of spaces and tabs count as one space, and those at the start and end of a line
@@ -95,8 +95,8 @@ public struct DiffOptions: Equatable, Codable {
 }
 
 /// One line of the two panes: a line of the left file, of the right file, or of both.
-public struct DiffRow: Equatable {
-    public enum Kind: Equatable {
+public struct DiffRow: Equatable, Sendable {
+    public enum Kind: Equatable, Sendable {
         case equal
         /// Both sides have a line here and the two differ.
         case changed
@@ -114,7 +114,7 @@ public struct DiffRow: Equatable {
 
 /// Two texts laid side by side (spec 09 › Display). Pure and UI-free; computing it is the
 /// slow part of the comparison and belongs on a background thread.
-public struct TextDiff: Equatable {
+public struct TextDiff: Equatable, Sendable {
     public let rows: [DiffRow]
     /// The differences as ranges of rows; a run of differing rows is one difference
     /// (spec 09 › Window, Next / Previous difference).
@@ -305,7 +305,7 @@ public struct TextDiff: Equatable {
 
 /// Two files compared byte by byte at the same offsets, in lines of a fixed number of bytes
 /// (spec 09 › Loading, mode and encodings: binary mode).
-public struct BinaryDiff: Equatable {
+public struct BinaryDiff: Equatable, Sendable {
     public let bytesPerLine: Int
     public let leftCount: Int
     public let rightCount: Int
@@ -330,7 +330,9 @@ public struct BinaryDiff: Equatable {
 
         let found: [(blocks: [Range<Int>], bytes: Int)] = left.withUnsafeBytes { first in
             right.withUnsafeBytes { second in
-                Parallel.map(pieces) { piece in
+                /// Only read, and only while the call lasts.
+                nonisolated(unsafe) let (first, second) = (first, second)
+                return Parallel.map(pieces) { piece in
                     var blocks: [Range<Int>] = []
                     var bytes = 0
                     var start: Int?

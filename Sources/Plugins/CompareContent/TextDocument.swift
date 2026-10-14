@@ -1,7 +1,7 @@
 public import Foundation
 
 /// How the bytes of a text file become characters (spec 09 › Loading, mode and encodings).
-public enum TextEncoding: Equatable {
+public enum TextEncoding: Equatable, Sendable {
     case utf8(bom: Bool)
     case utf16LittleEndian, utf16BigEndian
     /// The fallback for bytes that are not valid UTF-8: every byte is a character.
@@ -85,7 +85,7 @@ public enum TextEncoding: Equatable {
     }
 }
 
-public enum LineEnding: String, Equatable {
+public enum LineEnding: String, Equatable, Sendable {
     /// The last line of a file that does not end with a line break.
     case none = ""
     case lf = "\n"
@@ -93,7 +93,7 @@ public enum LineEnding: String, Equatable {
     case cr = "\r"
 }
 
-public struct TextLine: Equatable {
+public struct TextLine: Equatable, Sendable {
     public var text: String
     public var ending: LineEnding
     /// The line's number in the file as it was loaded; 0 for lines added or changed since
@@ -109,7 +109,7 @@ public struct TextLine: Equatable {
 
 /// A text file as lines, with what is needed to write it back unchanged: its encoding and
 /// every line's own line break. A value; safe to hand between threads.
-public struct TextDocument: Equatable {
+public struct TextDocument: Equatable, Sendable {
     public var encoding: TextEncoding
     public var lines: [TextLine]
     /// False when the bytes loaded were not valid in the encoding and were shown with replacement
