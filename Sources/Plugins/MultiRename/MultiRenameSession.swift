@@ -4,9 +4,12 @@ import Foundation
 import ImageIO
 import UniformTypeIdentifiers
 
-/// The text on the clipboard for `[X]`, read when a mask asks for it and not before, off the main
-/// thread (a program that provides its text only when asked can take as long as it likes), and
-/// kept until the clipboard changes. Safe to use from several threads.
+/// The text on the clipboard for `[X]`, read when a mask asks for it and not before, and kept
+/// until the clipboard changes. A mask does not wait for it on its own thread: a queue of the
+/// session asks for it (`read`, which reads on the main thread) and the mask waits at most
+/// `Snapshot.patience` (a program that provides its text only when asked can take as long as it
+/// likes). Main thread; its snapshots are safe to use from several threads.
+@MainActor
 final class ClipboardSource {
     /// One reading of the clipboard. Unchecked `Sendable`: the state is guarded by `condition`;
     /// `read` and `queue` do not change after `init`.
@@ -54,19 +57,18 @@ final class ClipboardSource {
     }
 
     private let read: @Sendable () -> String?
-    private let changeCount: (() -> Int)?
+    private let changeCount: (@MainActor () -> Int)?
     private let queue = DispatchQueue(label: "multirename.clipboard", qos: .userInitiated)
     private var last: (count: Int, snapshot: Snapshot)?
 
     /// Without `changeCount` the clipboard is read again for every preview.
-    init(read: @escaping @Sendable () -> String?, changeCount: (() -> Int)? = nil) {
+    init(read: @escaping @Sendable () -> String?, changeCount: (@MainActor () -> Int)? = nil) {
         self.read = read
         self.changeCount = changeCount
     }
 
     /// The clipboard as it is now. Cheap: nothing is read until the snapshot is asked for its
     /// value, and a clipboard that has not changed since the last call gives the same snapshot.
-    /// Main thread.
     func snapshot() -> Snapshot {
         guard let changeCount else { return Snapshot(read: read, queue: queue) }
         let count = changeCount()
@@ -159,7 +161,7 @@ final class MultiRenameSession {
     init(
         kernel: Kernel, items: [FileItem], store: RenameStore, settings: RenameSettings, logDirectory: URL,
         previewsInBackground: Bool = true, clipboard: @escaping @Sendable () -> String? = { nil },
-        clipboardChangeCount: (() -> Int)? = nil
+        clipboardChangeCount: (@MainActor () -> Int)? = nil
     ) {
         self.kernel = kernel
         self.store = store
@@ -190,7 +192,8 @@ final class MultiRenameSession {
         var context = RenameContext()
         context.opened = opened
         context.changed = optionsChanged
-        // Read when a mask uses it, on a thread of the preview, and only if the clipboard changed.
+        // Read when a mask uses it (on the main thread, asked for by a queue of the session), and
+        // only if the clipboard changed.
         let snapshot = clipboard.snapshot()
         context.clipboardLoader = { snapshot.value() }
         context.environment = environment
