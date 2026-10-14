@@ -596,6 +596,9 @@ extension FileSystemProvider {
 /// flushers, releasers and closers by `flushLock`.
 public final class FileSystemRegistry: @unchecked Sendable {
     private let lock = NSLock()
+    /// Guards the flushers, releasers and closers: they are added while the plugins start and
+    /// called from the threads of jobs.
+    private let flushLock = NSLock()
     private var providers: [any FileSystemProvider] = []
     private var flushers: [@Sendable (URL, CancellationFlag) throws -> Void] = []
     private var releasers: [@MainActor (URL) -> Void] = []
@@ -653,9 +656,6 @@ public final class FileSystemRegistry: @unchecked Sendable {
         return current
     }
 
-    /// What `addFlusher` was given. Guarded by `flushLock`: flushers are added while the
-    /// plugins start and called from the threads of jobs.
-    private static let flushLock = NSLock()
 
     /// Registers work that makes a file up to date before somebody else uses it: a plugin
     /// that keeps changes to a file back for a while (an archive that is written after a
@@ -664,9 +664,9 @@ public final class FileSystemRegistry: @unchecked Sendable {
     /// a file it has nothing to do with, blocks for as long as the writing takes otherwise,
     /// and throws when the file could not be brought up to date.
     public func addFlusher(_ flush: @escaping @Sendable (URL, CancellationFlag) throws -> Void) {
-        Self.flushLock.lock()
+        flushLock.lock()
         flushers.append(flush)
-        Self.flushLock.unlock()
+        flushLock.unlock()
     }
 
     /// Has every registered flusher bring the file at `url` up to date. **Who calls it:**
@@ -674,9 +674,9 @@ public final class FileSystemRegistry: @unchecked Sendable {
     /// still have changes for, on its own background thread, before the first read. A throw
     /// means the file on disk is not what the user sees: the operation is not carried out.
     public func flushPendingWrites(to url: URL, cancellation: CancellationFlag) throws {
-        Self.flushLock.lock()
+        flushLock.lock()
         let flushers = self.flushers
-        Self.flushLock.unlock()
+        flushLock.unlock()
         for flush in flushers { try flush(url, cancellation) }
     }
 
@@ -686,24 +686,24 @@ public final class FileSystemRegistry: @unchecked Sendable {
     /// closes the windows that show its files, stops what reads there. Called on the main
     /// thread with the volume's location; whoever registers is the plugin that holds it.
     public func addVolumeReleaser(_ release: @escaping @MainActor (URL) -> Void) {
-        Self.flushLock.lock()
+        flushLock.lock()
         releasers.append(release)
-        Self.flushLock.unlock()
+        flushLock.unlock()
     }
 
     /// The same for what has to wait on the disk to let go (writing what is pending, closing
     /// files): called on the thread of the job that ejects, after the releasers.
     public func addVolumeCloser(_ close: @escaping @Sendable (URL, CancellationFlag) -> Void) {
-        Self.flushLock.lock()
+        flushLock.lock()
         closers.append(close)
-        Self.flushLock.unlock()
+        flushLock.unlock()
     }
 
     /// Main thread: every releaser lets go of what it shows or reads on `volume`.
     @MainActor public func releaseVolume(_ volume: URL) {
-        Self.flushLock.lock()
+        flushLock.lock()
         let releasers = self.releasers
-        Self.flushLock.unlock()
+        flushLock.unlock()
         for release in releasers { release(volume) }
     }
 
@@ -712,9 +712,9 @@ public final class FileSystemRegistry: @unchecked Sendable {
     /// a volume that is ejected then would lose it.
     public func closeFiles(on volume: URL, cancellation: CancellationFlag) throws {
         try flushPendingWrites(to: volume, cancellation: cancellation)
-        Self.flushLock.lock()
+        flushLock.lock()
         let closers = self.closers
-        Self.flushLock.unlock()
+        flushLock.unlock()
         for close in closers { close(volume, cancellation) }
     }
 

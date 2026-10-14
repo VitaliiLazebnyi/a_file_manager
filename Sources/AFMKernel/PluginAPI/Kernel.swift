@@ -153,15 +153,13 @@ public final class Kernel {
         for plugin in plugins {
             group.enter()
             // A plugin that answers twice must not end the wait for the others.
-            let lock = NSLock()
-            // Guarded by `lock`.
-            nonisolated(unsafe) var isDone = false
+            let isDone = OSAllocatedUnfairLock(initialState: false)
             plugin.prepareToQuit(cancellation: cancellation) {
-                lock.lock()
-                let isFirst = !isDone
-                isDone = true
-                lock.unlock()
-                if isFirst { group.leave() }
+                let wasDone = isDone.withLock { done in
+                    defer { done = true }
+                    return done
+                }
+                if !wasDone { group.leave() }
             }
         }
         // Notified on the main queue.
