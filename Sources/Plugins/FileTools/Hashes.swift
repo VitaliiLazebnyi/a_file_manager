@@ -3,8 +3,9 @@ import CryptoKit
 import Foundation
 import zlib
 
-/// A checksum that is fed a file block by block. One hasher belongs to one thread at a time.
-protocol StreamHasher: AnyObject {
+/// A checksum that is fed a file block by block. One hasher belongs to one thread at a time,
+/// and may go from one thread to another between blocks.
+protocol StreamHasher: AnyObject, Sendable {
     func update(_ data: Data)
     /// The digest; the hasher is used up afterwards.
     func finish() -> [UInt8]
@@ -126,7 +127,9 @@ extension Sequence where Element == UInt8 {
 }
 
 /// CRC32 with the system's zlib, which uses the processor's CRC instructions.
-final class CRC32Hasher: StreamHasher {
+///
+/// Unchecked `Sendable`: used by one thread at a time, as `StreamHasher` allows.
+final class CRC32Hasher: StreamHasher, @unchecked Sendable {
     private(set) var value: UInt = zlib.crc32(0, nil, 0)
 
     func update(_ data: Data) {
@@ -151,7 +154,9 @@ final class CRC32Hasher: StreamHasher {
 }
 
 /// MD5 and the SHA-1/SHA-2 hashes of CryptoKit.
-final class CryptoHasher<Function: HashFunction>: StreamHasher {
+///
+/// Unchecked `Sendable`: used by one thread at a time, as `StreamHasher` allows.
+final class CryptoHasher<Function: HashFunction>: StreamHasher, @unchecked Sendable {
     private var function = Function()
 
     func update(_ data: Data) { function.update(data: data) }
@@ -159,7 +164,9 @@ final class CryptoHasher<Function: HashFunction>: StreamHasher {
 }
 
 /// SHA-224, which CryptoKit leaves out.
-final class SHA224Hasher: StreamHasher {
+///
+/// Unchecked `Sendable`: used by one thread at a time, as `StreamHasher` allows.
+final class SHA224Hasher: StreamHasher, @unchecked Sendable {
     private var context = CC_SHA256_CTX()
 
     init() { CC_SHA224_Init(&context) }
@@ -185,7 +192,9 @@ final class SHA224Hasher: StreamHasher {
 /// SHA-3 (FIPS 202): the Keccak sponge with 1600 bits of state. CryptoKit has it from
 /// macOS 26 on (and not SHA3-224 at all); this is the version for the others. It works on
 /// raw memory with wrapping arithmetic: nothing in the permutation is checked or allocated.
-final class SHA3Hasher: StreamHasher {
+///
+/// Unchecked `Sendable`: used by one thread at a time, as `StreamHasher` allows.
+final class SHA3Hasher: StreamHasher, @unchecked Sendable {
     private let state = UnsafeMutablePointer<UInt64>.allocate(capacity: 25)
     private let rate: Int
     private let digestLength: Int
@@ -205,7 +214,8 @@ final class SHA3Hasher: StreamHasher {
         pending.deallocate()
     }
 
-    private static let roundConstants: UnsafeMutablePointer<UInt64> = {
+    /// Filled once, when first used, and only read afterwards.
+    nonisolated(unsafe) private static let roundConstants: UnsafeMutablePointer<UInt64> = {
         let constants: [UInt64] = [
             0x0000_0000_0000_0001, 0x0000_0000_0000_8082, 0x8000_0000_0000_808A, 0x8000_0000_8000_8000,
             0x0000_0000_0000_808B, 0x0000_0000_8000_0001,
@@ -378,11 +388,14 @@ final class SHA3Hasher: StreamHasher {
 /// state lives in raw memory or on the stack. The chunks of large inputs are hashed on all
 /// cores, each core taking a subtree of equal size, which is correct because the chaining
 /// value of such a subtree does not depend on what is around it.
-final class BLAKE3Hasher: StreamHasher {
+///
+/// Unchecked `Sendable`: used by one thread at a time, as `StreamHasher` allows.
+final class BLAKE3Hasher: StreamHasher, @unchecked Sendable {
     private static let chunkStart: UInt32 = 1, chunkEnd: UInt32 = 2, parent: UInt32 = 4, root: UInt32 = 8
     private static let chunkSize = 1_024
 
-    private static let iv: UnsafePointer<UInt32> = {
+    /// Filled once, when first used, and only read afterwards.
+    nonisolated(unsafe) private static let iv: UnsafePointer<UInt32> = {
         let words: [UInt32] = [
             0x6A09_E667, 0xBB67_AE85, 0x3C6E_F372, 0xA54F_F53A, 0x510E_527F, 0x9B05_688C, 0x1F83_D9AB, 0x5BE0_CD19
         ]
@@ -391,8 +404,9 @@ final class BLAKE3Hasher: StreamHasher {
         return UnsafePointer(pointer)
     }()
 
-    /// The order in which each of the seven rounds takes the words of a block.
-    private static let schedule: UnsafePointer<UInt8> = {
+    /// The order in which each of the seven rounds takes the words of a block. Filled once, when
+    /// first used, and only read afterwards.
+    nonisolated(unsafe) private static let schedule: UnsafePointer<UInt8> = {
         let permutation = [2, 6, 3, 10, 7, 0, 4, 13, 1, 11, 12, 5, 9, 14, 15, 8]
         var order = Array(0..<16)
         var all: [UInt8] = []

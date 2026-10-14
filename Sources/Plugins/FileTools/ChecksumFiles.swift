@@ -355,8 +355,9 @@ enum ChecksumRun {
         }
     }
 
-    /// How many files are being hashed at this moment.
-    private final class BusyFiles {
+    /// How many files are being hashed at this moment. Unchecked `Sendable`: `active` is
+    /// guarded by `lock`.
+    private final class BusyFiles: @unchecked Sendable {
         private let lock = NSLock()
         private var active = 0
 
