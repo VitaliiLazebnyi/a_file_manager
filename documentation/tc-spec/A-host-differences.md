@@ -1,0 +1,182 @@
+# Appendix A: Host differences (Wine/CrossOver vs Windows)
+
+Most of this specification was first observed under CrossOver (Wine) on macOS and then checked on a Windows 11 virtual machine. This appendix collects everything that depended on the host rather than on Total Commander: artefacts a clone must not copy, values that depend on DPI and fonts (with both measurements), defaults that differed between the two sessions together with the real default, and keys the host did not deliver. The topical chapters state the Windows 11 behaviour and refer here for the rest.
+
+**Related:** [Appendix B](B-investigation-and-test-setup.md) (hosts, sandboxes and test setup), [02](02-main-window.md) › Fonts, Icons, Window geometry and rendering metrics; [13](13-configuration-dialog.md) › Display › Font, Display › Icons, Display › Tabstops/Data Formats; [19](19-settings-files-and-command-line.md) › INI rules; [06](06-keyboard.md).
+
+## 1. Artefacts not to copy
+
+### 1.1 The two hosts
+
+| | Wine session | Windows session |
+|---|---|---|
+| Host | macOS (Apple Silicon) → CrossOver 26.3 → bottle "TotalCommander" (Windows 10 type) | Parallels Desktop 27 → Windows 11 26H2, build 26300, ARM64; TC 64-bit under x64 emulation |
+| Display | 96 DPI | 200 % scaling (192 DPI) |
+| Shell | Wine's own shell (context menus, property sheets, thumbnails, recycle bin) | Windows Explorer shell |
+| Windows user | `crossover` | `cm0k` |
+| Sandbox | `~/tc-sandbox`, seen as `Y:\tc-sandbox` | `C:\tc-sandbox` |
+
+Details of both setups are in Appendix B.
+
+### 1.2 Wine artefacts
+
+Each row was either confirmed on Windows 11 or is plainly a property of the host.
+
+| What appeared under Wine | Real behaviour (Windows 11) | Rule for a clone |
+|---|---|---|
+| Title `crossover^ - Total Commander (x64) 11.58 - NOT REGISTERED` | `Total Commander (x64) 11.58 - NOT REGISTERED`, no prefix. The meaning of the `^` was never established | No `<user>^ - ` prefix (01 › Window title) |
+| Box "ESC is pressed - operation aborted!" / "The ESC key seems to be stuck - press to release!" [OK] when a copy started right after an injected Esc; the copy was not done and the selection stayed. Wine had lost the Esc key-up; pressing and releasing Esc once more cleared it | A copy started right after a normal Esc press ran normally, with no box | Keep the guard (Esc state checked when an operation starts and while it runs, `ESCcheck=1`), but let it fire only while Esc is really held down (07 › Esc guard) |
+| Names starting with `.` reported as hidden: home-folder dot-files showed `-ah-` with hidden files shown, and `A\.hidden_file.txt` was not listed with hidden files off | A dot-name without the Hidden attribute (`.hidden_dot.txt`) is listed normally | Only the Hidden or System attribute hides a file; the name plays no part |
+| A dot-file copied by TC (by Synchronize, into `B`) arrived **without** the hidden bit and was listed normally, because the explicit DOS attributes TC sets are stored in the extended attribute `user.DOSATTRIB` and override Wine's dot rule | — | Do not copy; attributes travel with the file as on NTFS |
+| DOS attributes such as Hidden on `descript.ion` lived in the xattr `user.DOSATTRIB` | Normal NTFS attributes | — |
+| Small PNG files showed the generic file icon in Thumbnail view (JPG files were rendered) | Real thumbnails for PNG and JPG from the shell thumbnail provider | Thumbnail every image type the platform can decode (03 › View types › Thumbnails) |
+| Button-bar icon caches `default.br2` / `vertical.br2` were not created | Written to `%APPDATA%\GHISLER` on the first start | Write the caches (19 › File inventory and locations) |
+| Ctrl+V with a name conflict showed Wine's shell dialog "Confirm file overwrite" ("This folder already contains a file called 'report_01.txt'." / "Do you want to replace it?" [Yes] [Yes to all] [No] [Cancel]) | Pasting goes through the platform shell's copy engine, so the platform's own dialog appears (the Windows dialog was not recorded) | Hand pasting to the platform shell, or imitate the platform dialog; do not copy Wine's text (07 › File clipboard and name lists) |
+| After Ctrl+C on files the Mac text clipboard was empty | TC places a file-list clipboard format; whether a text format is placed as well was not recorded on Windows | — |
+| After a menu was closed with Esc, keys did not reach the panel until it was clicked (Wine focus handling) | Not seen on Windows | Focus returns to the panel when a menu closes |
+| Once, just before the first Lister window, the Configuration dialog opened on its *Packer* page; never reproduced (probably a stray click) | — | Do not reproduce |
+| The F8 question read "Do you really want to delete the selected directory …?" (no recycle bin in the bottle) | With the default *delete to recycle bin*: "Do you really want to move the selected file <name> to the recycle bin?" [Yes] [No] [Cancel] | Use the recycle-bin wording whenever deletion goes to the recycle bin (07 › Delete (F8, Del, Shift+F8)) |
+| In dark mode the empty part of the menu bar stayed white | The whole menu bar is dark grey | Draw the full bar in the dark palette (02 › Dark mode) |
+| Right-clicking an empty Lister text area gave no menu | Not checked on Windows (unverified) | — |
+| The help viewer showed a blank key column on some pages (the keyboard topic) | Not a TC function | Key tables were taken from `KEYBOARD.TXT` instead |
+| Characters typed by the test tool sometimes arrived garbled under CrossOver; single key presses worked | — | Test-tool artefact |
+| One footer read `11,341 k / 11,332 k in 0 / 0 file(s), 1 / 2 dir(s)`: the selected size was higher than the total, because the two values came from different measurements (11,613,426 vs 11,604,818 bytes) while Wine was writing to the folder | — | Compute both figures from the same data (03 › Status line) |
+
+*Basis: observed under Wine; checked against observations on Windows 11.*
+
+### 1.3 Host shell and environment
+
+These values come from the host and differ on every machine. The topical chapters give them as examples only.
+
+| Item | Under Wine | On Windows 11 |
+|---|---|---|
+| File and folder context menu | Short Wine shell menu: bold default verb, Open, View (TC), Cut, Copy, Pack files (TC), Create Link, Delete, Properties | Windows 11 classic shell menu with shell extensions (Edit, Print, Scan with Microsoft Defender..., Open with, Copy as path, Share, Send to, Give access to, …) and TC's items; TC's entry reads "View (Lister)" (05 › File and folder context menu) |
+| Path-bar and drive context menus (right click on the path bar or the drive combo) | Wine's shell menu of the folder or drive root: the path bar gave the bold folder name (default verb) / Cut / Copy / Create Link / Rename / New ▸ / Properties; the drive combo gave Cut / Copy / Create Link / Rename (disabled) / New ▸ / Properties | The Windows shell menu of the folder or drive (not recorded item by item) (05 › Context menus of other elements) |
+| Properties sheet (Alt+Enter, Files › Properties) | Tab *General* only | General / Digital Signatures / Security / Details / Previous Versions (07 › Properties (Alt+Enter)) |
+| Drive list (drive combo, Alt+F1/F2) | `c`, `y`, `z`, `+  Computer`, `*  My Documents` | `c`, `d  DVD Drive`, `+  Computer (drive overview)`, `*  My Documents (directory)`, `\  Network Neighborhood`; a mapped drive adds e.g. `z  \\localhost\c$\tc-sandbox` |
+| Special-folder menu (path bar `▾`) and separate tree | Desktop / My Computer ▸ / Trash / **My Mac Desktop** (CrossOver-specific) / Documents ▸ / `\ftp`; the tree also showed `[Control Panel]`, `[Y:]`, `[Z:]` | The platform's own shell folders (the menu itself was not recorded on Windows) |
+| Path-bar colours (default *Title bar for file panels* colours) | Saturated blue (active) | Muted steel blue (active), lighter grey-blue (inactive), taken from the Windows caption colours |
+| Cursor (*Use Windows theme for cursor*) | Light-blue filled bar | Light-blue filled bar with a darker blue 1 px border |
+| Folder icons | Wine's folder icon | Explorer's yellow folder icons; `[..]` has the up-arrow icon |
+| Settings files | `C:\users\crossover\AppData\Roaming\GHISLER\wincmd.ini`, `…\wcx_ftp.ini` | `%APPDATA%\GHISLER\…` of the Windows user |
+| `%TEMP%` | `c:\users\crossover\AppData\Local\Temp` (TC's own subfolder `_tc\` below it), so a file viewed from an archive was titled "Lister - [c:\users\crossover\AppData\Local\Temp\_tc\report_01.txt]" and a nested archive opened as `c:\users\crossover\AppData\Local\Temp\_tc\sample.tar` | `C:\Users\cm0k\AppData\Local\Temp` (with `_tc\`) |
+| About box (Help › About Total Commander...) | "Settings files:" `C:\users\crossover\AppData\Roaming\GHISLER\wincmd.ini` and `…\wcx_ftp.ini`; "Program file:" `C:\Program Files\totalcmd\totalcmd64.exe` | The user's own settings paths; program file `C:\Program Files\totalcmd\TOTALCMD64.EXE` in upper case (12 › About box) |
+| Clock | Bottle at UTC+9: a file modified at 10:00 UTC was shown as 19:00:00. TC shows file times in local time | Local time |
+| System Information (12 › System Information) | "Wine: Windows 10 Professional", mode `10.0 (Build 19045)`, CPU `VirtualApple @ 2.50GHz`, display driver `Apple M4 Max`, `1728x1117x16m (32 bit)`, RAM `131,071 M (128 G)`, user `crossover`, computer `MAC` | Not recorded |
+| Example listings | `c:\users` with `[crossover]` and `[Public]`; `%USERNAME%` = `crossover` in the rename and new-folder menus | — |
+
+*Basis: observed under Wine and on Windows 11.*
+
+### 1.4 Artefacts of the Windows session
+
+| Item | Explanation |
+|---|---|
+| File name `utf8_Ã¼nÃ¯cÃ¶dÃ©.txt` in the sandbox | Mojibake made by the test script: PowerShell 5 read the BOM-less UTF-8 script as ANSI. Not TC |
+| TLS failed with "wrong version number" on the first FTP test | The first server script ran both servers on one pyftpdlib event loop from two threads; fixed before the tests. Not TC |
+| Windows Defender Firewall asked "Do you want to allow public and private networks to access this app?" on the first FTP data connection | A Windows prompt, not TC's. It was cancelled; the loopback connection worked anyway |
+| Start-menu search entries marked "(Mac)" | Parallels' links to the CrossOver app on the Mac, not TC's entries |
+| Folder `Mac` in `C:\` (`[Mac]`, `[Mac\Home]` in the tree cache, Attr `r---`) | Belongs to the Parallels VM, not to Windows or TC (unverified) |
+
+*Basis: observed on Windows 11.*
+
+## 2. Values that depend on DPI and fonts
+
+### 2.1 Display defaults
+
+TC picks these defaults from the screen DPI and the available fonts. The topical chapters give the Windows 11 value with "(depends on DPI/font; see Appendix A)".
+
+| Setting (13 › Display › Font, Icons, Tabstops/Data Formats; ini key) | Wine, 96 DPI | Windows 11, 200 % (192 DPI) |
+|---|---|---|
+| Font › File list font (`Fontname`, `Fontsize`) | Microsoft Sans Serif,8,b | **Segoe UI,9** (regular: neither Semibold nor bold) |
+| Font › Main window font | Microsoft Sans Serif,8,b | **Segoe UI,9** |
+| Font › Dialog box font | Microsoft Sans Serif,8 | Microsoft Sans Serif,8 |
+| Font › Set dots per inch (DPI) to (disabled by default) | `[96]` | `[192]` |
+| Icons › Icon size (`Iconsize32`) | 16x16 | **32x32** |
+| Tabstops › Extension / Size / Date/Time / Attributes / Comments (px) | 147 / 209 / 213 / 273 / 90 | **176 / 234 / 238 / 299 / 91** |
+| Screen-resolution section of `wincmd.ini` | `[1728x1117 (8x16)]` | `[3456x1896 (10x20)]` |
+| Button-bar icon caches | not written | `default.br2` 77,710 bytes, `vertical.br2` 25,906 bytes |
+
+- The help names **Segoe UI Semibold, 9** as the font of a fresh installation (`UseNewDefFont=-1` → 1, Windows Vista and later) and Microsoft Sans Serif 8 bold as the fallback and the default of existing installations. Windows 11 showed Segoe UI 9 regular. Under Wine the fallback appeared although the ini held `UseNewDefFont=1`; whether the bottle lacked Segoe UI was not checked.
+- The section name is `[<width>x<height> (<a>x<b>)]`. The pair in parentheses appears to be the system-font character cell: 8×16 at 96 DPI ("small fonts"), 10×20 at 120 DPI ("large fonts"); this is an interpretation, as the help does not explain the pair. At 192 DPI it was still 10×20. At 200 % the section carried the physical resolution (3456×1896), while the window geometry was measured against a logical screen of 1728 × 1117; the two figures were recorded as given and not reconciled.
+- Every other default on the pages checked on Windows (Layout, Display, Color, Folder Tabs, View Mode, Operation, Edit/View, Copy/Delete, Quick Search, Thumbnails, Misc) was the same in both sessions.
+
+*Basis: observed under Wine and on Windows 11; help: inisettings2 (`UseNewDefFont`), inisettings3 (`Fontname`, `Fontsize`, resolution sections).*
+
+### 2.2 Window and element metrics
+
+Wine values were estimated from screenshots of the Wine session; Windows values were measured at 200 % scaling in logical px. "—" = not measured.
+
+| Element | Wine (MS Sans Serif 8 bold) | Windows 11, 200 % (Segoe UI 9) |
+|---|---|---|
+| Default main window | 1092 × 794 logical points (macOS window bounds; about 867 × 630 px in the scaled screenshots) | ≈ 863 × 628, placed centred on a 1728 × 1117 logical screen |
+| File-list row pitch | ≈ 17 px at screenshot scale (font height + 1 px *Extra space vertical*) | ≈ 13 |
+| Column header row | ~16 px | ≈ 14 |
+| Path bar | ~16 px; `▾` at the left, `*` and `▼` ~14 px each at the right | ≈ 14 |
+| Drive line | ~20 px; drive combo ~36 px wide; `\` and `..` ~14 px each | ≈ 16 |
+| Menu bar | ~21 px | — |
+| Main button bar | 24 px buttons with 16 px icons ("Small icons" 16, button size 24); separator a 1 px etched line with 3–4 px padding | — |
+| Vertical button bar | ~30 px wide | — |
+| Status line / command line / F-key bar | ~16 / ~20 / ~20 px | — |
+| Configuration dialog | ~507 × 400 px; page tree ~120 px wide; blue page caption ~16 px | — |
+| Overwrite dialog with *Thumbnails* | preview boxes of about 78 × 78 px | — |
+| Thumbnail tiles (setting 96 × 96) | frames of about 80 × 80 px on the screenshots | — |
+| Find Files geometry (`Search…` keys of the resolution section) | `SearchX=580`, `SearchY=425`, `SearchDX=605`, `SearchDY=266` | keys present, values not recorded |
+| Multi-Rename / Synchronize column positions | `RenameTabs=121,152,362,425,551`, `SyncTabs=97,160,259,284,380,443` | — |
+
+*Basis: observed under Wine (screenshots) and on Windows 11.*
+
+### 2.3 How TC stores DPI-dependent values
+
+- Geometry, fonts, icon sizes, cursor width, thumbnail zoom, column tabstops and tool-window positions live in the **screen-resolution section** (19 › INI rules › Screen-resolution sections). `ResolutionSpecific=0` puts them into `[AllResolutions]`, which is also the fallback when no section for the current resolution exists.
+- Some keys carry the DPI in their name: `<Key><dpi>` and `<Key>_<dpi>` hold the value for that DPI, `<Key>_dpi` the DPI at which a value was saved (examples: `Buttonheight96=`, `Iconsize32_120=`, `ExtraDriveWidth_dpi=`).
+- Per monitor, the main monitor's section holds `monitor(x,y,dx,dy;dpi)=x,y,dx,dy`.
+- `[Tabstops]` is used only when no tabstops are stored for the current resolution.
+
+Rules for a clone:
+
+1. Derive the default fonts, icon size, tabstops and row height from the system DPI and font metrics; do not hard-code the 96-DPI values.
+2. Store and look up these values per screen resolution as above.
+3. Scale the dialogs with the system DPI (*Set dots per inch* is off by default; *Automatically adjust dialog boxes to larger fonts* is on).
+
+*Basis: help: inisettings, inisettings3; HISTORY.TXT (`[AllResolutions]` fallback, per-monitor positions); observed under Wine and on Windows 11.*
+
+## 3. Defaults that differed between the sessions
+
+| Item | Under Wine | On Windows 11 | Help | Real default (use this) |
+|---|---|---|---|---|
+| File list / main window font | Microsoft Sans Serif,8,b | Segoe UI,9 regular | Segoe UI Semibold,9 on Vista+; MS Sans Serif 8 bold as fallback | Segoe UI 9 regular on Windows 11 (depends on DPI/font) |
+| Icon size | 16x16 | 32x32 | per resolution | By DPI: 16×16 at 96 DPI, 32×32 at 192 DPI |
+| Tabstops | 147 / 209 / 213 / 273 / 90 | 176 / 234 / 238 / 299 / 91 | — | By font and DPI |
+| Operation › Refresh › *Refresh when files are created, deleted and renamed* (`WatchDirs`) | off | off | `WatchDirs=0`, default off | **Off.** The first edition took the Wine state for a quirk and claimed "on" for Windows; that was wrong. With it off, TC still rereads panels after most of its own operations and on activation, but some changes (several folders created with `\|`, a saved selection file) appear only after Ctrl+R |
+| *Auto-Refresh when activating the program* (no checkbox) | — | panel re-read when TC got the focus back after a program had run from the command line | always, except on drives listed in *No refresh for these drives* | As the help states |
+| `firstmnu=` in a fresh ini | `3002` | `2810` | documented only as a write test (like `Test=`, without the error message); the value has no documented meaning | Any value; it carries no meaning |
+| `.br2` icon caches | not written | written on first start | HISTORY.TXT (2009/2010) | Written |
+| F2 Queue window after the job | closed by itself (single job) | stayed open, title "(READY)", bars reset; jobs added while paused were appended and ran one after another | F2 Queue feeds the last opened manager; only the separate FTP-download manager is described as closing itself | Stays open with "(READY)" (Windows). Why the Wine window closed was not established |
+| Lister `N` key on one JPG | did nothing (cause unknown) | `N` and Alt+→ act only when several files were opened (`<< 1/3 >>`) | N/P only with several files | Not a host difference: works only with several files |
+| Lister Hex mode: separator before the character column | Written down as spaces (`… 0D 0A   [mail]..mapi=1..`) | Written down as ` \| ` (`… 6D 20 \| Report 1..Lorem`); both show `\|` after the 8th byte | — | Use the Windows form (10 › Hex) |
+| Attribute prompt on Shift+F8 | only the READ ONLY variant was seen | also "has either the attribute HIDDEN or SYSTEM!" | — | Both prompts exist (07 › Delete (F8, Del, Shift+F8)) |
+| Properties, context menus, drive list, path-bar colours | Wine shell | Windows shell | — | Platform shell (§1.3) |
+
+*Basis: observed under Wine and on Windows 11; help: inisettings2 (`WatchDirs`), dlg_configrefresh, options_background_transfer_manager, listercontents.*
+
+## 4. Keys the host intercepted
+
+Under CrossOver the Mac **Option key was not forwarded as Alt**, macOS kept some Ctrl combinations for itself, and modifier-only key events were withheld. All Alt shortcuts in this specification therefore come from `KEYBOARD.TXT`, the help and the shortcut texts in `WCMD_ENG.MNU`; on Windows (Parallels forwards Option as Alt) a subset was pressed and confirmed.
+
+| Key | Under Wine | On Windows 11 |
+|---|---|---|
+| Alt+F7 (Find Files) | Arrived as F7 | Find Files opens on the General tab, *Search in* = current path |
+| Alt+F1 (left drive list) | Not delivered | Opens the left drive list, current drive highlighted |
+| Alt+Enter (Properties) | Arrived as Enter: it opened the bottle's dummy `C:\windows\win.ini` in Wine Notepad (nothing edited) | Shell Properties sheet; on an FTP panel the raw listing |
+| Alt+F (Files menu) | Not delivered | Files menu with underlined accelerators, as in 04 › Files menu |
+| Alt+→ in Lister | Not delivered | Next file, only when several files were opened |
+| Ctrl+Shift+F5 (create shortcut) | Never reached TC; no `.lnk` created | Dialog `Create shortcut of "<name>" as`; `.lnk` created |
+| Ctrl+← / Ctrl+→ (open folder in the target panel) | Taken by macOS (Spaces); nothing happened | Not recorded |
+| Ctrl+F2 (Full view) | Taken by macOS; Show › Full used instead | Not recorded |
+| Holding Shift, Ctrl or Alt alone (F-key bar captions) | Modifier-only events withheld; caption change not observable | Not recorded; the shifted captions are unverified |
+| Esc (key-up of an injected Esc) | Lost, leaving Esc "stuck" (§1.2) | Normal |
+| Other Alt shortcuts, AltGr | Not testable | No result recorded |
+
+Rules for a clone: implement every key as documented in 06; none of the failures above is TC behaviour.
+
+*Basis: observed under Wine and on Windows 11; KEYBOARD.TXT; WCMD_ENG.MNU.*
