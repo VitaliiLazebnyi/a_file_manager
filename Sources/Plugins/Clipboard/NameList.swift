@@ -22,11 +22,11 @@ struct NameList {
     /// One column of the details form.
     struct Column {
         let title: String
-        let value: (FileItem) -> String
+        let value: @Sendable (FileItem) -> String
     }
 
     /// How a file system writes a location; answers at once (`FileSystemRegistry.displayPath`).
-    let displayPath: (URL) -> String
+    let displayPath: @Sendable (URL) -> String
 
     func entry(_ item: FileItem, _ style: Style) -> String {
         let text: String

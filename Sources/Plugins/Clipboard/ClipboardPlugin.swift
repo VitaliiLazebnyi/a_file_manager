@@ -96,7 +96,9 @@ public final class ClipboardPlugin: Plugin {
         let capabilities = { kernel.fileSystems.capabilities(for: model().directory) }
         let isWritable = { capabilities().contains(.write) && !capabilities().contains(.removeOnly) }
         let isRemoveOnly = { capabilities().contains(.removeOnly) }
-        let list = NameList(displayPath: kernel.fileSystems.displayPath)
+        let fileSystems = kernel.fileSystems
+        let displayPath: @Sendable (URL) -> String = { fileSystems.displayPath($0) }
+        let list = NameList(displayPath: displayPath)
 
         commands.register(Command(.cutToClipboard, "Cut", [.cmd("x")], editingRole: .cut), enabled: hasLocalOperands) {
             [self] in
@@ -116,7 +118,7 @@ public final class ClipboardPlugin: Plugin {
         /// `text` makes the text from the operands; it may run off the main thread.
         func names(
             _ id: CommandID, _ title: String, _ shortcuts: [Shortcut] = [], enabled: @escaping () -> Bool = { true },
-            _ text: @escaping ([FileItem], URL) -> String
+            _ text: @escaping @Sendable ([FileItem], URL) -> String
         ) {
             commands.register(Command(id, title, shortcuts, runsDuringJobs: true), enabled: enabled) { [self] in
                 // The list of the operands is made where the text is: for a long selection
@@ -125,7 +127,6 @@ public final class ClipboardPlugin: Plugin {
                 putText(for: Self.count(of: operands)) { text(operands.items(), directory) }
             }
         }
-        let displayPath = kernel.fileSystems.displayPath
         names(ClipboardCommands.copyNames, "Copy Names", enabled: hasOperands) { items, _ in list.names(items, .name) }
         names(.copyFullNames, "Copy Names with Path", [.cmd("c", .shift)]) { items, directory in
             // On `[..]` with nothing selected there is no item: the folder itself is meant.
@@ -338,7 +339,7 @@ public final class ClipboardPlugin: Plugin {
 
     // MARK: Text and pictures
 
-    private static let imageTypes: [NSPasteboard.PasteboardType] = [.png, .tiff]
+    nonisolated private static let imageTypes: [NSPasteboard.PasteboardType] = [.png, .tiff]
 
     /// Whether a picture or text is there to paste; looks at the kinds only, so menus can ask often.
     /// A yes is remembered for the state of the pasteboard it was found in, so that a menu
@@ -355,7 +356,7 @@ public final class ClipboardPlugin: Plugin {
     /// The picture or text on the clipboard. A picture wins over a text, because programs that
     /// copy a picture often add its name. Reads the data, which the program that owns it may
     /// make only now: for a job's thread.
-    private static func content(of pasteboard: NSPasteboard) -> PastedContent? {
+    nonisolated private static func content(of pasteboard: NSPasteboard) -> PastedContent? {
         if let type = pasteboard.availableType(from: imageTypes), let data = pasteboard.data(forType: type),
             !data.isEmpty
         {
@@ -373,7 +374,9 @@ public final class ClipboardPlugin: Plugin {
     /// write that fails leaves no half of it behind.
     private func pasteContent(into directory: URL, in kernel: Kernel) {
         let fileSystems = kernel.fileSystems
-        let pasteboard = self.pasteboard
+        // Read on the job's thread while the main thread leaves it alone (see Threading above):
+        // only the data of its contents is asked for there.
+        nonisolated(unsafe) let pasteboard = self.pasteboard
         kernel.jobs.run(
             title: "Paste:",
             work: { monitor -> Result<URL, any Error> in
@@ -424,7 +427,7 @@ public final class ClipboardPlugin: Plugin {
     }
 
     /// PNG data stays as it is; anything else is converted. Runs on a job's thread.
-    private static func png(from data: Data) throws -> Data {
+    nonisolated private static func png(from data: Data) throws -> Data {
         if data.starts(with: [0x89, 0x50, 0x4E, 0x47]) { return data }
         guard let converted = NSBitmapImageRep(data: data)?.representation(using: .png, properties: [:]) else {
             throw NotAPicture()
@@ -450,7 +453,7 @@ public final class ClipboardPlugin: Plugin {
     /// large selection the text is put together on a background queue (it is megabytes of
     /// paths) and only handed to the pasteboard here. The latest request wins: a text that
     /// arrives after something newer went to the clipboard (another text, or files) is dropped.
-    private func putText(for count: Int, _ make: @escaping () -> String) {
+    private func putText(for count: Int, _ make: @escaping @Sendable () -> String) {
         guard count > Self.listedAtOnce else {
             put(make())
             return
@@ -473,7 +476,8 @@ public final class ClipboardPlugin: Plugin {
         then completion: @escaping (String) -> Void
     ) {
         let (operands, extra) = detailsInput(in: kernel)
-        let list = NameList(displayPath: kernel.fileSystems.displayPath)
+        let fileSystems = kernel.fileSystems
+        let list = NameList(displayPath: { fileSystems.displayPath($0) })
         kernel.jobs.run(
             title: "Reading details:",
             work: { _ in
@@ -497,7 +501,7 @@ public final class ClipboardPlugin: Plugin {
         else { return }
         let (operands, extra) = detailsInput(in: kernel)
         let (fileSystems, ui) = (kernel.fileSystems, kernel.ui)
-        let list = NameList(displayPath: fileSystems.displayPath)
+        let list = NameList(displayPath: { fileSystems.displayPath($0) })
         let url = fileSystems.location(from: text, relativeTo: directory)
         kernel.jobs.run(
             title: "Saving details:",
@@ -511,7 +515,8 @@ public final class ClipboardPlugin: Plugin {
                         // Only a file is replaced; a folder of that name is not this command's to remove.
                         if existing.isDirectory { throw FileSystemError.alreadyExists(fileSystems.displayPath(url)) }
                         // Return keeps the file that is there.
-                        let replace = monitor.ask {
+                        // `@Sendable`, so that it may be sent from this thread to the main thread.
+                        let replace = monitor.ask { @Sendable in
                             ui.choose(
                                 "Overwrite:", detail: Format.displayName(fileSystems.displayPath(url)),
                                 buttons: ["Overwrite", "Cancel"],
@@ -579,7 +584,10 @@ final class FileListProvider: NSObject, NSPasteboardItemDataProvider {
 /// the main thread in slices it schedules. Called on the main thread itself (a job service
 /// that runs its work at once) it reads everything in one go, as there is nobody to wait for.
 /// The counters the two threads share are behind `lock`.
-final class FileListReading {
+///
+/// Unchecked: the counters are guarded by `lock`; the items and the pasteboard are only
+/// touched on the main thread.
+final class FileListReading: @unchecked Sendable {
     enum Outcome: Equatable {
         case read([URL])
         /// Cancelled, or the pasteboard got other contents while it was read.
