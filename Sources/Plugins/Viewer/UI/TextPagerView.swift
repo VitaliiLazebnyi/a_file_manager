@@ -277,7 +277,7 @@ final class TextPagerView: NSView {
                 if !document.cancellation.isCancelled { document.record(error) }
                 row = nil
             }
-            DispatchQueue.main.async { [weak self] in
+            DispatchQueue.main.async {
                 guard let self else { return }
                 self.restoringCaretIn = nil
                 guard self.document === document, self.caretToRestore == offset else { return }
@@ -441,7 +441,7 @@ final class TextPagerView: NSView {
                 if !request.flag.isCancelled { document.record(error) }
                 rows = []
             }
-            DispatchQueue.main.async { [weak self] in
+            DispatchQueue.main.async {
                 guard let self, self.generation == wanted, self.document === document else { return }
                 // A fetch that was stopped brought nothing: the rows on screen stay.
                 guard !request.flag.isCancelled else { return }
@@ -615,7 +615,7 @@ final class TextPagerView: NSView {
                 if !request.flag.isCancelled { document.record(error) }
                 row = nil
             }
-            DispatchQueue.main.async { [weak self] in
+            DispatchQueue.main.async {
                 guard let self, self.revealGeneration == wanted, self.document === document else { return }
                 guard let row else {
                     // That part of the text is not indexed yet; `rowCountChanged` asks again.
@@ -672,7 +672,7 @@ final class TextPagerView: NSView {
                 if !request.flag.isCancelled { document.record(error) }
                 row = nil
             }
-            DispatchQueue.main.async { [weak self] in
+            DispatchQueue.main.async {
                 guard let self, self.revealGeneration == wanted, self.document === document else { return }
                 if let row {
                     self.topRow = row

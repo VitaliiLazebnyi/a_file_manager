@@ -336,7 +336,7 @@ final class ViewerPane: NSView, NSMenuDelegate {
             } else {
                 result = open(item, cancellation)
             }
-            DispatchQueue.main.async { [weak self] in
+            DispatchQueue.main.async {
                 guard let self, self.loadGeneration == generation, !cancellation.isCancelled else {
                     ViewerCleanup.close((try? result.get())?.source)
                     return
@@ -402,7 +402,7 @@ final class ViewerPane: NSView, NSMenuDelegate {
             let summary = FolderSummary.measure(
                 url, provider: provider, cancellation: cancellation,
                 limit: isLocal ? nil : Self.remoteFolderEntryLimit)
-            DispatchQueue.main.async { [weak self] in
+            DispatchQueue.main.async {
                 guard let self, self.loadGeneration == generation, !cancellation.isCancelled else { return }
                 self.folderSummary = summary
                 self.showMessage("\(name)\n\n\(summary.text)")
@@ -571,7 +571,7 @@ final class ViewerPane: NSView, NSMenuDelegate {
                 if Int64(data.count) < range.upperBound - range.lowerBound { throw ViewerError.fileChanged }
             } catch {
                 guard !cancel.isCancelled else { return }
-                DispatchQueue.main.async { [weak self] in
+                DispatchQueue.main.async {
                     guard let self, self.loadGeneration == generation, self.presentGeneration == token,
                         self.mode == .html
                     else { return }
@@ -585,7 +585,7 @@ final class ViewerPane: NSView, NSMenuDelegate {
                     units: encoding.units(from: data), linkBraces: braces, cancellation: cancel)
             else { return }
             let stripped = DataByteSource(Data(result.text.utf8))
-            DispatchQueue.main.async { [weak self] in
+            DispatchQueue.main.async {
                 // The mode may have been changed while the tags were removed: then this is not wanted.
                 guard let self, self.loadGeneration == generation, self.presentGeneration == token, self.mode == .html
                 else { return }
@@ -665,7 +665,7 @@ final class ViewerPane: NSView, NSMenuDelegate {
             case .image:
                 // An animation shows its first frame while the others are still being decoded.
                 let early: (DecodedImage) -> Void = { first in
-                    DispatchQueue.main.async { [weak self] in
+                    DispatchQueue.main.async {
                         guard let self, isCurrent(self), self.imageView == nil else { return }
                         self.showImage(first)
                     }
@@ -706,7 +706,7 @@ final class ViewerPane: NSView, NSMenuDelegate {
             }
             // Made on this thread, which does not touch it again.
             let made = Handover(ready)
-            DispatchQueue.main.async { [weak self] in
+            DispatchQueue.main.async {
                 guard let self, isCurrent(self) else { return }
                 switch made.value {
                 case .image(let image):
