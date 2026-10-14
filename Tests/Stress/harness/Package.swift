@@ -55,8 +55,9 @@ internal func stress(_ name: String) -> Target {
     .executableTarget(name: name, dependencies: kEverything, path: "Stress/" + name, swiftSettings: kStrict)
 }
 
-/// The package: the project's modules, the measuring tools and the harnesses.
-internal let kPackage = Package(
+// The package: the project's modules, the measuring tools and the harnesses. SwiftPM keeps the value that
+// `Package(...)` makes; nothing refers to it by name.
+_ = Package(
     name: "AFMStress",
     platforms: [.macOS(.v14)],
     targets: [

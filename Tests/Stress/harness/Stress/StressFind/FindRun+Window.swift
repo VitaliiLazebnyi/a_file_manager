@@ -1,4 +1,3 @@
-internal import AFMKernel
 internal import AppKit
 internal import Foundation
 internal import StressKit

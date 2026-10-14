@@ -15,8 +15,6 @@ import TestSupport
 internal final class StallFS: @unchecked Sendable {
     /// The memory file system that answers once the provider talks.
     internal let inner: MemoryFileSystem
-    /// The URL scheme of the provider.
-    internal let scheme = "stall"
     /// Guards the state below; blocked calls wait on it.
     private let gate = NSCondition()
     /// Whether calls are held.

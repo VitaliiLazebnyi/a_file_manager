@@ -3,8 +3,6 @@ import Foundation
 import FuzzCore
 import LocalFileSystemPlugin
 
-@testable import FileToolsPlugin
-
 /// What the FileTools targets share: the file systems, the work folder with its canary, and the
 /// check that nothing was written outside the target folder.
 internal enum ToolsFuzz {

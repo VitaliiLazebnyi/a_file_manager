@@ -1,4 +1,4 @@
-internal import Foundation
+internal import CoreFoundation
 
 // Running the main run loop while a harness waits: timers, sources and the main dispatch queue
 // keep going, as in the program. Main thread only.

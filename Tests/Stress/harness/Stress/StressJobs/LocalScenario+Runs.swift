@@ -1,5 +1,4 @@
 import FileOperationsPlugin
-import Foundation
 import StressKit
 
 /// The runs of each kind.

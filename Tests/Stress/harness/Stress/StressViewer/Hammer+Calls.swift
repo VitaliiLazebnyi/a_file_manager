@@ -1,5 +1,5 @@
 import AFMKernel
-import Foundation
+import Dispatch
 import StressKit
 
 @testable import ViewerPlugin

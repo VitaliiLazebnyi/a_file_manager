@@ -1,6 +1,4 @@
 internal import AFMKernel
-internal import Darwin
-internal import Dispatch
 internal import Foundation
 internal import StressKit
 

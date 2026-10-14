@@ -1,5 +1,4 @@
 import AFMKernel
-import Foundation
 import StressKit
 
 @testable import AFMShell
