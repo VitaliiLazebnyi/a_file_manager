@@ -25,14 +25,17 @@ public final class VirtualFoldersPlugin: Plugin, FileListService {
     static let listsFoldersKey = "virtualFolders.listsFolders"
     static let entersPackagesKey = "virtualFolders.entersPackages"
 
-    private var kernel: Kernel?
+    /// Weak: the kernel owns the plugin.
+    private weak var owner: Kernel?
     /// The file system this plugin provides; nil until the plugin has started.
     public private(set) var fileSystem: VirtualFileSystem?
 
     public init() {}
 
-    public func start(in kernel: Kernel) {
-        self.kernel = kernel
+    public func start(in owner: Kernel) {
+        // The kernel keeps what is registered here; it must not be kept by it in turn.
+        unowned let kernel = owner
+        self.owner = owner
         let fileSystem = VirtualFileSystem(fileSystems: kernel.fileSystems)
         self.fileSystem = fileSystem
         kernel.fileSystems.register(fileSystem)
@@ -98,7 +101,7 @@ public final class VirtualFoldersPlugin: Plugin, FileListService {
 
     /// Hands the user's options to the file system, which reads them on background threads.
     private func applyOptions() {
-        guard let kernel else { return }
+        guard let kernel = owner else { return }
         fileSystem?.options = VirtualFileSystem.Options(
             listsFolders: kernel.settings.flag(Self.listsFoldersKey, default: false),
             entersPackages: kernel.settings.flag(Self.entersPackagesKey, default: false))
@@ -152,7 +155,7 @@ public final class VirtualFoldersPlugin: Plugin, FileListService {
     /// directory the view was made from; after a selected branch, the items it was made from
     /// are selected again.
     private func leave(_ panel: any PanelHandle) {
-        guard let kernel, let location = VirtualLocation(panel.model.directory) else { return }
+        guard let kernel = owner, let location = VirtualLocation(panel.model.directory) else { return }
         let tab = panel.model
         if let item = tab.cursorItem,
             let folder = (try? kernel.fileSystems.provider(for: item.url))?.parent(of: item.url)
@@ -187,7 +190,7 @@ public final class VirtualFoldersPlugin: Plugin, FileListService {
     // MARK: Lists from files
 
     private func loadList(_ argument: CommandArgument) {
-        guard let kernel else { return }
+        guard let kernel = owner else { return }
         let panel = kernel.panels.source
         let base = VirtualLocation(panel.model.directory).map(\.realDirectory) ?? panel.model.directory
         let home = URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)

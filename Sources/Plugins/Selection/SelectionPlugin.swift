@@ -20,7 +20,9 @@ public final class SelectionPlugin: Plugin {
         self.background = background
     }
 
-    public func start(in kernel: Kernel) {
+    public func start(in owner: Kernel) {
+        // The kernel keeps what is registered here; it must not be kept by it in turn.
+        unowned let kernel = owner
         let selections = Selections(kernel, pasteboard: pasteboard, background: background)
         self.selections = selections
         let commands = kernel.commands
@@ -263,7 +265,8 @@ final class Selections {
         let title: String
     }
 
-    private let kernel: Kernel
+    /// Unowned: the kernel owns the plugin, and through it this.
+    private unowned let kernel: Kernel
     private let pasteboard: NSPasteboard
     private let store: SelectionStore
     /// The tabs whose lists this plugin has cut down, by the identity of their models.

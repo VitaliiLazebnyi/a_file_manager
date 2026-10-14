@@ -105,7 +105,8 @@ final class SystemVolumes: VolumeAccess {
 /// Main thread, except what runs inside the jobs.
 @MainActor
 final class VolumeEjection {
-    private let kernel: Kernel
+    /// Unowned: the kernel owns the plugin, and through it this.
+    private unowned let kernel: Kernel
     private let access: any VolumeAccess
     private let home: () -> URL
     private let note: (String) -> Void

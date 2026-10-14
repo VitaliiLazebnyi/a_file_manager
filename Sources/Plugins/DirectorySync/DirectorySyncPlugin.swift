@@ -21,7 +21,9 @@ public final class DirectorySyncPlugin: Plugin {
         self.opensWindows = opensWindows
     }
 
-    public func start(in kernel: Kernel) {
+    public func start(in owner: Kernel) {
+        // The kernel keeps what is registered here; it must not be kept by it in turn.
+        unowned let kernel = owner
         kernel.commands.register(
             Command(.synchronizeDirectories, "Synchronize Dirs…", runsDuringJobs: true),
             parameterized: { [self] argument in

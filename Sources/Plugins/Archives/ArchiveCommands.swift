@@ -57,7 +57,8 @@ enum ArchiveSettings {
 /// thread to report and to refresh the panels.
 @MainActor
 final class ArchiveCommands {
-    private let kernel: Kernel
+    /// Unowned: the kernel owns the plugin, and through it this.
+    private unowned let kernel: Kernel
     private let store: ArchiveStore
     private let launchesApplications: Bool
     private var environment: ArchiveEnvironment { store.environment }

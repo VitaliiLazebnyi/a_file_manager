@@ -16,7 +16,7 @@ public final class CompareContentPlugin: Plugin {
     /// The sessions of the open windows; without windows (tests), the last one started.
     private(set) var sessions: [CompareSession] = []
     private var windows: [CompareWindowController] = []
-    private weak var kernel: Kernel?
+    private weak var owner: Kernel?
 
     /// Tests pass `opensWindows: false` and look at the session; the work then runs on the
     /// calling thread.
@@ -24,8 +24,10 @@ public final class CompareContentPlugin: Plugin {
         self.opensWindows = opensWindows
     }
 
-    public func start(in kernel: Kernel) {
-        self.kernel = kernel
+    public func start(in owner: Kernel) {
+        // The kernel keeps what is registered here; it must not be kept by it in turn.
+        unowned let kernel = owner
+        self.owner = owner
         kernel.commands.register(
             Command(.compareByContent, "Compare By Content…", runsDuringJobs: true),
             parameterized: { [self] argument in
@@ -96,7 +98,7 @@ public final class CompareContentPlugin: Plugin {
     }
 
     private func askAboutUnsavedChanges(allowCancel: Bool) -> Bool {
-        guard let kernel else { return true }
+        guard let kernel = owner else { return true }
         for session in sessions where session.hasUnsavedChanges {
             let names = [
                 session.modified.left ? session.displayPath(.left) : nil,

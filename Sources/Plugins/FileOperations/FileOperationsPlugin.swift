@@ -47,11 +47,14 @@ public final class FileOperationsPlugin: Plugin {
         operations.flushLog(cancellation: cancellation, completion: completion)
     }
 
-    public func start(in kernel: Kernel) {
+    public func start(in owner: Kernel) {
+        // The kernel keeps what is registered here; it must not be kept by it in turn.
+        unowned let kernel = owner
         let operations = FileOperations(kernel)
         self.operations = operations
         kernel.fileSystems.addVolumeCloser { [weak operations] volume, _ in operations?.closeLog(on: volume) }
-        let commands = kernel.commands
+        // Some handlers run other commands; the registry keeps them, so they hold it unowned.
+        unowned let commands = kernel.commands
         let source = { kernel.panels.source.model }
         let hasOperands = { source().hasOperands }
         /// Whether the folder a panel shows can be changed at all.
@@ -203,7 +206,8 @@ final class FileOperations: FileTransferService {
         case none
     }
 
-    private let kernel: Kernel
+    /// Unowned: the kernel owns the plugin, and through it this.
+    private unowned let kernel: Kernel
     /// The log as last configured; made again when the configuration page changed something.
     private var log: OperationLog? {
         didSet {

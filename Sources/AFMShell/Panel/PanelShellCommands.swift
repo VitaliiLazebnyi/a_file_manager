@@ -21,7 +21,9 @@ enum PanelShellCommands {
     /// The Show menu's entries about how names are coloured.
     static let showColors = MenuSection(.show, order: 35)
 
-    static func register(in kernel: Kernel, panels: PanelCoordinator) {
+    static func register(in owner: Kernel, panels: PanelCoordinator) {
+        // The kernel keeps what is registered here; it must not be kept by it in turn.
+        unowned let kernel = owner
         let commands = kernel.commands
         let source = { panels.sourcePanel }
 
@@ -53,7 +55,9 @@ enum PanelShellCommands {
     /// The list of colours by file type as a text, one entry per line, the first matching entry
     /// deciding (spec 03 › Colours by file type). Lines that cannot be read are reported and
     /// the list is shown again.
-    private static func defineColors(in kernel: Kernel, panels: PanelCoordinator) {
+    private static func defineColors(in owner: Kernel, panels: PanelCoordinator) {
+        // The kernel keeps what is registered here; it must not be kept by it in turn.
+        unowned let kernel = owner
         let settings = kernel.settings
         var text = settings.text(PanelSettings.colorRulesKey, default: PanelSettings.defaultColorRules)
             .replacingOccurrences(of: ";;", with: "\n")

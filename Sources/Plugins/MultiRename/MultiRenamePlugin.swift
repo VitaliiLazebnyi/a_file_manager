@@ -22,7 +22,9 @@ public final class MultiRenamePlugin: Plugin {
         self.logDirectory = logDirectory
     }
 
-    public func start(in kernel: Kernel) {
+    public func start(in owner: Kernel) {
+        // The kernel keeps what is registered here; it must not be kept by it in turn.
+        unowned let kernel = owner
         let source = { kernel.panels.source.model }
         let isWritable = { kernel.fileSystems.capabilities(for: source().directory).contains(.write) }
         // `.text`: the name of saved settings to open the tool with (the spec's `MULTIRENAME <name>`).

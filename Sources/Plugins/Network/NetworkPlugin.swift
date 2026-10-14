@@ -101,7 +101,9 @@ public final class NetworkPlugin: Plugin {
         self.sftpTransport = sftpTransport
     }
 
-    public func start(in kernel: Kernel) {
+    public func start(in owner: Kernel) {
+        // The kernel keeps what is registered here; it must not be kept by it in turn.
+        unowned let kernel = owner
         let passwords =
             self.passwords
             ?? (launchesApplications ? KeychainPasswords(service: kernel.productName + " network") : MemoryPasswords())
@@ -137,7 +139,10 @@ public final class NetworkPlugin: Plugin {
         }
         center.storedPassword = { vault.password(for: $0) }
         center.setSaved(store.connections.map(\.profile))
-        store.onChange = { center.setSaved(store.connections.map(\.profile)) }
+        // The plugin keeps both; the questions of the center's sessions keep the store.
+        store.onChange = { [weak store, weak center] in
+            if let store, let center { center.setSaved(store.connections.map(\.profile)) }
+        }
         for scheme in ServerKey.schemes {
             kernel.fileSystems.register(RemoteFileSystem(scheme: scheme, center: center))
         }
@@ -182,7 +187,9 @@ public final class NetworkPlugin: Plugin {
                 ], onChange: { options.values = NetworkSettings.values(from: kernel.settings) }))
     }
 
-    private func register(_ network: NetworkCommands, in kernel: Kernel, center: ConnectionCenter) {
+    private func register(_ network: NetworkCommands, in owner: Kernel, center: ConnectionCenter) {
+        // The kernel keeps what is registered here; it must not be kept by it in turn.
+        unowned let kernel = owner
         let commands = kernel.commands
         let source = { kernel.panels.source.model }
         let sourceIsRemote = { ServerKey(source().directory) != nil }

@@ -35,7 +35,8 @@ final class CompareSession {
         case empty, working, ready
     }
 
-    let kernel: Kernel
+    /// Unowned: the kernel owns the plugin, and through it this.
+    unowned let kernel: Kernel
     private let settings: any SettingsStore
 
     var leftURL: URL?

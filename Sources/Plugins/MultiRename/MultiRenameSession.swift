@@ -104,7 +104,8 @@ final class MultiRenameSession {
         case name, ext, size, date
     }
 
-    private let kernel: Kernel
+    /// Unowned: the kernel owns the plugin, and through it this.
+    private unowned let kernel: Kernel
     let store: RenameStore
     private let logDirectory: URL
     private let previewsInBackground: Bool
