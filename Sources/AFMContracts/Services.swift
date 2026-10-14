@@ -17,8 +17,12 @@ public protocol FileTransferService {
     /// being refused. The panels showing the folders involved are re-read when it ends, and
     /// `completion` receives the location of the last item that arrived.
     func transfer(
-        _ kind: TransferKind, _ sources: [URL], into directory: URL, renamingSelfCopies: Bool,
-        completion: @escaping @MainActor (_ lastTarget: URL?) -> Void)
+        _ kind: TransferKind,
+        _ sources: [URL],
+        into directory: URL,
+        renamingSelfCopies: Bool,
+        completion: @escaping @MainActor (_ lastTarget: URL?) -> Void
+    )
 }
 
 /// Showing a list of files from anywhere as if it were a folder (spec 09 › Feed to listbox,
@@ -38,36 +42,6 @@ public protocol FileListService {
 extension FileListService {
     public func show(_ files: [URL], title: String, in panel: any PanelHandle, isUnique _: Bool) {
         show(files, title: title, in: panel)
-    }
-}
-
-/// Telling the plugin that connects to servers which addresses the user chose in person.
-/// Offered by the network plugin; called by whoever takes a location from the keyboard (the
-/// command line, the path field), and by nobody for a location that was read from a file (a
-/// tab file, a list, a link, a dropped item): for those the user is asked before the first
-/// login to a server that is not a saved connection.
-@MainActor
-public protocol ServerConsentService {
-    /// The user typed this location just now. Main thread.
-    func userChose(_ location: URL)
-}
-
-extension Kernel {
-    /// Says that the user typed `text` as a place just now, in the field of a dialog or of a
-    /// window: if it names a server by its address, that server is the user's own choice and
-    /// is not asked about ("Connect to X?") when it is first reached. Whoever reads a place
-    /// from the keyboard calls this with what was typed, before the place is used.
-    ///
-    /// `proposal` is what the program had put into the field: text that was left as it was
-    /// has not been typed (it may stand for a place that came out of a file), and nothing is
-    /// said for it. Nothing is said either for text without an address in it (`scheme://`),
-    /// which is every ordinary path: those cost one look at the text. Main thread.
-    public func userTyped(location text: String, proposal: String? = nil, relativeTo base: URL) {
-        let text = text.trimmingCharacters(in: .whitespaces)
-        guard text != proposal?.trimmingCharacters(in: .whitespaces), text.contains("://"),
-            let consent = services.find((any ServerConsentService).self)
-        else { return }
-        consent.userChose(fileSystems.location(from: text, relativeTo: base))
     }
 }
 
