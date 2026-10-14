@@ -4,6 +4,7 @@ import Foundation
 /// What the Multi-Rename Tool remembers between sessions (spec 09 › Saved settings and
 /// persistence): named settings, the histories of its fields and the runs that can be undone.
 /// Main thread only, like the settings store behind it.
+@MainActor
 final class RenameStore {
     /// The fields that keep a history.
     enum History: String {
@@ -29,6 +30,7 @@ final class RenameStore {
     /// run is megabytes of JSON). Changes are written at once for the small lists; the undo
     /// history of a big run is encoded on a background queue and handed to the settings from
     /// the main thread.
+    @MainActor
     private final class Memory {
         weak var settings: any SettingsStore?
         var histories: [History: [String]] = [:]
@@ -162,7 +164,7 @@ final class RenameStore {
 
     /// Brings the undo history into memory, decoding it off the main thread; `completion` runs
     /// on the main thread. Asking for the history before this has finished decodes it where it is asked.
-    func loadUndo(completion: @escaping () -> Void = {}) {
+    func loadUndo(completion: @escaping @MainActor @Sendable () -> Void = {}) {
         guard memory.undo == nil else {
             completion()
             return

@@ -53,13 +53,13 @@ struct RenameContext {
     var clipboard: String?
     /// `[X]` when `clipboard` is not set: asked only if a mask uses it, on the thread that
     /// works out the names, and answered from the clipboard as it was when the preview began.
-    var clipboardLoader: (() -> String?)?
+    var clipboardLoader: (@Sendable () -> String?)?
     var environment: [String: String] = [:]
     var titleRule = TitleCaseRule.standard
     var locale = Locale.current
     var timeZone = TimeZone.current
     /// `[T4]`: the date recorded inside a picture. Called on the preview threads, several at once.
-    var contentDate: ((RenameSubject) -> Date?)?
+    var contentDate: (@Sendable (RenameSubject) -> Date?)?
 }
 
 /// Why a mask gives no name for an item; the preview then shows `<Error!>` (spec 09 › Rename pipeline).
@@ -465,7 +465,9 @@ struct MaskState {
 
 /// The date and time formats one preview uses. Built once and shared by the preview threads
 /// (formatting with a `DateFormatter` is safe from several threads).
-final class RenameFormats {
+///
+/// Unchecked `Sendable`: nothing changes after `init`, and the formatters are only used to format.
+final class RenameFormats: @unchecked Sendable {
     let calendar: Calendar
     let date: DateFormatter
     let time: DateFormatter

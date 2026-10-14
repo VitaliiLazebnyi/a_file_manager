@@ -86,7 +86,7 @@ struct RenamePlanner {
         let finalKeys = Parallel.map(Array(sources.indices), serialBelow: 512) { key(targets[$0] ?? sources[$0]) }
         var holders: [String: Int] = [:]
         for finalKey in finalKeys { holders[finalKey, default: 0] += 1 }
-        let sourceKeys = Set(Parallel.map(sources, serialBelow: 512, key))
+        let sourceKeys = Set(Parallel.map(sources, serialBelow: 512) { key($0) })
         var result: [Int: RenameStatus] = [:]
         for index in sources.indices where moves(sources[index], targets[index]) {
             let finalKey = finalKeys[index]
@@ -226,7 +226,7 @@ struct RenamePlanner {
         let temporaryName = temporaryName ?? { ".afm-rename-\(token)-\($0).tmp" }
         var moving = sources.indices.filter { moves(sources[$0], targets[$0]) }
         guard !moving.isEmpty, !cancelled() else { return [] }
-        let sourceKeys = Parallel.map(sources, serialBelow: 512, key)
+        let sourceKeys = Parallel.map(sources, serialBelow: 512) { key($0) }
         let targetKeys: [String?] = Parallel.map(Array(targets), serialBelow: 512) { $0.map(key) }
         if let isFolder, moving.count > 1 {
             moving = insideOut(

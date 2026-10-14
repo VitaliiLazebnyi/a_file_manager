@@ -71,10 +71,13 @@ public final class MultiRenamePlugin: Plugin {
                 "Logs"
             ).appendingPathComponent(product)
             ?? FileManager.default.temporaryDirectory.appendingPathComponent(product)
+        // Read on a queue of the session, off the main thread.
+        var clipboard: @Sendable () -> String? = { nil }
+        if opensWindows { clipboard = { NSPasteboard.general.string(forType: .string) } }
         let session = MultiRenameSession(
             kernel: kernel, items: items, store: store, settings: settings, logDirectory: log,
             previewsInBackground: opensWindows,
-            clipboard: opensWindows ? { NSPasteboard.general.string(forType: .string) } : { nil },
+            clipboard: clipboard,
             clipboardChangeCount: opensWindows ? { NSPasteboard.general.changeCount } : nil)
         self.session = session
         guard opensWindows else { return }

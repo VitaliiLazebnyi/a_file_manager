@@ -354,11 +354,11 @@ struct RenameEngine {
     private let searchReplace: SearchReplace?
     private let formats: RenameFormats
     /// Ends a regular expression that is still working on a name (the preview was overtaken, the run cancelled).
-    private let cancelled: () -> Bool
+    private let cancelled: @Sendable () -> Bool
     /// What is wrong with the settings as a whole, if anything: then no item gets a name.
     let problem: any Error?
 
-    init(_ settings: RenameSettings, context: RenameContext, cancelled: @escaping () -> Bool = { false }) {
+    init(_ settings: RenameSettings, context: RenameContext, cancelled: @escaping @Sendable () -> Bool = { false }) {
         self.settings = settings
         self.cancelled = cancelled
         var context = context

@@ -8,14 +8,15 @@ import UniformTypeIdentifiers
 /// thread (a program that provides its text only when asked can take as long as it likes), and
 /// kept until the clipboard changes. Safe to use from several threads.
 final class ClipboardSource {
-    /// One reading of the clipboard.
-    final class Snapshot {
+    /// One reading of the clipboard. Unchecked `Sendable`: the state is guarded by `condition`;
+    /// `read` and `queue` do not change after `init`.
+    final class Snapshot: @unchecked Sendable {
         private let condition = NSCondition()
         private var text: String?
         private var isRead = false
         private var isRequested = false
         private var gaveUpAt: Date?
-        private let read: () -> String?
+        private let read: @Sendable () -> String?
         private let queue: DispatchQueue
         /// The longest text taken: a name holds a line of it at the most.
         static let longest = 1 << 16
@@ -24,7 +25,7 @@ final class ClipboardSource {
         /// For this long after giving up, nobody waits again.
         static let grace: TimeInterval = 10
 
-        fileprivate init(read: @escaping () -> String?, queue: DispatchQueue) {
+        fileprivate init(read: @escaping @Sendable () -> String?, queue: DispatchQueue) {
             self.read = read
             self.queue = queue
         }
@@ -52,13 +53,13 @@ final class ClipboardSource {
         }
     }
 
-    private let read: () -> String?
+    private let read: @Sendable () -> String?
     private let changeCount: (() -> Int)?
     private let queue = DispatchQueue(label: "multirename.clipboard", qos: .userInitiated)
     private var last: (count: Int, snapshot: Snapshot)?
 
     /// Without `changeCount` the clipboard is read again for every preview.
-    init(read: @escaping () -> String?, changeCount: (() -> Int)? = nil) {
+    init(read: @escaping @Sendable () -> String?, changeCount: (() -> Int)? = nil) {
         self.read = read
         self.changeCount = changeCount
     }
@@ -88,6 +89,7 @@ final class ClipboardSource {
 /// cannot be changed. What the main thread keeps is O(1) per change of the fields: the entries
 /// are kept in an array of their own, the preview hands back the counts, and the clipboard is
 /// read, in the background, only when a mask uses it.
+@MainActor
 final class MultiRenameSession {
     struct Row {
         var entry: RenameEntry
@@ -156,7 +158,7 @@ final class MultiRenameSession {
 
     init(
         kernel: Kernel, items: [FileItem], store: RenameStore, settings: RenameSettings, logDirectory: URL,
-        previewsInBackground: Bool = true, clipboard: @escaping () -> String? = { nil },
+        previewsInBackground: Bool = true, clipboard: @escaping @Sendable () -> String? = { nil },
         clipboardChangeCount: (() -> Int)? = nil
     ) {
         self.kernel = kernel
@@ -224,7 +226,7 @@ final class MultiRenameSession {
         let (entries, settings, context, given, fileSystems) = (
             self.entries, self.settings, makeContext(cache: cache), givenNames, kernel.fileSystems
         )
-        func compute() -> RenamePreview {
+        @Sendable func compute() -> RenamePreview {
             RenameComputation.preview(
                 entries, settings: settings, context: context, given: given, fileSystems: fileSystems, cache: cache,
                 cancellation: cancellation, isCancelled: { cancellation.isCancelled })
@@ -238,7 +240,7 @@ final class MultiRenameSession {
             guard !cancellation.isCancelled else { return }
             let preview = autoreleasepool { compute() }
             let counts = preview.counts
-            DispatchQueue.main.async {
+            DispatchQueue.main.async { [weak self] in
                 guard let self, self.previewCancellation === cancellation, !cancellation.isCancelled else { return }
                 self.isComputing = false
                 self.apply(preview, counts: counts)
@@ -298,7 +300,7 @@ final class MultiRenameSession {
         // Names from anywhere: by the kernel's keys, made once per row where the sort is
         // made (not Foundation's localized comparison, which is no order and ends the
         // program for some names).
-        func makeKeys() -> [Keys] {
+        @Sendable func makeKeys() -> [Keys] {
             rows.map { entry -> Keys in
                 let item = entry.item
                 return Keys(
@@ -308,7 +310,7 @@ final class MultiRenameSession {
                     size: item.size, modified: item.modified)
             }
         }
-        func inOrder(_ first: Keys, _ second: Keys) -> Bool {
+        @Sendable func inOrder(_ first: Keys, _ second: Keys) -> Bool {
             switch key {
             case .name: return first.name < second.name
             case .ext: return first.ext == second.ext ? first.name < second.name : first.ext < second.ext
@@ -317,7 +319,7 @@ final class MultiRenameSession {
             }
         }
         // A stable sort: equal items keep their order, also when the direction turns.
-        func permutation() -> [Int] {
+        @Sendable func permutation() -> [Int] {
             let keys = makeKeys()
             return keys.indices.sorted { first, second in
                 if inOrder(keys[first], keys[second]) { return ascending }
@@ -325,7 +327,7 @@ final class MultiRenameSession {
                 return first < second
             }
         }
-        func apply(_ order: [Int]) {
+        let apply: @MainActor @Sendable ([Int]) -> Void = { [self] order in
             reorder(order)
             dropGivenNames()
             listChanged(keepingFolders: true)
@@ -339,7 +341,7 @@ final class MultiRenameSession {
         isComputing = true
         sortQueue.async { [weak self] in
             let order = permutation()
-            DispatchQueue.main.async {
+            DispatchQueue.main.async { [weak self] in
                 guard let self, self.listGeneration == generation, self.sortRequest == request else { return }
                 apply(order)
             }
@@ -396,14 +398,14 @@ final class MultiRenameSession {
     func nextStep() {
         guard !isBusy else { return }
         let (oldEntries, names) = (entries, newNames)
-        func renamed() -> [RenameEntry] {
+        @Sendable func renamed() -> [RenameEntry] {
             var entries = oldEntries
             for index in entries.indices {
                 if let name = names[index], RenameEngine.invalidity(of: name) == nil { entries[index].name = name }
             }
             return entries
         }
-        func finish(_ updated: [RenameEntry]) {
+        let finish: @MainActor @Sendable ([RenameEntry]) -> Void = { [self] updated in
             entries = updated
             givenNamesStorage = nil
             // The subjects carry the old names.
@@ -420,7 +422,7 @@ final class MultiRenameSession {
         isComputing = true
         sortQueue.async { [weak self] in
             let updated = renamed()
-            DispatchQueue.main.async {
+            DispatchQueue.main.async { [weak self] in
                 guard let self, self.listGeneration == generation else { return }
                 finish(updated)
             }
@@ -447,10 +449,10 @@ final class MultiRenameSession {
 
     /// Reads a list of names from a file on any file system, off the main thread; the text is
     /// split into lines there too.
-    func loadNames(from url: URL, completion: (() -> Void)? = nil) {
+    func loadNames(from url: URL, completion: (@MainActor @Sendable () -> Void)? = nil) {
         guard !isBusy else { return }
         let fileSystems = kernel.fileSystems
-        func read() -> Result<[String], any Error> {
+        @Sendable func read() -> Result<[String], any Error> {
             Result {
                 let reader = try fileSystems.provider(for: url).read(url)
                 defer { reader.close() }
@@ -460,7 +462,7 @@ final class MultiRenameSession {
                 return RenameNameList.names(in: RenameNameList.text(from: data))
             }
         }
-        func finish(_ result: Result<[String], any Error>) {
+        let finish: @MainActor @Sendable (Result<[String], any Error>) -> Void = { [self] result in
             switch result {
             case .success(let names): applyGivenNames(names)
             case .failure(let error): kernel.ui.report(error, title: "The names cannot be loaded!")
@@ -481,7 +483,7 @@ final class MultiRenameSession {
     /// "Edit names": the new names as text, one per line, for the user to change.
     func editNames() {
         guard !isBusy else { return }
-        func ask(_ text: String) {
+        let ask: @MainActor @Sendable (String) -> Void = { [self] text in
             let fields = [FormField.lines("names", "", text)]
             guard
                 let answer = kernel.ui.form(
@@ -500,7 +502,7 @@ final class MultiRenameSession {
         let (current, names, generation) = (entries, newNames, listGeneration)
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             let text = current.indices.map { names[$0] ?? current[$0].name }.joined(separator: "\n")
-            performOnMainLoop {
+            performOnMainLoop { [weak self] in
                 guard let self, self.listGeneration == generation else { return }
                 ask(text)
             }
@@ -569,7 +571,7 @@ final class MultiRenameSession {
     /// on the job's thread, so what happens is what the fields say, whatever the preview
     /// has caught up with; the job ends when it is cancelled, also in the middle of a regular
     /// expression. `completion` runs on the main thread.
-    func start(completion: ((RenameRunResult) -> Void)? = nil) {
+    func start(completion: (@MainActor (RenameRunResult) -> Void)? = nil) {
         guard !entries.isEmpty, !isBusy else { return }
         rememberFields()
         isBusy = true
@@ -603,7 +605,7 @@ final class MultiRenameSession {
                         let examples =
                             moving.prefix(8).map { (preview.names[$0] ?? "") }.joined(separator: "\n")
                             + (moving.count > 8 ? "\n…" : "")
-                        let go = monitor.ask {
+                        let go = monitor.ask { @MainActor @Sendable in
                             ui.choose(
                                 "\(moving.count) of the names given move the file into another folder.",
                                 detail: examples
@@ -623,7 +625,7 @@ final class MultiRenameSession {
                     let names =
                         conflicts.prefix(12).map { preview.names[$0] ?? "" }.joined(separator: "\n")
                         + (conflicts.count > 12 ? "\n…" : "")
-                    let choice = monitor.ask {
+                    let choice = monitor.ask { @MainActor @Sendable in
                         ui.pick(
                             "Name conflict: \(conflicts.count) file(s) would get a name that is already in use.",
                             detail: names + "\n\nAuto-rename them to \"name (2).ext\", \"name (3).ext\", …?",
@@ -741,7 +743,7 @@ final class MultiRenameSession {
 
     /// Undoes the last run after asking, last renamed first. `completion` runs on the main
     /// thread with what could not be put back; it is not called when the user says no.
-    func undo(completion: (([RenamedItem]) -> Void)? = nil) {
+    func undo(completion: (@MainActor ([RenamedItem]) -> Void)? = nil) {
         guard canUndo else { return }
         // Pressed again while this one is under way, it would find the same run and undo it twice.
         isBusy = true
@@ -753,7 +755,7 @@ final class MultiRenameSession {
         store.loadUndo { [weak self] in self?.performUndo(completion: completion) }
     }
 
-    private func performUndo(completion: (([RenamedItem]) -> Void)?) {
+    private func performUndo(completion: (@MainActor ([RenamedItem]) -> Void)?) {
         guard let last = store.lastUndo else {
             isBusy = false
             return
@@ -900,7 +902,8 @@ enum ContentDate {
 /// Hands a block to the main thread through the run loop (all modes that count), not through the
 /// main dispatch queue: a block that asks the user something runs a modal dialog, and a dialog
 /// started from inside a block of the main queue keeps every later block of the queue waiting.
-func performOnMainLoop(_ block: @escaping () -> Void) {
-    RunLoop.main.perform(inModes: [.common], block: block)
+func performOnMainLoop(_ block: @escaping @MainActor @Sendable () -> Void) {
+    // The main run loop runs its blocks on the main thread.
+    RunLoop.main.perform(inModes: [.common]) { MainActor.assumeIsolated(block) }
     CFRunLoopWakeUp(CFRunLoopGetMain())
 }
