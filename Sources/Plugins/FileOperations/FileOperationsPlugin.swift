@@ -44,9 +44,7 @@ public final class FileOperationsPlugin: Plugin {
             completion()
             return
         }
-        // `Plugin.prepareToQuit` lets `completion` be called on any thread, so it may go to the log's queue.
-        let completion = Handover(completion)
-        operations.flushLog(cancellation: cancellation) { completion.value() }
+        operations.flushLog(cancellation: cancellation, completion: completion)
     }
 
     public func start(in kernel: Kernel) {
