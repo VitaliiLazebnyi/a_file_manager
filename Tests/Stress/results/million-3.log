@@ -1,0 +1,857 @@
+STEP start-up (kernel, 21 plugins, shell)           wall=   0.145s cpu=   0.21s threads 7->19 footprint=39MB peakRSS=89MB load=18.8
+STEP idle baseline (1 s)                            wall=   1.002s cpu=   0.17s threads 19->19 footprint=78MB peakRSS=143MB load=18.8
+   first rows after 0.129 s: 5000 rows
+STEP 1a load 1M-file directory                      wall=   4.068s cpu=   8.64s threads 19->35 footprint=1037MB peakRSS=1143MB load=17.8
+   LOAD: first rows 0.129 s, complete 4.068 s, rows=1000200 isComplete=true
+STEP 1b layout + draw table (1M rows)               wall=   0.013s cpu=   0.01s threads 35->35 footprint=1037MB peakRSS=1146MB load=17.8
+STEP 1c idle 1 s after load                         wall=   1.001s cpu=   0.03s threads 35->25 footprint=1037MB peakRSS=1146MB load=17.8
+STEP 2 sort: by extension                           wall=   0.300s cpu=   0.79s threads 25->25 footprint=1123MB peakRSS=1228MB load=17.8
+   order now key=ext descending=false first=folder000
+STEP 2 sort: by size                                wall=   0.294s cpu=   0.71s threads 25->25 footprint=1127MB peakRSS=1233MB load=17.8
+   order now key=size descending=true first=folder000
+STEP 2 sort: by time                                wall=   0.300s cpu=   0.84s threads 25->25 footprint=1127MB peakRSS=1233MB load=17.8
+   order now key=date descending=true first=folder000
+STEP 2 sort: reversed                               wall=   0.309s cpu=   0.18s threads 25->25 footprint=1127MB peakRSS=1233MB load=17.8
+   order now key=date descending=false first=folder000
+STEP 2 sort: by name                                wall=   0.312s cpu=   1.01s threads 25->25 footprint=1128MB peakRSS=1234MB load=17.8
+   order now key=name descending=false first=folder000
+STEP 2 sort: reversed (name desc)                   wall=   0.305s cpu=   0.17s threads 25->25 footprint=1128MB peakRSS=1234MB load=17.8
+   order now key=name descending=true first=folder000
+STEP 2 sort: reversed (name asc)                    wall=   0.308s cpu=   0.18s threads 25->25 footprint=1128MB peakRSS=1234MB load=17.8
+   order now key=name descending=false first=folder000
+STEP 2x draw after sorts                            wall=   0.009s cpu=   0.01s threads 25->25 footprint=1128MB peakRSS=1237MB load=17.8
+STEP 3a quick filter: open field                    wall=   0.209s cpu=   0.04s threads 25->25 footprint=1128MB peakRSS=1252MB load=17.8
+STEP 3b quick filter typed slowly 'i'               wall=   0.198s cpu=   0.23s threads 25->25 footprint=1177MB peakRSS=1301MB load=17.8
+   'i' -> 1000000 rows
+STEP 3b quick filter typed slowly 'it'              wall=   0.228s cpu=   0.33s threads 25->25 footprint=1331MB peakRSS=1461MB load=17.8
+   'it' -> 1000000 rows
+STEP 3b quick filter typed slowly 'ite'             wall=   0.223s cpu=   0.32s threads 25->25 footprint=1411MB peakRSS=1541MB load=17.8
+   'ite' -> 1000000 rows
+STEP 3b quick filter typed slowly 'item'            wall=   0.216s cpu=   0.32s threads 25->25 footprint=1412MB peakRSS=1545MB load=17.8
+   'item' -> 1000000 rows
+STEP 3b quick filter typed slowly 'item0'           wall=   0.217s cpu=   0.32s threads 25->25 footprint=1413MB peakRSS=1546MB load=17.8
+   'item0' -> 1000000 rows
+STEP 3b quick filter typed slowly 'item00'          wall=   0.159s cpu=   0.24s threads 25->25 footprint=1413MB peakRSS=1547MB load=17.8
+   'item00' -> 100000 rows
+STEP 3b quick filter typed slowly 'item000'         wall=   0.128s cpu=   0.21s threads 25->25 footprint=1413MB peakRSS=1547MB load=16.7
+   'item000' -> 10000 rows
+STEP 3b quick filter typed slowly 'item0001'        wall=   0.125s cpu=   0.20s threads 25->25 footprint=1414MB peakRSS=1547MB load=16.7
+   'item0001' -> 1000 rows
+STEP 3b quick filter typed slowly 'item00012'       wall=   0.124s cpu=   0.20s threads 25->25 footprint=1414MB peakRSS=1548MB load=16.7
+   'item00012' -> 100 rows
+STEP 3c quick filter typed fast '.swift' (30 ms/key) wall=   0.350s cpu=   0.22s threads 25->25 footprint=1414MB peakRSS=1548MB load=16.7
+   '.swift' -> 83334 rows
+STEP 3d quick filter removed (Esc)                  wall=   0.085s cpu=   0.09s threads 25->25 footprint=1415MB peakRSS=1549MB load=16.7
+   single call: median 0.11 ms, p99 0.40 ms, max 0.43 ms, over 8 ms: 0 of 300
+STEP 3y cursor: 300 x Page Down, nothing marked     wall=   2.784s cpu=   2.62s threads 25->9 footprint=1475MB peakRSS=1666MB load=16.7
+   single call: median 0.11 ms, p99 0.77 ms, max 2.54 ms, over 8 ms: 0 of 300
+STEP 3z cursor: 300 x one row down, nothing marked  wall=   1.073s cpu=   0.75s threads 9->19 footprint=1476MB peakRSS=1686MB load=16.7
+STEP 4a select all (1000200)                        wall=   0.393s cpu=   0.26s threads 19->19 footprint=1473MB peakRSS=1690MB load=16.7
+   marked=1000200
+STEP 4b invert selection                            wall=   0.403s cpu=   0.26s threads 19->19 footprint=1477MB peakRSS=1694MB load=18.1
+   marked=0
+STEP 4c select group by mask (4 of 12 extensions)   wall=   1.464s cpu=   1.21s threads 19->19 footprint=1473MB peakRSS=1695MB load=18.1
+   marked=333336
+STEP 4d invert selection (to ~667k)                 wall=   0.438s cpu=   0.29s threads 19->19 footprint=1477MB peakRSS=1698MB load=18.1
+   marked=666864
+STEP 4e invert selection (back to ~333k)            wall=   0.451s cpu=   0.31s threads 19->19 footprint=1478MB peakRSS=1700MB load=18.1
+   marked=333336
+STEP 4f draw with 333k marked                       wall=   0.011s cpu=   0.01s threads 19->19 footprint=1479MB peakRSS=1706MB load=18.1
+   single call: median 0.29 ms, p99 1.65 ms, max 8.40 ms, over 8 ms: 1 of 1000
+STEP 5a cursor: 1000 x Page Down command            wall=  21.633s cpu=  17.25s threads 19->8 footprint=1100MB peakRSS=1784MB load=21.4
+   single call: median 0.16 ms, p99 0.67 ms, max 1.03 ms, over 8 ms: 0 of 1000
+STEP 5b cursor: 1000 x random row                   wall=  11.581s cpu=  11.71s threads 8->7 footprint=1233MB peakRSS=2207MB load=20.0
+   single call: median 2.94 ms, p99 4.78 ms, max 5.92 ms, over 8 ms: 0 of 300
+STEP 5c cursor: 300 x select-and-move-down (Insert) wall=   2.459s cpu=   2.32s threads 7->19 footprint=1308MB peakRSS=2309MB load=20.0
+   all 332 commands: 187.0 ms; the slowest:
+       165.41 ms  cm_PrintFile "Print File Contents"
+        20.21 ms  cm_ShowOnlySelected "Only Selected Files"
+         0.87 ms  afm_CdFromClipboard "Go to Path from Clipboard"
+         0.16 ms  cm_PasteFromClipboard "Paste"
+         0.02 ms  cm_OpenDirInNewTab "Open Folder in New Tab"
+         0.02 ms  cm_Associate "Open With…"
+         0.02 ms  cm_EditComment "Edit Comment…"
+         0.02 ms  cm_GoToRoot "Root Directory"
+         0.01 ms  afm_ReopenClosedTab "Reopen Closed Tab"
+         0.01 ms  cm_ListOnly "View File Under Cursor"
+         0.01 ms  afm_OpenAsArchive "Open as Archive"
+         0.01 ms  cm_PackFiles "Pack…"
+         0.01 ms  cm_GoToParent "Parent Directory"
+         0.01 ms  cm_UserMenu1 "Start Menu Item 1"
+   validateBars (the 0.1 s tick): 0.06 ms
+     menu 'A File Manager' (11 items incl. submenus): 0.0 ms
+     menu 'Files' (40 items incl. submenus): 147.6 ms
+     menu 'Edit' (17 items incl. submenus): 0.1 ms
+     menu 'Mark' (19 items incl. submenus): 0.0 ms
+     menu 'Commands' (35 items incl. submenus): 0.2 ms
+     menu 'Net' (11 items incl. submenus): 0.0 ms
+     menu 'Show' (39 items incl. submenus): 0.1 ms
+     menu 'Configuration' (15 items incl. submenus): 0.0 ms
+     menu 'Start' (1 items incl. submenus): 0.0 ms
+     menu 'Window' (7 items incl. submenus): 0.0 ms
+     menu 'Help' (3 items incl. submenus): 0.0 ms
+STEP 6a which commands' enabled/checked closures are slow wall=   0.336s cpu=   0.33s threads 19->19 footprint=1377MB peakRSS=2377MB load=20.0
+   per round: bars 0.13 ms, 332 commands enabled+checked 144.24 ms, menu items 147.82 ms; worst round 324.96 ms
+STEP 6 validation x10 (bars, all commands, menu)    wall=   2.925s cpu=   2.84s threads 19->19 footprint=1371MB peakRSS=2377MB load=19.4
+STEP 6b status line x50 with 333k marked            wall=   0.095s cpu=   0.00s threads 19->19 footprint=1371MB peakRSS=2377MB load=19.4
+STEP 7a navigate away to a small folder             wall=   0.778s cpu=   0.63s threads 19->19 footprint=801MB peakRSS=2377MB load=19.4
+   rows shown after 0.161 s, fresh after 5.200 s, rows=1000200
+STEP 7b come back (remembered listing + fresh read) wall=   5.200s cpu=   9.17s threads 19->28 footprint=1063MB peakRSS=2586MB load=19.6
+   asked=200 quiet reloads in 90.0 s; readings started=1; list versions seen=18; churn ops=128400
+STEP 8 200 quiet reloads + churn + watcher (<=90 s) wall= 101.068s cpu= 164.52s threads 28->9 footprint=1031MB peakRSS=3181MB load=46.6
+STEP 8b final quiet reload, list equals folder      wall=   6.202s cpu=   9.04s threads 9->23 footprint=1048MB peakRSS=3181MB load=43.5
+STEP shut down                                      wall=   0.503s cpu=   0.10s threads 23->24 footprint=1045MB peakRSS=3181MB load=41.3
+STEP threads return to baseline (up to 8 s)         wall=   1.020s cpu=   0.04s threads 24->9 footprint=1045MB peakRSS=3181MB load=41.3
+threads: baseline(after start-up)=19 after shut-down=9
+
+==== MAIN-THREAD WATCHDOG: scenario 1: 1,000,000 files in a panel ====
+histogram bounds (ms): <2 <4 <8 <16 <33 <100 <250 <1000 <5000 >=5000
+(max cpu = processor time the main thread used during its longest stall; stall ms / cpu ms = sums over all stalls > 8 ms: equal means the main thread was working, cpu much smaller means it was blocked or had no core)
+phase                                            wall s   pings   >8ms >100ms    >1s    max ms  max cpu  stall ms    cpu ms  histogram
+start-up (kernel, 21 plugins, shell)               0.15       1      1      1      0     151.4    126.2       151       126  0,0,0,0,0,0,1,0,0,0
+idle baseline (1 s)                                1.00     300      1      1      0     124.2    123.7       124       124  298,1,0,0,0,0,1,0,0,0
+1a load 1M-file directory                          4.07    1189      7      0      0      97.4     97.0       514       519  1179,3,0,0,1,6,0,0,0,0
+1b layout + draw table (1M rows)                   0.01       0      0      0      0       0.0      0.0         0         0  0,0,0,0,0,0,0,0,0,0
+1c idle 1 s after load                             1.00     345      1      0      0      11.5     12.0        11        12  344,0,0,1,0,0,0,0,0,0
+2 sort: by extension                               0.30      55      2      1      0     108.0    109.5       117       110  51,2,0,1,0,0,1,0,0,0
+2 sort: by size                                    0.29      58      1      1      0     105.1    107.7       105       108  57,0,0,0,0,0,1,0,0,0
+2 sort: by time                                    0.30      59      1      1      0     100.9    102.8       101       103  55,3,0,0,0,0,1,0,0,0
+2 sort: reversed                                   0.31      73      1      0      0      96.4     97.8        96        98  71,1,0,0,0,1,0,0,0,0
+2 sort: by name                                    0.31      60      1      0      0      99.1    101.1        99       101  57,1,1,0,0,1,0,0,0,0
+2 sort: reversed (name desc)                       0.31      71      1      0      0      96.1     98.7        96        99  70,0,0,0,0,1,0,0,0,0
+2 sort: reversed (name asc)                        0.31      74      1      1      0     100.3    100.6       100       101  73,0,0,0,0,0,1,0,0,0
+2x draw after sorts                                0.01       0      0      0      0       0.0      0.0         0         0  0,0,0,0,0,0,0,0,0,0
+3a quick filter: open field                        0.21      62      1      0      0      36.5     29.8        36        30  61,0,0,0,0,1,0,0,0,0
+3b quick filter typed slowly 'i'                   0.20      59      0      0      0       3.0      0.0         0         0  57,2,0,0,0,0,0,0,0,0
+3b quick filter typed slowly 'it'                  0.23      40      1      0      0      88.3     87.6        88        88  38,0,1,0,0,1,0,0,0,0
+3b quick filter typed slowly 'ite'                 0.22      39      1      1      0     101.7    101.2       102       101  38,0,0,0,0,0,1,0,0,0
+3b quick filter typed slowly 'item'                0.22      39      1      1      0     100.8    101.6       101       102  37,1,0,0,0,0,1,0,0,0
+3b quick filter typed slowly 'item0'               0.22      38      1      0      0      98.3    101.1        98       101  36,0,1,0,0,1,0,0,0,0
+3b quick filter typed slowly 'item00'              0.16      16      1      0      0      99.6    102.4       100       102  13,2,0,0,0,1,0,0,0,0
+3b quick filter typed slowly 'item000'             0.13      16      1      0      0      99.2    100.7        99       101  14,0,1,0,0,1,0,0,0,0
+3b quick filter typed slowly 'item0001'            0.12      16      1      0      0      74.4     75.7        74        76  15,0,0,0,0,1,0,0,0,0
+3b quick filter typed slowly 'item00012'           0.12      15      1      0      0      75.0     76.6        75        77  14,0,0,0,0,1,0,0,0,0
+3c quick filter typed fast '.swift' (30 ms/key)     0.35      94      1      0      0      76.1     76.0        76        76  93,0,0,0,0,1,0,0,0,0
+3d quick filter removed (Esc)                      0.09       1      1      0      0      79.2     80.7        79        81  0,0,0,0,0,1,0,0,0,0
+3y cursor: 300 x Page Down, nothing marked         2.78     144     47      0      0      96.6     96.5      2394      2387  97,0,0,0,0,47,0,0,0,0
+3z cursor: 300 x one row down, nothing marked      1.07     147     38      0      0      29.6     13.5       551       498  92,8,9,21,17,0,0,0,0,0
+4a select all (1000200)                            0.39      23      2      1      0     279.9    247.7       310       251  21,0,0,0,1,0,0,1,0,0
+4b invert selection                                0.40      43      1      1      0     276.2    255.1       276       255  42,0,0,0,0,0,0,1,0,0
+4c select group by mask (4 of 12 extensions)       1.46      28      1      1      1    1313.2   1203.9      1313      1204  19,4,4,0,0,0,0,0,1,0
+4d invert selection (to ~667k)                     0.44      28      1      1      0     370.5    279.1       370       279  26,1,0,0,0,0,0,1,0,0
+4e invert selection (back to ~333k)                0.45       5      1      1      0     419.5    308.5       420       309  1,3,0,0,0,0,0,1,0,0
+4f draw with 333k marked                           0.01       0      0      0      0       0.0      0.0         0         0  0,0,0,0,0,0,0,0,0,0
+5a cursor: 1000 x Page Down command               21.63     471    252     52      0     242.9    134.4     20198     14777  210,9,0,0,0,200,52,0,0,0
+5b cursor: 1000 x random row                      11.58     396    188      2      0     114.8    111.7     10418     10139  207,1,0,0,0,186,2,0,0,0
+5c cursor: 300 x select-and-move-down (Insert)     2.46     309    129      0      0      30.7     17.2      1404      1276  167,3,10,125,4,0,0,0,0,0
+6a which commands' enabled/checked closures are slow     0.34       0      0      0      0       0.0      0.0         0         0  0,0,0,0,0,0,0,0,0,0
+6 validation x10 (bars, all commands, menu)        2.93       8      8      8      0     621.0    614.5      3241      3152  0,0,0,0,0,0,0,8,0,0
+6b status line x50 with 333k marked                0.10      33      0      0      0       0.2      0.1         0         0  33,0,0,0,0,0,0,0,0,0
+7a navigate away to a small folder                 0.78      69      1      1      0     573.9    559.4       574       559  67,1,0,0,0,0,0,1,0,0
+7b come back (remembered listing + fresh read)     5.20    1317     11      5      0     137.9    133.8       803       750  1280,17,9,3,1,2,5,0,0,0
+8 200 quiet reloads + churn + watcher (<=90 s)    96.89   27977     69     19      0     672.7    536.8     10558      9453  27477,311,120,43,7,0,1,18,0,0
+(harness clean-up, not the app)                    4.18       0      0      0      0       0.0      0.0         0         0  0,0,0,0,0,0,0,0,0,0
+8b final quiet reload, list equals folder          6.20    2196      3      1      1    4800.9   4628.8      4832      4629  2190,2,1,1,1,0,0,0,1,0
+shut down                                          0.50     178      1      1      0     602.5    556.2       603       556  177,0,0,0,0,0,0,1,0,0
+threads return to baseline (up to 8 s)             1.02     378      0      0      0       2.9      0.0         0         0  375,3,0,0,0,0,0,0,0,0
+TOTAL                                            171.45   36470    782    102      2    4800.9      60708     52908
+
+-- stall 4801 ms (main thread cpu 4629 ms) at t=159.00s in phase '8b final quiet reload, list equals folder'; main thread stack at +100 ms:
+   0   libsystem_malloc.dylib              0x0000000183fd17f8 __xzm_xzone_free_to_freelist_chunk + 372
+   1   libswiftCore.dylib                  0x00000001987272a4 _swift_release_dealloc + 64
+   2   libswiftCore.dylib                  0x00000001987272a4 _swift_release_dealloc + 64
+   3   libswiftCore.dylib                  0x000000019878dae4 _ZN5swift9RefCountsINS_13RefCountBitsTILNS_19RefCountInlinednessE1EEEE15doDecrementSlowILNS_13PerformDeinitE1EEEbS3_j + 168
+   4   Foundation                          0x000000018624e2e0 $s10Foundation12URLParseInfoCfD + 20
+   5   libswiftCore.dylib                  0x00000001987272a4 _swift_release_dealloc + 64
+   6   libswiftCore.dylib                  0x000000019878dae4 _ZN5swift9RefCountsINS_13RefCountBitsTILNS_19RefCountInlinednessE1EEEE15doDecrementSlowILNS_13PerformDeinitE1EEEbS3_j + 168
+   7   Foundation                          0x0000000186213588 $s10Foundation9_SwiftURLCfD + 24
+   8   libswiftCore.dylib                  0x00000001987272a4 _swift_release_dealloc + 64
+   9   libswiftCore.dylib                  0x000000019878dae4 _ZN5swift9RefCountsINS_13RefCountBitsTILNS_19RefCountInlinednessE1EEEE15doDecrementSlowILNS_13PerformDeinitE1EEEbS3_j + 168
+   10  libswiftCore.dylib                  0x000000019876e528 _ZL21swift_cvw_destroyImplPN5swift11OpaqueValueEPKNS_14TargetMetadataINS_9InProcessEEE + 372
+   11  StressPanel                         0x0000000104c155d0 $s9AFMKernel8FileItemVwxx + 48
+   12  libswiftCore.dylib                  0x0000000198725788 swift_arrayDestroy + 204
+   13  libswiftCore.dylib                  0x0000000198727320 $ss23_ContiguousArrayStorageCfD + 96
+   14  libswiftCore.dylib                  0x00000001987272a4 _swift_release_dealloc + 64
+   15  libswiftCore.dylib                  0x000000019878dae4 _ZN5swift9RefCountsINS_13RefCountBitsTILNS_19RefCountInlinednessE1EEEE15doDecrementSlowILNS_13PerformDeinitE1EEEbS3_j + 168
+   16  StressPanel                         0x0000000104c2b41c $s9AFMKernel10PanelModelC6update4with5focus9presortedSbAA7ListingV_SSSgAA9ListOrderVSgtF + 2280
+   17  StressPanel                         0x0000000104cbd86c $s8AFMShell19PanelViewControllerC6reload33_75A16581E849F5F4B5635FE8120CEA5ELL_5focus7quietly9markDirty10completiony9AFMKernel0B5ModelC_SSSgS2byycSgtFyyYbcfU1_yyScMYccfU_ + 2140
+   18  StressPanel                         0x0000000104ce1404 $sIeg_IeyB_TR + 28
+   19  libdispatch.dylib                   0x0000000183ff0a34 _dispatch_call_block_and_release + 32
+   20  libdispatch.dylib                   0x000000018400a5a0 _dispatch_client_callout + 16
+   21  libdispatch.dylib                   0x0000000184028998 _dispatch_main_queue_drain.cold.6 + 832
+   22  libdispatch.dylib                   0x0000000183fffb0c _dispatch_main_queue_drain + 176
+   23  libdispatch.dylib                   0x0000000183fffa4c _dispatch_main_queue_callback_4CF + 44
+   24  CoreFoundation                      0x00000001842af9cc __CFRUNLOOP_IS_SERVICING_THE_MAIN_DISPATCH_QUEUE__ + 16
+   25  CoreFoundation                      0x000000018427165c __CFRunLoopRun + 1980
+   26  CoreFoundation                      0x000000018434b82c _CFRunLoopRunSpecificWithOptions + 536
+   27  StressPanel                         0x00000001051c4f6c $s9StressKit4pump4upTo5untilSbSd_SbyXEtF + 292
+   28  StressPanel                         0x0000000104becf88 $s11StressPanel7millionyyFyyXEfU26_ + 844
+   29  StressPanel                         0x0000000104bf8364 $s11StressPanel7millionyyFyyXEfU26_TA + 24
+   30  StressPanel                         0x00000001051c99b8 $s9StressKit4step_5limit_xSS_SdxyKXEtKlF + 444
+   31  StressPanel                         0x0000000104be3814 $s11StressPanel7millionyyF + 5796
+   32  StressPanel                         0x0000000104be20d4 main + 652
+   33  dyld                                0x0000000183ddbe80 start + 6688
+   .. and at +1 s:
+   0   libswiftCore.dylib                  0x0000000198720e68 swift_allocObject + 28
+   1   libswiftCore.dylib                  0x0000000198a567fc $ss22_allocateStringStorage33_A317BBF16F3432B4D1DDED3E0452DA4DLL16codeUnitCapacity23precalculatedUTF16Counts02__bC0C_s01_N8AndFlagsABLLVtSi_SiSgtF + 192
+   2   libswiftCore.dylib                  0x0000000198a567fc $ss22_allocateStringStorage33_A317BBF16F3432B4D1DDED3E0452DA4DLL16codeUnitCapacity23precalculatedUTF16Counts02__bC0C_s01_N8AndFlagsABLLVtSi_SiSgtF + 192
+   3   libswiftCore.dylib                  0x0000000198b61cd0 $sSS18_uncheckedFromUTF8_18asciiPreScanResultSSSRys5UInt8VG_SbtFZTf4nnd_n + 124
+   4   libswiftCore.dylib                  0x00000001988e3a30 $sSS18_fromUTF8RepairingySS6result_Sb11repairsMadetSRys5UInt8VGFZ + 56
+   5   Foundation                          0x00000001861cf5e4 $s10Foundation3URLV34parseFinalFileSystemRepresentation4path5flags13compatibilitySSs4SpanVys5UInt8VG_So12__CFURLFlagsVzAC01_E17PathCompatibilityOtFZTf4nnnd_n + 564
+   6   Foundation                          0x00000001861c5318 $s10Foundation29parseFileSystemRepresentation33_72FAC646C4B1170F6CEA9157D09C2D38LL6buffer5flags11isDirectorySSSgSRys5UInt8VG_So12__CFURLFlagsVzSbtF + 444
+   7   Foundation                          0x00000001861c9304 $sSo5NSURLC10FoundationE36__swiftParseFileSystemRepresentation_6length4into11isDirectorySbSPys5UInt8VG_SiSpySo15__CFFileURLImplaGSbtFZTf4nnnnd_n + 56
+   8   Foundation                          0x00000001861c53f0 $sSo5NSURLC10FoundationE36__swiftParseFileSystemRepresentation_6length4into11isDirectorySbSPys5UInt8VG_SiSpySo15__CFFileURLImplaGSbtFZTo + 32
+   9   CoreFoundation                      0x0000000184207d5c _CFURLCreateWithFileSystemRepresentation + 152
+   10  CoreServicesInternal                0x0000000188640a30 _ZL34__FSURLCreateWithPathAndAttributesPK13__CFAllocatorP19URLCreateParametersPP9__CFError + 444
+   11  CoreServicesInternal                0x0000000188640c94 _FSURLCreateWithPathAndExtendedAttributes + 88
+   12  CoreServicesInternal                0x000000018861ed94 _ZL17_GetDirectoryURLsP16_CFURLEnumerator + 612
+   13  CoreServicesInternal                0x000000018861d78c _URLEnumeratorGetNextURL + 132
+   14  Foundation                          0x0000000185979d68 _NSDirectoryContentsFromCFURLEnumeratorError + 292
+   15  Foundation                          0x0000000185e439dc $s10Foundation20_NSFileManagerBridgeC19contentsOfDirectory6atPathSaySSGSS_tKF + 880
+   16  Foundation                          0x0000000185e43f94 $s10Foundation20_NSFileManagerBridgeC19contentsOfDirectory6atPathSaySSGSS_tKFTo + 84
+   17  StressPanel                         0x0000000104bed090 $s11StressPanel7millionyyFyyXEfU26_ + 1108
+   18  StressPanel                         0x0000000104bf8364 $s11StressPanel7millionyyFyyXEfU26_TA + 24
+   19  StressPanel                         0x00000001051c99b8 $s9StressKit4step_5limit_xSS_SdxyKXEtKlF + 444
+   20  StressPanel                         0x0000000104be3814 $s11StressPanel7millionyyF + 5796
+   21  StressPanel                         0x0000000104be20d4 main + 652
+   22  dyld                                0x0000000183ddbe80 start + 6688
+
+-- stall 1313 ms (main thread cpu 1204 ms) at t=15.30s in phase '4c select group by mask (4 of 12 extensions)'; main thread stack at +100 ms:
+   0   libswiftCore.dylib                  0x0000000198a64320 $sSs5index_8offsetBySS5IndexVAD_SitF + 56
+   1   Foundation                          0x0000000185dbaa84 $sSK10FoundationE6_range2of8anchored9backwardsSny5IndexQzGSgqd___S2btSKRd__SQ7ElementRpzAJQyd__AKRSlFSs_SsTg5 + 776
+   2   Foundation                          0x0000000185dbaa84 $sSK10FoundationE6_range2of8anchored9backwardsSny5IndexQzGSgqd___S2btSKRd__SQ7ElementRpzAJQyd__AKRSlFSs_SsTg5 + 776
+   3   Foundation                          0x0000000185d22084 $s10Foundation29_StringCompareOptionsIterablePAAE6_range2of11toHalfWidth21diacriticsInsensitive8caseFold8anchored9backwardsSny5IndexQzGSgqd___S5btSKRd__7ElementQyd__AORtzAKQyd__ALRSlFSs_SsTg5 + 144
+   4   Foundation                          0x0000000186630498 $sSy10FoundationE5range2of7optionsAB6localeSnySS5IndexVGSgqd___So22NSStringCompareOptionsVAiA6LocaleVSgtSyRd__lF + 2916
+   5   Foundation                          0x00000001866312c4 $sSy10FoundationE8containsySbqd__SyRd__lF + 56
+   6   StressPanel                         0x0000000104d8c1d4 $s15SelectionPlugin0A4RuleV8matching5among4base3nowSaySSGSay9AFMKernel8FileItemVG_10Foundation3URLVAM4DateVtF + 912
+   7   StressPanel                         0x0000000104d86a4c $s15SelectionPlugin10SelectionsC5apply_6select5scopeySS_SbAA0A5ScopeOtF + 2068
+   8   StressPanel                         0x0000000104d7fbf0 $s15SelectionPluginAAC5start2iny9AFMKernel6KernelC_tFyAE15CommandArgumentOcfU12_ + 284
+   9   StressPanel                         0x0000000104c00834 $s9AFMKernel15CommandRegistryC7performySbAA0B2IDV_AA0B8ArgumentOtF + 152
+   10  StressPanel                         0x0000000104beb090 $s11StressPanel7millionyyFyyXEfU13_ + 240
+   11  StressPanel                         0x0000000104bf80c8 $s11StressPanel7millionyyFyyXEfU13_TA + 16
+   12  StressPanel                         0x00000001051c99b8 $s9StressKit4step_5limit_xSS_SdxyKXEtKlF + 444
+   13  StressPanel                         0x0000000104be3134 $s11StressPanel7millionyyF + 4036
+   14  StressPanel                         0x0000000104be20d4 main + 652
+   15  dyld                                0x0000000183ddbe80 start + 6688
+   .. and at +1 s:
+   0   Foundation                          0x00000001861ab6dc $s10Foundation3URLVMa + 0
+   1   StressPanel                         0x0000000104c15634 $s9AFMKernel8FileItemVwcp + 44
+   2   StressPanel                         0x0000000104d8f824 $s15SelectionPlugin0A4TypeVWOcTm + 52
+   3   StressPanel                         0x0000000104d8c664 $s15SelectionPlugin0A4RuleV8matching5among4base3nowSaySSGSay9AFMKernel8FileItemVG_10Foundation3URLVAM4DateVtF + 2080
+   4   StressPanel                         0x0000000104d86a4c $s15SelectionPlugin10SelectionsC5apply_6select5scopeySS_SbAA0A5ScopeOtF + 2068
+   5   StressPanel                         0x0000000104d7fbf0 $s15SelectionPluginAAC5start2iny9AFMKernel6KernelC_tFyAE15CommandArgumentOcfU12_ + 284
+   6   StressPanel                         0x0000000104c00834 $s9AFMKernel15CommandRegistryC7performySbAA0B2IDV_AA0B8ArgumentOtF + 152
+   7   StressPanel                         0x0000000104beb090 $s11StressPanel7millionyyFyyXEfU13_ + 240
+   8   StressPanel                         0x0000000104bf80c8 $s11StressPanel7millionyyFyyXEfU13_TA + 16
+   9   StressPanel                         0x00000001051c99b8 $s9StressKit4step_5limit_xSS_SdxyKXEtKlF + 444
+   10  StressPanel                         0x0000000104be3134 $s11StressPanel7millionyyF + 4036
+   11  StressPanel                         0x0000000104be20d4 main + 652
+   12  dyld                                0x0000000183ddbe80 start + 6688
+
+-- stall 673 ms (main thread cpu 537 ms) at t=143.78s in phase '8 200 quiet reloads + churn + watcher (<=90 s)'; main thread stack at +100 ms:
+   0   libswiftCore.dylib                  0x00000001987272bc _swift_release_dealloc + 88
+   1   libswiftCore.dylib                  0x000000019878dae4 _ZN5swift9RefCountsINS_13RefCountBitsTILNS_19RefCountInlinednessE1EEEE15doDecrementSlowILNS_13PerformDeinitE1EEEbS3_j + 168
+   2   Foundation                          0x000000018624e2e0 $s10Foundation12URLParseInfoCfD + 20
+   3   libswiftCore.dylib                  0x00000001987272a4 _swift_release_dealloc + 64
+   4   libswiftCore.dylib                  0x000000019878dae4 _ZN5swift9RefCountsINS_13RefCountBitsTILNS_19RefCountInlinednessE1EEEE15doDecrementSlowILNS_13PerformDeinitE1EEEbS3_j + 168
+   5   Foundation                          0x0000000186213588 $s10Foundation9_SwiftURLCfD + 24
+   6   libswiftCore.dylib                  0x00000001987272a4 _swift_release_dealloc + 64
+   7   libswiftCore.dylib                  0x000000019878dae4 _ZN5swift9RefCountsINS_13RefCountBitsTILNS_19RefCountInlinednessE1EEEE15doDecrementSlowILNS_13PerformDeinitE1EEEbS3_j + 168
+   8   libswiftCore.dylib                  0x000000019876e528 _ZL21swift_cvw_destroyImplPN5swift11OpaqueValueEPKNS_14TargetMetadataINS_9InProcessEEE + 372
+   9   StressPanel                         0x0000000104c155d0 $s9AFMKernel8FileItemVwxx + 48
+   10  libswiftCore.dylib                  0x0000000198725788 swift_arrayDestroy + 204
+   11  libswiftCore.dylib                  0x0000000198727320 $ss23_ContiguousArrayStorageCfD + 96
+   12  libswiftCore.dylib                  0x00000001987272a4 _swift_release_dealloc + 64
+   13  libswiftCore.dylib                  0x000000019878dae4 _ZN5swift9RefCountsINS_13RefCountBitsTILNS_19RefCountInlinednessE1EEEE15doDecrementSlowILNS_13PerformDeinitE1EEEbS3_j + 168
+   14  StressPanel                         0x0000000104c2b41c $s9AFMKernel10PanelModelC6update4with5focus9presortedSbAA7ListingV_SSSgAA9ListOrderVSgtF + 2280
+   15  StressPanel                         0x0000000104cbd86c $s8AFMShell19PanelViewControllerC6reload33_75A16581E849F5F4B5635FE8120CEA5ELL_5focus7quietly9markDirty10completiony9AFMKernel0B5ModelC_SSSgS2byycSgtFyyYbcfU1_yyScMYccfU_ + 2140
+   16  StressPanel                         0x0000000104ce1404 $sIeg_IeyB_TR + 28
+   17  libdispatch.dylib                   0x0000000183ff0a34 _dispatch_call_block_and_release + 32
+   18  libdispatch.dylib                   0x000000018400a5a0 _dispatch_client_callout + 16
+   19  libdispatch.dylib                   0x0000000184028998 _dispatch_main_queue_drain.cold.6 + 832
+   20  libdispatch.dylib                   0x0000000183fffb0c _dispatch_main_queue_drain + 176
+   21  libdispatch.dylib                   0x0000000183fffa4c _dispatch_main_queue_callback_4CF + 44
+   22  CoreFoundation                      0x00000001842af9cc __CFRUNLOOP_IS_SERVICING_THE_MAIN_DISPATCH_QUEUE__ + 16
+   23  CoreFoundation                      0x000000018427165c __CFRunLoopRun + 1980
+   24  CoreFoundation                      0x000000018434b82c _CFRunLoopRunSpecificWithOptions + 536
+   25  StressPanel                         0x00000001051c4f6c $s9StressKit4pump4upTo5untilSbSd_SbyXEtF + 292
+   26  StressPanel                         0x0000000104bece4c $s11StressPanel7millionyyFyyXEfU26_ + 528
+   27  StressPanel                         0x0000000104bf8364 $s11StressPanel7millionyyFyyXEfU26_TA + 24
+   28  StressPanel                         0x00000001051c99b8 $s9StressKit4step_5limit_xSS_SdxyKXEtKlF + 444
+   29  StressPanel                         0x0000000104be3814 $s11StressPanel7millionyyF + 5796
+   30  StressPanel                         0x0000000104be20d4 main + 652
+   31  dyld                                0x0000000183ddbe80 start + 6688
+
+-- stall 621 ms (main thread cpu 615 ms) at t=53.33s in phase '6 validation x10 (bars, all commands, menu)'; main thread stack at +100 ms:
+   0   libswiftCore.dylib                  0x000000019872280c swift_bridgeObjectRetain + 8
+   1   StressPanel                         0x0000000104c2f588 $s9AFMKernel10PanelModelC8operandsSayAA8FileItemVGyF + 508
+   2   StressPanel                         0x00000001051498e0 $s17SystemToolsPluginAAC5start2iny9AFMKernel6KernelC_tFSayAE8FileItemVGycfU1_ + 216
+   3   StressPanel                         0x0000000105155068 $s17SystemToolsPluginAAC5start2iny9AFMKernel6KernelC_tFSbycfU7_TA + 20
+   4   StressPanel                         0x0000000104c00600 $s9AFMKernel15CommandRegistryC9isEnabledySbAA0B2IDVF + 240
+   5   StressPanel                         0x0000000104beb2e8 $s11StressPanel7millionyyFyyXEfU20_ + 288
+   6   StressPanel                         0x0000000104bf81e4 $s11StressPanel7millionyyFyyXEfU20_TA + 16
+   7   StressPanel                         0x00000001051c99b8 $s9StressKit4step_5limit_xSS_SdxyKXEtKlF + 444
+   8   StressPanel                         0x0000000104be359c $s11StressPanel7millionyyF + 5164
+   9   StressPanel                         0x0000000104be20d4 main + 652
+   10  dyld                                0x0000000183ddbe80 start + 6688
+
+-- stall 609 ms (main thread cpu 518 ms) at t=127.67s in phase '8 200 quiet reloads + churn + watcher (<=90 s)'; main thread stack at +100 ms:
+   0   libsystem_malloc.dylib              0x0000000183fd4440 xzm_malloc_zone_try_free_default_tc + 0
+   1   Foundation                          0x00000001862135c0 $s10Foundation9_SwiftURLCfD + 80
+   2   libswiftCore.dylib                  0x00000001987272a4 _swift_release_dealloc + 64
+   3   libswiftCore.dylib                  0x000000019878dae4 _ZN5swift9RefCountsINS_13RefCountBitsTILNS_19RefCountInlinednessE1EEEE15doDecrementSlowILNS_13PerformDeinitE1EEEbS3_j + 168
+   4   libswiftCore.dylib                  0x000000019876e528 _ZL21swift_cvw_destroyImplPN5swift11OpaqueValueEPKNS_14TargetMetadataINS_9InProcessEEE + 372
+   5   StressPanel                         0x0000000104c155d0 $s9AFMKernel8FileItemVwxx + 48
+   6   libswiftCore.dylib                  0x0000000198725788 swift_arrayDestroy + 204
+   7   libswiftCore.dylib                  0x0000000198727320 $ss23_ContiguousArrayStorageCfD + 96
+   8   libswiftCore.dylib                  0x00000001987272a4 _swift_release_dealloc + 64
+   9   libswiftCore.dylib                  0x000000019878dae4 _ZN5swift9RefCountsINS_13RefCountBitsTILNS_19RefCountInlinednessE1EEEE15doDecrementSlowILNS_13PerformDeinitE1EEEbS3_j + 168
+   10  StressPanel                         0x0000000104c2b41c $s9AFMKernel10PanelModelC6update4with5focus9presortedSbAA7ListingV_SSSgAA9ListOrderVSgtF + 2280
+   11  StressPanel                         0x0000000104cbd86c $s8AFMShell19PanelViewControllerC6reload33_75A16581E849F5F4B5635FE8120CEA5ELL_5focus7quietly9markDirty10completiony9AFMKernel0B5ModelC_SSSgS2byycSgtFyyYbcfU1_yyScMYccfU_ + 2140
+   12  StressPanel                         0x0000000104ce1404 $sIeg_IeyB_TR + 28
+   13  libdispatch.dylib                   0x0000000183ff0a34 _dispatch_call_block_and_release + 32
+   14  libdispatch.dylib                   0x000000018400a5a0 _dispatch_client_callout + 16
+   15  libdispatch.dylib                   0x0000000184028998 _dispatch_main_queue_drain.cold.6 + 832
+   16  libdispatch.dylib                   0x0000000183fffb0c _dispatch_main_queue_drain + 176
+   17  libdispatch.dylib                   0x0000000183fffa4c _dispatch_main_queue_callback_4CF + 44
+   18  CoreFoundation                      0x00000001842af9cc __CFRUNLOOP_IS_SERVICING_THE_MAIN_DISPATCH_QUEUE__ + 16
+   19  CoreFoundation                      0x000000018427165c __CFRunLoopRun + 1980
+   20  CoreFoundation                      0x000000018434b82c _CFRunLoopRunSpecificWithOptions + 536
+   21  StressPanel                         0x00000001051c4f6c $s9StressKit4pump4upTo5untilSbSd_SbyXEtF + 292
+   22  StressPanel                         0x0000000104bece4c $s11StressPanel7millionyyFyyXEfU26_ + 528
+   23  StressPanel                         0x0000000104bf8364 $s11StressPanel7millionyyFyyXEfU26_TA + 24
+   24  StressPanel                         0x00000001051c99b8 $s9StressKit4step_5limit_xSS_SdxyKXEtKlF + 444
+   25  StressPanel                         0x0000000104be3814 $s11StressPanel7millionyyF + 5796
+   26  StressPanel                         0x0000000104be20d4 main + 652
+   27  dyld                                0x0000000183ddbe80 start + 6688
+
+-- stall 603 ms (main thread cpu 556 ms) at t=169.40s in phase 'shut down'; main thread stack at +100 ms:
+   0   libsystem_malloc.dylib              0x0000000183fd17f8 __xzm_xzone_free_to_freelist_chunk + 372
+   1   libswiftCore.dylib                  0x00000001987272a4 _swift_release_dealloc + 64
+   2   libswiftCore.dylib                  0x00000001987272a4 _swift_release_dealloc + 64
+   3   libswiftCore.dylib                  0x000000019878dae4 _ZN5swift9RefCountsINS_13RefCountBitsTILNS_19RefCountInlinednessE1EEEE15doDecrementSlowILNS_13PerformDeinitE1EEEbS3_j + 168
+   4   Foundation                          0x000000018624e2e0 $s10Foundation12URLParseInfoCfD + 20
+   5   libswiftCore.dylib                  0x00000001987272a4 _swift_release_dealloc + 64
+   6   libswiftCore.dylib                  0x000000019878dae4 _ZN5swift9RefCountsINS_13RefCountBitsTILNS_19RefCountInlinednessE1EEEE15doDecrementSlowILNS_13PerformDeinitE1EEEbS3_j + 168
+   7   Foundation                          0x0000000186213588 $s10Foundation9_SwiftURLCfD + 24
+   8   libswiftCore.dylib                  0x00000001987272a4 _swift_release_dealloc + 64
+   9   libswiftCore.dylib                  0x000000019878dae4 _ZN5swift9RefCountsINS_13RefCountBitsTILNS_19RefCountInlinednessE1EEEE15doDecrementSlowILNS_13PerformDeinitE1EEEbS3_j + 168
+   10  libswiftCore.dylib                  0x000000019876e528 _ZL21swift_cvw_destroyImplPN5swift11OpaqueValueEPKNS_14TargetMetadataINS_9InProcessEEE + 372
+   11  StressPanel                         0x0000000104c155d0 $s9AFMKernel8FileItemVwxx + 48
+   12  libswiftCore.dylib                  0x0000000198725788 swift_arrayDestroy + 204
+   13  libswiftCore.dylib                  0x0000000198727320 $ss23_ContiguousArrayStorageCfD + 96
+   14  libswiftCore.dylib                  0x00000001987272a4 _swift_release_dealloc + 64
+   15  libswiftCore.dylib                  0x000000019878dae4 _ZN5swift9RefCountsINS_13RefCountBitsTILNS_19RefCountInlinednessE1EEEE15doDecrementSlowILNS_13PerformDeinitE1EEEbS3_j + 168
+   16  StressPanel                         0x0000000104c2b41c $s9AFMKernel10PanelModelC6update4with5focus9presortedSbAA7ListingV_SSSgAA9ListOrderVSgtF + 2280
+   17  StressPanel                         0x0000000104cbd86c $s8AFMShell19PanelViewControllerC6reload33_75A16581E849F5F4B5635FE8120CEA5ELL_5focus7quietly9markDirty10completiony9AFMKernel0B5ModelC_SSSgS2byycSgtFyyYbcfU1_yyScMYccfU_ + 2140
+   18  StressPanel                         0x0000000104ce1404 $sIeg_IeyB_TR + 28
+   19  libdispatch.dylib                   0x0000000183ff0a34 _dispatch_call_block_and_release + 32
+   20  libdispatch.dylib                   0x000000018400a5a0 _dispatch_client_callout + 16
+   21  libdispatch.dylib                   0x0000000184028998 _dispatch_main_queue_drain.cold.6 + 832
+   22  libdispatch.dylib                   0x0000000183fffb0c _dispatch_main_queue_drain + 176
+   23  libdispatch.dylib                   0x0000000183fffa4c _dispatch_main_queue_callback_4CF + 44
+   24  CoreFoundation                      0x00000001842af9cc __CFRUNLOOP_IS_SERVICING_THE_MAIN_DISPATCH_QUEUE__ + 16
+   25  CoreFoundation                      0x000000018427165c __CFRunLoopRun + 1980
+   26  CoreFoundation                      0x000000018434b82c _CFRunLoopRunSpecificWithOptions + 536
+   27  StressPanel                         0x00000001051c4f6c $s9StressKit4pump4upTo5untilSbSd_SbyXEtF + 292
+   28  StressPanel                         0x0000000104bed6ec $s11StressPanel7millionyyFyyXEfU27_ + 200
+   29  StressPanel                         0x0000000104bf837c $s11StressPanel7millionyyFyyXEfU27_TA + 16
+   30  StressPanel                         0x00000001051c99b8 $s9StressKit4step_5limit_xSS_SdxyKXEtKlF + 444
+   31  StressPanel                         0x0000000104be384c $s11StressPanel7millionyyF + 5852
+   32  StressPanel                         0x0000000104be20d4 main + 652
+   33  dyld                                0x0000000183ddbe80 start + 6688
+
+-- stall 580 ms (main thread cpu 551 ms) at t=55.14s in phase '6 validation x10 (bars, all commands, menu)'; main thread stack at +100 ms:
+   0   libsystem_platform.dylib            0x00000001841bbf0c _platform_memmove + 428
+   1   libswiftCore.dylib                  0x000000019876f0a0 _ZL26swift_cvw_initWithCopyImplPN5swift11OpaqueValueES1_PKNS_14TargetMetadataINS_9InProcessEEE + 424
+   2   StressPanel                         0x0000000104c1564c $s9AFMKernel8FileItemVwcp + 68
+   3   StressPanel                         0x0000000105156fd8 $s17SystemToolsPlugin13ProcessRunnerVWOcTm + 52
+   4   StressPanel                         0x00000001051499b0 $s17SystemToolsPluginAAC5start2iny9AFMKernel6KernelC_tFSayAE8FileItemVGycfU1_ + 424
+   5   StressPanel                         0x0000000105155068 $s17SystemToolsPluginAAC5start2iny9AFMKernel6KernelC_tFSbycfU7_TA + 20
+   6   StressPanel                         0x0000000104c00600 $s9AFMKernel15CommandRegistryC9isEnabledySbAA0B2IDVF + 240
+   7   StressPanel                         0x0000000104be7c0c $s11StressPanel7RunningC18validateEverything4menuSd4bars_Sd8commandsSdAEtSo6NSMenuC_tF + 292
+   8   StressPanel                         0x0000000104bebf20 $s11StressPanel7millionyyFyyXEfU21_ + 108
+   9   StressPanel                         0x0000000104bf81fc $s11StressPanel7millionyyFyyXEfU21_TA + 16
+   10  StressPanel                         0x00000001051c99b8 $s9StressKit4step_5limit_xSS_SdxyKXEtKlF + 444
+   11  StressPanel                         0x0000000104be35d8 $s11StressPanel7millionyyF + 5224
+   12  StressPanel                         0x0000000104be20d4 main + 652
+   13  dyld                                0x0000000183ddbe80 start + 6688
+
+-- stall 574 ms (main thread cpu 559 ms) at t=56.69s in phase '7a navigate away to a small folder'; main thread stack at +100 ms:
+   0   libswiftCore.dylib                  0x000000019878da7c _ZN5swift9RefCountsINS_13RefCountBitsTILNS_19RefCountInlinednessE1EEEE15doDecrementSlowILNS_13PerformDeinitE1EEEbS3_j + 64
+   1   Foundation                          0x000000018624e2e0 $s10Foundation12URLParseInfoCfD + 20
+   2   libswiftCore.dylib                  0x00000001987272a4 _swift_release_dealloc + 64
+   3   libswiftCore.dylib                  0x000000019878dae4 _ZN5swift9RefCountsINS_13RefCountBitsTILNS_19RefCountInlinednessE1EEEE15doDecrementSlowILNS_13PerformDeinitE1EEEbS3_j + 168
+   4   Foundation                          0x0000000186213588 $s10Foundation9_SwiftURLCfD + 24
+   5   libswiftCore.dylib                  0x00000001987272a4 _swift_release_dealloc + 64
+   6   libswiftCore.dylib                  0x000000019878dae4 _ZN5swift9RefCountsINS_13RefCountBitsTILNS_19RefCountInlinednessE1EEEE15doDecrementSlowILNS_13PerformDeinitE1EEEbS3_j + 168
+   7   libswiftCore.dylib                  0x000000019876e528 _ZL21swift_cvw_destroyImplPN5swift11OpaqueValueEPKNS_14TargetMetadataINS_9InProcessEEE + 372
+   8   StressPanel                         0x0000000104c155d0 $s9AFMKernel8FileItemVwxx + 48
+   9   libswiftCore.dylib                  0x0000000198725788 swift_arrayDestroy + 204
+   10  libswiftCore.dylib                  0x0000000198727320 $ss23_ContiguousArrayStorageCfD + 96
+   11  libswiftCore.dylib                  0x00000001987272a4 _swift_release_dealloc + 64
+   12  libswiftCore.dylib                  0x000000019878dae4 _ZN5swift9RefCountsINS_13RefCountBitsTILNS_19RefCountInlinednessE1EEEE15doDecrementSlowILNS_13PerformDeinitE1EEEbS3_j + 168
+   13  StressPanel                         0x0000000104c2a694 $s9AFMKernel10PanelModelC9setListed33_F6249D9EA099D0D7EE7A09E6E80C7A7CLLyySayAA8FileItemVGF + 524
+   14  StressPanel                         0x0000000104c29c20 $s9AFMKernel10PanelModelC4show_5focus7history8complete9presortedyAA7ListingV_SSSgAC13HistoryEffectOSbAA9ListOrderVSgtF + 584
+   15  StressPanel                         0x0000000104cb6a10 $s8AFMShell19PanelViewControllerC4load_2in5focus7history13reportFailure10completiony10Foundation3URLV_9AFMKernel0B5ModelCSSSgAO13HistoryEffectOSbySbcSgtFyAA0B7LoadingC5PieceVcfU1_ + 2764
+   16  StressPanel                         0x0000000104cc6b9c $s8AFMShell19PanelViewControllerC4load_2in5focus7history13reportFailure10completiony10Foundation3URLV_9AFMKernel0B5ModelCSSSgAO13HistoryEffectOSbySbcSgtFyAA0B7LoadingC5PieceVcfU1_TATm + 56
+   17  StressPanel                         0x0000000104c91188 $s8AFMShell12PanelLoadingC5start7onPiece0E3EndyyAC0F0Vc_ys5Error_pSgctFyyYbcfU_4sendL_6isLastAHSgSb_tFyyScMYccfU_TATm + 80
+   18  StressPanel                         0x0000000104ce1404 $sIeg_IeyB_TR + 28
+   19  libdispatch.dylib                   0x0000000183ff0a34 _dispatch_call_block_and_release + 32
+   20  libdispatch.dylib                   0x000000018400a5a0 _dispatch_client_callout + 16
+   21  libdispatch.dylib                   0x0000000184028998 _dispatch_main_queue_drain.cold.6 + 832
+   22  libdispatch.dylib                   0x0000000183fffb0c _dispatch_main_queue_drain + 176
+   23  libdispatch.dylib                   0x0000000183fffa4c _dispatch_main_queue_callback_4CF + 44
+   24  CoreFoundation                      0x00000001842af9cc __CFRUNLOOP_IS_SERVICING_THE_MAIN_DISPATCH_QUEUE__ + 16
+   25  CoreFoundation                      0x000000018427165c __CFRunLoopRun + 1980
+   26  CoreFoundation                      0x000000018434b82c _CFRunLoopRunSpecificWithOptions + 536
+   27  StressPanel                         0x00000001051c4f6c $s9StressKit4pump4upTo5untilSbSd_SbyXEtF + 292
+   28  StressPanel                         0x0000000104bec180 $s11StressPanel7millionyyFyyXEfU23_ + 152
+   29  StressPanel                         0x0000000104bf822c $s11StressPanel7millionyyFyyXEfU23_TA + 16
+   30  StressPanel                         0x00000001051c99b8 $s9StressKit4step_5limit_xSS_SdxyKXEtKlF + 444
+   31  StressPanel                         0x0000000104be3640 $s11StressPanel7millionyyF + 5328
+   32  StressPanel                         0x0000000104be20d4 main + 652
+   33  dyld                                0x0000000183ddbe80 start + 6688
+
+-- stall 420 ms (main thread cpu 309 ms) at t=17.20s in phase '4e invert selection (back to ~333k)'; main thread stack at +100 ms:
+   0   libswiftCore.dylib                  0x000000019872345c swift_retain + 4
+   1   libswiftCore.dylib                  0x000000019876f010 _ZL26swift_cvw_initWithCopyImplPN5swift11OpaqueValueES1_PKNS_14TargetMetadataINS_9InProcessEEE + 280
+   2   StressPanel                         0x0000000104c1564c $s9AFMKernel8FileItemVwcp + 68
+   3   StressPanel                         0x0000000104c19704 $s9AFMKernel8FileItemVWOc + 52
+   4   StressPanel                         0x0000000104c2e890 $s9AFMKernel10PanelModelC15invertSelectionyyF + 204
+   5   StressPanel                         0x0000000104d828f0 $s15SelectionPlugin10SelectionsC6invert5scopeyAA0A5ScopeO_tF + 552
+   6   StressPanel                         0x0000000104d87f34 $s15SelectionPluginAAC5start2iny9AFMKernel6KernelC_tFyycfU30_TATm + 32
+   7   StressPanel                         0x0000000104c04338 $s9AFMKernel15CommandRegistryC8register_7enabled7checked_yAA0B0V_SbycSbycyyctFyAA0B8ArgumentOcfU_TA + 20
+   8   StressPanel                         0x0000000104c00834 $s9AFMKernel15CommandRegistryC7performySbAA0B2IDV_AA0B8ArgumentOtF + 152
+   9   StressPanel                         0x0000000104beb17c $s11StressPanel7millionyyFyyXEfU12_Tm + 160
+   10  StressPanel                         0x0000000104bf80b0 $s11StressPanel7millionyyFyyXEfU12_TA + 16
+   11  StressPanel                         0x0000000104bf9194 $s11StressPanel7millionyyFyyXEfU15_TA + 12
+   12  StressPanel                         0x00000001051c99b8 $s9StressKit4step_5limit_xSS_SdxyKXEtKlF + 444
+   13  StressPanel                         0x0000000104be3420 $s11StressPanel7millionyyF + 4784
+   14  StressPanel                         0x0000000104be20d4 main + 652
+   15  dyld                                0x0000000183ddbe80 start + 6688
+
+-- stall 370 ms (main thread cpu 279 ms) at t=16.74s in phase '4d invert selection (to ~667k)'; main thread stack at +100 ms:
+   0   libswiftCore.dylib                  0x0000000198723398 swift_bridgeObjectRelease + 0
+   1   StressPanel                         0x0000000104c2e8cc $s9AFMKernel10PanelModelC15invertSelectionyyF + 264
+   2   StressPanel                         0x0000000104d828f0 $s15SelectionPlugin10SelectionsC6invert5scopeyAA0A5ScopeO_tF + 552
+   3   StressPanel                         0x0000000104d87f34 $s15SelectionPluginAAC5start2iny9AFMKernel6KernelC_tFyycfU30_TATm + 32
+   4   StressPanel                         0x0000000104c04338 $s9AFMKernel15CommandRegistryC8register_7enabled7checked_yAA0B0V_SbycSbycyyctFyAA0B8ArgumentOcfU_TA + 20
+   5   StressPanel                         0x0000000104c00834 $s9AFMKernel15CommandRegistryC7performySbAA0B2IDV_AA0B8ArgumentOtF + 152
+   6   StressPanel                         0x0000000104beb17c $s11StressPanel7millionyyFyyXEfU12_Tm + 160
+   7   StressPanel                         0x0000000104bf80b0 $s11StressPanel7millionyyFyyXEfU12_TA + 16
+   8   StressPanel                         0x0000000104bf9180 $s11StressPanel7millionyyFyyXEfU14_TA + 12
+   9   StressPanel                         0x00000001051c99b8 $s9StressKit4step_5limit_xSS_SdxyKXEtKlF + 444
+   10  StressPanel                         0x0000000104be3348 $s11StressPanel7millionyyF + 4568
+   11  StressPanel                         0x0000000104be20d4 main + 652
+   12  dyld                                0x0000000183ddbe80 start + 6688
+
+-- stall 280 ms (main thread cpu 248 ms) at t=14.50s in phase '4a select all (1000200)'; main thread stack at +100 ms:
+   0   StressPanel                         0x0000000104c353e0 $s9AFMKernel9ExactNameV7areSameySbSS_SStFZTf4nnd_n + 540
+   1   StressPanel                         0x0000000104c31934 $sSh8_VariantV6insertySb8inserted_x17memberAfterInserttxnF9AFMKernel9ExactNameV_Tg5 + 168
+   2   StressPanel                         0x0000000104c31934 $sSh8_VariantV6insertySb8inserted_x17memberAfterInserttxnF9AFMKernel9ExactNameV_Tg5 + 168
+   3   StressPanel                         0x0000000104c2e734 $s9AFMKernel10PanelModelC9selectAllyyF + 256
+   4   StressPanel                         0x0000000104d82448 $s15SelectionPlugin10SelectionsC3all6select5scope4stepySb_AA0A5ScopeOSitF + 2448
+   5   StressPanel                         0x0000000104d81aa8 $s15SelectionPluginAAC5start2iny9AFMKernel6KernelC_tFyAE15CommandArgumentOcfU24_ + 92
+   6   StressPanel                         0x0000000104c00834 $s9AFMKernel15CommandRegistryC7performySbAA0B2IDV_AA0B8ArgumentOtF + 152
+   7   StressPanel                         0x0000000104bead34 $s11StressPanel7millionyyFyyXEfU11_ + 176
+   8   StressPanel                         0x0000000104bf8098 $s11StressPanel7millionyyFyyXEfU11_TA + 20
+   9   StressPanel                         0x00000001051c99b8 $s9StressKit4step_5limit_xSS_SdxyKXEtKlF + 444
+   10  StressPanel                         0x0000000104be2fc0 $s11StressPanel7millionyyF + 3664
+   11  StressPanel                         0x0000000104be20d4 main + 652
+   12  dyld                                0x0000000183ddbe80 start + 6688
+
+-- stall 276 ms (main thread cpu 255 ms) at t=14.89s in phase '4b invert selection'; main thread stack at +100 ms:
+   0   StressPanel                         0x00000001051d00b0 $s19ConfigurationPlugin23OptionsWindowControllerC6windowACSo8NSWindowCSg_tcfc + 10724
+   1   StressPanel                         0x0000000104c2e8cc $s9AFMKernel10PanelModelC15invertSelectionyyF + 264
+   2   StressPanel                         0x0000000104d828f0 $s15SelectionPlugin10SelectionsC6invert5scopeyAA0A5ScopeO_tF + 552
+   3   StressPanel                         0x0000000104d87f34 $s15SelectionPluginAAC5start2iny9AFMKernel6KernelC_tFyycfU30_TATm + 32
+   4   StressPanel                         0x0000000104c04338 $s9AFMKernel15CommandRegistryC8register_7enabled7checked_yAA0B0V_SbycSbycyyctFyAA0B8ArgumentOcfU_TA + 20
+   5   StressPanel                         0x0000000104c00834 $s9AFMKernel15CommandRegistryC7performySbAA0B2IDV_AA0B8ArgumentOtF + 152
+   6   StressPanel                         0x0000000104beb17c $s11StressPanel7millionyyFyyXEfU12_Tm + 160
+   7   StressPanel                         0x0000000104bf80b0 $s11StressPanel7millionyyFyyXEfU12_TA + 16
+   8   StressPanel                         0x00000001051c99b8 $s9StressKit4step_5limit_xSS_SdxyKXEtKlF + 444
+   9   StressPanel                         0x0000000104be3088 $s11StressPanel7millionyyF + 3864
+   10  StressPanel                         0x0000000104be20d4 main + 652
+   11  dyld                                0x0000000183ddbe80 start + 6688
+
+-- stall 243 ms (main thread cpu 134 ms) at t=27.70s in phase '5a cursor: 1000 x Page Down command'; main thread stack at +100 ms:
+   0   libsystem_kernel.dylib              0x000000018416cc20 mach_msg2_trap + 8
+   1   libsystem_kernel.dylib              0x000000018417f8e0 mach_msg2_internal + 76
+   2   libsystem_kernel.dylib              0x0000000184175a28 mach_msg_overwrite + 480
+   3   libsystem_kernel.dylib              0x000000018416cfac mach_msg + 24
+   4   QuartzCore                          0x000000018e93b2a8 _CASSynchronize + 164
+   5   QuartzCore                          0x000000018eaf1d8c _ZN2CA7Context11synchronizeEjib + 520
+   6   QuartzCore                          0x000000018e93b1d8 _ZL25CABackingStoreSynchronizeP14CABackingStorePN2CA14GenericContextEji + 100
+   7   QuartzCore                          0x000000018e919984 _ZL29CABackingStorePrepareUpdates_P14CABackingStoremmjjjyPN2CA14GenericContextEP11UpdateState + 1412
+   8   QuartzCore                          0x000000018e919168 CABackingStoreUpdate_ + 488
+   9   QuartzCore                          0x000000018e96eb24 ___ZN2CA5Layer8display_Ev_block_invoke + 76
+   10  QuartzCore                          0x000000018e918418 -[CALayer _display] + 1820
+   11  AppKit                              0x00000001899d3e40 __swift_closure_destructor.30 + 17936
+   12  AppKit                              0x00000001899d37a0 __swift_closure_destructor.30 + 16240
+   13  AppKit                              0x00000001899d3f40 __swift_closure_destructor.30 + 18192
+   14  QuartzCore                          0x000000018e9173e8 _ZN2CA5Layer17display_if_neededEPNS_11TransactionE + 788
+   15  QuartzCore                          0x000000018eaf2d30 _ZN2CA7Context18commit_transactionEPNS_11TransactionEdPd + 684
+   16  QuartzCore                          0x000000018e8f77d4 _ZN2CA11Transaction6commitEv + 652
+   17  QuartzCore                          0x000000018e8f7370 _ZN2CA11Transaction5flushEv + 84
+   18  AppKit                              0x000000018894af1c __62+[CATransaction(NSCATransaction) NS_setFlushesWithDisplayLink]_block_invoke + 272
+   19  CoreFoundation                      0x0000000184271cc4 __CFRUNLOOP_IS_CALLING_OUT_TO_AN_OBSERVER_CALLBACK_FUNCTION__ + 36
+   20  CoreFoundation                      0x0000000184271bbc __CFRunLoopDoObservers + 648
+   21  CoreFoundation                      0x00000001842711a8 __CFRunLoopRun + 776
+   22  CoreFoundation                      0x000000018434b82c _CFRunLoopRunSpecificWithOptions + 536
+   23  StressPanel                         0x0000000104be8a2c $s11StressPanel5timedyySi_ySiXEtF04$s11a27Panel7millionyyFyyXEfU9_ySiG2U_AA7RunningCTf1nc_nTm + 520
+   24  StressPanel                         0x0000000104bf811c $s11StressPanel7millionyyFyyXEfU17_TA + 36
+   25  StressPanel                         0x00000001051c99b8 $s9StressKit4step_5limit_xSS_SdxyKXEtKlF + 444
+   26  StressPanel                         0x0000000104be3500 $s11StressPanel7millionyyF + 5008
+   27  StressPanel                         0x0000000104be20d4 main + 652
+   28  dyld                                0x0000000183ddbe80 start + 6688
+
+-- stall 242 ms (main thread cpu 63 ms) at t=25.19s in phase '5a cursor: 1000 x Page Down command'; main thread stack at +100 ms:
+   0   libsystem_kernel.dylib              0x000000018416cc20 mach_msg2_trap + 8
+   1   libsystem_kernel.dylib              0x000000018417f8e0 mach_msg2_internal + 76
+   2   libsystem_kernel.dylib              0x0000000184175a28 mach_msg_overwrite + 480
+   3   libsystem_kernel.dylib              0x000000018416cfac mach_msg + 24
+   4   QuartzCore                          0x000000018ea9256c _ZN2CA6Render7Context20wait_for_synchronizeEjPjS2_S2_i + 120
+   5   QuartzCore                          0x000000018eaf1eac _ZN2CA7Context11synchronizeEjib + 808
+   6   QuartzCore                          0x000000018e93b1d8 _ZL25CABackingStoreSynchronizeP14CABackingStorePN2CA14GenericContextEji + 100
+   7   QuartzCore                          0x000000018e919984 _ZL29CABackingStorePrepareUpdates_P14CABackingStoremmjjjyPN2CA14GenericContextEP11UpdateState + 1412
+   8   QuartzCore                          0x000000018e919168 CABackingStoreUpdate_ + 488
+   9   QuartzCore                          0x000000018e96eb24 ___ZN2CA5Layer8display_Ev_block_invoke + 76
+   10  QuartzCore                          0x000000018e918418 -[CALayer _display] + 1820
+   11  AppKit                              0x00000001899d3e40 __swift_closure_destructor.30 + 17936
+   12  AppKit                              0x00000001899d37a0 __swift_closure_destructor.30 + 16240
+   13  AppKit                              0x00000001899d3f40 __swift_closure_destructor.30 + 18192
+   14  QuartzCore                          0x000000018e9173e8 _ZN2CA5Layer17display_if_neededEPNS_11TransactionE + 788
+   15  QuartzCore                          0x000000018eaf2d30 _ZN2CA7Context18commit_transactionEPNS_11TransactionEdPd + 684
+   16  QuartzCore                          0x000000018e8f77d4 _ZN2CA11Transaction6commitEv + 652
+   17  QuartzCore                          0x000000018e8f7370 _ZN2CA11Transaction5flushEv + 84
+   18  AppKit                              0x000000018894af1c __62+[CATransaction(NSCATransaction) NS_setFlushesWithDisplayLink]_block_invoke + 272
+   19  CoreFoundation                      0x0000000184271cc4 __CFRUNLOOP_IS_CALLING_OUT_TO_AN_OBSERVER_CALLBACK_FUNCTION__ + 36
+   20  CoreFoundation                      0x0000000184271bbc __CFRunLoopDoObservers + 648
+   21  CoreFoundation                      0x00000001842711a8 __CFRunLoopRun + 776
+   22  CoreFoundation                      0x000000018434b82c _CFRunLoopRunSpecificWithOptions + 536
+   23  StressPanel                         0x0000000104be8a2c $s11StressPanel5timedyySi_ySiXEtF04$s11a27Panel7millionyyFyyXEfU9_ySiG2U_AA7RunningCTf1nc_nTm + 520
+   24  StressPanel                         0x0000000104bf811c $s11StressPanel7millionyyFyyXEfU17_TA + 36
+   25  StressPanel                         0x00000001051c99b8 $s9StressKit4step_5limit_xSS_SdxyKXEtKlF + 444
+   26  StressPanel                         0x0000000104be3500 $s11StressPanel7millionyyF + 5008
+   27  StressPanel                         0x0000000104be20d4 main + 652
+   28  dyld                                0x0000000183ddbe80 start + 6688
+
+-- stall 151 ms (main thread cpu 126 ms) at t=0.00s in phase 'start-up (kernel, 21 plugins, shell)'; main thread stack at +100 ms:
+   0   AppKit                              0x00000001888d2684 -[NSView isOpaque] + 12
+   1   AppKit                              0x00000001892573e0 __38-[NSView _appearanceSensitiveIsOpaque]_block_invoke + 28
+   2   AppKit                              0x0000000188818314 +[NSAppearance _performWithCurrentAppearance:usingBlock:] + 72
+   3   AppKit                              0x0000000189257380 -[NSView _appearanceSensitiveIsOpaque] + 152
+   4   AppKit                              0x0000000188949ca4 -[NSView opaqueAncestor] + 24
+   5   AppKit                              0x000000018887716c -[NSCell(NSCellBackgroundStyleCompatibility) _externalContextSeemsLikelyToBeRaised] + 112
+   6   AppKit                              0x0000000188850c48 -[NSCell(NSCellBackgroundStyleCompatibility) _initialBackgroundStyleCompatibilityGuess] + 60
+   7   AppKit                              0x0000000188850bcc -[NSCell(NSCellBackgroundStyle) backgroundStyle] + 40
+   8   AppKit                              0x0000000188f178d4 -[NSButtonAppearanceBasedVisualProvider interiorBackgroundStyle] + 48
+   9   AppKit                              0x0000000188850b74 -[NSButtonCell interiorBackgroundStyle] + 32
+   10  AppKit                              0x000000018885090c -[NSButtonCell _interiorContentPresentationStateInView:] + 108
+   11  AppKit                              0x0000000188f172b4 -[NSButtonAppearanceBasedVisualProvider configuredButtonContentStyle] + 232
+   12  AppKit                              0x0000000188f1766c -[NSButtonAppearanceBasedVisualProvider effectiveButtonContentStyleForText] + 172
+   13  AppKit                              0x0000000188f10818 -[NSButtonAppearanceBasedVisualProvider updateTextFieldIfNecessary] + 196
+   14  AppKit                              0x0000000188f10664 -[NSButtonAppearanceBasedVisualProvider textField] + 688
+   15  AppKit                              0x0000000188f11b2c -[NSButtonAppearanceBasedVisualProvider layout] + 768
+   16  AppKit                              0x00000001888b9b2c -[NSButtonCell layoutLayerWithFrame:inView:] + 88
+   17  AppKit                              0x000000018886f668 -[NSControl layout] + 80
+   18  AppKit                              0x000000018983c228 __swift__destructor.26 + 260
+   19  AppKit                              0x000000018983c250 __swift__destructor.26 + 300
+   20  AppKit                              0x00000001898ed2b0 __swift_memcpy18_8 + 11648
+   21  AppKit                              0x00000001898ed8ac __swift_memcpy18_8 + 13180
+   22  AppKit                              0x000000018925bab8 ___NSViewLayout_block_invoke + 644
+   23  AppKit                              0x0000000188869b5c NSPerformVisuallyAtomicChange + 128
+   24  AppKit                              0x000000018886e4a8 _NSViewLayout + 96
+   25  AppKit                              0x0000000189250bb4 __36-[NSView _layoutSubtreeWithOldSize:]_block_invoke + 380
+   26  AppKit                              0x0000000188869b5c NSPerformVisuallyAtomicChange + 128
+   27  AppKit                              0x000000018886e43c -[NSView _layoutSubtreeWithOldSize:] + 100
+   28  AppKit                              0x0000000189250cf8 __36-[NSView _layoutSubtreeWithOldSize:]_block_invoke + 704
+   29  AppKit                              0x0000000188869b5c NSPerformVisuallyAtomicChange + 128
+   30  AppKit                              0x000000018886e43c -[NSView _layoutSubtreeWithOldSize:] + 100
+   31  AppKit                              0x0000000189250cf8 __36-[NSView _layoutSubtreeWithOldSize:]_block_invoke + 704
+   32  AppKit                              0x0000000188869b5c NSPerformVisuallyAtomicChange + 128
+   33  AppKit                              0x000000018886e43c -[NSView _layoutSubtreeWithOldSize:] + 100
+
+-- stall 138 ms (main thread cpu 134 ms) at t=61.85s in phase '7b come back (remembered listing + fresh read)'; main thread stack at +100 ms:
+   0   libsystem_platform.dylib            0x00000001841b9280 _platform_memcmp + 272
+   1   libswiftCore.dylib                  0x00000001987a6ac4 _ZNK5swift16MetadataCacheKeyeqERKS0_ + 132
+   2   libswiftCore.dylib                  0x00000001987a6ee4 _ZN5swift25ConcurrentReadableHashMapINS_21HashMapElementWrapperINS_17GenericCacheEntryEEENS_5MutexEE4findINS_16MetadataCacheKeyEEENSt3__14pairIPS3_jEERKT_NS5_12IndexStorageEmSA_ + 264
+   3   libswiftCore.dylib                  0x00000001987a8a80 _ZN5swift38StableAddressConcurrentReadableHashMapINS_17GenericCacheEntryENS_23TaggedMetadataAllocatorILt14EEENS_5MutexEE11getOrInsertINS_16MetadataCacheKeyEJRNS_17MetadataWaitQueue6WorkerERNS_15MetadataRequestERPKNS_27TargetTypeContextDescriptorINS_9InProcessEEERPKPKvEEENSt3__14pairIPS1_bEET_DpOT0_ + 188
+   4   libswiftCore.dylib                  0x00000001987a87d0 _ZN5swift20LockingConcurrentMapINS_17GenericCacheEntryENS_27LockingConcurrentMapStorageIS1_Lt14EEEE11getOrInsertINS_16MetadataCacheKeyEJRNS_15MetadataRequestERPKNS_27TargetTypeContextDescriptorINS_9InProcessEEERPKPKvEEENSt3__14pairIPS1_NS_16MetadataResponseEEET_DpOT0_ + 88
+   5   libswiftCore.dylib                  0x0000000198797990 _ZL25_swift_getGenericMetadataN5swift15MetadataRequestEPKPKvPKNS_27TargetTypeContextDescriptorINS_9InProcessEEE + 268
+   6   libswiftCore.dylib                  0x0000000198bacaf4 __swift_instantiateCanonicalPrespecializedGenericMetadata + 40
+   7   Foundation                          0x00000001864660cc $sSD10FoundationE34_conditionallyBridgeFromObjectiveC_6resultSbSo12NSDictionaryC_SDyxq_GSgztFZSiSryxG_Sryq_GtXEfU_ + 684
+   8   Foundation                          0x00000001864681d4 $sSD10FoundationE34_conditionallyBridgeFromObjectiveC_6resultSbSo12NSDictionaryC_SDyxq_GSgztFZSiSryxG_Sryq_GtXEfU_TA + 36
+   9   Foundation                          0x0000000186467854 $ss17_NativeDictionaryV28_unsafeUninitializedCapacity18allowingDuplicates16initializingWithAByxq_GSi_SbSiSryxG_Sryq_GtXEtcfC + 352
+   10  Foundation                          0x0000000186465d30 $sSD10FoundationE34_conditionallyBridgeFromObjectiveC_6resultSbSo12NSDictionaryC_SDyxq_GSgztFZ + 1348
+   11  AppKit                              0x00000001898a150c __swift_closure_destructor.2 + 588
+   12  AppKit                              0x00000001898a2124 __swift_closure_destructor.2 + 3684
+   13  AppKit                              0x00000001898a256c __swift_closure_destructor.2 + 4780
+   14  AppKit                              0x0000000188fe6cac -[NSTextFieldAppearanceBasedVisualProvider layout] + 1496
+   15  AppKit                              0x0000000188fe2e3c -[NSTextField layout] + 80
+   16  AppKit                              0x000000018983c228 __swift__destructor.26 + 260
+   17  AppKit                              0x000000018983c250 __swift__destructor.26 + 300
+   18  AppKit                              0x00000001898ed2b0 __swift_memcpy18_8 + 11648
+   19  AppKit                              0x00000001898ed8ac __swift_memcpy18_8 + 13180
+   20  AppKit                              0x000000018925bab8 ___NSViewLayout_block_invoke + 644
+   21  AppKit                              0x0000000188869b5c NSPerformVisuallyAtomicChange + 128
+   22  AppKit                              0x000000018886e4a8 _NSViewLayout + 96
+   23  AppKit                              0x0000000189250bb4 __36-[NSView _layoutSubtreeWithOldSize:]_block_invoke + 380
+   24  AppKit                              0x0000000188869b5c NSPerformVisuallyAtomicChange + 128
+   25  AppKit                              0x000000018886e43c -[NSView _layoutSubtreeWithOldSize:] + 100
+   26  AppKit                              0x0000000189250cf8 __36-[NSView _layoutSubtreeWithOldSize:]_block_invoke + 704
+   27  AppKit                              0x0000000188869b5c NSPerformVisuallyAtomicChange + 128
+   28  AppKit                              0x000000018886e43c -[NSView _layoutSubtreeWithOldSize:] + 100
+   29  AppKit                              0x0000000189250cf8 __36-[NSView _layoutSubtreeWithOldSize:]_block_invoke + 704
+   30  AppKit                              0x0000000188869b5c NSPerformVisuallyAtomicChange + 128
+   31  AppKit                              0x000000018886e43c -[NSView _layoutSubtreeWithOldSize:] + 100
+   32  AppKit                              0x0000000189250cf8 __36-[NSView _layoutSubtreeWithOldSize:]_block_invoke + 704
+   33  AppKit                              0x0000000188869b5c NSPerformVisuallyAtomicChange + 128
+
+-- stall 130 ms (main thread cpu 127 ms) at t=60.21s in phase '7b come back (remembered listing + fresh read)'; main thread stack at +100 ms:
+   0   libsystem_malloc.dylib              0x0000000183fd5948 _xzm_free_tc + 208
+   1   libswiftCore.dylib                  0x00000001987272a4 _swift_release_dealloc + 64
+   2   libswiftCore.dylib                  0x000000019878dae4 _ZN5swift9RefCountsINS_13RefCountBitsTILNS_19RefCountInlinednessE1EEEE15doDecrementSlowILNS_13PerformDeinitE1EEEbS3_j + 168
+   3   AppKit                              0x00000001898ed370 __swift_memcpy18_8 + 11840
+   4   AppKit                              0x00000001898ed8ac __swift_memcpy18_8 + 13180
+   5   AppKit                              0x000000018925bab8 ___NSViewLayout_block_invoke + 644
+   6   AppKit                              0x0000000188869b5c NSPerformVisuallyAtomicChange + 128
+   7   AppKit                              0x000000018886e4a8 _NSViewLayout + 96
+   8   AppKit                              0x0000000189250bb4 __36-[NSView _layoutSubtreeWithOldSize:]_block_invoke + 380
+   9   AppKit                              0x0000000188869b5c NSPerformVisuallyAtomicChange + 128
+   10  AppKit                              0x000000018886e43c -[NSView _layoutSubtreeWithOldSize:] + 100
+   11  AppKit                              0x0000000189250cf8 __36-[NSView _layoutSubtreeWithOldSize:]_block_invoke + 704
+   12  AppKit                              0x0000000188869b5c NSPerformVisuallyAtomicChange + 128
+   13  AppKit                              0x000000018886e43c -[NSView _layoutSubtreeWithOldSize:] + 100
+   14  AppKit                              0x0000000189250cf8 __36-[NSView _layoutSubtreeWithOldSize:]_block_invoke + 704
+   15  AppKit                              0x0000000188869b5c NSPerformVisuallyAtomicChange + 128
+   16  AppKit                              0x000000018886e43c -[NSView _layoutSubtreeWithOldSize:] + 100
+   17  AppKit                              0x0000000189250cf8 __36-[NSView _layoutSubtreeWithOldSize:]_block_invoke + 704
+   18  AppKit                              0x0000000188869b5c NSPerformVisuallyAtomicChange + 128
+   19  AppKit                              0x000000018886e43c -[NSView _layoutSubtreeWithOldSize:] + 100
+   20  AppKit                              0x0000000189250cf8 __36-[NSView _layoutSubtreeWithOldSize:]_block_invoke + 704
+   21  AppKit                              0x0000000188869b5c NSPerformVisuallyAtomicChange + 128
+   22  AppKit                              0x000000018886e43c -[NSView _layoutSubtreeWithOldSize:] + 100
+   23  AppKit                              0x0000000189250cf8 __36-[NSView _layoutSubtreeWithOldSize:]_block_invoke + 704
+   24  AppKit                              0x0000000188869b5c NSPerformVisuallyAtomicChange + 128
+   25  AppKit                              0x000000018886e43c -[NSView _layoutSubtreeWithOldSize:] + 100
+   26  AppKit                              0x0000000189250cf8 __36-[NSView _layoutSubtreeWithOldSize:]_block_invoke + 704
+   27  AppKit                              0x0000000188869b5c NSPerformVisuallyAtomicChange + 128
+   28  AppKit                              0x000000018886e43c -[NSView _layoutSubtreeWithOldSize:] + 100
+   29  AppKit                              0x0000000189250cf8 __36-[NSView _layoutSubtreeWithOldSize:]_block_invoke + 704
+   30  AppKit                              0x0000000188869b5c NSPerformVisuallyAtomicChange + 128
+   31  AppKit                              0x000000018886e43c -[NSView _layoutSubtreeWithOldSize:] + 100
+   32  AppKit                              0x0000000189250cf8 __36-[NSView _layoutSubtreeWithOldSize:]_block_invoke + 704
+   33  AppKit                              0x0000000188869b5c NSPerformVisuallyAtomicChange + 128
+
+-- stall 124 ms (main thread cpu 124 ms) at t=0.15s in phase 'idle baseline (1 s)'; main thread stack at +100 ms:
+   0   CoreFoundation                      0x00000001841f8d04 CFHash + 12
+   1   libcache.dylib                      0x0000000194dbe664 _entry_get_optionally_checking_collisions + 56
+   2   libcache.dylib                      0x0000000194dbec9c cache_get + 120
+   3   CoreFoundation                      0x000000018424ba68 -[NSCache objectForKey:] + 192
+   4   CoreUI                              0x000000018edbea9c _ZNK20CUICoreThemeRenderer19CopyCustomColorCoreEPK10__CFStringPK14__CFDictionary + 300
+   5   CoreUI                              0x000000018ee0f8a8 _ZNK11CUIRenderer26CopyCustomColorWithOptionsEPK10__CFStringPK14__CFDictionary + 108
+   6   CoreUI                              0x000000018edbe938 CUICopyCustomColorWithOptions + 168
+   7   AppKit                              0x00000001887fa1f0 __44-[NSAppearance _copyCustomCGColor:withTint:]_block_invoke + 36
+   8   AppKit                              0x000000018883221c -[NSCompositeAppearance _callCoreUIWithBlock:options:requireBezelTintColor:] + 280
+   9   AppKit                              0x00000001887fa178 -[NSAppearance _copyCustomCGColor:withTint:] + 276
+   10  AppKit                              0x000000018884bd60 -[NSDynamicSystemColor CGColor] + 84
+   11  AppKit                              0x0000000188938310 NSColorSetWithFillAndStroke + 172
+   12  UIFoundation                        0x0000000189f6a820 -[NSCoreTypesetter _NSFastDrawString:length:attributes:paragraphStyle:typesetterBehavior:lineBreakMode:rect:padding:graphicsContext:baselineRendering:usesFontLeading:usesScreenFont:scrollable:syncAlignment:mirrored:boundingRectPointer:baselineOffsetPointer:drawingContext:] + 3572
+   13  UIFoundation                        0x0000000189ecc634 -[NSCoreTypesetter _stringDrawingCoreTextEngineWithOriginalString:rect:padding:graphicsContext:forceClipping:attributes:stringDrawingOptions:drawingContext:stringDrawingInterface:] + 1332
+   14  UIFoundation                        0x0000000189e398dc __NSStringDrawingEngine + 1964
+   15  AppKit                              0x000000018989f5c8 __swift_closure_destructor.73 + 5036
+   16  AppKit                              0x000000018989f6ac __swift_closure_destructor.73 + 5264
+   17  AppKit                              0x000000018983c228 __swift__destructor.26 + 260
+   18  AppKit                              0x000000018983c250 __swift__destructor.26 + 300
+   19  AppKit                              0x00000001898eded0 __swift_memcpy18_8 + 14752
+   20  AppKit                              0x00000001898ee4a8 __swift_memcpy18_8 + 16248
+   21  AppKit                              0x000000018893bb58 _NSViewDrawRect + 136
+   22  AppKit                              0x00000001892594e0 -[NSView _recursive:displayRectIgnoringOpacity:inContext:stopAtLayerBackedViews:] + 1088
+   23  AppKit                              0x000000018893b55c -[NSView(NSLayerKitGlue) _drawViewBackingLayer:inContext:drawingHandler:] + 536
+   24  AppKit                              0x0000000188de9e44 -[NSViewBackingLayer drawInContext:] + 52
+   25  AppKit                              0x0000000189940ef8 __getCGDisplayListGetHashSymbolLoc_block_invoke + 15052
+   26  AppKit                              0x00000001899d1bf0 __swift_closure_destructor.30 + 9152
+   27  AppKit                              0x00000001899d2394 __swift_closure_destructor.30 + 11108
+   28  AppKit                              0x0000000188de9a70 -[NSViewBackingLayer display] + 1268
+   29  QuartzCore                          0x000000018e9173e8 _ZN2CA5Layer17display_if_neededEPNS_11TransactionE + 788
+   30  QuartzCore                          0x000000018eaf2d30 _ZN2CA7Context18commit_transactionEPNS_11TransactionEdPd + 684
+   31  QuartzCore                          0x000000018e8f77d4 _ZN2CA11Transaction6commitEv + 652
+   32  QuartzCore                          0x000000018e8f7370 _ZN2CA11Transaction5flushEv + 84
+   33  AppKit                              0x000000018894af1c __62+[CATransaction(NSCATransaction) NS_setFlushesWithDisplayLink]_block_invoke + 272
+
+-- stall 115 ms (main thread cpu 112 ms) at t=43.62s in phase '5b cursor: 1000 x random row'; main thread stack at +100 ms:
+   0   libsystem_platform.dylib            0x00000001841bd0f0 _platform_strcmp$VARIANT$Base + 0
+   1   libsystem_c.dylib                   0x000000018403fe04 bsearch + 72
+   2   libicucore.A.dylib                  0x00000001880f347c ualoc_getAppleParent + 2192
+   3   libicucore.A.dylib                  0x0000000188037cdc ualoc_localizationsToUse + 700
+   4   CoreFoundation                      0x000000018422da00 _CFBundleCreateMutableArrayOfFallbackLanguages + 340
+   5   CoreFoundation                      0x000000018422d4e0 _CFBundleCopyPreferredLanguagesInList + 144
+   6   CoreFoundation                      0x0000000184302bf0 _CFBundleCopyLocalizationsForPreferences + 76
+   7   CoreFoundation                      0x000000018422d3a0 CFBundleCopyLocalizationsForPreferences + 184
+   8   Foundation                          0x00000001859458ec +[NSBundle preferredLocalizationsFromArray:forPreferences:] + 28
+   9   Foundation                          0x0000000185ab10b8 +[NSLocale(NSLocale_LanguageExtras) __effectiveLanguageForBundle:] + 232
+   10  IconServices                        0x0000000196961060 +[NSLocale(IconServicesAdditions) _IS_currentLanguageDirection] + 32
+   11  IconServices                        0x00000001968f7c7c -[ISImageDescriptor initWithSize:scale:] + 112
+   12  AppKit                              0x00000001889d588c NSISIconImageRepGetCGImage + 144
+   13  AppKit                              0x0000000188920028 __48-[NSImage CGImageForProposedRect:context:hints:]_block_invoke + 76
+   14  AppKit                              0x000000018891fd08 -[NSImage _usingBestRepresentationForRect:context:hints:body:] + 148
+   15  AppKit                              0x000000018891f688 -[NSImage CGImageForProposedRect:context:hints:] + 436
+   16  AppKit                              0x000000018893ff50 -[_NSSimpleImageView updateLayer] + 908
+   17  AppKit                              0x000000018983c228 __swift__destructor.26 + 260
+   18  AppKit                              0x000000018983c250 __swift__destructor.26 + 300
+   19  AppKit                              0x00000001898eea5c __swift_memcpy18_8 + 17708
+   20  AppKit                              0x00000001898ef058 __swift_memcpy18_8 + 19240
+   21  AppKit                              0x00000001888d090c _NSViewUpdateLayer + 96
+   22  AppKit                              0x0000000188818314 +[NSAppearance _performWithCurrentAppearance:usingBlock:] + 72
+   23  AppKit                              0x0000000188de9c40 __29-[NSViewBackingLayer display]_block_invoke + 144
+   24  AppKit                              0x000000018884b3b4 -[NSFocusStack performWithFocusView:inWindow:usingBlock:] + 96
+   25  AppKit                              0x0000000188de968c -[NSViewBackingLayer display] + 272
+   26  QuartzCore                          0x000000018e9173e8 _ZN2CA5Layer17display_if_neededEPNS_11TransactionE + 788
+   27  QuartzCore                          0x000000018eaf2d30 _ZN2CA7Context18commit_transactionEPNS_11TransactionEdPd + 684
+   28  QuartzCore                          0x000000018e8f77d4 _ZN2CA11Transaction6commitEv + 652
+   29  QuartzCore                          0x000000018e8f7370 _ZN2CA11Transaction5flushEv + 84
+   30  AppKit                              0x000000018894af1c __62+[CATransaction(NSCATransaction) NS_setFlushesWithDisplayLink]_block_invoke + 272
+   31  CoreFoundation                      0x0000000184271cc4 __CFRUNLOOP_IS_CALLING_OUT_TO_AN_OBSERVER_CALLBACK_FUNCTION__ + 36
+   32  CoreFoundation                      0x0000000184271bbc __CFRunLoopDoObservers + 648
+   33  CoreFoundation                      0x00000001842711a8 __CFRunLoopRun + 776
+
+-- stall 112 ms (main thread cpu 107 ms) at t=45.01s in phase '5b cursor: 1000 x random row'; main thread stack at +100 ms:
+   0   libsystem_kernel.dylib              0x000000018416cc20 mach_msg2_trap + 8
+   1   libsystem_kernel.dylib              0x000000018417f8e0 mach_msg2_internal + 76
+   2   libsystem_kernel.dylib              0x0000000184175a28 mach_msg_overwrite + 480
+   3   libsystem_kernel.dylib              0x000000018416cfac mach_msg + 24
+   4   QuartzCore                          0x000000018e93b2a8 _CASSynchronize + 164
+   5   QuartzCore                          0x000000018eaf1d8c _ZN2CA7Context11synchronizeEjib + 520
+   6   QuartzCore                          0x000000018e93b1d8 _ZL25CABackingStoreSynchronizeP14CABackingStorePN2CA14GenericContextEji + 100
+   7   QuartzCore                          0x000000018e919984 _ZL29CABackingStorePrepareUpdates_P14CABackingStoremmjjjyPN2CA14GenericContextEP11UpdateState + 1412
+   8   QuartzCore                          0x000000018e919168 CABackingStoreUpdate_ + 488
+   9   QuartzCore                          0x000000018e96eb24 ___ZN2CA5Layer8display_Ev_block_invoke + 76
+   10  QuartzCore                          0x000000018e918418 -[CALayer _display] + 1820
+   11  AppKit                              0x00000001899d3e40 __swift_closure_destructor.30 + 17936
+   12  AppKit                              0x00000001899d37a0 __swift_closure_destructor.30 + 16240
+   13  AppKit                              0x00000001899d3f40 __swift_closure_destructor.30 + 18192
+   14  QuartzCore                          0x000000018e9173e8 _ZN2CA5Layer17display_if_neededEPNS_11TransactionE + 788
+   15  QuartzCore                          0x000000018eaf2d30 _ZN2CA7Context18commit_transactionEPNS_11TransactionEdPd + 684
+   16  QuartzCore                          0x000000018e8f77d4 _ZN2CA11Transaction6commitEv + 652
+   17  QuartzCore                          0x000000018e8f7370 _ZN2CA11Transaction5flushEv + 84
+   18  AppKit                              0x000000018894af1c __62+[CATransaction(NSCATransaction) NS_setFlushesWithDisplayLink]_block_invoke + 272
+   19  CoreFoundation                      0x0000000184271cc4 __CFRUNLOOP_IS_CALLING_OUT_TO_AN_OBSERVER_CALLBACK_FUNCTION__ + 36
+   20  CoreFoundation                      0x0000000184271bbc __CFRunLoopDoObservers + 648
+   21  CoreFoundation                      0x00000001842711a8 __CFRunLoopRun + 776
+   22  CoreFoundation                      0x000000018434b82c _CFRunLoopRunSpecificWithOptions + 536
+   23  StressPanel                         0x0000000104be8f44 $s11StressPanel5timedyySi_ySiXEtF04$s11a28Panel7millionyyFyyXEfU18_ySiG2U_8AFMShell0B14ViewControllerC0A3Kit6RandomVTf1nc_n + 680
+   24  StressPanel                         0x0000000104bf8170 $s11StressPanel7millionyyFyyXEfU18_TA + 52
+   25  StressPanel                         0x00000001051c99b8 $s9StressKit4step_5limit_xSS_SdxyKXEtKlF + 444
+   26  StressPanel                         0x0000000104be3530 $s11StressPanel7millionyyF + 5056
+   27  StressPanel                         0x0000000104be20d4 main + 652
+   28  dyld                                0x0000000183ddbe80 start + 6688
+
+-- stall 108 ms (main thread cpu 110 ms) at t=6.29s in phase '2 sort: by extension'; main thread stack at +100 ms:
+   0   QuartzCore                          0x000000018e916ca4 _ZN2CA5Layer15collect_layers_EPNS0_17CollectLayersDataE + 100
+   1   QuartzCore                          0x000000018e916d58 _ZN2CA5Layer15collect_layers_EPNS0_17CollectLayersDataE + 280
+   2   QuartzCore                          0x000000018e916d58 _ZN2CA5Layer15collect_layers_EPNS0_17CollectLayersDataE + 280
+   3   QuartzCore                          0x000000018e916d58 _ZN2CA5Layer15collect_layers_EPNS0_17CollectLayersDataE + 280
+   4   QuartzCore                          0x000000018e916d58 _ZN2CA5Layer15collect_layers_EPNS0_17CollectLayersDataE + 280
+   5   QuartzCore                          0x000000018e916d58 _ZN2CA5Layer15collect_layers_EPNS0_17CollectLayersDataE + 280
+   6   QuartzCore                          0x000000018e916d58 _ZN2CA5Layer15collect_layers_EPNS0_17CollectLayersDataE + 280
+   7   QuartzCore                          0x000000018e916d58 _ZN2CA5Layer15collect_layers_EPNS0_17CollectLayersDataE + 280
+   8   QuartzCore                          0x000000018e916d58 _ZN2CA5Layer15collect_layers_EPNS0_17CollectLayersDataE + 280
+   9   QuartzCore                          0x000000018e916d58 _ZN2CA5Layer15collect_layers_EPNS0_17CollectLayersDataE + 280
+   10  QuartzCore                          0x000000018e916d58 _ZN2CA5Layer15collect_layers_EPNS0_17CollectLayersDataE + 280
+   11  QuartzCore                          0x000000018e916d58 _ZN2CA5Layer15collect_layers_EPNS0_17CollectLayersDataE + 280
+   12  QuartzCore                          0x000000018e916d58 _ZN2CA5Layer15collect_layers_EPNS0_17CollectLayersDataE + 280
+   13  QuartzCore                          0x000000018e916d58 _ZN2CA5Layer15collect_layers_EPNS0_17CollectLayersDataE + 280
+   14  QuartzCore                          0x000000018e91723c _ZN2CA5Layer17display_if_neededEPNS_11TransactionE + 360
+   15  QuartzCore                          0x000000018eaf2d30 _ZN2CA7Context18commit_transactionEPNS_11TransactionEdPd + 684
+   16  QuartzCore                          0x000000018e8f77d4 _ZN2CA11Transaction6commitEv + 652
+   17  QuartzCore                          0x000000018e8f7370 _ZN2CA11Transaction5flushEv + 84
+   18  AppKit                              0x000000018894af1c __62+[CATransaction(NSCATransaction) NS_setFlushesWithDisplayLink]_block_invoke + 272
+   19  CoreFoundation                      0x0000000184271cc4 __CFRUNLOOP_IS_CALLING_OUT_TO_AN_OBSERVER_CALLBACK_FUNCTION__ + 36
+   20  CoreFoundation                      0x0000000184271bbc __CFRunLoopDoObservers + 648
+   21  CoreFoundation                      0x00000001842711a8 __CFRunLoopRun + 776
+   22  CoreFoundation                      0x000000018434b82c _CFRunLoopRunSpecificWithOptions + 536
+   23  StressPanel                         0x00000001051c5098 $s9StressKit4pump3forySd_tF + 248
+   24  StressPanel                         0x0000000104bea354 $s11StressPanel7millionyyF4sortL_yySS_9AFMKernel9CommandIDVtFyyXEfU_ + 532
+   25  StressPanel                         0x0000000104bf8ff4 $s11StressPanel7millionyyF4sortL_yySS_9AFMKernel9CommandIDVtFyyXEfU_TA + 48
+   26  StressPanel                         0x00000001051c99b8 $s9StressKit4step_5limit_xSS_SdxyKXEtKlF + 444
+   27  StressPanel                         0x0000000104be9ecc $s11StressPanel7millionyyF4sortL_yySS_9AFMKernel9CommandIDVtF + 324
+   28  StressPanel                         0x0000000104be28e4 $s11StressPanel7millionyyF + 1908
+   29  StressPanel                         0x0000000104be20d4 main + 652
+   30  dyld                                0x0000000183ddbe80 start + 6688
+
+-- stall 105 ms (main thread cpu 108 ms) at t=6.59s in phase '2 sort: by size'; main thread stack at +100 ms:
+   0   libsystem_malloc.dylib              0x0000000183fce9b8 _xzm_xzone_find_and_malloc_from_freelist_chunk + 296
+   1   libsystem_malloc.dylib              0x0000000183fce930 _xzm_xzone_find_and_malloc_from_freelist_chunk + 160
+   2   libsystem_malloc.dylib              0x0000000183fce0f8 _xzm_xzone_malloc_freelist_outlined + 324
+   3   CoreGraphics                        0x000000018b0149f8 ripc_GetRenderingState + 1304
+   4   CoreGraphics                        0x000000018b014380 ripc_DrawRects + 204
+   5   CoreGraphics                        0x000000018b4a4028 _ZN2CG11DisplayList14executeEntriesENSt3__111__wrap_iterIPNS1_10shared_ptrIKNS_16DisplayListEntryEEEEES8_P17CGContextDelegateP16CGRenderingStateP8CGGStackPK6CGRectPK14__CFDictionaryb + 1888
+   6   CoreGraphics                        0x000000018b092fd0 CGDisplayListDrawInContextDelegate + 676
+   7   QuartzCore                          0x000000018e9191f4 CABackingStoreUpdate_ + 628
+   8   QuartzCore                          0x000000018e96eb24 ___ZN2CA5Layer8display_Ev_block_invoke + 76
+   9   QuartzCore                          0x000000018e918418 -[CALayer _display] + 1820
+   10  AppKit                              0x00000001899d3e40 __swift_closure_destructor.30 + 17936
+   11  AppKit                              0x00000001899d37a0 __swift_closure_destructor.30 + 16240
+   12  AppKit                              0x00000001899d3f40 __swift_closure_destructor.30 + 18192
+   13  QuartzCore                          0x000000018e9173e8 _ZN2CA5Layer17display_if_neededEPNS_11TransactionE + 788
+   14  QuartzCore                          0x000000018eaf2d30 _ZN2CA7Context18commit_transactionEPNS_11TransactionEdPd + 684
+   15  QuartzCore                          0x000000018e8f77d4 _ZN2CA11Transaction6commitEv + 652
+   16  QuartzCore                          0x000000018e8f7370 _ZN2CA11Transaction5flushEv + 84
+   17  AppKit                              0x000000018894af1c __62+[CATransaction(NSCATransaction) NS_setFlushesWithDisplayLink]_block_invoke + 272
+   18  CoreFoundation                      0x0000000184271cc4 __CFRUNLOOP_IS_CALLING_OUT_TO_AN_OBSERVER_CALLBACK_FUNCTION__ + 36
+   19  CoreFoundation                      0x0000000184271bbc __CFRunLoopDoObservers + 648
+   20  CoreFoundation                      0x00000001842711a8 __CFRunLoopRun + 776
+   21  CoreFoundation                      0x000000018434b82c _CFRunLoopRunSpecificWithOptions + 536
+   22  StressPanel                         0x00000001051c5098 $s9StressKit4pump3forySd_tF + 248
+   23  StressPanel                         0x0000000104bea354 $s11StressPanel7millionyyF4sortL_yySS_9AFMKernel9CommandIDVtFyyXEfU_ + 532
+   24  StressPanel                         0x0000000104bf8ff4 $s11StressPanel7millionyyF4sortL_yySS_9AFMKernel9CommandIDVtFyyXEfU_TA + 48
+   25  StressPanel                         0x00000001051c99b8 $s9StressKit4step_5limit_xSS_SdxyKXEtKlF + 444
+   26  StressPanel                         0x0000000104be9ecc $s11StressPanel7millionyyF4sortL_yySS_9AFMKernel9CommandIDVtF + 324
+   27  StressPanel                         0x0000000104be2924 $s11StressPanel7millionyyF + 1972
+   28  StressPanel                         0x0000000104be20d4 main + 652
+   29  dyld                                0x0000000183ddbe80 start + 6688
+
+-- stall 102 ms (main thread cpu 101 ms) at t=8.97s in phase '3b quick filter typed slowly 'ite''; main thread stack at +100 ms:
+   0   libsystem_kernel.dylib              0x000000018416cc20 mach_msg2_trap + 8
+   1   libsystem_kernel.dylib              0x000000018417f8e0 mach_msg2_internal + 76
+   2   libsystem_kernel.dylib              0x0000000184175a28 mach_msg_overwrite + 480
+   3   libsystem_kernel.dylib              0x000000018416cfac mach_msg + 24
+   4   SkyLight                            0x000000018ab4a238 _ZL32get_current_display_system_statev + 264
+   5   SkyLight                            0x000000018ab4c240 SLSGetActiveDisplayList + 132
+   6   AppKit                              0x000000018894b33c +[NSDisplayTiming(NSDisplayTimingCreation) displayTimingsForActiveScreens] + 60
+   7   AppKit                              0x000000018894af3c __62+[CATransaction(NSCATransaction) NS_setFlushesWithDisplayLink]_block_invoke + 304
+   8   CoreFoundation                      0x0000000184271cc4 __CFRUNLOOP_IS_CALLING_OUT_TO_AN_OBSERVER_CALLBACK_FUNCTION__ + 36
+   9   CoreFoundation                      0x0000000184271bbc __CFRunLoopDoObservers + 648
+   10  CoreFoundation                      0x00000001842711a8 __CFRunLoopRun + 776
+   11  CoreFoundation                      0x000000018434b82c _CFRunLoopRunSpecificWithOptions + 536
+   12  StressPanel                         0x00000001051c4f6c $s9StressKit4pump4upTo5untilSbSd_SbyXEtF + 292
+   13  StressPanel                         0x0000000104bea530 $s11StressPanel7millionyyFyyXEfU6_ + 88
+   14  StressPanel                         0x0000000104bf7fcc $s11StressPanel7millionyyFyyXEfU6_TA + 20
+   15  StressPanel                         0x00000001051c99b8 $s9StressKit4step_5limit_xSS_SdxyKXEtKlF + 444
+   16  StressPanel                         0x0000000104be2bf8 $s11StressPanel7millionyyF + 2696
+   17  StressPanel                         0x0000000104be20d4 main + 652
+   18  dyld                                0x0000000183ddbe80 start + 6688
+
+FAILURES: 0
+peakRSS=3181MB footprint=1045MB
+      171.83 real       147.34 user        92.07 sys
+          3335716864  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+              519106  page reclaims
+                  29  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                   0  signals received
+                  55  voluntary context switches
+              763007  involuntary context switches
+       2132392150873  instructions retired
+        881305262128  cycles elapsed
+          1743555896  peak memory footprint
+RUN exit=0 wall=171.9s load_before=19.9 load_after=41.3 cmd=/usr/bin/time -l /private/tmp/claude-501/-Users-cm0k-Claude-Projects-TotalCommander/91e36f29-0d53-4421-8985-1ec839e7f5c4/scratchpad/review2/stress/b-harness/release/StressPanel million /private/tmp/cl

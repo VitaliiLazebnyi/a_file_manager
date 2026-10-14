@@ -1,0 +1,2 @@
+RUN exit=1 wall=198.3s load_before=16.5 load_after=15.6 cmd=swift test --skip-build --sanitize=thread --scratch-path /private/tmp/claude-501/-Users-cm0k-Claude-Projects-TotalCommander/91e36f29-0d53-4421-8985-1ec839e7f5c4/scratchpad/review2/stress/b-tsan
+PARTA3-DONE

@@ -1,0 +1,308 @@
+STEP start-up                                       wall=   0.135s cpu=   0.20s threads 7->19 footprint=38MB peakRSS=89MB load=16.7
+STEP idle baseline (1 s)                            wall=   1.001s cpu=   0.17s threads 19->19 footprint=78MB peakRSS=143MB load=16.7
+   rows=440 volume local=Optional(false)
+STEP A open the share while it still answers        wall=   0.083s cpu=   0.09s threads 19->19 footprint=79MB peakRSS=144MB load=16.7
+   after open: threads=19 blocked in provider=0 []
+---- the provider stops answering ----
+STEP B cursor moves over 40 folders (read-ahead)    wall=   2.470s cpu=   0.19s threads 19->19 footprint=86MB peakRSS=156MB load=15.9
+   after cursor moves over 40 folders (read-ahead): threads=19 blocked in provider=1 [volume(of:)=1]
+STEP B refresh (Cmd+R)                              wall=   0.402s cpu=   0.11s threads 19->19 footprint=88MB peakRSS=161MB load=15.9
+   after refresh (Cmd+R): threads=19 blocked in provider=2 [volume(of:)=2]
+STEP B validation x5                                wall=   0.404s cpu=   0.01s threads 19->19 footprint=88MB peakRSS=161MB load=15.9
+   after validation x5: threads=19 blocked in provider=2 [volume(of:)=2]
+STEP B enter folder under cursor (Return)           wall=   0.403s cpu=   0.03s threads 19->19 footprint=91MB peakRSS=162MB load=15.9
+   after enter folder under cursor (Return): threads=19 blocked in provider=3 [volume(of:)=3]
+STEP B go to parent                                 wall=   0.402s cpu=   0.08s threads 19->19 footprint=88MB peakRSS=172MB load=15.9
+   after go to parent: threads=19 blocked in provider=4 [volume(of:)=4]
+STEP B go back                                      wall=   0.406s cpu=   0.09s threads 19->19 footprint=100MB peakRSS=182MB load=15.9
+   after go back: threads=19 blocked in provider=5 [volume(of:)=5]
+STEP B new tab                                      wall=   0.408s cpu=   0.08s threads 19->19 footprint=108MB peakRSS=193MB load=15.9
+   after new tab: threads=19 blocked in provider=7 [places=1, volume(of:)=6]
+STEP B navigate the new tab to another stalled folder wall=   0.402s cpu=   0.04s threads 19->19 footprint=105MB peakRSS=196MB load=15.9
+   after navigate the new tab to another stalled folder: threads=19 blocked in provider=8 [places=1, volume(of:)=7]
+STEP B previous tab                                 wall=   0.401s cpu=   0.08s threads 19->19 footprint=106MB peakRSS=196MB load=15.9
+   after previous tab: threads=19 blocked in provider=8 [places=1, volume(of:)=7]
+STEP B next tab                                     wall=   0.410s cpu=   0.03s threads 19->19 footprint=109MB peakRSS=197MB load=15.1
+   after next tab: threads=19 blocked in provider=8 [places=1, volume(of:)=7]
+STEP B quick filter typed                           wall=   0.712s cpu=   0.08s threads 19->19 footprint=109MB peakRSS=227MB load=15.1
+   after quick filter typed: threads=19 blocked in provider=8 [places=1, volume(of:)=7]
+STEP B sort by size                                 wall=   0.401s cpu=   0.02s threads 19->17 footprint=109MB peakRSS=227MB load=15.1
+   after sort by size: threads=17 blocked in provider=8 [places=1, volume(of:)=7]
+STEP B select all + status line                     wall=   0.403s cpu=   0.01s threads 17->17 footprint=108MB peakRSS=227MB load=15.1
+   after select all + status line: threads=17 blocked in provider=8 [places=1, volume(of:)=7]
+STEP B space on a folder (size calculation)         wall=   0.401s cpu=   0.01s threads 17->17 footprint=108MB peakRSS=227MB load=15.1
+   after space on a folder (size calculation): threads=17 blocked in provider=8 [places=1, volume(of:)=7]
+STEP B application deactivates / activates          wall=   0.603s cpu=   0.11s threads 17->17 footprint=110MB peakRSS=233MB load=15.1
+   after application deactivates / activates: threads=17 blocked in provider=8 [places=1, volume(of:)=7]
+STEP B switch panel (Tab) and back                  wall=   0.502s cpu=   0.02s threads 17->17 footprint=111MB peakRSS=233MB load=15.1
+   after switch panel (Tab) and back: threads=17 blocked in provider=8 [places=1, volume(of:)=7]
+STEP B right panel: target = source                 wall=   0.602s cpu=   0.09s threads 17->17 footprint=120MB peakRSS=239MB load=15.1
+   after right panel: target = source: threads=17 blocked in provider=8 [places=1, volume(of:)=7]
+STEP B draw list                                    wall=   0.412s cpu=   0.02s threads 17->17 footprint=118MB peakRSS=242MB load=15.1
+   after draw list: threads=17 blocked in provider=8 [places=1, volume(of:)=7]
+STEP B validation x5 again                          wall=   0.404s cpu=   0.01s threads 17->17 footprint=118MB peakRSS=242MB load=15.1
+   after validation x5 again: threads=17 blocked in provider=8 [places=1, volume(of:)=7]
+STEP B close tab                                    wall=   0.409s cpu=   0.09s threads 17->17 footprint=131MB peakRSS=248MB load=14.6
+   after close tab: threads=17 blocked in provider=8 [places=1, volume(of:)=7]
+STEP B navigate away to a local folder (both panels) wall=   1.002s cpu=   0.21s threads 17->17 footprint=132MB peakRSS=261MB load=14.6
+   after navigate away to a local folder (both panels): threads=17 blocked in provider=8 [places=1, volume(of:)=7]
+STEP C wait 3 s after leaving; who is still blocked wall=   3.001s cpu=   0.09s threads 17->17 footprint=132MB peakRSS=261MB load=14.6
+   after 3 s after leaving the share: threads=17 blocked in provider=8 [places=1, volume(of:)=7]
+   blocked provider calls that did not end although the panel left: 8; threads now 17 (baseline 19)
+
+PROVIDER CALLS (all threads): capabilities(for:)=379, list(cancellation:receive:)=1, places=3, volume(of:)=8, watch=3
+PROVIDER CALLS MADE ON THE MAIN THREAD WHILE THE PROVIDER WAS NOT ANSWERING (each would freeze the window for as long as the server is silent): 
+  * capabilities(for:) x379; first stack:
+      2   StressPanel                         0x00000001025a8248 $s20FileOperationsPluginAAC5start2iny9AFMKernel6KernelC_tFSbAE10PanelModelCcfU1_ + 224
+      3   StressPanel                         0x00000001025b33cc $s20FileOperationsPluginAAC5start2iny9AFMKernel6KernelC_tFSbycfU2_TA + 40
+      4   StressPanel                         0x00000001025b3418 $s20FileOperationsPluginAAC5start2iny9AFMKernel6KernelC_tFSbycfU3_TA + 44
+      5   StressPanel                         0x000000010247c0a4 $s9AFMKernel15CommandRegistryC9isEnabledySbAA0B2IDVF + 240
+      6   StressPanel                         0x0000000102551294 $s8AFMShell13ButtonBarViewC8validateyyF + 236
+      7   StressPanel                         0x000000010255dff8 $s8AFMShell20MainWindowControllerC12validateBarsyyF + 44
+      8   StressPanel                         0x000000010255e55c $s8AFMShell20MainWindowControllerC18scheduleValidationyyFyyScMYccfU_ + 108
+      9   StressPanel                         0x000000010255cea8 $sIeg_IeyB_TR + 28
+      10  libdispatch.dylib                   0x000000018400a5a0 _dispatch_client_callout + 16
+      11  libdispatch.dylib                   0x0000000183ff51b4 _dispatch_continuation_pop + 596
+      12  libdispatch.dylib                   0x00000001840082a8 _dispatch_source_latch_and_call + 392
+      13  libdispatch.dylib                   0x0000000184006f7c _dispatch_source_invoke + 848
+      14  libdispatch.dylib                   0x00000001840288bc _dispatch_main_queue_drain.cold.6 + 612
+      15  libdispatch.dylib                   0x0000000183fffb0c _dispatch_main_queue_drain + 176
+      16  libdispatch.dylib                   0x0000000183fffa4c _dispatch_main_queue_callback_4CF + 44
+      17  CoreFoundation                      0x00000001842af9cc __CFRUNLOOP_IS_SERVICING_THE_MAIN_DISPATCH_QUEUE__ + 16
+      18  CoreFoundation                      0x000000018427165c __CFRunLoopRun + 1980
+      19  CoreFoundation                      0x000000018434b82c _CFRunLoopRunSpecificWithOptions + 536
+      20  StressPanel                         0x0000000102a40b3c $s9StressKit4pump3forySd_tF + 248
+      21  StressPanel                         0x000000010246a198 $s11StressPanel7stalledyyFyyXEfU2_ + 100
+      22  StressPanel                         0x0000000102474034 $s11StressPanel7stalledyyF3actL__4wait_ySS_SdyyXEtFyyXEfU_TATm + 36
+      23  StressPanel                         0x0000000102473e6c $s11StressPanel7stalledyyF3actL__4wait_ySS_SdyyXEtFyyXEfU_TA + 12
+  * watch x2; first stack:
+      2   StressPanel                         0x0000000102562b68 $s8AFMShell16PanelCoordinatorC14updateWatchers33_728BCF732EFB4AFE18D88C6C4DC80C09LLyyF + 1688
+      3   StressPanel                         0x0000000102563b58 $s8AFMShell16PanelCoordinatorCAA0B4HostA2aDP22panelDidChangeLocationyyAA0B14ViewControllerCFTW + 20
+      4   StressPanel                         0x00000001025265b0 $s8AFMShell19PanelViewControllerC11tabsChanged33_75A16581E849F5F4B5635FE8120CEA5ELLyyF + 4156
+      5   StressPanel                         0x000000010252983c $s8AFMShell19PanelViewControllerC4tabs6kernelAC9AFMKernel0B4TabsC_AF6KernelCtcfcyycfU_Tm + 64
+      6   StressPanel                         0x000000010253f680 $s8AFMShell19PanelViewControllerC4tabs6kernelAC9AFMKernel0B4TabsC_AF6KernelCtcfcyycfU_TA + 24
+      7   StressPanel                         0x00000001024b6468 $s9AFMKernel9PanelTabsC8activateyySiF + 152
+      8   StressPanel                         0x00000001024b6538 $s9AFMKernel9PanelTabsC17activateNeighbouryySiF + 156
+      9   StressPanel                         0x00000001025e21ec $s16FolderTabsPluginAAC5start2iny9AFMKernel6KernelC_tFyycfU23_TATm + 36
+      10  StressPanel                         0x000000010247fddc $s9AFMKernel15CommandRegistryC8register_7enabled7checked_yAA0B0V_SbycSbycyyctFyAA0B8ArgumentOcfU_TA + 20
+      11  StressPanel                         0x000000010247c2d8 $s9AFMKernel15CommandRegistryC7performySbAA0B2IDV_AA0B8ArgumentOtF + 152
+      12  StressPanel                         0x000000010246a288 $s11StressPanel7stalledyyFyyXEfU3_Tm + 156
+      13  StressPanel                         0x0000000102473f58 $s11StressPanel7stalledyyFyyXEfU11_TA + 24
+      14  StressPanel                         0x0000000102474034 $s11StressPanel7stalledyyF3actL__4wait_ySS_SdyyXEtFyyXEfU_TATm + 36
+      15  StressPanel                         0x0000000102473e6c $s11StressPanel7stalledyyF3actL__4wait_ySS_SdyyXEtFyyXEfU_TA + 12
+      16  StressPanel                         0x0000000102474cec $s11StressPanel7stalledyyF3actL__4wait_ySS_SdyyXEtFyyXEfU_TA.11 + 12
+      17  StressPanel                         0x0000000102a4545c $s9StressKit4step_5limit_xSS_SdxyKXEtKlF + 444
+      18  StressPanel                         0x00000001024603dc $s11StressPanel7stalledyyF + 2816
+      19  StressPanel                         0x000000010245e114 main + 716
+      20  dyld                                0x0000000183ddbe80 start + 6688
+FAIL: 2: 2 kinds of provider calls reached the main thread while the provider stalled: capabilities(for:), watch
+STEP E 100 x refresh of the dead share (50 ms apart) wall=   7.894s cpu=   6.82s threads 17->89 footprint=144MB peakRSS=263MB load=14.1
+   after 100 refreshes of the dead share: threads=89 blocked in provider=82 [places=1, volume(of:)=81]
+STEP E2 open a LOCAL folder in the other panel meanwhile wall=  20.003s cpu=   0.58s threads 89->89 footprint=142MB peakRSS=263MB load=11.7
+   LOCAL FOLDER DID NOT OPEN WITHIN 20 s while 82 provider calls are blocked (threads=89)
+FAIL: 2/E: with 82 calls blocked in a dead provider, a local folder took more than 20 s to open
+   after local load: threads=89 blocked in provider=82 [places=1, volume(of:)=81]
+STEP D release the stall; threads end               wall=   0.501s cpu=   0.20s threads 89->82 footprint=144MB peakRSS=263MB load=11.7
+   blocked now=0, most blocked at once=82; threads baseline=19 while stalled (after leaving)=17 after release=21
+STEP shut down                                      wall=   0.503s cpu=   0.01s threads 21->12 footprint=140MB peakRSS=263MB load=11.3
+STEP threads return to baseline (up to 8 s)         wall=   0.000s cpu=   0.00s threads 12->12 footprint=140MB peakRSS=263MB load=11.3
+threads: baseline(after start-up)=19 after shut-down=12
+
+==== MAIN-THREAD WATCHDOG: scenario 2: stalled provider ====
+histogram bounds (ms): <2 <4 <8 <16 <33 <100 <250 <1000 <5000 >=5000
+(max cpu = processor time the main thread used during its longest stall; stall ms / cpu ms = sums over all stalls > 8 ms: equal means the main thread was working, cpu much smaller means it was blocked or had no core)
+phase                                            wall s   pings   >8ms >100ms    >1s    max ms  max cpu  stall ms    cpu ms  histogram
+start-up                                           0.14       1      1      1      0     147.5    132.9       147       133  0,0,0,0,0,0,1,0,0,0
+idle baseline (1 s)                                1.00     296      1      1      0     122.6    122.3       123       122  294,0,1,0,0,0,1,0,0,0
+A open the share while it still answers            0.08       2      1      0      0      79.5     80.2        79        80  1,0,0,0,0,1,0,0,0,0
+B cursor moves over 40 folders (read-ahead)        2.47     792      3      0      0      20.3      0.0        39        11  782,6,1,2,1,0,0,0,0,0
+B refresh (Cmd+R)                                  0.40     105      2      0      0      76.4     76.7        86        81  103,0,0,1,0,1,0,0,0,0
+B validation x5                                    0.40     139      0      0      0       1.9      1.8         0         0  139,0,0,0,0,0,0,0,0,0
+B enter folder under cursor (Return)               0.40     128      1      0      0      12.5     13.3        13        13  126,0,1,1,0,0,0,0,0,0
+B go to parent                                     0.40     114      1      0      0      58.5     58.3        58        58  112,1,0,0,0,1,0,0,0,0
+B go back                                          0.41     113      1      0      0      65.0     65.1        65        65  111,1,0,0,0,1,0,0,0,0
+B new tab                                          0.41     114      1      0      0      65.3     65.2        65        65  113,0,0,0,0,1,0,0,0,0
+B navigate the new tab to another stalled folder     0.40     120      1      0      0      26.8     26.8        27        27  119,0,0,0,1,0,0,0,0,0
+B previous tab                                     0.40      92      2      0      0      56.7     53.1        76        53  86,1,3,0,1,1,0,0,0,0
+B next tab                                         0.41     134      1      0      0      13.2     13.4        13        13  133,0,0,1,0,0,0,0,0,0
+B quick filter typed                               0.71     224      3      0      0      27.8     21.3        53        44  221,0,0,2,1,0,0,0,0,0
+B sort by size                                     0.40     134      0      0      0       4.6      4.6         0         0  133,0,1,0,0,0,0,0,0,0
+B select all + status line                         0.40     136      0      0      0       0.1      0.1         0         0  136,0,0,0,0,0,0,0,0,0
+B space on a folder (size calculation)             0.40     134      0      0      0       1.3      0.0         0         0  134,0,0,0,0,0,0,0,0,0
+B application deactivates / activates              0.60     180      1      0      0      76.7     76.9        77        77  178,1,0,0,0,1,0,0,0,0
+B switch panel (Tab) and back                      0.50     169      0      0      0       0.8      1.4         0         0  169,0,0,0,0,0,0,0,0,0
+B right panel: target = source                     0.60     185      1      0      0      57.0     56.8        57        57  183,1,0,0,0,1,0,0,0,0
+B draw list                                        0.41     136      0      0      0       6.7      6.7         0         0  135,0,1,0,0,0,0,0,0,0
+B validation x5 again                              0.40     136      0      0      0       1.3      1.3         0         0  136,0,0,0,0,0,0,0,0,0
+B close tab                                        0.41     113      1      0      0      69.1     68.6        69        69  111,0,1,0,0,1,0,0,0,0
+B navigate away to a local folder (both panels)     1.00     284      1      1      0     158.3    160.4       158       160  282,0,1,0,0,0,1,0,0,0
+C wait 3 s after leaving; who is still blocked     3.08    1012      0      0      0       0.1      0.1         0         0  1012,0,0,0,0,0,0,0,0,0
+E 100 x refresh of the dead share (50 ms apart)     7.89     632     73      1      0     142.9    136.6      6060      6122  555,1,3,0,0,72,1,0,0,0
+E2 open a LOCAL folder in the other panel meanwhile    20.00    6861      1      0      0      30.1     30.1        30        30  6860,0,0,0,1,0,0,0,0,0
+D release the stall; threads end                   4.35    1437      2      0      0      76.2     76.5       147       147  1435,0,0,0,0,2,0,0,0,0
+shut down                                          0.50     168      0      0      0       0.0      0.0         0         0  168,0,0,0,0,0,0,0,0,0
+threads return to baseline (up to 8 s)             0.00       0      0      0      0       0.0      0.0         0         0  0,0,0,0,0,0,0,0,0,0
+TOTAL                                             49.01   14091     99      4      0     158.3       7443      7429
+
+-- stall 158 ms (main thread cpu 160 ms) at t=12.20s in phase 'B navigate away to a local folder (both panels)'; main thread stack at +100 ms:
+   0   Foundation                          0x000000018594cb48 NSKeyValueNotifyObserver + 224
+   1   Foundation                          0x000000018594cb48 NSKeyValueNotifyObserver + 224
+   2   Foundation                          0x00000001859fa638 NSKeyValueDidChange + 388
+   3   Foundation                          0x000000018593fd18 -[NSObject(NSKeyValueObservingPrivate) _changeValueForKeys:count:maybeOldValuesDict:maybeNewValuesDict:usingBlock:] + 736
+   4   Foundation                          0x0000000185968308 -[NSObject(NSKeyValueObservingPrivate) _changeValueForKey:key:key:usingBlock:] + 64
+   5   Foundation                          0x00000001859823d4 _NSSetObjectValueAndNotify + 400
+   6   AppKit                              0x0000000188f56208 -[NSImageView _shownImage] + 340
+   7   AppKit                              0x00000001888f9fe4 -[NSImageView intrinsicContentSize] + 96
+   8   AppKit                              0x000000018955fadc -[NSView(NSConstraintBasedLayoutInternal) _makeOrUpdateContentSizeWidthConstraint:heightConstraint:] + 136
+   9   AppKit                              0x000000018955f6c0 -[NSView(NSConstraintBasedLayoutInternal) _updateContentSizeConstraints] + 448
+   10  AppKit                              0x00000001888acd94 -[NSView updateConstraints] + 76
+   11  AppKit                              0x000000018983c228 __swift__destructor.26 + 260
+   12  AppKit                              0x000000018983c250 __swift__destructor.26 + 300
+   13  AppKit                              0x00000001898ec708 __swift_memcpy18_8 + 8664
+   14  AppKit                              0x00000001898ecd04 __swift_memcpy18_8 + 10196
+   15  AppKit                              0x000000018925c100 ___NSViewUpdateConstraints_block_invoke + 104
+   16  AppKit                              0x0000000188869b5c NSPerformVisuallyAtomicChange + 128
+   17  AppKit                              0x00000001888acd3c _NSViewUpdateConstraints + 96
+   18  AppKit                              0x00000001888aca3c -[NSView _updateConstraintsForSubtreeIfNeededCollectingViewsWithInvalidBaselines:] + 824
+   19  AppKit                              0x00000001888b8c64 __82-[NSView _updateConstraintsForSubtreeIfNeededCollectingViewsWithInvalidBaselines:]_block_invoke + 236
+   20  CoreAutoLayout                      0x000000018f0e0d54 -[NSISEngine withBehaviors:performModifications:] + 88
+   21  AppKit                              0x00000001888ac7d4 -[NSView _updateConstraintsForSubtreeIfNeededCollectingViewsWithInvalidBaselines:] + 208
+   22  AppKit                              0x00000001888b8c64 __82-[NSView _updateConstraintsForSubtreeIfNeededCollectingViewsWithInvalidBaselines:]_block_invoke + 236
+   23  CoreAutoLayout                      0x000000018f0e0d54 -[NSISEngine withBehaviors:performModifications:] + 88
+   24  AppKit                              0x00000001888ac7d4 -[NSView _updateConstraintsForSubtreeIfNeededCollectingViewsWithInvalidBaselines:] + 208
+   25  AppKit                              0x00000001888ac884 -[NSView _updateConstraintsForSubtreeIfNeededCollectingViewsWithInvalidBaselines:] + 384
+   26  AppKit                              0x00000001888ac884 -[NSView _updateConstraintsForSubtreeIfNeededCollectingViewsWithInvalidBaselines:] + 384
+   27  AppKit                              0x00000001888ac884 -[NSView _updateConstraintsForSubtreeIfNeededCollectingViewsWithInvalidBaselines:] + 384
+   28  AppKit                              0x00000001888ac884 -[NSView _updateConstraintsForSubtreeIfNeededCollectingViewsWithInvalidBaselines:] + 384
+   29  AppKit                              0x00000001888ac884 -[NSView _updateConstraintsForSubtreeIfNeededCollectingViewsWithInvalidBaselines:] + 384
+   30  AppKit                              0x00000001888ac884 -[NSView _updateConstraintsForSubtreeIfNeededCollectingViewsWithInvalidBaselines:] + 384
+   31  AppKit                              0x00000001888ac884 -[NSView _updateConstraintsForSubtreeIfNeededCollectingViewsWithInvalidBaselines:] + 384
+   32  AppKit                              0x00000001888b8c64 __82-[NSView _updateConstraintsForSubtreeIfNeededCollectingViewsWithInvalidBaselines:]_block_invoke + 236
+   33  CoreAutoLayout                      0x000000018f0e0d54 -[NSISEngine withBehaviors:performModifications:] + 88
+
+-- stall 147 ms (main thread cpu 133 ms) at t=0.00s in phase 'start-up'; main thread stack at +100 ms:
+   0   dyld                                0x0000000183dac5f4 dyld-internal + 16
+   1   dyld                                0x0000000183dc47b0 dyld-internal + 36
+   2   dyld                                0x0000000183dc4a1c dyld-internal + 204
+   3   dyld                                0x0000000183de703c dyld-internal + 84
+   4   dyld                                0x0000000183dc48fc dyld-internal + 144
+   5   AppKit                              0x0000000189355af4 NSViewReplaceImagesDefaultValueFunction + 192
+   6   AppKit                              0x00000001887f4be4 _NSGetBoolAppConfig + 172
+   7   AppKit                              0x000000018893b30c -[NSView(NSLayerKitGlue) drawLayer:inContext:] + 704
+   8   AppKit                              0x0000000188de9e44 -[NSViewBackingLayer drawInContext:] + 52
+   9   AppKit                              0x0000000189940ef8 __getCGDisplayListGetHashSymbolLoc_block_invoke + 15052
+   10  AppKit                              0x00000001899d1bf0 __swift_closure_destructor.30 + 9152
+   11  AppKit                              0x00000001899d2394 __swift_closure_destructor.30 + 11108
+   12  AppKit                              0x0000000188de9a70 -[NSViewBackingLayer display] + 1268
+   13  QuartzCore                          0x000000018e9173e8 _ZN2CA5Layer17display_if_neededEPNS_11TransactionE + 788
+   14  QuartzCore                          0x000000018eaf2d30 _ZN2CA7Context18commit_transactionEPNS_11TransactionEdPd + 684
+   15  QuartzCore                          0x000000018e8f77d4 _ZN2CA11Transaction6commitEv + 652
+   16  QuartzCore                          0x000000018e8f7370 _ZN2CA11Transaction5flushEv + 84
+   17  AppKit                              0x000000018894af1c __62+[CATransaction(NSCATransaction) NS_setFlushesWithDisplayLink]_block_invoke + 272
+   18  CoreFoundation                      0x0000000184271cc4 __CFRUNLOOP_IS_CALLING_OUT_TO_AN_OBSERVER_CALLBACK_FUNCTION__ + 36
+   19  CoreFoundation                      0x0000000184271bbc __CFRunLoopDoObservers + 648
+   20  CoreFoundation                      0x00000001842711a8 __CFRunLoopRun + 776
+   21  CoreFoundation                      0x000000018434b82c _CFRunLoopRunSpecificWithOptions + 536
+   22  StressPanel                         0x0000000102a40a10 $s9StressKit4pump4upTo5untilSbSd_SbyXEtF + 292
+   23  StressPanel                         0x0000000102469944 $s11StressPanel7stalledyyFAA7RunningCyXEfU_ + 340
+   24  StressPanel                         0x0000000102473e38 $s11StressPanel7stalledyyFAA7RunningCyXEfU_TA + 16
+   25  StressPanel                         0x0000000102a4545c $s9StressKit4step_5limit_xSS_SdxyKXEtKlF + 444
+   26  StressPanel                         0x000000010245fe90 $s11StressPanel7stalledyyF + 1460
+   27  StressPanel                         0x000000010245e114 main + 716
+   28  dyld                                0x0000000183ddbe80 start + 6688
+
+-- stall 143 ms (main thread cpu 137 ms) at t=16.20s in phase 'E 100 x refresh of the dead share (50 ms apart)'; main thread stack at +100 ms:
+   0   CoreAutoLayout                      0x000000018f105d04 -[NSLayoutConstraint _setSymbolicConstant:constant:symbolicConstantMultiplier:] + 376
+   1   CoreAutoLayout                      0x000000018f105c80 -[NSLayoutConstraint _setSymbolicConstant:constant:symbolicConstantMultiplier:] + 244
+   2   CoreAutoLayout                      0x000000018f105eac -[NSLayoutConstraint setConstant:] + 84
+   3   CoreAutoLayout                      0x000000018f0f70e0 +[NSAutoresizingMaskLayoutConstraint constraintWithItem:attribute:relatedBy:toItem:attribute:multiplier:constant:] + 260
+   4   CoreAutoLayout                      0x000000018f0f6c24 +[NSAutoresizingMaskLayoutConstraint constraintsWithAutoresizingMask:subitem:frame:superitem:bounds:] + 1204
+   5   AppKit                              0x000000018955eb38 -[NSView(NSConstraintBasedLayoutInternal) _constraintsEquivalentToAutoresizingMask] + 132
+   6   AppKit                              0x000000018955db8c -[NSView(NSConstraintBasedLayoutInternal) _updateAutoresizingConstraints] + 172
+   7   AppKit                              0x00000001888acd88 -[NSView updateConstraints] + 64
+   8   AppKit                              0x000000018983c228 __swift__destructor.26 + 260
+   9   AppKit                              0x000000018983c250 __swift__destructor.26 + 300
+   10  AppKit                              0x00000001898ec708 __swift_memcpy18_8 + 8664
+   11  AppKit                              0x00000001898ecd04 __swift_memcpy18_8 + 10196
+   12  AppKit                              0x000000018925c100 ___NSViewUpdateConstraints_block_invoke + 104
+   13  AppKit                              0x0000000188869b5c NSPerformVisuallyAtomicChange + 128
+   14  AppKit                              0x00000001888acd3c _NSViewUpdateConstraints + 96
+   15  AppKit                              0x00000001888aca3c -[NSView _updateConstraintsForSubtreeIfNeededCollectingViewsWithInvalidBaselines:] + 824
+   16  AppKit                              0x00000001888b8c64 __82-[NSView _updateConstraintsForSubtreeIfNeededCollectingViewsWithInvalidBaselines:]_block_invoke + 236
+   17  CoreAutoLayout                      0x000000018f0e0d54 -[NSISEngine withBehaviors:performModifications:] + 88
+   18  AppKit                              0x00000001888ac7d4 -[NSView _updateConstraintsForSubtreeIfNeededCollectingViewsWithInvalidBaselines:] + 208
+   19  AppKit                              0x000000018925085c __45-[NSView updateConstraintsForSubtreeIfNeeded]_block_invoke_2 + 52
+   20  CoreAutoLayout                      0x000000018f0e0d54 -[NSISEngine withBehaviors:performModifications:] + 88
+   21  AppKit                              0x000000018955cbc0 -[NSView(NSConstraintBasedLayoutInternal) _withAutomaticEngineOptimizationDisabled:] + 48
+   22  AppKit                              0x00000001888ac560 __45-[NSView updateConstraintsForSubtreeIfNeeded]_block_invoke + 224
+   23  AppKit                              0x0000000188869b5c NSPerformVisuallyAtomicChange + 128
+   24  AppKit                              0x00000001888ac474 -[NSView updateConstraintsForSubtreeIfNeeded] + 96
+   25  AppKit                              0x0000000189251320 __70-[NSView _updateConstraintsForLayoutCheckingDirtyBits:creatingEngine:]_block_invoke + 260
+   26  AppKit                              0x0000000188869b5c NSPerformVisuallyAtomicChange + 128
+   27  AppKit                              0x00000001888ac3a4 -[NSView _updateConstraintsForLayoutCheckingDirtyBits:creatingEngine:] + 132
+   28  AppKit                              0x00000001892514d8 __56-[NSView _layoutSubtreeIfNeededAndAllowTemporaryEngine:]_block_invoke + 252
+   29  AppKit                              0x0000000188869b5c NSPerformVisuallyAtomicChange + 128
+   30  AppKit                              0x000000018886e00c -[NSView _layoutSubtreeIfNeededAndAllowTemporaryEngine:] + 100
+   31  AppKit                              0x0000000188869b5c NSPerformVisuallyAtomicChange + 128
+   32  AppKit                              0x000000018886df9c -[NSView layoutSubtreeIfNeeded] + 96
+   33  AppKit                              0x00000001888b8914 -[NSView _setDefaultKeyViewLoop] + 232
+
+-- stall 123 ms (main thread cpu 122 ms) at t=0.15s in phase 'idle baseline (1 s)'; main thread stack at +100 ms:
+   0   libicucore.A.dylib                  0x000000018812ec3c _Z23ulocimp_setKeywordValueNSt3__117basic_string_viewIcNS_11char_traitsIcEEEES3_RN3icu10CharStringER10UErrorCode + 388
+   1   libicucore.A.dylib                  0x000000018812ec38 _Z23ulocimp_setKeywordValueNSt3__117basic_string_viewIcNS_11char_traitsIcEEEES3_RN3icu10CharStringER10UErrorCode + 384
+   2   libicucore.A.dylib                  0x000000018812fa1c _Z18ulocimp_getSubtagsNSt3__117basic_string_viewIcNS_11char_traitsIcEEEEPN3icu8ByteSinkES6_S6_S6_PPKcR10UErrorCode + 2180
+   3   libicucore.A.dylib                  0x000000018812f4e0 _Z18ulocimp_getSubtagsNSt3__117basic_string_viewIcNS_11char_traitsIcEEEEPN3icu8ByteSinkES6_S6_S6_PPKcR10UErrorCode + 840
+   4   libicucore.A.dylib                  0x000000018812f0e8 _Z18ulocimp_getSubtagsNSt3__117basic_string_viewIcNS_11char_traitsIcEEEEPN3icu10CharStringES6_S6_S6_PPKcR10UErrorCode + 272
+   5   libicucore.A.dylib                  0x00000001881302cc _Z15ulocimp_getNameNSt3__117basic_string_viewIcNS_11char_traitsIcEEEERN3icu8ByteSinkER10UErrorCode + 660
+   6   libicucore.A.dylib                  0x0000000188039fe4 uloc_getBaseName + 128
+   7   libicucore.A.dylib                  0x00000001880f2f08 ualoc_getAppleParent + 796
+   8   libicucore.A.dylib                  0x0000000188037c54 ualoc_localizationsToUse + 564
+   9   CoreFoundation                      0x000000018422da00 _CFBundleCreateMutableArrayOfFallbackLanguages + 340
+   10  CoreFoundation                      0x000000018422d4e0 _CFBundleCopyPreferredLanguagesInList + 144
+   11  CoreFoundation                      0x0000000184302bf0 _CFBundleCopyLocalizationsForPreferences + 76
+   12  CoreFoundation                      0x000000018422d3a0 CFBundleCopyLocalizationsForPreferences + 184
+   13  Foundation                          0x00000001859458ec +[NSBundle preferredLocalizationsFromArray:forPreferences:] + 28
+   14  Foundation                          0x0000000185ab10b8 +[NSLocale(NSLocale_LanguageExtras) __effectiveLanguageForBundle:] + 232
+   15  IconServices                        0x0000000196961060 +[NSLocale(IconServicesAdditions) _IS_currentLanguageDirection] + 32
+   16  IconServices                        0x00000001968f7c7c -[ISImageDescriptor initWithSize:scale:] + 112
+   17  AppKit                              0x00000001889d588c NSISIconImageRepGetCGImage + 144
+   18  AppKit                              0x0000000188920028 __48-[NSImage CGImageForProposedRect:context:hints:]_block_invoke + 76
+   19  AppKit                              0x000000018891fd08 -[NSImage _usingBestRepresentationForRect:context:hints:body:] + 148
+   20  AppKit                              0x000000018891f688 -[NSImage CGImageForProposedRect:context:hints:] + 436
+   21  AppKit                              0x000000018893ff50 -[_NSSimpleImageView updateLayer] + 908
+   22  AppKit                              0x000000018983c228 __swift__destructor.26 + 260
+   23  AppKit                              0x000000018983c250 __swift__destructor.26 + 300
+   24  AppKit                              0x00000001898eea5c __swift_memcpy18_8 + 17708
+   25  AppKit                              0x00000001898ef058 __swift_memcpy18_8 + 19240
+   26  AppKit                              0x00000001888d090c _NSViewUpdateLayer + 96
+   27  AppKit                              0x0000000188818314 +[NSAppearance _performWithCurrentAppearance:usingBlock:] + 72
+   28  AppKit                              0x0000000188de9c40 __29-[NSViewBackingLayer display]_block_invoke + 144
+   29  AppKit                              0x000000018884b3b4 -[NSFocusStack performWithFocusView:inWindow:usingBlock:] + 96
+   30  AppKit                              0x0000000188de968c -[NSViewBackingLayer display] + 272
+   31  QuartzCore                          0x000000018e9173e8 _ZN2CA5Layer17display_if_neededEPNS_11TransactionE + 788
+   32  QuartzCore                          0x000000018eaf2d30 _ZN2CA7Context18commit_transactionEPNS_11TransactionEdPd + 684
+   33  QuartzCore                          0x000000018e8f77d4 _ZN2CA11Transaction6commitEv + 652
+
+FAILURES: 2
+  - 2: 2 kinds of provider calls reached the main thread while the provider stalled: capabilities(for:), watch
+  - 2/E: with 82 calls blocked in a dead provider, a local folder took more than 20 s to open
+peakRSS=263MB footprint=140MB
+       49.41 real         8.40 user         1.40 sys
+           275578880  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+               63997  page reclaims
+                  40  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                   0  signals received
+                 447  voluntary context switches
+              125153  involuntary context switches
+        107551853723  instructions retired
+         37357399852  cycles elapsed
+           156779672  peak memory footprint
+RUN exit=1 wall=49.4s load_before=16.7 load_after=11.3 cmd=/usr/bin/time -l /private/tmp/claude-501/-Users-cm0k-Claude-Projects-TotalCommander/91e36f29-0d53-4421-8985-1ec839e7f5c4/scratchpad/review2/stress/b-harness/release/StressPanel stalled /private/tmp/cl

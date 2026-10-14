@@ -1,0 +1,53 @@
+StressArchives mode=deep dir=/private/tmp/claude-501/-Users-cm0k-Claude-Projects-TotalCommander/91e36f29-0d53-4421-8985-1ec839e7f5c4/scratchpad/review2/stress/data/archives cores=16 load=30.65576171875
+STEP idle baseline                                  wall=   1.502s cpu=   0.05s threads 7->7 footprint=7MB peakRSS=26MB load=29.8
+LOAD deep root: first 0.082s complete 0.082s, 3 items error=nil
+STEP deep: open + list root (panel path)            wall=   0.082s cpu=   0.09s threads 7->8 footprint=36MB peakRSS=57MB load=29.8
+deep chain: reached level 2000, slowest listing 0.52 ms
+STEP deep: walk down the chain of 2000 folders (list each level) wall=   0.278s cpu=   0.29s threads 8->9 footprint=37MB peakRSS=58MB load=29.8
+LOAD deep bottom: first 0.231s complete 0.231s, 1 items error=nil
+STEP deep: panel load at the bottom of the chain    wall=   0.232s cpu=   0.24s threads 8->8 footprint=37MB peakRSS=58MB load=29.8
+STEP deep: walk the binary tree (8191 folders) and read every node wall=   0.282s cpu=   0.29s threads 8->9 footprint=37MB peakRSS=59MB load=29.8
+long path: 238 levels walked
+STEP deep: the member with a 60,000-byte path       wall=   0.080s cpu=   0.08s threads 8->9 footprint=39MB peakRSS=60MB load=29.8
+deep commit: 0.034s
+deep unzip -tq: status 1 ted in /private/tmp/claude-501/-Users-cm0k-Claude-Projects-TotalCommander/91e36f29-0d53-4421-8985-1ec839e7f5c4/scratchpad/review2/stress/data/archives/deep.zip.
+deep python zipfile: testzip None members 8194
+STEP deep: add at the bottom + commit + unzip -tq + fresh reader wall=   0.279s cpu=   0.14s threads 8->9 footprint=71MB peakRSS=96MB load=29.8
+STEP deep: close the store                          wall=   0.000s cpu=   0.00s threads 9->8 footprint=71MB peakRSS=96MB load=29.8
+
+==== INVARIANT VIOLATIONS ====
+none
+
+==== MAIN-THREAD WATCHDOG: StressArchives deep ====
+histogram bounds (ms): <2 <4 <8 <16 <33 <100 <250 <1000 <5000 >=5000
+phase                                            wall s   pings   >8ms >100ms    >1s    max ms  histogram
+idle baseline                                      1.50     533      0      0      0       3.7  532,1,0,0,0,0,0,0,0,0
+deep: open + list root (panel path)                0.08      30      0      0      0       0.1  30,0,0,0,0,0,0,0,0,0
+deep: walk down the chain of 2000 folders (list each level)     0.28      98      0      0      0       0.3  98,0,0,0,0,0,0,0,0,0
+deep: panel load at the bottom of the chain        0.23      82      0      0      0       0.4  82,0,0,0,0,0,0,0,0,0
+deep: walk the binary tree (8191 folders) and read every node     0.28     101      0      0      0       0.4  101,0,0,0,0,0,0,0,0,0
+deep: the member with a 60,000-byte path           0.08      28      0      0      0       0.1  28,0,0,0,0,0,0,0,0,0
+deep: add at the bottom + commit + unzip -tq + fresh reader     0.28     100      0      0      0       0.2  100,0,0,0,0,0,0,0,0,0
+deep: close the store                              0.00       0      0      0      0       0.0  0,0,0,0,0,0,0,0,0,0
+end                                                0.00       0      0      0      0       0.0  0,0,0,0,0,0,0,0,0,0
+TOTAL                                              2.74     972      0      0      0       3.7
+FINAL threads=8 (baseline 7) peakRSS=96MB footprint=71MB load=29.8
+        2.77 real         1.11 user         0.16 sys
+           100663296  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+                8828  page reclaims
+                  31  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                   0  signals received
+                  45  voluntary context switches
+                9152  involuntary context switches
+         21542218925  instructions retired
+          4553879581  cycles elapsed
+            74793824  peak memory footprint
+RUN exit=0 wall=2.8s load_before=30.7 load_after=29.8 cmd=/usr/bin/time -l /private/tmp/claude-501/-Users-cm0k-Claude-Projects-TotalCommander/91e36f29-0d53-4421-8985-1ec839e7f5c4/scratchpad/review2/stress/bin/StressArchives.run --mode deep --dir /private/tmp

@@ -1,0 +1,367 @@
+tree: 100002 files
+tree: *.txt 80000, with needle 1129
+STEP ground truth: tree                             wall=  11.635s cpu=  20.99s threads 7->8 footprint=35MB peakRSS=59MB load=20.6
+million: 1000000 files
+million: *7.png 16667, with xxxx 99750, all files 1000000
+STEP ground truth: million                          wall=  19.386s cpu=  19.86s threads 8->19 footprint=481MB peakRSS=504MB load=22.6
+STEP idle baseline                                  wall=   2.003s cpu=   0.08s threads 19->19 footprint=482MB peakRSS=506MB load=23.4
+threads at baseline: 19
+  engine tree name *.txt: 80000 results in 0.320s, first after 0.003s
+STEP engine: tree name *.txt #0                     wall=   0.438s cpu=   3.30s threads 19->19 footprint=468MB peakRSS=581MB load=23.4
+  engine tree name *.txt: 80000 results in 0.314s, first after 0.021s
+STEP engine: tree name *.txt #1                     wall=   0.447s cpu=   3.39s threads 19->19 footprint=464MB peakRSS=596MB load=23.4
+  engine tree text NEEDLE: 1129 results in 2.016s, first after 0.861s
+STEP engine: tree text NEEDLE #0                    wall=   2.018s cpu=  14.50s threads 19->18 footprint=1029MB peakRSS=1134MB load=23.4
+  engine tree text NEEDLE: 1129 results in 2.405s, first after 0.806s
+STEP engine: tree text NEEDLE #1                    wall=   2.409s cpu=  17.41s threads 17->25 footprint=1105MB peakRSS=1210MB load=25.0
+  engine million name *7.png: 16667 results in 4.542s, first after 4.535s
+STEP engine: million name *7.png #0                 wall=   4.576s cpu=   7.83s threads 25->14 footprint=621MB peakRSS=1850MB load=23.9
+  engine million name *7.png: 16667 results in 4.066s, first after 4.058s
+STEP engine: million name *7.png #1                 wall=   4.117s cpu=   7.86s threads 14->14 footprint=486MB peakRSS=1938MB load=22.5
+  engine million text xxxx: 99750 results in 49.469s, first after 49.006s
+STEP engine: million text xxxx #0                   wall=  49.690s cpu= 481.38s threads 14->8 footprint=1115MB peakRSS=2367MB load=20.3
+  engine million text xxxx: 99750 results in 51.723s, first after 51.257s
+STEP engine: million text xxxx #1                   wall=  51.933s cpu= 522.23s threads 8->8 footprint=681MB peakRSS=2368MB load=20.5
+  engine million name * (all): 1000200 results in 11.584s, first after 11.425s
+STEP engine: million name * (all) #0                wall=  13.171s cpu=  17.31s threads 8->8 footprint=1062MB peakRSS=2587MB load=18.1
+  engine million name * (all): 1000200 results in 11.666s, first after 11.501s
+STEP engine: million name * (all) #1                wall=  13.454s cpu=  17.14s threads 8->9 footprint=1029MB peakRSS=2591MB load=16.4
+STEP engine: 8 concurrent searches of the tree      wall=  12.895s cpu= 165.84s threads 9->7 footprint=493MB peakRSS=4296MB load=29.1
+HEAP after the engine runs                        footprint    493 MB; malloc in use    426 MB, allocated from the system   4132 MB; threads 7
+threads after engine runs: 7 (baseline 19)
+STEP threads settle after engine runs               wall=   0.000s cpu=   0.00s threads 7->7 footprint=493MB peakRSS=4296MB load=29.1
+  window tree name *.txt: 80000 results in 0.316s, first rows after 0.159s, threads 20
+STEP window: tree name *.txt                        wall=   0.999s cpu=   4.08s threads 7->20 footprint=543MB peakRSS=4296MB load=29.1
+  window tree text NEEDLE: 1129 results in 3.737s, first rows after 0.858s, threads 16
+STEP window: tree text NEEDLE                       wall=   4.341s cpu=  46.80s threads 20->16 footprint=599MB peakRSS=4296MB load=29.0
+  window million name *7.png: 16667 results in 4.364s, first rows after 4.364s, threads 14
+STEP window: million name *7.png                    wall=   4.987s cpu=   7.79s threads 16->14 footprint=799MB peakRSS=4328MB load=27.8
+  window million text xxxx: 99750 results in 35.751s, first rows after 35.723s, threads 7
+STEP window: million text xxxx                      wall=  36.474s cpu= 175.76s threads 14->7 footprint=1223MB peakRSS=4804MB load=27.0
+  window million name * (all): 1000200 results in 12.605s, first rows after 12.271s, threads 8
+STEP window: million name * (all)                   wall=  14.544s cpu=  16.99s threads 7->8 footprint=1980MB peakRSS=5573MB load=24.5
+STEP window: 6 searches cancelled at random         wall=   5.737s cpu=  45.61s threads 8->8 footprint=2027MB peakRSS=5620MB load=23.5
+cancel -> finished: n=5 median=9.6ms p95=13.7ms max=13.7ms (tree name *.txt cancelled after 0.293s); 1 ended before the cancel
+threads right after each round: min 8 max 8 last 8
+HEAP after the window's cancelled searches        footprint   2027 MB; malloc in use   1071 MB, allocated from the system   5131 MB; threads 8
+STEP engine: 6 runs cancelled from another thread   wall=  10.967s cpu=  45.88s threads 8->31 footprint=1853MB peakRSS=5621MB load=21.8
+engine cancel -> run returned: median=18.0ms p95=59.6ms max=59.6ms
+HEAP after the engine's cancelled runs            footprint   1853 MB; malloc in use   1704 MB, allocated from the system   5257 MB; threads 16
+threads over time after the last search: 0.0s:16
+threads: baseline 19, at the end 16
+STEP threads settle at the end                      wall=   0.000s cpu=   0.00s threads 16->16 footprint=1853MB peakRSS=5621MB load=21.8
+STEP window after torture: tree name *.txt          wall=   0.700s cpu=   4.31s threads 16->15 footprint=1865MB peakRSS=5621MB load=20.4
+STEP window after torture: tree text NEEDLE         wall=   3.904s cpu=  43.73s threads 15->10 footprint=1594MB peakRSS=5621MB load=20.4
+HEAP at the end                                   footprint   1594 MB; malloc in use   1120 MB, allocated from the system   5145 MB; threads 10
+
+==== MAIN-THREAD WATCHDOG: scenario 6, Find Files ====
+histogram bounds (ms): <2 <4 <8 <16 <33 <100 <250 <1000 <5000 >=5000
+(max cpu = processor time the main thread used during its longest stall; stall ms / cpu ms = sums over all stalls > 8 ms: equal means the main thread was working, cpu much smaller means it was blocked or had no core)
+phase                                            wall s   pings   >8ms >100ms    >1s    max ms  max cpu  stall ms    cpu ms  histogram
+ground truth: tree                                11.63       0      0      0      0       0.0      0.0         0         0  0,0,0,0,0,0,0,0,0,0
+ground truth: million                             19.39       0      0      0      0       0.0      0.0         0         0  0,0,0,0,0,0,0,0,0,0
+idle baseline                                      2.00     669      1      1      1   31029.6  11978.2     31030     11978  664,2,2,0,0,0,0,0,0,1
+engine: tree name *.txt #0                         0.32     115      0      0      0       1.0      0.0         0         0  115,0,0,0,0,0,0,0,0,0
+(harness: checking results)                        7.81     489      4      2      1    1337.3   1333.7      1553      1548  476,7,2,0,1,1,1,0,1,0
+engine: tree name *.txt #1                         0.31      98      1      1      0     115.3    115.0       115       115  91,1,5,0,0,0,1,0,0,0
+engine: tree text NEEDLE #0                        2.02     656      1      1      0     133.3    132.3       133       132  655,0,0,0,0,0,1,0,0,0
+engine: tree text NEEDLE #1                        2.41     743      0      0      0       5.4      0.0         0         0  731,9,3,0,0,0,0,0,0,0
+engine: million name *7.png #0                     4.54    1497      1      0      0       9.3      0.0         9         0  1494,1,1,1,0,0,0,0,0,0
+engine: million name *7.png #1                     4.07    1366      1      0      0      33.0     33.3        33        33  1365,0,0,0,1,0,0,0,0,0
+engine: million text xxxx #0                      49.47   13659      2      0      0      48.0     48.0        57        48  13233,408,16,1,0,1,0,0,0,0
+engine: million text xxxx #1                      51.72   13909      3      1      0     221.4    221.4       239       221  13455,417,34,2,0,0,1,0,0,0
+engine: million name * (all) #0                   11.58    3882      1      1      0     210.0    209.9       210       210  3881,0,0,0,0,0,1,0,0,0
+engine: million name * (all) #1                   11.67    3925      1      1      1    1586.0   1585.9      1586      1586  3924,0,0,0,0,0,0,0,1,0
+engine: 8 concurrent searches of the tree         12.48    1920    119      2      1    1791.6   1694.6      4168      1698  1536,159,106,76,25,16,1,0,1,0
+threads settle after engine runs                   0.06       0      0      0      0       0.0      0.0         0         0  0,0,0,0,0,0,0,0,0,0
+window: tree name *.txt                            0.62     170      4      1      0     513.0    480.8       552       499  162,1,3,2,1,0,0,1,0,0
+window: tree text NEEDLE                           4.04    1066      5      0      0      15.3     12.9        54        22  976,59,26,5,0,0,0,0,0,0
+window: million name *7.png                        4.67    1433      1      0      0      25.1     16.2        25        16  1397,29,6,0,1,0,0,0,0,0
+window: million text xxxx                         36.05   10288     38      0      0      45.7     44.8       417       116  9753,338,159,37,0,1,0,0,0,0
+window: million name * (all)                      12.91    3924      6      1      0     510.6    512.6       586       529  3846,52,20,3,2,0,0,1,0,0
+window: 6 searches cancelled at random             5.65    1579     12      1      0     381.6    379.8       657       581  1537,12,18,7,1,3,0,1,0,0
+engine: 6 runs cancelled from another thread      10.97    3513      8      0      0      20.4      0.0       110         0  3463,25,17,6,2,0,0,0,0,0
+threads settle at the end                          0.00       0      0      0      0       0.0      0.0         0         0  0,0,0,0,0,0,0,0,0,0
+window after torture: tree name *.txt              0.63     188      2      0      0      19.5     18.7        28        26  184,1,1,1,1,0,0,0,0,0
+window after torture: tree text NEEDLE             3.90    1136      4      1      0     101.4     92.7       138       102  1088,31,13,2,1,0,1,0,0,0
+TOTAL                                            270.92   66225    215     14      4   31029.6      41701     19461
+
+-- stall 31030 ms (main thread cpu 11978 ms) at t=0.00s in phase 'idle baseline'; main thread stack at +100 ms:
+   0   libsystem_kernel.dylib              0x000000018416e9c0 __getdirentries64 + 8
+   1   libsystem_c.dylib                   0x000000018408d088 _readdir_unlocked + 224
+   2   libsystem_c.dylib                   0x000000018408d180 readdir + 40
+   3   StressFind                          0x0000000100c94e64 $s10StressFind8allFilesySaySSG10Foundation3URLVF + 216
+   4   StressFind                          0x0000000100c9485c $s10StressFindyyXEfU_ + 232
+   5   StressFind                          0x000000010126f034 $s9StressKit4step_5limit_xSS_SdxyKXEtKlF + 444
+   6   StressFind                          0x0000000100c92434 main + 1516
+   7   dyld                                0x0000000183ddbe80 start + 6688
+   .. and at +1 s:
+   0   libsystem_kernel.dylib              0x000000018416d910 read + 8
+   1   Foundation                          0x000000018611f89c $s10Foundation17readBytesFromFile4path14reportProgress9maxLength7options16attributesToRead0L0AA0nC6ResultVx_SbSiSgSo20NSDataReadingOptionsVSaySSGSDySSAA4DataVGztKAA0E19SystemRepresentableRzRi_zlFAA3URLV_TB5 + 6264
+   2   Foundation                          0x0000000185dfd6ac $s10Foundation16readDataFromFile4path14reportProgress9maxLength7optionsAA0C0Vx_SbSiSgSo20NSDataReadingOptionsVtKAA0E19SystemRepresentableRzRi_zlFAA3URLV_TB5Tm + 64
+   3   Foundation                          0x0000000185dfe7a8 $s10Foundation4DataV10contentsOf7optionsAcA3URLVh_So20NSDataReadingOptionsVtKcfC + 136
+   4   StressFind                          0x0000000100c9539c $s10StressFind8contains__15caseInsensitiveSbSS_Says5UInt8VGSbtF + 660
+   5   StressFind                          0x0000000100c950e8 $s10StressFindyyXEfU_SbSScfU0_ + 64
+   6   StressFind                          0x0000000100ca19a4 $s10StressFind14parallelFilteryShySSGSaySSG_SbSSctFySiYbXEfU_TA + 280
+   7   libswiftDispatch.dylib              0x00000001a06bee74 $sSiIgy_SiIegy_TRTA + 28
+   8   libswiftDispatch.dylib              0x00000001a06beea0 $sSiIegy_SiIyBy_TR + 32
+   9   libdispatch.dylib                   0x000000018400a5b8 _dispatch_client_callout2 + 16
+   10  libdispatch.dylib                   0x00000001840052c8 _dispatch_apply_invoke3 + 336
+   11  libdispatch.dylib                   0x000000018400a5a0 _dispatch_client_callout + 16
+   12  libdispatch.dylib                   0x0000000183ff3624 _dispatch_once_callout + 32
+   13  libdispatch.dylib                   0x000000018400595c _dispatch_apply_invoke_and_wait + 352
+   14  libdispatch.dylib                   0x0000000184004a44 _dispatch_apply_with_attr_f + 1292
+   15  libdispatch.dylib                   0x0000000184004be8 dispatch_apply + 96
+   16  libswiftDispatch.dylib              0x00000001a06bef2c _swift_dispatch_apply_current + 128
+   17  libswiftDispatch.dylib              0x00000001a06bedf8 $sSo17OS_dispatch_queueC8DispatchE17concurrentPerform10iterations7executeySi_ySiXEtFZ + 196
+   18  StressFind                          0x0000000100c957a8 $s10StressFind14parallelFilteryShySSGSaySSG_SbSSctF + 172
+   19  StressFind                          0x0000000100c94a14 $s10StressFindyyXEfU_ + 672
+   20  StressFind                          0x000000010126f034 $s9StressKit4step_5limit_xSS_SdxyKXEtKlF + 444
+   21  StressFind                          0x0000000100c92434 main + 1516
+   22  dyld                                0x0000000183ddbe80 start + 6688
+
+-- stall 1792 ms (main thread cpu 1695 ms) at t=173.50s in phase 'engine: 8 concurrent searches of the tree'; main thread stack at +100 ms:
+   0   libswiftCore.dylib                  0x0000000198a567d4 $ss22_allocateStringStorage33_A317BBF16F3432B4D1DDED3E0452DA4DLL16codeUnitCapacity23precalculatedUTF16Counts02__bC0C_s01_N8AndFlagsABLLVtSi_SiSgtF + 152
+   1   libswiftCore.dylib                  0x0000000198b616fc $ss15__StringStorageC6create33_A317BBF16F3432B4D1DDED3E0452DA4DLL16codeUnitCapacity13countAndFlags23precalculatedUTF16CountABSi_s01_A6ObjectV0tpQ0VSiSgtFZTf4nnnd_n + 40
+   2   libswiftCore.dylib                  0x0000000198b617d4 $sSS18_uncheckedFromUTF8_7isASCII23precalculatedUTF16CountSSSRys5UInt8VG_SbSiSgtFZTf4nnnd_n + 128
+   3   Foundation                          0x000000018620b630 $s10Foundation9_SwiftURLC12absolutePath14percentEncodedSSSb_tF + 188
+   4   Foundation                          0x000000018620b95c $s10Foundation9_SwiftURLC4pathSSvg + 136
+   5   Foundation                          0x0000000186195c08 $s10Foundation3URLV4pathSSvg + 60
+   6   StressFind                          0x0000000100c96a74 $s10StressFind6verify__7against9filesOnlyySS_Say9AFMKernel8FileItemVGShySSGSbtF + 468
+   7   StressFind                          0x0000000100ca1218 $s10StressFindyyXEfU2_TA + 352
+   8   StressFind                          0x000000010126f034 $s9StressKit4step_5limit_xSS_SdxyKXEtKlF + 444
+   9   StressFind                          0x0000000100c92950 main + 2824
+   10  dyld                                0x0000000183ddbe80 start + 6688
+   .. and at +1 s:
+   0   libswiftCore.dylib                  0x000000019872f450 $ss6HasherV7combine5bytesySW_tF + 492
+   1   libswiftCore.dylib                  0x0000000198889820 $sSS4hash4intoys6HasherVz_tF + 252
+   2   libswiftCore.dylib                  0x0000000198889820 $sSS4hash4intoys6HasherVz_tF + 252
+   3   StressFind                          0x0000000100c9c2e4 $sSh2eeoiySbShyxG_ABtFZSS_Tt1g5 + 260
+   4   StressFind                          0x0000000100c96c7c $s10StressFind6verify__7against9filesOnlyySS_Say9AFMKernel8FileItemVGShySSGSbtF + 988
+   5   StressFind                          0x0000000100ca1218 $s10StressFindyyXEfU2_TA + 352
+   6   StressFind                          0x000000010126f034 $s9StressKit4step_5limit_xSS_SdxyKXEtKlF + 444
+   7   StressFind                          0x0000000100c92950 main + 2824
+   8   dyld                                0x0000000183ddbe80 start + 6688
+
+-- stall 1586 ms (main thread cpu 1586 ms) at t=160.25s in phase 'engine: million name * (all) #1'; main thread stack at +100 ms:
+   0   libswiftCore.dylib                  0x0000000198b62214 $ss6HasherV5_hash4seed5bytes5countS2i_s6UInt64VSitFZTf4nnnd_n + 224
+   1   Foundation                          0x000000018620ba34 $s10Foundation9_SwiftURLC4pathSSvg + 352
+   2   Foundation                          0x0000000186195c08 $s10Foundation3URLV4pathSSvg + 60
+   3   StressFind                          0x0000000100c96a74 $s10StressFind6verify__7against9filesOnlyySS_Say9AFMKernel8FileItemVGShySSGSbtF + 468
+   4   StressFind                          0x0000000100ca1218 $s10StressFindyyXEfU2_TA + 352
+   5   StressFind                          0x000000010126f034 $s9StressKit4step_5limit_xSS_SdxyKXEtKlF + 444
+   6   StressFind                          0x0000000100c928bc main + 2676
+   7   dyld                                0x0000000183ddbe80 start + 6688
+   .. and at +1 s:
+   0   libswiftCore.dylib                  0x000000019872f400 $ss6HasherV7combine5bytesySW_tF + 412
+   1   libswiftCore.dylib                  0x0000000198889820 $sSS4hash4intoys6HasherVz_tF + 252
+   2   libswiftCore.dylib                  0x0000000198889820 $sSS4hash4intoys6HasherVz_tF + 252
+   3   StressFind                          0x0000000100c9c2e4 $sSh2eeoiySbShyxG_ABtFZSS_Tt1g5 + 260
+   4   StressFind                          0x0000000100c96c7c $s10StressFind6verify__7against9filesOnlyySS_Say9AFMKernel8FileItemVGShySSGSbtF + 988
+   5   StressFind                          0x0000000100ca1218 $s10StressFindyyXEfU2_TA + 352
+   6   StressFind                          0x000000010126f034 $s9StressKit4step_5limit_xSS_SdxyKXEtKlF + 444
+   7   StressFind                          0x0000000100c928bc main + 2676
+   8   dyld                                0x0000000183ddbe80 start + 6688
+
+-- stall 1337 ms (main thread cpu 1334 ms) at t=247.96s in phase '(harness: checking results)'; main thread stack at +100 ms:
+   0   libswiftCore.dylib                  0x0000000198723568 swift_release + 4
+   1   Foundation                          0x000000018620a3d8 $s10Foundation9_SwiftURLC6schemeSSSgvg + 124
+   2   Foundation                          0x000000018620b900 $s10Foundation9_SwiftURLC4pathSSvg + 44
+   3   Foundation                          0x0000000186195c08 $s10Foundation3URLV4pathSSvg + 60
+   4   StressFind                          0x0000000100c96a74 $s10StressFind6verify__7against9filesOnlyySS_Say9AFMKernel8FileItemVGShySSGSbtF + 468
+   5   StressFind                          0x0000000100c9858c $s10StressFindyyXEfU7_ + 752
+   6   StressFind                          0x0000000100ca167c $s10StressFindyyXEfU7_TA + 24
+   7   StressFind                          0x000000010126f034 $s9StressKit4step_5limit_xSS_SdxyKXEtKlF + 444
+   8   StressFind                          0x0000000100c92b7c main + 3380
+   9   dyld                                0x0000000183ddbe80 start + 6688
+   .. and at +1 s:
+   0   libswiftCore.dylib                  0x000000019872f458 $ss6HasherV7combine5bytesySW_tF + 500
+   1   libswiftCore.dylib                  0x0000000198889820 $sSS4hash4intoys6HasherVz_tF + 252
+   2   libswiftCore.dylib                  0x0000000198889820 $sSS4hash4intoys6HasherVz_tF + 252
+   3   StressFind                          0x0000000100c9c2e4 $sSh2eeoiySbShyxG_ABtFZSS_Tt1g5 + 260
+   4   StressFind                          0x0000000100c96c7c $s10StressFind6verify__7against9filesOnlyySS_Say9AFMKernel8FileItemVGShySSGSbtF + 988
+   5   StressFind                          0x0000000100c9858c $s10StressFindyyXEfU7_ + 752
+   6   StressFind                          0x0000000100ca167c $s10StressFindyyXEfU7_TA + 24
+   7   StressFind                          0x000000010126f034 $s9StressKit4step_5limit_xSS_SdxyKXEtKlF + 444
+   8   StressFind                          0x0000000100c92b7c main + 3380
+   9   dyld                                0x0000000183ddbe80 start + 6688
+
+-- stall 513 ms (main thread cpu 481 ms) at t=187.78s in phase 'window: tree name *.txt'; main thread stack at +100 ms:
+   0   StressFind                          0x0000000100c9e52c $sSh8_VariantV6insertySb8inserted_x17memberAfterInserttxnFSS_Tg5 + 192
+   1   StressFind                          0x0000000100c9e510 $sSh8_VariantV6insertySb8inserted_x17memberAfterInserttxnFSS_Tg5 + 164
+   2   StressFind                          0x0000000100ca1c24 $sShyShyxGqd__nc7ElementQyd__RszSTRd__lufCSS_SaySSGTt0g5Tf4g_n + 100
+   3   StressFind                          0x0000000100c96b08 $s10StressFind6verify__7against9filesOnlyySS_Say9AFMKernel8FileItemVGShySSGSbtF + 616
+   4   StressFind                          0x0000000100c97b20 $s10StressFindyyXEfU4_ + 2124
+   5   StressFind                          0x000000010126f034 $s9StressKit4step_5limit_xSS_SdxyKXEtKlF + 444
+   6   StressFind                          0x0000000100c92a04 main + 3004
+   7   dyld                                0x0000000183ddbe80 start + 6688
+
+-- stall 511 ms (main thread cpu 513 ms) at t=247.15s in phase 'window: million name * (all)'; main thread stack at +100 ms:
+   0   libswiftCore.dylib                  0x0000000198723564 swift_release + 0
+   1   libswiftCore.dylib                  0x000000019876e528 _ZL21swift_cvw_destroyImplPN5swift11OpaqueValueEPKNS_14TargetMetadataINS_9InProcessEEE + 372
+   2   StressFind                          0x0000000100ef8c58 $s15FindFilesPlugin0aB16WindowControllerC3RowOwxx + 76
+   3   libswiftCore.dylib                  0x0000000198725788 swift_arrayDestroy + 204
+   4   libswiftCore.dylib                  0x0000000198727320 $ss23_ContiguousArrayStorageCfD + 96
+   5   libswiftCore.dylib                  0x00000001987272a4 _swift_release_dealloc + 64
+   6   libswiftCore.dylib                  0x000000019878dae4 _ZN5swift9RefCountsINS_13RefCountBitsTILNS_19RefCountInlinednessE1EEEE15doDecrementSlowILNS_13PerformDeinitE1EEEbS3_j + 168
+   7   StressFind                          0x0000000100ee327c $sSa6append10contentsOfyqd__n_t7ElementQyd__RszSTRd__lF10Foundation3URLV_SayAGGTg5Tm + 168
+   8   StressFind                          0x0000000100ef2d88 $s15FindFilesPlugin0aB16WindowControllerC6append33_DD3DFA70A6D1DDE037628D46A938A271LLyySay9AFMKernel8FileItemVGF + 472
+   9   StressFind                          0x0000000100ef2a8c $s15FindFilesPlugin0aB16WindowControllerC4walk33_DD3DFA70A6D1DDE037628D46A938A271LLyyAA10FileSearchCFyyYbcfU_5flushL_yy10Foundation3URLVSgFyyScMYccfU_ + 116
+   10  StressFind                          0x0000000100ef347c $sIeg_IeyB_TRTm + 28
+   11  libdispatch.dylib                   0x0000000183ff0a34 _dispatch_call_block_and_release + 32
+   12  libdispatch.dylib                   0x000000018400a5a0 _dispatch_client_callout + 16
+   13  libdispatch.dylib                   0x0000000184028998 _dispatch_main_queue_drain.cold.6 + 832
+   14  libdispatch.dylib                   0x0000000183fffb0c _dispatch_main_queue_drain + 176
+   15  libdispatch.dylib                   0x0000000183fffa4c _dispatch_main_queue_callback_4CF + 44
+   16  CoreFoundation                      0x00000001842af9cc __CFRUNLOOP_IS_SERVICING_THE_MAIN_DISPATCH_QUEUE__ + 16
+   17  CoreFoundation                      0x000000018427165c __CFRunLoopRun + 1980
+   18  CoreFoundation                      0x000000018434b82c _CFRunLoopRunSpecificWithOptions + 536
+   19  StressFind                          0x000000010126a5e8 $s9StressKit4pump4upTo5untilSbSd_SbyXEtF + 292
+   20  StressFind                          0x0000000100c9838c $s10StressFindyyXEfU7_ + 240
+   21  StressFind                          0x0000000100ca167c $s10StressFindyyXEfU7_TA + 24
+   22  StressFind                          0x000000010126f034 $s9StressKit4step_5limit_xSS_SdxyKXEtKlF + 444
+   23  StressFind                          0x0000000100c92b7c main + 3380
+   24  dyld                                0x0000000183ddbe80 start + 6688
+
+-- stall 382 ms (main thread cpu 380 ms) at t=251.77s in phase 'window: 6 searches cancelled at random'; main thread stack at +100 ms:
+   0   libswiftCore.dylib                  0x00000001987272bc _swift_release_dealloc + 88
+   1   libswiftCore.dylib                  0x000000019878dae4 _ZN5swift9RefCountsINS_13RefCountBitsTILNS_19RefCountInlinednessE1EEEE15doDecrementSlowILNS_13PerformDeinitE1EEEbS3_j + 168
+   2   Foundation                          0x000000018624e2e0 $s10Foundation12URLParseInfoCfD + 20
+   3   libswiftCore.dylib                  0x00000001987272a4 _swift_release_dealloc + 64
+   4   libswiftCore.dylib                  0x000000019878dae4 _ZN5swift9RefCountsINS_13RefCountBitsTILNS_19RefCountInlinednessE1EEEE15doDecrementSlowILNS_13PerformDeinitE1EEEbS3_j + 168
+   5   Foundation                          0x0000000186213588 $s10Foundation9_SwiftURLCfD + 24
+   6   libswiftCore.dylib                  0x00000001987272a4 _swift_release_dealloc + 64
+   7   libswiftCore.dylib                  0x000000019878dae4 _ZN5swift9RefCountsINS_13RefCountBitsTILNS_19RefCountInlinednessE1EEEE15doDecrementSlowILNS_13PerformDeinitE1EEEbS3_j + 168
+   8   libswiftCore.dylib                  0x000000019876e528 _ZL21swift_cvw_destroyImplPN5swift11OpaqueValueEPKNS_14TargetMetadataINS_9InProcessEEE + 372
+   9   StressFind                          0x0000000100ef8c58 $s15FindFilesPlugin0aB16WindowControllerC3RowOwxx + 76
+   10  libswiftCore.dylib                  0x0000000198725788 swift_arrayDestroy + 204
+   11  libswiftCore.dylib                  0x0000000198727320 $ss23_ContiguousArrayStorageCfD + 96
+   12  libswiftCore.dylib                  0x00000001987272a4 _swift_release_dealloc + 64
+   13  libswiftCore.dylib                  0x000000019878dae4 _ZN5swift9RefCountsINS_13RefCountBitsTILNS_19RefCountInlinednessE1EEEE15doDecrementSlowILNS_13PerformDeinitE1EEEbS3_j + 168
+   14  libswiftCore.dylib                  0x0000000198748590 _ZL13tuple_destroyILb0ELb1EEvPN5swift11OpaqueValueEPKNS0_14TargetMetadataINS0_9InProcessEEE + 84
+   15  libswiftCore.dylib                  0x0000000198725788 swift_arrayDestroy + 204
+   16  libswiftCore.dylib                  0x0000000198727320 $ss23_ContiguousArrayStorageCfD + 96
+   17  libswiftCore.dylib                  0x00000001987272a4 _swift_release_dealloc + 64
+   18  libswiftCore.dylib                  0x000000019878dae4 _ZN5swift9RefCountsINS_13RefCountBitsTILNS_19RefCountInlinednessE1EEEE15doDecrementSlowILNS_13PerformDeinitE1EEEbS3_j + 168
+   19  StressFind                          0x0000000100ef1990 $s15FindFilesPlugin0aB16WindowControllerC6finish33_DD3DFA70A6D1DDE037628D46A938A271LL5items6groupsySay9AFMKernel8FileItemVGSg_SayAKGSgtF + 3276
+   20  StressFind                          0x0000000100ef3448 $s15FindFilesPlugin0aB16WindowControllerC4walk33_DD3DFA70A6D1DDE037628D46A938A271LLyyAA10FileSearchCFyyYbcfU_yyScMYccfU1_ + 96
+   21  StressFind                          0x0000000100ef347c $sIeg_IeyB_TRTm + 28
+   22  libdispatch.dylib                   0x0000000183ff0a34 _dispatch_call_block_and_release + 32
+   23  libdispatch.dylib                   0x000000018400a5a0 _dispatch_client_callout + 16
+   24  libdispatch.dylib                   0x0000000184028998 _dispatch_main_queue_drain.cold.6 + 832
+   25  libdispatch.dylib                   0x0000000183fffb0c _dispatch_main_queue_drain + 176
+   26  libdispatch.dylib                   0x0000000183fffa4c _dispatch_main_queue_callback_4CF + 44
+   27  CoreFoundation                      0x00000001842af9cc __CFRUNLOOP_IS_SERVICING_THE_MAIN_DISPATCH_QUEUE__ + 16
+   28  CoreFoundation                      0x000000018427165c __CFRunLoopRun + 1980
+   29  CoreFoundation                      0x000000018434b82c _CFRunLoopRunSpecificWithOptions + 536
+   30  StressFind                          0x000000010126a5e8 $s9StressKit4pump4upTo5untilSbSd_SbyXEtF + 292
+   31  StressFind                          0x0000000100c98c84 $s10StressFindyyXEfU8_ + 1056
+   32  StressFind                          0x000000010126f034 $s9StressKit4step_5limit_xSS_SdxyKXEtKlF + 444
+   33  StressFind                          0x0000000100c92cb8 main + 3696
+
+-- stall 221 ms (main thread cpu 221 ms) at t=96.51s in phase 'engine: million text xxxx #1'; main thread stack at +100 ms:
+   0   libswiftCore.dylib                  0x000000019872f464 $ss6HasherV7combine5bytesySW_tF + 512
+   1   libswiftCore.dylib                  0x0000000198889820 $sSS4hash4intoys6HasherVz_tF + 252
+   2   libswiftCore.dylib                  0x0000000198889820 $sSS4hash4intoys6HasherVz_tF + 252
+   3   StressFind                          0x0000000100c9c2e4 $sSh2eeoiySbShyxG_ABtFZSS_Tt1g5 + 260
+   4   StressFind                          0x0000000100c96c7c $s10StressFind6verify__7against9filesOnlyySS_Say9AFMKernel8FileItemVGShySSGSbtF + 988
+   5   StressFind                          0x0000000100ca1218 $s10StressFindyyXEfU2_TA + 352
+   6   StressFind                          0x000000010126f034 $s9StressKit4step_5limit_xSS_SdxyKXEtKlF + 444
+   7   StressFind                          0x0000000100c928bc main + 2676
+   8   dyld                                0x0000000183ddbe80 start + 6688
+
+-- stall 210 ms (main thread cpu 210 ms) at t=148.45s in phase 'engine: million name * (all) #0'; main thread stack at +100 ms:
+   0   libswiftCore.dylib                  0x000000019872f454 $ss6HasherV7combine5bytesySW_tF + 496
+   1   libswiftCore.dylib                  0x0000000198889820 $sSS4hash4intoys6HasherVz_tF + 252
+   2   libswiftCore.dylib                  0x0000000198889820 $sSS4hash4intoys6HasherVz_tF + 252
+   3   StressFind                          0x0000000100c9c2e4 $sSh2eeoiySbShyxG_ABtFZSS_Tt1g5 + 260
+   4   StressFind                          0x0000000100c96c7c $s10StressFind6verify__7against9filesOnlyySS_Say9AFMKernel8FileItemVGShySSGSbtF + 988
+   5   StressFind                          0x0000000100ca1218 $s10StressFindyyXEfU2_TA + 352
+   6   StressFind                          0x000000010126f034 $s9StressKit4step_5limit_xSS_SdxyKXEtKlF + 444
+   7   StressFind                          0x0000000100c92950 main + 2824
+   8   dyld                                0x0000000183ddbe80 start + 6688
+
+-- stall 139 ms (main thread cpu 0 ms) at t=175.36s in phase 'engine: 8 concurrent searches of the tree'; main thread stack at +100 ms:
+   0   libsystem_kernel.dylib              0x000000018416cc20 mach_msg2_trap + 8
+   1   libsystem_kernel.dylib              0x000000018417f8e0 mach_msg2_internal + 76
+   2   libsystem_kernel.dylib              0x0000000184175a28 mach_msg_overwrite + 480
+   3   libsystem_kernel.dylib              0x000000018416cfac mach_msg + 24
+   4   CoreFoundation                      0x0000000184272aec __CFRunLoopServiceMachPort + 160
+   5   CoreFoundation                      0x0000000184271334 __CFRunLoopRun + 1172
+   6   CoreFoundation                      0x000000018434b82c _CFRunLoopRunSpecificWithOptions + 536
+   7   StressFind                          0x000000010126a5e8 $s9StressKit4pump4upTo5untilSbSd_SbyXEtF + 292
+   8   StressFind                          0x0000000100c97a08 $s10StressFindyyXEfU4_ + 1844
+   9   StressFind                          0x000000010126f034 $s9StressKit4step_5limit_xSS_SdxyKXEtKlF + 444
+   10  StressFind                          0x0000000100c92a04 main + 3004
+   11  dyld                                0x0000000183ddbe80 start + 6688
+
+-- stall 133 ms (main thread cpu 132 ms) at t=33.79s in phase 'engine: tree text NEEDLE #0'; main thread stack at +100 ms:
+   0   libswiftCore.dylib                  0x0000000198a3b640 $ss12validateUTF8ys0B16ValidationResultOSRys5UInt8VGF + 36
+   1   libswiftCore.dylib                  0x0000000198a3b640 $ss12validateUTF8ys0B16ValidationResultOSRys5UInt8VGF + 36
+   2   libswiftCore.dylib                  0x00000001988e3bec $sSS12_tryFromUTF8ySSSgSRys5UInt8VGFZ + 28
+   3   Foundation                          0x000000018614fd48 $sSS10FoundationE5bytes8encodingSSSgxh_SSAAE8EncodingVtcSTRzs5UInt8V7ElementRtzlufCs5SliceVySryAHGG_Tt1B5 + 1684
+   4   Foundation                          0x0000000185a3ce2c -[NSAppleEventDescriptor attributeDescriptorForKeyword:] + 48600
+   5   Foundation                          0x0000000186219abc $sSy10FoundationE26removingURLPercentEncoding33_A90579D1FA072CB135F95EF00BA46450LL10utf8Buffer9excluding8encodingSSSgqd___Shys5UInt8VGSSAAE0D0VtSlRd__AI7ElementRtd__lFAGSryAIGXEfU_SS_SRyAIGTg5 + 16
+   6   Foundation                          0x0000000186219620 $sSy10FoundationE26removingURLPercentEncoding33_A90579D1FA072CB135F95EF00BA46450LL10utf8Buffer9excluding8encodingSSSgqd___Shys5UInt8VGSSAAE0D0VtSlRd__AI7ElementRtd__lFSS_SRyAIGTB5Tf4nnnd_nTm + 156
+   7   Foundation                          0x000000018622d928 $sSy10FoundationE26removingURLPercentEncoding33_A90579D1FA072CB135F95EF00BA46450LL9excluding8encodingSSSgShys5UInt8VG_SSAAE0D0VtFSS_TB5 + 96
+   8   Foundation                          0x000000018620bad4 $s10Foundation9_SwiftURLC4pathSSvg + 512
+   9   Foundation                          0x0000000186195c08 $s10Foundation3URLV4pathSSvg + 60
+   10  StressFind                          0x0000000100ca1288 $s10StressFindyyXEfU2_TA + 464
+   11  StressFind                          0x000000010126f034 $s9StressKit4step_5limit_xSS_SdxyKXEtKlF + 444
+   12  StressFind                          0x0000000100c92950 main + 2824
+   13  dyld                                0x0000000183ddbe80 start + 6688
+
+-- stall 120 ms (main thread cpu 120 ms) at t=234.63s in phase '(harness: checking results)'; main thread stack at +100 ms:
+   0   libswiftCore.dylib                  0x000000019872f424 $ss6HasherV7combine5bytesySW_tF + 448
+   1   libswiftCore.dylib                  0x0000000198889820 $sSS4hash4intoys6HasherVz_tF + 252
+   2   libswiftCore.dylib                  0x0000000198889820 $sSS4hash4intoys6HasherVz_tF + 252
+   3   StressFind                          0x0000000100c9c2e4 $sSh2eeoiySbShyxG_ABtFZSS_Tt1g5 + 260
+   4   StressFind                          0x0000000100c96c7c $s10StressFind6verify__7against9filesOnlyySS_Say9AFMKernel8FileItemVGShySSGSbtF + 988
+   5   StressFind                          0x0000000100c9858c $s10StressFindyyXEfU7_ + 752
+   6   StressFind                          0x0000000100ca167c $s10StressFindyyXEfU7_TA + 24
+   7   StressFind                          0x000000010126f034 $s9StressKit4step_5limit_xSS_SdxyKXEtKlF + 444
+   8   StressFind                          0x0000000100c92b7c main + 3380
+   9   dyld                                0x0000000183ddbe80 start + 6688
+
+-- stall 115 ms (main thread cpu 115 ms) at t=33.36s in phase 'engine: tree name *.txt #1'; main thread stack at +100 ms:
+   0   libsystem_kernel.dylib              0x000000018416cc20 mach_msg2_trap + 8
+   1   libsystem_kernel.dylib              0x000000018417f8e0 mach_msg2_internal + 76
+   2   libsystem_kernel.dylib              0x0000000184195b5c mach_vm_deferred_reclamation_buffer_resize + 140
+   3   libsystem_kernel.dylib              0x0000000184180370 mach_vm_reclaim_ring_resize + 88
+   4   libsystem_malloc.dylib              0x0000000183fabd74 xzm_reclaim_mark_free_locked + 240
+   5   libsystem_malloc.dylib              0x0000000183fcf92c _xzm_xzone_madvise_batch + 428
+   6   Foundation                          0x00000001862135c0 $s10Foundation9_SwiftURLCfD + 80
+   7   libswiftCore.dylib                  0x00000001987272a4 _swift_release_dealloc + 64
+   8   libswiftCore.dylib                  0x000000019878dae4 _ZN5swift9RefCountsINS_13RefCountBitsTILNS_19RefCountInlinednessE1EEEE15doDecrementSlowILNS_13PerformDeinitE1EEEbS3_j + 168
+   9   libswiftCore.dylib                  0x000000019876e528 _ZL21swift_cvw_destroyImplPN5swift11OpaqueValueEPKNS_14TargetMetadataINS_9InProcessEEE + 372
+   10  StressFind                          0x0000000100cbac4c $s9AFMKernel8FileItemVwxx + 48
+   11  libswiftCore.dylib                  0x0000000198725788 swift_arrayDestroy + 204
+   12  libswiftCore.dylib                  0x0000000198727320 $ss23_ContiguousArrayStorageCfD + 96
+   13  libswiftCore.dylib                  0x00000001987272a4 _swift_release_dealloc + 64
+   14  libswiftCore.dylib                  0x000000019878dae4 _ZN5swift9RefCountsINS_13RefCountBitsTILNS_19RefCountInlinednessE1EEEE15doDecrementSlowILNS_13PerformDeinitE1EEEbS3_j + 168
+   15  StressFind                          0x0000000100ca130c $s10StressFindyyXEfU2_TA + 596
+   16  StressFind                          0x000000010126f034 $s9StressKit4step_5limit_xSS_SdxyKXEtKlF + 444
+   17  StressFind                          0x0000000100c928bc main + 2676
+   18  dyld                                0x0000000183ddbe80 start + 6688
+
+FAILURES: 0
+peak RSS 5621 MB, threads 10, load 20.4
+      271.01 real       179.83 user      1519.08 sys
+          5893668864  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+              465861  page reclaims
+                 378  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                   0  signals received
+              880380  voluntary context switches
+             3805069  involuntary context switches
+       3987584868882  instructions retired
+       6141448399237  cycles elapsed
+          2884227128  peak memory footprint
+RUN exit=0 wall=271.0s load_before=22.4 load_after=20.4 cmd=/usr/bin/time -l /private/tmp/claude-501/-Users-cm0k-Claude-Projects-TotalCommander/91e36f29-0d53-4421-8985-1ec839e7f5c4/scratchpad/review2/stress/b-harness/release/StressFind run /private/tmp/claude-

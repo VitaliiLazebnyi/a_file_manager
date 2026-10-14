@@ -1,0 +1,120 @@
+StressArchives mode=big dir=/private/tmp/claude-501/-Users-cm0k-Claude-Projects-TotalCommander/91e36f29-0d53-4421-8985-1ec839e7f5c4/scratchpad/review2/stress/data/archives cores=16 load=38.3115234375
+STEP idle baseline                                  wall=   1.500s cpu=   0.04s threads 7->7 footprint=7MB peakRSS=26MB load=38.3
+big.zip: 96 MB
+probes: 64 members, 131 MB
+LOAD root: first piece 0.457s, complete 0.457s, 401 items, error=nil
+STEP open + list root (panel path)                  wall=   0.457s cpu=   0.47s threads 7->9 footprint=411MB peakRSS=432MB load=36.0
+MEMORY open archive with 200064 members: footprint 139 MB -> 411 MB (1424 bytes per member)
+LOAD root again: first 0.001s complete 0.001s
+STEP list root again (archive open)                 wall=   0.001s cpu=   0.00s threads 9->9 footprint=411MB peakRSS=432MB load=36.0
+LOAD dir0001: first 0.0012s complete 0.0013s, 500 items
+STEP list one folder of 500 (panel path)            wall=   0.001s cpu=   0.00s threads 9->9 footprint=411MB peakRSS=432MB load=36.0
+STEP list every folder (400 listings, 1 thread)     wall=   0.349s cpu=   0.36s threads 9->10 footprint=411MB peakRSS=432MB load=36.0
+STEP list every folder (16 threads at once)         wall=   0.075s cpu=   0.39s threads 9->22 footprint=414MB peakRSS=435MB load=36.0
+STEP harness loop on main: item(at:)+capabilities x20k wall=   0.473s cpu=   0.48s threads 21->21 footprint=414MB peakRSS=439MB load=36.0
+STEP read all 64 probes once, verify                wall=   0.035s cpu=   0.03s threads 21->22 footprint=512MB peakRSS=536MB load=36.0
+MEM after commit 5: footprint=598 MB (harness holds 20 MB of added reference data) t=9.0s
+MEM after commit 10: footprint=694 MB (harness holds 50 MB of added reference data) t=21.7s
+MEM after commit 15: footprint=671 MB (harness holds 65 MB of added reference data) t=33.0s
+MEM after commit 20: footprint=684 MB (harness holds 78 MB of added reference data) t=45.7s
+MEM after commit 25: footprint=689 MB (harness holds 89 MB of added reference data) t=56.9s
+STAGE concurrent: wall=61.1s cpu=541.8s (8.9 cores) footprint 512->689 MB peakRSS=794 MB threads=9 load=29.8
+final unzip -tq: No errors detected in compressed data of /private/tmp/claude-501/-Users-cm0k-Claude-Projects-TotalCommander/91e36f29-0d53-4421-8985-1ec839e7f5c4/scratchpad/review2/stress/data/archives/big.zip.
+final zipinfo -t: 200356 files, 237592388 bytes uncompressed, 150574939 bytes compressed:  36.6%
+final: 356 probe/added members verified through the long-lived store, wrong=0
+STEP after: wait for delayed writes, final checks   wall=   3.836s cpu=   0.33s threads 9->9 footprint=831MB peakRSS=932MB load=28.0
+STEP close the store                                wall=   0.034s cpu=   0.03s threads 9->8 footprint=287MB peakRSS=932MB load=28.0
+MEM after closing the store: footprint=287 MB
+HAZARD item(at:) without a flag, called on main 20 ms after another thread began opening the archive: returned after 418 ms (found=yes, opener done=yes)
+STEP hazard: item(at:) on main while another thread opens the same archive wall=   0.475s cpu=   0.48s threads 8->8 footprint=508MB peakRSS=932MB load=28.0
+STEP leaks(1) on this process                       wall= 829.086s cpu=  18.08s threads 8->8 footprint=276MB peakRSS=932MB load=8.3
+THREADS baseline=7 settled(<=8s)=8
+COUNT bytes read and verified = 1235819612791
+COUNT commits = 26
+COUNT contentsChanged callbacks = 26
+COUNT contentsChanged on main = 26
+COUNT listing rounds = 18810
+COUNT members added = 292
+COUNT reads completed although cancelled = 51
+COUNT reads completed and verified = 742286
+COUNT reads ended by cancel = 11088
+COUNT reference bytes held = 97237560
+TIME cancel -> read ended: n=11088 min=0.0ms median=0.0ms p95=1.5ms max=60.0ms
+TIME commit (200k-member archive): n=26 min=333.8ms median=363.0ms p95=539.7ms max=655.3ms
+TIME fresh reader open + verify: n=26 min=575.2ms median=662.2ms p95=1039.2ms max=1083.7ms
+TIME list folder of 500: n=18810 min=0.8ms median=0.9ms p95=2.9ms max=112.5ms
+TIME list root: n=18810 min=0.5ms median=0.6ms p95=1.9ms max=127.0ms
+TIME read of a 24 MB member (incl. cancelled): n=41326 min=0.1ms median=6.5ms p95=16.2ms max=175.9ms
+TIME read of a small/medium member (incl. cancelled): n=712099 min=0.0ms median=0.2ms p95=3.1ms max=200.2ms
+TIME unzip -tq: n=26 min=609.0ms median=1053.7ms p95=1373.7ms max=1438.3ms
+
+==== INVARIANT VIOLATIONS ====
+none
+
+==== MAIN-THREAD WATCHDOG: StressArchives big ====
+histogram bounds (ms): <2 <4 <8 <16 <33 <100 <250 <1000 <5000 >=5000
+phase                                            wall s   pings   >8ms >100ms    >1s    max ms  histogram
+idle baseline                                      1.54     577      0      0      0       0.2  577,0,0,0,0,0,0,0,0,0
+open + list root (panel path)                      0.46     172      1      0      0      42.0  171,0,0,0,0,1,0,0,0,0
+list root again (archive open)                     0.00       0      0      0      0       0.0  0,0,0,0,0,0,0,0,0,0
+list one folder of 500 (panel path)                0.00       1      0      0      0       0.0  1,0,0,0,0,0,0,0,0,0
+list every folder (400 listings, 1 thread)         0.35     133      0      0      0       0.1  133,0,0,0,0,0,0,0,0,0
+list every folder (16 threads at once)             0.07      28      0      0      0       0.1  28,0,0,0,0,0,0,0,0,0
+harness loop on main: item(at:)+capabilities x20k     0.47       0      0      0      0       0.0  0,0,0,0,0,0,0,0,0,0
+read all 64 probes once, verify                    0.03      14      1      1      0     472.9  13,0,0,0,0,0,0,1,0,0
+concurrent: 16 readers + adder/commit + lister    60.00   21328      9      0      0      17.0  21204,90,25,8,1,0,0,0,0,0
+concurrent: waiting for the threads to end         1.07     363      0      0      0       1.6  363,0,0,0,0,0,0,0,0,0
+after: wait for delayed writes, final checks       3.84    1260      6      0      0      15.4  1249,4,1,6,0,0,0,0,0,0
+close the store                                    0.03       0      0      0      0       0.0  0,0,0,0,0,0,0,0,0,0
+hazard: item(at:) on main while another thread opens the same archive     0.48       0      0      0      0       0.0  0,0,0,0,0,0,0,0,0,0
+leaks(1) on this process                         829.09  275635    249      1      0     508.6  273676,1215,495,216,29,3,0,1,0,0
+settle (idle)                                      8.01    2732      1      0      0      10.5  2729,1,1,1,0,0,0,0,0,0
+end                                                0.05       0      0      0      0       0.0  0,0,0,0,0,0,0,0,0,0
+TOTAL                                            905.50  302243    267      2      0     508.6
+
+-- stall 509 ms at t=67.84s in phase 'leaks(1) on this process'; main thread stack at +100 ms:
+   0   libsystem_kernel.dylib              0x000000018416f9dc __psynch_mutexwait + 8
+   1   libsystem_pthread.dylib             0x00000001841aef7c _pthread_mutex_firstfit_lock_wait + 84
+   2   libsystem_pthread.dylib             0x00000001841ac9b8 _pthread_mutex_firstfit_lock_slow + 216
+   3   StressArchives.run                  0x0000000102eb8524 $s14ArchivesPlugin12ArchiveStoreC7archive2at12cancellationAA04OpenC0C10Foundation3URLV_9AFMKernel16CancellationFlagCSgtKF + 988
+   4   StressArchives.run                  0x0000000102ebb5f8 $s14ArchivesPlugin17ArchiveFileSystemC7resolve33_6563B31C93C823A1B97E7C4339428A3BLL_12cancellationAC6TargetAELLO10Foundation3URLV_9AFMKernel16CancellationFlagCSgtKF + 556
+   5   StressArchives.run                  0x0000000102ebc7f0 $s14ArchivesPlugin17ArchiveFileSystemC4item33_6563B31C93C823A1B97E7C4339428A3BLL2at12cancellation9AFMKernel0D4ItemVSg10Foundation3URLV_AH16CancellationFlagCSgtF + 360
+   6   StressArchives.run                  0x0000000102c11b04 $s14StressArchives6runBigyyFyyXEfU13_ + 908
+   7   StressArchives.run                  0x0000000102c1c078 $s14StressArchives6runBigyyFyyXEfU13_TA + 24
+   8   StressArchives.run                  0x00000001031eaa34 $s9StressKit4step_5limit_xSS_SdxyKXEtKlF + 444
+   9   StressArchives.run                  0x0000000102c053c4 $s14StressArchives6runBigyyF + 9604
+   10  StressArchives.run                  0x0000000102c024d8 main + 1680
+   11  dyld                                0x0000000183ddbe80 start + 6688
+
+-- stall 473 ms at t=2.43s in phase 'read all 64 probes once, verify'; main thread stack at +100 ms:
+   0   libsystem_malloc.dylib              0x0000000183fd58cc _xzm_free_tc + 84
+   1   libswiftCore.dylib                  0x00000001988c48b0 $ss16IndexingIteratorVyxGStsSt4next7ElementQzSgyFTW + 600
+   2   libswiftCore.dylib                  0x00000001988915c8 $sSKsSS7ElementRtzrlE6joined9separatorS2S_tF + 4360
+   3   StressArchives.run                  0x0000000102ec61ec $s14ArchivesPlugin10ArchiveURLO5parseyAC5PlaceOSg10Foundation0D0VFZ + 1236
+   4   StressArchives.run                  0x0000000102ebec78 $s14ArchivesPlugin17ArchiveFileSystemC12capabilities3for9AFMKernel0dE12CapabilitiesV10Foundation3URLV_tF + 212
+   5   StressArchives.run                  0x0000000102c0ac80 $s14StressArchives6runBigyyFyyXEfU5_ + 600
+   6   StressArchives.run                  0x0000000102c1bbbc $s14StressArchives6runBigyyFyyXEfU5_TA + 28
+   7   StressArchives.run                  0x00000001031eaa34 $s9StressKit4step_5limit_xSS_SdxyKXEtKlF + 444
+   8   StressArchives.run                  0x0000000102c042d4 $s14StressArchives6runBigyyF + 5268
+   9   StressArchives.run                  0x0000000102c024d8 main + 1680
+   10  dyld                                0x0000000183ddbe80 start + 6688
+FINAL threads=8 (baseline 7) peakRSS=932MB footprint=276MB load=7.9
+      905.66 real       449.60 user       136.59 sys
+           977108992  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+              173915  page reclaims
+                 128  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                   0  signals received
+               63115  voluntary context switches
+             4883064  involuntary context switches
+       6432721542196  instructions retired
+       2011767261366  cycles elapsed
+           871237120  peak memory footprint
+RUN exit=0 wall=905.7s load_before=38.3 load_after=7.9 cmd=/usr/bin/time -l /private/tmp/claude-501/-Users-cm0k-Claude-Projects-TotalCommander/91e36f29-0d53-4421-8985-1ec839e7f5c4/scratchpad/review2/stress/bin/StressArchives.run --mode big --dir /private/tmp/

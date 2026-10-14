@@ -1,0 +1,2 @@
+RUN exit=0 wall=171.9s load_before=19.9 load_after=41.3 cmd=/usr/bin/time -l /private/tmp/claude-501/-Users-cm0k-Claude-Projects-TotalCommander/91e36f29-0d53-4421-8985-1ec839e7f5c4/scratchpad/review2/stress/b-harness/release/StressPanel million /private/tmp/cl
+M3-DONE

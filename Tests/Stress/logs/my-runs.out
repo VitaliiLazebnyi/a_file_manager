@@ -1,0 +1,5 @@
+RUN exit=0 wall=39.1s load_before=13.1 load_after=12.2 cmd=/usr/bin/time -l /private/tmp/claude-501/-Users-cm0k-Claude-Projects-TotalCommander/91e36f29-0d53-4421-8985-1ec839e7f5c4/scratchpad/review2/stress/b-harness/release/StressParallel
+RUN exit=1 wall=50.4s load_before=44.2 load_after=33.8 cmd=/usr/bin/time -l /private/tmp/claude-501/-Users-cm0k-Claude-Projects-TotalCommander/91e36f29-0d53-4421-8985-1ec839e7f5c4/scratchpad/review2/stress/b-harness/release/StressPanel stalled /private/tmp/cl
+RUN exit=0 wall=34.4s load_before=34.8 load_after=29.0 cmd=/usr/bin/time -l /private/tmp/claude-501/-Users-cm0k-Claude-Projects-TotalCommander/91e36f29-0d53-4421-8985-1ec839e7f5c4/scratchpad/review2/stress/b-harness/release/StressPanel flood /private/tmp/clau
+RUN exit=0 wall=235.3s load_before=29.8 load_after=29.5 cmd=/usr/bin/time -l /private/tmp/claude-501/-Users-cm0k-Claude-Projects-TotalCommander/91e36f29-0d53-4421-8985-1ec839e7f5c4/scratchpad/review2/stress/b-harness/release/StressPanel million /private/tmp/cl
+MY-RUNS-DONE

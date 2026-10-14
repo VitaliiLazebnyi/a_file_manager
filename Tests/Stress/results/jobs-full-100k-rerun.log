@@ -1,0 +1,81 @@
+StressJobs root=/private/tmp/claude-501/-Users-cm0k-Claude-Projects-TotalCommander/91e36f29-0d53-4421-8985-1ec839e7f5c4/scratchpad/review2/stress/data/jobs files=100000 folders=2000 big=12 seeds=4 memseeds=0 cores=16 load=7.94482421875
+STEP idle baseline                                  wall=   1.501s cpu=   0.04s threads 7->9 footprint=16MB peakRSS=40MB load=7.9
+STEP build tree                                     wall=   6.554s cpu=  56.16s threads 9->23 footprint=148MB peakRSS=171MB load=11.6
+tree: 100012 files, 2000 folders (+big), 225 MB
+RUN seed=0 copy wall=16.67s cancelAt=- sent=n cancelled=n completed=2001 failures=0 reports=403 pauses=0 threads=18
+RATE copy: 5999 files/s, 13.5 MB/s
+RUN seed=0 delete wall=4.54s cancelAt=- sent=n cancelled=n completed=2001 failures=0 reports=100 pauses=0 threads=18
+RATE delete: 22026 files/s
+RUN seed=0 move wall=5.93s cancelAt=- sent=n cancelled=n completed=2001 failures=0 reports=136 pauses=0 threads=11
+RATE move (half merge, same volume): 16858 files/s
+RUN seed=0 move-back wall=3.54s cancelAt=- sent=n cancelled=n completed=2001 failures=0 reports=85 pauses=0 threads=23
+RATE move back (a third merged, rest whole-folder renames): 28241 files/s
+STEP calibration: uninterrupted copy/delete/move    wall=  54.303s cpu= 367.09s threads 22->23 footprint=125MB peakRSS=403MB load=21.5
+threads at baseline (after calibration, settled 6 s): 10
+RUN seed=20 copy wall=15.59s cancelAt=- sent=n cancelled=n completed=2001 failures=0 reports=377 pauses=127 threads=17
+RUN seed=20 delete wall=3.17s cancelAt=4.817s(bg) sent=n cancelled=n completed=2001 failures=0 reports=69 pauses=32 threads=23
+RUN seed=20 move wall=4.59s cancelAt=4.576s(main) sent=y cancelled=y completed=1925 failures=0 reports=108 pauses=0 threads=18
+RUN seed=20 move-back wall=3.41s cancelAt=- sent=n cancelled=n completed=1963 failures=0 reports=82 pauses=29 threads=23
+RUN seed=100020 move-back wall=0.00s cancelAt=- sent=n cancelled=n completed=0 failures=0 reports=1 pauses=0 threads=23
+RUN seed=21 copy wall=10.67s cancelAt=10.663s(bg) sent=y cancelled=y completed=1298 failures=0 reports=255 pauses=107 threads=19
+RUN seed=21 delete wall=2.44s cancelAt=2.431s(bg) sent=y cancelled=y completed=1295 failures=0 reports=53 pauses=0 threads=23
+RUN seed=100021 delete wall=0.05s cancelAt=- sent=n cancelled=n completed=4 failures=0 reports=2 pauses=1 threads=38
+RUN seed=21 move wall=3.04s cancelAt=3.030s(main) sent=y cancelled=y completed=819 failures=0 reports=63 pauses=30 threads=23
+RUN seed=21 move-back wall=1.97s cancelAt=- sent=n cancelled=n completed=1410 failures=0 reports=46 pauses=0 threads=38
+RUN seed=100021 move-back wall=0.00s cancelAt=- sent=n cancelled=n completed=0 failures=0 reports=1 pauses=0 threads=23
+RUN seed=22 copy wall=6.11s cancelAt=6.105s(bg) sent=y cancelled=y completed=672 failures=0 reports=137 pauses=54 threads=18
+RUN seed=22 delete wall=0.09s cancelAt=0.085s(main) sent=y cancelled=y completed=0 failures=0 reports=0 pauses=0 threads=38
+RUN seed=100022 delete wall=2.10s cancelAt=- sent=n cancelled=n completed=673 failures=0 reports=49 pauses=16 threads=38
+RUN seed=22 move wall=5.62s cancelAt=6.383s(bg) sent=n cancelled=n completed=2001 failures=0 reports=124 pauses=0 threads=12
+RUN seed=22 move-back wall=3.36s cancelAt=- sent=n cancelled=n completed=2001 failures=0 reports=79 pauses=0 threads=22
+RUN seed=100022 move-back wall=0.00s cancelAt=- sent=n cancelled=n completed=0 failures=0 reports=1 pauses=0 threads=23
+RUN seed=23 copy wall=3.27s cancelAt=3.262s(main) sent=y cancelled=y completed=262 failures=0 reports=70 pauses=0 threads=23
+RUN seed=23 delete wall=0.40s cancelAt=3.648s(bg) sent=n cancelled=n completed=263 failures=0 reports=10 pauses=2 threads=38
+RUN seed=23 move wall=2.91s cancelAt=2.901s(main) sent=y cancelled=y completed=1208 failures=0 reports=66 pauses=0 threads=23
+RUN seed=23 move-back wall=1.95s cancelAt=- sent=n cancelled=n completed=1605 failures=0 reports=47 pauses=21 threads=38
+RUN seed=100023 move-back wall=0.00s cancelAt=- sent=n cancelled=n completed=0 failures=0 reports=1 pauses=0 threads=23
+THREADS after seed 23: right after=23 settled(<=8s)=9 baseline=10 max so far=38 footprint=132MB peakRSS=409MB load=22.548828125
+DURATIONS copy: n=5 min=3.27s max=16.67s mean=10.46s
+DURATIONS delete: n=7 min=0.05s max=4.54s mean=1.83s
+DURATIONS move: n=5 min=2.91s max=5.93s mean=4.42s
+DURATIONS move-back: n=9 min=0.00s max=3.54s mean=1.58s
+STEP remove tree                                    wall=   5.639s cpu=  38.93s threads 9->23 footprint=58MB peakRSS=409MB load=21.1
+
+==== INVARIANT VIOLATIONS ====
+none
+
+==== MAIN-THREAD WATCHDOG: StressJobs ====
+histogram bounds (ms): <2 <4 <8 <16 <33 <100 <250 <1000 <5000 >=5000
+phase                                            wall s   pings   >8ms >100ms    >1s    max ms  histogram
+idle baseline                                      1.50     509      0      0      0       6.8  508,0,1,0,0,0,0,0,0,0
+build tree                                         6.56    1877      0      0      0       4.3  1832,44,1,0,0,0,0,0,0,0
+calibration: uninterrupted copy/delete/move        0.01       3      1      0      0       8.7  2,0,0,1,0,0,0,0,0,0
+copy                                              52.31   17242      1      0      0      17.4  17239,2,0,0,1,0,0,0,0,0
+verify (harness)                                 154.49   31521    836      0      0      63.2  26266,2974,1445,557,246,33,0,0,0,0
+delete                                            12.80    4236      3      0      0      13.8  4204,23,6,3,0,0,0,0,0,0
+move                                              22.09    7196      5      0      0      16.1  7142,35,14,4,1,0,0,0,0,0
+move-back                                         14.24    4683      7      0      0      33.3  4663,7,6,3,3,1,0,0,0,0
+settle (idle)                                      4.97    1681      0      0      0       0.1  1681,0,0,0,0,0,0,0,0,0
+remove tree                                        5.64    1967      0      0      0       1.8  1967,0,0,0,0,0,0,0,0,0
+end                                                0.00       0      0      0      0       0.0  0,0,0,0,0,0,0,0,0,0
+TOTAL                                            274.62   70915    853      0      0      63.2
+FINAL threads=22 (baseline 10, max seen 38) peakRSS=409MB footprint=58MB load=21.1
+      274.77 real        43.13 user      2165.38 sys
+           428867584  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+              133087  page reclaims
+                 145  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                   0  signals received
+              351982  voluntary context switches
+             9160512  involuntary context switches
+       3418249913131  instructions retired
+       8179530415736  cycles elapsed
+           375522408  peak memory footprint
+RUN exit=0 wall=274.8s load_before=7.9 load_after=21.1 cmd=/usr/bin/time -l /private/tmp/claude-501/-Users-cm0k-Claude-Projects-TotalCommander/91e36f29-0d53-4421-8985-1ec839e7f5c4/scratchpad/review2/stress/bin/StressJobs.run --root /private/tmp/claude-501/-Us

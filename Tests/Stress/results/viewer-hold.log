@@ -1,0 +1,53 @@
+STEP idle baseline                                  wall=   1.004s cpu=   0.03s threads 9->10 footprint=7MB peakRSS=27MB load=26.5
+file smoke64m.txt: 67108864 bytes; threads at baseline 10
+  open 0.000s; first rows on screen after 0.018s (ok); rows known then: 834496
+STEP open, wrap at 131 columns: first rows          wall=   0.018s cpu=   0.06s threads 10->22 footprint=82MB peakRSS=105MB load=26.5
+  index complete after 0.000s more: rows 834496, lines 834432, checkpoints 13040, footprint 82 MB, read error: nil
+STEP index to the end (parallel)                    wall=   0.000s cpu=   0.00s threads 22->22 footprint=82MB peakRSS=105MB load=26.5
+STEP indexed: rows from 6 threads + user at the pager, 4 s wall=   4.000s cpu=   2.70s threads 22->22 footprint=84MB peakRSS=107MB load=26.1
+STEP indexed: first/last rows and round trips       wall=   0.077s cpu=   0.08s threads 22->22 footprint=106MB peakRSS=129MB load=26.1
+  marker NOT found in 0.024s (2711 MiB/s)
+FAIL smoke64m.txt: the marker at the end was not found where it is: nil
+STEP search forward: marker at the very end         wall=   0.024s cpu=   0.11s threads 22->37 footprint=134MB peakRSS=157MB load=26.1
+  absent text: not found in 0.008s
+STEP search backward from the end: absent text      wall=   0.008s cpu=   0.05s threads 37->37 footprint=183MB peakRSS=206MB load=26.1
+  cancel -> search returned: worst 0.6 ms; threads now 36
+STEP search cancelled at random, 30 times           wall=   0.258s cpu=   1.15s threads 37->36 footprint=1722MB peakRSS=1744MB load=26.1
+  wider, wrap at 154: complete in 0.010s, segments reused 0, rows 834496, lines 834432, checkpoints 13040, footprint 1771 MB
+STEP relayout: wider, wrap at 154                   wall=   0.010s cpu=   0.07s threads 36->36 footprint=1771MB peakRSS=1793MB load=26.1
+  narrow, wrap at 40: complete in 0.026s, segments reused 0, rows 2103872, lines 834432, checkpoints 8224, footprint 1789 MB
+STEP relayout: narrow, wrap at 40                   wall=   0.026s cpu=   0.20s threads 36->37 footprint=1789MB peakRSS=1811MB load=26.1
+  no wrap, cut at 1024: complete in 0.010s, segments reused 0, rows 834432, lines 834432, checkpoints 13040, footprint 1796 MB
+STEP relayout: no wrap, cut at 1024                 wall=   0.010s cpu=   0.07s threads 37->37 footprint=1796MB peakRSS=1818MB load=26.1
+  threads at most during the storm: 38
+  footprint at the end of the storm 1854 MB, peak RSS 1876 MB
+  the last layout was indexed 0.009s after the storm; shown document is the last one: true
+STEP storm: 40 relayouts during indexing + 6 readers + 2 searchers + user wall=   7.036s cpu=   5.70s threads 37->23 footprint=1854MB peakRSS=1876MB load=25.5
+  threads after closing: 0.0s:23 0.5s:23 1.0s:23 1.5s:23 2.0s:23 2.5s:23 3.0s:23 3.5s:23 4.0s:23 4.5s:18 5.0s:8 (baseline 10)
+  footprint after closing 1854 MB, peak RSS 1876 MB
+STEP close; threads settle                          wall=   5.015s cpu=   0.16s threads 23->8 footprint=1854MB peakRSS=1876MB load=26.2
+RELAYOUT wider, wrap at 154: 0.010s (reused 0); narrow, wrap at 40: 0.026s (reused 0); no wrap, cut at 1024: 0.010s (reused 0)
+holding for 45.0 s, pid 53287, footprint 1853.9555053710938 MB
+
+==== MAIN-THREAD WATCHDOG: scenario 7, viewer: /private/tmp/claude-501/-Users-cm0k-Claude-Projects-TotalCommander/91e36f29-0d53-4421-8985-1ec839e7f5c4/scratchpad/review2/stress/data/viewer/smoke64m.txt ====
+histogram bounds (ms): <2 <4 <8 <16 <33 <100 <250 <1000 <5000 >=5000
+phase                                            wall s   pings   >8ms >100ms    >1s    max ms  histogram
+idle baseline                                      1.01     321      0      0      0       3.8  317,4,0,0,0,0,0,0,0,0
+open, wrap at 131 columns: first rows              0.02       2      1      0      0      12.3  0,0,1,1,0,0,0,0,0,0
+index to the end (parallel)                        0.00       0      0      0      0       0.0  0,0,0,0,0,0,0,0,0,0
+indexed: rows from 6 threads + user at the pager, 4 s     4.00    1287      0      0      0       5.0  1281,5,1,0,0,0,0,0,0,0
+indexed: first/last rows and round trips           0.08      25      0      0      0       1.0  25,0,0,0,0,0,0,0,0,0
+search forward: marker at the very end             0.02       5      0      0      0       2.0  5,0,0,0,0,0,0,0,0,0
+search backward from the end: absent text          0.01       2      0      0      0       0.8  2,0,0,0,0,0,0,0,0,0
+search cancelled at random, 30 times               0.26      70      0      0      0       2.6  67,3,0,0,0,0,0,0,0,0
+relayout: wider, wrap at 154                       0.01       3      0      0      0       3.0  2,1,0,0,0,0,0,0,0,0
+relayout: narrow, wrap at 40                       0.03       4      0      0      0       5.6  3,0,1,0,0,0,0,0,0,0
+relayout: no wrap, cut at 1024                     0.01       3      0      0      0       0.5  3,0,0,0,0,0,0,0,0,0
+storm: 40 relayouts during indexing + 6 readers + 2 searchers + user     7.04    2156      8      0      0      14.5  2104,29,15,8,0,0,0,0,0,0
+close; threads settle                             50.02   16265     11      0      0      18.9  16117,113,24,9,2,0,0,0,0,0
+TOTAL                                             62.50   20143     20      0      0      18.9
+
+FAILURES: 1 kinds
+  smoke64m.txt: the marker at the end was not found where it is: nil
+  count 1: smoke64m.txt: the marker at the end was not found where it is
+peak RSS 1876 MB, threads 7, load 29.0

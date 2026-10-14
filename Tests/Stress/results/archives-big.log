@@ -1,0 +1,100 @@
+StressArchives mode=big dir=/private/tmp/claude-501/-Users-cm0k-Claude-Projects-TotalCommander/91e36f29-0d53-4421-8985-1ec839e7f5c4/scratchpad/review2/stress/data/archives cores=16 load=23.85888671875
+STEP idle baseline                                  wall=   1.502s cpu=   0.05s threads 7->7 footprint=7MB peakRSS=26MB load=23.9
+big.zip: 96 MB
+probes: 64 members, 131 MB
+LOAD root: first piece 0.470s, complete 0.471s, 401 items, error=nil
+STEP open + list root (panel path)                  wall=   0.471s cpu=   0.48s threads 7->8 footprint=411MB peakRSS=432MB load=23.9
+MEMORY open archive with 200064 members: footprint 139 MB -> 411 MB (1425 bytes per member)
+LOAD root again: first 0.001s complete 0.001s
+STEP list root again (archive open)                 wall=   0.001s cpu=   0.00s threads 8->8 footprint=411MB peakRSS=432MB load=23.9
+LOAD dir0001: first 0.0013s complete 0.0013s, 500 items
+STEP list one folder of 500 (panel path)            wall=   0.001s cpu=   0.00s threads 8->8 footprint=411MB peakRSS=432MB load=23.9
+STEP list every folder (400 listings, 1 thread)     wall=   0.358s cpu=   0.37s threads 8->9 footprint=411MB peakRSS=432MB load=23.9
+STEP list every folder (16 threads at once)         wall=   0.169s cpu=   0.47s threads 8->22 footprint=414MB peakRSS=435MB load=24.5
+STEP harness loop on main: item(at:)+capabilities x20k wall=   0.580s cpu=   0.57s threads 21->21 footprint=414MB peakRSS=439MB load=24.5
+STEP read all 64 probes once, verify                wall=   0.038s cpu=   0.04s threads 21->22 footprint=513MB peakRSS=537MB load=24.5
+STAGE concurrent: wall=92.2s cpu=569.0s (6.2 cores) footprint 513->817 MB peakRSS=917 MB threads=9 load=38.5
+final unzip -tq: No errors detected in compressed data of /private/tmp/claude-501/-Users-cm0k-Claude-Projects-TotalCommander/91e36f29-0d53-4421-8985-1ec839e7f5c4/scratchpad/review2/stress/data/archives/big.zip.
+final zipinfo -t: 200380 files, 264212795 bytes uncompressed, 170347700 bytes compressed:  35.5%
+final: 380 probe/added members verified through the long-lived store, wrong=0
+STEP after: wait for delayed writes, final checks   wall=   4.021s cpu=   0.43s threads 9->9 footprint=879MB peakRSS=985MB load=36.4
+STEP close the store                                wall=   0.030s cpu=   0.03s threads 8->8 footprint=879MB peakRSS=985MB load=36.4
+THREADS baseline=7 settled(<=8s)=8
+COUNT bytes read and verified = 1326631312265
+COUNT commits = 30
+COUNT contentsChanged callbacks = 30
+COUNT contentsChanged on main = 30
+COUNT listing rounds = 18070
+COUNT members added = 316
+COUNT reads completed although cancelled = 42
+COUNT reads completed and verified = 804155
+COUNT reads ended by cancel = 13419
+TIME cancel -> read ended: n=13419 min=0.0ms median=0.1ms p95=4.0ms max=119.7ms
+TIME commit (200k-member archive): n=30 min=332.6ms median=482.5ms p95=717.9ms max=721.5ms
+TIME fresh reader open + verify: n=30 min=620.9ms median=1011.8ms p95=1457.1ms max=1459.0ms
+TIME list folder of 500: n=18070 min=0.8ms median=0.9ms p95=7.0ms max=160.8ms
+TIME list root: n=18070 min=0.5ms median=0.6ms p95=3.4ms max=124.5ms
+TIME read of a 24 MB member (incl. cancelled): n=44730 min=0.0ms median=6.9ms p95=21.2ms max=224.1ms
+TIME read of a small/medium member (incl. cancelled): n=772886 min=0.0ms median=0.1ms p95=5.9ms max=240.9ms
+TIME unzip -tq: n=30 min=723.9ms median=1234.9ms p95=1889.8ms max=2215.6ms
+
+==== INVARIANT VIOLATIONS ====
+none
+
+==== MAIN-THREAD WATCHDOG: StressArchives big ====
+histogram bounds (ms): <2 <4 <8 <16 <33 <100 <250 <1000 <5000 >=5000
+phase                                            wall s   pings   >8ms >100ms    >1s    max ms  histogram
+idle baseline                                      1.55     512      0      0      0       1.0  512,0,0,0,0,0,0,0,0,0
+open + list root (panel path)                      0.47     154      1      0      0      49.4  153,0,0,0,0,1,0,0,0,0
+list root again (archive open)                     0.00       0      0      0      0       0.0  0,0,0,0,0,0,0,0,0,0
+list one folder of 500 (panel path)                0.00       1      0      0      0       0.1  1,0,0,0,0,0,0,0,0,0
+list every folder (400 listings, 1 thread)         0.36     121      0      0      0       0.9  121,0,0,0,0,0,0,0,0,0
+list every folder (16 threads at once)             0.17      44      0      0      0       3.9  41,3,0,0,0,0,0,0,0,0
+harness loop on main: item(at:)+capabilities x20k     0.58       0      0      0      0       0.0  0,0,0,0,0,0,0,0,0,0
+read all 64 probes once, verify                    0.04      13      1      1      0     577.9  12,0,0,0,0,0,0,1,0,0
+concurrent: 16 readers + adder/commit + lister    90.00   29291     23      0      0      16.7  28871,304,93,21,2,0,0,0,0,0
+concurrent: waiting for the threads to end         2.17     726      0      0      0       2.7  724,2,0,0,0,0,0,0,0,0
+after: wait for delayed writes, final checks       4.02    1345      0      0      0       7.8  1341,2,2,0,0,0,0,0,0,0
+close the store                                    0.03       0      0      0      0       0.0  0,0,0,0,0,0,0,0,0,0
+settle (idle)                                      8.04    2640      1      0      0      27.0  2623,14,2,0,1,0,0,0,0,0
+end                                                0.07       0      0      0      0       0.0  0,0,0,0,0,0,0,0,0,0
+TOTAL                                            107.50   34847     26      1      0     577.9
+
+-- stall 578 ms at t=2.55s in phase 'read all 64 probes once, verify'; main thread stack at +100 ms:
+   0   Foundation                          0x0000000185a3cd44 -[NSAppleEventDescriptor attributeDescriptorForKeyword:] + 48368
+   1   Foundation                          0x0000000186219abc $sSy10FoundationE26removingURLPercentEncoding33_A90579D1FA072CB135F95EF00BA46450LL10utf8Buffer9excluding8encodingSSSgqd___Shys5UInt8VGSSAAE0D0VtSlRd__AI7ElementRtd__lFAGSryAIGXEfU_SS_SRyAIGTg5 + 16
+   2   Foundation                          0x0000000186219abc $sSy10FoundationE26removingURLPercentEncoding33_A90579D1FA072CB135F95EF00BA46450LL10utf8Buffer9excluding8encodingSSSgqd___Shys5UInt8VGSSAAE0D0VtSlRd__AI7ElementRtd__lFAGSryAIGXEfU_SS_SRyAIGTg5 + 16
+   3   Foundation                          0x0000000186219620 $sSy10FoundationE26removingURLPercentEncoding33_A90579D1FA072CB135F95EF00BA46450LL10utf8Buffer9excluding8encodingSSSgqd___Shys5UInt8VGSSAAE0D0VtSlRd__AI7ElementRtd__lFSS_SRyAIGTB5Tf4nnnd_nTm + 156
+   4   Foundation                          0x000000018622d928 $sSy10FoundationE26removingURLPercentEncoding33_A90579D1FA072CB135F95EF00BA46450LL9excluding8encodingSSSgShys5UInt8VG_SSAAE0D0VtFSS_TB5 + 96
+   5   Foundation                          0x000000018620bad4 $s10Foundation9_SwiftURLC4pathSSvg + 512
+   6   Foundation                          0x0000000186195c08 $s10Foundation3URLV4pathSSvg + 60
+   7   StressArchives.run                  0x00000001052d0a94 $s14ArchivesPlugin11OpenArchiveC9isCurrentSbyF + 864
+   8   StressArchives.run                  0x00000001052a3208 $s14ArchivesPlugin12ArchiveStoreC7archive2at12cancellationAA04OpenC0C10Foundation3URLV_9AFMKernel16CancellationFlagCSgtKF + 1364
+   9   StressArchives.run                  0x00000001052a6164 $s14ArchivesPlugin17ArchiveFileSystemC7resolve33_6563B31C93C823A1B97E7C4339428A3BLL_12cancellationAC6TargetAELLO10Foundation3URLV_9AFMKernel16CancellationFlagCSgtKF + 556
+   10  StressArchives.run                  0x00000001052a735c $s14ArchivesPlugin17ArchiveFileSystemC4item33_6563B31C93C823A1B97E7C4339428A3BLL2at12cancellation9AFMKernel0D4ItemVSg10Foundation3URLV_AH16CancellationFlagCSgtF + 360
+   11  StressArchives.run                  0x0000000104ff6904 $s14StressArchives6runBigyyFyyXEfU5_ + 976
+   12  StressArchives.run                  0x000000010500699c $s14StressArchives6runBigyyFyyXEfU5_TA + 28
+   13  StressArchives.run                  0x00000001055d55a0 $s9StressKit4step_5limit_xSS_SdxyKXEtKlF + 444
+   14  StressArchives.run                  0x0000000104ff02d8 $s14StressArchives6runBigyyF + 5272
+   15  StressArchives.run                  0x0000000104fee4d8 main + 1680
+   16  dyld                                0x0000000183ddbe80 start + 6688
+FINAL threads=8 (baseline 7) peakRSS=985MB footprint=879MB load=34.8
+      107.87 real       474.69 user       122.76 sys
+          1032699904  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+              193519  page reclaims
+                 121  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                   0  signals received
+               63553  voluntary context switches
+             2652121  involuntary context switches
+       6657141801087  instructions retired
+       1983442321685  cycles elapsed
+           921749064  peak memory footprint
+RUN exit=0 wall=107.9s load_before=23.9 load_after=34.8 cmd=/usr/bin/time -l /private/tmp/claude-501/-Users-cm0k-Claude-Projects-TotalCommander/91e36f29-0d53-4421-8985-1ec839e7f5c4/scratchpad/review2/stress/bin/StressArchives.run --mode big --dir /private/tmp/

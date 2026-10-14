@@ -1,0 +1,33 @@
+tree: 100002 files
+tree: *.txt 80000, with needle 1129
+STEP ground truth: tree                             wall=  13.067s cpu=  21.65s threads 7->8 footprint=37MB peakRSS=60MB load=34.6
+million: 1000000 files
+million: *7.png 16667, with xxxx 99750, all files 1000000
+STEP ground truth: million                          wall=  21.488s cpu=  27.65s threads 8->19 footprint=482MB peakRSS=505MB load=34.7
+STEP idle baseline                                  wall=   2.001s cpu=   0.05s threads 19->19 footprint=483MB peakRSS=507MB load=32.6
+threads at baseline: 19
+  engine tree name *.txt: 80000 results in 0.322s, first after 0.009s
+STEP engine: tree name *.txt #0                     wall=   0.446s cpu=   2.45s threads 19->19 footprint=468MB peakRSS=581MB load=32.6
+  engine tree name *.txt: 80000 results in 0.353s, first after 0.002s
+STEP engine: tree name *.txt #1                     wall=   0.458s cpu=   3.44s threads 19->19 footprint=503MB peakRSS=584MB load=32.6
+  engine tree text NEEDLE: 1129 results in 3.218s, first after 0.490s
+STEP engine: tree text NEEDLE #0                    wall=   3.220s cpu=  21.62s threads 19->25 footprint=1069MB peakRSS=1149MB load=31.4
+  engine tree text NEEDLE: 1129 results in 3.406s, first after 1.032s
+STEP engine: tree text NEEDLE #1                    wall=   3.408s cpu=  28.48s threads 25->25 footprint=1201MB peakRSS=1307MB load=31.4
+  engine million name *7.png: 16667 results in 7.792s, first after 7.784s
+STEP engine: million name *7.png #0                 wall=   7.850s cpu=   9.56s threads 25->14 footprint=622MB peakRSS=1960MB load=29.6
+  engine million name *7.png: 16667 results in 8.637s, first after 8.622s
+STEP engine: million name *7.png #1                 wall=   8.856s cpu=   7.82s threads 14->9 footprint=830MB peakRSS=1968MB load=30.2
+  engine million text xxxx: 99750 results in 73.171s, first after 72.661s
+STEP engine: million text xxxx #0                   wall=  73.433s cpu= 378.64s threads 9->8 footprint=613MB peakRSS=2294MB load=38.6
+  engine million text xxxx: 99750 results in 75.903s, first after 75.126s
+STEP engine: million text xxxx #1                   wall=  76.148s cpu= 423.06s threads 8->8 footprint=731MB peakRSS=2358MB load=37.0
+  engine million name * (all): 1000200 results in 21.436s, first after 21.267s
+STEP engine: million name * (all) #0                wall=  23.260s cpu=  18.61s threads 8->8 footprint=1077MB peakRSS=2588MB load=32.7
+  engine million name * (all): 1000200 results in 19.434s, first after 18.783s
+STEP engine: million name * (all) #1                wall=  24.554s cpu=  18.60s threads 8->5 footprint=1011MB peakRSS=2588MB load=31.6
+STEP engine: 8 concurrent searches of the tree      wall=  19.816s cpu= 196.81s threads 5->7 footprint=2476MB peakRSS=4166MB load=52.6
+threads after engine runs: 7 (baseline 19)
+STEP threads settle after engine runs               wall=   0.000s cpu=   0.00s threads 7->7 footprint=2476MB peakRSS=4166MB load=52.6
+  window tree name *.txt: 80000 results in 0.333s, first rows after 0.115s, threads 14
+STEP window: tree name *.txt                        wall=   1.012s cpu=   2.09s threads 7->14 footprint=2494MB peakRSS=4166MB load=52.6

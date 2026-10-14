@@ -1,0 +1,80 @@
+STEP idle baseline                                  wall=   1.002s cpu=   0.02s threads 7->7 footprint=7MB peakRSS=27MB load=16.5
+file sparse4g.txt: 4294967296 bytes; threads at baseline 7
+  open 0.000s; first rows on screen after 0.011s (ok); rows known then: 42027
+STEP open, wrap at 131 columns: first rows          wall=   0.013s cpu=   0.11s threads 7->22 footprint=124MB peakRSS=147MB load=16.5
+  index complete after 0.854s more: rows 37911041, lines 13321217, checkpoints 296448, footprint 2516 MB, read error: nil
+STEP index to the end (parallel)                    wall=   0.854s cpu=  10.08s threads 22->22 footprint=2516MB peakRSS=7238MB load=16.5
+  [indexed] row(containing:)                                 n=  34287 mean=   0.131ms max=      5.7ms cancelled=267 threw=87
+  [indexed] row(ofLine:)                                     n=  34367 mean=   0.133ms max=      7.4ms cancelled=265 threw=68
+  [indexed] rows(from:count:100)                             n=  68545 mean=   0.215ms max=      7.4ms cancelled=1107 threw=144
+STEP indexed: rows from 6 threads + user at the pager, 4 s wall=   4.001s cpu=  27.79s threads 22->22 footprint=2531MB peakRSS=7242MB load=16.4
+STEP indexed: first/last rows and round trips       wall=   0.088s cpu=   0.09s threads 22->22 footprint=2557MB peakRSS=7242MB load=16.4
+  marker NOT found in 0.838s (4886 MiB/s)
+STEP search forward: marker at the very end         wall=   0.838s cpu=   6.87s threads 22->28 footprint=4458MB peakRSS=7646MB load=16.4
+  absent text: not found in 0.569s
+STEP search backward from the end: absent text      wall=   0.569s cpu=   5.62s threads 28->26 footprint=7762MB peakRSS=9901MB load=16.4
+  cancel -> search returned: worst 1.8 ms; threads now 24
+STEP search cancelled at random, 30 times           wall=   9.202s cpu=  91.43s threads 26->24 footprint=66236MB peakRSS=68947MB load=16.9
+  wider, wrap at 154: complete in 1.356s, segments reused 512, rows 34238976, lines 13321217, checkpoints 267776, footprint 70588 MB
+STEP relayout: wider, wrap at 154                   wall=   1.356s cpu=   7.57s threads 24->38 footprint=70588MB peakRSS=73297MB load=16.9
+  narrow, wrap at 40: complete in 1.119s, segments reused 512, rows 114234880, lines 13321217, checkpoints 446464, footprint 70918 MB
+STEP relayout: narrow, wrap at 40                   wall=   1.120s cpu=   9.55s threads 38->38 footprint=70918MB peakRSS=73627MB load=17.4
+  no wrap, cut at 1024: complete in 0.846s, segments reused 512, rows 16466944, lines 13321217, checkpoints 257536, footprint 35183 MB
+STEP relayout: no wrap, cut at 1024                 wall=   0.846s cpu=   7.36s threads 38->23 footprint=35183MB peakRSS=74231MB load=17.4
+  [during indexing] row(containing:)                         n= 462692 mean=   0.000ms max=      2.3ms cancelled=0 threw=0
+  [during indexing] row(ofLine:)                             n= 462782 mean=   0.000ms max=      3.8ms cancelled=0 threw=0
+  [during indexing] rows(from:count:100)                     n= 924906 mean=   0.000ms max=      3.9ms cancelled=0 threw=0
+  [during indexing] row(containing:)                         n=1390236 mean=   0.000ms max=     19.7ms cancelled=0 threw=0
+  [during indexing] row(ofLine:)                             n=1391185 mean=   0.000ms max=     20.5ms cancelled=0 threw=0
+  [during indexing] rows(from:count:100)                     n=2778797 mean=   0.000ms max=     17.6ms cancelled=0 threw=0
+  threads at most during the storm: 67
+  [during indexing] row(containing:)                         n= 170437 mean=   0.000ms max=      0.2ms cancelled=0 threw=0
+  [during indexing] row(ofLine:)                             n= 170707 mean=   0.000ms max=      0.4ms cancelled=0 threw=0
+  [during indexing] rows(from:count:100)                     n= 341095 mean=   0.000ms max=      0.6ms cancelled=0 threw=0
+  footprint at the end of the storm 40970 MB, peak RSS 78895 MB
+  the last layout was indexed 1.112s after the storm; shown document is the last one: true
+STEP storm: 40 relayouts during indexing + 6 readers + 2 searchers + user wall=  16.912s cpu= 206.06s threads 23->43 footprint=43602MB peakRSS=79726MB load=20.1
+  threads after closing: 0.0s:43 0.5s:43 1.0s:28 1.5s:28 2.0s:28 2.5s:28 3.0s:28 3.5s:26 4.0s:25 4.5s:24 5.0s:16 5.5s:9 (baseline 7)
+  footprint after closing 38271 MB, peak RSS 79727 MB
+STEP close; threads settle                          wall=   5.513s cpu=   1.51s threads 43->9 footprint=38271MB peakRSS=79727MB load=18.9
+RELAYOUT wider, wrap at 154: 1.356s (reused 512); narrow, wrap at 40: 1.119s (reused 512); no wrap, cut at 1024: 0.846s (reused 512)
+
+==== MAIN-THREAD WATCHDOG: scenario 7, viewer: /private/tmp/claude-501/-Users-cm0k-Claude-Projects-TotalCommander/91e36f29-0d53-4421-8985-1ec839e7f5c4/scratchpad/review2/stress/data/viewer/sparse4g.txt ====
+histogram bounds (ms): <2 <4 <8 <16 <33 <100 <250 <1000 <5000 >=5000
+phase                                            wall s   pings   >8ms >100ms    >1s    max ms  histogram
+idle baseline                                      1.01     338      0      0      0       2.2  337,1,0,0,0,0,0,0,0,0
+open, wrap at 131 columns: first rows              0.01       4      0      0      0       6.0  3,0,1,0,0,0,0,0,0,0
+index to the end (parallel)                        0.85     240      0      0      0       2.0  239,1,0,0,0,0,0,0,0,0
+indexed: rows from 6 threads + user at the pager, 4 s     4.00    1409      0      0      0       2.3  1407,2,0,0,0,0,0,0,0,0
+indexed: first/last rows and round trips           0.09      29      0      0      0       0.1  29,0,0,0,0,0,0,0,0,0
+search forward: marker at the very end             0.84     262      0      0      0       1.4  262,0,0,0,0,0,0,0,0,0
+search backward from the end: absent text          0.57     175      0      0      0       1.0  175,0,0,0,0,0,0,0,0,0
+search cancelled at random, 30 times               9.20    2835      0      0      0       1.7  2835,0,0,0,0,0,0,0,0,0
+relayout: wider, wrap at 154                       1.36     454      0      0      0       0.6  454,0,0,0,0,0,0,0,0,0
+relayout: narrow, wrap at 40                       1.12     372      0      0      0       1.0  372,0,0,0,0,0,0,0,0,0
+relayout: no wrap, cut at 1024                     0.85     206      1      0      0       9.7  181,21,3,1,0,0,0,0,0,0
+storm: 40 relayouts during indexing + 6 readers + 2 searchers + user    16.91    5067     22      0      0      44.9  4949,61,35,16,4,2,0,0,0,0
+close; threads settle                              5.51    1867      0      0      0       0.2  1867,0,0,0,0,0,0,0,0,0
+TOTAL                                             42.32   13258     23      0      0      44.9
+
+FAILURES: 0 kinds
+peak RSS 79727 MB, threads 9, load 18.9
+       42.99 real       151.15 user       223.56 sys
+         83599310848  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+             8498231  page reclaims
+                 139  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                   0  signals received
+                4099  voluntary context switches
+             3972458  involuntary context switches
+       2982272859059  instructions retired
+       1369500498162  cycles elapsed
+         74362573584  peak memory footprint
+RUN exit=0 wall=43.0s load_before=16.5 load_after=18.9 cmd=/usr/bin/time -l /private/tmp/claude-501/-Users-cm0k-Claude-Projects-TotalCommander/91e36f29-0d53-4421-8985-1ec839e7f5c4/scratchpad/review2/stress/b-harness/release/StressViewer run /private/tmp/claud

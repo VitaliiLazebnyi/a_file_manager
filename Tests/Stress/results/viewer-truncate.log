@@ -1,0 +1,146 @@
+STEP idle baseline                                  wall=   1.003s cpu=   0.02s threads 7->9 footprint=7MB peakRSS=27MB load=13.9
+STEP (harness: writing the 1 GiB file)              wall=   0.300s cpu=   0.08s threads 9->9 footprint=10MB peakRSS=34MB load=13.9
+FAIL truncated: no rows for a known row: row 12774548 of 13351936
+  round 0: cut to 300 MiB after 264 ms; indexing ended 1.50s after the start; rows 13351936, lines 13350912, indexed through 1073741824 of 1073741824, complete true, read error: none
+  [truncated] row(containing:)                               n=  19566 mean=   0.076ms max=     31.1ms cancelled=66 threw=33
+  [truncated] row(ofLine:)                                   n=  19437 mean=   0.078ms max=     11.6ms cancelled=84 threw=45
+  [truncated] rows(from:count:100)                           n=  38916 mean=   0.103ms max=     21.0ms cancelled=227 threw=67
+  [truncated] search(absent)                                 n=    119 mean=  15.139ms max=    140.5ms cancelled=19 threw=0
+STEP truncate while indexing                        wall=   1.807s cpu=  22.84s threads 9->41 footprint=8964MB peakRSS=9418MB load=13.9
+STEP (harness: writing the 1 GiB file)              wall=   0.136s cpu=   0.08s threads 41->41 footprint=8964MB peakRSS=9418MB load=13.9
+  round 1: cut to 0 after 170 ms; indexing ended 1.50s after the start; rows 11513425, lines 11512542, indexed through 1073741824 of 1073741824, complete true, read error: none
+  [truncated] row(containing:)                               n= 115490 mean=   0.013ms max=      8.3ms cancelled=56 threw=10
+  [truncated] row(ofLine:)                                   n= 115750 mean=   0.013ms max=      9.2ms cancelled=36 threw=5
+  [truncated] rows(from:count:100)                           n= 231488 mean=   0.015ms max=      9.7ms cancelled=119 threw=12
+  [truncated] search(absent)                                 n=    660 mean=   2.728ms max=    110.7ms cancelled=5 threw=0
+STEP truncate while indexing                        wall=   1.803s cpu=  17.66s threads 41->41 footprint=10034MB peakRSS=10780MB load=14.2
+STEP (harness: writing the 1 GiB file)              wall=   0.106s cpu=   0.08s threads 41->41 footprint=10034MB peakRSS=10780MB load=14.2
+  round 2: cut to 12345 bytes, then grown to 2 GiB after 42 ms; indexing ended 1.50s after the start; rows 3089995, lines 3089995, indexed through 1073741824 of 1073741824, complete true, read error: none
+  [truncated] row(containing:)                               n=   5540 mean=   0.004ms max=      6.7ms cancelled=0 threw=0
+  [truncated] row(ofLine:)                                   n=   5362 mean=   2.847ms max=   3949.3ms cancelled=3 threw=2
+  [truncated] rows(from:count:100)                           n=  11081 mean=   0.016ms max=      8.9ms cancelled=2 threw=2
+  [truncated] search(absent)                                 n=     65 mean=  28.157ms max=     96.7ms cancelled=14 threw=0
+STEP truncate while indexing                        wall=   4.047s cpu=  30.65s threads 41->26 footprint=19583MB peakRSS=24222MB load=13.9
+STEP (harness: writing the 1 GiB file)              wall=   0.111s cpu=   0.09s threads 26->26 footprint=19583MB peakRSS=24222MB load=13.9
+FAIL truncated: search(absent) threw without a cancel: Error Domain=NSCocoaErrorDomain Code=4 "The file “truncate1g.txt” doesn’t exist." UserInfo={NSFilePath=/private/tmp/claude-501/-Users-cm0k-Claude-Projects-TotalCommander/91e36f29-0d53-4421-8985-1ec839e7f5c4/scratchpad/review2/stress/data/viewer/truncate1g.txt, NSUnderlyingError=0x792b11df50 {Error Domain=NSPOSIXErrorDomain Code=2 "No such file or directory"}}
+FAIL truncated: rows(from:count:100) threw without a cancel: Error Domain=NSCocoaErrorDomain Code=4 "The file “truncate1g.txt” doesn’t exist." UserInfo={NSFilePath=/private/tmp/claude-501/-Users-cm0k-Claude-Projects-TotalCommander/91e36f29-0d53-4421-8985-1ec839e7f5c4/scratchpad/review2/stress/data/viewer/truncate1g.txt, NSUnderlyingError=0x792b11e2e0 {Error Domain=NSPOSIXErrorDomain Code=2 "No such file or directory"}}
+FAIL truncated: row(ofLine:) threw without a cancel: Error Domain=NSCocoaErrorDomain Code=4 "The file “truncate1g.txt” doesn’t exist." UserInfo={NSFilePath=/private/tmp/claude-501/-Users-cm0k-Claude-Projects-TotalCommander/91e36f29-0d53-4421-8985-1ec839e7f5c4/scratchpad/review2/stress/data/viewer/truncate1g.txt, NSUnderlyingError=0x792b11e2e0 {Error Domain=NSPOSIXErrorDomain Code=2 "No such file or directory"}}
+FAIL truncated: row(containing:) threw without a cancel: Error Domain=NSCocoaErrorDomain Code=4 "The file “truncate1g.txt” doesn’t exist." UserInfo={NSFilePath=/private/tmp/claude-501/-Users-cm0k-Claude-Projects-TotalCommander/91e36f29-0d53-4421-8985-1ec839e7f5c4/scratchpad/review2/stress/data/viewer/truncate1g.txt, NSUnderlyingError=0x792b430570 {Error Domain=NSPOSIXErrorDomain Code=2 "No such file or directory"}}
+  round 3: removed after 245 ms; indexing ended 1.50s after the start; rows 13351936, lines 13350912, indexed through 1073741824 of 1073741824, complete true, read error: Error Domain=NSCocoaErrorDomain Code=4 "The file “truncate1g.txt” doesn’t exist." UserInfo={NSFilePath=/private/tmp/clau
+  [truncated] row(containing:)                               n= 119002 mean=   0.012ms max=      6.4ms cancelled=62 threw=113460
+  [truncated] row(ofLine:)                                   n= 119686 mean=   0.013ms max=     46.2ms cancelled=43 threw=114084
+  [truncated] rows(from:count:100)                           n= 238802 mean=   0.014ms max=     37.3ms cancelled=123 threw=227575
+  [truncated] search(absent)                                 n=  13065 mean=   0.135ms max=    146.0ms cancelled=7 threw=13056
+STEP truncate while indexing                        wall=   1.801s cpu=  13.90s threads 26->42 footprint=19870MB peakRSS=24311MB load=13.9
+STEP (harness: writing the 1 GiB file)              wall=   0.106s cpu=   0.09s threads 42->42 footprint=19870MB peakRSS=24311MB load=13.9
+  round 4: cut to 300 MiB after 39 ms; indexing ended 1.50s after the start; rows 3911700, lines 3911400, indexed through 1073741824 of 1073741824, complete true, read error: none
+  [truncated] row(containing:)                               n=  10677 mean=   0.057ms max=      6.1ms cancelled=10 threw=3
+  [truncated] row(ofLine:)                                   n=  10758 mean=   0.160ms max=      5.8ms cancelled=56 threw=23
+  [truncated] rows(from:count:100)                           n=  21315 mean=   0.224ms max=     11.2ms cancelled=205 threw=45
+  [truncated] search(absent)                                 n=    129 mean=  13.995ms max=     65.4ms cancelled=11 threw=0
+STEP truncate while indexing                        wall=   1.807s cpu=  15.66s threads 42->42 footprint=20665MB peakRSS=24326MB load=13.9
+STEP (harness: writing the 1 GiB file)              wall=   0.125s cpu=   0.09s threads 42->42 footprint=20665MB peakRSS=24326MB load=13.9
+  round 5: cut to 0 after 34 ms; indexing ended 1.50s after the start; rows 3037840, lines 3037840, indexed through 1073741824 of 1073741824, complete true, read error: none
+  [truncated] row(containing:)                               n= 119917 mean=   0.007ms max=      1.8ms cancelled=46 threw=20
+  [truncated] row(ofLine:)                                   n= 119927 mean=   0.013ms max=      7.1ms cancelled=81 threw=27
+  [truncated] rows(from:count:100)                           n= 241357 mean=   0.016ms max=     11.5ms cancelled=174 threw=46
+  [truncated] search(absent)                                 n=    777 mean=   2.320ms max=     24.8ms cancelled=11 threw=0
+STEP truncate while indexing                        wall=   1.807s cpu=  12.34s threads 42->40 footprint=20698MB peakRSS=24334MB load=14.2
+STEP (harness: writing the 1 GiB file)              wall=   0.108s cpu=   0.09s threads 40->40 footprint=20698MB peakRSS=24334MB load=14.2
+  round 6: cut to 12345 bytes, then grown to 2 GiB after 143 ms; indexing ended 1.50s after the start; rows 9518457, lines 9517727, indexed through 1073741824 of 1073741824, complete true, read error: none
+  [truncated] row(containing:)                               n=   4343 mean=   0.022ms max=     12.5ms cancelled=0 threw=0
+  [truncated] row(ofLine:)                                   n=   4327 mean=   3.564ms max=   4016.3ms cancelled=1 threw=1
+  [truncated] rows(from:count:100)                           n=   8524 mean=   0.041ms max=     21.1ms cancelled=0 threw=0
+  [truncated] search(absent)                                 n=     49 mean=  37.320ms max=    156.9ms cancelled=12 threw=0
+STEP truncate while indexing                        wall=   4.194s cpu=  27.03s threads 40->25 footprint=3073MB peakRSS=26177MB load=13.9
+STEP (harness: writing the 1 GiB file)              wall=   0.111s cpu=   0.09s threads 25->25 footprint=3074MB peakRSS=26177MB load=13.9
+  round 7: removed after 51 ms; indexing ended 1.50s after the start; rows 4589729, lines 4589377, indexed through 1073741824 of 1073741824, complete true, read error: Error Domain=NSCocoaErrorDomain Code=4 "The file “truncate1g.txt” doesn’t exist." UserInfo={NSFilePath=/private/tmp/clau
+  [truncated] row(containing:)                               n=   5529 mean=   1.230ms max=     45.3ms cancelled=298 threw=1689
+  [truncated] row(ofLine:)                                   n=   5602 mean=   0.018ms max=      4.3ms cancelled=1 threw=1634
+  [truncated] rows(from:count:100)                           n=  11272 mean=   0.024ms max=     13.6ms cancelled=1 threw=3378
+  [truncated] search(absent)                                 n=  15587 mean=   0.113ms max=     40.2ms cancelled=5 threw=15581
+STEP truncate while indexing                        wall=   1.807s cpu=  13.51s threads 25->39 footprint=3602MB peakRSS=26182MB load=13.9
+STEP (harness: writing the 1 GiB file)              wall=   0.106s cpu=   0.08s threads 39->39 footprint=3602MB peakRSS=26182MB load=13.9
+  round 8: cut to 300 MiB after 156 ms; indexing ended 1.50s after the start; rows 8435572, lines 8435572, indexed through 1073741824 of 1073741824, complete true, read error: none
+  [truncated] row(containing:)                               n=  15599 mean=   0.068ms max=     20.8ms cancelled=48 threw=23
+  [truncated] row(ofLine:)                                   n=  15452 mean=   0.106ms max=     14.8ms cancelled=50 threw=19
+  [truncated] rows(from:count:100)                           n=  31286 mean=   0.140ms max=     16.0ms cancelled=202 threw=61
+  [truncated] search(absent)                                 n=     80 mean=  22.987ms max=    163.4ms cancelled=12 threw=0
+STEP truncate while indexing                        wall=   1.840s cpu=  17.59s threads 39->39 footprint=8619MB peakRSS=26218MB load=13.9
+STEP (harness: writing the 1 GiB file)              wall=   0.127s cpu=   0.09s threads 39->39 footprint=8619MB peakRSS=26218MB load=13.9
+  round 9: cut to 0 after 117 ms; indexing ended 1.50s after the start; rows 7536531, lines 7535953, indexed through 1073741824 of 1073741824, complete true, read error: none
+  [truncated] row(containing:)                               n= 112082 mean=   0.010ms max=      8.5ms cancelled=41 threw=10
+  [truncated] row(ofLine:)                                   n= 111814 mean=   0.014ms max=     19.6ms cancelled=62 threw=16
+  [truncated] rows(from:count:100)                           n= 223922 mean=   0.016ms max=     19.7ms cancelled=171 threw=36
+  [truncated] search(absent)                                 n=    680 mean=   2.650ms max=    133.4ms cancelled=12 threw=0
+STEP truncate while indexing                        wall=   1.805s cpu=  13.88s threads 39->39 footprint=9009MB peakRSS=26238MB load=14.2
+STEP (harness: writing the 1 GiB file)              wall=   0.106s cpu=   0.08s threads 39->39 footprint=9009MB peakRSS=26238MB load=14.2
+  round 10: cut to 12345 bytes, then grown to 2 GiB after 3 ms; indexing ended 1.50s after the start; rows 1069185, lines 1069103, indexed through 1073741824 of 1073741824, complete true, read error: none
+  [truncated] row(containing:)                               n=   4333 mean=   0.002ms max=      0.4ms cancelled=2 threw=0
+  [truncated] row(ofLine:)                                   n=   4450 mean=   3.946ms max=   4487.1ms cancelled=2 threw=1
+  [truncated] rows(from:count:100)                           n=   8610 mean=   0.012ms max=      9.6ms cancelled=1 threw=0
+  [truncated] search(absent)                                 n=     52 mean=  36.190ms max=    126.5ms cancelled=13 threw=0
+STEP truncate while indexing                        wall=   4.543s cpu=  29.43s threads 39->17 footprint=15805MB peakRSS=26477MB load=14.7
+STEP (harness: writing the 1 GiB file)              wall=   0.309s cpu=   0.09s threads 17->16 footprint=15806MB peakRSS=26477MB load=14.7
+  round 11: removed after 271 ms; indexing ended 1.50s after the start; rows 13350912, lines 13350912, indexed through 1073741824 of 1073741824, complete true, read error: Error Domain=NSCocoaErrorDomain Code=4 "The file “truncate1g.txt” doesn’t exist." UserInfo={NSFilePath=/private/tmp/clau
+  [truncated] row(containing:)                               n= 112246 mean=   0.013ms max=     60.1ms cancelled=62 threw=103675
+  [truncated] row(ofLine:)                                   n= 111735 mean=   0.014ms max=     38.1ms cancelled=55 threw=103375
+  [truncated] rows(from:count:100)                           n= 224136 mean=   0.015ms max=     45.6ms cancelled=118 threw=207398
+  [truncated] search(absent)                                 n=  13017 mean=   0.135ms max=    126.8ms cancelled=5 threw=13011
+STEP truncate while indexing                        wall=   1.802s cpu=  12.99s threads 16->40 footprint=16140MB peakRSS=26490MB load=14.7
+  threads: baseline 9, at the end 11
+STEP threads settle                                 wall=   3.339s cpu=   0.12s threads 40->11 footprint=16139MB peakRSS=26490MB load=14.3
+
+==== MAIN-THREAD WATCHDOG: scenario 7, viewer: /private/tmp/claude-501/-Users-cm0k-Claude-Projects-TotalCommander/91e36f29-0d53-4421-8985-1ec839e7f5c4/scratchpad/review2/stress/data/viewer ====
+histogram bounds (ms): <2 <4 <8 <16 <33 <100 <250 <1000 <5000 >=5000
+phase                                            wall s   pings   >8ms >100ms    >1s    max ms  histogram
+idle baseline                                      1.00     342      0      0      0       0.6  342,0,0,0,0,0,0,0,0,0
+(harness: writing the 1 GiB file)                  1.75       0      0      0      0       0.0  0,0,0,0,0,0,0,0,0,0
+truncate while indexing                           29.06    9582     16     12      0     309.1  9477,71,18,1,2,1,10,2,0,0
+threads settle                                     3.34    1162      0      0      0       0.3  1162,0,0,0,0,0,0,0,0,0
+TOTAL                                             35.16   11086     16     12      0     309.1
+
+-- stall 309 ms at t=29.71s in phase 'truncate while indexing'; main thread stack at +100 ms:
+   0   libsystem_kernel.dylib              0x0000000184170838 write + 8
+   1   Foundation                          0x000000018595b5f0 _NSWriteToFileDescriptorWithProgress + 184
+   2   Foundation                          0x00000001859676f8 __34-[NSConcreteFileHandle writeData:]_block_invoke + 72
+   3   Foundation                          0x000000018595b4e8 -[NSData(NSData) enumerateByteRangesUsingBlock:] + 120
+   4   Foundation                          0x000000018596762c -[NSConcreteFileHandle writeData:] + 188
+   5   StressViewer                        0x00000001004ab5d8 $s12StressViewer10writeDense_9megabytesSi10Foundation3URLV_SitF + 340
+   6   StressViewer                        0x00000001004c028c $s12StressViewer13runTruncation_6roundsy10Foundation3URLV_SitFyyXEfU0_TA + 28
+   7   StressViewer                        0x0000000100a8db44 $s9StressKit4step_5limit_xSS_SdxyKXEtKlF + 444
+   8   StressViewer                        0x00000001004aad4c $s12StressViewer13runTruncation_6roundsy10Foundation3URLV_SitF + 384
+   9   StressViewer                        0x00000001004a69a4 main + 2908
+   10  dyld                                0x0000000183ddbe80 start + 6688
+
+FAILURES: 5 kinds
+  truncated: no rows for a known row: row 12774548 of 13351936
+  truncated: search(absent) threw without a cancel: Error Domain=NSCocoaErrorDomain Code=4 "The file “truncate1g.txt” doesn’t exist." UserInfo={NSFilePath=/private/tmp/claude-501/-Users-cm0k-Claude-Projects-TotalCommander/91e36f29-0d53-4421-8985-1ec839e7f5c4/scratchpad/review2/stress/data/viewer/truncate1g.txt, NSUnderlyingError=0x792b11df50 {Error Domain=NSPOSIXErrorDomain Code=2 "No such file or directory"}}
+  truncated: rows(from:count:100) threw without a cancel: Error Domain=NSCocoaErrorDomain Code=4 "The file “truncate1g.txt” doesn’t exist." UserInfo={NSFilePath=/private/tmp/claude-501/-Users-cm0k-Claude-Projects-TotalCommander/91e36f29-0d53-4421-8985-1ec839e7f5c4/scratchpad/review2/stress/data/viewer/truncate1g.txt, NSUnderlyingError=0x792b11e2e0 {Error Domain=NSPOSIXErrorDomain Code=2 "No such file or directory"}}
+  truncated: row(ofLine:) threw without a cancel: Error Domain=NSCocoaErrorDomain Code=4 "The file “truncate1g.txt” doesn’t exist." UserInfo={NSFilePath=/private/tmp/claude-501/-Users-cm0k-Claude-Projects-TotalCommander/91e36f29-0d53-4421-8985-1ec839e7f5c4/scratchpad/review2/stress/data/viewer/truncate1g.txt, NSUnderlyingError=0x792b11e2e0 {Error Domain=NSPOSIXErrorDomain Code=2 "No such file or directory"}}
+  truncated: row(containing:) threw without a cancel: Error Domain=NSCocoaErrorDomain Code=4 "The file “truncate1g.txt” doesn’t exist." UserInfo={NSFilePath=/private/tmp/claude-501/-Users-cm0k-Claude-Projects-TotalCommander/91e36f29-0d53-4421-8985-1ec839e7f5c4/scratchpad/review2/stress/data/viewer/truncate1g.txt, NSUnderlyingError=0x792b430570 {Error Domain=NSPOSIXErrorDomain Code=2 "No such file or directory"}}
+  count 704854: truncated: no rows for a known row
+  count 218433: truncated: row(containing:) threw without a cancel
+  count 219019: truncated: row(ofLine:) threw without a cancel
+  count 438190: truncated: rows(from:count:100) threw without a cancel
+  count 41648: truncated: search(absent) threw without a cancel
+peak RSS 26490 MB, threads 11, load 14.3
+       35.40 real        90.05 user       138.85 sys
+         27776974848  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+             2774114  page reclaims
+                 247  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                   0  signals received
+                4063  voluntary context switches
+             4399532  involuntary context switches
+       1934498716578  instructions retired
+        843678928645  cycles elapsed
+         25320445504  peak memory footprint
+RUN exit=1 wall=35.4s load_before=13.9 load_after=14.3 cmd=/usr/bin/time -l /private/tmp/claude-501/-Users-cm0k-Claude-Projects-TotalCommander/91e36f29-0d53-4421-8985-1ec839e7f5c4/scratchpad/review2/stress/b-harness/release/StressViewer truncate /private/tmp/

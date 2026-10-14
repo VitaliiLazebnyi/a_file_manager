@@ -1,0 +1,398 @@
+StressJobs root=/private/tmp/claude-501/-Users-cm0k-Claude-Projects-TotalCommander/91e36f29-0d53-4421-8985-1ec839e7f5c4/scratchpad/review2/stress/data/jobs files=20000 folders=400 big=6 seeds=50 memseeds=60 cores=16 load=15.80322265625
+STEP idle baseline                                  wall=   1.500s cpu=   0.04s threads 8->10 footprint=10MB peakRSS=34MB load=15.8
+STEP build tree                                     wall=   1.233s cpu=  11.00s threads 10->23 footprint=57MB peakRSS=81MB load=16.0
+tree: 20006 files, 400 folders (+big), 64 MB
+RUN seed=0 copy wall=2.80s cancelAt=- sent=n cancelled=n completed=401 failures=0 reports=68 pauses=0 threads=23
+RATE copy: 7145 files/s, 23.1 MB/s
+RUN seed=0 delete wall=0.64s cancelAt=- sent=n cancelled=n completed=401 failures=0 reports=15 pauses=0 threads=38
+RATE delete: 31151 files/s
+RUN seed=0 move wall=1.02s cancelAt=- sent=n cancelled=n completed=401 failures=0 reports=25 pauses=0 threads=38
+RATE move (half merge, same volume): 19657 files/s
+RUN seed=0 move-back wall=0.69s cancelAt=- sent=n cancelled=n completed=401 failures=0 reports=17 pauses=0 threads=38
+RATE move back (a third merged, rest whole-folder renames): 29066 files/s
+STEP calibration: uninterrupted copy/delete/move    wall=   8.835s cpu=  60.73s threads 22->37 footprint=92MB peakRSS=117MB load=15.7
+threads at baseline (after calibration, settled 6 s): 8
+RUN seed=1 copy wall=4.26s cancelAt=- sent=n cancelled=n completed=401 failures=0 reports=104 pauses=0 threads=17
+RUN seed=1 delete wall=1.88s cancelAt=- sent=n cancelled=n completed=401 failures=0 reports=41 pauses=0 threads=39
+RUN seed=1 move wall=0.89s cancelAt=0.881s(main) sent=y cancelled=y completed=310 failures=0 reports=21 pauses=9 threads=39
+RUN seed=1 move-back wall=0.40s cancelAt=0.390s(bg) sent=y cancelled=y completed=204 failures=0 reports=10 pauses=2 threads=39
+RUN seed=100001 move-back wall=0.40s cancelAt=- sent=n cancelled=n completed=152 failures=0 reports=11 pauses=0 threads=39
+RUN seed=2 copy wall=0.34s cancelAt=0.334s(bg) sent=y cancelled=y completed=23 failures=0 reports=6 pauses=4 threads=39
+RUN seed=2 delete wall=0.06s cancelAt=0.537s(main) sent=n cancelled=n completed=24 failures=0 reports=3 pauses=0 threads=39
+RUN seed=2 move wall=0.08s cancelAt=0.072s(main) sent=y cancelled=y completed=9 failures=0 reports=1 pauses=0 threads=39
+RUN seed=2 move-back wall=0.05s cancelAt=0.328s(bg) sent=n cancelled=n completed=205 failures=0 reports=3 pauses=0 threads=39
+RUN seed=100002 move-back wall=0.00s cancelAt=- sent=n cancelled=n completed=0 failures=0 reports=1 pauses=0 threads=39
+RUN seed=3 copy wall=2.02s cancelAt=2.005s(bg) sent=y cancelled=y completed=212 failures=0 reports=48 pauses=22 threads=39
+RUN seed=3 delete wall=0.42s cancelAt=0.443s(bg) sent=n cancelled=n completed=213 failures=0 reports=10 pauses=5 threads=39
+RUN seed=3 move wall=0.35s cancelAt=0.345s(bg) sent=y cancelled=y completed=90 failures=0 reports=8 pauses=6 threads=39
+RUN seed=3 move-back wall=0.20s cancelAt=- sent=n cancelled=n completed=246 failures=0 reports=6 pauses=1 threads=39
+RUN seed=100003 move-back wall=0.00s cancelAt=- sent=n cancelled=n completed=0 failures=0 reports=1 pauses=0 threads=39
+RUN seed=4 copy wall=4.67s cancelAt=- sent=n cancelled=n completed=401 failures=0 reports=115 pauses=41 threads=19
+RUN seed=4 delete wall=0.39s cancelAt=0.383s(bg) sent=y cancelled=y completed=171 failures=0 reports=8 pauses=0 threads=38
+RUN seed=100004 delete wall=0.43s cancelAt=- sent=n cancelled=n completed=230 failures=0 reports=11 pauses=3 threads=38
+RUN seed=4 move wall=1.09s cancelAt=- sent=n cancelled=n completed=401 failures=0 reports=27 pauses=0 threads=38
+RUN seed=4 move-back wall=0.76s cancelAt=0.757s(main) sent=y cancelled=y completed=399 failures=0 reports=18 pauses=0 threads=38
+RUN seed=100004 move-back wall=0.00s cancelAt=- sent=n cancelled=n completed=2 failures=0 reports=2 pauses=0 threads=38
+RUN seed=5 copy wall=3.72s cancelAt=- sent=n cancelled=n completed=401 failures=0 reports=91 pauses=0 threads=24
+RUN seed=5 delete wall=0.23s cancelAt=0.218s(main) sent=y cancelled=y completed=104 failures=0 reports=4 pauses=2 threads=39
+RUN seed=100005 delete wall=0.47s cancelAt=- sent=n cancelled=n completed=297 failures=0 reports=11 pauses=4 threads=39
+RUN seed=5 move wall=0.99s cancelAt=- sent=n cancelled=n completed=401 failures=0 reports=25 pauses=12 threads=39
+RUN seed=5 move-back wall=0.34s cancelAt=0.341s(main) sent=y cancelled=y completed=176 failures=0 reports=8 pauses=5 threads=39
+RUN seed=100005 move-back wall=0.69s cancelAt=- sent=n cancelled=n completed=225 failures=0 reports=18 pauses=0 threads=39
+RUN seed=6 copy wall=3.14s cancelAt=- sent=n cancelled=n completed=401 failures=0 reports=77 pauses=31 threads=24
+RUN seed=6 delete wall=0.63s cancelAt=- sent=n cancelled=n completed=401 failures=0 reports=15 pauses=10 threads=39
+RUN seed=6 move wall=0.81s cancelAt=0.799s(bg) sent=y cancelled=y completed=315 failures=0 reports=19 pauses=6 threads=39
+RUN seed=6 move-back wall=0.39s cancelAt=0.384s(bg) sent=y cancelled=y completed=215 failures=0 reports=10 pauses=6 threads=39
+RUN seed=100006 move-back wall=0.32s cancelAt=- sent=n cancelled=n completed=143 failures=0 reports=9 pauses=6 threads=39
+RUN seed=7 copy wall=3.00s cancelAt=- sent=n cancelled=n completed=401 failures=0 reports=74 pauses=0 threads=24
+RUN seed=7 delete wall=0.64s cancelAt=- sent=n cancelled=n completed=401 failures=0 reports=15 pauses=3 threads=39
+RUN seed=7 move wall=0.80s cancelAt=0.795s(bg) sent=y cancelled=y completed=320 failures=0 reports=19 pauses=7 threads=39
+RUN seed=7 move-back wall=0.54s cancelAt=- sent=n cancelled=n completed=361 failures=0 reports=14 pauses=4 threads=39
+RUN seed=100007 move-back wall=0.00s cancelAt=- sent=n cancelled=n completed=0 failures=0 reports=1 pauses=0 threads=39
+RUN seed=8 copy wall=2.70s cancelAt=2.870s(main) sent=n cancelled=n completed=401 failures=0 reports=66 pauses=31 threads=24
+RUN seed=8 delete wall=0.13s cancelAt=0.123s(bg) sent=y cancelled=y completed=18 failures=0 reports=1 pauses=1 threads=39
+RUN seed=100008 delete wall=0.61s cancelAt=- sent=n cancelled=n completed=383 failures=0 reports=14 pauses=6 threads=39
+RUN seed=8 move wall=0.40s cancelAt=0.390s(main) sent=y cancelled=y completed=147 failures=0 reports=9 pauses=6 threads=39
+RUN seed=8 move-back wall=0.27s cancelAt=0.424s(bg) sent=n cancelled=n completed=274 failures=0 reports=8 pauses=3 threads=39
+RUN seed=100008 move-back wall=0.00s cancelAt=- sent=n cancelled=n completed=0 failures=0 reports=1 pauses=0 threads=39
+RUN seed=9 copy wall=2.65s cancelAt=- sent=n cancelled=n completed=401 failures=0 reports=65 pauses=0 threads=24
+RUN seed=9 delete wall=0.61s cancelAt=0.599s(bg) sent=y cancelled=y completed=373 failures=0 reports=13 pauses=8 threads=39
+RUN seed=100009 delete wall=0.04s cancelAt=- sent=n cancelled=n completed=28 failures=0 reports=2 pauses=0 threads=39
+RUN seed=9 move wall=0.99s cancelAt=- sent=n cancelled=n completed=401 failures=0 reports=25 pauses=8 threads=39
+RUN seed=9 move-back wall=0.42s cancelAt=0.416s(main) sent=y cancelled=y completed=247 failures=0 reports=10 pauses=0 threads=39
+RUN seed=100009 move-back wall=0.49s cancelAt=- sent=n cancelled=n completed=154 failures=0 reports=13 pauses=0 threads=39
+RUN seed=10 copy wall=1.04s cancelAt=1.041s(main) sent=y cancelled=y completed=147 failures=0 reports=24 pauses=12 threads=39
+RUN seed=10 delete wall=0.24s cancelAt=- sent=n cancelled=n completed=148 failures=0 reports=6 pauses=3 threads=39
+RUN seed=10 move wall=0.96s cancelAt=- sent=n cancelled=n completed=401 failures=0 reports=24 pauses=0 threads=39
+RUN seed=10 move-back wall=0.73s cancelAt=- sent=n cancelled=n completed=401 failures=0 reports=19 pauses=8 threads=39
+RUN seed=100010 move-back wall=0.00s cancelAt=- sent=n cancelled=n completed=0 failures=0 reports=1 pauses=0 threads=39
+THREADS after seed 10: right after=24 settled(<=8s)=9 baseline=8 max so far=39 footprint=48MB peakRSS=130MB load=16.4599609375
+RUN seed=11 copy wall=2.55s cancelAt=- sent=n cancelled=n completed=401 failures=0 reports=62 pauses=0 threads=17
+RUN seed=11 delete wall=0.49s cancelAt=0.491s(bg) sent=y cancelled=y completed=278 failures=0 reports=10 pauses=0 threads=38
+RUN seed=100011 delete wall=0.21s cancelAt=- sent=n cancelled=n completed=123 failures=0 reports=6 pauses=2 threads=38
+RUN seed=11 move wall=1.13s cancelAt=- sent=n cancelled=n completed=401 failures=0 reports=28 pauses=0 threads=38
+RUN seed=11 move-back wall=0.15s cancelAt=0.136s(main) sent=y cancelled=y completed=62 failures=0 reports=3 pauses=0 threads=38
+RUN seed=100011 move-back wall=1.13s cancelAt=- sent=n cancelled=n completed=339 failures=0 reports=28 pauses=0 threads=38
+RUN seed=12 copy wall=3.37s cancelAt=- sent=n cancelled=n completed=401 failures=0 reports=81 pauses=24 threads=23
+RUN seed=12 delete wall=3.37s cancelAt=- sent=n cancelled=n completed=401 failures=0 reports=81 pauses=38 threads=23
+RUN seed=12 move wall=1.05s cancelAt=- sent=n cancelled=n completed=401 failures=0 reports=26 pauses=9 threads=38
+RUN seed=12 move-back wall=0.67s cancelAt=- sent=n cancelled=n completed=401 failures=0 reports=17 pauses=10 threads=38
+RUN seed=100012 move-back wall=0.00s cancelAt=- sent=n cancelled=n completed=0 failures=0 reports=1 pauses=0 threads=38
+RUN seed=13 copy wall=3.34s cancelAt=- sent=n cancelled=n completed=401 failures=0 reports=80 pauses=30 threads=23
+RUN seed=13 delete wall=1.06s cancelAt=- sent=n cancelled=n completed=401 failures=0 reports=25 pauses=13 threads=38
+RUN seed=13 move wall=0.74s cancelAt=0.730s(bg) sent=y cancelled=y completed=202 failures=0 reports=17 pauses=5 threads=38
+RUN seed=13 move-back wall=0.37s cancelAt=- sent=n cancelled=n completed=302 failures=0 reports=10 pauses=1 threads=38
+RUN seed=100013 move-back wall=0.00s cancelAt=- sent=n cancelled=n completed=0 failures=0 reports=1 pauses=0 threads=40
+RUN seed=14 copy wall=0.07s cancelAt=0.066s(bg) sent=y cancelled=y completed=0 failures=0 reports=0 pauses=2 threads=38
+RUN seed=14 delete wall=0.00s cancelAt=- sent=n cancelled=n completed=0 failures=0 reports=1 pauses=0 threads=40
+RUN seed=14 move wall=0.98s cancelAt=- sent=n cancelled=n completed=401 failures=0 reports=25 pauses=0 threads=39
+RUN seed=14 move-back wall=0.34s cancelAt=0.343s(bg) sent=y cancelled=y completed=167 failures=0 reports=8 pauses=4 threads=39
+RUN seed=100014 move-back wall=0.75s cancelAt=- sent=n cancelled=n completed=234 failures=0 reports=19 pauses=6 threads=39
+RUN seed=15 copy wall=1.94s cancelAt=1.933s(bg) sent=y cancelled=y completed=247 failures=0 reports=46 pauses=0 threads=39
+RUN seed=15 delete wall=0.53s cancelAt=0.648s(bg) sent=n cancelled=n completed=248 failures=0 reports=13 pauses=0 threads=39
+RUN seed=15 move wall=1.00s cancelAt=- sent=n cancelled=n completed=401 failures=0 reports=25 pauses=5 threads=39
+RUN seed=15 move-back wall=0.57s cancelAt=0.563s(main) sent=y cancelled=y completed=325 failures=0 reports=14 pauses=3 threads=39
+RUN seed=100015 move-back wall=0.26s cancelAt=- sent=n cancelled=n completed=76 failures=0 reports=8 pauses=0 threads=39
+RUN seed=16 copy wall=3.20s cancelAt=- sent=n cancelled=n completed=401 failures=0 reports=78 pauses=28 threads=24
+RUN seed=16 delete wall=0.38s cancelAt=0.373s(main) sent=y cancelled=y completed=25 failures=0 reports=7 pauses=2 threads=39
+RUN seed=100016 delete wall=0.63s cancelAt=- sent=n cancelled=n completed=376 failures=0 reports=15 pauses=6 threads=39
+RUN seed=16 move wall=1.06s cancelAt=- sent=n cancelled=n completed=401 failures=0 reports=27 pauses=11 threads=39
+RUN seed=16 move-back wall=0.64s cancelAt=0.625s(main) sent=y cancelled=y completed=315 failures=0 reports=15 pauses=5 threads=39
+RUN seed=100016 move-back wall=0.33s cancelAt=- sent=n cancelled=n completed=86 failures=0 reports=9 pauses=2 threads=39
+RUN seed=17 copy wall=4.03s cancelAt=- sent=n cancelled=n completed=401 failures=0 reports=99 pauses=30 threads=23
+RUN seed=17 delete wall=0.46s cancelAt=0.451s(main) sent=y cancelled=y completed=219 failures=0 reports=9 pauses=8 threads=38
+RUN seed=100017 delete wall=0.38s cancelAt=- sent=n cancelled=n completed=182 failures=0 reports=10 pauses=3 threads=38
+RUN seed=17 move wall=1.18s cancelAt=- sent=n cancelled=n completed=401 failures=0 reports=28 pauses=9 threads=38
+RUN seed=17 move-back wall=0.77s cancelAt=- sent=n cancelled=n completed=401 failures=0 reports=20 pauses=8 threads=38
+RUN seed=100017 move-back wall=0.00s cancelAt=- sent=n cancelled=n completed=0 failures=0 reports=1 pauses=0 threads=38
+RUN seed=18 copy wall=3.67s cancelAt=- sent=n cancelled=n completed=401 failures=0 reports=90 pauses=0 threads=23
+RUN seed=18 delete wall=0.35s cancelAt=0.349s(bg) sent=y cancelled=y completed=167 failures=0 reports=7 pauses=3 threads=38
+RUN seed=100018 delete wall=0.41s cancelAt=- sent=n cancelled=n completed=234 failures=0 reports=10 pauses=5 threads=38
+RUN seed=18 move wall=1.11s cancelAt=- sent=n cancelled=n completed=401 failures=0 reports=28 pauses=11 threads=38
+RUN seed=18 move-back wall=0.32s cancelAt=0.318s(main) sent=y cancelled=y completed=160 failures=0 reports=8 pauses=1 threads=38
+RUN seed=100018 move-back wall=0.87s cancelAt=- sent=n cancelled=n completed=241 failures=0 reports=22 pauses=8 threads=38
+RUN seed=19 copy wall=2.86s cancelAt=2.843s(main) sent=y cancelled=y completed=313 failures=0 reports=69 pauses=21 threads=23
+RUN seed=19 delete wall=0.57s cancelAt=- sent=n cancelled=n completed=314 failures=0 reports=14 pauses=5 threads=38
+RUN seed=19 move wall=0.55s cancelAt=0.550s(bg) sent=y cancelled=y completed=188 failures=0 reports=13 pauses=3 threads=38
+RUN seed=19 move-back wall=0.38s cancelAt=- sent=n cancelled=n completed=295 failures=0 reports=10 pauses=0 threads=38
+RUN seed=100019 move-back wall=0.00s cancelAt=- sent=n cancelled=n completed=0 failures=0 reports=1 pauses=0 threads=38
+RUN seed=20 copy wall=3.84s cancelAt=- sent=n cancelled=n completed=401 failures=0 reports=94 pauses=35 threads=23
+RUN seed=20 delete wall=0.69s cancelAt=0.681s(bg) sent=y cancelled=y completed=351 failures=0 reports=15 pauses=6 threads=38
+RUN seed=100020 delete wall=0.08s cancelAt=- sent=n cancelled=n completed=50 failures=0 reports=3 pauses=0 threads=38
+RUN seed=20 move wall=0.79s cancelAt=0.785s(main) sent=y cancelled=y completed=271 failures=0 reports=18 pauses=0 threads=38
+RUN seed=20 move-back wall=0.52s cancelAt=- sent=n cancelled=n completed=336 failures=0 reports=14 pauses=6 threads=38
+RUN seed=100020 move-back wall=0.00s cancelAt=- sent=n cancelled=n completed=0 failures=0 reports=1 pauses=0 threads=38
+THREADS after seed 20: right after=38 settled(<=8s)=8 baseline=8 max so far=39 footprint=51MB peakRSS=130MB load=16.1162109375
+RUN seed=21 copy wall=1.79s cancelAt=1.791s(bg) sent=y cancelled=y completed=216 failures=0 reports=43 pauses=16 threads=32
+RUN seed=21 delete wall=0.33s cancelAt=0.344s(bg) sent=n cancelled=n completed=217 failures=0 reports=8 pauses=0 threads=39
+RUN seed=21 move wall=0.53s cancelAt=0.520s(main) sent=y cancelled=y completed=208 failures=0 reports=12 pauses=3 threads=39
+RUN seed=21 move-back wall=0.37s cancelAt=- sent=n cancelled=n completed=305 failures=0 reports=10 pauses=0 threads=39
+RUN seed=100021 move-back wall=0.00s cancelAt=- sent=n cancelled=n completed=0 failures=0 reports=1 pauses=0 threads=39
+RUN seed=22 copy wall=1.03s cancelAt=1.025s(bg) sent=y cancelled=y completed=107 failures=0 reports=24 pauses=10 threads=39
+RUN seed=22 delete wall=0.01s cancelAt=0.012s(main) sent=y cancelled=y completed=0 failures=0 reports=0 pauses=0 threads=39
+RUN seed=100022 delete wall=0.17s cancelAt=- sent=n cancelled=n completed=108 failures=0 reports=5 pauses=2 threads=39
+RUN seed=22 move wall=0.94s cancelAt=1.095s(bg) sent=n cancelled=n completed=401 failures=0 reports=23 pauses=0 threads=39
+RUN seed=22 move-back wall=0.68s cancelAt=- sent=n cancelled=n completed=401 failures=0 reports=18 pauses=0 threads=39
+RUN seed=100022 move-back wall=0.00s cancelAt=- sent=n cancelled=n completed=0 failures=0 reports=1 pauses=0 threads=39
+RUN seed=23 copy wall=0.55s cancelAt=0.548s(main) sent=y cancelled=y completed=56 failures=0 reports=12 pauses=0 threads=39
+RUN seed=23 delete wall=0.08s cancelAt=0.516s(bg) sent=n cancelled=n completed=57 failures=0 reports=3 pauses=1 threads=39
+RUN seed=23 move wall=0.51s cancelAt=0.498s(main) sent=y cancelled=y completed=206 failures=0 reports=12 pauses=0 threads=39
+RUN seed=23 move-back wall=0.37s cancelAt=- sent=n cancelled=n completed=304 failures=0 reports=10 pauses=4 threads=39
+RUN seed=100023 move-back wall=0.00s cancelAt=- sent=n cancelled=n completed=0 failures=0 reports=1 pauses=0 threads=39
+RUN seed=24 copy wall=0.41s cancelAt=0.407s(bg) sent=y cancelled=y completed=25 failures=0 reports=8 pauses=5 threads=39
+RUN seed=24 delete wall=0.04s cancelAt=- sent=n cancelled=n completed=26 failures=0 reports=2 pauses=0 threads=39
+RUN seed=24 move wall=0.10s cancelAt=0.090s(bg) sent=y cancelled=y completed=17 failures=0 reports=1 pauses=0 threads=39
+RUN seed=24 move-back wall=0.06s cancelAt=0.547s(main) sent=n cancelled=n completed=209 failures=0 reports=3 pauses=0 threads=39
+RUN seed=100024 move-back wall=0.00s cancelAt=- sent=n cancelled=n completed=0 failures=0 reports=1 pauses=0 threads=39
+RUN seed=25 copy wall=0.23s cancelAt=0.232s(bg) sent=y cancelled=y completed=17 failures=0 reports=4 pauses=0 threads=39
+RUN seed=25 delete wall=0.03s cancelAt=0.597s(bg) sent=n cancelled=n completed=18 failures=0 reports=2 pauses=0 threads=39
+RUN seed=25 move wall=0.69s cancelAt=0.682s(bg) sent=y cancelled=y completed=256 failures=0 reports=16 pauses=11 threads=39
+RUN seed=25 move-back wall=0.43s cancelAt=- sent=n cancelled=n completed=329 failures=0 reports=12 pauses=0 threads=39
+RUN seed=100025 move-back wall=0.00s cancelAt=- sent=n cancelled=n completed=0 failures=0 reports=1 pauses=0 threads=40
+RUN seed=26 copy wall=1.23s cancelAt=1.220s(bg) sent=y cancelled=y completed=152 failures=0 reports=28 pauses=11 threads=39
+RUN seed=26 delete wall=0.24s cancelAt=- sent=n cancelled=n completed=153 failures=0 reports=7 pauses=0 threads=39
+RUN seed=26 move wall=0.97s cancelAt=- sent=n cancelled=n completed=401 failures=0 reports=24 pauses=8 threads=39
+RUN seed=26 move-back wall=0.03s cancelAt=0.030s(main) sent=y cancelled=y completed=0 failures=0 reports=0 pauses=0 threads=39
+RUN seed=100026 move-back wall=1.31s cancelAt=- sent=n cancelled=n completed=401 failures=0 reports=32 pauses=9 threads=39
+RUN seed=27 copy wall=1.05s cancelAt=1.050s(bg) sent=y cancelled=y completed=131 failures=0 reports=24 pauses=0 threads=39
+RUN seed=27 delete wall=0.20s cancelAt=0.650s(bg) sent=n cancelled=n completed=132 failures=0 reports=6 pauses=1 threads=39
+RUN seed=27 move wall=0.96s cancelAt=0.943s(bg) sent=y cancelled=y completed=374 failures=0 reports=23 pauses=8 threads=39
+RUN seed=27 move-back wall=0.59s cancelAt=0.578s(bg) sent=y cancelled=y completed=334 failures=0 reports=14 pauses=0 threads=39
+RUN seed=100027 move-back wall=0.15s cancelAt=- sent=n cancelled=n completed=54 failures=0 reports=5 pauses=0 threads=39
+RUN seed=28 copy wall=2.98s cancelAt=3.068s(bg) sent=n cancelled=n completed=401 failures=0 reports=73 pauses=24 threads=24
+RUN seed=28 delete wall=0.44s cancelAt=0.431s(main) sent=y cancelled=y completed=182 failures=0 reports=9 pauses=3 threads=39
+RUN seed=100028 delete wall=0.41s cancelAt=- sent=n cancelled=n completed=219 failures=0 reports=10 pauses=3 threads=39
+RUN seed=28 move wall=1.16s cancelAt=- sent=n cancelled=n completed=401 failures=0 reports=28 pauses=0 threads=39
+RUN seed=28 move-back wall=0.70s cancelAt=0.697s(bg) sent=y cancelled=y completed=345 failures=0 reports=17 pauses=7 threads=39
+RUN seed=100028 move-back wall=0.20s cancelAt=- sent=n cancelled=n completed=56 failures=0 reports=6 pauses=0 threads=39
+RUN seed=29 copy wall=0.51s cancelAt=0.503s(bg) sent=y cancelled=y completed=35 failures=0 reports=10 pauses=0 threads=39
+RUN seed=29 delete wall=0.07s cancelAt=0.592s(main) sent=n cancelled=n completed=36 failures=0 reports=3 pauses=0 threads=39
+RUN seed=29 move wall=1.17s cancelAt=- sent=n cancelled=n completed=401 failures=0 reports=29 pauses=8 threads=39
+RUN seed=29 move-back wall=0.01s cancelAt=0.005s(main) sent=y cancelled=y completed=0 failures=0 reports=0 pauses=0 threads=39
+RUN seed=100029 move-back wall=1.45s cancelAt=- sent=n cancelled=n completed=401 failures=0 reports=36 pauses=0 threads=38
+RUN seed=30 copy wall=4.86s cancelAt=- sent=n cancelled=n completed=401 failures=0 reports=119 pauses=50 threads=18
+RUN seed=30 delete wall=0.36s cancelAt=0.363s(bg) sent=y cancelled=y completed=163 failures=0 reports=7 pauses=4 threads=38
+RUN seed=100030 delete wall=0.45s cancelAt=- sent=n cancelled=n completed=238 failures=0 reports=11 pauses=6 threads=38
+RUN seed=30 move wall=0.52s cancelAt=0.518s(bg) sent=y cancelled=y completed=169 failures=0 reports=12 pauses=5 threads=38
+RUN seed=30 move-back wall=0.18s cancelAt=0.176s(main) sent=y cancelled=y completed=85 failures=0 reports=4 pauses=3 threads=38
+RUN seed=100030 move-back wall=0.34s cancelAt=- sent=n cancelled=n completed=200 failures=0 reports=9 pauses=4 threads=38
+THREADS after seed 30: right after=38 settled(<=8s)=8 baseline=8 max so far=39 footprint=27MB peakRSS=130MB load=17.49609375
+RUN seed=31 copy wall=3.45s cancelAt=- sent=n cancelled=n completed=401 failures=0 reports=85 pauses=27 threads=17
+RUN seed=31 delete wall=0.64s cancelAt=- sent=n cancelled=n completed=401 failures=0 reports=15 pauses=4 threads=38
+RUN seed=31 move wall=0.53s cancelAt=0.524s(main) sent=y cancelled=y completed=214 failures=0 reports=12 pauses=4 threads=38
+RUN seed=31 move-back wall=0.37s cancelAt=0.671s(bg) sent=n cancelled=n completed=308 failures=0 reports=10 pauses=0 threads=38
+RUN seed=100031 move-back wall=0.00s cancelAt=- sent=n cancelled=n completed=0 failures=0 reports=1 pauses=0 threads=38
+RUN seed=32 copy wall=2.91s cancelAt=2.909s(bg) sent=y cancelled=y completed=324 failures=0 reports=70 pauses=0 threads=23
+RUN seed=32 delete wall=0.49s cancelAt=0.484s(bg) sent=y cancelled=y completed=188 failures=0 reports=10 pauses=5 threads=38
+RUN seed=100032 delete wall=0.41s cancelAt=- sent=n cancelled=n completed=137 failures=0 reports=9 pauses=5 threads=38
+RUN seed=32 move wall=1.01s cancelAt=- sent=n cancelled=n completed=401 failures=0 reports=25 pauses=5 threads=38
+RUN seed=32 move-back wall=0.17s cancelAt=0.162s(bg) sent=y cancelled=y completed=59 failures=0 reports=3 pauses=0 threads=39
+RUN seed=100032 move-back wall=1.23s cancelAt=- sent=n cancelled=n completed=342 failures=0 reports=30 pauses=12 threads=39
+RUN seed=33 copy wall=1.05s cancelAt=1.042s(bg) sent=y cancelled=y completed=89 failures=0 reports=24 pauses=16 threads=39
+RUN seed=33 delete wall=0.12s cancelAt=0.118s(bg) sent=y cancelled=y completed=52 failures=0 reports=3 pauses=1 threads=39
+RUN seed=100033 delete wall=0.07s cancelAt=- sent=n cancelled=n completed=38 failures=0 reports=3 pauses=0 threads=39
+RUN seed=33 move wall=1.26s cancelAt=- sent=n cancelled=n completed=401 failures=0 reports=31 pauses=6 threads=39
+RUN seed=33 move-back wall=0.95s cancelAt=- sent=n cancelled=n completed=401 failures=0 reports=24 pauses=11 threads=39
+RUN seed=100033 move-back wall=0.00s cancelAt=- sent=n cancelled=n completed=0 failures=0 reports=1 pauses=0 threads=39
+RUN seed=34 copy wall=1.55s cancelAt=1.548s(bg) sent=y cancelled=y completed=109 failures=0 reports=36 pauses=10 threads=39
+RUN seed=34 delete wall=0.59s cancelAt=- sent=n cancelled=n completed=110 failures=0 reports=13 pauses=6 threads=39
+RUN seed=34 move wall=0.69s cancelAt=0.670s(bg) sent=y cancelled=y completed=137 failures=0 reports=15 pauses=8 threads=39
+RUN seed=34 move-back wall=0.28s cancelAt=0.262s(bg) sent=y cancelled=y completed=132 failures=0 reports=7 pauses=4 threads=39
+RUN seed=100034 move-back wall=0.04s cancelAt=- sent=n cancelled=n completed=137 failures=0 reports=2 pauses=1 threads=39
+RUN seed=35 copy wall=4.13s cancelAt=- sent=n cancelled=n completed=401 failures=0 reports=101 pauses=41 threads=24
+RUN seed=35 delete wall=0.64s cancelAt=0.635s(main) sent=y cancelled=y completed=338 failures=0 reports=14 pauses=2 threads=39
+RUN seed=100035 delete wall=0.22s cancelAt=- sent=n cancelled=n completed=63 failures=0 reports=6 pauses=1 threads=39
+RUN seed=35 move wall=1.28s cancelAt=- sent=n cancelled=n completed=401 failures=0 reports=31 pauses=11 threads=39
+RUN seed=35 move-back wall=0.84s cancelAt=- sent=n cancelled=n completed=401 failures=0 reports=21 pauses=9 threads=39
+RUN seed=100035 move-back wall=0.00s cancelAt=- sent=n cancelled=n completed=0 failures=0 reports=1 pauses=0 threads=39
+RUN seed=36 copy wall=1.37s cancelAt=1.358s(bg) sent=y cancelled=y completed=120 failures=0 reports=30 pauses=16 threads=39
+RUN seed=36 delete wall=0.22s cancelAt=0.316s(bg) sent=n cancelled=n completed=120 failures=0 reports=6 pauses=1 threads=39
+RUN seed=36 move wall=1.10s cancelAt=- sent=n cancelled=n completed=401 failures=0 reports=28 pauses=12 threads=39
+RUN seed=36 move-back wall=0.18s cancelAt=0.181s(bg) sent=y cancelled=y completed=70 failures=0 reports=4 pauses=1 threads=39
+RUN seed=100036 move-back wall=1.17s cancelAt=- sent=n cancelled=n completed=331 failures=0 reports=29 pauses=8 threads=39
+RUN seed=37 copy wall=1.22s cancelAt=1.218s(bg) sent=y cancelled=y completed=135 failures=0 reports=28 pauses=5 threads=39
+RUN seed=37 delete wall=0.22s cancelAt=- sent=n cancelled=n completed=135 failures=0 reports=6 pauses=3 threads=39
+RUN seed=37 move wall=0.27s cancelAt=0.268s(bg) sent=y cancelled=y completed=98 failures=0 reports=6 pauses=3 threads=39
+RUN seed=37 move-back wall=0.19s cancelAt=0.251s(main) sent=n cancelled=n completed=250 failures=0 reports=6 pauses=0 threads=39
+RUN seed=100037 move-back wall=0.00s cancelAt=- sent=n cancelled=n completed=0 failures=0 reports=1 pauses=0 threads=39
+RUN seed=38 copy wall=2.13s cancelAt=2.127s(main) sent=y cancelled=y completed=244 failures=0 reports=51 pauses=23 threads=24
+RUN seed=38 delete wall=0.32s cancelAt=0.315s(main) sent=y cancelled=y completed=173 failures=0 reports=7 pauses=3 threads=39
+RUN seed=100038 delete wall=0.12s cancelAt=- sent=n cancelled=n completed=72 failures=0 reports=4 pauses=1 threads=39
+RUN seed=38 move wall=0.21s cancelAt=0.199s(bg) sent=y cancelled=y completed=67 failures=0 reports=4 pauses=1 threads=39
+RUN seed=38 move-back wall=0.15s cancelAt=0.479s(bg) sent=n cancelled=n completed=234 failures=0 reports=5 pauses=1 threads=39
+RUN seed=100038 move-back wall=0.00s cancelAt=- sent=n cancelled=n completed=0 failures=0 reports=1 pauses=0 threads=39
+RUN seed=39 copy wall=4.22s cancelAt=- sent=n cancelled=n completed=401 failures=0 reports=104 pauses=0 threads=23
+RUN seed=39 delete wall=0.55s cancelAt=0.530s(main) sent=y cancelled=y completed=266 failures=0 reports=11 pauses=4 threads=38
+RUN seed=100039 delete wall=0.27s cancelAt=- sent=n cancelled=n completed=135 failures=0 reports=7 pauses=3 threads=38
+RUN seed=39 move wall=0.11s cancelAt=0.096s(main) sent=y cancelled=y completed=20 failures=0 reports=2 pauses=0 threads=38
+RUN seed=39 move-back wall=0.07s cancelAt=0.087s(bg) sent=n cancelled=n completed=211 failures=0 reports=3 pauses=1 threads=38
+RUN seed=100039 move-back wall=0.00s cancelAt=- sent=n cancelled=n completed=0 failures=0 reports=1 pauses=0 threads=38
+RUN seed=40 copy wall=3.05s cancelAt=3.039s(bg) sent=y cancelled=y completed=231 failures=0 reports=73 pauses=30 threads=25
+RUN seed=40 delete wall=0.25s cancelAt=0.242s(bg) sent=y cancelled=y completed=98 failures=0 reports=5 pauses=3 threads=40
+RUN seed=100040 delete wall=0.25s cancelAt=- sent=n cancelled=n completed=134 failures=0 reports=7 pauses=6 threads=40
+RUN seed=40 move wall=0.20s cancelAt=0.195s(bg) sent=y cancelled=y completed=55 failures=0 reports=4 pauses=0 threads=40
+RUN seed=40 move-back wall=0.14s cancelAt=0.392s(main) sent=n cancelled=n completed=228 failures=0 reports=5 pauses=0 threads=40
+RUN seed=100040 move-back wall=0.00s cancelAt=- sent=n cancelled=n completed=0 failures=0 reports=1 pauses=0 threads=40
+THREADS after seed 40: right after=25 settled(<=8s)=9 baseline=8 max so far=40 footprint=56MB peakRSS=156MB load=26.14013671875
+RUN seed=41 copy wall=0.30s cancelAt=0.298s(bg) sent=y cancelled=y completed=21 failures=0 reports=5 pauses=0 threads=32
+RUN seed=41 delete wall=0.03s cancelAt=- sent=n cancelled=n completed=21 failures=0 reports=2 pauses=0 threads=38
+RUN seed=41 move wall=0.32s cancelAt=0.304s(bg) sent=y cancelled=y completed=100 failures=0 reports=7 pauses=0 threads=38
+RUN seed=41 move-back wall=0.21s cancelAt=- sent=n cancelled=n completed=251 failures=0 reports=6 pauses=2 threads=38
+RUN seed=100041 move-back wall=0.00s cancelAt=- sent=n cancelled=n completed=0 failures=0 reports=1 pauses=0 threads=38
+RUN seed=42 copy wall=0.64s cancelAt=0.634s(bg) sent=y cancelled=y completed=68 failures=0 reports=14 pauses=7 threads=38
+RUN seed=42 delete wall=0.11s cancelAt=- sent=n cancelled=n completed=69 failures=0 reports=4 pauses=0 threads=38
+RUN seed=42 move wall=1.01s cancelAt=1.017s(bg) sent=n cancelled=n completed=401 failures=0 reports=25 pauses=10 threads=38
+RUN seed=42 move-back wall=0.71s cancelAt=- sent=n cancelled=n completed=401 failures=0 reports=18 pauses=0 threads=38
+RUN seed=100042 move-back wall=0.00s cancelAt=- sent=n cancelled=n completed=0 failures=0 reports=1 pauses=0 threads=38
+RUN seed=43 copy wall=2.21s cancelAt=2.208s(main) sent=y cancelled=y completed=135 failures=0 reports=53 pauses=0 threads=23
+RUN seed=43 delete wall=0.31s cancelAt=- sent=n cancelled=n completed=136 failures=0 reports=8 pauses=0 threads=38
+RUN seed=43 move wall=0.79s cancelAt=0.786s(bg) sent=y cancelled=y completed=226 failures=0 reports=19 pauses=3 threads=38
+RUN seed=43 move-back wall=0.58s cancelAt=- sent=n cancelled=n completed=314 failures=0 reports=15 pauses=7 threads=38
+RUN seed=100043 move-back wall=0.00s cancelAt=- sent=n cancelled=n completed=0 failures=0 reports=1 pauses=0 threads=38
+RUN seed=44 copy wall=2.47s cancelAt=2.460s(main) sent=y cancelled=y completed=176 failures=0 reports=58 pauses=21 threads=23
+RUN seed=44 delete wall=0.35s cancelAt=0.600s(bg) sent=n cancelled=n completed=177 failures=0 reports=9 pauses=0 threads=38
+RUN seed=44 move wall=0.13s cancelAt=0.126s(main) sent=y cancelled=y completed=27 failures=0 reports=2 pauses=0 threads=38
+RUN seed=44 move-back wall=0.13s cancelAt=0.294s(bg) sent=n cancelled=n completed=214 failures=0 reports=4 pauses=2 threads=38
+RUN seed=100044 move-back wall=0.00s cancelAt=- sent=n cancelled=n completed=0 failures=0 reports=1 pauses=0 threads=38
+RUN seed=45 copy wall=4.85s cancelAt=- sent=n cancelled=n completed=401 failures=0 reports=119 pauses=40 threads=18
+RUN seed=45 delete wall=0.70s cancelAt=0.696s(bg) sent=y cancelled=y completed=340 failures=0 reports=15 pauses=7 threads=38
+RUN seed=100045 delete wall=0.11s cancelAt=- sent=n cancelled=n completed=61 failures=0 reports=4 pauses=1 threads=38
+RUN seed=45 move wall=0.84s cancelAt=0.831s(main) sent=y cancelled=y completed=282 failures=0 reports=20 pauses=12 threads=38
+RUN seed=45 move-back wall=0.27s cancelAt=0.268s(bg) sent=y cancelled=y completed=136 failures=0 reports=6 pauses=2 threads=38
+RUN seed=100045 move-back wall=0.55s cancelAt=- sent=n cancelled=n completed=206 failures=0 reports=14 pauses=0 threads=38
+RUN seed=46 copy wall=0.94s cancelAt=0.937s(bg) sent=y cancelled=y completed=92 failures=0 reports=21 pauses=5 threads=38
+RUN seed=46 delete wall=0.18s cancelAt=0.558s(bg) sent=n cancelled=n completed=93 failures=0 reports=5 pauses=0 threads=38
+RUN seed=46 move wall=0.16s cancelAt=0.142s(main) sent=y cancelled=y completed=35 failures=0 reports=3 pauses=0 threads=38
+RUN seed=46 move-back wall=0.10s cancelAt=- sent=n cancelled=n completed=218 failures=0 reports=4 pauses=0 threads=38
+RUN seed=100046 move-back wall=0.00s cancelAt=- sent=n cancelled=n completed=0 failures=0 reports=1 pauses=0 threads=39
+RUN seed=47 copy wall=4.07s cancelAt=- sent=n cancelled=n completed=401 failures=0 reports=100 pauses=0 threads=23
+RUN seed=47 delete wall=0.64s cancelAt=0.635s(bg) sent=y cancelled=y completed=362 failures=0 reports=14 pauses=7 threads=38
+RUN seed=100047 delete wall=0.06s cancelAt=- sent=n cancelled=n completed=39 failures=0 reports=3 pauses=0 threads=38
+RUN seed=47 move wall=0.86s cancelAt=0.852s(bg) sent=y cancelled=y completed=300 failures=0 reports=20 pauses=0 threads=39
+RUN seed=47 move-back wall=0.65s cancelAt=- sent=n cancelled=n completed=351 failures=0 reports=17 pauses=6 threads=39
+RUN seed=100047 move-back wall=0.00s cancelAt=- sent=n cancelled=n completed=0 failures=0 reports=1 pauses=0 threads=39
+RUN seed=48 copy wall=4.20s cancelAt=- sent=n cancelled=n completed=401 failures=0 reports=103 pauses=0 threads=23
+RUN seed=48 delete wall=0.74s cancelAt=- sent=n cancelled=n completed=401 failures=0 reports=17 pauses=0 threads=38
+RUN seed=48 move wall=0.85s cancelAt=0.846s(main) sent=y cancelled=y completed=299 failures=0 reports=20 pauses=0 threads=38
+RUN seed=48 move-back wall=0.61s cancelAt=- sent=n cancelled=n completed=350 failures=0 reports=16 pauses=10 threads=38
+RUN seed=100048 move-back wall=0.00s cancelAt=- sent=n cancelled=n completed=0 failures=0 reports=1 pauses=0 threads=38
+RUN seed=49 copy wall=2.61s cancelAt=2.600s(bg) sent=y cancelled=y completed=244 failures=0 reports=62 pauses=26 threads=23
+RUN seed=49 delete wall=0.40s cancelAt=- sent=n cancelled=n completed=245 failures=0 reports=10 pauses=2 threads=38
+RUN seed=49 move wall=0.97s cancelAt=- sent=n cancelled=n completed=401 failures=0 reports=24 pauses=10 threads=38
+RUN seed=49 move-back wall=0.64s cancelAt=- sent=n cancelled=n completed=401 failures=0 reports=17 pauses=4 threads=38
+RUN seed=100049 move-back wall=0.00s cancelAt=- sent=n cancelled=n completed=0 failures=0 reports=1 pauses=0 threads=38
+RUN seed=50 copy wall=0.36s cancelAt=0.352s(main) sent=y cancelled=y completed=33 failures=0 reports=7 pauses=0 threads=38
+RUN seed=50 delete wall=0.05s cancelAt=- sent=n cancelled=n completed=34 failures=0 reports=3 pauses=0 threads=38
+RUN seed=50 move wall=1.02s cancelAt=- sent=n cancelled=n completed=401 failures=0 reports=25 pauses=0 threads=38
+RUN seed=50 move-back wall=0.68s cancelAt=- sent=n cancelled=n completed=401 failures=0 reports=17 pauses=6 threads=38
+RUN seed=100050 move-back wall=0.00s cancelAt=- sent=n cancelled=n completed=0 failures=0 reports=1 pauses=0 threads=38
+THREADS after seed 50: right after=23 settled(<=8s)=8 baseline=8 max so far=40 footprint=45MB peakRSS=156MB load=20.12158203125
+DURATIONS copy: n=51 min=0.07s max=4.86s mean=2.38s
+DURATIONS delete: n=71 min=0.00s max=3.37s mean=0.41s
+DURATIONS move: n=51 min=0.08s max=1.28s mean=0.77s
+DURATIONS move-back: n=101 min=0.00s max=1.45s mean=0.32s
+STEP deferred: build source tree                    wall=   0.206s cpu=   1.96s threads 8->18 footprint=46MB peakRSS=157MB load=20.1
+RUN seed=1 deferred-move wall=0.03s cancelAt=0.448s(bg) sent=n cancelled=y completed=0 failures=1 reports=1 pauses=0 threads=33 rate=50% batch=7 answer=skip commits ok/failed=2/1 removed=22 kept=2981 errorsAsked=1
+RUN seed=2 deferred-move wall=1.73s cancelAt=- sent=n cancelled=n completed=63 failures=0 reports=40 pauses=0 threads=33 rate=0% batch=10000 answer=skipAll commits ok/failed=1/0 removed=3003 kept=0 errorsAsked=0
+RUN seed=3 deferred-move wall=0.04s cancelAt=- sent=n cancelled=y completed=1 failures=1 reports=1 pauses=0 threads=33 rate=50% batch=40 answer=abort commits ok/failed=2/1 removed=84 kept=2919 errorsAsked=1
+RUN seed=4 deferred-move wall=1.76s cancelAt=- sent=n cancelled=n completed=63 failures=0 reports=40 pauses=0 threads=34 rate=20% batch=10000 answer=skipAll commits ok/failed=1/0 removed=3003 kept=0 errorsAsked=0
+RUN seed=5 deferred-move wall=0.04s cancelAt=- sent=n cancelled=y completed=0 failures=1 reports=1 pauses=0 threads=34 rate=50% batch=40 answer=skip commits ok/failed=1/1 removed=43 kept=2960 errorsAsked=1
+RUN seed=6 deferred-move wall=0.34s cancelAt=0.306s(main) sent=y cancelled=y completed=0 failures=0 reports=7 pauses=3 threads=34 rate=0% batch=10000 answer=retry commits ok/failed=0/0 removed=0 kept=3003 errorsAsked=0
+RUN seed=7 deferred-move wall=1.87s cancelAt=- sent=n cancelled=y completed=0 failures=1 reports=40 pauses=18 threads=34 rate=50% batch=10000 answer=abort commits ok/failed=0/1 removed=0 kept=3003 errorsAsked=1
+RUN seed=8 deferred-move wall=0.60s cancelAt=0.591s(bg) sent=y cancelled=y completed=32 failures=0 reports=14 pauses=0 threads=34 rate=0% batch=7 answer=skipAll commits ok/failed=152/0 removed=1634 kept=1369 errorsAsked=0
+RUN seed=9 deferred-move wall=0.02s cancelAt=0.006s(main) sent=y cancelled=y completed=0 failures=0 reports=0 pauses=0 threads=34 rate=100% batch=250 answer=skip commits ok/failed=0/0 removed=0 kept=3003 errorsAsked=0
+RUN seed=10 deferred-move wall=0.04s cancelAt=- sent=n cancelled=y completed=0 failures=1 reports=1 pauses=0 threads=34 rate=50% batch=40 answer=skipAll commits ok/failed=1/1 removed=45 kept=2958 errorsAsked=1
+RUN seed=11 deferred-move wall=0.20s cancelAt=- sent=n cancelled=y completed=0 failures=10125 reports=1 pauses=0 threads=34 rate=50% batch=40 answer=retry commits ok/failed=0/1 removed=0 kept=3003 errorsAsked=10125
+RUN seed=12 deferred-move wall=0.03s cancelAt=0.126s(main) sent=n cancelled=y completed=0 failures=1 reports=1 pauses=0 threads=34 rate=50% batch=7 answer=abort commits ok/failed=1/1 removed=11 kept=2992 errorsAsked=1
+RUN seed=13 deferred-move wall=0.47s cancelAt=0.456s(main) sent=y cancelled=y completed=28 failures=0 reports=11 pauses=3 threads=34 rate=0% batch=7 answer=skip commits ok/failed=134/0 removed=1437 kept=1566 errorsAsked=0
+RUN seed=14 deferred-move wall=0.49s cancelAt=0.480s(bg) sent=y cancelled=y completed=29 failures=0 reports=12 pauses=0 threads=33 rate=0% batch=7 answer=skip commits ok/failed=134/0 removed=1484 kept=1519 errorsAsked=0
+RUN seed=15 deferred-move wall=0.05s cancelAt=- sent=n cancelled=y completed=0 failures=1 reports=1 pauses=0 threads=33 rate=100% batch=250 answer=skipAll commits ok/failed=0/1 removed=0 kept=3003 errorsAsked=1
+RUN seed=16 deferred-move wall=1.81s cancelAt=- sent=n cancelled=y completed=0 failures=1 reports=39 pauses=0 threads=33 rate=50% batch=10000 answer=skip commits ok/failed=0/1 removed=0 kept=3003 errorsAsked=1
+RUN seed=17 deferred-move wall=1.92s cancelAt=- sent=n cancelled=y completed=0 failures=1 reports=42 pauses=19 threads=33 rate=100% batch=10000 answer=abort commits ok/failed=0/1 removed=0 kept=3003 errorsAsked=1
+RUN seed=18 deferred-move wall=0.63s cancelAt=0.574s(main) sent=y cancelled=y completed=0 failures=0 reports=14 pauses=8 threads=33 rate=0% batch=10000 answer=retry commits ok/failed=0/0 removed=0 kept=3003 errorsAsked=0
+RUN seed=19 deferred-move wall=1.87s cancelAt=- sent=n cancelled=y completed=0 failures=1 reports=40 pauses=13 threads=33 rate=50% batch=10000 answer=skipAll commits ok/failed=0/1 removed=0 kept=3003 errorsAsked=1
+RUN seed=20 deferred-move wall=0.03s cancelAt=0.032s(main) sent=n cancelled=y completed=0 failures=1 reports=1 pauses=0 threads=33 rate=100% batch=7 answer=abort commits ok/failed=0/1 removed=0 kept=3003 errorsAsked=1
+RUN seed=21 deferred-move wall=0.26s cancelAt=0.249s(main) sent=y cancelled=y completed=14 failures=0 reports=6 pauses=1 threads=33 rate=0% batch=250 answer=abort commits ok/failed=3/0 removed=749 kept=2254 errorsAsked=0
+RUN seed=22 deferred-move wall=1.79s cancelAt=- sent=n cancelled=n completed=63 failures=0 reports=40 pauses=0 threads=19 rate=20% batch=10000 answer=skip commits ok/failed=1/0 removed=3003 kept=0 errorsAsked=0
+RUN seed=23 deferred-move wall=0.03s cancelAt=- sent=n cancelled=y completed=0 failures=1 reports=1 pauses=1 threads=34 rate=100% batch=7 answer=skip commits ok/failed=0/1 removed=0 kept=3003 errorsAsked=1
+RUN seed=24 deferred-move wall=0.24s cancelAt=0.230s(main) sent=y cancelled=y completed=17 failures=0 reports=6 pauses=0 threads=34 rate=0% batch=40 answer=skipAll commits ok/failed=20/0 removed=866 kept=2137 errorsAsked=0
+RUN seed=25 deferred-move wall=0.04s cancelAt=0.357s(main) sent=n cancelled=y completed=0 failures=1 reports=1 pauses=0 threads=34 rate=50% batch=40 answer=abort commits ok/failed=0/1 removed=0 kept=3003 errorsAsked=1
+RUN seed=26 deferred-move wall=0.29s cancelAt=0.264s(bg) sent=y cancelled=y completed=0 failures=0 reports=6 pauses=0 threads=34 rate=0% batch=10000 answer=abort commits ok/failed=0/0 removed=0 kept=3003 errorsAsked=0
+RUN seed=27 deferred-move wall=0.03s cancelAt=- sent=n cancelled=y completed=0 failures=1 reports=1 pauses=0 threads=34 rate=20% batch=7 answer=skip commits ok/failed=1/1 removed=15 kept=2988 errorsAsked=1
+RUN seed=28 deferred-move wall=1.80s cancelAt=- sent=n cancelled=n completed=63 failures=0 reports=40 pauses=11 threads=19 rate=50% batch=10000 answer=retry commits ok/failed=1/0 removed=3003 kept=0 errorsAsked=0
+RUN seed=29 deferred-move wall=1.83s cancelAt=- sent=n cancelled=n completed=63 failures=0 reports=46 pauses=17 threads=19 rate=0% batch=40 answer=skipAll commits ok/failed=70/0 removed=3003 kept=0 errorsAsked=0
+RUN seed=30 deferred-move wall=1.74s cancelAt=- sent=n cancelled=n completed=63 failures=0 reports=40 pauses=0 threads=34 rate=50% batch=10000 answer=retry commits ok/failed=1/0 removed=3003 kept=0 errorsAsked=0
+RUN seed=31 deferred-move wall=0.33s cancelAt=0.293s(bg) sent=y cancelled=y completed=0 failures=0 reports=7 pauses=0 threads=34 rate=20% batch=10000 answer=skip commits ok/failed=0/0 removed=0 kept=3003 errorsAsked=0
+RUN seed=32 deferred-move wall=0.37s cancelAt=0.329s(main) sent=y cancelled=y completed=0 failures=0 reports=8 pauses=0 threads=34 rate=100% batch=10000 answer=abort commits ok/failed=0/0 removed=0 kept=3003 errorsAsked=0
+RUN seed=33 deferred-move wall=0.05s cancelAt=0.041s(main) sent=y cancelled=y completed=0 failures=0 reports=1 pauses=0 threads=34 rate=100% batch=250 answer=skipAll commits ok/failed=0/0 removed=0 kept=3003 errorsAsked=0
+RUN seed=34 deferred-move wall=0.03s cancelAt=- sent=n cancelled=y completed=0 failures=1 reports=1 pauses=0 threads=34 rate=50% batch=7 answer=skipAll commits ok/failed=1/1 removed=12 kept=2991 errorsAsked=1
+RUN seed=35 deferred-move wall=0.69s cancelAt=- sent=n cancelled=y completed=29 failures=1 reports=16 pauses=5 threads=34 rate=20% batch=250 answer=skipAll commits ok/failed=6/1 removed=1495 kept=1508 errorsAsked=1
+RUN seed=36 deferred-move wall=2.09s cancelAt=- sent=n cancelled=n completed=63 failures=0 reports=51 pauses=21 threads=19 rate=0% batch=250 answer=retry commits ok/failed=13/0 removed=3003 kept=0 errorsAsked=0
+RUN seed=37 deferred-move wall=2.03s cancelAt=- sent=n cancelled=n completed=63 failures=0 reports=46 pauses=13 threads=19 rate=20% batch=10000 answer=skipAll commits ok/failed=1/0 removed=3003 kept=0 errorsAsked=0
+RUN seed=38 deferred-move wall=0.60s cancelAt=0.536s(main) sent=y cancelled=y completed=0 failures=0 reports=13 pauses=0 threads=34 rate=0% batch=10000 answer=abort commits ok/failed=0/0 removed=0 kept=3003 errorsAsked=0
+RUN seed=39 deferred-move wall=0.17s cancelAt=- sent=n cancelled=y completed=4 failures=1 reports=3 pauses=1 threads=34 rate=50% batch=250 answer=abort commits ok/failed=1/1 removed=249 kept=2754 errorsAsked=1
+RUN seed=40 deferred-move wall=0.20s cancelAt=- sent=n cancelled=y completed=0 failures=7121 reports=1 pauses=0 threads=33 rate=100% batch=40 answer=retry commits ok/failed=0/1 removed=0 kept=3003 errorsAsked=7121
+RUN seed=41 deferred-move wall=0.21s cancelAt=0.197s(bg) sent=y cancelled=y completed=0 failures=0 reports=5 pauses=0 threads=34 rate=0% batch=10000 answer=skip commits ok/failed=0/0 removed=0 kept=3003 errorsAsked=0
+RUN seed=42 deferred-move wall=0.04s cancelAt=0.255s(bg) sent=n cancelled=y completed=0 failures=1 reports=1 pauses=1 threads=34 rate=100% batch=7 answer=skip commits ok/failed=0/1 removed=0 kept=3003 errorsAsked=1
+RUN seed=43 deferred-move wall=0.04s cancelAt=- sent=n cancelled=y completed=0 failures=1 reports=1 pauses=1 threads=34 rate=20% batch=7 answer=skip commits ok/failed=3/1 removed=36 kept=2967 errorsAsked=1
+RUN seed=44 deferred-move wall=0.11s cancelAt=0.105s(bg) sent=y cancelled=y completed=5 failures=0 reports=2 pauses=2 threads=34 rate=0% batch=40 answer=abort commits ok/failed=7/0 removed=297 kept=2706 errorsAsked=0
+RUN seed=45 deferred-move wall=0.06s cancelAt=0.305s(bg) sent=n cancelled=y completed=2 failures=1 reports=1 pauses=0 threads=33 rate=20% batch=40 answer=abort commits ok/failed=3/1 removed=131 kept=2872 errorsAsked=1
+RUN seed=46 deferred-move wall=0.13s cancelAt=0.114s(bg) sent=y cancelled=y completed=0 failures=0 reports=3 pauses=0 threads=34 rate=0% batch=10000 answer=skip commits ok/failed=0/0 removed=0 kept=3003 errorsAsked=0
+RUN seed=47 deferred-move wall=0.08s cancelAt=0.072s(main) sent=y cancelled=y completed=0 failures=1947 reports=1 pauses=0 threads=34 rate=20% batch=7 answer=retry commits ok/failed=2/1 removed=21 kept=2982 errorsAsked=1947
+RUN seed=48 deferred-move wall=0.22s cancelAt=- sent=n cancelled=y completed=9 failures=1 reports=4 pauses=0 threads=34 rate=50% batch=250 answer=skipAll commits ok/failed=2/1 removed=497 kept=2506 errorsAsked=1
+RUN seed=49 deferred-move wall=0.05s cancelAt=0.572s(main) sent=n cancelled=y completed=2 failures=1 reports=1 pauses=0 threads=33 rate=20% batch=7 answer=skip commits ok/failed=10/1 removed=100 kept=2903 errorsAsked=1
+RUN seed=50 deferred-move wall=3.30s cancelAt=- sent=n cancelled=n completed=63 failures=0 reports=70 pauses=0 threads=19 rate=50% batch=10000 answer=skip commits ok/failed=1/0 removed=3003 kept=0 errorsAsked=0
+RUN seed=51 deferred-move wall=0.21s cancelAt=0.593s(bg) sent=n cancelled=y completed=0 failures=1657 reports=1 pauses=0 threads=34 rate=50% batch=7 answer=retry commits ok/failed=0/1 removed=0 kept=3003 errorsAsked=1657
+RUN seed=52 deferred-move wall=0.98s cancelAt=- sent=n cancelled=y completed=20 failures=1 reports=18 pauses=0 threads=33 rate=20% batch=250 answer=skip commits ok/failed=4/1 removed=1000 kept=2003 errorsAsked=1
+RUN seed=53 deferred-move wall=0.09s cancelAt=- sent=n cancelled=y completed=0 failures=1 reports=1 pauses=1 threads=34 rate=20% batch=7 answer=skip commits ok/failed=0/1 removed=0 kept=3003 errorsAsked=1
+RUN seed=54 deferred-move wall=0.10s cancelAt=- sent=n cancelled=y completed=0 failures=1 reports=1 pauses=1 threads=34 rate=50% batch=40 answer=skip commits ok/failed=0/1 removed=0 kept=3003 errorsAsked=1
+RUN seed=55 deferred-move wall=0.20s cancelAt=0.581s(main) sent=n cancelled=y completed=0 failures=1992 reports=1 pauses=0 threads=34 rate=50% batch=250 answer=retry commits ok/failed=0/1 removed=0 kept=3003 errorsAsked=1992
+RUN seed=56 deferred-move wall=3.88s cancelAt=- sent=n cancelled=n completed=63 failures=0 reports=72 pauses=0 threads=19 rate=20% batch=10000 answer=abort commits ok/failed=1/0 removed=3003 kept=0 errorsAsked=0
+RUN seed=57 deferred-move wall=0.09s cancelAt=0.285s(main) sent=n cancelled=y completed=0 failures=1 reports=1 pauses=0 threads=34 rate=50% batch=7 answer=skipAll commits ok/failed=0/1 removed=0 kept=3003 errorsAsked=1
+RUN seed=58 deferred-move wall=0.28s cancelAt=0.254s(main) sent=y cancelled=y completed=0 failures=0 reports=5 pauses=0 threads=33 rate=50% batch=10000 answer=skipAll commits ok/failed=0/0 removed=0 kept=3003 errorsAsked=0
+RUN seed=59 deferred-move wall=0.04s cancelAt=0.009s(bg) sent=y cancelled=y completed=0 failures=0 reports=0 pauses=0 threads=33 rate=100% batch=7 answer=retry commits ok/failed=0/0 removed=0 kept=3003 errorsAsked=0
+RUN seed=60 deferred-move wall=0.07s cancelAt=- sent=n cancelled=y completed=0 failures=1 reports=1 pauses=0 threads=34 rate=50% batch=40 answer=abort commits ok/failed=0/1 removed=0 kept=3003 errorsAsked=1
+DEFERRED TOTAL runs=60 cancelled=50 commits ok=581 failed=32 sources removed=40258 kept=139922
+THREADS after deferred runs: settled=9 baseline(local)=8
+STEP remove tree                                    wall=   0.998s cpu=   7.55s threads 22->23 footprint=18MB peakRSS=157MB load=16.7
+
+==== INVARIANT VIOLATIONS ====
+none
+
+==== MAIN-THREAD WATCHDOG: StressJobs ====
+histogram bounds (ms): <2 <4 <8 <16 <33 <100 <250 <1000 <5000 >=5000
+phase                                            wall s   pings   >8ms >100ms    >1s    max ms  histogram
+idle baseline                                      1.50     564      0      0      0       0.8  564,0,0,0,0,0,0,0,0,0
+build tree                                         1.23     405      0      0      0       2.5  403,2,0,0,0,0,0,0,0,0
+calibration: uninterrupted copy/delete/move        0.00       1      0      0      0       0.2  1,0,0,0,0,0,0,0,0,0
+copy                                             121.62   41798      3      0      0      15.0  41686,85,24,3,0,0,0,0,0,0
+verify (harness)                                 305.95   73544    951      0      0      86.9  64971,5150,2472,734,202,15,0,0,0,0
+delete                                            28.89    9985      0      0      0       7.8  9942,28,15,0,0,0,0,0,0,0
+move                                              39.10   13566      1      0      0       8.5  13513,31,21,1,0,0,0,0,0,0
+move-back                                         32.53   11282      0      0      0       5.7  11256,23,3,0,0,0,0,0,0,0
+settle (idle)                                     39.79   13713      2      0      0      10.7  13683,16,12,2,0,0,0,0,0,0
+deferred: build source tree                        0.21      66      0      0      0       3.0  65,1,0,0,0,0,0,0,0,0
+deferred move                                     38.82   12940      3      0      0      14.9  12849,70,18,3,0,0,0,0,0,0
+remove tree                                        1.00     356      0      0      0       2.8  355,1,0,0,0,0,0,0,0,0
+end                                                0.00       0      0      0      0       0.0  0,0,0,0,0,0,0,0,0,0
+TOTAL                                            610.65  178220    960      0      0      86.9
+FINAL threads=22 (baseline 8, max seen 40) peakRSS=157MB footprint=18MB load=16.7
+      610.84 real       126.69 user      3979.55 sys
+           164610048  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+               71238  page reclaims
+                  29  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                   0  signals received
+              646039  voluntary context switches
+            13571690  involuntary context switches
+       7474513802205  instructions retired
+      15268207264960  cycles elapsed
+           127484816  peak memory footprint
+RUN exit=0 wall=610.9s load_before=15.8 load_after=16.7 cmd=/usr/bin/time -l /private/tmp/claude-501/-Users-cm0k-Claude-Projects-TotalCommander/91e36f29-0d53-4421-8985-1ec839e7f5c4/scratchpad/review2/stress/bin/StressJobs.run --root /private/tmp/claude-501/-Us

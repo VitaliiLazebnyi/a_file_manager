@@ -1,0 +1,25 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite Application started.
+◇ Test aFolderThatFailsWhileAnotherReadingOvertookTheOpeningOneGoesBackOnceAndIsReportedOnce() started.
+✔ Test aFolderThatFailsWhileAnotherReadingOvertookTheOpeningOneGoesBackOnceAndIsReportedOnce() passed after 2.588 seconds.
+✔ Suite Application passed after 2.589 seconds.
+✔ Test run with 1 test in 1 suite passed after 2.591 seconds.
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite ArchiveFileSystems started.
+◇ Suite ArchiveFixes started.
+◇ Suite ConfigPlacesFixTreeModel started.
+◇ Test pendingChangesKeepAnArchiveAliveUntilTheyAreWritten() started.
+◇ Test aWideFolderResolvesNamesQuickly() started.
+◇ Test changesAreWrittenShortlyAfterTheLastOne() started.
+✔ Test aWideFolderResolvesNamesQuickly() passed after 0.175 seconds.
+✔ Suite ConfigPlacesFixTreeModel passed after 0.175 seconds.
+✔ Test pendingChangesKeepAnArchiveAliveUntilTheyAreWritten() passed after 0.758 seconds.
+✔ Suite ArchiveFixes passed after 0.758 seconds.
+✔ Test changesAreWrittenShortlyAfterTheLastOne() passed after 1.308 seconds.
+✔ Suite ArchiveFileSystems passed after 1.308 seconds.
+✔ Test run with 3 tests in 3 suites passed after 1.308 seconds.
+RUN exit=0 wall=13.5s load_before=29.5 load_after=26.0 cmd=swift test --skip-build --sanitize=thread --scratch-path /private/tmp/claude-501/-Users-cm0k-Claude-Projects-TotalCommander/91e36f29-0d53-4421-8985-1ec839e7f5c4/scratchpad/review2/stress/b-tsan --filt

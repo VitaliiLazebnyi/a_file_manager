@@ -1,0 +1,94 @@
+==================
+WARNING: ThreadSanitizer: Swift access race (pid=90361)
+  Modifying access of Swift variable at 0x000109303570 by thread T3:
+    #0 <null> <null> (ControlTests:arm64+0x43d8)
+    #1 <null> <null> (ControlTests:arm64+0x6174)
+    #2 <null> <null> (ControlTests:arm64+0x4490)
+    #3 <null> <null> (libclang_rt.tsan_osx_dynamic.dylib:arm64e+0x8e8f8)
+    #4 <null> <null> (libdispatch.dylib:arm64e+0x1b59c)
+
+  Previous write of size 1 at 0x000109303570 by thread T2:
+    #0 <null> <null> (ControlTests:arm64+0x4404)
+    #1 <null> <null> (ControlTests:arm64+0x6174)
+    #2 <null> <null> (ControlTests:arm64+0x4490)
+    #3 <null> <null> (libclang_rt.tsan_osx_dynamic.dylib:arm64e+0x8e8f8)
+    #4 <null> <null> (libdispatch.dylib:arm64e+0x1b59c)
+
+  Location is heap block of size 24 at 0x000109303560 allocated by thread T1:
+    #0 <null> <null> (libclang_rt.tsan_osx_dynamic.dylib:arm64e+0x67d68)
+    #1 <null> <null> (libsystem_malloc.dylib:arm64e+0x1edb0)
+    #2 <null> <null> (ControlTests:arm64+0x3548)
+    #3 <null> <null> (ControlTests:arm64+0x2f1c)
+    #4 <null> <null> (libswift_Concurrency.dylib:arm64e+0x2c4c)
+
+  Thread T3 (tid=17706746, running) is a GCD worker thread
+
+  Thread T2 (tid=17706742, running) is a GCD worker thread
+
+  Thread T1 (tid=17706738, running) is a GCD worker thread
+
+SUMMARY: ThreadSanitizer: Swift access race (/private/tmp/claude-501/-Users-cm0k-Claude-Projects-TotalCommander/91e36f29-0d53-4421-8985-1ec839e7f5c4/scratchpad/review2/stress/control/b-tsan/out/Products/Debug/ControlTests.xctest/Contents/MacOS/ControlTests:arm64+0x43d8) 
+==================
+==================
+WARNING: ThreadSanitizer: data race (pid=90361)
+  Write of size 8 at 0x000109303570 by thread T5:
+    #0 <null> <null> (ControlTests:arm64+0x4404)
+    #1 <null> <null> (ControlTests:arm64+0x6174)
+    #2 <null> <null> (ControlTests:arm64+0x4490)
+    #3 <null> <null> (libclang_rt.tsan_osx_dynamic.dylib:arm64e+0x8e8f8)
+    #4 <null> <null> (libdispatch.dylib:arm64e+0x1b59c)
+
+  Previous write of size 1 at 0x000109303570 by thread T2:
+    #0 <null> <null> (ControlTests:arm64+0x4404)
+    #1 <null> <null> (ControlTests:arm64+0x6174)
+    #2 <null> <null> (ControlTests:arm64+0x4490)
+    #3 <null> <null> (libclang_rt.tsan_osx_dynamic.dylib:arm64e+0x8e8f8)
+    #4 <null> <null> (libdispatch.dylib:arm64e+0x1b59c)
+
+  Location is heap block of size 24 at 0x000109303560 allocated by thread T1:
+    #0 <null> <null> (libclang_rt.tsan_osx_dynamic.dylib:arm64e+0x67d68)
+    #1 <null> <null> (libsystem_malloc.dylib:arm64e+0x1edb0)
+    #2 <null> <null> (ControlTests:arm64+0x3548)
+    #3 <null> <null> (ControlTests:arm64+0x2f1c)
+    #4 <null> <null> (libswift_Concurrency.dylib:arm64e+0x2c4c)
+
+  Thread T5 (tid=17706749, running) is a GCD worker thread
+
+  Thread T2 (tid=17706742, running) is a GCD worker thread
+
+  Thread T1 (tid=17706738, running) is a GCD worker thread
+
+SUMMARY: ThreadSanitizer: data race (/private/tmp/claude-501/-Users-cm0k-Claude-Projects-TotalCommander/91e36f29-0d53-4421-8985-1ec839e7f5c4/scratchpad/review2/stress/control/b-tsan/out/Products/Debug/ControlTests.xctest/Contents/MacOS/ControlTests:arm64+0x4404) 
+==================
+==================
+WARNING: ThreadSanitizer: Swift access race (pid=90361)
+  Modifying access of Swift variable at 0x000109303570 by thread T3:
+    #0 <null> <null> (ControlTests:arm64+0x43d8)
+    #1 <null> <null> (ControlTests:arm64+0x6174)
+    #2 <null> <null> (ControlTests:arm64+0x4490)
+    #3 <null> <null> (libclang_rt.tsan_osx_dynamic.dylib:arm64e+0x8e8f8)
+    #4 <null> <null> (libdispatch.dylib:arm64e+0x1b59c)
+
+  Previous modifying access of Swift variable at 0x000109303570 by thread T4:
+    #0 <null> <null> (ControlTests:arm64+0x43d8)
+    #1 <null> <null> (ControlTests:arm64+0x6174)
+    #2 <null> <null> (ControlTests:arm64+0x4490)
+    #3 <null> <null> (libclang_rt.tsan_osx_dynamic.dylib:arm64e+0x8e8f8)
+    #4 <null> <null> (libdispatch.dylib:arm64e+0x1b59c)
+
+  Location is heap block of size 24 at 0x000109303560 allocated by thread T1:
+    #0 <null> <null> (libclang_rt.tsan_osx_dynamic.dylib:arm64e+0x67d68)
+    #1 <null> <null> (libsystem_malloc.dylib:arm64e+0x1edb0)
+    #2 <null> <null> (ControlTests:arm64+0x3548)
+    #3 <null> <null> (ControlTests:arm64+0x2f1c)
+    #4 <null> <null> (libswift_Concurrency.dylib:arm64e+0x2c4c)
+
+  Thread T3 (tid=17706746, running) is a GCD worker thread
+
+  Thread T4 (tid=17706747, running) is a GCD worker thread
+
+  Thread T1 (tid=17706738, running) is a GCD worker thread
+
+SUMMARY: ThreadSanitizer: Swift access race (/private/tmp/claude-501/-Users-cm0k-Claude-Projects-TotalCommander/91e36f29-0d53-4421-8985-1ec839e7f5c4/scratchpad/review2/stress/control/b-tsan/out/Products/Debug/ControlTests.xctest/Contents/MacOS/ControlTests:arm64+0x43d8) 
+==================
+ThreadSanitizer: reported 3 warnings

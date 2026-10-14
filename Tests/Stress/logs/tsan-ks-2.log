@@ -1,0 +1,555 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite KeysAndMenus started.
+◇ Suite MainWindow started.
+◇ Suite SpeedAndTime started.
+◇ Suite PanelParts started.
+◇ Suite PanelStores started.
+◇ Test onlySafeShortcutsGoIntoMenus() started.
+◇ Test menuItemsTakeCaptionFromTheCommandAndKeyFromTheBindings() started.
+◇ Test modifiersConvertBothWays() started.
+◇ Test menusSkipUnregisteredNamesAndDoubleSeparators() started.
+◇ Suite Application started.
+◇ Suite PanelFeatures started.
+◇ Test keyPressesBecomeShortcuts() started.
+◇ Test statusLine() started.
+◇ Test followsTheLastSecondsOnly() started.
+◇ Test needsASecondOfMeasurements() started.
+◇ Test theButtonBarShowsWhatPluginsRegistered() started.
+◇ Test aKeyPressFindsItsCommand() started.
+◇ Test progressLine() started.
+◇ Test theTabStripIsChangedInPlaceWhileTheNumberOfTabsStays() started.
+◇ Test stalledAndFinishedJobs() started.
+◇ Test colourEntriesAreReadFromText() started.
+◇ Test arrowKeysInBrief() started.
+◇ Test columnValuesAreComputedInTheBackgroundOnSeveralCores() started.
+◇ Test theQuickFilterOfPlainTextAgreesWithFoundationForEveryKindOfName() started.
+◇ Test draggedItemsTravelOnThePasteboard() started.
+◇ Test findingByTypingCanLookAtAListWithoutCopyingItsNames() started.
+◇ Test pointlessDropsAreRefused() started.
+◇ Test thumbnailsFillRowsAndScrollVertically() started.
+◇ Test aBriefColumnIsAsWideAsTheLongestNameUpToTheLimit() started.
+◇ Test theQuickFilterLiesOverTheDisplayFilter() started.
+◇ Test thePathIsCutIntoItsFolders() started.
+◇ Test volumesAreToldApartByTheirMountPoints() started.
+◇ Test aClickOnAPartOfThePathGoesThere() started.
+◇ Test aDraggedTabLandsWhereItsNeighboursMiddleWasPassed() started.
+◇ Test onlyTextTypedOnIsTakenToNarrowTheList() started.
+◇ Test aDropCopiesBetweenVolumesAndMovesWithinOne() started.
+◇ Test theQuickFilterMatchesPartsOfNamesOrMasks() started.
+◇ Test aDragIsLookedAtOnceAndNotAtEveryMoveOfTheMouse() started.
+◇ Test whatWasTypedIsForgottenAfterAPause() started.
+◇ Test briefFillsColumnsFromTopToBottom() started.
+◇ Test theBriefViewsStatusLineDescribesTheItemUnderTheCursor() started.
+✔ Test onlySafeShortcutsGoIntoMenus() passed after 0.001 seconds.
+◇ Test theOptionsOfTheListsComeFromTheSettings() started.
+✔ Test modifiersConvertBothWays() passed after 0.001 seconds.
+◇ Test theViewOfEachPanelIsSwitchedAndRemembered() started.
+◇ Test typingFindsTheNextNameWithThatStart() started.
+◇ Test startsWithThePanelsOfTheLastSession() started.
+✔ Test stalledAndFinishedJobs() passed after 0.002 seconds.
+✔ Test needsASecondOfMeasurements() passed after 0.002 seconds.
+✔ Test arrowKeysInBrief() passed after 0.001 seconds.
+✔ Test followsTheLastSecondsOnly() passed after 0.002 seconds.
+✔ Test findingByTypingCanLookAtAListWithoutCopyingItsNames() passed after 0.001 seconds.
+✔ Test thumbnailsFillRowsAndScrollVertically() passed after 0.001 seconds.
+✔ Test pointlessDropsAreRefused() passed after 0.001 seconds.
+✔ Test theQuickFilterLiesOverTheDisplayFilter() passed after 0.001 seconds.
+✔ Test progressLine() passed after 0.002 seconds.
+✔ Test theQuickFilterOfPlainTextAgreesWithFoundationForEveryKindOfName() passed after 0.001 seconds.
+◇ Test anEmptyOrTinyGridDoesNotBreak() started.
+✔ Test aDropCopiesBetweenVolumesAndMovesWithinOne() passed after 0.001 seconds.
+✔ Test volumesAreToldApartByTheirMountPoints() passed after 0.001 seconds.
+✔ Test theQuickFilterMatchesPartsOfNamesOrMasks() passed after 0.002 seconds.
+✔ Test briefFillsColumnsFromTopToBottom() passed after 0.001 seconds.
+✔ Test onlyTextTypedOnIsTakenToNarrowTheList() passed after 0.001 seconds.
+✔ Suite SpeedAndTime passed after 0.002 seconds.
+✔ Test typingFindsTheNextNameWithThatStart() passed after 0.002 seconds.
+✔ Test anEmptyOrTinyGridDoesNotBreak() passed after 0.001 seconds.
+✔ Test whatWasTypedIsForgottenAfterAPause() passed after 0.002 seconds.
+✔ Test keyPressesBecomeShortcuts() passed after 0.006 seconds.
+✔ Test aKeyPressFindsItsCommand() passed after 0.006 seconds.
+✔ Test aDraggedTabLandsWhereItsNeighboursMiddleWasPassed() passed after 0.005 seconds.
+✔ Test menuItemsTakeCaptionFromTheCommandAndKeyFromTheBindings() passed after 0.006 seconds.
+✔ Test statusLine() passed after 0.007 seconds.
+✔ Test thePathIsCutIntoItsFolders() passed after 0.006 seconds.
+✔ Test theBriefViewsStatusLineDescribesTheItemUnderTheCursor() passed after 0.008 seconds.
+✔ Test aDragIsLookedAtOnceAndNotAtEveryMoveOfTheMouse() passed after 0.018 seconds.
+✔ Test colourEntriesAreReadFromText() passed after 0.058 seconds.
+✔ Test theOptionsOfTheListsComeFromTheSettings() passed after 0.058 seconds.
+✔ Test aBriefColumnIsAsWideAsTheLongestNameUpToTheLimit() passed after 0.073 seconds.
+✔ Test menusSkipUnregisteredNamesAndDoubleSeparators() passed after 0.130 seconds.
+✔ Suite KeysAndMenus passed after 0.130 seconds.
+✔ Test theTabStripIsChangedInPlaceWhileTheNumberOfTabsStays() passed after 0.178 seconds.
+✔ Test draggedItemsTravelOnThePasteboard() passed after 0.520 seconds.
+✔ Test aClickOnAPartOfThePathGoesThere() passed after 0.521 seconds.
+✔ Suite PanelParts passed after 0.521 seconds.
+✔ Test startsWithThePanelsOfTheLastSession() passed after 1.301 seconds.
+◇ Test aFolderThatIsGoneIsReplacedAtStartUp() started.
+✔ Test theViewOfEachPanelIsSwitchedAndRemembered() passed after 1.513 seconds.
+◇ Test cursorMarkingAndKeysWorkInTheBriefView() started.
+✔ Test theButtonBarShowsWhatPluginsRegistered() passed after 2.048 seconds.
+◇ Test theDriveButtonsAreHiddenUntilSwitchedOnAndShowPlaces() started.
+✔ Test aFolderThatIsGoneIsReplacedAtStartUp() passed after 0.901 seconds.
+◇ Test menusKeysAndFunctionBarComeFromThePlugins() started.
+✔ Test menusKeysAndFunctionBarComeFromThePlugins() passed after 0.992 seconds.
+◇ Test theUsersKeyBindingsChangeMenuAndFunctionBar() started.
+✔ Test columnValuesAreComputedInTheBackgroundOnSeveralCores() passed after 3.198 seconds.
+◇ Test theRowsAskedForLastAreComputedFirst() started.
+✔ Test cursorMarkingAndKeysWorkInTheBriefView() passed after 1.738 seconds.
+◇ Test thumbnailsAreMadeInTheBackgroundForLocalFilesOnly() started.
+✔ Test theDriveButtonsAreHiddenUntilSwitchedOnAndShowPlaces() passed after 1.220 seconds.
+◇ Test thePlaceOfAFolderIsTheOneWithTheLongestPath() started.
+✔ Test theUsersKeyBindingsChangeMenuAndFunctionBar() passed after 0.817 seconds.
+◇ Test cursorAndMarkingKeys() started.
+✔ Test thePlaceOfAFolderIsTheOneWithTheLongestPath() passed after 1.246 seconds.
+◇ Test theFunctionKeyBarFollowsTheModifiersAndTheCommands() started.
+✔ Test cursorAndMarkingKeys() passed after 0.503 seconds.
+◇ Test spaceSelectsAFolderAndCalculatesItsSize() started.
+✔ Test thumbnailsAreMadeInTheBackgroundForLocalFilesOnly() passed after 1.284 seconds.
+◇ Test pluginColumnsAreFilledInFromTheBackgroundAndRemembered() started.
+✔ Test theRowsAskedForLastAreComputedFirst() passed after 1.962 seconds.
+◇ Test anotherFolderForgetsTheValuesAndAChangedFileGetsANewOne() started.
+✔ Test theFunctionKeyBarFollowsTheModifiersAndTheCommands() passed after 1.390 seconds.
+◇ Test visibilityAndArrangementAreCommandsAndSurviveARestart() started.
+✔ Test spaceSelectsAFolderAndCalculatesItsSize() passed after 3.083 seconds.
+◇ Test aClickOnAColumnHeaderSorts() started.
+✔ Test visibilityAndArrangementAreCommandsAndSurviveARestart() passed after 1.787 seconds.
+◇ Test windowTitle() started.
+✔ Test anotherFolderForgetsTheValuesAndAChangedFileGetsANewOne() passed after 2.901 seconds.
+◇ Test thumbnailsArriveLaterAreKeptAndAreCancelledWhenOutOfSight() started.
+✔ Test aClickOnAColumnHeaderSorts() passed after 0.796 seconds.
+◇ Test copyMoveRenameAndDelete() started.
+✔ Test windowTitle() passed after 0.896 seconds.
+◇ Test theCommandLineChangesDirectoryRunsCommandsAndHandsOverTheRest() started.
+✔ Test pluginColumnsAreFilledInFromTheBackgroundAndRemembered() passed after 5.669 seconds.
+◇ Test theQuickFilterNarrowsTheListWhileTyping() started.
+✔ Test thumbnailsArriveLaterAreKeptAndAreCancelledWhenOutOfSight() passed after 3.116 seconds.
+◇ Test rowsThatWentOutOfSightAreNotComputedAnyMore() started.
+✔ Test theQuickFilterNarrowsTheListWhileTyping() passed after 1.072 seconds.
+◇ Test theQuickFilterEndsWithTheFolderAndLiesOverTheDisplayFilter() started.
+✔ Test theCommandLineChangesDirectoryRunsCommandsAndHandsOverTheRest() passed after 3.492 seconds.
+◇ Test aLineNobodyTakesStaysOnTheCommandLine() started.
+✔ Test rowsThatWentOutOfSightAreNotComputedAnyMore() passed after 1.950 seconds.
+◇ Test theAnswerOfAGivenUpThumbnailRequestDoesNotSpoilANewerOne() started.
+✔ Test theQuickFilterEndsWithTheFolderAndLiesOverTheDisplayFilter() passed after 1.858 seconds.
+◇ Test typingInTheQuickFilterWaitsForTheLastKeyAndEnterDoesNotWaitAtAll() started.
+✔ Test aLineNobodyTakesStaysOnTheCommandLine() passed after 1.641 seconds.
+◇ Test namesAndPathsArePutOnTheCommandLine() started.
+✔ Test theAnswerOfAGivenUpThumbnailRequestDoesNotSpoilANewerOne() passed after 1.644 seconds.
+◇ Test picturesAreCountedByTheirPixels() started.
+✔ Test namesAndPathsArePutOnTheCommandLine() passed after 1.083 seconds.
+◇ Test theKeysOfTheCommandLineLeadBackToTheFileList() started.
+✔ Test theKeysOfTheCommandLineLeadBackToTheFileList() passed after 1.174 seconds.
+◇ Test whatALineMeans() started.
+✔ Test typingInTheQuickFilterWaitsForTheLastKeyAndEnterDoesNotWaitAtAll() passed after 2.846 seconds.
+◇ Test clicksThatMarkAreRefusedWhileAJobRunsButAPlainClickIsLeftToTheList() started.
+✔ Test picturesAreCountedByTheirPixels() passed after 1.294 seconds.
+✔ Suite PanelStores passed after 16.071 seconds.
+✔ Test clicksThatMarkAreRefusedWhileAJobRunsButAPlainClickIsLeftToTheList() passed after 0.864 seconds.
+◇ Test thePathBarLeadsToTheFoldersAbove() started.
+✔ Test whatALineMeans() passed after 2.061 seconds.
+◇ Test theHistoryKeepsTheNewestTwentyLines() started.
+✔ Test thePathBarLeadsToTheFoldersAbove() passed after 1.510 seconds.
+◇ Test tabsHaveAMenuAndCanBeMoved() started.
+✔ Test copyMoveRenameAndDelete() passed after 9.964 seconds.
+◇ Test navigationAndFolderTabs() started.
+✔ Test theHistoryKeepsTheNewestTwentyLines() passed after 0.360 seconds.
+◇ Test theMenuBarHasTheMacsOwnMenusAroundThePlugins() started.
+✔ Test theMenuBarHasTheMacsOwnMenusAroundThePlugins() passed after 2.986 seconds.
+◇ Test aMenuBarWithoutEditingCommandsStillEdits() started.
+✔ Test tabsHaveAMenuAndCanBeMoved() passed after 3.317 seconds.
+◇ Test whatADragCarriesAndWhereADropGoes() started.
+✔ Test aMenuBarWithoutEditingCommandsStillEdits() passed after 1.283 seconds.
+◇ Test aMenuTooLongForTheScreenFoldsItsLastSections() started.
+✔ Test whatADragCarriesAndWhereADropGoes() passed after 1.256 seconds.
+◇ Test aDropIsCarriedOutByTheFileTransferService() started.
+✔ Test navigationAndFolderTabs() passed after 5.792 seconds.
+◇ Test aFailedNavigationLeavesThePanelAndTellsTheUser() started.
+✔ Test aMenuTooLongForTheScreenFoldsItsLastSections() passed after 1.938 seconds.
+◇ Test shortcutsAsTheMacWritesThem() started.
+✔ Test aFailedNavigationLeavesThePanelAndTellsTheUser() passed after 2.496 seconds.
+◇ Test changesMadeByOtherProgramsAppearByThemselves() started.
+✔ Test shortcutsAsTheMacWritesThem() passed after 2.041 seconds.
+◇ Test aJobCanBePausedResumedAndCancelledWhilePaused() started.
+✔ Test changesMadeByOtherProgramsAppearByThemselves() passed after 3.077 seconds.
+◇ Test aFolderThatVanishesIsLeftForItsParent() started.
+✔ Test aDropIsCarriedOutByTheFileTransferService() passed after 8.243 seconds.
+◇ Test namesAreColouredByMarkAndFileType() started.
+✔ Test namesAreColouredByMarkAndFileType() passed after 1.599 seconds.
+◇ Test aLargeFolderStaysFastInEveryView() started.
+✔ Test aFolderThatVanishesIsLeftForItsParent() passed after 3.052 seconds.
+◇ Test aSlowDirectoryIsShownWhileItIsStillArriving() started.
+✔ Test aJobCanBePausedResumedAndCancelledWhilePaused() passed after 9.611 seconds.
+◇ Test quittingStopsAPausedJob() started.
+✔ Test aLargeFolderStaysFastInEveryView() passed after 8.776 seconds.
+✔ Suite PanelFeatures passed after 41.555 seconds.
+✔ Test aSlowDirectoryIsShownWhileItIsStillArriving() passed after 9.222 seconds.
+◇ Test aFolderOnASlowServerIsEnteredAtOnce() started.
+✔ Test quittingStopsAPausedJob() passed after 5.744 seconds.
+◇ Test theBackgroundKeepsCommandsThatChangeFilesBlocked() started.
+✔ Test aFolderOnASlowServerIsEnteredAtOnce() passed after 4.165 seconds.
+◇ Test leavingAFolderThatIsStillBeingOpened() started.
+✔ Test theBackgroundKeepsCommandsThatChangeFilesBlocked() passed after 4.160 seconds.
+◇ Test progressTexts() started.
+✔ Test progressTexts() passed after 2.201 seconds.
+◇ Test theProgressWindowShowsStateAndOffersItsButtons() started.
+✔ Test leavingAFolderThatIsStillBeingOpened() passed after 2.256 seconds.
+◇ Test aSlowFolderThatCannotBeReadIsLeftAgain() started.
+✔ Test theProgressWindowShowsStateAndOffersItsButtons() passed after 1.791 seconds.
+◇ Test aFormReadsItsFieldsAndPutsTheKeyboardInTheFirstInput() started.
+✔ Test aFormReadsItsFieldsAndPutsTheKeyboardInTheFirstInput() passed after 0.701 seconds.
+◇ Test aFormWithManyFieldsIsScrolled() started.
+✔ Test aSlowFolderThatCannotBeReadIsLeftAgain() passed after 3.231 seconds.
+✔ Test aFormWithManyFieldsIsScrolled() passed after 0.790 seconds.
+◇ Test anOrdinaryFolderAppearsWholeWithoutAnEmptyMoment() started.
+◇ Test aLongListIsNarrowedDownByTyping() started.
+✔ Test anOrdinaryFolderAppearsWholeWithoutAnEmptyMoment() passed after 2.643 seconds.
+◇ Test goingElsewhereStopsASlowListing() started.
+✔ Test aLongListIsNarrowedDownByTyping() passed after 2.649 seconds.
+✔ Suite MainWindow passed after 54.309 seconds.
+✔ Test goingElsewhereStopsASlowListing() passed after 5.379 seconds.
+◇ Test jobsRunOneAfterAnotherAndBlockChangingCommands() started.
+✔ Test jobsRunOneAfterAnotherAndBlockChangingCommands() passed after 1.585 seconds.
+◇ Test cancellingEverythingStopsRunningAndWaitingJobs() started.
+✔ Test cancellingEverythingStopsRunningAndWaitingJobs() passed after 2.908 seconds.
+◇ Test aJobCanAskTheUserFromItsOwnThread() started.
+✔ Test aJobCanAskTheUserFromItsOwnThread() passed after 2.672 seconds.
+◇ Test aStalledListingIsEndedWhenThePanelMovesOn() started.
+✔ Test aStalledListingIsEndedWhenThePanelMovesOn() passed after 2.654 seconds.
+◇ Test aStalledListingIsEndedWhenItsTabIsClosed() started.
+✔ Test aStalledListingIsEndedWhenItsTabIsClosed() passed after 2.570 seconds.
+◇ Test aLastPieceInAnotherOrderIsSortedInTheBackgroundAndKeepsTheEndBehindIt() started.
+✔ Test aLastPieceInAnotherOrderIsSortedInTheBackgroundAndKeepsTheEndBehindIt() passed after 6.770 seconds.
+◇ Test aLongListIsFilteredInTheBackgroundAndOnlyTheLastTextCounts() started.
+✔ Test aLongListIsFilteredInTheBackgroundAndOnlyTheLastTextCounts() passed after 9.206 seconds.
+◇ Test textTypedBeforeATabSwitchBelongsToTheTabItWasTypedIn() started.
+✔ Test textTypedBeforeATabSwitchBelongsToTheTabItWasTypedIn() passed after 2.142 seconds.
+◇ Test onlyTheMarkedOfTwoNamesThatReadTheSameIsDrawnAndCountedAsMarked() started.
+✔ Test onlyTheMarkedOfTwoNamesThatReadTheSameIsDrawnAndCountedAsMarked() passed after 2.417 seconds.
+◇ Test aDropIsJudgedByTheCapabilitiesOfTheFolderItGoesTo() started.
+✔ Test aDropIsJudgedByTheCapabilitiesOfTheFolderItGoesTo() passed after 2.391 seconds.
+◇ Test freeSpaceFollowsTheFileSystemWhenItReportsANewFigure() started.
+✔ Test freeSpaceFollowsTheFileSystemWhenItReportsANewFigure() passed after 2.404 seconds.
+◇ Test aRememberedFolderIsShownAtOnceAndReadAfreshBehind() started.
+✔ Test aRememberedFolderIsShownAtOnceAndReadAfreshBehind() passed after 5.040 seconds.
+◇ Test readingAgainBringsWhatIsRememberedUpToDate() started.
+✔ Test readingAgainBringsWhatIsRememberedUpToDate() passed after 3.815 seconds.
+◇ Test aRememberedFolderInAnotherOrderIsSortedInTheBackground() started.
+✔ Test aRememberedFolderInAnotherOrderIsSortedInTheBackground() passed after 4.495 seconds.
+◇ Test aRefreshThatFailsLeavesTheFolderAndForgetsIt() started.
+✔ Test aRefreshThatFailsLeavesTheFolderAndForgetsIt() passed after 5.454 seconds.
+◇ Test aFolderThatFailsWhileAnotherReadingOvertookTheOpeningOneGoesBackOnceAndIsReportedOnce() started.
+✔ Test aFolderThatFailsWhileAnotherReadingOvertookTheOpeningOneGoesBackOnceAndIsReportedOnce() passed after 3.645 seconds.
+◇ Test aReloadThatIsTurnedAwayWhileTheFolderIsReadIsMadeUpForAfterwards() started.
+✔ Test aReloadThatIsTurnedAwayWhileTheFolderIsReadIsMadeUpForAfterwards() passed after 3.003 seconds.
+◇ Test theCompletionOfAReadingThatWasOvertakenHearsOfIt() started.
+✔ Test theCompletionOfAReadingThatWasOvertakenHearsOfIt() passed after 2.495 seconds.
+◇ Test aFileThatVanishedMeanwhileGivesTheUsualError() started.
+✔ Test aFileThatVanishedMeanwhileGivesTheUsualError() passed after 4.796 seconds.
+◇ Test anOperationInAFolderThatIsNotShownMakesItForgotten() started.
+✔ Test anOperationInAFolderThatIsNotShownMakesItForgotten() passed after 4.384 seconds.
+◇ Test switchedOffNothingIsRemembered() started.
+✔ Test switchedOffNothingIsRemembered() passed after 3.604 seconds.
+◇ Test theFolderUnderTheCursorIsReadAheadAfterAMoment() started.
+✔ Test theFolderUnderTheCursorIsReadAheadAfterAMoment() passed after 6.246 seconds.
+◇ Test nothingIsReadAheadOnALocalVolumeOrInAnInactiveWindow() started.
+✔ Test nothingIsReadAheadOnALocalVolumeOrInAnInactiveWindow() passed after 4.789 seconds.
+◇ Test readingAheadCanBeSwitchedOff() started.
+✔ Test readingAheadCanBeSwitchedOff() passed after 5.302 seconds.
+◇ Test movingTheCursorCancelsAReadAheadAndEnterJoinsOne() started.
+✔ Test movingTheCursorCancelsAReadAheadAndEnterJoinsOne() passed after 9.021 seconds.
+◇ Test aFolderThatCouldNotBeReadAheadIsLeftAlone() started.
+✔ Test aFolderThatCouldNotBeReadAheadIsLeftAlone() passed after 5.806 seconds.
+◇ Test nothingIsReadAheadWhileAJobRuns() started.
+✔ Test nothingIsReadAheadWhileAJobRuns() passed after 5.455 seconds.
+◇ Test aJobThatStartsStopsAReadAhead() started.
+✔ Test aJobThatStartsStopsAReadAhead() passed after 5.946 seconds.
+✔ Suite Application passed after 180.718 seconds.
+✔ Test run with 126 tests in 7 suites passed after 180.718 seconds.
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite PanelModelFixes started.
+◇ Suite CancellingWhatWaits started.
+◇ Suite Commands started.
+◇ Suite Panel started.
+◇ Suite ParallelWork started.
+◇ Suite Menus started.
+◇ Suite NamesThatReadTheSame started.
+◇ Suite Tabs started.
+◇ Suite FileMaskFixes started.
+◇ Suite FilteringElsewhere started.
+◇ Suite Names started.
+◇ Suite ProviderDefaults started.
+◇ Suite Keys started.
+◇ Suite CancellationHandlers started.
+◇ Suite MemoryFileSystemExtras started.
+◇ Suite KernelAndPlugins started.
+◇ Suite RememberedListings started.
+◇ Suite Loading started.
+◇ Suite SortingByKeys started.
+◇ Suite Concurrency started.
+◇ Suite Sorting started.
+◇ Test sumsThatLeaveTheRangeOfANumberStopAtItsEnd() started.
+◇ Test aRefreshThatOnlyEndsTheWaitingIsAnnounced() started.
+◇ Test aLongListThatDidNotChangeIsSeenAsTheSame() started.
+◇ Test rawDataIsStoredAsItIs() started.
+◇ Test rowsAreFoundByNameHoweverOftenTheyAreAsked() started.
+◇ Test theTotalsStayRightThroughEveryChange() started.
+◇ Test operandsThatIncludeAFileAreFoundWithoutTheList() started.
+◇ Test batchChangesAreAnnouncedOnce() started.
+◇ Test aPresortedListIsTakenAsItIs() started.
+◇ Test addingUpSizesEndsWhenAListingWaits() started.
+◇ Test theSelectionIsReplacedInOneAnnouncement() started.
+◇ Test aReadAndAWriteThatWaitAreInterruptedFromAnotherThread() started.
+◇ Test aListingThatWaitsEndsWhenThePanelLoaderIsCancelled() started.
+◇ Test aPausedListingStopsBetweenItsBatches() started.
+◇ Test someCommandsRunWhileAJobIsInProgress() started.
+◇ Test runsRegisteredCommandsWithTheirArgument() started.
+◇ Test checkedState() started.
+◇ Test rejectsUnknownDisabledAndBlockedCommands() started.
+◇ Test historyGoesBackAndForward() started.
+◇ Test startsUnlistedAndTakesAListing() started.
+◇ Test updateKeepsCursorSelectionAndFolderSizes() started.
+◇ Test aVanishedCursorItemLeavesTheCursorInPlace() started.
+◇ Test aChangedSortOrderIsRespectedWhileADirectoryGrows() started.
+◇ Test everyChangeIsAnnounced() started.
+◇ Test openingTheLocationOfAFileEndsInItsFolder() started.
+◇ Test operandRule() started.
+◇ Test listsWithParentRowAndHidesDotFiles() started.
+◇ Test aDirectoryCanArriveInPieces() started.
+◇ Test aRememberedListingIsShownUntilTheFreshOneArrives() started.
+◇ Test parentAndRootTargets() started.
+◇ Test aFolderThatCannotBeReadIsLeftAgain() started.
+◇ Test theCursorStaysOnItsItemWhileADirectoryGrows() started.
+◇ Test aNarrowingFilterGivesWhatTheFullFilterGives() started.
+◇ Test aFolderIsEnteredBeforeItHasBeenRead() started.
+◇ Test selectionCommandsAndTotals() started.
+◇ Test nestedMapsGiveTheSameResultsAsPlainLoops() started.
+◇ Test aJobIsNotLeftAloneWhileEveryThreadWaitsForSomething() started.
+◇ Test menusAreOrderedAndGrouped() started.
+◇ Test contextMenuLeavesOutItemEntriesOnEmptySpace() started.
+◇ Test aMarkOnOneIsNotAMarkOnTheOther(others:) started.
+◇ Test theFileSystemKeepsBothAndTheyAreEqualAsStrings() started.
+◇ Test aNameWrittenDifferentlyStillFindsTheOnlyEntryThatReadsTheSame() started.
+◇ Test aTabForAnotherFolderIsReadWhenItIsShown() started.
+◇ Test workBelowTheTopLevelIsSpreadOverTheCores() started.
+◇ Test tabsKeepTheirOwnSelection() started.
+◇ Test newTabCopiesTheActiveTab() started.
+◇ Test closingTabs() started.
+◇ Test stateRoundTrip() started.
+◇ Test aListThatChangedMeanwhileIsFilteredHere() started.
+◇ Test aMaskReadOnceMatchesLikeTheMaskReadEveryTime() started.
+◇ Test aListFilteredElsewhereIsWhatSetFilterShows(count:) started.
+◇ Test aNewVolumeFigureIsAnnounced() started.
+◇ Test splitsNameAndExtension() started.
+◇ Test theSamePathOnTwoServersIsTwoPlaces() started.
+◇ Test locations() started.
+◇ Test buildingAnEntrysLocationNeverAsksTheDisk() started.
+◇ Test fileMasks() started.
+◇ Test aFlagThatIsSetEndsTheDefaultsEarly() started.
+◇ Test whatAFileSystemDoesNotOfferBehavesAsBefore() started.
+◇ Test shortcutsAsText() started.
+◇ Test aKeyTakenTwiceStaysWithTheFirstAndIsReported() started.
+◇ Test commandsBringTheirDefaultKeys() started.
+◇ Test theUsersBindingsReplaceTheDefaults() started.
+◇ Test theFlagIsSetFromOtherThreadsWhileHandlersComeAndGo() started.
+◇ Test aHandlerIsCalledOnceWhenTheFlagIsSet() started.
+◇ Test capabilitiesAreAskedByLocation() started.
+◇ Test commitsMarksAndMetadataAreRecorded() started.
+◇ Test aReleasedRegistrationIsForgotten() started.
+◇ Test aCalculatedSizeGoesToItsOwnFolder(others:) started.
+◇ Test unknownSchemesHaveNoProvider() started.
+◇ Test aFileIsContinuedWhereItWasCut() started.
+◇ Test openersAreTriedByPriority() started.
+◇ Test manyCallersAtOnceAllFinish() started.
+◇ Test nothingRunsBeforeTheWindowExists() started.
+◇ Test theUsersKeysAreAppliedWhenTheShellAttaches() started.
+◇ Test theMarkStaysOnItsEntryWhenTheListChanges(others:) started.
+◇ Test aPluginAddsItsFeaturesThroughTheKernelOnly() started.
+◇ Test hitAndMiss() started.
+◇ Test theKernelSwitchesItFromTheSettings() started.
+◇ Test theLeastRecentlyUsedFolderGoesFirst() started.
+◇ Test localFoldersAreKeptOnlyWhenTheyWereSlowToRead() started.
+◇ Test anotherOrderIsSortedOnRequestAndKept() started.
+◇ Test anOldListingIsNotHandedOut() started.
+◇ Test manyThreadsAtOnce() started.
+◇ Test changedFoldersAreForgottenWithWhatLiesBelowAndTheFolderAbove() started.
+◇ Test directorySizeIsAddedUpOverTheTree() started.
+◇ Test switchedOffItKeepsNothing() started.
+◇ Test aFileLeadsToItsFolder() started.
+◇ Test aMissingFolderFailsUnlessClimbing() started.
+◇ Test streamingStopsWhenNoMoreIsWanted() started.
+◇ Test anEmptyDirectoryStillGivesOneBatch() started.
+◇ Test theTotalNumberOfEntriesIsLimited() started.
+◇ Test aLongListSortedOnAllCoresComesOutTheSame() started.
+◇ Test aSlowDirectoryArrivesInBatches() started.
+◇ Test mergingAndAddingBatchesGiveTheSortedList() started.
+◇ Test sortingGivesTheOrderOfTheComparisonForEveryKindOfName() started.
+◇ Test namesAreCutByTheirBytesAsByTheirCharacters() started.
+◇ Test settingsValuesAndScopes() started.
+◇ Test plainNamesAreInTheOrderOfTheComparison() started.
+◇ Test jobProgressChoosesBytesOrItems() started.
+◇ Test parallelMapUsesSeveralThreads() started.
+◇ Test aCancellationFlagIsSeenFromEveryThread() started.
+◇ Test sortsByExtensionThenName() started.
+◇ Test unsortedKeepsFilesInArrivalOrder() started.
+◇ Test mergingABatchEqualsSortingEverything() started.
+◇ Test aLongListSortedOnAllCoresEqualsTheSimpleSort() started.
+◇ Test headerClickReversesOrStartsInOwnDirection() started.
+◇ Test turningTheDirectionRoundGivesWhatSortingGives() started.
+◇ Test foldersFirstAndAlwaysByName() started.
+◇ Test withAndWithoutHiddenFilesAreTwoListings() started.
+◇ Test aReadingThatWasOvertakenIsNotKept() started.
+◇ Test parallelMapKeepsTheOrder() started.
+◇ Test aListCollectedInBatchesIsAlwaysSorted() started.
+◇ Test keysThatDoNotFitTheLanguageStillGiveTheDefinedOrder() started.
+◇ Test readsTypedLocations() started.
+◇ Test case passing 1 argument others → 200 to aMarkOnOneIsNotAMarkOnTheOther(others:) started.
+◇ Test case passing 1 argument others → 0 to aMarkOnOneIsNotAMarkOnTheOther(others:) started.
+◇ Test case passing 1 argument count → 300 to aListFilteredElsewhereIsWhatSetFilterShows(count:) started.
+◇ Test case passing 1 argument count → 40000 to aListFilteredElsewhereIsWhatSetFilterShows(count:) started.
+◇ Test case passing 1 argument others → 0 to aCalculatedSizeGoesToItsOwnFolder(others:) started.
+◇ Test case passing 1 argument others → 200 to aCalculatedSizeGoesToItsOwnFolder(others:) started.
+◇ Test case passing 1 argument others → 0 to theMarkStaysOnItsEntryWhenTheListChanges(others:) started.
+◇ Test case passing 1 argument others → 200 to theMarkStaysOnItsEntryWhenTheListChanges(others:) started.
+✔ Test checkedState() passed after 0.207 seconds.
+✔ Test runsRegisteredCommandsWithTheirArgument() passed after 0.207 seconds.
+✔ Test someCommandsRunWhileAJobIsInProgress() passed after 0.207 seconds.
+✔ Test rejectsUnknownDisabledAndBlockedCommands() passed after 0.207 seconds.
+✔ Test contextMenuLeavesOutItemEntriesOnEmptySpace() passed after 0.222 seconds.
+✔ Test splitsNameAndExtension() passed after 0.222 seconds.
+✔ Test theSamePathOnTwoServersIsTwoPlaces() passed after 0.222 seconds.
+✔ Test locations() passed after 0.222 seconds.
+✔ Test buildingAnEntrysLocationNeverAsksTheDisk() passed after 0.222 seconds.
+✔ Test fileMasks() passed after 0.222 seconds.
+✔ Test menusAreOrderedAndGrouped() passed after 0.222 seconds.
+✔ Test whatAFileSystemDoesNotOfferBehavesAsBefore() passed after 0.222 seconds.
+✔ Test aKeyTakenTwiceStaysWithTheFirstAndIsReported() passed after 0.222 seconds.
+✔ Test shortcutsAsText() passed after 0.222 seconds.
+✔ Test aHandlerIsCalledOnceWhenTheFlagIsSet() passed after 0.222 seconds.
+✔ Test commitsMarksAndMetadataAreRecorded() passed after 0.222 seconds.
+✔ Test theUsersBindingsReplaceTheDefaults() passed after 0.222 seconds.
+✔ Test capabilitiesAreAskedByLocation() passed after 0.222 seconds.
+✔ Test commandsBringTheirDefaultKeys() passed after 0.222 seconds.
+✔ Test aReleasedRegistrationIsForgotten() passed after 0.222 seconds.
+✔ Test aFileIsContinuedWhereItWasCut() passed after 0.222 seconds.
+✔ Test aListingThatWaitsEndsWhenThePanelLoaderIsCancelled() passed after 0.223 seconds.
+✔ Test aPausedListingStopsBetweenItsBatches() passed after 0.223 seconds.
+✔ Test aFlagThatIsSetEndsTheDefaultsEarly() passed after 0.222 seconds.
+✔ Test directorySizeIsAddedUpOverTheTree() passed after 0.222 seconds.
+✔ Test theFlagIsSetFromOtherThreadsWhileHandlersComeAndGo() passed after 0.222 seconds.
+✔ Test aFileLeadsToItsFolder() passed after 0.222 seconds.
+✔ Test streamingStopsWhenNoMoreIsWanted() passed after 0.222 seconds.
+✔ Test aMaskReadOnceMatchesLikeTheMaskReadEveryTime() passed after 0.223 seconds.
+✔ Test aMissingFolderFailsUnlessClimbing() passed after 0.222 seconds.
+✔ Test anEmptyDirectoryStillGivesOneBatch() passed after 0.222 seconds.
+✔ Test addingUpSizesEndsWhenAListingWaits() passed after 0.224 seconds.
+✔ Test aSlowDirectoryArrivesInBatches() passed after 0.222 seconds.
+✔ Test aReadAndAWriteThatWaitAreInterruptedFromAnotherThread() passed after 0.224 seconds.
+✔ Test hitAndMiss() passed after 0.222 seconds.
+✔ Test anOldListingIsNotHandedOut() passed after 0.222 seconds.
+✔ Test theLeastRecentlyUsedFolderGoesFirst() passed after 0.222 seconds.
+✔ Test jobProgressChoosesBytesOrItems() passed after 0.222 seconds.
+✔ Test anotherOrderIsSortedOnRequestAndKept() passed after 0.222 seconds.
+✔ Test aCancellationFlagIsSeenFromEveryThread() passed after 0.222 seconds.
+✔ Test sortsByExtensionThenName() passed after 0.222 seconds.
+✔ Test unsortedKeepsFilesInArrivalOrder() passed after 0.222 seconds.
+✔ Test changedFoldersAreForgottenWithWhatLiesBelowAndTheFolderAbove() passed after 0.222 seconds.
+✔ Test localFoldersAreKeptOnlyWhenTheyWereSlowToRead() passed after 0.222 seconds.
+✔ Test headerClickReversesOrStartsInOwnDirection() passed after 0.222 seconds.
+✔ Test switchedOffItKeepsNothing() passed after 0.222 seconds.
+✔ Test foldersFirstAndAlwaysByName() passed after 0.221 seconds.
+✔ Test withAndWithoutHiddenFilesAreTwoListings() passed after 0.221 seconds.
+✔ Test aReadingThatWasOvertakenIsNotKept() passed after 0.221 seconds.
+✔ Test mergingABatchEqualsSortingEverything() passed after 0.222 seconds.
+✔ Test namesAreCutByTheirBytesAsByTheirCharacters() passed after 0.222 seconds.
+✔ Test theTotalNumberOfEntriesIsLimited() passed after 0.222 seconds.
+✔ Test theKernelSwitchesItFromTheSettings() passed after 0.223 seconds.
+✔ Suite Commands passed after 0.225 seconds.
+✔ Suite Menus passed after 0.225 seconds.
+✔ Suite Names passed after 0.225 seconds.
+✔ Suite ProviderDefaults passed after 0.225 seconds.
+✔ Suite Keys passed after 0.225 seconds.
+✔ Suite CancellationHandlers passed after 0.225 seconds.
+✔ Suite MemoryFileSystemExtras passed after 0.225 seconds.
+✔ Suite CancellingWhatWaits passed after 0.226 seconds.
+✔ Suite Loading passed after 0.225 seconds.
+✔ Suite FileMaskFixes passed after 0.226 seconds.
+✔ Test parallelMapKeepsTheOrder() passed after 0.252 seconds.
+✔ Test workBelowTheTopLevelIsSpreadOverTheCores() passed after 0.276 seconds.
+✔ Test aListCollectedInBatchesIsAlwaysSorted() passed after 0.381 seconds.
+✔ Test nestedMapsGiveTheSameResultsAsPlainLoops() passed after 0.389 seconds.
+✔ Test manyCallersAtOnceAllFinish() passed after 0.420 seconds.
+✔ Test parallelMapUsesSeveralThreads() passed after 0.576 seconds.
+✔ Suite Concurrency passed after 0.579 seconds.
+✔ Test aJobIsNotLeftAloneWhileEveryThreadWaitsForSomething() passed after 0.935 seconds.
+✔ Suite ParallelWork passed after 0.937 seconds.
+✔ Test manyThreadsAtOnce() passed after 0.980 seconds.
+✔ Suite RememberedListings passed after 0.982 seconds.
+✔ Test plainNamesAreInTheOrderOfTheComparison() passed after 1.551 seconds.
+✔ Test rowsAreFoundByNameHoweverOftenTheyAreAsked() passed after 5.290 seconds.
+✔ Test theSelectionIsReplacedInOneAnnouncement() passed after 5.290 seconds.
+✔ Test historyGoesBackAndForward() passed after 5.290 seconds.
+✔ Test batchChangesAreAnnouncedOnce() passed after 5.290 seconds.
+✔ Test sumsThatLeaveTheRangeOfANumberStopAtItsEnd() passed after 5.291 seconds.
+✔ Test startsUnlistedAndTakesAListing() passed after 5.290 seconds.
+✔ Test aLongListThatDidNotChangeIsSeenAsTheSame() passed after 5.291 seconds.
+✔ Test theTotalsStayRightThroughEveryChange() passed after 5.290 seconds.
+✔ Test updateKeepsCursorSelectionAndFolderSizes() passed after 5.290 seconds.
+✔ Test aPresortedListIsTakenAsItIs() passed after 5.291 seconds.
+✔ Test aVanishedCursorItemLeavesTheCursorInPlace() passed after 5.290 seconds.
+✔ Test everyChangeIsAnnounced() passed after 5.290 seconds.
+✔ Test operandRule() passed after 5.290 seconds.
+✔ Test aChangedSortOrderIsRespectedWhileADirectoryGrows() passed after 5.290 seconds.
+✔ Test aRefreshThatOnlyEndsTheWaitingIsAnnounced() passed after 5.291 seconds.
+✔ Test openingTheLocationOfAFileEndsInItsFolder() passed after 5.290 seconds.
+✔ Test aRememberedListingIsShownUntilTheFreshOneArrives() passed after 5.290 seconds.
+✔ Test aDirectoryCanArriveInPieces() passed after 5.290 seconds.
+✔ Test theCursorStaysOnItsItemWhileADirectoryGrows() passed after 5.290 seconds.
+✔ Test aFolderThatCannotBeReadIsLeftAgain() passed after 5.290 seconds.
+✔ Test operandsThatIncludeAFileAreFoundWithoutTheList() passed after 5.291 seconds.
+✔ Test listsWithParentRowAndHidesDotFiles() passed after 5.291 seconds.
+✔ Test aFolderIsEnteredBeforeItHasBeenRead() passed after 5.290 seconds.
+✔ Test selectionCommandsAndTotals() passed after 5.290 seconds.
+✔ Test aNameWrittenDifferentlyStillFindsTheOnlyEntryThatReadsTheSame() passed after 5.290 seconds.
+✔ Test aTabForAnotherFolderIsReadWhenItIsShown() passed after 5.290 seconds.
+✔ Test theFileSystemKeepsBothAndTheyAreEqualAsStrings() passed after 5.290 seconds.
+✔ Test tabsKeepTheirOwnSelection() passed after 5.290 seconds.
+✔ Test aNarrowingFilterGivesWhatTheFullFilterGives() passed after 5.291 seconds.
+✔ Test rawDataIsStoredAsItIs() passed after 5.291 seconds.
+✔ Test aListThatChangedMeanwhileIsFilteredHere() passed after 5.290 seconds.
+✔ Test stateRoundTrip() passed after 5.290 seconds.
+✔ Test newTabCopiesTheActiveTab() passed after 5.290 seconds.
+✔ Test aCalculatedSizeGoesToItsOwnFolder(others:) with 2 test cases passed after 5.290 seconds.
+✔ Test openersAreTriedByPriority() passed after 5.290 seconds.
+✔ Test theMarkStaysOnItsEntryWhenTheListChanges(others:) with 2 test cases passed after 5.290 seconds.
+✔ Test aListFilteredElsewhereIsWhatSetFilterShows(count:) with 2 test cases passed after 5.290 seconds.
+✔ Test theUsersKeysAreAppliedWhenTheShellAttaches() passed after 5.290 seconds.
+✔ Test unknownSchemesHaveNoProvider() passed after 5.290 seconds.
+✔ Test settingsValuesAndScopes() passed after 5.290 seconds.
+✔ Test parentAndRootTargets() passed after 5.291 seconds.
+✔ Test aNewVolumeFigureIsAnnounced() passed after 5.290 seconds.
+✔ Test closingTabs() passed after 5.290 seconds.
+✔ Test nothingRunsBeforeTheWindowExists() passed after 5.290 seconds.
+✔ Suite PanelModelFixes passed after 5.293 seconds.
+✔ Test aMarkOnOneIsNotAMarkOnTheOther(others:) with 2 test cases passed after 5.290 seconds.
+✔ Test aPluginAddsItsFeaturesThroughTheKernelOnly() passed after 5.290 seconds.
+✔ Suite FilteringElsewhere passed after 5.292 seconds.
+✔ Suite Panel passed after 5.292 seconds.
+✔ Suite Tabs passed after 5.292 seconds.
+✔ Suite NamesThatReadTheSame passed after 5.292 seconds.
+✔ Test readsTypedLocations() passed after 5.289 seconds.
+✔ Suite KernelAndPlugins passed after 5.293 seconds.
+✔ Test turningTheDirectionRoundGivesWhatSortingGives() passed after 6.048 seconds.
+✔ Test mergingAndAddingBatchesGiveTheSortedList() passed after 11.591 seconds.
+✔ Test sortingGivesTheOrderOfTheComparisonForEveryKindOfName() passed after 13.488 seconds.
+✔ Test aLongListSortedOnAllCoresComesOutTheSame() passed after 16.876 seconds.
+✔ Test keysThatDoNotFitTheLanguageStillGiveTheDefinedOrder() passed after 29.939 seconds.
+✔ Suite SortingByKeys passed after 29.942 seconds.
+✔ Test aLongListSortedOnAllCoresEqualsTheSimpleSort() passed after 41.229 seconds.
+✔ Suite Sorting passed after 41.232 seconds.
+✔ Test run with 115 tests in 21 suites passed after 41.233 seconds.
+RUN exit=0 wall=229.2s load_before=26.8 load_after=30.7 cmd=swift test --skip-build --sanitize=thread --scratch-path /private/tmp/claude-501/-Users-cm0k-Claude-Projects-TotalCommander/91e36f29-0d53-4421-8985-1ec839e7f5c4/scratchpad/review2/stress/b-tsan --filt

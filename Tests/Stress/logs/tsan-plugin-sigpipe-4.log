@@ -1,0 +1,2659 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite PlacesHotlistModel started.
+◇ Suite FilePropertiesSums started.
+◇ Suite SpotlightQueries started.
+◇ Suite Targets started.
+◇ Suite ConfigPlacesFixStoredData started.
+◇ Suite SelectionMoreCommands started.
+◇ Suite ParallelCopies started.
+◇ Suite MultiRenamePlanning started.
+◇ Suite ViewerThroughVirtualFolders started.
+◇ Suite ConfigurationCommands started.
+◇ Suite CompareContentCommands started.
+◇ Suite CompareLoading started.
+◇ Suite FileOpsAdoptCancellation started.
+➜ Suite FileOpsAdoptVolumes skipped: "needs mounted disk images: set AFM_VOLUME_TESTS=1, AFM_VOLUME_A, AFM_VOLUME_B, AFM_VOLUME_CS"
+◇ Suite NamesInBranchViews started.
+◇ Suite SystemToolsTypes started.
+◇ Suite SelectionMoreRules started.
+◇ Suite NetworkSFTP started.
+◇ Suite ConfigPlacesFixCache started.
+◇ Suite OperationLogs started.
+◇ Suite NetworkAdoptSFTP started.
+◇ Suite ToolsAdoptFindFiles started.
+◇ Suite FileOpsAdoptCommit started.
+◇ Suite LocalDisk started.
+◇ Suite FileOpsFixJobs started.
+◇ Suite NetworkParsers started.
+◇ Suite KernelApiOnLocalDisks started.
+◇ Suite ConfigPlacesFixVirtual started.
+◇ Suite ConfigPlacesFixStore started.
+◇ Suite ProtectedItems started.
+◇ Suite FileOpsAdoptQuarantine started.
+◇ Suite PlacesHistoryModel started.
+◇ Suite MultiRenameWindow started.
+◇ Suite NetworkFixConnections started.
+◇ Suite ConfigPlacesFixSystemTools started.
+◇ Suite NetworkFixLineEnds started.
+◇ Suite NetworkPluginCommands started.
+◇ Suite ViewerAdoptSearch started.
+◇ Suite ConfigPlacesFixRunner started.
+◇ Suite VirtualLocations started.
+◇ Suite Duplicates started.
+◇ Suite TransferOptionsInJobs started.
+◇ Suite NameTemplates started.
+◇ Suite NetworkFTP started.
+◇ Suite NetworkAdoptFTP started.
+◇ Suite ViewerAdoptSource started.
+◇ Suite PluginFixes started.
+◇ Suite BranchWalking started.
+◇ Suite ViewerAdoptIndex started.
+◇ Suite TextComparing started.
+◇ Suite ConfigPlacesFixLaunching started.
+◇ Suite PlacesTreeModel started.
+◇ Suite FileToolsChecksums started.
+◇ Suite MultiRenameFixSessions started.
+◇ Suite ParameterExpansion started.
+◇ Suite FilePropertiesParallelWork started.
+◇ Suite ViewerAdoptPane started.
+◇ Suite DirectorySyncWindow started.
+◇ Suite VirtualFolderCommands started.
+◇ Suite SavedSearches started.
+◇ Suite FindFilesWindow started.
+◇ Suite ArchiveAdoption started.
+◇ Suite Searching started.
+◇ Suite FileToolsFixes started.
+◇ Suite ViewOptions started.
+◇ Suite ToolsAdoptMultiRename started.
+◇ Suite ConfigPlacesFixExpansion started.
+◇ Suite NetworkTLS started.
+◇ Suite ViewerAdoptHTML started.
+◇ Suite FileOpsAdoptCapabilities started.
+◇ Suite ConfigPlacesFixScanning started.
+◇ Suite ToolsAdoptCompare started.
+◇ Suite NetworkFixNames started.
+◇ Suite FileOpsFixCommands started.
+◇ Suite FilePropertiesFormats started.
+◇ Suite NetworkFixTLS started.
+◇ Suite TextPatterns started.
+◇ Suite FileOpsAdoptMetadata started.
+◇ Suite ViewerModel started.
+◇ Suite PluginCommands started.
+◇ Suite NetworkFixCache started.
+◇ Suite MyersDiff started.
+◇ Suite CopyFilters started.
+◇ Suite LocalJobs started.
+◇ Suite VirtualFoldersAdoption started.
+◇ Suite CrossFileSystemJobs started.
+◇ Suite ConfigPlacesFixTreeModel started.
+◇ Suite ArchiveJobsEndToEnd started.
+◇ Suite SearchCriteriaRules started.
+◇ Suite MultiRenameEngine started.
+◇ Suite FileOperationCommands started.
+◇ Suite ViewerAdoptImage started.
+◇ Suite SyncExecuting started.
+◇ Suite ConfigurationModels started.
+◇ Suite SyncComparing started.
+◇ Suite DirectorySyncFixes started.
+◇ Suite ArchiveCommandsInPanels started.
+◇ Suite BinaryComparing started.
+◇ Suite NetworkFixSFTP started.
+◇ Suite FileOpsAdoptSelection started.
+◇ Suite LocalDiskExtras started.
+◇ Suite NetworkFixSecrets started.
+◇ Suite OverwriteChoices started.
+◇ Suite ConfigurationAdoption started.
+◇ Suite JobsThroughVirtualFolders started.
+◇ Suite CompareContentWindow started.
+◇ Suite NetworkAdoptSFTPAppend started.
+◇ Suite FolderTabCommands started.
+◇ Suite ArchiveFixes started.
+◇ Suite TabFiles started.
+◇ Suite MultiRenameFixes started.
+◇ Suite DirectorySyncSessionFixes started.
+◇ Suite FileOpsFixLog started.
+◇ Suite Wording started.
+◇ Suite PlacesCommands started.
+◇ Suite LocalDiskFixes started.
+◇ Suite FileToolsTransforms started.
+◇ Suite FindFilesFixes started.
+◇ Suite ViewerWindows started.
+◇ Suite NavigationPlaces started.
+◇ Suite ToolsAdoptSyncSession started.
+◇ Suite FileOpsAdoptResume started.
+◇ Suite PlacesAdoption started.
+◇ Suite FilePropertiesCommands started.
+◇ Suite PlacesTreeScanning started.
+◇ Suite ClipboardMore started.
+◇ Suite FileOpsAdoptMeasure started.
+◇ Suite DirectorySyncCommands started.
+◇ Suite ArchiveFormats started.
+◇ Suite SystemToolsCommandTests started.
+◇ Suite ToolsAdoptDirectorySync started.
+◇ Suite ViewerFix started.
+◇ Suite FileToolsHashes started.
+◇ Suite ExtendedSearching started.
+◇ Suite CompareContentFixes started.
+◇ Suite MultiRenameRuns started.
+◇ Suite ToolsAdoptFileTools started.
+◇ Suite ArchiveFileSystems started.
+◇ Suite MacIntegrationMore started.
+◇ Suite Switches started.
+◇ Suite ToolsAdoptSelection started.
+◇ Test sizesNearTheEndOfTheRangeAddUpWithoutStoppingTheProgram() started.
+◇ Test menuMarksTheCurrentDirectoryAndTheSubmenusHoldingIt() started.
+◇ Test addingToASubmenuGoesBeforeTheSubmenusItEndsWith() started.
+◇ Test editorListIndentsSubmenus() started.
+◇ Test parsesTheTargetField() started.
+◇ Test theListTakesNoMoreThanItsLimit() started.
+◇ Test uniqueNames() started.
+◇ Test hiding() started.
+◇ Test insertRemoveAndUpdate() started.
+◇ Test spotlightUnderstandsEveryQuestion() started.
+◇ Test aCleanHotlistRaisesNoComplaint() started.
+◇ Test rowsListEveryEntryWithItsDepth() started.
+◇ Test sizesAndDates() started.
+◇ Test wildcardTargetNames() started.
+◇ Test hotlistEntriesRunUserCommands() started.
+◇ Test unreadableDataIsNotLostBySavingOver() started.
+◇ Test storedAsJSONAndReadBack() started.
+◇ Test conflictsAreAskedOneAtATimeInProcessingOrder() started.
+◇ Test movingWalksThroughSubmenusLikeAFlatList() started.
+◇ Test answersAreCheckedAgainstTheWholeSearch() started.
+◇ Test aCancelledParallelCopyLeavesNoPartialFiles() started.
+◇ Test aBlockedReadEndsWhenItsFlagIsSet() started.
+◇ Test aNetworkVolumeGetsASingleStream() started.
+◇ Test conflictsAndLetterCase() started.
+◇ Test chainsWaitForTheirPlace() started.
+◇ Test smallFilesAreCopiedSeveralAtOnceOnLocalStorage() started.
+◇ Test swapsAndRingsGoThroughATemporaryName() started.
+◇ Test aHotlistReadsLeniently() started.
+◇ Test caseOnlyRenames() started.
+◇ Test plainRenamesKeepListOrder() started.
+◇ Test actions() started.
+◇ Test historiesReadLeniently() started.
+◇ Test theWindowsAreBuiltFromWhatIsRegistered() started.
+◇ Test questionsInSpotlightsLanguage() started.
+◇ Test aQuestionMarkLetsTheUserChangeTheParameters() started.
+◇ Test aLongChainNeedsNoRecursion() started.
+◇ Test manySmallFilesOnDiskArriveCompleteInBothDirections() started.
+◇ Test theMenusOfTheConfigurationPlugin() started.
+◇ Test theStartMenuRunsItsEntriesByPosition() started.
+◇ Test twoSelectedFilesOfTheSourcePanel() started.
+◇ Test aFailedSaveIsReportedAndTheChangesStay() started.
+◇ Test commandsOfTheProgramChainsAndCd() started.
+◇ Test whatTheIndexCannotAnswerIsLeftToTheSearch() started.
+◇ Test textFilesAreLoadedAndCompared() started.
+◇ Test textAfterTheNameReachesTheCommand() started.
+◇ Test identicalAndBinaryAndMissingFiles() started.
+◇ Test savingReplacesTheFileAndLeavesNothingBehind() started.
+◇ Test resyncAndSwap() started.
+◇ Test conflictDetection() started.
+◇ Test everyNthLineAndSteps() started.
+◇ Test aLargeListIsSelectedWithFewAnnouncements() started.
+◇ Test anErrorInAWorkerAsksLikeAnyOtherAndAbortStopsEverything() started.
+◇ Test filesElsewhereAreReadOnceSideBySide() started.
+➜ Test renamingToAnotherCaseNeverReplacesTheFileThatHasThatName() skipped: "needs mounted disk images: set AFM_VOLUME_TESTS=1, AFM_VOLUME_A, AFM_VOLUME_B, AFM_VOLUME_CS"
+➜ Test aFolderMoveBetweenVolumesCopiesInParallelAndRemovesTheSources() skipped: "needs mounted disk images: set AFM_VOLUME_TESTS=1, AFM_VOLUME_A, AFM_VOLUME_B, AFM_VOLUME_CS"
+◇ Test oneSelectedFileWithTheTargetsSelectionOrTheSameName() started.
+◇ Test groupsByMask() started.
+◇ Test processedItemsAreFoundByLocationWhereNamesArePaths() started.
+◇ Test aUserCommandRunsAProgramWithExpandedParameters() started.
+◇ Test autoRename() started.
+◇ Test wholeBlocksAndInsertionsGoToTheRightPlace() started.
+◇ Test identicalFilesOnlyGetTheMessage() started.
+◇ Test cancelEndsAReadThatWaitsAndLeavesNoTemporaryFile() started.
+◇ Test aStreamThatIsNotCancelledStillCompletes() started.
+◇ Test binaryFilesAreComparedInHex() started.
+➜ Test aMoveOntoAnotherCaseAsksAboutTheCollisionAndKeepsBothFiles() skipped: "needs mounted disk images: set AFM_VOLUME_TESTS=1, AFM_VOLUME_A, AFM_VOLUME_B, AFM_VOLUME_CS"
+◇ Test cancelEndsAWriteThatWaitsAndRemovesWhatArrived() started.
+◇ Test markNewerHideSame() started.
+◇ Test saveSettingsWritesThePanelsTabs() started.
+◇ Test cancelEndsAVerifyingReadThatWaits() started.
+◇ Test likeTheItemUnderTheCursor() started.
+◇ Test theCursorFileWithTheSameNameInTheOtherPanel() started.
+◇ Test aUserCommandThatCallsItselfIsStopped() started.
+◇ Test encodingsSurviveEditing() started.
+◇ Test subfoldersAreCollectedToTheGivenDepth() started.
+◇ Test differencesAreCopiedAcrossUndoneAndSaved() started.
+◇ Test savingAndLoadingSelectionFiles() started.
+◇ Test historyAndSelectionTypes() started.
+➜ Test aCopyIntoItsOwnSubfolderThroughAnotherSpellingIsRefused() skipped: "needs mounted disk images: set AFM_VOLUME_TESTS=1, AFM_VOLUME_A, AFM_VOLUME_B, AFM_VOLUME_CS"
+◇ Test theDefinitionDialogStoresRegistersAndBindsTheKey() started.
+➜ Test theThreeVolumesAreTheKindsTheseTestsNeed() skipped: "needs mounted disk images: set AFM_VOLUME_TESTS=1, AFM_VOLUME_A, AFM_VOLUME_B, AFM_VOLUME_CS"
+◇ Test otherPluginsNameTheFilesThemselves() started.
+◇ Test loadingFromTheClipboard() started.
+➜ Test aRetryAfterAFailedSourceDeleteDoesNotCopyTheFileAgain() skipped: "needs mounted disk images: set AFM_VOLUME_TESTS=1, AFM_VOLUME_A, AFM_VOLUME_B, AFM_VOLUME_CS"
+◇ Test commandIsRegisteredWithMenusButtonAndPreferences() started.
+◇ Test largeLocalFilesAreCheckedInStretchesOnAllCores() started.
+◇ Test aProgramThatDoesNotExistIsAFailure() started.
+◇ Test longListsAreSplitIntoPagesWithAHeaderEach() started.
+◇ Test cancelEndsAListingThatWaits() started.
+◇ Test theListFileExistsWhenTheCommandStarts() started.
+◇ Test applicationsAreFoundByNameOrPath() started.
+◇ Test rowsNumbersAndHighlights() started.
+◇ Test optionsAreAppliedAndRemembered() started.
+◇ Test aLotOfOutputDoesNotBlockTheChild() started.
+◇ Test rowsAreAlignedAndTheFooterCounts() started.
+◇ Test headerPlaceholdersAreFilledIn() started.
+◇ Test settingsAreExportedImportedAndReset() started.
+◇ Test wildcardsIncludesAndExcludes() started.
+◇ Test selectionTypes() started.
+◇ Test registration() started.
+◇ Test aDetachedCommandIsNotReadFrom() started.
+◇ Test formatsFollowTheDialog() started.
+◇ Test selectionFiles() started.
+◇ Test pathLimitedMasks() started.
+◇ Test foldersAsConfigured() started.
+◇ Test comparingDirectories() started.
+◇ Test hiddenAndVisibleTreesAreSeparate() started.
+◇ Test regularExpressions() started.
+◇ Test relatedFiles() started.
+◇ Test volumeNamesAreChecked() started.
+◇ Test rulesReadPathsRelativeToTheListsDirectory() started.
+◇ Test manyThreadsCanWriteAtOnce() started.
+◇ Test selectionFilesOnTheLocalDisk() started.
+◇ Test comparingTwoLists() started.
+◇ Test onlyPlainHarmlessLinesAreHarmless() started.
+◇ Test masksIncludeAndExclude() started.
+◇ Test theHistoryKeepsEachLineOnceNewestFirst() started.
+◇ Test severalChildrenRunAtOnce() started.
+◇ Test unscannedAndPartialSurviveTheFile() started.
+◇ Test aLineIsTakenApart() started.
+◇ Test outputAndStatusAreCollected() started.
+◇ Test informationIsLaidOutInAlignedColumns() started.
+◇ Test onlyWhatIsWantedIsLogged() started.
+◇ Test linesAreWrittenInOrderOffTheCallingThread() started.
+◇ Test changes() started.
+◇ Test theSystemAnswers() started.
+◇ Test askpassCarriesQuestionAndAnswer() started.
+◇ Test interruptingAWriterEndsAWriteWhoseAnswersNeverCome() started.
+◇ Test notedFoldersAreWrittenOnceAfterABurst() started.
+◇ Test rotationBySizeKeepsALimitedNumberOfCopies() started.
+◇ Test dailyRotationStartsANewFileAfterMidnight() started.
+◇ Test cancellingEndsTheChild() started.
+◇ Test interruptingOneReaderLeavesTheOtherTransfersAlone() started.
+◇ Test reconnectsAfterDisconnect() started.
+◇ Test specialItemsAreNotHashed() started.
+◇ Test aCancelledListingEndsAndTheChannelStaysOpen() started.
+◇ Test aFileListedBesideItsFolderIsFoundOnce() started.
+◇ Test hardLinkedFilesOfOverlappingRootsAreOneResult() started.
+◇ Test aMovedFolderIsRemovedAfterTheCommitToo() started.
+◇ Test copyingNeverTouchesAnExistingDestination() started.
+◇ Test aLargeFolderIsListedInPieces() started.
+◇ Test logsInThroughSSH() started.
+◇ Test aSendThatIsCancelledOnAFullPipeEnds() started.
+◇ Test movesWithAndWithoutReplacing() started.
+◇ Test aCommitInTheMiddleOfAMoveMeetsNoFileUnderItsTemporaryName() started.
+◇ Test aTargetWithoutDeferredWritesIsNotCommittedAndSourcesGoAtOnce() started.
+◇ Test aFailedCommitKeepsEverySourceAndEndsTheJobAsFailed() started.
+◇ Test aHugeMoveIsCommittedInBatches() started.
+◇ Test writingNeverOverwritesAnExistingFile() started.
+◇ Test aSourceThatCouldNotBeRemovedIsNotReportedAsMoved() started.
+◇ Test sourcesAreDeletedOnlyAfterTheOneCommitOfTheTargetFolder() started.
+◇ Test offersPlacesAndVolumeInformation() started.
+◇ Test listsAndDescribes() started.
+◇ Test reportsChangesInWatchedFoldersOnly() started.
+◇ Test theBulkListingAgreesWithLookingAtEachEntry() started.
+◇ Test removesOneItemAndNeverATree() started.
+◇ Test cancellingEndsABlockedContentRead() started.
+◇ Test readsSeeksAndWrites() started.
+◇ Test aFailedTrashCanBeRetried() started.
+◇ Test aCopyOfALockedFileLeavesNoTemporaryFileBehind() started.
+◇ Test nestedRootsKeptForTheirDepthReportEachFileOnce() started.
+◇ Test listsADirectory() started.
+◇ Test readsWritesAndSeeks() started.
+◇ Test cancellingEndsABlockedDuplicateHash() started.
+◇ Test addresses() started.
+◇ Test olderOrSameKeepsAnOlderTargetOnlyBeyondTheTolerance() started.
+◇ Test itemsParentsAndRoots() started.
+◇ Test deletingNeverFollowsAHostileName() started.
+◇ Test aTransportThatIsNotSFTPFails() started.
+◇ Test removingTheSourceOfAMoveIsRetriedWithoutCopyingAgain() started.
+◇ Test aCancelDuringAParallelDeleteStopsAndReturns() started.
+◇ Test twoSourcesWhoseTargetNamesDifferInCaseOnlyAreOneConflict() started.
+◇ Test aLockComesLastAndTheCopyCanStillBeTakenAway() started.
+◇ Test theQuarantineMarkIsReadAndSet() started.
+◇ Test aStaleFreeSpaceFigureIsAnsweredAtOnceAndCorrectedBehind() started.
+◇ Test aFileIsContinuedInPlace() started.
+◇ Test volumes() started.
+◇ Test eplfListings() started.
+◇ Test aFolderThatMovesByOneRenameIsNotWalked() started.
+◇ Test aSkippedFolderAdvancesTheCounterToTheEnd() started.
+◇ Test lineEnds() started.
+◇ Test manyFilesAreDeletedBySeveralWorkersAndProtectedOnesAreAskedInOrder() started.
+◇ Test manyThreadsShareOneChannel() started.
+◇ Test largeListingsAreParsedInOrder() started.
+◇ Test aDeleteTreeWithoutAPoolStillDeletesEverything() started.
+◇ Test aFoldersTagsHiddenFlagAndCreationDateSurvive() started.
+◇ Test aCaseOnlyRenameIsNotAConflict() started.
+◇ Test aFinderLockedFileIsCopiedWithItsLockByTheJobItself() started.
+◇ Test cancellingEndsABlockedListing() started.
+◇ Test verifyingShowsProgressAndStillCatchesDamage() started.
+◇ Test hugeWidthsInNamesAreClamped() started.
+◇ Test theLeanListingSaysWhatTheFullOneSays() started.
+◇ Test aCopyOntoItsOwnNameInOtherLetterCaseIsACopyOntoItself() started.
+◇ Test onlyAPlaceWithoutATrashOffersPermanentDeletion() started.
+◇ Test filesOfDifferentSizesAreDifferentWithoutReadingThem() started.
+◇ Test unixListings() started.
+◇ Test aMoveKeepsAFolderWithARefusedName() started.
+◇ Test olderMeansOlderByMoreThanTheGranularityOfTheTarget() started.
+◇ Test aWalkListsEveryFileOnceAndSkipsMountFolders() started.
+◇ Test aSourceThatCannotBeRemovedStaysAndIsNotReportedAsMoved() started.
+◇ Test nameEncodings() started.
+◇ Test windowsListings() started.
+◇ Test savedConnections() started.
+◇ Test aFolderMergedIntoAnExistingOneIsCountedInFull() started.
+◇ Test downloadLists() started.
+◇ Test missingAndUnknownKeysAndABadElement() started.
+◇ Test aCancelledListingStopsBeforeTheNextBuffer() started.
+◇ Test sshArguments() started.
+◇ Test menuListsHistoryThenFrequentFolders() started.
+◇ Test namesThatLeadOutOfTheirFolderAreNotTransferred() started.
+◇ Test aCommandWhoseReplyIsLostIsNotRepeated() started.
+◇ Test evictionSparesAListThatIsShown() started.
+◇ Test unreadableDataIsKept() started.
+◇ Test keepsNoMoreThanTheStoredLimit() started.
+◇ Test thinningHidesFoldersThatWereOnlyPassedThrough() started.
+◇ Test aReadOnlyTargetAsksASecondTime() started.
+◇ Test filesAndFoldersFromAMarkedSourceAreMarkedBeforeTheyGetTheirNames() started.
+◇ Test aTargetInsideTheSourceThroughALinkIsRefused() started.
+◇ Test listIdsAreNotSmallNumbersAndMustMatchTheirLocation() started.
+◇ Test frequentFoldersAreRankedByVisits() started.
+◇ Test cancellingEndsAChildThatIgnoresTerminate() started.
+◇ Test mlsdListings() started.
+◇ Test manyDownloadsAtOnceWaitForAFreeConnection() started.
+◇ Test nothingIsMarkedWhenTheSourceHasNoMarkOrTheCopyStaysInOneFileSystem() started.
+◇ Test aBusyServerIsAskedAgain() started.
+◇ Test replySyntax() started.
+◇ Test replies() started.
+◇ Test linkTargetsAreAskedOnceAndNotAgain() started.
+◇ Test aProgramOnThePathBeatsAnApplicationOfTheSameName() started.
+◇ Test uploadsRenamesAndDeletesWithTheUsualCommands() started.
+◇ Test aTypedURLConnectsByItself() started.
+◇ Test quickConnectShowsTheServerAndDisconnectReturns() started.
+◇ Test aResumedFileIsMarkedToo() started.
+◇ Test aLockedFileIsAskedAboutWhenTheSystemRefuses() started.
+◇ Test windowShowsTheSessionAndFollowsIt() started.
+◇ Test hiddenFilesAndTransferMode() started.
+◇ Test downloadListIsWrittenAndWorkedThrough() started.
+◇ Test aFailedConnectionIsReportedAndLeavesThePanel() started.
+◇ Test aLongRunOfTwoByteCharactersIsFoundExactlyForwardAndBackward(codePage:) started.
+◇ Test disconnectCanSaveTheQuickConnection() started.
+◇ Test downloadsAndCopiesStayWithinTheConnectionLimit() started.
+◇ Test mergingIntoAnExistingFolderCanBeAskedAbout() started.
+◇ Test downloadsWithTheCopyJob() started.
+◇ Test theDecodedListIsCachedUntilItIsReplaced() started.
+◇ Test rawByteSearchGivesTheAnswerOfTheDecodedSearch() started.
+◇ Test agreesWithTheByteByByteRule() started.
+◇ Test closingAReaderEndsAReadThatWaitsForTheServer() started.
+◇ Test aDataConnectionThatBreaksIsAnErrorNotAnEnd() started.
+◇ Test theDataConnectionGoesToTheControlConnectionsAddress() started.
+◇ Test characterBoundariesAreExactAndAreReadOnce() started.
+◇ Test savedConnectionsKeepTheirPasswordInThePasswordStore() started.
+◇ Test deletingReadOnlyAndHiddenFilesAsks() started.
+◇ Test movesBetweenServerAndDisk() started.
+◇ Test aSearchNeverChangesAnswerWhenTheTextHasCharactersThatFoldToLetters() started.
+◇ Test noSubCriterionSwitchesTheOptionOff() started.
+◇ Test manyReportsBecomeFewWalks() started.
+◇ Test asksForAPasswordThatIsNotStored() started.
+◇ Test manyFilesAreHashedOnAllCores() started.
+◇ Test aCommandWithANameCodeDoesNotRunWithoutAName() started.
+◇ Test otherFileSystemsHostsAndPortsSurvive() started.
+◇ Test sameSizeGroupsAreOrderedBySize() started.
+◇ Test foreignAndBrokenLocationsAreNotVirtual() started.
+◇ Test attributesAndFolderDates() started.
+◇ Test registersCommandsMenusAndFileSystems() started.
+◇ Test checksumsCompareContents() started.
+◇ Test connectToServerMountsAndEjects() started.
+◇ Test sameNameAndSize() started.
+◇ Test plainNamesListsAndNesting() started.
+◇ Test sameContentsIsDecidedByHashing() started.
+◇ Test trackerMeasuresStaysAndSavesToTheSettings() started.
+◇ Test aSearchThroughAClusterOfLineEndsKeepsTheCharactersInStep() started.
+◇ Test aBranchLocationCarriesItsRealDirectory() started.
+◇ Test aPartFileCanBeKeptAndResumed() started.
+◇ Test aListLocationKnowsItsTitleAndWhereItCameFrom() started.
+◇ Test linksAreCopiedAsLinksOrFollowed() started.
+◇ Test theFilterChoosesWhatIsCopied() started.
+◇ Test everyItemIsRecordedForTheLog() started.
+◇ Test disconnectInterruptsARunningTransfer() started.
+◇ Test aCancelledRunShowsNothing() started.
+◇ Test asksForThePasswordAndRemembersTheRefusal() started.
+◇ Test partsOfTheNameUnderTheCursor() started.
+◇ Test caseSwitchesEnvironmentClipboardAndBrackets() started.
+◇ Test recordsEveryPlaceOnceTheLastVisitedLast() started.
+◇ Test theOptionalDigitFindsTheFirstFreeName() started.
+◇ Test theKeyboardEditorKeepsBindingsStoredElsewhere() started.
+◇ Test itemWithoutMLST() started.
+◇ Test counterRanges() started.
+◇ Test textModeConvertsLineEnds() started.
+◇ Test renameMasksInTheTarget() started.
+◇ Test dateAndTime() started.
+◇ Test aTabFileIsReplacedInOneStepAndOnlyIfItIsAFile() started.
+◇ Test withoutRESTAndInTextModeTheCapabilityIsMissing() started.
+◇ Test unicodeNames() started.
+◇ Test keepingGoingOnErrorsSkipsWithoutAskingAndCounts() started.
+◇ Test aFilteredMoveKeepsWhatWasLeftOut() started.
+◇ Test continuesAFileInTheMiddleAtTheEndAndWhereItEnds() started.
+◇ Test linksBeyondTheProbeLimitAreResolvedAfterTheListing() started.
+◇ Test aReaderInterruptedBeforeItsFirstReadNeverStarts() started.
+◇ Test aSearchOfAFileThatIsOnDiskAsksTheServerForNothing() started.
+◇ Test interruptingAWriterEndsAWriteThatWaitsForTheServer() started.
+◇ Test aLinkedFlagFollowsItsParentsAndLetsGoWhenReleased() started.
+◇ Test keepsIdleConnectionsAlive() started.
+◇ Test stopsWhenNoMoreIsWantedAndSkipsWhatCannotBeRead() started.
+◇ Test aSearchThroughAFileThatNeverAnswersEndsWithItsFlag() started.
+◇ Test aFileTooLargeToBeATabFileIsNotLoaded() started.
+◇ Test downloadsUploadsAndResumes() started.
+◇ Test listsDOSFormatAndWithoutEPSV() started.
+◇ Test aBigFileOfASlowSourceIsNotFetchedAgainWhenItIsLaidOutAgain() started.
+◇ Test timesOutAndCancelsOnAServerThatDoesNotAnswer() started.
+◇ Test aServerThatWantsTheTLSSessionReusedGetsAnUnderstandableError() started.
+◇ Test aReadThatWaitsForTheServerEndsWhenItsFlagIsSet() started.
+◇ Test aLongListIsSortedInTheBackgroundAndAShortOneAtOnce() started.
+◇ Test interruptingAReaderEndsAReadThatWaitsForTheServer() started.
+◇ Test linksAreListedNotFollowedAndPackagesStayWhole() started.
+◇ Test aCancelledListingEndsAtOnceAndGivesTheConnectionUp(streaming:) started.
+◇ Test changesAttributes() started.
+◇ Test aWideTreeIsReadCompletelyOnAllCores() started.
+◇ Test aSourceWhoseDiskIsFullGoesOnWithoutIt() started.
+◇ Test aCancelledListingIsNotRemembered() started.
+◇ Test serverKeysAndPaths() started.
+◇ Test everyOccurrenceOfAWholeWordIsFoundInOrderInTheRawBytes() started.
+◇ Test listsConcurrentlyOnSeveralConnections() started.
+◇ Test manyWalksAtOnceShareTheProvidersSafely() started.
+◇ Test aCacheStopsAtItsLimit() started.
+◇ Test aDeletedUserCommandLeavesNoKeyBehind() started.
+◇ Test seeksWhileReading() started.
+◇ Test aServerThatKeepsTheTailIsReportedNotTrusted() started.
+◇ Test aSegmentRecordsTheWidestLineOrThatALineWasCut() started.
+◇ Test blocksAreKeptOnDiskAndGivenBack() started.
+◇ Test listsWithMLSDAndWithLIST(mlsd:) started.
+◇ Test activeMode() started.
+◇ Test indexingAFileThatNeverAnswersStopsWhenTheDocumentIsDropped() started.
+◇ Test makesRenamesAndDeletes() started.
+◇ Test fetchingRowsFromAFileThatNeverAnswersEndsWhenTheFetchIsOvertaken() started.
+◇ Test aFileOfNothingButLineEndsNeedsFewCheckpoints() started.
+◇ Test aCopyOfAFileThatNeverAnswersEndsWithItsFlagAndLeavesNothingBehind() started.
+◇ Test resyncAnchorsForceLinesTogether() started.
+◇ Test verifyCatchesACorruptedCopy() started.
+◇ Test longTextsAreKeyedOnAllCores() started.
+◇ Test aTransferDoesNotBlockCommands() started.
+◇ Test encodingsAreDetectedAndWrittenBackUnchanged() started.
+◇ Test aLineOfCharactersThatCarryALineEndByteIsNotCut() started.
+◇ Test anImportIsCheckedBeforeItIsWritten() started.
+◇ Test listsEveryFileBelowWithItsRelativePathAndRealLocation() started.
+◇ Test aFlagThatIsSetAlreadyStopsEverythingBeforeItStarts() started.
+◇ Test optionsDecideWhichLinesAreEqual() started.
+◇ Test reconnectsAfterTheServerDroppedTheConnection() started.
+◇ Test aLinkResolvedInTheBackgroundIsAFolderInWhatTheFileSystemRemembers() started.
+◇ Test nothingIsTakenOverFromAnotherTextAnotherEncodingOrAnotherTabWidth() started.
+◇ Test aChainWaitsForTheProgramBeforeItsNextStep() started.
+◇ Test plainLinesAreCutFromTheirBytesWithTheRowsOfTheDecodedText() started.
+◇ Test pathsAndLocations() started.
+◇ Test theRowsAlwaysRebuildTheRightFile() started.
+◇ Test aWiderLayoutTakesOverTheSegmentsWhoseLinesStillFitInOneRow() started.
+◇ Test windowsFormatAndUnicodeNames() started.
+◇ Test rootsFollowTheDisksOfTheVolumeList() started.
+◇ Test aLaunchIsNoJobAndNoHistoryEntry() started.
+◇ Test aRunThatCanNeverBeUndoneDoesNotBlockEarlierOnes() started.
+◇ Test rawScannedUTF16FindsTheRowsDecodingEverythingFinds() started.
+◇ Test rowsShowChangedAddedAndRemovedLines() started.
+◇ Test theClipboardCommandIsOfferedForAnyTextAndReadsOnlyTheFirstLine() started.
+◇ Test placesAndPaths() started.
+◇ Test aFlagOnlyEndsTheReadsItWasGiven() started.
+◇ Test sortingByExtensionKeepsEqualItemsInOrder() started.
+◇ Test verifiesFilesWrittenByTheSystemTools() started.
+◇ Test namesWithSpacesAreQuotedAsOneWord() started.
+◇ Test everyMethodRoundTripsThroughVerify() started.
+◇ Test encodingsOfChecksumFiles() started.
+◇ Test listFilesAreWrittenToTheListFolder() started.
+◇ Test shaFilesAreAcceptedByShasum(method:algorithm:) started.
+◇ Test binaryFilesAreRecognised() started.
+◇ Test verifyAgainstTheClipboardAndTheFileName() started.
+◇ Test aCancelledCopyLeavesNothingBehind() started.
+◇ Test differencesInsideALine() started.
+◇ Test createOnAnotherFileSystemAndFailures() started.
+◇ Test commentStoreReadsAFolderOnceForManyReaders() started.
+◇ Test argumentsOfAUserCommand() started.
+◇ Test buildsFromCachedPathsInNaturalOrder() started.
+◇ Test md5FileMatchesTheSystemTool() started.
+◇ Test directoriesComparedFilesAndSides() started.
+◇ Test quickSearchFindsTheNextFolderStartingWithTheText() started.
+◇ Test aLeadingQuestionMarkAsksFirst() started.
+◇ Test separateFilesPerFileAndPerFolder() started.
+◇ Test selectedNames() started.
+◇ Test sfvFileMatchesCksum() started.
+◇ Test measuresRealAllocationOnTheLocalDisk() started.
+◇ Test lineFormats() started.
+◇ Test windowShowsABackgroundComparison() started.
+◇ Test singleValues() started.
+◇ Test runsOfEmptyLinesAmongTextAreCountedLikeAnyOtherLines() started.
+◇ Test neighboursFollowDisplayOrderAndWrapAround() started.
+◇ Test leavingWithTheCommandGoesToTheFolderOfTheFileUnderTheCursor() started.
+◇ Test branchViewShowsEveryFileBelowAndLeavesThroughTheParentRow() started.
+◇ Test aForgottenListFailsWithoutHarm() started.
+◇ Test verifyReportsOkMissingAndWrong() started.
+◇ Test verifyManyFilesOnAnotherFileSystem() started.
+◇ Test substrings() started.
+◇ Test savingLoadingAndDeleting() started.
+◇ Test operationsWorkOnTheRealFiles() started.
+◇ Test selectedBranchShowsOnlyTheMarkedItemsAndRestoresTheSelection() started.
+◇ Test optionsChangeWhatABranchLists() started.
+◇ Test summaryNamesWhatIsNotDefault() started.
+◇ Test aLeadingAngleKeepsTheFieldOfTheWindow() started.
+◇ Test aFileListKeepsRealLocationsAndFullPathsAsNames() started.
+◇ Test closingThePaneEndsAReadThatWaitsForTheServer() started.
+◇ Test settingChildrenKeepsKnownFoldersAndDropsVanishedOnes() started.
+◇ Test newSearchEmptiesTheList() started.
+◇ Test watchingIsForwardedToTheRealFileSystem() started.
+◇ Test proposalsAndDialog() started.
+◇ Test registersCommandsMenusAndPreferences() started.
+◇ Test measuresATreeOnAllCores() started.
+◇ Test textAndDepthComeFromTheForm() started.
+◇ Test aLaunchThatCannotStartIsReported() started.
+◇ Test anArchiveOnAServerIsCommittedThereToo() started.
+◇ Test goToFilePutsThePanelOnTheResult() started.
+◇ Test aFormThatCannotBeSearchedWithIsReported() started.
+◇ Test thePackedOperandsAreDeselectedByTheNamesThePanelMarksThemWith() started.
+◇ Test anArchiveOnAServerThatCannotBeWrittenToCannotBeChanged() started.
+◇ Test fieldHistoriesKeepTheNewestFirst() started.
+◇ Test changesAttributesOfATreeOnAllCores() started.
+◇ Test settingsBecomeAQuery() started.
+◇ Test theMarkOfAnArchiveOnAnotherFileSystemIsThatFileSystemsWord() started.
+◇ Test duplicatesAreListedInGroups() started.
+◇ Test packAndDeleteSourcesWaitsForTheArchiveWhereItLies() started.
+◇ Test aReaderIsEndedFromAnotherThreadAndStaysEnded() started.
+◇ Test decompressionAndSkippingEndWhenTheRequestComes() started.
+◇ Test registersItsFileSystemServiceCommandsAndOptions() started.
+◇ Test columnsAnswerFromManyThreadsAtOnce() started.
+◇ Test aSearchListsItsHitsUnderASummary() started.
+◇ Test aPlaceOutsideTheArchiveAnswersForItsOwnFileSystem() started.
+◇ Test aCommitReachesTheArchivesThatHoldTheArchive() started.
+◇ Test openingAStreamArchiveCanBeAbandoned(format:) started.
+◇ Test aCommitPutsWhatClosedWritersBroughtIntoTheArchiveFile() started.
+◇ Test cancelledSearchFindsNothing() started.
+◇ Test aChildProcessIsStoppedByTheRequest() started.
+◇ Test theSidedCommandsWorkOnTheirPanel() started.
+◇ Test onlySelectedItemsOfThePanel() started.
+◇ Test feedToListboxHandsTheResultsToTheListService() started.
+◇ Test searchMasks() started.
+◇ Test searchesAnyFileSystem() started.
+◇ Test hiddenFilesInBothPanelsOrInOne() started.
+◇ Test aMemberReadFromAStreamEndsWhenInterruptedAndLeavesTheNextReadsAlone() started.
+◇ Test theFormGivesBackWhatItWasGiven() started.
+◇ Test blake3Vectors(count:expected:) started.
+◇ Test aFailedCommitKeepsEverythingForTheNextTry() started.
+◇ Test loadsAListFile() started.
+◇ Test aMemberWriterEndsWhenInterrupted() started.
+◇ Test customColumnsAreChosenInAForm() started.
+◇ Test registersCommandsKeysMenusToolbarAndPreferences() started.
+◇ Test withoutPluginColumnsThereIsNothingToChoose() started.
+◇ Test verifyHashesTheLikelyMethodFirstAndFindsTheOthers() started.
+◇ Test eachArchiveSaysWhatItCanDo() started.
+◇ Test aChecksumFileAmongTheOperandsIsNotHashed() started.
+◇ Test findsText() started.
+◇ Test theToolFollowsTheCapabilitiesOfTheFolderItIsIn() started.
+◇ Test partsOfOneFileStillJoin() started.
+◇ Test unreadableSourceCostsNoOutput() started.
+◇ Test findsByNameInPathOrder() started.
+◇ Test selectedNamesAreSeparateWords() started.
+◇ Test displayMasks() started.
+◇ Test depthLimit() started.
+◇ Test callsOutsideTheArchiveGoToTheFileSystemWithTheFlag() started.
+◇ Test aMissingNameIsReported() started.
+◇ Test aCustomFilterIsAskedForRememberedAndReset() started.
+◇ Test fetchingAnArchiveFromAServerCanBeAbandoned() started.
+◇ Test programsShowsWhatCanBeRun() started.
+◇ Test findsTextAcrossBlockBorders() started.
+◇ Test decodingOneNumberedFileDoesNotRunIntoTheNext() started.
+◇ Test sha3FallbackAgreesWithTheSelectedImplementation() started.
+◇ Test aFilterLaidOverADisplayFilterKeepsItChecked() started.
+◇ Test theViewCommandsSwitchTheSourcePanel() started.
+◇ Test overwriteKeepsTheOldFileUntilTheNewOneIsDone() started.
+◇ Test connectsListsAndTransfers(mode:) started.
+◇ Test excludedAndUnreachedFoldersAreRecorded() started.
+◇ Test splitAndEncodeRefuseToReplaceTheirSource() started.
+◇ Test unquotedPlaceholderIsOneWord() started.
+◇ Test theLeanReaderHonoursHiddenFoldersPackagesAndLinks() started.
+◇ Test manySmallFilesDoNotWriteTheArchiveForEachOfThem() started.
+◇ Test onlySelectedFilesIsASnapshot() started.
+◇ Test filesOutsideTheTargetFolderKeepTheirFullPath() started.
+◇ Test theFastScanAgreesOnLongPagesToo() started.
+◇ Test theTrashIsOfferedWhereTheItemsAreNotWhereTheFileSystemSaysInGeneral() started.
+◇ Test aServerWithoutTLSRefusesExplicitTLS() started.
+◇ Test insideDoubleQuotes() started.
+◇ Test commandsFollowTheCapabilitiesOfTheFolderShown() started.
+◇ Test checksumLinesInOtherForms() started.
+◇ Test theChosenFilesAreTheMarkedTwins() started.
+◇ Test listDropsThemInEveryFormat() started.
+◇ Test cancellingEndsABlockedLoad() started.
+◇ Test linesThatDifferOnlyInNormalisationAreEqual() started.
+◇ Test readsTheCommentFileAsTotalCommanderWritesIt() started.
+◇ Test environmentValuesAreQuotedToo() started.
+◇ Test textThatAnEncodingCannotWriteDropsThatEncoding() started.
+◇ Test textIsSearchedOnAllCoresAndReportedInOrder() started.
+◇ Test mlsdAndMlstDropThem() started.
+◇ Test theTestRecordsOfTheMacPluginStayBounded() started.
+◇ Test pressingOKOnALockedFileDoesNotUnlockIt() started.
+◇ Test anAddressMustBeAmongTheCertificatesAddresses() started.
+◇ Test theSharedCheck() started.
+◇ Test pasteIsOfferedWhileFilesAreOnTheClipboard() started.
+◇ Test anOversizedCommentFileIsNotOverwritten() started.
+◇ Test hexBytes() started.
+◇ Test permissionsTypedOrLoadedAreStillApplied() started.
+◇ Test insideSingleQuotes() started.
+◇ Test linksAreFoundTheSameWayInEveryFormOfTheAttribute() started.
+◇ Test choosesAnEncodingThatHoldsEveryCharacter() started.
+◇ Test readsCommandParameters() started.
+◇ Test changesCommentsAndKeepsTheOrder() started.
+◇ Test regularExpressionsMatchLineByLine() started.
+◇ Test base64EndsAtItsPadding() started.
+◇ Test foldersTheJobCreatedAreGivenTheirMetadataLastAndOnlyWhenAttributesAreKept() started.
+◇ Test theSFTPListingCheckIsTheSameFunction() started.
+◇ Test savingDetailsKeepsTheOldFileUntilTheNewOneIsThereAndNeverRemovesAFolder() started.
+◇ Test theToolbarAsksWithoutBuildingTheListOfOperands() started.
+◇ Test aFollowedLinkKeepsTheTagsOfItsTarget() started.
+◇ Test readsPermissionsInEveryNotation() started.
+◇ Test theFastScanGivesTheOutputOfTheUnitByUnitOne() started.
+◇ Test escapesStandForTabAndLineBreak() started.
+◇ Test openingAFileGoesToTheOpeners() started.
+◇ Test wholeWords() started.
+◇ Test newTextFileIsCreatedAndHandedToTheEditor() started.
+◇ Test removingFromAListedFolderAsksNoQuestions() started.
+◇ Test relativeLinkPaths() started.
+◇ Test aListingFromAServerKeepsOnlyTheSafeNames(mlsd:) started.
+◇ Test membersCarryTheMarkOfTheirArchiveSoThatACopyCanPassItOn() started.
+◇ Test aCaseOnlyRenameWorksAndNeverReplacesAnotherFile() started.
+◇ Test comparisonIgnoresNormalisationInFiles() started.
+◇ Test changingOnlyTheDateOfAFolderLeavesThePermissionsBelowAlone() started.
+◇ Test longLinesWrapAtWordsOrAreCut() started.
+◇ Test selection() started.
+◇ Test aCopiedFolderKeepsItsTagHiddenFlagAndCreationDate() started.
+◇ Test onAReadOnlyFileSystemChangingCommandsAreWithheld() started.
+◇ Test commandsThatMeanEverythingWaitForACompleteListing() started.
+◇ Test theIndexAgreesWithASimpleSplitAtLineEnds() started.
+◇ Test decodingBlockByBlockEqualsDecodingAtOnce() started.
+◇ Test aServerThatRefusesToProtectItsDataIsNotUsed() started.
+◇ Test spaceReportWording() started.
+◇ Test copyingASelectionDeselectsItAndRefreshesTheTarget() started.
+◇ Test regularExpressionsInOtherEncodings() started.
+◇ Test partialDatesKeepTheOtherParts() started.
+◇ Test manyUploadsToAServerWithoutMLSTListTheFolderOnce() started.
+◇ Test aCommentFileThatCannotBeReadIsNeverOverwritten() started.
+◇ Test cancelledDiffEndsEarlyButIsStillACover() started.
+◇ Test newFolders() started.
+◇ Test theAllocatedSizeIsOnlyAskedForWhenItIsWanted() started.
+◇ Test filesAreReadThroughTheirProviderWithSeek() started.
+◇ Test edgeCases() started.
+◇ Test encodings() started.
+◇ Test aLargeFileWithFewChangesIsExact() started.
+◇ Test placesInARowMapToBytesAndBack() started.
+◇ Test folderTabs() started.
+◇ Test applyingTheDiffToAYieldsBAndItIsTheShortest() started.
+◇ Test cancellingEndsABlockedIdentityCheck() started.
+◇ Test aByteOrderMarkIsNotPartOfTheText() started.
+◇ Test anAbandonedUploadMakesTheFolderBeReadAgain() started.
+◇ Test emptyAndEverything() started.
+◇ Test folderPatterns() started.
+◇ Test aRenameIsEnteredIntoTheListings() started.
+◇ Test hexSearchTakesBytesAndQuotedText() started.
+◇ Test aBoundedSearchStillGivesACorrectDiff() started.
+◇ Test includeAndExcludeMasks() started.
+◇ Test editedCopiesAreFoundExactly() started.
+◇ Test panelsFollowEachOther() started.
+◇ Test operationsOnAPickedViewActOnTheRealFiles() started.
+◇ Test plainTextSearchWithItsSwitches() started.
+◇ Test hitsAcrossBlockBordersAreFoundWithTheirSurroundings() started.
+◇ Test overwriteAllOlderKeepsNewerTargets() started.
+◇ Test deleteMovesToTheTrashOnTheLocalDisk() started.
+◇ Test sameNamedFilesOfAPickedViewHaveNamesOfTheirOwn() started.
+◇ Test linesKeepTheirOwnLineBreaks() started.
+◇ Test regularExpressions() started.
+◇ Test navigation() started.
+◇ Test plainTextIgnoresCaseUnlessAsked() started.
+◇ Test deleteAsksAndDeletesDirectlyWhereThereIsNoTrash() started.
+◇ Test createsMissingTargetFolders() started.
+◇ Test folderSizesThatLeaveTheRangeOfANumberStopAtItsEnd() started.
+◇ Test cancelStopsTheJob() started.
+◇ Test foldersOfAPickedViewKeepTheirContentsApart() started.
+◇ Test aFolderMadeIsKnownAtOnce() started.
+◇ Test renameInPlace() started.
+◇ Test binaryRowsHaveAFixedLengthAndDotsForControlCharacters() started.
+◇ Test hugeInputsFallBackToTheHeuristicAndStayCorrect() started.
+◇ Test linesWithoutAPartnerAreTakenOutFirst() started.
+◇ Test clipboardCopiesMovesAndRenamesSelfCopies() started.
+◇ Test copyInTheSameFolderPutsTheCursorOnTheCopy() started.
+◇ Test contentKindsComeFromNameAndFirstBytes() started.
+◇ Test aDeleteCanBeCancelledInTheMiddleOfATree() started.
+◇ Test aCancelledBranchWalkOfAStalledTreeEndsAndLeavesNothingBehind() started.
+◇ Test theClipboardCarriesLocalFilesOnly() started.
+◇ Test linesEndWithCRLFOrCROrLF() started.
+◇ Test foldersMadeLateBecauseOfAFilterAreFinishedLikeTheOthers() started.
+◇ Test changeDirectoryTakesLocationsAndTypedText() started.
+◇ Test aWalkWithAFlagThatIsNeverSetListsAsWithout() started.
+◇ Test aFileSystemThatCannotCopyByItselfIsStreamed() started.
+◇ Test trashWhereThereIsNoneOffersToDeleteForGood() started.
+◇ Test deletesTreesItemByItem() started.
+◇ Test byteOrderMarksNameTheEncoding() started.
+◇ Test aCharacterCutOffAtTheEndWaitsForItsRest() started.
+◇ Test twoNamesThatDifferOnlyInNormalisationAreTwoFiles() started.
+◇ Test aFolderThatCannotBeReadIsNeverRemoved() started.
+◇ Test aSelectionShowsInBothPartsOfAHexRow() started.
+◇ Test indexesStayRightAfterInsertsAndRewrites() started.
+◇ Test copyingOntoItselfIsRefusedWithAMessage() started.
+◇ Test aMissingSourceIsReportedAndSkipped() started.
+◇ Test moveAndRename() started.
+◇ Test movingBetweenFileSystemsRemovesTheSource() started.
+◇ Test copiesFilesAndFoldersRecursively() started.
+◇ Test copyAsksForTheTargetAndAboutOverwriting() started.
+◇ Test aBranchWalkStaysOnItsVolume() started.
+◇ Test anUnreadableFolderIsNotMovedAwayOrDeleted() started.
+◇ Test callsAreForwardedToTheRealFileSystem() started.
+◇ Test pluginsRegisterCommandsMenusAndServices() started.
+◇ Test aFileWithoutLineEndsIsStillCutIntoRows() started.
+◇ Test overwritingOnAnotherFileSystemGoesThroughATemporaryName() started.
+◇ Test eachLocationReportsWhatItsOwnFileSystemCanDo() started.
+◇ Test textEncodingsAreGuessedFromTheContent() started.
+◇ Test nothingIsOfferedOnTheParentRow() started.
+◇ Test aWideFolderResolvesNamesQuickly() started.
+◇ Test malformedInputBecomesReplacementCharactersAndKeepsItsOffsets() started.
+◇ Test copiesFromDiskIntoAnotherFileSystem() started.
+◇ Test hexRowsLookAsInTheSpecification() started.
+◇ Test jobsWithinAnotherFileSystemUseItsOwnOperations() started.
+◇ Test aMoveOfSmallAndLargeFilesPutsThemInTheArchiveFileOnceAndRemovesTheSources() started.
+◇ Test aCancelledStreamLeavesNothingBehind() started.
+◇ Test foldersAreSummedUpThroughTheirFileSystem() started.
+◇ Test attributesAreTriState() started.
+◇ Test aJobWithoutAnyoneToAskStopsAtItsFirstQuestion() started.
+◇ Test steppingThroughAWideFolderIsLinear() started.
+◇ Test aMoveKeepsEverySourceWhenTheArchiveCannotBeWritten(quickWrites:) started.
+◇ Test aCopyOutOfAnArchiveCarriesTheArchivesQuarantineMark() started.
+◇ Test everyOccurrenceIsFoundOnceInOrder() started.
+◇ Test theIndexBuiltInSegmentsEqualsCuttingTheWholeText(parallel:) started.
+◇ Test copiesFromAnotherFileSystemOntoDisk() started.
+◇ Test aCopyFromOneFolderOfTheDiskToAnotherIsNotMarked() started.
+◇ Test sizeRules() started.
+◇ Test sortingAndHiddenFiles() started.
+◇ Test renamingOntoAnotherFileWhoseNameDiffersInCaseIsRefused() started.
+◇ Test fieldRuleOperators() started.
+◇ Test copyWithRenameAndMask() started.
+◇ Test indexingStopsWhenCancelled() started.
+◇ Test pipelineOrderAndGivenNames() started.
+◇ Test symbolicLinksAreCopiedAndDeletedAsLinks() started.
+◇ Test overwriteAndSkip() started.
+◇ Test unscannedFoldersStayUnscannedFromTheCache() started.
+◇ Test pasteIntoTheSameFolderRenamesTheCopy() started.
+◇ Test ageCutsOffAtMidnightForDaysAndLonger() started.
+◇ Test htmlBecomesTextWithItsLinks() started.
+◇ Test movesAndMergesFolders() started.
+◇ Test moveKeepsSkippedSources() started.
+◇ Test aTextOnAnotherFileSystemIsIndexedSearchedAndShown() started.
+◇ Test aCancelledSearchFindsNothingAndProgressIsReported() started.
+◇ Test aFileSystemThatKeepsNoMetadataDoesNotSpoilTheCopy() started.
+◇ Test fieldRulesCombineWithAndOrOr() started.
+◇ Test aFinderLockedFolderIsCopiedCompletelyAndLockedLikeTheOriginal() started.
+◇ Test matchesAcrossChunkBordersAreFound(backwards:) started.
+◇ Test foldersAndTheFolderDotSwitch() started.
+◇ Test invalidPlaceholdersGiveAnError() started.
+◇ Test definedCounter() started.
+◇ Test copyKeepsTimeAndPermissions() started.
+◇ Test dateCriteria() started.
+◇ Test commandSwitchesStartWithoutADialog() started.
+◇ Test copyOntoItselfIsRefused() started.
+◇ Test searchingInOtherEncodingsGivesByteRanges() started.
+◇ Test noTemporaryNamesAreLeftBehind() started.
+◇ Test theTrashKeyCanBeTurnedAround() started.
+◇ Test nameLists() started.
+◇ Test ranges(mask:expected:) started.
+◇ Test letterCases() started.
+◇ Test operationsAreWrittenToTheLogFile() started.
+◇ Test rangesCountCharactersNotBytes() started.
+◇ Test invalidNames() started.
+◇ Test timeSourcesAndOffsets() started.
+◇ Test aFrameIsScaledOnceForTheSizeItIsShownAt() started.
+◇ Test severalPairsAndWildcards() started.
+◇ Test aLargeImageIsResampledOnceWhileItIsScrolledAndDrawnAgain() started.
+◇ Test keepingGoingOnErrorsReportsAtTheEnd() started.
+◇ Test copyAndMoveWithoutAsking() started.
+◇ Test regularExpressions() started.
+◇ Test commandsKeysPagesAndButtons() started.
+◇ Test regularExpressionSubstitutionAndDialect() started.
+◇ Test aScaledFrameKeepsItsColorsAndSides() started.
+◇ Test counters() started.
+◇ Test pathParts() started.
+◇ Test rangePadding() started.
+◇ Test literalsAndBrackets() started.
+◇ Test dateAndTime() started.
+◇ Test newFoldersWithRangesPlaceholdersAndInTheOtherPanel() started.
+◇ Test theOptionsCanBecomeTheDefaultsAndAlwaysBeShown() started.
+◇ Test plainSearchAndReplace() started.
+◇ Test environmentAndClipboard() started.
+◇ Test aPreferencePageHoldsChangesUntilApply() started.
+◇ Test readOnlyFilesAreAskedAboutAgainWhenDeleting() started.
+◇ Test caseSwitches() started.
+◇ Test aShorterTargetCanBeResumedButAMoveCannotAppend() started.
+◇ Test anotherTargetFolderKeepsTheRelativePaths() started.
+◇ Test bothDirectionsArriveWithTheirDatesAndTheSidesAreEqualAfterwards() started.
+◇ Test manyNamesOnAllCoresKeepTheirOrder() started.
+◇ Test subSecondDifferencesAreNotDifferences() started.
+◇ Test asymmetricMakesTheRightACopyOfTheLeft() started.
+◇ Test planCountsWhatTheRowsAsk() started.
+◇ Test actionsARowAccepts() started.
+◇ Test emptyDirectoriesAreRowsOfTheirOwn() started.
+◇ Test severalItemsAreRenamedWithAMaskOrOneByOne() started.
+◇ Test aFolderThatCannotBeReadIsLeftOutOnBothSides() started.
+◇ Test theOptionsDialogCarriesFilterAndOverwriteMode() started.
+◇ Test theOverwriteDialogShowsBothFilesAndOffersEveryChoice() started.
+◇ Test aKeyInUseNamesItsCommandAndIsTakenOnlyWhenTheUserAgrees() started.
+◇ Test dateTolerances() started.
+◇ Test newFilesSeveralAtOnce() started.
+◇ Test streamsOfUnevenBlocksCompareCorrectly() started.
+◇ Test aFileSystemThatCopiesNothingItselfIsStreamed() started.
+◇ Test showButtonsFilterByComputedDirection() started.
+◇ Test testArchivesReportsWhatIsDamaged() started.
+◇ Test aLinkFacingAFileIsNeverActedOn() started.
+◇ Test asymmetricDeletesOnTheRightAndNeverCopiesLeft() started.
+◇ Test deletingOnBothSidesAndOnTheLeft() started.
+◇ Test shortcutsAreWrittenReadAndRecognisedFromKeyPresses() started.
+◇ Test theButtonBarIsEditedAsAListAndStoredOnCommit() started.
+◇ Test caseInsensitivePairingKeepsItsOrderAndIsFast() started.
+◇ Test withoutSubdirectoriesOnlyTheStartFolders() started.
+◇ Test packOptions() started.
+◇ Test statesAndDefaultDirections() started.
+◇ Test settingsSurviveExportAndImport() started.
+◇ Test cancellingAtAQuestionStopsTheRun() started.
+◇ Test largeFilesAreComparedInPiecesOnAllCores() started.
+◇ Test overwritesAreConfirmedPerFile() started.
+◇ Test whichFilesOpenAsArchivesIsASetting() started.
+◇ Test enterGoesIntoAnArchiveAndTheParentRowLeavesIt() started.
+◇ Test bytesAreComparedAtTheSameOffsets() started.
+◇ Test worksBetweenDiskAndAnotherFileSystem() started.
+◇ Test errorsCanBeSkippedRetriedOrEndTheRun() started.
+◇ Test aFailingReadDeliversWhatCameBeforeIt() started.
+◇ Test everyCombinationOfOptionsKeepsItsPromises() started.
+◇ Test packIntoTheTargetPanel() started.
+◇ Test processedItemsAreFoundByLocationWhoseNamesArePaths() started.
+◇ Test newFolderRenameAndDeleteInsideAnArchive() started.
+◇ Test edgeCases() started.
+◇ Test theCommandListIsGroupedByMenuAndFiltered() started.
+◇ Test foldersAreCreatedAndAFolderTheUserKeptAFileInStays() started.
+◇ Test theKeyMapFollowsTheKernelsRules() started.
+◇ Test unpackArchivesIntoTheTargetPanel() started.
+◇ Test aCommandFieldIsReadAsStepsOrAsOneLine() started.
+◇ Test comparesAcrossFileSystemsAndIgnoresLinks() started.
+◇ Test committedKeysAreStoredAndApplyAtOnceAndAfterARestart() started.
+◇ Test aStalledPipeFailsInsteadOfHanging() started.
+◇ Test namesThatDifferOnlyInUnicodeFormKeepTheirOwnRows() started.
+◇ Test manyPairsAreComparedOnAllCoresAndStayInOrder() started.
+◇ Test archivesOnAnotherFileSystemOpenTheSameWay() started.
+◇ Test namesThatDifferInCaseAndFilesFacingFoldersAreExcluded() started.
+◇ Test cancelledComparisonStopsAndSaysSo() started.
+◇ Test copyOutOfAnArchiveWithTheCopyCommand() started.
+◇ Test movesDataThroughTheWindowInBothDirections() started.
+◇ Test ignoreDateKnowsOnlyEqualAndDifferent() started.
+◇ Test packEncryptedAndIntoAnExistingArchive() started.
+◇ Test copyIntoAnArchiveWithTheCopyCommand() started.
+◇ Test aRequestThatTimesOutDoesNotCloseTheChannel() started.
+◇ Test byContentReadsPairsThatLookEqual() started.
+◇ Test masksWithExclusions() started.
+◇ Test onlySelectedNamesOfTheStartFolders() started.
+◇ Test makingALockedFileWritableUnlocksIt() started.
+◇ Test placesListTheUsualFoldersAndTheVolumes() started.
+◇ Test aCopyKeepsCreationDateExtendedAttributesAndFlags() started.
+◇ Test theStoredPasswordAnswersOnlyThisServersPrompt() started.
+◇ Test aPasswordIsNotRemembered() started.
+◇ Test aMarkedNameIsNotMarkedForItsNormalisationTwin() started.
+◇ Test aStartMenuEntryInAChainIsWaitedFor() started.
+◇ Test cancelEndsAWriteIntoABranchViewAtOnce() started.
+◇ Test cancelEndsTheListingOfABranchViewThatWaits() started.
+◇ Test windowOpensForDifferentFilesOnly() started.
+◇ Test continuesCutsAndAppends() started.
+◇ Test closesAllOtherTabsAfterAsking() started.
+◇ Test movesTabsWithinAndBetweenThePanels() started.
+◇ Test thePluginRegistersItsParts() started.
+◇ Test renamesAndLocksTabs() started.
+◇ Test registersTheSpecificationsKeysAndAPreferencePage() started.
+◇ Test unpackFromInsideAnArchive() started.
+◇ Test cancelEndsAReadOfAFileNamedThroughABranchViewAtOnce() started.
+◇ Test enterOnAMemberShowsWhatTheArchiveKnows() started.
+◇ Test aLargeContinuationGoesThroughTheWindow() started.
+◇ Test activatesTabsByNumberAndFromTheList() started.
+◇ Test readOnlyArchivesWithholdTheCommandsThatChange() started.
+◇ Test opensTabsInTheBackgroundAndInTheOtherPanel() started.
+◇ Test sparseFilesAreShownAndRefused() started.
+◇ Test anOpenReaderSurvivesTheRewriteOfItsArchive(clones:) started.
+◇ Test theRulesByAgeAndSize() started.
+◇ Test addingRenamingAndDatingLeaveTheOldMembersWhereTheyAre() started.
+◇ Test closesDuplicatesKeepingTheActiveTab() started.
+◇ Test reopensClosedTabsWhereTheyWere() started.
+◇ Test resumeContinuesAPartialFile() started.
+◇ Test aCachedPreviewGivesTheSameAnswer() started.
+◇ Test aDirectoryWithImpossibleOffsetsIsDamaged() started.
+◇ Test overwriteAllAndSkipAllAskOnce() started.
+◇ Test optionsDecideWhereAndHowNewTabsOpen() started.
+◇ Test hugeWidthsAreCapped() started.
+◇ Test packingIntoAnExistingArchiveAddsToItAndTestsOnlyWhatIsNew() started.
+◇ Test writesAndReadsBothSides() started.
+◇ Test neitherSynchronizeNorCompareStartsWhileTheJobRuns() started.
+◇ Test autoRenameExistingKeepsTheOldFilesUnderNumberedNames() started.
+◇ Test readsHandWrittenAndDamagedFiles() started.
+◇ Test paxRecordsShorterThanTheirOwnLengthEndTheList() started.
+◇ Test aMissingOrEmptyTabFileIsReported() started.
+◇ Test togglingTouchesOnlyItsRowsAndKeepsTheCount() started.
+◇ Test manyRenamesEndInOneRewriteInsteadOfAnArchiveFullOfHoles() started.
+◇ Test savesAndLoadsTabFiles() started.
+◇ Test overwriteAndSkipAreForOneFileEach() started.
+◇ Test manyThreadsBringFilesInAtOnce(clones:) started.
+◇ Test undoHistoryLivesInMemoryAndIsSaved() started.
+◇ Test autoRenameCopiedHoldsForTheRestOfTheJob() started.
+◇ Test anArchiveThatListsANameTwiceIsNotChanged() started.
+◇ Test exchangesThePanelsWithAllTheirTabs() started.
+◇ Test renameExistingMovesTheTargetAsideFirst() started.
+◇ Test caseIsFoldedPerFolder() started.
+◇ Test renameAsksAgainWhenTheNewNameIsTakenToo() started.
+◇ Test pruningLeavesOtherPeoplesFilesAlone() started.
+◇ Test tarHeadersWithImpossibleSizesAreDamaged() started.
+◇ Test aTrailingDotBelongsToTheName() started.
+◇ Test appendAddsTheSourceToTheEndOfTheTarget() started.
+◇ Test theNamesOfRotatedCopiesAreRecognisedExactly() started.
+◇ Test unpackedProgramsDoNotRunAsTheirOwner() started.
+◇ Test aFileThatWasDeletedWhileTheLogWasOpenIsWrittenAgain() started.
+◇ Test renameOlderSkipNewer() started.
+◇ Test autoRenameCountsOnInsteadOfStartingOver() started.
+◇ Test aCopiedFileIsInTheArchiveFileBeforeTheJobIsDone() started.
+◇ Test aMoveOntoAnExistingNameAsksToo() started.
+◇ Test linesAreWrittenWithoutAFlushAfterAShortWhile() started.
+◇ Test theSizeOfACompressedFileIsReadFromItsEnd() started.
+◇ Test aReplacingMoveNeverOverwritesAnotherFile() started.
+◇ Test cancelLeavesEverythingAsItWas() started.
+◇ Test aPresetAnswersWithoutAsking() started.
+◇ Test aMemberWrittenThroughTheFileSystemIsCompressedInPieces() started.
+◇ Test persistedUndoIsCapped() started.
+◇ Test itemsNamedByPathAreRenamedWhereTheyAre() started.
+◇ Test unpackedFilesCarryTheArchivesQuarantine() started.
+◇ Test aWrongPasswordThatPassesTheCheckByteIsNotKept() started.
+◇ Test hugeCountersGiveTheErrorMarker() started.
+◇ Test aFailedUploadIsRepeated() started.
+◇ Test skippingFollowsTheChainOnce() started.
+◇ Test membersOfAStreamReadOneAfterTheOtherCostOnePass() started.
+◇ Test registersCommandsKeysMenuButtonsAndPreferences() started.
+◇ Test oldGnuHeadersHaveNoPathPrefix() started.
+◇ Test volumesAreFoundAlsoForPlacesThatDoNotExistYet() started.
+◇ Test formats() started.
+◇ Test aMemberThatUnpacksToMoreThanItSaysIsStopped() started.
+◇ Test deleteQuestions() started.
+◇ Test targetProposals() started.
+◇ Test historyIsSavedAndCleared() started.
+◇ Test headings() started.
+◇ Test aSelfExtractingArchiveKeepsItsProgram(clones:) started.
+◇ Test pendingChangesKeepAnArchiveAliveUntilTheyAreWritten() started.
+◇ Test historyListsTheVisitedDirectoriesOfThePanel() started.
+◇ Test hardLinksAreFilesOfTheirOwnWhereverTheirTargetStands() started.
+◇ Test theTreeKeepsItsOrderAndItsFolders() started.
+◇ Test secondButtonOpensTheEntryInANewTab() started.
+◇ Test sizesThatSumPastTheLargestNumberAreOnlyNumbers() started.
+◇ Test aMoveKeepsItsSourceWhenTheArchiveCannotTakeTheFile() started.
+◇ Test aFailedWriteKeepsEveryChangeForTheNextAttempt() started.
+◇ Test aTreeIsMeasuredLikeItIsListed() started.
+◇ Test historySettingsLimitTheListAndHideFrequentFolders() started.
+◇ Test combineChecksTheCrc() started.
+◇ Test aMemberThatLiesInAFileIsReadAtAnyPlace() started.
+◇ Test decodesMailsAndYEnc() started.
+◇ Test extraFieldsThatFillAnEntryMakeWayInsteadOfOverflowing() started.
+◇ Test pipesAndTheLikeAreToldFromFiles() started.
+◇ Test placesAndVolumesAnswerFromWhatIsKnown() started.
+◇ Test newMembersSurviveAChangeFromOutside() started.
+◇ Test decodesWhatTheSystemToolsWrite() started.
+◇ Test aLargeFolderIsListedLikeASmallOne() started.
+◇ Test preparedCriteriaAgreeWithTheDirectOnes() started.
+◇ Test hiddenEntriesStayOutOfTheMenu() started.
+◇ Test encryptionWorksInPlaceAndBothWays() started.
+◇ Test cancelledSearchEndsEarly() started.
+◇ Test aFailedCopyLeavesAnExistingFileAlone() started.
+◇ Test aLongWildcardIsNotSlow() started.
+◇ Test goesToThePathOnTheClipboard() started.
+◇ Test overlappingStartDirectoriesAreSearchedOnce() started.
+◇ Test membersThatCannotBeWrittenAreSavedInAnArchiveOfTheirOwn() started.
+◇ Test cancellingLeavesNoHalfWrittenFiles() started.
+◇ Test configureStoresWhatTheEditorReturnsAndKeepsTheListOnCancel() started.
+◇ Test duplicatesIgnorePipesHardLinksAndRepeatedRoots() started.
+◇ Test textSearchSkipsPipesAndDevices() started.
+◇ Test goesToTheStandardPlaces() started.
+◇ Test absurdNumbersDoNotTrap() started.
+◇ Test showsTheFolderUnderTheCursorInTheOtherPanel() started.
+◇ Test nameIsTestedBeforeTheCriteria() started.
+◇ Test choosesTheNeighbourPlace() started.
+◇ Test mirrorsThePathEitherWay() started.
+◇ Test aFolderReachedBySymlinkedParentIsNotSearchedTwice() started.
+◇ Test changingTheTimeOfAnEncryptedMemberKeepsItReadable() started.
+◇ Test aLockedFileIsCopiedUnderATemporaryNameAndRenamed() started.
+◇ Test partSeries() started.
+◇ Test masksUseCharactersNotBytesOrBrackets() started.
+◇ Test aWatcherThatGoesAwayWhileChangesArriveDoesNoHarm() started.
+◇ Test entriesRunCommands() started.
+◇ Test theViewerRegistersItsCommandsKeysPageAndService() started.
+◇ Test registersTheSpecificationsKeysWithoutConflicts() started.
+◇ Test cyclesThroughTheVolumes() started.
+◇ Test filesThatWouldShareANameAreNotPackedOverEachOther() started.
+◇ Test anArchiveWithAnOpenWriterStaysInTheStore() started.
+◇ Test manyFoldersAreReportedInPathOrder() started.
+◇ Test addsAndRemovesTheCurrentDirectory() started.
+◇ Test theSelectionOfTwoPanelsKeepsTheTwins() started.
+◇ Test decodeNamesTargetsAndClashes() started.
+◇ Test regexTextSearchReadsLinesInBlocks() started.
+◇ Test historyKnowsTheCurrentDirectoryBeforeAnyEvent() started.
+◇ Test combineWithoutACrcFile() started.
+◇ Test splitWritesPartsAndTheCrcFile() started.
+◇ Test favoritesAreOfferedUnlessSwitchedOff() started.
+◇ Test withoutAppendTheFileIsWrittenAnewAndSwappedIn() started.
+◇ Test occupiedSpaceMeasuresTheOperandsAndShowsFolderSizes() started.
+◇ Test attachingToAKnownFolderKeepsWhatIsBelowIt() started.
+◇ Test historyButtonsOpenTabsAndTheOtherPanelAndRemoveEntries() started.
+◇ Test commandsAndMenu() started.
+◇ Test propertiesOfFilesFoldersAndSelections() started.
+◇ Test cacheIsSafeToUseFromManyThreads() started.
+◇ Test sixBitLines() started.
+◇ Test choosingAnEntryChangesDirectoryAndTheTargetPanel() started.
+◇ Test verifyComparesAllOfThePartialFileNotJustItsLastBlock() started.
+◇ Test submenusOpenAsTheNextListAndCancelLeadsBack() started.
+◇ Test aPartialFileThatIsNotTheStartOfTheSourceIsNotContinued() started.
+◇ Test levelsComeWithTheirNodesAndLinkLikeTheOldPath() started.
+◇ Test cacheFilesOfOtherRootsAndBrokenFilesAreNotTaken() started.
+◇ Test aResumeContinuesThePartialFileWhereTheFileSystemCanAppend() started.
+◇ Test aWideFolderIsLinkedInBoundedTurns() started.
+◇ Test commentsWorkOnAnyWritableFileSystemAndForTheFolderItself() started.
+◇ Test cacheWithoutFolderStaysInMemory() started.
+◇ Test aFileSystemThatClaimsAppendButRefusesItFallsBackToWritingAnew() started.
+◇ Test aScanDoesNotEnterAMountedVolume() started.
+◇ Test detailsAreTabSeparatedColumns() started.
+◇ Test registration() started.
+◇ Test wrongEntriesAreAskedAgainAndTargetFileCanBeLoaded() started.
+◇ Test scansFoldersOnlyLevelByLevel() started.
+◇ Test aPictureOnTheClipboardIsPastedAsPNG() started.
+◇ Test aResumeOnTheLocalDiskContinuesTheFileItself() started.
+◇ Test splitByTypedSizeIntoTheSourceFolderAndOntoAnotherFileSystem() started.
+◇ Test parametersApplyWithoutADialogAndFailuresAreReported() started.
+◇ Test wideTreesAreReadInBatches() started.
+◇ Test filesOnTheClipboardWinOverText() started.
+◇ Test encodeInSeveralParts(method:) started.
+◇ Test editsCommentsInTheFoldersCommentFile() started.
+◇ Test namesAreOneLineEachAndFoldersEndWithASlash() started.
+◇ Test directionsAreChangedForOneRowOrMany() started.
+◇ Test cancellingStopsTheScan() started.
+◇ Test splitOfAnEmptyFile() started.
+◇ Test theDialogDecidesWhatRuns() started.
+◇ Test createsSymbolicLinksAliasesAndHardLinks() started.
+◇ Test withoutASelectionTheCursorItemIsMeant() started.
+◇ Test pluginTellsTheCacheAboutVisitedFoldersWithoutTouchingRealFolders() started.
+◇ Test onlyVisibleRowsAreSynchronized() started.
+◇ Test splitRefusesBadSizesAndCleansUp() started.
+◇ Test propertiesAndFinderInfoElsewhere() started.
+◇ Test aTextOnTheClipboardIsPastedAsANewFile() started.
+◇ Test unreadableFoldersCountAsEmptyAndLinksAndPackagesAreLeftOut() started.
+◇ Test splitSizes() started.
+◇ Test registersCommandsMenusKeysAndColumns() started.
+◇ Test zip64IsUsedExactlyWhereTheClassicFieldsEnd() started.
+◇ Test excludedFoldersAreListedButNotRead() started.
+◇ Test parallelCompressionGivesOneValidStream() started.
+◇ Test anUnknownOwnerIsRefused() started.
+◇ Test allFolderSizesAtOnce() started.
+◇ Test asymmetricDeletesOnTheRightAfterConfirmation() started.
+◇ Test cacheLearnsFoldersThePanelsShow() started.
+◇ Test goesToTheTargetOfALink() started.
+◇ Test viewAndCompareGoThroughOtherPluginsCommands() started.
+◇ Test commandIsRegisteredWithMenuButtonAndPreferences() started.
+◇ Test aHugeNumberOfEntriesIsListedFromTheDirectoryAlone() started.
+◇ Test changesPermissionsDateAndFlagsOfOneFile() started.
+◇ Test unreadableFoldersAreReported() started.
+◇ Test aChildProcessIsStoppedWhenItsStreamIsClosed() started.
+◇ Test cacheKeepsTreesInMemoryAndInFilesOfItsOwnFolder() started.
+◇ Test changesSeveralItemsWithAndWithoutTheirContents() started.
+◇ Test aBigFolderRenamedInsideAMergeIsNotCountedAgainEvenWhenTheCacheIsFull() started.
+◇ Test aLargeArchiveIsStreamedInsteadOfUnpackedToATemporaryFile() started.
+◇ Test namesDatesAndAttributesOfForeignZips() started.
+◇ Test packListUnpackGivesTheSameBytes(format:) started.
+◇ Test opensWithThePanelsDirectoriesAndSelection() started.
+◇ Test detailsIncludeThePluginColumnsThePanelShows() started.
+◇ Test pastingContentsNeedsAWritableFolderAndCanBeSwitchedOff() started.
+◇ Test archivesOfTheSystemToolsAreRead() started.
+◇ Test listIsGroupedBySubdirectoryAndFilteredByTheShowButtons() started.
+◇ Test trashIsAskedPerLocation() started.
+◇ Test freeNamesCountUp() started.
+◇ Test base64MatchesTheSystemTool() started.
+◇ Test detailsCanBeSavedToAFile() started.
+◇ Test theFileListGoesToThePrinterAsPages() started.
+◇ Test aFailedCommitKeepsTheSources() started.
+◇ Test settingsAreSavedUnderNamesAndLoaded() started.
+◇ Test noCommitWhereWritesAreNotDeferred() started.
+◇ Test aVolumeIsRenamedOnlyWithAValidName() started.
+◇ Test aDamagedMemberIsFoundByTheTest() started.
+◇ Test failuresAreAskedAboutAndTheRestStillRuns() started.
+◇ Test registration() started.
+◇ Test htmlIsStrippedFast() started.
+◇ Test theIndexPublishesTheFrontierSegmentAsItGoes() started.
+◇ Test synchronizeRunsBothDirectionsAndComparesAgain() started.
+◇ Test aCalculatedFolderSizeReplacesDIR() started.
+◇ Test aFileLargerThanOneWindowOfPiecesIsPackedInSeveralRounds() started.
+◇ Test aFileWithoutLineEndsShowsItsStartBeforeItIsRead() started.
+◇ Test aTextInADoubleByteEncodingIsFoundAcrossChunkBorders() started.
+◇ Test singleCompressedFilesRoundTrip(codec:) started.
+◇ Test aBacktrackingExpressionCanBeCancelled() started.
+◇ Test theWalkOrdersNamesAsTheSystemDoes() started.
+◇ Test runCommandAsksForTheLine() started.
+◇ Test outsideTheLocalDisksTheHomeFolderIsUsed() started.
+◇ Test cancellingEndsABlockedComparisonByContent() started.
+◇ Test systemToolsReadWhatIsWritten() started.
+◇ Test encryptedZipsAskForThePassword() started.
+◇ Test sha3(count:sha224:sha256:sha384:sha512:) started.
+◇ Test theViewerShowsTheOutputWhenThereIsOne() started.
+◇ Test copiesAreCommittedBeforeDeletions() started.
+◇ Test tarHeadersCarryLongNamesAndLargeSizes() started.
+◇ Test theListWithSubfoldersAsksForDepthAndMask() started.
+◇ Test hashingStopsWhenCancelled() started.
+◇ Test uuencodeMatchesTheSystemTool() started.
+◇ Test cancellingEndsABlockedListing() started.
+◇ Test knownDigests() started.
+◇ Test theFileListCanBeShownAsText() started.
+◇ Test cancellingEndsABlockedCopy() started.
+◇ Test regularExpressionForNames() started.
+◇ Test encodeAndDecodeRoundTrip(method:count:) started.
+◇ Test manyFilesAreHashedOnAllCoresInOrder() started.
+◇ Test aDigestWithoutAMethodHintIsFoundInOnePassOverTheOthers() started.
+◇ Test binaryRowText() started.
+◇ Test combineFromTheFirstPartOrTheCrcFile() started.
+◇ Test agreesWithTheSystemTools() started.
+◇ Test slashesMoveIntoFoldersThatAreCreated() started.
+◇ Test previewFollowsTheSettings() started.
+◇ Test hashedKeysFindTheSameDifferencesAsBefore() started.
+◇ Test savingKeepsTheLinkAndTheTags() started.
+◇ Test criteriaNarrowTheSearch() started.
+◇ Test sixBitLoopsMatchTheFirstImplementation() started.
+◇ Test undoHistoryIsLimited() started.
+◇ Test manyFilesAreExaminedOnAllCoresAndReportedInOrder() started.
+◇ Test methodsOfTheDialog() started.
+◇ Test testsRunOnlyHarmlessLines() started.
+◇ Test insideALineTheCommonEndsAreTrimmed() started.
+◇ Test archivesAreSearchedWhereAFileSystemOffersTheirContents() started.
+◇ Test blake3(count:expected:) started.
+◇ Test allUppercaseOnTheLocalDisk() started.
+◇ Test fieldRulesUseBuiltInFieldsAndPluginColumns() started.
+◇ Test cancellingStopsPackingAndLeavesNothingBehind() started.
+◇ Test cancellingEndsABlockedWrite() started.
+◇ Test aFailingCommandReportsItsExitStatus() started.
+◇ Test textOptionsReachTheSearch() started.
+◇ Test undoWorksAfterTheToolWasClosedAndKeepsWhatFailed() started.
+◇ Test cancellingEndsABlockedSplit() started.
+◇ Test undoAsksAndRestoresInReverseOrder() started.
+◇ Test whatWouldStartApplicationsIsOnlyRecorded() started.
+◇ Test onlyChosenItemsAreSearched() started.
+◇ Test aFileThatAppearsMeanwhileIsNotOverwritten() started.
+◇ Test archivesInsideArchives() started.
+◇ Test cancellingEndsABlockedHash() started.
+◇ Test aTypedLineRunsInTheSourceFolderAndItsOutputIsShown() started.
+◇ Test acceptsChecksAnItemFoundElsewhere() started.
+◇ Test theSystemVolumeCannotBeEjected() started.
+◇ Test changesAreWrittenShortlyAfterTheLastOne() started.
+◇ Test finderTagsAreReadEditedAndWritten() started.
+◇ Test severalStartDirectoriesAreSearchedInTurn() started.
+◇ Test f4UsesTheEditorOfThePreferences() started.
+◇ Test masksWithQuotesAndSpaces() started.
+◇ Test quickLookShareAndPathnameTakeTheOperands() started.
+◇ Test unchangedItemsStayInTheList() started.
+◇ Test openWithOffersTheApplicationsForTheFile() started.
+◇ Test previewInTheBackground() started.
+◇ Test manyThreadsUseTheProviderAtOnce() started.
+◇ Test systemInformationIsShownAsText() started.
+◇ Test nextStepChainsRules() started.
+◇ Test theEditorPreferenceNamesAnApplication() started.
+◇ Test theCopyJobStreamsOutOfAndIntoArchives() started.
+◇ Test printingFileContentsIsConfirmedFirst() started.
+◇ Test urlsCarryTheArchiveAndThePathInside() started.
+◇ Test openWithListsApplications() started.
+◇ Test commandMenuAndPreferences() started.
+◇ Test swapsAndShiftsThroughGivenNames() started.
+◇ Test otherFormatsAndProtectedFilesRefuseChanges() started.
+◇ Test anArchiveOnAnotherFileSystem() started.
+◇ Test resultLog() started.
+◇ Test conflictsCanBeSkippedOrCancelTheRun() started.
+◇ Test previewMarksConflictsAndInvalidNames() started.
+◇ Test deletingTheLastFileKeepsItsFolder() started.
+◇ Test counterShiftOnTheLocalDisk() started.
+◇ Test pathsAreShownAndReadLikeFolders() started.
+◇ Test editNamesAndLoadNamesFromAFile() started.
+◇ Test leavingAnArchiveLeadsToTheFolderThatHoldsIt() started.
+◇ Test commandOptionsAreRead() started.
+◇ Test aChangeFromOutsideIsNoticed() started.
+◇ Test aZipIsChangedInPlace() started.
+◇ Test renamesAndEmptiesTheList() started.
+◇ Test savedSettings() started.
+◇ Test failuresAreReportedAndStayInTheList() started.
+◇ Test conflictsAreAutoRenamedWhenAsked() started.
+◇ Test operandsAreTheSelectionOrTheCursorItem() started.
+◇ Test orderDrivesTheCounter() started.
+◇ Test swapAndCaseOnlyRenameOnTheLocalDisk() started.
+◇ Test historiesAndTitleWords() started.
+◇ Test htmlIsStrippedFromUnitsAndCanBeCancelled() started.
+◇ Test anchorsAndWordBoundariesDoNotMatchAtTheSearchStart() started.
+◇ Test anchorsAndWordBoundariesDoNotMatchAtChunkBorders() started.
+◇ Test aSmallRemoteFileIsFetchedOnceForAnyNumberOfLongReads() started.
+◇ Test temporaryCopiesAreUniqueKeyedByStampAndReleased() started.
+◇ Test aFailedReadIsRecordedAndShown() started.
+◇ Test aGroupMarksBothTwins() started.
+◇ Test comparingKeepsTheTwinsApart() started.
+◇ Test theRawByteScanFindsTheSameRowsAsDecodingEverything() started.
+◇ Test aSelectionFileNamesTheTwinItWrites() started.
+◇ Test decodingWithoutOffsetsGivesTheSameText() started.
+◇ Test invertingTreatsTheTwinsApart() started.
+◇ Test leftoverFoldersOfDeadProcessesAreSwept() started.
+◇ Test aRuleAnswersPerEntry() started.
+◇ Test checkpointsArePacked() started.
+◇ Test plainTextMatchingCaseIsSearchedInTheRawBytes() started.
+◇ Test case passing 1 argument codePage → 936 to aLongRunOfTwoByteCharactersIsFoundExactlyForwardAndBackward(codePage:) started.
+◇ Test case passing 1 argument codePage → 932 to aLongRunOfTwoByteCharactersIsFoundExactlyForwardAndBackward(codePage:) started.
+◇ Test case passing 1 argument codePage → 950 to aLongRunOfTwoByteCharactersIsFoundExactlyForwardAndBackward(codePage:) started.
+◇ Test case passing 1 argument codePage → 949 to aLongRunOfTwoByteCharactersIsFoundExactlyForwardAndBackward(codePage:) started.
+◇ Test case passing 1 argument streaming → true to aCancelledListingEndsAtOnceAndGivesTheConnectionUp(streaming:) started.
+◇ Test case passing 1 argument streaming → false to aCancelledListingEndsAtOnceAndGivesTheConnectionUp(streaming:) started.
+◇ Test case passing 1 argument mlsd → true to listsWithMLSDAndWithLIST(mlsd:) started.
+◇ Test case passing 1 argument mlsd → false to listsWithMLSDAndWithLIST(mlsd:) started.
+◇ Test case passing 2 arguments chosen → .sha1, algorithm → "1" to shaFilesAreAcceptedByShasum(method:algorithm:) started.
+◇ Test case passing 2 arguments chosen → .sha224, algorithm → "224" to shaFilesAreAcceptedByShasum(method:algorithm:) started.
+◇ Test case passing 2 arguments chosen → .sha256, algorithm → "256" to shaFilesAreAcceptedByShasum(method:algorithm:) started.
+◇ Test case passing 2 arguments chosen → .sha384, algorithm → "384" to shaFilesAreAcceptedByShasum(method:algorithm:) started.
+◇ Test case passing 2 arguments chosen → .sha512, algorithm → "512" to shaFilesAreAcceptedByShasum(method:algorithm:) started.
+◇ Test case passing 1 argument format → .compressedTar(ArchivesPlugin.ArchiveFormat.Codec.gzip) to openingAStreamArchiveCanBeAbandoned(format:) started.
+◇ Test case passing 1 argument format → .compressedTar(ArchivesPlugin.ArchiveFormat.Codec.xz) to openingAStreamArchiveCanBeAbandoned(format:) started.
+◇ Test case passing 1 argument format → .compressedTar(ArchivesPlugin.ArchiveFormat.Codec.bzip2) to openingAStreamArchiveCanBeAbandoned(format:) started.
+◇ Test case passing 1 argument format → .compressedFile(ArchivesPlugin.ArchiveFormat.Codec.bzip2) to openingAStreamArchiveCanBeAbandoned(format:) started.
+◇ Test case passing 2 arguments count → 0, expected → "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262" to blake3Vectors(count:expected:) started.
+◇ Test case passing 2 arguments count → 1, expected → "2d3adedff11b61f14c886e35afa036736dcd87a74d27b5c1510225d0f592e213" to blake3Vectors(count:expected:) started.
+◇ Test case passing 2 arguments count → 1023, expected → "10108970eeda3eb932baac1428c7a2163b0e924c9a9e25b35bba72b28f70bd11" to blake3Vectors(count:expected:) started.
+◇ Test case passing 2 arguments count → 1024, expected → "42214739f095a406f3fc83deb889744ac00df831c10daa55189b5d121c855af7" to blake3Vectors(count:expected:) started.
+◇ Test case passing 2 arguments count → 1025, expected → "d00278ae47eb27b34faecf67b4fe263f82d5412916c1ffd97c8cb7fb814b8444" to blake3Vectors(count:expected:) started.
+◇ Test case passing 2 arguments count → 2048, expected → "e776b6028c7cd22a4d0ba182a8bf62205d2ef576467e838ed6f2529b85fba24a" to blake3Vectors(count:expected:) started.
+◇ Test case passing 2 arguments count → 3072, expected → "b98cb0ff3623be03326b373de6b9095218513e64f1ee2edd2525c7ad1e5cffd2" to blake3Vectors(count:expected:) started.
+◇ Test case passing 2 arguments count → 65536, expected → "68d647e619a930e7b1082f74f334b0c65a315725569bdc123f0ee11881717bfe" to blake3Vectors(count:expected:) started.
+◇ Test case passing 2 arguments count → 1048576, expected → "74cb441fd087764ca9c3694da742ebe30cbeb3060a17009ca81825c7a8d10343" to blake3Vectors(count:expected:) started.
+◇ Test case passing 2 arguments count → 1048577, expected → "2f053cd7472cf0cd2f9adaf45c1180255b91b9a865404a63671a0ee5f792ed33" to blake3Vectors(count:expected:) started.
+◇ Test case passing 2 arguments count → 9000007, expected → "5719b9667d3fee9292ca79e9aac4d4668a0738cb3b2ef7ee60258adf5aa9e9cf" to blake3Vectors(count:expected:) started.
+◇ Test case passing 1 argument mode → .explicit to connectsListsAndTransfers(mode:) started.
+◇ Test case passing 1 argument mode → .implicit to connectsListsAndTransfers(mode:) started.
+◇ Test case passing 1 argument mlsd → true to aListingFromAServerKeepsOnlyTheSafeNames(mlsd:) started.
+◇ Test case passing 1 argument mlsd → false to aListingFromAServerKeepsOnlyTheSafeNames(mlsd:) started.
+✔ Test sizesNearTheEndOfTheRangeAddUpWithoutStoppingTheProgram() passed after 24.686 seconds.
+◇ Test case passing 1 argument quickWrites → true to aMoveKeepsEverySourceWhenTheArchiveCannotBeWritten(quickWrites:) started.
+◇ Test case passing 1 argument quickWrites → false to aMoveKeepsEverySourceWhenTheArchiveCannotBeWritten(quickWrites:) started.
+◇ Test case passing 1 argument parallel → true to theIndexBuiltInSegmentsEqualsCuttingTheWholeText(parallel:) started.
+◇ Test case passing 1 argument parallel → false to theIndexBuiltInSegmentsEqualsCuttingTheWholeText(parallel:) started.
+◇ Test case passing 1 argument backwards → false to matchesAcrossChunkBordersAreFound(backwards:) started.
+◇ Test case passing 1 argument backwards → true to matchesAcrossChunkBordersAreFound(backwards:) started.
+◇ Test case passing 2 arguments mask → "[N1]", expected → "a" to ranges(mask:expected:) started.
+◇ Test case passing 2 arguments mask → "[N-5]", expected → "e" to ranges(mask:expected:) started.
+◇ Test case passing 2 arguments mask → "[N2-5]", expected → "bcde" to ranges(mask:expected:) started.
+◇ Test case passing 2 arguments mask → "[N2,5]", expected → "bcdef" to ranges(mask:expected:) started.
+◇ Test case passing 2 arguments mask → "[N2-]", expected → "bcdefghi" to ranges(mask:expected:) started.
+◇ Test case passing 2 arguments mask → "[N-8,5]", expected → "bcdef" to ranges(mask:expected:) started.
+◇ Test case passing 2 arguments mask → "[N-8-5]", expected → "bcde" to ranges(mask:expected:) started.
+◇ Test case passing 2 arguments mask → "[N2--5]", expected → "bcde" to ranges(mask:expected:) started.
+◇ Test case passing 2 arguments mask → "[N-5-]", expected → "efghi" to ranges(mask:expected:) started.
+◇ Test case passing 2 arguments mask → "[N20-]", expected → "" to ranges(mask:expected:) started.
+✔ Test editorListIndentsSubmenus() passed after 26.702 seconds.
+◇ Test case passing 2 arguments mask → "[N7-20]", expected → "ghi" to ranges(mask:expected:) started.
+◇ Test case passing 2 arguments mask → "[N-20-2]", expected → "abcdefgh" to ranges(mask:expected:) started.
+✔ Test addingToASubmenuGoesBeforeTheSubmenusItEndsWith() passed after 26.710 seconds.
+✔ Test menuMarksTheCurrentDirectoryAndTheSubmenusHoldingIt() passed after 26.711 seconds.
+✔ Test hiding() passed after 26.710 seconds.
+✔ Test insertRemoveAndUpdate() passed after 26.816 seconds.
+✔ Test wildcardTargetNames() passed after 26.819 seconds.
+✔ Test rowsListEveryEntryWithItsDepth() passed after 26.826 seconds.
+✔ Test hotlistEntriesRunUserCommands() passed after 26.835 seconds.
+✔ Test unreadableDataIsNotLostBySavingOver() passed after 26.850 seconds.
+✔ Test aCleanHotlistRaisesNoComplaint() passed after 26.850 seconds.
+✔ Test storedAsJSONAndReadBack() passed after 27.242 seconds.
+✔ Test conflictsAndLetterCase() passed after 28.402 seconds.
+✔ Test movingWalksThroughSubmenusLikeAFlatList() passed after 28.402 seconds.
+✔ Test aHotlistReadsLeniently() passed after 28.403 seconds.
+✔ Test chainsWaitForTheirPlace() passed after 29.540 seconds.
+✔ Test caseOnlyRenames() passed after 29.540 seconds.
+✔ Test plainRenamesKeepListOrder() passed after 29.540 seconds.
+◇ Test case passing 1 argument clones → true to anOpenReaderSurvivesTheRewriteOfItsArchive(clones:) started.
+◇ Test case passing 1 argument clones → false to anOpenReaderSurvivesTheRewriteOfItsArchive(clones:) started.
+✔ Test aBlockedReadEndsWhenItsFlagIsSet() passed after 30.131 seconds.
+✔ Test actions() passed after 30.131 seconds.
+✔ Test swapsAndRingsGoThroughATemporaryName() passed after 30.204 seconds.
+✔ Test historiesReadLeniently() passed after 30.204 seconds.
+◇ Test case passing 1 argument clones → true to manyThreadsBringFilesInAtOnce(clones:) started.
+◇ Test case passing 1 argument clones → false to manyThreadsBringFilesInAtOnce(clones:) started.
+✔ Test whatTheIndexCannotAnswerIsLeftToTheSearch() passed after 31.505 seconds.
+✔ Test questionsInSpotlightsLanguage() passed after 31.530 seconds.
+✔ Test conflictDetection() passed after 31.575 seconds.
+✔ Test spotlightUnderstandsEveryQuestion() passed after 31.576 seconds.
+✔ Test sizesAndDates() passed after 31.621 seconds.
+✔ Test processedItemsAreFoundByLocationWhereNamesArePaths() passed after 32.758 seconds.
+✔ Test autoRename() passed after 32.758 seconds.
+✔ Test theListTakesNoMoreThanItsLimit() passed after 32.960 seconds.
+✔ Test textFilesAreLoadedAndCompared() passed after 32.960 seconds.
+✔ Test uniqueNames() passed after 32.961 seconds.
+◇ Test case passing 1 argument clones → true to aSelfExtractingArchiveKeepsItsProgram(clones:) started.
+◇ Test case passing 1 argument clones → false to aSelfExtractingArchiveKeepsItsProgram(clones:) started.
+✔ Test savingReplacesTheFileAndLeavesNothingBehind() passed after 33.533 seconds.
+✔ Test identicalAndBinaryAndMissingFiles() passed after 33.636 seconds.
+✔ Test parsesTheTargetField() passed after 35.179 seconds.
+✔ Test aProgramThatDoesNotExistIsAFailure() passed after 35.323 seconds.
+✔ Test subfoldersAreCollectedToTheGivenDepth() passed after 35.479 seconds.
+✔ Test longListsAreSplitIntoPagesWithAHeaderEach() passed after 35.490 seconds.
+✔ Test applicationsAreFoundByNameOrPath() passed after 35.490 seconds.
+✔ Test answersAreCheckedAgainstTheWholeSearch() passed after 36.179 seconds.
+✔ Test anErrorInAWorkerAsksLikeAnyOtherAndAbortStopsEverything() passed after 36.179 seconds.
+✔ Test rowsAreAlignedAndTheFooterCounts() passed after 36.178 seconds.
+✔ Test headerPlaceholdersAreFilledIn() passed after 36.279 seconds.
+✔ Test wildcardsIncludesAndExcludes() passed after 36.334 seconds.
+✔ Test formatsFollowTheDialog() passed after 36.353 seconds.
+✔ Test selectionTypes() passed after 36.353 seconds.
+✔ Test selectionFiles() passed after 36.353 seconds.
+◇ Test case passing 1 argument method → .mime to encodeInSeveralParts(method:) started.
+◇ Test case passing 1 argument method → .uue to encodeInSeveralParts(method:) started.
+◇ Test case passing 1 argument method → .xxe to encodeInSeveralParts(method:) started.
+✔ Test pathLimitedMasks() passed after 36.414 seconds.
+✔ Test regularExpressions() passed after 36.442 seconds.
+✔ Test aDetachedCommandIsNotReadFrom() passed after 36.442 seconds.
+✔ Test volumeNamesAreChecked() passed after 36.442 seconds.
+✔ Test rulesReadPathsRelativeToTheListsDirectory() passed after 36.442 seconds.
+✔ Test hiddenAndVisibleTreesAreSeparate() passed after 36.442 seconds.
+✔ Test comparingTwoLists() passed after 36.442 seconds.
+✔ Test onlyPlainHarmlessLinesAreHarmless() passed after 36.443 seconds.
+✔ Test masksIncludeAndExclude() passed after 36.442 seconds.
+✔ Test theHistoryKeepsEachLineOnceNewestFirst() passed after 36.454 seconds.
+✔ Test relatedFiles() passed after 36.454 seconds.
+✔ Test manyThreadsCanWriteAtOnce() passed after 36.623 seconds.
+✔ Test unscannedAndPartialSurviveTheFile() passed after 36.623 seconds.
+✔ Test filesElsewhereAreReadOnceSideBySide() passed after 36.636 seconds.
+✔ Test aLineIsTakenApart() passed after 39.276 seconds.
+✔ Test informationIsLaidOutInAlignedColumns() passed after 39.878 seconds.
+✔ Test onlyWhatIsWantedIsLogged() passed after 39.890 seconds.
+◇ Test case passing 1 argument format → .zip to packListUnpackGivesTheSameBytes(format:) started.
+◇ Test case passing 1 argument format → .tar to packListUnpackGivesTheSameBytes(format:) started.
+◇ Test case passing 1 argument format → .compressedTar(ArchivesPlugin.ArchiveFormat.Codec.gzip) to packListUnpackGivesTheSameBytes(format:) started.
+◇ Test case passing 1 argument format → .compressedTar(ArchivesPlugin.ArchiveFormat.Codec.bzip2) to packListUnpackGivesTheSameBytes(format:) started.
+◇ Test case passing 1 argument format → .compressedTar(ArchivesPlugin.ArchiveFormat.Codec.xz) to packListUnpackGivesTheSameBytes(format:) started.
+✔ Test severalChildrenRunAtOnce() passed after 45.783 seconds.
+✔ Test outputAndStatusAreCollected() passed after 45.783 seconds.
+✔ Test theSystemAnswers() passed after 47.665 seconds.
+✔ Test changes() passed after 47.665 seconds.
+✔ Test linesAreWrittenInOrderOffTheCallingThread() passed after 47.666 seconds.
+✔ Test notedFoldersAreWrittenOnceAfterABurst() passed after 47.667 seconds.
+◇ Test case passing 1 argument codec → .gzip to singleCompressedFilesRoundTrip(codec:) started.
+◇ Test case passing 1 argument codec → .bzip2 to singleCompressedFilesRoundTrip(codec:) started.
+◇ Test case passing 1 argument codec → .xz to singleCompressedFilesRoundTrip(codec:) started.
+✔ Test dailyRotationStartsANewFileAfterMidnight() passed after 60.658 seconds.
+✔ Test askpassCarriesQuestionAndAnswer() passed after 60.959 seconds.
+✔ Test cancelEndsAVerifyingReadThatWaits() passed after 61.102 seconds.
+✔ Test aStreamThatIsNotCancelledStillCompletes() passed after 62.345 seconds.
+◇ Test case passing 5 arguments count → 0, sha224 → "6b4e03423667dbb73b6e15454f0eb1abd4597f9a1b078e3f5b5a6bc7", sha256 → "a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a", sha384 → "0c63a75b845e4f7d01107d852e4c2485c51a50aaaa94fc61995e71bbee983a2ac3713831264adb47fb6bd1e058d5f004", sha512 → "a69f73cca23a9ac5c8b567dc185a756e97c982164fe25859e0d1dcc1475c80a615b2123af1f5f94c11e3e9402c3ac558f500199d95b6d3e301758586281dcd26" to sha3(count:sha224:sha256:sha384:sha512:) started.
+◇ Test case passing 5 arguments count → 135, sha224 → "3174e5126280625ecdfdb238d6a10d1c8b071031870ed197640cad90", sha256 → "fded8fd9d6551c601eeb3b7c6bc5e5cfd8aad1d015b7e9aaa9c9b9475231d5e2", sha384 → "25d2be1f5a681f8135992e0cc18a7b0758d1a880eb3c64d9c722f80d68b744bb3a89c223a0c38164cf4a423f91f8a533", sha512 → "d942df0df09ac042cd3b641144c98d8fda0980bb037fc5c0e7f2e9a073b073dc4bb8a8c1f4cb5b45f5805c6523741ed0571d6779b15829b2faa280fc60b50645" to sha3(count:sha224:sha256:sha384:sha512:) started.
+◇ Test case passing 5 arguments count → 136, sha224 → "5d633f7e245e4338fa2698ef8b0cf98b129b5cc99622f770e3ba0cb6", sha256 → "cf3ccff92480a29160c2d38317c430e14749bfee1788106957dfe73f8c4930e5", sha384 → "ced899b993a69f66251a7872fbb87f8be5967857b2693e3feb032b3440dd94b78cab782debfa10956642ae536a8241e9", sha512 → "ad8edff4f1b7aa1c63bbe49728ab9b165f7245b3d7102e6f99c261fc15d2d0bf6afef6a491720454a1349fbf5d848854875ac83a1156fd7f6e2a37af26c07fb2" to sha3(count:sha224:sha256:sha384:sha512:) started.
+◇ Test case passing 5 arguments count → 137, sha224 → "7098ddcff44c0ae3e0802d8d60fe7bea8d0d3219ce28660af1aee40c", sha256 → "ce9d7dc90913ee5d92745019479a5352c6d6279bef18ed07dc0a83ee8084daca", sha384 → "ef446c45f31f98fe3aa92392ee4198d8c797128cb87da84ad008aad1e1d972d0c6d98ef74e99b4bc5b97ae92be53ee27", sha512 → "3f827e5d7ddbd54ea1dba28cae0154eb5ff8d8d973770865861b7cdf5f091040889d55c0e74b672cead274fac1d4a559fd9185be898ab8969b5e78681527660d" to sha3(count:sha224:sha256:sha384:sha512:) started.
+◇ Test case passing 5 arguments count → 1000, sha224 → "51481b8dbd6b73dd110a967f438aa22facfcdce1eb5d2b36a5ec023f", sha256 → "48e66a01861d0eadaacdb7a6ae7db6b9ac79242ecced4154a9fbb33c4e3cc571", sha384 → "43e60a7ef818a0e367fcd4ede8f5fabbdb7090cb45972bb7a84038cc3abf4fc26c4f44b59d3a0306c973b66e84c8890b", sha512 → "b8030d306ae990bc794bfb3a6100f67851889d6c272257afac7d1077a18660d6ea8d0da5d2299c3ebaa0d34baf62cc58ac1fd4476506cf512a4897bb083a6fc4" to sha3(count:sha224:sha256:sha384:sha512:) started.
+◇ Test case passing 5 arguments count → 100000, sha224 → "98c0926f75e7c1907450b43b5d3c50ebff848a33d554f4e8764f0dbe", sha256 → "b751df62942bc84db9f6a5c2def78558162c2857d5b126d7a2e56a0a357cdf62", sha384 → "1c771bd5027191aa0d06ae42f555c94d98f68b6059da56881f6bab6b183ec9371be7717e9c3e9c67eca086f29124f57d", sha512 → "04ffdd636dc25b3e900d12778cacbbd5c98300786b0b83e5c34b088bd2aa201f3fc41dbe4c0e30cc6fa1c60e28354a02942b7ddf9e7a2f863ec6494472f1de47" to sha3(count:sha224:sha256:sha384:sha512:) started.
+✔ Test aLotOfOutputDoesNotBlockTheChild() passed after 63.243 seconds.
+◇ Test case passing 2 arguments method → .mime, count → 0 to encodeAndDecodeRoundTrip(method:count:) started.
+◇ Test case passing 2 arguments method → .mime, count → 1 to encodeAndDecodeRoundTrip(method:count:) started.
+◇ Test case passing 2 arguments method → .mime, count → 2 to encodeAndDecodeRoundTrip(method:count:) started.
+◇ Test case passing 2 arguments method → .mime, count → 3 to encodeAndDecodeRoundTrip(method:count:) started.
+◇ Test case passing 2 arguments method → .mime, count → 44 to encodeAndDecodeRoundTrip(method:count:) started.
+◇ Test case passing 2 arguments method → .mime, count → 45 to encodeAndDecodeRoundTrip(method:count:) started.
+◇ Test case passing 2 arguments method → .mime, count → 46 to encodeAndDecodeRoundTrip(method:count:) started.
+◇ Test case passing 2 arguments method → .mime, count → 56 to encodeAndDecodeRoundTrip(method:count:) started.
+◇ Test case passing 2 arguments method → .mime, count → 57 to encodeAndDecodeRoundTrip(method:count:) started.
+◇ Test case passing 2 arguments method → .mime, count → 58 to encodeAndDecodeRoundTrip(method:count:) started.
+◇ Test case passing 2 arguments method → .mime, count → 1000 to encodeAndDecodeRoundTrip(method:count:) started.
+◇ Test case passing 2 arguments method → .mime, count → 150000 to encodeAndDecodeRoundTrip(method:count:) started.
+◇ Test case passing 2 arguments method → .uue, count → 0 to encodeAndDecodeRoundTrip(method:count:) started.
+◇ Test case passing 2 arguments method → .uue, count → 1 to encodeAndDecodeRoundTrip(method:count:) started.
+◇ Test case passing 2 arguments method → .uue, count → 2 to encodeAndDecodeRoundTrip(method:count:) started.
+✔ Test cancelEndsAReadThatWaitsAndLeavesNoTemporaryFile() passed after 63.245 seconds.
+◇ Test case passing 2 arguments method → .uue, count → 3 to encodeAndDecodeRoundTrip(method:count:) started.
+◇ Test case passing 2 arguments method → .uue, count → 44 to encodeAndDecodeRoundTrip(method:count:) started.
+◇ Test case passing 2 arguments method → .uue, count → 45 to encodeAndDecodeRoundTrip(method:count:) started.
+◇ Test case passing 2 arguments method → .uue, count → 46 to encodeAndDecodeRoundTrip(method:count:) started.
+◇ Test case passing 2 arguments method → .uue, count → 56 to encodeAndDecodeRoundTrip(method:count:) started.
+◇ Test case passing 2 arguments method → .uue, count → 57 to encodeAndDecodeRoundTrip(method:count:) started.
+◇ Test case passing 2 arguments method → .uue, count → 58 to encodeAndDecodeRoundTrip(method:count:) started.
+◇ Test case passing 2 arguments method → .uue, count → 1000 to encodeAndDecodeRoundTrip(method:count:) started.
+◇ Test case passing 2 arguments method → .uue, count → 150000 to encodeAndDecodeRoundTrip(method:count:) started.
+◇ Test case passing 2 arguments method → .xxe, count → 0 to encodeAndDecodeRoundTrip(method:count:) started.
+◇ Test case passing 2 arguments method → .xxe, count → 1 to encodeAndDecodeRoundTrip(method:count:) started.
+◇ Test case passing 2 arguments method → .xxe, count → 2 to encodeAndDecodeRoundTrip(method:count:) started.
+◇ Test case passing 2 arguments method → .xxe, count → 3 to encodeAndDecodeRoundTrip(method:count:) started.
+◇ Test case passing 2 arguments method → .xxe, count → 44 to encodeAndDecodeRoundTrip(method:count:) started.
+◇ Test case passing 2 arguments method → .xxe, count → 45 to encodeAndDecodeRoundTrip(method:count:) started.
+◇ Test case passing 2 arguments method → .xxe, count → 46 to encodeAndDecodeRoundTrip(method:count:) started.
+◇ Test case passing 2 arguments method → .xxe, count → 56 to encodeAndDecodeRoundTrip(method:count:) started.
+◇ Test case passing 2 arguments method → .xxe, count → 57 to encodeAndDecodeRoundTrip(method:count:) started.
+◇ Test case passing 2 arguments method → .xxe, count → 58 to encodeAndDecodeRoundTrip(method:count:) started.
+◇ Test case passing 2 arguments method → .xxe, count → 1000 to encodeAndDecodeRoundTrip(method:count:) started.
+◇ Test case passing 2 arguments method → .xxe, count → 150000 to encodeAndDecodeRoundTrip(method:count:) started.
+◇ Test case passing 2 arguments count → 0, expected → "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262" to blake3(count:expected:) started.
+◇ Test case passing 2 arguments count → 3, expected → "e1be4d7a8ab5560aa4199eea339849ba8e293d55ca0a81006726d184519e647f" to blake3(count:expected:) started.
+◇ Test case passing 2 arguments count → 1023, expected → "10108970eeda3eb932baac1428c7a2163b0e924c9a9e25b35bba72b28f70bd11" to blake3(count:expected:) started.
+◇ Test case passing 2 arguments count → 1024, expected → "42214739f095a406f3fc83deb889744ac00df831c10daa55189b5d121c855af7" to blake3(count:expected:) started.
+◇ Test case passing 2 arguments count → 1025, expected → "d00278ae47eb27b34faecf67b4fe263f82d5412916c1ffd97c8cb7fb814b8444" to blake3(count:expected:) started.
+◇ Test case passing 2 arguments count → 2048, expected → "e776b6028c7cd22a4d0ba182a8bf62205d2ef576467e838ed6f2529b85fba24a" to blake3(count:expected:) started.
+◇ Test case passing 2 arguments count → 2049, expected → "5f4d72f40d7a5f82b15ca2b2e44b1de3c2ef86c426c95c1af0b6879522563030" to blake3(count:expected:) started.
+◇ Test case passing 2 arguments count → 3072, expected → "b98cb0ff3623be03326b373de6b9095218513e64f1ee2edd2525c7ad1e5cffd2" to blake3(count:expected:) started.
+◇ Test case passing 2 arguments count → 3073, expected → "7124b49501012f81cc7f11ca069ec9226cecb8a2c850cfe644e327d22d3e1cd3" to blake3(count:expected:) started.
+◇ Test case passing 2 arguments count → 4096, expected → "015094013f57a5277b59d8475c0501042c0b642e531b0a1c8f58d2163229e969" to blake3(count:expected:) started.
+◇ Test case passing 2 arguments count → 5000, expected → "ee78d92070de3df1c57c37002abf0a6b1a6589acdeef4d8ffac7cf3d9e8f2836" to blake3(count:expected:) started.
+◇ Test case passing 2 arguments count → 8192, expected → "aae792484c8efe4f19e2ca7d371d8c467ffb10748d8a5a1ae579948f718a2a63" to blake3(count:expected:) started.
+◇ Test case passing 2 arguments count → 31744, expected → "62b6960e1a44bcc1eb1a611a8d6235b6b4b78f32e7abc4fb4c6cdcce94895c47" to blake3(count:expected:) started.
+◇ Test case passing 2 arguments count → 102400, expected → "bc3e3d41a1146b069abffad3c0d44860cf664390afce4d9661f7902e7943e085" to blake3(count:expected:) started.
+✔ Test specialItemsAreNotHashed() passed after 68.488 seconds.
+✔ Test aFileListedBesideItsFolderIsFoundOnce() passed after 68.746 seconds.
+✔ Test reconnectsAfterDisconnect() passed after 68.752 seconds.
+✔ Test hardLinkedFilesOfOverlappingRootsAreOneResult() passed after 68.752 seconds.
+✔ Test copyingNeverTouchesAnExistingDestination() passed after 68.792 seconds.
+✔ Test conflictsAreAskedOneAtATimeInProcessingOrder() passed after 68.794 seconds.
+✔ Test cancelEndsAListingThatWaits() passed after 68.998 seconds.
+✔ Test movesWithAndWithoutReplacing() passed after 68.998 seconds.
+✔ Test cancelEndsAWriteThatWaitsAndRemovesWhatArrived() passed after 68.999 seconds.
+✔ Test smallFilesAreCopiedSeveralAtOnceOnLocalStorage() passed after 69.001 seconds.
+✔ Test aMovedFolderIsRemovedAfterTheCommitToo() passed after 69.002 seconds.
+✔ Test aLongChainNeedsNoRecursion() passed after 69.763 seconds.
+✔ Test aHugeMoveIsCommittedInBatches() passed after 69.761 seconds.
+✔ Test writingNeverOverwritesAnExistingFile() passed after 69.761 seconds.
+✔ Test aCancelledParallelCopyLeavesNoPartialFiles() passed after 69.763 seconds.
+✔ Test aTargetWithoutDeferredWritesIsNotCommittedAndSourcesGoAtOnce() passed after 69.762 seconds.
+✔ Test aFailedCommitKeepsEverySourceAndEndsTheJobAsFailed() passed after 69.762 seconds.
+✔ Test listsAndDescribes() passed after 69.761 seconds.
+✔ Test sourcesAreDeletedOnlyAfterTheOneCommitOfTheTargetFolder() passed after 69.921 seconds.
+✔ Test theBulkListingAgreesWithLookingAtEachEntry() passed after 69.921 seconds.
+✔ Test removesOneItemAndNeverATree() passed after 69.921 seconds.
+✔ Test readsSeeksAndWrites() passed after 69.922 seconds.
+✔ Test aFailedTrashCanBeRetried() passed after 69.922 seconds.
+✔ Test cancellingEndsABlockedContentRead() passed after 70.339 seconds.
+✔ Test listsADirectory() passed after 70.339 seconds.
+✔ Test aSourceThatCouldNotBeRemovedIsNotReportedAsMoved() passed after 70.340 seconds.
+✔ Test offersPlacesAndVolumeInformation() passed after 70.346 seconds.
+✔ Test cancellingEndsABlockedDuplicateHash() passed after 70.464 seconds.
+✔ Test addresses() passed after 70.464 seconds.
+✔ Test olderOrSameKeepsAnOlderTargetOnlyBeyondTheTolerance() passed after 70.464 seconds.
+✔ Test deletingNeverFollowsAHostileName() passed after 70.464 seconds.
+✔ Test itemsParentsAndRoots() passed after 70.464 seconds.
+✔ Test aCommitInTheMiddleOfAMoveMeetsNoFileUnderItsTemporaryName() passed after 70.465 seconds.
+✔ Test aTransportThatIsNotSFTPFails() passed after 70.465 seconds.
+✔ Test nestedRootsKeptForTheirDepthReportEachFileOnce() passed after 70.465 seconds.
+✔ Test aCopyOfALockedFileLeavesNoTemporaryFileBehind() passed after 70.465 seconds.
+✔ Test cancellingEndsTheChild() passed after 70.524 seconds.
+✔ Test aLockComesLastAndTheCopyCanStillBeTakenAway() passed after 70.764 seconds.
+✔ Test theQuarantineMarkIsReadAndSet() passed after 70.764 seconds.
+✔ Test aFileIsContinuedInPlace() passed after 70.764 seconds.
+✔ Test volumes() passed after 70.764 seconds.
+✔ Test eplfListings() passed after 70.764 seconds.
+✔ Test removingTheSourceOfAMoveIsRetriedWithoutCopyingAgain() passed after 70.764 seconds.
+✔ Test twoSourcesWhoseTargetNamesDifferInCaseOnlyAreOneConflict() passed after 70.764 seconds.
+✔ Test lineEnds() passed after 70.764 seconds.
+✔ Test rotationBySizeKeepsALimitedNumberOfCopies() passed after 70.765 seconds.
+✔ Test aSkippedFolderAdvancesTheCounterToTheEnd() passed after 70.764 seconds.
+✔ Test aFolderThatMovesByOneRenameIsNotWalked() passed after 70.764 seconds.
+✔ Test aFoldersTagsHiddenFlagAndCreationDateSurvive() passed after 70.764 seconds.
+✔ Test manySmallFilesOnDiskArriveCompleteInBothDirections() passed after 70.766 seconds.
+✔ Test aDeleteTreeWithoutAPoolStillDeletesEverything() passed after 70.764 seconds.
+✔ Test cancellingEndsABlockedListing() passed after 70.764 seconds.
+✔ Test manyThreadsShareOneChannel() passed after 70.764 seconds.
+✔ Test hugeWidthsInNamesAreClamped() passed after 70.764 seconds.
+✔ Test theLeanListingSaysWhatTheFullOneSays() passed after 70.764 seconds.
+✔ Test largeListingsAreParsedInOrder() passed after 70.765 seconds.
+✔ Test onlyAPlaceWithoutATrashOffersPermanentDeletion() passed after 70.765 seconds.
+✔ Test aCopyOntoItsOwnNameInOtherLetterCaseIsACopyOntoItself() passed after 70.803 seconds.
+✔ Test filesOfDifferentSizesAreDifferentWithoutReadingThem() passed after 70.804 seconds.
+✔ Test unixListings() passed after 70.804 seconds.
+✔ Test olderMeansOlderByMoreThanTheGranularityOfTheTarget() passed after 70.807 seconds.
+✔ Test aWalkListsEveryFileOnceAndSkipsMountFolders() passed after 70.984 seconds.
+✔ Test aCancelDuringAParallelDeleteStopsAndReturns() passed after 70.985 seconds.
+✔ Test nameEncodings() passed after 70.984 seconds.
+✔ Test windowsListings() passed after 70.984 seconds.
+✔ Test savedConnections() passed after 71.025 seconds.
+✔ Test largeLocalFilesAreCheckedInStretchesOnAllCores() passed after 71.027 seconds.
+✔ Test downloadLists() passed after 71.026 seconds.
+✔ Test readsWritesAndSeeks() passed after 71.027 seconds.
+✔ Test sshArguments() passed after 71.027 seconds.
+✔ Test menuListsHistoryThenFrequentFolders() passed after 71.027 seconds.
+✔ Test manyFilesAreDeletedBySeveralWorkersAndProtectedOnesAreAskedInOrder() passed after 71.027 seconds.
+✔ Test aCommandWhoseReplyIsLostIsNotRepeated() passed after 71.027 seconds.
+✔ Test evictionSparesAListThatIsShown() passed after 71.027 seconds.
+✔ Test aMoveKeepsAFolderWithARefusedName() passed after 71.027 seconds.
+✔ Test thinningHidesFoldersThatWereOnlyPassedThrough() passed after 71.027 seconds.
+✔ Test aCaseOnlyRenameIsNotAConflict() passed after 71.027 seconds.
+✔ Test filesAndFoldersFromAMarkedSourceAreMarkedBeforeTheyGetTheirNames() passed after 71.027 seconds.
+✔ Test verifyingShowsProgressAndStillCatchesDamage() passed after 71.027 seconds.
+✔ Test listIdsAreNotSmallNumbersAndMustMatchTheirLocation() passed after 71.027 seconds.
+✔ Test frequentFoldersAreRankedByVisits() passed after 71.027 seconds.
+✔ Test keepsNoMoreThanTheStoredLimit() passed after 71.027 seconds.
+✔ Test mlsdListings() passed after 71.027 seconds.
+✔ Test aFinderLockedFileIsCopiedWithItsLockByTheJobItself() passed after 71.027 seconds.
+✔ Test nothingIsMarkedWhenTheSourceHasNoMarkOrTheCopyStaysInOneFileSystem() passed after 71.027 seconds.
+✔ Test aSourceThatCannotBeRemovedStaysAndIsNotReportedAsMoved() passed after 71.028 seconds.
+✔ Test replySyntax() passed after 71.027 seconds.
+✔ Test replies() passed after 71.027 seconds.
+✔ Test aFolderMergedIntoAnExistingOneIsCountedInFull() passed after 71.027 seconds.
+✔ Test namesThatLeadOutOfTheirFolderAreNotTransferred() passed after 71.027 seconds.
+✔ Test aResumedFileIsMarkedToo() passed after 71.027 seconds.
+✔ Test aProgramOnThePathBeatsAnApplicationOfTheSameName() passed after 71.027 seconds.
+✔ Test linkTargetsAreAskedOnceAndNotAgain() passed after 71.027 seconds.
+✔ Test aTargetInsideTheSourceThroughALinkIsRefused() passed after 71.028 seconds.
+✔ Test mergingIntoAnExistingFolderCanBeAskedAbout() passed after 71.028 seconds.
+✔ Test aNetworkVolumeGetsASingleStream() passed after 71.030 seconds.
+✔ Test aLockedFileIsAskedAboutWhenTheSystemRefuses() passed after 71.028 seconds.
+✔ Test aReadOnlyTargetAsksASecondTime() passed after 71.028 seconds.
+✔ Test manyDownloadsAtOnceWaitForAFreeConnection() passed after 71.028 seconds.
+✔ Test downloadsAndCopiesStayWithinTheConnectionLimit() passed after 71.027 seconds.
+✔ Test aDataConnectionThatBreaksIsAnErrorNotAnEnd() passed after 71.027 seconds.
+✔ Test theDataConnectionGoesToTheControlConnectionsAddress() passed after 71.028 seconds.
+✔ Test logsInThroughSSH() passed after 71.029 seconds.
+✔ Test agreesWithTheByteByByteRule() passed after 71.028 seconds.
+✔ Test deletingReadOnlyAndHiddenFilesAsks() passed after 71.028 seconds.
+✔ Test aSearchNeverChangesAnswerWhenTheTextHasCharactersThatFoldToLetters() passed after 71.028 seconds.
+✔ Test noSubCriterionSwitchesTheOptionOff() passed after 71.028 seconds.
+✔ Test closingAReaderEndsAReadThatWaitsForTheServer() passed after 71.028 seconds.
+✔ Test aCancelledListingEndsAndTheChannelStaysOpen() passed after 71.029 seconds.
+✔ Test otherFileSystemsHostsAndPortsSurvive() passed after 71.028 seconds.
+✔ Test sameSizeGroupsAreOrderedBySize() passed after 71.028 seconds.
+✔ Test foreignAndBrokenLocationsAreNotVirtual() passed after 71.028 seconds.
+✔ Test interruptingAWriterEndsAWriteWhoseAnswersNeverCome() passed after 71.029 seconds.
+✔ Test checksumsCompareContents() passed after 71.028 seconds.
+✔ Test attributesAndFolderDates() passed after 71.028 seconds.
+✔ Test plainNamesListsAndNesting() passed after 71.028 seconds.
+✔ Test sameNameAndSize() passed after 71.028 seconds.
+✔ Test aBranchLocationCarriesItsRealDirectory() passed after 71.028 seconds.
+✔ Test sameContentsIsDecidedByHashing() passed after 71.028 seconds.
+✔ Test aListLocationKnowsItsTitleAndWhereItCameFrom() passed after 71.028 seconds.
+✔ Test manyFilesAreHashedOnAllCores() passed after 71.028 seconds.
+✔ Test aPartFileCanBeKeptAndResumed() passed after 71.028 seconds.
+✔ Test theFilterChoosesWhatIsCopied() passed after 71.028 seconds.
+✔ Test everyItemIsRecordedForTheLog() passed after 71.028 seconds.
+✔ Test disconnectInterruptsARunningTransfer() passed after 71.028 seconds.
+✔ Test asksForThePasswordAndRemembersTheRefusal() passed after 71.028 seconds.
+✔ Test aCancelledRunShowsNothing() passed after 71.028 seconds.
+✔ Test partsOfTheNameUnderTheCursor() passed after 71.028 seconds.
+✔ Test caseSwitchesEnvironmentClipboardAndBrackets() passed after 71.028 seconds.
+✔ Test recordsEveryPlaceOnceTheLastVisitedLast() passed after 71.028 seconds.
+✔ Test linksAreCopiedAsLinksOrFollowed() passed after 71.028 seconds.
+✔ Test itemWithoutMLST() passed after 71.028 seconds.
+✔ Test counterRanges() passed after 71.028 seconds.
+✔ Test textModeConvertsLineEnds() passed after 71.028 seconds.
+✔ Test interruptingOneReaderLeavesTheOtherTransfersAlone() passed after 71.030 seconds.
+✔ Test dateAndTime() passed after 71.028 seconds.
+✔ Test theOptionalDigitFindsTheFirstFreeName() passed after 71.028 seconds.
+✔ Test renameMasksInTheTarget() passed after 71.028 seconds.
+✔ Test keepingGoingOnErrorsSkipsWithoutAskingAndCounts() passed after 71.028 seconds.
+✔ Test aFilteredMoveKeepsWhatWasLeftOut() passed after 71.028 seconds.
+✔ Test manyReportsBecomeFewWalks() passed after 71.029 seconds.
+✔ Test withoutRESTAndInTextModeTheCapabilityIsMissing() passed after 71.028 seconds.
+✔ Test aReaderInterruptedBeforeItsFirstReadNeverStarts() passed after 71.028 seconds.
+✔ Test unicodeNames() passed after 71.028 seconds.
+✔ Test aLinkedFlagFollowsItsParentsAndLetsGoWhenReleased() passed after 71.028 seconds.
+✔ Test continuesAFileInTheMiddleAtTheEndAndWhereItEnds() passed after 71.028 seconds.
+✔ Test linksBeyondTheProbeLimitAreResolvedAfterTheListing() passed after 71.028 seconds.
+✔ Test stopsWhenNoMoreIsWantedAndSkipsWhatCannotBeRead() passed after 71.028 seconds.
+✔ Test aSearchThroughAFileThatNeverAnswersEndsWithItsFlag() passed after 71.028 seconds.
+✔ Test downloadsUploadsAndResumes() passed after 71.028 seconds.
+✔ Test listsDOSFormatAndWithoutEPSV() passed after 71.028 seconds.
+✔ Test aCancelledListingStopsBeforeTheNextBuffer() passed after 71.029 seconds.
+✔ Test aBusyServerIsAskedAgain() passed after 71.029 seconds.
+✔ Test aServerThatWantsTheTLSSessionReusedGetsAnUnderstandableError() passed after 71.028 seconds.
+✔ Test aReadThatWaitsForTheServerEndsWhenItsFlagIsSet() passed after 71.028 seconds.
+✔ Test interruptingAReaderEndsAReadThatWaitsForTheServer() passed after 71.028 seconds.
+✔ Test linksAreListedNotFollowedAndPackagesStayWhole() passed after 71.028 seconds.
+✔ Test changesAttributes() passed after 71.028 seconds.
+✔ Test aLargeFolderIsListedInPieces() passed after 71.030 seconds.
+✔ Test interruptingAWriterEndsAWriteThatWaitsForTheServer() passed after 71.029 seconds.
+✔ Test aSendThatIsCancelledOnAFullPipeEnds() passed after 71.031 seconds.
+✔ Test keepsIdleConnectionsAlive() passed after 71.029 seconds.
+✔ Test cancellingEndsAChildThatIgnoresTerminate() passed after 71.030 seconds.
+✔ Test serverKeysAndPaths() passed after 71.029 seconds.
+✔ Test aCancelledListingEndsAtOnceAndGivesTheConnectionUp(streaming:) with 2 test cases passed after 71.029 seconds.
+✔ Test aCancelledListingIsNotRemembered() passed after 71.029 seconds.
+✔ Test aCacheStopsAtItsLimit() passed after 71.029 seconds.
+✔ Test manyWalksAtOnceShareTheProvidersSafely() passed after 71.029 seconds.
+✔ Test aServerThatKeepsTheTailIsReportedNotTrusted() passed after 71.029 seconds.
+✔ Test aSegmentRecordsTheWidestLineOrThatALineWasCut() passed after 71.029 seconds.
+✔ Test blocksAreKeptOnDiskAndGivenBack() passed after 71.029 seconds.
+✔ Test listsWithMLSDAndWithLIST(mlsd:) with 2 test cases passed after 71.029 seconds.
+✔ Test activeMode() passed after 71.029 seconds.
+✔ Test indexingAFileThatNeverAnswersStopsWhenTheDocumentIsDropped() passed after 71.029 seconds.
+✔ Test makesRenamesAndDeletes() passed after 71.029 seconds.
+✔ Test fetchingRowsFromAFileThatNeverAnswersEndsWhenTheFetchIsOvertaken() passed after 71.029 seconds.
+✔ Test aSourceWhoseDiskIsFullGoesOnWithoutIt() passed after 71.029 seconds.
+✔ Test aCopyOfAFileThatNeverAnswersEndsWithItsFlagAndLeavesNothingBehind() passed after 71.029 seconds.
+✔ Test listsConcurrentlyOnSeveralConnections() passed after 71.029 seconds.
+✔ Test resyncAnchorsForceLinesTogether() passed after 71.029 seconds.
+✔ Test seeksWhileReading() passed after 71.029 seconds.
+✔ Test verifyCatchesACorruptedCopy() passed after 71.029 seconds.
+✔ Test encodingsAreDetectedAndWrittenBackUnchanged() passed after 71.029 seconds.
+✔ Test aLineOfCharactersThatCarryALineEndByteIsNotCut() passed after 71.029 seconds.
+✔ Test listsEveryFileBelowWithItsRelativePathAndRealLocation() passed after 71.029 seconds.
+✔ Test aFlagThatIsSetAlreadyStopsEverythingBeforeItStarts() passed after 71.029 seconds.
+✔ Test optionsDecideWhichLinesAreEqual() passed after 71.029 seconds.
+✔ Test aTransferDoesNotBlockCommands() passed after 71.029 seconds.
+✔ Test everyOccurrenceOfAWholeWordIsFoundInOrderInTheRawBytes() passed after 71.029 seconds.
+✔ Test nothingIsTakenOverFromAnotherTextAnotherEncodingOrAnotherTabWidth() passed after 71.029 seconds.
+✔ Test reconnectsAfterTheServerDroppedTheConnection() passed after 71.029 seconds.
+✔ Test pathsAndLocations() passed after 71.029 seconds.
+✔ Test characterBoundariesAreExactAndAreReadOnce() passed after 71.030 seconds.
+✔ Test theRowsAlwaysRebuildTheRightFile() passed after 71.029 seconds.
+✔ Test rootsFollowTheDisksOfTheVolumeList() passed after 71.029 seconds.
+✔ Test aWideTreeIsReadCompletelyOnAllCores() passed after 71.030 seconds.
+✔ Test rowsShowChangedAddedAndRemovedLines() passed after 71.029 seconds.
+✔ Test placesAndPaths() passed after 71.030 seconds.
+✔ Test aFlagOnlyEndsTheReadsItWasGiven() passed after 71.029 seconds.
+✔ Test binaryFilesAreRecognised() passed after 71.029 seconds.
+✔ Test listFilesAreWrittenToTheListFolder() passed after 71.029 seconds.
+✔ Test namesWithSpacesAreQuotedAsOneWord() passed after 71.029 seconds.
+✔ Test aCancelledCopyLeavesNothingBehind() passed after 71.029 seconds.
+✔ Test differencesInsideALine() passed after 71.029 seconds.
+✔ Test argumentsOfAUserCommand() passed after 71.029 seconds.
+✔ Test commentStoreReadsAFolderOnceForManyReaders() passed after 71.029 seconds.
+✔ Test directoriesComparedFilesAndSides() passed after 71.029 seconds.
+✔ Test buildsFromCachedPathsInNaturalOrder() passed after 71.029 seconds.
+✔ Test quickSearchFindsTheNextFolderStartingWithTheText() passed after 71.029 seconds.
+✔ Test aLeadingQuestionMarkAsksFirst() passed after 71.029 seconds.
+✔ Test measuresRealAllocationOnTheLocalDisk() passed after 71.029 seconds.
+✔ Test selectedNames() passed after 71.030 seconds.
+✔ Test singleValues() passed after 71.029 seconds.
+✔ Test timesOutAndCancelsOnAServerThatDoesNotAnswer() passed after 71.030 seconds.
+✔ Test neighboursFollowDisplayOrderAndWrapAround() passed after 71.030 seconds.
+✔ Test substrings() passed after 71.030 seconds.
+✔ Test savingLoadingAndDeleting() passed after 71.030 seconds.
+✔ Test summaryNamesWhatIsNotDefault() passed after 71.030 seconds.
+✔ Test aLeadingAngleKeepsTheFieldOfTheWindow() passed after 71.030 seconds.
+✔ Test settingChildrenKeepsKnownFoldersAndDropsVanishedOnes() passed after 71.030 seconds.
+✔ Test runsOfEmptyLinesAmongTextAreCountedLikeAnyOtherLines() passed after 71.030 seconds.
+✔ Test aSearchOfAFileThatIsOnDiskAsksTheServerForNothing() passed after 71.031 seconds.
+✔ Test thePackedOperandsAreDeselectedByTheNamesThePanelMarksThemWith() passed after 71.030 seconds.
+✔ Test measuresATreeOnAllCores() passed after 71.030 seconds.
+✔ Test longTextsAreKeyedOnAllCores() passed after 71.030 seconds.
+✔ Test settingsBecomeAQuery() passed after 71.030 seconds.
+✔ Test fieldHistoriesKeepTheNewestFirst() passed after 71.030 seconds.
+✔ Test anArchiveOnAServerThatCannotBeWrittenToCannotBeChanged() passed after 71.030 seconds.
+✔ Test anArchiveOnAServerIsCommittedThereToo() passed after 71.030 seconds.
+✔ Test aReaderIsEndedFromAnotherThreadAndStaysEnded() passed after 71.030 seconds.
+✔ Test decompressionAndSkippingEndWhenTheRequestComes() passed after 71.030 seconds.
+✔ Test columnsAnswerFromManyThreadsAtOnce() passed after 71.030 seconds.
+✔ Test aFileOfNothingButLineEndsNeedsFewCheckpoints() passed after 71.031 seconds.
+✔ Test theMarkOfAnArchiveOnAnotherFileSystemIsThatFileSystemsWord() passed after 71.030 seconds.
+✔ Test changesAttributesOfATreeOnAllCores() passed after 71.030 seconds.
+✔ Test aCommitReachesTheArchivesThatHoldTheArchive() passed after 71.030 seconds.
+✔ Test cancelledSearchFindsNothing() passed after 71.030 seconds.
+✔ Test packAndDeleteSourcesWaitsForTheArchiveWhereItLies() passed after 71.030 seconds.
+✔ Test aPlaceOutsideTheArchiveAnswersForItsOwnFileSystem() passed after 71.030 seconds.
+✔ Test searchMasks() passed after 71.030 seconds.
+✔ Test aCommitPutsWhatClosedWritersBroughtIntoTheArchiveFile() passed after 71.030 seconds.
+✔ Test searchesAnyFileSystem() passed after 71.030 seconds.
+✔ Test aMemberReadFromAStreamEndsWhenInterruptedAndLeavesTheNextReadsAlone() passed after 71.030 seconds.
+✔ Test aFailedCommitKeepsEverythingForTheNextTry() passed after 71.030 seconds.
+✔ Test blake3Vectors(count:expected:) with 11 test cases passed after 71.030 seconds.
+✔ Test aMemberWriterEndsWhenInterrupted() passed after 71.030 seconds.
+✔ Test verifyHashesTheLikelyMethodFirstAndFindsTheOthers() passed after 71.030 seconds.
+✔ Test aChildProcessIsStoppedByTheRequest() passed after 71.030 seconds.
+✔ Test aChecksumFileAmongTheOperandsIsNotHashed() passed after 71.030 seconds.
+✔ Test findsText() passed after 71.030 seconds.
+✔ Test eachArchiveSaysWhatItCanDo() passed after 71.030 seconds.
+✔ Test partsOfOneFileStillJoin() passed after 71.030 seconds.
+✔ Test unreadableSourceCostsNoOutput() passed after 71.030 seconds.
+✔ Test selectedNamesAreSeparateWords() passed after 71.030 seconds.
+✔ Test aWiderLayoutTakesOverTheSegmentsWhoseLinesStillFitInOneRow() passed after 71.031 seconds.
+✔ Test findsByNameInPathOrder() passed after 71.030 seconds.
+✔ Test depthLimit() passed after 71.030 seconds.
+✔ Test aMissingNameIsReported() passed after 71.030 seconds.
+✔ Test callsOutsideTheArchiveGoToTheFileSystemWithTheFlag() passed after 71.030 seconds.
+✔ Test fetchingAnArchiveFromAServerCanBeAbandoned() passed after 71.031 seconds.
+✔ Test decodingOneNumberedFileDoesNotRunIntoTheNext() passed after 71.030 seconds.
+✔ Test findsTextAcrossBlockBorders() passed after 71.030 seconds.
+✔ Test sha3FallbackAgreesWithTheSelectedImplementation() passed after 71.030 seconds.
+✔ Test overwriteKeepsTheOldFileUntilTheNewOneIsDone() passed after 71.030 seconds.
+✔ Test excludedAndUnreachedFoldersAreRecorded() passed after 71.030 seconds.
+✔ Test aLongRunOfTwoByteCharactersIsFoundExactlyForwardAndBackward(codePage:) with 4 test cases passed after 71.033 seconds.
+✔ Test splitAndEncodeRefuseToReplaceTheirSource() passed after 71.030 seconds.
+✔ Test connectsListsAndTransfers(mode:) with 2 test cases passed after 71.030 seconds.
+✔ Test theLeanReaderHonoursHiddenFoldersPackagesAndLinks() passed after 71.030 seconds.
+✔ Test filesOutsideTheTargetFolderKeepTheirFullPath() passed after 71.030 seconds.
+✔ Test unquotedPlaceholderIsOneWord() passed after 71.030 seconds.
+✔ Test aServerWithoutTLSRefusesExplicitTLS() passed after 71.030 seconds.
+✔ Test insideDoubleQuotes() passed after 71.030 seconds.
+✔ Test checksumLinesInOtherForms() passed after 71.031 seconds.
+✔ Test listDropsThemInEveryFormat() passed after 71.030 seconds.
+✔ Test cancellingEndsABlockedLoad() passed after 71.030 seconds.
+✔ Test linesThatDifferOnlyInNormalisationAreEqual() passed after 71.030 seconds.
+✔ Test readsTheCommentFileAsTotalCommanderWritesIt() passed after 71.030 seconds.
+✔ Test environmentValuesAreQuotedToo() passed after 71.030 seconds.
+✔ Test textThatAnEncodingCannotWriteDropsThatEncoding() passed after 71.030 seconds.
+✔ Test manySmallFilesDoNotWriteTheArchiveForEachOfThem() passed after 71.031 seconds.
+✔ Test mlsdAndMlstDropThem() passed after 71.030 seconds.
+✔ Test textIsSearchedOnAllCoresAndReportedInOrder() passed after 71.031 seconds.
+✔ Test theSharedCheck() passed after 71.031 seconds.
+✔ Test hexBytes() passed after 71.031 seconds.
+✔ Test anAddressMustBeAmongTheCertificatesAddresses() passed after 71.031 seconds.
+✔ Test linksAreFoundTheSameWayInEveryFormOfTheAttribute() passed after 71.031 seconds.
+✔ Test choosesAnEncodingThatHoldsEveryCharacter() passed after 71.030 seconds.
+✔ Test readsCommandParameters() passed after 71.031 seconds.
+✔ Test changesCommentsAndKeepsTheOrder() passed after 71.031 seconds.
+✔ Test regularExpressionsMatchLineByLine() passed after 71.031 seconds.
+✔ Test base64EndsAtItsPadding() passed after 71.031 seconds.
+✔ Test foldersTheJobCreatedAreGivenTheirMetadataLastAndOnlyWhenAttributesAreKept() passed after 71.031 seconds.
+✔ Test theSFTPListingCheckIsTheSameFunction() passed after 71.031 seconds.
+✔ Test aFollowedLinkKeepsTheTagsOfItsTarget() passed after 71.031 seconds.
+✔ Test readsPermissionsInEveryNotation() passed after 71.031 seconds.
+✔ Test escapesStandForTabAndLineBreak() passed after 71.031 seconds.
+✔ Test theFastScanGivesTheOutputOfTheUnitByUnitOne() passed after 71.031 seconds.
+✔ Test wholeWords() passed after 71.031 seconds.
+✔ Test removingFromAListedFolderAsksNoQuestions() passed after 71.031 seconds.
+✔ Test relativeLinkPaths() passed after 71.031 seconds.
+✔ Test aListingFromAServerKeepsOnlyTheSafeNames(mlsd:) with 2 test cases passed after 71.031 seconds.
+✔ Test insideSingleQuotes() passed after 71.031 seconds.
+✔ Test comparisonIgnoresNormalisationInFiles() passed after 71.031 seconds.
+✔ Test longLinesWrapAtWordsOrAreCut() passed after 71.031 seconds.
+✔ Test aCopiedFolderKeepsItsTagHiddenFlagAndCreationDate() passed after 71.031 seconds.
+✔ Test decodingBlockByBlockEqualsDecodingAtOnce() passed after 71.031 seconds.
+✔ Test theFastScanAgreesOnLongPagesToo() passed after 71.031 seconds.
+✔ Test aServerThatRefusesToProtectItsDataIsNotUsed() passed after 71.031 seconds.
+✔ Test spaceReportWording() passed after 71.031 seconds.
+✔ Test regularExpressionsInOtherEncodings() passed after 71.031 seconds.
+✔ Test partialDatesKeepTheOtherParts() passed after 71.031 seconds.
+✔ Test manyUploadsToAServerWithoutMLSTListTheFolderOnce() passed after 71.031 seconds.
+✔ Test cancelledDiffEndsEarlyButIsStillACover() passed after 71.031 seconds.
+✔ Test edgeCases() passed after 71.031 seconds.
+✔ Test encodings() passed after 71.031 seconds.
+✔ Test theIndexAgreesWithASimpleSplitAtLineEnds() passed after 71.031 seconds.
+✔ Test placesInARowMapToBytesAndBack() passed after 71.031 seconds.
+✔ Test membersCarryTheMarkOfTheirArchiveSoThatACopyCanPassItOn() passed after 71.031 seconds.
+✔ Test cancellingEndsABlockedIdentityCheck() passed after 71.032 seconds.
+✔ Test aByteOrderMarkIsNotPartOfTheText() passed after 71.031 seconds.
+✔ Test anAbandonedUploadMakesTheFolderBeReadAgain() passed after 71.031 seconds.
+✔ Test emptyAndEverything() passed after 71.031 seconds.
+✔ Test folderPatterns() passed after 71.031 seconds.
+✔ Test aRenameIsEnteredIntoTheListings() passed after 71.031 seconds.
+✔ Test hexSearchTakesBytesAndQuotedText() passed after 71.031 seconds.
+✔ Test filesAreReadThroughTheirProviderWithSeek() passed after 71.031 seconds.
+✔ Test includeAndExcludeMasks() passed after 71.031 seconds.
+✔ Test operationsOnAPickedViewActOnTheRealFiles() passed after 71.031 seconds.
+✔ Test plainTextSearchWithItsSwitches() passed after 71.031 seconds.
+✔ Test hitsAcrossBlockBordersAreFoundWithTheirSurroundings() passed after 71.031 seconds.
+✔ Test overwriteAllOlderKeepsNewerTargets() passed after 71.031 seconds.
+✔ Test sameNamedFilesOfAPickedViewHaveNamesOfTheirOwn() passed after 71.031 seconds.
+✔ Test linesKeepTheirOwnLineBreaks() passed after 71.031 seconds.
+✔ Test regularExpressions() passed after 71.031 seconds.
+✔ Test plainTextIgnoresCaseUnlessAsked() passed after 71.031 seconds.
+✔ Test applyingTheDiffToAYieldsBAndItIsTheShortest() passed after 71.031 seconds.
+✔ Test folderSizesThatLeaveTheRangeOfANumberStopAtItsEnd() passed after 71.031 seconds.
+✔ Test foldersOfAPickedViewKeepTheirContentsApart() passed after 71.031 seconds.
+✔ Test aFolderMadeIsKnownAtOnce() passed after 71.031 seconds.
+✔ Test createsMissingTargetFolders() passed after 71.031 seconds.
+✔ Test renameInPlace() passed after 71.031 seconds.
+✔ Test aLargeFileWithFewChangesIsExact() passed after 71.032 seconds.
+✔ Test cancelStopsTheJob() passed after 71.031 seconds.
+✔ Test contentKindsComeFromNameAndFirstBytes() passed after 71.031 seconds.
+✔ Test aDeleteCanBeCancelledInTheMiddleOfATree() passed after 71.031 seconds.
+✔ Test aCancelledBranchWalkOfAStalledTreeEndsAndLeavesNothingBehind() passed after 71.031 seconds.
+✔ Test binaryRowsHaveAFixedLengthAndDotsForControlCharacters() passed after 71.031 seconds.
+✔ Test linesEndWithCRLFOrCROrLF() passed after 71.031 seconds.
+✔ Test foldersMadeLateBecauseOfAFilterAreFinishedLikeTheOthers() passed after 71.031 seconds.
+✔ Test aWalkWithAFlagThatIsNeverSetListsAsWithout() passed after 71.031 seconds.
+✔ Test aFileSystemThatCannotCopyByItselfIsStreamed() passed after 71.031 seconds.
+✔ Test trashWhereThereIsNoneOffersToDeleteForGood() passed after 71.031 seconds.
+✔ Test deletesTreesItemByItem() passed after 71.031 seconds.
+✔ Test aCharacterCutOffAtTheEndWaitsForItsRest() passed after 71.031 seconds.
+✔ Test byteOrderMarksNameTheEncoding() passed after 71.031 seconds.
+✔ Test twoNamesThatDifferOnlyInNormalisationAreTwoFiles() passed after 71.031 seconds.
+✔ Test aFolderThatCannotBeReadIsNeverRemoved() passed after 71.031 seconds.
+✔ Test aSelectionShowsInBothPartsOfAHexRow() passed after 71.031 seconds.
+✔ Test indexesStayRightAfterInsertsAndRewrites() passed after 71.031 seconds.
+✔ Test aMissingSourceIsReportedAndSkipped() passed after 71.031 seconds.
+✔ Test movingBetweenFileSystemsRemovesTheSource() passed after 71.031 seconds.
+✔ Test copiesFilesAndFoldersRecursively() passed after 71.031 seconds.
+✔ Test linesWithoutAPartnerAreTakenOutFirst() passed after 71.032 seconds.
+✔ Test anUnreadableFolderIsNotMovedAwayOrDeleted() passed after 71.032 seconds.
+✔ Test callsAreForwardedToTheRealFileSystem() passed after 71.031 seconds.
+✔ Test aFileWithoutLineEndsIsStillCutIntoRows() passed after 71.031 seconds.
+✔ Test overwritingOnAnotherFileSystemGoesThroughATemporaryName() passed after 71.031 seconds.
+✔ Test eachLocationReportsWhatItsOwnFileSystemCanDo() passed after 71.031 seconds.
+✔ Test textEncodingsAreGuessedFromTheContent() passed after 71.031 seconds.
+✔ Test malformedInputBecomesReplacementCharactersAndKeepsItsOffsets() passed after 71.031 seconds.
+✔ Test aWideFolderResolvesNamesQuickly() passed after 71.031 seconds.
+✔ Test copiesFromDiskIntoAnotherFileSystem() passed after 71.032 seconds.
+✔ Test hexRowsLookAsInTheSpecification() passed after 71.032 seconds.
+✔ Test jobsWithinAnotherFileSystemUseItsOwnOperations() passed after 71.031 seconds.
+✔ Test aBoundedSearchStillGivesACorrectDiff() passed after 71.032 seconds.
+✔ Test editedCopiesAreFoundExactly() passed after 71.032 seconds.
+✔ Test foldersAreSummedUpThroughTheirFileSystem() passed after 71.031 seconds.
+✔ Test attributesAreTriState() passed after 71.031 seconds.
+✔ Test aJobWithoutAnyoneToAskStopsAtItsFirstQuestion() passed after 71.031 seconds.
+✔ Test aCancelledStreamLeavesNothingBehind() passed after 71.032 seconds.
+✔ Test aCopyOutOfAnArchiveCarriesTheArchivesQuarantineMark() passed after 71.032 seconds.
+✔ Test hugeInputsFallBackToTheHeuristicAndStayCorrect() passed after 71.032 seconds.
+✔ Test aMoveOfSmallAndLargeFilesPutsThemInTheArchiveFileOnceAndRemovesTheSources() passed after 71.032 seconds.
+✔ Test aMoveKeepsEverySourceWhenTheArchiveCannotBeWritten(quickWrites:) with 2 test cases passed after 71.032 seconds.
+✔ Test copiesFromAnotherFileSystemOntoDisk() passed after 71.032 seconds.
+✔ Test aCopyFromOneFolderOfTheDiskToAnotherIsNotMarked() passed after 71.032 seconds.
+✔ Test sizeRules() passed after 71.032 seconds.
+✔ Test steppingThroughAWideFolderIsLinear() passed after 71.032 seconds.
+✔ Test fieldRuleOperators() passed after 71.032 seconds.
+✔ Test aBranchWalkStaysOnItsVolume() passed after 71.032 seconds.
+✔ Test indexingStopsWhenCancelled() passed after 71.032 seconds.
+✔ Test pipelineOrderAndGivenNames() passed after 71.032 seconds.
+✔ Test copyWithRenameAndMask() passed after 71.032 seconds.
+✔ Test symbolicLinksAreCopiedAndDeletedAsLinks() passed after 71.032 seconds.
+✔ Test unscannedFoldersStayUnscannedFromTheCache() passed after 71.032 seconds.
+✔ Test pasteIntoTheSameFolderRenamesTheCopy() passed after 71.032 seconds.
+✔ Test ageCutsOffAtMidnightForDaysAndLonger() passed after 71.032 seconds.
+✔ Test htmlBecomesTextWithItsLinks() passed after 71.032 seconds.
+✔ Test overwriteAndSkip() passed after 71.032 seconds.
+✔ Test movesAndMergesFolders() passed after 71.032 seconds.
+✔ Test moveKeepsSkippedSources() passed after 71.032 seconds.
+✔ Test aCancelledSearchFindsNothingAndProgressIsReported() passed after 71.032 seconds.
+✔ Test aFileSystemThatKeepsNoMetadataDoesNotSpoilTheCopy() passed after 71.032 seconds.
+✔ Test fieldRulesCombineWithAndOrOr() passed after 71.032 seconds.
+✔ Test aFinderLockedFolderIsCopiedCompletelyAndLockedLikeTheOriginal() passed after 71.032 seconds.
+✔ Test everyOccurrenceIsFoundOnceInOrder() passed after 71.032 seconds.
+✔ Test foldersAndTheFolderDotSwitch() passed after 71.032 seconds.
+✔ Test invalidPlaceholdersGiveAnError() passed after 71.032 seconds.
+✔ Test definedCounter() passed after 71.032 seconds.
+✔ Test aTextOnAnotherFileSystemIsIndexedSearchedAndShown() passed after 71.032 seconds.
+✔ Test dateCriteria() passed after 71.032 seconds.
+✔ Test copyKeepsTimeAndPermissions() passed after 71.032 seconds.
+✔ Test copyOntoItselfIsRefused() passed after 71.032 seconds.
+✔ Test searchingInOtherEncodingsGivesByteRanges() passed after 71.032 seconds.
+✔ Test noTemporaryNamesAreLeftBehind() passed after 71.032 seconds.
+✔ Test nameLists() passed after 71.032 seconds.
+✔ Test letterCases() passed after 71.032 seconds.
+✔ Test ranges(mask:expected:) with 12 test cases passed after 71.032 seconds.
+✔ Test rangesCountCharactersNotBytes() passed after 71.032 seconds.
+✔ Test invalidNames() passed after 71.032 seconds.
+✔ Test timeSourcesAndOffsets() passed after 71.032 seconds.
+✔ Test severalPairsAndWildcards() passed after 71.032 seconds.
+✔ Test regularExpressions() passed after 71.032 seconds.
+✔ Test regularExpressionSubstitutionAndDialect() passed after 71.033 seconds.
+✔ Test counters() passed after 71.032 seconds.
+✔ Test pathParts() passed after 71.032 seconds.
+✔ Test rangePadding() passed after 71.032 seconds.
+✔ Test dateAndTime() passed after 71.032 seconds.
+✔ Test literalsAndBrackets() passed after 71.033 seconds.
+✔ Test plainSearchAndReplace() passed after 71.032 seconds.
+✔ Test environmentAndClipboard() passed after 71.032 seconds.
+✔ Test caseSwitches() passed after 71.032 seconds.
+✔ Test anotherTargetFolderKeepsTheRelativePaths() passed after 71.032 seconds.
+✔ Test bothDirectionsArriveWithTheirDatesAndTheSidesAreEqualAfterwards() passed after 71.032 seconds.
+✔ Test matchesAcrossChunkBordersAreFound(backwards:) with 2 test cases passed after 71.033 seconds.
+✔ Test subSecondDifferencesAreNotDifferences() passed after 71.032 seconds.
+✔ Test asymmetricMakesTheRightACopyOfTheLeft() passed after 71.032 seconds.
+✔ Test planCountsWhatTheRowsAsk() passed after 71.032 seconds.
+✔ Test actionsARowAccepts() passed after 71.032 seconds.
+✔ Test emptyDirectoriesAreRowsOfTheirOwn() passed after 71.032 seconds.
+✔ Test aFolderThatCannotBeReadIsLeftOutOnBothSides() passed after 71.032 seconds.
+✔ Test dateTolerances() passed after 71.032 seconds.
+✔ Test aFileSystemThatCopiesNothingItselfIsStreamed() passed after 71.032 seconds.
+✔ Test streamsOfUnevenBlocksCompareCorrectly() passed after 71.032 seconds.
+✔ Test showButtonsFilterByComputedDirection() passed after 71.032 seconds.
+✔ Test asymmetricDeletesOnTheRightAndNeverCopiesLeft() passed after 71.032 seconds.
+✔ Test deletingOnBothSidesAndOnTheLeft() passed after 71.032 seconds.
+✔ Test aLinkFacingAFileIsNeverActedOn() passed after 71.032 seconds.
+✔ Test withoutSubdirectoriesOnlyTheStartFolders() passed after 71.032 seconds.
+✔ Test statesAndDefaultDirections() passed after 71.032 seconds.
+✔ Test cancellingAtAQuestionStopsTheRun() passed after 71.032 seconds.
+✔ Test manyNamesOnAllCoresKeepTheirOrder() passed after 71.033 seconds.
+✔ Test overwritesAreConfirmedPerFile() passed after 71.032 seconds.
+✔ Test bytesAreComparedAtTheSameOffsets() passed after 71.032 seconds.
+✔ Test worksBetweenDiskAndAnotherFileSystem() passed after 71.032 seconds.
+✔ Test errorsCanBeSkippedRetriedOrEndTheRun() passed after 71.032 seconds.
+✔ Test largeFilesAreComparedInPiecesOnAllCores() passed after 71.032 seconds.
+✔ Test everyCombinationOfOptionsKeepsItsPromises() passed after 71.032 seconds.
+✔ Test processedItemsAreFoundByLocationWhoseNamesArePaths() passed after 71.032 seconds.
+✔ Test edgeCases() passed after 71.032 seconds.
+✔ Test foldersAreCreatedAndAFolderTheUserKeptAFileInStays() passed after 71.032 seconds.
+✔ Test comparesAcrossFileSystemsAndIgnoresLinks() passed after 71.032 seconds.
+✔ Test caseInsensitivePairingKeepsItsOrderAndIsFast() passed after 71.033 seconds.
+✔ Test namesThatDifferOnlyInUnicodeFormKeepTheirOwnRows() passed after 71.032 seconds.
+✔ Test manyPairsAreComparedOnAllCoresAndStayInOrder() passed after 71.032 seconds.
+✔ Test namesThatDifferInCaseAndFilesFacingFoldersAreExcluded() passed after 71.032 seconds.
+✔ Test cancelledComparisonStopsAndSaysSo() passed after 71.032 seconds.
+✔ Test aFailingReadDeliversWhatCameBeforeIt() passed after 71.033 seconds.
+✔ Test ignoreDateKnowsOnlyEqualAndDifferent() passed after 71.032 seconds.
+✔ Test aStalledPipeFailsInsteadOfHanging() passed after 71.032 seconds.
+✔ Test masksWithExclusions() passed after 71.032 seconds.
+✔ Test byContentReadsPairsThatLookEqual() passed after 71.032 seconds.
+✔ Test onlySelectedNamesOfTheStartFolders() passed after 71.032 seconds.
+✔ Test makingALockedFileWritableUnlocksIt() passed after 71.032 seconds.
+✔ Test placesListTheUsualFoldersAndTheVolumes() passed after 71.032 seconds.
+✔ Test aCopyKeepsCreationDateExtendedAttributesAndFlags() passed after 71.032 seconds.
+✔ Test theStoredPasswordAnswersOnlyThisServersPrompt() passed after 71.032 seconds.
+✔ Test aPasswordIsNotRemembered() passed after 71.032 seconds.
+✔ Test cancelEndsAWriteIntoABranchViewAtOnce() passed after 71.032 seconds.
+✔ Test cancelEndsTheListingOfABranchViewThatWaits() passed after 71.032 seconds.
+✔ Test continuesCutsAndAppends() passed after 71.032 seconds.
+✔ Test cancelEndsAReadOfAFileNamedThroughABranchViewAtOnce() passed after 71.032 seconds.
+✔ Test aLargeContinuationGoesThroughTheWindow() passed after 71.032 seconds.
+✔ Test sparseFilesAreShownAndRefused() passed after 71.031 seconds.
+✔ Test aRequestThatTimesOutDoesNotCloseTheChannel() passed after 71.033 seconds.
+✔ Test anOpenReaderSurvivesTheRewriteOfItsArchive(clones:) with 2 test cases passed after 71.032 seconds.
+✔ Test resumeContinuesAPartialFile() passed after 71.031 seconds.
+✔ Test aCachedPreviewGivesTheSameAnswer() passed after 71.031 seconds.
+✔ Test aDirectoryWithImpossibleOffsetsIsDamaged() passed after 71.031 seconds.
+✔ Test hugeWidthsAreCapped() passed after 71.031 seconds.
+✔ Test overwriteAllAndSkipAllAskOnce() passed after 71.031 seconds.
+✔ Test writesAndReadsBothSides() passed after 71.031 seconds.
+✔ Test theRulesByAgeAndSize() passed after 71.032 seconds.
+✔ Test autoRenameExistingKeepsTheOldFilesUnderNumberedNames() passed after 71.031 seconds.
+✔ Test readsHandWrittenAndDamagedFiles() passed after 71.031 seconds.
+✔ Test paxRecordsShorterThanTheirOwnLengthEndTheList() passed after 71.031 seconds.
+✔ Test overwriteAndSkipAreForOneFileEach() passed after 71.031 seconds.
+✔ Test addingRenamingAndDatingLeaveTheOldMembersWhereTheyAre() passed after 71.032 seconds.
+✔ Test manyRenamesEndInOneRewriteInsteadOfAnArchiveFullOfHoles() passed after 71.031 seconds.
+✔ Test autoRenameCopiedHoldsForTheRestOfTheJob() passed after 71.031 seconds.
+✔ Test packingIntoAnExistingArchiveAddsToItAndTestsOnlyWhatIsNew() passed after 71.032 seconds.
+✔ Test manyThreadsBringFilesInAtOnce(clones:) with 2 test cases passed after 71.031 seconds.
+✔ Test caseIsFoldedPerFolder() passed after 71.031 seconds.
+✔ Test anArchiveThatListsANameTwiceIsNotChanged() passed after 71.031 seconds.
+✔ Test renameExistingMovesTheTargetAsideFirst() passed after 71.031 seconds.
+✔ Test tarHeadersWithImpossibleSizesAreDamaged() passed after 71.031 seconds.
+✔ Test aTrailingDotBelongsToTheName() passed after 71.031 seconds.
+✔ Test renameAsksAgainWhenTheNewNameIsTakenToo() passed after 71.031 seconds.
+✔ Test theNamesOfRotatedCopiesAreRecognisedExactly() passed after 71.031 seconds.
+✔ Test appendAddsTheSourceToTheEndOfTheTarget() passed after 71.031 seconds.
+✔ Test renameOlderSkipNewer() passed after 71.031 seconds.
+✔ Test unpackedProgramsDoNotRunAsTheirOwner() passed after 71.031 seconds.
+✔ Test aFileThatWasDeletedWhileTheLogWasOpenIsWrittenAgain() passed after 71.031 seconds.
+✔ Test pruningLeavesOtherPeoplesFilesAlone() passed after 71.032 seconds.
+✔ Test autoRenameCountsOnInsteadOfStartingOver() passed after 71.031 seconds.
+✔ Test aMoveOntoAnExistingNameAsksToo() passed after 71.031 seconds.
+✔ Test aReplacingMoveNeverOverwritesAnotherFile() passed after 71.029 seconds.
+✔ Test cancelLeavesEverythingAsItWas() passed after 71.029 seconds.
+✔ Test aPresetAnswersWithoutAsking() passed after 71.029 seconds.
+✔ Test linesAreWrittenWithoutAFlushAfterAShortWhile() passed after 71.030 seconds.
+✔ Test aCopiedFileIsInTheArchiveFileBeforeTheJobIsDone() passed after 71.173 seconds.
+✔ Test aWrongPasswordThatPassesTheCheckByteIsNotKept() passed after 71.171 seconds.
+✔ Test hugeCountersGiveTheErrorMarker() passed after 71.171 seconds.
+✔ Test unpackedFilesCarryTheArchivesQuarantine() passed after 71.171 seconds.
+✔ Test skippingFollowsTheChainOnce() passed after 71.171 seconds.
+✔ Test aFailedUploadIsRepeated() passed after 71.171 seconds.
+✔ Test oldGnuHeadersHaveNoPathPrefix() passed after 71.169 seconds.
+✔ Test volumesAreFoundAlsoForPlacesThatDoNotExistYet() passed after 71.169 seconds.
+✔ Test formats() passed after 71.153 seconds.
+✔ Test aMemberThatUnpacksToMoreThanItSaysIsStopped() passed after 71.140 seconds.
+✔ Test deleteQuestions() passed after 71.140 seconds.
+✔ Test targetProposals() passed after 71.140 seconds.
+✔ Test headings() passed after 71.140 seconds.
+✔ Test membersOfAStreamReadOneAfterTheOtherCostOnePass() passed after 71.171 seconds.
+✔ Test aMemberWrittenThroughTheFileSystemIsCompressedInPieces() passed after 71.171 seconds.
+✔ Test aSelfExtractingArchiveKeepsItsProgram(clones:) with 2 test cases passed after 71.140 seconds.
+✔ Test theTreeKeepsItsOrderAndItsFolders() passed after 71.140 seconds.
+✔ Test sizesThatSumPastTheLargestNumberAreOnlyNumbers() passed after 71.140 seconds.
+✔ Test hardLinksAreFilesOfTheirOwnWhereverTheirTargetStands() passed after 71.140 seconds.
+✔ Test plainLinesAreCutFromTheirBytesWithTheRowsOfTheDecodedText() passed after 71.182 seconds.
+✔ Test aMoveKeepsItsSourceWhenTheArchiveCannotTakeTheFile() passed after 71.140 seconds.
+✔ Test aFailedWriteKeepsEveryChangeForTheNextAttempt() passed after 71.139 seconds.
+✔ Test extraFieldsThatFillAnEntryMakeWayInsteadOfOverflowing() passed after 71.139 seconds.
+✔ Test pipesAndTheLikeAreToldFromFiles() passed after 71.139 seconds.
+✔ Test aTreeIsMeasuredLikeItIsListed() passed after 71.139 seconds.
+✔ Test placesAndVolumesAnswerFromWhatIsKnown() passed after 71.139 seconds.
+✔ Test aMemberThatLiesInAFileIsReadAtAnyPlace() passed after 71.139 seconds.
+✔ Test preparedCriteriaAgreeWithTheDirectOnes() passed after 71.138 seconds.
+✔ Test movesDataThroughTheWindowInBothDirections() passed after 71.177 seconds.
+✔ Test cancelledSearchEndsEarly() passed after 71.138 seconds.
+✔ Test aFailedCopyLeavesAnExistingFileAlone() passed after 71.136 seconds.
+✔ Test aLongWildcardIsNotSlow() passed after 71.136 seconds.
+✔ Test encryptionWorksInPlaceAndBothWays() passed after 71.139 seconds.
+✔ Test overlappingStartDirectoriesAreSearchedOnce() passed after 71.136 seconds.
+✔ Test duplicatesIgnorePipesHardLinksAndRepeatedRoots() passed after 71.136 seconds.
+✔ Test textSearchSkipsPipesAndDevices() passed after 71.136 seconds.
+✔ Test absurdNumbersDoNotTrap() passed after 71.136 seconds.
+✔ Test nameIsTestedBeforeTheCriteria() passed after 71.136 seconds.
+✔ Test aFolderReachedBySymlinkedParentIsNotSearchedTwice() passed after 71.135 seconds.
+✔ Test newMembersSurviveAChangeFromOutside() passed after 71.139 seconds.
+✔ Test aLockedFileIsCopiedUnderATemporaryNameAndRenamed() passed after 71.134 seconds.
+✔ Test masksUseCharactersNotBytesOrBrackets() passed after 71.134 seconds.
+✔ Test filesThatWouldShareANameAreNotPackedOverEachOther() passed after 71.132 seconds.
+✔ Test changingTheTimeOfAnEncryptedMemberKeepsItReadable() passed after 71.135 seconds.
+✔ Test manyFoldersAreReportedInPathOrder() passed after 71.132 seconds.
+✔ Test anArchiveWithAnOpenWriterStaysInTheStore() passed after 71.132 seconds.
+✔ Test withoutAppendTheFileIsWrittenAnewAndSwappedIn() passed after 71.132 seconds.
+✔ Test attachingToAKnownFolderKeepsWhatIsBelowIt() passed after 71.126 seconds.
+✔ Test regexTextSearchReadsLinesInBlocks() passed after 71.132 seconds.
+✔ Test membersThatCannotBeWrittenAreSavedInAnArchiveOfTheirOwn() passed after 71.137 seconds.
+✔ Test aPartialFileThatIsNotTheStartOfTheSourceIsNotContinued() passed after 71.125 seconds.
+✔ Test levelsComeWithTheirNodesAndLinkLikeTheOldPath() passed after 71.125 seconds.
+✔ Test cacheFilesOfOtherRootsAndBrokenFilesAreNotTaken() passed after 71.125 seconds.
+✔ Test aResumeContinuesThePartialFileWhereTheFileSystemCanAppend() passed after 71.125 seconds.
+✔ Test aWideFolderIsLinkedInBoundedTurns() passed after 71.125 seconds.
+✔ Test cacheWithoutFolderStaysInMemory() passed after 71.125 seconds.
+✔ Test aFileSystemThatClaimsAppendButRefusesItFallsBackToWritingAnew() passed after 71.125 seconds.
+✔ Test cacheIsSafeToUseFromManyThreads() passed after 71.126 seconds.
+✔ Test scansFoldersOnlyLevelByLevel() passed after 71.124 seconds.
+✔ Test verifyComparesAllOfThePartialFileNotJustItsLastBlock() passed after 71.126 seconds.
+✔ Test aLargeFolderIsListedLikeASmallOne() passed after 71.140 seconds.
+✔ Test cancellingStopsTheScan() passed after 71.120 seconds.
+✔ Test unreadableFoldersCountAsEmptyAndLinksAndPackagesAreLeftOut() passed after 71.116 seconds.
+✔ Test aResumeOnTheLocalDiskContinuesTheFileItself() passed after 71.124 seconds.
+✔ Test excludedFoldersAreListedButNotRead() passed after 71.115 seconds.
+✔ Test zip64IsUsedExactlyWhereTheClassicFieldsEnd() passed after 71.115 seconds.
+✔ Test cacheLearnsFoldersThePanelsShow() passed after 71.112 seconds.
+✔ Test aScanDoesNotEnterAMountedVolume() passed after 71.126 seconds.
+✔ Test wideTreesAreReadInBatches() passed after 71.122 seconds.
+✔ Test cacheKeepsTreesInMemoryAndInFilesOfItsOwnFolder() passed after 71.109 seconds.
+✔ Test aBigFolderRenamedInsideAMergeIsNotCountedAgainEvenWhenTheCacheIsFull() passed after 71.107 seconds.
+✔ Test aLargeArchiveIsStreamedInsteadOfUnpackedToATemporaryFile() passed after 71.107 seconds.
+✔ Test namesDatesAndAttributesOfForeignZips() passed after 71.107 seconds.
+➜ Test aLinkResolvedInTheBackgroundIsAFolderInWhatTheFileSystemRemembers() was cancelled after 71.184 seconds: "the background work did not get through in time"
+✔ Test rawScannedUTF16FindsTheRowsDecodingEverythingFinds() passed after 71.184 seconds.
+✔ Test trashIsAskedPerLocation() passed after 71.107 seconds.
+✔ Test aFailedCommitKeepsTheSources() passed after 71.094 seconds.
+✔ Test noCommitWhereWritesAreNotDeferred() passed after 71.093 seconds.
+✔ Test aDamagedMemberIsFoundByTheTest() passed after 71.086 seconds.
+✔ Test htmlIsStrippedFast() passed after 71.086 seconds.
+✔ Test theIndexPublishesTheFrontierSegmentAsItGoes() passed after 71.086 seconds.
+✔ Test aHugeNumberOfEntriesIsListedFromTheDirectoryAlone() passed after 71.110 seconds.
+✔ Test aFileWithoutLineEndsShowsItsStartBeforeItIsRead() passed after 71.086 seconds.
+✔ Test aTextInADoubleByteEncodingIsFoundAcrossChunkBorders() passed after 71.086 seconds.
+✔ Test rawByteSearchGivesTheAnswerOfTheDecodedSearch() passed after 71.186 seconds.
+✔ Test aFileLargerThanOneWindowOfPiecesIsPackedInSeveralRounds() passed after 71.086 seconds.
+✔ Test aBacktrackingExpressionCanBeCancelled() passed after 71.083 seconds.
+✔ Test theWalkOrdersNamesAsTheSystemDoes() passed after 71.058 seconds.
+✔ Test cancellingEndsABlockedComparisonByContent() passed after 71.055 seconds.
+✔ Test sha3(count:sha224:sha256:sha384:sha512:) with 6 test cases passed after 71.034 seconds.
+✔ Test copiesAreCommittedBeforeDeletions() passed after 71.034 seconds.
+✔ Test tarHeadersCarryLongNamesAndLargeSizes() passed after 71.034 seconds.
+✔ Test hashingStopsWhenCancelled() passed after 71.034 seconds.
+✔ Test cancellingEndsABlockedListing() passed after 71.034 seconds.
+✔ Test knownDigests() passed after 71.034 seconds.
+✔ Test cancellingEndsABlockedCopy() passed after 71.034 seconds.
+✔ Test regularExpressionForNames() passed after 71.030 seconds.
+✔ Test manyFilesAreHashedOnAllCoresInOrder() passed after 71.030 seconds.
+✔ Test encryptedZipsAskForThePassword() passed after 71.034 seconds.
+✔ Test binaryRowText() passed after 71.030 seconds.
+✔ Test agreesWithTheSystemTools() passed after 71.030 seconds.
+✔ Test hashedKeysFindTheSameDifferencesAsBefore() passed after 71.030 seconds.
+✔ Test savingKeepsTheLinkAndTheTags() passed after 71.030 seconds.
+✔ Test criteriaNarrowTheSearch() passed after 71.030 seconds.
+✔ Test sixBitLoopsMatchTheFirstImplementation() passed after 71.030 seconds.
+✔ Test manyFilesAreExaminedOnAllCoresAndReportedInOrder() passed after 71.030 seconds.
+✔ Test methodsOfTheDialog() passed after 71.030 seconds.
+✔ Test insideALineTheCommonEndsAreTrimmed() passed after 71.030 seconds.
+✔ Test archivesAreSearchedWhereAFileSystemOffersTheirContents() passed after 71.030 seconds.
+✔ Test blake3(count:expected:) with 14 test cases passed after 71.030 seconds.
+✔ Test fieldRulesUseBuiltInFieldsAndPluginColumns() passed after 71.029 seconds.
+✔ Test aDigestWithoutAMethodHintIsFoundInOnePassOverTheOthers() passed after 71.030 seconds.
+✔ Test cancellingEndsABlockedWrite() passed after 71.029 seconds.
+✔ Test textOptionsReachTheSearch() passed after 71.022 seconds.
+✔ Test cancellingEndsABlockedSplit() passed after 71.022 seconds.
+✔ Test onlyChosenItemsAreSearched() passed after 71.020 seconds.
+✔ Test cancellingStopsPackingAndLeavesNothingBehind() passed after 71.029 seconds.
+✔ Test cancellingEndsABlockedHash() passed after 71.020 seconds.
+✔ Test acceptsChecksAnItemFoundElsewhere() passed after 71.007 seconds.
+✔ Test archivesInsideArchives() passed after 71.020 seconds.
+✔ Test severalStartDirectoriesAreSearchedInTurn() passed after 70.995 seconds.
+✔ Test masksWithQuotesAndSpaces() passed after 70.984 seconds.
+✔ Test theIndexBuiltInSegmentsEqualsCuttingTheWholeText(parallel:) with 2 test cases passed after 71.183 seconds.
+✔ Test urlsCarryTheArchiveAndThePathInside() passed after 70.892 seconds.
+✔ Test otherFormatsAndProtectedFilesRefuseChanges() passed after 70.890 seconds.
+✔ Test anArchiveOnAnotherFileSystem() passed after 70.890 seconds.
+✔ Test deletingTheLastFileKeepsItsFolder() passed after 70.884 seconds.
+✔ Test theCopyJobStreamsOutOfAndIntoArchives() passed after 70.898 seconds.
+✔ Test commandOptionsAreRead() passed after 70.872 seconds.
+✔ Test pathsAreShownAndReadLikeFolders() passed after 70.879 seconds.
+✔ Test aZipIsChangedInPlace() passed after 70.844 seconds.
+✔ Test htmlIsStrippedFromUnitsAndCanBeCancelled() passed after 70.680 seconds.
+✔ Test anchorsAndWordBoundariesDoNotMatchAtTheSearchStart() passed after 70.680 seconds.
+✔ Test anchorsAndWordBoundariesDoNotMatchAtChunkBorders() passed after 70.628 seconds.
+✔ Test aSmallRemoteFileIsFetchedOnceForAnyNumberOfLongReads() passed after 70.627 seconds.
+✔ Test temporaryCopiesAreUniqueKeyedByStampAndReleased() passed after 70.627 seconds.
+✔ Test aFailedReadIsRecordedAndShown() passed after 70.624 seconds.
+✔ Test aChangeFromOutsideIsNoticed() passed after 70.847 seconds.
+✔ Test decodingWithoutOffsetsGivesTheSameText() passed after 70.622 seconds.
+✔ Test leftoverFoldersOfDeadProcessesAreSwept() passed after 70.596 seconds.
+✔ Test checkpointsArePacked() passed after 70.596 seconds.
+✔ Test plainTextMatchingCaseIsSearchedInTheRawBytes() passed after 70.592 seconds.
+✔ Test trackerMeasuresStaysAndSavesToTheSettings() passed after 71.189 seconds.
+✔ Test closingThePaneEndsAReadThatWaitsForTheServer() passed after 71.188 seconds.
+✔ Test aFormThatCannotBeSearchedWithIsReported() passed after 71.188 seconds.
+✔ Test theChosenFilesAreTheMarkedTwins() passed after 71.187 seconds.
+✔ Suite FilePropertiesSums passed after 71.196 seconds.
+✔ Suite PlacesHotlistModel passed after 71.197 seconds.
+✔ Suite Targets passed after 71.197 seconds.
+✔ Suite ConfigPlacesFixStoredData passed after 71.197 seconds.
+✔ Suite MultiRenamePlanning passed after 71.197 seconds.
+✔ Suite ViewerThroughVirtualFolders passed after 71.197 seconds.
+✔ Test undoHistoryLivesInMemoryAndIsSaved() passed after 71.182 seconds.
+✔ Suite SpotlightQueries passed after 71.197 seconds.
+✔ Test itemsNamedByPathAreRenamedWhereTheyAre() passed after 71.179 seconds.
+✔ Suite NamesInBranchViews passed after 71.197 seconds.
+✔ Suite CompareLoading passed after 71.197 seconds.
+✔ Suite SystemToolsTypes passed after 71.197 seconds.
+✔ Suite ParallelCopies passed after 71.198 seconds.
+✔ Suite SelectionMoreRules passed after 71.197 seconds.
+✔ Suite ConfigPlacesFixCache passed after 71.197 seconds.
+✔ Test pluginTellsTheCacheAboutVisitedFoldersWithoutTouchingRealFolders() passed after 71.125 seconds.
+✔ Suite OperationLogs passed after 71.197 seconds.
+✔ Suite NetworkSFTP passed after 71.197 seconds.
+✔ Suite FileOpsAdoptCancellation passed after 71.198 seconds.
+✔ Suite ToolsAdoptFindFiles passed after 71.198 seconds.
+✔ Suite FileOpsAdoptCommit passed after 71.198 seconds.
+✔ Suite FileOpsFixJobs passed after 71.198 seconds.
+✔ Suite NetworkParsers passed after 71.198 seconds.
+✔ Test leavingAnArchiveLeadsToTheFolderThatHoldsIt() passed after 70.882 seconds.
+✔ Suite ConfigPlacesFixVirtual passed after 71.199 seconds.
+✔ Suite NetworkFixConnections passed after 71.199 seconds.
+✔ Suite FileOpsAdoptQuarantine passed after 71.199 seconds.
+✔ Suite ConfigPlacesFixSystemTools passed after 71.199 seconds.
+✔ Suite ProtectedItems passed after 71.199 seconds.
+✔ Suite NetworkFixLineEnds passed after 71.199 seconds.
+✔ Suite Duplicates passed after 71.199 seconds.
+✔ Suite NetworkAdoptSFTP passed after 71.199 seconds.
+✔ Suite VirtualLocations passed after 71.199 seconds.
+✔ Suite TransferOptionsInJobs passed after 71.199 seconds.
+✔ Suite NameTemplates passed after 71.199 seconds.
+✔ Suite NetworkFTP passed after 71.199 seconds.
+✔ Suite NetworkAdoptFTP passed after 71.199 seconds.
+✔ Suite BranchWalking passed after 71.200 seconds.
+✔ Suite ViewerAdoptIndex passed after 71.200 seconds.
+✔ Suite TextComparing passed after 71.200 seconds.
+✔ Suite PlacesTreeModel passed after 71.200 seconds.
+✔ Suite ParameterExpansion passed after 71.200 seconds.
+✔ Suite FilePropertiesParallelWork passed after 71.200 seconds.
+✔ Suite SavedSearches passed after 71.200 seconds.
+✔ Suite Searching passed after 71.200 seconds.
+✔ Suite FileToolsFixes passed after 71.200 seconds.
+✔ Suite ConfigPlacesFixExpansion passed after 71.200 seconds.
+✔ Suite ConfigPlacesFixScanning passed after 71.200 seconds.
+✔ Suite NetworkTLS passed after 71.200 seconds.
+✔ Suite NetworkFixNames passed after 71.200 seconds.
+✔ Suite ToolsAdoptCompare passed after 71.200 seconds.
+✔ Suite FilePropertiesFormats passed after 71.200 seconds.
+✔ Suite TextPatterns passed after 71.200 seconds.
+✔ Suite NetworkFixTLS passed after 71.200 seconds.
+✔ Suite ViewerAdoptHTML passed after 71.200 seconds.
+✔ Suite FileOpsAdoptMetadata passed after 71.200 seconds.
+✔ Suite NetworkFixCache passed after 71.200 seconds.
+✔ Suite ViewerModel passed after 71.201 seconds.
+✔ Suite MyersDiff passed after 71.200 seconds.
+✔ Suite CopyFilters passed after 71.201 seconds.
+✔ Suite VirtualFoldersAdoption passed after 71.201 seconds.
+✔ Suite LocalJobs passed after 71.201 seconds.
+✔ Suite CrossFileSystemJobs passed after 71.201 seconds.
+✔ Suite ConfigPlacesFixTreeModel passed after 71.201 seconds.
+✔ Suite SearchCriteriaRules passed after 71.201 seconds.
+✔ Suite ArchiveJobsEndToEnd passed after 71.201 seconds.
+✔ Suite MultiRenameEngine passed after 71.201 seconds.
+✔ Suite SyncExecuting passed after 71.201 seconds.
+✔ Suite DirectorySyncFixes passed after 71.201 seconds.
+✔ Suite SyncComparing passed after 71.201 seconds.
+✔ Suite BinaryComparing passed after 71.201 seconds.
+✔ Suite FileOpsAdoptSelection passed after 71.201 seconds.
+✔ Suite NetworkFixSFTP passed after 71.201 seconds.
+✔ Suite LocalDiskExtras passed after 71.201 seconds.
+✔ Suite NetworkFixSecrets passed after 71.201 seconds.
+✔ Suite JobsThroughVirtualFolders passed after 71.201 seconds.
+✔ Suite NetworkAdoptSFTPAppend passed after 71.201 seconds.
+✔ Suite OverwriteChoices passed after 71.201 seconds.
+✔ Suite TabFiles passed after 71.201 seconds.
+✔ Suite FileOpsFixLog passed after 71.201 seconds.
+✔ Suite Wording passed after 71.201 seconds.
+✔ Suite FindFilesFixes passed after 71.201 seconds.
+✔ Suite FileOpsAdoptResume passed after 71.201 seconds.
+✔ Suite PlacesAdoption passed after 71.201 seconds.
+✔ Suite FileOpsAdoptMeasure passed after 71.201 seconds.
+✔ Suite ToolsAdoptDirectorySync passed after 71.201 seconds.
+✔ Suite FileToolsHashes passed after 71.201 seconds.
+✔ Suite ExtendedSearching passed after 71.201 seconds.
+✔ Suite CompareContentFixes passed after 71.201 seconds.
+✔ Suite ToolsAdoptFileTools passed after 71.201 seconds.
+✔ Suite Switches passed after 71.201 seconds.
+✔ Suite PlacesHistoryModel passed after 71.203 seconds.
+✔ Suite PlacesTreeScanning passed after 71.202 seconds.
+◇ Test switchingFilesInTheQuickViewDropsTheFileThatIsStillBeingRead() started.
+✔ Test pendingChangesKeepAnArchiveAliveUntilTheyAreWritten() passed after 71.445 seconds.
+✔ Test changesAreWrittenShortlyAfterTheLastOne() passed after 71.328 seconds.
+✔ Test singleCompressedFilesRoundTrip(codec:) with 3 test cases passed after 71.425 seconds.
+✔ Test theSizeOfACompressedFileIsReadFromItsEnd() passed after 71.519 seconds.
+✔ Suite ArchiveFixes passed after 71.535 seconds.
+✔ Test openingAStreamArchiveCanBeAbandoned(format:) with 4 test cases passed after 71.557 seconds.
+✔ Suite ArchiveAdoption passed after 71.565 seconds.
+✔ Test packListUnpackGivesTheSameBytes(format:) with 5 test cases passed after 71.522 seconds.
+✔ Test aChildProcessIsStoppedWhenItsStreamIsClosed() passed after 71.537 seconds.
+✔ Test manyThreadsUseTheProviderAtOnce() passed after 71.467 seconds.
+✔ Suite ArchiveFileSystems passed after 71.691 seconds.
+✔ Test parallelCompressionGivesOneValidStream() passed after 72.049 seconds.
+✔ Test systemToolsReadWhatIsWritten() passed after 73.168 seconds.
+✔ Test persistedUndoIsCapped() passed after 74.308 seconds.
+✔ Suite MultiRenameFixes passed after 74.324 seconds.
+✔ Test archivesOfTheSystemToolsAreRead() passed after 74.331 seconds.
+✔ Suite ArchiveFormats passed after 74.414 seconds.
+✔ Test theRawByteScanFindsTheSameRowsAsDecodingEverything() passed after 74.199 seconds.
+✔ Suite ViewerFix passed after 74.771 seconds.
+✔ Test unreadableDataIsKept() passed after 76.653 seconds.
+✔ Test missingAndUnknownKeysAndABadElement() passed after 76.654 seconds.
+✔ Test newSearchEmptiesTheList() passed after 76.655 seconds.
+✔ Test goToFilePutsThePanelOnTheResult() passed after 76.663 seconds.
+✔ Test duplicatesAreListedInGroups() passed after 76.664 seconds.
+✔ Test onlySelectedItemsOfThePanel() passed after 76.671 seconds.
+✔ Test feedToListboxHandsTheResultsToTheListService() passed after 76.672 seconds.
+✔ Test windowShowsABackgroundComparison() passed after 76.713 seconds.
+✔ Suite DirectorySyncWindow passed after 76.720 seconds.
+✔ Test aLongListIsSortedInTheBackgroundAndAShortOneAtOnce() passed after 77.045 seconds.
+✔ Test aChainWaitsForTheProgramBeforeItsNextStep() passed after 77.045 seconds.
+✔ Test aLaunchIsNoJobAndNoHistoryEntry() passed after 77.045 seconds.
+✔ Test aLaunchThatCannotStartIsReported() passed after 77.045 seconds.
+✔ Suite ConfigPlacesFixLaunching passed after 77.052 seconds.
+✔ Test aStartMenuEntryInAChainIsWaitedFor() passed after 77.040 seconds.
+✔ Test previewInTheBackground() passed after 76.832 seconds.
+✔ Test aBigFileOfASlowSourceIsNotFetchedAgainWhenItIsLaidOutAgain() passed after 77.074 seconds.
+✔ Suite ViewerAdoptSource passed after 77.080 seconds.
+✔ Test aStaleFreeSpaceFigureIsAnsweredAtOnceAndCorrectedBehind() passed after 77.160 seconds.
+✔ Suite KernelApiOnLocalDisks passed after 77.165 seconds.
+✔ Test aSearchThroughAClusterOfLineEndsKeepsTheCharactersInStep() passed after 78.222 seconds.
+✔ Suite ViewerAdoptSearch passed after 78.228 seconds.
+✔ Test reportsChangesInWatchedFoldersOnly() passed after 78.720 seconds.
+✔ Suite LocalDisk passed after 78.725 seconds.
+sandbox_extension_consume failed: 1 (Operation not permitted)
+sandbox_extension_consume failed: 1 (Operation not permitted)
+sandbox_extension_consume failed: 1 (Operation not permitted)
+✔ Test theWindowsAreBuiltFromWhatIsRegistered() passed after 83.088 seconds.
+✔ Test aQuestionMarkLetsTheUserChangeTheParameters() passed after 83.088 seconds.
+✔ Test theMenusOfTheConfigurationPlugin() passed after 83.088 seconds.
+✔ Test theStartMenuRunsItsEntriesByPosition() passed after 83.089 seconds.
+✔ Test twoSelectedFilesOfTheSourcePanel() passed after 83.090 seconds.
+✔ Test textAfterTheNameReachesTheCommand() passed after 83.092 seconds.
+✔ Test resyncAndSwap() passed after 83.092 seconds.
+✔ Test aFailedSaveIsReportedAndTheChangesStay() passed after 83.092 seconds.
+✔ Test everyNthLineAndSteps() passed after 83.092 seconds.
+✔ Test aLargeListIsSelectedWithFewAnnouncements() passed after 83.092 seconds.
+✔ Test commandsOfTheProgramChainsAndCd() passed after 83.092 seconds.
+✔ Test oneSelectedFileWithTheTargetsSelectionOrTheSameName() passed after 83.094 seconds.
+✔ Test groupsByMask() passed after 83.094 seconds.
+✔ Test aUserCommandRunsAProgramWithExpandedParameters() passed after 83.094 seconds.
+✔ Test wholeBlocksAndInsertionsGoToTheRightPlace() passed after 83.094 seconds.
+✔ Test binaryFilesAreComparedInHex() passed after 83.094 seconds.
+✔ Test identicalFilesOnlyGetTheMessage() passed after 83.094 seconds.
+✔ Test markNewerHideSame() passed after 83.094 seconds.
+✔ Test saveSettingsWritesThePanelsTabs() passed after 83.095 seconds.
+✔ Test theCursorFileWithTheSameNameInTheOtherPanel() passed after 83.095 seconds.
+✔ Test likeTheItemUnderTheCursor() passed after 83.095 seconds.
+✔ Test encodingsSurviveEditing() passed after 83.095 seconds.
+✔ Test aUserCommandThatCallsItselfIsStopped() passed after 83.095 seconds.
+✔ Test differencesAreCopiedAcrossUndoneAndSaved() passed after 83.095 seconds.
+✔ Test savingAndLoadingSelectionFiles() passed after 83.095 seconds.
+✔ Test historyAndSelectionTypes() passed after 83.101 seconds.
+✔ Test theDefinitionDialogStoresRegistersAndBindsTheKey() passed after 83.105 seconds.
+✔ Test otherPluginsNameTheFilesThemselves() passed after 83.600 seconds.
+✔ Test commandIsRegisteredWithMenusButtonAndPreferences() passed after 83.601 seconds.
+✔ Test loadingFromTheClipboard() passed after 83.893 seconds.
+✔ Test theListFileExistsWhenTheCommandStarts() passed after 83.896 seconds.
+✔ Test rowsNumbersAndHighlights() passed after 83.898 seconds.
+✔ Test optionsAreAppliedAndRemembered() passed after 83.985 seconds.
+✔ Suite CompareContentCommands passed after 83.989 seconds.
+✔ Test settingsAreExportedImportedAndReset() passed after 83.995 seconds.
+✔ Suite ConfigurationCommands passed after 83.998 seconds.
+✔ Test registration() passed after 83.996 seconds.
+sandbox_extension_consume failed: 1 (Operation not permitted)
+✔ Test foldersAsConfigured() passed after 84.173 seconds.
+✔ Test comparingDirectories() passed after 84.175 seconds.
+✔ Test selectionFilesOnTheLocalDisk() passed after 84.284 seconds.
+✔ Suite SelectionMoreCommands passed after 84.289 seconds.
+✔ Test downloadListIsWrittenAndWorkedThrough() passed after 85.460 seconds.
+✔ Test quickConnectShowsTheServerAndDisconnectReturns() passed after 85.460 seconds.
+✔ Test windowShowsTheSessionAndFollowsIt() passed after 85.460 seconds.
+✔ Test uploadsRenamesAndDeletesWithTheUsualCommands() passed after 85.460 seconds.
+✔ Test hiddenFilesAndTransferMode() passed after 85.460 seconds.
+✔ Test aFailedConnectionIsReportedAndLeavesThePanel() passed after 85.460 seconds.
+✔ Test aTypedURLConnectsByItself() passed after 85.461 seconds.
+✔ Suite MultiRenameWindow passed after 85.466 seconds.
+✔ Test theDecodedListIsCachedUntilItIsReplaced() passed after 85.471 seconds.
+✔ Test downloadsWithTheCopyJob() passed after 85.470 seconds.
+✔ Test aLargeImageIsResampledOnceWhileItIsScrolledAndDrawnAgain() passed after 85.481 seconds.
+✔ Test movesBetweenServerAndDisk() passed after 85.685 seconds.
+✔ Test disconnectCanSaveTheQuickConnection() passed after 85.685 seconds.
+✔ Test asksForAPasswordThatIsNotStored() passed after 85.685 seconds.
+✔ Test aTabFileIsReplacedInOneStepAndOnlyIfItIsAFile() passed after 85.685 seconds.
+✔ Test aDeletedUserCommandLeavesNoKeyBehind() passed after 85.685 seconds.
+✔ Test aFileTooLargeToBeATabFileIsNotLoaded() passed after 85.685 seconds.
+✔ Test savedConnectionsKeepTheirPasswordInThePasswordStore() passed after 85.685 seconds.
+✔ Test theClipboardCommandIsOfferedForAnyTextAndReadsOnlyTheFirstLine() passed after 85.684 seconds.
+✔ Test aRunThatCanNeverBeUndoneDoesNotBlockEarlierOnes() passed after 85.684 seconds.
+✔ Test anImportIsCheckedBeforeItIsWritten() passed after 85.684 seconds.
+✔ Test connectToServerMountsAndEjects() passed after 85.685 seconds.
+✔ Test aCommandWithANameCodeDoesNotRunWithoutAName() passed after 85.685 seconds.
+✔ Test registersCommandsMenusAndFileSystems() passed after 85.685 seconds.
+✔ Test theKeyboardEditorKeepsBindingsStoredElsewhere() passed after 85.685 seconds.
+✔ Suite ConfigPlacesFixStore passed after 85.691 seconds.
+✔ Test windowsFormatAndUnicodeNames() passed after 85.684 seconds.
+✔ Suite ConfigPlacesFixRunner passed after 85.691 seconds.
+✔ Suite PluginFixes passed after 85.691 seconds.
+✔ Suite NetworkPluginCommands passed after 85.691 seconds.
+✔ Test verifiesFilesWrittenByTheSystemTools() passed after 85.685 seconds.
+✔ Test everyMethodRoundTripsThroughVerify() passed after 85.685 seconds.
+✔ Test sortingByExtensionKeepsEqualItemsInOrder() passed after 85.685 seconds.
+✔ Test encodingsOfChecksumFiles() passed after 85.685 seconds.
+✔ Test verifyAgainstTheClipboardAndTheFileName() passed after 85.685 seconds.
+✔ Test createOnAnotherFileSystemAndFailures() passed after 85.685 seconds.
+✔ Test separateFilesPerFileAndPerFolder() passed after 85.685 seconds.
+✔ Test md5FileMatchesTheSystemTool() passed after 85.685 seconds.
+✔ Test sfvFileMatchesCksum() passed after 85.685 seconds.
+✔ Test lineFormats() passed after 85.685 seconds.
+✔ Test verifyReportsOkMissingAndWrong() passed after 85.685 seconds.
+✔ Test shaFilesAreAcceptedByShasum(method:algorithm:) with 5 test cases passed after 85.685 seconds.
+✔ Test leavingWithTheCommandGoesToTheFolderOfTheFileUnderTheCursor() passed after 85.685 seconds.
+✔ Test branchViewShowsEveryFileBelowAndLeavesThroughTheParentRow() passed after 85.685 seconds.
+✔ Test optionsChangeWhatABranchLists() passed after 85.685 seconds.
+✔ Test aForgottenListFailsWithoutHarm() passed after 85.685 seconds.
+✔ Test verifyManyFilesOnAnotherFileSystem() passed after 85.685 seconds.
+✔ Test selectedBranchShowsOnlyTheMarkedItemsAndRestoresTheSelection() passed after 85.685 seconds.
+✔ Test aFileListKeepsRealLocationsAndFullPathsAsNames() passed after 85.685 seconds.
+✔ Test watchingIsForwardedToTheRealFileSystem() passed after 85.685 seconds.
+✔ Test registersItsFileSystemServiceCommandsAndOptions() passed after 85.685 seconds.
+✔ Test proposalsAndDialog() passed after 85.685 seconds.
+✔ Test operationsWorkOnTheRealFiles() passed after 85.685 seconds.
+✔ Test customColumnsAreChosenInAForm() passed after 85.684 seconds.
+✔ Test hiddenFilesInBothPanelsOrInOne() passed after 85.685 seconds.
+✔ Test registersCommandsKeysMenusToolbarAndPreferences() passed after 85.685 seconds.
+✔ Test registersCommandsMenusAndPreferences() passed after 85.685 seconds.
+✔ Test theFormGivesBackWhatItWasGiven() passed after 85.685 seconds.
+✔ Test withoutPluginColumnsThereIsNothingToChoose() passed after 85.685 seconds.
+✔ Suite MultiRenameFixSessions passed after 85.693 seconds.
+✔ Test programsShowsWhatCanBeRun() passed after 85.685 seconds.
+✔ Test theViewCommandsSwitchTheSourcePanel() passed after 85.684 seconds.
+✔ Test commandsFollowTheCapabilitiesOfTheFolderShown() passed after 85.684 seconds.
+✔ Test aFilterLaidOverADisplayFilterKeepsItChecked() passed after 85.684 seconds.
+✔ Test theTestRecordsOfTheMacPluginStayBounded() passed after 85.684 seconds.
+✔ Test aCustomFilterIsAskedForRememberedAndReset() passed after 85.685 seconds.
+✔ Test theSidedCommandsWorkOnTheirPanel() passed after 85.685 seconds.
+✔ Test anOversizedCommentFileIsNotOverwritten() passed after 85.684 seconds.
+✔ Test theToolbarAsksWithoutBuildingTheListOfOperands() passed after 85.684 seconds.
+✔ Test openingAFileGoesToTheOpeners() passed after 85.684 seconds.
+✔ Test loadsAListFile() passed after 85.685 seconds.
+✔ Test changingOnlyTheDateOfAFolderLeavesThePermissionsBelowAlone() passed after 85.684 seconds.
+✔ Test newTextFileIsCreatedAndHandedToTheEditor() passed after 85.684 seconds.
+✔ Test selection() passed after 85.684 seconds.
+✔ Test commandsThatMeanEverythingWaitForACompleteListing() passed after 85.684 seconds.
+✔ Test theToolFollowsTheCapabilitiesOfTheFolderItIsIn() passed after 85.685 seconds.
+✔ Test onAReadOnlyFileSystemChangingCommandsAreWithheld() passed after 85.684 seconds.
+✔ Test pressingOKOnALockedFileDoesNotUnlockIt() passed after 85.684 seconds.
+✔ Test copyingASelectionDeselectsItAndRefreshesTheTarget() passed after 85.684 seconds.
+✔ Test pasteIsOfferedWhileFilesAreOnTheClipboard() passed after 85.684 seconds.
+✔ Test navigation() passed after 85.683 seconds.
+✔ Test savingDetailsKeepsTheOldFileUntilTheNewOneIsThereAndNeverRemovesAFolder() passed after 85.684 seconds.
+✔ Test newFolders() passed after 85.684 seconds.
+✔ Test theTrashIsOfferedWhereTheItemsAreNotWhereTheFileSystemSaysInGeneral() passed after 85.684 seconds.
+✔ Test theClipboardCarriesLocalFilesOnly() passed after 85.683 seconds.
+✔ Test aCaseOnlyRenameWorksAndNeverReplacesAnotherFile() passed after 85.684 seconds.
+✔ Test permissionsTypedOrLoadedAreStillApplied() passed after 85.684 seconds.
+✔ Test theAllocatedSizeIsOnlyAskedForWhenItIsWanted() passed after 85.684 seconds.
+✔ Test pluginsRegisterCommandsMenusAndServices() passed after 85.683 seconds.
+✔ Test changeDirectoryTakesLocationsAndTypedText() passed after 85.683 seconds.
+✔ Test copyingOntoItselfIsRefusedWithAMessage() passed after 85.683 seconds.
+✔ Test folderTabs() passed after 85.684 seconds.
+✔ Test aCommentFileThatCannotBeReadIsNeverOverwritten() passed after 85.684 seconds.
+✔ Test panelsFollowEachOther() passed after 85.684 seconds.
+✔ Test nothingIsOfferedOnTheParentRow() passed after 85.683 seconds.
+✔ Test sortingAndHiddenFiles() passed after 85.683 seconds.
+✔ Test copyAsksForTheTargetAndAboutOverwriting() passed after 85.683 seconds.
+✔ Test theTrashKeyCanBeTurnedAround() passed after 85.682 seconds.
+✔ Test commandSwitchesStartWithoutADialog() passed after 85.683 seconds.
+✔ Test operationsAreWrittenToTheLogFile() passed after 85.682 seconds.
+✔ Test keepingGoingOnErrorsReportsAtTheEnd() passed after 85.682 seconds.
+✔ Test newFoldersWithRangesPlaceholdersAndInTheOtherPanel() passed after 85.682 seconds.
+✔ Test displayMasks() passed after 85.685 seconds.
+✔ Test deleteAsksAndDeletesDirectlyWhereThereIsNoTrash() passed after 85.684 seconds.
+✔ Test clipboardCopiesMovesAndRenamesSelfCopies() passed after 85.683 seconds.
+✔ Test copyAndMoveWithoutAsking() passed after 85.682 seconds.
+✔ Test readOnlyFilesAreAskedAboutAgainWhenDeleting() passed after 85.682 seconds.
+✔ Test deleteMovesToTheTrashOnTheLocalDisk() passed after 85.684 seconds.
+✔ Test aPreferencePageHoldsChangesUntilApply() passed after 85.682 seconds.
+✔ Test aShorterTargetCanBeResumedButAMoveCannotAppend() passed after 85.682 seconds.
+✔ Test renamingOntoAnotherFileWhoseNameDiffersInCaseIsRefused() passed after 85.683 seconds.
+✔ Test aKeyInUseNamesItsCommandAndIsTakenOnlyWhenTheUserAgrees() passed after 85.682 seconds.
+✔ Test copyInTheSameFolderPutsTheCursorOnTheCopy() passed after 85.684 seconds.
+✔ Test severalItemsAreRenamedWithAMaskOrOneByOne() passed after 85.682 seconds.
+✔ Test moveAndRename() passed after 85.684 seconds.
+✔ Test theOptionsCanBecomeTheDefaultsAndAlwaysBeShown() passed after 85.682 seconds.
+✔ Test theOptionsDialogCarriesFilterAndOverwriteMode() passed after 85.682 seconds.
+✔ Test onlySelectedFilesIsASnapshot() passed after 85.685 seconds.
+✔ Test theOverwriteDialogShowsBothFilesAndOffersEveryChoice() passed after 85.682 seconds.
+✔ Test commandsKeysPagesAndButtons() passed after 85.683 seconds.
+✔ Test newFilesSeveralAtOnce() passed after 85.682 seconds.
+✔ Test shortcutsAreWrittenReadAndRecognisedFromKeyPresses() passed after 85.682 seconds.
+✔ Test testArchivesReportsWhatIsDamaged() passed after 85.682 seconds.
+✔ Test packOptions() passed after 85.682 seconds.
+✔ Test theButtonBarIsEditedAsAListAndStoredOnCommit() passed after 85.682 seconds.
+✔ Test aScaledFrameKeepsItsColorsAndSides() passed after 85.683 seconds.
+✔ Test settingsSurviveExportAndImport() passed after 85.682 seconds.
+✔ Suite FileToolsChecksums passed after 85.694 seconds.
+✔ Test theKeyMapFollowsTheKernelsRules() passed after 85.682 seconds.
+✔ Suite FileOpsAdoptCapabilities passed after 85.694 seconds.
+✔ Test unpackArchivesIntoTheTargetPanel() passed after 85.682 seconds.
+✔ Test enterGoesIntoAnArchiveAndTheParentRowLeavesIt() passed after 85.682 seconds.
+✔ Test packEncryptedAndIntoAnExistingArchive() passed after 85.682 seconds.
+✔ Test whichFilesOpenAsArchivesIsASetting() passed after 85.682 seconds.
+✔ Test thePluginRegistersItsParts() passed after 85.681 seconds.
+✔ Test theCommandListIsGroupedByMenuAndFiltered() passed after 85.682 seconds.
+✔ Suite VirtualFolderCommands passed after 85.694 seconds.
+✔ Test registersTheSpecificationsKeysAndAPreferencePage() passed after 85.681 seconds.
+✔ Test archivesOnAnotherFileSystemOpenTheSameWay() passed after 85.682 seconds.
+✔ Test enterOnAMemberShowsWhatTheArchiveKnows() passed after 85.681 seconds.
+✔ Test closesDuplicatesKeepingTheActiveTab() passed after 85.680 seconds.
+✔ Test copyIntoAnArchiveWithTheCopyCommand() passed after 85.682 seconds.
+✔ Test aMarkedNameIsNotMarkedForItsNormalisationTwin() passed after 85.681 seconds.
+✔ Suite ToolsAdoptMultiRename passed after 85.694 seconds.
+✔ Test neitherSynchronizeNorCompareStartsWhileTheJobRuns() passed after 85.680 seconds.
+✔ Test opensTabsInTheBackgroundAndInTheOtherPanel() passed after 85.681 seconds.
+✔ Test movesTabsWithinAndBetweenThePanels() passed after 85.681 seconds.
+✔ Test savesAndLoadsTabFiles() passed after 85.680 seconds.
+✔ Test reopensClosedTabsWhereTheyWere() passed after 85.680 seconds.
+✔ Suite ViewOptions passed after 85.694 seconds.
+✔ Test packIntoTheTargetPanel() passed after 85.682 seconds.
+✔ Test aCommandFieldIsReadAsStepsOrAsOneLine() passed after 85.682 seconds.
+✔ Suite FileOpsFixCommands passed after 85.694 seconds.
+✔ Test togglingTouchesOnlyItsRowsAndKeepsTheCount() passed after 85.680 seconds.
+✔ Test exchangesThePanelsWithAllTheirTabs() passed after 85.680 seconds.
+✔ Suite PluginCommands passed after 85.694 seconds.
+✔ Test aMissingOrEmptyTabFileIsReported() passed after 85.680 seconds.
+✔ Suite FileOperationCommands passed after 85.694 seconds.
+✔ Test optionsDecideWhereAndHowNewTabsOpen() passed after 85.681 seconds.
+✔ Test closesAllOtherTabsAfterAsking() passed after 85.681 seconds.
+✔ Test copyOutOfAnArchiveWithTheCopyCommand() passed after 85.682 seconds.
+✔ Suite DirectorySyncSessionFixes passed after 85.694 seconds.
+✔ Test unpackFromInsideAnArchive() passed after 85.681 seconds.
+✔ Suite ConfigurationAdoption passed after 85.694 seconds.
+✔ Test activatesTabsByNumberAndFromTheList() passed after 85.681 seconds.
+✔ Test committedKeysAreStoredAndApplyAtOnceAndAfterARestart() passed after 85.682 seconds.
+✔ Test newFolderRenameAndDeleteInsideAnArchive() passed after 85.682 seconds.
+✔ Suite ConfigurationModels passed after 85.694 seconds.
+✔ Test readOnlyArchivesWithholdTheCommandsThatChange() passed after 85.681 seconds.
+✔ Test renamesAndLocksTabs() passed after 85.681 seconds.
+✔ Suite FolderTabCommands passed after 85.694 seconds.
+✔ Suite ArchiveCommandsInPanels passed after 85.694 seconds.
+✔ Test secondButtonOpensTheEntryInANewTab() passed after 85.710 seconds.
+✔ Test decodesMailsAndYEnc() passed after 85.709 seconds.
+✔ Test registersCommandsKeysMenuButtonsAndPreferences() passed after 85.739 seconds.
+✔ Test configureStoresWhatTheEditorReturnsAndKeepsTheListOnCancel() passed after 85.706 seconds.
+✔ Test historyIsSavedAndCleared() passed after 85.711 seconds.
+✔ Test hiddenEntriesStayOutOfTheMenu() passed after 85.708 seconds.
+✔ Test cancellingLeavesNoHalfWrittenFiles() passed after 85.706 seconds.
+✔ Test historySettingsLimitTheListAndHideFrequentFolders() passed after 85.709 seconds.
+✔ Test decodesWhatTheSystemToolsWrite() passed after 85.708 seconds.
+✔ Test showsTheFolderUnderTheCursorInTheOtherPanel() passed after 85.706 seconds.
+✔ Test mirrorsThePathEitherWay() passed after 85.704 seconds.
+✔ Test goesToThePathOnTheClipboard() passed after 85.706 seconds.
+✔ Test choosesTheNeighbourPlace() passed after 85.704 seconds.
+✔ Test goesToTheStandardPlaces() passed after 85.706 seconds.
+✔ Test entriesRunCommands() passed after 85.704 seconds.
+✔ Test historyListsTheVisitedDirectoriesOfThePanel() passed after 85.711 seconds.
+✔ Test theSelectionOfTwoPanelsKeepsTheTwins() passed after 85.701 seconds.
+✔ Test cyclesThroughTheVolumes() passed after 85.701 seconds.
+✔ Test theViewerRegistersItsCommandsKeysPageAndService() passed after 85.704 seconds.
+✔ Test combineChecksTheCrc() passed after 85.709 seconds.
+✔ Test decodeNamesTargetsAndClashes() passed after 85.701 seconds.
+✔ Test favoritesAreOfferedUnlessSwitchedOff() passed after 85.701 seconds.
+✔ Test splitWritesPartsAndTheCrcFile() passed after 85.701 seconds.
+✔ Test combineWithoutACrcFile() passed after 85.701 seconds.
+✔ Test historyButtonsOpenTabsAndTheOtherPanelAndRemoveEntries() passed after 85.695 seconds.
+✔ Test registersTheSpecificationsKeysWithoutConflicts() passed after 85.704 seconds.
+✔ Test addsAndRemovesTheCurrentDirectory() passed after 85.701 seconds.
+✔ Test choosingAnEntryChangesDirectoryAndTheTargetPanel() passed after 85.695 seconds.
+✔ Test occupiedSpaceMeasuresTheOperandsAndShowsFolderSizes() passed after 85.696 seconds.
+✔ Test sixBitLines() passed after 85.695 seconds.
+✔ Test historyKnowsTheCurrentDirectoryBeforeAnyEvent() passed after 85.701 seconds.
+✔ Test partSeries() passed after 85.704 seconds.
+✔ Test propertiesOfFilesFoldersAndSelections() passed after 85.696 seconds.
+✔ Test wrongEntriesAreAskedAgainAndTargetFileCanBeLoaded() passed after 85.693 seconds.
+✔ Test commandsAndMenu() passed after 85.696 seconds.
+✔ Test aPictureOnTheClipboardIsPastedAsPNG() passed after 85.693 seconds.
+✔ Test filesOnTheClipboardWinOverText() passed after 85.690 seconds.
+✔ Test splitByTypedSizeIntoTheSourceFolderAndOntoAnotherFileSystem() passed after 85.693 seconds.
+✔ Test commentsWorkOnAnyWritableFileSystemAndForTheFolderItself() passed after 85.695 seconds.
+✔ Test parametersApplyWithoutADialogAndFailuresAreReported() passed after 85.691 seconds.
+✔ Test encodeInSeveralParts(method:) with 3 test cases passed after 85.690 seconds.
+✔ Test submenusOpenAsTheNextListAndCancelLeadsBack() passed after 85.695 seconds.
+✔ Test registration() passed after 85.693 seconds.
+✔ Test theDialogDecidesWhatRuns() passed after 85.689 seconds.
+✔ Test detailsAreTabSeparatedColumns() passed after 85.693 seconds.
+✔ Test namesAreOneLineEachAndFoldersEndWithASlash() passed after 85.690 seconds.
+✔ Test onlyVisibleRowsAreSynchronized() passed after 85.685 seconds.
+✔ Test splitOfAnEmptyFile() passed after 85.689 seconds.
+✔ Test anUnknownOwnerIsRefused() passed after 85.681 seconds.
+✔ Test directionsAreChangedForOneRowOrMany() passed after 85.690 seconds.
+✔ Test splitRefusesBadSizesAndCleansUp() passed after 85.685 seconds.
+✔ Test splitSizes() passed after 85.684 seconds.
+✔ Test withoutASelectionTheCursorItemIsMeant() passed after 85.688 seconds.
+✔ Test aTextOnTheClipboardIsPastedAsANewFile() passed after 85.685 seconds.
+✔ Test asymmetricDeletesOnTheRightAfterConfirmation() passed after 85.681 seconds.
+✔ Test allFolderSizesAtOnce() passed after 85.681 seconds.
+✔ Test createsSymbolicLinksAliasesAndHardLinks() passed after 85.688 seconds.
+✔ Test editsCommentsInTheFoldersCommentFile() passed after 85.691 seconds.
+✔ Suite ToolsAdoptSyncSession passed after 85.759 seconds.
+✔ Test goesToTheTargetOfALink() passed after 85.681 seconds.
+✔ Test listIsGroupedBySubdirectoryAndFilteredByTheShowButtons() passed after 85.675 seconds.
+✔ Test opensWithThePanelsDirectoriesAndSelection() passed after 85.676 seconds.
+✔ Test unreadableFoldersAreReported() passed after 85.678 seconds.
+✔ Test detailsIncludeThePluginColumnsThePanelShows() passed after 85.676 seconds.
+✔ Test viewAndCompareGoThroughOtherPluginsCommands() passed after 85.681 seconds.
+✔ Test propertiesAndFinderInfoElsewhere() passed after 85.685 seconds.
+✔ Test changesPermissionsDateAndFlagsOfOneFile() passed after 85.678 seconds.
+✔ Test aVolumeIsRenamedOnlyWithAValidName() passed after 85.655 seconds.
+✔ Test theFileListGoesToThePrinterAsPages() passed after 85.666 seconds.
+✔ Test settingsAreSavedUnderNamesAndLoaded() passed after 85.662 seconds.
+✔ Test aCalculatedFolderSizeReplacesDIR() passed after 85.655 seconds.
+✔ Test base64MatchesTheSystemTool() passed after 85.675 seconds.
+✔ Test registersCommandsMenusKeysAndColumns() passed after 85.684 seconds.
+✔ Test changesSeveralItemsWithAndWithoutTheirContents() passed after 85.676 seconds.
+✔ Test outsideTheLocalDisksTheHomeFolderIsUsed() passed after 85.624 seconds.
+✔ Test detailsCanBeSavedToAFile() passed after 85.667 seconds.
+✔ Test commandIsRegisteredWithMenuButtonAndPreferences() passed after 85.681 seconds.
+✔ Test failuresAreAskedAboutAndTheRestStillRuns() passed after 85.655 seconds.
+✔ Suite NavigationPlaces passed after 85.759 seconds.
+✔ Suite PlacesCommands passed after 85.759 seconds.
+✔ Test synchronizeRunsBothDirectionsAndComparesAgain() passed after 85.655 seconds.
+✔ Test theFileListCanBeShownAsText() passed after 85.602 seconds.
+✔ Test registration() passed after 85.655 seconds.
+✔ Test freeNamesCountUp() passed after 85.676 seconds.
+✔ Test theViewerShowsTheOutputWhenThereIsOne() passed after 85.602 seconds.
+✔ Test theListWithSubfoldersAsksForDepthAndMask() passed after 85.602 seconds.
+✔ Test pastingContentsNeedsAWritableFolderAndCanBeSwitchedOff() passed after 85.676 seconds.
+✔ Test uuencodeMatchesTheSystemTool() passed after 85.602 seconds.
+✔ Test combineFromTheFirstPartOrTheCrcFile() passed after 85.598 seconds.
+✔ Test runCommandAsksForTheLine() passed after 85.624 seconds.
+✔ Test previewFollowsTheSettings() passed after 85.598 seconds.
+✔ Test whatWouldStartApplicationsIsOnlyRecorded() passed after 85.590 seconds.
+✔ Test allUppercaseOnTheLocalDisk() passed after 85.597 seconds.
+✔ Test undoHistoryIsLimited() passed after 85.598 seconds.
+✔ Test aFileThatAppearsMeanwhileIsNotOverwritten() passed after 85.588 seconds.
+✔ Test slashesMoveIntoFoldersThatAreCreated() passed after 85.598 seconds.
+✔ Test f4UsesTheEditorOfThePreferences() passed after 85.552 seconds.
+✔ Test encodeAndDecodeRoundTrip(method:count:) with 36 test cases passed after 85.599 seconds.
+✔ Test unchangedItemsStayInTheList() passed after 85.552 seconds.
+✔ Test undoAsksAndRestoresInReverseOrder() passed after 85.590 seconds.
+✔ Test aTypedLineRunsInTheSourceFolderAndItsOutputIsShown() passed after 85.586 seconds.
+✔ Test theEditorPreferenceNamesAnApplication() passed after 85.509 seconds.
+✔ Test undoWorksAfterTheToolWasClosedAndKeepsWhatFailed() passed after 85.590 seconds.
+✔ Test systemInformationIsShownAsText() passed after 85.535 seconds.
+✔ Test quickLookShareAndPathnameTakeTheOperands() passed after 85.552 seconds.
+✔ Test nextStepChainsRules() passed after 85.525 seconds.
+✔ Test openWithOffersTheApplicationsForTheFile() passed after 85.535 seconds.
+✔ Test theSystemVolumeCannotBeEjected() passed after 85.575 seconds.
+✔ Test swapsAndShiftsThroughGivenNames() passed after 85.458 seconds.
+✔ Test testsRunOnlyHarmlessLines() passed after 85.598 seconds.
+✔ Test finderTagsAreReadEditedAndWritten() passed after 85.575 seconds.
+✔ Test commandMenuAndPreferences() passed after 85.459 seconds.
+✔ Test conflictsCanBeSkippedOrCancelTheRun() passed after 85.451 seconds.
+✔ Test resultLog() passed after 85.458 seconds.
+✔ Test openWithListsApplications() passed after 85.459 seconds.
+✔ Test editNamesAndLoadNamesFromAFile() passed after 85.445 seconds.
+✔ Test savedSettings() passed after 85.405 seconds.
+✔ Test printingFileContentsIsConfirmedFirst() passed after 85.459 seconds.
+✔ Test swapAndCaseOnlyRenameOnTheLocalDisk() passed after 85.277 seconds.
+✔ Test orderDrivesTheCounter() passed after 85.279 seconds.
+✔ Test aFailingCommandReportsItsExitStatus() passed after 85.590 seconds.
+✔ Test renamesAndEmptiesTheList() passed after 85.407 seconds.
+✔ Test historiesAndTitleWords() passed after 85.247 seconds.
+✔ Test previewMarksConflictsAndInvalidNames() passed after 85.452 seconds.
+✔ Test invertingTreatsTheTwinsApart() passed after 85.163 seconds.
+✔ Test conflictsAreAutoRenamedWhenAsked() passed after 85.336 seconds.
+✔ Test comparingKeepsTheTwinsApart() passed after 85.188 seconds.
+◇ Test viewingNeedsAFile() started.
+✔ Test aGroupMarksBothTwins() passed after 85.188 seconds.
+✔ Suite FilePropertiesCommands passed after 85.760 seconds.
+✔ Test counterShiftOnTheLocalDisk() passed after 85.446 seconds.
+✔ Test aRuleAnswersPerEntry() passed after 85.162 seconds.
+✔ Test failuresAreReportedAndStayInTheList() passed after 85.405 seconds.
+✔ Suite FileToolsTransforms passed after 85.760 seconds.
+✔ Suite ClipboardMore passed after 85.760 seconds.
+✔ Suite MacIntegrationMore passed after 85.760 seconds.
+✔ Test operandsAreTheSelectionOrTheCursorItem() passed after 85.321 seconds.
+✔ Suite DirectorySyncCommands passed after 85.760 seconds.
+✔ Test aSelectionFileNamesTheTwinItWrites() passed after 85.188 seconds.
+✔ Suite SystemToolsCommandTests passed after 85.760 seconds.
+✔ Suite ToolsAdoptSelection passed after 85.760 seconds.
+✔ Suite MultiRenameRuns passed after 85.760 seconds.
+✔ Test textAndDepthComeFromTheForm() passed after 85.754 seconds.
+✔ Test aSearchListsItsHitsUnderASummary() passed after 85.755 seconds.
+✔ Suite FindFilesWindow passed after 85.763 seconds.
+✔ Test windowOpensForDifferentFilesOnly() passed after 85.761 seconds.
+✔ Suite CompareContentWindow passed after 85.773 seconds.
+✔ Test switchingFilesInTheQuickViewDropsTheFileThatIsStillBeingRead() passed after 14.602 seconds.
+◇ Test aBigTextOfASlowFileSystemIsKeptOnDiskForTheNextLayout() started.
+✔ Test aFrameIsScaledOnceForTheSizeItIsShownAt() passed after 85.861 seconds.
+✔ Suite ViewerAdoptImage passed after 85.872 seconds.
+✔ Test viewingNeedsAFile() passed after 0.111 seconds.
+◇ Test theServiceShowsFilesOfAnyFileSystemAndTexts() started.
+✔ Test theServiceShowsFilesOfAnyFileSystemAndTexts() passed after 0.147 seconds.
+◇ Test aTextIsLaidOutOnceWhenItsWindowKeepsItsSize() started.
+✔ Test aTextIsLaidOutOnceWhenItsWindowKeepsItsSize() passed after 0.875 seconds.
+◇ Test aMissingFileIsReportedInTheWindow() started.
+✔ Test aMissingFileIsReportedInTheWindow() passed after 0.046 seconds.
+◇ Test severalMarkedFilesAreSteppedThroughWithNAndP() started.
+✔ Test severalMarkedFilesAreSteppedThroughWithNAndP() passed after 0.121 seconds.
+◇ Test modesAreChosenAtStartupAndSwitchedWithTheirKeys() started.
+✔ Test modesAreChosenAtStartupAndSwitchedWithTheirKeys() passed after 0.139 seconds.
+◇ Test binaryUnicodeHtmlAndImagesOpenInTheirModes() started.
+✔ Test binaryUnicodeHtmlAndImagesOpenInTheirModes() passed after 0.338 seconds.
+◇ Test theConfigurationDecidesTheStartupMode() started.
+✔ Test theConfigurationDecidesTheStartupMode() passed after 0.174 seconds.
+◇ Test findSearchesTheWholeFileAndRepeatsInBothDirections() started.
+✔ Test findSearchesTheWholeFileAndRepeatsInBothDirections() passed after 0.362 seconds.
+◇ Test theSelectionIsCopiedAsTextOrAsHex() started.
+✔ Test theSelectionIsCopiedAsTextOrAsHex() passed after 0.112 seconds.
+◇ Test positionsAreReachedByPercentOffsetAndLine() started.
+✔ Test positionsAreReachedByPercentOffsetAndLine() passed after 0.200 seconds.
+◇ Test theQuickViewCoversTheTargetPanelAndFollowsTheCursor() started.
+✔ Test theQuickViewCoversTheTargetPanelAndFollowsTheCursor() passed after 0.145 seconds.
+◇ Test switchingToTheCoveredPanelOrChangingItsPlaceEndsTheQuickView() started.
+✔ Test aBigTextOfASlowFileSystemIsKeptOnDiskForTheNextLayout() passed after 2.806 seconds.
+✔ Suite ViewerAdoptPane passed after 88.612 seconds.
+✔ Test switchingToTheCoveredPanelOrChangingItsPlaceEndsTheQuickView() passed after 0.079 seconds.
+◇ Test theSeparateQuickViewIsAWindowThatFollowsTheCursor() started.
+✔ Test theSeparateQuickViewIsAWindowThatFollowsTheCursor() passed after 0.133 seconds.
+✔ Suite ViewerWindows passed after 88.752 seconds.
+✔ Test aWatcherThatGoesAwayWhileChangesArriveDoesNoHarm() passed after 90.253 seconds.
+✔ Suite LocalDiskFixes passed after 90.308 seconds.
+✔ Test run with 1126 tests in 141 suites passed after 90.310 seconds.
+RUN exit=0 wall=97.5s load_before=31.3 load_after=20.8 cmd=swift test --skip-build --sanitize=thread --scratch-path /private/tmp/claude-501/-Users-cm0k-Claude-Projects-TotalCommander/91e36f29-0d53-4421-8985-1ec839e7f5c4/scratchpad/review2/stress/b-tsan --filt

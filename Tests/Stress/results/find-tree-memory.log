@@ -1,0 +1,198 @@
+tree: 100002 files
+tree: *.txt 80000, with needle 1129
+STEP ground truth: tree                             wall=  11.593s cpu=  18.74s threads 7->8 footprint=36MB peakRSS=59MB load=14.2
+STEP idle baseline                                  wall=   2.002s cpu=   0.05s threads 8->8 footprint=37MB peakRSS=61MB load=14.2
+threads at baseline: 8
+  engine tree name *.txt: 80000 results in 0.293s, first after 0.003s
+STEP engine: tree name *.txt #0                     wall=   0.386s cpu=   3.60s threads 8->8 footprint=50MB peakRSS=148MB load=14.2
+  engine tree name *.txt: 80000 results in 0.280s, first after 0.003s
+STEP engine: tree name *.txt #1                     wall=   0.380s cpu=   3.42s threads 8->8 footprint=81MB peakRSS=165MB load=14.2
+  engine tree text NEEDLE: 1129 results in 3.022s, first after 0.490s
+STEP engine: tree text NEEDLE #0                    wall=   3.023s cpu=  35.49s threads 8->24 footprint=644MB peakRSS=728MB load=14.9
+  engine tree text NEEDLE: 1129 results in 3.032s, first after 0.563s
+STEP engine: tree text NEEDLE #1                    wall=   3.034s cpu=  35.66s threads 24->24 footprint=774MB peakRSS=878MB load=18.0
+STEP engine: 8 concurrent searches of the tree      wall=   8.411s cpu= 111.70s threads 24->7 footprint=87MB peakRSS=2742MB load=22.4
+HEAP after the engine runs                        footprint     87 MB; malloc in use     21 MB, allocated from the system   2870 MB; threads 7
+threads after engine runs: 7 (baseline 8)
+STEP threads settle after engine runs               wall=   0.000s cpu=   0.00s threads 7->7 footprint=87MB peakRSS=2742MB load=22.4
+  window tree name *.txt: 80000 results in 0.296s, first rows after 0.247s, threads 17
+STEP window: tree name *.txt                        wall=   0.978s cpu=   3.33s threads 7->17 footprint=153MB peakRSS=2765MB load=22.4
+  window tree text NEEDLE: 1129 results in 2.946s, first rows after 0.685s, threads 17
+STEP window: tree text NEEDLE                       wall=   3.550s cpu=  33.67s threads 17->17 footprint=198MB peakRSS=2811MB load=22.8
+STEP window: 20 searches cancelled at random        wall=  22.763s cpu= 263.26s threads 17->26 footprint=283MB peakRSS=2881MB load=27.2
+cancel -> finished: n=17 median=7.6ms p95=17.2ms max=17.2ms (tree text NEEDLE cancelled after 0.875s); 3 ended before the cancel
+threads right after each round: min 10 max 26 last 26
+HEAP after the window's cancelled searches        footprint    283 MB; malloc in use    616 MB, allocated from the system   2928 MB; threads 26
+STEP engine: 20 runs cancelled from another thread  wall=  16.694s cpu= 207.68s threads 26->25 footprint=229MB peakRSS=2881MB load=31.8
+engine cancel -> run returned: median=10.3ms p95=18.5ms max=18.5ms
+HEAP after the engine's cancelled runs            footprint    229 MB; malloc in use    635 MB, allocated from the system   2928 MB; threads 25
+threads over time after the last search: 0.0s:25 0.5s:9
+threads: baseline 8, at the end 9
+STEP threads settle at the end                      wall=   0.501s cpu=   0.13s threads 25->9 footprint=229MB peakRSS=2881MB load=31.8
+STEP window after torture: tree name *.txt          wall=   0.683s cpu=   3.31s threads 9->9 footprint=236MB peakRSS=2881MB load=31.8
+STEP window after torture: tree text NEEDLE         wall=   3.648s cpu=  42.81s threads 9->9 footprint=252MB peakRSS=2885MB load=31.5
+HEAP at the end                                   footprint    252 MB; malloc in use    143 MB, allocated from the system   2940 MB; threads 9
+HEAP after 5 more text searches of the tree       footprint    181 MB; malloc in use    695 MB, allocated from the system   2940 MB; threads 25
+HEAP after 10 more text searches of the tree      footprint    164 MB; malloc in use    693 MB, allocated from the system   2940 MB; threads 25
+HEAP after 15 more text searches of the tree      footprint    173 MB; malloc in use    687 MB, allocated from the system   2940 MB; threads 24
+HEAP after 20 more text searches of the tree      footprint    164 MB; malloc in use    695 MB, allocated from the system   2940 MB; threads 24
+HEAP 5 s after the last of them                   footprint    163 MB; malloc in use    143 MB, allocated from the system   2940 MB; threads 8
+
+==== MAIN-THREAD WATCHDOG: scenario 6, Find Files ====
+histogram bounds (ms): <2 <4 <8 <16 <33 <100 <250 <1000 <5000 >=5000
+(max cpu = processor time the main thread used during its longest stall; stall ms / cpu ms = sums over all stalls > 8 ms: equal means the main thread was working, cpu much smaller means it was blocked or had no core)
+phase                                            wall s   pings   >8ms >100ms    >1s    max ms  max cpu  stall ms    cpu ms  histogram
+ground truth: tree                                11.60       0      0      0      0       0.0      0.0         0         0  0,0,0,0,0,0,0,0,0,0
+idle baseline                                      2.00     753      1      1      1   11598.6   1357.0     11599      1357  752,0,0,0,0,0,0,0,0,1
+engine: tree name *.txt #0                         0.29      95      0      0      0       1.4      0.0         0         0  95,0,0,0,0,0,0,0,0,0
+(harness: checking results)                       62.24   20452     24      0      0      77.1     77.2       374        78  20034,327,67,19,4,1,0,0,0,0
+engine: tree name *.txt #1                         0.28      99      1      0      0      91.0     90.9        91        91  98,0,0,0,0,1,0,0,0,0
+engine: tree text NEEDLE #0                        3.02    1053      1      0      0      97.6     97.5        98        97  1035,15,2,0,0,1,0,0,0,0
+engine: tree text NEEDLE #1                        3.03    1004      2      0      0      15.4      0.0        25         0  984,18,0,2,0,0,0,0,0,0
+engine: 8 concurrent searches of the tree          8.04    1783     44      0      0      92.1      0.0      1100         1  1630,63,46,18,16,10,0,0,0,0
+threads settle after engine runs                   0.05       0      0      0      0       0.0      0.0         0         0  0,0,0,0,0,0,0,0,0,0
+window: tree name *.txt                            0.60     198      3      1      0     460.6    440.5       491       471  195,0,0,1,1,0,0,1,0,0
+window: tree text NEEDLE                           3.25    1069      2      0      0      13.1      9.5        22        17  1053,11,3,2,0,0,0,0,0,0
+window: 20 searches cancelled at random           22.52    7181     24      2      0     103.3    104.3       633       462  6930,179,48,16,3,3,2,0,0,0
+engine: 20 runs cancelled from another thread     16.70    5287      6      0      0      14.4      0.0        65        10  5116,142,23,6,0,0,0,0,0,0
+threads settle at the end                          0.50     194      0      0      0       0.1      0.0         0         0  194,0,0,0,0,0,0,0,0,0
+window after torture: tree name *.txt              0.61     215      2      0      0      18.5     18.7        27        27  211,1,1,1,1,0,0,0,0,0
+window after torture: tree text NEEDLE             3.65    1045      5      1      0     109.8     95.7       167       105  979,48,13,3,1,0,1,0,0,0
+TOTAL                                            138.38   40428    115      5      1   11598.6      14691      2716
+
+-- stall 11599 ms (main thread cpu 1357 ms) at t=0.00s in phase 'idle baseline'; main thread stack at +100 ms:
+   0   libsystem_kernel.dylib              0x000000018416d93c __open_nocancel + 8
+   1   libsystem_kernel.dylib              0x0000000184182024 open$NOCANCEL + 64
+   2   libsystem_c.dylib                   0x000000018408c5f4 __opendir2 + 44
+   3   StressFind                          0x00000001009b0e38 $s10StressFind8allFilesySaySSG10Foundation3URLVF + 172
+   4   StressFind                          0x00000001009b085c $s10StressFindyyXEfU_ + 232
+   5   StressFind                          0x0000000100f8b034 $s9StressKit4step_5limit_xSS_SdxyKXEtKlF + 444
+   6   StressFind                          0x00000001009ae434 main + 1516
+   7   dyld                                0x0000000183ddbe80 start + 6688
+   .. and at +1 s:
+   0   libsystem_kernel.dylib              0x000000018416d910 read + 8
+   1   Foundation                          0x000000018611f89c $s10Foundation17readBytesFromFile4path14reportProgress9maxLength7options16attributesToRead0L0AA0nC6ResultVx_SbSiSgSo20NSDataReadingOptionsVSaySSGSDySSAA4DataVGztKAA0E19SystemRepresentableRzRi_zlFAA3URLV_TB5 + 6264
+   2   Foundation                          0x0000000185dfd6ac $s10Foundation16readDataFromFile4path14reportProgress9maxLength7optionsAA0C0Vx_SbSiSgSo20NSDataReadingOptionsVtKAA0E19SystemRepresentableRzRi_zlFAA3URLV_TB5Tm + 64
+   3   Foundation                          0x0000000185dfe7a8 $s10Foundation4DataV10contentsOf7optionsAcA3URLVh_So20NSDataReadingOptionsVtKcfC + 136
+   4   StressFind                          0x00000001009b139c $s10StressFind8contains__15caseInsensitiveSbSS_Says5UInt8VGSbtF + 660
+   5   StressFind                          0x00000001009b10e8 $s10StressFindyyXEfU_SbSScfU0_ + 64
+   6   StressFind                          0x00000001009bd9a4 $s10StressFind14parallelFilteryShySSGSaySSG_SbSSctFySiYbXEfU_TA + 280
+   7   libswiftDispatch.dylib              0x00000001a06bee74 $sSiIgy_SiIegy_TRTA + 28
+   8   libswiftDispatch.dylib              0x00000001a06beea0 $sSiIegy_SiIyBy_TR + 32
+   9   libdispatch.dylib                   0x000000018400a5b8 _dispatch_client_callout2 + 16
+   10  libdispatch.dylib                   0x00000001840052c8 _dispatch_apply_invoke3 + 336
+   11  libdispatch.dylib                   0x000000018400a5a0 _dispatch_client_callout + 16
+   12  libdispatch.dylib                   0x0000000183ff3624 _dispatch_once_callout + 32
+   13  libdispatch.dylib                   0x000000018400595c _dispatch_apply_invoke_and_wait + 352
+   14  libdispatch.dylib                   0x0000000184004a44 _dispatch_apply_with_attr_f + 1292
+   15  libdispatch.dylib                   0x0000000184004be8 dispatch_apply + 96
+   16  libswiftDispatch.dylib              0x00000001a06bef2c _swift_dispatch_apply_current + 128
+   17  libswiftDispatch.dylib              0x00000001a06bedf8 $sSo17OS_dispatch_queueC8DispatchE17concurrentPerform10iterations7executeySi_ySiXEtFZ + 196
+   18  StressFind                          0x00000001009b17a8 $s10StressFind14parallelFilteryShySSGSaySSG_SbSSctF + 172
+   19  StressFind                          0x00000001009b0a14 $s10StressFindyyXEfU_ + 672
+   20  StressFind                          0x0000000100f8b034 $s9StressKit4step_5limit_xSS_SdxyKXEtKlF + 444
+   21  StressFind                          0x00000001009ae434 main + 1516
+   22  dyld                                0x0000000183ddbe80 start + 6688
+
+-- stall 461 ms (main thread cpu 440 ms) at t=28.47s in phase 'window: tree name *.txt'; main thread stack at +100 ms:
+   0   libswiftCore.dylib                  0x0000000198b68860 __swift_instantiateConcreteTypeFromMangledNameV2 + 20
+   1   libswiftCore.dylib                  0x0000000198bac52c $ss11AnyHashableVSg_ACtWOhTm + 32
+   2   libswiftCore.dylib                  0x0000000198bac52c $ss11AnyHashableVSg_ACtWOhTm + 32
+   3   libswiftCore.dylib                  0x0000000198a5688c $ss15__StringStorageCfD + 100
+   4   libswiftCore.dylib                  0x00000001987272a4 _swift_release_dealloc + 64
+   5   libswiftCore.dylib                  0x000000019878dae4 _ZN5swift9RefCountsINS_13RefCountBitsTILNS_19RefCountInlinednessE1EEEE15doDecrementSlowILNS_13PerformDeinitE1EEEbS3_j + 168
+   6   Foundation                          0x000000018620baf8 $s10Foundation9_SwiftURLC4pathSSvg + 548
+   7   Foundation                          0x0000000186195c08 $s10Foundation3URLV4pathSSvg + 60
+   8   StressFind                          0x00000001009b2a74 $s10StressFind6verify__7against9filesOnlyySS_Say9AFMKernel8FileItemVGShySSGSbtF + 468
+   9   StressFind                          0x00000001009b3b20 $s10StressFindyyXEfU4_ + 2124
+   10  StressFind                          0x0000000100f8b034 $s9StressKit4step_5limit_xSS_SdxyKXEtKlF + 444
+   11  StressFind                          0x00000001009aea04 main + 3004
+   12  dyld                                0x0000000183ddbe80 start + 6688
+
+-- stall 110 ms (main thread cpu 96 ms) at t=73.99s in phase 'window after torture: tree text NEEDLE'; main thread stack at +100 ms:
+   0   libsystem_kernel.dylib              0x000000018416cc20 mach_msg2_trap + 8
+   1   libsystem_kernel.dylib              0x000000018417f8e0 mach_msg2_internal + 76
+   2   libsystem_kernel.dylib              0x0000000184175a28 mach_msg_overwrite + 480
+   3   libsystem_kernel.dylib              0x000000018416cfac mach_msg + 24
+   4   QuartzCore                          0x000000018ea9256c _ZN2CA6Render7Context20wait_for_synchronizeEjPjS2_S2_i + 120
+   5   QuartzCore                          0x000000018eaf1eac _ZN2CA7Context11synchronizeEjib + 808
+   6   QuartzCore                          0x000000018e93b1d8 _ZL25CABackingStoreSynchronizeP14CABackingStorePN2CA14GenericContextEji + 100
+   7   QuartzCore                          0x000000018e919984 _ZL29CABackingStorePrepareUpdates_P14CABackingStoremmjjjyPN2CA14GenericContextEP11UpdateState + 1412
+   8   QuartzCore                          0x000000018e919168 CABackingStoreUpdate_ + 488
+   9   QuartzCore                          0x000000018e96eb24 ___ZN2CA5Layer8display_Ev_block_invoke + 76
+   10  QuartzCore                          0x000000018e918418 -[CALayer _display] + 1820
+   11  AppKit                              0x00000001899d3e40 __swift_closure_destructor.30 + 17936
+   12  AppKit                              0x00000001899d37a0 __swift_closure_destructor.30 + 16240
+   13  AppKit                              0x00000001899d3f40 __swift_closure_destructor.30 + 18192
+   14  QuartzCore                          0x000000018e9173e8 _ZN2CA5Layer17display_if_neededEPNS_11TransactionE + 788
+   15  QuartzCore                          0x000000018eaf2d30 _ZN2CA7Context18commit_transactionEPNS_11TransactionEdPd + 684
+   16  QuartzCore                          0x000000018e8f77d4 _ZN2CA11Transaction6commitEv + 652
+   17  QuartzCore                          0x000000018e8f7370 _ZN2CA11Transaction5flushEv + 84
+   18  AppKit                              0x000000018894af1c __62+[CATransaction(NSCATransaction) NS_setFlushesWithDisplayLink]_block_invoke + 272
+   19  CoreFoundation                      0x0000000184271cc4 __CFRUNLOOP_IS_CALLING_OUT_TO_AN_OBSERVER_CALLBACK_FUNCTION__ + 36
+   20  CoreFoundation                      0x0000000184271bbc __CFRunLoopDoObservers + 648
+   21  CoreFoundation                      0x00000001842711a8 __CFRunLoopRun + 776
+   22  CoreFoundation                      0x000000018434b82c _CFRunLoopRunSpecificWithOptions + 536
+   23  StressFind                          0x0000000100f865e8 $s9StressKit4pump4upTo5untilSbSd_SbyXEtF + 292
+   24  StressFind                          0x00000001009bd734 $s10StressFindyyXEfU11_TA + 104
+   25  StressFind                          0x0000000100f8b034 $s9StressKit4step_5limit_xSS_SdxyKXEtKlF + 444
+   26  StressFind                          0x00000001009af154 main + 4876
+   27  dyld                                0x0000000183ddbe80 start + 6688
+
+-- stall 103 ms (main thread cpu 104 ms) at t=41.30s in phase 'window: 20 searches cancelled at random'; main thread stack at +100 ms:
+   0   CoreText                            0x00000001872c0ec8 _ZNK8TRunGlue12FocusOnIndexEl + 76
+   1   CoreText                            0x0000000187278be8 _ZNK8TRunGlue9IsDeletedEl + 44
+   2   CoreText                            0x000000018727c9d8 _ZNK14TGlyphIterator21CurrentGlyphIsIgnoredEPKN3OTL6LookupE + 116
+   3   CoreText                            0x000000018727c94c _ZN14TGlyphIterator4NextEl + 176
+   4   CoreText                            0x00000001872ab5d4 _ZNK3OTL4GPOS12ApplyPairPosEPKNS_14LookupSubtableER14TGlyphIteratorj + 100
+   5   CoreText                            0x000000018727b90c _ZN26TOpenTypePositioningEngine12PositionRunsER9SyncStateR13KerningStatus + 3504
+   6   CoreText                            0x00000001872d1e4c _ZN14TKerningEngine14PositionGlyphsER8TRunGlueRK11TCharStreama + 444
+   7   CoreText                            0x00000001872db6ec _ZN11TTypesetter12FinishLayoutERKNSt3__15tupleIJPK5TLinePK11TCharStreamPFPKvPK7__CTRunPK10__CFStringPvESG_PNS0_10shared_ptrI19TBidiLevelsProviderEEjhbPlEEER8TRunGluea9SyncState + 68
+   8   CoreText                            0x00000001872ee93c _ZN21TTypesetterAttrString10InitializeEPK20__CFAttributedStringb + 3060
+   9   CoreText                            0x00000001872edd2c _ZN21TTypesetterAttrStringC2EPK20__CFAttributedStringPK14__CFDictionaryb + 160
+   10  CoreText                            0x0000000187287a48 CTLineCreateWithAttributedString + 80
+   11  UIFoundation                        0x0000000189ec92a0 __NSCoreTypesetterCreateBaseLineFromAttributedString + 784
+   12  UIFoundation                        0x0000000189eccc3c -[NSCoreTypesetter _stringDrawingCoreTextEngineWithOriginalString:rect:padding:graphicsContext:forceClipping:attributes:stringDrawingOptions:drawingContext:stringDrawingInterface:] + 2876
+   13  UIFoundation                        0x0000000189e398dc __NSStringDrawingEngine + 1964
+   14  AppKit                              0x000000018989f5c8 __swift_closure_destructor.73 + 5036
+   15  AppKit                              0x000000018989f6ac __swift_closure_destructor.73 + 5264
+   16  AppKit                              0x000000018983c228 __swift__destructor.26 + 260
+   17  AppKit                              0x000000018983c250 __swift__destructor.26 + 300
+   18  AppKit                              0x00000001898eded0 __swift_memcpy18_8 + 14752
+   19  AppKit                              0x00000001898ee4a8 __swift_memcpy18_8 + 16248
+   20  AppKit                              0x000000018893bb58 _NSViewDrawRect + 136
+   21  AppKit                              0x00000001892594e0 -[NSView _recursive:displayRectIgnoringOpacity:inContext:stopAtLayerBackedViews:] + 1088
+   22  AppKit                              0x000000018893b55c -[NSView(NSLayerKitGlue) _drawViewBackingLayer:inContext:drawingHandler:] + 536
+   23  AppKit                              0x0000000188de9e44 -[NSViewBackingLayer drawInContext:] + 52
+   24  AppKit                              0x0000000189940ef8 __getCGDisplayListGetHashSymbolLoc_block_invoke + 15052
+   25  AppKit                              0x00000001899d1bf0 __swift_closure_destructor.30 + 9152
+   26  AppKit                              0x00000001899d2394 __swift_closure_destructor.30 + 11108
+   27  AppKit                              0x0000000188de9a70 -[NSViewBackingLayer display] + 1268
+   28  QuartzCore                          0x000000018e9173e8 _ZN2CA5Layer17display_if_neededEPNS_11TransactionE + 788
+   29  QuartzCore                          0x000000018eaf2d30 _ZN2CA7Context18commit_transactionEPNS_11TransactionEdPd + 684
+   30  QuartzCore                          0x000000018e8f77d4 _ZN2CA11Transaction6commitEv + 652
+   31  QuartzCore                          0x000000018e8f7370 _ZN2CA11Transaction5flushEv + 84
+   32  AppKit                              0x000000018894af1c __62+[CATransaction(NSCATransaction) NS_setFlushesWithDisplayLink]_block_invoke + 272
+   33  CoreFoundation                      0x0000000184271cc4 __CFRUNLOOP_IS_CALLING_OUT_TO_AN_OBSERVER_CALLBACK_FUNCTION__ + 36
+
+FAILURES: 0
+peak RSS 2891 MB, threads 8, load 38.3
+      138.76 real       129.72 user      1241.64 sys
+          3031875584  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+              203800  page reclaims
+                  31  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                   0  signals received
+              111692  voluntary context switches
+             2687355  involuntary context switches
+       2774943316256  instructions retired
+       5087390974468  cycles elapsed
+          2767457232  peak memory footprint
+RUN exit=0 wall=138.8s load_before=16.0 load_after=38.3 cmd=/usr/bin/time -l /private/tmp/claude-501/-Users-cm0k-Claude-Projects-TotalCommander/91e36f29-0d53-4421-8985-1ec839e7f5c4/scratchpad/review2/stress/b-harness/release/StressFind run /private/tmp/claude-
