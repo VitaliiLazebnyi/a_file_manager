@@ -154,6 +154,7 @@ public final class FilePropertiesPlugin: Plugin {
 /// panel's state and ask the user. Whatever touches a file system, even to pre-fill a dialog,
 /// runs inside a job on the job's thread; the completion returns to the main thread to show
 /// the result and refresh the panels.
+@MainActor
 final class PropertyActions {
     private let kernel: Kernel
     private let comments: CommentStore
@@ -171,7 +172,7 @@ final class PropertyActions {
 
     /// The folders whose listings an operation on `items` may have changed. Grows with the
     /// selection, so it is worked out on a job's thread.
-    private static func folders(of items: [FileItem], and directory: URL) -> [URL] {
+    nonisolated private static func folders(of items: [FileItem], and directory: URL) -> [URL] {
         var seen = Set<String>()
         return ([directory] + items.map { $0.url.deletingLastPathComponent() }).filter {
             seen.insert($0.locationKey).inserted

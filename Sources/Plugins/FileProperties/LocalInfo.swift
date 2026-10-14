@@ -28,8 +28,10 @@ struct LocalDetails: Equatable {
 /// and are guarded by a lock.
 enum LocalInfo {
     private static let lock = NSLock()
-    private static var userNames: [uid_t: String] = [:]
-    private static var groupNames: [gid_t: String] = [:]
+    /// Guarded by `lock`.
+    nonisolated(unsafe) private static var userNames: [uid_t: String] = [:]
+    /// Guarded by `lock`.
+    nonisolated(unsafe) private static var groupNames: [gid_t: String] = [:]
 
     private static func date(_ time: timespec) -> Date {
         Date(timeIntervalSince1970: TimeInterval(time.tv_sec) + TimeInterval(time.tv_nsec) / 1_000_000_000)
@@ -74,7 +76,8 @@ enum LocalInfo {
     /// the network) because it was not known yet. For tests: they check that this happens on
     /// a job's thread and not when a dialog is put together.
     static var nameLookups: Int { lock.withLock { lookups } }
-    private static var lookups = 0
+    /// Guarded by `lock`.
+    nonisolated(unsafe) private static var lookups = 0
 
     static func userName(_ id: uid_t) -> String {
         lock.lock()

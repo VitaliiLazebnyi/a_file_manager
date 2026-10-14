@@ -204,7 +204,10 @@ struct DescriptIon: Equatable {
 /// ends when its caller's flag is set, and a thread that waits for another's reading gives
 /// up when its own flag is set or after `waitLimit` (the reader may be held by a server
 /// that has stopped answering, with a flag nobody sets).
-final class CommentStore {
+///
+/// `remembered`, `beingRead` and `generations` are guarded by `condition`; `waitLimit` is set
+/// before the store is used, and only read afterwards.
+final class CommentStore: @unchecked Sendable {
     private struct Remembered {
         let comments: [String: String]
         let read: Date

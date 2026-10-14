@@ -30,7 +30,9 @@ struct SpaceTotals: Equatable {
 /// `JobMonitor`, which expects one reporting thread, sees one at a time). Whichever thread
 /// comes by reports, because the job's own thread may be waiting for the others or deep in one
 /// slow folder; a paused job then stops the threads that come by, which is what Pause is for.
-final class ProgressMeter {
+///
+/// All state is guarded by `lock`.
+final class ProgressMeter: @unchecked Sendable {
     private let monitor: any JobMonitor
     private let title: String
     private let total: Int
