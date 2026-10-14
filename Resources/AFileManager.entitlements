@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<!--
+    What the hardened runtime lets the program do beyond its defaults: one thing.
+
+    Apple events: File Properties asks Finder for the Get Info window (through osascript), and
+    the commands the user starts may control other applications. The system still asks the
+    user once per application (NSAppleEventsUsageDescription in Info.plist).
+
+    Deliberately absent, so the runtime keeps refusing them:
+    - com.apple.security.cs.allow-dyld-environment-variables: DYLD_INSERT_LIBRARIES and
+      DYLD_LIBRARY_PATH stay without effect on the program.
+    - com.apple.security.cs.disable-library-validation: only libraries of the system and of
+      the program's own signature are loaded (the one library opened by name,
+      /usr/lib/libicucore.A.dylib, is the system's).
+    - com.apple.security.cs.allow-jit, allow-unsigned-executable-memory,
+      disable-executable-page-protection: the program generates no code.
+    - com.apple.security.get-task-allow: no debugger attaches to a built program.
+    The App Sandbox is not used: a file manager works on every folder the user can reach.
+-->
+<dict>
+    <key>com.apple.security.automation.apple-events</key>
+    <true/>
+</dict>
+</plist>

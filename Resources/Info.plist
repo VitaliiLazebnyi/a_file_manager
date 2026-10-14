@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleName</key>
+    <string>A File Manager</string>
+    <key>CFBundleDisplayName</key>
+    <string>A File Manager</string>
+    <key>CFBundleExecutable</key>
+    <string>AFileManager</string>
+    <key>CFBundleIdentifier</key>
+    <string>local.a-file-manager</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>en</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>0.1</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>13.0</string>
+    <key>LSApplicationCategoryType</key>
+    <string>public.app-category.utilities</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>NSPrincipalClass</key>
+    <string>NSApplication</string>
+    <key>NSDesktopFolderUsageDescription</key>
+    <string>A File Manager shows and manages the files in your Desktop folder.</string>
+    <key>NSDocumentsFolderUsageDescription</key>
+    <string>A File Manager shows and manages the files in your Documents folder.</string>
+    <key>NSDownloadsFolderUsageDescription</key>
+    <string>A File Manager shows and manages the files in your Downloads folder.</string>
+    <key>NSRemovableVolumesUsageDescription</key>
+    <string>A File Manager shows and manages the files on removable volumes.</string>
+    <key>NSNetworkVolumesUsageDescription</key>
+    <string>A File Manager shows and manages the files on network volumes.</string>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>A File Manager asks Finder to show the Get Info window of a file, and runs the commands you start from its command line and its menus, which may control other applications.</string>
+    <key>NSSupportsAutomaticTermination</key>
+    <false/>
+    <key>NSSupportsSuddenTermination</key>
+    <false/>
+</dict>
+</plist>
