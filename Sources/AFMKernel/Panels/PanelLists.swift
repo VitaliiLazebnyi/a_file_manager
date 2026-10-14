@@ -176,8 +176,10 @@ struct NameIndex {
     private static func hashes(of items: [FileItem]) -> [UInt64] {
         guard items.count > ListWork.pieceSize * 2 else { return items.map { hash($0.name) } }
         return [UInt64](unsafeUninitializedCapacity: items.count) { buffer, count in
-            let target = buffer.baseAddress!
+            // Each piece writes its own places and only reads the list.
+            nonisolated(unsafe) let target = buffer.baseAddress!
             items.withUnsafeBufferPointer { items in
+                nonisolated(unsafe) let items = items
                 _ = Parallel.map(ListWork.pieces(items.count)) { piece in
                     for place in piece { (target + place).initialize(to: hash(items[place].name)) }
                 }
@@ -309,7 +311,7 @@ enum ListWork {
 
     /// The parts as one list. The copying is spread over the cores: every entry copied is
     /// a handful of reference counts.
-    static func joined<Element>(_ parts: [[Element]]) -> [Element] {
+    static func joined<Element: Sendable>(_ parts: [[Element]]) -> [Element] {
         let total = parts.reduce(0) { $0 + $1.count }
         guard total > pieceSize * 2 else { return Array(parts.joined()) }
         var starts: [Int] = []
@@ -318,8 +320,9 @@ enum ListWork {
             starts.append(next)
             next += part.count
         }
-        return [Element](unsafeUninitializedCapacity: total) { buffer, count in
-            let target = buffer.baseAddress!
+        return [Element](unsafeUninitializedCapacity: total) { [starts] buffer, count in
+            // Each part is copied to its own places.
+            nonisolated(unsafe) let target = buffer.baseAddress!
             _ = Parallel.map(Array(parts.indices)) { index in
                 parts[index].withUnsafeBufferPointer { part in
                     guard let source = part.baseAddress else { return }
@@ -338,7 +341,9 @@ enum ListWork {
         var places: [UInt32] = []
         if listed.count > pieceSize * 2 {
             let parts = listed.withUnsafeBufferPointer { listed in
-                Parallel.map(pieces(listed.count)) { piece -> (items: [FileItem], places: [UInt32]) in
+                // Only read, while the call lasts.
+                nonisolated(unsafe) let listed = listed
+                return Parallel.map(pieces(listed.count)) { piece -> (items: [FileItem], places: [UInt32]) in
                     var passed: (items: [FileItem], places: [UInt32]) = ([], [])
                     for place in piece where filter.matches(listed[place]) {
                         passed.items.append(listed[place])
@@ -373,7 +378,7 @@ enum ListWork {
     /// name twice): its location and what the list says about it.
     static func places(of shown: [FileItem], in listed: [FileItem]) -> [UInt32]? {
         guard shown.count <= listed.count else { return nil }
-        func isSame(_ a: FileItem, _ b: FileItem) -> Bool {
+        @Sendable func isSame(_ a: FileItem, _ b: FileItem) -> Bool {
             guard ExactName.areSame(a.name, b.name), a.size == b.size, a.isDirectory == b.isDirectory,
                 a.isSymlink == b.isSymlink,
                 a.modified == b.modified
@@ -408,7 +413,7 @@ enum ListWork {
     /// all cores.
     static func areSameEntries(_ items: [FileItem], _ others: [FileItem]) -> Bool {
         guard items.count == others.count else { return false }
-        func isSame(_ a: FileItem, _ b: FileItem) -> Bool {
+        @Sendable func isSame(_ a: FileItem, _ b: FileItem) -> Bool {
             ExactName.areSame(a.name, b.name) && a.size == b.size && a.modified == b.modified
                 && a.isDirectory == b.isDirectory
                 && a.isSymlink == b.isSymlink && a.isPackage == b.isPackage && a.isHidden == b.isHidden
@@ -418,7 +423,9 @@ enum ListWork {
         let differs = CancellationFlag()
         return items.withUnsafeBufferPointer { items in
             others.withUnsafeBufferPointer { others in
-                Parallel.map(pieces(items.count, of: pieceSize * 2)) { piece -> Bool in
+                // Only read, while the call lasts.
+                nonisolated(unsafe) let (items, others) = (items, others)
+                return Parallel.map(pieces(items.count, of: pieceSize * 2)) { piece -> Bool in
                     // One difference settles it for every piece.
                     guard !differs.isCancelled, piece.allSatisfy({ isSame(items[$0], others[$0]) }) else {
                         differs.cancel()
@@ -434,7 +441,7 @@ enum ListWork {
     static func sized(_ items: [FileItem]) -> Bitset {
         let wordsPerPiece = pieceSize / 64
         let wordCount = (items.count + 63) / 64
-        func words(_ range: Range<Int>) -> [UInt64] {
+        @Sendable func words(_ range: Range<Int>) -> [UInt64] {
             range.map { word in
                 var bits: UInt64 = 0
                 for place in (word * 64)..<min(word * 64 + 64, items.count) where items[place].computedSize != nil {
@@ -449,9 +456,11 @@ enum ListWork {
 
     /// The places among `candidates` (all places when nil) whose entries `matches` holds for.
     /// `matches` is called from several threads at once for a long list.
-    static func matching(_ items: [FileItem], among candidates: Bitset?, where matches: (FileItem) -> Bool) -> Bitset {
+    static func matching(
+        _ items: [FileItem], among candidates: Bitset?, where matches: @Sendable (FileItem) -> Bool
+    ) -> Bitset {
         let wordCount = (items.count + 63) / 64
-        func words(_ range: Range<Int>) -> [UInt64] {
+        @Sendable func words(_ range: Range<Int>) -> [UInt64] {
             var result = [UInt64](repeating: 0, count: range.count)
             if let candidates {
                 candidates.forEach(inWords: range) { place in
@@ -472,7 +481,7 @@ enum ListWork {
     /// Counts the entries at `places` of a list (all of it when nil). The result is what
     /// counting them one after the other gives, sizes that fit no number included.
     static func tally(_ items: [FileItem], at places: Bitset? = nil) -> Tally {
-        func count(_ range: Range<Int>) -> Tally {
+        @Sendable func count(_ range: Range<Int>) -> Tally {
             var tally = Tally()
             if let places {
                 places.forEach(inWords: range) { tally.add(items[$0]) }
@@ -505,7 +514,7 @@ enum ListWork {
     /// not there. Lists that differ little are walked side by side; names are looked up only
     /// where the two part ways.
     static func moves(from old: [FileItem], to finder: NameFinder) -> [UInt32] {
-        func walk(_ range: Range<Int>, _ place: (FileItem, Int) -> Int?) -> [UInt32] {
+        @Sendable func walk(_ range: Range<Int>, _ place: (FileItem, Int) -> Int?) -> [UInt32] {
             var shift = 0
             return range.map { index in
                 guard let found = place(old[index], index + shift) else { return UInt32.max }
@@ -530,7 +539,9 @@ enum ListWork {
 /// Lists that are no longer shown, kept by whoever may still want them (a snapshot, a list
 /// that was worked out and not taken). When the last holder lets go, on whatever thread, the
 /// memory is released in the background.
-final class Remains {
+///
+/// Unchecked: `lists` is changed only in `deinit`, when nobody else holds the object.
+final class Remains: @unchecked Sendable {
     var lists: [[FileItem]]
 
     init(_ lists: [FileItem]...) {

@@ -5,14 +5,17 @@ import QuickLookThumbnailing
 /// Makes the picture of one file. `completion` may be called on any thread, with nil when the
 /// file has no picture of its own. The returned function gives the request up.
 protocol ThumbnailSource: AnyObject {
-    func thumbnail(for url: URL, side: CGFloat, scale: CGFloat, completion: @escaping (NSImage?) -> Void) -> () -> Void
+    func thumbnail(
+        for url: URL, side: CGFloat, scale: CGFloat, completion: @escaping @Sendable (NSImage?) -> Void
+    ) -> () -> Void
 }
 
 /// Thumbnails from the system's Quick Look, which makes them in its own processes and threads
 /// and keeps the main thread out of it.
 final class QuickLookThumbnails: ThumbnailSource {
-    func thumbnail(for url: URL, side: CGFloat, scale: CGFloat, completion: @escaping (NSImage?) -> Void) -> () -> Void
-    {
+    func thumbnail(
+        for url: URL, side: CGFloat, scale: CGFloat, completion: @escaping @Sendable (NSImage?) -> Void
+    ) -> () -> Void {
         let request = QLThumbnailGenerator.Request(
             fileAt: url, size: CGSize(width: side, height: side), scale: scale,
             representationTypes: .thumbnail)
@@ -32,6 +35,7 @@ final class QuickLookThumbnails: ThumbnailSource {
 /// cancelled (`keepOnly`), so a fast scroll through a large folder leaves no queue behind.
 ///
 /// **Threading.** Main thread only; the source's answer is brought back to the main thread.
+@MainActor
 final class ThumbnailStore {
     var source: any ThumbnailSource
     private let cache = NSCache<NSString, NSImage>()
@@ -77,7 +81,10 @@ final class ThumbnailStore {
         lastToken += 1
         let token = lastToken
         let cancel = source.thumbnail(for: item.url, side: side, scale: scale) { [weak self] image in
-            MainLoop.perform {
+            // An image may go from thread to thread once it is made.
+            let image = Handover(image)
+            MainLoop.perform { [weak self] in
+                let image = image.value
                 // An answer for a request that was given up (or given up and made again) is of no interest.
                 guard let self, self.running[key]?.token == token else { return }
                 self.running[key] = nil

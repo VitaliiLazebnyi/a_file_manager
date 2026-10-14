@@ -5,7 +5,9 @@ public import Foundation
 /// location the program does not have yet (archives, servers) and shows that panels, jobs and
 /// search need nothing but the provider interface. It can be made slow, read-only or awkward
 /// in the ways a real remote file system is.
-public final class MemoryFileSystem: FileSystemProvider {
+///
+/// Unchecked: the tree is guarded by `lock`, the settings by `settings`.
+public final class MemoryFileSystem: FileSystemProvider, @unchecked Sendable {
     public let scheme: String
     public var capabilities: FileSystemCapabilities {
         get { settings.withLock { _capabilities } }
@@ -467,7 +469,9 @@ public final class MemoryFileSystem: FileSystemProvider {
         return own == "/" ? nil : url(decoded(parentKey(own)))
     }
 
-    private final class Reader: FileReader {
+    /// Unchecked: used by one thread at a time, as `FileReader` allows; `interrupt` touches
+    /// only the stall, which is safe from any thread.
+    private final class Reader: FileReader, @unchecked Sendable {
         private let data: Data
         private var position = 0
         private let stall: Stall
@@ -510,7 +514,9 @@ public final class MemoryFileSystem: FileSystemProvider {
         }
     }
 
-    private final class Writer: FileWriter {
+    /// Unchecked: used by one thread at a time, as `FileWriter` allows; `interrupt` touches
+    /// only the stall, which is safe from any thread.
+    private final class Writer: FileWriter, @unchecked Sendable {
         private var data: Data
         private let store: (Data, FileAttributes) -> Void
         private let stall: Stall

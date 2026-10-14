@@ -6,6 +6,7 @@ import AppKit
 /// sideways through the Brief and Thumbnails views, and the colours by file type
 /// (spec 03 › Quick search and quick filter, 03 › Brief, 03 › Colours by file type). The
 /// options of the lists get their configuration page here as well.
+@MainActor
 enum PanelShellCommands {
     /// One step to the left or right in the Brief and Thumbnails views. In those views the
     /// keys of "first entry" and "last entry" (← and →) run these instead.

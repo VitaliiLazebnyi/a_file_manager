@@ -3,8 +3,9 @@ import Foundation
 /// The buttons of the button bar (spec 02 › Button bars). Plugins say which of their commands
 /// deserve a button and with which picture; the shell draws the bar. The user's own layout,
 /// kept in the settings, replaces the plugins' proposal.
+@MainActor
 public final class ToolbarRegistry {
-    public struct Button: Equatable {
+    public struct Button: Equatable, Sendable {
         public let command: CommandID
         /// The name of a system symbol, e.g. `doc.on.doc`.
         public let symbol: String
@@ -17,9 +18,9 @@ public final class ToolbarRegistry {
 
     /// Settings key of the user's layout: command names in order, an empty text for a
     /// separator.
-    public static let settingsKey = "toolbar.layout"
+    public nonisolated static let settingsKey = "toolbar.layout"
     /// In a layout, where the bar goes on in a new line: the groups after it start one.
-    public static let lineBreak: CommandID = "afm_ButtonBarLineBreak"
+    public nonisolated static let lineBreak: CommandID = "afm_ButtonBarLineBreak"
 
     private var contributions: [(group: Int, button: Button)] = []
     private var symbols: [CommandID: String] = [:]

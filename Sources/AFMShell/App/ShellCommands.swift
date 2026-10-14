@@ -6,6 +6,7 @@ import AppKit
 /// switching panels, the volume list and the in-place name editor. They are registered like
 /// any plugin's commands, so their keys are in the key bindings and can be changed there
 /// (spec 06 › Navigation, 06 › Selection).
+@MainActor
 enum ShellCommands {
     static func register(in kernel: Kernel, panels: PanelCoordinator) {
         let commands = kernel.commands

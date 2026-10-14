@@ -3,6 +3,7 @@ public import Foundation
 /// A feature of the program. A plugin registers what it provides (commands, menu entries,
 /// file systems, openers, services) with the kernel when it starts, and keeps whatever state
 /// it needs in itself. It never refers to another plugin.
+@MainActor
 public protocol Plugin: AnyObject {
     var name: String { get }
     /// Called once, before the window exists. Register here; use `kernel.panels` and
@@ -31,6 +32,7 @@ extension Plugin {
 }
 
 /// What the window shell provides to plugins once it exists.
+@MainActor
 public protocol ShellServices: AnyObject {
     var panels: any PanelSet { get }
     var jobs: any JobService { get }
@@ -39,17 +41,18 @@ public protocol ShellServices: AnyObject {
 /// The kernel has no features of its own. It holds the registries plugins fill and the
 /// services they share, and it is the only thing plugins and the shell have in common.
 /// Except where a member says otherwise, the kernel is used on the main thread.
+@MainActor
 public final class Kernel {
     /// The program's name, for window titles and dialogs.
-    public let productName: String
+    nonisolated public let productName: String
     public let keyBindings: KeyBindings
     public let commands: CommandRegistry
     public let menus = MenuRegistry()
-    public let fileSystems = FileSystemRegistry()
+    nonisolated public let fileSystems = FileSystemRegistry()
     public let openers = OpenerRegistry()
     public let services = ServiceRegistry()
     /// Columns plugins add to the file list.
-    public let columns = ColumnRegistry()
+    nonisolated public let columns = ColumnRegistry()
     /// The buttons of the button bar.
     public let toolbar = ToolbarRegistry()
     /// The pages of the configuration dialog.
@@ -59,12 +62,12 @@ public final class Kernel {
     public let settingsKeys = SettingsKeyRegistry()
     /// What happens in the panels, for plugins that follow them.
     public let panelEvents = PanelEvents()
-    public let settings: any SettingsStore
-    public let ui: any UserInteraction
+    nonisolated public let settings: any SettingsStore
+    nonisolated public let ui: any UserInteraction
     /// Listings of slow folders, remembered so that returning to one is immediate. Unlike the
     /// rest of the kernel it is used from any thread. The panels fill and empty it; plugins
     /// have no business with it (they report changed folders through `panels.refresh`).
-    public let listingCache = ListingCache()
+    nonisolated public let listingCache = ListingCache()
     public private(set) var plugins: [any Plugin] = []
     private var shell: any ShellServices?
 
@@ -89,7 +92,7 @@ public final class Kernel {
     /// which would then no longer end when the reader of its output goes away; a handler is
     /// not passed on. A handler that is installed already (by whoever embeds the kernel) is
     /// left alone.
-    private static let ignoreBrokenPipes: Void = {
+    private nonisolated static let ignoreBrokenPipes: Void = {
         var current = sigaction()
         guard sigaction(SIGPIPE, nil, &current) == 0,
             unsafeBitCast(current.__sigaction_u.__sa_handler, to: Int.self) == 0
@@ -167,8 +170,10 @@ public final class Kernel {
     /// Asks the user something from any thread and waits for the answer: the route for a file
     /// system that needs, say, a password in the middle of a job. Inside a job prefer
     /// `JobMonitor.ask`, which also keeps the progress window correct.
-    public func askUser<Answer>(_ question: (any UserInteraction) -> Answer) -> Answer {
-        if Thread.isMainThread { return question(ui) }
+    nonisolated public func askUser<Answer: Sendable>(_ question: sending @MainActor (any UserInteraction) -> Answer)
+        -> Answer
+    {
+        if Thread.isMainThread { return MainActor.assumeIsolated { question(ui) } }
         // Work that the main thread itself is waiting for must not wait for it.
         Parallel.assertMayWaitForMainThread()
         // The question is put to the main thread through its run loop, not as a block of the
@@ -180,8 +185,10 @@ public final class Kernel {
         let hop = MainThreadHop()
         var answer: Answer?
         withoutActuallyEscaping(question) { question in
-            hop.work = { answer = question(ui) }
-            let block = { hop.run() }
+            // Run on the main thread only (by its run loop or its queue), while this thread waits.
+            nonisolated(unsafe) let question = question
+            hop.work = { answer = MainActor.assumeIsolated { question(ui) } }
+            let block: @Sendable () -> Void = { hop.run() }
             CFRunLoopPerformBlock(CFRunLoopGetMain(), CFRunLoopMode.commonModes.rawValue, block)
             CFRunLoopWakeUp(CFRunLoopGetMain())
             if hop.done.wait(timeout: .now() + .milliseconds(200)) == .timedOut {
@@ -195,8 +202,9 @@ public final class Kernel {
 }
 
 /// One piece of work for the main thread that may be offered to it in more than one way and
-/// is done once.
-private final class MainThreadHop {
+/// is done once. Unchecked: `work` is guarded by `lock`, and the thread that set it waits on
+/// `done` until it has run.
+private final class MainThreadHop: @unchecked Sendable {
     private let lock = NSLock()
     var work: (() -> Void)?
     let done = DispatchSemaphore(value: 0)
@@ -215,7 +223,7 @@ private final class MainThreadHop {
 }
 
 /// What kind of thing a settings key holds, for whoever exports or imports settings.
-public enum SettingsKeyKind {
+public enum SettingsKeyKind: Sendable {
     /// A preference or a piece of state.
     case ordinary
     /// What the user did (lines typed, folders visited): left out of exports.
@@ -230,14 +238,15 @@ public enum SettingsKeyKind {
 }
 
 /// The settings keys the plugins have declared. Filled while the plugins start; main thread.
+@MainActor
 public final class SettingsKeyRegistry {
-    public struct Declaration {
+    public struct Declaration: Sendable {
         /// The key, or for a family of keys what they all begin with.
         public let key: String
         public let isPrefix: Bool
         public let kind: SettingsKeyKind
         /// Whether a value read from a file may be stored under the key; nil accepts any.
-        public let check: ((Data) -> Bool)?
+        public let check: (@Sendable (Data) -> Bool)?
     }
 
     private var exact: [String: Declaration] = [:]
@@ -246,12 +255,12 @@ public final class SettingsKeyRegistry {
     public init() {}
 
     /// Says what a key of the plugin's is. Declaring a key twice keeps the later word.
-    public func declare(_ key: String, kind: SettingsKeyKind = .ordinary, check: ((Data) -> Bool)? = nil) {
+    public func declare(_ key: String, kind: SettingsKeyKind = .ordinary, check: (@Sendable (Data) -> Bool)? = nil) {
         exact[key] = Declaration(key: key, isPrefix: false, kind: kind, check: check)
     }
 
     /// The same for every key that begins with `prefix` (`findFiles.history.`).
-    public func declare(prefix: String, kind: SettingsKeyKind = .ordinary, check: ((Data) -> Bool)? = nil) {
+    public func declare(prefix: String, kind: SettingsKeyKind = .ordinary, check: (@Sendable (Data) -> Bool)? = nil) {
         families.removeAll { $0.key == prefix }
         families.append(Declaration(key: prefix, isPrefix: true, kind: kind, check: check))
     }
@@ -275,6 +284,7 @@ public final class SettingsKeyRegistry {
 }
 
 /// Typed services one plugin offers to the others, found by their protocol.
+@MainActor
 public final class ServiceRegistry {
     private var services: [ObjectIdentifier: Any] = [:]
 
@@ -288,8 +298,8 @@ public final class ServiceRegistry {
     }
 }
 
-/// Values remembered between sessions.
-public protocol SettingsStore: AnyObject {
+/// Values remembered between sessions. Used from any thread.
+public protocol SettingsStore: AnyObject, Sendable {
     func data(forKey key: String) -> Data?
     func set(_ data: Data?, forKey key: String)
     /// A value that may be large (megabytes: a long history) and is read and written as a
@@ -338,11 +348,13 @@ private final class ScopedSettings: SettingsStore {
     func setLarge(_ data: Data?, forKey key: String) { base.setLarge(data, forKey: prefix + key) }
 }
 
-/// Settings that live only as long as the program runs; used by tests.
-public final class MemorySettings: SettingsStore {
+/// Settings that live only as long as the program runs; used by tests. Unchecked: the values
+/// are guarded by `lock`.
+public final class MemorySettings: SettingsStore, @unchecked Sendable {
+    private let lock = NSLock()
     private var values: [String: Data] = [:]
 
     public init() {}
-    public func data(forKey key: String) -> Data? { values[key] }
-    public func set(_ data: Data?, forKey key: String) { values[key] = data }
+    public func data(forKey key: String) -> Data? { lock.withLock { values[key] } }
+    public func set(_ data: Data?, forKey key: String) { lock.withLock { values[key] = data } }
 }

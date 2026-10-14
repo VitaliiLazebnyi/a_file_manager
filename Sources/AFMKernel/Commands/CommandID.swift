@@ -2,7 +2,7 @@ public import Foundation
 
 /// The name of a command. Plugins register commands under names; menus, keys and other
 /// plugins refer to them by name only. The kernel defines no names itself.
-public struct CommandID: Hashable, RawRepresentable, ExpressibleByStringLiteral, CustomStringConvertible {
+public struct CommandID: Hashable, RawRepresentable, ExpressibleByStringLiteral, CustomStringConvertible, Sendable {
     public let rawValue: String
 
     public init(rawValue: String) { self.rawValue = rawValue }
@@ -11,7 +11,7 @@ public struct CommandID: Hashable, RawRepresentable, ExpressibleByStringLiteral,
 }
 
 /// What a command is given to work on. Most commands take nothing and act on the source panel.
-public enum CommandArgument: Equatable {
+public enum CommandArgument: Equatable, Sendable {
     case none
     /// A place on a file system: the file to view, the folder to show.
     case location(URL)

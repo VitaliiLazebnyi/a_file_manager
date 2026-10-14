@@ -111,8 +111,9 @@ public final class AlertInteraction: UserInteraction {
 /// the preferences are one file that is read whole at the start and written whole after every
 /// change. Each such value has a file of its own in `largeFolder`, written on a background
 /// thread, newest value last, however often it is set; what is read comes from memory once it
-/// was read or set. Safe to use from any thread.
-public final class UserDefaultsSettings: SettingsStore {
+/// was read or set. Safe to use from any thread: the large values are guarded by `lock`, and
+/// `UserDefaults` is thread-safe.
+public final class UserDefaultsSettings: SettingsStore, @unchecked Sendable {
     private let defaults: UserDefaults
     /// Where the large values are kept; nil keeps them with the rest.
     public let largeFolder: URL?

@@ -5,6 +5,7 @@ import AppKit
 /// window, or, once the user pressed Background, a small window of its own that leaves the
 /// main window free. One window serves the whole queue; it shows the running job and how many
 /// are waiting. Main thread only.
+@MainActor
 final class ProgressDisplay {
     weak var window: NSWindow?
     weak var service: ProgressJobService?
@@ -14,7 +15,8 @@ final class ProgressDisplay {
     private let content = ProgressContentView()
     /// The count shows what is left instead of what is done (toggled by a click on it).
     private var showsRemaining = false
-    private var observers: [any NSObjectProtocol] = []
+    /// Main thread, and `deinit`.
+    nonisolated(unsafe) private var observers: [any NSObjectProtocol] = []
 
     init() {
         content.pauseButton.target = self
@@ -53,9 +55,12 @@ final class ProgressDisplay {
     private func observeWindow() {
         guard observers.isEmpty, let window else { return }
         let center = NotificationCenter.default
-        let retry: (Notification) -> Void = { [weak self] _ in
-            guard let self, monitor != nil, panel == nil else { return }
-            show()
+        // Delivered on the main queue.
+        let retry: @Sendable (Notification) -> Void = { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let display = self, display.monitor != nil, display.panel == nil else { return }
+                display.show()
+            }
         }
         observers = [
             center.addObserver(

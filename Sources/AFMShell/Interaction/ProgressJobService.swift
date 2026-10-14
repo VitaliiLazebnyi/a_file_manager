@@ -91,9 +91,10 @@ final class ProgressJobService: JobService {
     }
 
     @discardableResult
-    func run<Result>(title: String, work: @escaping (any JobMonitor) -> Result, completion: @escaping (Result) -> Void)
-        -> any JobHandle
-    {
+    func run<Result: Sendable>(
+        title: String, work: @escaping @Sendable (any JobMonitor) -> Result,
+        completion: @escaping @MainActor (Result) -> Void
+    ) -> any JobHandle {
         MainThread.assert("The job service")
         let job = QueuedJob(title: title)
         // What the plugin handed in may hold panels and windows: it is let go of on the main
@@ -276,8 +277,8 @@ final class ProgressJobService: JobService {
     }
 }
 
-/// Where a paused job waits. Safe to use from any thread.
-final class PauseGate {
+/// Where a paused job waits. Safe to use from any thread: the state is guarded by `condition`.
+final class PauseGate: @unchecked Sendable {
     private let condition = NSCondition()
     private var paused = false
 
@@ -306,15 +307,19 @@ final class PauseGate {
     }
 }
 
-/// Where a job's question waits for the main thread, and its answer for the job.
-private final class AskSlot<Answer> {
-    var question: (() -> Answer)?
+/// Where a job's question waits for the main thread, and its answer for the job. Unchecked:
+/// the job's thread fills it and then waits until the main thread has answered.
+private final class AskSlot<Answer>: @unchecked Sendable {
+    var question: (@MainActor () -> Answer)?
     var answer: Answer?
 }
 
 /// The progress of one job and the job's way to ask the user something: what the work reports
 /// on its own thread is brought to the main thread here, where the progress window reads it.
-final class ProgressSheet: JobMonitor {
+///
+/// Unchecked: what is marked "main thread only" is touched on the main thread alone, the
+/// report counters are guarded by `reportLock`, and the rest does not change.
+final class ProgressSheet: JobMonitor, @unchecked Sendable {
     let cancellation: CancellationFlag
     let title: String
     private let gate: PauseGate
@@ -374,19 +379,14 @@ final class ProgressSheet: JobMonitor {
     /// Asks on the main thread and waits for the answer. The question is put from the run
     /// loop, not from inside a block of the main dispatch queue, where its dialog would keep
     /// everything else that was sent to the main thread waiting (`MainLoop`).
-    func ask<Answer>(_ question: () -> Answer) -> Answer {
-        func put(_ question: () -> Answer) -> Answer {
-            display?.show()
-            let answer = question()
-            // The wait for the answer must not count as slow copying.
-            rate.reset()
-            return answer
-        }
+    func ask<Answer: Sendable>(_ question: sending @MainActor () -> Answer) -> Answer {
         // A job has no business on the main thread; whoever asks from there is answered there.
-        if Thread.isMainThread { return put(question) }
+        if Thread.isMainThread { return MainActor.assumeIsolated { put(question) } }
         let slot = AskSlot<Answer>()
         let answered = DispatchSemaphore(value: 0)
         withoutActuallyEscaping(question) { question in
+            // Asked on the main thread only, while this thread waits.
+            nonisolated(unsafe) let question = question
             slot.question = question
             MainLoop.perform {
                 // The question is let go of here, before the job's thread is woken: the run
@@ -394,13 +394,22 @@ final class ProgressSheet: JobMonitor {
                 // must not be held by anybody when the job's thread goes on.
                 var asked = slot.question
                 slot.question = nil
-                slot.answer = asked.map { put($0) }
+                slot.answer = asked.map { self.put($0) }
                 asked = nil
                 answered.signal()
             }
             answered.wait()
         }
         return slot.answer!
+    }
+
+    /// Main thread: shows the progress and asks.
+    @MainActor private func put<Answer>(_ question: @MainActor () -> Answer) -> Answer {
+        display?.show()
+        let answer = question()
+        // The wait for the answer must not count as slow copying.
+        rate.reset()
+        return answer
     }
 
     // MARK: Texts

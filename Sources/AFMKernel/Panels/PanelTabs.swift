@@ -3,10 +3,11 @@ public import Foundation
 /// The ordered folder tabs of one panel. Each tab keeps its own directory, sort order,
 /// selection and history (spec 03 › Folder tabs). Like the tabs' models it only holds state:
 /// a tab that was never shown is read when it becomes the active one. Main thread only.
+@MainActor
 public final class PanelTabs {
     /// What is remembered of a panel between sessions.
-    public struct State: Codable, Equatable {
-        public struct Tab: Codable, Equatable {
+    public struct State: Codable, Equatable, Sendable {
+        public struct Tab: Codable, Equatable, Sendable {
             /// The location as a URL string, so it can be on any file system.
             public var location: String
             public var sortKey: Int

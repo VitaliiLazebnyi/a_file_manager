@@ -2,7 +2,7 @@ public import Foundation
 
 /// The contents of one directory as read from its file system, with what a panel needs to
 /// know about its surroundings. Read in the background, then handed to the panel's model.
-public struct Listing {
+public struct Listing: Sendable {
     public let directory: URL
     /// In file-system order; the model sorts them.
     public let items: [FileItem]
@@ -23,15 +23,15 @@ public struct Listing {
 
 /// Reads what a panel is asked to show. Everything here blocks on the file system and is
 /// meant for a background thread; the results are applied to the model on the main thread.
-public enum PanelLoader {
-    public struct Result {
+public enum PanelLoader: Sendable {
+    public struct Result: Sendable {
         public let listing: Listing
         /// The item the cursor should go to, when the location named a file.
         public let focus: String?
     }
 
     /// One piece of a directory that is read step by step.
-    public struct Batch {
+    public struct Batch: Sendable {
         /// The directory and its surroundings; `items` holds only the entries of this batch.
         public let listing: Listing
         public let focus: String?
@@ -144,9 +144,9 @@ public enum PanelLoader {
 
     /// A question that may block, asked on a kernel thread and shared with whoever asks the
     /// same; nil when `cancellation` was set before the answer came.
-    private static func ask<Answer>(
+    private static func ask<Answer: Sendable>(
         _ provider: any FileSystemProvider, _ question: String, _ cancellation: CancellationFlag,
-        _ work: @escaping (CancellationFlag) -> Answer?
+        _ work: @escaping @Sendable (CancellationFlag) -> Answer?
     ) -> Answer? {
         if Thread.isMainThread { return work(cancellation) }
         return BlockingCalls.answer(from: provider, to: question, cancellation: cancellation, work) ?? nil
@@ -201,7 +201,8 @@ public enum PanelLoader {
 
     /// Passes batches from the thread that lists to the thread that asked, one at a time: the
     /// listing waits until the batch was taken and it is known whether more are wanted.
-    private final class Relay {
+    /// All state is guarded by `condition`.
+    private final class Relay: @unchecked Sendable {
         enum Event {
             case batch([FileItem])
             case finished(Swift.Result<Void, any Error>?)
@@ -270,7 +271,8 @@ public enum PanelLoader {
     /// system finds the top by going up one level at a time, which for a path thousands of
     /// levels deep (inside an archive) is thousands of steps over a long text each; the
     /// directory above was nearly always asked just before, and its top is this one's.
-    private final class RootCache {
+    /// All state is guarded by `lock`.
+    private final class RootCache: @unchecked Sendable {
         private struct Entry {
             let root: URL
             let made: Date

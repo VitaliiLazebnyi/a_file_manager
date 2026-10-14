@@ -3,6 +3,7 @@ import AFMKernel
 import AppKit
 
 /// What a panel tells its surroundings.
+@MainActor
 protocol PanelHost: AnyObject {
     func panelDidBecomeActive(_ panel: PanelViewController)
     /// The panel shows another directory or another tab.
@@ -64,7 +65,7 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
     var commands: CommandRegistry { kernel.commands }
 
     /// Lists from this length on are put in a new order in the background (as with the sort commands).
-    static let backgroundSortThreshold = 20_000
+    nonisolated static let backgroundSortThreshold = 20_000
 
     let tableView = FileTableView()
     private let volumeButton = NSPopUpButton(frame: .zero, pullsDown: true)
@@ -165,8 +166,9 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
     var filterJobs: [ObjectIdentifier: Int] = [:]
     var filterJobCount = 0
     /// Waits for the file systems to report new figures of a volume (free space).
-    private var volumeObserver: any NSObjectProtocol?
-    private var iconObserver: any NSObjectProtocol?
+    /// Set in `init`, read in `deinit`.
+    nonisolated(unsafe) private var volumeObserver: (any NSObjectProtocol)?
+    nonisolated(unsafe) private var iconObserver: (any NSObjectProtocol)?
     /// The tabs whose volume is being asked about, and those that have to be asked again when
     /// the answer is there: one question at a time per tab, however often the figures change
     /// and however long the file system takes to answer.
@@ -229,15 +231,20 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
         super.init(nibName: nil, bundle: nil)
         tabs.onChange = { [weak self] in self?.tabsChanged() }
         observeModels()
+        // Both are delivered on the main queue.
         volumeObserver = NotificationCenter.default.addObserver(
             forName: FileSystemRegistry.volumeInfoDidChange, object: nil,
             queue: .main
         ) { [weak self] note in
-            self?.volumeInfoChanged(note)
+            nonisolated(unsafe) let note = note
+            MainActor.assumeIsolated { self?.volumeInfoChanged(note) }
         }
         iconObserver = NotificationCenter.default.addObserver(forName: IconStore.didArrive, object: nil, queue: .main) {
             [weak self] note in
-            if let paths = note.userInfo?[IconStore.pathsKey] as? Set<String> { self?.iconsArrived(for: paths) }
+            let paths = note.userInfo?[IconStore.pathsKey] as? Set<String>
+            MainActor.assumeIsolated {
+                if let paths { self?.iconsArrived(for: paths) }
+            }
         }
         // Where the panel starts is known to everybody; what is announced is where it goes from there.
         announced = (ObjectIdentifier(tabs.active), tabs.active.directory.locationKey)
@@ -669,7 +676,7 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
 
     /// One reading of a location for a tab: its cancellation, the order the list should come in,
     /// and who is waiting for it to end.
-    private final class Load {
+    @MainActor private final class Load {
         let flag = CancellationFlag()
         /// The order of the tab's list, which the reading follows when it changes under way.
         let order: PanelLoading.OrderBox
@@ -701,7 +708,7 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
         /// A newer reading overtook this one, or its tab is gone: whoever waits hears of
         /// the failure, after the newer reading is in place.
         func supersede() {
-            MainLoop.perform { self.complete(false) }
+            MainLoop.queue { self.complete(false) }
         }
     }
 
@@ -745,7 +752,7 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
     /// threads is gone, and that last hold is dropped in the background.
     func change(
         _ tab: PanelModel, count: Int = 0, fresh: [FileItem] = [], while isWanted: @escaping () -> Bool = { true },
-        by prepare: @escaping (PanelModel.Basis) -> PanelModel.Prepared,
+        by prepare: @escaping @Sendable (PanelModel.Basis) -> PanelModel.Prepared,
         then done: @escaping (PanelModel.Outcome?) -> Void
     ) {
         MainThread.assert("A panel")
@@ -758,10 +765,10 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
             work: { prepare(basis) },
             then: { [weak self, weak tab] prepared in
                 /// Runs after this block and what it holds (the prepared change) have gone.
-                func letGoOfFresh() {
+                @MainActor func letGoOfFresh() {
                     guard fresh.count >= Self.backgroundSortThreshold else { return }
                     var last: [FileItem]? = fresh
-                    MainLoop.perform { Background.release(&last) }
+                    MainLoop.queue { Background.release(&last) }
                 }
                 guard let self, let tab, isWanted() else {
                     letGoOfFresh()
@@ -802,7 +809,8 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
 
     /// A reading that was taken over from the read-ahead is left when this reading is overtaken.
     private func leave(_ joined: ReadAhead.Joined, whenOvertaken load: Load) {
-        load.keeps.append(load.flag.onCancel { MainLoop.perform(joined.leave) })
+        let owned = MainOwned(joined)
+        load.keeps.append(load.flag.onCancel { MainLoop.perform { owned.take()?.leave() } })
     }
 
     /// Reads a location in the background and shows it in `tab`, piece by piece when it takes
@@ -1248,7 +1256,7 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
     ) {
         MainThread.assert("A panel")
         guard !isShutDown else {
-            if let completion { MainLoop.perform(completion) }
+            if let completion { MainLoop.queue(completion) }
             return
         }
         let id = ObjectIdentifier(tab)

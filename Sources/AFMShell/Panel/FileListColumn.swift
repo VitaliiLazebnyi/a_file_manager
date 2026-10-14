@@ -4,6 +4,7 @@ import AppKit
 import UniformTypeIdentifiers
 
 /// The columns of the Full view and how a row is drawn in each (spec 03 › Rows in Full view).
+@MainActor
 enum FileListColumn: String, CaseIterable {
     case name, ext, size, date, attr
 
@@ -228,11 +229,12 @@ struct TwoGenerationCache<Key: Hashable, Value> {
 /// so a changed file is asked again.
 ///
 /// **Threading.** Main thread only; `source` is called on background threads.
+@MainActor
 final class IconStore {
     static let shared = IconStore()
     /// Posted on the main thread; `userInfo[pathsKey]` holds the paths (a `Set<String>`).
     static let didArrive = Notification.Name("AFMIconsDidArrive")
-    static let pathsKey = "paths"
+    nonisolated static let pathsKey = "paths"
 
     private struct Key: Hashable {
         let path: String
@@ -241,7 +243,7 @@ final class IconStore {
 
     /// Fetches the icon of the file at a path; called on background threads. The system's own
     /// by default, which may be asked from any thread.
-    var source: (String) -> NSImage = { NSWorkspace.shared.icon(forFile: $0) }
+    var source: @Sendable (String) -> NSImage = { NSWorkspace.shared.icon(forFile: $0) }
     private var icons = TwoGenerationCache<Key, NSImage>(limit: IconStore.limit)
     /// What is waiting, by folder, oldest first; the end of each line is served first.
     private var waiting: [String: [Key]] = [:]
@@ -292,9 +294,11 @@ final class IconStore {
         let source = source
         Background.storage(
             "icons", at: URL(fileURLWithPath: folder, isDirectory: true), qos: .utility,
-            work: { batch.map { source($0.path) } },
+            // An image may go from thread to thread once it is made.
+            work: { Handover(batch.map { source($0.path) }) },
             then: { [weak self] fetched in
                 guard let self else { return }
+                let fetched = fetched.value
                 busy.remove(folder)
                 for (key, icon) in zip(batch, fetched) {
                     asked.remove(key)

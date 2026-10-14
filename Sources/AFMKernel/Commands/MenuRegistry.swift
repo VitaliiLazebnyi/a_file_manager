@@ -1,7 +1,7 @@
 import Foundation
 
 /// A menu of the menu bar. Menus are shown in the order of their `order` values.
-public struct MenuID: Hashable {
+public struct MenuID: Hashable, Sendable {
     public let title: String
     public let order: Int
 
@@ -13,7 +13,7 @@ public struct MenuID: Hashable {
 
 /// A group of entries inside a menu; groups are shown in the order of their `order` values,
 /// with a separator between them. Plugins that share a section share one constant.
-public struct MenuSection: Hashable {
+public struct MenuSection: Hashable, Sendable {
     public let menu: MenuID
     public let order: Int
 
@@ -24,7 +24,7 @@ public struct MenuSection: Hashable {
 }
 
 /// A group of entries in the context menu of the file list.
-public struct ContextMenuSection: Hashable {
+public struct ContextMenuSection: Hashable, Sendable {
     public let order: Int
 
     public init(order: Int) {
@@ -34,8 +34,9 @@ public struct ContextMenuSection: Hashable {
 
 /// Where plugins say in which menus their commands appear. The shell builds the menu bar and
 /// the context menu from this; it has no menu layout of its own.
+@MainActor
 public final class MenuRegistry {
-    public struct Menu {
+    public struct Menu: Sendable {
         public let title: String
         /// Commands in display order; `nil` is a separator between sections.
         public let items: [CommandID?]

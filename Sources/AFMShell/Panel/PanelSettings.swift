@@ -59,7 +59,7 @@ struct PanelSettings {
     }
 
     /// The configuration page of the file lists.
-    static func page(onChange: @escaping () -> Void) -> PreferencePage {
+    static func page(onChange: @escaping @MainActor @Sendable () -> Void) -> PreferencePage {
         PreferencePage(
             title: "File Panels",
             preferences: [

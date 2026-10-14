@@ -11,7 +11,7 @@ import Foundation
 ///
 /// A reading that reaches its end is also handed to the listing cache, from the background
 /// thread (the cache is safe to use from any thread).
-final class PanelLoading {
+final class PanelLoading: Sendable {
     struct Piece {
         /// The directory and its surroundings; `items` is everything read so far, sorted by `order`.
         let listing: Listing
@@ -37,8 +37,9 @@ final class PanelLoading {
     static let intervalGrowth = 1.5
 
     /// The order the list should come in, which the panel may change while the reading is under
-    /// way (the user sorts a listing that is still arriving). Safe to use from any thread.
-    final class OrderBox {
+    /// way (the user sorts a listing that is still arriving). Safe to use from any thread: the
+    /// order is guarded by `lock`.
+    final class OrderBox: @unchecked Sendable {
         private let lock = NSLock()
         private var order: ListOrder
 
@@ -209,7 +210,7 @@ final class PanelLoading {
                     )
                 }
             }
-            MainLoop.perform { receivers.take()?.onEnd(failure) }
+            MainLoop.perform { [failure] in receivers.take()?.onEnd(failure) }
         }
     }
 }

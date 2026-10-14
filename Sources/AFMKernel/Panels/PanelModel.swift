@@ -33,12 +33,13 @@ public import Foundation
 ///
 /// `selectAll`, `invertSelection`, `clearSelection`, `saveSelection`, `totals` after those,
 /// `hasOperandFile`, `snapshot`, `open`, `basis` and `apply` cost next to nothing at any length.
+@MainActor
 public final class PanelModel {
-    public static let historyLimit = 50
+    public nonisolated static let historyLimit = 50
     /// Lists longer than this get their index of names made along with background work.
-    static let indexedAbove = 20_000
+    nonisolated static let indexedAbove = 20_000
 
-    public enum Change {
+    public enum Change: Sendable {
         /// The directory, its items or their order.
         case contents
         /// The marked items or a calculated folder size.
@@ -48,7 +49,7 @@ public final class PanelModel {
     }
 
     /// What a new listing does to the visited-directories history.
-    public enum HistoryEffect {
+    public enum HistoryEffect: Sendable {
         /// A new place: recorded after the current position, dropping what lay ahead.
         case record
         /// Go Back / Go Forward: the position moves, the list stays.
@@ -57,7 +58,7 @@ public final class PanelModel {
         case keep
     }
 
-    public struct Totals: Equatable {
+    public struct Totals: Equatable, Sendable {
         public var selectedBytes: Int64 = 0, totalBytes: Int64 = 0
         public var selectedFiles = 0, totalFiles = 0
         public var selectedFolders = 0, totalFolders = 0
@@ -557,7 +558,7 @@ public final class PanelModel {
 
     /// Everything a panel shows, kept so that a directory change that fails can be taken
     /// back: the lists with the filter they were shown through and the order they are in.
-    public struct Snapshot {
+    public struct Snapshot: Sendable {
         fileprivate let directory: URL
         /// The listed and the shown items; released in the background when the snapshot goes.
         fileprivate let lists: Remains
@@ -813,7 +814,9 @@ public final class PanelModel {
     /// What a change of the list is worked out from: the lists as they are now, with the
     /// filter and the order. Taken on the main thread, which costs nothing (the lists are
     /// shared, not copied), and handed to a `prepare` function on any thread.
-    public final class Basis {
+    ///
+    /// Unchecked: the lists are changed only in `deinit`, when nobody else holds the basis.
+    public final class Basis: @unchecked Sendable {
         /// `PanelModel.listVersion` when the basis was taken.
         public let listVersion: Int
         public let directory: URL
@@ -832,7 +835,7 @@ public final class PanelModel {
         fileprivate let sized: Bitset?
         private let discards: Bool
 
-        fileprivate init(_ model: PanelModel, discards: Bool) {
+        @MainActor fileprivate init(_ model: PanelModel, discards: Bool) {
             (listVersion, directory, listedItems, items) = (
                 model.listVersion, model.directory, model.listedItems, model.items
             )
@@ -855,7 +858,10 @@ public final class PanelModel {
 
     /// A change of the list, worked out by a `prepare` function and waiting for `apply`.
     /// Whatever it holds is released in the background, taken or not.
-    public final class Prepared {
+    ///
+    /// Unchecked: made on one thread and handed to the main thread, which alone changes it
+    /// from then on (`apply`).
+    public final class Prepared: @unchecked Sendable {
         fileprivate enum Kind {
             case sort
             case filter
@@ -913,7 +919,7 @@ public final class PanelModel {
     }
 
     /// What became of a prepared change.
-    public enum Outcome {
+    public enum Outcome: Sendable {
         /// The model has changed since the basis was taken (its list, filter or order):
         /// nothing was done. The caller takes a new basis and prepares again, in the background.
         case stale
@@ -928,11 +934,11 @@ public final class PanelModel {
 
     /// The list in another order. **For any thread.** Turning the direction round is one
     /// pass; anything else is a sort on all cores.
-    public static func prepare(_ basis: Basis, sort order: ListOrder) -> Prepared {
+    public nonisolated static func prepare(_ basis: Basis, sort order: ListOrder) -> Prepared {
         prepare(basis, sort: order, indexing: true)
     }
 
-    fileprivate static func prepare(_ basis: Basis, sort order: ListOrder, indexing: Bool) -> Prepared {
+    fileprivate nonisolated static func prepare(_ basis: Basis, sort order: ListOrder, indexing: Bool) -> Prepared {
         let old = basis.listedItems
         // The list is in the order of its basis: asked for that order again, it stays.
         guard order != basis.sort, let indexes = Sorter.resortedIndexes(of: old, from: basis.sort, to: order) else {
@@ -966,7 +972,7 @@ public final class PanelModel {
     /// The list through another filter; nil shows everything. **For any thread**: a long
     /// list is filtered on all cores, so `filter.matches` is called from several threads at
     /// once and must be a function of the entry alone.
-    public static func prepare(_ basis: Basis, filter: PanelFilter?) -> Prepared {
+    public nonisolated static func prepare(_ basis: Basis, filter: PanelFilter?) -> Prepared {
         let (shown, places) = ListWork.arrange(basis.listedItems, by: filter)
         return Prepared(
             .filter, from: basis, listed: basis.listedItems, shown: shown, places: places, index: basis.index,
@@ -978,13 +984,13 @@ public final class PanelModel {
     /// sorting (unless `presorted` is the panel's order), comparing with what the panel has,
     /// carrying over calculated folder sizes, filtering, and finding the place every old
     /// entry has in the new list, so that `apply` only moves the marks.
-    public static func prepare(
+    public nonisolated static func prepare(
         _ basis: Basis, update listing: Listing, focus: String? = nil, presorted: ListOrder? = nil
     ) -> Prepared {
         prepare(basis, update: listing, focus: focus, presorted: presorted, tabulating: true)
     }
 
-    fileprivate static func prepare(
+    fileprivate nonisolated static func prepare(
         _ basis: Basis, update listing: Listing, focus: String?, presorted: ListOrder?, tabulating: Bool
     ) -> Prepared {
         // A list that arrives is put into the order the user asked for, if one is waiting.
@@ -1038,7 +1044,7 @@ public final class PanelModel {
     /// `apply` answers `.stale` when the panel's list, filter or order changed since the
     /// basis was taken (the folder it showed was read again, another order was chosen):
     /// the caller takes a new basis and prepares again, in the background.
-    public static func prepare(
+    public nonisolated static func prepare(
         _ basis: Basis, show listing: Listing, focus: String? = nil, history: HistoryEffect = .record,
         complete: Bool = true, remembered: Bool = false, presorted: ListOrder? = nil
     ) -> Prepared {
@@ -1056,7 +1062,9 @@ public final class PanelModel {
 
     /// A directory that is arriving piece by piece, grown to `listed` (sorted by `order`), as
     /// `extend(to:sortedBy:)` takes it. **For any thread.**
-    public static func prepare(_ basis: Basis, extendingTo listed: [FileItem], sortedBy order: ListOrder) -> Prepared {
+    public nonisolated static func prepare(_ basis: Basis, extendingTo listed: [FileItem], sortedBy order: ListOrder)
+        -> Prepared
+    {
         let wanted = basis.wantedSort
         let grown = order == wanted ? listed : Sorter.sort(listed, by: wanted)
         let finder = NameFinder(grown)
@@ -1078,7 +1086,9 @@ public final class PanelModel {
     /// `apply` answers `.stale` when the list, the filter or the order changed since the
     /// basis was taken, **or another size was set**: the caller takes a new basis and
     /// prepares again. `.unchanged` when no name was found.
-    public static func prepare(_ basis: Basis, computedSizes sizes: [(name: String, size: Int64)]) -> Prepared {
+    public nonisolated static func prepare(_ basis: Basis, computedSizes sizes: [(name: String, size: Int64)])
+        -> Prepared
+    {
         let old = basis.listedItems
         let finder = NameFinder(old, index: basis.index)
         var targets: [(place: Int, size: Int64)] = []
@@ -1376,7 +1386,7 @@ public final class PanelModel {
     /// works this out in the background and hands it to `setFilter(_:prefiltered:listVersion:)`.
     /// A long list is filtered on all cores, so `filter.matches` is then called from several
     /// threads at once and must be a function of the entry alone.
-    public static func filtered(_ listed: [FileItem], by filter: PanelFilter?) -> [FileItem] {
+    public nonisolated static func filtered(_ listed: [FileItem], by filter: PanelFilter?) -> [FileItem] {
         ListWork.arrange(listed, by: filter).shown
     }
 
@@ -1532,7 +1542,7 @@ public final class PanelModel {
     /// once and must be a function of the item alone. With a test that costs more than a
     /// look at the name this is **not for the main thread on long lists**: `rows(of:where:)`
     /// does it in the background.
-    public func select(where matches: (FileItem) -> Bool, select: Bool = true) {
+    public func select(where matches: @Sendable (FileItem) -> Bool, select: Bool = true) {
         let found = ListWork.matching(listedItems, among: shownPlaces == nil ? nil : shownBits(), where: matches)
         var bits = marks
         if select { bits.formUnion(found) } else { bits.subtract(found) }
@@ -1541,7 +1551,7 @@ public final class PanelModel {
 
     /// A set of shown rows of one model, as the list, the filter and the order were when its
     /// basis was taken.
-    public struct RowSet {
+    public struct RowSet: Sendable {
         fileprivate let stamp: Int
         fileprivate let bits: Bitset
         /// How many rows are in the set.
@@ -1550,7 +1560,7 @@ public final class PanelModel {
 
     /// The shown rows `matches` holds for. **For any thread**; a long list is looked through
     /// on all cores, so `matches` must be a function of the item alone.
-    public static func rows(of basis: Basis, where matches: (FileItem) -> Bool) -> RowSet {
+    public nonisolated static func rows(of basis: Basis, where matches: @Sendable (FileItem) -> Bool) -> RowSet {
         var shown: Bitset?
         if let places = basis.places {
             var bits = Bitset(size: basis.listedItems.count)
@@ -1564,7 +1574,7 @@ public final class PanelModel {
     /// out itself (rows that are found by comparing entries with each other, or with another
     /// list, which a test of one item cannot do). **For any thread.** Indexes outside the list
     /// are left out.
-    public static func rows(of basis: Basis, indices: some Sequence<Int>) -> RowSet {
+    public nonisolated static func rows(of basis: Basis, indices: some Sequence<Int>) -> RowSet {
         var bits = Bitset(size: basis.listedItems.count)
         let count = basis.items.count
         if let places = basis.places {
@@ -1575,7 +1585,7 @@ public final class PanelModel {
         return RowSet(stamp: basis.stamp, bits: bits)
     }
 
-    public enum SelectionChange {
+    public enum SelectionChange: Sendable {
         /// The rows become the whole selection.
         case replace
         /// The rows are marked besides what is marked.
@@ -1675,7 +1685,7 @@ public final class PanelModel {
     }
 
     /// The marked entries in the order of the list. For any thread.
-    private static func gathered(_ marks: Bitset, of listed: [FileItem], shown: [FileItem]) -> [FileItem] {
+    private nonisolated static func gathered(_ marks: Bitset, of listed: [FileItem], shown: [FileItem]) -> [FileItem] {
         // Everything shown is marked: the list itself, not a copy of it.
         if marks.count == shown.count { return shown }
         guard marks.count > ListWork.pieceSize * 2 else {
@@ -1696,7 +1706,7 @@ public final class PanelModel {
     /// everything it offers may be asked on any thread. For whoever needs the marked items
     /// of a long list (a drag, a command that starts a job) without holding up the main
     /// thread for making the list of them.
-    public struct Operands {
+    public struct Operands: Sendable {
         /// What the panel shows (`PanelModel.items`).
         public let shownItems: [FileItem]
         public let cursorItem: FileItem?
@@ -1892,7 +1902,7 @@ struct ExactName: Hashable {
         self.name = name
     }
 
-    static func == (a: Self, b: Self) -> Bool { areSame(a.name, b.name) }
+    nonisolated static func == (a: Self, b: Self) -> Bool { areSame(a.name, b.name) }
 
     func hash(into hasher: inout Hasher) {
         if name.utf8.withContiguousStorageIfAvailable({ hasher.combine(bytes: UnsafeRawBufferPointer($0)) }) == nil {
@@ -1901,7 +1911,7 @@ struct ExactName: Hashable {
     }
 
     /// Whether two names are the same bytes.
-    static func areSame(_ a: String, _ b: String) -> Bool {
+    nonisolated static func areSame(_ a: String, _ b: String) -> Bool {
         let same = a.utf8.withContiguousStorageIfAvailable { first in
             b.utf8.withContiguousStorageIfAvailable { second in
                 first.count == second.count
@@ -1916,18 +1926,18 @@ struct ExactName: Hashable {
 /// quick filter. `matches` runs on the main thread, once per entry, and must not block; a
 /// filter that is handed to `PanelModel.filtered` runs wherever that is called, on several
 /// threads at once.
-public struct PanelFilter {
+public struct PanelFilter: Sendable {
     /// Shown to the user while the filter is on, e.g. `*.txt`.
     public let title: String
-    public let matches: (FileItem) -> Bool
+    public let matches: @Sendable (FileItem) -> Bool
 
-    public init(title: String, matches: @escaping (FileItem) -> Bool) {
+    public init(title: String, matches: @escaping @Sendable (FileItem) -> Bool) {
         self.title = title
         self.matches = matches
     }
 
     /// Files whose names match a file mask; folders always stay (spec 03 › Display filters).
-    public static func mask(_ text: String) -> Self {
+    public nonisolated static func mask(_ text: String) -> Self {
         let mask = FileMask(text)
         return Self(title: text) { $0.isFolder || mask.matches($0.name) }
     }

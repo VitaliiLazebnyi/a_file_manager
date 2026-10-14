@@ -2,12 +2,12 @@ import Foundation
 
 /// The standard editing action a command shares its key with. The shell sends such a command
 /// along the system's editing path, so text fields keep Cmd+C, Cmd+V, Cmd+X and Cmd+A.
-public enum EditingRole {
+public enum EditingRole: Sendable {
     case cut, copy, paste, selectAll
 }
 
 /// What the user sees of a command.
-public struct Command {
+public struct Command: Sendable {
     public let id: CommandID
     public let title: String
     /// The keys the command has until the user chooses others (see `KeyBindings`).
@@ -35,6 +35,7 @@ public struct Command {
 /// The one place every command is registered and passes through, whatever triggered it: menu,
 /// key, button, context menu or another plugin (spec 20 › Command dispatch contract).
 /// Used on the main thread only.
+@MainActor
 public final class CommandRegistry {
     private struct Entry {
         let command: Command

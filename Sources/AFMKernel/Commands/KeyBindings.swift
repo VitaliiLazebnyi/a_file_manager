@@ -3,9 +3,10 @@ import Foundation
 /// Which key runs which command. Plugins supply defaults with their commands; the user's own
 /// choices, kept in the settings, replace them. Every key press and every menu key is looked
 /// up here, so a key is bound in exactly one place (spec 14 › Redefining hotkeys).
+@MainActor
 public final class KeyBindings {
     /// Two commands asked for the same key; the first one kept it.
-    public struct Conflict: Equatable {
+    public struct Conflict: Equatable, Sendable {
         public let shortcut: Shortcut
         public let kept: CommandID
         public let rejected: CommandID
@@ -18,7 +19,7 @@ public final class KeyBindings {
     }
 
     /// Settings key of the user's bindings: command name → shortcuts in text form.
-    public static let settingsKey = "keyBindings"
+    public nonisolated static let settingsKey = "keyBindings"
 
     private var commands: [Shortcut: CommandID] = [:]
     private var shortcuts: [CommandID: [Shortcut]] = [:]

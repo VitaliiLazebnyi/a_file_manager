@@ -1,6 +1,6 @@
 import Foundation
 
-public struct KeyModifiers: OptionSet, Hashable {
+public struct KeyModifiers: OptionSet, Hashable, Sendable {
     public let rawValue: Int
     public init(rawValue: Int) { self.rawValue = rawValue }
 
@@ -11,7 +11,7 @@ public struct KeyModifiers: OptionSet, Hashable {
 }
 
 /// A key of a shortcut: a character (as it is on the user's keyboard layout) or a named key.
-public enum Key: Hashable {
+public enum Key: Hashable, Sendable {
     case character(String)
     /// F1…F12
     case function(Int)
@@ -27,7 +27,7 @@ public enum Key: Hashable {
     ]
 }
 
-public struct Shortcut: Hashable {
+public struct Shortcut: Hashable, Sendable {
     public let key: Key
     public let modifiers: KeyModifiers
 

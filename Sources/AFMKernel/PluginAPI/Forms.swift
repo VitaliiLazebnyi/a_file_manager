@@ -2,8 +2,8 @@ import Foundation
 
 /// One row of a dialog a plugin asks the user to fill in (`UserInteraction.form`). A plugin
 /// describes what it wants to know; how the dialog looks is up to whoever shows it.
-public struct FormField {
-    public enum Kind {
+public struct FormField: Sendable {
+    public enum Kind: Sendable {
         /// One line of text, pre-filled.
         case text(String)
         /// One line whose characters are not shown (a password).
@@ -62,8 +62,8 @@ public struct FormField {
 }
 
 /// What the user entered in a form.
-public struct FormValues {
-    public enum Value: Equatable {
+public struct FormValues: Sendable {
+    public enum Value: Equatable, Sendable {
         case text(String)
         case flag(Bool)
         case index(Int)

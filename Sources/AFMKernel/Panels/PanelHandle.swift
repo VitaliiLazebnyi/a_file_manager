@@ -3,6 +3,7 @@ public import Foundation
 /// A file panel as plugins see it. Its state is in the models (`tabs`): a plugin changes a
 /// model and the panel on screen follows by itself. What needs the file system goes through
 /// the calls below, which read in the background and never block. Main thread only.
+@MainActor
 public protocol PanelHandle: AnyObject {
     var tabs: PanelTabs { get }
     /// True while a directory is being read for this panel.
@@ -25,7 +26,7 @@ public protocol PanelHandle: AnyObject {
 }
 
 /// The layouts of a file list (spec 03 › View types).
-public enum PanelViewMode: Int, Codable {
+public enum PanelViewMode: Int, Codable, Sendable {
     /// One row per item with all columns.
     case full = 0
     /// Names only, in several columns side by side.
@@ -48,6 +49,7 @@ extension PanelHandle {
 }
 
 /// The two panels of the main window (spec 01 › Two panels: source and target).
+@MainActor
 public protocol PanelSet: AnyObject {
     var left: any PanelHandle { get }
     var right: any PanelHandle { get }

@@ -197,6 +197,7 @@ struct TypeSelect {
 
 /// The cursor bar, the same in every view: a light bar with a darker border
 /// (spec 03 › Cursor, selection and row states).
+@MainActor
 enum CursorBar {
     static func draw(in rect: NSRect) {
         let bar = rect.insetBy(dx: 0.5, dy: 0.5)

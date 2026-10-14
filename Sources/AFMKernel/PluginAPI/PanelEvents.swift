@@ -2,7 +2,7 @@ import Foundation
 
 /// What happens in the panels, for plugins that follow them (a quick-view pane follows the
 /// cursor, a tree follows the directory).
-public enum PanelEvent {
+public enum PanelEvent: Sendable {
     /// The cursor is on another item, or the panel's list changed under it.
     case cursorMoved
     /// The marked items changed.
@@ -14,6 +14,7 @@ public enum PanelEvent {
 }
 
 /// Where the window shell announces panel events and plugins listen. Main thread only.
+@MainActor
 public final class PanelEvents {
     private final class Subscription {
         let handler: (PanelEvent, any PanelHandle) -> Void

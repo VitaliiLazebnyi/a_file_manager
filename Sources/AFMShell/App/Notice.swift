@@ -3,6 +3,7 @@ import AppKit
 /// A short message that shows for a few seconds near the bottom of a window, without a button
 /// and without taking the keyboard (`UserInteraction.notice`). A newer one replaces the one on
 /// screen. Main thread only.
+@MainActor
 enum Notice {
     private static var shown: NSPanel?
     private static var generation = 0
@@ -58,18 +59,24 @@ enum Notice {
             panel.animator().alphaValue = 1
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + duration) {
-            guard current == generation else { return }
-            NSAnimationContext.runAnimationGroup(
-                {
-                    $0.duration = 0.4
-                    panel.animator().alphaValue = 0
-                },
-                completionHandler: {
-                    guard current == generation else { return }
-                    panel.parent?.removeChildWindow(panel)
-                    panel.orderOut(nil)
-                    shown = nil
-                })
+            // Queued on the main queue, so it runs on the main thread; AppKit calls the
+            // completion handler there too.
+            MainActor.assumeIsolated {
+                guard current == generation else { return }
+                NSAnimationContext.runAnimationGroup(
+                    {
+                        $0.duration = 0.4
+                        panel.animator().alphaValue = 0
+                    },
+                    completionHandler: {
+                        MainActor.assumeIsolated {
+                            guard current == generation else { return }
+                            panel.parent?.removeChildWindow(panel)
+                            panel.orderOut(nil)
+                            shown = nil
+                        }
+                    })
+            }
         }
     }
 }

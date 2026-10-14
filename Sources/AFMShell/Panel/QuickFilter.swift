@@ -37,7 +37,7 @@ struct QuickFilter {
 
     /// How typed text is compared with a name: as a file mask when it has a `*` or `?` in it,
     /// otherwise the name has to contain it. Upper and lower case are the same.
-    static func matcher(for text: String) -> (String) -> Bool {
+    static func matcher(for text: String) -> @Sendable (String) -> Bool {
         let pattern = text.lowercased()
         if pattern.contains("*") || pattern.contains("?") {
             return { fnmatch(pattern, $0.lowercased(), 0) == 0 }

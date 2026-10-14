@@ -3,6 +3,7 @@ import Foundation
 /// What happens when the user opens a file (Enter, double click). Plugins offer openers; the
 /// first one that takes the file wins. An archive plugin enters a `.zip` as a folder this way,
 /// ahead of the plugin that hands files to their applications.
+@MainActor
 public final class OpenerRegistry {
     /// Returns true when it took care of the file.
     public typealias Opener = (_ file: FileItem, _ panel: any PanelHandle) -> Bool

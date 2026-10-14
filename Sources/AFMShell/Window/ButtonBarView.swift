@@ -4,6 +4,7 @@ import AppKit
 
 /// The look the buttons of the bars share: flat, framed only under the mouse, drawn pressed
 /// while their state is on (spec 02 › Horizontal button bar: appearance).
+@MainActor
 enum BarButton {
     static let height: CGFloat = 24
 

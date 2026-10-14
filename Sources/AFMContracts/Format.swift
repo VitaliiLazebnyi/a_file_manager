@@ -2,7 +2,7 @@ public import Foundation
 
 /// How sizes, dates, speeds and attributes are written everywhere in the program
 /// (spec 03 › Data formats).
-public enum Format {
+public enum Format: Sendable {
     /// Day, month, year and time in the order and with the separators of the user's region
     /// (`10/11/2026 01:19` in the US, `11.10.2026 01:19` in Germany).
     ///
@@ -11,7 +11,9 @@ public enum Format {
     /// is made). When the user changes the region or the time zone while the program runs,
     /// it is thrown away and the next date makes a new one: a formatter keeps the pattern it
     /// worked out for the region it was made in.
-    private final class Dates {
+    ///
+    /// Unchecked: `formatter` is guarded by `lock`; `observers` is set in `init` only.
+    private final class Dates: @unchecked Sendable {
         private let lock = NSLock()
         private var formatter: DateFormatter?
         private var observers: [any NSObjectProtocol] = []

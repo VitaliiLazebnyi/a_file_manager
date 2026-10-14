@@ -12,7 +12,7 @@ import Foundation
 /// usual names (ASCII), so a mask can be put to every entry of a long list. Matching takes
 /// time in proportion to the length of the name times that of the mask at most, whatever
 /// the two look like. A mask is a value that several threads can match with at once.
-public struct FileMask {
+public struct FileMask: Sendable {
     /// How one mask is matched. The two shapes nearly every mask has, `*.txt` and `*text*`,
     /// need no pattern matcher at all.
     private enum Shape {
@@ -105,8 +105,9 @@ public struct FileMask {
         text.folding(options: .caseInsensitive, locale: nil).precomposedStringWithCanonicalMapping
     }
 
-    /// The masks of one `FileMask`, read once and never changed.
-    private final class Compiled {
+    /// The masks of one `FileMask`, read once and never changed: immutable after `init`, so
+    /// several threads match with it at once.
+    private final class Compiled: @unchecked Sendable {
         /// For each mask: the mask, and for one that ends with a dot the mask without it.
         let matchers: UnsafeBufferPointer<(whole: Matcher, withoutDot: Matcher?)>
         /// `*` or `*.*` is among the masks.
@@ -114,7 +115,7 @@ public struct FileMask {
         /// A mask ends with a dot, so it matters whether a name has one.
         let asksForDot: Bool
         let countsCharacters: Bool
-        private var memory: [UnsafeMutableRawPointer] = []
+        private let memory: [UnsafeMutableRawPointer]
 
         init(_ patterns: [String]) {
             var memory: [UnsafeMutableRawPointer] = []

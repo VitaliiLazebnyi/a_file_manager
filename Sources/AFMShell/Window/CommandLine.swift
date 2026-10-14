@@ -14,7 +14,7 @@ enum CommandLineAction: Equatable {
     /// Anything else is for whoever runs programs (`afm_RunCommandLine`).
     case run(String)
 
-    init(line: String, commands: CommandRegistry) {
+    @MainActor init(line: String, commands: CommandRegistry) {
         let line = line.trimmingCharacters(in: .whitespaces)
         guard !line.isEmpty else {
             self = .openCursorItem
@@ -69,6 +69,7 @@ enum CommandLineAction: Equatable {
 /// begins with a blank is not remembered, as in a shell, and remembering can be switched off
 /// altogether (`recordKey`, the plugin's switch, so there is one switch for both). Switched
 /// off, what was remembered goes too.
+@MainActor
 final class CommandLineHistory {
     static let settingsKey = "window.commandLineHistory"
     /// "Remember the command lines that were run", as the command-line plugin names it.

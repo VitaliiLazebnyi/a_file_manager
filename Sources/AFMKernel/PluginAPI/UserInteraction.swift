@@ -1,12 +1,13 @@
 import Foundation
 
-public enum QuestionStyle {
+public enum QuestionStyle: Sendable {
     case information, warning, critical
 }
 
 /// Every question the program asks goes through here, so plugins do not depend on windows
 /// and can be driven by a script in tests.
-public protocol UserInteraction: AnyObject {
+@MainActor
+public protocol UserInteraction: AnyObject, Sendable {
     /// A question with one text field. Returns nil on Cancel.
     func prompt(_ message: String, value: String, detail: String) -> String?
     /// Returns the index of the chosen button. Esc chooses the last one.

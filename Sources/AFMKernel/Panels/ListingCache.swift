@@ -22,8 +22,8 @@ public import Foundation
 /// **Threading.** Safe to use from any thread: the main thread looks entries up while
 /// background readers store them. All state is protected by one lock, which is never held
 /// while sorting or while anything else slow happens.
-public final class ListingCache {
-    public struct Limits {
+public final class ListingCache: @unchecked Sendable {
+    public struct Limits: Sendable {
         /// At most this many folders…
         public var maxFolders = 20
         /// …and this many entries in all of them together. A single folder with more entries
@@ -38,7 +38,7 @@ public final class ListingCache {
     }
 
     /// One remembered reading of a folder.
-    public struct Entry {
+    public struct Entry: Sendable {
         /// The folder with its items sorted by `order`.
         public let listing: Listing
         public let order: ListOrder
@@ -48,7 +48,7 @@ public final class ListingCache {
     }
 
     /// The moment a reading started, in the cache's own count of events (`startReading`).
-    public struct Ticket {
+    public struct Ticket: Sendable {
         fileprivate let clock: UInt64
     }
 

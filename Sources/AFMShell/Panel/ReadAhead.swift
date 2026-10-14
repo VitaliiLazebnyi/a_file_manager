@@ -26,6 +26,7 @@ import Foundation
 /// thread of its location's lane (`Background`), shares only its `Reading` (whose shared part
 /// is behind a lock) and the (thread-safe) cache with the main thread, and reports back on
 /// the main thread.
+@MainActor
 final class ReadAhead {
     /// How long the cursor has to rest on a folder before it is read.
     static let dwell: TimeInterval = 0.4
@@ -62,17 +63,19 @@ final class ReadAhead {
     /// A reading a panel has taken over (`join`).
     struct Joined {
         /// Registers who gets the result, on the main thread.
-        let receive: (@escaping (Outcome) -> Void) -> Void
+        let receive: @MainActor (@escaping @MainActor (Outcome) -> Void) -> Void
         /// The panel no longer wants the result (it moved on). A reading nobody waits for and
         /// the cursor does not rest on is told to stop.
-        let leave: () -> Void
+        let leave: @MainActor () -> Void
     }
 
-    private final class Reading {
+    /// Unchecked: what is marked "main thread only" is touched there alone, and what is
+    /// shared with the reading thread is guarded by `lock`.
+    private final class Reading: @unchecked Sendable {
         let target: Target
         let cancellation = CancellationFlag()
         // Main thread only.
-        var waiting: [(Outcome) -> Void] = []
+        var waiting: [@MainActor (Outcome) -> Void] = []
         /// How many panels wait for the result.
         var waiters = 0
         /// When the reading was told to stop.
@@ -267,7 +270,7 @@ final class ReadAhead {
                 outcome = reading.cancellation.isCancelled ? nil : .failure(error)
             }
             reading.finished()
-            MainLoop.perform { [weak self] in self?.ended(reading, outcome) }
+            MainLoop.perform { [weak self, outcome] in self?.ended(reading, outcome) }
         }
     }
 

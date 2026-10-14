@@ -88,7 +88,7 @@ public final class Shell: ShellServices {
     /// writing they go on writing.
     public func finishToQuit(
         patience: TimeInterval = Shell.quitPatience, progressDelay: TimeInterval = Shell.quitProgressDelay,
-        then reply: @escaping (Bool) -> Void
+        then reply: @escaping @MainActor (Bool) -> Void
     ) {
         MainThread.assert("Quitting")
         stopJobsToQuit(patience: patience) { [self] _ in
@@ -96,7 +96,7 @@ public final class Shell: ShellServices {
             let progress = QuitProgress()
             var hasReplied = false
             var stopWaiting: (() -> Void)?
-            func answer(_ quits: Bool) {
+            @MainActor func answer(_ quits: Bool) {
                 guard !hasReplied else { return }
                 hasReplied = true
                 stopWaiting?()
@@ -125,7 +125,9 @@ public final class Shell: ShellServices {
     /// ended. A job that has not stopped after `patience` (it waits for a disk or a server
     /// that does not answer) does not keep the program from quitting for ever: the user is
     /// asked whether to quit anyway, and again after twice as long each time the answer is no.
-    public func stopJobsToQuit(patience: TimeInterval = Shell.quitPatience, then reply: @escaping (Bool) -> Void) {
+    public func stopJobsToQuit(
+        patience: TimeInterval = Shell.quitPatience, then reply: @escaping @MainActor (Bool) -> Void
+    ) {
         guard jobService.isBusy else {
             reply(true)
             return
@@ -187,6 +189,7 @@ public final class Shell: ShellServices {
 }
 
 /// Runs the program: a kernel, the given plugins, and the shell on top.
+@MainActor
 public final class ShellApplication: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private let productName: String
     private let plugins: [any Plugin]
@@ -220,7 +223,7 @@ public final class ShellApplication: NSObject, NSApplicationDelegate, NSMenuItem
     }
 
     /// How long quitting waits for settings that are still on their way to the disk.
-    public static var settingsPatience: TimeInterval = 5
+    public static let settingsPatience: TimeInterval = 5
 
     /// Quitting asks the plugins first (one with unsaved work asks the user, who may call the
     /// quit off), then stops the file jobs and lets them tidy up, so no half-written file is

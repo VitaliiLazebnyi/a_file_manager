@@ -222,10 +222,10 @@ final class PanelCoordinator: PanelSet, PanelHost {
     // MARK: Watching
 
     /// One watched folder, from the moment watching it is asked of its file system.
-    private final class Watch {
+    @MainActor private final class Watch {
         let directory: URL
         /// What the file system returned; watching ends when it is let go of.
-        var watcher: AnyObject?
+        var watcher: (any WatchToken)?
         /// The file system has not come back from setting the watch up.
         var isStarting = true
         /// A panel shows the folder. A watch that is no longer wanted while it is still being
@@ -283,7 +283,7 @@ final class PanelCoordinator: PanelSet, PanelHost {
         // references for the file system's callback.
         Background.storage(
             "watch", at: directory, qos: .utility,
-            work: { [weak self, weak watch] () -> AnyObject? in
+            work: { [weak self, weak watch] () -> (any WatchToken)? in
                 provider.watch([directory]) { [weak self, weak watch] changed in
                     // Main thread, as the file system promises.
                     guard let self, let watch, watch.isWanted, watches[key] === watch else { return }
@@ -366,6 +366,7 @@ final class PanelCoordinator: PanelSet, PanelHost {
 /// thread of the kernel's for calls that block (`BlockingCalls`), one question at a time, and
 /// the list here is what they answered last. Asked again when volumes come and go, when a file system says its places changed,
 /// and whenever a volume list is opened. Main thread only.
+@MainActor
 final class PlacesStore {
     /// Posted by a file system (the object) when its places are no longer what it answered.
     static let placesDidChange = Notification.Name("AFMPlacesDidChange")
@@ -375,7 +376,8 @@ final class PlacesStore {
     private var asking: Set<Int> = []
     private var askAgain: Set<Int> = []
     private var handlers: [() -> Void] = []
-    private var observers: [(center: NotificationCenter, token: any NSObjectProtocol)] = []
+    /// Filled in `init`, emptied in `deinit`.
+    nonisolated(unsafe) private var observers: [(center: NotificationCenter, token: any NSObjectProtocol)] = []
     /// Every place, in the order of the file systems.
     private(set) var all: [Place] = []
     /// True once every file system has answered at least once.
@@ -393,7 +395,9 @@ final class PlacesStore {
             observers.append(
                 (
                     workspace,
-                    workspace.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in self?.refresh()
+                    workspace.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                        // Delivered on the main queue.
+                        MainActor.assumeIsolated { self?.refresh() }
                     }
                 ))
         }
@@ -402,7 +406,7 @@ final class PlacesStore {
             (
                 center,
                 center.addObserver(forName: Self.placesDidChange, object: nil, queue: .main) { [weak self] _ in
-                    self?.refresh()
+                    MainActor.assumeIsolated { self?.refresh() }
                 }
             ))
         refresh()

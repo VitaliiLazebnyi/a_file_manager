@@ -10,6 +10,7 @@ import AppKit
 /// loop or the main queue still arrives (the plugins' completions, their questions). Without
 /// a running application (tests) nothing is put on screen, and the two answers are given by
 /// `pressQuitNow` and `pressDontQuit`. Main thread only.
+@MainActor
 final class QuitProgress: NSObject {
     static let waitingText = "Finishing before quitting…"
     static let waitingDetail =

@@ -1,7 +1,7 @@
 public import Foundation
 
 /// Spreads independent work over the processor's cores.
-public enum Parallel {
+public enum Parallel: Sendable {
     /// Transforms every element, using all cores, and returns the results in the original
     /// order. `transform` runs on several threads at once and must not touch shared state
     /// without protecting it. Short inputs are done on the calling thread.
@@ -24,15 +24,17 @@ public enum Parallel {
     /// is gone when the piece ends.
     public static func map<Element, Result>(
         _ items: [Element], serialBelow threshold: Int = 2,
-        _ transform: (Element) -> Result
-    ) -> [Result] {
+        _ transform: @Sendable (Element) -> Result
+    ) -> [Result] where Element: Sendable, Result: Sendable {
         guard items.count >= threshold, items.count > 1, ParallelPool.shared.width > 0 else {
             return items.map(transform)
         }
         return [Result](unsafeUninitializedCapacity: items.count) { buffer, count in
             // Each iteration writes its own slot, so the slots need no lock.
-            let slots = UnsafeMutablePointer<Result>(buffer.baseAddress!)
+            nonisolated(unsafe) let slots = UnsafeMutablePointer<Result>(buffer.baseAddress!)
             items.withUnsafeBufferPointer { source in
+                // Only read, while the call lasts.
+                nonisolated(unsafe) let source = source
                 withoutActuallyEscaping(transform) { transform in
                     ParallelPool.shared.run(count: source.count) { index in
                         (slots + index).initialize(to: transform(source[index]))
@@ -82,7 +84,9 @@ public enum Parallel {
 /// threads than cores. Threads beyond the cores go away as soon as they are not needed, and
 /// all of them when there is nothing left to do. The pool uses no dispatch queue: it keeps
 /// working when those are all taken.
-final class ParallelPool {
+///
+/// All state, the counters of every `Job` included, is guarded by `condition`.
+final class ParallelPool: @unchecked Sendable {
     static let shared = ParallelPool()
 
     /// Helper threads besides the callers themselves.
@@ -96,8 +100,8 @@ final class ParallelPool {
     /// …and how seldom when looking has stopped changing anything.
     private static let longestPatience: UInt64 = 1_000_000_000
 
-    private final class Job {
-        var body: ((Int) -> Void)?
+    private final class Job: @unchecked Sendable {
+        var body: (@Sendable (Int) -> Void)?
         let count: Int
         /// Indexes taken in one piece: large inputs are handed out in runs, so the lock is
         /// not taken for every element.
@@ -127,7 +131,8 @@ final class ParallelPool {
         var room = 0
 
         init(
-            count: Int, grain: Int, parent: Job?, isForMain: Bool, urgency: qos_class_t, body: @escaping (Int) -> Void
+            count: Int, grain: Int, parent: Job?, isForMain: Bool, urgency: qos_class_t,
+            body: @escaping @Sendable (Int) -> Void
         ) {
             (self.count, self.grain, self.parent, self.body) = (count, grain, parent, body)
             top = parent.map(\.root)
@@ -221,7 +226,7 @@ final class ParallelPool {
         return own.rawValue < QOS_CLASS_UTILITY.rawValue ? QOS_CLASS_UTILITY : own
     }
 
-    func run(count: Int, body: @escaping (Int) -> Void) {
+    func run(count: Int, body: @escaping @Sendable (Int) -> Void) {
         let parent = current
         let job = Job(
             count: count, grain: max(1, count / ((width + 1) * 16)), parent: parent,
@@ -524,7 +529,7 @@ final class ParallelPool {
 
 /// States which thread a piece of state belongs to. Panel state, the registries and everything
 /// on screen belong to the main thread; these checks stop a wrong caller in debug builds.
-public enum MainThread {
+public enum MainThread: Sendable {
     public static func assert(
         _ what: @autoclosure () -> String = "This", file: StaticString = #fileID, line: UInt = #line
     ) {
@@ -537,7 +542,7 @@ public enum MainThread {
 /// run than there are cores, a thread stands still for long stretches, and a search that
 /// allows a regular expression a quarter of a second "of time" then gives up on names it
 /// would have matched in a millisecond. The answer would depend on how busy the machine is.
-public enum ThreadTime {
+public enum ThreadTime: Sendable {
     /// Seconds of processor time the calling thread has used so far.
     public static var used: TimeInterval {
         TimeInterval(clock_gettime_nsec_np(CLOCK_THREAD_CPUTIME_ID)) / 1_000_000_000

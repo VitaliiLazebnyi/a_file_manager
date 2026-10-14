@@ -18,6 +18,7 @@ import Foundation
 /// **Threading.** Everything in here belongs to the main thread; a batch takes copies of what
 /// it needs to the background and brings its results back. The column's own `value` function
 /// is called on several background threads at once, as its contract says.
+@MainActor
 final class ColumnValueStore {
     /// A value belongs to a column and to an entry as it was listed: a file that changed gets
     /// its value computed again.

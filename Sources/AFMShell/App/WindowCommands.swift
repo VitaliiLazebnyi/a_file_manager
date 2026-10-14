@@ -25,6 +25,7 @@ extension CommandID {
 /// arrangement, 06 › Command line). They are registered like any plugin's commands, so their
 /// keys are in the key bindings and they can be put in menus and on the button bar. None of
 /// them changes files or panels, so all of them also run while a job is under way.
+@MainActor
 enum WindowCommands {
     /// `window` answers nil until the window exists; the commands are registered before it,
     /// because it is built from the final key bindings.

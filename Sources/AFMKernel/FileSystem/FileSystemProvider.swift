@@ -1,8 +1,8 @@
 public import Foundation
 
 /// An entry of the volume list: a disk, a mounted folder or a well-known place.
-public struct Place {
-    public enum Kind {
+public struct Place: Sendable {
+    public enum Kind: Sendable {
         case home, folder, internalDisk, externalDisk
     }
 
@@ -36,7 +36,7 @@ public struct Place {
     }
 }
 
-public struct VolumeInfo: Equatable {
+public struct VolumeInfo: Equatable, Sendable {
     public let name: String
     public let freeBytes: Int64?
     public let totalBytes: Int64?
@@ -53,7 +53,7 @@ public struct VolumeInfo: Equatable {
 }
 
 /// What a file system can do, so commands can be offered or withheld before they fail.
-public struct FileSystemCapabilities: OptionSet {
+public struct FileSystemCapabilities: OptionSet, Sendable {
     public let rawValue: Int
     public init(rawValue: Int) { self.rawValue = rawValue }
 
@@ -76,7 +76,7 @@ public struct FileSystemCapabilities: OptionSet {
 }
 
 /// What is carried over when a file is copied from one file system to another.
-public struct FileAttributes {
+public struct FileAttributes: Sendable {
     public var modified: Date?
     public var permissions: UInt16?
 
@@ -86,7 +86,7 @@ public struct FileAttributes {
     }
 }
 
-public enum FileSystemError: LocalizedError {
+public enum FileSystemError: LocalizedError, Sendable {
     case noProvider(URL)
     case notSupported(String)
     case alreadyExists(String)
@@ -105,7 +105,7 @@ public enum FileSystemError: LocalizedError {
 
 /// Access to the contents of a file. Used by one thread at a time; only `interrupt` may be
 /// called from another thread meanwhile.
-public protocol FileReader: AnyObject {
+public protocol FileReader: AnyObject, Sendable {
     /// The next block, or nil at the end of the file.
     func read(upToCount count: Int) throws -> Data?
     /// Continues reading at a position counted from the start of the file.
@@ -120,7 +120,7 @@ public protocol FileReader: AnyObject {
 }
 
 /// Used by one thread at a time; only `interrupt` may be called from another thread meanwhile.
-public protocol FileWriter: AnyObject {
+public protocol FileWriter: AnyObject, Sendable {
     func write(_ data: Data) throws
     /// Finishes the file and gives it the attributes the file system can keep.
     func close(attributes: FileAttributes) throws
@@ -152,8 +152,12 @@ extension CancellationFlag {
     }
 }
 
+/// What `FileSystemProvider.watch` returns: the watching goes on until it is released, which
+/// may happen on any thread.
+public typealias WatchToken = AnyObject & Sendable
+
 /// What a lean listing tells about an entry: enough to walk a tree of folders, and no more.
-public struct DirectoryEntry: Equatable {
+public struct DirectoryEntry: Equatable, Sendable {
     public let name: String
     /// A directory, or a symbolic link that points to one.
     public let isDirectory: Bool
@@ -193,7 +197,7 @@ public struct DirectoryEntry: Equatable {
 /// connection) registers with `CancellationFlag.onCancel`; one that works in a loop looks at
 /// `isCancelled`. Each variant's default is the call without a flag, so a provider adds only
 /// the ones it can really end early, and callers that hold a flag always pass it.
-public protocol FileSystemProvider: AnyObject {
+public protocol FileSystemProvider: AnyObject, Sendable {
     var scheme: String { get }
     var capabilities: FileSystemCapabilities { get }
     /// What can be done at one location, for a file system whose locations differ (a view
@@ -347,13 +351,15 @@ public protocol FileSystemProvider: AnyObject {
     /// Reports changes made by others to the given directories until the returned object is
     /// released. `onChange` is called on the main thread with the directories that changed.
     /// Nil when watching is not available.
-    func watch(_ directories: [URL], onChange: @escaping ([URL]) -> Void) -> AnyObject?
+    func watch(_ directories: [URL], onChange: @escaping @MainActor @Sendable ([URL]) -> Void) -> (any WatchToken)?
     /// The same for whole trees: with `recursively`, `onChange` names a watched directory
     /// when anything at or below it changed, however deep. For a view that shows a tree as
     /// one list, which would otherwise have to watch every folder of it. The default
     /// watches the directories themselves only, as the call above does: a file system that
     /// can watch a tree at the cost of one folder offers this.
-    func watch(_ directories: [URL], recursively: Bool, onChange: @escaping ([URL]) -> Void) -> AnyObject?
+    func watch(_ directories: [URL], recursively: Bool, onChange: @escaping @MainActor @Sendable ([URL]) -> Void) -> (
+        any WatchToken
+    )?
 
     // The calls that change something, ended early once `cancellation` is set (see
     // Cancellation above). Each one's default is the call without a flag. A file system whose
@@ -500,8 +506,10 @@ extension FileSystemProvider {
     public func volume(of url: URL, cancellation: CancellationFlag) -> VolumeInfo? {
         cancellation.isCancelled ? nil : volume(of: url)
     }
-    public func watch(_: [URL], onChange _: @escaping ([URL]) -> Void) -> AnyObject? { nil }
-    public func watch(_ directories: [URL], recursively _: Bool, onChange: @escaping ([URL]) -> Void) -> AnyObject? {
+    public func watch(_: [URL], onChange _: @escaping @MainActor @Sendable ([URL]) -> Void) -> (any WatchToken)? { nil }
+    public func watch(
+        _ directories: [URL], recursively _: Bool, onChange: @escaping @MainActor @Sendable ([URL]) -> Void
+    ) -> (any WatchToken)? {
         watch(directories, onChange: onChange)
     }
 
@@ -655,12 +663,13 @@ extension FileSystemProvider {
 }
 
 /// The file systems the plugins provide, found by URL scheme. Filled while the plugins start
-/// and only read afterwards, so it may be read from any thread.
-public final class FileSystemRegistry {
+/// and only read afterwards, so it may be read from any thread. (The lists of flushers,
+/// releasers and closers are guarded by `flushLock`.)
+public final class FileSystemRegistry: @unchecked Sendable {
     private var providers: [any FileSystemProvider] = []
-    private var flushers: [(URL, CancellationFlag) throws -> Void] = []
-    private var releasers: [(URL) -> Void] = []
-    private var closers: [(URL, CancellationFlag) -> Void] = []
+    private var flushers: [@Sendable (URL, CancellationFlag) throws -> Void] = []
+    private var releasers: [@MainActor (URL) -> Void] = []
+    private var closers: [@Sendable (URL, CancellationFlag) -> Void] = []
 
     public init() {}
 
@@ -725,7 +734,7 @@ public final class FileSystemRegistry {
     /// location of a file that is about to be read, moved or deleted; it returns at once for
     /// a file it has nothing to do with, blocks for as long as the writing takes otherwise,
     /// and throws when the file could not be brought up to date.
-    public func addFlusher(_ flush: @escaping (URL, CancellationFlag) throws -> Void) {
+    public func addFlusher(_ flush: @escaping @Sendable (URL, CancellationFlag) throws -> Void) {
         Self.flushLock.lock()
         flushers.append(flush)
         Self.flushLock.unlock()
@@ -747,7 +756,7 @@ public final class FileSystemRegistry {
     /// Registers who keeps something open on volumes and lets go of it before one is ejected:
     /// closes the windows that show its files, stops what reads there. Called on the main
     /// thread with the volume's location; whoever registers is the plugin that holds it.
-    public func addVolumeReleaser(_ release: @escaping (URL) -> Void) {
+    public func addVolumeReleaser(_ release: @escaping @MainActor (URL) -> Void) {
         Self.flushLock.lock()
         releasers.append(release)
         Self.flushLock.unlock()
@@ -755,14 +764,14 @@ public final class FileSystemRegistry {
 
     /// The same for what has to wait on the disk to let go (writing what is pending, closing
     /// files): called on the thread of the job that ejects, after the releasers.
-    public func addVolumeCloser(_ close: @escaping (URL, CancellationFlag) -> Void) {
+    public func addVolumeCloser(_ close: @escaping @Sendable (URL, CancellationFlag) -> Void) {
         Self.flushLock.lock()
         closers.append(close)
         Self.flushLock.unlock()
     }
 
     /// Main thread: every releaser lets go of what it shows or reads on `volume`.
-    public func releaseVolume(_ volume: URL) {
+    @MainActor public func releaseVolume(_ volume: URL) {
         Self.flushLock.lock()
         let releasers = self.releasers
         Self.flushLock.unlock()
@@ -819,7 +828,7 @@ public final class FileSystemRegistry {
 /// How deep the calls of a walk through a tree of folders are nested on the current thread.
 /// For walks that call themselves once per level (`totalSizeByListing`), so that they can
 /// stop nesting before a thread's stack is used up.
-public enum TreeWalk {
+public enum TreeWalk: Sendable {
     /// Calls nested deeper than this on one thread go on without nesting.
     public static let deepestNesting = 32
     /// Levels below which a walk that no longer nests gives up: no real tree is that deep.

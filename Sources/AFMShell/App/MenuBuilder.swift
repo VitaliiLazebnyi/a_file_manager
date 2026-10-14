@@ -5,6 +5,7 @@ import AppKit
 /// Builds menus from what the plugins registered: captions from the command registry, keys
 /// from the key bindings, layout from the menu registry. The shell adds what every Mac program
 /// has: the application menu, the standard editing actions and the Window menu.
+@MainActor
 enum MenuBuilder {
     /// Menu items send this action along the responder chain; the main window answers it.
     static let action = #selector((any CommandResponder).performCommand(_:))
@@ -247,7 +248,7 @@ enum MenuBuilder {
     }
 }
 
-@objc protocol CommandResponder {
+@MainActor @objc protocol CommandResponder {
     func performCommand(_ sender: NSMenuItem)
 }
 
@@ -267,6 +268,7 @@ enum MenuBuilder {
 ///   checked and named as what is to run. No other entry is looked at.
 ///
 /// Main thread only.
+@MainActor
 final class MenuKeys: NSObject, NSMenuDelegate {
     private let kernel: Kernel
     /// The entry the last key belonged to, until its action has run.

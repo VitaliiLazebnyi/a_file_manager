@@ -2,8 +2,8 @@ import Foundation
 
 /// One setting the user can change in the configuration dialog (spec 13 › The dialog
 /// framework). The value lives in the settings store under `key`.
-public struct Preference {
-    public enum Kind {
+public struct Preference: Sendable {
+    public enum Kind: Sendable {
         case flag(default: Bool)
         case text(default: String)
         /// One of a few options; the index is stored.
@@ -23,13 +23,13 @@ public struct Preference {
 }
 
 /// A page of the configuration dialog, offered by the plugin whose settings it holds.
-public struct PreferencePage {
+public struct PreferencePage: Sendable {
     public let title: String
     public let preferences: [Preference]
     /// Called on the main thread after the user changed something on this page.
-    public let onChange: () -> Void
+    public let onChange: @MainActor @Sendable () -> Void
 
-    public init(title: String, preferences: [Preference], onChange: @escaping () -> Void = {}) {
+    public init(title: String, preferences: [Preference], onChange: @escaping @MainActor @Sendable () -> Void = {}) {
         self.title = title
         self.preferences = preferences
         self.onChange = onChange
@@ -38,6 +38,7 @@ public struct PreferencePage {
 
 /// The pages of the configuration dialog. Plugins add pages while they start; whichever plugin
 /// provides the dialog shows them.
+@MainActor
 public final class PreferenceRegistry {
     public private(set) var pages: [PreferencePage] = []
 

@@ -21,7 +21,7 @@ import Foundation
 /// - Waiting costs no thread of the kernel's, and it ends at once when the asker's
 ///   `CancellationFlag` is set. The question itself may go on (a system call cannot be taken
 ///   back); it is told through the flag it was handed, and its answer is dropped.
-public enum BlockingCalls {
+public enum BlockingCalls: Sendable {
     /// The most questions one file system has under way at a time, answered or not.
     public static var limit: Int {
         get { CallBook.shared.limit }
@@ -30,7 +30,7 @@ public enum BlockingCalls {
 
     /// Runs `work` on a thread of the kernel's own, inside an autorelease pool, and returns at
     /// once. For any thread. The threads are made as they are needed and go away when idle.
-    public static func run(_ work: @escaping () -> Void) {
+    public static func run(_ work: @escaping @Sendable () -> Void) {
         KernelThreads.shared.run(work)
     }
 
@@ -45,9 +45,9 @@ public enum BlockingCalls {
     /// once an earlier one was given up.
     ///
     /// Returns nil when `cancellation` was set before the answer came.
-    public static func answer<Answer>(
+    public static func answer<Answer: Sendable>(
         from owner: AnyObject, to question: String, sharing: Bool = true, cancellation: CancellationFlag? = nil,
-        _ work: @escaping (CancellationFlag) -> Answer
+        _ work: @escaping @Sendable (CancellationFlag) -> Answer
     ) -> Answer? {
         if cancellation?.isCancelled == true { return nil }
         let slot = Slot<Answer>()
@@ -67,13 +67,14 @@ public enum BlockingCalls {
 
     /// The same without waiting: `deliver` is called once, on the main thread, with the
     /// answer, or with nil when `cancellation` was set first. For any thread.
-    public static func answer<Answer>(
+    public static func answer<Answer: Sendable>(
         from owner: AnyObject, to question: String, sharing: Bool = true, cancellation: CancellationFlag? = nil,
-        _ work: @escaping (CancellationFlag) -> Answer, then deliver: @escaping (Answer?) -> Void
+        _ work: @escaping @Sendable (CancellationFlag) -> Answer,
+        then deliver: @escaping @MainActor @Sendable (Answer?) -> Void
     ) {
         let slot = Slot<Answer>()
         // Only the first of answer and cancellation is delivered.
-        func finish(_ answer: Answer?) {
+        @Sendable func finish(_ answer: Answer?) {
             guard slot.close() else { return }
             DispatchQueue.main.async { deliver(answer) }
         }
@@ -100,8 +101,8 @@ public enum BlockingCalls {
         CallBook.shared.unanswered(for: ObjectIdentifier(owner))
     }
 
-    /// Where an answer is put by one thread and taken by another.
-    private final class Slot<Answer> {
+    /// Where an answer is put by one thread and taken by another; guarded by `lock`.
+    private final class Slot<Answer>: @unchecked Sendable {
         private let lock = NSLock()
         private var answer: Answer?
         private var isClosed = false
@@ -139,8 +140,9 @@ public enum BlockingCalls {
     }
 }
 
-/// The questions under way and those waiting their turn.
-final class CallBook {
+/// The questions under way and those waiting their turn. All state, that of every `Call`
+/// included, is guarded by `lock`.
+final class CallBook: @unchecked Sendable {
     static let shared = CallBook()
 
     fileprivate struct Key: Hashable {
@@ -148,24 +150,24 @@ final class CallBook {
         let question: String
     }
 
-    fileprivate final class Call {
+    fileprivate final class Call: @unchecked Sendable {
         fileprivate let key: Key
         let shares: Bool
         /// Set when nobody waits for the answer any more.
         let flag = CancellationFlag()
-        var work: ((CancellationFlag) -> Any)?
-        var listeners: [Int: (Any?) -> Void] = [:]
+        var work: (@Sendable (CancellationFlag) -> Any)?
+        var listeners: [Int: @Sendable (Any?) -> Void] = [:]
         var isRunning = false
         /// Running, and given up by everyone who asked.
         var isStranded = false
 
-        fileprivate init(key: Key, shares: Bool, work: @escaping (CancellationFlag) -> Any) {
+        fileprivate init(key: Key, shares: Bool, work: @escaping @Sendable (CancellationFlag) -> Any) {
             (self.key, self.shares, self.work) = (key, shares, work)
         }
     }
 
     /// One asker's place at a call.
-    final class Ticket {
+    final class Ticket: Sendable {
         private let book: CallBook
         private let call: Call
         private let id: Int
@@ -210,8 +212,8 @@ final class CallBook {
     /// `listener` is called once with the answer, on the thread that worked it out, unless
     /// the ticket is cancelled first.
     func ask(
-        owner: AnyObject, question: String, shares: Bool, work: @escaping (CancellationFlag) -> Any,
-        listener: @escaping (Any?) -> Void
+        owner: AnyObject, question: String, shares: Bool, work: @escaping @Sendable (CancellationFlag) -> Any,
+        listener: @escaping @Sendable (Any?) -> Void
     ) -> Ticket {
         let key = Key(owner: ObjectIdentifier(owner), question: question)
         lock.lock()
@@ -287,7 +289,7 @@ final class CallBook {
             return
         }
         var isGivenUp = false
-        var work: ((CancellationFlag) -> Any)?
+        var work: (@Sendable (CancellationFlag) -> Any)?
         if call.listeners.isEmpty {
             if call.isRunning {
                 call.isStranded = true
@@ -305,15 +307,15 @@ final class CallBook {
 }
 
 /// Threads for work that blocks: one per piece of work, kept for a few seconds when idle so
-/// that a run of short pieces does not start a thread each.
-final class KernelThreads {
+/// that a run of short pieces does not start a thread each. All state is guarded by `condition`.
+final class KernelThreads: @unchecked Sendable {
     static let shared = KernelThreads()
 
     private let condition = NSCondition()
-    private var queue: [() -> Void] = []
+    private var queue: [@Sendable () -> Void] = []
     private var idle = 0
 
-    func run(_ work: @escaping () -> Void) {
+    func run(_ work: @escaping @Sendable () -> Void) {
         condition.lock()
         queue.append(work)
         let isTaken = idle >= queue.count
@@ -327,7 +329,7 @@ final class KernelThreads {
             condition.lock()
             while true {
                 if !queue.isEmpty {
-                    var work: (() -> Void)? = queue.removeFirst()
+                    var work: (@Sendable () -> Void)? = queue.removeFirst()
                     condition.unlock()
                     autoreleasepool { work?() }
                     // Whatever the work held goes here, on this thread, before the next piece.
@@ -351,7 +353,7 @@ final class KernelThreads {
 
 /// Lets go of large lists away from the thread that used them: freeing a million entries
 /// takes a tenth of a second and more, which the main thread does not have.
-public enum Discard {
+public enum Discard: Sendable {
     /// Lists shorter than this are not worth the trip.
     public static let threshold = 20_000
 
@@ -377,7 +379,9 @@ public enum Discard {
         KernelThreads.shared.run { box.empty() }
     }
 
-    private final class Box<Value> {
+    /// Handed from the thread that lets go to the one that releases, and touched by one of
+    /// them at a time.
+    private final class Box<Value>: @unchecked Sendable {
         var value: Value?
         init(_ value: Value?) { self.value = value }
         func empty() { value = nil }

@@ -4,6 +4,7 @@ import AppKit
 
 /// The rules of dragging files with the mouse (spec 05 › Drag & drop), apart from the views
 /// they happen in.
+@MainActor
 enum PanelDrop {
     /// Marks a drag that started in a panel of this program. It carries no location, only
     /// the ticket of the drag (`Payload.token`): what is dragged stays inside the program
@@ -12,7 +13,7 @@ enum PanelDrop {
     static let itemType = NSPasteboard.PasteboardType("afm.panel-item")
     /// The paths of files as a list, the way programs took files before there were file URLs;
     /// the one form in which a single pasteboard item can name many files.
-    static let fileNamesType = NSPasteboard.PasteboardType("NSFilenamesPboardType")
+    nonisolated static let fileNamesType = NSPasteboard.PasteboardType("NSFilenamesPboardType")
 
     static let acceptedTypes: [NSPasteboard.PasteboardType] = [itemType, .fileURL]
 
@@ -20,7 +21,7 @@ enum PanelDrop {
     /// other programs expect of a drag of several files. A larger drag (making a hundred
     /// thousand pasteboard items takes a third of a second and more) travels as one item that
     /// hands out its files only when a program asks for them.
-    static let itemsWrittenSingly = 2_000
+    nonisolated static let itemsWrittenSingly = 2_000
 
     /// What a drag that started in a panel carries. Main thread only.
     ///
@@ -29,7 +30,7 @@ enum PanelDrop {
     /// list of the items and of their locations is put together in the background while the
     /// drag is already under way, and whoever needs it before that (a drop a moment after the
     /// start, another program asking for the files) has it put together then and there.
-    final class Payload: NSObject, NSPasteboardItemDataProvider, NSPasteboardTypeOwner {
+    @MainActor final class Payload: NSObject, NSPasteboardItemDataProvider, @preconcurrency NSPasteboardTypeOwner {
         let token = UUID().uuidString
         /// How many items are dragged.
         let count: Int
@@ -90,13 +91,14 @@ enum PanelDrop {
             if let gathered { receive(gathered.locations) } else { waiting.append(receive) }
         }
 
-        /// Another program asks for a file: the first one of the local disks.
-        func pasteboard(
+        /// Another program asks for a file: the first one of the local disks. AppKit asks on
+        /// the main thread.
+        nonisolated func pasteboard(
             _: NSPasteboard?, item: NSPasteboardItem, provideDataForType type: NSPasteboard.PasteboardType
         ) {
-            if type == .fileURL, let first = items.first(where: { $0.url.isFileURL }) {
-                item.setString(first.url.absoluteString, forType: .fileURL)
-            }
+            guard type == .fileURL else { return }
+            let location = MainActor.assumeIsolated { items.first(where: { $0.url.isFileURL })?.url.absoluteString }
+            if let location { item.setString(location, forType: .fileURL) }
         }
 
         /// Another program asks for the list of files: only now are their paths put together.
@@ -298,6 +300,7 @@ struct DragSources {
 /// What a drag carries and where its sources are, worked out once for the whole drag: the
 /// mouse reports its position many times a second, and the items may be many thousands.
 /// Main thread only.
+@MainActor
 final class DropSession {
     /// Identifies the drag (`NSDraggingInfo.draggingSequenceNumber`).
     let sequence: Int

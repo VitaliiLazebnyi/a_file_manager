@@ -153,16 +153,20 @@ public final class ImmediateJobService: JobService {
         func cancel() {}
     }
 
-    private final class Monitor: JobMonitor {
+    /// Unchecked: the job runs on the main thread, the only one that touches the monitor.
+    private final class Monitor: JobMonitor, @unchecked Sendable {
         let cancellation = CancellationFlag()
         var reports: [JobProgress] = []
         func report(_ progress: JobProgress) { reports.append(progress) }
-        func ask<Answer>(_ question: () -> Answer) -> Answer { question() }
+        func ask<Answer: Sendable>(_ question: sending @MainActor () -> Answer) -> Answer {
+            MainActor.assumeIsolated { question() }
+        }
     }
 
     @discardableResult
-    public func run<Result>(
-        title: String, work: @escaping (any JobMonitor) -> Result, completion: @escaping (Result) -> Void
+    public func run<Result: Sendable>(
+        title: String, work: @escaping @Sendable (any JobMonitor) -> Result,
+        completion: @escaping @MainActor (Result) -> Void
     ) -> any JobHandle {
         titles.append(title)
         let monitor = Monitor()

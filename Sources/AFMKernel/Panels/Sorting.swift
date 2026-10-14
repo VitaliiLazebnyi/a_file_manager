@@ -1,7 +1,7 @@
 public import Foundation
 
 /// Sort keys of the Show menu; raw values match `sortorder=` in the spec (03 › Sort keys).
-public enum SortKey: Int {
+public enum SortKey: Int, Sendable {
     case name = 0
     case ext = 1
     case size = 2
@@ -12,7 +12,7 @@ public enum SortKey: Int {
     public var startsDescending: Bool { self == .date || self == .size }
 }
 
-public struct ListOrder: Equatable {
+public struct ListOrder: Equatable, Sendable {
     public var key: SortKey
     public var descending: Bool
 
@@ -44,7 +44,7 @@ public struct ListOrder: Equatable {
 /// Each item gets a compact record once (`SortKeys`) holding the keys of the parts of its
 /// name the order looks at; sorting, merging and reversing compare those records as plain
 /// bytes, on all cores. `areInOrder` gives the same answers for two items on their own.
-public enum Sorter {
+public enum Sorter: Sendable {
     /// An item with the parts of its name the comparison needs: the first decides, the
     /// second decides between items whose first parts are the same bytes.
     fileprivate struct Keyed {
@@ -103,7 +103,7 @@ public enum Sorter {
     }
 
     /// See `Sorter.key(of:numeric:)`.
-    public struct NameKey: Comparable {
+    public struct NameKey: Comparable, Sendable {
         fileprivate let key: [UInt8]
         fileprivate let name: String
 
@@ -249,9 +249,11 @@ public enum Sorter {
                 count = records.count
             }
             items.withUnsafeBufferPointer { items in
+                // Both lists are only read, while the call lasts.
+                nonisolated(unsafe) let (items, records) = (items, records)
                 // Equal items keep the order they came in, which also makes any two items
                 // different: the result does not depend on how the sorting is cut into pieces.
-                func isBefore(_ a: UInt32, _ b: UInt32) -> Bool {
+                @Sendable func isBefore(_ a: UInt32, _ b: UInt32) -> Bool {
                     var result = SortKeys.quick(records[Int(a)], records[Int(b)], order)
                     // A name too long for a record: the same comparison, worked out for the pair.
                     if result == SortKeys.unknown {
@@ -272,7 +274,9 @@ public enum Sorter {
 
     /// Sorts in place. A long list is dealt into buckets of neighbouring values, which are
     /// then sorted at the same time; nothing is left to merge on a single thread.
-    private static func sort(_ indexes: UnsafeMutableBufferPointer<UInt32>, by isBefore: (UInt32, UInt32) -> Bool) {
+    private static func sort(
+        _ indexes: UnsafeMutableBufferPointer<UInt32>, by isBefore: @Sendable (UInt32, UInt32) -> Bool
+    ) {
         let cores = ProcessInfo.processInfo.activeProcessorCount
         guard indexes.count > parallelThreshold, cores > 1 else {
             var run = indexes
@@ -284,15 +288,18 @@ public enum Sorter {
         let oversampling = 16
         let sampleCount = bucketCount * oversampling
         let sample = (0..<sampleCount).map { indexes[$0 * indexes.count / sampleCount] }.sorted(by: isBefore)
-        let splitters = UnsafeMutablePointer<UInt32>.allocate(capacity: bucketCount - 1)
+        nonisolated(unsafe) let splitters = UnsafeMutablePointer<UInt32>.allocate(capacity: bucketCount - 1)
         for bucket in 1..<bucketCount { splitters[bucket - 1] = sample[bucket * oversampling] }
 
         let pieceCount = cores * 4
         let pieces = (0..<pieceCount).map {
             ($0 * indexes.count / pieceCount)..<(($0 + 1) * indexes.count / pieceCount)
         }
-        let bucketOf = UnsafeMutablePointer<UInt8>.allocate(capacity: indexes.count)
-        let copy = UnsafeMutablePointer<UInt32>.allocate(capacity: indexes.count)
+        // Every piece below reads the splitters and the copy and writes its own positions
+        // (its own buckets, in the last step) of the rest.
+        nonisolated(unsafe) let bucketOf = UnsafeMutablePointer<UInt8>.allocate(capacity: indexes.count)
+        nonisolated(unsafe) let copy = UnsafeMutablePointer<UInt32>.allocate(capacity: indexes.count)
+        nonisolated(unsafe) let indexes = indexes
         defer {
             bucketOf.deallocate()
             copy.deallocate()
@@ -326,7 +333,7 @@ public enum Sorter {
             }
             buckets.append(start..<position)
         }
-        _ = Parallel.map(Array(0..<pieceCount)) { piece in
+        _ = Parallel.map(Array(0..<pieceCount)) { [starts] piece in
             var next = starts[piece]
             for position in pieces[piece] {
                 let bucket = Int(bucketOf[position])
@@ -342,11 +349,13 @@ public enum Sorter {
 
     /// The items in the order of `indexes`. Copying an item counts its references, which is
     /// worth spreading over the cores for a long list.
-    static func permute<Element>(_ items: [Element], by indexes: [UInt32]) -> [Element] {
+    static func permute<Element: Sendable>(_ items: [Element], by indexes: [UInt32]) -> [Element] {
         guard indexes.count > parallelThreshold else { return indexes.map { items[Int($0)] } }
         return [Element](unsafeUninitializedCapacity: indexes.count) { buffer, count in
-            let target = buffer.baseAddress!
+            // Each piece writes its own positions and only reads the items.
+            nonisolated(unsafe) let target = buffer.baseAddress!
             items.withUnsafeBufferPointer { items in
+                nonisolated(unsafe) let items = items
                 let pieceCount = ProcessInfo.processInfo.activeProcessorCount * 4
                 let pieces = (0..<pieceCount).map {
                     ($0 * indexes.count / pieceCount)..<(($0 + 1) * indexes.count / pieceCount)
@@ -409,7 +418,7 @@ public enum Sorter {
 /// A list that stays sorted while batches are added to it: what a directory that arrives in
 /// pieces is collected in, on a background thread. Each batch is sorted on its own and merged
 /// in, so adding costs one pass instead of a new sort.
-public struct SortedFileList {
+public struct SortedFileList: Sendable {
     public let order: ListOrder
     /// The items in order.
     public private(set) var items: [FileItem] = []
@@ -441,7 +450,10 @@ public struct SortedFileList {
 /// That is the order of names, not an approximation of it (see `Sorter`). Only a name too
 /// long for a record has none; `quick` then says so and the caller works the same
 /// comparison out for the pair.
-struct SortKeys {
+///
+/// Unchecked: the records point into `blocks`, which the keys own and which nobody writes
+/// once the keys are made, so the keys may be read on any number of threads.
+struct SortKeys: @unchecked Sendable {
     /// The answer of `quick` when a record is missing.
     static let unknown = 2
 
@@ -461,7 +473,7 @@ struct SortKeys {
     }
 
     /// The memory the records point into.
-    fileprivate final class Block {
+    fileprivate final class Block: @unchecked Sendable {
         let bytes: UnsafeMutablePointer<UInt8>
         init(_ bytes: UnsafeMutablePointer<UInt8>) { self.bytes = bytes }
         deinit { free(bytes) }
@@ -502,9 +514,11 @@ struct SortKeys {
         let pieces = (0..<pieceCount).map { ($0 * items.count / pieceCount)..<(($0 + 1) * items.count / pieceCount) }
         var blocks: [Block] = []
         records = [Record](unsafeUninitializedCapacity: items.count) { buffer, count in
-            let records = buffer.baseAddress!
+            // Each piece writes the records of its own items.
+            nonisolated(unsafe) let records = buffer.baseAddress!
             blocks = items.withUnsafeBufferPointer { items in
-                Parallel.map(pieces) { piece in
+                nonisolated(unsafe) let items = items
+                return Parallel.map(pieces) { piece in
                     Self.build(items, piece, into: records, order: order, collator: collator)
                 }
             }
@@ -720,7 +734,9 @@ struct SortKeys {
 /// strings but not the keys, and that comparison is not an order (see `Sorter`). Should the
 /// collator be missing, names are ordered by their lowercase forms: still an order in the
 /// strict sense, only not the language's.
-final class NameCollator {
+///
+/// Immutable after `init`, and the collator may make keys on several threads at once.
+final class NameCollator: @unchecked Sendable {
     typealias SortKey =
         @convention(c) (OpaquePointer, UnsafePointer<UInt16>?, Int32, UnsafeMutablePointer<UInt8>?, Int32) -> Int32
     private typealias Open = @convention(c) (UnsafePointer<CChar>, UnsafeMutablePointer<Int32>) -> OpaquePointer?
@@ -741,7 +757,8 @@ final class NameCollator {
     }()
 
     private static let lock = NSLock()
-    private static var cache: [String: NameCollator] = [:]
+    /// Guarded by `lock`.
+    nonisolated(unsafe) private static var cache: [String: NameCollator] = [:]
 
     /// The collator of the user's language as it is now.
     static var current: NameCollator {
@@ -766,7 +783,8 @@ final class NameCollator {
         return made
     }
 
-    private static var numericCache: [String: NameCollator] = [:]
+    /// Guarded by `lock`.
+    nonisolated(unsafe) private static var numericCache: [String: NameCollator] = [:]
 
     /// No collator: what sorting falls back on when the system's cannot be reached.
     static let unavailable = NameCollator()

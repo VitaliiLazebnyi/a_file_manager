@@ -1,7 +1,7 @@
 public import Foundation
 
 /// One entry of a directory, on whatever file system it lives (spec 03 › Rows in Full view).
-public struct FileItem: Equatable {
+public struct FileItem: Equatable, Sendable {
     public let url: URL
     public let name: String
     /// A directory, or a symbolic link that points to one.
@@ -170,7 +170,7 @@ extension URL {
 /// mark is one character that is not `/`, so a path of `..`, such a `/`, and more looked like
 /// a single harmless name to code that split on characters, and the file system, which goes
 /// by bytes, walked up a folder.
-public enum PathSafety {
+public enum PathSafety: Sendable {
     /// Whether `name` can be the name of one entry: not empty, not `.` or `..`, and holding
     /// neither the byte `/` nor a zero byte.
     public static func isSafeName(_ name: String) -> Bool {

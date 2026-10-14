@@ -1,12 +1,12 @@
 import Foundation
 
 /// A request to stop, shared between whoever asks (a Cancel button, the program quitting) and
-/// the work that checks it. Safe to use from any thread.
-public final class CancellationFlag {
+/// the work that checks it. Safe to use from any thread: all state is guarded by `lock`.
+public final class CancellationFlag: @unchecked Sendable {
     private let lock = NSLock()
     private var cancelled = false
     /// What `onCancel` was given, until the flag is set or the registration is released.
-    private var handlers: [Int: () -> Void] = [:]
+    private var handlers: [Int: @Sendable () -> Void] = [:]
     private var lastHandler = 0
 
     public init() {}
@@ -36,7 +36,7 @@ public final class CancellationFlag {
     /// only what is safe from another thread (close a socket, set a mark) and returns at once.
     /// A cancel that has begun may still call it for a moment after the object was released:
     /// it holds what it touches weakly, or touches only what outlives the registration.
-    public func onCancel(_ handler: @escaping () -> Void) -> AnyObject {
+    public func onCancel(_ handler: @escaping @Sendable () -> Void) -> AnyObject {
         lock.lock()
         guard !cancelled else {
             lock.unlock()
@@ -50,7 +50,8 @@ public final class CancellationFlag {
         return Registration(flag: self, id: id)
     }
 
-    private final class Registration {
+    /// Unchecked: `flag` is set in `init` only (it is weak, and so a `var`).
+    private final class Registration: @unchecked Sendable {
         private weak var flag: CancellationFlag?
         private let id: Int
 

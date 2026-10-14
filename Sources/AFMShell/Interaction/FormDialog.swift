@@ -4,6 +4,7 @@ import AppKit
 /// Shows a plugin's form (`UserInteraction.form`) as an alert with one row per field. A form
 /// with more rows than fit is scrolled; a long list gets a field that narrows it down.
 /// Return takes the first button, Esc cancels, a double click on a list row accepts.
+@MainActor
 final class FormDialog: NSObject, NSTextViewDelegate {
     private let fields: [FormField]
     private var controls: [(field: FormField, read: () -> FormValues.Value)] = []
@@ -94,10 +95,13 @@ final class FormDialog: NSObject, NSTextViewDelegate {
         // A field reached with Tab is brought into view.
         if scrollView != nil {
             focusObservation = alert.window.observe(\.firstResponder) { window, _ in
-                // The field editor stands in for the text field it edits.
-                let responder = window.firstResponder
-                let view = ((responder as? NSTextView)?.delegate as? NSView) ?? responder as? NSView
-                if let view { view.scrollToVisible(view.bounds.insetBy(dx: 0, dy: -8)) }
+                // The first responder changes on the main thread, where this is called.
+                MainActor.assumeIsolated {
+                    // The field editor stands in for the text field it edits.
+                    let responder = window.firstResponder
+                    let view = ((responder as? NSTextView)?.delegate as? NSView) ?? responder as? NSView
+                    if let view { view.scrollToVisible(view.bounds.insetBy(dx: 0, dy: -8)) }
+                }
             }
         }
         return alert
@@ -215,6 +219,7 @@ private final class FlippedClipView: NSClipView {
 /// A list field of a form. A long list has a field above it: what is typed there narrows the
 /// list down to the rows that contain it, while ↑ and ↓ still move through the rows. A short
 /// list finds a row by typing its beginning.
+@MainActor
 final class FormList: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSearchFieldDelegate {
     /// Lists longer than this get the filter field.
     static let filterThreshold = 12

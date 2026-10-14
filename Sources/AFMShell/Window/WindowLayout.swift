@@ -5,6 +5,7 @@ import Foundation
 /// (spec 02 › Showing and hiding regions, 02 › Panel divider and arrangement). Every value is
 /// kept in the settings the moment it changes, so the next start finds the window as it was
 /// left. Main thread only.
+@MainActor
 final class WindowLayout {
     /// A part of the window the user can switch off.
     enum Region: String, CaseIterable {
