@@ -298,7 +298,10 @@ struct AttributeChange: Equatable {
 /// threads share and is guarded by a lock. Date and permissions go through the item's file-system
 /// provider, so they work wherever the provider supports them; flags and owners are POSIX
 /// calls and exist for `file:` URLs only.
-final class AttributeJob {
+///
+/// `outcome` is guarded by `lock`. `ownerID` and `groupID` are set on the job's thread before
+/// the parallel work starts, and only read afterwards.
+final class AttributeJob: @unchecked Sendable {
     struct Outcome {
         var changed = 0
         var failed = 0
@@ -341,12 +344,12 @@ final class AttributeJob {
             }
             groupID = id
         }
-        each(items, process)
+        each(items) { self.process($0) }
         outcome.cancelled = cancellation.isCancelled
         return outcome
     }
 
-    private func each(_ items: [FileItem], serialBelow threshold: Int = 2, _ body: (FileItem) -> Void) {
+    private func each(_ items: [FileItem], serialBelow threshold: Int = 2, _ body: @Sendable (FileItem) -> Void) {
         guard items.count >= threshold, items.count > 1 else {
             items.forEach(body)
             return
@@ -379,8 +382,8 @@ final class AttributeJob {
         }
         guard !cancellation.isCancelled else { return }
         let contents = children ?? []
-        each(contents.filter { !$0.isRealDirectory }, serialBelow: 64, apply)
-        each(contents.filter(\.isRealDirectory), process)
+        each(contents.filter { !$0.isRealDirectory }, serialBelow: 64) { self.apply(to: $0) }
+        each(contents.filter(\.isRealDirectory)) { self.process($0) }
         if !changedFirst { apply(to: item) }
     }
 
