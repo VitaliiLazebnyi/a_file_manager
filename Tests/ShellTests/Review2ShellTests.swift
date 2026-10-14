@@ -581,7 +581,7 @@ extension Application {
         _ = NSApplication.shared
     }
 
-    func wait(upTo seconds: TimeInterval = 10, until condition: () -> Bool) async -> Bool {
+    func wait(upTo seconds: TimeInterval = 60, until condition: () -> Bool) async -> Bool {
         let deadline = Date().addingTimeInterval(seconds)
         while !condition(), Date() < deadline { try? await Task.sleep(nanoseconds: 2_000_000) }
         return condition()

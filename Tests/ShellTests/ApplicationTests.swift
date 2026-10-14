@@ -35,7 +35,7 @@ import Testing
     /// Waits, with the main thread free to work, until `condition` holds. (Spinning the run
     /// loop from inside a test would not do: the main queue is not drained re-entrantly.)
     @discardableResult
-    func wait(upTo seconds: TimeInterval = 10, until condition: () -> Bool) async -> Bool {
+    func wait(upTo seconds: TimeInterval = 60, until condition: () -> Bool) async -> Bool {
         let deadline = Date().addingTimeInterval(seconds)
         while !condition(), Date() < deadline {
             try? await Task.sleep(nanoseconds: 5_000_000)

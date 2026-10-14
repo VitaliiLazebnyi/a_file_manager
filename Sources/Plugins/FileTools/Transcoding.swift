@@ -94,6 +94,10 @@ enum SixBitText {
                 let needed = (count + 2) / 3 * 4
                 // Programs that cut spaces off the end of a line leave UUEncode lines short.
                 guard available >= needed || (!xx && available + 3 >= needed) else { return nil }
+                // An empty array is never made with `unsafeUninitializedCapacity`: for a capacity of zero
+                // the standard library writes the count into the storage all empty arrays share, a write
+                // that races with any other thread reading an empty array.
+                guard count > 0 else { return [] }
                 return [UInt8](unsafeUninitializedCapacity: count) { bytes, initialized in
                     func six(_ index: Int) -> UInt8 { index < available ? table[Int(text[index + 1])] : 0 }
                     var (group, written) = (0, 0)

@@ -948,7 +948,10 @@ public final class PanelModel {
                 sort: order, filter: basis.filter, moves: .same)
         }
         let listed = Sorter.permute(old, by: indexes)
-        let table = [UInt32](unsafeUninitializedCapacity: indexes.count) { buffer, count in
+        // An empty array is never made with `unsafeUninitializedCapacity`: for a capacity of zero
+        // the standard library writes the count into the storage all empty arrays share, a write
+        // that races with any other thread reading an empty array.
+        let table = indexes.isEmpty ? [] : [UInt32](unsafeUninitializedCapacity: indexes.count) { buffer, count in
             for (new, old) in indexes.enumerated() { buffer[Int(old)] = UInt32(new) }
             count = indexes.count
         }

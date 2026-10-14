@@ -212,6 +212,10 @@ public enum Sorter: Sendable {
         for index in files.indices.dropFirst() where ExactName.areSame(files[index - 1].name, files[index].name) {
             return sortedIndexes(of: items, by: new)
         }
+        // An empty array is never made with `unsafeUninitializedCapacity`: for a capacity of zero
+        // the standard library writes the count into the storage all empty arrays share, a write
+        // that races with any other thread reading an empty array.
+        guard !items.isEmpty else { return [] }
         return [UInt32](unsafeUninitializedCapacity: items.count) { buffer, count in
             for index in 0..<folderCount { buffer[index] = UInt32(index) }
             for index in folderCount..<items.count { buffer[index] = UInt32(items.count - 1 - (index - folderCount)) }
@@ -231,6 +235,10 @@ public enum Sorter: Sendable {
 
     /// The positions of the items in sorted order.
     fileprivate static func sortedIndexes(of items: [FileItem], keys: SortKeys) -> [UInt32] {
+        // An empty array is never made with `unsafeUninitializedCapacity`: for a capacity of zero
+        // the standard library writes the count into the storage all empty arrays share, a write
+        // that races with any other thread reading an empty array.
+        guard !keys.records.isEmpty else { return [] }
         let order = keys.order
         return keys.records.withUnsafeBufferPointer { records in
             // Folders come first and are always in ascending order of their names; the files
