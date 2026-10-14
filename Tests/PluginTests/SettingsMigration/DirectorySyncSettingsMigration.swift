@@ -50,7 +50,12 @@ internal struct DirectorySyncSettingsMigration {
     }
 
     /// A session of the window on the settings, with two real folders for the panels.
-    private static func session(on settings: any SettingsStore, in box: Sandbox) throws -> SyncSession {
+    /// A session on a bench of its own. The bench is returned with it: it owns the kernel, which
+    /// the session needs for as long as it is used.
+    private static func session(
+        on settings: any SettingsStore,
+        in box: Sandbox
+    ) throws -> (bench: TestBench, session: SyncSession) {
         let bench = TestBench(
             plugins: [],
             fileSystems: [LocalFileSystem()],
@@ -60,7 +65,7 @@ internal struct DirectorySyncSettingsMigration {
         )
         let session = SyncSession(kernel: bench.kernel)
         session.runsInline = true
-        return session
+        return (bench, session)
     }
 
     /// The options and the show filter load with every box.
@@ -69,7 +74,8 @@ internal struct DirectorySyncSettingsMigration {
         let settings = MemorySettings()
         SettingsJSON.store(Fixture.options, forKey: "directorySync.options", in: settings)
         SettingsJSON.store(Fixture.show, forKey: "directorySync.show", in: settings)
-        let session = try Self.session(on: settings, in: try Sandbox())
+        let (bench, session) = try Self.session(on: settings, in: try Sandbox())
+        defer { withExtendedLifetime(bench) {} }
         let options = session.options
         #expect(options.subdirectories && options.byContent && !options.ignoreDate && options.asymmetric)
         #expect(!options.emptyDirectories && options.mask == "*.swift *.md" && options.toleranceSeconds == 2)
@@ -83,7 +89,8 @@ internal struct DirectorySyncSettingsMigration {
     internal func aFilterThatShowsNothingIsMended() throws {
         let settings = MemorySettings()
         SettingsJSON.store(Fixture.showNothing, forKey: "directorySync.show", in: settings)
-        let session = try Self.session(on: settings, in: try Sandbox())
+        let (bench, session) = try Self.session(on: settings, in: try Sandbox())
+        defer { withExtendedLifetime(bench) {} }
         #expect(session.show == .all)
     }
 
@@ -92,7 +99,8 @@ internal struct DirectorySyncSettingsMigration {
     internal func theSavedSetsLoad() throws {
         let settings = MemorySettings()
         SettingsJSON.store(Fixture.sets, forKey: "directorySync.sets", in: settings)
-        let session = try Self.session(on: settings, in: try Sandbox())
+        let (bench, session) = try Self.session(on: settings, in: try Sandbox())
+        defer { withExtendedLifetime(bench) {} }
         #expect(session.savedSets.map(\.name) == ["Backup"])
         #expect(session.loadSet(named: "Backup"))
         #expect(session.leftPath == "/Users/me/Documents" && session.rightPath == "/Volumes/Backup/Documents")
@@ -109,7 +117,8 @@ internal struct DirectorySyncSettingsMigration {
         SettingsJSON.store(Fixture.show, forKey: "directorySync.show", in: settings)
         SettingsJSON.store(Fixture.sets, forKey: "directorySync.sets", in: settings)
         let box = try Sandbox()
-        let session = try Self.session(on: settings, in: box)
+        let (bench, session) = try Self.session(on: settings, in: box)
+        defer { withExtendedLifetime(bench) {} }
         session.leftPath = box.url("A").path
         session.rightPath = box.url("B").path
         session.compare()

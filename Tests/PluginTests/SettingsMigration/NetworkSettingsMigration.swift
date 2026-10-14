@@ -54,18 +54,19 @@ internal struct NetworkSettingsMigration {
         internal static let trustedCertificates = #"{"files.example.com":["AA:BB:CC"]}"#
     }
 
-    /// The plugin started on the settings, with passwords in memory.
-    private static func started(on settings: any SettingsStore) -> NetworkPlugin {
+    /// The plugin started on the settings, with passwords in memory. The bench is returned with it: it
+    /// owns the kernel the plugin works with.
+    private static func started(on settings: any SettingsStore) -> (bench: TestBench, plugin: NetworkPlugin) {
         let memory = MemoryFileSystem()
         let plugin = NetworkPlugin(launchesApplications: false, passwords: MemoryPasswords())
-        _ = TestBench(
+        let bench = TestBench(
             plugins: [plugin],
             fileSystems: [memory],
             left: memory.addDirectory("/A"),
             right: memory.addDirectory("/B"),
             settings: settings
         )
-        return plugin
+        return (bench, plugin)
     }
 
     /// Both connections load with every field; the mirror has the usual port of FTP.
@@ -73,7 +74,9 @@ internal struct NetworkSettingsMigration {
     internal func theConnectionsLoad() throws {
         let settings = MemorySettings()
         SettingsJSON.store(Fixture.connections, forKey: "network.connections", in: settings)
-        let connections = Self.started(on: settings).connections
+        let (bench, plugin) = Self.started(on: settings)
+        defer { withExtendedLifetime(bench) {} }
+        let connections = plugin.connections
         try #require(connections.count == 2)
         let work = connections[0]
         #expect(work.id.uuidString == "6F1C2B3A-1D2E-4F50-8A9B-0C1D2E3F4A5B" && work.name == "Work server")
@@ -92,7 +95,9 @@ internal struct NetworkSettingsMigration {
     internal func connectionsWithOtherFieldsLoad() throws {
         let settings = MemorySettings()
         SettingsJSON.store(Fixture.connectionsOtherFields, forKey: "network.connections", in: settings)
-        let connection = try #require(Self.started(on: settings).connections.first)
+        let (bench, plugin) = Self.started(on: settings)
+        defer { withExtendedLifetime(bench) {} }
+        let connection = try #require(plugin.connections.first)
         #expect(connection.host == "old.example.com" && connection.port == nil && connection.kind == .ftp)
         #expect(connection.name.isEmpty && connection.user.isEmpty && connection.passive)
         #expect(connection.encoding == .automatic && connection.listing == .automatic)
@@ -114,7 +119,8 @@ internal struct NetworkSettingsMigration {
     internal func trustedCertificatesInTheSettingsAreErased() {
         let settings = MemorySettings()
         SettingsJSON.store(Fixture.trustedCertificates, forKey: "network.trustedCertificates", in: settings)
-        let plugin = Self.started(on: settings)
+        let (bench, plugin) = Self.started(on: settings)
+        defer { withExtendedLifetime(bench) {} }
         let trust = plugin.center.environment.trust
         trust.prepare()
         #expect(!trust.isAccepted("AA:BB:CC", for: "files.example.com"))

@@ -40,6 +40,8 @@ internal struct SettingsMigrationApp {
     }
 
     private let interaction = ScriptedInteraction()
+    /// A pasteboard of the test's own, given back when the suite goes.
+    private let scratch = ScratchPasteboard()
     /// Where the program's home folder is.
     private let box: Sandbox
 
@@ -65,7 +67,7 @@ internal struct SettingsMigrationApp {
     private func start(on settings: any SettingsStore) async throws -> (shell: Shell, kernel: Kernel) {
         _ = NSApplication.shared
         let kernel = Kernel(productName: StandardPlugins.productName, settings: settings, ui: interaction)
-        kernel.load(CorePlugins.make())
+        kernel.load(CorePlugins.make(pasteboard: scratch.pasteboard))
         let shell = Shell(kernel: kernel, home: try box.folder("home"))
         let deadline = Date().addingTimeInterval(10)
         while shell.panelCoordinator.isLoading, Date() < deadline {

@@ -126,7 +126,8 @@ internal struct SettingsMigrationShell {
         _ = NSApplication.shared
         let settings = Self.settings([ToolbarRegistry.settingsKey: #"["cm_Copy","","cm_Delete"]"#])
         let kernel = Kernel(productName: "Test", settings: settings, ui: ScriptedInteraction())
-        kernel.load(CorePlugins.make())
+        let scratch = ScratchPasteboard()
+        kernel.load(CorePlugins.make(pasteboard: scratch.pasteboard))
         defer { kernel.shutdown() }
         let layout = ButtonBarView.entries(of: kernel.toolbar.layout(from: settings), commands: kernel.commands)
         let bar = ButtonBarArrangement(entries: layout.map { $0?.command })

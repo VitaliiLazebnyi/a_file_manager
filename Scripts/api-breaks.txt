@@ -9,3 +9,65 @@
 # Example:
 #   # reason: the old name said "path" for what is a URL; renamed before any outside plugin exists
 #   AFMKernel: Func FileSystemProvider.list(path:) has been renamed to Func list(at:)
+
+# reason: Swift 6 migration. File systems, readers, writers, settings stores, job monitors and the user
+# interaction are used from several threads (their documentation always said so); the protocols now say it to
+# the compiler, so a plugin type that is not safe to share fails to build instead of racing.
+AFMKernel: Protocol FileReader has generic signature change from <Self : AnyObject> to <Self : AnyObject, Self : Swift.Sendable>
+AFMKernel: Protocol FileSystemProvider has generic signature change from <Self : AnyObject> to <Self : AnyObject, Self : Swift.Sendable>
+AFMKernel: Protocol FileWriter has generic signature change from <Self : AnyObject> to <Self : AnyObject, Self : Swift.Sendable>
+AFMKernel: Protocol JobMonitor has generic signature change from <Self : AnyObject> to <Self : AnyObject, Self : Swift.Sendable>
+AFMKernel: Protocol SettingsStore has generic signature change from <Self : AnyObject> to <Self : AnyObject, Self : Swift.Sendable>
+AFMKernel: Protocol UserInteraction has generic signature change from <Self : AnyObject> to <Self : AnyObject, Self : Swift.Sendable>
+AFMKernel: Protocol FileReader has added inherited protocol Sendable
+AFMKernel: Protocol FileReader has added inherited protocol SendableMetatype
+AFMKernel: Protocol FileSystemProvider has added inherited protocol Sendable
+AFMKernel: Protocol FileSystemProvider has added inherited protocol SendableMetatype
+AFMKernel: Protocol FileWriter has added inherited protocol Sendable
+AFMKernel: Protocol FileWriter has added inherited protocol SendableMetatype
+AFMKernel: Protocol JobMonitor has added inherited protocol Sendable
+AFMKernel: Protocol JobMonitor has added inherited protocol SendableMetatype
+AFMKernel: Protocol SettingsStore has added inherited protocol Sendable
+AFMKernel: Protocol SettingsStore has added inherited protocol SendableMetatype
+AFMKernel: Protocol UserInteraction has added inherited protocol Sendable
+AFMKernel: Protocol UserInteraction has added inherited protocol SendableMetatype
+
+# reason: Swift 6 migration. These calls hand values from one thread to another (a background answer, a job's
+# result, the elements of a parallel map), so the values must be Sendable; the compiler now checks it.
+AFMKernel: Func BlockingCalls.answer(from:to:sharing:cancellation:_:) has generic signature change from <Answer> to <Answer where Answer : Swift.Sendable>
+AFMKernel: Func BlockingCalls.answer(from:to:sharing:cancellation:_:then:) has generic signature change from <Answer> to <Answer where Answer : Swift.Sendable>
+AFMKernel: Func JobMonitor.ask(_:) has generic signature change from <Self, Answer where Self : AFMKernel.JobMonitor> to <Self, Answer where Self : AFMKernel.JobMonitor, Answer : Swift.Sendable>
+AFMKernel: Func JobService.run(title:work:completion:) has generic signature change from <Self, Result where Self : AFMKernel.JobService> to <Self, Result where Self : AFMKernel.JobService, Result : Swift.Sendable>
+AFMKernel: Func Kernel.askUser(_:) has generic signature change from <Answer> to <Answer where Answer : Swift.Sendable>
+AFMKernel: Func Parallel.map(_:serialBelow:_:) has generic signature change from <Element, Result> to <Element, Result where Element : Swift.Sendable, Result : Swift.Sendable>
+
+# reason: Swift 6 migration. The watch token is released on whatever thread lets go of it, so it must be
+# Sendable (`WatchToken` is `AnyObject & Sendable`); `onChange` is documented to run on the main thread and is
+# now @MainActor.
+AFMKernel: Func FileSystemProvider.watch(_:onChange:) has return type change from Swift.AnyObject? to (any AFMKernel.WatchToken)?
+AFMKernel: Func FileSystemProvider.watch(_:recursively:onChange:) has return type change from Swift.AnyObject? to (any AFMKernel.WatchToken)?
+
+# reason: Swift 6 migration. The kernel and the panel model are @MainActor now; these members are documented
+# "for any thread" (constants, thread-safe registries, the pure prepare/filter functions), so they are
+# nonisolated and stay callable from background work.
+AFMKernel: Func Kernel.askUser(_:) is now with nonisolated
+AFMKernel: Func PanelFilter.mask(_:) is now with nonisolated
+AFMKernel: Func PanelModel.filtered(_:by:) is now with nonisolated
+AFMKernel: Func PanelModel.prepare(_:computedSizes:) is now with nonisolated
+AFMKernel: Func PanelModel.prepare(_:extendingTo:sortedBy:) is now with nonisolated
+AFMKernel: Func PanelModel.prepare(_:filter:) is now with nonisolated
+AFMKernel: Func PanelModel.prepare(_:show:focus:history:complete:remembered:presorted:) is now with nonisolated
+AFMKernel: Func PanelModel.prepare(_:sort:) is now with nonisolated
+AFMKernel: Func PanelModel.prepare(_:update:focus:presorted:) is now with nonisolated
+AFMKernel: Func PanelModel.rows(of:indices:) is now with nonisolated
+AFMKernel: Func PanelModel.rows(of:where:) is now with nonisolated
+AFMKernel: Var Kernel.columns is now with nonisolated
+AFMKernel: Var Kernel.fileSystems is now with nonisolated
+AFMKernel: Var Kernel.listingCache is now with nonisolated
+AFMKernel: Var Kernel.productName is now with nonisolated
+AFMKernel: Var Kernel.settings is now with nonisolated
+AFMKernel: Var Kernel.ui is now with nonisolated
+AFMKernel: Var KeyBindings.settingsKey is now with nonisolated
+AFMKernel: Var PanelModel.historyLimit is now with nonisolated
+AFMKernel: Var ToolbarRegistry.lineBreak is now with nonisolated
+AFMKernel: Var ToolbarRegistry.settingsKey is now with nonisolated
