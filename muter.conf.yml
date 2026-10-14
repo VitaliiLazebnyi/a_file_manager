@@ -1,0 +1,17 @@
+# Muter's configuration, used by Scripts/mutation.sh (run Muter through that script, not directly).
+#
+# Muter runs the test command in its own copy of the project with a nearly empty environment, so
+# the command is the project's script: it restores the environment, builds once, runs the test
+# target closest to the mutated file first and the other test targets only if that one passes, and
+# stops a test run that hangs. A relative path: Muter starts it from inside its copy.
+executable: Scripts/mutation.sh
+arguments:
+- --run-tests
+# Only used when Muter looks for files itself; Scripts/mutation.sh always names the files.
+exclude:
+- .build
+- Tests
+- Package.swift
+# Calls the Remove Side Effects operator leaves alone. Empty on purpose: a call whose removal no
+# test notices is listed in Tests/Mutation/equivalent-mutants.txt with its reason instead.
+excludeCalls: []
