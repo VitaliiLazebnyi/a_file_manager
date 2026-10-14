@@ -1,8 +1,9 @@
 import AFMKernel
 import Foundation
-@testable import NetworkPlugin
 import TestSupport
 import Testing
+
+@testable import NetworkPlugin
 
 /// The SFTP server that comes with macOS.
 let systemSFTPServer = "/usr/libexec/sftp-server"
@@ -23,7 +24,9 @@ let systemSFTPServer = "/usr/libexec/sftp-server"
         environment.options.values = values
         center = ConnectionCenter(environment: environment)
         center.makeSession = { profile, environment in
-            SFTPSession(profile: profile, environment: environment, transport: SFTPTransport(executable: systemSFTPServer, arguments: ["-e"]))
+            SFTPSession(
+                profile: profile, environment: environment,
+                transport: SFTPTransport(executable: systemSFTPServer, arguments: ["-e"]))
         }
         fileSystem = RemoteFileSystem(scheme: "sftp", center: center)
     }
@@ -41,7 +44,9 @@ let systemSFTPServer = "/usr/libexec/sftp-server"
 
         let items = try fileSystem.list(url(""), showHidden: false).sorted { $0.name < $1.name }
         #expect(items.map(\.name) == ["a.txt", "dir", "to-dir", "to-file"])
-        #expect(items.map(\.isDirectory) == [false, true, true, false] && items.map(\.isSymlink) == [false, false, true, true])
+        #expect(
+            items.map(\.isDirectory) == [false, true, true, false]
+                && items.map(\.isSymlink) == [false, false, true, true])
         #expect(items[0].size == 5 && items[0].modified == stamp && items[0].permissions == 0o644)
         #expect(try fileSystem.list(url(""), showHidden: true).count == 5)
         #expect(fileSystem.item(at: url("dir/inner.txt"))?.size == 1)
@@ -63,7 +68,9 @@ let systemSFTPServer = "/usr/libexec/sftp-server"
         let stamp = Date(timeIntervalSince1970: 1_600_000_000)
         try writer.close(attributes: FileAttributes(modified: stamp, permissions: 0o600))
         #expect(try Data(contentsOf: box.url("big.bin")) == content)
-        #expect(fileSystem.item(at: url("big.bin"))?.modified == stamp && fileSystem.item(at: url("big.bin"))?.permissions == 0o600)
+        #expect(
+            fileSystem.item(at: url("big.bin"))?.modified == stamp
+                && fileSystem.item(at: url("big.bin"))?.permissions == 0o600)
         #expect(throws: FileSystemError.self) { _ = try fileSystem.write(url("big.bin")) }
 
         let reader = try fileSystem.read(url("big.bin"))
@@ -85,7 +92,9 @@ let systemSFTPServer = "/usr/libexec/sftp-server"
         try fileSystem.createDirectory(at: url("x/y/z"))
         #expect(box.exists("x/y/z"))
         try fileSystem.move(url("a.txt"), to: url("x/a.txt"), replacing: false)
-        #expect(throws: FileSystemError.self) { try fileSystem.move(url("b.txt"), to: url("x/a.txt"), replacing: false) }
+        #expect(throws: FileSystemError.self) {
+            try fileSystem.move(url("b.txt"), to: url("x/a.txt"), replacing: false)
+        }
         try fileSystem.move(url("b.txt"), to: url("x/a.txt"), replacing: true)
         #expect(box.read("x/a.txt") == "b" && !box.exists("b.txt"))
         try fileSystem.setAttributes(FileAttributes(permissions: 0o640), of: url("x/a.txt"))
@@ -102,7 +111,9 @@ let systemSFTPServer = "/usr/libexec/sftp-server"
         for index in 0..<12 { try box.file("d\(index)/f\(index).txt", String(repeating: "x", count: index * 1000)) }
         let results = Parallel.map(Array(0..<12)) { index -> Int in
             let names = (try? fileSystem.list(url("d\(index)"), showHidden: true).map(\.name)) ?? []
-            guard names == ["f\(index).txt"], let reader = try? fileSystem.read(url("d\(index)/f\(index).txt")) else { return -1 }
+            guard names == ["f\(index).txt"], let reader = try? fileSystem.read(url("d\(index)/f\(index).txt")) else {
+                return -1
+            }
             defer { reader.close() }
             var count = 0
             while let block = try? reader.read(upToCount: 4096) { count += block.count }
@@ -122,7 +133,9 @@ let systemSFTPServer = "/usr/libexec/sftp-server"
 
     @Test func aTransportThatIsNotSFTPFails() throws {
         center.makeSession = { profile, environment in
-            SFTPSession(profile: profile, environment: environment, transport: SFTPTransport(executable: "/bin/echo", arguments: ["hello"]))
+            SFTPSession(
+                profile: profile, environment: environment,
+                transport: SFTPTransport(executable: "/bin/echo", arguments: ["hello"]))
         }
         #expect(throws: (any Error).self) { try fileSystem.list(url(""), showHidden: true) }
         #expect(!center.isConnected(key))
@@ -131,7 +144,8 @@ let systemSFTPServer = "/usr/libexec/sftp-server"
     @Test func sshArguments() {
         var values = NetworkOptions.Values()
         (values.timeout, values.keepAliveInterval) = (20, 45)
-        let profile = ConnectionProfile(key: ServerKey(scheme: "sftp", host: "-oProxyCommand=evil", port: 2222), user: "deploy")
+        let profile = ConnectionProfile(
+            key: ServerKey(scheme: "sftp", host: "-oProxyCommand=evil", port: 2222), user: "deploy")
         let arguments = SFTPSession.sshArguments(for: profile, options: values)
         #expect(arguments.suffix(4) == ["-s", "--", "-oproxycommand=evil", "sftp"])
         #expect(arguments.contains("ConnectTimeout=20") && arguments.contains("ServerAliveInterval=45"))
@@ -160,7 +174,10 @@ let systemSFTPServer = "/usr/libexec/sftp-server"
         #expect(answer == "s3cr\\et $HOME `x`\n")
         // Nothing secret is in the environment or in the helper's folder.
         #expect(!helper.environment.values.contains { $0.contains("s3cr") })
-        #expect(try FileManager.default.contentsOfDirectory(atPath: helper.directory.path).sorted() == ["answer", "askpass.sh", "question"])
+        #expect(
+            try FileManager.default.contentsOfDirectory(atPath: helper.directory.path).sorted() == [
+                "answer", "askpass.sh", "question"
+            ])
     }
 
     /// The whole way through `ssh`: a secure-shell server of the system on 127.0.0.1 with keys
@@ -170,8 +187,11 @@ let systemSFTPServer = "/usr/libexec/sftp-server"
         let server = try LocalSSHServer(box: box, passphrase: "open sesame")
         defer { server.stop() }
         try box.file("srv/hello.txt", "over ssh")
-        let transport = SFTPTransport(executable: "/usr/bin/ssh", arguments: server.clientArguments, asksQuestions: true)
-        center.makeSession = { profile, environment in SFTPSession(profile: profile, environment: environment, transport: transport) }
+        let transport = SFTPTransport(
+            executable: "/usr/bin/ssh", arguments: server.clientArguments, asksQuestions: true)
+        center.makeSession = { profile, environment in
+            SFTPSession(profile: profile, environment: environment, transport: transport)
+        }
         var questions: [(String, Bool)] = []
         var passphrase = "wrong"
         center.environment.declineMemory = 0
@@ -199,7 +219,8 @@ let systemSFTPServer = "/usr/libexec/sftp-server"
 /// key, a user key and an `authorized_keys` file that exist only in the sandbox.
 final class LocalSSHServer {
     static var isAvailable: Bool {
-        ["/usr/sbin/sshd", "/usr/bin/ssh", "/usr/bin/ssh-keygen", systemSFTPServer].allSatisfy(FileManager.default.isExecutableFile)
+        ["/usr/sbin/sshd", "/usr/bin/ssh", "/usr/bin/ssh-keygen", systemSFTPServer].allSatisfy(
+            FileManager.default.isExecutableFile)
     }
 
     let port: Int
@@ -217,7 +238,9 @@ final class LocalSSHServer {
             try process.run()
             process.waitUntilExit()
         }
-        let (hostKey, userKey) = (folder.appendingPathComponent("host").path, folder.appendingPathComponent("user").path)
+        let (hostKey, userKey) = (
+            folder.appendingPathComponent("host").path, folder.appendingPathComponent("user").path
+        )
         try run("/usr/bin/ssh-keygen", ["-q", "-t", "ed25519", "-N", "", "-f", hostKey])
         try run("/usr/bin/ssh-keygen", ["-q", "-t", "ed25519", "-N", passphrase, "-f", userKey])
         let authorized = folder.appendingPathComponent("authorized_keys")
@@ -248,10 +271,14 @@ final class LocalSSHServer {
         process.arguments = ["-D", "-e", "-f", config.path]
         (process.standardOutput, process.standardError) = (FileHandle.nullDevice, FileHandle.nullDevice)
         try process.run()
-        clientArguments = ["-F", "/dev/null", "-o", "IdentitiesOnly=yes", "-o", "IdentityAgent=none", "-o", "NumberOfPasswordPrompts=1",
-                           "-o", "UserKnownHostsFile=\(folder.appendingPathComponent("known_hosts").path)", "-o", "GlobalKnownHostsFile=/dev/null",
-                           "-o", "StrictHostKeyChecking=ask", "-o", "ConnectionAttempts=20", "-i", userKey, "-p", String(port),
-                           "-s", "--", "127.0.0.1", "sftp"]
+        clientArguments = [
+            "-F", "/dev/null", "-o", "IdentitiesOnly=yes", "-o", "IdentityAgent=none", "-o",
+            "NumberOfPasswordPrompts=1",
+            "-o", "UserKnownHostsFile=\(folder.appendingPathComponent("known_hosts").path)", "-o",
+            "GlobalKnownHostsFile=/dev/null",
+            "-o", "StrictHostKeyChecking=ask", "-o", "ConnectionAttempts=20", "-i", userKey, "-p", String(port),
+            "-s", "--", "127.0.0.1", "sftp"
+        ]
         // Until the server listens.
         for _ in 0..<100 {
             let descriptor = socket(AF_INET, SOCK_STREAM, 0)
@@ -261,7 +288,9 @@ final class LocalSSHServer {
             address.sin_port = UInt16(port).bigEndian
             address.sin_addr.s_addr = inet_addr("127.0.0.1")
             let result = withUnsafePointer(to: &address) {
-                $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { connect(descriptor, $0, socklen_t(MemoryLayout<sockaddr_in>.size)) }
+                $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                    connect(descriptor, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
+                }
             }
             close(descriptor)
             if result == 0 { break }

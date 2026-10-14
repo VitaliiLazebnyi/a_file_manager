@@ -1,7 +1,8 @@
-@testable import AFMKernel
 import Foundation
 import TestSupport
 import Testing
+
+@testable import AFMKernel
 
 private let folder = URL(fileURLWithPath: "/review2/requests")
 
@@ -11,7 +12,10 @@ private func file(_ name: String, size: Int64 = 1, in directory: URL = folder) -
 
 private func panel(_ items: [FileItem]) -> PanelModel {
     let model = PanelModel(directory: folder)
-    model.show(Listing(directory: folder, items: items, parent: folder.deletingLastPathComponent(), root: URL(fileURLWithPath: "/")))
+    model.show(
+        Listing(
+            directory: folder, items: items, parent: folder.deletingLastPathComponent(),
+            root: URL(fileURLWithPath: "/")))
     return model
 }
 
@@ -26,7 +30,10 @@ private final class QuittingPlugin: Plugin {
     init(_ name: String) { self.name = name }
     func start(in kernel: Kernel) {}
     func stop() { stopped += 1 }
-    func shouldTerminate() -> Bool { asked += 1; return mayQuit }
+    func shouldTerminate() -> Bool {
+        asked += 1
+        return mayQuit
+    }
     func prepareToQuit(cancellation: CancellationFlag, completion: @escaping () -> Void) {
         sawFlag = cancellation
         guard finishesLate else { return completion() }
@@ -73,7 +80,8 @@ private final class PlainPlugin: Plugin {
                 var onMain = false
                 let chosen = kernel.askUser { ui -> Int in
                     onMain = Thread.isMainThread
-                    return ui.choose("Go on?", detail: "", buttons: ["Yes", "No"], style: .warning, defaultButton: nil)
+                    return ui.choose(
+                        "Go on?", detail: "", buttons: ["Yes", "No"], style: .warning, defaultButton: nil)
                 }
                 continuation.resume(returning: (chosen, onMain))
             }
@@ -87,23 +95,28 @@ private final class PlainPlugin: Plugin {
         let owner = Owner()
         var onMain = false
         let value: Int? = await withCheckedContinuation { continuation in
-            BlockingCalls.answer(from: owner, to: "quick", { _ in 5 }, then: { (answer: Int?) in
-                onMain = Thread.isMainThread
-                continuation.resume(returning: answer)
-            })
+            BlockingCalls.answer(
+                from: owner, to: "quick", { _ in 5 },
+                then: { (answer: Int?) in
+                    onMain = Thread.isMainThread
+                    continuation.resume(returning: answer)
+                })
         }
         #expect(value == 5 && onMain)
         // Given up before the answer: nil is delivered, once, and the answer that comes later is dropped.
         let (flag, release) = (CancellationFlag(), DispatchSemaphore(value: 0))
         var delivered = 0
         let none: Int? = await withCheckedContinuation { continuation in
-            BlockingCalls.answer(from: owner, to: "slow", cancellation: flag, { _ -> Int in
-                release.wait()
-                return 1
-            }, then: { (answer: Int?) in
-                delivered += 1
-                continuation.resume(returning: answer)
-            })
+            BlockingCalls.answer(
+                from: owner, to: "slow", cancellation: flag,
+                { _ -> Int in
+                    release.wait()
+                    return 1
+                },
+                then: { (answer: Int?) in
+                    delivered += 1
+                    continuation.resume(returning: answer)
+                })
             flag.cancel()
         }
         release.signal()
@@ -123,7 +136,9 @@ private final class PlainPlugin: Plugin {
         let wanted = stride(from: 0, to: model.items.count, by: 3).map { $0 }
         #expect(model.setSelection(indices: wanted + [-1, model.items.count + 5], shownVersion: version))
         #expect(model.selectionCount == wanted.count)
-        #expect(model.setSelected(false, indices: [0, 3], shownVersion: version) && model.selectionCount == wanted.count - 2)
+        #expect(
+            model.setSelected(false, indices: [0, 3], shownVersion: version) && model.selectionCount == wanted.count - 2
+        )
         model.moveCursor(to: 5)
         let snapshot = model.operandsSnapshot()
         let done = DispatchSemaphore(value: 0)
@@ -131,17 +146,23 @@ private final class PlainPlugin: Plugin {
         Thread.detachNewThread {
             names = snapshot.items().map(\.name)
             indices = snapshot.markedIndices()
-            marked = snapshot.isMarked(at: 6) && !snapshot.isMarked(at: 0) && !snapshot.isMarked(at: 7) && !snapshot.isMarked(at: -1)
+            marked =
+                snapshot.isMarked(at: 6) && !snapshot.isMarked(at: 0) && !snapshot.isMarked(at: 7)
+                && !snapshot.isMarked(at: -1)
             done.signal()
         }
         done.wait()
         #expect(names == model.operands().map(\.name) && indices == Array(wanted.dropFirst(2)) && marked)
-        #expect(snapshot.markedCount == wanted.count - 2 && snapshot.cursorItem?.name == model.cursorItem?.name && snapshot.shownVersion == version)
+        #expect(
+            snapshot.markedCount == wanted.count - 2 && snapshot.cursorItem?.name == model.cursorItem?.name
+                && snapshot.shownVersion == version)
         // A filter moves what is shown, not the list: indexes worked out before are refused.
         let listVersion = model.listVersion
         model.setFilter(nil)
         #expect(model.listVersion == listVersion && model.shownVersion != version)
-        #expect(!model.setSelection(indices: [1, 2], shownVersion: version) && !model.setSelected(true, indices: [1], shownVersion: version))
+        #expect(
+            !model.setSelection(indices: [1, 2], shownVersion: version)
+                && !model.setSelected(true, indices: [1], shownVersion: version))
         model.clearSelection()
         #expect(model.operandsSnapshot().items().map(\.name) == [model.cursorItem!.name])
     }
@@ -150,13 +171,22 @@ private final class PlainPlugin: Plugin {
         // Two entries of one name, of which the filter lets the second through: the list
         // handed in must not be taken for the first (found by the fuzzer).
         let (a, b) = (URL(fileURLWithPath: "/review2/a"), URL(fileURLWithPath: "/review2/b"))
-        let items = [file("twin", size: 0, in: a), file("twin", size: 5, in: b), file("other", size: 3), file("twin", size: 5, in: a)]
+        let items = [
+            file("twin", size: 0, in: a), file("twin", size: 5, in: b), file("other", size: 3),
+            file("twin", size: 5, in: a)
+        ]
         let model = panel(items)
         let filter = PanelFilter(title: "big") { $0.size > 1 }
-        #expect(model.setFilter(filter, prefiltered: PanelModel.filtered(model.listedItems, by: filter), listVersion: model.listVersion))
-        #expect(model.items.map(\.size) == model.listedItems.filter(filter.matches).map(\.size) && model.items.count == 3)
+        #expect(
+            model.setFilter(
+                filter, prefiltered: PanelModel.filtered(model.listedItems, by: filter), listVersion: model.listVersion
+            ))
+        #expect(
+            model.items.map(\.size) == model.listedItems.filter(filter.matches).map(\.size) && model.items.count == 3)
         model.selectAll()
-        #expect(model.selectionCount == 3 && model.totals.selectedBytes == 13 && model.operands().allSatisfy { $0.size > 1 })
+        #expect(
+            model.selectionCount == 3 && model.totals.selectedBytes == 13 && model.operands().allSatisfy { $0.size > 1 }
+        )
         // Asked again and again (the model makes its index of names on the way): the same answer.
         for _ in 0..<4 {
             for item in model.items { #expect(model.isSelected(item)) }
@@ -170,13 +200,16 @@ private final class PlainPlugin: Plugin {
     @Test func whatAFileSystemNeedNotOfferHasADefault() throws {
         let memory = MemoryFileSystem(scheme: "mem")
         _ = memory.addFile("/a/x.txt")
-        let live = CancellationFlag(), cancelled = CancellationFlag()
+        let live = CancellationFlag()
+        let cancelled = CancellationFlag()
         cancelled.cancel()
         try memory.createDirectory(at: memory.url("/a/new"), cancellation: live)
         try memory.move(memory.url("/a/x.txt"), to: memory.url("/a/y.txt"), replacing: false, cancellation: live)
         #expect(memory.exists("/a/new") && memory.exists("/a/y.txt"))
         #expect(throws: (any Error).self) { try memory.remove(memory.url("/a/y.txt"), cancellation: cancelled) }
-        #expect(throws: (any Error).self) { try memory.createDirectory(at: memory.url("/a/never"), cancellation: cancelled) }
+        #expect(throws: (any Error).self) {
+            try memory.createDirectory(at: memory.url("/a/never"), cancellation: cancelled)
+        }
         #expect(memory.exists("/a/y.txt") && !memory.exists("/a/never"))
         try memory.remove(memory.url("/a/y.txt"), cancellation: live)
         #expect(!memory.exists("/a/y.txt"))
@@ -192,10 +225,14 @@ private final class PlainPlugin: Plugin {
         registry.register(memory)
         var flushed: [String] = []
         registry.addFlusher { url, _ in flushed.append(url.lastPathComponent) }
-        registry.addFlusher { url, flag in if url.lastPathComponent == "bad" || flag.isCancelled { throw FileSystemError.notSupported("Flushing") } }
+        registry.addFlusher { url, flag in
+            if url.lastPathComponent == "bad" || flag.isCancelled { throw FileSystemError.notSupported("Flushing") }
+        }
         try registry.flushPendingWrites(to: memory.url("/a/archive.zip"), cancellation: live)
         #expect(flushed == ["archive.zip"])
-        #expect(throws: (any Error).self) { try registry.flushPendingWrites(to: memory.url("/a/bad"), cancellation: live) }
+        #expect(throws: (any Error).self) {
+            try registry.flushPendingWrites(to: memory.url("/a/bad"), cancellation: live)
+        }
         #expect(registry.realLocation(of: memory.url("/a")) == memory.url("/a"))
     }
 
@@ -206,15 +243,22 @@ private final class PlainPlugin: Plugin {
         item.device = 16_777_233
         #expect(item.linkTargetSize == 0 && item.device == 16_777_233 && item != file("link"))
         let made = FileItem(url: folder, name: "x", isDirectory: false, linkTargetSize: 77, device: -3)
-        #expect(made.linkTargetSize == 77 && made.device == -3 && made.isSameEntry(as: FileItem(url: folder, name: "x", isDirectory: false)))
+        #expect(
+            made.linkTargetSize == 77 && made.device == -3
+                && made.isSameEntry(as: FileItem(url: folder, name: "x", isDirectory: false)))
         // The same file under two names.
         let sandbox = try Sandbox()
-        let original = try sandbox.file("a/original.txt"), other = try sandbox.file("a/other.txt")
+        let original = try sandbox.file("a/original.txt")
+        let other = try sandbox.file("a/other.txt")
         try FileManager.default.linkItem(at: original, to: sandbox.url("a/hard.txt"))
         try FileManager.default.createSymbolicLink(at: sandbox.url("a/soft.txt"), withDestinationURL: original)
-        #expect(original.isSameFile(as: sandbox.url("a/hard.txt")) && original.isSameFile(as: sandbox.url("a/../a/original.txt")))
+        #expect(
+            original.isSameFile(as: sandbox.url("a/hard.txt"))
+                && original.isSameFile(as: sandbox.url("a/../a/original.txt")))
         #expect(!original.isSameFile(as: other) && !original.isSameFile(as: sandbox.url("a/none.txt")))
-        #expect(!original.isSameFile(as: sandbox.url("a/soft.txt")) && original.isSameFile(as: sandbox.url("a/soft.txt"), followingLinks: true))
+        #expect(
+            !original.isSameFile(as: sandbox.url("a/soft.txt"))
+                && original.isSameFile(as: sandbox.url("a/soft.txt"), followingLinks: true))
         #expect(URL(string: "ftp://h/a")!.isSameFile(as: URL(string: "ftp://h/a/")!))
     }
 
@@ -225,13 +269,19 @@ private final class PlainPlugin: Plugin {
         keys.declare(prefix: "findFiles.history.", kind: .history)
         keys.declare(prefix: "findFiles.", kind: .ordinary) { $0.count < 4 }
         #expect(keys.kind(of: "commands.user") == .runsCode && keys.kind(of: "findFiles.history.text") == .history)
-        #expect(keys.kind(of: "findFiles.size") == .ordinary && keys.kind(of: "unknown") == nil && keys.kind(of: "commands.user2") == nil)
-        #expect(keys.accepts(Data([1, 2]), forKey: "findFiles.size") && !keys.accepts(Data([1, 2, 3, 4, 5]), forKey: "findFiles.size"))
+        #expect(
+            keys.kind(of: "findFiles.size") == .ordinary && keys.kind(of: "unknown") == nil
+                && keys.kind(of: "commands.user2") == nil)
+        #expect(
+            keys.accepts(Data([1, 2]), forKey: "findFiles.size")
+                && !keys.accepts(Data([1, 2, 3, 4, 5]), forKey: "findFiles.size"))
         #expect(!keys.accepts(Data(), forKey: "unknown") && keys.all.count == 3)
         // Large values go where the store keeps them; by default, with the rest.
         let settings = MemorySettings()
         settings.scoped(to: "rename").setLarge(Data([9]), forKey: "undo")
-        #expect(settings.largeData(forKey: "rename.undo") == Data([9]) && settings.scoped(to: "rename").largeData(forKey: "undo") == Data([9]))
+        #expect(
+            settings.largeData(forKey: "rename.undo") == Data([9])
+                && settings.scoped(to: "rename").largeData(forKey: "undo") == Data([9]))
     }
 
     @Test func aBrokenPipeIsAnErrorHereAndStillEndsTheProgramsWeStart() {
@@ -276,10 +326,14 @@ private final class PlainPlugin: Plugin {
 
     @Test func aColumnCanBeToldThatItsAnswerIsNoLongerWanted() {
         let plain = ContentColumn(id: "plain", title: "Plain") { $0.name.uppercased() }
-        let patient = ContentColumn(id: "patient", title: "Patient", cancellableValue: { item, flag in flag.isCancelled ? "given up" : item.name })
+        let patient = ContentColumn(
+            id: "patient", title: "Patient",
+            cancellableValue: { item, flag in flag.isCancelled ? "given up" : item.name })
         let cancelled = CancellationFlag()
         cancelled.cancel()
-        #expect(plain.value(file("a")) == "A" && plain.cancellableValue(file("a"), CancellationFlag()) == "A" && plain.cancellableValue(file("a"), cancelled) == "")
+        #expect(
+            plain.value(file("a")) == "A" && plain.cancellableValue(file("a"), CancellationFlag()) == "A"
+                && plain.cancellableValue(file("a"), cancelled) == "")
         #expect(patient.value(file("a")) == "a" && patient.cancellableValue(file("a"), cancelled) == "given up")
     }
 }

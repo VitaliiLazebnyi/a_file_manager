@@ -44,10 +44,14 @@ public enum CompareLoader {
     public static let loadLimit: Int64 = 128 * 1024 * 1024
     public static let stretch = 4 * 1024 * 1024
 
-    public static func load(left: URL, right: URL, forceBinary: Bool = false, options: DiffOptions = DiffOptions(), bytesPerLine: Int = 16,
-                            fileSystems: FileSystemRegistry, cancellation: CancellationFlag = CancellationFlag()) -> ComparedFiles {
+    public static func load(
+        left: URL, right: URL, forceBinary: Bool = false, options: DiffOptions = DiffOptions(), bytesPerLine: Int = 16,
+        fileSystems: FileSystemRegistry, cancellation: CancellationFlag = CancellationFlag()
+    ) -> ComparedFiles {
         var result = ComparedFiles()
-        let items = Parallel.map([left, right]) { url in (try? fileSystems.provider(for: url))?.item(at: url, cancellation: cancellation) }
+        let items = Parallel.map([left, right]) { url in
+            (try? fileSystems.provider(for: url))?.item(at: url, cancellation: cancellation)
+        }
         if cancellation.isCancelled {
             result.wasCancelled = true
             return result
@@ -61,7 +65,10 @@ public enum CompareLoader {
         result.rightItem = rightItem.isSymlink ? nil : rightItem
         do {
             if leftItem.size == rightItem.size, leftItem.size >= quickCheckFrom {
-                guard let same = try identical(left, right, size: leftItem.size, fileSystems: fileSystems, cancellation: cancellation) else {
+                guard
+                    let same = try identical(
+                        left, right, size: leftItem.size, fileSystems: fileSystems, cancellation: cancellation)
+                else {
                     result.wasCancelled = true
                     return result
                 }
@@ -71,11 +78,14 @@ public enum CompareLoader {
                 }
             }
             guard max(leftItem.size, rightItem.size) <= loadLimit else {
-                result.message = "The two files are different. They are too large to be shown side by side "
+                result.message =
+                    "The two files are different. They are too large to be shown side by side "
                     + "(more than \(Format.shortSize(loadLimit)))."
                 return result
             }
-            let loaded = Parallel.map([left, right]) { url in Result { try read(url, fileSystems: fileSystems, cancellation: cancellation) } }
+            let loaded = Parallel.map([left, right]) { url in
+                Result { try read(url, fileSystems: fileSystems, cancellation: cancellation) }
+            }
             let (first, second) = (try loaded[0].get(), try loaded[1].get())
             guard !cancellation.isCancelled else {
                 result.wasCancelled = true
@@ -83,25 +93,37 @@ public enum CompareLoader {
             }
             result.isIdentical = first == second
             if forceBinary || TextDocument.looksBinary(first) || TextDocument.looksBinary(second) {
-                result.content = .binary(left: first, right: second,
-                                         diff: BinaryDiff.compute(left: first, right: second, bytesPerLine: bytesPerLine, cancellation: cancellation))
+                result.content = .binary(
+                    left: first, right: second,
+                    diff: BinaryDiff.compute(
+                        left: first, right: second, bytesPerLine: bytesPerLine, cancellation: cancellation))
             } else {
                 let documents = Parallel.map([first, second]) { TextDocument(data: $0) }
-                result.content = text(left: documents[0], right: documents[1], options: options, cancellation: cancellation)
+                result.content = text(
+                    left: documents[0], right: documents[1], options: options, cancellation: cancellation)
             }
             result.wasCancelled = cancellation.isCancelled
         } catch {
             // A read that was ended by the cancel is no error to show.
-            if cancellation.isCancelled { result.wasCancelled = true } else { result.message = error.localizedDescription }
+            if cancellation.isCancelled {
+                result.wasCancelled = true
+            } else {
+                result.message = error.localizedDescription
+            }
         }
         return result
     }
 
     /// Lays two texts side by side.
-    public static func text(left: TextDocument, right: TextDocument, options: DiffOptions, anchors: [(left: Int, right: Int)] = [],
-                            cancellation: CancellationFlag? = nil) -> CompareContent {
-        let diff = TextDiff.compute(left: left.lines, right: right.lines, options: options, anchors: anchors, cancellation: cancellation)
-        let widths = Parallel.map([left.lines, right.lines]) { lines in lines.reduce(0) { max($0, $1.text.utf16.count) } }
+    public static func text(
+        left: TextDocument, right: TextDocument, options: DiffOptions, anchors: [(left: Int, right: Int)] = [],
+        cancellation: CancellationFlag? = nil
+    ) -> CompareContent {
+        let diff = TextDiff.compute(
+            left: left.lines, right: right.lines, options: options, anchors: anchors, cancellation: cancellation)
+        let widths = Parallel.map([left.lines, right.lines]) { lines in
+            lines.reduce(0) { max($0, $1.text.utf16.count) }
+        }
         return .text(left: left, right: right, diff: diff, width: max(widths[0], widths[1]))
     }
 
@@ -114,7 +136,9 @@ public enum CompareLoader {
         defer { withExtendedLifetime(token) {} }
         var data = Data()
         while try autoreleasepool(invoking: { () throws -> Bool in
-            guard !cancellation.isCancelled, let block = try reader.read(upToCount: 1 << 20), !block.isEmpty else { return false }
+            guard !cancellation.isCancelled, let block = try reader.read(upToCount: 1 << 20), !block.isEmpty else {
+                return false
+            }
             data.append(block)
             return true
         }) {}
@@ -124,13 +148,17 @@ public enum CompareLoader {
     // MARK: Identical?
 
     /// Whether two files of `size` bytes have the same content; nil when cancelled.
-    public static func identical(_ first: URL, _ second: URL, size: Int64, fileSystems: FileSystemRegistry,
-                                 cancellation: CancellationFlag = CancellationFlag(), stretch: Int = CompareLoader.stretch) throws -> Bool? {
+    public static func identical(
+        _ first: URL, _ second: URL, size: Int64, fileSystems: FileSystemRegistry,
+        cancellation: CancellationFlag = CancellationFlag(), stretch: Int = CompareLoader.stretch
+    ) throws -> Bool? {
         if cancellation.isCancelled { return nil }
         try fileSystems.flushPendingWrites(to: first, cancellation: cancellation)
         try fileSystems.flushPendingWrites(to: second, cancellation: cancellation)
         let systems = [try fileSystems.provider(for: first), try fileSystems.provider(for: second)]
-        let isLocal = zip(systems, [first, second]).allSatisfy { $0.volume(of: $1, cancellation: cancellation)?.isLocal ?? false }
+        let isLocal = zip(systems, [first, second]).allSatisfy {
+            $0.volume(of: $1, cancellation: cancellation)?.isLocal ?? false
+        }
         // (A size is what a file system says; a server may say anything.)
         let stretches = Int(max(0, size).addingSaturated(Int64(stretch) - 1) / Int64(stretch))
         guard isLocal, stretches > 1 else {
@@ -149,7 +177,8 @@ public enum CompareLoader {
         var differs = false
         var failure: Error?
         func take() -> Int? {
-            lock.lock(); defer { lock.unlock() }
+            lock.lock()
+            defer { lock.unlock() }
             guard !differs, failure == nil, next < stretches, !cancellation.isCancelled else { return nil }
             next += 1
             return next - 1
@@ -176,12 +205,16 @@ public enum CompareLoader {
                     try autoreleasepool {
                         try readers.forEach { try $0.seek(to: offset) }
                         if try exactly(count, from: readers[0]) != exactly(count, from: readers[1]) {
-                            lock.lock(); differs = true; lock.unlock()
+                            lock.lock()
+                            differs = true
+                            lock.unlock()
                         }
                     }
                 }
             } catch {
-                lock.lock(); failure = failure ?? error; lock.unlock()
+                lock.lock()
+                failure = failure ?? error
+                lock.unlock()
             }
         }
         if let failure, !cancellation.isCancelled { throw failure }
@@ -193,7 +226,9 @@ public enum CompareLoader {
     private static func exactly(_ count: Int, from reader: FileReader) throws -> Data {
         var data = Data()
         while try autoreleasepool(invoking: { () throws -> Bool in
-            guard data.count < count, let block = try reader.read(upToCount: count - data.count), !block.isEmpty else { return false }
+            guard data.count < count, let block = try reader.read(upToCount: count - data.count), !block.isEmpty else {
+                return false
+            }
             data.append(block)
             return true
         }) {}
@@ -201,7 +236,9 @@ public enum CompareLoader {
     }
 
     /// Reads the two files once, side by side, and stops at the first difference.
-    private static func sameStream(_ first: URL, _ second: URL, systems: [FileSystemProvider], cancellation: CancellationFlag) throws -> Bool? {
+    private static func sameStream(
+        _ first: URL, _ second: URL, systems: [FileSystemProvider], cancellation: CancellationFlag
+    ) throws -> Bool? {
         var readers: [FileReader] = []
         var tokens: [AnyObject] = []
         defer {
@@ -235,12 +272,17 @@ public enum CompareLoader {
 
         var errorDescription: String? {
             switch self {
-            case .changedOnDisk(let name): return "\(name) was changed by someone else after it was loaded. It is not overwritten; compare the files again."
+            case .changedOnDisk(let name):
+                return
+                    "\(name) was changed by someone else after it was loaded. It is not overwritten; compare the files again."
             case .notRepresentable(let name, let encoding):
-                return "\(name) has characters that \(encoding.name) cannot hold, so it is not saved (that would turn them into question marks)."
+                return
+                    "\(name) has characters that \(encoding.name) cannot hold, so it is not saved (that would turn them into question marks)."
             case .invalidSequences(let name, let encoding):
-                return "\(name) has bytes that are not valid \(encoding.name). Saving would change them, so it is not saved."
-            case .sameFile(let name): return "Both sides are the same file (\(name)) and both were edited, so it is not saved."
+                return
+                    "\(name) has bytes that are not valid \(encoding.name). Saving would change them, so it is not saved."
+            case .sameFile(let name):
+                return "Both sides are the same file (\(name)) and both were edited, so it is not saved."
             }
         }
     }
@@ -258,7 +300,9 @@ public enum CompareLoader {
     /// A local file with several hard links is written in place instead: a rename would give
     /// this name a file of its own and leave the other names with the old content.
     @discardableResult
-    public static func replace(_ url: URL, with data: Data, expected: FileItem? = nil, fileSystems: FileSystemRegistry) throws -> FileItem? {
+    public static func replace(_ url: URL, with data: Data, expected: FileItem? = nil, fileSystems: FileSystemRegistry)
+        throws -> FileItem?
+    {
         var url = url
         let fileSystem = try fileSystems.provider(for: url)
         var existing = fileSystem.item(at: url)
@@ -268,7 +312,8 @@ public enum CompareLoader {
             existing = fileSystem.item(at: url)
         }
         if let expected, let current = existing, !expected.isSymlink,
-           current.size != expected.size || abs(current.modified.timeIntervalSince(expected.modified)) > 0.001 {
+            current.size != expected.size || abs(current.modified.timeIntervalSince(expected.modified)) > 0.001
+        {
             throw SaveError.changedOnDisk(url.lastPathComponent)
         }
         if existing != nil, url.isFileURL, try writeInPlaceIfLinked(url, data) { return fileSystem.item(at: url) }
@@ -286,7 +331,7 @@ public enum CompareLoader {
             if existing != nil, url.isFileURL { carryOverMetadata(from: url, to: temporary) }
             do {
                 try fileSystem.move(temporary, to: url, replacing: true)
-            } catch where existing != nil {
+            } catch  where existing != nil {
                 // A file system that cannot replace in one step: the old file is moved aside, not
                 // deleted, until the new one is in its place; if that fails the old one comes back.
                 let aside = url.deletingLastPathComponent().appending(name: ".\(name).afm-old")

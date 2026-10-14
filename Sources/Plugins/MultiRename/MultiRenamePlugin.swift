@@ -26,18 +26,31 @@ public final class MultiRenamePlugin: Plugin {
         let source = { kernel.panels.source.model }
         let isWritable = { kernel.fileSystems.capabilities(for: source().directory).contains(.write) }
         // `.text`: the name of saved settings to open the tool with (the spec's `MULTIRENAME <name>`).
-        kernel.commands.register(Command(.multiRename, "Multi-Rename Tool…", [Shortcut(.character("m"), .control)]),
-                                 enabled: { source().hasOperands && isWritable() }, parameterized: { [self] argument in
-            open(kernel, settingsName: argument.text)
-        })
+        kernel.commands.register(
+            Command(.multiRename, "Multi-Rename Tool…", [Shortcut(.character("m"), .control)]),
+            enabled: { source().hasOperands && isWritable() },
+            parameterized: { [self] argument in
+                open(kernel, settingsName: argument.text)
+            })
         kernel.menus.add([.multiRename], to: .filesAdvanced)
         kernel.menus.addToContextMenu([.multiRename], in: .tools, onItemOnly: true)
-        kernel.toolbar.add(.multiRename, symbol: "character.cursor.ibeam", group: 50, hint: "Rename many files at once, with a pattern, counters and search and replace.")
-        kernel.preferences.add(PreferencePage(title: "Multi-Rename Tool", preferences: [
-            Preference(RenameStore.undoLimitKey, "Rename runs that can be undone (0 = no Undo)", .text(default: "20")),
-            Preference(RenameStore.startupSettingsKey, "Saved settings to open the tool with (empty = last used)", .text(default: "")),
-            Preference(RenameStore.lowercaseWordsKey, "Words kept in lower case in titles", .text(default: TitleCaseRule.defaultSetting)),
-        ]))
+        kernel.toolbar.add(
+            .multiRename, symbol: "character.cursor.ibeam", group: 50,
+            hint: "Rename many files at once, with a pattern, counters and search and replace.")
+        kernel.preferences.add(
+            PreferencePage(
+                title: "Multi-Rename Tool",
+                preferences: [
+                    Preference(
+                        RenameStore.undoLimitKey, "Rename runs that can be undone (0 = no Undo)", .text(default: "20")
+                    ),
+                    Preference(
+                        RenameStore.startupSettingsKey, "Saved settings to open the tool with (empty = last used)",
+                        .text(default: "")),
+                    Preference(
+                        RenameStore.lowercaseWordsKey, "Words kept in lower case in titles",
+                        .text(default: TitleCaseRule.defaultSetting))
+                ]))
     }
 
     private func open(_ kernel: Kernel, settingsName: String?) {
@@ -52,13 +65,17 @@ public final class MultiRenamePlugin: Plugin {
         let settings = wanted.map { store.saved[$0] ?? .unchanged } ?? lastSettings ?? .unchanged
         // The log of a run is kept in the user's own Logs folder, not in the temporary one.
         let product = kernel.productName.replacingOccurrences(of: "/", with: "_")
-        let log = logDirectory
-            ?? FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first?.appendingPathComponent("Logs").appendingPathComponent(product)
+        let log =
+            logDirectory
+            ?? FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first?.appendingPathComponent(
+                "Logs"
+            ).appendingPathComponent(product)
             ?? FileManager.default.temporaryDirectory.appendingPathComponent(product)
-        let session = MultiRenameSession(kernel: kernel, items: items, store: store, settings: settings, logDirectory: log,
-                                         previewsInBackground: opensWindows,
-                                         clipboard: opensWindows ? { NSPasteboard.general.string(forType: .string) } : { nil },
-                                         clipboardChangeCount: opensWindows ? { NSPasteboard.general.changeCount } : nil)
+        let session = MultiRenameSession(
+            kernel: kernel, items: items, store: store, settings: settings, logDirectory: log,
+            previewsInBackground: opensWindows,
+            clipboard: opensWindows ? { NSPasteboard.general.string(forType: .string) } : { nil },
+            clipboardChangeCount: opensWindows ? { NSPasteboard.general.changeCount } : nil)
         self.session = session
         guard opensWindows else { return }
         // The tool that is open is closed first, and its closing is not told to anyone: it

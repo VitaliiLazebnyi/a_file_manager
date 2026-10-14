@@ -42,8 +42,10 @@ public final class ConnectionCenter {
         lock.lock()
         let isNewlyChosen = isChosen && chosen.insert(profile.key).inserted
         // Announced again as it is known already (a location that is read once more): nothing changes.
-        if !isNewlyChosen, let known = announced[profile.key], (known.user, known.password, known.tls, known.anonymous, known.savedID)
-            == (profile.user, profile.password, profile.tls, profile.anonymous, profile.savedID) {
+        if !isNewlyChosen, let known = announced[profile.key],
+            (known.user, known.password, known.tls, known.anonymous, known.savedID)
+                == (profile.user, profile.password, profile.tls, profile.anonymous, profile.savedID)
+        {
             lock.unlock()
             return
         }
@@ -93,7 +95,8 @@ public final class ConnectionCenter {
         guard var profile = known else {
             // Nothing is known: a guest on an FTP server, the Mac's user on a secure shell
             // (with the keys and the configuration that user has). Not without asking.
-            var guest = ConnectionProfile(key: key, user: key.scheme == "sftp" ? NSUserName() : nil, anonymous: key.scheme != "sftp")
+            var guest = ConnectionProfile(
+                key: key, user: key.scheme == "sftp" ? NSUserName() : nil, anonymous: key.scheme != "sftp")
             guest.asksBeforeConnecting = !isChosen
             return guest
         }
@@ -111,7 +114,9 @@ public final class ConnectionCenter {
         lock.unlock()
         // The password comes from the Keychain, which may take a moment; not under the lock.
         let profile = self.profile(for: key)
-        guard let created = makeSession(profile, environment) else { throw FileSystemError.notSupported("Connections of the type \(key.scheme)") }
+        guard let created = makeSession(profile, environment) else {
+            throw FileSystemError.notSupported("Connections of the type \(key.scheme)")
+        }
         lock.lock()
         defer { lock.unlock() }
         if let session = sessions[key] { return session }
@@ -121,7 +126,8 @@ public final class ConnectionCenter {
 
     /// The session of a server when there is one.
     func existingSession(for key: ServerKey) -> RemoteSession? {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         return sessions[key]
     }
 
@@ -180,7 +186,8 @@ public final class ConnectionCenter {
 
     /// The folder last listed on a server.
     public func lastPath(on key: ServerKey) -> String? {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         return lastPaths[key]
     }
 }
@@ -234,11 +241,13 @@ private final class EntryCache {
     }
 
     enum Answer {
-        case entry(RemoteEntry), absent, unknown
+        case entry(RemoteEntry)
+        case absent, unknown
     }
 
     func lookUp(_ name: String, in directory: URL) -> Answer {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         guard let known = fresh(directory.locationKey) else { return .unknown }
         if let entry = known.entries[name] { return .entry(entry) }
         return known.includesHidden || !name.hasPrefix(".") ? .absent : .unknown
@@ -247,9 +256,12 @@ private final class EntryCache {
     /// Whether the listing of the directory holds a name that a server may take for `name`
     /// although it is spelled differently: in another case, or composed differently.
     func hasNameAlike(_ name: String, in directory: URL) -> Bool {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         guard let known = fresh(directory.locationKey) else { return false }
-        return known.entries.keys.contains { $0.compare(name, options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive]) == .orderedSame }
+        return known.entries.keys.contains {
+            $0.compare(name, options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive]) == .orderedSame
+        }
     }
 
     /// Changes what is known of an entry, when it is known; nothing else happens. For news that
@@ -257,7 +269,8 @@ private final class EntryCache {
     /// be forgotten that they do not concern.
     func updateIfKnown(_ name: String, in directory: URL, _ change: (inout RemoteEntry) -> Void) {
         let key = directory.locationKey
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         guard fresh(key) != nil, var entry = directories[key]?.entries[name] else { return }
         change(&entry)
         note(key, name: name, entry: entry)
@@ -286,7 +299,8 @@ private final class EntryCache {
     /// A name that now exists in the directory (a file just created, a folder just made).
     func insert(_ entry: RemoteEntry, in directory: URL) {
         let key = directory.locationKey
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         note(key, name: entry.name, entry: entry)
         if fresh(key) != nil { directories[key]?.entries[entry.name] = entry }
     }
@@ -294,7 +308,8 @@ private final class EntryCache {
     /// A name that is gone from the directory.
     func remove(_ name: String, from directory: URL) {
         let key = directory.locationKey
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         note(key, name: name, entry: nil)
         if fresh(key) != nil { directories[key]?.entries[name] = nil }
     }
@@ -302,7 +317,8 @@ private final class EntryCache {
     /// Changes what is known of an entry; the directory is forgotten when the entry is not known.
     func update(_ name: String, in directory: URL, _ change: (inout RemoteEntry) -> Void) {
         let key = directory.locationKey
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         if fresh(key) != nil, var entry = directories[key]?.entries[name] {
             change(&entry)
             note(key, name: name, entry: entry)
@@ -316,7 +332,8 @@ private final class EntryCache {
     /// An entry that went from one directory to another, or to another name.
     func move(_ name: String, from source: URL, to destination: URL, as newName: String) {
         let (from, to) = (source.locationKey, destination.locationKey)
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         guard fresh(from) != nil, var entry = directories[from]?.entries[name] else {
             // Nothing is known of what moved, so nothing of where it arrived.
             note(from, name: nil, entry: nil)
@@ -333,7 +350,8 @@ private final class EntryCache {
     }
 
     func forget(_ directories: URL...) {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         for directory in directories {
             let key = directory.locationKey
             note(key, name: nil, entry: nil)
@@ -344,7 +362,8 @@ private final class EntryCache {
     /// Forgets a directory and everything below it, after it was removed or moved.
     func forgetTree(_ root: URL) {
         let key = root.locationKey
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         for known in directories.keys where known == key || known.hasPrefix(key + "/") {
             note(known, name: nil, entry: nil)
             directories[known] = nil
@@ -373,7 +392,9 @@ public final class RemoteFileSystem: FileSystemProvider {
         self.center = center
     }
 
-    private func resolve(_ url: URL, cancellation: CancellationFlag? = nil) throws -> (session: RemoteSession, key: ServerKey, path: String) {
+    private func resolve(_ url: URL, cancellation: CancellationFlag? = nil) throws -> (
+        session: RemoteSession, key: ServerKey, path: String
+    ) {
         if cancellation?.isCancelled == true { throw NetworkError.cancelled }
         guard let key = ServerKey(url), key.scheme == scheme else { throw FileSystemError.noProvider(url) }
         // Every name of the path must read as a name of its own (see `RemotePath.normalized`).
@@ -411,13 +432,18 @@ public final class RemoteFileSystem: FileSystemProvider {
         return items
     }
 
-    public func list(_ directory: URL, showHidden: Bool, cancellation: CancellationFlag, receive: ([FileItem]) -> Bool) throws {
+    public func list(_ directory: URL, showHidden: Bool, cancellation: CancellationFlag, receive: ([FileItem]) -> Bool)
+        throws
+    {
         try read(directory, showHidden: showHidden, isVisit: true, cancellation: cancellation, receive: receive)
     }
 
     /// Reads a directory and remembers the listing. A visit is what the panels do; reading
     /// the directory to answer a question about one entry is not. A cancelled listing is not remembered.
-    private func read(_ directory: URL, showHidden: Bool, isVisit: Bool, cancellation: CancellationFlag?, receive: ([FileItem]) -> Bool) throws {
+    private func read(
+        _ directory: URL, showHidden: Bool, isVisit: Bool, cancellation: CancellationFlag?,
+        receive: ([FileItem]) -> Bool
+    ) throws {
         let (session, key, path) = try resolve(directory)
         let base = key.url(path: path)
         var all: [RemoteEntry] = []
@@ -426,7 +452,9 @@ public final class RemoteFileSystem: FileSystemProvider {
         // A link the session resolves after the listing was delivered is a folder in what is remembered, too.
         session.onLinkResolved { [weak self] link, isDirectory in
             guard let self, let parent = RemotePath.parent(of: link) else { return }
-            self.cache.updateIfKnown(RemotePath.name(of: link), in: key.url(path: parent)) { $0.isDirectory = isDirectory }
+            self.cache.updateIfKnown(RemotePath.name(of: link), in: key.url(path: parent)) {
+                $0.isDirectory = isDirectory
+            }
         }
         try session.list(path, showHidden: showHidden, cancellation: cancellation) { entries in
             all += entries
@@ -447,20 +475,26 @@ public final class RemoteFileSystem: FileSystemProvider {
     /// seconds old is then not believed when it says "nothing there": the server is asked,
     /// where one question is cheap, and in any case when the listing holds a name that differs
     /// only in case or composition, which a server that does not tell those apart takes for the same file.
-    private func entry(at url: URL, cancellation: CancellationFlag? = nil, beforeOverwriting: Bool = false) throws -> RemoteEntry? {
+    private func entry(at url: URL, cancellation: CancellationFlag? = nil, beforeOverwriting: Bool = false) throws
+        -> RemoteEntry?
+    {
         let (session, key, path) = try resolve(url)
         guard let parent = RemotePath.parent(of: path) else { return RemoteEntry(name: key.host, isDirectory: true) }
         let (parentURL, name) = (key.url(path: parent), RemotePath.name(of: path))
         switch cache.lookUp(name, in: parentURL) {
         case .entry(let entry): return entry
         case .absent:
-            guard beforeOverwriting, session.singleLookupsAreCheap || cache.hasNameAlike(name, in: parentURL) else { return nil }
+            guard beforeOverwriting, session.singleLookupsAreCheap || cache.hasNameAlike(name, in: parentURL) else {
+                return nil
+            }
             return try session.entry(at: path, cancellation: cancellation)
         case .unknown: break
         }
         // Where one question costs several commands and a listing, the listing is read once
         // and answers the questions that follow, about the entries that are not there as well.
-        if !session.singleLookupsAreCheap, (try? read(parentURL, showHidden: true, isVisit: false, cancellation: cancellation) { _ in true }) != nil {
+        if !session.singleLookupsAreCheap,
+            (try? read(parentURL, showHidden: true, isVisit: false, cancellation: cancellation) { _ in true }) != nil
+        {
             switch cache.lookUp(name, in: parentURL) {
             case .entry(let entry): return entry
             case .absent: return nil
@@ -479,8 +513,10 @@ public final class RemoteFileSystem: FileSystemProvider {
     }
 
     private func item(at url: URL, cancellation: CancellationFlag?) -> FileItem? {
-        guard cancellation?.isCancelled != true, let entry = try? entry(at: url, cancellation: cancellation), let key = ServerKey(url),
-              cancellation?.isCancelled != true else { return nil }
+        guard cancellation?.isCancelled != true, let entry = try? entry(at: url, cancellation: cancellation),
+            let key = ServerKey(url),
+            cancellation?.isCancelled != true
+        else { return nil }
         let path = RemotePath.of(url)
         guard let parent = RemotePath.parent(of: path) else {
             return FileItem(url: key.url(), name: key.host, isDirectory: true, permissions: 0o755)
@@ -491,7 +527,9 @@ public final class RemoteFileSystem: FileSystemProvider {
     }
 
     public func parent(of directory: URL) -> URL? {
-        guard let key = ServerKey(directory), let parent = RemotePath.parent(of: RemotePath.of(directory)) else { return nil }
+        guard let key = ServerKey(directory), let parent = RemotePath.parent(of: RemotePath.of(directory)) else {
+            return nil
+        }
         return key.url(path: parent)
     }
 
@@ -532,7 +570,9 @@ public final class RemoteFileSystem: FileSystemProvider {
             throw FileSystemError.alreadyExists(displayPath(url))
         }
         let parentURL = key.url(path: parent)
-        if parent != "/", try entry(at: parentURL, cancellation: cancellation) == nil { try createDirectory(at: parentURL, cancellation: cancellation) }
+        if parent != "/", try entry(at: parentURL, cancellation: cancellation) == nil {
+            try createDirectory(at: parentURL, cancellation: cancellation)
+        }
         do {
             try session.makeDirectory(path, cancellation: cancellation)
         } catch {
@@ -552,7 +592,9 @@ public final class RemoteFileSystem: FileSystemProvider {
 
     private func write(_ url: URL, cancellation: CancellationFlag?) throws -> FileWriter {
         let (session, _, path) = try resolve(url, cancellation: cancellation)
-        if try entry(at: url, cancellation: cancellation, beforeOverwriting: true) != nil { throw FileSystemError.alreadyExists(displayPath(url)) }
+        if try entry(at: url, cancellation: cancellation, beforeOverwriting: true) != nil {
+            throw FileSystemError.alreadyExists(displayPath(url))
+        }
         let directory = parentURL(url)
         let name = RemotePath.name(of: path)
         let writer: FileWriter
@@ -587,7 +629,9 @@ public final class RemoteFileSystem: FileSystemProvider {
     /// Where a server cannot continue a file (an FTP server without `REST`, a transfer in text
     /// mode) the capability is missing, and the caller writes the file again.
     public func capabilities(for url: URL) -> FileSystemCapabilities {
-        guard let key = ServerKey(url), key.scheme == scheme, let session = center.existingSession(for: key) else { return capabilities }
+        guard let key = ServerKey(url), key.scheme == scheme, let session = center.existingSession(for: key) else {
+            return capabilities
+        }
         return session.canAppend(RemotePath.of(url)) ? capabilities : capabilities.subtracting(.append)
     }
 
@@ -601,7 +645,9 @@ public final class RemoteFileSystem: FileSystemProvider {
 
     private func remove(_ url: URL, cancellation: CancellationFlag?) throws {
         let (session, key, path) = try resolve(url, cancellation: cancellation)
-        guard let parent = RemotePath.parent(of: path) else { throw FileSystemError.notSupported("Deleting the root of a server") }
+        guard let parent = RemotePath.parent(of: path) else {
+            throw FileSystemError.notSupported("Deleting the root of a server")
+        }
         let (parentURL, name) = (key.url(path: parent), RemotePath.name(of: path))
         var isDirectory: Bool?
         if case .entry(let known) = cache.lookUp(name, in: parentURL) {
@@ -644,7 +690,9 @@ public final class RemoteFileSystem: FileSystemProvider {
         guard let targetKey = ServerKey(destination), targetKey == key else { throw FileSystemError.crossesVolumes }
         let to = RemotePath.of(destination)
         if from == to { return }
-        if !replacing, try entry(at: destination, cancellation: cancellation, beforeOverwriting: true) != nil { throw FileSystemError.alreadyExists(displayPath(destination)) }
+        if !replacing, try entry(at: destination, cancellation: cancellation, beforeOverwriting: true) != nil {
+            throw FileSystemError.alreadyExists(displayPath(destination))
+        }
         // Whether the rename went through as one step, so the cached listings can follow it.
         var isPlain = true
         do {
@@ -655,7 +703,8 @@ public final class RemoteFileSystem: FileSystemProvider {
                 cache.forget(parentURL(source), parentURL(destination))
                 // Asked of the server, not of what is remembered: both answers decide over a file.
                 guard try session.entry(at: from, cancellation: cancellation) != nil,
-                      let existing = try session.entry(at: to, cancellation: cancellation), !existing.isDirectory else { throw refusal }
+                    let existing = try session.entry(at: to, cancellation: cancellation), !existing.isDirectory
+                else { throw refusal }
                 try replace(to, with: from, on: session, refusal: refusal, cancellation: cancellation)
             }
         } catch {
@@ -665,7 +714,9 @@ public final class RemoteFileSystem: FileSystemProvider {
             throw error
         }
         if isPlain {
-            cache.move(RemotePath.name(of: from), from: parentURL(source), to: parentURL(destination), as: RemotePath.name(of: to))
+            cache.move(
+                RemotePath.name(of: from), from: parentURL(source), to: parentURL(destination),
+                as: RemotePath.name(of: to))
         } else {
             cache.forget(parentURL(source), parentURL(destination))
         }
@@ -688,7 +739,9 @@ public final class RemoteFileSystem: FileSystemProvider {
     /// The caller's flag ends only the first step. Once the file in the way stands aside, the
     /// rest is seen through whatever the flag says (it still ends with the session and at the
     /// time limits): a Cancel between the two renames would leave the name without a file.
-    private func replace(_ to: String, with from: String, on session: RemoteSession, refusal: Error, cancellation: CancellationFlag?) throws {
+    private func replace(
+        _ to: String, with from: String, on session: RemoteSession, refusal: Error, cancellation: CancellationFlag?
+    ) throws {
         let directory = RemotePath.parent(of: to) ?? "/"
         let aside = RemotePath.join(directory, RemoteFileSystem.asideName(for: RemotePath.name(of: to)))
         do {
@@ -704,8 +757,9 @@ public final class RemoteFileSystem: FileSystemProvider {
             do {
                 try session.rename(aside, to: to, replacing: false)
             } catch {
-                throw NetworkError.incomplete("\(RemotePath.name(of: to)) could not be replaced (\(refusal.localizedDescription)), "
-                    + "and the file that was there could not be put back: it is kept on the server as \(aside).")
+                throw NetworkError.incomplete(
+                    "\(RemotePath.name(of: to)) could not be replaced (\(refusal.localizedDescription)), "
+                        + "and the file that was there could not be put back: it is kept on the server as \(aside).")
             }
             throw error
         }
@@ -713,7 +767,9 @@ public final class RemoteFileSystem: FileSystemProvider {
             try session.remove(aside, isDirectory: false)
         } catch {
             // The new file is in place; only the old one is still there under its other name.
-            center.environment.log("The replaced file could not be removed and stays on the server as \(aside): \(error.localizedDescription)")
+            center.environment.log(
+                "The replaced file could not be removed and stays on the server as \(aside): \(error.localizedDescription)"
+            )
         }
     }
 
@@ -721,7 +777,8 @@ public final class RemoteFileSystem: FileSystemProvider {
     static func asideName(for name: String) -> String {
         let mark = String(UInt32.random(in: 0...UInt32.max), radix: 16)
         // Short enough for servers with a limit of 255 bytes for a name.
-        let kept = String(decoding: name.utf8.prefix(180), as: UTF8.self).replacingOccurrences(of: "\u{FFFD}", with: "")
+        let kept = String(decoding: name.utf8.prefix(180), as: UTF8.self).replacingOccurrences(
+            of: "\u{FFFD}", with: "")
         return ".\(kept).replaced-\(mark)"
     }
 
@@ -767,12 +824,15 @@ public final class RemoteFileSystem: FileSystemProvider {
     public func location(from text: String) -> URL? {
         let lowered = text.lowercased()
         let prefixes = scheme == "ftps" ? ["ftps://", "ftpes://", "ftpis://"] : [scheme + "://"]
-        guard let prefix = prefixes.first(where: lowered.hasPrefix), let address = ServerAddress(text), address.scheme == scheme else { return nil }
+        guard let prefix = prefixes.first(where: lowered.hasPrefix), let address = ServerAddress(text),
+            address.scheme == scheme
+        else { return nil }
         // Reading a location only says how to log in, should the server be used. It is not the
         // user's wish to connect (the text may come from a file), so `announce` is told nothing
         // of the kind, and it leaves a session alone that is in the middle of its login.
         if address.user != nil || prefix != scheme + "://", !center.isConnected(address.key) {
-            center.announce(ConnectionProfile(key: address.key, tls: address.tls, user: address.user, password: address.password))
+            center.announce(
+                ConnectionProfile(key: address.key, tls: address.tls, user: address.user, password: address.password))
         }
         return address.url
     }
@@ -796,7 +856,9 @@ public final class RemoteFileSystem: FileSystemProvider {
     /// The connected servers, for the volume list.
     public func places() -> [Place] {
         center.connected.filter { $0.key.scheme == scheme }.map { profile in
-            Place(name: profile.title, url: profile.key.url(path: center.lastPath(on: profile.key) ?? "/"), kind: .externalDisk)
+            Place(
+                name: profile.title, url: profile.key.url(path: center.lastPath(on: profile.key) ?? "/"),
+                kind: .externalDisk)
         }
     }
 

@@ -103,15 +103,17 @@ final class ColumnValueStore {
         let generation = self.generation
         let lane = folder ?? URL(fileURLWithPath: "/")
         let flag = cancellation
-        Background.storage("columns", at: lane, qos: .utility, work: { Parallel.map(batch) { $0.column.cancellableValue($0.item, flag) } },
-                           then: { [weak self] texts in
-            guard let self else { return }
-            self.working.remove(location)
-            if generation == self.generation {
-                for (request, text) in zip(batch, texts) { self.values[request.key] = text }
-                self.onArrival?(Set(batch.map(\.item.name)))
-            }
-            self.work()
-        })
+        Background.storage(
+            "columns", at: lane, qos: .utility,
+            work: { Parallel.map(batch) { $0.column.cancellableValue($0.item, flag) } },
+            then: { [weak self] texts in
+                guard let self else { return }
+                self.working.remove(location)
+                if generation == self.generation {
+                    for (request, text) in zip(batch, texts) { self.values[request.key] = text }
+                    self.onArrival?(Set(batch.map(\.item.name)))
+                }
+                self.work()
+            })
     }
 }

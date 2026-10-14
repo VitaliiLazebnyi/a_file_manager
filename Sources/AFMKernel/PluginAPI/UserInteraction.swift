@@ -27,7 +27,9 @@ public protocol UserInteraction: AnyObject {
 }
 
 extension UserInteraction {
-    public func choose(_ message: String, detail: String, buttons: [String], style: QuestionStyle, defaultButton: Int?) -> Int {
+    public func choose(_ message: String, detail: String, buttons: [String], style: QuestionStyle, defaultButton: Int?)
+        -> Int
+    {
         choose(message, detail: detail, buttons: buttons, style: style)
     }
 
@@ -40,8 +42,13 @@ extension UserInteraction {
     }
 
     /// Lets the user pick one row of a list; nil on Cancel.
-    public func pickRow(_ title: String, detail: String = "", rows: [String], selected: Int = 0, button: String = "OK") -> Int? {
-        guard let answer = form(title, detail: detail, fields: [.list("row", "", rows, selected: selected)], buttons: [button]) else { return nil }
+    public func pickRow(_ title: String, detail: String = "", rows: [String], selected: Int = 0, button: String = "OK")
+        -> Int?
+    {
+        guard
+            let answer = form(
+                title, detail: detail, fields: [.list("row", "", rows, selected: selected)], buttons: [button])
+        else { return nil }
         let row = answer.index("row")
         return rows.indices.contains(row) ? row : nil
     }
@@ -59,8 +66,10 @@ extension UserInteraction {
     }
 
     /// A question whose buttons stand for values; `fallback` when the dialog is dismissed.
-    public func pick<Choice>(_ message: String, detail: String, _ choices: [(String, Choice)], fallback: Choice,
-                             style: QuestionStyle = .warning) -> Choice {
+    public func pick<Choice>(
+        _ message: String, detail: String, _ choices: [(String, Choice)], fallback: Choice,
+        style: QuestionStyle = .warning
+    ) -> Choice {
         let index = choose(message, detail: detail, buttons: choices.map(\.0), style: style)
         return choices.indices.contains(index) ? choices[index].1 : fallback
     }

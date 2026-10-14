@@ -23,7 +23,7 @@ public enum Key: Hashable {
         (.returnKey, "return"), (.enter, "enter"), (.tab, "tab"), (.space, "space"), (.backspace, "backspace"),
         (.forwardDelete, "delete"), (.insert, "insert"), (.home, "home"), (.end, "end"), (.pageUp, "pageup"),
         (.pageDown, "pagedown"), (.left, "left"), (.right, "right"), (.up, "up"), (.down, "down"),
-        (.keypadPlus, "num+"), (.keypadMinus, "num-"), (.keypadMultiply, "num*"), (.keypadDivide, "num/"),
+        (.keypadPlus, "num+"), (.keypadMinus, "num-"), (.keypadMultiply, "num*"), (.keypadDivide, "num/")
     ]
 }
 
@@ -46,7 +46,9 @@ public struct Shortcut: Hashable {
         Shortcut(.function(number), modifiers)
     }
 
-    private static let modifierNames: [(KeyModifiers, String)] = [(.control, "ctrl"), (.option, "opt"), (.shift, "shift"), (.command, "cmd")]
+    private static let modifierNames: [(KeyModifiers, String)] = [
+        (.control, "ctrl"), (.option, "opt"), (.shift, "shift"), (.command, "cmd")
+    ]
 
     /// The shortcut as text, as it is stored in the settings: `cmd+shift+c`, `f5`, `ctrl+tab`, `num+`.
     public var notation: String {
@@ -62,7 +64,9 @@ public struct Shortcut: Hashable {
     public init?(notation: String) {
         var rest = notation.lowercased()
         var modifiers: KeyModifiers = []
-        while let (modifier, name) = Shortcut.modifierNames.first(where: { rest.hasPrefix($0.1 + "+") && rest.count > $0.1.count + 1 }) {
+        while let (modifier, name) = Shortcut.modifierNames.first(where: {
+            rest.hasPrefix($0.1 + "+") && rest.count > $0.1.count + 1
+        }) {
             modifiers.insert(modifier)
             rest.removeFirst(name.count + 1)
         }

@@ -40,8 +40,10 @@ public enum Myers {
 
     /// `costLimit` bounds the effort per split; nil chooses by size. The result is cut short
     /// (everything left counts as different) when `cancellation` is set.
-    public static func diff<Element: Hashable>(_ a: [Element], _ b: [Element], costLimit: Int? = nil,
-                                               cancellation: CancellationFlag? = nil) -> [DiffSegment] {
+    public static func diff<Element: Hashable>(
+        _ a: [Element], _ b: [Element], costLimit: Int? = nil,
+        cancellation: CancellationFlag? = nil
+    ) -> [DiffSegment] {
         var numbers: [Element: Int32] = [:]
         func number(_ element: Element) -> Int32 {
             if let known = numbers[element] { return known }
@@ -50,15 +52,21 @@ public enum Myers {
             return next
         }
         let (first, second) = (a.map(number), b.map(number))
-        return segments(of: matching(first, second, kinds: numbers.count, costLimit: costLimit, cancellation: cancellation),
-                        counts: (a.count, b.count))
+        return segments(
+            of: matching(first, second, kinds: numbers.count, costLimit: costLimit, cancellation: cancellation),
+            counts: (a.count, b.count))
     }
 
     /// The same for sequences of UTF-16 units: a unit is its own small number, so no table of
     /// elements is built.
-    public static func diff(_ a: [UInt16], _ b: [UInt16], costLimit: Int? = nil, cancellation: CancellationFlag? = nil) -> [DiffSegment] {
-        segments(of: matching(a.map { Int32($0) }, b.map { Int32($0) }, kinds: 1 << 16, costLimit: costLimit, cancellation: cancellation),
-                 counts: (a.count, b.count))
+    public static func diff(_ a: [UInt16], _ b: [UInt16], costLimit: Int? = nil, cancellation: CancellationFlag? = nil)
+        -> [DiffSegment]
+    {
+        segments(
+            of: matching(
+                a.map { Int32($0) }, b.map { Int32($0) }, kinds: 1 << 16, costLimit: costLimit,
+                cancellation: cancellation),
+            counts: (a.count, b.count))
     }
 
     /// The sequence the segments turn `a` into; equal to `b` for a diff of `a` and `b`.
@@ -75,7 +83,9 @@ public enum Myers {
 
     /// For every element of `a` the position of its partner in `b`, or -1. The partners rise
     /// with the positions.
-    static func matching(_ a: [Int32], _ b: [Int32], kinds: Int, costLimit: Int?, cancellation: CancellationFlag?) -> [Int] {
+    static func matching(_ a: [Int32], _ b: [Int32], kinds: Int, costLimit: Int?, cancellation: CancellationFlag?)
+        -> [Int]
+    {
         var inA = [Bool](repeating: false, count: kinds)
         var inB = [Bool](repeating: false, count: kinds)
         for element in a { inA[Int(element)] = true }
@@ -110,8 +120,11 @@ public enum Myers {
                         bHigh -= 1
                     }
                     guard aLow < aHigh, bLow < bHigh,
-                          let split = middle(UnsafeBufferPointer(rebasing: first[aLow..<aHigh]),
-                                             UnsafeBufferPointer(rebasing: second[bLow..<bHigh]), limit: limit, tables: tables, reach: reach) else { continue }
+                        let split = middle(
+                            UnsafeBufferPointer(rebasing: first[aLow..<aHigh]),
+                            UnsafeBufferPointer(rebasing: second[bLow..<bHigh]), limit: limit, tables: tables,
+                            reach: reach)
+                    else { continue }
                     if !split.isExact {
                         // The search was cut off. Lines that both sides have exactly once are fixed points
                         // that a block moved or deleted far away cannot lead astray.
@@ -139,15 +152,18 @@ public enum Myers {
     /// end, found by walking from both corners until the walks meet. Nil when the sequences
     /// have nothing in common. With a `limit`, the walks stop after that many rounds and the
     /// point is the furthest either of them reached (`isExact` is false then).
-    private static func middle(_ a: UnsafeBufferPointer<Int32>, _ b: UnsafeBufferPointer<Int32>, limit: Int?,
-                               tables: UnsafeMutablePointer<Int>, reach: Int) -> (x: Int, y: Int, isExact: Bool)? {
+    private static func middle(
+        _ a: UnsafeBufferPointer<Int32>, _ b: UnsafeBufferPointer<Int32>, limit: Int?,
+        tables: UnsafeMutablePointer<Int>, reach: Int
+    ) -> (x: Int, y: Int, isExact: Bool)? {
         let (n, m) = (a.count, b.count)
         let rounds = min((n + m + 1) / 2, limit.map { $0 + 1 } ?? Int.max)
         let offset = rounds
         let length = 2 * rounds + 2
         // Furthest x reached on each diagonal, walking forward (v1) and backward (v2); the
         // part of the shared tables this split uses is cleared.
-        let v1 = tables, v2 = tables + (2 * reach + 2)
+        let v1 = tables
+        let v2 = tables + (2 * reach + 2)
         v1.update(repeating: -1, count: length)
         v2.update(repeating: -1, count: length)
         v1[offset + 1] = 0
@@ -210,14 +226,18 @@ public enum Myers {
                 while k <= d - k1End {
                     let x = v1[offset + k]
                     let y = x - k
-                    if x >= 0, x <= n, y >= 0, y <= m, x + y < n + m, x + y > (best?.progress ?? 0) { best = (x, y, x + y) }
+                    if x >= 0, x <= n, y >= 0, y <= m, x + y < n + m, x + y > (best?.progress ?? 0) {
+                        best = (x, y, x + y)
+                    }
                     k += 2
                 }
                 k = -d + k2Start
                 while k <= d - k2End {
                     let x = v2[offset + k]
                     let y = x - k
-                    if x >= 0, x <= n, y >= 0, y <= m, x + y < n + m, x + y > (best?.progress ?? 0) { best = (n - x, m - y, x + y) }
+                    if x >= 0, x <= n, y >= 0, y <= m, x + y < n + m, x + y > (best?.progress ?? 0) {
+                        best = (n - x, m - y, x + y)
+                    }
                     k += 2
                 }
                 if let best { return (best.x, best.y, false) }
@@ -242,9 +262,15 @@ public enum Myers {
 
     /// The longest run, rising on both sides, of the elements that occur exactly once in each of
     /// the two stretches: pairs of positions (patience diff). Empty when there are none.
-    private static func uniqueAnchors(_ a: UnsafeBufferPointer<Int32>, _ b: UnsafeBufferPointer<Int32>, _ aLow: Int, _ aHigh: Int, _ bLow: Int, _ bHigh: Int,
-                                      counts: inout AnchorCounts) -> [(a: Int, b: Int)] {
-        for i in aLow..<aHigh { let v = Int(a[i]); if counts.inA[v] < 2 { counts.inA[v] += 1 } }
+    private static func uniqueAnchors(
+        _ a: UnsafeBufferPointer<Int32>, _ b: UnsafeBufferPointer<Int32>, _ aLow: Int, _ aHigh: Int, _ bLow: Int,
+        _ bHigh: Int,
+        counts: inout AnchorCounts
+    ) -> [(a: Int, b: Int)] {
+        for i in aLow..<aHigh {
+            let v = Int(a[i])
+            if counts.inA[v] < 2 { counts.inA[v] += 1 }
+        }
         for j in bLow..<bHigh {
             let v = Int(b[j])
             if counts.inB[v] < 2 { counts.inB[v] += 1 }
@@ -264,10 +290,22 @@ public enum Myers {
                 if tails[middle] < j { low = middle + 1 } else { high = middle }
             }
             candidates.append((i, j, low > 0 ? tailIndex[low - 1] : -1))
-            if low == tails.count { tails.append(j); tailIndex.append(candidates.count - 1) } else { tails[low] = j; tailIndex[low] = candidates.count - 1 }
+            if low == tails.count {
+                tails.append(j)
+                tailIndex.append(candidates.count - 1)
+            } else {
+                tails[low] = j
+                tailIndex[low] = candidates.count - 1
+            }
         }
-        for i in aLow..<aHigh { let v = Int(a[i]); counts.inA[v] = 0 }
-        for j in bLow..<bHigh { let v = Int(b[j]); counts.inB[v] = 0 }
+        for i in aLow..<aHigh {
+            let v = Int(a[i])
+            counts.inA[v] = 0
+        }
+        for j in bLow..<bHigh {
+            let v = Int(b[j])
+            counts.inB[v] = 0
+        }
         guard var current = tailIndex.last else { return [] }
         var anchors: [(a: Int, b: Int)] = []
         while current >= 0 {
@@ -291,7 +329,9 @@ public enum Myers {
             let (differentA, differentB) = (i, j)
             while i < counts.a, match[i] == -1 { i += 1 }
             j = i < counts.a ? match[i] : counts.b
-            if i > differentA || j > differentB { result.append(DiffSegment(a: differentA..<i, b: differentB..<j, isEqual: false)) }
+            if i > differentA || j > differentB {
+                result.append(DiffSegment(a: differentA..<i, b: differentB..<j, isEqual: false))
+            }
         }
         return result
     }

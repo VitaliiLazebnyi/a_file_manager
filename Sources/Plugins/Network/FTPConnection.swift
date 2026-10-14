@@ -5,7 +5,8 @@ import Foundation
 public enum NameEncoding: Int, Codable, CaseIterable {
     /// UTF-8 when the server offers it or the names are valid UTF-8, else Western Latin 1.
     case automatic = 0
-    case utf8, windowsLatin1, isoLatin1, windowsLatin2, windowsCyrillic, koi8R, macRoman, dosLatinUS, shiftJIS, gb18030, big5, eucKR
+    case utf8, windowsLatin1, isoLatin1, windowsLatin2, windowsCyrillic, koi8R, macRoman, dosLatinUS, shiftJIS, gb18030,
+        big5, eucKR
 
     public var title: String {
         switch self {
@@ -72,7 +73,8 @@ public enum NameEncoding: Int, Codable, CaseIterable {
     func encode(_ text: String, names: NameMemory? = nil) throws -> Data {
         func bytes(_ piece: String, as encoding: String.Encoding) throws -> Data {
             guard let data = piece.data(using: encoding, allowLossyConversion: false) else {
-                throw FileSystemError.notSupported("Writing the name \(piece) in the encoding of this server (\(title))")
+                throw FileSystemError.notSupported(
+                    "Writing the name \(piece) in the encoding of this server (\(title))")
             }
             return data
         }
@@ -106,18 +108,21 @@ final class NameMemory {
     private static let capacity = 65536
 
     var isEmpty: Bool {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         return spellings.isEmpty
     }
 
     func encoding<Bytes: Sequence>(of name: Bytes) -> String.Encoding? where Bytes.Element == UInt8 {
         let key = Data(name)
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         return spellings[key]
     }
 
     func remember(_ name: String, encoding: String.Encoding) {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         if spellings.count >= NameMemory.capacity { spellings.removeAll() }
         spellings[Data(name.utf8)] = encoding
     }
@@ -149,9 +154,12 @@ public struct FTPServerConfig {
     /// (spec 11 › Listing: MLSD or LIST).
     public var usesMLSD: Bool?
 
-    public init(host: String, port: Int = 21, tls: TLSMode = .none, user: String = "anonymous", password: String = "",
-                passive: Bool = true, encoding: NameEncoding = .automatic, timeout: TimeInterval = 30, initCommands: [String] = [],
-                usesMLSD: Bool? = nil) {
+    public init(
+        host: String, port: Int = 21, tls: TLSMode = .none, user: String = "anonymous", password: String = "",
+        passive: Bool = true, encoding: NameEncoding = .automatic, timeout: TimeInterval = 30,
+        initCommands: [String] = [],
+        usesMLSD: Bool? = nil
+    ) {
         self.host = host
         self.port = port
         self.tls = tls
@@ -168,7 +176,9 @@ public struct FTPServerConfig {
     public static func initCommands(from text: String) -> [String] {
         let marker = "\u{1}"
         return text.replacingOccurrences(of: ";;", with: marker).split(separator: ";")
-            .map { $0.replacingOccurrences(of: marker, with: ";").trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+            .map { $0.replacingOccurrences(of: marker, with: ";").trimmingCharacters(in: .whitespaces) }.filter {
+                !$0.isEmpty
+            }
     }
 }
 
@@ -181,19 +191,22 @@ final class LinkMemory {
     private static let capacity = 2048
 
     func isDirectory(_ path: String) -> Bool? {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         return kinds[path]
     }
 
     func remember(_ path: String, isDirectory: Bool) {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         if kinds.count >= LinkMemory.capacity { kinds.removeAll() }
         kinds[path] = isDirectory
     }
 
     /// After anything changed on the server that may have changed where a link leads.
     func forgetAll() {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         kinds.removeAll()
     }
 }
@@ -296,7 +309,9 @@ final class FTPConnection {
             let reply = try readReply(cancellation: cancellation)
             if reply.code != 120 { hello = reply }
         }
-        guard let hello, hello.code == 220 else { throw NetworkError.refused(hello ?? FTPReply(code: 421, lines: ["No greeting"])) }
+        guard let hello, hello.code == 220 else {
+            throw NetworkError.refused(hello ?? FTPReply(code: 421, lines: ["No greeting"]))
+        }
         greeting = hello.text
 
         if config.tls != .none {
@@ -305,8 +320,9 @@ final class FTPConnection {
             // shown as secure, so a server that refuses it is not used.
             let protection = try send("PROT P", cancellation: cancellation)
             guard protection.isSuccess else {
-                throw NetworkError.unexpected("The server refused to encrypt its data connections (PROT P: \(protection.message)). "
-                                              + "The files would travel unprotected, so the connection was not used.")
+                throw NetworkError.unexpected(
+                    "The server refused to encrypt its data connections (PROT P: \(protection.message)). "
+                        + "The files would travel unprotected, so the connection was not used.")
             }
             protectsData = true
         }
@@ -314,7 +330,9 @@ final class FTPConnection {
         if reply.code == 331 {
             reply = try send("PASS \(config.password)", shown: "PASS ***", cancellation: cancellation)
         }
-        if reply.code == 332 { throw NetworkError.loginFailed("The server asks for an account (ACCT), which is not supported.") }
+        if reply.code == 332 {
+            throw NetworkError.loginFailed("The server asks for an account (ACCT), which is not supported.")
+        }
         guard reply.isSuccess else {
             if reply.code == 421 { throw NetworkError.refused(reply) }
             throw NetworkError.loginFailed(reply.message)
@@ -333,7 +351,9 @@ final class FTPConnection {
             _ = try send(command, cancellation: cancellation)
         }
         let pwd = try send("PWD", cancellation: cancellation)
-        if pwd.isSuccess, let path = FTPSyntax.quotedPath(pwd.text), path.hasPrefix("/") { home = RemotePath.normalized(path) }
+        if pwd.isSuccess, let path = FTPSyntax.quotedPath(pwd.text), path.hasPrefix("/") {
+            home = RemotePath.normalized(path)
+        }
         workingDirectory = home
     }
 
@@ -388,7 +408,9 @@ final class FTPConnection {
                     onActivity?()
                     return reply
                 }
-                if read > FTPLimits.replyLinesRead { throw NetworkError.unexpected("a reply of more than \(FTPLimits.replyLinesRead) lines") }
+                if read > FTPLimits.replyLinesRead {
+                    throw NetworkError.unexpected("a reply of more than \(FTPLimits.replyLinesRead) lines")
+                }
             }
         } catch {
             // A reply that did not arrive would be taken for the answer to the next command.
@@ -399,7 +421,10 @@ final class FTPConnection {
 
     /// Sends one command and returns the server's answer, whatever it is.
     @discardableResult
-    func send(_ command: String, shown: String? = nil, replyWithin: TimeInterval? = nil, cancellation: CancellationFlag? = nil) throws -> FTPReply {
+    func send(
+        _ command: String, shown: String? = nil, replyWithin: TimeInterval? = nil,
+        cancellation: CancellationFlag? = nil
+    ) throws -> FTPReply {
         let control = try stream()
         // A line end inside a name would be the start of another command.
         guard !command.unicodeScalars.contains(where: { $0 == "\r" || $0 == "\n" || $0 == "\0" }) else {
@@ -409,7 +434,9 @@ final class FTPConnection {
         lastUsed = Date()
         commandMayHaveRun = false
         do {
-            try control.write(try encoding.encode(command, names: knownNames) + Data("\r\n".utf8), timeout: config.timeout, cancellation: cancellation)
+            try control.write(
+                try encoding.encode(command, names: knownNames) + Data("\r\n".utf8), timeout: config.timeout,
+                cancellation: cancellation)
         } catch let error as FileSystemError {
             // Nothing was sent; the connection is as good as before.
             throw error
@@ -462,7 +489,9 @@ final class FTPConnection {
     func removeDirectory(_ path: String, cancellation: CancellationFlag? = nil) throws {
         knownLinks.forgetAll()
         // Some servers refuse to remove the directory they stand in.
-        if let current = workingDirectory, current == path || current.hasPrefix(path + "/") { try? changeDirectory("/", cancellation: cancellation) }
+        if let current = workingDirectory, current == path || current.hasPrefix(path + "/") {
+            try? changeDirectory("/", cancellation: cancellation)
+        }
         try perform("RMD \(path)", cancellation: cancellation)
     }
     func deleteFile(_ path: String, cancellation: CancellationFlag? = nil) throws {
@@ -520,14 +549,19 @@ final class FTPConnection {
         // Encrypted data connections cannot be accepted, so TLS always goes the passive way.
         guard config.passive || protectsData else {
             // Only the machine the control connection reached may open the data connection.
-            guard let peer = control.remoteAddress else { throw NetworkError.connectionFailed("The address of the server is unknown.") }
-            guard let address = control.localAddress else { throw NetworkError.connectionFailed("The local address is unknown.") }
+            guard let peer = control.remoteAddress else {
+                throw NetworkError.connectionFailed("The address of the server is unknown.")
+            }
+            guard let address = control.localAddress else {
+                throw NetworkError.connectionFailed("The local address is unknown.")
+            }
             let listener = try DataListener(peer: peer, local: address)
             let port = try listener.start(timeout: config.timeout)
             if let argument = FTPSyntax.portArgument(host: address, port: port) {
                 try perform("PORT \(argument)", cancellation: cancellation)
             } else {
-                try perform("EPRT \(FTPSyntax.extendedPortArgument(host: address, port: port))", cancellation: cancellation)
+                try perform(
+                    "EPRT \(FTPSyntax.extendedPortArgument(host: address, port: port))", cancellation: cancellation)
             }
             return (nil, listener)
         }
@@ -539,7 +573,9 @@ final class FTPConnection {
         }
         if port == nil {
             let reply = try send("PASV", cancellation: cancellation)
-            guard reply.code == 227, let endpoint = FTPSyntax.passiveEndpoint(reply.text) else { throw NetworkError.refused(reply) }
+            guard reply.code == 227, let endpoint = FTPSyntax.passiveEndpoint(reply.text) else {
+                throw NetworkError.refused(reply)
+            }
             // The address in the reply is often a private one behind a router; the data
             // connection goes to the host the control connection reached.
             port = endpoint.port
@@ -554,8 +590,10 @@ final class FTPConnection {
 
     /// Starts a transfer: `RETR`, `STOR`, `LIST` and the like. The returned stream carries the
     /// data; `finishTransfer` or `abortTransfer` must follow.
-    func beginTransfer(_ command: String, type: Character, restartAt offset: UInt64 = 0,
-                       cancellation: CancellationFlag? = nil) throws -> NetStream {
+    func beginTransfer(
+        _ command: String, type: Character, restartAt offset: UInt64 = 0,
+        cancellation: CancellationFlag? = nil
+    ) throws -> NetStream {
         guard data == nil else { throw NetworkError.unexpected("A transfer is still running on this connection.") }
         try setType(type, cancellation: cancellation)
         let (stream, listener) = try openData(cancellation: cancellation)
@@ -581,8 +619,10 @@ final class FTPConnection {
                 channel?.close()
                 listener?.cancel()
                 // A server that wants the control connection's TLS session reused says so here.
-                if cancellation?.isCancelled != true, let said = try? readReply(timeout: min(config.timeout, 5), cancellation: cancellation),
-                   !said.isPreliminary {
+                if cancellation?.isCancelled != true,
+                    let said = try? readReply(timeout: min(config.timeout, 5), cancellation: cancellation),
+                    !said.isPreliminary
+                {
                     throw refusal(said, otherwise: error)
                 }
                 isBroken = true
@@ -598,7 +638,9 @@ final class FTPConnection {
     /// The error for a reply that refused a command; a server that insists on TLS session reuse
     /// on the data connections gets its own, so the user is told what is wrong.
     private func refusal(_ reply: FTPReply, otherwise: Error? = nil) -> Error {
-        if protectsData, FTPConnection.requiresSessionReuse(reply) { return NetworkError.sessionReuseRequired(reply.message) }
+        if protectsData, FTPConnection.requiresSessionReuse(reply) {
+            return NetworkError.sessionReuseRequired(reply.message)
+        }
         return otherwise ?? NetworkError.refused(reply)
     }
 
@@ -608,7 +650,9 @@ final class FTPConnection {
         guard [421, 425, 426, 450, 522, 522, 550].contains(reply.code) else { return false }
         let text = reply.text.lowercased()
         let mentionsSession = text.contains("session") || text.contains("reuse") || text.contains("re-use")
-        let says = text.contains("reuse") || text.contains("re-use") || text.contains("resum") || text.contains("cached") || text.contains("same")
+        let says =
+            text.contains("reuse") || text.contains("re-use") || text.contains("resum") || text.contains("cached")
+            || text.contains("same")
         return mentionsSession && says
     }
 
@@ -663,7 +707,10 @@ final class FTPConnection {
         var extra = 0
         while control.hasInput(within: 0.05) {
             extra += 1
-            if extra > 3 || (try? readReply(timeout: 2, cancellation: nil)) == nil { isBroken = true; return }
+            if extra > 3 || (try? readReply(timeout: 2, cancellation: nil)) == nil {
+                isBroken = true
+                return
+            }
         }
         lastUsed = Date()
     }
@@ -673,7 +720,9 @@ final class FTPConnection {
     /// Reads a directory: with MLSD where the server offers it, else with LIST (`-la` when
     /// hidden files are wanted). `receive` gets the entries piece by piece and returns false
     /// to stop.
-    func list(_ path: String, showHidden: Bool, cancellation: CancellationFlag? = nil, receive: ([RemoteEntry]) -> Bool) throws {
+    func list(
+        _ path: String, showHidden: Bool, cancellation: CancellationFlag? = nil, receive: ([RemoteEntry]) -> Bool
+    ) throws {
         let path = RemotePath.normalized(path)
         unresolvedLinks = []
         var asMLSD = config.usesMLSD ?? offersMLSD
@@ -681,7 +730,9 @@ final class FTPConnection {
         if asMLSD {
             do {
                 channel = try beginTransfer("MLSD \(path)", type: "I", cancellation: cancellation)
-            } catch NetworkError.refused(let reply) where config.usesMLSD == nil && [500, 502, 504].contains(reply.code) {
+            } catch NetworkError.refused(let reply)
+                where config.usesMLSD == nil && [500, 502, 504].contains(reply.code)
+            {
                 // Announced but not there: LIST from now on.
                 features["MLSD"] = nil
                 features["MLST"] = nil
@@ -723,11 +774,16 @@ final class FTPConnection {
             if !plain.isEmpty { wanted = receive(plain) }
         }
         do {
-            while wanted, let block = try channel.read(upToCount: 256 * 1024, timeout: config.timeout, cancellation: cancellation) {
+            while wanted,
+                let block = try channel.read(
+                    upToCount: 256 * 1024, timeout: config.timeout, cancellation: cancellation)
+            {
                 onActivity?()
                 bytesSoFar += Int64(block.count)
                 guard bytesSoFar <= FTPLimits.listingBytes, entriesSoFar <= FTPLimits.listingEntries else {
-                    throw NetworkError.unexpected("a directory listing of more than \(FTPLimits.listingEntries) entries or \(FTPLimits.listingBytes >> 20) MB")
+                    throw NetworkError.unexpected(
+                        "a directory listing of more than \(FTPLimits.listingEntries) entries or \(FTPLimits.listingBytes >> 20) MB"
+                    )
                 }
                 deliver(splitter.feed(block))
             }
@@ -737,7 +793,11 @@ final class FTPConnection {
         }
         guard wanted else { return cancellation?.isCancelled == true ? abandonTransfer() : abortTransfer() }
         if let rest = splitter.finish() { deliver([rest]) }
-        if splitter.dropped > 0 { log?("\(splitter.dropped) lines of the listing were longer than \(FTPLimits.lineLength) bytes and were left out.") }
+        if splitter.dropped > 0 {
+            log?(
+                "\(splitter.dropped) lines of the listing were longer than \(FTPLimits.lineLength) bytes and were left out."
+            )
+        }
         try finishTransfer(cancellation: cancellation)
         guard wanted, !links.isEmpty, cancellation?.isCancelled != true else { return }
         _ = receive(resolveLinks(links, in: path, cancellation: cancellation))
@@ -747,7 +807,8 @@ final class FTPConnection {
     /// what the target's spelling or an earlier question settles is not asked, MLST is used where
     /// the server has it (it does not move the working directory), and a long list of links
     /// is only asked through for a short while.
-    private func resolveLinks(_ links: [RemoteEntry], in path: String, cancellation: CancellationFlag?) -> [RemoteEntry] {
+    private func resolveLinks(_ links: [RemoteEntry], in path: String, cancellation: CancellationFlag?) -> [RemoteEntry]
+    {
         let deadline = Date().addingTimeInterval(FTPConnection.linkBudget)
         var asked = 0
         return links.map { link in
@@ -757,7 +818,9 @@ final class FTPConnection {
                 link.isDirectory = known
             } else if link.linkTarget?.hasSuffix("/") == true {
                 link.isDirectory = true
-            } else if asked < FTPConnection.resolvedLinks, Date() < deadline, isUsable, cancellation?.isCancelled != true {
+            } else if asked < FTPConnection.resolvedLinks, Date() < deadline, isUsable,
+                cancellation?.isCancelled != true
+            {
                 asked += 1
                 if let isDirectory = probeLink(full, cancellation: cancellation) {
                     link.isDirectory = isDirectory

@@ -2,7 +2,11 @@ import Foundation
 
 /// Sort keys of the Show menu; raw values match `sortorder=` in the spec (03 › Sort keys).
 public enum SortKey: Int {
-    case name = 0, ext = 1, size = 2, date = 3, unsorted = 4
+    case name = 0
+    case ext = 1
+    case size = 2
+    case date = 3
+    case unsorted = 4
 
     /// Time and Size start descending (newest / largest first), the others ascending.
     public var startsDescending: Bool { self == .date || self == .size }
@@ -19,8 +23,9 @@ public struct ListOrder: Equatable {
 
     /// A header click: the same column reverses, another column starts in its own direction.
     public func clicked(_ key: SortKey) -> ListOrder {
-        key == self.key ? ListOrder(key: key, descending: !descending)
-                        : ListOrder(key: key, descending: key.startsDescending)
+        key == self.key
+            ? ListOrder(key: key, descending: !descending)
+            : ListOrder(key: key, descending: key.startsDescending)
     }
 }
 
@@ -106,7 +111,9 @@ public enum Sorter {
 
         public static func < (a: NameKey, b: NameKey) -> Bool {
             if ExactName.areSame(a.name, b.name) { return false }
-            var result = a.key.withUnsafeBufferPointer { first in b.key.withUnsafeBufferPointer { SortKeys.bytewise(first, $0) } }
+            var result = a.key.withUnsafeBufferPointer { first in
+                b.key.withUnsafeBufferPointer { SortKeys.bytewise(first, $0) }
+            }
             if result == 0 { result = SortKeys.bytewise(a.name, b.name) }
             return result < 0
         }
@@ -114,14 +121,18 @@ public enum Sorter {
 
     /// `items` by their names, in the order of `compare(_:_:numeric:)`; items of the same
     /// name stay in the order they came. The key of each name is made once. Any thread.
-    public static func sorted<Element>(_ items: [Element], numeric: Bool = false, byName name: (Element) -> String) -> [Element] {
+    public static func sorted<Element>(_ items: [Element], numeric: Bool = false, byName name: (Element) -> String)
+        -> [Element]
+    {
         guard items.count > 1 else { return items }
         let collator: NameCollator = numeric ? .currentNumeric : .current
         let names = items.map(name)
         let keys = names.map { name in collator.withKey(of: name) { Array($0) } }
         var order = Array(items.indices)
         order.sort { first, second in
-            var result = keys[first].withUnsafeBufferPointer { a in keys[second].withUnsafeBufferPointer { SortKeys.bytewise(a, $0) } }
+            var result = keys[first].withUnsafeBufferPointer { a in
+                keys[second].withUnsafeBufferPointer { SortKeys.bytewise(a, $0) }
+            }
             if result == 0 { result = SortKeys.bytewise(names[first], names[second]) }
             return result != 0 ? result < 0 : first < second
         }
@@ -141,7 +152,8 @@ public enum Sorter {
     /// The comparison that defines the order, for two items without records: negative when
     /// `a` belongs before `b`, zero when neither has to come first (two files in the order
     /// they came, or two items of the same name, byte for byte).
-    fileprivate static func exactOrder(_ a: FileItem, _ b: FileItem, by order: ListOrder, collator: NameCollator) -> Int {
+    fileprivate static func exactOrder(_ a: FileItem, _ b: FileItem, by order: ListOrder, collator: NameCollator) -> Int
+    {
         if a.isFolder != b.isFolder { return a.isFolder ? -1 : 1 }
         if !a.isFolder {
             if order.key == .unsorted { return 0 }
@@ -225,9 +237,15 @@ public enum Sorter {
             // follow in the chosen order. Both groups start in the order the items came in.
             var folderCount = 0
             var indexes = [UInt32](unsafeUninitializedCapacity: records.count) { buffer, count in
-                for index in 0..<records.count where records[index].isFolder { buffer[folderCount] = UInt32(index); folderCount += 1 }
+                for index in 0..<records.count where records[index].isFolder {
+                    buffer[folderCount] = UInt32(index)
+                    folderCount += 1
+                }
                 var next = folderCount
-                for index in 0..<records.count where !records[index].isFolder { buffer[next] = UInt32(index); next += 1 }
+                for index in 0..<records.count where !records[index].isFolder {
+                    buffer[next] = UInt32(index)
+                    next += 1
+                }
                 count = records.count
             }
             items.withUnsafeBufferPointer { items in
@@ -236,12 +254,16 @@ public enum Sorter {
                 func isBefore(_ a: UInt32, _ b: UInt32) -> Bool {
                     var result = SortKeys.quick(records[Int(a)], records[Int(b)], order)
                     // A name too long for a record: the same comparison, worked out for the pair.
-                    if result == SortKeys.unknown { result = exactOrder(items[Int(a)], items[Int(b)], by: order, collator: keys.collator) }
+                    if result == SortKeys.unknown {
+                        result = exactOrder(items[Int(a)], items[Int(b)], by: order, collator: keys.collator)
+                    }
                     return result < 0 || (result == 0 && a < b)
                 }
                 indexes.withUnsafeMutableBufferPointer { indexes in
                     sort(UnsafeMutableBufferPointer(rebasing: indexes[..<folderCount]), by: isBefore)
-                    if order.key != .unsorted { sort(UnsafeMutableBufferPointer(rebasing: indexes[folderCount...]), by: isBefore) }
+                    if order.key != .unsorted {
+                        sort(UnsafeMutableBufferPointer(rebasing: indexes[folderCount...]), by: isBefore)
+                    }
                 }
             }
             return indexes
@@ -265,10 +287,16 @@ public enum Sorter {
         for bucket in 1..<bucketCount { splitters[bucket - 1] = sample[bucket * oversampling] }
 
         let pieceCount = cores * 4
-        let pieces = (0..<pieceCount).map { ($0 * indexes.count / pieceCount)..<(($0 + 1) * indexes.count / pieceCount) }
+        let pieces = (0..<pieceCount).map {
+            ($0 * indexes.count / pieceCount)..<(($0 + 1) * indexes.count / pieceCount)
+        }
         let bucketOf = UnsafeMutablePointer<UInt8>.allocate(capacity: indexes.count)
         let copy = UnsafeMutablePointer<UInt32>.allocate(capacity: indexes.count)
-        defer { bucketOf.deallocate(); copy.deallocate(); splitters.deallocate() }
+        defer {
+            bucketOf.deallocate()
+            copy.deallocate()
+            splitters.deallocate()
+        }
         copy.initialize(from: indexes.baseAddress!, count: indexes.count)
         let counts = Parallel.map(pieces) { piece -> [Int] in
             var counts = [Int](repeating: 0, count: bucketCount)
@@ -319,7 +347,9 @@ public enum Sorter {
             let target = buffer.baseAddress!
             items.withUnsafeBufferPointer { items in
                 let pieceCount = ProcessInfo.processInfo.activeProcessorCount * 4
-                let pieces = (0..<pieceCount).map { ($0 * indexes.count / pieceCount)..<(($0 + 1) * indexes.count / pieceCount) }
+                let pieces = (0..<pieceCount).map {
+                    ($0 * indexes.count / pieceCount)..<(($0 + 1) * indexes.count / pieceCount)
+                }
                 _ = Parallel.map(pieces) { piece in
                     for position in piece { (target + position).initialize(to: items[Int(indexes[position])]) }
                 }
@@ -331,19 +361,30 @@ public enum Sorter {
     // MARK: Merging
 
     /// Both lists are sorted; their keys speak for their items.
-    fileprivate static func merge(_ list: [FileItem], _ listKeys: SortKeys, with batch: [FileItem], _ batchKeys: SortKeys)
-        -> (items: [FileItem], keys: SortKeys) {
+    fileprivate static func merge(
+        _ list: [FileItem], _ listKeys: SortKeys, with batch: [FileItem], _ batchKeys: SortKeys
+    )
+        -> (items: [FileItem], keys: SortKeys)
+    {
         guard !batch.isEmpty else { return (list, listKeys) }
         guard !list.isEmpty else { return (batch, batchKeys) }
         let order = listKeys.order
         // Which list each place of the result is filled from.
-        var fromBatch = [Bool]()
+        var fromBatch: [Bool] = []
         fromBatch.reserveCapacity(list.count + batch.count)
         var (i, j) = (0, 0)
         while i < list.count, j < batch.count {
             var result = SortKeys.quick(batchKeys.records[j], listKeys.records[i], order)
-            if result == SortKeys.unknown { result = exactOrder(batch[j], list[i], by: order, collator: listKeys.collator) }
-            if result < 0 { fromBatch.append(true); j += 1 } else { fromBatch.append(false); i += 1 }
+            if result == SortKeys.unknown {
+                result = exactOrder(batch[j], list[i], by: order, collator: listKeys.collator)
+            }
+            if result < 0 {
+                fromBatch.append(true)
+                j += 1
+            } else {
+                fromBatch.append(false)
+                i += 1
+            }
         }
         fromBatch.append(contentsOf: repeatElement(false, count: list.count - i))
         fromBatch.append(contentsOf: repeatElement(true, count: batch.count - j))
@@ -352,7 +393,13 @@ public enum Sorter {
         merged.reserveCapacity(fromBatch.count)
         (i, j) = (0, 0)
         for isBatch in fromBatch {
-            if isBatch { merged.append(batch[j]); j += 1 } else { merged.append(list[i]); i += 1 }
+            if isBatch {
+                merged.append(batch[j])
+                j += 1
+            } else {
+                merged.append(list[i])
+                i += 1
+            }
         }
         return (merged, SortKeys(merging: listKeys, batchKeys, fromSecond: fromBatch))
     }
@@ -378,7 +425,8 @@ public struct SortedFileList {
         guard !batch.isEmpty else { return }
         let batchKeys = SortKeys(batch, order: order)
         let indexes = Sorter.sortedIndexes(of: batch, keys: batchKeys)
-        (items, keys) = Sorter.merge(items, keys, with: Sorter.permute(batch, by: indexes), batchKeys.permuted(by: indexes))
+        (items, keys) = Sorter.merge(
+            items, keys, with: Sorter.permute(batch, by: indexes), batchKeys.permuted(by: indexes))
     }
 }
 
@@ -453,7 +501,9 @@ struct SortKeys {
         records = [Record](unsafeUninitializedCapacity: items.count) { buffer, count in
             let records = buffer.baseAddress!
             blocks = items.withUnsafeBufferPointer { items in
-                Parallel.map(pieces) { piece in SortKeys.build(items, piece, into: records, order: order, collator: collator) }
+                Parallel.map(pieces) { piece in
+                    SortKeys.build(items, piece, into: records, order: order, collator: collator)
+                }
             }
             count = items.count
         }
@@ -475,7 +525,13 @@ struct SortKeys {
         records.reserveCapacity(fromSecond.count)
         var (i, j) = (0, 0)
         for isSecond in fromSecond {
-            if isSecond { records.append(second.records[j]); j += 1 } else { records.append(first.records[i]); i += 1 }
+            if isSecond {
+                records.append(second.records[j])
+                j += 1
+            } else {
+                records.append(first.records[i])
+                i += 1
+            }
         }
         self.init(order: first.order, collator: first.collator, records: records, blocks: first.blocks + second.blocks)
     }
@@ -492,23 +548,30 @@ struct SortKeys {
     }
 
     private static func names(_ x: Record, _ y: Record) -> Int {
-        guard (x.flags | y.flags) & Record.keyless == 0, let xBytes = x.bytes, let yBytes = y.bytes else { return unknown }
+        guard (x.flags | y.flags) & Record.keyless == 0, let xBytes = x.bytes, let yBytes = y.bytes else {
+            return unknown
+        }
         let result = part(xBytes, Int(x.firstKey), Int(x.first), yBytes, Int(y.firstKey), Int(y.first))
         if result != 0 { return result }
-        return part(xBytes + Int(x.firstKey) + Int(x.first), Int(x.secondKey), Int(x.second),
-                    yBytes + Int(y.firstKey) + Int(y.first), Int(y.secondKey), Int(y.second))
+        return part(
+            xBytes + Int(x.firstKey) + Int(x.first), Int(x.secondKey), Int(x.second),
+            yBytes + Int(y.firstKey) + Int(y.first), Int(y.secondKey), Int(y.second))
     }
 
     /// One part of two names: by collation key, and by the part's own bytes if those are equal.
     @inline(__always)
-    private static func part(_ x: UnsafePointer<UInt8>, _ xKey: Int, _ xText: Int,
-                             _ y: UnsafePointer<UInt8>, _ yKey: Int, _ yText: Int) -> Int {
+    private static func part(
+        _ x: UnsafePointer<UInt8>, _ xKey: Int, _ xText: Int,
+        _ y: UnsafePointer<UInt8>, _ yKey: Int, _ yText: Int
+    ) -> Int {
         let keys = bytewise(x, xKey, y, yKey)
         return keys != 0 ? keys : bytewise(x + xKey, xText, y + yKey, yText)
     }
 
     @inline(__always)
-    private static func bytewise(_ x: UnsafePointer<UInt8>, _ xCount: Int, _ y: UnsafePointer<UInt8>, _ yCount: Int) -> Int {
+    private static func bytewise(_ x: UnsafePointer<UInt8>, _ xCount: Int, _ y: UnsafePointer<UInt8>, _ yCount: Int)
+        -> Int
+    {
         let common = memcmp(x, y, min(xCount, yCount))
         if common != 0 { return common < 0 ? -1 : 1 }
         return xCount == yCount ? 0 : (xCount < yCount ? -1 : 1)
@@ -516,7 +579,9 @@ struct SortKeys {
 
     /// Two runs of bytes in the order of their bytes; the shorter of two that start alike first.
     static func bytewise(_ x: UnsafeBufferPointer<UInt8>, _ y: UnsafeBufferPointer<UInt8>) -> Int {
-        guard let first = x.baseAddress, let second = y.baseAddress else { return x.count == y.count ? 0 : (x.count < y.count ? -1 : 1) }
+        guard let first = x.baseAddress, let second = y.baseAddress else {
+            return x.count == y.count ? 0 : (x.count < y.count ? -1 : 1)
+        }
         return bytewise(first, x.count, second, y.count)
     }
 
@@ -529,8 +594,10 @@ struct SortKeys {
     // MARK: Making keys
 
     /// Makes the records of a run of items and returns the memory they point into.
-    private static func build(_ items: UnsafeBufferPointer<FileItem>, _ piece: Range<Int>, into records: UnsafeMutablePointer<Record>,
-                              order: ListOrder, collator: NameCollator) -> Block {
+    private static func build(
+        _ items: UnsafeBufferPointer<FileItem>, _ piece: Range<Int>, into records: UnsafeMutablePointer<Record>,
+        order: ListOrder, collator: NameCollator
+    ) -> Block {
         var capacity = max(256, piece.count * 48)
         var bytes = malloc(capacity)!.assumingMemoryBound(to: UInt8.self)
         var used = 0
@@ -579,48 +646,60 @@ struct SortKeys {
             var name = item.name
             name.makeContiguousUTF8()
             let start = used
-            let made: Bool = name.utf8.withContiguousStorageIfAvailable { text -> Bool in
-                guard text.count <= limit / 4 else { return false }
-                let isPlain = text.allSatisfy { $0 >= 0x20 && $0 < 0x7F }
-                // Where the name is cut, as `FileItem.split` cuts it.
-                var baseCount = text.count
-                if !isFolder {
-                    if let cut = FileItem.splitPoint(text) { baseCount = cut == FileItem.noExtension ? text.count : cut } else { baseCount = FileItem.split(name).base.utf8.count }
-                }
-                let hasExtension = baseCount < text.count
-                // The parts as ranges of the name's bytes.
-                let first: Range<Int>, second: Range<Int>
-                if isFolder {
-                    (first, second) = (0..<text.count, 0..<0)
-                } else if order.key == .ext {
-                    (first, second) = (hasExtension ? (baseCount + 1)..<text.count : 0..<0, 0..<baseCount)
-                } else {
-                    (first, second) = (0..<baseCount, baseCount..<text.count)
-                }
-                // The collator wants UTF-16; a part's place in it is found by counting.
-                units.removeAll(keepingCapacity: true)
-                if isPlain { units.append(contentsOf: text.lazy.map(UInt16.init)) } else { units.append(contentsOf: name.utf16) }
-                func unitRange(_ range: Range<Int>) -> Range<Int> {
-                    if isPlain { return range }
-                    let lower = unitCount(text, 0..<range.lowerBound)
-                    return lower..<(lower + unitCount(text, range))
-                }
-                return units.withUnsafeBufferPointer { units -> Bool in
-                    reserve(text.count * 2 + 64)
-                    let (firstUnits, secondUnits) = (unitRange(first), unitRange(second))
-                    guard let firstKey = appendKey(units.baseAddress! + firstUnits.lowerBound, firstUnits.count) else { return false }
-                    reserve(text.count * 2 + 64)
-                    (bytes + used).update(from: text.baseAddress! + first.lowerBound, count: first.count)
-                    used += first.count
-                    guard let secondKey = appendKey(units.baseAddress! + secondUnits.lowerBound, secondUnits.count) else { return false }
-                    reserve(text.count)
-                    (bytes + used).update(from: text.baseAddress! + second.lowerBound, count: second.count)
-                    used += second.count
-                    (record.firstKey, record.first) = (UInt16(firstKey), UInt16(first.count))
-                    (record.secondKey, record.second) = (UInt16(secondKey), UInt16(second.count))
-                    return true
-                }
-            } ?? false
+            let made: Bool =
+                name.utf8.withContiguousStorageIfAvailable { text -> Bool in
+                    guard text.count <= limit / 4 else { return false }
+                    let isPlain = text.allSatisfy { $0 >= 0x20 && $0 < 0x7F }
+                    // Where the name is cut, as `FileItem.split` cuts it.
+                    var baseCount = text.count
+                    if !isFolder {
+                        if let cut = FileItem.splitPoint(text) {
+                            baseCount = cut == FileItem.noExtension ? text.count : cut
+                        } else {
+                            baseCount = FileItem.split(name).base.utf8.count
+                        }
+                    }
+                    let hasExtension = baseCount < text.count
+                    // The parts as ranges of the name's bytes.
+                    let first: Range<Int>
+                    let second: Range<Int>
+                    if isFolder {
+                        (first, second) = (0..<text.count, 0..<0)
+                    } else if order.key == .ext {
+                        (first, second) = (hasExtension ? (baseCount + 1)..<text.count : 0..<0, 0..<baseCount)
+                    } else {
+                        (first, second) = (0..<baseCount, baseCount..<text.count)
+                    }
+                    // The collator wants UTF-16; a part's place in it is found by counting.
+                    units.removeAll(keepingCapacity: true)
+                    if isPlain {
+                        units.append(contentsOf: text.lazy.map(UInt16.init))
+                    } else {
+                        units.append(contentsOf: name.utf16)
+                    }
+                    func unitRange(_ range: Range<Int>) -> Range<Int> {
+                        if isPlain { return range }
+                        let lower = unitCount(text, 0..<range.lowerBound)
+                        return lower..<(lower + unitCount(text, range))
+                    }
+                    return units.withUnsafeBufferPointer { units -> Bool in
+                        reserve(text.count * 2 + 64)
+                        let (firstUnits, secondUnits) = (unitRange(first), unitRange(second))
+                        guard let firstKey = appendKey(units.baseAddress! + firstUnits.lowerBound, firstUnits.count)
+                        else { return false }
+                        reserve(text.count * 2 + 64)
+                        (bytes + used).update(from: text.baseAddress! + first.lowerBound, count: first.count)
+                        used += first.count
+                        guard let secondKey = appendKey(units.baseAddress! + secondUnits.lowerBound, secondUnits.count)
+                        else { return false }
+                        reserve(text.count)
+                        (bytes + used).update(from: text.baseAddress! + second.lowerBound, count: second.count)
+                        used += second.count
+                        (record.firstKey, record.first) = (UInt16(firstKey), UInt16(first.count))
+                        (record.secondKey, record.second) = (UInt16(secondKey), UInt16(second.count))
+                        return true
+                    }
+                } ?? false
             if !made {
                 used = start
                 record.flags |= Record.keyless
@@ -639,7 +718,8 @@ struct SortKeys {
 /// collator be missing, names are ordered by their lowercase forms: still an order in the
 /// strict sense, only not the language's.
 final class NameCollator {
-    typealias SortKey = @convention(c) (OpaquePointer, UnsafePointer<UInt16>?, Int32, UnsafeMutablePointer<UInt8>?, Int32) -> Int32
+    typealias SortKey =
+        @convention(c) (OpaquePointer, UnsafePointer<UInt16>?, Int32, UnsafeMutablePointer<UInt8>?, Int32) -> Int32
     private typealias Open = @convention(c) (UnsafePointer<CChar>, UnsafeMutablePointer<Int32>) -> OpaquePointer?
     private typealias SetAttribute = @convention(c) (OpaquePointer, Int32, Int32, UnsafeMutablePointer<Int32>) -> Void
 
@@ -649,8 +729,12 @@ final class NameCollator {
 
     private static let library: (open: Open, setAttribute: SetAttribute, sortKey: SortKey)? = {
         guard let handle = dlopen("/usr/lib/libicucore.A.dylib", RTLD_LAZY), let open = dlsym(handle, "ucol_open"),
-              let setAttribute = dlsym(handle, "ucol_setAttribute"), let sortKey = dlsym(handle, "ucol_getSortKey") else { return nil }
-        return (unsafeBitCast(open, to: Open.self), unsafeBitCast(setAttribute, to: SetAttribute.self), unsafeBitCast(sortKey, to: SortKey.self))
+            let setAttribute = dlsym(handle, "ucol_setAttribute"), let sortKey = dlsym(handle, "ucol_getSortKey")
+        else { return nil }
+        return (
+            unsafeBitCast(open, to: Open.self), unsafeBitCast(setAttribute, to: SetAttribute.self),
+            unsafeBitCast(sortKey, to: SortKey.self)
+        )
     }()
 
     private static let lock = NSLock()
@@ -718,13 +802,18 @@ final class NameCollator {
     /// Writes the key of a text given in UTF-16 into `buffer` and returns the key's length. A
     /// length above `capacity` means the key did not fit and nothing usable was written; the
     /// caller comes again with more room.
-    func writeKey(of text: UnsafePointer<UInt16>, _ count: Int, into buffer: UnsafeMutablePointer<UInt8>, capacity: Int) -> Int {
+    func writeKey(
+        of text: UnsafePointer<UInt16>, _ count: Int, into buffer: UnsafeMutablePointer<UInt8>, capacity: Int
+    ) -> Int {
         if let (handle, sortKey) = collator {
             return Int(sortKey(handle, text, Int32(clamping: count), buffer, Int32(min(capacity, Int(Int32.max)))))
         }
         // Without the system's collator: the lowercase form, which at least ignores case.
-        let lowercase = Array(String(decoding: UnsafeBufferPointer(start: text, count: count), as: UTF16.self).lowercased().utf8)
-        if lowercase.count <= capacity { lowercase.withUnsafeBufferPointer { buffer.update(from: $0.baseAddress!, count: $0.count) } }
+        let lowercase = Array(
+            String(decoding: UnsafeBufferPointer(start: text, count: count), as: UTF16.self).lowercased().utf8)
+        if lowercase.count <= capacity {
+            lowercase.withUnsafeBufferPointer { buffer.update(from: $0.baseAddress!, count: $0.count) }
+        }
         return lowercase.count
     }
 
@@ -742,7 +831,8 @@ final class NameCollator {
             var capacity = unitCount * 6 + 32
             while true {
                 let result: Result? = withUnsafeTemporaryAllocation(of: UInt8.self, capacity: capacity) { key in
-                    let length = writeKey(of: units.baseAddress!, unitCount, into: key.baseAddress!, capacity: capacity)
+                    let length = writeKey(
+                        of: units.baseAddress!, unitCount, into: key.baseAddress!, capacity: capacity)
                     if length > capacity {
                         capacity = length
                         return nil

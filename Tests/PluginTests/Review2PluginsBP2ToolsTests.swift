@@ -3,6 +3,7 @@ import Foundation
 import LocalFileSystemPlugin
 import TestSupport
 import Testing
+
 @testable import CompareContentPlugin
 @testable import DirectorySyncPlugin
 @testable import FileToolsPlugin
@@ -24,7 +25,9 @@ import Testing
     }
 
     func run() -> ToolRun {
-        ToolRun(fileSystems: registry, cancellation: CancellationFlag(), report: { _ in }, askExisting: { _ in .overwrite })
+        ToolRun(
+            fileSystems: registry, cancellation: CancellationFlag(), report: { _ in }, askExisting: { _ in .overwrite }
+        )
     }
 
     /// A reproducer the fuzzer left; nil where the tree has no `Tests/Fuzz`.
@@ -42,9 +45,13 @@ import Testing
     // MARK: T050, BLAKE3 beside many files
 
     @Test func blake3SpreadsOverTheCoresOnlyWhileCoresAreLeftOver() {
-        #expect(ChecksumRun.spreadsBLAKE3(filesInProgress: 0, cores: 8) && ChecksumRun.spreadsBLAKE3(filesInProgress: 1, cores: 8))
+        #expect(
+            ChecksumRun.spreadsBLAKE3(filesInProgress: 0, cores: 8)
+                && ChecksumRun.spreadsBLAKE3(filesInProgress: 1, cores: 8))
         #expect(ChecksumRun.spreadsBLAKE3(filesInProgress: 7, cores: 8))
-        #expect(!ChecksumRun.spreadsBLAKE3(filesInProgress: 8, cores: 8) && !ChecksumRun.spreadsBLAKE3(filesInProgress: 100, cores: 8))
+        #expect(
+            !ChecksumRun.spreadsBLAKE3(filesInProgress: 8, cores: 8)
+                && !ChecksumRun.spreadsBLAKE3(filesInProgress: 100, cores: 8))
         #expect(!ChecksumRun.spreadsBLAKE3(filesInProgress: 1, cores: 1))
     }
 
@@ -53,7 +60,9 @@ import Testing
         #expect(ChecksumRun.serialPiece < 16 * 1024)
         for size in [0, 1, 1023, 1024, 8191, 8192, 8193, 100_000, (1 << 20) + 7, 3 << 20] {
             let block = Data((0..<size).map { UInt8(truncatingIfNeeded: $0 &* 31 &+ $0 >> 8) })
-            let whole = BLAKE3Hasher(), spread = BLAKE3Hasher(), serial = BLAKE3Hasher()
+            let whole = BLAKE3Hasher()
+            let spread = BLAKE3Hasher()
+            let serial = BLAKE3Hasher()
             whole.update(block)
             ChecksumRun.feed(spread, block, spread: true)
             ChecksumRun.feed(serial, block, spread: false)
@@ -63,11 +72,13 @@ import Testing
         // Other methods are never cut up; a slice of a larger Data is fed as it is.
         let big = Data(repeating: 7, count: 100_000)
         let slice = big[1_000..<60_000]
-        let a = BLAKE3Hasher(), b = BLAKE3Hasher()
+        let a = BLAKE3Hasher()
+        let b = BLAKE3Hasher()
         ChecksumRun.feed(a, slice, spread: false)
         b.update(Data(slice))
         #expect(a.finish() == b.finish())
-        let one = ChecksumMethod.sha256.makeHasher(), two = ChecksumMethod.sha256.makeHasher()
+        let one = ChecksumMethod.sha256.makeHasher()
+        let two = ChecksumMethod.sha256.makeHasher()
         ChecksumRun.feed(one, big, spread: false)
         two.update(big)
         #expect(one.finish() == two.finish())
@@ -83,11 +94,12 @@ import Testing
             try data.write(to: box.url("f\(number).bin"))
             let methods: [ChecksumMethod] = number % 3 == 0 ? [.blake3, .sha256] : [.blake3]
             files.append((box.url("f\(number).bin"), methods))
-            expected.append(methods.map { method in
-                let hasher = method.makeHasher()
-                hasher.update(data)
-                return hasher.finish()
-            })
+            expected.append(
+                methods.map { method in
+                    let hasher = method.makeHasher()
+                    hasher.update(data)
+                    return hasher.finish()
+                })
         }
         let results = ChecksumRun.digests(of: files, run: run())
         for (number, result) in results.enumerated() {
@@ -131,10 +143,15 @@ import Testing
         try box.folder("out/target")
         try data.write(to: box.url("in/part001.uue"))
         for autoRename in [false, true] {
-            let written = (try? Decoder.decode(item("in/part001.uue"), into: box.url("out/target"), autoRename: autoRename, run: run())) ?? []
+            let written =
+                (try? Decoder.decode(
+                    item("in/part001.uue"), into: box.url("out/target"), autoRename: autoRename, run: run())) ?? []
             for url in written { #expect(url.deletingLastPathComponent().path == box.url("out/target").path) }
         }
-        #expect(((try? FileManager.default.contentsOfDirectory(atPath: box.url("out").path)) ?? []).filter { $0 != "target" }.isEmpty)
+        #expect(
+            ((try? FileManager.default.contentsOfDirectory(atPath: box.url("out").path)) ?? []).filter {
+                $0 != "target"
+            }.isEmpty)
     }
 
     @Test func theLastWordOnADecodedNameIsTheKernelsCheck() {
@@ -148,9 +165,12 @@ import Testing
     @Test func aCancelledCompareOverEditedContentLeavesRowsThatMatchTheTexts() async throws {
         let lines = (1...3_000).map { "line \($0)" }
         try box.file("A/big.txt", lines.joined(separator: "\n") + "\n")
-        try box.file("B/big.txt", lines.map { $0.hasSuffix("7") ? $0 + " changed" : $0 }.joined(separator: "\n") + "\n")
+        try box.file(
+            "B/big.txt", lines.map { $0.hasSuffix("7") ? $0 + " changed" : $0 }.joined(separator: "\n") + "\n")
         let plugin = CompareContentPlugin(opensWindows: false)
-        let bench = TestBench(plugins: [plugin], fileSystems: [LocalFileSystem()], left: box.url("A"), right: box.url("B"), settings: MemorySettings())
+        let bench = TestBench(
+            plugins: [plugin], fileSystems: [LocalFileSystem()], left: box.url("A"), right: box.url("B"),
+            settings: MemorySettings())
         bench.left.reload()
         bench.left.moveCursor(toName: "big.txt")
         bench.commands.perform(.compareByContent)
@@ -188,7 +208,13 @@ import Testing
         let flag = CancellationFlag()
         var plan = SyncPlan(rows: [])
         plan.deleteRight = [SyncPlan.Deletion(url: memory.url("/R/keep"), isDirectory: true)]
-        let executor = SyncExecutor(plan: plan, options: { var o = SyncRunOptions(); o.useTrash = false; return o }(), fileSystems: registry, cancellation: flag)
+        let executor = SyncExecutor(
+            plan: plan,
+            options: {
+                var o = SyncRunOptions()
+                o.useTrash = false
+                return o
+            }(), fileSystems: registry, cancellation: flag)
         let finished = DispatchSemaphore(value: 0)
         let thread = Thread {
             _ = executor.run()
@@ -205,7 +231,9 @@ import Testing
     // MARK: R024, the marks of a long selection
 
     func benchOf(_ memory: MemoryFileSystem, plugins: [Plugin] = []) -> TestBench {
-        TestBench(plugins: plugins, fileSystems: [LocalFileSystem(), memory], left: memory.url("/A"), right: memory.url("/B"), settings: MemorySettings())
+        TestBench(
+            plugins: plugins, fileSystems: [LocalFileSystem(), memory], left: memory.url("/A"), right: memory.url("/B"),
+            settings: MemorySettings())
     }
 
     @Test func theNamesToSynchronizeAreReadFromTheMarksOnly() async {

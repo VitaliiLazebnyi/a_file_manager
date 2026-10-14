@@ -189,11 +189,17 @@ struct SelectionMask {
             result.append(!cancelled() && matches(entry, cancelled: cancelled))
         }
         guard let related else { return result }
-        func key(_ directory: [String], _ name: String) -> String { directory.joined(separator: "/").lowercased() + "/" + name.lowercased() }
+        func key(_ directory: [String], _ name: String) -> String {
+            directory.joined(separator: "/").lowercased() + "/" + name.lowercased()
+        }
         var places: [String: [Int]] = [:]
-        for (index, entry) in entries.enumerated() { places[key(entry.directory, entry.name), default: []].append(index) }
+        for (index, entry) in entries.enumerated() {
+            places[key(entry.directory, entry.name), default: []].append(index)
+        }
         for (index, entry) in entries.enumerated() where result[index] && !entry.isFolder {
-            for partner in places[key(entry.directory, Wildcard.rename(entry.name, with: related))] ?? [] { result[partner] = true }
+            for partner in places[key(entry.directory, Wildcard.rename(entry.name, with: related))] ?? [] {
+                result[partner] = true
+            }
         }
         return result
     }
@@ -203,7 +209,9 @@ struct SelectionMask {
         var quoted = false
         for index in text.indices {
             if text[index] == "\"" { quoted.toggle() }
-            if text[index] == separator && !quoted { return (String(text[..<index]), String(text[text.index(after: index)...])) }
+            if text[index] == separator && !quoted {
+                return (String(text[..<index]), String(text[text.index(after: index)...]))
+            }
         }
         return (text, nil)
     }
@@ -248,7 +256,9 @@ enum Wildcard {
     static func matches(ascii pattern: [UInt8], _ name: UnsafeBufferPointer<UInt8>) -> Bool {
         if glob(pattern[...], name) { return true }
         guard !name.contains(UInt8(ascii: ".")) else { return false }
-        if pattern.count >= 2, pattern[pattern.count - 2] == UInt8(ascii: "."), pattern[pattern.count - 1] == UInt8(ascii: "*") {
+        if pattern.count >= 2, pattern[pattern.count - 2] == UInt8(ascii: "."),
+            pattern[pattern.count - 1] == UInt8(ascii: "*")
+        {
             return glob(pattern.dropLast(2), name)
         }
         if pattern.last == UInt8(ascii: ".") { return glob(pattern.dropLast(), name) }

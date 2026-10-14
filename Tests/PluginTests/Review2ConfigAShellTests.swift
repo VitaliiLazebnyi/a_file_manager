@@ -1,8 +1,9 @@
 import AFMKernel
-@testable import ConfigurationPlugin
 import Foundation
 import TestSupport
 import Testing
+
+@testable import ConfigurationPlugin
 
 /// File names against real shells (review 2, C002 and its kin): a name is handed to the shell
 /// as data and referred to, so whatever it is made of, it arrives as one argument and nothing
@@ -13,11 +14,15 @@ import Testing
     /// Names that ran commands before, and their relatives. The marks after a quote, a
     /// backtick, a backslash and a dollar sign are U+0301: one `Character` with what they follow.
     static let hostile: [String] = [
-        "a\"\u{301};touch M1;\"\u{301}", "`\u{301};touch M2;`\u{301}", "\\\u{301}", "$\u{301}(touch M3)", "'\u{301};touch M4;'\u{301}",
-        "a\"\u{FE0F};touch M5;\"\u{FE0F}", "';touch M6;'", "a;touch M7", "$(touch M8)", "`touch M9`", "line\nbreak;touch M10\n;touch M11",
-        "-rf", "-\u{301}x", "g x;touch M12", "e\";touch M13;\"", "f$(touch M14)", "h\\';touch M15;'", "\\';touch M16;#", "a\\", "a\u{A0}",
-        "report\u{3000}", " lead and trail ", "!bang", "~", "*", "#c", "x=1", "a&b|c>d<e", "tab\there", "${IFS}touch${IFS}M17", "$0", "%N%Q",
-        "\u{1B}[31mred", "a\rb",
+        "a\"\u{301};touch M1;\"\u{301}", "`\u{301};touch M2;`\u{301}", "\\\u{301}", "$\u{301}(touch M3)",
+        "'\u{301};touch M4;'\u{301}",
+        "a\"\u{FE0F};touch M5;\"\u{FE0F}", "';touch M6;'", "a;touch M7", "$(touch M8)", "`touch M9`",
+        "line\nbreak;touch M10\n;touch M11",
+        "-rf", "-\u{301}x", "g x;touch M12", "e\";touch M13;\"", "f$(touch M14)", "h\\';touch M15;'", "\\';touch M16;#",
+        "a\\", "a\u{A0}",
+        "report\u{3000}", " lead and trail ", "!bang", "~", "*", "#c", "x=1", "a&b|c>d<e", "tab\there",
+        "${IFS}touch${IFS}M17", "$0", "%N%Q",
+        "\u{1B}[31mred", "a\rb"
     ]
 
     let box: Sandbox
@@ -28,9 +33,11 @@ import Testing
     }
 
     func context(name: String?, selection: [String] = []) -> ExpansionContext {
-        ExpansionContext(left: PanelSnapshot(path: "/tmp/A dir/", cursorName: name, selection: selection),
-                         right: PanelSnapshot(path: "/B/", cursorName: nil),
-                         environment: ["EVIL": "e'v\"\u{301}il $x `touch M18`;touch M19"], listFolder: box.url("lists"), listName: "t")
+        ExpansionContext(
+            left: PanelSnapshot(path: "/tmp/A dir/", cursorName: name, selection: selection),
+            right: PanelSnapshot(path: "/B/", cursorName: nil),
+            environment: ["EVIL": "e'v\"\u{301}il $x `touch M18`;touch M19"], listFolder: box.url("lists"),
+            listName: "t")
     }
 
     func expand(_ template: String, name: String?, selection: [String] = []) -> ExpandedParameters {
@@ -64,15 +71,20 @@ import Testing
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
         process.waitUntilExit()
         var arguments: [[String]] = [[]]
-        for word in String(decoding: data, as: UTF8.self).split(separator: "\0", omittingEmptySubsequences: false).dropLast() {
+        for word in String(decoding: data, as: UTF8.self).split(separator: "\0", omittingEmptySubsequences: false)
+            .dropLast()
+        {
             if word == "\u{1}" { arguments.append([]) } else { arguments[arguments.count - 1].append(String(word)) }
         }
-        return Outcome(arguments: Array(arguments.dropLast()), created: try FileManager.default.contentsOfDirectory(atPath: folder.path))
+        return Outcome(
+            arguments: Array(arguments.dropLast()),
+            created: try FileManager.default.contentsOfDirectory(atPath: folder.path))
     }
 
     /// The same bytes whatever form the test process or the shell prefers for accents.
     func same(_ a: [[String]], _ b: [[String]]) -> Bool {
-        a.map { $0.map(\.decomposedStringWithCanonicalMapping) } == b.map { $0.map(\.decomposedStringWithCanonicalMapping) }
+        a.map { $0.map(\.decomposedStringWithCanonicalMapping) }
+            == b.map { $0.map(\.decomposedStringWithCanonicalMapping) }
     }
 
     func protected(_ name: String) -> String { name.unicodeScalars.first == "-" ? "./" + name : name }
@@ -95,7 +107,7 @@ import Testing
         ("%S", { _, guarded in [guarded, "b c"] }),
         ("\"new-%S-old\"", { name, _ in ["new-" + name + "-old", "new-b c-old"] }),
         ("%|EVIL|", { _, _ in ["e'v\"\u{301}il $x `touch M18`;touch M19"] }),
-        ("'%|EVIL|' \"%|EVIL|\"", { _, _ in Array(repeating: "e'v\"\u{301}il $x `touch M18`;touch M19", count: 2) }),
+        ("'%|EVIL|' \"%|EVIL|\"", { _, _ in Array(repeating: "e'v\"\u{301}il $x `touch M18`;touch M19", count: 2) })
     ]
 
     @Test func aNameIsOneArgumentAndNothingOfItRunsInAnyPlaceAndShell() throws {
@@ -107,10 +119,13 @@ import Testing
                 let outcome = try run(cases, shell: shell)
                 #expect(outcome.created.isEmpty, "\(shell) \(template): created \(outcome.created)")
                 let wanted = names.map { expected($0, protected($0)) }
-                #expect(outcome.arguments.count == wanted.count, "\(shell) \(template): \(outcome.arguments.count) cases")
+                #expect(
+                    outcome.arguments.count == wanted.count, "\(shell) \(template): \(outcome.arguments.count) cases")
                 for (index, name) in names.enumerated() where index < outcome.arguments.count {
-                    #expect(same([outcome.arguments[index]], [wanted[index]]),
-                            "\(shell) \(template) \(name.debugDescription): got \(outcome.arguments[index].map(\.debugDescription))")
+                    #expect(
+                        same([outcome.arguments[index]], [wanted[index]]),
+                        "\(shell) \(template) \(name.debugDescription): got \(outcome.arguments[index].map(\.debugDescription))"
+                    )
                 }
             }
         }
@@ -118,8 +133,11 @@ import Testing
 
     /// Names put together from everything a shell gives a meaning to, always the same ones.
     @Test func namesMadeOfShellCharactersArriveUnchanged() throws {
-        let parts: [String] = [" ", "\t", "\n", "\"", "'", "\\", "$", "`", "!", "*", "?", "[", "]", "(", ")", "{", "}", "<", ">", "|", "&", ";", "~", "#",
-                               "=", "%", "-", "\u{301}", "\u{FE0F}", "\u{A0}", "a", "touch MX", "$(", "${", "<<", "$'", "\r"]
+        let parts: [String] = [
+            " ", "\t", "\n", "\"", "'", "\\", "$", "`", "!", "*", "?", "[", "]", "(", ")", "{", "}", "<", ">", "|", "&",
+            ";", "~", "#",
+            "=", "%", "-", "\u{301}", "\u{FE0F}", "\u{A0}", "a", "touch MX", "$(", "${", "<<", "$'", "\r"
+        ]
         var state: UInt64 = 0x9E37_79B9_7F4A_7C15
         func next(_ bound: Int) -> Int {
             state = state &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
@@ -143,12 +161,16 @@ import Testing
     }
 
     @Test func aPlaceWhereNoReferenceIsSafeIsRefused() {
-        let refused = ["`printf %s %N`", "\"`cmd %N`\"", "$'%N'", "echo # %N", "cat <<EOF\n%N\nEOF", "cat << 'EOF' %N", "\\%N", "$((%N + 1))", "echo $((1 + %N))",
-                       "((x = %N))", "echo $[%N]", "${x:-%N}", "echo ${x:-y} %N", "$%N", "echo \"\\%N\"",
-                       "echo \"$(case x in a) echo;; esac; echo %N)\"",
-                       // Where a shell works a value out as arithmetic, the value is read as an expression again.
-                       "[[ %N -eq 1 ]]", "[ 1 -lt %N ]", "test %N -ge 2 && echo", "if [[ 5 -gt \"%N\" ]]; then echo; fi", "echo $arr[%N]",
-                       "echo \"$arr[%N]\"", "echo $a1_b[1+%N]"]
+        let refused = [
+            "`printf %s %N`", "\"`cmd %N`\"", "$'%N'", "echo # %N", "cat <<EOF\n%N\nEOF", "cat << 'EOF' %N", "\\%N",
+            "$((%N + 1))", "echo $((1 + %N))",
+            "((x = %N))", "echo $[%N]", "${x:-%N}", "echo ${x:-y} %N", "$%N", "echo \"\\%N\"",
+            "echo \"$(case x in a) echo;; esac; echo %N)\"",
+            // Where a shell works a value out as arithmetic, the value is read as an expression again.
+            "[[ %N -eq 1 ]]", "[ 1 -lt %N ]", "test %N -ge 2 && echo", "if [[ 5 -gt \"%N\" ]]; then echo; fi",
+            "echo $arr[%N]",
+            "echo \"$arr[%N]\"", "echo $a1_b[1+%N]"
+        ]
         for template in refused {
             let result = ShellLine.script(expand("printf %s " + template, name: "n;touch M").pieces)
             guard case .failure = result else {
@@ -157,9 +179,13 @@ import Testing
             }
         }
         // What only looks like one of those is run.
-        for template in ["echo \\\\ %N", "echo $HOME %N", "echo ${HOME} %N", "echo $(date) %N", "cat <<<x %N", "(cd /; ls %N)", "a=1; case $a in 1) echo %N;; esac",
-                         "echo '#' %N", "echo a#b %N", "echo \"$(date)\" %N", "[[ -f %N ]] && echo", "[ -d %N ] || echo", "[[ %N == *.txt ]]",
-                         "[ 1 -eq 1 ]; echo %N", "[[ 1 -lt 2 ]] && echo %N", "test 1 -eq 1 && echo %N", "echo $a [%N]", "echo $1 %N"] {
+        for template in [
+            "echo \\\\ %N", "echo $HOME %N", "echo ${HOME} %N", "echo $(date) %N", "cat <<<x %N", "(cd /; ls %N)",
+            "a=1; case $a in 1) echo %N;; esac",
+            "echo '#' %N", "echo a#b %N", "echo \"$(date)\" %N", "[[ -f %N ]] && echo", "[ -d %N ] || echo",
+            "[[ %N == *.txt ]]",
+            "[ 1 -eq 1 ]; echo %N", "[[ 1 -lt 2 ]] && echo %N", "test 1 -eq 1 && echo %N", "echo $a [%N]", "echo $1 %N"
+        ] {
             guard case .success = ShellLine.script(expand(template, name: "n").pieces) else {
                 Issue.record("\(template.debugDescription) was refused")
                 continue
@@ -172,9 +198,13 @@ import Testing
             for template in ["%N", "\"%N\"", "'%N'", "%P%N", "%S", "%|EVIL|"] {
                 let script = try ShellLine.script(expand("cmd " + template, name: name, selection: [name]).pieces).get()
                 // The text holds the user's words and references, and the references are all of the same harmless form.
-                let withoutReferences = script.text.replacingOccurrences(of: #"__afm_[0-9]+"#, with: "", options: .regularExpression)
-                #expect(withoutReferences.unicodeScalars.allSatisfy { "cmd \"'${}=\n0123456789".unicodeScalars.contains($0) },
-                        "\(template) \(name.debugDescription): \(script.text.debugDescription)")
+                let withoutReferences = script.text.replacingOccurrences(
+                    of: #"__afm_[0-9]+"#, with: "", options: .regularExpression)
+                #expect(
+                    withoutReferences.unicodeScalars.allSatisfy {
+                        "cmd \"'${}=\n0123456789".unicodeScalars.contains($0)
+                    },
+                    "\(template) \(name.debugDescription): \(script.text.debugDescription)")
                 #expect(script.values.contains { $0.hasSuffix(name) || $0.contains("e'v") })
             }
         }
@@ -189,9 +219,17 @@ import Testing
         let outer = expand("%N", name: "%Q$(touch M) %N")
         var context = context(name: "inner")
         context.argumentPieces = outer.pieces
-        for inner in [ParameterExpander(context: context).expand(outer.pieces), ParameterExpander(context: context).expand("-v %A"),
-                      ParameterExpander(context: context).expand("%A1")] {
-            #expect(inner.pieces.contains(.value("%Q$(touch M) %N")) && !inner.pieces.contains { if case .raw = $0 { return true } else { return false } })
+        for inner in [
+            ParameterExpander(context: context).expand(outer.pieces),
+            ParameterExpander(context: context).expand("-v %A"),
+            ParameterExpander(context: context).expand("%A1")
+        ] {
+            #expect(
+                inner.pieces.contains(.value("%Q$(touch M) %N"))
+                    && !inner.pieces.contains {
+                        guard case .raw = $0 else { return false }
+                        return true
+                    })
             let outcome = try run([inner.pieces], shell: "/bin/zsh")
             #expect(outcome.created.isEmpty && outcome.arguments.first?.last == "%Q$(touch M) %N")
         }
@@ -213,22 +251,30 @@ import Testing
     @Test func numbersTheUserTypesNeverTrap() {
         let huge = "9223372036854775807"
         let beyond = "99999999999999999999999999"
-        for template in ["%N:~6,\(huge)", "%N:~\(huge),\(huge)", "%N:~-\(huge),-\(huge)", "%N:~\(beyond),\(beyond)", "%N:~-0,\(huge)", "%N:~-0,-\(beyond)",
-                         "%S\(huge)", "%S+\(huge)-", "%S-\(huge)-\(huge)", "%S+\(beyond)-\(beyond)", "%S-\(huge)-", "%A\(huge)", "%A-\(huge)-\(beyond)",
-                         "%A\(beyond)+", "%B9", "%C9", "%S:~\(huge),\(huge)"] {
+        for template in [
+            "%N:~6,\(huge)", "%N:~\(huge),\(huge)", "%N:~-\(huge),-\(huge)", "%N:~\(beyond),\(beyond)",
+            "%N:~-0,\(huge)", "%N:~-0,-\(beyond)",
+            "%S\(huge)", "%S+\(huge)-", "%S-\(huge)-\(huge)", "%S+\(beyond)-\(beyond)", "%S-\(huge)-", "%A\(huge)",
+            "%A-\(huge)-\(beyond)",
+            "%A\(beyond)+", "%B9", "%C9", "%S:~\(huge),\(huge)"
+        ] {
             _ = expand(template, name: "my file.txt", selection: ["a", "b", "c"])
         }
         #expect(expand("%N:~6,\(huge)", name: "my file.txt").pieces == [.value("e.txt")])
         #expect(expand("%N:~3,\(beyond)", name: "my file.txt").pieces == [.value("file.txt")])
         #expect(expand("%S+2-\(huge)", name: nil, selection: ["a", "b", "c"]).text == "b c")
-        #expect(CommandLanguage.steps("cm_wait 99999999999999999999, cm_wait \(huge)") { _ in nil }
+        #expect(
+            CommandLanguage.steps("cm_wait 99999999999999999999, cm_wait \(huge)") { _ in nil }
                 == [.wait(milliseconds: 0), .wait(milliseconds: CommandLanguage.longestWait)])
     }
 
     @Test func aLeadingDashIsGuardedOnlyWhereAWordBegins() {
-        #expect(expand("%N", name: "-x").pieces == [.value("./-x")] && expand("\"%N\"", name: "-x").text == "\"./-x\"")
+        #expect(
+            expand("%N", name: "-x").pieces == [.value("./-x")] && expand("\"%N\"", name: "-x").text == "\"./-x\"")
         // After a blank inside the user's quotes the name is no argument of its own.
-        #expect(expand("'pre %N post'", name: "-x").text == "'pre -x post'" && expand("\"pre %N\"", name: "-x").text == "\"pre -x\"")
+        #expect(
+            expand("'pre %N post'", name: "-x").text == "'pre -x post'"
+                && expand("\"pre %N\"", name: "-x").text == "\"pre -x\"")
         // A dash with a combining mark is a dash to the program that reads it.
         #expect(expand("%N", name: "-\u{301}x").pieces == [.value("./-\u{301}x")])
         // Names in the user's quotes get the guard too, each of them.
@@ -244,7 +290,9 @@ import Testing
     @Test func listFilesRefuseNamesThatWouldBeTwoLines() {
         let broken = expand("xargs rm < %L", name: nil, selection: ["x\n/Users/me/important", "b"])
         #expect(broken.problem?.contains("line break") == true)
-        #expect(expand("%F", name: nil, selection: ["a\rb"]).problem != nil && expand("%L", name: nil, selection: ["a", "b"]).problem == nil)
+        #expect(
+            expand("%F", name: nil, selection: ["a\rb"]).problem != nil
+                && expand("%L", name: nil, selection: ["a", "b"]).problem == nil)
         // Without a path, a name that begins with a dash would be an option to whoever reads the list.
         #expect(expand("%F", name: nil, selection: ["-rf", "b"]).listFile?.contents == Data("./-rf\nb\n".utf8))
         #expect(expand("%L", name: nil, selection: ["-rf"]).listFile?.contents == Data("/tmp/A dir/-rf\n".utf8))
@@ -253,12 +301,16 @@ import Testing
     @Test func thePromptShowsNamesAndTakesThemBack() {
         let pieces = expand("-v %N %P%N '%N'", name: "my file.txt").pieces
         let shown = ShellLine.prompt(pieces)
-        #expect(shown.text == "-v \"my file.txt\" \"/tmp/A dir/my file.txt\" 'my file.txt'" && shown.values.isEmpty && shown.legend.isEmpty)
+        #expect(
+            shown.text == "-v \"my file.txt\" \"/tmp/A dir/my file.txt\" 'my file.txt'" && shown.values.isEmpty
+                && shown.legend.isEmpty)
         // A name a shell could read as something else is shown as the reference the shell gets.
         let hostile = "a\"\u{301};touch M;\"\u{301}"
         let guarded = ShellLine.prompt(expand("-v %N \"%N\" '%N'", name: hostile).pieces)
         // Inside the user's single quotes the quote is closed, the reference written, and the quote opened again.
-        #expect(guarded.text == "-v \"${__afm_1}\" \"${__afm_2}\" ''\"${__afm_3}\"''" && guarded.values == [hostile, hostile, hostile])
+        #expect(
+            guarded.text == "-v \"${__afm_1}\" \"${__afm_2}\" ''\"${__afm_3}\"''"
+                && guarded.values == [hostile, hostile, hostile])
         #expect(guarded.legend.contains("${__afm_1} = ") && !guarded.legend.contains("\n\n"))
         // What the user makes of it: the references are the values again, the rest is the user's text.
         let edited = ShellLine.pieces(fromPrompt: "--new \"${__afm_2}\" ${__afm_9} ${__afm_x", values: guarded.values)
@@ -269,7 +321,9 @@ import Testing
     @Test func textForMessagesHasNoLineBreaksOrControlCharacters() {
         #expect(DisplayText.oneLine("a\nb\rc\td\u{1B}[31m\u{202E}x\u{7}") == "a\\nb\\rc\\td\\u{1B}[31m\\u{202E}x\\u{7}")
         #expect(DisplayText.oneLine("caf\u{e9} 👨‍👩‍👧 ok") == "caf\u{e9} 👨‍👩‍👧 ok")
-        #expect(DisplayText.oneLine(String(repeating: "x", count: 500), limit: 10) == String(repeating: "x", count: 10) + "…")
+        #expect(
+            DisplayText.oneLine(String(repeating: "x", count: 500), limit: 10) == String(repeating: "x", count: 10)
+                + "…")
     }
 
     @Test func aProgramGetsItsArgumentsByteForByte() async throws {
@@ -279,8 +333,10 @@ import Testing
         let script = try ShellLine.script([.text("printf '%s' "), .value(name), .text(" > "), .value(out.path)]).get()
         for shell in Self.shells {
             try? FileManager.default.removeItem(at: out)
-            let pid = try ChildProcess.spawn(executable: shell, arguments: ["-c"] + script.arguments, environment: ["PATH": "/usr/bin:/bin"],
-                                             directory: box.url("run").path).get()
+            let pid = try ChildProcess.spawn(
+                executable: shell, arguments: ["-c"] + script.arguments, environment: ["PATH": "/usr/bin:/bin"],
+                directory: box.url("run").path
+            ).get()
             let table = ChildTable()
             let status: Int32? = await withCheckedContinuation { continuation in
                 table.watch(pid, waitedFor: true) { continuation.resume(returning: $0.status) }
@@ -289,7 +345,10 @@ import Testing
             #expect(try Data(contentsOf: out) == Data(name.utf8), "\(shell)")
         }
         // A program that cannot be started says so.
-        guard case .failure = ChildProcess.spawn(executable: "/nonexistent/afm-shell", arguments: [], environment: [:], directory: "/") else {
+        guard
+            case .failure = ChildProcess.spawn(
+                executable: "/nonexistent/afm-shell", arguments: [], environment: [:], directory: "/")
+        else {
             Issue.record("a missing program was started")
             return
         }

@@ -38,7 +38,10 @@ final class ZipPacker {
     /// `level` 0 stores without compressing. With a password the members are encrypted: with
     /// AES-256, or the traditional way when that is asked for (spec 08 › Encryption; see
     /// `ZipEncryption` for what each is worth).
-    init(_ output: OutputFile, level: Int, password: String? = nil, encryption: ZipEncryption = .aes256, limits: ZipLimits = .standard) {
+    init(
+        _ output: OutputFile, level: Int, password: String? = nil, encryption: ZipEncryption = .aes256,
+        limits: ZipLimits = .standard
+    ) {
         writer = ZipWriter(output, limits: limits)
         self.level = level
         self.password = password?.isEmpty == false ? password : nil
@@ -58,7 +61,8 @@ final class ZipPacker {
         repeat {
             // One block is read ahead, to know which piece is the last.
             let following = current == nil ? nil : try next()
-            pieces.append(Piece(member: id, data: current ?? Data(), isFirst: isFirst, isLast: following == nil, stored: stored))
+            pieces.append(
+                Piece(member: id, data: current ?? Data(), isFirst: isFirst, isLast: following == nil, stored: stored))
             pendingBytes += current?.count ?? 0
             if pendingBytes >= windowBytes { try drain() }
             isFirst = false
@@ -94,7 +98,8 @@ final class ZipPacker {
                     header = crypto.header(check: UInt8(member.record.dosTime >> 8))
                     member.crypto = crypto
                 }
-                member.opened = try writer.begin(member.record, expectedSize: member.expectedSize + UInt64(header.count))
+                member.opened = try writer.begin(
+                    member.record, expectedSize: member.expectedSize + UInt64(header.count))
                 try writer.append(header)
                 member.record.compressedSize = UInt64(header.count)
             }
@@ -202,7 +207,11 @@ final class Packer {
                 let folder = archive.deletingLastPathComponent()
                 for source in sources {
                     let name = Packer.archiveName(for: source, format: options.format)
-                    plans.append((folder.appending(name: name), [source], try collect([source], skippingBase: options.skipsBaseFolder)))
+                    plans.append(
+                        (
+                            folder.appending(name: name), [source],
+                            try collect([source], skippingBase: options.skipsBaseFolder)
+                        ))
                 }
             } else {
                 plans.append((archive, sources, try collect(sources, skippingBase: false)))
@@ -235,7 +244,8 @@ final class Packer {
     /// single-file compressors keep the whole name (`a.txt` → `a.txt.gz`), spec 08 › Target string.
     static func archiveName(for source: FileItem, format: ArchiveFormat) -> String {
         if case .compressedFile = format { return source.name + "." + format.defaultExtension }
-        return (source.isFolder || source.baseName.isEmpty ? source.name : source.baseName) + "." + format.defaultExtension
+        return (source.isFolder || source.baseName.isEmpty ? source.name : source.baseName) + "."
+            + format.defaultExtension
     }
 
     private func checkCancelled() throws {
@@ -246,7 +256,10 @@ final class Packer {
         // A report for each of a hundred thousand small files would only slow the job down.
         guard force || Date().timeIntervalSince(lastReport) > 0.05 else { return }
         lastReport = Date()
-        monitor.report(JobProgress(lines: lines, itemsDone: done.items, itemsTotal: total.items, bytesDone: done.bytes, bytesTotal: total.bytes))
+        monitor.report(
+            JobProgress(
+                lines: lines, itemsDone: done.items, itemsTotal: total.items, bytesDone: done.bytes,
+                bytesTotal: total.bytes))
     }
 
     // MARK: What to pack
@@ -265,7 +278,8 @@ final class Packer {
             let isSkippedBase = skippingBase && depth == 0
             if options.storesPaths, !isSkippedBase { members.append(Member(item: item, path: path)) }
             guard depth == 0 || options.recurses else { return }
-            let children = Sorter.sorted(try fileSystems.provider(for: item.url).list(item.url, showHidden: true), byName: \.name)
+            let children = Sorter.sorted(
+                try fileSystems.provider(for: item.url).list(item.url, showHidden: true), byName: \.name)
             for child in children {
                 // Without recursion only the files directly inside a selected folder are taken.
                 if child.isRealDirectory, !options.recurses { continue }
@@ -276,7 +290,9 @@ final class Packer {
         // Without paths, files of different folders can meet under one name; an archive
         // would keep one of them, and Move to archive would then delete the other for good.
         var taken = Set<String>()
-        for member in members where !taken.insert(member.path).inserted { throw ArchiveError.nameCollision(member.path) }
+        for member in members where !taken.insert(member.path).inserted {
+            throw ArchiveError.nameCollision(member.path)
+        }
         return members
     }
 
@@ -292,24 +308,27 @@ final class Packer {
         // A read that waits on a server ends when the job is cancelled.
         let tie = monitor.cancellation.interrupting(reader)
         var ended = false
-        return ({ [self] in
-            guard !ended else { return nil }
-            try checkCancelled()
-            var block = Data()
-            while block.count < size {
-                guard let more = try reader.read(upToCount: size - block.count) else {
-                    ended = true
-                    break
+        return (
+            { [self] in
+                guard !ended else { return nil }
+                try checkCancelled()
+                var block = Data()
+                while block.count < size {
+                    guard let more = try reader.read(upToCount: size - block.count) else {
+                        ended = true
+                        break
+                    }
+                    block.append(more)
                 }
-                block.append(more)
+                done.bytes += Int64(block.count)
+                report()
+                return block.isEmpty ? nil : block
+            },
+            {
+                reader.close()
+                withExtendedLifetime(tie) {}
             }
-            done.bytes += Int64(block.count)
-            report()
-            return block.isEmpty ? nil : block
-        }, {
-            reader.close()
-            withExtendedLifetime(tie) {}
-        })
+        )
     }
 
     // MARK: Writing
@@ -345,11 +364,15 @@ final class Packer {
                 let real = Durable.realFile(archive)
                 try open.whileHoldingFile(cancellation: cancellation) { stillUnchanged in
                     if try !appendToZip(members, at: real, innerFolder: innerFolder, check: stillUnchanged) {
-                        try build(real, check: stillUnchanged) { output in try writeZip(members, to: output, existing: real, innerFolder: innerFolder) }
+                        try build(real, check: stillUnchanged) { output in
+                            try writeZip(members, to: output, existing: real, innerFolder: innerFolder)
+                        }
                     }
                 }
             } else {
-                try build(archive) { output in try writeZip(members, to: output, existing: nil, innerFolder: innerFolder) }
+                try build(archive) { output in
+                    try writeZip(members, to: output, existing: nil, innerFolder: innerFolder)
+                }
             }
         case .tar:
             try build(archive) { output in try writeTar(members, to: output, method: .none) }
@@ -359,10 +382,13 @@ final class Packer {
             let files = members.filter { !$0.item.isDirectory }
             guard files.count == 1, let file = files.first else {
                 let advice = "choose \"Create a TAR archive first\""
-                throw ArchiveError.unsupported("Packing several files or a folder into one \(options.format.title) file (\(advice))")
+                throw ArchiveError.unsupported(
+                    "Packing several files or a folder into one \(options.format.title) file (\(advice))")
             }
             try build(archive) { output in
-                lines = ["Packing: \(fileSystems.displayPath(file.item.url))", "To: \(fileSystems.displayPath(archive))"]
+                lines = [
+                    "Packing: \(fileSystems.displayPath(file.item.url))", "To: \(fileSystems.displayPath(archive))"
+                ]
                 let compressor = try ParallelCompressor(method(for: codec), to: output, modified: file.item.modified)
                 let source = try blocks(of: file.item, size: 1 << 20)
                 defer { source.close() }
@@ -373,7 +399,9 @@ final class Packer {
         case .foreign:
             throw ArchiveError.unsupported("Creating archives of this type")
         }
-        if options.datesByNewest, archive.isFileURL, let newest = members.filter({ !$0.item.isDirectory }).map(\.item.modified).max() {
+        if options.datesByNewest, archive.isFileURL,
+            let newest = members.filter({ !$0.item.isDirectory }).map(\.item.modified).max()
+        {
             try? FileManager.default.setAttributes([.modificationDate: newest], ofItemAtPath: archive.path)
         }
         report(force: true)
@@ -462,8 +490,9 @@ final class Packer {
     }
 
     private func record(for member: Member, path: String) -> ZipRecord {
-        ZipRecord.new(name: path, isDirectory: member.item.isRealDirectory, modified: member.item.modified,
-                      permissions: member.item.permissions, isSymbolicLink: linkTarget(of: member.item) != nil)
+        ZipRecord.new(
+            name: path, isDirectory: member.item.isRealDirectory, modified: member.item.modified,
+            permissions: member.item.permissions, isSymbolicLink: linkTarget(of: member.item) != nil)
     }
 
     /// Adds members to an existing ZIP on the local disk without copying what it holds: the
@@ -473,24 +502,29 @@ final class Packer {
     /// done, when that is not possible: a member is to be replaced, the file system does not
     /// clone, or the archive is not laid out plainly. A failed or cancelled pack leaves the
     /// archive as it was, as `build` does.
-    private func appendToZip(_ members: [Member], at archive: URL, innerFolder: String, check: () throws -> Void) throws -> Bool {
+    private func appendToZip(_ members: [Member], at archive: URL, innerFolder: String, check: () throws -> Void) throws
+        -> Bool
+    {
         let file = try RandomAccessFile(archive)
         let contents = try ZipDirectory.read(file)
         let added = Set(members.map { ArchiveTree.join(innerFolder, $0.path) })
         var offsets: [UInt64] = []
         for record in contents.records {
             guard case .archive(let offset, _) = record.source, offset < contents.directoryOffset,
-                  !(ArchiveTree.normalized(record.name).map(added.contains) ?? false) else { return false }
+                !(ArchiveTree.normalized(record.name).map(added.contains) ?? false)
+            else { return false }
             offsets.append(offset)
         }
-        let temporary = archive.deletingLastPathComponent().appendingPathComponent(".\(UUID().uuidString).afm-pack.tmp", isDirectory: false)
+        let temporary = archive.deletingLastPathComponent().appendingPathComponent(
+            ".\(UUID().uuidString).afm-pack.tmp", isDirectory: false)
         store.environment.scratch.noteExternal(temporary)
         guard store.environment.clonesArchives, clonefile(archive.path, temporary.path, 0) == 0 else { return false }
         do {
             let output = try OutputFile(extending: temporary, from: contents.directoryOffset)
             do {
-                let packer = ZipPacker(output, level: options.level, password: options.password, encryption: options.encryption,
-                                       limits: options.limits)
+                let packer = ZipPacker(
+                    output, level: options.level, password: options.password, encryption: options.encryption,
+                    limits: options.limits)
                 for (record, offset) in zip(contents.records, offsets) { packer.writer.adopt(record, at: offset) }
                 try add(members, to: packer, innerFolder: innerFolder, shownIn: archive.deletingLastPathComponent())
                 try packer.finish(comment: contents.comment)
@@ -512,7 +546,9 @@ final class Packer {
     /// A new ZIP, or an existing one with the members added: what the old archive holds is
     /// copied over as it is, except the members that are packed again.
     private func writeZip(_ members: [Member], to output: OutputFile, existing: URL?, innerFolder: String) throws {
-        let packer = ZipPacker(output, level: options.level, password: options.password, encryption: options.encryption, limits: options.limits)
+        let packer = ZipPacker(
+            output, level: options.level, password: options.password, encryption: options.encryption,
+            limits: options.limits)
         var comment = Data()
         if let existing {
             let file = try RandomAccessFile(existing)
@@ -526,7 +562,8 @@ final class Packer {
             }
             let prefix = FileRangeStream(file, offset: 0, length: first)
             while let block = try prefix.read(upToCount: 1 << 20) { try packer.writer.append(block) }
-            for record in contents.records where !(ArchiveTree.normalized(record.name).map(replaced.contains) ?? false) {
+            for record in contents.records where !(ArchiveTree.normalized(record.name).map(replaced.contains) ?? false)
+            {
                 try checkCancelled()
                 try packer.writer.copyMember(record)
             }
@@ -541,7 +578,9 @@ final class Packer {
     private func add(_ members: [Member], to packer: ZipPacker, innerFolder: String, shownIn place: URL) throws {
         let paths = members.map { ArchiveTree.join(innerFolder, $0.path) }
         for (member, path) in zip(members, paths) {
-            lines = ["Packing: \(fileSystems.displayPath(member.item.url))", "To: \(fileSystems.displayPath(place))/\(path)"]
+            lines = [
+                "Packing: \(fileSystems.displayPath(member.item.url))", "To: \(fileSystems.displayPath(place))/\(path)"
+            ]
             let record = record(for: member, path: path)
             if member.item.isRealDirectory {
                 try packer.add(record, expectedSize: 0, stored: true) { nil }
@@ -573,14 +612,19 @@ final class Packer {
         /// The store may have let the archive go before the first change (see `OpenArchive`).
         func changing<T>(_ change: (OpenArchive) throws -> T) throws -> T {
             for _ in 0..<8 {
-                do { return try change(open) } catch ArchiveError.retired { open = try store.archive(at: archive, cancellation: cancellation) }
+                do { return try change(open) } catch ArchiveError.retired {
+                    open = try store.archive(at: archive, cancellation: cancellation)
+                }
             }
             return try change(open)
         }
         for member in members {
             try checkCancelled()
             let path = ArchiveTree.join(innerFolder, member.path)
-            lines = ["Packing: \(fileSystems.displayPath(member.item.url))", "To: \(fileSystems.displayPath(archive))/\(path)"]
+            lines = [
+                "Packing: \(fileSystems.displayPath(member.item.url))",
+                "To: \(fileSystems.displayPath(archive))/\(path)"
+            ]
             if member.item.isRealDirectory {
                 try changing { try $0.makeDirectory(path) }
             } else {
@@ -592,7 +636,9 @@ final class Packer {
                     let source = try blocks(of: member.item, size: 1 << 20)
                     defer { source.close() }
                     while let block = try source.next() { try writer.write(block) }
-                    try writer.close(attributes: FileAttributes(modified: member.item.modified, permissions: member.item.permissions))
+                    try writer.close(
+                        attributes: FileAttributes(
+                            modified: member.item.modified, permissions: member.item.permissions))
                 } catch {
                     // Ended, not finished: nothing of it joins the archive.
                     writer.interrupt()
@@ -617,7 +663,8 @@ final class Packer {
         let compressor = try ParallelCompressor(method, to: output)
         for member in members {
             lines = ["Packing: \(fileSystems.displayPath(member.item.url))", "To: \(member.path)"]
-            var header = TarHeader(path: member.path, modified: member.item.modified, permissions: member.item.permissions)
+            var header = TarHeader(
+                path: member.path, modified: member.item.modified, permissions: member.item.permissions)
             if member.item.isRealDirectory {
                 header.kind = .directory
                 try compressor.write(header.encoded())
@@ -689,7 +736,8 @@ final class Packer {
             if member.item.isRealDirectory {
                 folders.append(member.item.url)
             } else {
-                try fileSystems.provider(for: member.item.url).remove(member.item.url, cancellation: monitor.cancellation)
+                try fileSystems.provider(for: member.item.url).remove(
+                    member.item.url, cancellation: monitor.cancellation)
             }
         }
         // Deepest first; a folder that still holds something (not packed) stays.

@@ -37,7 +37,8 @@ public enum NetworkError: LocalizedError {
         case .unexpected(let what): return "Unexpected answer from the server: \(what)"
         case .notConnected(let server): return "There is no connection to \(server)."
         case .sessionReuseRequired(let said):
-            return "The server requires the encrypted data connections to reuse the TLS session of the control connection, "
+            return
+                "The server requires the encrypted data connections to reuse the TLS session of the control connection, "
                 + "which this program does not support (the server said: \(said)). "
                 + "Turn off \"require session reuse\" on the server (vsftpd: require_ssl_reuse=NO) or use SFTP."
         case .incomplete(let what): return what
@@ -69,7 +70,8 @@ final class Pending<Value> {
 
     /// The value when it is there already; never waits.
     func poll() -> Value? {
-        condition.lock(); defer { condition.unlock() }
+        condition.lock()
+        defer { condition.unlock() }
         return value
     }
 
@@ -130,25 +132,29 @@ public final class CertificateTrust {
     }
 
     public func isAccepted(_ fingerprint: String, for host: String) -> Bool {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         return accepted[host.lowercased()]?.contains(fingerprint) ?? false
     }
 
     /// The certificates accepted for a server so far, in order.
     public func fingerprints(for host: String) -> [String] {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         return (accepted[host.lowercased()] ?? []).sorted()
     }
 
     public func accept(_ fingerprint: String, for host: String) {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         accepted[host.lowercased(), default: []].insert(fingerprint)
     }
 
     /// Makes `fingerprint` the only certificate accepted for the server: the answer to a
     /// certificate that changed. The ones accepted before are no longer trusted.
     public func replace(with fingerprint: String, for host: String) {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         accepted[host.lowercased()] = [fingerprint]
     }
 }
@@ -170,13 +176,22 @@ final class TLSSettings {
     }
 
     var rejected: CertificateInfo? {
-        get { lock.lock(); defer { lock.unlock() }; return rejectedCertificate }
-        set { lock.lock(); rejectedCertificate = newValue; lock.unlock() }
+        get {
+            lock.lock()
+            defer { lock.unlock() }
+            return rejectedCertificate
+        }
+        set {
+            lock.lock()
+            rejectedCertificate = newValue
+            lock.unlock()
+        }
     }
 
     /// Where certificates are checked. The check may ask the network (revocation) and take
     /// seconds; on a queue of its own it holds up neither the stream it belongs to nor another.
-    private static let verifyQueue = DispatchQueue(label: "afm.network.verify", qos: .userInitiated, attributes: .concurrent)
+    private static let verifyQueue = DispatchQueue(
+        label: "afm.network.verify", qos: .userInitiated, attributes: .concurrent)
 
     /// Options for `NWProtocolTLS` that verify the server like the system does, and accept what
     /// the user accepted before.
@@ -185,10 +200,12 @@ final class TLSSettings {
         let security = options.securityProtocolOptions
         if isName { sec_protocol_options_set_tls_server_name(security, host) }
         sec_protocol_options_set_min_tls_protocol_version(security, .TLSv12)
-        sec_protocol_options_set_verify_block(security, { [self] _, secTrust, complete in
-            beforeEvaluating()
-            complete(evaluate(sec_trust_copy_ref(secTrust).takeRetainedValue()))
-        }, TLSSettings.verifyQueue)
+        sec_protocol_options_set_verify_block(
+            security,
+            { [self] _, secTrust, complete in
+                beforeEvaluating()
+                complete(evaluate(sec_trust_copy_ref(secTrust).takeRetainedValue()))
+            }, TLSSettings.verifyQueue)
         return options
     }
 
@@ -216,10 +233,13 @@ final class TLSSettings {
 extension CertificateInfo {
     /// Describes the server's own certificate, the first of the chain.
     init?(trust: SecTrust, problem: String) {
-        guard let chain = SecTrustCopyCertificateChain(trust) as? [SecCertificate], let leaf = chain.first else { return nil }
+        guard let chain = SecTrustCopyCertificateChain(trust) as? [SecCertificate], let leaf = chain.first else {
+            return nil
+        }
         let digest = SHA256.hash(data: SecCertificateCopyData(leaf) as Data)
-        self.init(fingerprint: digest.map { String(format: "%02X", $0) }.joined(separator: ":"),
-                  subject: (SecCertificateCopySubjectSummary(leaf) as String?) ?? "", problem: problem)
+        self.init(
+            fingerprint: digest.map { String(format: "%02X", $0) }.joined(separator: ":"),
+            subject: (SecCertificateCopySubjectSummary(leaf) as String?) ?? "", problem: problem)
     }
 }
 
@@ -232,13 +252,29 @@ final class ExplicitTLSReport {
     private var refusalReply: FTPReply?
 
     var greeting: FTPReply? {
-        get { lock.lock(); defer { lock.unlock() }; return greetingReply }
-        set { lock.lock(); greetingReply = newValue; lock.unlock() }
+        get {
+            lock.lock()
+            defer { lock.unlock() }
+            return greetingReply
+        }
+        set {
+            lock.lock()
+            greetingReply = newValue
+            lock.unlock()
+        }
     }
 
     var refusal: FTPReply? {
-        get { lock.lock(); defer { lock.unlock() }; return refusalReply }
-        set { lock.lock(); refusalReply = newValue; lock.unlock() }
+        get {
+            lock.lock()
+            defer { lock.unlock() }
+            return refusalReply
+        }
+        set {
+            lock.lock()
+            refusalReply = newValue
+            lock.unlock()
+        }
     }
 }
 
@@ -262,7 +298,9 @@ final class FTPAuthTLSFramer: NWProtocolFramerImplementation {
     func stop(framer: NWProtocolFramer.Instance) -> Bool { true }
     func cleanup(framer: NWProtocolFramer.Instance) {}
 
-    func handleOutput(framer: NWProtocolFramer.Instance, message: NWProtocolFramer.Message, messageLength: Int, isComplete: Bool) {
+    func handleOutput(
+        framer: NWProtocolFramer.Instance, message: NWProtocolFramer.Message, messageLength: Int, isComplete: Bool
+    ) {
         try? framer.writeOutputNoCopy(length: messageLength)
     }
 
@@ -399,7 +437,11 @@ final class NetStream {
             case .waiting(let error), .failed(let error):
                 // "Waiting" is how a refused or unreachable address shows; nobody waits for a
                 // server to appear here.
-                if failure == nil { failure = isReady ? NetworkError.connectionLost : NetworkError.connectionFailed(error.localizedDescription) }
+                if failure == nil {
+                    failure =
+                        isReady
+                        ? NetworkError.connectionLost : NetworkError.connectionFailed(error.localizedDescription)
+                }
             case .cancelled:
                 if failure == nil { failure = NetworkError.connectionLost }
             default:
@@ -442,12 +484,15 @@ final class NetStream {
         if wanted { isReceiving = true }
         condition.unlock()
         guard wanted else { return }
-        connection.receive(minimumIncompleteLength: 1, maximumLength: 256 * 1024) { [weak self] data, _, isComplete, error in
+        connection.receive(minimumIncompleteLength: 1, maximumLength: 256 * 1024) {
+            [weak self] data, _, isComplete, error in
             guard let self else { return }
             condition.lock()
             isReceiving = false
             if let data { buffer.append(data) }
-            if let error, receiveFailure == nil { receiveFailure = NetworkError.connectionFailed(error.localizedDescription) }
+            if let error, receiveFailure == nil {
+                receiveFailure = NetworkError.connectionFailed(error.localizedDescription)
+            }
             if isComplete || error != nil { atEnd = true }
             condition.broadcast()
             condition.unlock()
@@ -471,7 +516,9 @@ final class NetStream {
     }
 
     /// Waits until `ready` returns a value, the stream fails, the time is up or the caller cancels.
-    private func wait<Result>(timeout: TimeInterval, cancellation: CancellationFlag?, for what: String, _ ready: () throws -> Result?) throws -> Result {
+    private func wait<Result>(
+        timeout: TimeInterval, cancellation: CancellationFlag?, for what: String, _ ready: () throws -> Result?
+    ) throws -> Result {
         let deadline = Date().addingTimeInterval(timeout)
         condition.lock()
         defer { condition.unlock() }
@@ -497,7 +544,8 @@ final class NetStream {
     /// The next bytes, at most `count`; nil when the other side has closed the connection.
     /// A connection that broke instead of ending throws, once what arrived before is read.
     func read(upToCount count: Int, timeout: TimeInterval, cancellation: CancellationFlag? = nil) throws -> Data? {
-        let data: Data? = try wait(timeout: timeout, cancellation: cancellation, for: "reading") { () throws -> Data?? in
+        let data: Data? = try wait(timeout: timeout, cancellation: cancellation, for: "reading") {
+            () throws -> Data?? in
             if self.buffered > 0 {
                 let piece = Data(self.buffer[self.readOffset..<self.readOffset + min(count, self.buffered)])
                 self.consume(piece.count)
@@ -513,10 +561,13 @@ final class NetStream {
     /// The next line without its line end. Throws `connectionLost` when the connection ends
     /// first, and `unexpected` when no line end comes within `limit` bytes: a line of a reply
     /// is short, and the wait for one must not collect whatever a server sends instead.
-    func readLine(timeout: TimeInterval, limit: Int = FTPLimits.lineLength, cancellation: CancellationFlag? = nil) throws -> Data {
+    func readLine(timeout: TimeInterval, limit: Int = FTPLimits.lineLength, cancellation: CancellationFlag? = nil)
+        throws -> Data
+    {
         /// How far the buffer was searched already, so no byte is looked at twice.
         var searched = 0
-        let line: Data? = try wait(timeout: timeout, cancellation: cancellation, for: "waiting for a reply") { () throws -> Data?? in
+        let line: Data? = try wait(timeout: timeout, cancellation: cancellation, for: "waiting for a reply") {
+            () throws -> Data?? in
             let from = self.readOffset + min(searched, self.buffered)
             let until = min(self.buffer.count, self.readOffset + limit + 2)
             if from < until, let end = self.buffer[from..<until].firstIndex(of: 0x0A) {
@@ -538,7 +589,8 @@ final class NetStream {
 
     /// True when something has arrived that was not read yet.
     func hasInput(within timeout: TimeInterval) -> Bool {
-        (try? wait(timeout: timeout, cancellation: nil, for: "") { self.buffered == 0 && !self.atEnd ? nil : true }) ?? false
+        (try? wait(timeout: timeout, cancellation: nil, for: "") { self.buffered == 0 && !self.atEnd ? nil : true })
+            ?? false
     }
 
     // MARK: Writing
@@ -557,7 +609,9 @@ final class NetStream {
                 let end = min(offset + NetStream.sendPiece, data.endIndex)
                 outstanding.append(submit(data[offset..<end], isFinal: false))
                 offset = end
-                if outstanding.count >= NetStream.sendsInFlight { try complete(outstanding.removeFirst(), timeout: timeout, cancellation: cancellation) }
+                if outstanding.count >= NetStream.sendsInFlight {
+                    try complete(outstanding.removeFirst(), timeout: timeout, cancellation: cancellation)
+                }
             }
             for pending in outstanding { try complete(pending, timeout: timeout, cancellation: cancellation) }
         } catch {
@@ -573,7 +627,8 @@ final class NetStream {
     /// announced before that makes it drop what is still on its way. Found by test.
     /// True once the caller has declared its data complete.
     var didFinishWriting: Bool {
-        condition.lock(); defer { condition.unlock() }
+        condition.lock()
+        defer { condition.unlock() }
         return hasFinishedWriting
     }
 
@@ -582,7 +637,9 @@ final class NetStream {
         let alreadyFinished = hasFinishedWriting
         hasFinishedWriting = true
         condition.unlock()
-        if !alreadyFinished, !isEncrypted { try send(nil, isFinal: true, timeout: timeout, cancellation: cancellation) }
+        if !alreadyFinished, !isEncrypted {
+            try send(nil, isFinal: true, timeout: timeout, cancellation: cancellation)
+        }
     }
 
     private func send(_ data: Data?, isFinal: Bool, timeout: TimeInterval, cancellation: CancellationFlag?) throws {
@@ -597,13 +654,16 @@ final class NetStream {
 
     private func submit(_ data: Data?, isFinal: Bool) -> Pending<Bool> {
         let sent = Pending<Bool>()
-        connection.send(content: data, contentContext: isFinal ? .finalMessage : .defaultMessage, isComplete: true,
-                        completion: .contentProcessed { error in sent.fulfill(error == nil) })
+        connection.send(
+            content: data, contentContext: isFinal ? .finalMessage : .defaultMessage, isComplete: true,
+            completion: .contentProcessed { error in sent.fulfill(error == nil) })
         return sent
     }
 
     private func complete(_ sent: Pending<Bool>, timeout: TimeInterval, cancellation: CancellationFlag?) throws {
-        guard let succeeded = try sent.wait(timeout: timeout, cancellation: cancellation) else { throw NetworkError.timedOut("sending") }
+        guard let succeeded = try sent.wait(timeout: timeout, cancellation: cancellation) else {
+            throw NetworkError.timedOut("sending")
+        }
         if !succeeded { throw NetworkError.connectionLost }
     }
 

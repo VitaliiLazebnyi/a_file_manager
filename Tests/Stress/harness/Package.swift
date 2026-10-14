@@ -6,7 +6,9 @@ import PackageDescription
 // The target list mirrors the root Package.swift (without its test targets and the program).
 
 func plugin(_ name: String, needsShell: Bool = false) -> Target {
-    .target(name: name + "Plugin", dependencies: ["AFMKernel", "AFMContracts"] + (needsShell ? ["AFMShell"] : []), path: "Sources/Plugins/" + name)
+    .target(
+        name: name + "Plugin", dependencies: ["AFMKernel", "AFMContracts"] + (needsShell ? ["AFMShell"] : []),
+        path: "Sources/Plugins/" + name)
 }
 
 let plugins = [
@@ -30,7 +32,7 @@ let plugins = [
     plugin("VirtualFolders"),
     plugin("FileProperties", needsShell: true),
     plugin("SystemTools", needsShell: true),
-    plugin("Configuration", needsShell: true),
+    plugin("Configuration", needsShell: true)
 ]
 let pluginDependencies = plugins.map { Target.Dependency(stringLiteral: $0.name) }
 
@@ -43,16 +45,17 @@ let package = Package(
         .target(name: "AFMShell", dependencies: ["AFMKernel", "AFMContracts"]),
         .target(name: "StandardPlugins", dependencies: ["AFMKernel"] + pluginDependencies),
 
-        .target(name: "TestSupport", dependencies: ["AFMKernel"], path: "TestSupport"),
+        .target(name: "TestSupport", dependencies: ["AFMKernel"], path: "TestSupport")
     ] + plugins
 )
 
-let everything: [Target.Dependency] = ["AFMKernel", "AFMContracts", "AFMShell", "StandardPlugins", "TestSupport", "StressKit"] + pluginDependencies
+let everything: [Target.Dependency] =
+    ["AFMKernel", "AFMContracts", "AFMShell", "StandardPlugins", "TestSupport", "StressKit"] + pluginDependencies
 func stress(_ name: String) -> Target {
     .executableTarget(name: name, dependencies: everything, path: "Stress/" + name)
 }
 package.targets += [
     .target(name: "StressKit", path: "Stress/StressKit"),
     stress("StressPanel"), stress("StressParallel"), stress("StressJobs"), stress("StressArchives"),
-    stress("StressFind"), stress("StressViewer"),
+    stress("StressFind"), stress("StressViewer")
 ]

@@ -1,10 +1,11 @@
 import AFMKernel
-@testable import ArchivesPlugin
-@testable import FileOperationsPlugin
 import Foundation
 import LocalFileSystemPlugin
 import TestSupport
 import Testing
+
+@testable import ArchivesPlugin
+@testable import FileOperationsPlugin
 @testable import ViewerPlugin
 @testable import VirtualFoldersPlugin
 
@@ -99,9 +100,13 @@ private final class BreakingAnswers: FileJobDelegate {
 
     @Test func aMoveOfSmallAndLargeFilesPutsThemInTheArchiveFileOnceAndRemovesTheSources() throws {
         let archive = try makeZip()
-        let sources = try makeSources(["a.txt": 20, "b.txt": 3000, "big1.txt": 300_000, "big2.txt": 700_000, "c.txt": 7])
-        let wanted = try Dictionary(uniqueKeysWithValues: sources.map { ($0.lastPathComponent, try String(contentsOf: $0, encoding: .utf8)) })
-        let result = runJob(.move, sources, to: TargetSpec(directory: bench.inside(archive, "tree")), fileSystems: bench.fileSystems)
+        let sources = try makeSources([
+            "a.txt": 20, "b.txt": 3000, "big1.txt": 300_000, "big2.txt": 700_000, "c.txt": 7
+        ])
+        let wanted = try Dictionary(
+            uniqueKeysWithValues: sources.map { ($0.lastPathComponent, try String(contentsOf: $0, encoding: .utf8)) })
+        let result = runJob(
+            .move, sources, to: TargetSpec(directory: bench.inside(archive, "tree")), fileSystems: bench.fileSystems)
         #expect(result.completed.count == 5 && !result.cancelled && result.failureCount == 0)
         #expect(sources.allSatisfy { !FileManager.default.fileExists(atPath: $0.path) })
         // Written before the sources went: nothing waits in memory any more.
@@ -129,8 +134,14 @@ private final class BreakingAnswers: FileJobDelegate {
         let answers = BreakingAnswers()
         let (locked, open) = (FileAttributes(permissions: 0o555), FileAttributes(permissions: 0o755))
         func setFolder(_ attributes: FileAttributes) { try? LocalFileSystem().setAttributes(attributes, of: box.root) }
-        if quickWrites { setFolder(locked) } else { answers.onLines = { if $0.contains(where: { $0.hasSuffix("big3.txt") }) { setFolder(locked) } } }
-        let job = FileJob(kind: .move, sources: sources, target: TargetSpec(directory: bench.inside(archive, "tree")), fileSystems: bench.fileSystems)
+        if quickWrites {
+            setFolder(locked)
+        } else {
+            answers.onLines = { if $0.contains(where: { $0.hasSuffix("big3.txt") }) { setFolder(locked) } }
+        }
+        let job = FileJob(
+            kind: .move, sources: sources, target: TargetSpec(directory: bench.inside(archive, "tree")),
+            fileSystems: bench.fileSystems)
         job.delegate = answers
         // One file after the other, so that the folder is locked before the last one is begun and not before.
         job.parallelWidth = 1
@@ -140,7 +151,9 @@ private final class BreakingAnswers: FileJobDelegate {
         // At the commit the job ends, after the question about the last file and the one about the commit;
         // at the renames each file fails on its own.
         if !quickWrites { #expect(result.cancelled && answers.errors.count == 2) }
-        for source in sources { #expect(FileManager.default.fileExists(atPath: source.path), "\(source.lastPathComponent)") }
+        for source in sources {
+            #expect(FileManager.default.fileExists(atPath: source.path), "\(source.lastPathComponent)")
+        }
         // The archive file was not touched.
         #expect(try Data(contentsOf: archive) == before && isSound(archive))
     }
@@ -151,8 +164,10 @@ private final class BreakingAnswers: FileJobDelegate {
         let value = "0083;5e8b1c2d;Safari;"
         mark(archive, with: value)
         let out = try box.folder("out")
-        let result = runJob(.copy, [bench.inside(archive, "tree/readme.txt"), bench.inside(archive, "tree/sub")], to: TargetSpec(directory: out),
-                            fileSystems: bench.fileSystems)
+        let result = runJob(
+            .copy, [bench.inside(archive, "tree/readme.txt"), bench.inside(archive, "tree/sub")],
+            to: TargetSpec(directory: out),
+            fileSystems: bench.fileSystems)
         #expect(result.completed.count == 2 && result.failureCount == 0)
         #expect(markOf(out.appendingPathComponent("readme.txt")) == value)
         #expect(markOf(out.appendingPathComponent("sub/deep/inner.txt")) == value)
@@ -163,7 +178,8 @@ private final class BreakingAnswers: FileJobDelegate {
         try box.file("plain/x.txt", "x")
         mark(box.url("plain"), with: "0083;5e8b1c2d;Safari;")
         let out = try box.folder("out")
-        let result = runJob(.copy, [box.url("plain/x.txt")], to: TargetSpec(directory: out), fileSystems: bench.fileSystems)
+        let result = runJob(
+            .copy, [box.url("plain/x.txt")], to: TargetSpec(directory: out), fileSystems: bench.fileSystems)
         #expect(result.completed.count == 1 && box.read("out/x.txt") == "x")
         #expect(markOf(out.appendingPathComponent("x.txt")) == nil)
     }
@@ -209,7 +225,9 @@ private final class BreakingAnswers: FileJobDelegate {
         probe.onWrite = { gate.signal() }
         memory.addDirectory("/A")
         let source = try box.file("in/data.bin", "some data")
-        let job = FileJob(kind: .copy, sources: [source], target: TargetSpec(directory: virtual.branch(of: memory.url("/A"))), fileSystems: registry)
+        let job = FileJob(
+            kind: .copy, sources: [source], target: TargetSpec(directory: virtual.branch(of: memory.url("/A"))),
+            fileSystems: registry)
         let answers = Answers()
         job.delegate = answers
         cancel(job, when: gate)
@@ -251,9 +269,14 @@ private final class BreakingAnswers: FileJobDelegate {
         memory.addFile("/A/x/same.txt")
         memory.addFile("/A/y/same.txt")
         memory.addFile("/A/other.txt")
-        let picked = virtual.registerPicked([memory.url("/A/x/same.txt"), memory.url("/A/y/same.txt"), memory.url("/A/other.txt")], in: memory.url("/A"))
+        let picked = virtual.registerPicked(
+            [memory.url("/A/x/same.txt"), memory.url("/A/y/same.txt"), memory.url("/A/other.txt")],
+            in: memory.url("/A"))
         let items = try virtual.list(picked, showHidden: false)
-        let (first, second) = (try #require(items.first { $0.url.path == "/A/x/same.txt" }), try #require(items.first { $0.url.path == "/A/y/same.txt" }))
+        let (first, second) = (
+            try #require(items.first { $0.url.path == "/A/x/same.txt" }),
+            try #require(items.first { $0.url.path == "/A/y/same.txt" })
+        )
         #expect(first.name != "same.txt" && second.name != "same.txt" && first.name != second.name)
         let names = FileOperations.names(of: [memory.url("/A/y/same.txt"), memory.url("/A/other.txt")], among: items)
         #expect(Set(names) == [second.name, "other.txt"])

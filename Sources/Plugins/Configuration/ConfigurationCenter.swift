@@ -37,7 +37,9 @@ final class ConfigurationCenter {
             let entries = store.startMenu
             return entries.indices.contains(number - 1) && !entries[number - 1].isSeparator ? entries[number - 1] : nil
         }
-        store.onProblem = { [unowned kernel] in kernel.ui.inform("Some settings could not be read", detail: $0, style: .warning) }
+        store.onProblem = { [unowned kernel] in
+            kernel.ui.inform("Some settings could not be read", detail: $0, style: .warning)
+        }
     }
 
     // MARK: User commands
@@ -51,11 +53,13 @@ final class ConfigurationCenter {
     func register(_ command: UserCommand) {
         let name = command.name
         guard kernel.commands[command.id] == nil else { return }
-        kernel.commands.register(Command(command.id, DisplayText.oneLine(command.caption, limit: 120)), enabled: { [unowned self] in userCommand(named: name) != nil },
-                                 parameterized: { [unowned self] argument in
-            guard let current = userCommand(named: name) else { return }
-            runner.run(current.action, arguments: argument.text ?? "", as: name, title: current.caption)
-        })
+        kernel.commands.register(
+            Command(command.id, DisplayText.oneLine(command.caption, limit: 120)),
+            enabled: { [unowned self] in userCommand(named: name) != nil },
+            parameterized: { [unowned self] argument in
+                guard let current = userCommand(named: name) else { return }
+                runner.run(current.action, arguments: argument.text ?? "", as: name, title: current.caption)
+            })
     }
 
     /// Stores a new or changed user command; `oldName` is the one it replaces when it was renamed.
@@ -110,23 +114,30 @@ final class ConfigurationCenter {
             .text("path", "Start path:", action.startPath),
             .text("shortcut", "Shortcut:", keys.first?.notation ?? ""),
             .text("symbol", "Symbol:", existing?.symbol ?? ""),
-            .note("Command: a command of the program (cm_…, several separated by commas), cd <folder>, or a program or shell line.\n"
-                  + "Shortcut: for example ctrl+shift+n or f9.  Symbol: the name of a system symbol for the button bar.\n"
-                  + ConfigurationCenter.startMenuHint),
+            .note(
+                "Command: a command of the program (cm_…, several separated by commas), cd <folder>, or a program or shell line.\n"
+                    + "Shortcut: for example ctrl+shift+n or f9.  Symbol: the name of a system symbol for the button bar.\n"
+                    + ConfigurationCenter.startMenuHint)
         ]
-        guard let answer = kernel.ui.form(existing == nil ? "New User Command" : "Edit User Command", fields: fields) else { return nil }
+        guard let answer = kernel.ui.form(existing == nil ? "New User Command" : "Edit User Command", fields: fields)
+        else { return nil }
         guard let name = UserCommand.name(from: answer.text("name")) else {
-            kernel.ui.inform("The command needs a name", detail: "Use letters, digits and the underscore.", style: .warning)
+            kernel.ui.inform(
+                "The command needs a name", detail: "Use letters, digits and the underscore.", style: .warning)
             return nil
         }
         if name != existing?.name, userCommand(named: name) != nil {
-            kernel.ui.inform("\(name) exists already", detail: "Choose another name, or edit that command.", style: .warning)
+            kernel.ui.inform(
+                "\(name) exists already", detail: "Choose another name, or edit that command.", style: .warning)
             return nil
         }
-        let command = UserCommand(name: name, title: answer.text("title").trimmingCharacters(in: .whitespaces),
-                                  action: CommandAction(command: answer.text("command").trimmingCharacters(in: .whitespaces),
-                                                        parameters: answer.text("parameters"), startPath: answer.text("path").trimmingCharacters(in: .whitespaces)),
-                                  symbol: answer.text("symbol").trimmingCharacters(in: .whitespaces))
+        let command = UserCommand(
+            name: name, title: answer.text("title").trimmingCharacters(in: .whitespaces),
+            action: CommandAction(
+                command: answer.text("command").trimmingCharacters(in: .whitespaces),
+                parameters: answer.text("parameters"),
+                startPath: answer.text("path").trimmingCharacters(in: .whitespaces)),
+            symbol: answer.text("symbol").trimmingCharacters(in: .whitespaces))
         save(command, replacing: existing?.name)
         if answer.text("shortcut") != (keys.first?.notation ?? "") || name != existing?.name {
             setShortcut(answer.text("shortcut"), for: command.id)
@@ -138,9 +149,13 @@ final class ConfigurationCenter {
 
     /// The Start menu with the keys its entries have now.
     func startMenuDraft() -> StartMenuDraft {
-        StartMenuDraft(rows: store.startMenu.enumerated().map { index, entry in
-            StartMenuDraft.Row(entry: entry, shortcut: kernel.keyBindings.shortcuts(for: StartMenuEntry.commandID(at: index)).first?.notation ?? "")
-        })
+        StartMenuDraft(
+            rows: store.startMenu.enumerated().map { index, entry in
+                StartMenuDraft.Row(
+                    entry: entry,
+                    shortcut: kernel.keyBindings.shortcuts(for: StartMenuEntry.commandID(at: index)).first?.notation
+                        ?? "")
+            })
     }
 
     /// Registers `cm_UserMenu1` … for every position there is, and at least the ten the
@@ -149,16 +164,24 @@ final class ConfigurationCenter {
         let entries = store.startMenu
         while slotCount < max(10, min(count, ConfigurationStore.startMenuLimit)) {
             let index = slotCount
-            let title = entries.indices.contains(index) && !entries[index].isSeparator ? entries[index].title : "Start Menu Item \(index + 1)"
+            let title =
+                entries.indices.contains(index) && !entries[index].isSeparator
+                ? entries[index].title : "Start Menu Item \(index + 1)"
             func entry() -> StartMenuEntry? {
                 let current = store.startMenu
                 return current.indices.contains(index) && !current[index].isSeparator ? current[index] : nil
             }
-            kernel.commands.register(Command(StartMenuEntry.commandID(at: index), DisplayText.oneLine(title.replacingOccurrences(of: "&", with: ""), limit: 120)),
-                                     enabled: { entry() != nil }, parameterized: { [unowned self] argument in
-                guard let entry = entry() else { return }
-                runner.run(entry.action, arguments: argument.text ?? "", as: StartMenuEntry.commandID(at: index).rawValue, title: entry.title)
-            })
+            kernel.commands.register(
+                Command(
+                    StartMenuEntry.commandID(at: index),
+                    DisplayText.oneLine(title.replacingOccurrences(of: "&", with: ""), limit: 120)),
+                enabled: { entry() != nil },
+                parameterized: { [unowned self] argument in
+                    guard let entry = entry() else { return }
+                    runner.run(
+                        entry.action, arguments: argument.text ?? "", as: StartMenuEntry.commandID(at: index).rawValue,
+                        title: entry.title)
+                })
             slotCount += 1
         }
     }
@@ -193,7 +216,9 @@ final class ConfigurationCenter {
     }
 
     /// The dialog of one Start-menu entry (spec 14 › The Change start menu dialog).
-    func editStartMenuRow(_ row: StartMenuDraft.Row?, proposing action: CommandAction = CommandAction(), title: String = "") -> StartMenuDraft.Row? {
+    func editStartMenuRow(
+        _ row: StartMenuDraft.Row?, proposing action: CommandAction = CommandAction(), title: String = ""
+    ) -> StartMenuDraft.Row? {
         let action = row?.entry.action ?? action
         let fields: [FormField] = [
             .text("title", "Title:", row?.entry.title ?? title),
@@ -201,19 +226,25 @@ final class ConfigurationCenter {
             .text("parameters", "Parameters:", action.parameters),
             .text("path", "Start path:", action.startPath),
             .text("shortcut", "Shortcut key:", row?.shortcut ?? ""),
-            .note(ConfigurationCenter.startMenuHint),
+            .note(ConfigurationCenter.startMenuHint)
         ]
-        guard let answer = kernel.ui.form(row == nil ? "Add Start Menu Item" : "Change Start Menu Item", fields: fields) else { return nil }
+        guard
+            let answer = kernel.ui.form(row == nil ? "Add Start Menu Item" : "Change Start Menu Item", fields: fields)
+        else { return nil }
         let title = answer.text("title").trimmingCharacters(in: .whitespaces)
         guard !title.isEmpty else { return nil }
         var shortcut = answer.text("shortcut").trimmingCharacters(in: .whitespaces)
         if !shortcut.isEmpty, ShortcutText.parse(shortcut) == nil {
-            kernel.ui.inform("“\(shortcut)” is not a shortcut", detail: "Write it like ctrl+shift+n or f9.", style: .warning)
+            kernel.ui.inform(
+                "“\(shortcut)” is not a shortcut", detail: "Write it like ctrl+shift+n or f9.", style: .warning)
             shortcut = ""
         }
-        let entry = StartMenuEntry(title: title, action: CommandAction(command: answer.text("command").trimmingCharacters(in: .whitespaces),
-                                                                       parameters: answer.text("parameters"),
-                                                                       startPath: answer.text("path").trimmingCharacters(in: .whitespaces)))
+        let entry = StartMenuEntry(
+            title: title,
+            action: CommandAction(
+                command: answer.text("command").trimmingCharacters(in: .whitespaces),
+                parameters: answer.text("parameters"),
+                startPath: answer.text("path").trimmingCharacters(in: .whitespaces)))
         return StartMenuDraft.Row(entry: entry, shortcut: ShortcutText.parse(shortcut)?.notation ?? "")
     }
 
@@ -231,7 +262,8 @@ final class ConfigurationCenter {
         } else if let shortcut = ShortcutText.parse(text) {
             guard editor.assign(shortcut, to: command, adding: false, asking: kernel.ui) else { return false }
         } else {
-            kernel.ui.inform("“\(text)” is not a shortcut", detail: "Write it like ctrl+shift+n or f9.", style: .warning)
+            kernel.ui.inform(
+                "“\(text)” is not a shortcut", detail: "Write it like ctrl+shift+n or f9.", style: .warning)
             return false
         }
         commitKeys(editor)
@@ -253,7 +285,10 @@ final class ConfigurationCenter {
     /// the button bar, the panels' tabs, this plugin's own, and whatever the store can list.
     func settingsKeys() -> [String] {
         var keys = kernel.preferences.pages.flatMap { $0.preferences.map(\.key) }
-        keys += [KeyBindings.settingsKey, ToolbarRegistry.settingsKey, ListingCache.settingsKey, "listingCache.readAhead", "left.tabs", "right.tabs"]
+        keys += [
+            KeyBindings.settingsKey, ToolbarRegistry.settingsKey, ListingCache.settingsKey, "listingCache.readAhead",
+            "left.tabs", "right.tabs"
+        ]
         keys += ConfigurationStore.keys + enumeratedKeys()
         var seen = Set<String>()
         return keys.filter { seen.insert($0).inserted }
@@ -262,7 +297,9 @@ final class ConfigurationCenter {
     /// What is known about the settings now, for import and export.
     func settingsSchema() -> SettingsSchema {
         var schema = SettingsSchema()
-        for preference in kernel.preferences.pages.flatMap(\.preferences) { schema.preferences[preference.key] = preference.kind }
+        for preference in kernel.preferences.pages.flatMap(\.preferences) {
+            schema.preferences[preference.key] = preference.kind
+        }
         schema.known = Set(settingsKeys())
         let declared = kernel.settingsKeys
         schema.declaredKind = { declared.kind(of: $0) }
@@ -272,29 +309,39 @@ final class ConfigurationCenter {
     /// Asks what an export is to hold besides the settings themselves. Nil when the user gave up.
     func askExportOptions() -> SettingsExportOptions? {
         let fields: [FormField] = [
-            .note("The file holds the options of all pages, the key bindings, the button bar, the user commands, the Start menu, the directory "
-                  + "hotlist and the panels' tabs. Passwords are never in it, and only you can read the file."),
+            .note(
+                "The file holds the options of all pages, the key bindings, the button bar, the user commands, the Start menu, the directory "
+                    + "hotlist and the panels' tabs. Passwords are never in it, and only you can read the file."),
             .checkbox("history", "Also include " + SettingsExportOptions.historyNote),
-            .checkbox("connections", "Also include " + SettingsExportOptions.connectionsNote),
+            .checkbox("connections", "Also include " + SettingsExportOptions.connectionsNote)
         ]
-        guard let answer = kernel.ui.form("Export Settings", detail: "", fields: fields, buttons: ["Export…"]) else { return nil }
-        return SettingsExportOptions(includesHistory: answer.flag("history"), includesConnections: answer.flag("connections"))
+        guard let answer = kernel.ui.form("Export Settings", detail: "", fields: fields, buttons: ["Export…"]) else {
+            return nil
+        }
+        return SettingsExportOptions(
+            includesHistory: answer.flag("history"), includesConnections: answer.flag("connections"))
     }
 
     /// Writes the settings to a file only the user can read. What the user did rather than set
     /// up (histories), and the servers the user connects to, are in it only when `options` says so.
-    func exportSettings(to url: URL, options: SettingsExportOptions = SettingsExportOptions(), tellsWhatIsIncluded: Bool = true) {
+    func exportSettings(
+        to url: URL, options: SettingsExportOptions = SettingsExportOptions(), tellsWhatIsIncluded: Bool = true
+    ) {
         let keys = options.included(settingsKeys(), schema: settingsSchema())
         let archive = SettingsArchive.capture(from: kernel.settings, keys: keys)
-        runner.offMain({ Result { try archive.write(to: url) } }, then: { [self] result in
-            switch result {
-            case .failure(let error): kernel.ui.report(error, title: "The settings could not be exported")
-            case .success:
-                if tellsWhatIsIncluded {
-                    kernel.ui.inform("The settings were exported", detail: options.description(count: archive.values.count), style: .information)
+        runner.offMain(
+            { Result { try archive.write(to: url) } },
+            then: { [self] result in
+                switch result {
+                case .failure(let error): kernel.ui.report(error, title: "The settings could not be exported")
+                case .success:
+                    if tellsWhatIsIncluded {
+                        kernel.ui.inform(
+                            "The settings were exported", detail: options.description(count: archive.values.count),
+                            style: .information)
+                    }
                 }
-            }
-        })
+            })
     }
 
     /// Reads a settings file, checks it, shows what it would change and stores it when the
@@ -304,18 +351,24 @@ final class ConfigurationCenter {
     func importSettings(from url: URL) {
         let schema = settingsSchema()
         let knownKeys = settingsKeys()
-        runner.offMain({ Result { try CheckedSettings(SettingsArchive(data: CheckedSettings.read(url)), schema: schema) } }, then: { [self] result in
-            switch result {
-            case .failure(let error):
-                kernel.ui.report(error, title: "The settings could not be imported")
-            case .success(let checked):
-                var current: [String: Data] = [:]
-                for key in Set(knownKeys).union(checked.values.keys) { current[key] = kernel.settings.data(forKey: key) }
-                runner.offMain({ SettingsImportPlan(checked, current: current, knownKeys: knownKeys, schema: schema) }, then: { [self] plan in
-                    confirmAndApply(plan, fileName: url.lastPathComponent)
-                })
-            }
-        })
+        runner.offMain(
+            { Result { try CheckedSettings(SettingsArchive(data: CheckedSettings.read(url)), schema: schema) } },
+            then: { [self] result in
+                switch result {
+                case .failure(let error):
+                    kernel.ui.report(error, title: "The settings could not be imported")
+                case .success(let checked):
+                    var current: [String: Data] = [:]
+                    for key in Set(knownKeys).union(checked.values.keys) {
+                        current[key] = kernel.settings.data(forKey: key)
+                    }
+                    runner.offMain(
+                        { SettingsImportPlan(checked, current: current, knownKeys: knownKeys, schema: schema) },
+                        then: { [self] plan in
+                            confirmAndApply(plan, fileName: url.lastPathComponent)
+                        })
+                }
+            })
     }
 
     private func confirmAndApply(_ plan: SettingsImportPlan, fileName: String) {
@@ -327,21 +380,27 @@ final class ConfigurationCenter {
             fields.append(.checkbox(part.group.rawValue, part.title, false))
             fields.append(.lines(part.group.rawValue + ".contents", "", part.lines.joined(separator: "\n")))
         }
-        guard let answer = kernel.ui.form("Import Settings", detail: "", fields: fields, buttons: ["Import"]) else { return }
+        guard let answer = kernel.ui.form("Import Settings", detail: "", fields: fields, buttons: ["Import"]) else {
+            return
+        }
         let accepted = Set(plan.parts.map(\.group).filter { answer.flag($0.rawValue) })
         plan.apply(to: kernel.settings, accepting: accepted)
         applyStoredSettings()
         let skipped = plan.parts.filter { !accepted.contains($0.group) }.count
-        kernel.ui.inform("The settings were imported", detail: (skipped > 0 ? "\(skipped) parts were not ticked and stay as they were. " : "")
-                         + "Some settings take effect when the program is started again.", style: .information)
+        kernel.ui.inform(
+            "The settings were imported",
+            detail: (skipped > 0 ? "\(skipped) parts were not ticked and stay as they were. " : "")
+                + "Some settings take effect when the program is started again.", style: .information)
     }
 
     /// Removes every known setting after asking; returns whether it did.
     @discardableResult
     func resetSettings() -> Bool {
-        let answer = kernel.ui.choose("Reset all settings?", detail: "Options, key bindings, the button bar, user commands and the Start menu "
-                                      + "go back to how the program came. Export the settings first to keep them.",
-                                      buttons: ["Reset", "Cancel"], style: .critical)
+        let answer = kernel.ui.choose(
+            "Reset all settings?",
+            detail: "Options, key bindings, the button bar, user commands and the Start menu "
+                + "go back to how the program came. Export the settings first to keep them.",
+            buttons: ["Reset", "Cancel"], style: .critical)
         guard answer == 0 else { return false }
         SettingsArchive().restore(into: kernel.settings, replacing: settingsKeys())
         applyStoredSettings()
@@ -365,7 +424,9 @@ final class ConfigurationCenter {
 
     /// The pictures the user chose replace the plugins' (spec 14 › Button bars).
     func applySymbols() {
-        for command in store.userCommands where !command.symbol.isEmpty { kernel.toolbar.setSymbol(command.symbol, for: command.id) }
+        for command in store.userCommands where !command.symbol.isEmpty {
+            kernel.toolbar.setSymbol(command.symbol, for: command.id)
+        }
         for (name, symbol) in store.symbols { kernel.toolbar.setSymbol(symbol, for: CommandID(rawValue: name)) }
     }
 
@@ -379,7 +440,9 @@ final class ConfigurationCenter {
     }
 
     func savePosition() {
-        for window in NSApp?.windows ?? [] where !window.frameAutosaveName.isEmpty { window.saveFrame(usingName: window.frameAutosaveName) }
+        for window in NSApp?.windows ?? [] where !window.frameAutosaveName.isEmpty {
+            window.saveFrame(usingName: window.frameAutosaveName)
+        }
         // Handing the preferences to the system's store is a call to another process: not here.
         runner.offMain({ UserDefaults.standard.synchronize() }, then: { _ in })
     }
@@ -387,6 +450,7 @@ final class ConfigurationCenter {
     // MARK: Command list
 
     func commandRows() -> [CommandRow] {
-        CommandCatalog.rows(commands: kernel.commands.all, menus: kernel.menus.menus, shortcuts: kernel.keyBindings.shortcuts(for:))
+        CommandCatalog.rows(
+            commands: kernel.commands.all, menus: kernel.menus.menus, shortcuts: kernel.keyBindings.shortcuts(for:))
     }
 }

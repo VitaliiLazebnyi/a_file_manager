@@ -77,7 +77,8 @@ final class PathBarView: NSView {
 
     override func layout() {
         super.layout()
-        ejectButton.frame = NSRect(x: bounds.width - PathBarView.ejectWidth, y: 0, width: PathBarView.ejectWidth, height: bounds.height)
+        ejectButton.frame = NSRect(
+            x: bounds.width - PathBarView.ejectWidth, y: 0, width: PathBarView.ejectWidth, height: bounds.height)
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
@@ -132,13 +133,18 @@ final class PathBarView: NSView {
     }
 
     override func draw(_ dirtyRect: NSRect) {
-        (isActive ? NSColor.selectedContentBackgroundColor : NSColor.unemphasizedSelectedContentBackgroundColor).setFill()
+        (isActive ? NSColor.selectedContentBackgroundColor : NSColor.unemphasizedSelectedContentBackgroundColor)
+            .setFill()
         bounds.fill()
-        let attributed = NSMutableAttributedString(string: text, attributes: [
-            .font: PathBarView.font, .foregroundColor: isActive ? NSColor.alternateSelectedControlTextColor : NSColor.labelColor,
-        ])
+        let attributed = NSMutableAttributedString(
+            string: text,
+            attributes: [
+                .font: PathBarView.font,
+                .foregroundColor: isActive ? NSColor.alternateSelectedControlTextColor : NSColor.labelColor
+            ])
         if let hovered, segments.indices.contains(hovered) {
-            attributed.addAttribute(.underlineStyle, value: NSUnderlineStyle.single.rawValue, range: segments[hovered].range)
+            attributed.addAttribute(
+                .underlineStyle, value: NSUnderlineStyle.single.rawValue, range: segments[hovered].range)
         }
         NSGraphicsContext.saveGraphicsState()
         NSRect(x: 2, y: 0, width: max(textArea - 4, 0), height: bounds.height).clip()
@@ -151,8 +157,9 @@ final class PathBarView: NSView {
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
         if let mouseArea { removeTrackingArea(mouseArea) }
-        let area = NSTrackingArea(rect: .zero, options: [.mouseMoved, .mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect],
-                                  owner: self, userInfo: nil)
+        let area = NSTrackingArea(
+            rect: .zero, options: [.mouseMoved, .mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect],
+            owner: self, userInfo: nil)
         addTrackingArea(area)
         mouseArea = area
     }

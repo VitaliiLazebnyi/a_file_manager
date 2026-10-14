@@ -14,7 +14,9 @@ enum LoginShell {
     /// The shell the user logs in with.
     static var usersShell: String {
         var path = ProcessInfo.processInfo.environment["SHELL"] ?? ""
-        if path.isEmpty, let entry = getpwuid(getuid()), let shell = entry.pointee.pw_shell { path = String(cString: shell) }
+        if path.isEmpty, let entry = getpwuid(getuid()), let shell = entry.pointee.pw_shell {
+            path = String(cString: shell)
+        }
         return path.isEmpty ? "/bin/zsh" : path
     }
 
@@ -24,7 +26,9 @@ enum LoginShell {
     /// waits up to a few seconds for it: never for the main thread.
     static let foreignPath: String? = {
         let shell = usersShell
-        guard URL(fileURLWithPath: shell).lastPathComponent != "zsh", FileManager.default.isExecutableFile(atPath: shell) else { return nil }
+        guard URL(fileURLWithPath: shell).lastPathComponent != "zsh",
+            FileManager.default.isExecutableFile(atPath: shell)
+        else { return nil }
         // `csh` and `tcsh` take `-c` but not `-l` with it.
         return path(from: shell, ["-l", "-c", "printenv PATH"]) ?? path(from: shell, ["-c", "printenv PATH"])
     }()

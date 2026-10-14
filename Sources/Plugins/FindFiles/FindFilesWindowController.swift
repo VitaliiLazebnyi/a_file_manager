@@ -13,7 +13,8 @@ import AppKit
 /// and checked in the background. What the end of a search or an action on the results would
 /// otherwise do to every row (counting, building the text to copy, making the list of
 /// locations) is kept up to date as rows arrive or done in the background.
-final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NSTableViewDataSource, NSTableViewDelegate {
+final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NSTableViewDataSource, NSTableViewDelegate
+{
     /// A line of the result list (spec 09 › Running a search and the result list).
     enum Row {
         /// `[6 files and 0 directories found]`, always the first line.
@@ -49,7 +50,9 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
                 rows.append(.item(item))
                 if item.isDirectory { directories += 1 }
             }
-            return Built(rows: rows, urls: items.map(\.url), files: items.count - directories, directories: directories, showsDuplicates: false)
+            return Built(
+                rows: rows, urls: items.map(\.url), files: items.count - directories, directories: directories,
+                showsDuplicates: false)
         }
 
         static func make(groups: [[FileItem]]) -> Built {
@@ -139,9 +142,12 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
     init(kernel: Kernel, title: String = "Find Files") {
         self.kernel = kernel
         store = SearchStore(settings: kernel.settings)
-        form = SearchForm(fields: SearchField.all(fileSystems: kernel.fileSystems, columns: kernel.columns), store: store, ui: kernel.ui)
-        let window = FindWindow(contentRect: NSRect(x: 0, y: 0, width: 780, height: 640),
-                                styleMask: [.titled, .closable, .resizable, .miniaturizable], backing: .buffered, defer: false)
+        form = SearchForm(
+            fields: SearchField.all(fileSystems: kernel.fileSystems, columns: kernel.columns), store: store,
+            ui: kernel.ui)
+        let window = FindWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 780, height: 640),
+            styleMask: [.titled, .closable, .resizable, .miniaturizable], backing: .buffered, defer: false)
         window.title = title
         window.isReleasedWhenClosed = false
         window.minSize = NSSize(width: 640, height: 520)
@@ -190,7 +196,9 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
         form.settings = settings
         form.setSelectionAvailable(hasSelectedItems)
         form.tabView.selectTabViewItem(at: 0)
-        if !isSearching, !kernel.settings.flag(FindFilesWindowController.keepResultsKey, default: true) { clearResults() }
+        if !isSearching, !kernel.settings.flag(FindFilesWindowController.keepResultsKey, default: true) {
+            clearResults()
+        }
     }
 
     /// Whether anything is marked in the source panel; asked often, so it does not look at the items.
@@ -240,7 +248,7 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
         resultButtons = [
             NSButton(title: "F3 View", target: self, action: #selector(viewResult)),
             NSButton(title: "F4 Edit", target: self, action: #selector(editResult)),
-            NSButton(title: "Go to file", target: self, action: #selector(goToFile)),
+            NSButton(title: "Go to file", target: self, action: #selector(goToFile))
         ]
 
         let buttons = NSStackView(views: [startButton, cancelButton])
@@ -248,12 +256,18 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
         buttons.alignment = .leading
         buttons.spacing = 8
         buttons.edgeInsets.top = 24
-        for button in [startButton, cancelButton] { button.widthAnchor.constraint(equalToConstant: 110).isActive = true }
+        for button in [startButton, cancelButton] {
+            button.widthAnchor.constraint(equalToConstant: 110).isActive = true
+        }
         let top = NSStackView(views: [form.tabView, buttons])
         top.alignment = .top
         form.tabView.setContentHuggingPriority(NSLayoutConstraint.Priority(1), for: .horizontal)
-        let header = NSStackView(views: [NSTextField(labelWithString: "Search results:"), NSView(), backButton, forwardButton, inFoundBox])
-        let footer = NSStackView(views: [resultButtons[0], resultButtons[1], newSearchButton, resultButtons[2], feedButton, NSView()])
+        let header = NSStackView(views: [
+            NSTextField(labelWithString: "Search results:"), NSView(), backButton, forwardButton, inFoundBox
+        ])
+        let footer = NSStackView(views: [
+            resultButtons[0], resultButtons[1], newSearchButton, resultButtons[2], feedButton, NSView()
+        ])
         let stack = NSStackView(views: [top, header, scroll, footer, statusLabel])
         stack.orientation = .vertical
         stack.alignment = .leading
@@ -298,9 +312,16 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
     func cancelSearch(ifItReads volume: URL) {
         guard isSearching else { return }
         let places = form.settings.searchIn.split(separator: ";")
-            .map { kernel.fileSystems.location(from: String($0).trimmingCharacters(in: .whitespaces), relativeTo: startDirectory) }
+            .map {
+                kernel.fileSystems.location(
+                    from: String($0).trimmingCharacters(in: .whitespaces), relativeTo: startDirectory)
+            }
         // A search whose places are not known is stopped too: better a search again than a drive refused.
-        if places.isEmpty || places.contains(where: { $0.isFileURL && ($0.isSameLocation(as: volume) || $0.isInside(volume)) }) { cancelSearch() }
+        if places.isEmpty
+            || places.contains(where: { $0.isFileURL && ($0.isSameLocation(as: volume) || $0.isInside(volume)) })
+        {
+            cancelSearch()
+        }
     }
 
     /// Stops the running search; it ends through the usual path with what it has.
@@ -320,10 +341,13 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
         // Start directories the user typed (not the ones the window was opened with or a saved
         // search brought) are the user's own choice of their servers, if they name any.
         if settings.searchIn != form.placedSearchIn {
-            for part in settings.searchIn.split(separator: ";") { kernel.userTyped(location: String(part), relativeTo: startDirectory) }
+            for part in settings.searchIn.split(separator: ";") {
+                kernel.userTyped(location: String(part), relativeTo: startDirectory)
+            }
         }
-        var query = settings.query(relativeTo: startDirectory, fileSystems: kernel.fileSystems, includeHidden: includeHidden,
-                                   selected: settings.onlySelected ? selectedItems : [])
+        var query = settings.query(
+            relativeTo: startDirectory, fileSystems: kernel.fileSystems, includeHidden: includeHidden,
+            selected: settings.onlySelected ? selectedItems : [])
         if inFoundBox.state == .on { query.onlyItems = resultURLs }
         query.resultLimit = FindFilesWindowController.resultLimit
         let search = FileSearch(query, fileSystems: kernel.fileSystems, columns: kernel.columns)
@@ -331,8 +355,11 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
             kernel.ui.report(problem, title: "The search cannot start")
             return
         }
-        form.rememberHistory(limit: FindFilesWindowController.historyLengths[
-            min(max(kernel.settings.index(FindFilesWindowController.historyLengthKey, default: 1), 0), FindFilesWindowController.historyLengths.count - 1)])
+        form.rememberHistory(
+            limit: FindFilesWindowController.historyLengths[
+                min(
+                    max(kernel.settings.index(FindFilesWindowController.historyLengthKey, default: 1), 0),
+                    FindFilesWindowController.historyLengths.count - 1)])
         self.search = search
         rows = [.summary("[Searching...]")]
         (resultURLs, foundFiles, foundDirectories) = ([], 0, 0)
@@ -342,7 +369,8 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
         updateButtons()
 
         if settings.useSpotlight, SpotlightQuery.isAvailable(for: query),
-           let spotlight = SpotlightSearch(SpotlightQuery.string(for: query), scopes: query.directories) {
+            let spotlight = SpotlightSearch(SpotlightQuery.string(for: query), scopes: query.directories)
+        {
             askSpotlight(spotlight, for: search)
         } else if query.duplicates.isActive {
             walkForDuplicates(search)
@@ -371,14 +399,18 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
                     if let directory { self.statusLabel.stringValue = self.kernel.fileSystems.displayPath(directory) }
                 }
             }
-            search.run(onDirectory: { directory in
-                if Date().timeIntervalSince(lastFlush) > 0.1 { flush(directory) }
-            }, onMatch: { item in
-                pending.append(item)
-                if pending.count >= FindFilesWindowController.batchSize || (pending.count % 128 == 0 && Date().timeIntervalSince(lastFlush) > 0.1) {
-                    flush(nil)
-                }
-            })
+            search.run(
+                onDirectory: { directory in
+                    if Date().timeIntervalSince(lastFlush) > 0.1 { flush(directory) }
+                },
+                onMatch: { item in
+                    pending.append(item)
+                    if pending.count >= FindFilesWindowController.batchSize
+                        || (pending.count % 128 == 0 && Date().timeIntervalSince(lastFlush) > 0.1)
+                    {
+                        flush(nil)
+                    }
+                })
             flush(nil)
             DispatchQueue.main.async {
                 guard let self, self.search === search else { return }
@@ -410,8 +442,9 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
                     self.statusLabel.stringValue = text
                 }
             }
-            let groups = search.runForDuplicates(onDirectory: { directory in status(fileSystems.displayPath(directory)) },
-                                                 onHashing: { done, total in status("Comparing contents: \(done) of \(total)") })
+            let groups = search.runForDuplicates(
+                onDirectory: { directory in status(fileSystems.displayPath(directory)) },
+                onHashing: { done, total in status("Comparing contents: \(done) of \(total)") })
             let built = Built.make(groups: groups)
             DispatchQueue.main.async {
                 guard let self, self.search === search else { return }
@@ -430,14 +463,20 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
             self.statusLabel.stringValue = "[Checking \(paths.count) files...]"
             BlockingCalls.run { [weak self] in
                 let items = SpotlightQuery.verify(paths, with: search, fileSystems: fileSystems)
-                let groups = search.query.duplicates.isActive
-                    ? DuplicateFinder.groups(of: items, options: search.query.duplicates, fileSystems: fileSystems, cancellation: search.cancellation)
+                let groups =
+                    search.query.duplicates.isActive
+                    ? DuplicateFinder.groups(
+                        of: items, options: search.query.duplicates, fileSystems: fileSystems,
+                        cancellation: search.cancellation)
                     : nil
                 let built = groups.map(Built.make(groups:)) ?? Built.make(items: items)
                 DispatchQueue.main.async {
                     guard let self, self.search === search else { return }
                     var notes = self.notes(of: search)
-                    if truncated { notes.append("Spotlight gave more than \(SpotlightSearch.resultLimit) files, the rest were left out") }
+                    if truncated {
+                        notes.append(
+                            "Spotlight gave more than \(SpotlightSearch.resultLimit) files, the rest were left out")
+                    }
                     self.finish(built: built, notes: notes)
                 }
             }
@@ -463,14 +502,21 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
         let wasCancelled = search?.cancellation.isCancelled ?? false
         search = nil
         if let built {
-            (rows, resultURLs, foundFiles, foundDirectories, showsDuplicates) = (built.rows, built.urls, built.files, built.directories, built.showsDuplicates)
+            (rows, resultURLs, foundFiles, foundDirectories, showsDuplicates) = (
+                built.rows, built.urls, built.files, built.directories, built.showsDuplicates
+            )
         }
         if rows.isEmpty { rows = [.summary("")] }
         let found = foundFiles + foundDirectories
         let counts = "\(foundFiles) files and \(foundDirectories) directories"
-        var summary = wasCancelled ? (found == 0 ? "[Search cancelled]" : "[Search cancelled, \(counts) found so far]")
+        var summary =
+            wasCancelled
+            ? (found == 0 ? "[Search cancelled]" : "[Search cancelled, \(counts) found so far]")
             : found == 0 ? "[No files found]" : "[\(counts) found]"
-        if !notes.isEmpty { summary = String(summary.dropLast(summary.hasSuffix("]") ? 1 : 0)) + " - " + notes.joined(separator: "; ") + "]" }
+        if !notes.isEmpty {
+            summary =
+                String(summary.dropLast(summary.hasSuffix("]") ? 1 : 0)) + " - " + notes.joined(separator: "; ") + "]"
+        }
         rows[0] = .summary(summary)
         if built != nil {
             resultsTable.reloadData()
@@ -478,12 +524,17 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
             resultsTable.reloadData(forRowIndexes: IndexSet(integer: 0), columnIndexes: IndexSet(integer: 0))
         }
         statusLabel.stringValue = summary
-        earlier.append(ResultSet(rows: rows, showsDuplicates: showsDuplicates, urls: resultURLs, files: foundFiles, directories: foundDirectories))
+        earlier.append(
+            ResultSet(
+                rows: rows, showsDuplicates: showsDuplicates, urls: resultURLs, files: foundFiles,
+                directories: foundDirectories))
         // The last few searches are kept, as far as their lists are not huge.
         var kept = 0
         for (index, set) in earlier.enumerated().reversed() {
             kept += set.rows.count
-            if index < earlier.count - FindFilesWindowController.earlierLimit || (kept > FindFilesWindowController.earlierRowLimit && index < earlier.count - 1) {
+            if index < earlier.count - FindFilesWindowController.earlierLimit
+                || (kept > FindFilesWindowController.earlierRowLimit && index < earlier.count - 1)
+            {
                 let dropped = Array(earlier[...index])
                 earlier.removeFirst(index + 1)
                 // Freeing a list of millions of rows is not done on the main thread.
@@ -517,7 +568,9 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
         switch row {
         case .summary(let text): return text
         case .separator: return String(repeating: "- ", count: 40)
-        case .item(let item): return FindFilesWindowController.text(of: item, showsDuplicates: showsDuplicates, fileSystems: kernel.fileSystems)
+        case .item(let item):
+            return FindFilesWindowController.text(
+                of: item, showsDuplicates: showsDuplicates, fileSystems: kernel.fileSystems)
         }
     }
 
@@ -529,7 +582,8 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
     }
 
     private var selectedItem: FileItem? {
-        guard rows.indices.contains(resultsTable.selectedRow), case .item(let item) = rows[resultsTable.selectedRow] else { return nil }
+        guard rows.indices.contains(resultsTable.selectedRow), case .item(let item) = rows[resultsTable.selectedRow]
+        else { return nil }
         return item
     }
 
@@ -616,7 +670,9 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
             goToFile()
         } else if Shortcut.cmd("c").matches(event) || Shortcut(.character("c"), .control).matches(event) {
             copyListToPasteboard()
-        } else if let command = kernel.keyBindings.command(for: event), command == .view || command == .edit, let url = selectedResult {
+        } else if let command = kernel.keyBindings.command(for: event), command == .view || command == .edit,
+            let url = selectedResult
+        {
             kernel.commands.perform(command, .location(url))
         } else {
             return false
@@ -636,7 +692,10 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
             switch row {
             case .summary(let text): lines.append(text)
             case .separator: lines.append("")
-            case .item(let item): lines.append(FindFilesWindowController.text(of: item, showsDuplicates: showsDuplicates, fileSystems: fileSystems))
+            case .item(let item):
+                lines.append(
+                    FindFilesWindowController.text(
+                        of: item, showsDuplicates: showsDuplicates, fileSystems: fileSystems))
             }
         }
         return lines.joined(separator: "\n")
@@ -656,11 +715,14 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
         guard rows.count > FindFilesWindowController.smallList else { return put(copyText) }
         statusLabel.stringValue = "[Copying the list...]"
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            let text = FindFilesWindowController.copyText(of: rows, showsDuplicates: showsDuplicates, fileSystems: fileSystems)
+            let text = FindFilesWindowController.copyText(
+                of: rows, showsDuplicates: showsDuplicates, fileSystems: fileSystems)
             DispatchQueue.main.async {
                 guard let self, self.copyRequest == request else { return }
                 put(text)
-                if case .summary(let summary)? = self.rows.first, !self.isSearching { self.statusLabel.stringValue = summary }
+                if case .summary(let summary)? = self.rows.first, !self.isSearching {
+                    self.statusLabel.stringValue = summary
+                }
             }
         }
     }
@@ -669,12 +731,14 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
 
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
         let identifier = NSUserInterfaceItemIdentifier("path")
-        let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? NSTextField ?? {
-            let label = NSTextField(labelWithString: "")
-            label.identifier = identifier
-            label.lineBreakMode = .byTruncatingMiddle
-            return label
-        }()
+        let cell =
+            tableView.makeView(withIdentifier: identifier, owner: nil) as? NSTextField
+            ?? {
+                let label = NSTextField(labelWithString: "")
+                label.identifier = identifier
+                label.lineBreakMode = .byTruncatingMiddle
+                return label
+            }()
         cell.stringValue = text(of: rows[row])
         if case .item = rows[row] { cell.textColor = .labelColor } else { cell.textColor = .secondaryLabelColor }
         return cell
@@ -692,7 +756,8 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
         guard !isSearching else { return }
         if let item = selectedItem {
             let size = item.isDirectory ? "<DIR>" : Format.bytes(item.size)
-            statusLabel.stringValue = "\(item.name)   \(size)  \(Format.date(item.modified))  \(Format.permissions(item.permissions))"
+            statusLabel.stringValue =
+                "\(item.name)   \(size)  \(Format.date(item.modified))  \(Format.permissions(item.permissions))"
         } else if case .summary(let text)? = rows.first {
             statusLabel.stringValue = text
         }
@@ -710,7 +775,9 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
         // Half a result list is not kept.
         if wasSearching { clearResults() } else { updateButtons() }
         // Only the list on show outlives the window; the older ones are not kept for good.
-        if earlier.count > 1, earlier.indices.contains(earlierIndex) { (earlier, earlierIndex) = ([earlier[earlierIndex]], 0) }
+        if earlier.count > 1, earlier.indices.contains(earlierIndex) {
+            (earlier, earlierIndex) = ([earlier[earlierIndex]], 0)
+        }
         updateButtons()
         onClose(self)
     }

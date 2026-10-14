@@ -25,7 +25,9 @@ extension PanelViewController {
         if filter == nil, quickFilterBar.isEditing { view.window?.makeFirstResponder(listView) }
         quickFilterBar.isHidden = filter == nil
         // The text in the field is ahead of the filter while typing waits for the list.
-        if let filter, pendingQuickFilter == nil, quickFilterBar.text != filter.text { quickFilterBar.text = filter.text }
+        if let filter, pendingQuickFilter == nil, quickFilterBar.text != filter.text {
+            quickFilterBar.text = filter.text
+        }
     }
 
     /// The text of the active tab's quick filter; nil when it has none.
@@ -88,16 +90,18 @@ extension PanelViewController {
         filterJobCount += 1
         let job = filterJobCount
         filterJobs[id] = job
-        change(tab, while: { [weak self] in self?.filterJobs[id] == job }, by: { PanelModel.prepare($0, filter: filter) }, then: { [weak self] outcome in
-            guard let self, outcome != nil, self.filterJobs[id] == job else { return }
-            self.filterJobs[id] = nil
-            // Whoever waited for the filter to be in place (the quick filter's field) looks again.
-            if tab === self.model {
-                _ = self.dropStaleQuickFilter(of: tab)
-                self.showQuickFilterBar()
-                self.updateStatus()
-            }
-        })
+        change(
+            tab, while: { [weak self] in self?.filterJobs[id] == job }, by: { PanelModel.prepare($0, filter: filter) },
+            then: { [weak self] outcome in
+                guard let self, outcome != nil, self.filterJobs[id] == job else { return }
+                self.filterJobs[id] = nil
+                // Whoever waited for the filter to be in place (the quick filter's field) looks again.
+                if tab === self.model {
+                    _ = self.dropStaleQuickFilter(of: tab)
+                    self.showQuickFilterBar()
+                    self.updateStatus()
+                }
+            })
         return false
     }
 
@@ -204,8 +208,9 @@ extension PanelViewController {
         }
         // The parts are cut from the path as it is; what is shown has every character that
         // could mislead replaced by one that can be seen, one for one, so the parts stay where they are.
-        pathBar.update(text: DisplayText.clean((path.hasSuffix("/") ? path : path + "/") + displayMask),
-                       segments: PathBarView.segments(of: path, ancestors: ancestors.reversed()))
+        pathBar.update(
+            text: DisplayText.clean((path.hasSuffix("/") ? path : path + "/") + displayMask),
+            segments: PathBarView.segments(of: path, ancestors: ancestors.reversed()))
         pathBar.toolTip = DisplayText.clean(path)
         updateEjectButton()
     }
@@ -213,8 +218,9 @@ extension PanelViewController {
     /// The menu of the path bar: copying the path, and the commands about places that are there.
     func pathMenu() -> NSMenu {
         focus()
-        let menu = MenuBuilder.menu("", [.editPath, .directoryHotlist, .directoryHistory, nil, .newTab, .reread], commands: commands,
-                                    keys: kernel.keyBindings)
+        let menu = MenuBuilder.menu(
+            "", [.editPath, .directoryHotlist, .directoryHistory, nil, .newTab, .reread], commands: commands,
+            keys: kernel.keyBindings)
         let copy = NSMenuItem(title: "Copy Path", action: #selector(copyPathChosen), keyEquivalent: "")
         copy.target = self
         menu.insertItem(copy, at: 0)
@@ -237,7 +243,7 @@ extension PanelViewController {
     static let tabMenuCommands: [CommandID?] = [
         .newTab, "cm_RenameTab", "cm_ToggleLockCurrentTab", nil,
         .closeTab, "cm_CloseOtherTabs", "cm_CloseAllTabs", nil,
-        .nextTab, .previousTab,
+        .nextTab, .previousTab
     ]
 
     /// The menu of a tab. The commands act on the active tab of the source panel, so the tab
@@ -306,14 +312,20 @@ extension PanelViewController {
 
     /// Decides what dropping `sources` on a row does; nil when the drop is not taken: while a
     /// job runs, onto a file system that cannot be written, or when it would change nothing.
-    func dropPlan(for sources: [URL], row: Int, modifiers: NSEvent.ModifierFlags, allowed: NSDragOperation,
-                  session: DropSession? = nil) -> DropPlan? {
-        guard !commands.isBlocked(), model.isListed, let first = sources.first, kernel.services.find(FileTransferService.self) != nil else { return nil }
+    func dropPlan(
+        for sources: [URL], row: Int, modifiers: NSEvent.ModifierFlags, allowed: NSDragOperation,
+        session: DropSession? = nil
+    ) -> DropPlan? {
+        guard !commands.isBlocked(), model.isListed, let first = sources.first,
+            kernel.services.find(FileTransferService.self) != nil
+        else { return nil }
         let target = dropDestination(forRow: row)
         guard kernel.fileSystems.capabilities(for: target.location).contains(.write) else { return nil }
-        let sameVolume = PanelDrop.areOnSameVolume(first, target.location, mountPoints: session?.mountPoints ?? PanelDrop.mountPoints())
+        let sameVolume = PanelDrop.areOnSameVolume(
+            first, target.location, mountPoints: session?.mountPoints ?? PanelDrop.mountPoints())
         guard let kind = PanelDrop.kind(modifiers: modifiers, sameVolume: sameVolume, allowed: allowed),
-              !(session?.isPointless(kind, into: target.location) ?? PanelDrop.isPointless(kind, sources, into: target.location))
+            !(session?.isPointless(kind, into: target.location)
+                ?? PanelDrop.isPointless(kind, sources, into: target.location))
         else { return nil }
         return DropPlan(kind: kind, sources: sources, destination: target.location, row: target.row)
     }
@@ -323,8 +335,11 @@ extension PanelViewController {
     func validateDrop(_ info: NSDraggingInfo, row: Int) -> (operation: NSDragOperation, row: Int?) {
         let allowed = info.draggingSourceOperationMask
         let session = dropSession(for: info)
-        guard let plan = dropPlan(for: session.sources, row: row, modifiers: NSEvent.modifierFlags, allowed: allowed,
-                                  session: session) else { return ([], nil) }
+        guard
+            let plan = dropPlan(
+                for: session.sources, row: row, modifiers: NSEvent.modifierFlags, allowed: allowed,
+                session: session)
+        else { return ([], nil) }
         let operation: NSDragOperation = plan.kind == .copy ? .copy : (allowed.contains(.move) ? .move : .generic)
         return (operation, plan.row)
     }
@@ -336,8 +351,11 @@ extension PanelViewController {
         // Dropped before the drag's items were all put together: they are now.
         session.finishNow()
         PanelDrop.endSession(session.sequence)
-        guard let plan = dropPlan(for: session.sources, row: row, modifiers: NSEvent.modifierFlags,
-                                  allowed: info.draggingSourceOperationMask, session: session) else { return false }
+        guard
+            let plan = dropPlan(
+                for: session.sources, row: row, modifiers: NSEvent.modifierFlags,
+                allowed: info.draggingSourceOperationMask, session: session)
+        else { return false }
         // From the run loop, like everything that may ask: the question is a dialog.
         MainLoop.dialog { [weak self] in self?.carryOut(plan) }
         return true
@@ -346,15 +364,22 @@ extension PanelViewController {
     /// Copies or moves what was dropped, through the file-transfer service, which shows the
     /// progress and asks the usual questions. Asks first when the user wants that.
     func carryOut(_ plan: DropPlan) {
-        guard !commands.isBlocked(), let transfers = kernel.services.find(FileTransferService.self) else { return commands.onRejected() }
+        guard !commands.isBlocked(), let transfers = kernel.services.find(FileTransferService.self) else {
+            return commands.onRejected()
+        }
         if settings.confirmsDrops {
             let verb = plan.kind == .move ? "Move" : "Copy"
-            guard kernel.ui.choose(PanelDrop.question(plan.kind, count: plan.sources.count),
-                                   detail: kernel.fileSystems.displayPath(plan.destination), buttons: [verb, "Cancel"],
-                                   style: .information) == 0 else { return }
+            guard
+                kernel.ui.choose(
+                    PanelDrop.question(plan.kind, count: plan.sources.count),
+                    detail: kernel.fileSystems.displayPath(plan.destination), buttons: [verb, "Cancel"],
+                    style: .information) == 0
+            else { return }
         }
         // A copy dropped into the folder it came from gets a new name, as a pasted one does.
-        transfers.transfer(plan.kind, plan.sources, into: plan.destination, renamingSelfCopies: plan.kind == .copy) { _ in }
+        transfers.transfer(plan.kind, plan.sources, into: plan.destination, renamingSelfCopies: plan.kind == .copy) {
+            _ in
+        }
     }
 
     // The table of the Full view drags and takes drops through its data source.
@@ -366,8 +391,10 @@ extension PanelViewController {
         return pendingDragItems.first
     }
 
-    func tableView(_ tableView: NSTableView, draggingSession session: NSDraggingSession, willBeginAt screenPoint: NSPoint,
-                   forRowIndexes rowIndexes: IndexSet) {
+    func tableView(
+        _ tableView: NSTableView, draggingSession session: NSDraggingSession, willBeginAt screenPoint: NSPoint,
+        forRowIndexes rowIndexes: IndexSet
+    ) {
         let items = pendingDragItems
         pendingDragItems = []
         if items.count > 1 {
@@ -377,20 +404,28 @@ extension PanelViewController {
         PanelDrop.offerFileNames(on: session.draggingPasteboard)
     }
 
-    func tableView(_ tableView: NSTableView, draggingSession session: NSDraggingSession, endedAt screenPoint: NSPoint, operation: NSDragOperation) {
+    func tableView(
+        _ tableView: NSTableView, draggingSession session: NSDraggingSession, endedAt screenPoint: NSPoint,
+        operation: NSDragOperation
+    ) {
         pendingDragItems = []
         PanelDrop.endDrag()
         PanelDrop.endSession()
     }
 
-    func tableView(_ tableView: NSTableView, validateDrop info: NSDraggingInfo, proposedRow row: Int,
-                   proposedDropOperation dropOperation: NSTableView.DropOperation) -> NSDragOperation {
-        let (operation, target) = validateDrop(info, row: tableView.row(at: tableView.convert(info.draggingLocation, from: nil)))
+    func tableView(
+        _ tableView: NSTableView, validateDrop info: NSDraggingInfo, proposedRow row: Int,
+        proposedDropOperation dropOperation: NSTableView.DropOperation
+    ) -> NSDragOperation {
+        let (operation, target) = validateDrop(
+            info, row: tableView.row(at: tableView.convert(info.draggingLocation, from: nil)))
         if let target { tableView.setDropRow(target, dropOperation: .on) }
         return operation
     }
 
-    func tableView(_ tableView: NSTableView, acceptDrop info: NSDraggingInfo, row: Int, dropOperation: NSTableView.DropOperation) -> Bool {
+    func tableView(
+        _ tableView: NSTableView, acceptDrop info: NSDraggingInfo, row: Int, dropOperation: NSTableView.DropOperation
+    ) -> Bool {
         acceptDrop(info, row: tableView.row(at: tableView.convert(info.draggingLocation, from: nil)))
     }
 }

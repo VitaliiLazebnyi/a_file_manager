@@ -38,7 +38,10 @@ final class TabBarView: NSView {
                     return
                 }
                 if abs(next.locationInWindow.x - start.x) > 5 { isDragging = true }
-                if isDragging { bar.showMarker(at: TabBarView.destination(forX: x, dragging: tag, frames: bar.tabFrames), dragging: tag) }
+                if isDragging {
+                    bar.showMarker(
+                        at: TabBarView.destination(forX: x, dragging: tag, frames: bar.tabFrames), dragging: tag)
+                }
             }
         }
 
@@ -61,7 +64,7 @@ final class TabBarView: NSView {
             stack.topAnchor.constraint(equalTo: topAnchor),
             stack.bottomAnchor.constraint(equalTo: bottomAnchor),
             stack.leadingAnchor.constraint(equalTo: leadingAnchor),
-            stack.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor),
+            stack.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor)
         ])
     }
 

@@ -1,8 +1,9 @@
 import AFMKernel
 import Foundation
-@testable import LocalFileSystemPlugin
 import TestSupport
 import Testing
+
+@testable import LocalFileSystemPlugin
 
 extension LocalFileSystem {
     /// `places()` once the first read in the background has landed (it never waits itself).
@@ -52,11 +53,15 @@ private func status(_ url: URL) -> stat {
         try FileManager.default.createSymbolicLink(at: box.url("link"), withDestinationURL: pipe)
         var results: [String: Bool] = [:]
         let lock = NSLock()
-        for (name, url) in [("pipe", pipe), ("link", box.url("link")), ("null", URL(fileURLWithPath: "/dev/null")),
-                            ("zero", URL(fileURLWithPath: "/dev/zero")), ("folder", box.root)] {
+        for (name, url) in [
+            ("pipe", pipe), ("link", box.url("link")), ("null", URL(fileURLWithPath: "/dev/null")),
+            ("zero", URL(fileURLWithPath: "/dev/zero")), ("folder", box.root)
+        ] {
             let returned = finishes {
                 let threw = (try? self.local.read(url)) == nil
-                lock.lock(); results[name] = threw; lock.unlock()
+                lock.lock()
+                results[name] = threw
+                lock.unlock()
             }
             #expect(returned, "reading \(name) did not return")
         }
@@ -79,7 +84,9 @@ private func status(_ url: URL) -> stat {
         for url in [pipe, box.url("pipelink"), box.url("filelink")] {
             let returned = finishes {
                 let failed = (try? self.local.append(to: url, at: nil)) == nil
-                lock.lock(); threw.append(failed); lock.unlock()
+                lock.lock()
+                threw.append(failed)
+                lock.unlock()
             }
             #expect(returned)
         }
@@ -104,7 +111,12 @@ private func status(_ url: URL) -> stat {
         // A folder is a tree: it is not copied here, without progress and without a way to stop.
         try box.file("tree/a.txt")
         var calls = 0
-        #expect(throws: (any Error).self) { try self.local.copy(box.url("tree"), to: box.url("tree2")) { _ in calls += 1; return true } }
+        #expect(throws: (any Error).self) {
+            try self.local.copy(box.url("tree"), to: box.url("tree2")) { _ in
+                calls += 1
+                return true
+            }
+        }
         #expect(!box.exists("tree2") && calls == 0)
         #expect(throws: (any Error).self) { try self.local.copy(pipe, to: box.url("pipe2")) { _ in true } }
         // A link is copied as a link.
@@ -116,7 +128,10 @@ private func status(_ url: URL) -> stat {
     @Test func aBlockedCallIsEndedByInterrupt() throws {
         var pair: [Int32] = [0, 0]
         #expect(pipe(&pair) == 0)
-        defer { close(pair[0]); close(pair[1]) }
+        defer {
+            close(pair[0])
+            close(pair[1])
+        }
         let interruption = Interruption()
         let outcome = Locked<String>("waiting")
         let started = DispatchSemaphore(value: 0)
@@ -183,7 +198,8 @@ private func status(_ url: URL) -> stat {
         let other = box.url("other.bin")
         let second = try local.write(other)
         try second.close(attributes: FileAttributes())
-        let mask = umask(0o022); umask(mask)
+        let mask = umask(0o022)
+        umask(mask)
         #expect(status(other).st_mode & 0o777 == 0o644 & ~mask)
         // A source that was 0600 stays 0600 from the first byte to the last.
         let private600 = box.url("private.bin")
@@ -204,7 +220,8 @@ private func status(_ url: URL) -> stat {
         // The name is swapped for a link to another file of the user before the file is closed.
         unlink(url.path)
         try FileManager.default.createSymbolicLink(at: url, withDestinationURL: victim)
-        try writer.close(attributes: FileAttributes(modified: Date(timeIntervalSince1970: 1_000_000_000), permissions: 0o600))
+        try writer.close(
+            attributes: FileAttributes(modified: Date(timeIntervalSince1970: 1_000_000_000), permissions: 0o600))
         let after = status(victim)
         #expect(after.st_mode == before.st_mode && after.st_mtimespec.tv_sec == before.st_mtimespec.tv_sec)
         #expect(box.read("victim.txt") == "mine")
@@ -228,7 +245,9 @@ private func status(_ url: URL) -> stat {
         // A plain file is changed as ever.
         try local.setAttributes(FileAttributes(modified: date, permissions: 0o600), of: target)
         #expect(status(target).st_mode & 0o7777 == 0o600 && local.item(at: target)?.modified == date)
-        #expect(throws: (any Error).self) { try self.local.setAttributes(FileAttributes(permissions: 0o600), of: box.url("missing")) }
+        #expect(throws: (any Error).self) {
+            try self.local.setAttributes(FileAttributes(permissions: 0o600), of: box.url("missing"))
+        }
     }
 
     @Test func aLinkIntoNowhereAndALinkToAPipeAreListedWithoutBlocking() throws {
@@ -246,9 +265,12 @@ private func status(_ url: URL) -> stat {
         #expect(byName["topipe"]?.isSpecial == true && byName["pipe"]?.isSpecial == true)
         #expect(byName["todir"]?.isDirectory == true && byName["rel"]?.isDirectory == true)
         // The lean listing and the single item agree.
-        let lean = try local.entries(of: box.root, showHidden: true, foldersOnly: true, cancellation: CancellationFlag())
+        let lean = try local.entries(
+            of: box.root, showHidden: true, foldersOnly: true, cancellation: CancellationFlag())
         #expect(Set(lean.map(\.name)) == ["dir", "todir", "rel"])
-        #expect(local.item(at: box.url("todir"))?.isDirectory == true && local.item(at: box.url("topipe"))?.isSpecial == true)
+        #expect(
+            local.item(at: box.url("todir"))?.isDirectory == true
+                && local.item(at: box.url("topipe"))?.isSpecial == true)
     }
 
     // MARK: Locks
@@ -268,10 +290,13 @@ private func status(_ url: URL) -> stat {
         #expect(status(box.url("dst.txt")).st_flags & UInt32(UF_IMMUTABLE) != 0)
         // Not unlocked and deleted merely because it was copied by this file system.
         #expect(throws: (any Error).self) { try self.local.remove(box.url("dst.txt")) }
-        #expect(throws: (any Error).self) { try self.local.move(box.url("dst.txt"), to: box.url("moved.txt"), replacing: false) }
+        #expect(throws: (any Error).self) {
+            try self.local.move(box.url("dst.txt"), to: box.url("moved.txt"), replacing: false)
+        }
         #expect(box.exists("dst.txt"))
         // A locked folder whose metadata was copied is the user's as well.
-        let folder = try box.folder("srcdir"), copy = try box.folder("copydir")
+        let folder = try box.folder("srcdir")
+        let copy = try box.folder("copydir")
         lock(folder)
         try local.copyMetadata(from: folder, to: copy)
         #expect(status(copy).st_flags & UInt32(UF_IMMUTABLE) != 0)
@@ -329,7 +354,8 @@ private func status(_ url: URL) -> stat {
 
     @Test func aRenameOfOnlyTheLettersCaseOrTheFormOfAnAccentNeverRemovesTheFile() throws {
         let box = try Sandbox()
-        let decomposed = "e\u{0301}.txt", composed = "\u{00E9}.txt"
+        let decomposed = "e\u{0301}.txt"
+        let composed = "\u{00E9}.txt"
         // Replacing or not, accent to accent and case to case: the file is there afterwards, once.
         for replacing in [true, false] {
             let from = try box.file(replacing ? decomposed : "x" + decomposed, "accent")
@@ -374,7 +400,9 @@ private func status(_ url: URL) -> stat {
         // Listened for before the file system exists: it begins to read the moment it is
         // made, and may have told the world before a listener that came after it was there.
         let heard = Locked<[(ObjectIdentifier, Bool)]>([])
-        let observer = NotificationCenter.default.addObserver(forName: LocalFileSystem.placesDidChange, object: nil, queue: nil) { note in
+        let observer = NotificationCenter.default.addObserver(
+            forName: LocalFileSystem.placesDidChange, object: nil, queue: nil
+        ) { note in
             guard let sender = note.object as AnyObject? else { return }
             heard.withValue { $0.append((ObjectIdentifier(sender), Thread.isMainThread)) }
         }
@@ -451,7 +479,9 @@ private func status(_ url: URL) -> stat {
         let elapsed = Date().timeIntervalSince(started)
         let reports = count.withValue { $0 }
         // Hundreds of changes; at most one report per half second (plus slack).
-        #expect(reports >= 1 && Double(reports) <= elapsed / 0.5 + 3, "\(reports) reports in \(elapsed) s for \(number) changes")
+        #expect(
+            reports >= 1 && Double(reports) <= elapsed / 0.5 + 3,
+            "\(reports) reports in \(elapsed) s for \(number) changes")
         watcher.stop()
         try await Task.sleep(nanoseconds: 200_000_000)
         let afterStop = count.withValue { $0 }
@@ -465,7 +495,9 @@ private func status(_ url: URL) -> stat {
         try box.folder("a")
         try box.folder("b")
         let seen = Locked(Set<String>())
-        let watcher = DirectoryWatcher(queue: DispatchQueue(label: "test")) { urls in seen.withValue { $0.formUnion(urls.map(\.lastPathComponent)) } }
+        let watcher = DirectoryWatcher(queue: DispatchQueue(label: "test")) { urls in
+            seen.withValue { $0.formUnion(urls.map(\.lastPathComponent)) }
+        }
         watcher.watch([box.url("a")])
         watcher.watch([box.url("a"), box.url("b")])
         // A change is made again and again until one is reported. The first ones may come
@@ -479,12 +511,16 @@ private func status(_ url: URL) -> stat {
         // watcher, was the failure once seen in a full run.
         var number = 0
         let started = Date()
-        while !seen.withValue({ $0.contains("b") }), number < 50 || Date().timeIntervalSince(started) < 60, number < 3_000 {
+        while !seen.withValue({ $0.contains("b") }), number < 50 || Date().timeIntervalSince(started) < 60,
+            number < 3_000
+        {
             try box.file("b/f\(number).txt")
             number += 1
             try await Task.sleep(nanoseconds: 200_000_000)
         }
-        #expect(seen.withValue { $0.contains("b") }, "no report after \(number) changes in \(Int(Date().timeIntervalSince(started))) s")
+        #expect(
+            seen.withValue { $0.contains("b") },
+            "no report after \(number) changes in \(Int(Date().timeIntervalSince(started))) s")
         watcher.stop()
     }
 }

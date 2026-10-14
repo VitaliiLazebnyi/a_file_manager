@@ -15,7 +15,10 @@ public final class LocalFileSystem: FileSystemProvider {
     public init() {
         // Disks that come and go change the list of places; it is read again behind the scenes.
         let workspace = NSWorkspace.shared.notificationCenter
-        let names = [NSWorkspace.didMountNotification, NSWorkspace.didUnmountNotification, NSWorkspace.didRenameVolumeNotification]
+        let names = [
+            NSWorkspace.didMountNotification, NSWorkspace.didUnmountNotification,
+            NSWorkspace.didRenameVolumeNotification
+        ]
         mountObservers = names.map { name in
             workspace.addObserver(forName: name, object: nil, queue: nil) { [weak self] _ in self?.refreshPlaces() }
         }
@@ -50,7 +53,9 @@ public final class LocalFileSystem: FileSystemProvider {
     /// share costs a few requests instead of one per file, and its entries can be shown while
     /// the rest is still coming from the server. The flag is looked at before every buffer:
     /// a listing that was cancelled ends quietly with what it has delivered.
-    public func list(_ directory: URL, showHidden: Bool, cancellation: CancellationFlag, receive: ([FileItem]) -> Bool) throws {
+    public func list(_ directory: URL, showHidden: Bool, cancellation: CancellationFlag, receive: ([FileItem]) -> Bool)
+        throws
+    {
         if try listInBulk(directory, showHidden: showHidden, cancellation: cancellation, receive: receive) { return }
         // A volume without bulk reads: every entry is examined on its own, on all cores.
         let names = try fm.contentsOfDirectory(atPath: directory.path)
@@ -67,14 +72,17 @@ public final class LocalFileSystem: FileSystemProvider {
     /// Names, kinds and flags are all that is read, and no location is made for any entry,
     /// which is most of what a full listing costs. Only links (where do they point?) and
     /// folders with an extension (a package?) are asked about one by one.
-    public func entries(of directory: URL, showHidden: Bool, foldersOnly: Bool, cancellation: CancellationFlag) throws -> [DirectoryEntry] {
+    public func entries(of directory: URL, showHidden: Bool, foldersOnly: Bool, cancellation: CancellationFlag) throws
+        -> [DirectoryEntry]
+    {
         probes.willAsk?(directory.path)
         let descriptor = LocalFileSystem.openDirectory(directory.path)
         guard descriptor >= 0 else { throw LocalFileSystem.posixError(errno, directory) }
         defer { close(descriptor) }
         var request = attrlist()
         request.bitmapcount = UInt16(ATTR_BIT_MAP_COUNT)
-        request.commonattr = attrgroup_t(ATTR_CMN_RETURNED_ATTRS) | Entry.wantError | Entry.wantName | Entry.wantType | Entry.wantFlags
+        request.commonattr =
+            attrgroup_t(ATTR_CMN_RETURNED_ATTRS) | Entry.wantError | Entry.wantName | Entry.wantType | Entry.wantFlags
         let capacity = 64 * 1024
         let buffer = UnsafeMutableRawPointer.allocate(byteCount: capacity, alignment: 8)
         defer { buffer.deallocate() }
@@ -87,7 +95,8 @@ public final class LocalFileSystem: FileSystemProvider {
             if count == 0 { break }
             if count < 0 {
                 if isFirst, errno == ENOTSUP || errno == EINVAL {
-                    return try entriesByListing(of: directory, showHidden: showHidden, foldersOnly: foldersOnly, cancellation: cancellation)
+                    return try entriesByListing(
+                        of: directory, showHidden: showHidden, foldersOnly: foldersOnly, cancellation: cancellation)
                 }
                 throw LocalFileSystem.posixError(errno, directory)
             }
@@ -99,7 +108,9 @@ public final class LocalFileSystem: FileSystemProvider {
                 guard !read.name.isEmpty else { continue }
                 // Links into a share that does not answer are the slow part: the flag is looked at here too.
                 if cancellation.isCancelled { return found }
-                var (isDirectory, isSymlink, isHidden) = (read.type == VDIR.rawValue, read.type == VLNK.rawValue, read.isHidden)
+                var (isDirectory, isSymlink, isHidden) = (
+                    read.type == VDIR.rawValue, read.type == VLNK.rawValue, read.isHidden
+                )
                 // What could not be read in bulk, and where a link leads, is asked for by itself.
                 lazy var child = path.hasSuffix("/") ? path + read.name : path + "/" + read.name
                 var st = stat()
@@ -112,9 +123,11 @@ public final class LocalFileSystem: FileSystemProvider {
                 if isSymlink { isDirectory = LinkResolver.shared.resolve(child)?.isDirectory ?? false }
                 guard isDirectory || !foldersOnly else { continue }
                 let mayBePackage = isDirectory && !isSymlink && read.name.dropFirst().contains(".")
-                found.append(DirectoryEntry(name: read.name, isDirectory: isDirectory, isSymlink: isSymlink,
-                                            isPackage: mayBePackage && isPackage(URL(fileURLWithPath: child, isDirectory: true)),
-                                            isHidden: isHidden))
+                found.append(
+                    DirectoryEntry(
+                        name: read.name, isDirectory: isDirectory, isSymlink: isSymlink,
+                        isPackage: mayBePackage && isPackage(URL(fileURLWithPath: child, isDirectory: true)),
+                        isHidden: isHidden))
             }
         }
         return found
@@ -136,8 +149,12 @@ public final class LocalFileSystem: FileSystemProvider {
 
         var isHidden: Bool { name.hasPrefix(".") || flags & UInt32(UF_HIDDEN) != 0 }
 
-        static let (wantName, wantType, wantModified) = (attrgroup_t(ATTR_CMN_NAME), attrgroup_t(ATTR_CMN_OBJTYPE), attrgroup_t(ATTR_CMN_MODTIME))
-        static let (wantMode, wantFlags, wantSize) = (attrgroup_t(ATTR_CMN_ACCESSMASK), attrgroup_t(ATTR_CMN_FLAGS), attrgroup_t(ATTR_FILE_DATALENGTH))
+        static let (wantName, wantType, wantModified) = (
+            attrgroup_t(ATTR_CMN_NAME), attrgroup_t(ATTR_CMN_OBJTYPE), attrgroup_t(ATTR_CMN_MODTIME)
+        )
+        static let (wantMode, wantFlags, wantSize) = (
+            attrgroup_t(ATTR_CMN_ACCESSMASK), attrgroup_t(ATTR_CMN_FLAGS), attrgroup_t(ATTR_FILE_DATALENGTH)
+        )
         static let wantError = attrgroup_t(ATTR_CMN_ERROR)
 
         /// One entry of a bulk read, and its length: the length, which attributes follow, then
@@ -172,7 +189,8 @@ public final class LocalFileSystem: FileSystemProvider {
             }
             if returned.commonattr & wantModified != 0 {
                 let time = field.loadUnaligned(as: timespec.self)
-                read.modified = Date(timeIntervalSince1970: TimeInterval(time.tv_sec) + TimeInterval(time.tv_nsec) / 1_000_000_000)
+                read.modified = Date(
+                    timeIntervalSince1970: TimeInterval(time.tv_sec) + TimeInterval(time.tv_nsec) / 1_000_000_000)
                 field += MemoryLayout<timespec>.size
             }
             if returned.commonattr & wantMode != 0 {
@@ -191,8 +209,10 @@ public final class LocalFileSystem: FileSystemProvider {
     }
 
     /// Reads a directory with `getattrlistbulk`. Returns false when the volume does not offer it.
-    private func listInBulk(_ directory: URL, showHidden: Bool, cancellation: CancellationFlag,
-                            receive: ([FileItem]) -> Bool) throws -> Bool {
+    private func listInBulk(
+        _ directory: URL, showHidden: Bool, cancellation: CancellationFlag,
+        receive: ([FileItem]) -> Bool
+    ) throws -> Bool {
         // Opening the folder and every read of it can wait on the volume. The flag ends such
         // a wait where the system lets a signal end it; the listing then ends quietly, like
         // one that saw the flag between two buffers.
@@ -201,14 +221,18 @@ public final class LocalFileSystem: FileSystemProvider {
         defer { withExtendedLifetime(registration) {} }
         probes.willAsk?(directory.path)
         let path = directory.path
-        guard let opened = try? interruption.run({ Int(Darwin.open(path, O_RDONLY | O_DIRECTORY | O_CLOEXEC)) }) else { return true }
+        guard let opened = try? interruption.run({ Int(Darwin.open(path, O_RDONLY | O_DIRECTORY | O_CLOEXEC)) }) else {
+            return true
+        }
         let descriptor = Int32(opened)
         guard descriptor >= 0 else { throw LocalFileSystem.posixError(errno, directory) }
         defer { close(descriptor) }
 
         var request = attrlist()
         request.bitmapcount = UInt16(ATTR_BIT_MAP_COUNT)
-        request.commonattr = attrgroup_t(ATTR_CMN_RETURNED_ATTRS) | Entry.wantError | Entry.wantName | Entry.wantType | Entry.wantModified
+        request.commonattr =
+            attrgroup_t(ATTR_CMN_RETURNED_ATTRS) | Entry.wantError | Entry.wantName | Entry.wantType
+            | Entry.wantModified
             | Entry.wantMode | Entry.wantFlags
         request.fileattr = Entry.wantSize
 
@@ -221,7 +245,8 @@ public final class LocalFileSystem: FileSystemProvider {
             // On a share every buffer is a trip to the server; none is made for a listing nobody wants.
             if cancellation.isCancelled { return true }
             probes.willAsk?(directory.path)
-            guard let read = try? interruption.run({ Int(getattrlistbulk(descriptor, &request, buffer, capacity, 0)) }) else { return true }
+            guard let read = try? interruption.run({ Int(getattrlistbulk(descriptor, &request, buffer, capacity, 0)) })
+            else { return true }
             let count = Int32(read)
             if count == 0 { return true }
             if count < 0 {
@@ -263,7 +288,9 @@ public final class LocalFileSystem: FileSystemProvider {
         // Mount points are written with every link resolved; so is the path the system
         // gives for an open folder.
         var path = [CChar](repeating: 0, count: Int(MAXPATHLEN) + 1)
-        if fcntl(descriptor, F_GETPATH, &path) == 0 { devices.mounted = MountTable.shared.mounts(directlyIn: String(cString: path)) }
+        if fcntl(descriptor, F_GETPATH, &path) == 0 {
+            devices.mounted = MountTable.shared.mounts(directlyIn: String(cString: path))
+        }
         return devices
     }
 
@@ -280,7 +307,9 @@ public final class LocalFileSystem: FileSystemProvider {
         return entries.withUnsafeBufferPointer { entries in
             Parallel.map(pieces) { piece -> [FileItem] in
                 let directory = URL(string: text) ?? directory
-                return piece.compactMap { self.item(of: entries[$0], in: directory, showHidden: showHidden, devices: devices) }
+                return piece.compactMap {
+                    self.item(of: entries[$0], in: directory, showHidden: showHidden, devices: devices)
+                }
             }
         }.flatMap { $0 }
     }
@@ -305,10 +334,11 @@ public final class LocalFileSystem: FileSystemProvider {
         }
         // A name that is not valid UTF-8 cannot be written as a location: nothing may try to open it.
         if entry.isNameRepaired { isSpecial = true }
-        return FileItem(url: url, name: entry.name, isDirectory: isDirectory, isSymlink: isSymlink,
-                        isPackage: isDirectory && !isSymlink && isPackage(url), isHidden: entry.isHidden,
-                        size: isRegular ? entry.size : 0, modified: entry.modified, permissions: UInt16(entry.mode & 0o7777),
-                        isSpecial: isSpecial, linkTargetSize: targetSize, device: devices.device(of: entry.name))
+        return FileItem(
+            url: url, name: entry.name, isDirectory: isDirectory, isSymlink: isSymlink,
+            isPackage: isDirectory && !isSymlink && isPackage(url), isHidden: entry.isHidden,
+            size: isRegular ? entry.size : 0, modified: entry.modified, permissions: UInt16(entry.mode & 0o7777),
+            isSpecial: isSpecial, linkTargetSize: targetSize, device: devices.device(of: entry.name))
     }
 
     /// A folder that is shown and opened like a file (`.app` and the like). Only folders with
@@ -324,7 +354,9 @@ public final class LocalFileSystem: FileSystemProvider {
         let key = pathExtension.lowercased()
         func ask() -> Bool? { try? url.resourceValues(forKeys: [.isPackageKey]).isPackage }
         packageLock.lock()
-        let known = packageExtensions[key].flatMap { DispatchTime.now().uptimeNanoseconds - $0.learned < 60_000_000_000 ? $0.isPackage : nil }
+        let known = packageExtensions[key].flatMap {
+            DispatchTime.now().uptimeNanoseconds - $0.learned < 60_000_000_000 ? $0.isPackage : nil
+        }
         packageLock.unlock()
         if known == true { return true }
         if known == false {
@@ -379,13 +411,15 @@ public final class LocalFileSystem: FileSystemProvider {
             if target.isRegular { targetSize = target.size }
         }
         let isPackage = isDirectory && !isSymlink && isPackage(url)
-        let modified = Date(timeIntervalSince1970: TimeInterval(st.st_mtimespec.tv_sec)
-                            + TimeInterval(st.st_mtimespec.tv_nsec) / 1_000_000_000)
-        return FileItem(url: url, name: name, isDirectory: isDirectory, isSymlink: isSymlink, isPackage: isPackage,
-                        isHidden: name.hasPrefix(".") || (st.st_flags & UInt32(UF_HIDDEN)) != 0,
-                        size: type == S_IFREG ? Int64(st.st_size) : 0, modified: modified,
-                        permissions: UInt16(st.st_mode & 0o7777), isSpecial: isSpecial, linkTargetSize: targetSize,
-                        device: Int64(st.st_dev))
+        let modified = Date(
+            timeIntervalSince1970: TimeInterval(st.st_mtimespec.tv_sec)
+                + TimeInterval(st.st_mtimespec.tv_nsec) / 1_000_000_000)
+        return FileItem(
+            url: url, name: name, isDirectory: isDirectory, isSymlink: isSymlink, isPackage: isPackage,
+            isHidden: name.hasPrefix(".") || (st.st_flags & UInt32(UF_HIDDEN)) != 0,
+            size: type == S_IFREG ? Int64(st.st_size) : 0, modified: modified,
+            permissions: UInt16(st.st_mode & 0o7777), isSpecial: isSpecial, linkTargetSize: targetSize,
+            device: Int64(st.st_dev))
     }
 
     public func parent(of directory: URL) -> URL? {
@@ -402,7 +436,8 @@ public final class LocalFileSystem: FileSystemProvider {
     /// `open`, where the open itself can wait (a share that does not answer): it ends, by
     /// throwing, once `cancellation` is set. Always `O_CLOEXEC`; an `EINTR` nobody asked for is
     /// tried again.
-    private func openFile(_ url: URL, _ flags: Int32, mode: mode_t = 0, cancellation: CancellationFlag) throws -> Int32 {
+    private func openFile(_ url: URL, _ flags: Int32, mode: mode_t = 0, cancellation: CancellationFlag) throws -> Int32
+    {
         if cancellation.isCancelled { throw CocoaError(.userCancelled) }
         let interruption = Interruption()
         let registration = cancellation.onCancel { interruption.interrupt() }
@@ -438,11 +473,14 @@ public final class LocalFileSystem: FileSystemProvider {
             default: kind = "not an ordinary file"
             }
             close(descriptor)
-            throw NSError(domain: NSPOSIXErrorDomain, code: Int(EINVAL),
-                          userInfo: [NSLocalizedDescriptionKey: "\(url.path) is \(kind) and is not opened."])
+            throw NSError(
+                domain: NSPOSIXErrorDomain, code: Int(EINVAL),
+                userInfo: [NSLocalizedDescriptionKey: "\(url.path) is \(kind) and is not opened."])
         } else {
             let flags = fcntl(descriptor, F_GETFL)
-            if flags >= 0, flags & O_NONBLOCK != 0, fcntl(descriptor, F_SETFL, flags & ~O_NONBLOCK) != 0 { code = errno }
+            if flags >= 0, flags & O_NONBLOCK != 0, fcntl(descriptor, F_SETFL, flags & ~O_NONBLOCK) != 0 {
+                code = errno
+            }
         }
         if code != 0 {
             close(descriptor)
@@ -520,7 +558,9 @@ public final class LocalFileSystem: FileSystemProvider {
     /// a signal) and keeps the next one from being begun. On a share or an automounted
     /// folder, where a call can wait for as long as the server is away, it is made on a
     /// thread of its own so that the caller can leave it behind (`RemoteChanges`).
-    private func change<Value>(at url: URL, _ cancellation: CancellationFlag, _ body: @escaping (LocalCall) throws -> Value) throws -> Value {
+    private func change<Value>(
+        at url: URL, _ cancellation: CancellationFlag, _ body: @escaping (LocalCall) throws -> Value
+    ) throws -> Value {
         if cancellation.isCancelled { throw CocoaError(.userCancelled) }
         let call = LocalCall(probes)
         let path = url.path
@@ -529,7 +569,8 @@ public final class LocalFileSystem: FileSystemProvider {
         let mount = MountTable.shared.mount(containing: path)
         if probes.isLocal?(path) ?? mount?.isLocal ?? true { return try body(call) }
         let volume = (probes.isLocal == nil ? mount?.path : volumeKey(path)) ?? path
-        return try RemoteChanges.shared.run(on: volume, patience: probes.patienceAfterCancel, cancellation: cancellation, call, body)
+        return try RemoteChanges.shared.run(
+            on: volume, patience: probes.patienceAfterCancel, cancellation: cancellation, call, body)
     }
 
     public func createDirectory(at url: URL) throws {
@@ -571,13 +612,17 @@ public final class LocalFileSystem: FileSystemProvider {
             while let folder = current {
                 let made = try make(folder)
                 if made == 0 || made == EEXIST || made == EISDIR { break }
-                guard made == ENOENT else { throw LocalFileSystem.posixError(made, URL(fileURLWithPath: folder, isDirectory: true)) }
+                guard made == ENOENT else {
+                    throw LocalFileSystem.posixError(made, URL(fileURLWithPath: folder, isDirectory: true))
+                }
                 missing.append(folder)
                 current = above(folder)
             }
             for folder in missing.reversed() {
                 let made = try make(folder)
-                guard made == 0 || made == EEXIST else { throw LocalFileSystem.posixError(made, URL(fileURLWithPath: folder, isDirectory: true)) }
+                guard made == 0 || made == EEXIST else {
+                    throw LocalFileSystem.posixError(made, URL(fileURLWithPath: folder, isDirectory: true))
+                }
             }
             code = try make(path)
         }
@@ -627,11 +672,14 @@ public final class LocalFileSystem: FileSystemProvider {
         do {
             descriptor = try openFile(url, O_WRONLY | O_NONBLOCK | O_NOFOLLOW, cancellation: cancellation)
         } catch let error as NSError where error.domain == NSPOSIXErrorDomain && error.code == Int(ELOOP) {
-            throw NSError(domain: NSPOSIXErrorDomain, code: Int(ELOOP),
-                          userInfo: [NSLocalizedDescriptionKey: "\(url.path) is a symbolic link and is not continued."])
+            throw NSError(
+                domain: NSPOSIXErrorDomain, code: Int(ELOOP),
+                userInfo: [NSLocalizedDescriptionKey: "\(url.path) is a symbolic link and is not continued."])
         } catch let error as NSError where error.domain == NSPOSIXErrorDomain && error.code == Int(ENXIO) {
-            throw NSError(domain: NSPOSIXErrorDomain, code: Int(EINVAL),
-                          userInfo: [NSLocalizedDescriptionKey: "\(url.path) is a named pipe or a device and is not continued."])
+            throw NSError(
+                domain: NSPOSIXErrorDomain, code: Int(EINVAL),
+                userInfo: [NSLocalizedDescriptionKey: "\(url.path) is a named pipe or a device and is not continued."]
+            )
         }
         try requireRegularFile(descriptor, url)
         var st = stat()
@@ -703,7 +751,10 @@ public final class LocalFileSystem: FileSystemProvider {
                 let seconds = modified.timeIntervalSince1970.rounded(.down)
                 let nanoseconds = ((modified.timeIntervalSince1970 - seconds) * 1e9).rounded(.down)
                 // The time of access stays as it is.
-                var times = [timespec(tv_sec: 0, tv_nsec: Int((1 << 30) - 2)), timespec(tv_sec: Int(seconds), tv_nsec: Int(nanoseconds))]
+                var times = [
+                    timespec(tv_sec: 0, tv_nsec: Int((1 << 30) - 2)),
+                    timespec(tv_sec: Int(seconds), tv_nsec: Int(nanoseconds))
+                ]
                 if futimens(descriptor, &times) != 0 { failure = LocalFileSystem.posixError(errno, url) }
             }
             if let mode = attributes.permissions.map({ mode_t($0) & 0o7777 }) ?? defaultPermissions {
@@ -739,16 +790,23 @@ public final class LocalFileSystem: FileSystemProvider {
         let (path, top) = (url.standardizedFileURL.path, root.standardizedFileURL.path)
         let prefix = top.hasSuffix("/") ? top : top + "/"
         guard path.utf8.count > prefix.utf8.count, path.utf8.starts(with: prefix.utf8),
-              let names = PathSafety.components(ofRelativePath: String(decoding: path.utf8.dropFirst(prefix.utf8.count), as: UTF8.self)),
-              let last = names.last else {
-            throw NSError(domain: NSPOSIXErrorDomain, code: Int(EINVAL),
-                          userInfo: [NSLocalizedDescriptionKey: "\(url.path) is not below \(root.path) and is not removed."])
+            let names = PathSafety.components(
+                ofRelativePath: String(decoding: path.utf8.dropFirst(prefix.utf8.count), as: UTF8.self)),
+            let last = names.last
+        else {
+            throw NSError(
+                domain: NSPOSIXErrorDomain, code: Int(EINVAL),
+                userInfo: [NSLocalizedDescriptionKey: "\(url.path) is not below \(root.path) and is not removed."])
         }
         func changed(_ code: Int32, _ name: String) -> Error {
             // ELOOP and ENOTDIR are what the system says to a link or a file where a folder was.
             guard code == ELOOP || code == ENOTDIR else { return LocalFileSystem.posixError(code, url) }
-            return NSError(domain: NSPOSIXErrorDomain, code: Int(code), userInfo: [NSLocalizedDescriptionKey:
-                "\(name) on the way to \(url.path) is no longer a folder; nothing was removed."])
+            return NSError(
+                domain: NSPOSIXErrorDomain, code: Int(code),
+                userInfo: [
+                    NSLocalizedDescriptionKey:
+                        "\(name) on the way to \(url.path) is no longer a folder; nothing was removed."
+                ])
         }
         var folder = try call.run(top) { Darwin.open(top, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC) }
         guard folder >= 0 else { throw changed(errno, root.lastPathComponent) }
@@ -760,7 +818,9 @@ public final class LocalFileSystem: FileSystemProvider {
             folder = next
         }
         var st = stat()
-        guard try call.run(path, { fstatat(folder, last, &st, AT_SYMLINK_NOFOLLOW) }) == 0 else { throw LocalFileSystem.posixError(errno, url) }
+        guard try call.run(path, { fstatat(folder, last, &st, AT_SYMLINK_NOFOLLOW) }) == 0 else {
+            throw LocalFileSystem.posixError(errno, url)
+        }
         let flag = (st.st_mode & S_IFMT) == S_IFDIR ? AT_REMOVEDIR : 0
         if try call.run(path, { unlinkat(folder, last, flag) }) == 0 { return forgetLockedCopy(url) }
         var code = errno
@@ -816,7 +876,9 @@ public final class LocalFileSystem: FileSystemProvider {
         // step as the rename, so nothing can slip in between a check and the move.
         /// Renames, and returns the system's error number when that fails.
         func rename() throws -> Int32? {
-            let result = try call.run(from) { replacing ? Darwin.rename(from, to) : renamex_np(from, to, UInt32(RENAME_EXCL)) }
+            let result = try call.run(from) {
+                replacing ? Darwin.rename(from, to) : renamex_np(from, to, UInt32(RENAME_EXCL))
+            }
             guard result != 0 else { return nil }
             guard errno == ENOTSUP, !replacing else { return errno }
             // A volume that cannot rename exclusively: check, then rename.
@@ -829,8 +891,10 @@ public final class LocalFileSystem: FileSystemProvider {
         // of the letters' case or of the accents' form names the same entry twice, and that is a
         // plain rename, after which nothing may be removed.
         var (before, after) = (stat(), stat())
-        let areTwoLinks = try replacing && from != to && call.run(from, { lstat(from, &before) }) == 0
-            && call.run(to, { lstat(to, &after) }) == 0 && before.st_dev == after.st_dev && before.st_ino == after.st_ino
+        let areTwoLinks =
+            try replacing && from != to && call.run(from, { lstat(from, &before) }) == 0
+            && call.run(to, { lstat(to, &after) }) == 0 && before.st_dev == after.st_dev
+            && before.st_ino == after.st_ino
             && LocalFileSystem.storedName(of: source) == Array(source.lastPathComponent.utf8)
             && LocalFileSystem.storedName(of: destination) == Array(destination.lastPathComponent.utf8)
         var code = try rename()
@@ -865,7 +929,10 @@ public final class LocalFileSystem: FileSystemProvider {
         var request = attrlist()
         request.bitmapcount = UInt16(ATTR_BIT_MAP_COUNT)
         request.commonattr = attrgroup_t(ATTR_CMN_RETURNED_ATTRS) | attrgroup_t(ATTR_CMN_NAME)
-        var reply = [UInt8](repeating: 0, count: 4 + MemoryLayout<attribute_set_t>.size + MemoryLayout<attrreference_t>.size + Int(NAME_MAX) * 4 + 8)
+        var reply = [UInt8](
+            repeating: 0,
+            count: 4 + MemoryLayout<attribute_set_t>.size + MemoryLayout<attrreference_t>.size + Int(NAME_MAX) * 4 + 8
+        )
         guard getattrlist(url.path, &request, &reply, reply.count, UInt32(FSOPT_NOFOLLOW)) == 0 else { return nil }
         return reply.withUnsafeBytes { raw in
             let at = 4 + MemoryLayout<attribute_set_t>.size
@@ -873,7 +940,9 @@ public final class LocalFileSystem: FileSystemProvider {
             let start = at + Int(reference.attr_dataoffset)
             guard start >= 0, start < raw.count else { return nil }
             let bytes = raw.baseAddress!.advanced(by: start).assumingMemoryBound(to: CChar.self)
-            return Array(UnsafeBufferPointer(start: UnsafeRawPointer(bytes).assumingMemoryBound(to: UInt8.self), count: strlen(bytes)))
+            return Array(
+                UnsafeBufferPointer(
+                    start: UnsafeRawPointer(bytes).assumingMemoryBound(to: UInt8.self), count: strlen(bytes)))
         }
     }
 
@@ -906,7 +975,9 @@ public final class LocalFileSystem: FileSystemProvider {
             // Whatever is stale goes first; only then the oldest. Never the whole table: the
             // others are temporaries of copies that are going on.
             lockedCopies = lockedCopies.filter { now &- $0.value.made < LocalFileSystem.lockedCopyLifetime }
-            while lockedCopies.count >= LocalFileSystem.lockedCopyLimit, let oldest = lockedCopies.min(by: { $0.value.made < $1.value.made }) {
+            while lockedCopies.count >= LocalFileSystem.lockedCopyLimit,
+                let oldest = lockedCopies.min(by: { $0.value.made < $1.value.made })
+            {
                 lockedCopies[oldest.key] = nil
             }
         }
@@ -937,12 +1008,16 @@ public final class LocalFileSystem: FileSystemProvider {
         if descriptor >= 0 {
             defer { close(descriptor) }
             guard fstat(descriptor, &st) == 0, st.st_dev == known.device, st.st_ino == known.inode,
-                  st.st_flags & LocalFileSystem.lockFlags != 0, fchflags(descriptor, st.st_flags & ~LocalFileSystem.lockFlags) == 0 else { return nil }
+                st.st_flags & LocalFileSystem.lockFlags != 0,
+                fchflags(descriptor, st.st_flags & ~LocalFileSystem.lockFlags) == 0
+            else { return nil }
             return st.st_flags
         }
         // A file that cannot be opened for reading: by name, as before.
         guard lstat(url.path, &st) == 0, st.st_dev == known.device, st.st_ino == known.inode,
-              st.st_flags & LocalFileSystem.lockFlags != 0, lchflags(url.path, st.st_flags & ~LocalFileSystem.lockFlags) == 0 else { return nil }
+            st.st_flags & LocalFileSystem.lockFlags != 0,
+            lchflags(url.path, st.st_flags & ~LocalFileSystem.lockFlags) == 0
+        else { return nil }
         return st.st_flags
     }
 
@@ -965,7 +1040,9 @@ public final class LocalFileSystem: FileSystemProvider {
     /// called on that other thread, while the caller waits, and never after this has returned.
     /// What a stopped copy has written is removed, by this call or, if it was left behind,
     /// by its thread when the system lets it go.
-    public func copy(_ source: URL, to destination: URL, cancellation: CancellationFlag, progress: (Int64) -> Bool) throws {
+    public func copy(_ source: URL, to destination: URL, cancellation: CancellationFlag, progress: (Int64) -> Bool)
+        throws
+    {
         try withoutActuallyEscaping(progress) { progress in
             let report = CopyReport(progress)
             defer { report.detach() }
@@ -999,14 +1076,21 @@ public final class LocalFileSystem: FileSystemProvider {
     private func copyItem(_ source: URL, to destination: URL, _ call: LocalCall, _ report: CopyReport) throws {
         // The destination must be free; an existing file is never touched, not even on failure.
         var st = stat()
-        if try call.run(destination.path, { lstat(destination.path, &st) }) == 0 { throw FileSystemError.alreadyExists(destination.path) }
-        guard try call.run(source.path, { lstat(source.path, &st) }) == 0 else { throw LocalFileSystem.posixError(errno, source) }
+        if try call.run(destination.path, { lstat(destination.path, &st) }) == 0 {
+            throw FileSystemError.alreadyExists(destination.path)
+        }
+        guard try call.run(source.path, { lstat(source.path, &st) }) == 0 else {
+            throw LocalFileSystem.posixError(errno, source)
+        }
         switch st.st_mode & S_IFMT {
         case S_IFREG, S_IFLNK: break
         case S_IFDIR: throw LocalFileSystem.posixError(EISDIR, source)
         default:
-            throw NSError(domain: NSPOSIXErrorDomain, code: Int(EINVAL),
-                          userInfo: [NSLocalizedDescriptionKey: "\(source.path) is not an ordinary file or a link and is not copied."])
+            throw NSError(
+                domain: NSPOSIXErrorDomain, code: Int(EINVAL),
+                userInfo: [
+                    NSLocalizedDescriptionKey: "\(source.path) is not an ordinary file or a link and is not copied."
+                ])
         }
         // The system calls back through a C function, which cannot capture; what it needs
         // travels as the context pointer.
@@ -1014,7 +1098,9 @@ public final class LocalFileSystem: FileSystemProvider {
             let report: CopyReport
             let interruption: Interruption
             var stopped = false
-            init(_ report: CopyReport, _ interruption: Interruption) { (self.report, self.interruption) = (report, interruption) }
+            init(_ report: CopyReport, _ interruption: Interruption) {
+                (self.report, self.interruption) = (report, interruption)
+            }
         }
         let context = Progress(report, call.interruption)
         let state = copyfile_state_alloc()
@@ -1032,16 +1118,21 @@ public final class LocalFileSystem: FileSystemProvider {
             if progress.interruption.isInterrupted { progress.stopped = true }
             return progress.stopped ? COPYFILE_QUIT : COPYFILE_CONTINUE
         }
-        copyfile_state_set(state, UInt32(COPYFILE_STATE_STATUS_CB), unsafeBitCast(callback, to: UnsafeRawPointer.self))
+        copyfile_state_set(
+            state, UInt32(COPYFILE_STATE_STATUS_CB), unsafeBitCast(callback, to: UnsafeRawPointer.self))
         copyfile_state_set(state, UInt32(COPYFILE_STATE_STATUS_CTX), Unmanaged.passUnretained(context).toOpaque())
         // Data, attributes, permissions and extended attributes; clone instead of copying
         // when possible; and only ever to a name that is free at the moment the copy is
         // made (a file another program put there after the check above stays as it is).
         // Neither end is followed if a link is put there since the check above; holes of a
         // sparse file stay holes (a disk image copied to another volume is not written out in full).
-        let (clone, exclusive, noFollow, sparse) = (copyfile_flags_t(1 << 24), copyfile_flags_t(1 << 17), copyfile_flags_t(3 << 18),
-                                                    copyfile_flags_t(1 << 27))
-        let flags = copyfile_flags_t(COPYFILE_ACL | COPYFILE_STAT | COPYFILE_XATTR | COPYFILE_DATA) | clone | exclusive | noFollow | sparse
+        let (clone, exclusive, noFollow, sparse) = (
+            copyfile_flags_t(1 << 24), copyfile_flags_t(1 << 17), copyfile_flags_t(3 << 18),
+            copyfile_flags_t(1 << 27)
+        )
+        let flags =
+            copyfile_flags_t(COPYFILE_ACL | COPYFILE_STAT | COPYFILE_XATTR | COPYFILE_DATA) | clone | exclusive
+            | noFollow | sparse
         // Made once: a copy that a stray signal ended has its file already, and fails here.
         guard try call.runOnce(source.path, { copyfile(source.path, destination.path, state, flags) }) == 0 else {
             let code = errno
@@ -1049,13 +1140,18 @@ public final class LocalFileSystem: FileSystemProvider {
             // Only what this copy created is taken away again: the file it had open.
             var descriptor: Int32 = -1
             var (created, found) = (stat(), stat())
-            if copyfile_state_get(state, UInt32(COPYFILE_STATE_DST_FD), &descriptor) == 0, descriptor >= 0, fstat(descriptor, &created) == 0,
-               lstat(destination.path, &found) == 0, found.st_dev == created.st_dev, found.st_ino == created.st_ino {
-                if unlink(destination.path) != 0, errno == EPERM, lchflags(destination.path, found.st_flags & ~LocalFileSystem.lockFlags) == 0 {
+            if copyfile_state_get(state, UInt32(COPYFILE_STATE_DST_FD), &descriptor) == 0, descriptor >= 0,
+                fstat(descriptor, &created) == 0,
+                lstat(destination.path, &found) == 0, found.st_dev == created.st_dev, found.st_ino == created.st_ino
+            {
+                if unlink(destination.path) != 0, errno == EPERM,
+                    lchflags(destination.path, found.st_flags & ~LocalFileSystem.lockFlags) == 0
+                {
                     unlink(destination.path)
                 }
             }
-            throw context.stopped || call.interruption.isInterrupted ? CocoaError(.userCancelled) : LocalFileSystem.posixError(code, source)
+            throw context.stopped || call.interruption.isInterrupted
+                ? CocoaError(.userCancelled) : LocalFileSystem.posixError(code, source)
         }
         var copied = stat()
         guard lstat(destination.path, &copied) == 0 else { return }
@@ -1101,12 +1197,19 @@ public final class LocalFileSystem: FileSystemProvider {
                 let seconds = modified.timeIntervalSince1970.rounded(.down)
                 let nanoseconds = ((modified.timeIntervalSince1970 - seconds) * 1e9).rounded(.down)
                 // The time of access stays as it is.
-                var times = [timespec(tv_sec: 0, tv_nsec: Int((1 << 30) - 2)), timespec(tv_sec: Int(seconds), tv_nsec: Int(nanoseconds))]
-                if try call.run(path, { utimensat(AT_FDCWD, path, &times, AT_SYMLINK_NOFOLLOW) }) != 0 { throw LocalFileSystem.posixError(errno, url) }
+                var times = [
+                    timespec(tv_sec: 0, tv_nsec: Int((1 << 30) - 2)),
+                    timespec(tv_sec: Int(seconds), tv_nsec: Int(nanoseconds))
+                ]
+                if try call.run(path, { utimensat(AT_FDCWD, path, &times, AT_SYMLINK_NOFOLLOW) }) != 0 {
+                    throw LocalFileSystem.posixError(errno, url)
+                }
             }
             if let permissions = attributes.permissions {
                 // A link has no rights of its own on some volumes: that is not an error.
-                if try call.run(path, { lchmod(path, mode_t(permissions) & 0o7777) }) != 0, errno != ENOTSUP, errno != EOPNOTSUPP {
+                if try call.run(path, { lchmod(path, mode_t(permissions) & 0o7777) }) != 0, errno != ENOTSUP,
+                    errno != EOPNOTSUPP
+                {
                     throw LocalFileSystem.posixError(errno, url)
                 }
             }
@@ -1139,23 +1242,40 @@ public final class LocalFileSystem: FileSystemProvider {
             throw FileSystemError.notSupported("Copying metadata from \(source.scheme ?? "another file system")")
         }
         var (from, to) = (stat(), stat())
-        guard try call.run(source.path, { lstat(source.path, &from) }) == 0 else { throw LocalFileSystem.posixError(errno, source) }
-        guard try call.run(destination.path, { lstat(destination.path, &to) }) == 0 else { throw LocalFileSystem.posixError(errno, destination) }
+        guard try call.run(source.path, { lstat(source.path, &from) }) == 0 else {
+            throw LocalFileSystem.posixError(errno, source)
+        }
+        guard try call.run(destination.path, { lstat(destination.path, &to) }) == 0 else {
+            throw LocalFileSystem.posixError(errno, destination)
+        }
         // Opening a pipe or a device to copy from or to it could wait for ever.
         for (st, url) in [(from, source), (to, destination)] {
             switch st.st_mode & S_IFMT {
             case S_IFREG, S_IFDIR, S_IFLNK: break
             default:
-                throw NSError(domain: NSPOSIXErrorDomain, code: Int(EINVAL),
-                              userInfo: [NSLocalizedDescriptionKey: "\(url.path) is not an ordinary file, a folder or a link: nothing is copied to or from it."])
+                throw NSError(
+                    domain: NSPOSIXErrorDomain, code: Int(EINVAL),
+                    userInfo: [
+                        NSLocalizedDescriptionKey:
+                            "\(url.path) is not an ordinary file, a folder or a link: nothing is copied to or from it."
+                    ])
             }
         }
         var failure: Error?
         // Attributes that are there already are written again, so the call may be made twice.
-        if try call.run(destination.path, { copyfile(source.path, destination.path, nil, copyfile_flags_t(COPYFILE_XATTR | COPYFILE_ACL | COPYFILE_NOFOLLOW)) }) != 0 {
+        if try call.run(
+            destination.path,
+            {
+                copyfile(
+                    source.path, destination.path, nil,
+                    copyfile_flags_t(COPYFILE_XATTR | COPYFILE_ACL | COPYFILE_NOFOLLOW))
+            }) != 0
+        {
             failure = LocalFileSystem.posixError(errno, destination)
         }
-        if from.st_birthtimespec.tv_sec != to.st_birthtimespec.tv_sec || from.st_birthtimespec.tv_nsec != to.st_birthtimespec.tv_nsec {
+        if from.st_birthtimespec.tv_sec != to.st_birthtimespec.tv_sec
+            || from.st_birthtimespec.tv_nsec != to.st_birthtimespec.tv_nsec
+        {
             if !LocalFileSystem.setCreationDate(from.st_birthtimespec, of: destination.path), failure == nil {
                 failure = LocalFileSystem.posixError(errno, destination)
             }
@@ -1183,7 +1303,9 @@ public final class LocalFileSystem: FileSystemProvider {
         let size = getxattr(path, LocalFileSystem.quarantineName, nil, 0, 0, XATTR_NOFOLLOW)
         guard size > 0 else { return nil }
         var value = Data(count: size)
-        let got = value.withUnsafeMutableBytes { getxattr(path, LocalFileSystem.quarantineName, $0.baseAddress, size, 0, XATTR_NOFOLLOW) }
+        let got = value.withUnsafeMutableBytes {
+            getxattr(path, LocalFileSystem.quarantineName, $0.baseAddress, size, 0, XATTR_NOFOLLOW)
+        }
         return got > 0 ? value.prefix(got) : nil
     }
 
@@ -1198,7 +1320,9 @@ public final class LocalFileSystem: FileSystemProvider {
     private func mark(_ value: Data, of url: URL, _ call: LocalCall) throws {
         let path = url.path
         let result = try value.withUnsafeBytes { bytes in
-            try call.run(path) { setxattr(path, LocalFileSystem.quarantineName, bytes.baseAddress, bytes.count, 0, XATTR_NOFOLLOW) }
+            try call.run(path) {
+                setxattr(path, LocalFileSystem.quarantineName, bytes.baseAddress, bytes.count, 0, XATTR_NOFOLLOW)
+            }
         }
         if result != 0 { throw LocalFileSystem.posixError(errno, url) }
     }
@@ -1216,8 +1340,9 @@ public final class LocalFileSystem: FileSystemProvider {
     }
 
     static func posixError(_ code: Int32, _ url: URL) -> Error {
-        NSError(domain: NSPOSIXErrorDomain, code: Int(code),
-                userInfo: [NSLocalizedDescriptionKey: String(cString: strerror(code)) + ": " + url.path])
+        NSError(
+            domain: NSPOSIXErrorDomain, code: Int(code),
+            userInfo: [NSLocalizedDescriptionKey: String(cString: strerror(code)) + ": " + url.path])
     }
 
     // MARK: Surroundings
@@ -1340,8 +1465,14 @@ public final class LocalFileSystem: FileSystemProvider {
     private static func fixedPlaces() -> [Place] {
         let home = FileManager.default.homeDirectoryForCurrentUser
         return [Place(name: "Home", url: home, kind: .home)]
-            + ["Desktop", "Documents", "Downloads"].map { Place(name: $0, url: home.appending(name: $0), kind: .folder) }
-            + [Place(name: "Applications", url: URL(fileURLWithPath: "/Applications", isDirectory: true), kind: .folder)]
+            + ["Desktop", "Documents", "Downloads"].map {
+                Place(name: $0, url: home.appending(name: $0), kind: .folder)
+            }
+            + [
+                Place(
+                    name: "Applications", url: URL(fileURLWithPath: "/Applications", isDirectory: true), kind: .folder
+                )
+            ]
     }
 
     /// Volumes whose questions have not been answered yet: asked about once, not again and
@@ -1355,12 +1486,17 @@ public final class LocalFileSystem: FileSystemProvider {
         let fm = FileManager.default
         let home = fm.homeDirectoryForCurrentUser
         var places = [Place(name: "Home", url: home, kind: .home)]
-        places += ["Desktop", "Documents", "Downloads"].map { Place(name: $0, url: home.appending(name: $0), kind: .folder) }
+        places += ["Desktop", "Documents", "Downloads"].map {
+            Place(name: $0, url: home.appending(name: $0), kind: .folder)
+        }
         let cloud = home.appendingPathComponent("Library/Mobile Documents/com~apple~CloudDocs", isDirectory: true)
         if fm.fileExists(atPath: cloud.path) { places.append(Place(name: "iCloud Drive", url: cloud, kind: .folder)) }
-        places.append(Place(name: "Applications", url: URL(fileURLWithPath: "/Applications", isDirectory: true), kind: .folder))
-        let keys: [URLResourceKey] = [.volumeNameKey, .volumeIsInternalKey, .volumeIsLocalKey, .volumeIsRemovableKey, .volumeIsEjectableKey,
-                                      .volumeIsRootFileSystemKey]
+        places.append(
+            Place(name: "Applications", url: URL(fileURLWithPath: "/Applications", isDirectory: true), kind: .folder))
+        let keys: [URLResourceKey] = [
+            .volumeNameKey, .volumeIsInternalKey, .volumeIsLocalKey, .volumeIsRemovableKey, .volumeIsEjectableKey,
+            .volumeIsRootFileSystemKey
+        ]
         let volumes = fm.mountedVolumeURLs(includingResourceValuesForKeys: nil, options: [.skipHiddenVolumes]) ?? []
         final class Slot {
             let lock = NSLock()
@@ -1374,12 +1510,15 @@ public final class LocalFileSystem: FileSystemProvider {
             group.enter()
             BlockingCalls.run {
                 let values = try? volume.resourceValues(forKeys: Set(keys))
-                let place = Place(name: values?.volumeName ?? volume.lastPathComponent, url: volume,
-                                  kind: LocalFileSystem.volumeKind(path: volume.path, isInternal: values?.volumeIsInternal, isLocal: values?.volumeIsLocal,
-                                                                   isRemovable: values?.volumeIsRemovable, isEjectable: values?.volumeIsEjectable),
-                                  canBeEjected: Place.isEjectable(path: volume.path, isRootFileSystem: values?.volumeIsRootFileSystem,
-                                                                  isInternal: values?.volumeIsInternal, isLocal: values?.volumeIsLocal,
-                                                                  isRemovable: values?.volumeIsRemovable, isEjectable: values?.volumeIsEjectable))
+                let place = Place(
+                    name: values?.volumeName ?? volume.lastPathComponent, url: volume,
+                    kind: LocalFileSystem.volumeKind(
+                        path: volume.path, isInternal: values?.volumeIsInternal, isLocal: values?.volumeIsLocal,
+                        isRemovable: values?.volumeIsRemovable, isEjectable: values?.volumeIsEjectable),
+                    canBeEjected: Place.isEjectable(
+                        path: volume.path, isRootFileSystem: values?.volumeIsRootFileSystem,
+                        isInternal: values?.volumeIsInternal, isLocal: values?.volumeIsLocal,
+                        isRemovable: values?.volumeIsRemovable, isEjectable: values?.volumeIsEjectable))
                 slot.lock.lock()
                 slot.place = place
                 slot.lock.unlock()
@@ -1397,7 +1536,10 @@ public final class LocalFileSystem: FileSystemProvider {
             } else if let known = previous.first(where: { $0.url.path == volume.path }) {
                 places.append(known)
             } else {
-                places.append(Place(name: volume.lastPathComponent, url: volume, kind: volume.path == "/" ? .internalDisk : .externalDisk))
+                places.append(
+                    Place(
+                        name: volume.lastPathComponent, url: volume,
+                        kind: volume.path == "/" ? .internalDisk : .externalDisk))
             }
         }
         return places
@@ -1405,7 +1547,9 @@ public final class LocalFileSystem: FileSystemProvider {
 
     /// Internal: the start-up disk, and a local disk the system calls internal that cannot be
     /// taken out. A volume the system knows nothing about counts as external.
-    static func volumeKind(path: String, isInternal: Bool?, isLocal: Bool?, isRemovable: Bool?, isEjectable: Bool?) -> Place.Kind {
+    static func volumeKind(path: String, isInternal: Bool?, isLocal: Bool?, isRemovable: Bool?, isEjectable: Bool?)
+        -> Place.Kind
+    {
         if path == "/" { return .internalDisk }
         let fixed = isLocal == true && isInternal == true && isRemovable != true && isEjectable != true
         return fixed ? .internalDisk : .externalDisk
@@ -1441,8 +1585,10 @@ public final class LocalFileSystem: FileSystemProvider {
             return queryVolume(of: url, cancellation)
         }
         func fromMemory() -> VolumeInfo {
-            lastVolumes[mount] ?? VolumeInfo(name: URL(fileURLWithPath: mount).lastPathComponent,
-                                             isLocal: probes.isLocal?(mount) ?? MountTable.shared.isLocal(mount) ?? true)
+            lastVolumes[mount]
+                ?? VolumeInfo(
+                    name: URL(fileURLWithPath: mount).lastPathComponent,
+                    isLocal: probes.isLocal?(mount) ?? MountTable.shared.isLocal(mount) ?? true)
         }
         let patience = UInt64(probes.volumePatience * 1_000_000_000)
         volumeLock.lock()
@@ -1477,8 +1623,11 @@ public final class LocalFileSystem: FileSystemProvider {
                 // Somebody was given the old figures meanwhile: they are told to ask again.
                 if wasMissed {
                     DispatchQueue.main.async {
-                        NotificationCenter.default.post(name: FileSystemRegistry.volumeInfoDidChange, object: self,
-                                                        userInfo: [FileSystemRegistry.volumeRootKey: URL(fileURLWithPath: mount, isDirectory: true)])
+                        NotificationCenter.default.post(
+                            name: FileSystemRegistry.volumeInfoDidChange, object: self,
+                            userInfo: [
+                                FileSystemRegistry.volumeRootKey: URL(fileURLWithPath: mount, isDirectory: true)
+                            ])
                     }
                 }
             }
@@ -1557,7 +1706,9 @@ public final class LocalFileSystem: FileSystemProvider {
     /// Asks the system, which may wait for as long as the volume likes. The flag is looked
     /// at between the questions: once nobody wants the answer, no further one is asked.
     private func queryVolume(of url: URL, _ cancellation: CancellationFlag? = nil) -> VolumeInfo? {
-        let keys: Set<URLResourceKey> = [.volumeNameKey, .volumeAvailableCapacityKey, .volumeTotalCapacityKey, .volumeIsLocalKey]
+        let keys: Set<URLResourceKey> = [
+            .volumeNameKey, .volumeAvailableCapacityKey, .volumeTotalCapacityKey, .volumeIsLocalKey
+        ]
         var existing = url.standardizedFileURL
         probes.willAsk?(existing.path)
         while existing.path != "/", cancellation?.isCancelled != true, !fm.fileExists(atPath: existing.path) {
@@ -1572,14 +1723,23 @@ public final class LocalFileSystem: FileSystemProvider {
         let mounted = statfs(existing.path, &info) == 0
         guard let name = values.volumeName ?? (mounted ? existing.pathComponents.last : nil) else { return nil }
         if cancellation?.isCancelled == true { return nil }
-        let available = probes.freeSpace.map { $0(existing.path).available } ?? values.volumeAvailableCapacity.map(Int64.init)
-        let mountPoint = mounted ? withUnsafeBytes(of: &info.f_mntonname) { String(cString: $0.bindMemory(to: CChar.self).baseAddress!) } : nil
+        let available =
+            probes.freeSpace.map { $0(existing.path).available } ?? values.volumeAvailableCapacity.map(Int64.init)
+        let mountPoint =
+            mounted
+            ? withUnsafeBytes(of: &info.f_mntonname) { String(cString: $0.bindMemory(to: CChar.self).baseAddress!) }
+            : nil
         // Network shares report only the plain figure for free space.
-        let free = freeForImportantUsage(on: existing, mountPoint: mountPoint, fsid: mounted ? info.f_fsid : nil, available: available) ?? available
+        let free =
+            freeForImportantUsage(
+                on: existing, mountPoint: mountPoint, fsid: mounted ? info.f_fsid : nil, available: available)
+            ?? available
             ?? (mounted ? Int64(info.f_bavail) * Int64(info.f_bsize) : nil)
-        let total = values.volumeTotalCapacity.map(Int64.init) ?? (mounted ? Int64(info.f_blocks) * Int64(info.f_bsize) : nil)
-        return VolumeInfo(name: name, freeBytes: free, totalBytes: total,
-                          isLocal: values.volumeIsLocal ?? (mounted ? info.f_flags & UInt32(MNT_LOCAL) != 0 : true))
+        let total =
+            values.volumeTotalCapacity.map(Int64.init) ?? (mounted ? Int64(info.f_blocks) * Int64(info.f_bsize) : nil)
+        return VolumeInfo(
+            name: name, freeBytes: free, totalBytes: total,
+            isLocal: values.volumeIsLocal ?? (mounted ? info.f_flags & UInt32(MNT_LOCAL) != 0 : true))
     }
 
     let spareLock = NSLock()
@@ -1605,22 +1765,28 @@ public final class LocalFileSystem: FileSystemProvider {
     private func freeForImportantUsage(on url: URL, mountPoint: String?, fsid: fsid_t?, available: Int64?) -> Int64? {
         func measure(_ url: URL) -> Int64? {
             if let freeSpace = probes.freeSpace { return freeSpace(url.path).important.flatMap { $0 > 0 ? $0 : nil } }
-            return (try? url.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey]))?.volumeAvailableCapacityForImportantUsage.flatMap { $0 > 0 ? $0 : nil }
+            return (try? url.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey]))?
+                .volumeAvailableCapacityForImportantUsage.flatMap { $0 > 0 ? $0 : nil }
         }
         guard let mountPoint, let available, let fsid else { return measure(url) }
         let now = DispatchTime.now().uptimeNanoseconds
         spareLock.lock()
         // What was measured of another volume that once was mounted here is of no use.
-        if let known = spareSpace[mountPoint], known.volume.val.0 != fsid.val.0 || known.volume.val.1 != fsid.val.1 { spareSpace[mountPoint] = nil }
+        if let known = spareSpace[mountPoint], known.volume.val.0 != fsid.val.0 || known.volume.val.1 != fsid.val.1 {
+            spareSpace[mountPoint] = nil
+        }
         guard let known = spareSpace[mountPoint] else {
             spareLock.unlock()
             let important = measure(url)
             spareLock.lock()
-            spareSpace[mountPoint] = (important.map { $0 - available }, DispatchTime.now().uptimeNanoseconds, false, fsid)
+            spareSpace[mountPoint] = (
+                important.map { $0 - available }, DispatchTime.now().uptimeNanoseconds, false, fsid
+            )
             spareLock.unlock()
             return important
         }
-        let isDue = (now &- known.measured > LocalFileSystem.spareSpaceAge && !known.isMeasuring)
+        let isDue =
+            (now &- known.measured > LocalFileSystem.spareSpaceAge && !known.isMeasuring)
             || (known.isMeasuring && now &- known.measured > LocalFileSystem.spareSpaceLoss)
         if isDue {
             spareSpace[mountPoint]?.isMeasuring = true
@@ -1641,7 +1807,9 @@ public final class LocalFileSystem: FileSystemProvider {
         var figures: (available: Int64?, important: Int64?)?
         if let freeSpace = probes.freeSpace {
             figures = freeSpace(mountPoint)
-        } else if let values = try? volume.resourceValues(forKeys: [.volumeAvailableCapacityKey, .volumeAvailableCapacityForImportantUsageKey]) {
+        } else if let values = try? volume.resourceValues(forKeys: [
+            .volumeAvailableCapacityKey, .volumeAvailableCapacityForImportantUsageKey
+        ]) {
             figures = (values.volumeAvailableCapacity.map(Int64.init), values.volumeAvailableCapacityForImportantUsage)
         }
         spareLock.lock()
@@ -1657,8 +1825,9 @@ public final class LocalFileSystem: FileSystemProvider {
         spareLock.unlock()
         guard after != before else { return }
         DispatchQueue.main.async {
-            NotificationCenter.default.post(name: FileSystemRegistry.volumeInfoDidChange, object: self,
-                                            userInfo: [FileSystemRegistry.volumeRootKey: volume])
+            NotificationCenter.default.post(
+                name: FileSystemRegistry.volumeInfoDidChange, object: self,
+                userInfo: [FileSystemRegistry.volumeRootKey: volume])
         }
     }
 
@@ -1686,7 +1855,8 @@ public final class LocalFileSystem: FileSystemProvider {
     /// Adds up a tree without making an item of every entry: names, kinds and sizes are all
     /// that is read, and the folders of each level are measured on all cores.
     public func totalSize(of directory: URL, cancellation: CancellationFlag) -> Int64 {
-        totalSize(ofPath: directory.path, cancellation) ?? totalSizeByListing(of: directory, cancellation: cancellation)
+        totalSize(ofPath: directory.path, cancellation)
+            ?? totalSizeByListing(of: directory, cancellation: cancellation)
     }
 
     /// The folder's entries, a buffer at a time: files are added up, folders are returned.
@@ -1700,7 +1870,9 @@ public final class LocalFileSystem: FileSystemProvider {
         defer { close(descriptor) }
         var request = attrlist()
         request.bitmapcount = UInt16(ATTR_BIT_MAP_COUNT)
-        let (wantError, wantName, wantType) = (attrgroup_t(ATTR_CMN_ERROR), attrgroup_t(ATTR_CMN_NAME), attrgroup_t(ATTR_CMN_OBJTYPE))
+        let (wantError, wantName, wantType) = (
+            attrgroup_t(ATTR_CMN_ERROR), attrgroup_t(ATTR_CMN_NAME), attrgroup_t(ATTR_CMN_OBJTYPE)
+        )
         request.commonattr = attrgroup_t(ATTR_CMN_RETURNED_ATTRS) | wantError | wantName | wantType
         request.fileattr = attrgroup_t(ATTR_FILE_DATALENGTH)
         let capacity = 64 * 1024
@@ -1736,7 +1908,9 @@ public final class LocalFileSystem: FileSystemProvider {
                     field += MemoryLayout<UInt32>.size
                 }
                 var size: Int64 = 0
-                if returned.fileattr & attrgroup_t(ATTR_FILE_DATALENGTH) != 0 { size = field.loadUnaligned(as: Int64.self) }
+                if returned.fileattr & attrgroup_t(ATTR_FILE_DATALENGTH) != 0 {
+                    size = field.loadUnaligned(as: Int64.self)
+                }
                 entry += length
                 guard !name.isEmpty else { continue }
                 let child = path.hasSuffix("/") ? path + name : path + "/" + name
@@ -1744,10 +1918,16 @@ public final class LocalFileSystem: FileSystemProvider {
                     // The entry is asked by itself, as the listing does.
                     var st = stat()
                     guard lstat(child, &st) == 0 else { continue }
-                    type = (st.st_mode & S_IFMT) == S_IFDIR ? VDIR.rawValue : ((st.st_mode & S_IFMT) == S_IFREG ? VREG.rawValue : 0)
+                    type =
+                        (st.st_mode & S_IFMT) == S_IFDIR
+                        ? VDIR.rawValue : ((st.st_mode & S_IFMT) == S_IFREG ? VREG.rawValue : 0)
                     size = Int64(st.st_size)
                 }
-                if type == VDIR.rawValue { folders.append(child) } else if type == VREG.rawValue { files = files.addingSaturated(size) }
+                if type == VDIR.rawValue {
+                    folders.append(child)
+                } else if type == VREG.rawValue {
+                    files = files.addingSaturated(size)
+                }
             }
         }
         return (files, folders)
@@ -1760,7 +1940,9 @@ public final class LocalFileSystem: FileSystemProvider {
         guard let level = LocalFileSystem.withoutMaterializing({ measureLevel(path, cancellation) }) else { return nil }
         guard !cancellation.isCancelled else { return 0 }
         return Parallel.map(level.folders) { folder in
-            self.totalSize(ofPath: folder, cancellation) ?? self.totalSizeByListing(of: URL(fileURLWithPath: folder, isDirectory: true), cancellation: cancellation)
+            self.totalSize(ofPath: folder, cancellation)
+                ?? self.totalSizeByListing(
+                    of: URL(fileURLWithPath: folder, isDirectory: true), cancellation: cancellation)
         }.reduce(level.files) { $0.addingSaturated($1) }
     }
 
@@ -1775,7 +1957,10 @@ public final class LocalFileSystem: FileSystemProvider {
     }
 
     /// `getattrlistbulk`, tried again after an `EINTR` nobody asked for.
-    static func readBulk(_ descriptor: Int32, _ request: UnsafeMutablePointer<attrlist>, _ buffer: UnsafeMutableRawPointer, _ capacity: Int) -> Int32 {
+    static func readBulk(
+        _ descriptor: Int32, _ request: UnsafeMutablePointer<attrlist>, _ buffer: UnsafeMutableRawPointer,
+        _ capacity: Int
+    ) -> Int32 {
         while true {
             let count = getattrlistbulk(descriptor, request, buffer, capacity, 0)
             if count >= 0 || errno != EINTR { return count }

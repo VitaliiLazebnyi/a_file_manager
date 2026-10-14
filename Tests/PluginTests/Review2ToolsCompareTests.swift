@@ -1,17 +1,18 @@
 import AFMContracts
 import AFMKernel
 import AppKit
-@testable import CompareContentPlugin
 import Foundation
 import LocalFileSystemPlugin
 import TestSupport
 import Testing
 
+@testable import CompareContentPlugin
+
 private struct Seeded: RandomNumberGenerator {
     var state: UInt64
 
     mutating func next() -> UInt64 {
-        state = state &* 6364136223846793005 &+ 1442695040888963407
+        state = state &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
         return state ^ (state >> 29)
     }
 }
@@ -19,7 +20,9 @@ private struct Seeded: RandomNumberGenerator {
 private func isValid(_ segments: [DiffSegment], _ a: [Int], _ b: [Int]) -> Bool {
     var (i, j) = (0, 0)
     for segment in segments {
-        guard segment.a.lowerBound == i, segment.b.lowerBound == j, !(segment.a.isEmpty && segment.b.isEmpty) else { return false }
+        guard segment.a.lowerBound == i, segment.b.lowerBound == j, !(segment.a.isEmpty && segment.b.isEmpty) else {
+            return false
+        }
         if segment.isEqual, Array(a[segment.a]) != Array(b[segment.b]) { return false }
         (i, j) = (segment.a.upperBound, segment.b.upperBound)
     }
@@ -29,7 +32,9 @@ private func isValid(_ segments: [DiffSegment], _ a: [Int], _ b: [Int]) -> Bool 
 /// A source-like file: mostly distinct lines, some repeated ones (braces, blanks).
 private func sourceLike(_ count: Int, seed: UInt64) -> [Int] {
     var random = Seeded(state: seed)
-    return (0..<count).map { index in Int.random(in: 0..<10, using: &random) < 2 ? -Int.random(in: 1...30, using: &random) : index }
+    return (0..<count).map { index in
+        Int.random(in: 0..<10, using: &random) < 2 ? -Int.random(in: 1...30, using: &random) : index
+    }
 }
 
 /// Review round 2: the diff of large files near the shortest, saving that never loses or mangles
@@ -40,7 +45,9 @@ private func sourceLike(_ count: Int, seed: UInt64) -> [Int] {
         var b = a
         var random = Seeded(state: 2)
         b.removeSubrange(9_000..<10_500)
-        for _ in 0..<150 { b[Int.random(in: 0..<b.count, using: &random)] = 1_000_000 + Int.random(in: 0..<1_000_000, using: &random) }
+        for _ in 0..<150 {
+            b[Int.random(in: 0..<b.count, using: &random)] = 1_000_000 + Int.random(in: 0..<1_000_000, using: &random)
+        }
         let segments = Myers.diff(a, b)
         #expect(isValid(segments, a, b))
         // The shortest script deletes the block and replaces 150 lines: at most 1,500 + 2 x 150.
@@ -54,7 +61,9 @@ private func sourceLike(_ count: Int, seed: UInt64) -> [Int] {
         b.removeSubrange(3_000..<3_400)
         b.insert(contentsOf: block, at: 17_000)
         var random = Seeded(state: 4)
-        for _ in 0..<100 { b[Int.random(in: 0..<b.count, using: &random)] = 2_000_000 + Int.random(in: 0..<1_000_000, using: &random) }
+        for _ in 0..<100 {
+            b[Int.random(in: 0..<b.count, using: &random)] = 2_000_000 + Int.random(in: 0..<1_000_000, using: &random)
+        }
         let segments = Myers.diff(a, b)
         #expect(isValid(segments, a, b))
         #expect(Myers.editDistance(segments) <= 1_000 + 100)
@@ -66,7 +75,9 @@ private func sourceLike(_ count: Int, seed: UInt64) -> [Int] {
         var b = a
         b.removeSubrange(2_000..<2_800)
         var random = Seeded(state: 5)
-        for _ in 0..<60 { b[Int.random(in: 0..<b.count, using: &random)] = 100_000 + Int.random(in: 0..<100_000, using: &random) }
+        for _ in 0..<60 {
+            b[Int.random(in: 0..<b.count, using: &random)] = 100_000 + Int.random(in: 0..<100_000, using: &random)
+        }
         for limit in [0, 1, 5, 20] {
             let segments = Myers.diff(a, b, costLimit: limit)
             #expect(isValid(segments, a, b))
@@ -93,7 +104,9 @@ private func sourceLike(_ count: Int, seed: UInt64) -> [Int] {
     @Test func insideALineOnlyTheStartOfAHugeLineIsLookedAt() {
         let long = String(repeating: "abcdefghij", count: 200_000)
         let ranges = TextDiff.inline(long, long + "X")
-        #expect(ranges.left.allSatisfy { $0.upperBound <= long.utf16.count } && ranges.right.last?.upperBound == long.utf16.count + 1)
+        #expect(
+            ranges.left.allSatisfy { $0.upperBound <= long.utf16.count }
+                && ranges.right.last?.upperBound == long.utf16.count + 1)
     }
 }
 
@@ -109,7 +122,9 @@ private func sourceLike(_ count: Int, seed: UInt64) -> [Int] {
         box = try Sandbox()
         try box.file("A/f.txt", "one\ntwo\nthree\nfour\n")
         try box.file("B/f.txt", "one\n2\nthree\nfour\nfive\n")
-        bench = TestBench(plugins: [plugin], fileSystems: [LocalFileSystem()], left: box.url("A"), right: box.url("B"), settings: settings)
+        bench = TestBench(
+            plugins: [plugin], fileSystems: [LocalFileSystem()], left: box.url("A"), right: box.url("B"),
+            settings: settings)
     }
 
     func open() {
@@ -130,7 +145,9 @@ private func sourceLike(_ count: Int, seed: UInt64) -> [Int] {
         session.undo()
         session.undo()
         #expect(!session.hasUnsavedChanges && !session.canUndo)
-        #expect(session.text(.right, row: 1) == before && (0..<session.rowCount).map { session.text(.left, row: $0) } == ["one", "two", "three", "four", nil])
+        #expect(
+            session.text(.right, row: 1) == before
+                && (0..<session.rowCount).map { session.text(.left, row: $0) } == ["one", "two", "three", "four", nil])
     }
 
     @Test func aRowThatPointsOutsideTheTextsIsNeverTrusted() {
@@ -143,14 +160,14 @@ private func sourceLike(_ count: Int, seed: UInt64) -> [Int] {
     @Test func quittingAsksAboutUnsavedEditsAndCanBeCalledOff() throws {
         open()
         session.setText("two edited", .left, row: 1)
-        ui.choiceAnswers = [2]   // Cancel
+        ui.choiceAnswers = [2]  // Cancel
         #expect(!plugin.shouldTerminate())
         #expect(box.read("A/f.txt") == "one\ntwo\nthree\nfour\n" && session.hasUnsavedChanges)
-        ui.choiceAnswers = [1]   // Don't Save
+        ui.choiceAnswers = [1]  // Don't Save
         #expect(plugin.shouldTerminate())
         #expect(box.read("A/f.txt") == "one\ntwo\nthree\nfour\n" && !session.hasUnsavedChanges)
         session.setText("second edit", .left, row: 1)
-        ui.choiceAnswers = [0]   // Save
+        ui.choiceAnswers = [0]  // Save
         #expect(plugin.shouldTerminate())
         #expect(box.read("A/f.txt") == "one\nsecond edit\nthree\nfour\n")
     }
@@ -193,7 +210,8 @@ private func sourceLike(_ count: Int, seed: UInt64) -> [Int] {
         try box.file("A/g.txt", "a\nb\n")
         bench.left.reload()
         bench.left.moveCursor(toName: "g.txt")
-        bench.commands.perform(.compareByContent, .text(box.url("A/g.txt").absoluteString + "\n" + box.url("A/g.txt").absoluteString))
+        bench.commands.perform(
+            .compareByContent, .text(box.url("A/g.txt").absoluteString + "\n" + box.url("A/g.txt").absoluteString))
         session.setEditing(true)
         session.setText("x", .left, row: 0)
         session.setText("y", .right, row: 1)
@@ -212,7 +230,8 @@ private func sourceLike(_ count: Int, seed: UInt64) -> [Int] {
         let loaded = try #require(registry.item(at: box.url("h/one.txt")))
         try "changed elsewhere, longer".write(to: box.url("h/one.txt"), atomically: false, encoding: .utf8)
         #expect(throws: CompareLoader.SaveError.self) {
-            try CompareLoader.replace(box.url("h/one.txt"), with: Data("mine".utf8), expected: loaded, fileSystems: registry)
+            try CompareLoader.replace(
+                box.url("h/one.txt"), with: Data("mine".utf8), expected: loaded, fileSystems: registry)
         }
         #expect(box.read("h/one.txt") == "changed elsewhere, longer")
     }

@@ -1,16 +1,17 @@
 import AFMContracts
 import AFMKernel
 import AppKit
+import Foundation
+import LocalFileSystemPlugin
+import TestSupport
+import Testing
+
 @testable import CompareContentPlugin
 @testable import DirectorySyncPlugin
 @testable import FileToolsPlugin
 @testable import FindFilesPlugin
-import Foundation
-import LocalFileSystemPlugin
 @testable import MultiRenamePlugin
 @testable import SelectionPlugin
-import TestSupport
-import Testing
 
 // MARK: Helpers
 
@@ -28,17 +29,22 @@ private final class ProbingFileSystem: FileSystemProvider {
     var scheme: String { memory.scheme }
     var capabilities: FileSystemCapabilities { memory.capabilities }
     func capabilities(for url: URL) -> FileSystemCapabilities { memory.capabilities(for: url) }
-    func list(_ directory: URL, showHidden: Bool) throws -> [FileItem] { try memory.list(directory, showHidden: showHidden) }
+    func list(_ directory: URL, showHidden: Bool) throws -> [FileItem] {
+        try memory.list(directory, showHidden: showHidden)
+    }
     func list(_ directory: URL, showHidden: Bool, cancellation: CancellationFlag) throws -> [FileItem] {
         listing.signal()
         return try memory.list(directory, showHidden: showHidden, cancellation: cancellation)
     }
-    func list(_ directory: URL, showHidden: Bool, cancellation: CancellationFlag, receive: ([FileItem]) -> Bool) throws {
+    func list(_ directory: URL, showHidden: Bool, cancellation: CancellationFlag, receive: ([FileItem]) -> Bool) throws
+    {
         listing.signal()
         try memory.list(directory, showHidden: showHidden, cancellation: cancellation, receive: receive)
     }
     func item(at url: URL) -> FileItem? { memory.item(at: url) }
-    func item(at url: URL, cancellation: CancellationFlag) -> FileItem? { memory.item(at: url, cancellation: cancellation) }
+    func item(at url: URL, cancellation: CancellationFlag) -> FileItem? {
+        memory.item(at: url, cancellation: cancellation)
+    }
     func parent(of directory: URL) -> URL? { memory.parent(of: directory) }
     func read(_ url: URL) throws -> FileReader { try memory.read(url) }
     func read(_ url: URL, cancellation: CancellationFlag) throws -> FileReader {
@@ -54,8 +60,12 @@ private final class ProbingFileSystem: FileSystemProvider {
         return writer
     }
     func remove(_ url: URL) throws { try memory.remove(url) }
-    func move(_ source: URL, to destination: URL, replacing: Bool) throws { try memory.move(source, to: destination, replacing: replacing) }
-    func copy(_ source: URL, to destination: URL, progress: (Int64) -> Bool) throws { try memory.copy(source, to: destination, progress: progress) }
+    func move(_ source: URL, to destination: URL, replacing: Bool) throws {
+        try memory.move(source, to: destination, replacing: replacing)
+    }
+    func copy(_ source: URL, to destination: URL, progress: (Int64) -> Bool) throws {
+        try memory.copy(source, to: destination, progress: progress)
+    }
 }
 
 /// What a background thread produced.
@@ -63,15 +73,26 @@ private final class Outcome<Value> {
     private let lock = NSLock()
     private var stored: Value?
     var value: Value? {
-        get { lock.lock(); defer { lock.unlock() }; return stored }
-        set { lock.lock(); stored = newValue; lock.unlock() }
+        get {
+            lock.lock()
+            defer { lock.unlock() }
+            return stored
+        }
+        set {
+            lock.lock()
+            stored = newValue
+            lock.unlock()
+        }
     }
 }
 
 /// Runs `work` on its own thread; the semaphore is signalled when it ends.
 private func background(_ work: @escaping () -> Void) -> DispatchSemaphore {
     let done = DispatchSemaphore(value: 0)
-    Thread { work(); done.signal() }.start()
+    Thread {
+        work()
+        done.signal()
+    }.start()
     return done
 }
 
@@ -103,8 +124,10 @@ private func isExactly(_ name: String, _ other: String) -> Bool { name.utf8.elem
     let pasteboard = NSPasteboard.withUniqueName()
 
     func makeBench() -> TestBench {
-        TestBench(plugins: [SelectionPlugin(pasteboard: pasteboard, background: false)], fileSystems: [LocalFileSystem(), memory],
-                  left: memory.url("/A"), right: memory.url("/B"), settings: MemorySettings())
+        TestBench(
+            plugins: [SelectionPlugin(pasteboard: pasteboard, background: false)],
+            fileSystems: [LocalFileSystem(), memory],
+            left: memory.url("/A"), right: memory.url("/B"), settings: MemorySettings())
     }
 
     func marked(_ model: PanelModel) -> [String] { model.items.filter { model.isSelected($0) }.map(\.name) }
@@ -141,8 +164,11 @@ private func isExactly(_ name: String, _ other: String) -> Bool { name.utf8.elem
 
     @Test func comparingKeepsTheTwinsApart() {
         let early = Date(timeIntervalSince1970: 1_000_000)
-        func file(_ name: String) -> FileItem { FileItem(url: memory.url("/x/" + name), name: name, isDirectory: false, size: 1, modified: early) }
-        let marks = DirectoryComparison.compare(left: [file(composed), file(decomposed)], right: [file(composed)], mode: .missing)
+        func file(_ name: String) -> FileItem {
+            FileItem(url: memory.url("/x/" + name), name: name, isDirectory: false, size: 1, modified: early)
+        }
+        let marks = DirectoryComparison.compare(
+            left: [file(composed), file(decomposed)], right: [file(composed)], mode: .missing)
         #expect(marks.leftNames.count == 1 && isExactly(marks.leftNames[0], decomposed))
         #expect(marks.rightNames.isEmpty && marks.sameNames.count == 1 && isExactly(marks.sameNames[0], composed))
         // Only reading alike is enough where nothing is written exactly like it.
@@ -160,8 +186,8 @@ private func isExactly(_ name: String, _ other: String) -> Bool { name.utf8.elem
     }
 }
 
-private extension MemoryFileSystem {
-    func listing(_ path: String) -> [FileItem] { (try? list(url(path), showHidden: true)) ?? [] }
+extension MemoryFileSystem {
+    fileprivate func listing(_ path: String) -> [FileItem] { (try? list(url(path), showHidden: true)) ?? [] }
 }
 
 // MARK: Multi-Rename
@@ -172,8 +198,9 @@ private extension MemoryFileSystem {
         memory.addFile("/open/a.txt")
         memory.addFile("/locked/b.txt")
         memory.capabilitiesAt = { $0.path.hasPrefix("/locked") ? [] : [.write] }
-        let bench = TestBench(plugins: [MultiRenamePlugin(opensWindows: false)], fileSystems: [LocalFileSystem(), memory],
-                              left: memory.url("/open"), right: memory.url("/locked"), settings: MemorySettings())
+        let bench = TestBench(
+            plugins: [MultiRenamePlugin(opensWindows: false)], fileSystems: [LocalFileSystem(), memory],
+            left: memory.url("/open"), right: memory.url("/locked"), settings: MemorySettings())
         bench.left.model.selectAll()
         bench.right.model.selectAll()
         #expect(bench.commands.isEnabled(.multiRename))
@@ -203,13 +230,16 @@ private extension MemoryFileSystem {
 
     @Test func aFileListedBesideItsFolderIsFoundOnce() throws {
         var query = SearchQuery(directory: memory.url("/D"), names: "*.txt")
-        query.onlyItems = [memory.url("/D"), memory.url("/D/top.txt"), memory.url("/D/sub/s.txt"), memory.url("/D/sub/deep/x.txt")]
+        query.onlyItems = [
+            memory.url("/D"), memory.url("/D/top.txt"), memory.url("/D/sub/s.txt"), memory.url("/D/sub/deep/x.txt")
+        ]
         #expect(find(query).sorted() == ["/D/sub/deep/x.txt", "/D/sub/s.txt", "/D/top.txt"])
         // With a limit a deeper file may or may not be reached from the folder; either way once.
         for depth in 0...3 {
             query.maxDepth = depth
             let found = find(query)
-            #expect(Set(found).count == found.count && found.contains("/D/top.txt") && found.contains("/D/sub/deep/x.txt"))
+            #expect(
+                Set(found).count == found.count && found.contains("/D/top.txt") && found.contains("/D/sub/deep/x.txt"))
         }
     }
 
@@ -278,8 +308,10 @@ private extension MemoryFileSystem {
         let items = ["a", "b"].map { memory.item(at: memory.url("/E/" + $0))! }
         let groups = Outcome<[[FileItem]]>()
         let done = background {
-            groups.value = DuplicateFinder.groups(of: items, options: DuplicateOptions(isEnabled: true, sameName: false, sameSize: true, sameContents: true),
-                                                  fileSystems: registry, cancellation: flag)
+            groups.value = DuplicateFinder.groups(
+                of: items,
+                options: DuplicateOptions(isEnabled: true, sameName: false, sameSize: true, sameContents: true),
+                fileSystems: registry, cancellation: flag)
         }
         #expect(probe.reading.wait(timeout: .now() + adoptWait) == .success)
         cancelFromThread(flag)
@@ -288,10 +320,13 @@ private extension MemoryFileSystem {
     }
 
     @Test func specialItemsAreNotHashed() {
-        let special = FileItem(url: memory.url("/D/top.txt"), name: "top.txt", isDirectory: false, size: 1, isSpecial: true)
+        let special = FileItem(
+            url: memory.url("/D/top.txt"), name: "top.txt", isDirectory: false, size: 1, isSpecial: true)
         let plain = memory.item(at: memory.url("/D/sub/s.txt"))!
-        let groups = DuplicateFinder.groups(of: [special, plain], options: DuplicateOptions(isEnabled: true, sameName: false, sameSize: true, sameContents: true),
-                                            fileSystems: fileSystems)
+        let groups = DuplicateFinder.groups(
+            of: [special, plain],
+            options: DuplicateOptions(isEnabled: true, sameName: false, sameSize: true, sameContents: true),
+            fileSystems: fileSystems)
         #expect(groups.isEmpty)
     }
 }
@@ -314,28 +349,37 @@ private extension MemoryFileSystem {
         var state: UInt64 = 7
         let alphabet = Array("aAbBzZ0019_.- \u{e9}(")
         func name() -> String {
-            state = state &* 6364136223846793005 &+ 1442695040888963407
+            state = state &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
             var rest = state >> 20
-            return String((0..<Int(1 + state % 9)).map { _ in
-                defer { rest = rest &* 31 &+ 17 }
-                return alphabet[Int((rest >> 5) % UInt64(alphabet.count))]
-            })
+            return String(
+                (0..<Int(1 + state % 9)).map { _ in
+                    defer { rest = rest &* 31 &+ 17 }
+                    return alphabet[Int((rest >> 5) % UInt64(alphabet.count))]
+                })
         }
         let memory = MemoryFileSystem()
         let pairs = (0..<3000).map { index -> SyncComparison.Pair in
             let text = name()
-            return SyncComparison.Pair(left: FileItem(url: memory.url("/" + String(index)), name: text, isDirectory: false), right: nil)
+            return SyncComparison.Pair(
+                left: FileItem(url: memory.url("/" + String(index)), name: text, isDirectory: false), right: nil)
         }
         let ordered = SyncComparison.sorted(pairs).map { $0.left!.name }
-        for (one, two) in zip(ordered, ordered.dropFirst()) { #expect(Sorter.compare(one, two, numeric: true) != .orderedDescending) }
+        for (one, two) in zip(ordered, ordered.dropFirst()) {
+            #expect(Sorter.compare(one, two, numeric: true) != .orderedDescending)
+        }
         #expect(ordered.count == pairs.count)
         // Names of letters and digits stand as the system has them: without regard to case, numbers by value.
         let plain = ["file10.txt", "File2.txt", "file1.txt", "b", "A", "a10", "a9", "Zebra", "apple"]
-        let walked = SyncComparison.sorted(plain.enumerated().map { index, text in
-            SyncComparison.Pair(left: FileItem(url: memory.url("/p" + String(index)), name: text, isDirectory: false), right: nil)
-        }).map { $0.left!.name }
+        let walked = SyncComparison.sorted(
+            plain.enumerated().map { index, text in
+                SyncComparison.Pair(
+                    left: FileItem(url: memory.url("/p" + String(index)), name: text, isDirectory: false), right: nil)
+            }
+        ).map { $0.left!.name }
         #expect(walked == ["A", "a9", "a10", "apple", "b", "file1.txt", "File2.txt", "file10.txt", "Zebra"])
-        for (one, two) in zip(walked, walked.dropFirst()) { #expect(one.localizedStandardCompare(two) != .orderedDescending) }
+        for (one, two) in zip(walked, walked.dropFirst()) {
+            #expect(one.localizedStandardCompare(two) != .orderedDescending)
+        }
     }
 
     @Test func cancellingEndsABlockedListing() {
@@ -379,7 +423,10 @@ private extension MemoryFileSystem {
         memory.addDirectory("/R")
         let probe = ProbingFileSystem(memory)
         let registry = registry(probe)
-        let plan = SyncPlan(rows: SyncComparison(options: SyncOptions(), fileSystems: registry).run(left: memory.url("/L"), right: memory.url("/R")).rows)
+        let plan = SyncPlan(
+            rows: SyncComparison(options: SyncOptions(), fileSystems: registry).run(
+                left: memory.url("/L"), right: memory.url("/R")
+            ).rows)
         #expect(plan.toRight.count == 1)
         memory.stallsReads = true
         defer { memory.releaseStalls() }
@@ -407,7 +454,9 @@ private extension MemoryFileSystem {
     func plan(_ memory: MemoryFileSystem, _ registry: FileSystemRegistry) -> SyncPlan {
         var options = SyncOptions()
         options.emptyDirectories = true
-        var rows = SyncComparison(options: options, fileSystems: registry).run(left: memory.url("/L"), right: memory.url("/R")).rows
+        var rows = SyncComparison(options: options, fileSystems: registry).run(
+            left: memory.url("/L"), right: memory.url("/R")
+        ).rows
         for index in rows.indices where rows[index].name == "gone.txt" { rows[index].action = .deleteRight }
         return SyncPlan(rows: rows)
     }
@@ -453,7 +502,6 @@ private extension MemoryFileSystem {
         // The memory file system has no Trash: asking for it fails, which shows the capability was consulted for the location.
         #expect(outcome.deleted == 0 && !outcome.errors.isEmpty)
     }
-
 }
 
 @MainActor @Suite struct ToolsAdoptSyncSession {
@@ -462,8 +510,9 @@ private extension MemoryFileSystem {
         memory.addFile("/A/" + composed)
         memory.addFile("/A/" + decomposed)
         memory.addDirectory("/B")
-        let bench = TestBench(plugins: [DirectorySyncPlugin(opensWindows: false)], fileSystems: [LocalFileSystem(), memory],
-                              left: memory.url("/A"), right: memory.url("/B"), settings: MemorySettings())
+        let bench = TestBench(
+            plugins: [DirectorySyncPlugin(opensWindows: false)], fileSystems: [LocalFileSystem(), memory],
+            left: memory.url("/A"), right: memory.url("/B"), settings: MemorySettings())
         bench.left.model.setSelected(true, names: [decomposed])
         let session = SyncSession(kernel: bench.kernel)
         session.adopt(left: bench.left.model, right: bench.right.model, includeHidden: false)
@@ -476,15 +525,17 @@ private extension MemoryFileSystem {
 @Suite struct ToolsAdoptCompare {
     @Test func linesThatDifferOnlyInNormalisationAreEqual() {
         let options = DiffOptions()
-        let nfc = TextLine("caf\u{e9} au lait"), nfd = TextLine("cafe\u{301} au lait")
+        let nfc = TextLine("caf\u{e9} au lait")
+        let nfd = TextLine("cafe\u{301} au lait")
         #expect(options.hash(nfc) == options.hash(nfd) && options.isSameKey(nfc, nfd))
         var exact = DiffOptions()
         exact.ignoreCase = false
         exact.ignoreRepeatedSpaces = false
         exact.ignoreLineEndings = false
         #expect(exact.hash(nfc) == exact.hash(nfd))
-        let diff = TextDiff.compute(left: [nfc, TextLine("same"), TextLine("\u{c5}ngstr\u{f6}m")],
-                                    right: [nfd, TextLine("same"), TextLine("A\u{30a}ngstro\u{308}m")], options: options)
+        let diff = TextDiff.compute(
+            left: [nfc, TextLine("same"), TextLine("\u{c5}ngstr\u{f6}m")],
+            right: [nfd, TextLine("same"), TextLine("A\u{30a}ngstro\u{308}m")], options: options)
         #expect(diff.isIdentical)
         // ASCII is hashed as it is, and a real difference still shows.
         #expect(options.hash(TextLine("Hello  world")) == options.hash(TextLine("hello world")))
@@ -499,7 +550,11 @@ private extension MemoryFileSystem {
         memory.addFile("/a.txt", "caf\u{e9}\nsame\n")
         memory.addFile("/b.txt", "cafe\u{301}\nsame\n")
         let result = CompareLoader.load(left: memory.url("/a.txt"), right: memory.url("/b.txt"), fileSystems: registry)
-        if case .text(_, _, let diff, _) = result.content { #expect(diff.isIdentical) } else { Issue.record("not text") }
+        if case .text(_, _, let diff, _) = result.content {
+            #expect(diff.isIdentical)
+        } else {
+            Issue.record("not text")
+        }
         #expect(!result.isIdentical)
     }
 
@@ -508,11 +563,14 @@ private extension MemoryFileSystem {
         memory.addFile("/A/" + composed, "x")
         memory.addFile("/A/" + decomposed, "y")
         memory.addFile("/B/other.txt", "z")
-        let bench = TestBench(plugins: [], fileSystems: [LocalFileSystem(), memory], left: memory.url("/A"), right: memory.url("/B"), settings: MemorySettings())
+        let bench = TestBench(
+            plugins: [], fileSystems: [LocalFileSystem(), memory], left: memory.url("/A"), right: memory.url("/B"),
+            settings: MemorySettings())
         bench.left.model.setSelected(true, names: [decomposed])
         bench.right.model.setSelected(true, names: ["other.txt"])
         let (left, right) = CompareOperands.choose(source: bench.left.model, target: bench.right.model)
-        #expect(left.map { isExactly($0.lastPathComponent, decomposed) } == true && right?.lastPathComponent == "other.txt")
+        #expect(
+            left.map { isExactly($0.lastPathComponent, decomposed) } == true && right?.lastPathComponent == "other.txt")
     }
 
     @Test func cancellingEndsABlockedLoad() {
@@ -526,7 +584,10 @@ private extension MemoryFileSystem {
         defer { memory.releaseStalls() }
         let flag = CancellationFlag()
         let result = Outcome<ComparedFiles>()
-        let done = background { result.value = CompareLoader.load(left: memory.url("/a.txt"), right: memory.url("/b.txt"), fileSystems: registry, cancellation: flag) }
+        let done = background {
+            result.value = CompareLoader.load(
+                left: memory.url("/a.txt"), right: memory.url("/b.txt"), fileSystems: registry, cancellation: flag)
+        }
         #expect(probe.reading.wait(timeout: .now() + adoptWait) == .success)
         cancelFromThread(flag)
         #expect(done.wait(timeout: .now() + adoptWait) == .success)
@@ -544,7 +605,10 @@ private extension MemoryFileSystem {
         memory.stallsReads = true
         defer { memory.releaseStalls() }
         let flag = CancellationFlag()
-        let done = background { _ = try? CompareLoader.identical(memory.url("/a"), memory.url("/b"), size: 10_000, fileSystems: registry, cancellation: flag) }
+        let done = background {
+            _ = try? CompareLoader.identical(
+                memory.url("/a"), memory.url("/b"), size: 10_000, fileSystems: registry, cancellation: flag)
+        }
         #expect(probe.reading.wait(timeout: .now() + adoptWait) == .success)
         cancelFromThread(flag)
         #expect(done.wait(timeout: .now() + adoptWait) == .success)
@@ -556,17 +620,20 @@ private extension MemoryFileSystem {
 @Suite struct ToolsAdoptFileTools {
     private func random(_ count: Int, seed: UInt64) -> Data {
         var state = seed
-        return Data((0..<count).map { _ in
-            state = state &* 6364136223846793005 &+ 1442695040888963407
-            return UInt8(truncatingIfNeeded: state >> 33)
-        })
+        return Data(
+            (0..<count).map { _ in
+                state = state &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
+                return UInt8(truncatingIfNeeded: state >> 33)
+            })
     }
 
     /// The first form of the two six-bit codecs, kept as the reference of the pointer loops.
     private enum Reference {
         static let xx = Array("+-0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz".utf8)
 
-        static func character(_ value: UInt8, xx isXX: Bool) -> UInt8 { isXX ? xx[Int(value & 63)] : (value & 63 == 0 ? 96 : (value & 63) + 32) }
+        static func character(_ value: UInt8, xx isXX: Bool) -> UInt8 {
+            isXX ? xx[Int(value & 63)] : (value & 63 == 0 ? 96 : (value & 63) + 32)
+        }
 
         static func value(_ character: UInt8, xx isXX: Bool) -> UInt8? {
             if isXX { return xx.firstIndex(of: character).map { UInt8($0) } }
@@ -574,7 +641,7 @@ private extension MemoryFileSystem {
         }
 
         static func encode(_ data: Data, xx: Bool) -> Data {
-            var output = [UInt8]()
+            var output: [UInt8] = []
             data.withUnsafeBytes { (input: UnsafeRawBufferPointer) in
                 var offset = 0
                 while offset < input.count {
@@ -598,7 +665,7 @@ private extension MemoryFileSystem {
 
         static func decode(_ line: ArraySlice<UInt8>, xx: Bool) -> [UInt8]? {
             guard let first = line.first, let count = value(first, xx: xx).map(Int.init) else { return nil }
-            var values = [UInt8]()
+            var values: [UInt8] = []
             for character in line.dropFirst() {
                 guard let value = value(character, xx: xx) else { return nil }
                 values.append(value)
@@ -606,7 +673,7 @@ private extension MemoryFileSystem {
             let needed = (count + 2) / 3 * 4
             guard values.count >= needed || (!xx && values.count + 3 >= needed) else { return nil }
             while values.count < needed { values.append(0) }
-            var bytes = [UInt8]()
+            var bytes: [UInt8] = []
             for group in stride(from: 0, to: needed, by: 4) {
                 bytes.append(values[group] << 2 | values[group + 1] >> 4)
                 bytes.append(values[group + 1] << 4 | values[group + 2] >> 2)
@@ -617,7 +684,9 @@ private extension MemoryFileSystem {
     }
 
     @Test func sixBitLoopsMatchTheFirstImplementation() {
-        let lengths = [0, 1, 2, 3, 4, 43, 44, 45, 46, 47, 89, 90, 91, 92, 135, 1000, 4096, 65_537] + (0..<60).map { ($0 * 7919) % 3000 }
+        let lengths =
+            [0, 1, 2, 3, 4, 43, 44, 45, 46, 47, 89, 90, 91, 92, 135, 1000, 4096, 65_537]
+            + (0..<60).map { ($0 * 7919) % 3000 }
         for (index, length) in lengths.enumerated() {
             let data = random(length, seed: UInt64(index + 1))
             for xx in [false, true] {
@@ -630,7 +699,9 @@ private extension MemoryFileSystem {
                     let end = bytes[start...].firstIndex(of: 13)!
                     let line = bytes[start..<end]
                     let one = SixBitText.decode(line, xx: xx)
-                    #expect(one == Reference.decode(line, xx: xx) && SixBitText.decode(line, xx: !xx) == Reference.decode(line, xx: !xx))
+                    #expect(
+                        one == Reference.decode(line, xx: xx)
+                            && SixBitText.decode(line, xx: !xx) == Reference.decode(line, xx: !xx))
                     decoded += one ?? []
                     start = end + 2
                 }
@@ -640,11 +711,12 @@ private extension MemoryFileSystem {
         // Lines that are not lines of the format, cut short, or too long.
         var state: UInt64 = 99
         for _ in 0..<20_000 {
-            state = state &* 6364136223846793005 &+ 1442695040888963407
+            state = state &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
             let count = Int(state >> 40) % 90
-            let line = ArraySlice((0..<count).map { offset -> UInt8 in
-                UInt8(28 + Int(((state >> UInt64(offset % 40)) &+ UInt64(offset) &* 31) % 100))
-            })
+            let line = ArraySlice(
+                (0..<count).map { offset -> UInt8 in
+                    UInt8(28 + Int(((state >> UInt64(offset % 40)) &+ UInt64(offset) &* 31) % 100))
+                })
             for xx in [false, true] { #expect(SixBitText.decode(line, xx: xx) == Reference.decode(line, xx: xx)) }
         }
     }
@@ -666,7 +738,9 @@ private extension MemoryFileSystem {
         let wanted = digest(.blake3)
         let results = ChecksumRun.digests(of: [(box.url("f.bin"), candidates, wanted)], run: run)
         let found = try results[0].get()
-        #expect(found.count == 3 && found[0].hex == digest(.sha256) && found[1].hex == digest(.sha3_256) && found[2].hex == wanted)
+        #expect(
+            found.count == 3 && found[0].hex == digest(.sha256) && found[1].hex == digest(.sha3_256)
+                && found[2].hex == wanted)
     }
 
     @Test func cancellingEndsABlockedHash() {
@@ -684,7 +758,11 @@ private extension MemoryFileSystem {
         #expect(probe.reading.wait(timeout: .now() + adoptWait) == .success)
         cancelFromThread(flag)
         #expect(done.wait(timeout: .now() + adoptWait) == .success)
-        if case .failure(let error)? = results.value?.first { #expect((error as? ToolError) == .cancelled) } else { Issue.record("the hash did not fail") }
+        if case .failure(let error)? = results.value?.first {
+            #expect((error as? ToolError) == .cancelled)
+        } else {
+            Issue.record("the hash did not fail")
+        }
         #expect(memory.interruptions >= 1)
     }
 
@@ -702,7 +780,9 @@ private extension MemoryFileSystem {
         let item = memory.item(at: source)!
         let error = Outcome<Error>()
         let done = background {
-            do { try Splitter.split(item, into: memory.url("/out"), partSize: 40, run: run) } catch let thrown { error.value = thrown }
+            do { try Splitter.split(item, into: memory.url("/out"), partSize: 40, run: run) } catch let thrown {
+                error.value = thrown
+            }
         }
         #expect(probe.reading.wait(timeout: .now() + adoptWait) == .success)
         cancelFromThread(flag)
@@ -725,7 +805,9 @@ private extension MemoryFileSystem {
         let item = memory.item(at: source)!
         let error = Outcome<Error>()
         let done = background {
-            do { try Encoder.encode(item, into: memory.url("/out"), method: .uue, run: run) } catch let thrown { error.value = thrown }
+            do { try Encoder.encode(item, into: memory.url("/out"), method: .uue, run: run) } catch let thrown {
+                error.value = thrown
+            }
         }
         #expect(probe.writing.wait(timeout: .now() + adoptWait) == .success)
         cancelFromThread(flag)

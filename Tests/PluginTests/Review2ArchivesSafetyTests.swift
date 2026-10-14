@@ -1,13 +1,16 @@
 import AFMKernel
-@testable import ArchivesPlugin
 import Foundation
 import TestSupport
 import Testing
 
+@testable import ArchivesPlugin
+
 /// One 512-byte TAR header built by hand.
 private func tarHeader(name: String, type: UInt8 = 48, size: UInt64 = 0, link: String = "") -> Data {
     var block = [UInt8](repeating: 0, count: 512)
-    func put(_ bytes: [UInt8], at offset: Int) { for (index, byte) in bytes.enumerated() { block[offset + index] = byte } }
+    func put(_ bytes: [UInt8], at offset: Int) {
+        for (index, byte) in bytes.enumerated() { block[offset + index] = byte }
+    }
     func octal(_ value: UInt64, _ length: Int) -> [UInt8] {
         let digits = String(value, radix: 8)
         return Array((String(repeating: "0", count: length - 1 - digits.count) + digits).utf8)
@@ -73,8 +76,11 @@ private func tarBody(_ text: String) -> Data {
         #expect(ArchiveTree.name(of: "a/b/c.txt") == "c.txt" && ArchiveTree.parent(of: "a/b/c.txt") == "a/b")
         #expect(ArchiveTree.relative("a/b/c", to: "a") == "b/c" && ArchiveTree.relative("ab/c", to: "a") == nil)
         // Too deep, or too long: every name would be a folder kept under its whole path.
-        #expect(ArchiveTree.normalized(Array(repeating: "a", count: ArchiveTree.maxDepth + 1).joined(separator: "/")) == nil)
-        #expect(ArchiveTree.normalized(Array(repeating: "a", count: ArchiveTree.maxDepth).joined(separator: "/")) != nil)
+        #expect(
+            ArchiveTree.normalized(Array(repeating: "a", count: ArchiveTree.maxDepth + 1).joined(separator: "/")) == nil
+        )
+        #expect(
+            ArchiveTree.normalized(Array(repeating: "a", count: ArchiveTree.maxDepth).joined(separator: "/")) != nil)
         #expect(ArchiveTree.normalized(String(repeating: "x", count: ArchiveTree.maxPathBytes + 1)) == nil)
     }
 
@@ -90,7 +96,8 @@ private func tarBody(_ text: String) -> Data {
         try tar.write(to: box.url("slash.tar"))
         var archives = [zip, box.url("slash.tar")]
         // The reproducers the fuzzer left, when they are there.
-        let repro = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("Fuzz/repro/arch")
+        let repro = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Fuzz/repro/arch")
         for name in ["containment-slash-combining-mark.zip", "containment-slash-combining-mark.tar"] {
             let fixture = repro.appendingPathComponent(name)
             guard FileManager.default.fileExists(atPath: fixture.path) else { continue }
@@ -101,12 +108,17 @@ private func tarBody(_ text: String) -> Data {
         for (index, archive) in archives.enumerated() {
             let target = try box.folder("out\(index)/deep/target")
             _ = try bench.unpack(archive, to: target)
-            let outside = try FileManager.default.subpathsOfDirectory(atPath: box.url("out\(index)").path).filter { !$0.hasPrefix("deep/target") && $0 != "deep" }
+            let outside = try FileManager.default.subpathsOfDirectory(atPath: box.url("out\(index)").path).filter {
+                !$0.hasPrefix("deep/target") && $0 != "deep"
+            }
             #expect(outside.isEmpty, "\(archive.lastPathComponent) wrote \(outside)")
         }
         #expect(box.exists("out0/deep/target/fine.txt") && box.exists("out1/deep/target/fine.txt"))
-        #expect(Unpacker.lies(box.url("a/b"), below: box.url("a")) && !Unpacker.lies(box.url("a/../b"), below: box.url("a")))
-        #expect(!Unpacker.lies(box.url("ab"), below: box.url("a")) && !Unpacker.lies(box.url("a"), below: box.url("a")))
+        #expect(
+            Unpacker.lies(box.url("a/b"), below: box.url("a"))
+                && !Unpacker.lies(box.url("a/../b"), below: box.url("a")))
+        #expect(
+            !Unpacker.lies(box.url("ab"), below: box.url("a")) && !Unpacker.lies(box.url("a"), below: box.url("a")))
     }
 
     @Test func deepPathsAreRefusedBeforeTheyFillTheMemory() throws {
@@ -160,24 +172,34 @@ private func tarBody(_ text: String) -> Data {
     @Test func nothingIsUnpackedThroughALinkThatAlreadyStandsInTheTarget() throws {
         let outside = try box.folder("outside")
         let target = try box.folder("target")
-        try FileManager.default.createSymbolicLink(at: target.appendingPathComponent("dir"), withDestinationURL: outside)
-        try FileManager.default.createSymbolicLink(atPath: target.appendingPathComponent("loose.txt").path, withDestinationPath: outside.path + "/nowhere.txt")
+        try FileManager.default.createSymbolicLink(
+            at: target.appendingPathComponent("dir"), withDestinationURL: outside)
+        try FileManager.default.createSymbolicLink(
+            atPath: target.appendingPathComponent("loose.txt").path, withDestinationPath: outside.path + "/nowhere.txt"
+        )
         let archive = try writeZip("through.zip", names: ["dir/planted.txt", "loose.txt", "safe/ok.txt"])
         let result = try bench.unpack(archive, to: target)
         #expect(result.problems.count == 1 && box.exists("target/safe/ok.txt"), "\(result.problems)")
         // Nothing went through either link: the one that stood where a file was to go was
         // replaced by the file (the bench answers "overwrite"), not followed.
         #expect(try FileManager.default.contentsOfDirectory(atPath: outside.path).isEmpty)
-        #expect((try? FileManager.default.destinationOfSymbolicLink(atPath: target.appendingPathComponent("loose.txt").path)) == nil)
+        #expect(
+            (try? FileManager.default.destinationOfSymbolicLink(atPath: target.appendingPathComponent("loose.txt").path))
+                == nil)
         // The links are what they were.
-        #expect((try? FileManager.default.destinationOfSymbolicLink(atPath: target.appendingPathComponent("dir").path)) == outside.path)
+        #expect(
+            (try? FileManager.default.destinationOfSymbolicLink(atPath: target.appendingPathComponent("dir").path))
+                == outside.path)
     }
 
     // MARK: Files that are handed to bsdtar (A038, A087)
 
     @Test func aTextFileNamedLikeAnArchiveIsNotGivenToBsdtar() throws {
         let secret = try box.file("secret.txt", "TOP-SECRET-CONTENT")
-        for (name, head) in [("holiday.7z", "#mtree\n"), ("list.rar", ""), ("lha.lzh", "ab-lh5- type=file contents=\(secret.path)\n#mtree\n")] {
+        for (name, head) in [
+            ("holiday.7z", "#mtree\n"), ("list.rar", ""),
+            ("lha.lzh", "ab-lh5- type=file contents=\(secret.path)\n#mtree\n")
+        ] {
             let url = box.url(name)
             try Data((head + "photo.jpg type=file contents=\(secret.path)\n").utf8).write(to: url)
             #expect { try bench.store.archive(at: url) } throws: { error in
@@ -202,11 +224,14 @@ private func tarBody(_ text: String) -> Data {
     @Test func realForeignArchivesStillOpen() throws {
         try bench.makeTree()
         #expect(runTool("/usr/bin/bsdtar", ["--format", "7zip", "-cf", "tree.7z", "tree"], in: box.root).status == 0)
-        #expect(runTool("/usr/bin/bsdtar", ["--format", "cpio", "-cf", "tree.cpio", "tree"], in: box.root).status == 0)
+        #expect(
+            runTool("/usr/bin/bsdtar", ["--format", "cpio", "-cf", "tree.cpio", "tree"], in: box.root).status == 0)
         for name in ["tree.7z", "tree.cpio"] {
             let inner = bench.inside(box.url(name), "tree", scheme: ArchiveURL.readOnlyScheme)
             #expect(try bench.names(inner).contains("readme.txt"), "\(name)")
-            #expect(try bench.read(inner.appending(name: "readme.txt")) == Data(contentsOf: box.url("tree/readme.txt")), "\(name)")
+            #expect(
+                try bench.read(inner.appending(name: "readme.txt")) == Data(contentsOf: box.url("tree/readme.txt")),
+                "\(name)")
         }
     }
 
@@ -244,7 +269,9 @@ private func tarBody(_ text: String) -> Data {
     }
 
     @Test func aZip64EndRecordIsFoundBehindASelfExtractorStub() throws {
-        let plain = try writeZip("wide.zip", limits: ZipLimits(maxField: 0xFFFF_FFFE, maxEntries: 2), names: ["a.txt", "b.txt", "c.txt", "d.txt"])
+        let plain = try writeZip(
+            "wide.zip", limits: ZipLimits(maxField: 0xFFFF_FFFE, maxEntries: 2),
+            names: ["a.txt", "b.txt", "c.txt", "d.txt"])
         var stubbed = Data(repeating: 0x90, count: 5000)
         stubbed.append(try Data(contentsOf: plain))
         try stubbed.write(to: box.url("sfx.zip"))
@@ -272,31 +299,52 @@ private func tarBody(_ text: String) -> Data {
     @Test func newArchivesAreEncryptedWithAESAndOldOnesStillOpen() throws {
         let tree = try bench.makeTree()
         let archive = box.url("aes.zip")
-        try bench.pack([tree], to: archive) { $0.password = "open sesame"; $0.verifies = true }
+        try bench.pack([tree], to: archive) {
+            $0.password = "open sesame"
+            $0.verifies = true
+        }
         let records = try ZipDirectory.read(try RandomAccessFile(archive)).records.filter { !$0.isDirectory }
-        #expect(!records.isEmpty && records.allSatisfy { $0.method == ZipAES.method && $0.aes?.strength == 3 && $0.aes?.version == 2 && $0.crc == 0 })
+        #expect(
+            !records.isEmpty
+                && records.allSatisfy {
+                    $0.method == ZipAES.method && $0.aes?.strength == 3 && $0.aes?.version == 2 && $0.crc == 0
+                })
         // libarchive reads what was written, with the password and not without.
-        let listed = runTool("/usr/bin/bsdtar", ["-xOf", archive.path, "--passphrase", "open sesame", "tree/sub/deep/übung – ñ 日本.txt"])
+        let listed = runTool(
+            "/usr/bin/bsdtar", ["-xOf", archive.path, "--passphrase", "open sesame", "tree/sub/deep/übung – ñ 日本.txt"]
+        )
         #expect(listed.status == 0 && listed.output == "unicode name")
-        #expect(runTool("/usr/bin/bsdtar", ["-xOf", archive.path, "--passphrase", "nope", "tree/readme.txt"]).status != 0)
+        #expect(
+            runTool("/usr/bin/bsdtar", ["-xOf", archive.path, "--passphrase", "nope", "tree/readme.txt"]).status != 0)
         // Read back here: a wrong password is asked for again, the right one is kept.
         bench.store.close()
         bench.passwords.set(["wrong", "open sesame"])
-        #expect(try bench.read(bench.inside(archive, "tree/big.log")) == Data(contentsOf: tree.appendingPathComponent("big.log")))
+        #expect(
+            try bench.read(bench.inside(archive, "tree/big.log"))
+                == Data(contentsOf: tree.appendingPathComponent("big.log")))
         #expect(bench.passwords.asked == 2)
         #expect(try bench.read(bench.inside(archive, "tree/empty.txt")).isEmpty && bench.passwords.asked == 2)
         let back = try bench.unpack(archive, to: box.url("back"))
         #expect(back.problems.isEmpty && snapshot(box.url("back/tree")) == snapshot(tree))
 
         // What another program encrypted with AES (libarchive writes AE-1, with a checksum).
-        #expect(runTool("/usr/bin/bsdtar", ["-a", "-cf", "theirs.zip", "--options", "zip:encryption=aes256", "--passphrase", "pw", "tree"],
-                        in: box.root).status == 0)
+        #expect(
+            runTool(
+                "/usr/bin/bsdtar",
+                ["-a", "-cf", "theirs.zip", "--options", "zip:encryption=aes256", "--passphrase", "pw", "tree"],
+                in: box.root
+            ).status == 0)
         let fresh = try ArchiveBench()
         fresh.passwords.set(["pw"])
-        #expect(try fresh.read(fresh.inside(box.url("theirs.zip"), "tree/readme.txt")) == Data(contentsOf: tree.appendingPathComponent("readme.txt")))
+        #expect(
+            try fresh.read(fresh.inside(box.url("theirs.zip"), "tree/readme.txt"))
+                == Data(contentsOf: tree.appendingPathComponent("readme.txt")))
         fresh.store.close()
         // The old encryption is still written on request, for programs that know no other.
-        try bench.pack([tree.appendingPathComponent("readme.txt")], to: box.url("old.zip")) { $0.password = "pw"; $0.encryption = .legacy }
+        try bench.pack([tree.appendingPathComponent("readme.txt")], to: box.url("old.zip")) {
+            $0.password = "pw"
+            $0.encryption = .legacy
+        }
         #expect(runTool("/usr/bin/unzip", ["-tq", "-P", "pw", box.url("old.zip").path]).status == 0)
         #expect(ArchiveCommands.legacyLabel.contains("weak") && ArchiveCommands.encryptionNote.contains("AES-256"))
     }
@@ -305,8 +353,10 @@ private func tarBody(_ text: String) -> Data {
         var plain = Data(count: 100_003)
         plain.withUnsafeMutableBytes { arc4random_buf($0.baseAddress, $0.count) }
         let salt = Data((0..<16).map { UInt8($0) })
-        let (encrypting, decrypting) = (try ZipAES.Cipher(password: "pässword", salt: salt, keyLength: 32),
-                                        try ZipAES.Cipher(password: "pässword", salt: salt, keyLength: 32))
+        let (encrypting, decrypting) = (
+            try ZipAES.Cipher(password: "pässword", salt: salt, keyLength: 32),
+            try ZipAES.Cipher(password: "pässword", salt: salt, keyLength: 32)
+        )
         var encrypted = Data()
         var offset = 0
         // Blocks of every awkward length, so the key stream is carried over correctly.
@@ -335,7 +385,8 @@ private func tarBody(_ text: String) -> Data {
         // The next operation asks again, once, and every member opens with the answer.
         bench.passwords.set(["sesame"])
         let opened = try bench.unpack(archive, to: box.url("opened"))
-        #expect(opened.problems.isEmpty && bench.passwords.asked == 2 && snapshot(box.url("opened/tree")) == snapshot(tree))
+        #expect(
+            opened.problems.isEmpty && bench.passwords.asked == 2 && snapshot(box.url("opened/tree")) == snapshot(tree))
         // Outside an operation a refusal is remembered for as long as the environment says.
         let fresh = try ArchiveBench()
         fresh.environment.passwordRefusalMemory = 60
@@ -353,7 +404,9 @@ private func tarBody(_ text: String) -> Data {
         try bench.pack([tree.appendingPathComponent("big.log")], to: archive) { $0.password = "pw" }
         bench.store.close()
         let open = try bench.store.archive(at: archive)
-        let unpacker = Unpacker(fileSystems: bench.fileSystems, monitor: bench.monitor, options: UnpackOptions()) { _, _ in .overwrite }
+        let unpacker = Unpacker(fileSystems: bench.fileSystems, monitor: bench.monitor, options: UnpackOptions()) {
+            _, _ in .overwrite
+        }
         let result = unpacker.run([Unpacker.Source(archive: open, selection: ["readme.txt"])], into: box.url("plain"))
         #expect(result.problems.isEmpty && box.exists("plain/readme.txt") && bench.passwords.asked == 0)
     }
@@ -371,7 +424,9 @@ private func tarBody(_ text: String) -> Data {
         let stale = parent.appendingPathComponent("\(ScratchFolder.prefix)\(dead)-AAAA")
         let kept = parent.appendingPathComponent("\(ScratchFolder.prefix)\(dead)-BBBB")
         let alive = parent.appendingPathComponent("\(ScratchFolder.prefix)\(getpid())-CCCC")
-        for folder in [stale, kept, alive] { try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true) }
+        for folder in [stale, kept, alive] {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        }
         try Data().write(to: kept.appendingPathComponent("kept-unsaved-changes"))
         let outside = try box.folder("elsewhere")
         let leftover = outside.appendingPathComponent(".1234.afm-zip.tmp")
@@ -380,13 +435,16 @@ private func tarBody(_ text: String) -> Data {
         try Data("x".utf8).write(to: leftover)
         try FileManager.default.createDirectory(at: spool, withIntermediateDirectories: true)
         try Data("x".utf8).write(to: innocent)
-        try Data("\(leftover.path)\n\(spool.path)\n\(innocent.path)\n".utf8).write(to: URL(fileURLWithPath: stale.path + ".external"))
+        try Data("\(leftover.path)\n\(spool.path)\n\(innocent.path)\n".utf8).write(
+            to: URL(fileURLWithPath: stale.path + ".external"))
         ScratchFolder.sweepLeftovers(in: parent)
         let fm = FileManager.default
         #expect(!fm.fileExists(atPath: stale.path) && !fm.fileExists(atPath: stale.path + ".external"))
         #expect(fm.fileExists(atPath: kept.path) && fm.fileExists(atPath: alive.path))
         // Only what carries one of the plugin's own temporary names is removed outside.
-        #expect(!fm.fileExists(atPath: leftover.path) && !fm.fileExists(atPath: spool.path) && fm.fileExists(atPath: innocent.path))
+        #expect(
+            !fm.fileExists(atPath: leftover.path) && !fm.fileExists(atPath: spool.path)
+                && fm.fileExists(atPath: innocent.path))
 
         // The folder is the user's alone, and so is what is written into it.
         let scratch = ScratchFolder(in: parent)

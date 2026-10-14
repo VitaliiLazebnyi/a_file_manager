@@ -46,8 +46,16 @@ public final class NetworkOptions {
     public init() {}
 
     public var values: Values {
-        get { lock.lock(); defer { lock.unlock() }; return current }
-        set { lock.lock(); current = newValue; lock.unlock() }
+        get {
+            lock.lock()
+            defer { lock.unlock() }
+            return current
+        }
+        set {
+            lock.lock()
+            current = newValue
+            lock.unlock()
+        }
     }
 
     /// Whether a file of this name is transferred as text.
@@ -84,9 +92,13 @@ public struct ConnectionProfile {
     /// link, and nothing is known of it. The user is asked before the first login.
     public var asksBeforeConnecting = false
 
-    public init(key: ServerKey, name: String? = nil, savedID: UUID? = nil, tls: TLSMode? = nil, user: String? = nil, password: String? = nil,
-                anonymous: Bool = false, passive: Bool? = nil, encoding: NameEncoding = .automatic, remoteDirectory: String? = nil,
-                initCommands: [String] = [], usesMLSD: Bool? = nil) {
+    public init(
+        key: ServerKey, name: String? = nil, savedID: UUID? = nil, tls: TLSMode? = nil, user: String? = nil,
+        password: String? = nil,
+        anonymous: Bool = false, passive: Bool? = nil, encoding: NameEncoding = .automatic,
+        remoteDirectory: String? = nil,
+        initCommands: [String] = [], usesMLSD: Bool? = nil
+    ) {
         self.key = key
         self.name = name
         self.savedID = savedID
@@ -137,7 +149,8 @@ public final class SessionEnvironment {
     /// (`known`, their fingerprints): the sign of somebody in the middle, or of a server that
     /// renewed its certificate. True when the user accepts the new one in place of the old;
     /// whoever asks records that with `CertificateTrust.replace`. Refused unless set.
-    public var askToTrustChanged: (_ profile: ConnectionProfile, _ certificate: CertificateInfo, _ known: [String]) -> Bool = { _, _, _ in false }
+    public var askToTrustChanged:
+        (_ profile: ConnectionProfile, _ certificate: CertificateInfo, _ known: [String]) -> Bool = { _, _, _ in false }
     /// Asks whether to connect to a server nobody chose (`ConnectionProfile.asksBeforeConnecting`).
     public var askToConnect: (_ profile: ConnectionProfile) -> Bool = { _ in true }
     /// Asks whether to send a password over a connection that is not encrypted (plain FTP).
@@ -149,7 +162,9 @@ public final class SessionEnvironment {
     /// connecting thread.
     public var rememberPassword: (_ profile: ConnectionProfile, _ password: String) -> Void = { _, _ in }
     /// Asks a question of the secure shell (a host key to confirm, the passphrase of a key).
-    public var askSecret: (_ profile: ConnectionProfile, _ question: String, _ isSecret: Bool) -> String? = { _, _, _ in nil }
+    public var askSecret: (_ profile: ConnectionProfile, _ question: String, _ isSecret: Bool) -> String? = { _, _, _ in
+        nil
+    }
     /// After the user refused a password or a certificate, further attempts to connect to that
     /// server fail for this many seconds without asking again: one click on a folder leads to
     /// several questions to the file system, and the user answered once.
@@ -178,7 +193,8 @@ protocol RemoteSession: AnyObject {
     var isConnecting: Bool { get }
     /// A set `cancellation` ends the call soon, by throwing `NetworkError.cancelled`, and leaves
     /// the connection in a state it can be used from again, or gone. The same goes for the calls below.
-    func list(_ path: String, showHidden: Bool, cancellation: CancellationFlag?, receive: ([RemoteEntry]) -> Bool) throws
+    func list(_ path: String, showHidden: Bool, cancellation: CancellationFlag?, receive: ([RemoteEntry]) -> Bool)
+        throws
     /// The entry at a path; nil when nothing is there.
     func entry(at path: String, cancellation: CancellationFlag?) throws -> RemoteEntry?
     /// The flag of the three calls that open a file covers the opening only; the reader or writer
@@ -191,7 +207,9 @@ protocol RemoteSession: AnyObject {
     func canAppend(_ path: String) -> Bool
     /// Continues an existing file: cut to `offset` bytes when given (throws when it is shorter),
     /// else at its end. `size` is the length the file has when the writer starts.
-    func openAppend(_ path: String, at offset: Int64?, cancellation: CancellationFlag?) throws -> (writer: FileWriter, size: Int64)
+    func openAppend(_ path: String, at offset: Int64?, cancellation: CancellationFlag?) throws -> (
+        writer: FileWriter, size: Int64
+    )
     /// `handler` is called, from any thread, when the session finds out after a listing where a
     /// link of it leads: the path of the link, and whether it leads to a folder. A session that
     /// tells at once ignores it.
@@ -219,16 +237,24 @@ protocol RemoteSession: AnyObject {
 extension RemoteSession {
     var singleLookupsAreCheap: Bool { true }
     var isConnecting: Bool { false }
-    func rename(_ source: String, to destination: String) throws { try rename(source, to: destination, replacing: false, cancellation: nil) }
+    func rename(_ source: String, to destination: String) throws {
+        try rename(source, to: destination, replacing: false, cancellation: nil)
+    }
     func makeDirectory(_ path: String) throws { try makeDirectory(path, cancellation: nil) }
-    func remove(_ path: String, isDirectory: Bool?) throws { try remove(path, isDirectory: isDirectory, cancellation: nil) }
+    func remove(_ path: String, isDirectory: Bool?) throws {
+        try remove(path, isDirectory: isDirectory, cancellation: nil)
+    }
     func rename(_ source: String, to destination: String, replacing: Bool) throws {
         try rename(source, to: destination, replacing: replacing, cancellation: nil)
     }
-    func setAttributes(_ attributes: FileAttributes, of path: String) throws { try setAttributes(attributes, of: path, cancellation: nil) }
+    func setAttributes(_ attributes: FileAttributes, of path: String) throws {
+        try setAttributes(attributes, of: path, cancellation: nil)
+    }
     func canAppend(_ path: String) -> Bool { false }
     func onLinkResolved(_ handler: @escaping (_ path: String, _ isDirectory: Bool) -> Void) {}
-    func openAppend(_ path: String, at offset: Int64?, cancellation: CancellationFlag?) throws -> (writer: FileWriter, size: Int64) {
+    func openAppend(_ path: String, at offset: Int64?, cancellation: CancellationFlag?) throws -> (
+        writer: FileWriter, size: Int64
+    ) {
         throw FileSystemError.notSupported("Continuing a file on this server")
     }
 
@@ -291,7 +317,11 @@ enum Background {
 
     /// The first piece in line whose lane has room. Called with the lock held.
     private static func takeNext() -> Piece? {
-        guard let index = waiting.firstIndex(where: { piece in piece.lane.map { runningIn[$0, default: 0] < mostPerLane } ?? true }) else { return nil }
+        guard
+            let index = waiting.firstIndex(where: { piece in
+                piece.lane.map { runningIn[$0, default: 0] < mostPerLane } ?? true
+            })
+        else { return nil }
         let piece = waiting.remove(at: index)
         if let lane = piece.lane {
             runningIn[lane, default: 0] += 1
@@ -342,7 +372,8 @@ enum Background {
 
     private static func wait(_ timeout: TimeInterval, until isDone: () -> Bool) -> Bool {
         let deadline = Date().addingTimeInterval(timeout)
-        condition.lock(); defer { condition.unlock() }
+        condition.lock()
+        defer { condition.unlock() }
         while !isDone() {
             guard Date() < deadline else { return false }
             condition.wait(until: min(deadline, Date().addingTimeInterval(0.1)))
@@ -352,7 +383,8 @@ enum Background {
 
     /// The threads that exist right now, for tests.
     static var threadCount: Int {
-        condition.lock(); defer { condition.unlock() }
+        condition.lock()
+        defer { condition.unlock() }
         return threads
     }
 }
@@ -360,7 +392,9 @@ enum Background {
 /// Runs `body` with a flag that is set as soon as either of two is: the session's own (set
 /// by Disconnect) and the caller's (Cancel in the progress window). Without a caller's flag
 /// the session's own is passed as it is.
-func withEither<Result>(_ own: CancellationFlag, _ callers: CancellationFlag?, _ body: (CancellationFlag) throws -> Result) rethrows -> Result {
+func withEither<Result>(
+    _ own: CancellationFlag, _ callers: CancellationFlag?, _ body: (CancellationFlag) throws -> Result
+) rethrows -> Result {
     guard let callers, callers !== own else { return try body(own) }
     let both = CancellationFlag()
     // The registrations are released when the call is over; `both` outlives them.

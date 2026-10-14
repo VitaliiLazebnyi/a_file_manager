@@ -98,19 +98,26 @@ public final class ClipboardPlugin: Plugin {
         let isRemoveOnly = { capabilities().contains(.removeOnly) }
         let list = NameList(displayPath: kernel.fileSystems.displayPath)
 
-        commands.register(Command(.cutToClipboard, "Cut", [.cmd("x")], editingRole: .cut), enabled: hasLocalOperands) { [self] in
+        commands.register(Command(.cutToClipboard, "Cut", [.cmd("x")], editingRole: .cut), enabled: hasLocalOperands) {
+            [self] in
             place(model().operandsSnapshot(), cut: true, ui: kernel.ui)
         }
-        commands.register(Command(.copyToClipboard, "Copy", [.cmd("c")], editingRole: .copy), enabled: hasLocalOperands) { [self] in
+        commands.register(
+            Command(.copyToClipboard, "Copy", [.cmd("c")], editingRole: .copy), enabled: hasLocalOperands
+        ) { [self] in
             place(model().operandsSnapshot(), cut: false, ui: kernel.ui)
         }
-        commands.register(Command(.pasteFromClipboard, "Paste", [.cmd("v")], editingRole: .paste),
-                          enabled: { [self] in (hasFiles() && !isRemoveOnly()) || (isWritable() && hasContent(in: kernel)) }) { [self] in paste(in: kernel) }
+        commands.register(
+            Command(.pasteFromClipboard, "Paste", [.cmd("v")], editingRole: .paste),
+            enabled: { [self] in (hasFiles() && !isRemoveOnly()) || (isWritable() && hasContent(in: kernel)) }
+        ) { [self] in paste(in: kernel) }
 
         // Names as text. They change nothing, so they also work while a job runs.
         /// `text` makes the text from the operands; it may run off the main thread.
-        func names(_ id: CommandID, _ title: String, _ shortcuts: [Shortcut] = [], enabled: @escaping () -> Bool = { true },
-                   _ text: @escaping ([FileItem], URL) -> String) {
+        func names(
+            _ id: CommandID, _ title: String, _ shortcuts: [Shortcut] = [], enabled: @escaping () -> Bool = { true },
+            _ text: @escaping ([FileItem], URL) -> String
+        ) {
             commands.register(Command(id, title, shortcuts, runsDuringJobs: true), enabled: enabled) { [self] in
                 // The list of the operands is made where the text is: for a long selection
                 // that is not the main thread.
@@ -124,12 +131,18 @@ public final class ClipboardPlugin: Plugin {
             // On `[..]` with nothing selected there is no item: the folder itself is meant.
             items.isEmpty ? displayPath(directory) : list.names(items, .fullPath)
         }
-        names(ClipboardCommands.copyNetNames, "Copy Names as URLs", enabled: hasOperands) { items, _ in list.names(items, .url) }
-        names(ClipboardCommands.copyPathOfFiles, "Copy Path of Each File", enabled: hasOperands) { items, _ in list.parentPaths(items) }
-        commands.register(Command(ClipboardCommands.copySourcePath, "Copy Source Path", runsDuringJobs: true)) { [self] in
+        names(ClipboardCommands.copyNetNames, "Copy Names as URLs", enabled: hasOperands) { items, _ in
+            list.names(items, .url)
+        }
+        names(ClipboardCommands.copyPathOfFiles, "Copy Path of Each File", enabled: hasOperands) { items, _ in
+            list.parentPaths(items)
+        }
+        commands.register(Command(ClipboardCommands.copySourcePath, "Copy Source Path", runsDuringJobs: true)) {
+            [self] in
             put(displayPath(model().directory))
         }
-        commands.register(Command(ClipboardCommands.copyTargetPath, "Copy Target Path", runsDuringJobs: true)) { [self] in
+        commands.register(Command(ClipboardCommands.copyTargetPath, "Copy Target Path", runsDuringJobs: true)) {
+            [self] in
             put(displayPath(kernel.panels.target.model.directory))
         }
 
@@ -139,25 +152,36 @@ public final class ClipboardPlugin: Plugin {
             (ClipboardCommands.copyDetailsWithURL, "Copy with URL and Details", .url, false),
             (ClipboardCommands.copyDetailsWithHeaders, "Copy with Details and Headers", .name, true),
             (ClipboardCommands.copyDetailsWithHeadersAndPath, "Copy with Path, Details and Headers", .fullPath, true),
-            (ClipboardCommands.copyDetailsWithHeadersAndURL, "Copy with URL, Details and Headers", .url, true),
+            (ClipboardCommands.copyDetailsWithHeadersAndURL, "Copy with URL, Details and Headers", .url, true)
         ]
         for (id, title, style, headers) in detailCommands {
-            commands.register(Command(id, title), enabled: hasOperands, parameterized: { [self] argument in
-                details(style, headers: headers, mask: argument.index, in: kernel) { [self] text in put(text) }
-            })
+            commands.register(
+                Command(id, title), enabled: hasOperands,
+                parameterized: { [self] argument in
+                    details(style, headers: headers, mask: argument.index, in: kernel) { [self] text in put(text) }
+                })
         }
-        for (id, title, headers) in [(ClipboardCommands.saveDetails, "Save Details to File…", false),
-                                     (ClipboardCommands.saveDetailsWithHeaders, "Save Details with Headers to File…", true)] {
-            commands.register(Command(id, title), enabled: { hasOperands() && isWritable() }, parameterized: { [self] argument in
-                saveDetails(headers: headers, to: argument.text, in: kernel)
-            })
+        for (id, title, headers) in [
+            (ClipboardCommands.saveDetails, "Save Details to File…", false),
+            (ClipboardCommands.saveDetailsWithHeaders, "Save Details with Headers to File…", true)
+        ] {
+            commands.register(
+                Command(id, title), enabled: { hasOperands() && isWritable() },
+                parameterized: { [self] argument in
+                    saveDetails(headers: headers, to: argument.text, in: kernel)
+                })
         }
 
         kernel.menus.add([.cutToClipboard, .copyToClipboard, .pasteFromClipboard], to: .editClipboard)
-        kernel.menus.add([ClipboardCommands.copyNames, .copyFullNames, ClipboardCommands.copyNetNames, ClipboardCommands.copyDetails,
-                          ClipboardCommands.copyDetailsWithPath, ClipboardCommands.copyDetailsWithHeaders], to: .editNames)
-        kernel.menus.add([ClipboardCommands.copySourcePath, ClipboardCommands.copyTargetPath, ClipboardCommands.saveDetails],
-                         to: MenuSection(.edit, order: 30))
+        kernel.menus.add(
+            [
+                ClipboardCommands.copyNames, .copyFullNames, ClipboardCommands.copyNetNames,
+                ClipboardCommands.copyDetails,
+                ClipboardCommands.copyDetailsWithPath, ClipboardCommands.copyDetailsWithHeaders
+            ], to: .editNames)
+        kernel.menus.add(
+            [ClipboardCommands.copySourcePath, ClipboardCommands.copyTargetPath, ClipboardCommands.saveDetails],
+            to: MenuSection(.edit, order: 30))
         kernel.menus.addToContextMenu([.cutToClipboard, .copyToClipboard], in: .clipboard, onItemOnly: true)
         kernel.menus.addToContextMenu([.pasteFromClipboard], in: .clipboard)
         kernel.menus.addToContextMenu([.copyFullNames], in: .tools)
@@ -167,9 +191,14 @@ public final class ClipboardPlugin: Plugin {
         kernel.toolbar.setSymbol("doc.on.doc", for: .copyToClipboard)
         kernel.toolbar.setSymbol("doc.on.clipboard", for: .pasteFromClipboard)
         kernel.toolbar.setSymbol("list.clipboard", for: .copyFullNames)
-        kernel.preferences.add(PreferencePage(title: "Clipboard", preferences: [
-            Preference(ClipboardPlugin.pastesContentsKey, "Paste a text or picture from the clipboard as a new file", .flag(default: true)),
-        ]))
+        kernel.preferences.add(
+            PreferencePage(
+                title: "Clipboard",
+                preferences: [
+                    Preference(
+                        ClipboardPlugin.pastesContentsKey, "Paste a text or picture from the clipboard as a new file",
+                        .flag(default: true))
+                ]))
     }
 
     // MARK: Files
@@ -187,10 +216,11 @@ public final class ClipboardPlugin: Plugin {
         if count > ClipboardPlugin.eagerLimit {
             // Roughly what the system takes for that many; said so that the choice is an informed one.
             let seconds = max(1, count / 5000)
-            let answer = ui.choose("\(cut ? "Cut" : "Copy") \(count) files",
-                                   detail: "They can be pasted in this program at once. Offering them to other programs as well (Finder) "
-                                       + "takes about \(seconds) second(s), during which this program does not respond.",
-                                   buttons: ["For This Program", "Also for Other Programs", "Cancel"], style: .information)
+            let answer = ui.choose(
+                "\(cut ? "Cut" : "Copy") \(count) files",
+                detail: "They can be pasted in this program at once. Offering them to other programs as well (Finder) "
+                    + "takes about \(seconds) second(s), during which this program does not respond.",
+                buttons: ["For This Program", "Also for Other Programs", "Cancel"], style: .information)
             guard answer == 0 || answer == 1 else { return }
             forOthers = answer == 1
         }
@@ -239,7 +269,8 @@ public final class ClipboardPlugin: Plugin {
         if let paths = pasteboard.propertyList(forType: ClipboardPlugin.fileNamesType) as? [String], !paths.isEmpty {
             return paths.map { URL(fileURLWithPath: $0, isDirectory: false) }
         }
-        return pasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL] ?? []
+        return pasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL]
+            ?? []
     }
 
     /// Pastes into the source panel's folder at once, without a dialog. Files are transferred
@@ -252,11 +283,14 @@ public final class ClipboardPlugin: Plugin {
                 if hasContent(in: kernel) { pasteContent(into: directory, in: kernel) }
                 return
             }
-            guard let transfers = kernel.services.find(FileTransferService.self) else { return kernel.commands.onRejected() }
+            guard let transfers = kernel.services.find(FileTransferService.self) else {
+                return kernel.commands.onRejected()
+            }
             // A copy pasted next to its original gets a new name: "report (2).txt". Files that are
             // moved into the folder they are in already are left out by the service, on its own
             // thread: telling that needs the real folder behind a branch view.
-            transfers.transfer(isMove ? .move : .copy, files, into: directory, renamingSelfCopies: !isMove) { [self] arrived in
+            transfers.transfer(isMove ? .move : .copy, files, into: directory, renamingSelfCopies: !isMove) {
+                [self] arrived in
                 // Files that were cut stay cut until some of them have really been moved: a Paste
                 // into the folder they are in moves nothing, and the next Paste elsewhere still moves.
                 if isMove, arrived != nil { cutChangeCount = nil }
@@ -277,18 +311,22 @@ public final class ClipboardPlugin: Plugin {
         let reading = FileListReading(items, on: pasteboard)
         self.reading = reading
         let title = "Reading the clipboard:"
-        kernel.jobs.run(title: title, work: { monitor in
-            reading.run(cancellation: monitor.cancellation) { done, total in
-                monitor.report(JobProgress(lines: [title, "\(done) of \(total) files"], itemsDone: done, itemsTotal: total))
-            }
-        }, completion: { [self] (outcome: FileListReading.Outcome) in
-            self.reading = nil
-            switch outcome {
-            case .abandoned: break
-            // Items that are not file locations one by one (an old program's list): asked for whole.
-            case .read(let urls): deliver(urls.isEmpty ? files() : urls)
-            }
-        })
+        kernel.jobs.run(
+            title: title,
+            work: { monitor in
+                reading.run(cancellation: monitor.cancellation) { done, total in
+                    monitor.report(
+                        JobProgress(lines: [title, "\(done) of \(total) files"], itemsDone: done, itemsTotal: total))
+                }
+            },
+            completion: { [self] (outcome: FileListReading.Outcome) in
+                self.reading = nil
+                switch outcome {
+                case .abandoned: break
+                // Items that are not file locations one by one (an old program's list): asked for whole.
+                case .read(let urls): deliver(urls.isEmpty ? files() : urls)
+                }
+            })
     }
 
     // MARK: Text and pictures
@@ -311,7 +349,9 @@ public final class ClipboardPlugin: Plugin {
     /// copy a picture often add its name. Reads the data, which the program that owns it may
     /// make only now: for a job's thread.
     private static func content(of pasteboard: NSPasteboard) -> PastedContent? {
-        if let type = pasteboard.availableType(from: imageTypes), let data = pasteboard.data(forType: type), !data.isEmpty {
+        if let type = pasteboard.availableType(from: imageTypes), let data = pasteboard.data(forType: type),
+            !data.isEmpty
+        {
             return .image(data)
         }
         if let text = pasteboard.string(forType: .string), !text.isEmpty { return .text(text) }
@@ -327,46 +367,49 @@ public final class ClipboardPlugin: Plugin {
     private func pasteContent(into directory: URL, in kernel: Kernel) {
         let fileSystems = kernel.fileSystems
         let pasteboard = self.pasteboard
-        kernel.jobs.run(title: "Paste:", work: { monitor -> Result<URL, Error> in
-            let cancellation = monitor.cancellation
-            return Result {
-                guard let content = ClipboardPlugin.content(of: pasteboard) else { throw NothingToPaste() }
-                let provider = try fileSystems.provider(for: directory)
-                let data: Data
-                switch content {
-                case .text(let text): data = Data(text.utf8)
-                case .image(let picture): data = try ClipboardPlugin.png(from: picture)
-                }
-                let name = PastedContent.freeName(extension: content.fileExtension) {
-                    provider.item(at: directory.appending(name: $0), cancellation: cancellation) != nil
-                }
-                if cancellation.isCancelled { throw NothingToPaste() }
-                let url = directory.appending(name: name)
-                let draft = directory.appending(name: ".\(name).\(UUID().uuidString.prefix(8)).tmp")
-                do {
-                    let writer = try provider.write(draft, cancellation: cancellation)
-                    do {
-                        try writer.write(data)
-                        try writer.close(attributes: FileAttributes())
-                    } catch {
-                        try? writer.close(attributes: FileAttributes())
-                        throw error
+        kernel.jobs.run(
+            title: "Paste:",
+            work: { monitor -> Result<URL, Error> in
+                let cancellation = monitor.cancellation
+                return Result {
+                    guard let content = ClipboardPlugin.content(of: pasteboard) else { throw NothingToPaste() }
+                    let provider = try fileSystems.provider(for: directory)
+                    let data: Data
+                    switch content {
+                    case .text(let text): data = Data(text.utf8)
+                    case .image(let picture): data = try ClipboardPlugin.png(from: picture)
                     }
-                    try provider.move(draft, to: url, replacing: false, cancellation: cancellation)
-                } catch {
-                    // Tidying up: not with the job's flag, which may be what ended the writing.
-                    try? provider.remove(draft)
-                    throw cancellation.isCancelled ? NothingToPaste() : error
+                    let name = PastedContent.freeName(extension: content.fileExtension) {
+                        provider.item(at: directory.appending(name: $0), cancellation: cancellation) != nil
+                    }
+                    if cancellation.isCancelled { throw NothingToPaste() }
+                    let url = directory.appending(name: name)
+                    let draft = directory.appending(name: ".\(name).\(UUID().uuidString.prefix(8)).tmp")
+                    do {
+                        let writer = try provider.write(draft, cancellation: cancellation)
+                        do {
+                            try writer.write(data)
+                            try writer.close(attributes: FileAttributes())
+                        } catch {
+                            try? writer.close(attributes: FileAttributes())
+                            throw error
+                        }
+                        try provider.move(draft, to: url, replacing: false, cancellation: cancellation)
+                    } catch {
+                        // Tidying up: not with the job's flag, which may be what ended the writing.
+                        try? provider.remove(draft)
+                        throw cancellation.isCancelled ? NothingToPaste() : error
+                    }
+                    return url
                 }
-                return url
-            }
-        }, completion: { result in
-            switch result {
-            case .success(let url): kernel.panels.refresh([directory], focus: url)
-            case .failure(is NothingToPaste): break
-            case .failure(let error): kernel.ui.report(error, title: "The clipboard cannot be pasted as a file!")
-            }
-        })
+            },
+            completion: { result in
+                switch result {
+                case .success(let url): kernel.panels.refresh([directory], focus: url)
+                case .failure(is NothingToPaste): break
+                case .failure(let error): kernel.ui.report(error, title: "The clipboard cannot be pasted as a file!")
+                }
+            })
     }
 
     private struct NotAPicture: LocalizedError {
@@ -376,7 +419,9 @@ public final class ClipboardPlugin: Plugin {
     /// PNG data stays as it is; anything else is converted. Runs on a job's thread.
     private static func png(from data: Data) throws -> Data {
         if data.starts(with: [0x89, 0x50, 0x4E, 0x47]) { return data }
-        guard let converted = NSBitmapImageRep(data: data)?.representation(using: .png, properties: [:]) else { throw NotAPicture() }
+        guard let converted = NSBitmapImageRep(data: data)?.representation(using: .png, properties: [:]) else {
+            throw NotAPicture()
+        }
         return converted
     }
 
@@ -413,12 +458,17 @@ public final class ClipboardPlugin: Plugin {
 
     /// Works out the details lines of the operands in a job, because the plugin columns the
     /// panel shows may block on the file system, and hands the text over on the main thread.
-    private func details(_ style: NameList.Style, headers: Bool, mask: Int?, in kernel: Kernel, then completion: @escaping (String) -> Void) {
+    private func details(
+        _ style: NameList.Style, headers: Bool, mask: Int?, in kernel: Kernel,
+        then completion: @escaping (String) -> Void
+    ) {
         let (operands, extra) = detailsInput(in: kernel)
         let list = NameList(displayPath: kernel.fileSystems.displayPath)
-        kernel.jobs.run(title: "Reading details:", work: { _ in
-            list.details(operands.items(), style, headers: headers, extra: extra, mask: mask)
-        }, completion: completion)
+        kernel.jobs.run(
+            title: "Reading details:",
+            work: { _ in
+                list.details(operands.items(), style, headers: headers, extra: extra, mask: mask)
+            }, completion: completion)
     }
 
     /// The operands and the plugin columns the source panel shows, read on the main thread.
@@ -433,54 +483,62 @@ public final class ClipboardPlugin: Plugin {
     private func saveDetails(headers: Bool, to proposed: String?, in kernel: Kernel) {
         let directory = kernel.panels.source.model.directory
         guard let text = proposed ?? kernel.ui.prompt("Save details to file:", value: "details.txt"),
-              !text.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+            !text.trimmingCharacters(in: .whitespaces).isEmpty
+        else { return }
         let (operands, extra) = detailsInput(in: kernel)
         let (fileSystems, ui) = (kernel.fileSystems, kernel.ui)
         let list = NameList(displayPath: fileSystems.displayPath)
         let url = fileSystems.location(from: text, relativeTo: directory)
-        kernel.jobs.run(title: "Saving details:", work: { monitor -> Error? in
-            do {
-                let provider = try fileSystems.provider(for: url)
-                let cancellation = monitor.cancellation
-                let existing = provider.item(at: url, cancellation: cancellation)
-                if cancellation.isCancelled { return CocoaError(.userCancelled) }
-                if let existing {
-                    // Only a file is replaced; a folder of that name is not this command's to remove.
-                    if existing.isDirectory { throw FileSystemError.alreadyExists(fileSystems.displayPath(url)) }
-                    // Return keeps the file that is there.
-                    let replace = monitor.ask {
-                        ui.choose("Overwrite:", detail: Format.displayName(fileSystems.displayPath(url)), buttons: ["Overwrite", "Cancel"],
-                                  style: .warning, defaultButton: 1) == 0
-                    }
-                    guard replace else { return CocoaError(.userCancelled) }
-                }
-                // Written next to the target and moved into place when complete: a failed write
-                // leaves the old file as it was, and nothing is removed before there is a new one.
-                let draft = url.deletingLastPathComponent().appending(name: ".\(url.lastPathComponent).\(UUID().uuidString.prefix(8)).tmp")
+        kernel.jobs.run(
+            title: "Saving details:",
+            work: { monitor -> Error? in
                 do {
-                    let writer = try provider.write(draft, cancellation: cancellation)
-                    do {
-                        try writer.write(Data(list.details(operands.items(), .name, headers: headers, extra: extra).utf8))
-                        try writer.close(attributes: FileAttributes())
-                    } catch {
-                        try? writer.close(attributes: FileAttributes())
-                        throw error
+                    let provider = try fileSystems.provider(for: url)
+                    let cancellation = monitor.cancellation
+                    let existing = provider.item(at: url, cancellation: cancellation)
+                    if cancellation.isCancelled { return CocoaError(.userCancelled) }
+                    if let existing {
+                        // Only a file is replaced; a folder of that name is not this command's to remove.
+                        if existing.isDirectory { throw FileSystemError.alreadyExists(fileSystems.displayPath(url)) }
+                        // Return keeps the file that is there.
+                        let replace = monitor.ask {
+                            ui.choose(
+                                "Overwrite:", detail: Format.displayName(fileSystems.displayPath(url)),
+                                buttons: ["Overwrite", "Cancel"],
+                                style: .warning, defaultButton: 1) == 0
+                        }
+                        guard replace else { return CocoaError(.userCancelled) }
                     }
-                    try provider.move(draft, to: url, replacing: existing != nil, cancellation: cancellation)
+                    // Written next to the target and moved into place when complete: a failed write
+                    // leaves the old file as it was, and nothing is removed before there is a new one.
+                    let draft = url.deletingLastPathComponent().appending(
+                        name: ".\(url.lastPathComponent).\(UUID().uuidString.prefix(8)).tmp")
+                    do {
+                        let writer = try provider.write(draft, cancellation: cancellation)
+                        do {
+                            try writer.write(
+                                Data(list.details(operands.items(), .name, headers: headers, extra: extra).utf8))
+                            try writer.close(attributes: FileAttributes())
+                        } catch {
+                            try? writer.close(attributes: FileAttributes())
+                            throw error
+                        }
+                        try provider.move(draft, to: url, replacing: existing != nil, cancellation: cancellation)
+                    } catch {
+                        try? provider.remove(draft)
+                        throw cancellation.isCancelled ? CocoaError(.userCancelled) : error
+                    }
+                    return nil
                 } catch {
-                    try? provider.remove(draft)
-                    throw cancellation.isCancelled ? CocoaError(.userCancelled) : error
+                    return error
                 }
-                return nil
-            } catch {
-                return error
-            }
-        }, completion: { error in
-            // Declining to overwrite is no failure and changes nothing.
-            if (error as? CocoaError)?.code == .userCancelled { return }
-            if let error { kernel.ui.report(error, title: "The details cannot be saved!") }
-            kernel.panels.refresh([url.deletingLastPathComponent()], focus: error == nil ? url : nil)
-        })
+            },
+            completion: { error in
+                // Declining to overwrite is no failure and changes nothing.
+                if (error as? CocoaError)?.code == .userCancelled { return }
+                if let error { kernel.ui.report(error, title: "The details cannot be saved!") }
+                kernel.panels.refresh([url.deletingLastPathComponent()], focus: error == nil ? url : nil)
+            })
     }
 }
 
@@ -495,7 +553,9 @@ final class FileListProvider: NSObject, NSPasteboardItemDataProvider {
         self.urls = urls
     }
 
-    func pasteboard(_ pasteboard: NSPasteboard?, item: NSPasteboardItem, provideDataForType type: NSPasteboard.PasteboardType) {
+    func pasteboard(
+        _ pasteboard: NSPasteboard?, item: NSPasteboardItem, provideDataForType type: NSPasteboard.PasteboardType
+    ) {
         item.setString(urls.map(\.path).joined(separator: "\n"), forType: type)
     }
 }

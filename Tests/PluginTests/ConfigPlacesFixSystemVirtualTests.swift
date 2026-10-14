@@ -3,6 +3,7 @@ import Foundation
 import LocalFileSystemPlugin
 import TestSupport
 import Testing
+
 @testable import SystemToolsPlugin
 @testable import VirtualFoldersPlugin
 
@@ -13,14 +14,18 @@ import Testing
         try box.folder("Apps/afmnotaprogram.app")
         try box.file("bin/mail")
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: box.url("bin/mail").path)
-        #expect(TypedCommand.isOnPath("mail", path: box.url("bin").path) && !TypedCommand.isOnPath("mail", path: box.url("Apps").path))
+        #expect(
+            TypedCommand.isOnPath("mail", path: box.url("bin").path)
+                && !TypedCommand.isOnPath("mail", path: box.url("Apps").path))
         #expect(TypedCommand.isOnPath("sh", path: "/bin:/usr/bin"))
         // A name that no program has still opens the application.
         let app = try #require(TypedCommand("afmnotaprogram"))
         #expect(app.application(relativeTo: box.root, searching: [box.url("Apps")]) != nil)
         // `mail` is a program of the system, so it is left to the shell.
         if TypedCommand.isOnPath("mail") {
-            #expect(try #require(TypedCommand("mail")).application(relativeTo: box.root, searching: [box.url("Apps")]) == nil)
+            #expect(
+                try #require(TypedCommand("mail")).application(relativeTo: box.root, searching: [box.url("Apps")])
+                    == nil)
         }
         // A path ending in .app is an application whatever the PATH holds.
         #expect(try #require(TypedCommand(box.url("Apps/mail.app").path)).application(relativeTo: box.root) != nil)
@@ -28,7 +33,9 @@ import Testing
 
     @Test func cancellingEndsAChildThatIgnoresTerminate() {
         let flag = CancellationFlag()
-        let runner = ProcessRunner(executable: URL(fileURLWithPath: "/bin/sh"), arguments: ["-c", "trap '' TERM; sleep 30 & wait"], directory: nil)
+        let runner = ProcessRunner(
+            executable: URL(fileURLWithPath: "/bin/sh"), arguments: ["-c", "trap '' TERM; sleep 30 & wait"],
+            directory: nil)
         Thread.detachNewThread {
             Thread.sleep(forTimeInterval: 0.3)
             flag.cancel()
@@ -53,7 +60,10 @@ import Testing
 
     @Test func listIdsAreNotSmallNumbersAndMustMatchTheirLocation() throws {
         let url = virtual.register(files: [memory.url("/A/one.txt")], title: "Found", origin: memory.url("/A"))
-        guard case .list(let id, _, _)? = VirtualLocation(url) else { Issue.record("not a list"); return }
+        guard case .list(let id, _, _)? = VirtualLocation(url) else {
+            Issue.record("not a list")
+            return
+        }
         #expect(id > 100)
         #expect(virtual.entries(of: url)?.count == 1)
         // The same number under another title is not that list.
@@ -89,7 +99,9 @@ import Testing
         let watcher = fileSystem.watch([list]) { _ in reports.increment() }
         for _ in 0..<100 { watchable.fire() }
         // Reports reach the caller on the main thread: wait for the main queue.
-        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in DispatchQueue.main.async { continuation.resume() } }
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            DispatchQueue.main.async { continuation.resume() }
+        }
         // One report at once; the window may already have passed on a busy machine, which adds the second.
         #expect((1...2).contains(reports.value))
         // The rest comes as one more report once the window has passed (the timer runs at the
@@ -107,11 +119,17 @@ import Testing
         try box.file("c/three.txt")
         var names: [String] = []
         let walker = BranchWalker(fileSystems: fileSystems, showHidden: false)
-        try walker.walk([BranchWalker.Start(box.root)]) { names += $0.map(\.name); return true }
+        try walker.walk([BranchWalker.Start(box.root)]) {
+            names += $0.map(\.name)
+            return true
+        }
         #expect(names.sorted() == ["a/b/two.txt", "a/one.txt", "c/three.txt"])
         // The same start twice is walked once.
         names = []
-        try walker.walk([BranchWalker.Start(box.root), BranchWalker.Start(box.root)]) { names += $0.map(\.name); return true }
+        try walker.walk([BranchWalker.Start(box.root), BranchWalker.Start(box.root)]) {
+            names += $0.map(\.name)
+            return true
+        }
         #expect(names.count == 3)
         #expect(BranchWalker.mountFolders.contains("/Volumes") && BranchWalker.mountFolders.contains("/System/Volumes"))
     }
@@ -120,8 +138,16 @@ import Testing
 private final class Counter: @unchecked Sendable {
     private let lock = NSLock()
     private var count = 0
-    func increment() { lock.lock(); count += 1; lock.unlock() }
-    var value: Int { lock.lock(); defer { lock.unlock() }; return count }
+    func increment() {
+        lock.lock()
+        count += 1
+        lock.unlock()
+    }
+    var value: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return count
+    }
 }
 
 /// A file system whose watchers can be fired by hand.
@@ -140,8 +166,12 @@ private final class WatchedSystem: FileSystemProvider {
     func createDirectory(at url: URL) throws { throw FileSystemError.notSupported("Writing") }
     func write(_ url: URL) throws -> FileWriter { throw FileSystemError.notSupported("Writing") }
     func remove(_ url: URL) throws { throw FileSystemError.notSupported("Writing") }
-    func move(_ source: URL, to destination: URL, replacing: Bool) throws { throw FileSystemError.notSupported("Writing") }
-    func copy(_ source: URL, to destination: URL, progress: (Int64) -> Bool) throws { throw FileSystemError.notSupported("Writing") }
+    func move(_ source: URL, to destination: URL, replacing: Bool) throws {
+        throw FileSystemError.notSupported("Writing")
+    }
+    func copy(_ source: URL, to destination: URL, progress: (Int64) -> Bool) throws {
+        throw FileSystemError.notSupported("Writing")
+    }
     func watch(_ directories: [URL], onChange: @escaping ([URL]) -> Void) -> AnyObject? {
         self.onChange = onChange
         return self

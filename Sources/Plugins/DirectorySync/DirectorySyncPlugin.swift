@@ -21,21 +21,37 @@ public final class DirectorySyncPlugin: Plugin {
     }
 
     public func start(in kernel: Kernel) {
-        kernel.commands.register(Command(.synchronizeDirectories, "Synchronize Dirs…", runsDuringJobs: true), parameterized: { [self] argument in
-            open(in: kernel, set: argument.text)
-        })
+        kernel.commands.register(
+            Command(.synchronizeDirectories, "Synchronize Dirs…", runsDuringJobs: true),
+            parameterized: { [self] argument in
+                open(in: kernel, set: argument.text)
+            })
         kernel.menus.add([.synchronizeDirectories], to: .commandsTools)
-        kernel.toolbar.add(.synchronizeDirectories, symbol: "arrow.triangle.2.circlepath", group: 50, hint: "Compare two folders, including subfolders, and copy what differs to make them the same.")
+        kernel.toolbar.add(
+            .synchronizeDirectories, symbol: "arrow.triangle.2.circlepath", group: 50,
+            hint: "Compare two folders, including subfolders, and copy what differs to make them the same.")
 
         func key(_ name: String) -> String { SyncSettingsKey.scope + "." + name }
-        kernel.preferences.add(PreferencePage(title: "Synchronize directories", preferences: [
-            Preference(key(SyncSettingsKey.recompare), "Compare again after synchronizing", .flag(default: true)),
-            Preference(key(SyncSettingsKey.confirmOverwrites), "Confirm overwrites (default of the Synchronize dialog)", .flag(default: true)),
-            Preference(key(SyncSettingsKey.useTrash), "Move deleted files to the Trash where possible", .flag(default: true)),
-            Preference(key(SyncSettingsKey.changeSourceDates),
-                       "When a target cannot keep a file's date, give the source file the target's date", .flag(default: true)),
-            Preference(key(SyncSettingsKey.warnReadErrors), "Report directories that could not be read", .flag(default: true)),
-        ]))
+        kernel.preferences.add(
+            PreferencePage(
+                title: "Synchronize directories",
+                preferences: [
+                    Preference(
+                        key(SyncSettingsKey.recompare), "Compare again after synchronizing", .flag(default: true)),
+                    Preference(
+                        key(SyncSettingsKey.confirmOverwrites),
+                        "Confirm overwrites (default of the Synchronize dialog)", .flag(default: true)),
+                    Preference(
+                        key(SyncSettingsKey.useTrash), "Move deleted files to the Trash where possible",
+                        .flag(default: true)),
+                    Preference(
+                        key(SyncSettingsKey.changeSourceDates),
+                        "When a target cannot keep a file's date, give the source file the target's date",
+                        .flag(default: true)),
+                    Preference(
+                        key(SyncSettingsKey.warnReadErrors), "Report directories that could not be read",
+                        .flag(default: true))
+                ]))
     }
 
     private func open(in kernel: Kernel, set: String?) {
@@ -43,7 +59,8 @@ public final class DirectorySyncPlugin: Plugin {
         self.session = session
         session.runsInline = !opensWindows
         let panels = kernel.panels
-        session.adopt(left: panels.left.model, right: panels.right.model, includeHidden: panels.source.model.showHidden)
+        session.adopt(
+            left: panels.left.model, right: panels.right.model, includeHidden: panels.source.model.showHidden)
         var compareAtOnce = false
         if var name = set {
             compareAtOnce = name.hasPrefix("=")

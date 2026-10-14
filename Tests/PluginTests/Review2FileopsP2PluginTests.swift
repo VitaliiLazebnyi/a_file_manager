@@ -1,14 +1,15 @@
 import AFMContracts
 import AFMKernel
 import AppKit
-@testable import ClipboardPlugin
-@testable import FileOperationsPlugin
-@testable import FilePropertiesPlugin
 import Foundation
 import LocalFileSystemPlugin
 import SelectionPlugin
 import TestSupport
 import Testing
+
+@testable import ClipboardPlugin
+@testable import FileOperationsPlugin
+@testable import FilePropertiesPlugin
 
 // Second pass of review round 2 for the commands of the file-operation plugins, the clipboard
 // and the file properties: the fixes of the first pass that had no test of their own (F003,
@@ -40,7 +41,8 @@ final class P2RecordingUI: UserInteraction {
         questions.append(question)
         return answer(question) ?? 0
     }
-    func choose(_ message: String, detail: String, buttons: [String], style: QuestionStyle, defaultButton: Int?) -> Int {
+    func choose(_ message: String, detail: String, buttons: [String], style: QuestionStyle, defaultButton: Int?) -> Int
+    {
         let question = Question(message: message, buttons: buttons, defaultButton: defaultButton)
         questions.append(question)
         // Return presses the default button; without one, nothing happens until Esc: the last.
@@ -76,7 +78,9 @@ final class P2DeferredJobs: JobService {
     }
 
     @discardableResult
-    func run<Result>(title: String, work: @escaping (JobMonitor) -> Result, completion: @escaping (Result) -> Void) -> JobHandle {
+    func run<Result>(title: String, work: @escaping (JobMonitor) -> Result, completion: @escaping (Result) -> Void)
+        -> JobHandle
+    {
         titles.append(title)
         let result = work(Monitor())
         afterWork?()
@@ -104,13 +108,17 @@ final class P2Bench: ShellServices {
     var right: FakePanel { panelSet.rightPanel }
     var commands: CommandRegistry { kernel.commands }
 
-    init(plugins: [Plugin], fileSystems: [FileSystemProvider], left: URL, right: URL, ui: UserInteraction, jobs: JobService = ImmediateJobService(),
-         settings: SettingsStore = MemorySettings()) {
+    init(
+        plugins: [Plugin], fileSystems: [FileSystemProvider], left: URL, right: URL, ui: UserInteraction,
+        jobs: JobService = ImmediateJobService(),
+        settings: SettingsStore = MemorySettings()
+    ) {
         kernel = Kernel(productName: "Test", settings: settings, ui: ui)
         fileSystems.forEach(kernel.fileSystems.register)
         kernel.load(plugins)
-        panelSet = FakePanelSet(left: FakePanel(showing: left, fileSystems: kernel.fileSystems),
-                                right: FakePanel(showing: right, fileSystems: kernel.fileSystems))
+        panelSet = FakePanelSet(
+            left: FakePanel(showing: left, fileSystems: kernel.fileSystems),
+            right: FakePanel(showing: right, fileSystems: kernel.fileSystems))
         self.jobs = jobs
         kernel.attach(self)
     }
@@ -131,10 +139,16 @@ final class P2Bench: ShellServices {
         memory.addDirectory("/B")
     }
 
-    private func bench(_ plugins: [Plugin] = [FileOperationsPlugin(), SelectionPlugin()], left: URL? = nil, settings: SettingsStore = MemorySettings())
-        -> P2Bench {
-        P2Bench(plugins: plugins, fileSystems: [LocalFileSystem(), memory], left: left ?? memory.url("/A"), right: memory.url("/B"), ui: ui,
-                settings: settings)
+    private func bench(
+        _ plugins: [Plugin] = [FileOperationsPlugin(), SelectionPlugin()], left: URL? = nil,
+        settings: SettingsStore = MemorySettings()
+    )
+        -> P2Bench
+    {
+        P2Bench(
+            plugins: plugins, fileSystems: [LocalFileSystem(), memory], left: left ?? memory.url("/A"),
+            right: memory.url("/B"), ui: ui,
+            settings: settings)
     }
 
     // F055: Return must not delete for good.
@@ -144,7 +158,9 @@ final class P2Bench: ShellServices {
         // Nobody chooses a button: Return.
         #expect(bench.commands.perform(.deleteDirectly))
         let question = try #require(ui.questions.last)
-        #expect(question.message == "Permanently delete" && question.buttons == ["Yes", "No"] && question.defaultButton == 1)
+        #expect(
+            question.message == "Permanently delete" && question.buttons == ["Yes", "No"] && question.defaultButton == 1
+        )
         #expect(memory.exists("/A/one.txt"))
         // Chosen, it is done.
         ui.answer = { _ in 0 }
@@ -173,13 +189,17 @@ final class P2Bench: ShellServices {
         #expect(bridge.job(job, conflictAt: old, source: new) == .skip)
         #expect(ui.questions.last?.message == "Overwrite:" && ui.questions.last?.defaultButton == 2)
         #expect(bridge.job(job, confirmDeleteNonEmpty: memory.url("/A")) == .skip)
-        #expect(ui.questions.last?.buttons == ["Delete", "All", "Skip", "Cancel"] && ui.questions.last?.defaultButton == 2)
+        #expect(
+            ui.questions.last?.buttons == ["Delete", "All", "Skip", "Cancel"] && ui.questions.last?.defaultButton == 2)
         for reason in [ProtectionQuestion.Reason.readOnly, .hidden, .locked, .noTrash] {
-            #expect(bridge.job(job, confirm: ProtectionQuestion(reason: reason, purpose: .delete, item: old)) == .skip)
+            #expect(
+                bridge.job(job, confirm: ProtectionQuestion(reason: reason, purpose: .delete, item: old)) == .skip)
             #expect(ui.questions.last?.defaultButton == 2)
         }
-        #expect(bridge.job(job, confirm: ProtectionQuestion(reason: .readOnly, purpose: .overwrite, item: old)) == .skip)
-        #expect(bridge.job(job, crossVolumeAt: old, purpose: .delete) == .skip && ui.questions.last?.defaultButton == 0)
+        #expect(
+            bridge.job(job, confirm: ProtectionQuestion(reason: .readOnly, purpose: .overwrite, item: old)) == .skip)
+        #expect(
+            bridge.job(job, crossVolumeAt: old, purpose: .delete) == .skip && ui.questions.last?.defaultButton == 0)
         // Every question of the bridge that can destroy said which button Return presses.
         #expect(ui.questions.allSatisfy { $0.defaultButton != -1 })
         // A chosen answer is still the answer.
@@ -203,11 +223,14 @@ final class P2Bench: ShellServices {
         #expect(picked.items().map(\.name) == ["one.txt", "three.txt"])
         #expect(OperationText.heading("Copy", count: picked.count, single: picked.single) == "Copy 2 file(s) to")
         #expect(OperationText.targetProposal(count: 2, single: nil, targetPath: "mem:/B") == "mem:/B/*.*")
-        #expect(OperationText.deleteQuestion(count: 2, single: nil, toTrash: false) == "Do you really want to delete the 2 selected files/directories?")
+        #expect(
+            OperationText.deleteQuestion(count: 2, single: nil, toTrash: false)
+                == "Do you really want to delete the 2 selected files/directories?")
         // The old forms say the same.
         #expect(OperationText.heading("Copy", picked.items()) == "Copy 2 file(s) to")
-        #expect(OperationText.deleteQuestion(Array(picked.items().prefix(1)), toTrash: true)
-            == OperationText.deleteQuestion(count: 1, single: picked.first, toTrash: true))
+        #expect(
+            OperationText.deleteQuestion(Array(picked.items().prefix(1)), toTrash: true)
+                == OperationText.deleteQuestion(count: 1, single: picked.first, toTrash: true))
         // On `[..]` with nothing marked there is nothing to do.
         model.clearSelection()
         model.moveCursor(to: 0)
@@ -240,7 +263,7 @@ final class P2Bench: ShellServices {
 
     @Test func afterACopyOnlyTheCopiedItemsLoseTheirMark() throws {
         let bench = bench()
-        memory.addDirectory("/B/two.txt")   // a folder in the way of one of the three
+        memory.addDirectory("/B/two.txt")  // a folder in the way of one of the three
         bench.right.reload()
         bench.left.model.selectAll()
         ui.promptAnswer = { $0 }
@@ -340,7 +363,8 @@ final class P2Bench: ShellServices {
         #expect(bench.commands.perform(.makeDirectory, .text("fresh|fresh/inner|one.txt")))
         #expect(memory.exists("/A/fresh/inner"))
         // The name of a file that is there: said, and nothing made.
-        #expect(ui.messages.contains { $0.contains("one.txt cannot be created") } && memory.contents("/A/one.txt") == "1")
+        #expect(
+            ui.messages.contains { $0.contains("one.txt cannot be created") } && memory.contents("/A/one.txt") == "1")
     }
 }
 
@@ -358,8 +382,9 @@ final class P2Bench: ShellServices {
         box = try Sandbox()
         try box.folder("t")
         probe.base.addFile("/A/one.txt")
-        bench = TestBench(plugins: [FileOperationsPlugin(), ClipboardPlugin(pasteboard: pasteboard), SelectionPlugin()],
-                          fileSystems: [LocalFileSystem(), probe], left: probe.base.url("/A"), right: box.url("t"))
+        bench = TestBench(
+            plugins: [FileOperationsPlugin(), ClipboardPlugin(pasteboard: pasteboard), SelectionPlugin()],
+            fileSystems: [LocalFileSystem(), probe], left: probe.base.url("/A"), right: box.url("t"))
     }
 
     /// Lets the main queue run until `condition` holds. The limit is far beyond what the
@@ -398,11 +423,12 @@ final class P2Bench: ShellServices {
     /// What another program does: one pasteboard item per file.
     private func writeAsAnotherProgram(_ urls: [URL]) {
         pasteboard.clearContents()
-        pasteboard.writeObjects(urls.map { url -> NSPasteboardItem in
-            let item = NSPasteboardItem()
-            item.setString(url.absoluteString, forType: .fileURL)
-            return item
-        })
+        pasteboard.writeObjects(
+            urls.map { url -> NSPasteboardItem in
+                let item = NSPasteboardItem()
+                item.setString(url.absoluteString, forType: .fileURL)
+                return item
+            })
     }
 
     // F039
@@ -487,7 +513,9 @@ final class P2Bench: ShellServices {
         // And when it can be written, the file is there under its own name only.
         probe.writeFailure = nil
         commands.perform(.pasteFromClipboard)
-        #expect(probe.base.allPaths == ["/A", "/A/Clipboard.txt", "/A/one.txt"] && probe.base.contents("/A/Clipboard.txt") == "some text")
+        #expect(
+            probe.base.allPaths == ["/A", "/A/Clipboard.txt", "/A/one.txt"]
+                && probe.base.contents("/A/Clipboard.txt") == "some text")
     }
 
     @Test func whetherThereIsSomethingToPasteIsAskedOncePerStateOfTheClipboard() throws {
@@ -556,7 +584,8 @@ final class P2Bench: ShellServices {
 
     @Test func aTreeIsChangedOnAllCoresWithNothingLeftOut() throws {
         // Folders in folders, each with files: the calls for them are made from inside calls.
-        var files = 0, folders = 1
+        var files = 0
+        var folders = 1
         for a in 0..<6 {
             folders += 1
             for b in 0..<5 {
@@ -605,16 +634,18 @@ final class P2Bench: ShellServices {
         #expect(probe.reads.count == alreadyRead + 1)
         // A thread that waits for that reading gives up when its own flag is set…
         p2CancelSoon(second, after: 0.1)
-        #expect(p2Finishes(rescue: { self.probe.base.releaseStalls() }) {
-            let comments = store.comments(in: folder, cancellation: second)
-            lock.withLock { answers[1] = comments }
-        })
+        #expect(
+            p2Finishes(rescue: { self.probe.base.releaseStalls() }) {
+                let comments = store.comments(in: folder, cancellation: second)
+                lock.withLock { answers[1] = comments }
+            })
         // …and one without a flag when its patience runs out.
         store.waitLimit = 0.2
-        #expect(p2Finishes(rescue: { self.probe.base.releaseStalls() }) {
-            let comments = store.comments(in: folder)
-            lock.withLock { answers[2] = comments }
-        })
+        #expect(
+            p2Finishes(rescue: { self.probe.base.releaseStalls() }) {
+                let comments = store.comments(in: folder)
+                lock.withLock { answers[2] = comments }
+            })
         // Nobody opened the file a second time meanwhile.
         #expect(probe.reads.count == alreadyRead + 1)
         // The reader itself ends with its flag, and what it did not read is not remembered.
@@ -630,7 +661,9 @@ final class P2Bench: ShellServices {
         let store = CommentStore(fileSystems: fileSystems)
         let flag = CancellationFlag()
         flag.cancel()
-        #expect(throws: (any Error).self) { try store.setComment("new", for: "a.txt", in: memory.url("/A"), hidden: false, cancellation: flag) }
+        #expect(throws: (any Error).self) {
+            try store.setComment("new", for: "a.txt", in: memory.url("/A"), hidden: false, cancellation: flag)
+        }
         #expect(memory.contents("/A/descript.ion") == "a.txt old\r\nb.txt other\r\n")
         #expect(memory.allPaths.filter { $0.hasPrefix("/A/") } == ["/A/descript.ion"])
         try store.setComment("new", for: "a.txt", in: memory.url("/A"), hidden: false)
@@ -645,7 +678,10 @@ final class P2Bench: ShellServices {
             return Array(try Data(contentsOf: file))
         }
         // One well-formed line: a name without separators, a space, a comment.
-        for (name, quoted) in [("descript-line-misread-prepend-char.bin", false), ("descript-quoted-line-misread-combining-mark.bin", true)] {
+        for (name, quoted) in [
+            ("descript-line-misread-prepend-char.bin", false),
+            ("descript-quoted-line-misread-combining-mark.bin", true)
+        ] {
             let input = try bytes(name)
             let take = min(Int(input[0] % 32), input.count - 1)
             var fileName = String(decoding: input[1..<(1 + take)], as: UTF8.self)
@@ -680,7 +716,9 @@ final class P2Bench: ShellServices {
             try store.setComment("fresh\ncomment", for: "new.txt", in: folder, hidden: false)
             let after = store.comments(in: folder)
             #expect(after["new.txt"] == "fresh\ncomment", "\(name)")
-            for (entry, comment) in before where entry != "new.txt" { #expect(after[entry] == comment, "\(name): \(entry.debugDescription)") }
+            for (entry, comment) in before where entry != "new.txt" {
+                #expect(after[entry] == comment, "\(name): \(entry.debugDescription)")
+            }
             #expect(after.count == before.count + (before["new.txt"] == nil ? 1 : 0), "\(name)")
         }
     }
@@ -700,8 +738,10 @@ final class P2Bench: ShellServices {
         try box.file("d/folder/inside.txt", "12345")
         try box.folder("other")
         try box.file("files/only.txt", "x")
-        bench = P2Bench(plugins: [FilePropertiesPlugin(launchesApplications: false), SelectionPlugin()], fileSystems: [LocalFileSystem()],
-                        left: box.url("d"), right: box.url("other"), ui: ui, jobs: jobs)
+        bench = P2Bench(
+            plugins: [FilePropertiesPlugin(launchesApplications: false), SelectionPlugin()],
+            fileSystems: [LocalFileSystem()],
+            left: box.url("d"), right: box.url("other"), ui: ui, jobs: jobs)
     }
 
     // F037: a dialog about what the panel showed when the command was given.
@@ -716,7 +756,8 @@ final class P2Bench: ShellServices {
             bench.left.show(box.url("d"))
             bench.left.moveCursor(toName: "a.txt")
         }
-        try FileManager.default.createSymbolicLink(at: box.url("d/link"), withDestinationURL: box.url("files/only.txt"))
+        try FileManager.default.createSymbolicLink(
+            at: box.url("d/link"), withDestinationURL: box.url("files/only.txt"))
         bench.left.reload()
         bench.left.moveCursor(toName: "link")
         #expect(bench.commands.perform(.showLinkTarget))

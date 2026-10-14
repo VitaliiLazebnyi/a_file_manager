@@ -61,7 +61,9 @@ public struct FTPReplyParser {
     /// Returns a reply when `line` completes one.
     public mutating func feed(_ line: String) -> FTPReply? {
         let digits = line.utf8.prefix(3)
-        let number = digits.count == 3 && digits.allSatisfy({ $0 >= 0x30 && $0 <= 0x39 }) ? Int(String(decoding: digits, as: UTF8.self)) : nil
+        let number =
+            digits.count == 3 && digits.allSatisfy({ $0 >= 0x30 && $0 <= 0x39 })
+            ? Int(String(decoding: digits, as: UTF8.self)) : nil
         let separator = line.utf8.dropFirst(3).first
         /// The line without the code and the one character that follows it.
         func text() -> String {
@@ -170,7 +172,10 @@ public enum FTPSyntax {
             if character.isASCII, character.isNumber {
                 current.append(character)
             } else {
-                if !current.isEmpty { numbers.append(Int(current) ?? 999); current = "" }
+                if !current.isEmpty {
+                    numbers.append(Int(current) ?? 999)
+                    current = ""
+                }
                 if character != "," {
                     if numbers.count == 6 { best = numbers }
                     numbers = []
@@ -244,8 +249,9 @@ public enum FTPSyntax {
 
     public static func timeText(_ date: Date) -> String {
         let parts = utc.dateComponents([.year, .month, .day, .hour, .minute, .second], from: date)
-        return String(format: "%04d%02d%02d%02d%02d%02d", parts.year ?? 1970, parts.month ?? 1, parts.day ?? 1,
-                      parts.hour ?? 0, parts.minute ?? 0, parts.second ?? 0)
+        return String(
+            format: "%04d%02d%02d%02d%02d%02d", parts.year ?? 1970, parts.month ?? 1, parts.day ?? 1,
+            parts.hour ?? 0, parts.minute ?? 0, parts.second ?? 0)
     }
 
     static let utc: Calendar = {

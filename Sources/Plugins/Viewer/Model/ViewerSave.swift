@@ -7,22 +7,29 @@ enum ViewerSave {
     /// does not exist yet): saving onto it would replace what is being read.
     static func isSameFile(_ viewed: URL?, _ target: URL) -> Bool {
         guard let viewed, viewed.isFileURL, target.isFileURL else { return false }
-        var first = stat(), second = stat()
+        var first = stat()
+        var second = stat()
         if stat(viewed.path, &first) == 0, stat(target.path, &second) == 0 {
             return first.st_dev == second.st_dev && first.st_ino == second.st_ino
         }
-        return viewed.resolvingSymlinksInPath().standardizedFileURL.path == target.resolvingSymlinksInPath().standardizedFileURL.path
+        return viewed.resolvingSymlinksInPath().standardizedFileURL.path
+            == target.resolvingSymlinksInPath().standardizedFileURL.path
     }
 
     /// Writes the whole `source` to `target`: into a new file beside it that is then moved onto
     /// it, so a target that is being read, or a copy that stops half way (the file became
     /// shorter, the disk is full, the job is cancelled), never leaves a half-written file in
     /// place of a whole one. Blocks. `progress` is given the bytes written.
-    static func save(_ source: ByteSource, to target: URL, cancellation: CancellationFlag, progress: (Int64) -> Void = { _ in }) throws {
+    static func save(
+        _ source: ByteSource, to target: URL, cancellation: CancellationFlag, progress: (Int64) -> Void = { _ in }
+    ) throws {
         let folder = target.deletingLastPathComponent()
-        let temporary = folder.appendingPathComponent(".\(target.lastPathComponent).afm-saving-\(UUID().uuidString.prefix(8))")
+        let temporary = folder.appendingPathComponent(
+            ".\(target.lastPathComponent).afm-saving-\(UUID().uuidString.prefix(8))")
         let descriptor = open(temporary.path, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0o644)
-        guard descriptor >= 0 else { throw CocoaError(.fileWriteNoPermission, userInfo: [NSFilePathErrorKey: folder.path]) }
+        guard descriptor >= 0 else {
+            throw CocoaError(.fileWriteNoPermission, userInfo: [NSFilePathErrorKey: folder.path])
+        }
         let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
         var finished = false
         defer {
@@ -43,7 +50,11 @@ enum ViewerSave {
         try cancellation.throwIfCancelled()
         try handle.synchronize()
         guard rename(temporary.path, target.path) == 0 else {
-            throw CocoaError(.fileWriteUnknown, userInfo: [NSFilePathErrorKey: target.path, NSLocalizedFailureReasonErrorKey: String(cString: strerror(errno))])
+            throw CocoaError(
+                .fileWriteUnknown,
+                userInfo: [
+                    NSFilePathErrorKey: target.path, NSLocalizedFailureReasonErrorKey: String(cString: strerror(errno))
+                ])
         }
         finished = true
     }

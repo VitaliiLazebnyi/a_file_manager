@@ -45,12 +45,15 @@ public enum BlockingCalls {
     /// once an earlier one was given up.
     ///
     /// Returns nil when `cancellation` was set before the answer came.
-    public static func answer<Answer>(from owner: AnyObject, to question: String, sharing: Bool = true, cancellation: CancellationFlag? = nil,
-                                      _ work: @escaping (CancellationFlag) -> Answer) -> Answer? {
+    public static func answer<Answer>(
+        from owner: AnyObject, to question: String, sharing: Bool = true, cancellation: CancellationFlag? = nil,
+        _ work: @escaping (CancellationFlag) -> Answer
+    ) -> Answer? {
         if cancellation?.isCancelled == true { return nil }
         let slot = Slot<Answer>()
         let done = DispatchSemaphore(value: 0)
-        let ticket = CallBook.shared.ask(owner: owner, question: question, shares: sharing, work: { work($0) }) { answer in
+        let ticket = CallBook.shared.ask(owner: owner, question: question, shares: sharing, work: { work($0) }) {
+            answer in
             slot.set(answer as? Answer)
             done.signal()
         }
@@ -64,8 +67,10 @@ public enum BlockingCalls {
 
     /// The same without waiting: `deliver` is called once, on the main thread, with the
     /// answer, or with nil when `cancellation` was set first. For any thread.
-    public static func answer<Answer>(from owner: AnyObject, to question: String, sharing: Bool = true, cancellation: CancellationFlag? = nil,
-                                      _ work: @escaping (CancellationFlag) -> Answer, then deliver: @escaping (Answer?) -> Void) {
+    public static func answer<Answer>(
+        from owner: AnyObject, to question: String, sharing: Bool = true, cancellation: CancellationFlag? = nil,
+        _ work: @escaping (CancellationFlag) -> Answer, then deliver: @escaping (Answer?) -> Void
+    ) {
         let slot = Slot<Answer>()
         // Only the first of answer and cancellation is delivered.
         func finish(_ answer: Answer?) {
@@ -73,7 +78,8 @@ public enum BlockingCalls {
             DispatchQueue.main.async { deliver(answer) }
         }
         if cancellation?.isCancelled == true { return finish(nil) }
-        let ticket = CallBook.shared.ask(owner: owner, question: question, shares: sharing, work: { work($0) }) { answer in
+        let ticket = CallBook.shared.ask(owner: owner, question: question, shares: sharing, work: { work($0) }) {
+            answer in
             finish(answer as? Answer)
             slot.keep(nil)
         }
@@ -99,18 +105,21 @@ public enum BlockingCalls {
         private var held: AnyObject?
 
         func set(_ answer: Answer?) {
-            lock.lock(); defer { lock.unlock() }
+            lock.lock()
+            defer { lock.unlock() }
             self.answer = answer
         }
 
         var value: Answer? {
-            lock.lock(); defer { lock.unlock() }
+            lock.lock()
+            defer { lock.unlock() }
             return answer
         }
 
         /// True the first time only.
         func close() -> Bool {
-            lock.lock(); defer { lock.unlock() }
+            lock.lock()
+            defer { lock.unlock() }
             defer { isClosed = true }
             return !isClosed
         }
@@ -177,24 +186,38 @@ final class CallBook {
     private var mostAtOnce = 64
 
     var limit: Int {
-        get { lock.lock(); defer { lock.unlock() }; return mostAtOnce }
-        set { lock.lock(); mostAtOnce = newValue; lock.unlock() }
+        get {
+            lock.lock()
+            defer { lock.unlock() }
+            return mostAtOnce
+        }
+        set {
+            lock.lock()
+            mostAtOnce = newValue
+            lock.unlock()
+        }
     }
 
     func unanswered(for owner: ObjectIdentifier) -> Int {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         return underWay[owner] ?? 0
     }
 
     /// `listener` is called once with the answer, on the thread that worked it out, unless
     /// the ticket is cancelled first.
-    func ask(owner: AnyObject, question: String, shares: Bool, work: @escaping (CancellationFlag) -> Any,
-             listener: @escaping (Any?) -> Void) -> Ticket {
+    func ask(
+        owner: AnyObject, question: String, shares: Bool, work: @escaping (CancellationFlag) -> Any,
+        listener: @escaping (Any?) -> Void
+    ) -> Ticket {
         let key = Key(owner: ObjectIdentifier(owner), question: question)
         lock.lock()
         lastListener += 1
         let id = lastListener
-        if shares, let call = running[key]?.first(where: { $0.shares && !$0.isStranded }) ?? waiting.first(where: { $0.key == key && $0.shares }) {
+        if shares,
+            let call = running[key]?.first(where: { $0.shares && !$0.isStranded })
+                ?? waiting.first(where: { $0.key == key && $0.shares })
+        {
             call.listeners[id] = listener
             lock.unlock()
             return Ticket(book: self, call: call, id: id)
@@ -329,7 +352,10 @@ public enum Discard {
     /// Empties `items`; if the list is long, the memory is released on a background thread
     /// (when nobody else holds the list, otherwise whoever lets go last releases it).
     public static func later<Element>(_ items: inout [Element]) {
-        guard items.count >= threshold else { return items = [] }
+        guard items.count >= threshold else {
+            items = []
+            return
+        }
         let box = Box(items)
         items = []
         KernelThreads.shared.run { box.empty() }

@@ -1,9 +1,10 @@
 import AFMContracts
 import AFMKernel
-@testable import FolderTabsPlugin
 import Foundation
 import TestSupport
 import Testing
+
+@testable import FolderTabsPlugin
 
 @Suite struct TabFiles {
     let memory = MemoryFileSystem()
@@ -13,36 +14,42 @@ import Testing
     }
 
     @Test func writesAndReadsBothSides() throws {
-        let active = PanelTabs.State(tabs: [
-            .init(location: memory.url("/A"), title: "Work", locked: true),
-            .init(location: memory.url("/A/my docs"), sortKey: 3, descending: true, showHidden: true),
-        ], active: 1)
+        let active = PanelTabs.State(
+            tabs: [
+                .init(location: memory.url("/A"), title: "Work", locked: true),
+                .init(location: memory.url("/A/my docs"), sortKey: 3, descending: true, showHidden: true)
+            ], active: 1)
         let inactive = PanelTabs.State(tabs: [.init(location: memory.url("/B"))], active: 0)
         let text = TabFile(active: active, inactive: inactive).text(displayPath: memory.displayPath)
-        #expect(text == """
-        [activetabs]
-        0_path=mem:/A
-        0_caption=Work
-        0_options=1|0|0|0|0|1|0
-        1_path=mem:/A/my docs
-        1_options=1|3|1|0|0|0|1
-        activetab=1
+        #expect(
+            text == """
+                [activetabs]
+                0_path=mem:/A
+                0_caption=Work
+                0_options=1|0|0|0|0|1|0
+                1_path=mem:/A/my docs
+                1_options=1|3|1|0|0|0|1
+                activetab=1
 
-        [inactivetabs]
-        0_path=mem:/B
-        0_options=1|0|0|0|0|0|0
-        activetab=0
+                [inactivetabs]
+                0_path=mem:/B
+                0_options=1|0|0|0|0|0|0
+                activetab=0
 
-        """)
+                """)
         #expect(read(text) == TabFile(active: active, inactive: inactive))
         #expect(read(TabFile(active: inactive).text(displayPath: memory.displayPath)) == TabFile(active: inactive))
     }
 
     @Test func readsHandWrittenAndDamagedFiles() throws {
-        let file = try #require(read("; my tabs\r\n[ActiveTabs]\r\n3_path=mem:/C\r\n1_path=mem:/A\r\n2_path=elsewhere\r\nactivetab=3\r\nunknown=1\r\n"))
+        let file = try #require(
+            read(
+                "; my tabs\r\n[ActiveTabs]\r\n3_path=mem:/C\r\n1_path=mem:/A\r\n2_path=elsewhere\r\nactivetab=3\r\nunknown=1\r\n"
+            ))
         #expect(file.active.tabs.map(\.location) == [memory.url("/A").absoluteString, memory.url("/C").absoluteString])
         #expect(file.active.active == 1 && file.inactive == nil)
-        #expect(file.active.tabs[0].title == nil && file.active.tabs[0].locked == nil && !file.active.tabs[0].showHidden)
+        #expect(
+            file.active.tabs[0].title == nil && file.active.tabs[0].locked == nil && !file.active.tabs[0].showHidden)
         #expect(read("") == nil && read("[activetabs]\nactivetab=0\n") == nil)
         // A file with only the other side's section still gives tabs.
         #expect(read("[inactivetabs]\n0_path=mem:/B\n")?.active.tabs.count == 1)
@@ -64,7 +71,9 @@ import Testing
         memory.addFile("/A/docs/in.txt", "inside")
         memory.addFile("/A/pics/cat.jpg", "meow")
         memory.addFile("/B/other.txt", "o")
-        bench = TestBench(plugins: [FolderTabsPlugin()], fileSystems: [memory], left: memory.url("/A"), right: memory.url("/B"), settings: settings)
+        bench = TestBench(
+            plugins: [FolderTabsPlugin()], fileSystems: [memory], left: memory.url("/A"), right: memory.url("/B"),
+            settings: settings)
     }
 
     func paths(_ panel: FakePanel) -> [String] { panel.tabs.tabs.map(\.directory.path) }
@@ -80,7 +89,9 @@ import Testing
         #expect(keys.conflicts.isEmpty)
         #expect(bench.kernel.preferences.pages.first { $0.title == "Folder Tabs" }?.preferences.count == 3)
         let inMenus = bench.kernel.menus.menus.flatMap(\.items).compactMap { $0 }
-        #expect(inMenus.allSatisfy { commands[$0] != nil } && inMenus.contains("SAVETABS") && inMenus.contains("afm_ReopenClosedTab"))
+        #expect(
+            inMenus.allSatisfy { commands[$0] != nil } && inMenus.contains("SAVETABS")
+                && inMenus.contains("afm_ReopenClosedTab"))
     }
 
     @Test func opensTabsInTheBackgroundAndInTheOtherPanel() {
@@ -112,7 +123,8 @@ import Testing
         commands.perform(.openInNewTab)
         #expect(left.tabs.activeIndex == 1 && left.names == ["cat.jpg"])
         commands.perform(.newTab)
-        #expect(paths(left) == ["/A", "/A/pics", "/A/pics", "/A/pics", "/A/docs", "/A/docs"] && left.tabs.activeIndex == 2)
+        #expect(
+            paths(left) == ["/A", "/A/pics", "/A/pics", "/A/pics", "/A/docs", "/A/docs"] && left.tabs.activeIndex == 2)
     }
 
     @Test func closesAllOtherTabsAfterAsking() {
@@ -136,7 +148,9 @@ import Testing
     }
 
     @Test func closesDuplicatesKeepingTheActiveTab() {
-        for path in ["/A/docs", "/A", "/A/docs", "/A/docs/", "/B"] { left.tabs.openTab(showing: memory.url(path), activate: false) }
+        for path in ["/A/docs", "/A", "/A/docs", "/A/docs/", "/B"] {
+            left.tabs.openTab(showing: memory.url(path), activate: false)
+        }
         left.tabs.activate(3)
         commands.perform("cm_CloseDuplicateTabs")
         #expect(paths(left) == ["/A", "/A/docs", "/B"] && left.tabs.activeIndex == 1)
@@ -149,12 +163,16 @@ import Testing
         left.tabs.tabs[1].customTitle = "Papers"
         commands.perform(.closeTab, .index(1))
         commands.perform(.closeTab, .index(1))
-        #expect(paths(left) == ["/A"] && commands.isEnabled("afm_ReopenClosedTab") && !commands.isEnabled("afm_ReopenClosedTab") == false)
+        #expect(
+            paths(left) == ["/A"] && commands.isEnabled("afm_ReopenClosedTab")
+                && !commands.isEnabled("afm_ReopenClosedTab") == false)
         commands.perform("afm_ReopenClosedTab")
         #expect(paths(left) == ["/A", "/A/pics"] && left.tabs.activeIndex == 1 && left.names == ["cat.jpg"])
         ui.formAnswers = [.accept]
         commands.perform("afm_RecentlyClosedTabs")
-        #expect(paths(left) == ["/A", "/A/docs", "/A/pics"] && left.tabs.title(at: 1) == "Papers" && left.tabs.activeIndex == 1)
+        #expect(
+            paths(left) == ["/A", "/A/docs", "/A/pics"] && left.tabs.title(at: 1) == "Papers"
+                && left.tabs.activeIndex == 1)
         #expect(!commands.isEnabled("afm_ReopenClosedTab"))
         // The right panel has a history of its own.
         #expect(!right.tabs.closeTab(at: 0))
@@ -219,16 +237,22 @@ import Testing
         left.tabs.openTab(showing: memory.url("/A/docs"), activate: true)
         left.model.customTitle = "Papers"
         commands.perform("cm_MoveTabLeft")
-        #expect(paths(left) == ["/A/docs", "/A"] && left.tabs.activeIndex == 0 && !commands.isEnabled("cm_MoveTabLeft"))
+        #expect(
+            paths(left) == ["/A/docs", "/A"] && left.tabs.activeIndex == 0 && !commands.isEnabled("cm_MoveTabLeft"))
         commands.perform("cm_MoveTabRight")
-        #expect(paths(left) == ["/A", "/A/docs"] && left.tabs.activeIndex == 1 && !commands.isEnabled("cm_MoveTabRight"))
+        #expect(
+            paths(left) == ["/A", "/A/docs"] && left.tabs.activeIndex == 1 && !commands.isEnabled("cm_MoveTabRight"))
         commands.perform("afm_DuplicateTab")
         #expect(paths(left) == ["/A", "/A/docs", "/A/docs"] && left.tabs.activeIndex == 2 && left.names == ["in.txt"])
         left.tabs.activate(1)
         commands.perform("afm_CopyTabToOtherPanel")
-        #expect(paths(right) == ["/B", "/A/docs"] && right.tabs.activeIndex == 1 && right.tabs.title(at: 1) == "Papers" && left.tabs.count == 3)
+        #expect(
+            paths(right) == ["/B", "/A/docs"] && right.tabs.activeIndex == 1 && right.tabs.title(at: 1) == "Papers"
+                && left.tabs.count == 3)
         commands.perform("afm_MoveTabToOtherPanel")
-        #expect(paths(left) == ["/A", "/A/docs"] && paths(right) == ["/B", "/A/docs", "/A/docs"] && right.tabs.activeIndex == 2)
+        #expect(
+            paths(left) == ["/A", "/A/docs"] && paths(right) == ["/B", "/A/docs", "/A/docs"]
+                && right.tabs.activeIndex == 2)
         left.tabs.closeTab(at: 1)
         #expect(!commands.isEnabled("afm_MoveTabToOtherPanel"))
     }
@@ -239,7 +263,9 @@ import Testing
         left.tabs.tabs[0].setSort(ListOrder(key: .size, descending: true))
         commands.perform("cm_ExchangeWithTabs")
         #expect(paths(left) == ["/B"] && left.names == ["other.txt"])
-        #expect(paths(right) == ["/A", "/A/docs"] && right.tabs.activeIndex == 1 && right.model.isLocked && right.names == ["in.txt"])
+        #expect(
+            paths(right) == ["/A", "/A/docs"] && right.tabs.activeIndex == 1 && right.model.isLocked
+                && right.names == ["in.txt"])
         #expect(right.tabs.tabs[0].sort == ListOrder(key: .size, descending: true))
     }
 
@@ -250,13 +276,17 @@ import Testing
         commands.perform("SAVETABS")
         #expect(ui.log.contains("prompt: Save tabs to file: [mem:/A/docs/tabs.tab]"))
         let saved = try #require(memory.contents("/B/mine.tab"))
-        #expect(saved.hasPrefix("[activetabs]\n0_path=mem:/A\n") && saved.contains("1_caption=Papers") && !saved.contains("[inactivetabs]"))
+        #expect(
+            saved.hasPrefix("[activetabs]\n0_path=mem:/A\n") && saved.contains("1_caption=Papers")
+                && !saved.contains("[inactivetabs]"))
         #expect(right.names == ["mine.tab", "other.txt"] && bench.jobService.titles == ["Save tabs"])
 
         // Appending keeps the tabs and the active one; replacing takes the file's.
         right.focus()
         commands.perform("APPENDTABS", .location(memory.url("/B/mine.tab")))
-        #expect(paths(right) == ["/B", "/A", "/A/docs"] && right.tabs.activeIndex == 0 && right.tabs.title(at: 2) == "Papers")
+        #expect(
+            paths(right) == ["/B", "/A", "/A/docs"] && right.tabs.activeIndex == 0
+                && right.tabs.title(at: 2) == "Papers")
         right.tabs.tabs[0].isLocked = true
         commands.perform("OPENTABS", .text("mine.tab"))
         #expect(paths(right) == ["/A", "/A/docs"] && right.tabs.activeIndex == 1 && right.names == ["in.txt"])

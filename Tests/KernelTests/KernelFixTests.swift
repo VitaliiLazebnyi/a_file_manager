@@ -1,28 +1,35 @@
-@testable import AFMKernel
 import Foundation
 import TestSupport
 import Testing
+
+@testable import AFMKernel
 
 /// A fixed sequence of numbers, so a failing case can be found again.
 private struct Sequence {
     var state: UInt64
     mutating func next(_ limit: Int) -> Int {
-        state = state &* 6364136223846793005 &+ 1442695040888963407
+        state = state &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
         return Int((state >> 33) % UInt64(limit))
     }
 }
 
 private func entry(_ name: String, folder: Bool = false, size: Int64 = 0, time: TimeInterval = 0) -> FileItem {
-    FileItem(url: URL(fileURLWithPath: "/tmp/\(name)"), name: name, isDirectory: folder, size: size, modified: Date(timeIntervalSince1970: time))
+    FileItem(
+        url: URL(fileURLWithPath: "/tmp/\(name)"), name: name, isDirectory: folder, size: size,
+        modified: Date(timeIntervalSince1970: time))
 }
 
 /// Names of every kind the order has to cope with: case, digits, punctuation, accents written
 /// in one or two characters, other scripts, dots in odd places.
 private func variedItems(_ count: Int, seed: UInt64) -> [FileItem] {
     var random = Sequence(state: seed)
-    let words = ["report", "Report", "REPORT", "img_", "IMG-", "read me", "a", "B", "z", "data(1)", "x_y", "résumé", "re\u{301}sume\u{301}",
-                 "Übung", "übung", "uebung", "été", "naïve", "ñandú", "Ångström", "straße", "strasse", "İstanbul", "файл", "Файл", "отчёт",
-                 "写真", "資料", "ｆｕｌｌ", "full", "한국어", "ﬁle", "file", "e\u{301}", "é", "#tag", "~temp", "100", "20", "3"]
+    let words = [
+        "report", "Report", "REPORT", "img_", "IMG-", "read me", "a", "B", "z", "data(1)", "x_y", "résumé",
+        "re\u{301}sume\u{301}",
+        "Übung", "übung", "uebung", "été", "naïve", "ñandú", "Ångström", "straße", "strasse", "İstanbul", "файл",
+        "Файл", "отчёт",
+        "写真", "資料", "ｆｕｌｌ", "full", "한국어", "ﬁle", "file", "e\u{301}", "é", "#tag", "~temp", "100", "20", "3"
+    ]
     let extensions = ["txt", "TXT", "Txt", "md", "jpg", "JPG", "tar.gz", "", "", "c", "h", "é", "файл", "x."]
     return (0..<count).map { _ in
         var name = words[random.next(words.count)]
@@ -35,7 +42,9 @@ private func variedItems(_ count: Int, seed: UInt64) -> [FileItem] {
     }
 }
 
-private let everyOrder = [SortKey.name, .ext, .size, .date, .unsorted].flatMap { [ListOrder(key: $0), ListOrder(key: $0, descending: true)] }
+private let everyOrder = [SortKey.name, .ext, .size, .date, .unsorted].flatMap {
+    [ListOrder(key: $0), ListOrder(key: $0, descending: true)]
+}
 
 @Suite struct SortingByKeys {
     /// The order is defined by `areInOrder`; a stable sort with it is what sorting has to give.
@@ -55,7 +64,10 @@ private let everyOrder = [SortKey.name, .ext, .size, .date, .unsorted].flatMap {
     @Test func aLongListSortedOnAllCoresComesOutTheSame() {
         // Long enough to be dealt into buckets, with many names that are equal or nearly so.
         let items = variedItems(12_000, seed: 6)
-        for order in [ListOrder(key: .name), ListOrder(key: .ext, descending: true), ListOrder(key: .size), ListOrder(key: .unsorted)] {
+        for order in [
+            ListOrder(key: .name), ListOrder(key: .ext, descending: true), ListOrder(key: .size),
+            ListOrder(key: .unsorted)
+        ] {
             #expect(Sorter.sort(items, by: order).map(\.name) == reference(items, order).map(\.name), "by \(order)")
         }
     }
@@ -66,16 +78,26 @@ private let everyOrder = [SortKey.name, .ext, .size, .date, .unsorted].flatMap {
         // one its comparison of two items defines, and the comparison is an order: the
         // same list comes out however the items were shuffled before.
         var random = Sequence(state: 11)
-        let syllables = ["aa", "a", "å", "ä", "ae", "æ", "ö", "ø", "o", "z", "y", "ü", "u", "w", "v", "ch", "c", "h", "Aa", "Z", "ll", "l", "ñ", "n"]
+        let syllables = [
+            "aa", "a", "å", "ä", "ae", "æ", "ö", "ø", "o", "z", "y", "ü", "u", "w", "v", "ch", "c", "h", "Aa", "Z",
+            "ll", "l", "ñ", "n"
+        ]
         let items = (0..<2500).map { index -> FileItem in
-            let name = (0..<(1 + random.next(3))).map { _ in syllables[random.next(syllables.count)] }.joined() + String(random.next(50)) + "-\(index)"
+            let name =
+                (0..<(1 + random.next(3))).map { _ in syllables[random.next(syllables.count)] }.joined()
+                + String(random.next(50)) + "-\(index)"
             return entry(index % 3 == 0 ? name + ".txt" : name, folder: index % 11 == 0, size: Int64(random.next(9)))
         }
         for order in [ListOrder(key: .name), ListOrder(key: .ext, descending: true), ListOrder(key: .size)] {
-            for collator in ["da", "sv", "de@collation=phonebook", "es@collation=traditional", "cs"].map(NameCollator.init(identifier:)) + [.unavailable] {
+            for collator in ["da", "sv", "de@collation=phonebook", "es@collation=traditional", "cs"].map(
+                NameCollator.init(identifier:)) + [.unavailable]
+            {
                 let sorted = Sorter.sort(items, by: order, collator: collator)
-                #expect(sorted == items.sorted { Sorter.areInOrder($0, $1, by: order, collator: collator) }, "by \(order)")
-                #expect(Sorter.sort(items.reversed(), by: order, collator: collator) == sorted, "shuffled, by \(order)")
+                #expect(
+                    sorted == items.sorted { Sorter.areInOrder($0, $1, by: order, collator: collator) }, "by \(order)"
+                )
+                #expect(
+                    Sorter.sort(items.reversed(), by: order, collator: collator) == sorted, "shuffled, by \(order)")
             }
         }
     }
@@ -83,7 +105,9 @@ private let everyOrder = [SortKey.name, .ext, .size, .date, .unsorted].flatMap {
     @Test func plainNamesAreInTheOrderOfTheComparison() {
         // Printable ASCII is the case the keys decide alone, without a check: every pair of
         // short names made of characters that sort in surprising places, and longer ones.
-        let characters = ["a", "A", "b", "Z", "0", "9", " ", ".", "-", "_", "~", "!", "(", "[", "{", "'", "+", "=", "@", "#"]
+        let characters = [
+            "a", "A", "b", "Z", "0", "9", " ", ".", "-", "_", "~", "!", "(", "[", "{", "'", "+", "=", "@", "#"
+        ]
         var names = characters + characters.flatMap { first in characters.map { first + $0 } }
         names += characters.flatMap { first in characters.map { "ab" + first + "c" + $0 + ".x" + first } }
         let items = names.enumerated().map { entry($1, folder: $0 % 7 == 0) }
@@ -112,11 +136,18 @@ private let everyOrder = [SortKey.name, .ext, .size, .date, .unsorted].flatMap {
 
     @Test func turningTheDirectionRoundGivesWhatSortingGives() {
         // With names that are equal for the order (the same name twice) and without.
-        for items in [variedItems(800, seed: 8), variedItems(800, seed: 9).enumerated().map { entry("n\($0)-" + $1.name, folder: $1.isFolder, size: $1.size) }] {
+        for items in [
+            variedItems(800, seed: 8),
+            variedItems(800, seed: 9).enumerated().map {
+                entry("n\($0)-" + $1.name, folder: $1.isFolder, size: $1.size)
+            }
+        ] {
             for order in everyOrder {
                 let sorted = Sorter.sort(items, by: order)
                 let turned = ListOrder(key: order.key, descending: !order.descending)
-                #expect(Sorter.resort(sorted, from: order, to: turned) == Sorter.sort(sorted, by: turned), "\(order) turned round")
+                #expect(
+                    Sorter.resort(sorted, from: order, to: turned) == Sorter.sort(sorted, by: turned),
+                    "\(order) turned round")
                 let other = ListOrder(key: order.key == .size ? .name : .size)
                 #expect(Sorter.resort(sorted, from: order, to: other) == Sorter.sort(sorted, by: other))
             }
@@ -125,11 +156,16 @@ private let everyOrder = [SortKey.name, .ext, .size, .date, .unsorted].flatMap {
 
     @Test func namesAreCutByTheirBytesAsByTheirCharacters() {
         func slow(_ name: String) -> (String, String) {
-            guard let dot = name.lastIndex(of: "."), dot != name.startIndex, name.index(after: dot) != name.endIndex else { return (name, "") }
+            guard let dot = name.lastIndex(of: "."), dot != name.startIndex, name.index(after: dot) != name.endIndex
+            else { return (name, "") }
             return (String(name[..<dot]), String(name[name.index(after: dot)...]))
         }
-        let names = ["a.b", ".a", "a.", "a", "", ".", "..", "a..b", "é.é", "a.\u{301}b", "a.b.\u{301}", "a\u{301}.b", "写真.jpg", "x.写真", "\u{600}.a",
-                     "a.b\u{301}", "…", "a.b c.d", "🇯🇵.🇯🇵", "👨‍👩‍👧.txt"] + variedItems(300, seed: 10).map(\.name)
+        let names =
+            [
+                "a.b", ".a", "a.", "a", "", ".", "..", "a..b", "é.é", "a.\u{301}b", "a.b.\u{301}", "a\u{301}.b",
+                "写真.jpg", "x.写真", "\u{600}.a",
+                "a.b\u{301}", "…", "a.b c.d", "🇯🇵.🇯🇵", "👨‍👩‍👧.txt"
+            ] + variedItems(300, seed: 10).map(\.name)
         for name in names {
             #expect(FileItem.split(name) == slow(name), "\(name.debugDescription)")
         }
@@ -164,15 +200,22 @@ private let everyOrder = [SortKey.name, .ext, .size, .date, .unsorted].flatMap {
         _ = Parallel.map(Array(0..<cores)) { outer -> Int in
             guard outer == 0 else { return 0 }
             return Parallel.map(Array(0..<(cores * 2))) { _ -> Int in
-                lock.lock(); running += 1; most = max(most, running); lock.unlock()
+                lock.lock()
+                running += 1
+                most = max(most, running)
+                lock.unlock()
                 while Date() < deadline {
-                    lock.lock(); let isShared = most > 1; lock.unlock()
+                    lock.lock()
+                    let isShared = most > 1
+                    lock.unlock()
                     if isShared { break }
                     Thread.sleep(forTimeInterval: 0.002)
                 }
                 // Long enough for the pieces that run at once to be seen running at once.
                 Thread.sleep(forTimeInterval: 0.01)
-                lock.lock(); running -= 1; lock.unlock()
+                lock.lock()
+                running -= 1
+                lock.unlock()
                 return 1
             }.reduce(0, +)
         }
@@ -209,14 +252,21 @@ private let everyOrder = [SortKey.name, .ext, .size, .date, .unsorted].flatMap {
         var (running, most) = (0, 0)
         let deadline = Date().addingTimeInterval(60)
         _ = Parallel.map(Array(0..<8)) { _ in
-            lock.lock(); running += 1; most = max(most, running); lock.unlock()
+            lock.lock()
+            running += 1
+            most = max(most, running)
+            lock.unlock()
             // Stays until a second piece runs beside it, however long a thread takes to come.
             while Date() < deadline {
-                lock.lock(); let isShared = most > 1; lock.unlock()
+                lock.lock()
+                let isShared = most > 1
+                lock.unlock()
                 if isShared || cores == 1 { break }
                 Thread.sleep(forTimeInterval: 0.002)
             }
-            lock.lock(); running -= 1; lock.unlock()
+            lock.lock()
+            running -= 1
+            lock.unlock()
         }
         #expect(most > 1 || cores == 1)
         gate.lock()
@@ -232,7 +282,9 @@ private let everyOrder = [SortKey.name, .ext, .size, .date, .unsorted].flatMap {
             sums.withUnsafeMutableBufferPointer { sums in
                 let slots = sums.baseAddress!
                 DispatchQueue.concurrentPerform(iterations: 24) { caller in
-                    slots[caller] = Parallel.map(Array(0..<200)) { Parallel.map([$0, caller]) { $0 * 2 }.reduce(0, +) }.reduce(0, +)
+                    slots[caller] = Parallel.map(Array(0..<200)) {
+                        Parallel.map([$0, caller]) { $0 * 2 }.reduce(0, +)
+                    }.reduce(0, +)
                 }
             }
             return sums
@@ -251,7 +303,9 @@ private let everyOrder = [SortKey.name, .ext, .size, .date, .unsorted].flatMap {
     }
 
     private func listing(_ items: [FileItem]) -> Listing {
-        Listing(directory: directory, items: items, parent: URL(fileURLWithPath: "/", isDirectory: true), root: URL(fileURLWithPath: "/", isDirectory: true))
+        Listing(
+            directory: directory, items: items, parent: URL(fileURLWithPath: "/", isDirectory: true),
+            root: URL(fileURLWithPath: "/", isDirectory: true))
     }
 
     /// The totals as they are defined, counted from scratch.
@@ -313,7 +367,9 @@ private let everyOrder = [SortKey.name, .ext, .size, .date, .unsorted].flatMap {
         #expect(model.totals == counted(model))
         model.setComputedSizes(["folder20": 11, "folder30": 12, "missing": 13])
         #expect(model.totals == counted(model))
-        #expect(model.items.first { $0.name == "folder30" }?.computedSize == 12 && model.listedItems.first { $0.name == "folder20" }?.computedSize == 11)
+        #expect(
+            model.items.first { $0.name == "folder30" }?.computedSize == 12
+                && model.listedItems.first { $0.name == "folder20" }?.computedSize == 11)
         model.invertSelection()
         #expect(model.totals == counted(model))
         model.deselect(["file1.txt", "file2.txt"])
@@ -373,7 +429,8 @@ private let everyOrder = [SortKey.name, .ext, .size, .date, .unsorted].flatMap {
     @Test func aNarrowingFilterGivesWhatTheFullFilterGives() {
         let wide = PanelFilter(title: "wide") { $0.isFolder || $0.name.contains("1") }
         let narrow = PanelFilter(title: "narrow") { $0.isFolder || $0.name.contains("12") }
-        let narrowed = model(sample), whole = model(sample)
+        let narrowed = model(sample)
+        let whole = model(sample)
         narrowed.setSelected(true, names: ["file12.txt", "file120.txt", "file5.txt"])
         whole.setSelected(true, names: ["file12.txt", "file120.txt", "file5.txt"])
         narrowed.setFilter(wide)
@@ -384,7 +441,9 @@ private let everyOrder = [SortKey.name, .ext, .size, .date, .unsorted].flatMap {
         // A filter shows less of the list; the list itself is what it was.
         #expect(narrowed.listVersion == version)
         #expect(narrowed.items.map(\.name) == whole.items.map(\.name) && narrowed.listedItems.count == 300)
-        #expect(narrowed.selection == whole.selection && narrowed.cursorItem?.name == "file12.txt" && narrowed.totals == counted(narrowed))
+        #expect(
+            narrowed.selection == whole.selection && narrowed.cursorItem?.name == "file12.txt"
+                && narrowed.totals == counted(narrowed))
         // Taking the filter off shows everything again.
         narrowed.setFilter(nil)
         #expect(narrowed.items.count == 300)
@@ -400,7 +459,10 @@ private let everyOrder = [SortKey.name, .ext, .size, .date, .unsorted].flatMap {
     }
 
     @Test func sumsThatLeaveTheRangeOfANumberStopAtItsEnd() {
-        let huge = [entry("a.bin", size: .max - 10), entry("b.bin", size: .max - 10), entry("c.bin", size: 100), entry("d", folder: true)]
+        let huge = [
+            entry("a.bin", size: .max - 10), entry("b.bin", size: .max - 10), entry("c.bin", size: 100),
+            entry("d", folder: true)
+        ]
         let model = model(huge)
         #expect(model.totals.totalBytes == .max)
         model.selectAll()
@@ -413,7 +475,9 @@ private let everyOrder = [SortKey.name, .ext, .size, .date, .unsorted].flatMap {
         #expect(model.totals.selectedBytes == .max)
         model.setComputedSize(.max, forName: "d")
         #expect(model.totals.selectedBytes == .max && model.totals.totalBytes == .max)
-        #expect(Int64.max.addingSaturated(1) == .max && Int64.min.addingSaturated(-1) == .min && Int64(2).addingSaturated(3) == 5)
+        #expect(
+            Int64.max.addingSaturated(1) == .max && Int64.min.addingSaturated(-1) == .min
+                && Int64(2).addingSaturated(3) == 5)
 
         let memory = MemoryFileSystem()
         memory.addFile("/big/a/one.bin", "x")
@@ -430,7 +494,9 @@ private let everyOrder = [SortKey.name, .ext, .size, .date, .unsorted].flatMap {
         let sorted = Sorter.resort(model.listedItems, from: model.sort, to: order)
         #expect(model.listVersion == version)
         model.setSort(order, presorted: sorted)
-        #expect(model.sort == order && model.items == Sorter.sort(sample, by: order) && model.cursorItem?.name == "file7.txt")
+        #expect(
+            model.sort == order && model.items == Sorter.sort(sample, by: order)
+                && model.cursorItem?.name == "file7.txt")
         #expect(model.listVersion != version)
         // A list of another length cannot be this list in another order.
         model.setSort(ListOrder(key: .name), presorted: Array(sorted.dropLast()))
@@ -486,18 +552,26 @@ private final class HugeSizes: FileSystemProvider {
     func createDirectory(at url: URL) throws { try inner.createDirectory(at: url) }
     func write(_ url: URL) throws -> FileWriter { try inner.write(url) }
     func remove(_ url: URL) throws { try inner.remove(url) }
-    func move(_ source: URL, to destination: URL, replacing: Bool) throws { try inner.move(source, to: destination, replacing: replacing) }
-    func copy(_ source: URL, to destination: URL, progress: (Int64) -> Bool) throws { try inner.copy(source, to: destination, progress: progress) }
+    func move(_ source: URL, to destination: URL, replacing: Bool) throws {
+        try inner.move(source, to: destination, replacing: replacing)
+    }
+    func copy(_ source: URL, to destination: URL, progress: (Int64) -> Bool) throws {
+        try inner.copy(source, to: destination, progress: progress)
+    }
 }
 
 @Suite struct FileMaskFixes {
     /// The matching spelled out the slow way: both without case and with composed accents,
     /// then character by character (as Unicode numbers them), `*` for any run and `?` for one.
     private func reference(_ text: String, _ name: String) -> Bool {
-        func fold(_ text: String) -> String { text.folding(options: .caseInsensitive, locale: nil).precomposedStringWithCanonicalMapping }
+        func fold(_ text: String) -> String {
+            text.folding(options: .caseInsensitive, locale: nil).precomposedStringWithCanonicalMapping
+        }
         func fits(_ pattern: ArraySlice<Unicode.Scalar>, _ name: ArraySlice<Unicode.Scalar>) -> Bool {
             guard let first = pattern.first else { return name.isEmpty }
-            if first == "*" { return (name.startIndex...name.endIndex).contains { fits(pattern.dropFirst(), name[$0...]) } }
+            if first == "*" {
+                return (name.startIndex...name.endIndex).contains { fits(pattern.dropFirst(), name[$0...]) }
+            }
             guard let character = name.first, first == "?" || first == character else { return false }
             return fits(pattern.dropFirst(), name.dropFirst())
         }
@@ -511,15 +585,26 @@ private final class HugeSizes: FileSystemProvider {
     }
 
     @Test func aMaskReadOnceMatchesLikeTheMaskReadEveryTime() {
-        let masks = ["*.txt", "*.TXT", "*", "*.*", "", "*.", "name.", "*report*", "*Re*", "report_??.*", "[a-c]*.md", "*.t?t", "a*b*c", "*é*", "*.É",
-                     "файл*", "*ФАЙЛ*", "*.txt;*.md", "*.txt  *.jpg", "**", "*a.b*", "?", "\\*", "*[*", "x", "*.", "*x.", "*写真*", "*.tar.gz", "*ı*", "*k*", "k*", "*σ", "*ς", "*.", "*ss*", "*日本*", "ünï*"]
-        let names = ["report.txt", "REPORT.TXT", "Report_01.Txt", "a.md", "B.MD", "d.md", "name", "NAME", "name.x", "abc", "aXbYc", "été.É", "ÉTÉ.é",
-                     "файл.txt", "ФАЙЛ", "мой файл", "x", "", ".", "a.b", "*", "[", "写真.jpg", "archive.TAR.GZ", "İstanbul", "ISTANBUL", "a.b\u{301}", "no ext",
-                     "\u{212A}elvin.txt", "ΟΔΟΣ.md", "οδος", "straße.TXT", "STRASSE", "ǅ.txt", "名前.", "日本語.TXT", "x.\u{301}", "файл", "Ünïcödé.Md"]
+        let masks = [
+            "*.txt", "*.TXT", "*", "*.*", "", "*.", "name.", "*report*", "*Re*", "report_??.*", "[a-c]*.md", "*.t?t",
+            "a*b*c", "*é*", "*.É",
+            "файл*", "*ФАЙЛ*", "*.txt;*.md", "*.txt  *.jpg", "**", "*a.b*", "?", "\\*", "*[*", "x", "*.", "*x.", "*写真*",
+            "*.tar.gz", "*ı*", "*k*", "k*", "*σ", "*ς", "*.", "*ss*", "*日本*", "ünï*"
+        ]
+        let names = [
+            "report.txt", "REPORT.TXT", "Report_01.Txt", "a.md", "B.MD", "d.md", "name", "NAME", "name.x", "abc",
+            "aXbYc", "été.É", "ÉTÉ.é",
+            "файл.txt", "ФАЙЛ", "мой файл", "x", "", ".", "a.b", "*", "[", "写真.jpg", "archive.TAR.GZ", "İstanbul",
+            "ISTANBUL", "a.b\u{301}", "no ext",
+            "\u{212A}elvin.txt", "ΟΔΟΣ.md", "οδος", "straße.TXT", "STRASSE", "ǅ.txt", "名前.", "日本語.TXT", "x.\u{301}",
+            "файл", "Ünïcödé.Md"
+        ]
         for mask in masks {
             let compiled = FileMask(mask)
             for name in names {
-                #expect(compiled.matches(name) == reference(mask, name), "\(mask.debugDescription) on \(name.debugDescription)")
+                #expect(
+                    compiled.matches(name) == reference(mask, name),
+                    "\(mask.debugDescription) on \(name.debugDescription)")
             }
         }
     }

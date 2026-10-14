@@ -69,7 +69,6 @@ final class CharacterBoundaries {
         return data
     }
 
-
     /// The start of the character that the byte at `offset` belongs to: `offset` itself when a
     /// character begins there. Reads at most one block, plus what finding the block's
     /// boundary needs the first time.
@@ -78,7 +77,8 @@ final class CharacterBoundaries {
         let block = (offset - content.lowerBound) / spacing
         let from = try boundary(ofBlock: block, cancellation)
         guard offset > from else { return from }
-        let data = try read(at: from, count: Int(offset - from) + table.longestCharacter, needed: Int(offset - from), cancellation)
+        let data = try read(
+            at: from, count: Int(offset - from) + table.longestCharacter, needed: Int(offset - from), cancellation)
         return from + Int64(walk(data, from: 0, whileAtOrBefore: Int(offset - from)))
     }
 
@@ -125,7 +125,8 @@ final class CharacterBoundaries {
                 found = (anchor, hit)
                 break
             }
-            let lower = start(ofBlock: anchor), upper = min(content.upperBound, start(ofBlock: anchor + 1))
+            let lower = start(ofBlock: anchor)
+            let upper = min(content.upperBound, start(ofBlock: anchor + 1))
             let data = try read(at: lower, count: Int(upper - lower) + 1, needed: Int(upper - lower), cancellation)
             if let last = (0..<Int(upper - lower)).last(where: { table.isSynchronizing(data[data.startIndex + $0]) }) {
                 // The character after a byte that is no lead byte begins right behind it.
@@ -153,7 +154,8 @@ final class CharacterBoundaries {
     private func advance(from: Int64, toBlock block: Int64, _ cancellation: CancellationFlag?) throws -> Int64 {
         let target = min(content.upperBound, start(ofBlock: block))
         guard target > from else { return from }
-        let data = try read(at: from, count: Int(target - from) + table.longestCharacter, needed: Int(target - from), cancellation)
+        let data = try read(
+            at: from, count: Int(target - from) + table.longestCharacter, needed: Int(target - from), cancellation)
         return from + Int64(walk(data, from: 0, whileAtOrBefore: Int(target - from)))
     }
 }

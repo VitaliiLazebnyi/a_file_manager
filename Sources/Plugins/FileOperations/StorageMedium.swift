@@ -18,7 +18,8 @@ enum StorageMedium {
             $0.withMemoryRebound(to: CChar.self, capacity: Int(MAXPATHLEN)) { String(cString: $0) }
         }
         guard device.hasPrefix("/dev/") else { return false }
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         if let answer = known[device] { return answer }
         let answer = mediumIsRotational(bsdName: String(device.dropFirst(5)))
         known[device] = answer
@@ -32,7 +33,8 @@ enum StorageMedium {
         guard service != 0 else { return false }
         defer { IOObjectRelease(service) }
         let options = IOOptionBits(kIORegistryIterateRecursively | kIORegistryIterateParents)
-        let found = IORegistryEntrySearchCFProperty(service, kIOServicePlane, "Device Characteristics" as CFString, kCFAllocatorDefault, options)
+        let found = IORegistryEntrySearchCFProperty(
+            service, kIOServicePlane, "Device Characteristics" as CFString, kCFAllocatorDefault, options)
         return ((found as? [String: Any])?["Medium Type"] as? String) == "Rotational"
     }
 }

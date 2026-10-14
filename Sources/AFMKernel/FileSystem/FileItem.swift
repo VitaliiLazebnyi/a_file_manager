@@ -38,10 +38,12 @@ public struct FileItem: Equatable {
     private var deviceNumber = FileItem.unknown
     private static let unknown = Int64.min
 
-    public init(url: URL, name: String, isDirectory: Bool, isSymlink: Bool = false, isPackage: Bool = false,
-                isHidden: Bool = false, size: Int64 = 0, modified: Date = Date(timeIntervalSince1970: 0),
-                permissions: UInt16 = 0o644, computedSize: Int64? = nil, isSpecial: Bool = false,
-                linkTargetSize: Int64? = nil, device: Int64? = nil) {
+    public init(
+        url: URL, name: String, isDirectory: Bool, isSymlink: Bool = false, isPackage: Bool = false,
+        isHidden: Bool = false, size: Int64 = 0, modified: Date = Date(timeIntervalSince1970: 0),
+        permissions: UInt16 = 0o644, computedSize: Int64? = nil, isSpecial: Bool = false,
+        linkTargetSize: Int64? = nil, device: Int64? = nil
+    ) {
         targetSize = linkTargetSize ?? FileItem.unknown
         deviceNumber = device ?? FileItem.unknown
         self.isSpecial = isSpecial
@@ -130,7 +132,8 @@ extension URL {
     public var locationKey: String {
         let path = self.path
         let host = (self.host ?? "") + (port.map { ":\($0)" } ?? "")
-        return (scheme ?? "file") + "://" + host + (path.count > 1 && path.hasSuffix("/") ? String(path.dropLast()) : path)
+        return (scheme ?? "file") + "://" + host
+            + (path.count > 1 && path.hasSuffix("/") ? String(path.dropLast()) : path)
     }
 
     public func isSameLocation(as other: URL) -> Bool {
@@ -202,8 +205,12 @@ public enum PathSafety {
     /// The location a relative path from outside names below `root`; nil when the path is
     /// not made of safe names. Works on the text alone, and the result is checked once more
     /// to lie below `root` (`isContained`).
-    public static func location(ofRelativePath path: String, below root: URL, allowingTrailingSeparator: Bool = false) -> URL? {
-        guard let names = components(ofRelativePath: path, allowingTrailingSeparator: allowingTrailingSeparator) else { return nil }
+    public static func location(ofRelativePath path: String, below root: URL, allowingTrailingSeparator: Bool = false)
+        -> URL?
+    {
+        guard let names = components(ofRelativePath: path, allowingTrailingSeparator: allowingTrailingSeparator) else {
+            return nil
+        }
         let url = names.reduce(root) { $0.appendingPathComponent($1, isDirectory: false) }
         return isContained(url, in: root) ? url : nil
     }
@@ -214,7 +221,9 @@ public enum PathSafety {
     /// the disk and is for local files only: a link inside the folder that points out of it
     /// is then seen for what it is, also when the file at the end does not exist yet.
     public static func isContained(_ url: URL, in root: URL, resolvingLinks: Bool = false) -> Bool {
-        guard (url.scheme ?? "file") == (root.scheme ?? "file"), url.host == root.host, url.port == root.port else { return false }
+        guard (url.scheme ?? "file") == (root.scheme ?? "file"), url.host == root.host, url.port == root.port else {
+            return false
+        }
         func bytes(_ url: URL) -> [UInt8] {
             var path = Array((resolvingLinks && url.isFileURL ? resolved(url) : url.standardized.path).utf8)
             while path.count > 1, path.last == 0x2F { path.removeLast() }

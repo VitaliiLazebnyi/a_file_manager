@@ -1,10 +1,11 @@
 import AFMContracts
 import AFMKernel
-@testable import AFMShell
 import AppKit
 import StandardPlugins
 import TestSupport
 import Testing
+
+@testable import AFMShell
 
 /// The panel's use of what the kernel offers: cancellable listings, filtering off the main
 /// thread, exact marks, per-location capabilities, and free space that follows the server.
@@ -76,9 +77,12 @@ extension Application {
         app.left.model.setSort(ListOrder(key: .name, descending: true))
         // The end of the reading waits for the piece that is sorted again; if it did not, the
         // piece would find the reading over and be thrown away.
-        #expect(await wait { app.left.model.directory.path == "/big" && app.left.model.isComplete && !app.left.isLoading })
+        #expect(
+            await wait { app.left.model.directory.path == "/big" && app.left.model.isComplete && !app.left.isLoading })
         #expect(app.left.model.items.count == total && app.left.model.sort == ListOrder(key: .name, descending: true))
-        #expect(app.left.model.items.first?.name == String(format: "f%05d.txt", total - 1) && app.left.model.items.last?.name == "f00000.txt")
+        #expect(
+            app.left.model.items.first?.name == String(format: "f%05d.txt", total - 1)
+                && app.left.model.items.last?.name == "f00000.txt")
     }
 
     // MARK: Quick filter
@@ -92,7 +96,8 @@ extension Application {
         defer { app.stop() }
         app.kernel.fileSystems.register(big)
         app.left.show(big.url("/big"))
-        #expect(await wait { app.left.model.directory.path == "/big" && app.left.model.isComplete && !app.left.isLoading })
+        #expect(
+            await wait { app.left.model.directory.path == "/big" && app.left.model.isComplete && !app.left.isLoading })
         app.left.showQuickFilter()
         app.left.quickFilterTyped("77")
         // Not done on this thread: the list is as it was until the answer comes.
@@ -107,7 +112,9 @@ extension Application {
         // Esc takes the filter away, also one that is still being worked out.
         app.left.quickFilterTyped("5")
         app.left.removeQuickFilter()
-        await withCheckedContinuation { done in DispatchQueue.global().async { DispatchQueue.main.async { done.resume() } } }
+        await withCheckedContinuation { done in
+            DispatchQueue.global().async { DispatchQueue.main.async { done.resume() } }
+        }
         #expect(await wait { app.left.model.items.count == total })
         #expect(app.left.quickFilterText == nil && app.left.model.filter == nil)
     }
@@ -131,21 +138,27 @@ extension Application {
     // MARK: Marks
 
     @Test func onlyTheMarkedOfTwoNamesThatReadTheSameIsDrawnAndCountedAsMarked() async {
-        let composed = "caf\u{E9}.txt", decomposed = "cafe\u{301}.txt"
+        let composed = "caf\u{E9}.txt"
+        let decomposed = "cafe\u{301}.txt"
         memory.addFile("/twins/" + composed)
         memory.addFile("/twins/" + decomposed)
         let app = await start()
         defer { app.stop() }
         app.left.show(memory.url("/twins"))
-        #expect(await wait { app.left.model.directory.path == "/twins" && app.left.model.isComplete && !app.left.isLoading })
+        #expect(
+            await wait { app.left.model.directory.path == "/twins" && app.left.model.isComplete && !app.left.isLoading }
+        )
         let model = app.left.model
         let rows = model.items.indices.map { $0 + (model.hasParentRow ? 1 : 0) }
         #expect(rows.count == 2)
-        let nameColumn = app.left.tableView.tableColumns.first { $0.identifier.rawValue == FileListColumn.name.rawValue }!
+        let nameColumn = app.left.tableView.tableColumns.first {
+            $0.identifier.rawValue == FileListColumn.name.rawValue
+        }!
         func drawnMarked(_ row: Int) -> Bool {
             let cell = app.left.tableView(app.left.tableView, viewFor: nameColumn, row: row) as? NSTableCellView
             return cell?.textField?.textColor == app.left.nameColor(for: model.item(atRow: row), selected: true)
-                && app.left.nameColor(for: model.item(atRow: row), selected: true) != app.left.nameColor(for: model.item(atRow: row), selected: false)
+                && app.left.nameColor(for: model.item(atRow: row), selected: true)
+                    != app.left.nameColor(for: model.item(atRow: row), selected: false)
         }
         model.toggleSelection(row: rows[0])
         #expect(model.selectionCount == 1)
@@ -168,12 +181,19 @@ extension Application {
         defer { app.stop() }
         #expect(app.kernel.fileSystems.capabilities(for: memory.url("/readonly")) == [])
         app.left.show(memory.url("/readonly"))
-        #expect(await wait { app.left.model.directory.path == "/readonly" && app.left.model.isComplete && !app.left.isLoading })
+        #expect(
+            await wait {
+                app.left.model.directory.path == "/readonly" && app.left.model.isComplete && !app.left.isLoading
+            })
         let source = box.url("B/one.txt")
         #expect(app.left.dropPlan(for: [source], row: -1, modifiers: [], allowed: .copy) == nil)
         app.left.show(memory.url("/writable"))
-        #expect(await wait { app.left.model.directory.path == "/writable" && app.left.model.isComplete && !app.left.isLoading })
-        #expect(app.left.dropPlan(for: [source], row: -1, modifiers: [], allowed: .copy)?.destination.path == "/writable")
+        #expect(
+            await wait {
+                app.left.model.directory.path == "/writable" && app.left.model.isComplete && !app.left.isLoading
+            })
+        #expect(
+            app.left.dropPlan(for: [source], row: -1, modifiers: [], allowed: .copy)?.destination.path == "/writable")
     }
 
     // MARK: Free space
@@ -186,12 +206,16 @@ extension Application {
         defer { app.stop() }
         app.kernel.fileSystems.register(share)
         app.left.show(share.url("/share/sub"))
-        #expect(await wait { app.left.model.directory.path == "/share/sub" && app.left.model.isComplete && !app.left.isLoading })
+        #expect(
+            await wait {
+                app.left.model.directory.path == "/share/sub" && app.left.model.isComplete && !app.left.isLoading
+            })
         #expect(app.left.model.volume?.freeBytes == 100)
         let asked = share.volumeQuestions
         func report(root: String) {
-            NotificationCenter.default.post(name: FileSystemRegistry.volumeInfoDidChange, object: share,
-                                            userInfo: [FileSystemRegistry.volumeRootKey: share.url(root)])
+            NotificationCenter.default.post(
+                name: FileSystemRegistry.volumeInfoDidChange, object: share,
+                userInfo: [FileSystemRegistry.volumeRootKey: share.url(root)])
         }
         // Another volume's news is not for this panel; the right one's is, also from a higher root.
         share.volumeFigure = VolumeInfo(name: "Share", freeBytes: 40, totalBytes: 1000, isLocal: false)

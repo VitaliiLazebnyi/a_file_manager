@@ -1,8 +1,9 @@
 import AFMKernel
 import Foundation
-@testable import LocalFileSystemPlugin
 import TestSupport
 import Testing
+
+@testable import LocalFileSystemPlugin
 
 /// Waits for a condition, not for a length of time; false only after a very long while.
 private func waitUntil(seconds: TimeInterval = 60, _ condition: () -> Bool) -> Bool {
@@ -30,14 +31,16 @@ private final class Running<Value> {
     }
 
     var isOver: Bool {
-        condition.lock(); defer { condition.unlock() }
+        condition.lock()
+        defer { condition.unlock() }
         return result != nil
     }
 
     /// Nil when it did not end for a very long time: a hang, reported as a failure.
     func wait(seconds: TimeInterval = 60) -> Result<Value, Error>? {
         let end = Date(timeIntervalSinceNow: seconds)
-        condition.lock(); defer { condition.unlock() }
+        condition.lock()
+        defer { condition.unlock() }
         while result == nil, condition.wait(until: end) {}
         return result
     }
@@ -73,8 +76,16 @@ private final class DeadVolume {
     }
 
     /// How many questions are waiting at this moment, and how many were ever put.
-    var waiting: Int { condition.lock(); defer { condition.unlock() }; return waitingNow }
-    var asked: Int { condition.lock(); defer { condition.unlock() }; return askedSoFar }
+    var waiting: Int {
+        condition.lock()
+        defer { condition.unlock() }
+        return waitingNow
+    }
+    var asked: Int {
+        condition.lock()
+        defer { condition.unlock() }
+        return askedSoFar
+    }
 
     /// The server is back: everything that waits goes on, and nothing waits from now on.
     func answer() {
@@ -107,11 +118,16 @@ private final class DeadVolume {
         try FileManager.default.createSymbolicLink(atPath: box.url("to-file").path, withDestinationPath: "big.bin")
         try FileManager.default.createSymbolicLink(atPath: box.url("to-folder").path, withDestinationPath: "folder")
         try FileManager.default.createSymbolicLink(atPath: box.url("to-nothing").path, withDestinationPath: "missing")
-        let listed = Dictionary(uniqueKeysWithValues: try local.list(box.root, showHidden: true).map { ($0.name, $0) })
+        let listed = Dictionary(
+            uniqueKeysWithValues: try local.list(box.root, showHidden: true).map { ($0.name, $0) })
         // The link itself has no size (the entry is what `lstat` sees); the file's is said besides.
-        #expect(listed["to-file"]?.size == 0 && listed["to-file"]?.linkTargetSize == 5 && listed["to-file"]?.isSymlink == true)
+        #expect(
+            listed["to-file"]?.size == 0 && listed["to-file"]?.linkTargetSize == 5
+                && listed["to-file"]?.isSymlink == true)
         #expect(listed["to-folder"]?.linkTargetSize == nil && listed["to-folder"]?.isDirectory == true)
-        #expect(listed["to-nothing"]?.linkTargetSize == nil && listed["big.bin"]?.linkTargetSize == nil && listed["big.bin"]?.size == 5)
+        #expect(
+            listed["to-nothing"]?.linkTargetSize == nil && listed["big.bin"]?.linkTargetSize == nil
+                && listed["big.bin"]?.size == 5)
         // Asked one by one, the same.
         for name in ["to-file", "to-folder", "to-nothing", "big.bin", "folder"] {
             #expect(local.item(at: box.root.appending(name: name)) == listed[name], "\(name)")
@@ -146,7 +162,8 @@ private final class DeadVolume {
         var checked = 0
         for parent in ["/", "/System/Volumes", "/Volumes"] {
             let folder = URL(fileURLWithPath: parent, isDirectory: true)
-            guard let own = local.item(at: folder)?.device, let listed = try? local.list(folder, showHidden: true) else { continue }
+            guard let own = local.item(at: folder)?.device, let listed = try? local.list(folder, showHidden: true)
+            else { continue }
             for item in listed where item.isDirectory && !item.isSymlink {
                 // Only disks of this Mac are asked one by one here: a share may not answer.
                 guard MountTable.shared.isLocal(item.url.path) == true || item.url.path == "/dev" else { continue }
@@ -155,7 +172,9 @@ private final class DeadVolume {
                 #expect(item.device == Int64(st.st_dev), "\(item.url.path)")
                 if Int64(st.st_dev) != own {
                     // A mount point: told from its neighbours by the number alone.
-                    #expect(item.device != own && local.isMountPoint(item.url) && local.deviceID(of: item.url) == item.device)
+                    #expect(
+                        item.device != own && local.isMountPoint(item.url)
+                            && local.deviceID(of: item.url) == item.device)
                     checked += 1
                 }
             }
@@ -191,14 +210,17 @@ private final class DeadVolume {
         try FileManager.default.createSymbolicLink(at: box.url("a/link"), withDestinationURL: outside)
         #expect(throws: FileSystemError.self) { try local.createDirectory(at: box.url("a/link"), exclusive: true) }
         // A dangling link has the name too, and nothing is made where it points.
-        try FileManager.default.createSymbolicLink(atPath: box.url("a/dangling").path, withDestinationPath: box.url("elsewhere").path)
+        try FileManager.default.createSymbolicLink(
+            atPath: box.url("a/dangling").path, withDestinationPath: box.url("elsewhere").path)
         #expect(throws: FileSystemError.self) { try local.createDirectory(at: box.url("a/dangling"), exclusive: true) }
         let inside = try FileManager.default.contentsOfDirectory(atPath: outside.path)
         #expect(!box.exists("elsewhere") && inside.isEmpty)
         // Through the protocol, with a flag.
         let provider: FileSystemProvider = local
         try provider.createDirectory(at: box.url("c/new"), exclusive: true, cancellation: CancellationFlag())
-        #expect(throws: FileSystemError.self) { try provider.createDirectory(at: box.url("c/new"), exclusive: true, cancellation: CancellationFlag()) }
+        #expect(throws: FileSystemError.self) {
+            try provider.createDirectory(at: box.url("c/new"), exclusive: true, cancellation: CancellationFlag())
+        }
     }
 
     @Test func aFolderThatMayBeThereIsMadeAsBefore() throws {
@@ -232,14 +254,21 @@ private final class DeadVolume {
         let box = try Sandbox()
         let failures = Locked(0)
         DispatchQueue.concurrentPerform(iterations: 32) { index in
-            do { try local.createDirectory(at: box.url("shared/a/b/c/leaf\(index % 4)")) } catch { failures.withValue { $0 += 1 } }
+            do { try local.createDirectory(at: box.url("shared/a/b/c/leaf\(index % 4)")) } catch {
+                failures.withValue { $0 += 1 }
+            }
         }
         #expect(failures.withValue { $0 } == 0)
-        #expect(try FileManager.default.contentsOfDirectory(atPath: box.url("shared/a/b/c").path).sorted() == ["leaf0", "leaf1", "leaf2", "leaf3"])
+        #expect(
+            try FileManager.default.contentsOfDirectory(atPath: box.url("shared/a/b/c").path).sorted() == [
+                "leaf0", "leaf1", "leaf2", "leaf3"
+            ])
         // Of many that want the same new folder, one gets it.
         let made = Locked(0)
         DispatchQueue.concurrentPerform(iterations: 32) { _ in
-            if (try? local.createDirectory(at: box.url("shared/only"), exclusive: true)) != nil { made.withValue { $0 += 1 } }
+            if (try? local.createDirectory(at: box.url("shared/only"), exclusive: true)) != nil {
+                made.withValue { $0 += 1 }
+            }
         }
         #expect(made.withValue { $0 } == 1)
     }
@@ -262,9 +291,15 @@ private final class DeadVolume {
         // A folder of the tree is swapped for a link to somebody else's folder, after it was listed.
         try FileManager.default.moveItem(at: box.url("tree/sub"), to: box.url("aside"))
         try FileManager.default.createSymbolicLink(at: box.url("tree/sub"), withDestinationURL: box.url("victim"))
-        #expect(throws: (any Error).self) { try local.remove(box.url("tree/sub/b.txt"), below: root, cancellation: flag) }
-        #expect(throws: (any Error).self) { try local.remove(box.url("tree/sub/deep/a.txt"), below: root, cancellation: flag) }
-        #expect(throws: (any Error).self) { try local.remove(box.url("tree/sub/deep"), below: root, cancellation: flag) }
+        #expect(throws: (any Error).self) {
+            try local.remove(box.url("tree/sub/b.txt"), below: root, cancellation: flag)
+        }
+        #expect(throws: (any Error).self) {
+            try local.remove(box.url("tree/sub/deep/a.txt"), below: root, cancellation: flag)
+        }
+        #expect(throws: (any Error).self) {
+            try local.remove(box.url("tree/sub/deep"), below: root, cancellation: flag)
+        }
         #expect(box.read("victim/b.txt") == "precious" && box.read("victim/deep/a.txt") == "precious")
         // The link itself is an entry of the tree like any other, and goes as a link.
         try local.remove(box.url("tree/sub"), below: root, cancellation: flag)
@@ -273,10 +308,14 @@ private final class DeadVolume {
         try box.file("tree2/x.txt")
         try FileManager.default.moveItem(at: box.url("tree2"), to: box.url("aside2"))
         try FileManager.default.createSymbolicLink(at: box.url("tree2"), withDestinationURL: box.url("victim"))
-        #expect(throws: (any Error).self) { try local.remove(box.url("tree2/b.txt"), below: box.url("tree2"), cancellation: flag) }
+        #expect(throws: (any Error).self) {
+            try local.remove(box.url("tree2/b.txt"), below: box.url("tree2"), cancellation: flag)
+        }
         #expect(box.read("victim/b.txt") == "precious")
         // Not below the root at all, by a path that only looks as if it were: refused.
-        #expect(throws: (any Error).self) { try local.remove(box.url("tree/../victim/b.txt"), below: root, cancellation: flag) }
+        #expect(throws: (any Error).self) {
+            try local.remove(box.url("tree/../victim/b.txt"), below: root, cancellation: flag)
+        }
         #expect(throws: (any Error).self) { try local.remove(box.url("treeish"), below: root, cancellation: flag) }
         #expect(throws: (any Error).self) { try local.remove(root, below: root, cancellation: flag) }
         #expect(box.read("victim/b.txt") == "precious")
@@ -285,7 +324,9 @@ private final class DeadVolume {
         #expect(throws: (any Error).self) { try local.remove(box.url("tree/full"), below: root, cancellation: flag) }
         let set = CancellationFlag()
         set.cancel()
-        #expect(throws: CocoaError.self) { try local.remove(box.url("tree/full/in.txt"), below: root, cancellation: set) }
+        #expect(throws: CocoaError.self) {
+            try local.remove(box.url("tree/full/in.txt"), below: root, cancellation: set)
+        }
         #expect(box.exists("tree/full/in.txt"))
     }
 
@@ -299,11 +340,14 @@ private final class DeadVolume {
         try local.move(box.url("made/a.txt"), to: box.url("made/b.txt"), replacing: false, cancellation: flag)
         #expect(!box.exists("made/a.txt") && box.read("made/b.txt") == "abc")
         try box.file("made/c.txt", "taken")
-        #expect(throws: FileSystemError.self) { try local.move(box.url("made/b.txt"), to: box.url("made/c.txt"), replacing: false, cancellation: flag) }
+        #expect(throws: FileSystemError.self) {
+            try local.move(box.url("made/b.txt"), to: box.url("made/c.txt"), replacing: false, cancellation: flag)
+        }
         try local.move(box.url("made/b.txt"), to: box.url("made/c.txt"), replacing: true, cancellation: flag)
         #expect(box.read("made/c.txt") == "abc")
         let date = Date(timeIntervalSince1970: 1_500_000_000)
-        try local.setAttributes(FileAttributes(modified: date, permissions: 0o640), of: box.url("made/c.txt"), cancellation: flag)
+        try local.setAttributes(
+            FileAttributes(modified: date, permissions: 0o640), of: box.url("made/c.txt"), cancellation: flag)
         let item = try #require(local.item(at: box.url("made/c.txt")))
         #expect(item.modified == date && item.permissions == 0o640)
         let mark = Data("0081;65f0a1b2;Safari;".utf8)
@@ -311,16 +355,26 @@ private final class DeadVolume {
         #expect(local.quarantine(of: box.url("made/c.txt")) == mark)
         try box.file("made/d.txt", "d")
         let tag = Data("red".utf8)
-        #expect(tag.withUnsafeBytes { setxattr(box.url("made/c.txt").path, "afm.test.tag", $0.baseAddress, $0.count, 0, 0) } == 0)
+        #expect(
+            tag.withUnsafeBytes {
+                setxattr(box.url("made/c.txt").path, "afm.test.tag", $0.baseAddress, $0.count, 0, 0)
+            } == 0)
         try local.copyMetadata(from: box.url("made/c.txt"), to: box.url("made/d.txt"), cancellation: flag)
         var carried = [UInt8](repeating: 0, count: 16)
         let length = getxattr(box.url("made/d.txt").path, "afm.test.tag", &carried, carried.count, 0, 0)
         #expect(length == 3 && Data(carried.prefix(3)) == tag)
         var reported: [Int64] = []
-        try local.copy(box.url("made/c.txt"), to: box.url("made/e.txt"), cancellation: flag) { reported.append($0); return true }
+        try local.copy(box.url("made/c.txt"), to: box.url("made/e.txt"), cancellation: flag) {
+            reported.append($0)
+            return true
+        }
         #expect(box.read("made/e.txt") == "abc" && local.item(at: box.url("made/e.txt"))?.modified == date)
-        #expect(throws: FileSystemError.self) { try local.copy(box.url("made/c.txt"), to: box.url("made/e.txt"), cancellation: flag) { _ in true } }
-        for name in ["c.txt", "d.txt", "e.txt", "inner"] { try local.remove(box.url("made/" + name), cancellation: flag) }
+        #expect(throws: FileSystemError.self) {
+            try local.copy(box.url("made/c.txt"), to: box.url("made/e.txt"), cancellation: flag) { _ in true }
+        }
+        for name in ["c.txt", "d.txt", "e.txt", "inner"] {
+            try local.remove(box.url("made/" + name), cancellation: flag)
+        }
         try local.remove(box.url("made"), cancellation: flag)
         #expect(!box.exists("made"))
         // What fails without a flag fails the same way with one.
@@ -343,12 +397,23 @@ private final class DeadVolume {
         #expect(stopped { try local.createDirectory(at: box.url("new"), cancellation: flag) })
         #expect(stopped { try local.createDirectory(at: box.url("new"), exclusive: true, cancellation: flag) })
         #expect(stopped { try local.remove(box.url("a.txt"), cancellation: flag) })
-        #expect(stopped { try local.move(box.url("a.txt"), to: box.url("b.txt"), replacing: true, cancellation: flag) })
-        #expect(stopped { try local.setAttributes(FileAttributes(modified: Date(), permissions: 0o600), of: box.url("a.txt"), cancellation: flag) })
+        #expect(
+            stopped { try local.move(box.url("a.txt"), to: box.url("b.txt"), replacing: true, cancellation: flag) })
+        #expect(
+            stopped {
+                try local.setAttributes(
+                    FileAttributes(modified: Date(), permissions: 0o600), of: box.url("a.txt"), cancellation: flag)
+            })
         #expect(stopped { try local.setQuarantine(Data("0081;0;x;".utf8), of: box.url("a.txt"), cancellation: flag) })
         #expect(stopped { try local.copyMetadata(from: box.url("a.txt"), to: box.url("a.txt"), cancellation: flag) })
         var asked = 0
-        #expect(stopped { try local.copy(box.url("a.txt"), to: box.url("c.txt"), cancellation: flag) { _ in asked += 1; return true } })
+        #expect(
+            stopped {
+                try local.copy(box.url("a.txt"), to: box.url("c.txt"), cancellation: flag) { _ in
+                    asked += 1
+                    return true
+                }
+            })
         #expect(asked == 0 && local.volume(of: box.root, cancellation: flag) == nil)
         // Nothing was touched.
         #expect(try FileManager.default.contentsOfDirectory(atPath: box.root.path) == ["a.txt"])
@@ -373,12 +438,15 @@ private final class DeadVolume {
         }
         var failure: Error?
         do {
-            try stopping.setAttributes(FileAttributes(modified: Date(timeIntervalSince1970: 1_000_000), permissions: 0o644), of: file, cancellation: flag)
+            try stopping.setAttributes(
+                FileAttributes(modified: Date(timeIntervalSince1970: 1_000_000), permissions: 0o644), of: file,
+                cancellation: flag)
         } catch { failure = error }
         #expect((failure as? CocoaError)?.code == .userCancelled && steps == 3)
         var st = stat()
         #expect(lstat(file.path, &st) == 0 && st.st_flags & UInt32(UF_IMMUTABLE) != 0)
-        #expect(Date(timeIntervalSince1970: TimeInterval(st.st_mtimespec.tv_sec)) != Date(timeIntervalSince1970: 1_000_000))
+        #expect(
+            Date(timeIntervalSince1970: TimeInterval(st.st_mtimespec.tv_sec)) != Date(timeIntervalSince1970: 1_000_000))
     }
 
     @Test func aCopyIsStoppedBetweenTheStepsTheSystemReports() throws {
@@ -427,7 +495,8 @@ private final class DeadVolume {
         // Cancel: the caller is free after the moment the call is given to come back.
         flag.cancel()
         #expect(wasCancelled(removal.wait()))
-        #expect(RemoteChanges.shared.strandedCalls(on: dead.root) == 1 && dead.waiting == 1 && box.exists("share/a.txt"))
+        #expect(
+            RemoteChanges.shared.strandedCalls(on: dead.root) == 1 && dead.waiting == 1 && box.exists("share/a.txt"))
         // The server answers again: the call that was left behind makes no further step.
         dead.answer()
         #expect(waitUntil { RemoteChanges.shared.strandedCalls(on: dead.root) == 0 })
@@ -451,12 +520,16 @@ private final class DeadVolume {
         #expect(RemoteChanges.shared.strandedCalls(on: dead.root) == RemoteChanges.limit)
         // The next one is refused at once, without a thread and without a question.
         let asked = dead.asked
-        let refused = Running { try local.createDirectory(at: box.url("share/more"), cancellation: CancellationFlag()) }
+        let refused = Running {
+            try local.createDirectory(at: box.url("share/more"), cancellation: CancellationFlag())
+        }
         guard case .failure(let error)? = refused.wait() else {
             Issue.record("a change on a volume that does not answer was not refused")
             return
         }
-        #expect((error as NSError).domain == NSPOSIXErrorDomain && (error as NSError).code == Int(ETIMEDOUT) && dead.asked == asked)
+        #expect(
+            (error as NSError).domain == NSPOSIXErrorDomain && (error as NSError).code == Int(ETIMEDOUT)
+                && dead.asked == asked)
         // Another volume is none of its business.
         try local.createDirectory(at: box.url("here/new"), cancellation: CancellationFlag())
         #expect(box.exists("here/new"))
@@ -475,13 +548,17 @@ private final class DeadVolume {
         // Patience enough for the "server" to answer after the flag was set.
         let local = dead.fileSystem(patienceAfterCancel: 60)
         let flag = CancellationFlag()
-        let moving = Running { try local.move(box.url("share/a.txt"), to: box.url("share/b.txt"), replacing: false, cancellation: flag) }
+        let moving = Running {
+            try local.move(box.url("share/a.txt"), to: box.url("share/b.txt"), replacing: false, cancellation: flag)
+        }
         #expect(waitUntil { dead.waiting == 1 })
         flag.cancel()
         dead.answer()
         // It came back, saw the flag before its next step, and says so: nothing was renamed.
         #expect(wasCancelled(moving.wait()))
-        #expect(RemoteChanges.shared.strandedCalls(on: dead.root) == 0 && box.exists("share/a.txt") && !box.exists("share/b.txt"))
+        #expect(
+            RemoteChanges.shared.strandedCalls(on: dead.root) == 0 && box.exists("share/a.txt")
+                && !box.exists("share/b.txt"))
     }
 
     @Test func aCopyOntoAVolumeThatDoesNotAnswerLeavesNothingAndReportsToNobodyAfterItWasLeft() throws {
@@ -524,7 +601,11 @@ private final class DeadVolume {
         // is the only one, and after the moment a volume is given everybody is answered
         // from what is known (here: only the name of its folder).
         let askers = (0..<20).map { index in
-            Running { index % 2 == 0 ? local.volume(of: box.url("share")) : local.volume(of: box.url("share/x/y"), cancellation: CancellationFlag()) }
+            Running {
+                index % 2 == 0
+                    ? local.volume(of: box.url("share"))
+                    : local.volume(of: box.url("share/x/y"), cancellation: CancellationFlag())
+            }
         }
         for asker in askers {
             guard case .success(let info)? = asker.wait() else {
@@ -545,7 +626,9 @@ private final class DeadVolume {
             var roots: [String] = []
         }
         let heard = Heard()
-        let observer = NotificationCenter.default.addObserver(forName: FileSystemRegistry.volumeInfoDidChange, object: local, queue: nil) { note in
+        let observer = NotificationCenter.default.addObserver(
+            forName: FileSystemRegistry.volumeInfoDidChange, object: local, queue: nil
+        ) { note in
             guard let root = note.userInfo?[FileSystemRegistry.volumeRootKey] as? URL else { return }
             heard.lock.lock()
             heard.roots.append(root.path)
@@ -555,7 +638,8 @@ private final class DeadVolume {
         dead.answer()
         var waited = 0
         func wasHeard() -> Bool {
-            heard.lock.lock(); defer { heard.lock.unlock() }
+            heard.lock.lock()
+            defer { heard.lock.unlock() }
             return heard.roots.contains(dead.root)
         }
         while !wasHeard(), waited < 60_000 {
@@ -563,10 +647,11 @@ private final class DeadVolume {
             waited += 5
         }
         #expect(wasHeard())
-        #expect(waitUntil {
-            let fresh = local.volume(of: box.url("share/a.txt"), cancellation: CancellationFlag())
-            return fresh?.totalBytes != nil && fresh?.freeBytes != nil
-        })
+        #expect(
+            waitUntil {
+                let fresh = local.volume(of: box.url("share/a.txt"), cancellation: CancellationFlag())
+                return fresh?.totalBytes != nil && fresh?.freeBytes != nil
+            })
     }
 
     /// K004 / K007 / K040 end to end, as far as a stand-in can show it: a panel that is
@@ -586,7 +671,8 @@ private final class DeadVolume {
             let flag = CancellationFlag()
             let load = Running { () -> [String] in
                 var names: [String] = []
-                try PanelLoader.stream(location, showHidden: true, fileSystems: fileSystems, cancellation: flag) { batch in
+                try PanelLoader.stream(location, showHidden: true, fileSystems: fileSystems, cancellation: flag) {
+                    batch in
                     names += batch.listing.items.map(\.name)
                     return true
                 }
@@ -610,13 +696,15 @@ private final class DeadVolume {
         // volume and one listing. Nothing was begun behind the listing that was given up.
         #expect(dead.waiting == 2 && dead.asked == 2 && BlockingCalls.unanswered(for: local) == 1)
         // A folder on a disk that answers is read meanwhile, by the same file system.
-        let healthy = try PanelLoader.load(box.url("here"), showHidden: true, fileSystems: fileSystems, cancellation: CancellationFlag())
+        let healthy = try PanelLoader.load(
+            box.url("here"), showHidden: true, fileSystems: fileSystems, cancellation: CancellationFlag())
         #expect(healthy.listing.items.map(\.name) == ["b.txt"] && healthy.listing.volume != nil)
         #expect(waitUntil { local.volume(of: box.url("here"), cancellation: CancellationFlag())?.totalBytes != nil })
         // The server is back: the stuck questions return, and the folder loads.
         dead.answer()
         #expect(waitUntil { BlockingCalls.unanswered(for: local) == 0 })
-        let back = try PanelLoader.load(location, showHidden: true, fileSystems: fileSystems, cancellation: CancellationFlag())
+        let back = try PanelLoader.load(
+            location, showHidden: true, fileSystems: fileSystems, cancellation: CancellationFlag())
         #expect(back.listing.items.map(\.name) == ["a.txt"])
     }
 }
@@ -631,8 +719,16 @@ private final class DeadVolume {
         final class Seen: @unchecked Sendable {
             let lock = NSLock()
             var paths: Set<String> = []
-            func note(_ urls: [URL]) { lock.lock(); urls.forEach { paths.insert($0.lastPathComponent) }; lock.unlock() }
-            func has(_ name: String) -> Bool { lock.lock(); defer { lock.unlock() }; return paths.contains(name) }
+            func note(_ urls: [URL]) {
+                lock.lock()
+                urls.forEach { paths.insert($0.lastPathComponent) }
+                lock.unlock()
+            }
+            func has(_ name: String) -> Bool {
+                lock.lock()
+                defer { lock.unlock() }
+                return paths.contains(name)
+            }
         }
         let (tree, single) = (Seen(), Seen())
         // The folders were made a moment ago, and what changed up to a few milliseconds

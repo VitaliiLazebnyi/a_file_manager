@@ -6,8 +6,10 @@ import AppKit
 /// list with its submenus indented, buttons to add, delete, rename and move entries, and the
 /// command and target path of the selected entry. It works on a copy of the list; only OK
 /// hands the copy back. Main thread only; nothing here touches a file system.
-final class HotlistEditorWindowController: NSWindowController, NSWindowDelegate, NSTableViewDataSource, NSTableViewDelegate,
-    NSTextFieldDelegate {
+final class HotlistEditorWindowController: NSWindowController, NSWindowDelegate, NSTableViewDataSource,
+    NSTableViewDelegate,
+    NSTextFieldDelegate
+{
     private final class EntryTableView: NSTableView {
         var onKey: ((NSEvent) -> Bool)?
 
@@ -28,7 +30,8 @@ final class HotlistEditorWindowController: NSWindowController, NSWindowDelegate,
     private let numberLabel = NSTextField(labelWithString: "")
     private let commandField = NSTextField()
     private let targetField = NSTextField()
-    private let hideBox = NSButton(checkboxWithTitle: "Hide menu items starting with this character:", target: nil, action: nil)
+    private let hideBox = NSButton(
+        checkboxWithTitle: "Hide menu items starting with this character:", target: nil, action: nil)
     private let hideField = NSTextField()
     private var entryButtons: [NSButton] = []
 
@@ -46,9 +49,12 @@ final class HotlistEditorWindowController: NSWindowController, NSWindowDelegate,
         self.hotlist = hotlist
         self.kernel = kernel
         proposedCommand = "cd " + kernel.fileSystems.displayPath(currentDirectory)
-        proposedTitle = currentDirectory.lastPathComponent.isEmpty ? kernel.fileSystems.displayPath(currentDirectory) : currentDirectory.lastPathComponent
-        let window = ToolWindow(contentRect: NSRect(x: 0, y: 0, width: 640, height: 460),
-                                styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
+        proposedTitle =
+            currentDirectory.lastPathComponent.isEmpty
+            ? kernel.fileSystems.displayPath(currentDirectory) : currentDirectory.lastPathComponent
+        let window = ToolWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 640, height: 460),
+            styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
         window.title = "Change Directory Menu"
         window.isReleasedWhenClosed = false
         window.minSize = NSSize(width: 520, height: 340)
@@ -82,9 +88,14 @@ final class HotlistEditorWindowController: NSWindowController, NSWindowDelegate,
             button.widthAnchor.constraint(equalToConstant: 140).isActive = true
             return button
         }
-        let add = [button("Add Item…", #selector(addItem)), button("Add Submenu…", #selector(addSubmenu)), button("Add Separator", #selector(addSeparator))]
-        entryButtons = [button("Delete Item", #selector(deleteEntry)), button("Change Title…", #selector(changeTitle)),
-                        button("Move Up", #selector(moveEntryUp)), button("Move Down", #selector(moveEntryDown))]
+        let add = [
+            button("Add Item…", #selector(addItem)), button("Add Submenu…", #selector(addSubmenu)),
+            button("Add Separator", #selector(addSeparator))
+        ]
+        entryButtons = [
+            button("Delete Item", #selector(deleteEntry)), button("Change Title…", #selector(changeTitle)),
+            button("Move Up", #selector(moveEntryUp)), button("Move Down", #selector(moveEntryDown))
+        ]
         let buttons = NSStackView(views: add + entryButtons)
         buttons.orientation = .vertical
         buttons.alignment = .leading
@@ -107,12 +118,15 @@ final class HotlistEditorWindowController: NSWindowController, NSWindowDelegate,
         let fields = NSGridView(views: [[label("Command:"), commandField], [label("Target path:"), targetField]])
         fields.column(at: 0).xPlacement = .trailing
         let hiding = NSStackView(views: [hideBox, hideField])
-        let hint = NSTextField(labelWithString: "Double click a menu item to hide or show it. Shift+↑ and Shift+↓ move it.")
+        let hint = NSTextField(
+            labelWithString: "Double click a menu item to hide or show it. Shift+↑ and Shift+↓ move it.")
         hint.textColor = .secondaryLabelColor
 
         let ok = NSButton(title: "OK", target: self, action: #selector(accept))
         ok.keyEquivalent = "\r"
-        let footer = NSStackView(views: [numberLabel, NSView(), NSButton(title: "Cancel", target: self, action: #selector(cancel)), ok])
+        let footer = NSStackView(views: [
+            numberLabel, NSView(), NSButton(title: "Cancel", target: self, action: #selector(cancel)), ok
+        ])
         numberLabel.textColor = .secondaryLabelColor
 
         let stack = NSStackView(views: [top, fields, hiding, hint, footer])
@@ -157,21 +171,27 @@ final class HotlistEditorWindowController: NSWindowController, NSWindowDelegate,
     /// Where a new entry goes: right below the selected line, which is inside a submenu when
     /// that line is the submenu's title.
     private var insertionPath: Hotlist.Path {
-        guard let path = selectedPath, let index = path.last, let entry = hotlist.entry(at: path) else { return [hotlist.entries.count] }
+        guard let path = selectedPath, let index = path.last, let entry = hotlist.entry(at: path) else {
+            return [hotlist.entries.count]
+        }
         return entry.kind == .submenu ? path + [0] : Array(path.dropLast()) + [index + 1]
     }
 
     private func add(_ entry: HotlistEntry) {
         guard let path = hotlist.insert(entry, at: insertionPath) else {
-            kernel.ui.inform("The directory menu is full.", detail: "It holds at most \(Hotlist.limit) entries.", style: .warning)
+            kernel.ui.inform(
+                "The directory menu is full.", detail: "It holds at most \(Hotlist.limit) entries.", style: .warning)
             return
         }
         reload(selecting: path)
     }
 
     @objc private func addItem() {
-        guard let title = kernel.ui.prompt("Title of the new entry:", value: proposedTitle, detail: "A single - makes a separator line."),
-              !title.isEmpty else { return }
+        guard
+            let title = kernel.ui.prompt(
+                "Title of the new entry:", value: proposedTitle, detail: "A single - makes a separator line."),
+            !title.isEmpty
+        else { return }
         add(.titled(title, command: proposedCommand))
     }
 
@@ -194,7 +214,8 @@ final class HotlistEditorWindowController: NSWindowController, NSWindowDelegate,
 
     @objc private func changeTitle() {
         guard let path = selectedPath, let entry = hotlist.entry(at: path), entry.kind != .separator,
-              let title = kernel.ui.prompt("New title:", value: entry.title), !title.isEmpty else { return }
+            let title = kernel.ui.prompt("New title:", value: entry.title), !title.isEmpty
+        else { return }
         hotlist.update(at: path) { $0.title = title }
         reload(selecting: path)
     }
@@ -239,7 +260,11 @@ final class HotlistEditorWindowController: NSWindowController, NSWindowDelegate,
             hotlist.hideCharacter = character == "-" ? "" : character
         } else if let path = selectedPath {
             hotlist.update(at: path) { entry in
-                if field === commandField { entry.command = field.stringValue } else { entry.target = field.stringValue }
+                if field === commandField {
+                    entry.command = field.stringValue
+                } else {
+                    entry.target = field.stringValue
+                }
             }
             rows = hotlist.rows
         }
@@ -249,12 +274,14 @@ final class HotlistEditorWindowController: NSWindowController, NSWindowDelegate,
 
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
         let identifier = NSUserInterfaceItemIdentifier("entry")
-        let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? NSTextField ?? {
-            let label = NSTextField(labelWithString: "")
-            label.identifier = identifier
-            label.lineBreakMode = .byTruncatingTail
-            return label
-        }()
+        let cell =
+            tableView.makeView(withIdentifier: identifier, owner: nil) as? NSTextField
+            ?? {
+                let label = NSTextField(labelWithString: "")
+                label.identifier = identifier
+                label.lineBreakMode = .byTruncatingTail
+                return label
+            }()
         cell.stringValue = HotlistEditorWindowController.title(of: rows[row])
         return cell
     }

@@ -31,7 +31,9 @@ enum WindowCommands {
     static func register(in kernel: Kernel, layout: WindowLayout, window: @escaping () -> MainWindowController?) {
         let commands = kernel.commands
         func toggle(_ id: CommandID, _ region: WindowLayout.Region) {
-            commands.register(Command(id, region.caption, runsDuringJobs: true), checked: { layout.isVisible(region) }) {
+            commands.register(
+                Command(id, region.caption, runsDuringJobs: true), checked: { layout.isVisible(region) }
+            ) {
                 layout.setVisible(region, !layout.isVisible(region))
             }
         }
@@ -39,16 +41,23 @@ enum WindowCommands {
         toggle(.showDriveButtons, .driveButtons)
         toggle(.showCommandLine, .commandLine)
         toggle(.showFunctionKeys, .functionKeys)
-        commands.register(Command(.panelsStacked, "Panels One Above the Other", runsDuringJobs: true), checked: { layout.isStacked }) {
+        commands.register(
+            Command(.panelsStacked, "Panels One Above the Other", runsDuringJobs: true), checked: { layout.isStacked }
+        ) {
             layout.isStacked.toggle()
         }
-        commands.register(Command(.panelsEqualWidth, "Panels of Equal Size", runsDuringJobs: true), checked: { layout.divider == 500 }) {
+        commands.register(
+            Command(.panelsEqualWidth, "Panels of Equal Size", runsDuringJobs: true),
+            checked: { layout.divider == 500 }
+        ) {
             layout.divider = 500
         }
 
         /// A command of the command line; using it shows a line that was switched off
         /// (spec 02 › Showing and hiding regions: a hidden command line reappears).
-        func line(_ id: CommandID, _ title: String, _ shortcuts: [Shortcut] = [], _ run: @escaping (CommandLineView) -> Void) {
+        func line(
+            _ id: CommandID, _ title: String, _ shortcuts: [Shortcut] = [], _ run: @escaping (CommandLineView) -> Void
+        ) {
             commands.register(Command(id, title, shortcuts, runsDuringJobs: true)) {
                 layout.setVisible(.commandLine, true)
                 if let commandLine = window()?.commandLine { run(commandLine) }
@@ -56,32 +65,53 @@ enum WindowCommands {
         }
         // Total Commander has no key for the focus command; Cmd+L is where the Mac has "go to the address".
         line(.focusCommandLine, "Focus Command Line", [.cmd("l")]) { $0.focusField() }
-        line(.commandLineHistory, "Command Line History", [.f(8, .option), Shortcut(.down, .control)]) { $0.showHistory() }
-        line(.addNameToCommandLine, "Add Name to Command Line", [Shortcut(.returnKey, .control), Shortcut(.enter, .control)]) {
+        line(.commandLineHistory, "Command Line History", [.f(8, .option), Shortcut(.down, .control)]) {
+            $0.showHistory()
+        }
+        line(
+            .addNameToCommandLine, "Add Name to Command Line",
+            [Shortcut(.returnKey, .control), Shortcut(.enter, .control)]
+        ) {
             $0.addCursorItem(withPath: false)
         }
-        line(.addPathAndNameToCommandLine, "Add Name with Path to Command Line",
-             [Shortcut(.returnKey, [.control, .shift]), Shortcut(.enter, [.control, .shift])]) {
+        line(
+            .addPathAndNameToCommandLine, "Add Name with Path to Command Line",
+            [Shortcut(.returnKey, [.control, .shift]), Shortcut(.enter, [.control, .shift])]
+        ) {
             $0.addCursorItem(withPath: true)
         }
         line(.addPathToCommandLine, "Add Path to Command Line", [Shortcut(.character("p"), .control)]) { $0.addPath() }
         line(.previousCommandLine, "Previous Command Line", [Shortcut(.character("e"), .control)]) { $0.recall(1) }
         line(.nextCommandLine, "Next Command Line") { $0.recall(-1) }
-        commands.register(Command(.resetButtonBar, "Reset Button Bar to Default", runsDuringJobs: true),
-                          enabled: { kernel.toolbar.hasUserLayout(in: kernel.settings) }) {
+        commands.register(
+            Command(.resetButtonBar, "Reset Button Bar to Default", runsDuringJobs: true),
+            enabled: { kernel.toolbar.hasUserLayout(in: kernel.settings) }
+        ) {
             kernel.toolbar.setLayout(nil, in: kernel.settings)
         }
-        commands.register(Command(.clearCommandLine, "Clear Command Line", runsDuringJobs: true)) { window()?.commandLine.clear() }
+        commands.register(Command(.clearCommandLine, "Clear Command Line", runsDuringJobs: true)) {
+            window()?.commandLine.clear()
+        }
 
-        kernel.menus.add([.showButtonBar, .showDriveButtons, .showCommandLine, .showFunctionKeys, .panelsStacked, .panelsEqualWidth],
-                         to: .showWindow)
-        kernel.menus.add([.focusCommandLine, .commandLineHistory, .addNameToCommandLine, .addPathAndNameToCommandLine, .addPathToCommandLine],
-                         to: .commandsRun)
+        kernel.menus.add(
+            [
+                .showButtonBar, .showDriveButtons, .showCommandLine, .showFunctionKeys, .panelsStacked,
+                .panelsEqualWidth
+            ],
+            to: .showWindow)
+        kernel.menus.add(
+            [
+                .focusCommandLine, .commandLineHistory, .addNameToCommandLine, .addPathAndNameToCommandLine,
+                .addPathToCommandLine
+            ],
+            to: .commandsRun)
         kernel.preferences.add(layout.preferencePage())
         // Pictures for the user who wants these on the button bar; none is proposed as a button.
         let symbols: [(CommandID, String)] = [
-            (.panelsStacked, "rectangle.split.1x2"), (.panelsEqualWidth, "rectangle.split.2x1"), (.focusCommandLine, "terminal"),
-            (.showDriveButtons, "externaldrive"), (.showCommandLine, "character.cursor.ibeam"), (.showFunctionKeys, "keyboard"),
+            (.panelsStacked, "rectangle.split.1x2"), (.panelsEqualWidth, "rectangle.split.2x1"),
+            (.focusCommandLine, "terminal"),
+            (.showDriveButtons, "externaldrive"), (.showCommandLine, "character.cursor.ibeam"),
+            (.showFunctionKeys, "keyboard")
         ]
         for (command, symbol) in symbols { kernel.toolbar.setSymbol(symbol, for: command) }
     }

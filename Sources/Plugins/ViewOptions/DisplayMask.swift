@@ -14,8 +14,12 @@ struct DisplayMask {
     init(_ text: String) {
         let text = text.trimmingCharacters(in: .whitespaces)
         self.text = text
-        let parts = text.split(separator: "|", maxSplits: 1, omittingEmptySubsequences: false).map { $0.trimmingCharacters(in: .whitespaces) }
-        func words(_ part: String) -> [String] { part.split(whereSeparator: { $0 == " " || $0 == ";" }).map(String.init) }
+        let parts = text.split(separator: "|", maxSplits: 1, omittingEmptySubsequences: false).map {
+            $0.trimmingCharacters(in: .whitespaces)
+        }
+        func words(_ part: String) -> [String] {
+            part.split(whereSeparator: { $0 == " " || $0 == ";" }).map(String.init)
+        }
         func mask(_ words: [String]) -> FileMask? { words.isEmpty ? nil : FileMask(words.joined(separator: " ")) }
         let excluded = parts.count > 1 ? words(parts[1]) : []
         // The Windows form of a folder exclusion, `name\`, is read as well.

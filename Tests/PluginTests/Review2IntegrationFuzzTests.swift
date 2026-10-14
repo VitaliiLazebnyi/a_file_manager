@@ -1,10 +1,11 @@
 import AFMKernel
-@testable import FilePropertiesPlugin
-@testable import FileToolsPlugin
 import Foundation
-@testable import MultiRenamePlugin
 import TestSupport
 import Testing
+
+@testable import FilePropertiesPlugin
+@testable import FileToolsPlugin
+@testable import MultiRenamePlugin
 @testable import ViewerPlugin
 
 // Review round 2, integration: the four defects of the last fuzz campaign (N1–N4 of
@@ -20,28 +21,41 @@ import Testing
         let source = memory.addFile("/in/post.ync", text)
         memory.addDirectory("/out")
         let item = try #require(registry.item(at: source))
-        return (try Decoder.decodeChecked(item, into: memory.url("/out"), run: ToolRun(fileSystems: registry)), memory)
+        return (
+            try Decoder.decodeChecked(item, into: memory.url("/out"), run: ToolRun(fileSystems: registry)), memory
+        )
     }
 
     @Test func aPartRangeThatCannotBeIsADamagedHeaderAndNoTrap() throws {
         // The reproducer, and its relatives: every pair far apart, upside down, or before the first byte.
-        for range in ["begin=-9223372036854775808 end=0", "begin=-1 end=9223372036854775807", "begin=0 end=10", "begin=9 end=3",
-                      "begin=1 end=x", "begin=-9223372036854775808 end=9223372036854775807"] {
-            let (outcome, _) = try decode("=ybegin part=1 line=128 size=3 name=a.bin\n=ypart \(range)\n" + "\u{8b}\u{8c}\u{8d}\n" + "=yend size=3 part=1\n")
+        for range in [
+            "begin=-9223372036854775808 end=0", "begin=-1 end=9223372036854775807", "begin=0 end=10", "begin=9 end=3",
+            "begin=1 end=x", "begin=-9223372036854775808 end=9223372036854775807"
+        ] {
+            let (outcome, _) = try decode(
+                "=ybegin part=1 line=128 size=3 name=a.bin\n=ypart \(range)\n" + "\u{8b}\u{8c}\u{8d}\n"
+                    + "=yend size=3 part=1\n")
             #expect(outcome.problems.contains { $0.contains("range of the part") }, "\(range): \(outcome.problems)")
         }
         // The largest part there can be is a number like any other.
-        let (whole, _) = try decode("=ybegin part=1 line=128 size=3 name=a.bin\n=ypart begin=1 end=9223372036854775807\nKLM\n=yend size=3 part=1\n")
+        let (whole, _) = try decode(
+            "=ybegin part=1 line=128 size=3 name=a.bin\n=ypart begin=1 end=9223372036854775807\nKLM\n=yend size=3 part=1\n"
+        )
         #expect(whole.problems.contains { $0.contains("the part holds 9223372036854775807") }, "\(whole.problems)")
         // A part that is what it says is decoded without a word.
-        let (good, memory) = try decode("=ybegin part=1 line=128 size=3 name=a.bin\n=ypart begin=1 end=3\nKLM\n=yend size=3 part=1\n")
+        let (good, memory) = try decode(
+            "=ybegin part=1 line=128 size=3 name=a.bin\n=ypart begin=1 end=3\nKLM\n=yend size=3 part=1\n")
         #expect(good.problems.isEmpty && memory.contents("/out/a.bin") == "!\"#", "\(good.problems)")
     }
 
     // MARK: N2 — the raw row scan at a segment's end
 
-    private func rows(_ data: Data, columns: Int, segment: Int, chunk: Int, raw: Bool, parallel: Bool = false) throws -> (ranges: [Range<Int64>], lines: Int) {
-        let document = TextDocument(source: DataByteSource(data), encoding: .utf8, layout: .text(TextLayoutOptions(columns: columns, wordWrap: false)))
+    private func rows(_ data: Data, columns: Int, segment: Int, chunk: Int, raw: Bool, parallel: Bool = false) throws
+        -> (ranges: [Range<Int64>], lines: Int)
+    {
+        let document = TextDocument(
+            source: DataByteSource(data), encoding: .utf8,
+            layout: .text(TextLayoutOptions(columns: columns, wordWrap: false)))
         document.buildIndex(parallel: parallel, segmentSize: segment, chunkSize: chunk, rawScan: raw)
         return (try document.rows(from: 0, count: max(1, document.rowCount)).map(\.range), document.lineCount)
     }
@@ -73,7 +87,9 @@ import Testing
             let reference = try rows(data, columns: 80, segment: 1 << 30, chunk: 1 << 20, raw: false)
             for parallel in [false, true] {
                 let raw = try rows(data, columns: 80, segment: 4 << 20, chunk: 1 << 20, raw: true, parallel: parallel)
-                #expect(raw.lines == reference.lines && raw.ranges.count == reference.ranges.count, "over by \(over), parallel \(parallel)")
+                #expect(
+                    raw.lines == reference.lines && raw.ranges.count == reference.ranges.count,
+                    "over by \(over), parallel \(parallel)")
                 #expect(raw.ranges.suffix(12) == reference.ranges.suffix(12), "over by \(over), parallel \(parallel)")
             }
         }
@@ -101,7 +117,8 @@ import Testing
         // Plain names are written in the code page as before, without a mark.
         var plain = DescriptIon(data: Data([0xE9, 0x20, 0x78, 0x0D, 0x0A]))
         plain.setComment("y", for: "ü.txt")
-        #expect(plain.data() == Data([0xE9, 0x20, 0x78, 0x0D, 0x0A, 0xFC, 0x2E, 0x74, 0x78, 0x74, 0x20, 0x79, 0x0D, 0x0A]))
+        #expect(
+            plain.data() == Data([0xE9, 0x20, 0x78, 0x0D, 0x0A, 0xFC, 0x2E, 0x74, 0x78, 0x74, 0x20, 0x79, 0x0D, 0x0A]))
     }
 
     // MARK: N4 — a long plain search in a long name
@@ -123,7 +140,13 @@ import Testing
         #expect(result == nil || result == name)
         // What the matcher finds is what it found before.
         let matcher = WildcardMatcher("a*É?", caseSensitive: false)
-        #expect(matcher.matches(in: "xaBCéd-AéZ", firstOnly: false) == [NSRange(location: 1, length: 5), NSRange(location: 7, length: 3)])
-        #expect(WildcardMatcher("*é", caseSensitive: true).matches(in: "aÉbéc", firstOnly: false) == [NSRange(location: 0, length: 4)])
+        #expect(
+            matcher.matches(in: "xaBCéd-AéZ", firstOnly: false) == [
+                NSRange(location: 1, length: 5), NSRange(location: 7, length: 3)
+            ])
+        #expect(
+            WildcardMatcher("*é", caseSensitive: true).matches(in: "aÉbéc", firstOnly: false) == [
+                NSRange(location: 0, length: 4)
+            ])
     }
 }

@@ -1,10 +1,11 @@
 import AFMContracts
 import AFMKernel
-@testable import AFMShell
 import AppKit
 import StandardPlugins
 import TestSupport
 import Testing
+
+@testable import AFMShell
 
 /// Returning to a folder on a slow server, and entering the folder under the cursor: the
 /// listing cache ("show old, refresh behind") and the read-ahead, through the real window.
@@ -56,10 +57,12 @@ extension Application {
         #expect(app.left.statusLineText == "Refreshing…   0 k / 0 k in 0 / 2 file(s), 0 / 1 dir(s)")
         #expect(app.left.model.backLocation?.path == "/")
         // "Everything" has to wait for the fresh listing; what is named can be worked with.
-        #expect(!app.commands.isEnabled(.selectAll) && !app.commands.isEnabled(.invertSelection) && !app.commands.isEnabled(.selectGroup))
+        #expect(
+            !app.commands.isEnabled(.selectAll) && !app.commands.isEnabled(.invertSelection)
+                && !app.commands.isEnabled(.selectGroup))
         app.cursor(app.left, on: "sub")
         #expect(app.commands.isEnabled(.copy) && app.commands.isEnabled(.delete) && app.commands.isEnabled(.goToParent))
-        #expect(press(app, 49) && app.left.model.selection == ["sub"])                 // Space: mark and measure
+        #expect(press(app, 49) && app.left.model.selection == ["sub"])  // Space: mark and measure
         let measured = await wait(upTo: 2.5) { app.left.model.cursorItem?.computedSize == 5 }
         #expect(measured && app.left.model.isRefreshing)
         app.cursor(app.left, on: "a.txt")
@@ -70,7 +73,8 @@ extension Application {
         #expect(app.names(app.left) == ["sub", "a.txt", "new.txt"] && app.left.tableView.numberOfRows == 4)
         #expect(app.left.model.cursorItem?.name == "a.txt" && app.left.model.selection == ["sub", "a.txt"])
         #expect(app.left.model.items.first?.computedSize == 5)
-        #expect(app.left.model.isComplete && !app.left.model.isRefreshing && !app.left.isLoading && !app.left.showsActivity)
+        #expect(
+            app.left.model.isComplete && !app.left.model.isRefreshing && !app.left.isLoading && !app.left.showsActivity)
         #expect(app.left.statusLineText == "0 k / 0 k in 1 / 2 file(s), 1 / 1 dir(s)")
         #expect(app.commands.isEnabled(.selectAll) && app.commands.isEnabled(.invertSelection))
         // The server was asked once for the first visit and once for the refresh.
@@ -104,7 +108,9 @@ extension Application {
         #expect(shown && app.names(app.left) == ["sub", "b.txt", "a.txt"] && app.left.model.isRefreshing)
         await settle(app)
         #expect(app.names(app.left) == ["sub", "b.txt", "a.txt"] && app.left.model.isComplete)
-        #expect(app.kernel.listingCache.entry(for: memory.url("/nas"), showHidden: false)?.order == ListOrder(key: .name, descending: true))
+        #expect(
+            app.kernel.listingCache.entry(for: memory.url("/nas"), showHidden: false)?.order
+                == ListOrder(key: .name, descending: true))
     }
 
     @Test func aRefreshThatFailsLeavesTheFolderAndForgetsIt() async {
@@ -145,7 +151,9 @@ extension Application {
         #expect(asked && opened && app.left.model.directory.path == "/nas")
         // Reading it again (a refresh) overtakes the first reading, which had the way back.
         app.commands.perform(.reread)
-        let again = await wait(upTo: 30) { memory.listRequests(for: "/nas") == 2 && memory.stalledListings(of: "/nas") == 1 }
+        let again = await wait(upTo: 30) {
+            memory.listRequests(for: "/nas") == 2 && memory.stalledListings(of: "/nas") == 1
+        }
         #expect(again && app.left.isLoading)
         // Now the server answers: the folder cannot be read.
         memory.releaseStalls()
@@ -155,7 +163,8 @@ extension Application {
         _ = await wait(upTo: 10) { !ui.log.isEmpty }
         await pause(0.5)
         // Back where it came from; told once, and not asked again.
-        #expect(app.left.model.directory.isSameLocation(as: before) && app.left.model.isListed && app.left.model.isComplete)
+        #expect(
+            app.left.model.directory.isSameLocation(as: before) && app.left.model.isListed && app.left.model.isComplete)
         #expect(ui.log.filter { $0 == "inform: The folder cannot be read!" }.count == 1)
         #expect(memory.listRequests(for: "/nas") == 2)
     }
@@ -362,7 +371,9 @@ extension Application {
         app.cursor(app.left, on: "locked")
         // Tried, and come back with its failure (a reading that the cursor leaves while it is
         // still under way is stopped, which is no failure of the folder).
-        let tried = await wait(upTo: 600) { self.memory.listRequests(for: "/nas/locked") == 1 && !app.shell.panelCoordinator.readAhead.isReading }
+        let tried = await wait(upTo: 600) {
+            self.memory.listRequests(for: "/nas/locked") == 1 && !app.shell.panelCoordinator.readAhead.isReading
+        }
         #expect(tried)
         app.cursor(app.left, on: "file.txt")
         app.cursor(app.left, on: "locked")

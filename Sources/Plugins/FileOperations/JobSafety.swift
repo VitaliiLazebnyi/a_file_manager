@@ -20,8 +20,10 @@ enum RealLocation {
         var current = fileSystems.realLocation(of: url)
         // A view of a view is as deep as it gets; the bound keeps a confused provider from looping.
         for _ in 0..<4 {
-            guard !current.isFileURL, let provider = try? fileSystems.provider(for: current), let real = provider.parent(of: current),
-                  (real.scheme ?? "file") != (current.scheme ?? "file"), path(of: real) == path(of: current) else { break }
+            guard !current.isFileURL, let provider = try? fileSystems.provider(for: current),
+                let real = provider.parent(of: current),
+                (real.scheme ?? "file") != (current.scheme ?? "file"), path(of: real) == path(of: current)
+            else { break }
             current = fileSystems.realLocation(of: real)
         }
         return current
@@ -40,7 +42,8 @@ enum RealLocation {
         let typed = fileSystems.displayPath(directory)
         // Read from somewhere else: a path that only means something relative to where one
         // stands is not the name of this place.
-        let probe = fileSystems.location(from: (typed.hasSuffix("/") ? typed : typed + "/") + "x", relativeTo: URL(fileURLWithPath: "/"))
+        let probe = fileSystems.location(
+            from: (typed.hasSuffix("/") ? typed : typed + "/") + "x", relativeTo: URL(fileURLWithPath: "/"))
         return (probe.scheme ?? "file") == (directory.scheme ?? "file")
     }
 }
@@ -101,7 +104,8 @@ extension FileIdentity {
     /// True when `folder` is on another volume than the folder it lies in: a mounted disk, disk
     /// image or share. False when either cannot be asked.
     static func isMountPoint(_ folder: URL) -> Bool {
-        guard let own = id(of: folder), let above = id(of: folder.deletingLastPathComponent(), followingLinks: true) else { return false }
+        guard let own = id(of: folder), let above = id(of: folder.deletingLastPathComponent(), followingLinks: true)
+        else { return false }
         return own.device != above.device
     }
 
@@ -125,7 +129,7 @@ extension FileIdentity {
         switch type {
         case "apfs": return 0
         case "hfs": return 1
-        default: return 2     // FAT and exFAT keep even seconds; whatever else there is gets the same caution
+        default: return 2  // FAT and exFAT keep even seconds; whatever else there is gets the same caution
         }
     }
 }

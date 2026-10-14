@@ -57,8 +57,9 @@ public final class MenuRegistry {
     /// order they were added (the order the plugins were loaded in).
     public func add(_ items: [CommandID], to section: MenuSection) {
         let menu = section.menu
-        precondition(menus_[menu.title] == nil || menus_[menu.title] == menu,
-                     "Two different menus are called \(menu.title); plugins must share one MenuID")
+        precondition(
+            menus_[menu.title] == nil || menus_[menu.title] == menu,
+            "Two different menus are called \(menu.title); plugins must share one MenuID")
         menus_[menu.title] = menu
         entries.append((section, items))
     }
@@ -72,7 +73,10 @@ public final class MenuRegistry {
     /// The menus of the menu bar, in order.
     public var menus: [Menu] {
         menus_.values.sorted { ($0.order, $0.title) < ($1.order, $1.title) }.map { menu in
-            Menu(title: menu.title, items: MenuRegistry.flatten(entries.filter { $0.section.menu == menu }.map { ($0.section.order, $0.items) }))
+            Menu(
+                title: menu.title,
+                items: MenuRegistry.flatten(
+                    entries.filter { $0.section.menu == menu }.map { ($0.section.order, $0.items) }))
         }
     }
 

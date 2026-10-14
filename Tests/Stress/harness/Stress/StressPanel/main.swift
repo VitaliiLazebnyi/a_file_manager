@@ -1,11 +1,12 @@
 import AFMContracts
 import AFMKernel
-@testable import AFMShell
 import AppKit
 import Darwin
 import StandardPlugins
 import StressKit
 import TestSupport
+
+@testable import AFMShell
 
 // Scenarios 1 (a million files in a panel), 2 (a provider that stops answering) and
 // 8 (a flood of changes in a watched folder), driven through the real kernel, the standard
@@ -17,14 +18,21 @@ import TestSupport
 
 setvbuf(stdout, nil, _IOLBF, 0)
 let arguments = CommandLine.arguments
-guard arguments.count >= 3 else { say("usage: StressPanel million|stalled|flood ..."); exit(2) }
+guard arguments.count >= 3 else {
+    say("usage: StressPanel million|stalled|flood ...")
+    exit(2)
+}
 let mode = arguments[1]
-HangGuard.shared.sampleDirectory = ProcessInfo.processInfo.environment["STRESS_RESULTS"] ?? FileManager.default.currentDirectoryPath
+HangGuard.shared.sampleDirectory =
+    ProcessInfo.processInfo.environment["STRESS_RESULTS"] ?? FileManager.default.currentDirectoryPath
 
 let fm = FileManager.default
 var failures: [String] = []
 func check(_ ok: Bool, _ what: String) {
-    if !ok { failures.append(what); say("FAIL: " + what) }
+    if !ok {
+        failures.append(what)
+        say("FAIL: " + what)
+    }
 }
 
 /// The program without a visible window: kernel, all standard plugins, shell.
@@ -96,13 +104,20 @@ MainWatchdog.shared.start()
 
 func makeSmall(_ directory: URL, files: Int = 40) {
     try? fm.createDirectory(at: directory, withIntermediateDirectories: true)
-    for index in 0..<files { fm.createFile(atPath: directory.appendingPathComponent("small\(index).txt").path, contents: Data("x".utf8)) }
+    for index in 0..<files {
+        fm.createFile(atPath: directory.appendingPathComponent("small\(index).txt").path, contents: Data("x".utf8))
+    }
     try? fm.createDirectory(at: directory.appendingPathComponent("sub"), withIntermediateDirectories: true)
 }
 
 func finish(_ title: String, baseline: Int, app: Running) -> Never {
-    step("shut down") { app.stop(); pump(for: 0.5) }
-    let after = step("threads return to baseline (up to 8 s)") { waitForThreads(atMost: baseline + 2, upTo: 8, onMain: true) }
+    step("shut down") {
+        app.stop()
+        pump(for: 0.5)
+    }
+    let after = step("threads return to baseline (up to 8 s)") {
+        waitForThreads(atMost: baseline + 2, upTo: 8, onMain: true)
+    }
     say("threads: baseline(after start-up)=\(baseline) after shut-down=\(after)")
     MainWatchdog.shared.report(title: title)
     say("\nFAILURES: \(failures.count)")
@@ -122,7 +137,11 @@ func timed(_ count: Int, _ body: (Int) -> Void) {
         CFRunLoopRunInMode(.defaultMode, 0.0005, false)
     }
     durations.sort()
-    say(String(format: "   single call: median %.2f ms, p99 %.2f ms, max %.2f ms, over 8 ms: %d of %d", durations[count / 2], durations[count * 99 / 100], durations[count - 1], durations.filter { $0 > 8 }.count, count))
+    say(
+        String(
+            format: "   single call: median %.2f ms, p99 %.2f ms, max %.2f ms, over 8 ms: %d of %d",
+            durations[count / 2], durations[count * 99 / 100], durations[count - 1], durations.filter { $0 > 8 }.count,
+            count))
 }
 
 // MARK: - Scenario 1: a million files
@@ -158,9 +177,15 @@ func million() {
         check(ok, "1a: loading the directory did not end in 280 s")
     }
     let total = left.model.items.count
-    say(String(format: "   LOAD: first rows %.3f s, complete %.3f s, rows=%d isComplete=%@", firstRows ?? -1, now() - started, total, "\(left.model.isComplete)"))
+    say(
+        String(
+            format: "   LOAD: first rows %.3f s, complete %.3f s, rows=%d isComplete=%@", firstRows ?? -1,
+            now() - started, total, "\(left.model.isComplete)"))
     check(total >= 1_000_000, "1a: only \(total) rows listed")
-    step("1b layout + draw table (1M rows)") { app.layOut(); app.draw(left) }
+    step("1b layout + draw table (1M rows)") {
+        app.layOut()
+        app.draw(left)
+    }
     step("1c idle 1 s after load") { pump(for: 1) }
 
     // Sort through the ViewOptions commands.
@@ -172,7 +197,9 @@ func million() {
             check(ok, "2: sort \(name) did not arrive in 180 s")
             pump(for: 0.2)
         }
-        say("   order now key=\(left.model.sort.key) descending=\(left.model.sort.descending) first=\(left.model.items.first?.name ?? "-")")
+        say(
+            "   order now key=\(left.model.sort.key) descending=\(left.model.sort.descending) first=\(left.model.items.first?.name ?? "-")"
+        )
     }
     sort("by extension", .sortByExtension)
     sort("by size", .sortBySize)
@@ -185,7 +212,10 @@ func million() {
 
     // Quick filter, a key at a time.
     func filterSettled() -> Bool { left.pendingQuickFilter == nil && left.filterJobs.isEmpty }
-    step("3a quick filter: open field") { left.showQuickFilter(); pump(for: 0.2) }
+    step("3a quick filter: open field") {
+        left.showQuickFilter()
+        pump(for: 0.2)
+    }
     let typed = "item00012"
     for length in 1...typed.count {
         let text = String(typed.prefix(length))
@@ -206,7 +236,9 @@ func million() {
     say("   '.swift' -> \(left.model.items.count) rows")
     step("3d quick filter removed (Esc)", limit: 120) {
         left.removeQuickFilter()
-        check(pump(upTo: 100) { filterSettled() && left.model.items.count == total }, "3d: list did not come back whole")
+        check(
+            pump(upTo: 100) { filterSettled() && left.model.items.count == total }, "3d: list did not come back whole"
+        )
     }
 
     step("3y cursor: 300 x Page Down, nothing marked", limit: 120) {
@@ -220,13 +252,16 @@ func million() {
     // Marking.
     step("4a select all (\(total))", limit: 120) {
         app.commands.perform(.selectAll)
-        check(pump(upTo: 100) { left.model.selectionCount >= total - 300 }, "4a: select all marked \(left.model.selectionCount)")
+        check(
+            pump(upTo: 100) { left.model.selectionCount >= total - 300 },
+            "4a: select all marked \(left.model.selectionCount)")
         pump(for: 0.15)
     }
     say("   marked=\(left.model.selectionCount)")
     step("4b invert selection", limit: 120) {
         app.commands.perform(.invertSelection)
-        check(pump(upTo: 100) { left.model.selectionCount == 0 }, "4b: invert left \(left.model.selectionCount) marked")
+        check(
+            pump(upTo: 100) { left.model.selectionCount == 0 }, "4b: invert left \(left.model.selectionCount) marked")
         pump(for: 0.15)
     }
     say("   marked=\(left.model.selectionCount)")
@@ -235,8 +270,13 @@ func million() {
         let asked = now()
         app.commands.perform(.selectGroup)
         // On a long list the Selection plugin works the mask out in the background and marks when it is done.
-        let arrived = pump(upTo: 100) { (300_000...340_000).contains(left.model.selectionCount) && !app.kernel.jobs.isBusy }
-        say(String(format: "   marks of the mask %@ after %.3f s", arrived ? "arrived" : "did NOT arrive", now() - asked))
+        let arrived = pump(upTo: 100) {
+            (300_000...340_000).contains(left.model.selectionCount) && !app.kernel.jobs.isBusy
+        }
+        say(
+            String(
+                format: "   marks of the mask %@ after %.3f s", arrived ? "arrived" : "did NOT arrive", now() - asked)
+        )
         pump(for: 0.15)
     }
     let byMask = left.model.selectionCount
@@ -244,13 +284,17 @@ func million() {
     check(byMask > 300_000 && byMask < 340_000, "4c: mask marked \(byMask), expected about 333,333")
     step("4d invert selection (to ~667k)", limit: 120) {
         app.commands.perform(.invertSelection)
-        check(pump(upTo: 100) { left.model.selectionCount == total - byMask }, "4d: invert left \(left.model.selectionCount) marked, expected \(total - byMask)")
+        check(
+            pump(upTo: 100) { left.model.selectionCount == total - byMask },
+            "4d: invert left \(left.model.selectionCount) marked, expected \(total - byMask)")
         pump(for: 0.15)
     }
     say("   marked=\(left.model.selectionCount)")
     step("4e invert selection (back to ~333k)", limit: 120) {
         app.commands.perform(.invertSelection)
-        check(pump(upTo: 100) { left.model.selectionCount == byMask }, "4e: invert left \(left.model.selectionCount) marked, expected \(byMask)")
+        check(
+            pump(upTo: 100) { left.model.selectionCount == byMask },
+            "4e: invert left \(left.model.selectionCount) marked, expected \(byMask)")
         pump(for: 0.15)
     }
     say("   marked=\(left.model.selectionCount)")
@@ -290,9 +334,17 @@ func million() {
         for item in menu.items {
             guard let submenu = item.submenu else { continue }
             let t1 = now()
-            func walk(_ menu: NSMenu) { for item in menu.items { _ = app.shell.mainWindow.validateMenuItem(item); if let sub = item.submenu { walk(sub) } } }
+            func walk(_ menu: NSMenu) {
+                for item in menu.items {
+                    _ = app.shell.mainWindow.validateMenuItem(item)
+                    if let sub = item.submenu { walk(sub) }
+                }
+            }
             walk(submenu)
-            say(String(format: "     menu '%@' (%d items incl. submenus): %.1f ms", submenu.title as NSString, submenu.items.count, (now() - t1) * 1000))
+            say(
+                String(
+                    format: "     menu '%@' (%d items incl. submenus): %.1f ms", submenu.title as NSString,
+                    submenu.items.count, (now() - t1) * 1000))
         }
     }
     step("6 validation x10 (bars, all commands, menu)", limit: 300) {
@@ -300,15 +352,23 @@ func million() {
         var worst = 0.0
         for _ in 0..<10 {
             let t = app.validateEverything(menu: menu)
-            sums.bars += t.bars; sums.commands += t.commands; sums.menu += t.menu
+            sums.bars += t.bars
+            sums.commands += t.commands
+            sums.menu += t.menu
             worst = max(worst, t.bars + t.commands + t.menu)
             CFRunLoopRunInMode(.defaultMode, 0.002, true)
         }
-        say(String(format: "   per round: bars %.2f ms, %d commands enabled+checked %.2f ms, menu items %.2f ms; worst round %.2f ms",
-                   sums.bars * 100, app.kernel.commands.all.count, sums.commands * 100, sums.menu * 100, worst * 1000))
+        say(
+            String(
+                format:
+                    "   per round: bars %.2f ms, %d commands enabled+checked %.2f ms, menu items %.2f ms; worst round %.2f ms",
+                sums.bars * 100, app.kernel.commands.all.count, sums.commands * 100, sums.menu * 100, worst * 1000))
     }
     step("6b status line x50 with 333k marked") {
-        for _ in 0..<50 { left.updateStatus(); CFRunLoopRunInMode(.defaultMode, 0.002, true) }
+        for _ in 0..<50 {
+            left.updateStatus()
+            CFRunLoopRunInMode(.defaultMode, 0.002, true)
+        }
     }
 
     // Leave and come back: the remembered listing is shown, the fresh one merged behind.
@@ -328,7 +388,10 @@ func million() {
             return back && !left.isLoading
         }
         check(ok, "7b: coming back did not end")
-        say(String(format: "   rows shown after %.3f s, fresh after %.3f s, rows=%d", shown ?? -1, now() - t0, left.model.items.count))
+        say(
+            String(
+                format: "   rows shown after %.3f s, fresh after %.3f s, rows=%d", shown ?? -1, now() - t0,
+                left.model.items.count))
     }
 
     // 200 quiet reloads while another "program" creates and deletes files; the watcher is live too.
@@ -367,7 +430,10 @@ func million() {
             return asked >= 200 && !loading
         }
         churnStop.cancel()
-        say(String(format: "   asked=%d quiet reloads in %.1f s; readings started=%d; list versions seen=%d; churn ops=%d", asked, now() - t0, reads, versions.count, churned.count))
+        say(
+            String(
+                format: "   asked=%d quiet reloads in %.1f s; readings started=%d; list versions seen=%d; churn ops=%d",
+                asked, now() - t0, reads, versions.count, churned.count))
         check(pump(upTo: 200) { !left.isLoading }, "8: reloading did not settle after the churn stopped")
         // Whatever the churn left behind goes; then the list must match the folder again.
         usleep(100_000)
@@ -382,7 +448,9 @@ func million() {
         _ = pump(upTo: 120) { !left.isLoading }
         left.reload(focus: nil, quietly: false) { ended = true }
         check(pump(upTo: 200) { ended && !left.isLoading }, "8b: final reload did not end")
-        check(left.model.items.count == total, "8b: after the churn the panel lists \(left.model.items.count), the folder has \(total)")
+        check(
+            left.model.items.count == total,
+            "8b: after the churn the panel lists \(left.model.items.count), the folder has \(total)")
         check(!left.model.items.contains { $0.name.hasPrefix("zz-churn-") }, "8b: churn files still listed")
     }
     finish("scenario 1: 1,000,000 files in a panel", baseline: baseline, app: app)
@@ -391,8 +459,16 @@ func million() {
 final class Counter {
     private var value = 0
     private let lock = NSLock()
-    func add(_ n: Int = 1) { lock.lock(); value += n; lock.unlock() }
-    var count: Int { lock.lock(); defer { lock.unlock() }; return value }
+    func add(_ n: Int = 1) {
+        lock.lock()
+        value += n
+        lock.unlock()
+    }
+    var count: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return value
+    }
 }
 
 // MARK: - Scenario 2: a provider that stops answering
@@ -423,7 +499,9 @@ func stalled() {
     var log: [(String, Int, Int)] = []
     func note(_ what: String) {
         log.append((what, threadCount(), stall.blockedNow))
-        say("   after \(what): threads=\(threadCount()) blocked in provider=\(stall.blockedNow) [\(stall.blockedByMethod)]")
+        say(
+            "   after \(what): threads=\(threadCount()) blocked in provider=\(stall.blockedNow) [\(stall.blockedByMethod)]"
+        )
     }
 
     step("A open the share while it still answers") {
@@ -437,39 +515,71 @@ func stalled() {
     stall.isStalled = true
     say("---- the provider stops answering ----")
     func act(_ name: String, wait seconds: Double = 0.4, _ body: () -> Void) {
-        step("B " + name, limit: 30) { body(); pump(for: seconds) }
+        step("B " + name, limit: 30) {
+            body()
+            pump(for: seconds)
+        }
         note(name)
     }
     act("cursor moves over 40 folders (read-ahead)") {
-        for row in 1...40 { left.model.moveCursor(to: row); pump(for: 0.05) }
+        for row in 1...40 {
+            left.model.moveCursor(to: row)
+            pump(for: 0.05)
+        }
     }
     act("refresh (Cmd+R)") { app.commands.perform(.reread) }
     act("validation x5") { for _ in 0..<5 { _ = app.validateEverything(menu: menu) } }
-    act("enter folder under cursor (Return)") { left.model.moveCursor(to: 3); app.commands.perform(.open) }
+    act("enter folder under cursor (Return)") {
+        left.model.moveCursor(to: 3)
+        app.commands.perform(.open)
+    }
     act("go to parent") { app.commands.perform(.goToParent) }
     act("go back") { app.commands.perform(.goBack) }
     act("new tab") { app.commands.perform(.newTab) }
-    act("navigate the new tab to another stalled folder") { left.show(stall.inner.url("/other/place"), focus: nil, history: .record, completion: nil) }
+    act("navigate the new tab to another stalled folder") {
+        left.show(stall.inner.url("/other/place"), focus: nil, history: .record, completion: nil)
+    }
     act("previous tab") { app.commands.perform(.previousTab) }
     act("next tab") { app.commands.perform(.nextTab) }
-    act("quick filter typed") { left.showQuickFilter(); left.quickFilterEdited("doc1"); pump(for: 0.3); left.removeQuickFilter() }
+    act("quick filter typed") {
+        left.showQuickFilter()
+        left.quickFilterEdited("doc1")
+        pump(for: 0.3)
+        left.removeQuickFilter()
+    }
     act("sort by size") { app.commands.perform(.sortBySize) }
-    act("select all + status line") { app.commands.perform(.selectAll); left.updateStatus() }
-    act("space on a folder (size calculation)") { left.model.moveCursor(to: 2); app.commands.perform(.toggleSelectionWithSize) }
+    act("select all + status line") {
+        app.commands.perform(.selectAll)
+        left.updateStatus()
+    }
+    act("space on a folder (size calculation)") {
+        left.model.moveCursor(to: 2)
+        app.commands.perform(.toggleSelectionWithSize)
+    }
     act("application deactivates / activates") {
         NotificationCenter.default.post(name: NSApplication.didResignActiveNotification, object: NSApp)
         pump(for: 0.2)
         NotificationCenter.default.post(name: NSApplication.didBecomeActiveNotification, object: NSApp)
     }
-    act("switch panel (Tab) and back") { app.commands.perform(.focusTarget); pump(for: 0.1); app.commands.perform(.focusTarget) }
-    act("right panel: target = source") { app.commands.perform(.focusTarget); app.commands.perform(.targetEqualsSource); pump(for: 0.2); app.commands.perform(.focusTarget) }
+    act("switch panel (Tab) and back") {
+        app.commands.perform(.focusTarget)
+        pump(for: 0.1)
+        app.commands.perform(.focusTarget)
+    }
+    act("right panel: target = source") {
+        app.commands.perform(.focusTarget)
+        app.commands.perform(.targetEqualsSource)
+        pump(for: 0.2)
+        app.commands.perform(.focusTarget)
+    }
     act("draw list") { app.draw(left) }
     act("validation x5 again") { for _ in 0..<5 { _ = app.validateEverything(menu: menu) } }
     act("close tab") { app.commands.perform(.closeTab) }
     act("navigate away to a local folder (both panels)", wait: 1.0) {
         left.show(small, focus: nil, history: .record, completion: nil)
         app.right.show(small, focus: nil, history: .record, completion: nil)
-        for index in stride(from: left.tabs.count - 1, through: 0, by: -1) where left.tabs.count > 1 && left.tabs.tabs[index] !== left.model { _ = left.tabs.closeTab(at: index) }
+        for index in stride(from: left.tabs.count - 1, through: 0, by: -1)
+        where left.tabs.count > 1 && left.tabs.tabs[index] !== left.model { _ = left.tabs.closeTab(at: index) }
     }
     let stillBlocked = step("C wait 3 s after leaving; who is still blocked") { () -> Int in
         pump(for: 3)
@@ -477,16 +587,25 @@ func stalled() {
     }
     note("3 s after leaving the share")
     let threadsWhileStalled = threadCount()
-    say("   blocked provider calls that did not end although the panel left: \(stillBlocked); threads now \(threadsWhileStalled) (baseline \(baseline))")
+    say(
+        "   blocked provider calls that did not end although the panel left: \(stillBlocked); threads now \(threadsWhileStalled) (baseline \(baseline))"
+    )
 
     let (calls, main) = stall.snapshotCalls()
-    say("\nPROVIDER CALLS (all threads): " + calls.sorted { $0.key < $1.key }.map { "\($0.key)=\($0.value)" }.joined(separator: ", "))
-    say("PROVIDER CALLS MADE ON THE MAIN THREAD WHILE THE PROVIDER WAS NOT ANSWERING (each would freeze the window for as long as the server is silent): \(main.isEmpty ? "none" : "")")
+    say(
+        "\nPROVIDER CALLS (all threads): "
+            + calls.sorted { $0.key < $1.key }.map { "\($0.key)=\($0.value)" }.joined(separator: ", "))
+    say(
+        "PROVIDER CALLS MADE ON THE MAIN THREAD WHILE THE PROVIDER WAS NOT ANSWERING (each would freeze the window for as long as the server is silent): \(main.isEmpty ? "none" : "")"
+    )
     for (method, entry) in main.sorted(by: { $0.key < $1.key }) {
         say("  * \(method) x\(entry.count); first stack:")
         for line in entry.stack.dropFirst(2).prefix(22) { say("      " + line) }
     }
-    check(main.isEmpty, "2: \(main.count) kinds of provider calls reached the main thread while the provider stalled: \(main.keys.sorted().joined(separator: ", "))")
+    check(
+        main.isEmpty,
+        "2: \(main.count) kinds of provider calls reached the main thread while the provider stalled: \(main.keys.sorted().joined(separator: ", "))"
+    )
 
     // E. A user who keeps pressing Refresh on the dead share: does the rest of the program still work?
     let other = work.appendingPathComponent("other")
@@ -494,7 +613,10 @@ func stalled() {
     step("E 100 x refresh of the dead share (50 ms apart)", limit: 60) {
         left.show(share, focus: nil, history: .record, completion: nil)
         pump(for: 0.3)
-        for _ in 0..<100 { app.commands.perform(.reread); pump(for: 0.05) }
+        for _ in 0..<100 {
+            app.commands.perform(.reread)
+            pump(for: 0.05)
+        }
     }
     note("100 refreshes of the dead share")
     var localLoad: Double?
@@ -504,9 +626,18 @@ func stalled() {
         app.right.show(other, focus: nil, history: .record) { _ in done = true }
         if pump(upTo: 20, until: { done && !app.right.isLoading }) { localLoad = now() - t0 }
     }
-    say(localLoad.map { String(format: "   local folder (300 files) opened in %.3f s while %d provider calls are blocked", $0, stall.blockedNow) }
-        ?? "   LOCAL FOLDER DID NOT OPEN WITHIN 20 s while \(stall.blockedNow) provider calls are blocked (threads=\(threadCount()))")
-    check(localLoad != nil && localLoad! < 2, "2/E: with \(stall.blockedNow) calls blocked in a dead provider, a local folder took \(localLoad.map { String(format: "%.1f s", $0) } ?? "more than 20 s") to open")
+    say(
+        localLoad.map {
+            String(
+                format: "   local folder (300 files) opened in %.3f s while %d provider calls are blocked", $0,
+                stall.blockedNow)
+        }
+            ?? "   LOCAL FOLDER DID NOT OPEN WITHIN 20 s while \(stall.blockedNow) provider calls are blocked (threads=\(threadCount()))"
+    )
+    check(
+        localLoad != nil && localLoad! < 2,
+        "2/E: with \(stall.blockedNow) calls blocked in a dead provider, a local folder took \(localLoad.map { String(format: "%.1f s", $0) } ?? "more than 20 s") to open"
+    )
     note("local load")
 
     step("D release the stall; threads end") {
@@ -514,7 +645,9 @@ func stalled() {
         pump(for: 0.5)
     }
     let after = waitForThreads(atMost: baseline + 2, upTo: 8, onMain: true)
-    say("   blocked now=\(stall.blockedNow), most blocked at once=\(stall.mostBlockedAtOnce); threads baseline=\(baseline) while stalled (after leaving)=\(threadsWhileStalled) after release=\(after)")
+    say(
+        "   blocked now=\(stall.blockedNow), most blocked at once=\(stall.mostBlockedAtOnce); threads baseline=\(baseline) while stalled (after leaving)=\(threadsWhileStalled) after release=\(after)"
+    )
     check(stall.blockedNow == 0, "2: \(stall.blockedNow) provider calls still blocked after release")
     finish("scenario 2: stalled provider", baseline: baseline, app: app)
 }
@@ -532,7 +665,12 @@ func flood() {
     makeSmall(small)
     try? fm.removeItem(at: watched)
     try! fm.createDirectory(at: watched, withIntermediateDirectories: true)
-    for index in 0..<files { close(open(watched.appendingPathComponent(String(format: "base%06d.dat", index)).path, O_CREAT | O_WRONLY, 0o644)) }
+    for index in 0..<files {
+        close(
+            open(
+                watched.appendingPathComponent(String(format: "base%06d.dat", index)).path, O_CREAT | O_WRONLY, 0o644)
+        )
+    }
 
     let app = step("start-up") { () -> Running in
         let app = Running(left: watched, right: small, home: small)
@@ -597,8 +735,12 @@ func flood() {
         stop.cancel()
     }
     let cpuFlood = cpuSeconds() - cpu0
-    say(String(format: "   achieved %d operations (%.0f/s); readings of the folder started=%d; list versions=%d; process CPU %.1f s over %.0f s (%.0f%% of one core, includes the flooding thread itself)",
-               operations.count, Double(operations.count) / seconds, reads, versions.count, cpuFlood, seconds, cpuFlood / seconds * 100))
+    say(
+        String(
+            format:
+                "   achieved %d operations (%.0f/s); readings of the folder started=%d; list versions=%d; process CPU %.1f s over %.0f s (%.0f%% of one core, includes the flooding thread itself)",
+            operations.count, Double(operations.count) / seconds, reads, versions.count, cpuFlood, seconds,
+            cpuFlood / seconds * 100))
     step("settle after flood (3 s + until quiet)", limit: 120) {
         pump(for: 3)
         check(pump(upTo: 100) { !left.isLoading }, "8: panel still reading 100 s after the flood")
@@ -607,8 +749,14 @@ func flood() {
     }
     let onDisk = Set((try? fm.contentsOfDirectory(atPath: watched.path)) ?? [])
     let shown = Set(left.model.items.map(\.name))
-    check(onDisk == shown, "8: after the flood the panel shows \(shown.count) names, the folder has \(onDisk.count) (missing \(onDisk.subtracting(shown).count), stale \(shown.subtracting(onDisk).count))")
-    say(String(format: "   after settle: panel rows=%d, folder entries=%d, equal=%@; footprint before=%.0fMB after=%.0fMB", shown.count, onDisk.count, "\(onDisk == shown)", footprintBefore, footprintMB()))
+    check(
+        onDisk == shown,
+        "8: after the flood the panel shows \(shown.count) names, the folder has \(onDisk.count) (missing \(onDisk.subtracting(shown).count), stale \(shown.subtracting(onDisk).count))"
+    )
+    say(
+        String(
+            format: "   after settle: panel rows=%d, folder entries=%d, equal=%@; footprint before=%.0fMB after=%.0fMB",
+            shown.count, onDisk.count, "\(onDisk == shown)", footprintBefore, footprintMB()))
     MainWatchdog.shared.setPhase("(harness clean-up, not the app)")
     try? fm.removeItem(at: watched)
     finish("scenario 8: watcher flood", baseline: baseline, app: app)
@@ -618,5 +766,7 @@ switch mode {
 case "million": million()
 case "stalled": stalled()
 case "flood": flood()
-default: say("unknown mode"); exit(2)
+default:
+    say("unknown mode")
+    exit(2)
 }

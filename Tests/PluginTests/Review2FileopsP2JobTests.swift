@@ -1,10 +1,11 @@
 import AFMContracts
 import AFMKernel
-@testable import FileOperationsPlugin
 import Foundation
 import LocalFileSystemPlugin
 import TestSupport
 import Testing
+
+@testable import FileOperationsPlugin
 
 // Second pass of review round 2 for the file-operation engine: what the first pass left open
 // (F021, F046, F052, F041, F047), what other areas asked for (A041 read order, A044 pending
@@ -97,7 +98,9 @@ final class P2ProbeFileSystem: FileSystemProvider {
     func append(to url: URL, at offset: Int64?, cancellation: CancellationFlag) throws -> FileWriter {
         try base.append(to: url, at: offset, cancellation: cancellation)
     }
-    func copy(_ source: URL, to destination: URL, progress: (Int64) -> Bool) throws { try base.copy(source, to: destination, progress: progress) }
+    func copy(_ source: URL, to destination: URL, progress: (Int64) -> Bool) throws {
+        try base.copy(source, to: destination, progress: progress)
+    }
     func commit(_ url: URL, cancellation: CancellationFlag) throws { try base.commit(url, cancellation: cancellation) }
     func quarantine(of url: URL) -> Data? { base.quarantine(of: url) }
     func displayPath(_ url: URL) -> String {
@@ -146,9 +149,13 @@ final class P2ProbeFileSystem: FileSystemProvider {
         try base.move(source, to: destination, replacing: replacing)
     }
     func setAttributes(_ attributes: FileAttributes, of url: URL) throws { try note("setAttributes", flag: nil) }
-    func setAttributes(_ attributes: FileAttributes, of url: URL, cancellation: CancellationFlag) throws { try note("setAttributes", flag: cancellation) }
+    func setAttributes(_ attributes: FileAttributes, of url: URL, cancellation: CancellationFlag) throws {
+        try note("setAttributes", flag: cancellation)
+    }
     func copyMetadata(from source: URL, to destination: URL) throws { try note("copyMetadata", flag: nil) }
-    func copyMetadata(from source: URL, to destination: URL, cancellation: CancellationFlag) throws { try note("copyMetadata", flag: cancellation) }
+    func copyMetadata(from source: URL, to destination: URL, cancellation: CancellationFlag) throws {
+        try note("copyMetadata", flag: cancellation)
+    }
     func setQuarantine(_ value: Data, of url: URL) throws {
         try note("setQuarantine", flag: nil)
         if let quarantineFailure { throw quarantineFailure }
@@ -171,7 +178,9 @@ final class P2RacingLocalFileSystem: FileSystemProvider {
     var beforeCreating: ((URL) -> Void)?
 
     func capabilities(for url: URL) -> FileSystemCapabilities { local.capabilities(for: url) }
-    func list(_ directory: URL, showHidden: Bool) throws -> [FileItem] { try local.list(directory, showHidden: showHidden) }
+    func list(_ directory: URL, showHidden: Bool) throws -> [FileItem] {
+        try local.list(directory, showHidden: showHidden)
+    }
     func list(_ directory: URL, showHidden: Bool, cancellation: CancellationFlag) throws -> [FileItem] {
         try local.list(directory, showHidden: showHidden, cancellation: cancellation)
     }
@@ -180,10 +189,18 @@ final class P2RacingLocalFileSystem: FileSystemProvider {
     func read(_ url: URL) throws -> FileReader { try local.read(url) }
     func write(_ url: URL) throws -> FileWriter { try local.write(url) }
     func remove(_ url: URL) throws { try local.remove(url) }
-    func move(_ source: URL, to destination: URL, replacing: Bool) throws { try local.move(source, to: destination, replacing: replacing) }
-    func copy(_ source: URL, to destination: URL, progress: (Int64) -> Bool) throws { try local.copy(source, to: destination, progress: progress) }
-    func setAttributes(_ attributes: FileAttributes, of url: URL) throws { try local.setAttributes(attributes, of: url) }
-    func copyMetadata(from source: URL, to destination: URL) throws { try local.copyMetadata(from: source, to: destination) }
+    func move(_ source: URL, to destination: URL, replacing: Bool) throws {
+        try local.move(source, to: destination, replacing: replacing)
+    }
+    func copy(_ source: URL, to destination: URL, progress: (Int64) -> Bool) throws {
+        try local.copy(source, to: destination, progress: progress)
+    }
+    func setAttributes(_ attributes: FileAttributes, of url: URL) throws {
+        try local.setAttributes(attributes, of: url)
+    }
+    func copyMetadata(from source: URL, to destination: URL) throws {
+        try local.copyMetadata(from: source, to: destination)
+    }
     func displayPath(_ url: URL) -> String { local.displayPath(url) }
     func location(from text: String) -> URL? { local.location(from: text) }
     func volume(of url: URL) -> VolumeInfo? { local.volume(of: url) }
@@ -211,7 +228,9 @@ final class P2ViewFileSystem: FileSystemProvider {
 
     init(fileSystems: FileSystemRegistry) { self.fileSystems = fileSystems }
 
-    func view(of real: URL) -> URL { URL(string: "p2view://shown" + real.path.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)!)! }
+    func view(of real: URL) -> URL {
+        URL(string: "p2view://shown" + real.path.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)!)!
+    }
     func realLocation(of url: URL) -> URL? { URL(fileURLWithPath: url.path) }
 
     struct Unused: Error {}
@@ -299,10 +318,13 @@ func p2Quarantine(_ url: URL) -> String? {
         fileSystems.register(probe)
     }
 
-    private func job(_ kind: JobKind, _ sources: [URL], to directory: URL? = nil, replies: P2Replies,
-                     cancellation: CancellationFlag = CancellationFlag()) -> FileJob {
-        let job = FileJob(kind: kind, sources: sources, target: directory.map { TargetSpec(directory: $0) }, fileSystems: fileSystems,
-                          cancellation: cancellation)
+    private func job(
+        _ kind: JobKind, _ sources: [URL], to directory: URL? = nil, replies: P2Replies,
+        cancellation: CancellationFlag = CancellationFlag()
+    ) -> FileJob {
+        let job = FileJob(
+            kind: kind, sources: sources, target: directory.map { TargetSpec(directory: $0) }, fileSystems: fileSystems,
+            cancellation: cancellation)
         job.delegate = replies
         return job
     }
@@ -328,7 +350,10 @@ func p2Quarantine(_ url: URL) -> String? {
         // Nothing reached the file system without a flag…
         #expect(probe.unflagged.isEmpty, "\(probe.unflagged)")
         // …and all the kinds of call were made.
-        #expect(Set(probe.flagged).isSuperset(of: ["createDirectory", "move", "setQuarantine", "setAttributes", "copyMetadata", "remove"]))
+        #expect(
+            Set(probe.flagged).isSuperset(of: [
+                "createDirectory", "move", "setQuarantine", "setAttributes", "copyMetadata", "remove"
+            ]))
     }
 
     @Test func aRemovalThatWaitsForAServerEndsWhenTheJobIsCancelled() throws {
@@ -354,7 +379,9 @@ func p2Quarantine(_ url: URL) -> String? {
         let flag = CancellationFlag()
         flaky.afterFirstBlock = { flag.cancel() }
         let replies = P2Replies()
-        let result = job(.copy, [flaky.base.url("/s/big.bin")], to: probe.base.url("/t"), replies: replies, cancellation: flag).run()
+        let result = job(
+            .copy, [flaky.base.url("/s/big.bin")], to: probe.base.url("/t"), replies: replies, cancellation: flag
+        ).run()
         #expect(result.cancelled)
         // The job's flag is set by the time the half-written file is removed; the removal is
         // made with a flag of its own, or the file system would have refused it.
@@ -375,7 +402,8 @@ func p2Quarantine(_ url: URL) -> String? {
         }
         // (Kept here: the job holds whoever answers its questions weakly.)
         let replies = P2Replies()
-        let job = job(.copy, [flaky.base.url("/s/big.bin")], to: probe.base.url("/t"), replies: replies, cancellation: flag)
+        let job = job(
+            .copy, [flaky.base.url("/s/big.bin")], to: probe.base.url("/t"), replies: replies, cancellation: flag)
         job.cleanupPatience = 0.2
         var result = JobResult()
         // The patience is short so that the test is; the test does not depend on how short.
@@ -399,7 +427,9 @@ func p2Quarantine(_ url: URL) -> String? {
             try? FileManager.default.createSymbolicLink(at: planted, withDestinationURL: self.box.url("elsewhere"))
         }
         let replies = P2Replies()
-        let job = FileJob(kind: .copy, sources: [box.url("s/dir")], target: TargetSpec(directory: box.url("t")), fileSystems: registry)
+        let job = FileJob(
+            kind: .copy, sources: [box.url("s/dir")], target: TargetSpec(directory: box.url("t")),
+            fileSystems: registry)
         job.delegate = replies
         let result = job.run()
         #expect(namesOnDisk(box.url("elsewhere")).isEmpty)
@@ -444,8 +474,11 @@ func p2Quarantine(_ url: URL) -> String? {
         memory.addFile("/s/other.txt", "other")
         memory.addDirectory("/t")
         let replies = P2Replies()
-        var result = job(.move, [memory.url("/s/open.zip"), memory.url("/s/other.txt")], to: memory.url("/t"), replies: replies).run()
-        #expect(result.completed == [memory.url("/s/other.txt")] && replies.errors == ["The archive could not be written."])
+        var result = job(
+            .move, [memory.url("/s/open.zip"), memory.url("/s/other.txt")], to: memory.url("/t"), replies: replies
+        ).run()
+        #expect(
+            result.completed == [memory.url("/s/other.txt")] && replies.errors == ["The archive could not be written."])
         #expect(memory.contents("/s/open.zip") == "what is on disk" && !memory.exists("/t/open.zip"))
         result = job(.delete(toTrash: false), [memory.url("/s/open.zip")], replies: replies).run()
         #expect(result.completed.isEmpty && memory.exists("/s/open.zip") && replies.errors.count == 2)
@@ -554,12 +587,15 @@ func p2Quarantine(_ url: URL) -> String? {
         job.onRecord = { record in lock.withLock { records.append(record) } }
         let result = job.run()
         // The copy is there and counts as done; the failure is told at the end, not asked about.
-        #expect(result.completed.count == 1 && probe.base.contents("/t/tool.command") == "#!/bin/sh\n" && replies.errors.isEmpty)
+        #expect(
+            result.completed.count == 1 && probe.base.contents("/t/tool.command") == "#!/bin/sh\n"
+                && replies.errors.isEmpty)
         #expect(result.failureCount == 1 && result.failures.first?.contains("could not be marked") == true)
-        #expect(records.contains { record in
-            if case .failed(let message) = record.status { return message.contains("marks are not kept here") }
-            return false
-        })
+        #expect(
+            records.contains { record in
+                if case .failed(let message) = record.status { return message.contains("marks are not kept here") }
+                return false
+            })
     }
 
     // MARK: F041, F047 — work that grows with the tree is done once, or not at all
@@ -574,7 +610,9 @@ func p2Quarantine(_ url: URL) -> String? {
         let result = job.run()
         #expect(result.completed.count == 1 && probe.base.exists("/t/s/f299.txt"))
         // Two paths per report that went out; two per file would be six hundred.
-        #expect(replies.progress.count <= 3 && probe.displayed <= 12, "\(replies.progress.count) reports, \(probe.displayed) paths")
+        #expect(
+            replies.progress.count <= 3 && probe.displayed <= 12,
+            "\(replies.progress.count) reports, \(probe.displayed) paths")
     }
 
     @Test func aFolderThatIsSkippedIsNotWalkedAgainForTheCount() throws {
@@ -611,7 +649,11 @@ func p2Quarantine(_ url: URL) -> String? {
     // MARK: Names
 
     @Test func theRuleForNamesIsTheKernels() {
-        for name in ["", ".", "..", "a/b", "a\u{0}b"] { #expect(!FileJob.isSafeName(name) && !PathSafety.isSafeName(name)) }
-        for name in ["a", "...", "a b", ".hidden", "é"] { #expect(FileJob.isSafeName(name) && PathSafety.isSafeName(name)) }
+        for name in ["", ".", "..", "a/b", "a\u{0}b"] {
+            #expect(!FileJob.isSafeName(name) && !PathSafety.isSafeName(name))
+        }
+        for name in ["a", "...", "a b", ".hidden", "é"] {
+            #expect(FileJob.isSafeName(name) && PathSafety.isSafeName(name))
+        }
     }
 }

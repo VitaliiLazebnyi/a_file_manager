@@ -12,7 +12,8 @@ public func threadCount() -> Int {
     var count: mach_msg_type_number_t = 0
     guard task_threads(mach_task_self_, &list, &count) == KERN_SUCCESS, let list else { return -1 }
     for index in 0..<Int(count) { mach_port_deallocate(mach_task_self_, list[index]) }
-    vm_deallocate(mach_task_self_, vm_address_t(UInt(bitPattern: list)), vm_size_t(Int(count) * MemoryLayout<thread_t>.size))
+    vm_deallocate(
+        mach_task_self_, vm_address_t(UInt(bitPattern: list)), vm_size_t(Int(count) * MemoryLayout<thread_t>.size))
     return Int(count)
 }
 
@@ -29,7 +30,8 @@ public func threadNames() -> String {
         names[text.isEmpty ? (index == 0 ? "main" : "unnamed") : text, default: 0] += 1
         mach_port_deallocate(mach_task_self_, list[index])
     }
-    vm_deallocate(mach_task_self_, vm_address_t(UInt(bitPattern: list)), vm_size_t(Int(count) * MemoryLayout<thread_t>.size))
+    vm_deallocate(
+        mach_task_self_, vm_address_t(UInt(bitPattern: list)), vm_size_t(Int(count) * MemoryLayout<thread_t>.size))
     return names.sorted { $0.key < $1.key }.map { "\($0.value) x \($0.key)" }.joined(separator: ", ")
 }
 
@@ -46,7 +48,8 @@ public func threadCount(named prefix: String, except: String = "\u{0}") -> Int {
         if text.hasPrefix(prefix), !text.hasSuffix(except) { found += 1 }
         mach_port_deallocate(mach_task_self_, list[index])
     }
-    vm_deallocate(mach_task_self_, vm_address_t(UInt(bitPattern: list)), vm_size_t(Int(count) * MemoryLayout<thread_t>.size))
+    vm_deallocate(
+        mach_task_self_, vm_address_t(UInt(bitPattern: list)), vm_size_t(Int(count) * MemoryLayout<thread_t>.size))
     return found
 }
 
@@ -61,7 +64,11 @@ public func peakRSSMB() -> Double {
 public func footprintMB() -> Double {
     var info = task_vm_info_data_t()
     var count = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<integer_t>.size)
-    let result = withUnsafeMutablePointer(to: &info) { $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), $0, &count) } }
+    let result = withUnsafeMutablePointer(to: &info) {
+        $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+            task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), $0, &count)
+        }
+    }
     return result == KERN_SUCCESS ? Double(info.phys_footprint) / 1_048_576 : -1
 }
 
@@ -69,7 +76,8 @@ public func footprintMB() -> Double {
 public func cpuSeconds() -> Double {
     var usage = rusage()
     getrusage(RUSAGE_SELF, &usage)
-    return Double(usage.ru_utime.tv_sec) + Double(usage.ru_utime.tv_usec) / 1e6 + Double(usage.ru_stime.tv_sec) + Double(usage.ru_stime.tv_usec) / 1e6
+    return Double(usage.ru_utime.tv_sec) + Double(usage.ru_utime.tv_usec) / 1e6 + Double(usage.ru_stime.tv_sec)
+        + Double(usage.ru_stime.tv_usec) / 1e6
 }
 
 public func loadAverage() -> Double {
@@ -167,7 +175,10 @@ public final class MainWatchdog {
         lock.lock()
         closePhase()
         phase = name
-        if stats[name] == nil { order.append(name); stats[name] = Stats() }
+        if stats[name] == nil {
+            order.append(name)
+            stats[name] = Stats()
+        }
         stats[name]!.started = now()
         lock.unlock()
     }
@@ -199,16 +210,33 @@ public final class MainWatchdog {
             lock.lock()
             // A stall belongs to the phase in which it ended (the ping was sent before it began).
             let label = phase
-            var entry = stats[label] ?? { order.append(label); return Stats() }()
+            var entry =
+                stats[label]
+                ?? {
+                    order.append(label)
+                    return Stats()
+                }()
             entry.pings += 1
-            if ms > entry.maxMs { entry.maxMs = ms; entry.maxCPUMs = cpuMs }
-            if ms > 8 { entry.stallMs += ms; entry.stallCPUMs += cpuMs }
+            if ms > entry.maxMs {
+                entry.maxMs = ms
+                entry.maxCPUMs = cpuMs
+            }
+            if ms > 8 {
+                entry.stallMs += ms
+                entry.stallCPUMs += cpuMs
+            }
             entry.histogram[MainWatchdog.bounds.firstIndex(where: { ms < $0 }) ?? MainWatchdog.bounds.count] += 1
             if ms > 8 { entry.over8 += 1 }
             if ms > 100 { entry.over100 += 1 }
             if ms > 1000 { entry.over1000 += 1 }
             stats[label] = entry
-            if ms > 8 { stalls.append(Stall(at: sent - started, milliseconds: ms, mainCPUMilliseconds: cpuMs, phase: label, stacks: stacks)) }
+            if ms > 8 {
+                stalls.append(
+                    Stall(
+                        at: sent - started, milliseconds: ms, mainCPUMilliseconds: cpuMs, phase: label, stacks: stacks
+                    )
+                )
+            }
             lock.unlock()
             usleep(2000)
         }
@@ -218,15 +246,23 @@ public final class MainWatchdog {
     private func mainCPU() -> Double {
         var info = thread_basic_info()
         var count = mach_msg_type_number_t(MemoryLayout<thread_basic_info>.size / MemoryLayout<integer_t>.size)
-        let result = withUnsafeMutablePointer(to: &info) { $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { thread_info(mainThread, thread_flavor_t(THREAD_BASIC_INFO), $0, &count) } }
+        let result = withUnsafeMutablePointer(to: &info) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+                thread_info(mainThread, thread_flavor_t(THREAD_BASIC_INFO), $0, &count)
+            }
+        }
         guard result == KERN_SUCCESS else { return 0 }
-        return Double(info.user_time.seconds) + Double(info.system_time.seconds) + Double(info.user_time.microseconds + info.system_time.microseconds) / 1e6
+        return Double(info.user_time.seconds) + Double(info.system_time.seconds) + Double(
+            info.user_time.microseconds + info.system_time.microseconds) / 1e6
     }
 
     /// The main thread's stack, taken from this thread.
     private func mainStack() -> [String]? {
         lock.lock()
-        guard stackBudget > 0 else { lock.unlock(); return nil }
+        guard stackBudget > 0 else {
+            lock.unlock()
+            return nil
+        }
         stackBudget -= 1
         lock.unlock()
         var count = 0
@@ -234,10 +270,16 @@ public final class MainWatchdog {
         // Nothing here may allocate or take a lock: the main thread may hold any of them.
         var state = arm_thread_state64_t()
         var size = mach_msg_type_number_t(MemoryLayout<arm_thread_state64_t>.size / MemoryLayout<UInt32>.size)
-        let result = withUnsafeMutablePointer(to: &state) { $0.withMemoryRebound(to: natural_t.self, capacity: Int(size)) { thread_get_state(mainThread, ARM_THREAD_STATE64, $0, &size) } }
+        let result = withUnsafeMutablePointer(to: &state) {
+            $0.withMemoryRebound(to: natural_t.self, capacity: Int(size)) {
+                thread_get_state(mainThread, ARM_THREAD_STATE64, $0, &size)
+            }
+        }
         if result == KERN_SUCCESS {
-            frames[0] = UnsafeMutableRawPointer(bitPattern: UInt(state.__pc)); count = 1
-            frames[1] = UnsafeMutableRawPointer(bitPattern: UInt(state.__lr)); count = 2
+            frames[0] = UnsafeMutableRawPointer(bitPattern: UInt(state.__pc))
+            count = 1
+            frames[1] = UnsafeMutableRawPointer(bitPattern: UInt(state.__lr))
+            count = 2
             var fp = UInt(state.__fp)
             while count < 200, fp >= stackLow, fp + 16 <= stackHigh, fp & 7 == 0 {
                 let record = UnsafePointer<UInt>(bitPattern: fp)!
@@ -256,7 +298,8 @@ public final class MainWatchdog {
     }
 
     public func snapshot() -> (order: [String], stats: [String: Stats], stalls: [Stall]) {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         closePhase()
         if stats[phase] != nil { stats[phase]!.started = now() }
         return (order, stats, stalls)
@@ -266,27 +309,53 @@ public final class MainWatchdog {
     public func report(title: String) {
         let (order, stats, stalls) = snapshot()
         say("\n==== MAIN-THREAD WATCHDOG: \(title) ====")
-        say("histogram bounds (ms): <" + MainWatchdog.bounds.map { String(format: "%g", $0) }.joined(separator: " <") + " >=5000")
-        say("(max cpu = processor time the main thread used during its longest stall; stall ms / cpu ms = sums over all stalls > 8 ms: equal means the main thread was working, cpu much smaller means it was blocked or had no core)")
+        say(
+            "histogram bounds (ms): <" + MainWatchdog.bounds.map { String(format: "%g", $0) }.joined(separator: " <")
+                + " >=5000")
+        say(
+            "(max cpu = processor time the main thread used during its longest stall; stall ms / cpu ms = sums over all stalls > 8 ms: equal means the main thread was working, cpu much smaller means it was blocked or had no core)"
+        )
         say(pad("phase") + "   wall s   pings   >8ms >100ms    >1s    max ms  max cpu  stall ms    cpu ms  histogram")
         var total = Stats()
         for name in order {
             guard let s = stats[name], s.pings > 0 || s.wall > 0 else { continue }
-            say(pad(name) + String(format: " %8.2f %7d %6d %6d %6d %9.1f %8.1f %9.0f %9.0f  ", s.wall, s.pings, s.over8, s.over100, s.over1000, s.maxMs, s.maxCPUMs, s.stallMs, s.stallCPUMs) + s.histogram.map(String.init).joined(separator: ","))
-            total.pings += s.pings; total.over8 += s.over8; total.over100 += s.over100; total.over1000 += s.over1000
-            total.maxMs = max(total.maxMs, s.maxMs); total.wall += s.wall; total.stallMs += s.stallMs; total.stallCPUMs += s.stallCPUMs
+            say(
+                pad(name)
+                    + String(
+                        format: " %8.2f %7d %6d %6d %6d %9.1f %8.1f %9.0f %9.0f  ", s.wall, s.pings, s.over8, s.over100,
+                        s.over1000, s.maxMs, s.maxCPUMs, s.stallMs, s.stallCPUMs)
+                    + s.histogram.map(String.init).joined(separator: ","))
+            total.pings += s.pings
+            total.over8 += s.over8
+            total.over100 += s.over100
+            total.over1000 += s.over1000
+            total.maxMs = max(total.maxMs, s.maxMs)
+            total.wall += s.wall
+            total.stallMs += s.stallMs
+            total.stallCPUMs += s.stallCPUMs
         }
-        say(pad("TOTAL") + String(format: " %8.2f %7d %6d %6d %6d %9.1f %8@ %9.0f %9.0f", total.wall, total.pings, total.over8, total.over100, total.over1000, total.maxMs, "" as NSString, total.stallMs, total.stallCPUMs))
+        say(
+            pad("TOTAL")
+                + String(
+                    format: " %8.2f %7d %6d %6d %6d %9.1f %8@ %9.0f %9.0f", total.wall, total.pings, total.over8,
+                    total.over100, total.over1000, total.maxMs, "" as NSString, total.stallMs, total.stallCPUMs))
         let long = stalls.filter { $0.milliseconds > 100 }
         // For each phase the two longest stalls with different stacks.
         var perPhase: [String: Int] = [:]
         var seen = Set<String>()
         for stall in long.sorted(by: { $0.milliseconds > $1.milliseconds }) where !stall.stacks.isEmpty {
             guard perPhase[stall.phase, default: 0] < 2 else { continue }
-            let key = stall.phase + "|" + stall.stacks[0].prefix(8).map { $0.split(separator: " ", maxSplits: 3).last.map(String.init) ?? $0 }.joined()
+            let key =
+                stall.phase + "|"
+                + stall.stacks[0].prefix(8).map { $0.split(separator: " ", maxSplits: 3).last.map(String.init) ?? $0 }
+                .joined()
             guard seen.insert(key).inserted else { continue }
             perPhase[stall.phase, default: 0] += 1
-            say(String(format: "\n-- stall %.0f ms (main thread cpu %.0f ms) at t=%.2fs in phase '%@'; main thread stack at +100 ms:", stall.milliseconds, stall.mainCPUMilliseconds, stall.at, stall.phase as NSString))
+            say(
+                String(
+                    format:
+                        "\n-- stall %.0f ms (main thread cpu %.0f ms) at t=%.2fs in phase '%@'; main thread stack at +100 ms:",
+                    stall.milliseconds, stall.mainCPUMilliseconds, stall.at, stall.phase as NSString))
             for line in stall.stacks[0].prefix(34) { say("   " + line) }
             if stall.stacks.count > 1 {
                 say("   .. and at +1 s:")
@@ -318,9 +387,13 @@ public final class HangGuard {
         let thread = Thread { [self] in
             while true {
                 usleep(200_000)
-                lock.lock(); let (limit, name) = (deadline, self.label); lock.unlock()
+                lock.lock()
+                let (limit, name) = (deadline, self.label)
+                lock.unlock()
                 guard now() > limit else { continue }
-                let file = sampleDirectory + "/hang-\(name.replacingOccurrences(of: " ", with: "_").replacingOccurrences(of: "/", with: "_"))-\(getpid()).sample.txt"
+                let file =
+                    sampleDirectory
+                    + "/hang-\(name.replacingOccurrences(of: " ", with: "_").replacingOccurrences(of: "/", with: "_"))-\(getpid()).sample.txt"
                 say("!!!! HANG: '\(name)' exceeded its time limit; threads=\(threadCount()); sampling to \(file)")
                 let process = Process()
                 process.executableURL = URL(fileURLWithPath: "/usr/bin/sample")
@@ -329,7 +402,10 @@ public final class HangGuard {
                 process.standardError = FileHandle.nullDevice
                 try? process.run()
                 process.waitUntilExit()
-                if let onHang, onHang(name) { disarm(); continue }
+                if let onHang, onHang(name) {
+                    disarm()
+                    continue
+                }
                 MainWatchdog.shared.report(title: "at hang")
                 exit(97)
             }
@@ -339,7 +415,9 @@ public final class HangGuard {
     }
 
     public func disarm() {
-        lock.lock(); deadline = .infinity; lock.unlock()
+        lock.lock()
+        deadline = .infinity
+        lock.unlock()
     }
 }
 
@@ -351,8 +429,11 @@ public func step<T>(_ name: String, limit: Double = 600, _ body: () throws -> T)
     let (t0, c0, th0) = (now(), cpuSeconds(), threadCount())
     let result = try body()
     let wall = now() - t0
-    say("STEP " + pad(name) + String(format: " wall=%8.3fs cpu=%7.2fs threads %d->%d footprint=%.0fMB peakRSS=%.0fMB load=%.1f",
-               wall, cpuSeconds() - c0, th0, threadCount(), footprintMB(), peakRSSMB(), loadAverage()))
+    say(
+        "STEP " + pad(name)
+            + String(
+                format: " wall=%8.3fs cpu=%7.2fs threads %d->%d footprint=%.0fMB peakRSS=%.0fMB load=%.1f",
+                wall, cpuSeconds() - c0, th0, threadCount(), footprintMB(), peakRSSMB(), loadAverage()))
     HangGuard.shared.disarm()
     return result
 }

@@ -8,9 +8,11 @@ import Testing
         let commands = CommandRegistry()
         var log: [String] = []
         commands.register(Command("plain", "Plain")) { log.append("plain") }
-        commands.register(Command("cd", "Change Directory"), parameterized: { argument in
-            log.append("cd \(argument.location?.path ?? argument.text ?? "-")")
-        })
+        commands.register(
+            Command("cd", "Change Directory"),
+            parameterized: { argument in
+                log.append("cd \(argument.location?.path ?? argument.text ?? "-")")
+            })
         #expect(commands.perform("plain"))
         #expect(commands.perform("cd", .location(URL(fileURLWithPath: "/tmp"))))
         #expect(commands.perform("cd", .text("docs")))
@@ -23,7 +25,9 @@ import Testing
 
     @Test func rejectsUnknownDisabledAndBlockedCommands() {
         let commands = CommandRegistry()
-        var enabled = false, runs = 0, rejections = 0
+        var enabled = false
+        var runs = 0
+        var rejections = 0
         commands.onRejected = { rejections += 1 }
         commands.register(Command("copy", "Copy"), enabled: { enabled }) { runs += 1 }
         #expect(!commands.perform("unknown"))
@@ -60,9 +64,12 @@ import Testing
 @Suite struct Keys {
     @Test func shortcutsAsText() {
         let samples: [(Shortcut, String)] = [
-            (.cmd("c", .shift), "shift+cmd+c"), (.f(5), "f5"), (.f(6, .shift), "shift+f6"), (Shortcut(.tab, .control), "ctrl+tab"),
-            (Shortcut(.left, .option), "opt+left"), (Shortcut(.keypadPlus), "num+"), (Shortcut(.keypadPlus, .control), "ctrl+num+"),
-            (.cmd("="), "cmd+="), (.cmd("+"), "cmd++"), (Shortcut(.space), "space"), (Shortcut(.forwardDelete, .shift), "shift+delete"),
+            (.cmd("c", .shift), "shift+cmd+c"), (.f(5), "f5"), (.f(6, .shift), "shift+f6"),
+            (Shortcut(.tab, .control), "ctrl+tab"),
+            (Shortcut(.left, .option), "opt+left"), (Shortcut(.keypadPlus), "num+"),
+            (Shortcut(.keypadPlus, .control), "ctrl+num+"),
+            (.cmd("="), "cmd+="), (.cmd("+"), "cmd++"), (Shortcut(.space), "space"),
+            (Shortcut(.forwardDelete, .shift), "shift+delete")
         ]
         for (shortcut, text) in samples {
             #expect(shortcut.notation == text)
@@ -70,7 +77,9 @@ import Testing
         }
         #expect(Shortcut(notation: "CMD+Shift+C") == .cmd("c", .shift))
         #expect(Shortcut(notation: "cmd+shift+c") == Shortcut(notation: "shift+cmd+c"))
-        #expect(Shortcut(notation: "f13") == nil && Shortcut(notation: "") == nil && Shortcut(notation: "cmd+nonsense") == nil)
+        #expect(
+            Shortcut(notation: "f13") == nil && Shortcut(notation: "") == nil
+                && Shortcut(notation: "cmd+nonsense") == nil)
     }
 
     @Test func commandsBringTheirDefaultKeys() {
@@ -170,7 +179,9 @@ import Testing
         let kernel = Kernel(productName: "Test", settings: MemorySettings(), ui: ScriptedInteraction())
         var runs = 0
         // The enabled check would crash on kernel.panels; a blocked registry never asks it.
-        kernel.commands.register(Command("copy", "Copy"), enabled: { kernel.panels.source.model.hasOperands }) { runs += 1 }
+        kernel.commands.register(Command("copy", "Copy"), enabled: { kernel.panels.source.model.hasOperands }) {
+            runs += 1
+        }
         #expect(!kernel.commands.isEnabled("copy") && !kernel.commands.perform("copy") && runs == 0)
     }
 
@@ -178,8 +189,12 @@ import Testing
         let memory = MemoryFileSystem()
         let settings = MemorySettings()
         settings.set(["mem_Hello": ["f10"]], forKey: KeyBindings.settingsKey)
-        let bench = TestBench(plugins: [MemoryPlugin()], fileSystems: [], left: memory.url("/"), right: memory.url("/"), settings: settings)
-        #expect(bench.kernel.keyBindings.command(for: .f(10)) == "mem_Hello" && bench.kernel.keyBindings.command(for: .f(9)) == nil)
+        let bench = TestBench(
+            plugins: [MemoryPlugin()], fileSystems: [], left: memory.url("/"), right: memory.url("/"),
+            settings: settings)
+        #expect(
+            bench.kernel.keyBindings.command(for: .f(10)) == "mem_Hello"
+                && bench.kernel.keyBindings.command(for: .f(9)) == nil)
         #expect(bench.commands.isEnabled("mem_Hello"))
     }
 
@@ -187,7 +202,10 @@ import Testing
         let memory = MemoryFileSystem()
         let bench = TestBench(plugins: [], fileSystems: [memory], left: memory.url("/"), right: memory.url("/"))
         var log: [String] = []
-        bench.kernel.openers.add { file, _ in log.append("general \(file.name)"); return true }
+        bench.kernel.openers.add { file, _ in
+            log.append("general \(file.name)")
+            return true
+        }
         bench.kernel.openers.add(priority: 10) { file, _ in
             guard file.name.hasSuffix(".zip") else { return false }
             log.append("archive \(file.name)")
@@ -211,11 +229,15 @@ import Testing
         let fileSystems = FileSystemRegistry()
         fileSystems.register(memory)
         let base = memory.url("/work/docs")
-        #expect(fileSystems.location(from: "sub/a.txt", relativeTo: base).isSameLocation(as: memory.url("/work/docs/sub/a.txt")))
+        #expect(
+            fileSystems.location(from: "sub/a.txt", relativeTo: base).isSameLocation(
+                as: memory.url("/work/docs/sub/a.txt")))
         #expect(fileSystems.location(from: "..", relativeTo: base).isSameLocation(as: memory.url("/work")))
         #expect(fileSystems.location(from: "/top", relativeTo: base).isSameLocation(as: memory.url("/top")))
         #expect(fileSystems.location(from: "", relativeTo: base).isSameLocation(as: base))
-        #expect(fileSystems.location(from: "mem:///other/place", relativeTo: URL(fileURLWithPath: "/tmp")).isSameLocation(as: memory.url("/other/place")))
+        #expect(
+            fileSystems.location(from: "mem:///other/place", relativeTo: URL(fileURLWithPath: "/tmp")).isSameLocation(
+                as: memory.url("/other/place")))
         let local = URL(fileURLWithPath: "/tmp")
         #expect(fileSystems.location(from: "/usr/bin", relativeTo: local).path == "/usr/bin")
         #expect(fileSystems.location(from: "~/x", relativeTo: local).path == NSHomeDirectory() + "/x")
@@ -223,8 +245,9 @@ import Testing
         #expect(fileSystems.displayPath(base) == "mem:/work/docs")
         #expect(fileSystems.displayPath(URL(string: "ftp://host/x")!) == "ftp://host/x")
         // What a file system writes for the user, it reads back: dialogs propose targets this way.
-        #expect(fileSystems.location(from: fileSystems.displayPath(base) + "/new.txt", relativeTo: local)
-            .isSameLocation(as: memory.url("/work/docs/new.txt")))
+        #expect(
+            fileSystems.location(from: fileSystems.displayPath(base) + "/new.txt", relativeTo: local)
+                .isSameLocation(as: memory.url("/work/docs/new.txt")))
         #expect(fileSystems.location(from: "mem:/top/*.*", relativeTo: local).path == "/top/*.*")
     }
 
@@ -233,7 +256,8 @@ import Testing
         #expect(settings.value([String].self, forKey: "list") == nil)
         settings.set(["a", "b"], forKey: "list")
         #expect(settings.value([String].self, forKey: "list") == ["a", "b"])
-        let viewer = settings.scoped(to: "viewer"), search = settings.scoped(to: "search")
+        let viewer = settings.scoped(to: "viewer")
+        let search = settings.scoped(to: "search")
         viewer.set(12, forKey: "fontSize")
         #expect(viewer.value(Int.self, forKey: "fontSize") == 12)
         #expect(search.value(Int.self, forKey: "fontSize") == nil)
@@ -259,9 +283,13 @@ import Testing
         _ = Parallel.map(Array(0..<64)) { _ -> Int in
             var id: UInt64 = 0
             pthread_threadid_np(nil, &id)
-            lock.lock(); threads.insert(id); lock.unlock()
+            lock.lock()
+            threads.insert(id)
+            lock.unlock()
             while ProcessInfo.processInfo.activeProcessorCount > 1, Date() < deadline {
-                lock.lock(); let isShared = threads.count > 1; lock.unlock()
+                lock.lock()
+                let isShared = threads.count > 1
+                lock.unlock()
                 if isShared { break }
                 Thread.sleep(forTimeInterval: 0.002)
             }
@@ -281,9 +309,14 @@ import Testing
     }
 
     @Test func jobProgressChoosesBytesOrItems() {
-        let copying = JobProgress(lines: ["From: a", "To: b"], itemsDone: 1, itemsTotal: 4, bytesDone: 250, bytesTotal: 1000)
-        #expect(copying.measuresBytes && copying.amountDone == 250 && copying.amountTotal == 1000 && copying.fraction == 0.25)
+        let copying = JobProgress(
+            lines: ["From: a", "To: b"], itemsDone: 1, itemsTotal: 4, bytesDone: 250, bytesTotal: 1000)
+        #expect(
+            copying.measuresBytes && copying.amountDone == 250 && copying.amountTotal == 1000
+                && copying.fraction == 0.25)
         let deleting = JobProgress(lines: ["Deleting: a"], itemsDone: 1, itemsTotal: 4)
-        #expect(!deleting.measuresBytes && deleting.amountDone == 1 && deleting.amountTotal == 4 && deleting.fraction == 0.25)
+        #expect(
+            !deleting.measuresBytes && deleting.amountDone == 1 && deleting.amountTotal == 4
+                && deleting.fraction == 0.25)
     }
 }

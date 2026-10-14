@@ -27,7 +27,9 @@ final class DirectoryWatcher {
             guard getenv("AFM_WATCHER_CENSUS") != nil else { return }
             atexit {
                 let figures = DirectoryWatcher.Census.figures
-                fputs("AFM_WATCHER_CENSUS live=\(figures.live) peak=\(figures.peak) refused=\(figures.refused)\n", stderr)
+                fputs(
+                    "AFM_WATCHER_CENSUS live=\(figures.live) peak=\(figures.peak) refused=\(figures.refused)\n", stderr
+                )
             }
         }()
 
@@ -109,9 +111,13 @@ final class DirectoryWatcher {
         /// contents count.
         private let trees: [(path: [UInt8], key: String)]?
 
-        init(watched: [String: URL], recursive: Bool, queue: DispatchQueue, streamQueue: DispatchQueue, gate: Gate,
-             onChange: @escaping ([URL]) -> Void) {
-            (self.watched, self.queue, self.streamQueue, self.gate, self.onChange) = (watched, queue, streamQueue, gate, onChange)
+        init(
+            watched: [String: URL], recursive: Bool, queue: DispatchQueue, streamQueue: DispatchQueue, gate: Gate,
+            onChange: @escaping ([URL]) -> Void
+        ) {
+            (self.watched, self.queue, self.streamQueue, self.gate, self.onChange) = (
+                watched, queue, streamQueue, gate, onChange
+            )
             lengths = Set(watched.keys.map { $0.utf8.count })
             trees = recursive ? watched.keys.map { (Array($0.utf8), $0) } : nil
         }
@@ -130,7 +136,9 @@ final class DirectoryWatcher {
         }
 
         /// Called on the stream's queue.
-        func report(count: Int, paths: UnsafePointer<UnsafePointer<CChar>>, flags: UnsafePointer<FSEventStreamEventFlags>) {
+        func report(
+            count: Int, paths: UnsafePointer<UnsafePointer<CChar>>, flags: UnsafePointer<FSEventStreamEventFlags>
+        ) {
             let rescanFlags = UInt32(kFSEventStreamEventFlagMustScanSubDirs | kFSEventStreamEventFlagRootChanged)
             var changed: [String: URL] = [:]
             var isRescan = false
@@ -145,14 +153,20 @@ final class DirectoryWatcher {
                 if let trees {
                     // A change anywhere below a watched folder is a change of that folder's tree.
                     for tree in trees where changed[tree.key] == nil && length >= tree.path.count {
-                        let isBelow = length == tree.path.count || tree.path.count == 1 || bytes[tree.path.count] == CChar(UInt8(ascii: "/"))
-                        if isBelow, memcmp(bytes, tree.path, tree.path.count) == 0 { changed[tree.key] = watched[tree.key] }
+                        let isBelow =
+                            length == tree.path.count || tree.path.count == 1
+                            || bytes[tree.path.count] == CChar(UInt8(ascii: "/"))
+                        if isBelow, memcmp(bytes, tree.path, tree.path.count) == 0 {
+                            changed[tree.key] = watched[tree.key]
+                        }
                     }
                     continue
                 }
                 guard lengths.contains(length) else { continue }
-                let path = String(decoding: UnsafeBufferPointer(start: UnsafeRawPointer(bytes).assumingMemoryBound(to: UInt8.self), count: length),
-                                  as: UTF8.self)
+                let path = String(
+                    decoding: UnsafeBufferPointer(
+                        start: UnsafeRawPointer(bytes).assumingMemoryBound(to: UInt8.self), count: length),
+                    as: UTF8.self)
                 if let directory = watched[path] { changed[path] = directory }
             }
             if isRescan { changed = watched }
@@ -277,7 +291,9 @@ final class DirectoryWatcher {
             guard resolved != watched else { return }
             tearDown()
             guard !resolved.isEmpty else { return }
-            let watch = Watch(watched: resolved, recursive: isRecursive, queue: queue, streamQueue: streamQueue, gate: gate, onChange: onChange)
+            let watch = Watch(
+                watched: resolved, recursive: isRecursive, queue: queue, streamQueue: streamQueue, gate: gate,
+                onChange: onChange)
             // The stream holds its own reference to the state, taken and given back through these.
             var context = FSEventStreamContext(
                 version: 0, info: Unmanaged.passUnretained(watch).toOpaque(),
@@ -294,11 +310,15 @@ final class DirectoryWatcher {
             let callback: FSEventStreamCallback = { _, info, count, paths, flags, _ in
                 guard let info else { return }
                 Unmanaged<Watch>.fromOpaque(info).takeUnretainedValue()
-                    .report(count: count, paths: paths.assumingMemoryBound(to: UnsafePointer<CChar>.self), flags: flags)
+                    .report(
+                        count: count, paths: paths.assumingMemoryBound(to: UnsafePointer<CChar>.self), flags: flags)
             }
             let flags = UInt32(kFSEventStreamCreateFlagWatchRoot)
-            guard let stream = FSEventStreamCreate(nil, callback, &context, Array(resolved.keys) as CFArray,
-                                                   FSEventStreamEventId(kFSEventStreamEventIdSinceNow), 0.5, flags) else {
+            guard
+                let stream = FSEventStreamCreate(
+                    nil, callback, &context, Array(resolved.keys) as CFArray,
+                    FSEventStreamEventId(kFSEventStreamEventIdSinceNow), 0.5, flags)
+            else {
                 // Not remembered as watched: the next request tries again, and so does this.
                 Census.wasRefused()
                 return retryLater()

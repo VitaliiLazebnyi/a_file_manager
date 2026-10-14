@@ -42,7 +42,8 @@ public struct HotlistEntry: Codable, Equatable {
 
     /// The title as it is shown: without the `&` that marks an accelerator (`&&` is an ampersand).
     public var displayTitle: String {
-        title.replacingOccurrences(of: "&&", with: "\u{0}").replacingOccurrences(of: "&", with: "").replacingOccurrences(of: "\u{0}", with: "&")
+        title.replacingOccurrences(of: "&&", with: "\u{0}").replacingOccurrences(of: "&", with: "")
+            .replacingOccurrences(of: "\u{0}", with: "&")
     }
 }
 
@@ -252,18 +253,23 @@ public enum HotlistAction: Equatable {
         } else if ["cm_", "afm_", "em_"].contains(where: text.lowercased().hasPrefix) {
             let parts = text.split(separator: " ", maxSplits: 1).map(String.init)
             let argument = parts.count > 1 ? parts[1].trimmingCharacters(in: .whitespaces) : ""
-            self = .command(CommandID(rawValue: parts[0]),
-                            argument.isEmpty ? .none : Int(argument).map(CommandArgument.index) ?? .text(argument))
+            self = .command(
+                CommandID(rawValue: parts[0]),
+                argument.isEmpty ? .none : Int(argument).map(CommandArgument.index) ?? .text(argument))
         } else {
             // A bare path is taken as `cd <path>`.
-            var path = text.lowercased().hasPrefix("cd ") ? String(text.dropFirst(3)).trimmingCharacters(in: .whitespaces) : text
+            var path =
+                text.lowercased().hasPrefix("cd ")
+                ? String(text.dropFirst(3)).trimmingCharacters(in: .whitespaces) : text
             // A quoted path is the path as it stands: spaces at its ends and a final `:` are its own.
             var isQuoted = false
             if path.count > 1, path.hasPrefix("\""), path.hasSuffix("\"") {
                 path = String(path.dropFirst().dropLast())
                 isQuoted = true
             }
-            if !isQuoted, let suffix = ["//:", "/:", "\\\\:", "\\:"].first(where: path.hasSuffix), path.count > suffix.count {
+            if !isQuoted, let suffix = ["//:", "/:", "\\\\:", "\\:"].first(where: path.hasSuffix),
+                path.count > suffix.count
+            {
                 self = .changeDirectory(path: String(path.dropLast(suffix.count)), focusingOnIt: true)
             } else {
                 self = .changeDirectory(path: path, focusingOnIt: false)
@@ -315,7 +321,10 @@ public struct HotlistMenu {
 
     /// One level of the user's list. `isCurrent` tells whether an entry leads to the directory
     /// the panel shows; such entries, and the submenus holding one, are marked.
-    public init(_ hotlist: Hotlist, at path: Hotlist.Path = [], offersFavorites: Bool = false, isCurrent: (HotlistEntry) -> Bool) {
+    public init(
+        _ hotlist: Hotlist, at path: Hotlist.Path = [], offersFavorites: Bool = false,
+        isCurrent: (HotlistEntry) -> Bool
+    ) {
         var rows: [Row] = []
         var current: Hotlist.Path?
         var selected: Int?
@@ -326,15 +335,20 @@ public struct HotlistMenu {
             case .separator:
                 rows.append(Row(title: HotlistMenu.separatorTitle, action: .separator))
             case .submenu:
-                rows.append(Row(title: HotlistMenu.mark(marked) + entry.displayTitle + "  ▸", action: .open(path + [index])))
+                rows.append(
+                    Row(title: HotlistMenu.mark(marked) + entry.displayTitle + "  ▸", action: .open(path + [index])))
             case .item:
                 if marked, current == nil { current = path + [index] }
                 rows.append(Row(title: HotlistMenu.mark(marked) + entry.displayTitle, action: .run(entry)))
             }
         }
         if !rows.isEmpty { rows.append(Row(title: HotlistMenu.separatorTitle, action: .separator)) }
-        if offersFavorites, path.isEmpty { rows.append(Row(title: HotlistMenu.mark(false) + "Favorites  ▸", action: .openFavorites)) }
-        rows.append(current.map { Row(title: "− Remove current dir", action: .removeCurrent($0)) } ?? Row(title: "+ Add current dir", action: .addCurrent))
+        if offersFavorites, path.isEmpty {
+            rows.append(Row(title: HotlistMenu.mark(false) + "Favorites  ▸", action: .openFavorites))
+        }
+        rows.append(
+            current.map { Row(title: "− Remove current dir", action: .removeCurrent($0)) }
+                ?? Row(title: "+ Add current dir", action: .addCurrent))
         rows.append(Row(title: "* Configure…", action: .configure))
         self.rows = rows
         self.selected = selected ?? 0
@@ -359,6 +373,13 @@ public enum MacFavorites {
             HotlistEntry.item(name, command: "cd " + home.appendingPathComponent(name, isDirectory: true).path)
         }
         return [.item("Home", command: "cd " + home.path), .item("Applications", command: "cd /Applications")] + below
-            + [.item("iCloud Drive", command: "cd " + home.appendingPathComponent("Library/Mobile Documents/com~apple~CloudDocs", isDirectory: true).path)]
+            + [
+                .item(
+                    "iCloud Drive",
+                    command: "cd "
+                        + home.appendingPathComponent(
+                            "Library/Mobile Documents/com~apple~CloudDocs", isDirectory: true
+                        ).path)
+            ]
     }
 }

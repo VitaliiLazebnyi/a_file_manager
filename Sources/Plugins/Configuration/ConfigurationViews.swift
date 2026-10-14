@@ -42,9 +42,10 @@ func padded(_ view: NSView, by margin: CGFloat = 14) -> NSView {
     view.translatesAutoresizingMaskIntoConstraints = false
     holder.addSubview(view)
     NSLayoutConstraint.activate([
-        view.topAnchor.constraint(equalTo: holder.topAnchor, constant: margin), view.leadingAnchor.constraint(equalTo: holder.leadingAnchor, constant: margin),
+        view.topAnchor.constraint(equalTo: holder.topAnchor, constant: margin),
+        view.leadingAnchor.constraint(equalTo: holder.leadingAnchor, constant: margin),
         view.trailingAnchor.constraint(equalTo: holder.trailingAnchor, constant: -margin),
-        view.bottomAnchor.constraint(equalTo: holder.bottomAnchor, constant: -margin),
+        view.bottomAnchor.constraint(equalTo: holder.bottomAnchor, constant: -margin)
     ])
     return holder
 }
@@ -144,14 +145,16 @@ final class RowsTable: NSScrollView, NSTableViewDataSource, NSTableViewDelegate 
             image.translatesAutoresizingMaskIntoConstraints = false
             cell.addSubview(image)
             NSLayoutConstraint.activate([
-                image.leadingAnchor.constraint(equalTo: cell.leadingAnchor), image.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
-                image.widthAnchor.constraint(equalToConstant: 20),
+                image.leadingAnchor.constraint(equalTo: cell.leadingAnchor),
+                image.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
+                image.widthAnchor.constraint(equalToConstant: 20)
             ])
             leading = image.trailingAnchor
         }
         NSLayoutConstraint.activate([
-            label.leadingAnchor.constraint(equalTo: leading, constant: 2), label.trailingAnchor.constraint(equalTo: cell.trailingAnchor),
-            label.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
+            label.leadingAnchor.constraint(equalTo: leading, constant: 2),
+            label.trailingAnchor.constraint(equalTo: cell.trailingAnchor),
+            label.centerYAnchor.constraint(equalTo: cell.centerYAnchor)
         ])
         return cell
     }
@@ -168,8 +171,9 @@ final class TextWindowController: NSWindowController {
     private let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: 640, height: 560))
 
     init(title: String) {
-        let window = ToolWindow(contentRect: NSRect(x: 0, y: 0, width: 640, height: 560),
-                                styleMask: [.titled, .closable, .resizable, .miniaturizable], backing: .buffered, defer: false)
+        let window = ToolWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 640, height: 560),
+            styleMask: [.titled, .closable, .resizable, .miniaturizable], backing: .buffered, defer: false)
         window.title = title
         window.isReleasedWhenClosed = false
         window.center()
@@ -265,7 +269,9 @@ enum LiveMenus {
     static func refreshKeys(in menu: NSMenu, kernel: Kernel) {
         for item in menu.items {
             if let submenu = item.submenu { refreshKeys(in: submenu, kernel: kernel) }
-            guard let name = item.representedObject as? String, kernel.commands[CommandID(rawValue: name)] != nil else { continue }
+            guard let name = item.representedObject as? String, kernel.commands[CommandID(rawValue: name)] != nil else {
+                continue
+            }
             let shortcut = kernel.keyBindings.shortcuts(for: CommandID(rawValue: name)).first { menuKey($0) != nil }
             item.keyEquivalent = shortcut.flatMap(menuKey) ?? ""
             item.keyEquivalentModifierMask = shortcut.map { flags($0.modifiers) } ?? []
@@ -275,7 +281,9 @@ enum LiveMenus {
     /// Replaces the user's entries of the Start menu by the current ones; the menu's fixed
     /// entries stay below them. Does nothing when the menu bar has no Start menu.
     static func rebuildStartMenu(in mainMenu: NSMenu, entries: [StartMenuEntry], target: StartMenuTarget) {
-        guard let menu = mainMenu.items.first(where: { $0.submenu?.title == MenuID.start.title })?.submenu else { return }
+        guard let menu = mainMenu.items.first(where: { $0.submenu?.title == MenuID.start.title })?.submenu else {
+            return
+        }
         let fixed = menu.items.filter { item in
             guard let name = item.representedObject as? String else { return false }
             return !name.hasPrefix(slotPrefix)
@@ -286,9 +294,10 @@ enum LiveMenus {
                 if menu.items.last?.isSeparatorItem == false { menu.addItem(.separator()) }
                 continue
             }
-            let item = NSMenuItem(title: DisplayText.oneLine(entry.title.replacingOccurrences(of: "&", with: ""), limit: 120),
-                                  action: #selector(StartMenuTarget.runEntry(_:)),
-                                  keyEquivalent: "")
+            let item = NSMenuItem(
+                title: DisplayText.oneLine(entry.title.replacingOccurrences(of: "&", with: ""), limit: 120),
+                action: #selector(StartMenuTarget.runEntry(_:)),
+                keyEquivalent: "")
             item.target = target
             item.representedObject = StartMenuEntry.commandID(at: index).rawValue
             menu.addItem(item)

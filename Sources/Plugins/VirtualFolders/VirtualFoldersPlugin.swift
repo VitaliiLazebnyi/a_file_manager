@@ -49,40 +49,59 @@ public final class VirtualFoldersPlugin: Plugin, FileListService {
             }
         }
 
-        commands.register(Command(.branchView, "Branch View (With Subdirs)", [Shortcut(.character("b"), .control)]),
-                          checked: { isBranch(source()) }, parameterized: { [self] in setBranchView($0, in: source(), selectedOnly: false) })
-        commands.register(Command(.branchViewSelected, "Branch View of Selected Folders", [Shortcut(.character("b"), [.control, .shift])]),
-                          enabled: { isVirtual(source()) || source().model.hasOperands },
-                          parameterized: { [self] in setBranchView($0, in: source(), selectedOnly: true) })
+        commands.register(
+            Command(.branchView, "Branch View (With Subdirs)", [Shortcut(.character("b"), .control)]),
+            checked: { isBranch(source()) },
+            parameterized: { [self] in setBranchView($0, in: source(), selectedOnly: false) })
+        commands.register(
+            Command(
+                .branchViewSelected, "Branch View of Selected Folders",
+                [Shortcut(.character("b"), [.control, .shift])]),
+            enabled: { isVirtual(source()) || source().model.hasOperands },
+            parameterized: { [self] in setBranchView($0, in: source(), selectedOnly: true) })
         let sided: [(CommandID, String, Bool, Bool)] = [
-            (.leftBranchView, "Left: Branch View", true, false), (.rightBranchView, "Right: Branch View", false, false),
+            (.leftBranchView, "Left: Branch View", true, false),
+            (.rightBranchView, "Right: Branch View", false, false),
             (.leftBranchViewSelected, "Left: Branch View of Selected Folders", true, true),
-            (.rightBranchViewSelected, "Right: Branch View of Selected Folders", false, true),
+            (.rightBranchViewSelected, "Right: Branch View of Selected Folders", false, true)
         ]
         for (id, title, isLeft, selectedOnly) in sided {
             let panel = { isLeft ? kernel.panels.left : kernel.panels.right }
-            commands.register(Command(id, title), checked: { isBranch(panel()) },
-                              parameterized: { [self] in setBranchView($0, in: panel(), selectedOnly: selectedOnly) })
+            commands.register(
+                Command(id, title), checked: { isBranch(panel()) },
+                parameterized: { [self] in setBranchView($0, in: panel(), selectedOnly: selectedOnly) })
         }
-        commands.register(Command(.loadFileList, "Load File List into Panel…"), parameterized: { [self] in loadList($0) })
+        commands.register(
+            Command(.loadFileList, "Load File List into Panel…"), parameterized: { [self] in loadList($0) })
 
         kernel.menus.add([.branchView, .branchViewSelected], to: .commandsPlaces)
-        kernel.toolbar.add(.branchView, symbol: "list.bullet.indent", group: 30, hint: "Show the files of this folder and of all its subfolders in one list.")
+        kernel.toolbar.add(
+            .branchView, symbol: "list.bullet.indent", group: 30,
+            hint: "Show the files of this folder and of all its subfolders in one list.")
         kernel.toolbar.setSymbol("list.bullet.rectangle", for: .loadFileList)
-        kernel.preferences.add(PreferencePage(title: "Branch View", preferences: [
-            Preference(VirtualFoldersPlugin.listsFoldersKey, "List the folders too, not only the files in them", .flag(default: false)),
-            Preference(VirtualFoldersPlugin.entersPackagesKey, "Show the contents of packages (applications, bundles)", .flag(default: false)),
-        ], onChange: { [self] in
-            applyOptions()
-            for panel in kernel.panels.all where isVirtual(panel) { panel.reload() }
-        }))
+        kernel.preferences.add(
+            PreferencePage(
+                title: "Branch View",
+                preferences: [
+                    Preference(
+                        VirtualFoldersPlugin.listsFoldersKey, "List the folders too, not only the files in them",
+                        .flag(default: false)),
+                    Preference(
+                        VirtualFoldersPlugin.entersPackagesKey, "Show the contents of packages (applications, bundles)",
+                        .flag(default: false))
+                ],
+                onChange: { [self] in
+                    applyOptions()
+                    for panel in kernel.panels.all where isVirtual(panel) { panel.reload() }
+                }))
     }
 
     /// Hands the user's options to the file system, which reads them on background threads.
     private func applyOptions() {
         guard let kernel else { return }
-        fileSystem?.options = VirtualFileSystem.Options(listsFolders: kernel.settings.flag(VirtualFoldersPlugin.listsFoldersKey, default: false),
-                                                        entersPackages: kernel.settings.flag(VirtualFoldersPlugin.entersPackagesKey, default: false))
+        fileSystem?.options = VirtualFileSystem.Options(
+            listsFolders: kernel.settings.flag(VirtualFoldersPlugin.listsFoldersKey, default: false),
+            entersPackages: kernel.settings.flag(VirtualFoldersPlugin.entersPackagesKey, default: false))
     }
 
     // MARK: FileListService
@@ -135,7 +154,9 @@ public final class VirtualFoldersPlugin: Plugin, FileListService {
     private func leave(_ panel: PanelHandle) {
         guard let kernel, let location = VirtualLocation(panel.model.directory) else { return }
         let tab = panel.model
-        if let item = tab.cursorItem, let folder = (try? kernel.fileSystems.provider(for: item.url))?.parent(of: item.url) {
+        if let item = tab.cursorItem,
+            let folder = (try? kernel.fileSystems.provider(for: item.url))?.parent(of: item.url)
+        {
             panel.show(folder, focus: item.url.lastPathComponent)
             return
         }
@@ -153,9 +174,11 @@ public final class VirtualFoldersPlugin: Plugin, FileListService {
         // The names of what the view was made from are taken in the background: there may be
         // hundreds of thousands.
         let virtual = tab.directory
-        kernel.jobs.run(title: "Leave selected branch", work: { _ in
-            (fileSystem.entries(of: virtual) ?? []).map(\.lastPathComponent)
-        }, completion: { names in show(selecting: names) })
+        kernel.jobs.run(
+            title: "Leave selected branch",
+            work: { _ in
+                (fileSystem.entries(of: virtual) ?? []).map(\.lastPathComponent)
+            }, completion: { names in show(selecting: names) })
     }
 
     // MARK: Lists from files
@@ -165,18 +188,26 @@ public final class VirtualFoldersPlugin: Plugin, FileListService {
         let panel = kernel.panels.source
         let base = VirtualLocation(panel.model.directory).map(\.realDirectory) ?? panel.model.directory
         let home = URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
-        let typed = argument.text ?? (argument.location == nil ? kernel.ui.prompt("Load the list of files from:", value: "") : nil)
-        guard let file = argument.location ?? typed.map({ kernel.fileSystems.location(from: $0, relativeTo: base ?? home) }) else { return }
+        let typed =
+            argument.text
+            ?? (argument.location == nil ? kernel.ui.prompt("Load the list of files from:", value: "") : nil)
+        guard
+            let file = argument.location
+                ?? typed.map({ kernel.fileSystems.location(from: $0, relativeTo: base ?? home) })
+        else { return }
         let fileSystems = kernel.fileSystems
         // The list file is read in the background; a job keeps other commands away meanwhile.
-        kernel.jobs.run(title: "Load file list", work: { _ in
-            Result { try FileListFile.read(file, fileSystems: fileSystems, relativeTo: base ?? home) }
-        }, completion: { [self] result in
-            switch result {
-            case .success(let files): show(files, title: FileItem.split(file.lastPathComponent).base, in: panel)
-            case .failure(let error): kernel.ui.report(error, title: "The list of files could not be loaded.")
-            }
-        })
+        kernel.jobs.run(
+            title: "Load file list",
+            work: { _ in
+                Result { try FileListFile.read(file, fileSystems: fileSystems, relativeTo: base ?? home) }
+            },
+            completion: { [self] result in
+                switch result {
+                case .success(let files): show(files, title: FileItem.split(file.lastPathComponent).base, in: panel)
+                case .failure(let error): kernel.ui.report(error, title: "The list of files could not be loaded.")
+                }
+            })
     }
 }
 
@@ -204,7 +235,8 @@ public enum FileListFile {
         if data.starts(with: [0xFF, 0xFE]) || data.starts(with: [0xFE, 0xFF]) {
             text = String(data: data, encoding: .utf16)
         } else {
-            text = String(data: data.starts(with: [0xEF, 0xBB, 0xBF]) ? data.dropFirst(3) : data, encoding: .utf8)
+            text =
+                String(data: data.starts(with: [0xEF, 0xBB, 0xBF]) ? data.dropFirst(3) : data, encoding: .utf8)
                 ?? String(data: data, encoding: .isoLatin1)
         }
         return (text ?? "").split(whereSeparator: \.isNewline).compactMap { raw in
@@ -217,7 +249,9 @@ public enum FileListFile {
     /// The name a quoted line stands for; nil when the line is not quoted, or holds an escape
     /// that is none of ours (then it is an old, unquoted line).
     static func unquoted(_ line: String) -> String? {
-        guard line.unicodeScalars.count >= 2, line.unicodeScalars.first == "\"", line.unicodeScalars.last == "\"" else { return nil }
+        guard line.unicodeScalars.count >= 2, line.unicodeScalars.first == "\"", line.unicodeScalars.last == "\"" else {
+            return nil
+        }
         let body = Array(line.unicodeScalars.dropFirst().dropLast())
         var result = String.UnicodeScalarView()
         var index = 0
@@ -239,9 +273,13 @@ public enum FileListFile {
             case "r": result.append("\r")
             case "t": result.append("\t")
             case "u":
-                guard index < body.count, body[index] == "{", let close = body[index...].firstIndex(of: "}") else { return nil }
+                guard index < body.count, body[index] == "{", let close = body[index...].firstIndex(of: "}") else {
+                    return nil
+                }
                 let digits = String(String.UnicodeScalarView(body[(index + 1)..<close]))
-                guard !digits.isEmpty, digits.count <= 6, let value = UInt32(digits, radix: 16), let unicode = Unicode.Scalar(value) else { return nil }
+                guard !digits.isEmpty, digits.count <= 6, let value = UInt32(digits, radix: 16),
+                    let unicode = Unicode.Scalar(value)
+                else { return nil }
                 result.append(unicode)
                 index = close + 1
             default: return nil
@@ -253,8 +291,10 @@ public enum FileListFile {
     /// One line for a name: as it is when that reads back the same, otherwise quoted.
     public static func line(for name: String) -> String {
         let scalars = name.unicodeScalars
-        let needsQuotes = scalars.first == "\"" || scalars.contains { isUnsafe($0) }
-            || scalars.first.map({ $0.properties.isWhitespace }) == true || scalars.last.map({ $0.properties.isWhitespace }) == true
+        let needsQuotes =
+            scalars.first == "\"" || scalars.contains { isUnsafe($0) }
+            || scalars.first.map({ $0.properties.isWhitespace }) == true
+            || scalars.last.map({ $0.properties.isWhitespace }) == true
         guard needsQuotes else { return name }
         var text = "\""
         for scalar in scalars {
@@ -265,7 +305,11 @@ public enum FileListFile {
             case "\r": text += "\\r"
             case "\t": text += "\\t"
             default:
-                if isUnsafe(scalar) { text += "\\u{" + String(scalar.value, radix: 16) + "}" } else { text.unicodeScalars.append(scalar) }
+                if isUnsafe(scalar) {
+                    text += "\\u{" + String(scalar.value, radix: 16) + "}"
+                } else {
+                    text.unicodeScalars.append(scalar)
+                }
             }
         }
         return text + "\""

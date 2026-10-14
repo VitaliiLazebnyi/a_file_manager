@@ -58,7 +58,9 @@ final class PanelCoordinator: PanelSet, PanelHost {
         activate(leftPanel)
         // The folders of the last session are read in the background; one that is gone is
         // replaced by the home folder, and that by the root.
-        for panel in panels { loadInitially(panel, candidates: [panel.model.directory, home, URL(fileURLWithPath: "/")]) }
+        for panel in panels {
+            loadInitially(panel, candidates: [panel.model.directory, home, URL(fileURLWithPath: "/")])
+        }
         places.observe { [weak self] in self?.panels.forEach { $0.placesDidChange() } }
         // Nothing is watched yet: a folder is watched from the moment it has been listed.
     }
@@ -70,7 +72,9 @@ final class PanelCoordinator: PanelSet, PanelHost {
     /// come out of an imported settings file, and a start that hangs on a server that is gone
     /// or asks for a password before a window is there helps nobody. Going to the tab connects.
     static func keepFromConnectingAtStart(_ tabs: PanelTabs, home: URL, fileSystems: FileSystemRegistry) {
-        func connects(_ tab: PanelModel) -> Bool { (try? fileSystems.provider(for: tab.directory))?.connectsToServer == true }
+        func connects(_ tab: PanelModel) -> Bool {
+            (try? fileSystems.provider(for: tab.directory))?.connectsToServer == true
+        }
         guard connects(tabs.active) else { return }
         if let other = tabs.tabs.firstIndex(where: { !connects($0) }) {
             tabs.activate(other)
@@ -81,7 +85,8 @@ final class PanelCoordinator: PanelSet, PanelHost {
 
     private func loadInitially(_ panel: PanelViewController, candidates: [URL]) {
         guard let first = candidates.first else { return }
-        panel.load(first, in: panel.model, focus: nil, history: .keep, reportFailure: false) { [weak self, weak panel] succeeded in
+        panel.load(first, in: panel.model, focus: nil, history: .keep, reportFailure: false) {
+            [weak self, weak panel] succeeded in
             // Not when the reading was overtaken by one the user started: that one decides.
             if let panel, !succeeded, !panel.isLoading, !panel.model.isListed {
                 self?.loadInitially(panel, candidates: Array(candidates.dropFirst()))
@@ -156,8 +161,10 @@ final class PanelCoordinator: PanelSet, PanelHost {
     /// when it was read; nothing here touches a file system.
     private func readAheadTarget() -> ReadAhead.Target? {
         let model = sourcePanel.model
-        guard readsAhead, isWindowActive(), !isPaused(), !sourcePanel.isLoading, model.isComplete, model.volume?.isLocal == false,
-              let item = model.cursorItem, item.isFolder, kernel.listingCache.isEnabled else { return nil }
+        guard readsAhead, isWindowActive(), !isPaused(), !sourcePanel.isLoading, model.isComplete,
+            model.volume?.isLocal == false,
+            let item = model.cursorItem, item.isFolder, kernel.listingCache.isEnabled
+        else { return nil }
         return ReadAhead.Target(location: item.url, showHidden: model.showHidden, order: model.wantedSort)
     }
 
@@ -244,7 +251,9 @@ final class PanelCoordinator: PanelSet, PanelHost {
     private func updateWatchers() {
         guard !isShutDown else { return }
         var wanted: [String: URL] = [:]
-        for panel in panels where panel.model.isListed { wanted[panel.model.directory.locationKey] = panel.model.directory }
+        for panel in panels where panel.model.isListed {
+            wanted[panel.model.directory.locationKey] = panel.model.directory
+        }
         guard Set(wanted.keys) != watchedLocations else { return }
         watchedLocations = Set(wanted.keys)
         for (key, watch) in watches where wanted[key] == nil {
@@ -272,23 +281,30 @@ final class PanelCoordinator: PanelSet, PanelHost {
         let began = ProcessInfo.processInfo.systemUptime
         // The background takes nothing along that belongs to the main thread, only two weak
         // references for the file system's callback.
-        Background.storage("watch", at: directory, qos: .utility, work: { [weak self, weak watch] () -> AnyObject? in
-            provider.watch([directory]) { [weak self, weak watch] changed in
-                // Main thread, as the file system promises.
-                guard let self, let watch, watch.isWanted, self.watches[key] === watch else { return }
-                self.reloadChangedPanels(showing: changed)
-            }
-        }, then: { [weak self] watcher in
-            var watcher = watcher
-            watch.isStarting = false
-            guard let self, !self.isShutDown, self.watches[key] === watch else { return Background.release(&watcher) }
-            guard watch.isWanted else {
-                self.watches[key] = nil
-                return Background.release(&watcher)
-            }
-            watch.watcher = watcher
-            if ProcessInfo.processInfo.systemUptime - began > PanelCoordinator.slowWatch { self.reloadChangedPanels(showing: [directory]) }
-        })
+        Background.storage(
+            "watch", at: directory, qos: .utility,
+            work: { [weak self, weak watch] () -> AnyObject? in
+                provider.watch([directory]) { [weak self, weak watch] changed in
+                    // Main thread, as the file system promises.
+                    guard let self, let watch, watch.isWanted, self.watches[key] === watch else { return }
+                    self.reloadChangedPanels(showing: changed)
+                }
+            },
+            then: { [weak self] watcher in
+                var watcher = watcher
+                watch.isStarting = false
+                guard let self, !self.isShutDown, self.watches[key] === watch else {
+                    return Background.release(&watcher)
+                }
+                guard watch.isWanted else {
+                    self.watches[key] = nil
+                    return Background.release(&watcher)
+                }
+                watch.watcher = watcher
+                if ProcessInfo.processInfo.systemUptime - began > PanelCoordinator.slowWatch {
+                    self.reloadChangedPanels(showing: [directory])
+                }
+            })
     }
 
     /// The number of folders watched or being set up, for checks.
@@ -370,13 +386,25 @@ final class PlacesStore {
         providers = fileSystems.all
         answers = Array(repeating: [], count: providers.count)
         let workspace = NSWorkspace.shared.notificationCenter
-        for name in [NSWorkspace.didMountNotification, NSWorkspace.didUnmountNotification, NSWorkspace.didRenameVolumeNotification] {
-            observers.append((workspace, workspace.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in self?.refresh() }))
+        for name in [
+            NSWorkspace.didMountNotification, NSWorkspace.didUnmountNotification,
+            NSWorkspace.didRenameVolumeNotification
+        ] {
+            observers.append(
+                (
+                    workspace,
+                    workspace.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in self?.refresh()
+                    }
+                ))
         }
         let center = NotificationCenter.default
-        observers.append((center, center.addObserver(forName: PlacesStore.placesDidChange, object: nil, queue: .main) { [weak self] _ in
-            self?.refresh()
-        }))
+        observers.append(
+            (
+                center,
+                center.addObserver(forName: PlacesStore.placesDidChange, object: nil, queue: .main) { [weak self] _ in
+                    self?.refresh()
+                }
+            ))
         refresh()
     }
 
@@ -405,23 +433,26 @@ final class PlacesStore {
         let provider = providers[index]
         // On one of the kernel's threads for calls that block; one question per file system
         // is out at a time, whoever asks.
-        BlockingCalls.answer(from: provider as AnyObject, to: "places", { _ in provider.places() }, then: { [weak self] (answer: [Place]?) in
-            guard let self else { return }
-            let places = answer ?? []
-            self.asking.remove(index)
-            self.answered.insert(index)
-            let wasComplete = self.isComplete
-            self.isComplete = self.answered.count == self.providers.count
-            if !PlacesStore.areSame(places, self.answers[index]) || wasComplete != self.isComplete {
-                self.answers[index] = places
-                self.all = self.answers.flatMap { $0 }
-                self.handlers.forEach { $0() }
-            }
-            if self.askAgain.remove(index) != nil { self.ask(index) }
-        })
+        BlockingCalls.answer(
+            from: provider as AnyObject, to: "places", { _ in provider.places() },
+            then: { [weak self] (answer: [Place]?) in
+                guard let self else { return }
+                let places = answer ?? []
+                self.asking.remove(index)
+                self.answered.insert(index)
+                let wasComplete = self.isComplete
+                self.isComplete = self.answered.count == self.providers.count
+                if !PlacesStore.areSame(places, self.answers[index]) || wasComplete != self.isComplete {
+                    self.answers[index] = places
+                    self.all = self.answers.flatMap { $0 }
+                    self.handlers.forEach { $0() }
+                }
+                if self.askAgain.remove(index) != nil { self.ask(index) }
+            })
     }
 
     private static func areSame(_ first: [Place], _ second: [Place]) -> Bool {
-        first.count == second.count && zip(first, second).allSatisfy { $0.name == $1.name && $0.url == $1.url && $0.kind == $1.kind }
+        first.count == second.count
+            && zip(first, second).allSatisfy { $0.name == $1.name && $0.url == $1.url && $0.kind == $1.kind }
     }
 }

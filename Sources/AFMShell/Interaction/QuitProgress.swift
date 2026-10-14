@@ -12,7 +12,8 @@ import AppKit
 /// `pressQuitNow` and `pressDontQuit`. Main thread only.
 final class QuitProgress: NSObject {
     static let waitingText = "Finishing before quitting…"
-    static let waitingDetail = "Changes that have not been written yet are being written (into archives, to servers). "
+    static let waitingDetail =
+        "Changes that have not been written yet are being written (into archives, to servers). "
         + "You can wait, quit without waiting, or go on working."
     static let stoppingText = "Quitting…"
 
@@ -50,8 +51,10 @@ final class QuitProgress: NSObject {
         // Ends the modal loop from wherever this is called: a button, or a block of the run
         // loop, which the loop does not look at by itself until an event wakes it.
         NSApp.stopModal()
-        if let wake = NSEvent.otherEvent(with: .applicationDefined, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0,
-                                         context: nil, subtype: 0, data1: 0, data2: 0) {
+        if let wake = NSEvent.otherEvent(
+            with: .applicationDefined, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0,
+            context: nil, subtype: 0, data1: 0, data2: 0)
+        {
             NSApp.postEvent(wake, atStart: true)
         }
     }
@@ -114,12 +117,14 @@ final class QuitProgress: NSObject {
         let content = NSView()
         content.addSubview(stack)
         NSLayoutConstraint.activate([
-            stack.topAnchor.constraint(equalTo: content.topAnchor), stack.bottomAnchor.constraint(equalTo: content.bottomAnchor),
-            stack.leadingAnchor.constraint(equalTo: content.leadingAnchor), stack.trailingAnchor.constraint(equalTo: content.trailingAnchor),
+            stack.topAnchor.constraint(equalTo: content.topAnchor),
+            stack.bottomAnchor.constraint(equalTo: content.bottomAnchor),
+            stack.leadingAnchor.constraint(equalTo: content.leadingAnchor),
+            stack.trailingAnchor.constraint(equalTo: content.trailingAnchor),
             stack.widthAnchor.constraint(equalToConstant: 440),
             bar.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -32),
             footer.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -32),
-            detail.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -32),
+            detail.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -32)
         ])
         let panel = NSPanel(contentRect: .zero, styleMask: [.titled], backing: .buffered, defer: false)
         panel.isReleasedWhenClosed = false

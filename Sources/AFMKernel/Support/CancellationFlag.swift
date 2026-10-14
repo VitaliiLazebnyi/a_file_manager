@@ -22,7 +22,8 @@ public final class CancellationFlag {
     }
 
     public var isCancelled: Bool {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         return cancelled
     }
 

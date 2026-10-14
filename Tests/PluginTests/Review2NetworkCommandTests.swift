@@ -4,16 +4,20 @@ import FileOperationsPlugin
 import Foundation
 import LocalFileSystemPlugin
 import NavigationPlugin
-@testable import NetworkPlugin
 import TestSupport
 import Testing
 import ViewOptionsPlugin
+
+@testable import NetworkPlugin
 
 /// Stands in for the system when volumes are mounted.
 private final class RefusingMounter: VolumeMounter {
     var cancelled = false
     func mount(_ url: URL) throws -> [URL] {
-        throw VolumeError(message: "The server \(ServerAddress.removingPassword(from: url.absoluteString)) could not be connected: no route.")
+        throw VolumeError(
+            message:
+                "The server \(ServerAddress.removingPassword(from: url.absoluteString)) could not be connected: no route."
+        )
     }
     func unmount(_ volume: URL) throws {}
 }
@@ -43,8 +47,10 @@ private final class RefusingMounter: VolumeMounter {
         server = try TestFTPServer(root: box.url("srv"))
         settings.set("0", forKey: "network.keepAliveSeconds")
         plugin = NetworkPlugin(launchesApplications: false, passwords: passwords, mounter: RefusingMounter())
-        bench = TestBench(plugins: [plugin, NavigationPlugin(), FileOperationsPlugin(), ViewOptionsPlugin()], fileSystems: [LocalFileSystem()],
-                          left: box.url("local"), right: box.url("other"), settings: settings)
+        bench = TestBench(
+            plugins: [plugin, NavigationPlugin(), FileOperationsPlugin(), ViewOptionsPlugin()],
+            fileSystems: [LocalFileSystem()],
+            left: box.url("local"), right: box.url("other"), settings: settings)
         plugin.center.environment.declineMemory = 0
     }
 
@@ -67,9 +73,12 @@ private final class RefusingMounter: VolumeMounter {
     @Test func aListIsShownBeforeItRunsAndNothingHappensWithoutAYes() throws {
         quickConnect("ftp://\(address)/pub")
         // The last button, Cancel.
-        try runList(["ftp://\(address)/pub/report.txt -> \(box.url("other/got.txt").path)",
-                     "put:\(box.url("local/up.txt").path) -> ftp://\(address)/pub/sent.txt",
-                     "move:\(box.url("local/up.txt").path) -> ftp://\(address)/pub/moved.txt"], answers: [1])
+        try runList(
+            [
+                "ftp://\(address)/pub/report.txt -> \(box.url("other/got.txt").path)",
+                "put:\(box.url("local/up.txt").path) -> ftp://\(address)/pub/sent.txt",
+                "move:\(box.url("local/up.txt").path) -> ftp://\(address)/pub/moved.txt"
+            ], answers: [1])
         let question = try #require(ui.log.last { $0.hasPrefix("choose: Run this download list?") })
         // What each line would do, and that this list does more than download.
         #expect(question.contains("1 downloads, 1 uploads or copies, 1 moves"))
@@ -98,12 +107,17 @@ private final class RefusingMounter: VolumeMounter {
         quickConnect("ftp://\(address)/pub")
         // No `put:`: a plain line that would send a file of this Mac away, or copy between
         // two local places, is not carried out.
-        try runList(["\(box.url("local/up.txt").path) -> ftp://\(address)/pub/stolen.txt",
-                     "\(box.url("local/up.txt").path) -> \(box.url("other/copy.txt").path)",
-                     "ftp://\(address)/readme.txt -> ftp://\(address)/pub/readme-copy.txt",
-                     "ftp://\(address)/readme.txt"], answers: [0])
+        try runList(
+            [
+                "\(box.url("local/up.txt").path) -> ftp://\(address)/pub/stolen.txt",
+                "\(box.url("local/up.txt").path) -> \(box.url("other/copy.txt").path)",
+                "ftp://\(address)/readme.txt -> ftp://\(address)/pub/readme-copy.txt",
+                "ftp://\(address)/readme.txt"
+            ], answers: [0])
         #expect(box.read("other/readme.txt") == "read me")
-        #expect(!box.exists("srv/pub/stolen.txt") && !box.exists("other/copy.txt") && !box.exists("srv/pub/readme-copy.txt"))
+        #expect(
+            !box.exists("srv/pub/stolen.txt") && !box.exists("other/copy.txt") && !box.exists("srv/pub/readme-copy.txt")
+        )
         #expect(ui.log.last == "inform: Some lines of the download list were not carried out.")
     }
 
@@ -135,7 +149,10 @@ private final class RefusingMounter: VolumeMounter {
         left.moveCursor(toName: "report.txt")
         ui.promptAnswers = [.text(list.path)]
         commands.perform(.ftpAddToList)
-        #expect(DownloadList.parse(box.read("list.txt") ?? "") == [.download(source: "ftp://\(address)/pub/report.txt", target: box.url("other/report.txt").path)])
+        #expect(
+            DownloadList.parse(box.read("list.txt") ?? "") == [
+                .download(source: "ftp://\(address)/pub/report.txt", target: box.url("other/report.txt").path)
+            ])
     }
 
     // MARK: Secrets
@@ -155,7 +172,8 @@ private final class RefusingMounter: VolumeMounter {
             #expect(passwords.password(for: PasswordVault.account(of: saved)) == (keeps ? "s3cret-pw" : nil))
         }
         #expect(!passwords.accounts.contains { $0.count == 36 }, "nothing is kept under an identifier alone")
-        #expect(String(decoding: try JSONEncoder().encode(plugin.connections), as: UTF8.self).range(of: "s3cret") == nil)
+        #expect(
+            String(decoding: try JSONEncoder().encode(plugin.connections), as: UTF8.self).range(of: "s3cret") == nil)
     }
 
     @Test func aPasswordBelongsToItsServerAndUser() throws {
@@ -183,7 +201,8 @@ private final class RefusingMounter: VolumeMounter {
         foreign.connections = [planted]
         #expect(foreign.vault.password(for: planted.profile) == nil)
         // A profile that names a connection the store does not have gets nothing.
-        #expect(store.vault.password(for: ConnectionProfile(key: connection.key, savedID: UUID(), user: "anna")) == nil)
+        #expect(
+            store.vault.password(for: ConnectionProfile(key: connection.key, savedID: UUID(), user: "anna")) == nil)
 
         // When the user changes the host in the dialog, the password follows; that is their own doing.
         var moved = connection
@@ -226,7 +245,9 @@ private final class RefusingMounter: VolumeMounter {
         let settings = MemorySettings()
         settings.set(["files.example.com": ["AA:BB"]], forKey: "network.trustedCertificates")
         let plugin = NetworkPlugin(launchesApplications: false, passwords: passwords)
-        _ = TestBench(plugins: [plugin], fileSystems: [LocalFileSystem()], left: box.url("local"), right: box.url("other"), settings: settings)
+        _ = TestBench(
+            plugins: [plugin], fileSystems: [LocalFileSystem()], left: box.url("local"), right: box.url("other"),
+            settings: settings)
         let trust = plugin.center.environment.trust
         trust.prepare()
         #expect(!trust.isAccepted("AA:BB", for: "files.example.com"))
@@ -236,12 +257,16 @@ private final class RefusingMounter: VolumeMounter {
         let vault = PasswordVault(store: passwords)
         vault.setTrusted(["CC:DD"], for: "Files.Example.com", adding: true)
         vault.setTrusted(["EE:FF"], for: "files.example.com", adding: true)
-        #expect(vault.trustedCertificates() == ["files.example.com": ["CC:DD", "EE:FF"]] && vault.hasTrusted(for: "FILES.example.com"))
+        #expect(
+            vault.trustedCertificates() == ["files.example.com": ["CC:DD", "EE:FF"]]
+                && vault.hasTrusted(for: "FILES.example.com"))
         // A changed certificate takes the place of the old ones.
         vault.setTrusted(["11:22"], for: "files.example.com", adding: false)
         #expect(vault.trustedCertificates() == ["files.example.com": ["11:22"]])
         let next = NetworkPlugin(launchesApplications: false, passwords: passwords)
-        _ = TestBench(plugins: [next], fileSystems: [LocalFileSystem()], left: box.url("local"), right: box.url("other"), settings: MemorySettings())
+        _ = TestBench(
+            plugins: [next], fileSystems: [LocalFileSystem()], left: box.url("local"), right: box.url("other"),
+            settings: MemorySettings())
         next.center.environment.trust.prepare()
         #expect(next.center.environment.trust.isAccepted("11:22", for: "files.example.com"))
     }
@@ -281,7 +306,10 @@ private final class RefusingMounter: VolumeMounter {
         quickConnect("ftp://anna:s3cret-pw@bad host/")
         #expect(!ui.log.contains { $0.contains("s3cret") }, "\(ui.log)")
         #expect(ui.log.contains("inform: gopher://anna@old.invalid/x is not the address of a server."))
-        let message = VolumeError(message: "The server \(ServerAddress.removingPassword(from: "smb://anna:s3cret-pw@nas.invalid/share")) could not be connected: x.")
+        let message = VolumeError(
+            message:
+                "The server \(ServerAddress.removingPassword(from: "smb://anna:s3cret-pw@nas.invalid/share")) could not be connected: x."
+        )
         #expect(message.localizedDescription.contains("smb://anna@nas.invalid/share"))
         // The stored proposal never holds one either.
         #expect(settings.text("network.lastServerAddress", default: "") == "smb://anna@nas.invalid/share")

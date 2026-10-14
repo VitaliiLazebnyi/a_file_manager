@@ -15,12 +15,14 @@ final class SelectionRegexTrip {
     }
 
     var hasTimedOut: Bool {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         return timeouts > 0
     }
 
     var isTripped: Bool {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         return timeouts >= 3
     }
 }
@@ -33,14 +35,18 @@ enum SelectionRegex {
     /// What one name may take.
     static let budget: TimeInterval = 0.25
 
-    static func matches(_ regex: NSRegularExpression, _ name: String, trip: SelectionRegexTrip, cancelled: () -> Bool) -> Bool {
+    static func matches(_ regex: NSRegularExpression, _ name: String, trip: SelectionRegexTrip, cancelled: () -> Bool)
+        -> Bool
+    {
         if trip.isTripped || cancelled() { return false }
         guard !name.isEmpty else { return regex.firstMatch(in: name, range: NSRange(location: 0, length: 0)) != nil }
         // (Processor time of this thread, not the clock: see `ThreadTime`.)
         let deadline = ThreadTime.used + budget
         var found = false
         var timedOut = false
-        regex.enumerateMatches(in: name, options: [.reportProgress], range: NSRange(location: 0, length: name.utf16.count)) { result, _, stop in
+        regex.enumerateMatches(
+            in: name, options: [.reportProgress], range: NSRange(location: 0, length: name.utf16.count)
+        ) { result, _, stop in
             if result != nil {
                 found = true
                 stop.pointee = true

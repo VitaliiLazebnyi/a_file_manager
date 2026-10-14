@@ -33,7 +33,9 @@ public final class MacIntegrationPlugin: Plugin {
     /// A line of the log. Names come from the disk: a line break in one cannot make a second line.
     private func remember(_ line: String) {
         log.append(DisplayText.oneLine(line, limit: 2000))
-        if log.count > MacIntegrationPlugin.recordLimit * 2 { log.removeFirst(log.count - MacIntegrationPlugin.recordLimit) }
+        if log.count > MacIntegrationPlugin.recordLimit * 2 {
+            log.removeFirst(log.count - MacIntegrationPlugin.recordLimit)
+        }
     }
 
     /// The files of a log line: their paths while they are few, their number when they are
@@ -55,7 +57,9 @@ public final class MacIntegrationPlugin: Plugin {
     /// the list are taken as they are, which copies nothing); with few, everything is done at
     /// once, here. `deliver` runs from the main run loop, not from a block of the main queue:
     /// it may ask the user something.
-    private func withLocalOperands<Result>(of model: PanelModel, _ work: @escaping ([URL]) -> Result, then deliver: @escaping (Result) -> Void) {
+    private func withLocalOperands<Result>(
+        of model: PanelModel, _ work: @escaping ([URL]) -> Result, then deliver: @escaping (Result) -> Void
+    ) {
         let operands = model.operandsSnapshot()
         func urls() -> [URL] { operands.items().map(\.url).filter(\.isFileURL) }
         guard operands.markedCount >= MacIntegrationPlugin.backgroundListThreshold else { return deliver(work(urls())) }
@@ -109,7 +113,9 @@ public final class MacIntegrationPlugin: Plugin {
     public static let copyAsPathname: CommandID = "afm_CopyAsPathname"
 
     /// Tests pass a pasteboard of their own and say which applications open a file.
-    public init(launchesApplications: Bool = true, pasteboard: NSPasteboard = .general, applications: ((URL) -> [URL])? = nil) {
+    public init(
+        launchesApplications: Bool = true, pasteboard: NSPasteboard = .general, applications: ((URL) -> [URL])? = nil
+    ) {
         self.launchesApplications = launchesApplications
         self.pasteboard = pasteboard
         self.applications = applications ?? MacIntegrationPlugin.installedApplications
@@ -138,9 +144,13 @@ public final class MacIntegrationPlugin: Plugin {
         }
         let name = text.hasSuffix(".app") ? String(text.dropLast(4)) : text
         guard !name.isEmpty else { return fallback }
-        let folders = ["/Applications", "/System/Applications", "/Applications/Utilities", "/System/Applications/Utilities",
-                       fm.homeDirectoryForCurrentUser.appendingPathComponent("Applications").path]
-        if let path = folders.map({ $0 + "/" + name + ".app" }).first(where: fm.fileExists(atPath:)) { return URL(fileURLWithPath: path) }
+        let folders = [
+            "/Applications", "/System/Applications", "/Applications/Utilities", "/System/Applications/Utilities",
+            fm.homeDirectoryForCurrentUser.appendingPathComponent("Applications").path
+        ]
+        if let path = folders.map({ $0 + "/" + name + ".app" }).first(where: fm.fileExists(atPath:)) {
+            return URL(fileURLWithPath: path)
+        }
         return NSWorkspace.shared.urlForApplication(withBundleIdentifier: text) ?? fallback
     }
 
@@ -150,7 +160,8 @@ public final class MacIntegrationPlugin: Plugin {
         remember(opened: urls)
         guard launchesApplications else { return }
         if let application {
-            NSWorkspace.shared.open(urls, withApplicationAt: application, configuration: NSWorkspace.OpenConfiguration())
+            NSWorkspace.shared.open(
+                urls, withApplicationAt: application, configuration: NSWorkspace.OpenConfiguration())
         } else {
             // Launch Services answers each file in its own time; none of them holds up the main thread.
             urls.forEach { NSWorkspace.shared.open($0, configuration: NSWorkspace.OpenConfiguration()) }
@@ -181,53 +192,82 @@ public final class MacIntegrationPlugin: Plugin {
         }
 
         // F4 starts the editor the user chose (spec 10 › Editor and parameters).
-        commands.register(Command(.edit, "Edit", [.f(4)], barLabel: "Edit", runsDuringJobs: true),
-                          enabled: { cursorFile() != nil }, parameterized: { [self] argument in
-            guard let url = argument.location ?? cursorFile(), url.isFileURL else { return }
-            let editor = kernel.settings.text(MacIntegrationPlugin.editorKey, default: MacIntegrationPlugin.defaultEditor)
-            remember(opened: [url])
-            remember("edit \(DisplayText.oneLine(editor, limit: 200)) \(url.path)")
-            guard launchesApplications else { return }
-            // (The system looks at the file and the application: on a thread of the kernel's own.)
-            BlockingCalls.run {
-                workspace.open([url], withApplicationAt: MacIntegrationPlugin.editorApplication(named: editor),
-                               configuration: NSWorkspace.OpenConfiguration())
-            }
-        })
+        commands.register(
+            Command(.edit, "Edit", [.f(4)], barLabel: "Edit", runsDuringJobs: true),
+            enabled: { cursorFile() != nil },
+            parameterized: { [self] argument in
+                guard let url = argument.location ?? cursorFile(), url.isFileURL else { return }
+                let editor = kernel.settings.text(
+                    MacIntegrationPlugin.editorKey, default: MacIntegrationPlugin.defaultEditor)
+                remember(opened: [url])
+                remember("edit \(DisplayText.oneLine(editor, limit: 200)) \(url.path)")
+                guard launchesApplications else { return }
+                // (The system looks at the file and the application: on a thread of the kernel's own.)
+                BlockingCalls.run {
+                    workspace.open(
+                        [url], withApplicationAt: MacIntegrationPlugin.editorApplication(named: editor),
+                        configuration: NSWorkspace.OpenConfiguration())
+                }
+            })
         // `.text`: the editor's name, path or bundle identifier; `.location`: the application;
         // without, the user picks it.
-        commands.register(Command(MacIntegrationPlugin.chooseEditor, "Choose Editor for F4…", runsDuringJobs: true), parameterized: { [self] argument in
-            guard let editor = argument.text ?? argument.location?.path ?? chooseApplication(title: "Choose the editor for F4")?.path else { return }
-            kernel.settings.set(editor, forKey: MacIntegrationPlugin.editorKey)
-        })
+        commands.register(
+            Command(MacIntegrationPlugin.chooseEditor, "Choose Editor for F4…", runsDuringJobs: true),
+            parameterized: { [self] argument in
+                guard
+                    let editor = argument.text ?? argument.location?.path
+                        ?? chooseApplication(title: "Choose the editor for F4")?.path
+                else { return }
+                kernel.settings.set(editor, forKey: MacIntegrationPlugin.editorKey)
+            })
 
-        commands.register(Command(MacIntegrationPlugin.openWithDefault, "Open with Default Application", runsDuringJobs: true),
-                          enabled: { cursorItem() != nil }) { [self] in
+        commands.register(
+            Command(MacIntegrationPlugin.openWithDefault, "Open with Default Application", runsDuringJobs: true),
+            enabled: { cursorItem() != nil }
+        ) { [self] in
             guard let url = cursorItem() else { return }
             remember("open \(url.path)")
             open([url], with: nil)
         }
-        commands.register(Command(MacIntegrationPlugin.openWith, "Open With…", runsDuringJobs: true), enabled: { cursorItem() != nil }) { [self] in
+        commands.register(
+            Command(MacIntegrationPlugin.openWith, "Open With…", runsDuringJobs: true),
+            enabled: { cursorItem() != nil }
+        ) { [self] in
             guard let url = cursorItem() else { return }
             let applications = self.applications
             // Launch Services looks at the file to know what opens it; on a volume that has
             // stopped answering that never returns. It is asked in a job, which can be cancelled.
-            kernel.jobs.run(title: "Applications:", work: { monitor -> [URL]? in
-                BlockingCalls.answer(from: MacIntegrationPlugin.launchServices, to: "applications " + url.path,
-                                     cancellation: monitor.cancellation) { _ in applications(url) }
-            }, completion: { [self] found in
-                guard let candidates = found else { return }
-                let rows = candidates.enumerated().map { MacIntegrationPlugin.applicationName($0.element) + ($0.offset == 0 ? " (default)" : "") }
-                guard let row = kernel.ui.pickRow("Open “\(DisplayText.oneLine(url.lastPathComponent))” with", rows: rows + ["Other…"],
-                                                  button: "Open") else { return }
-                guard let application = candidates.indices.contains(row) ? candidates[row]
-                    : chooseApplication(title: "Choose an application") else { return }
-                remember("open-with \(MacIntegrationPlugin.applicationName(application)) \(url.path)")
-                open([url], with: application)
-            })
+            kernel.jobs.run(
+                title: "Applications:",
+                work: { monitor -> [URL]? in
+                    BlockingCalls.answer(
+                        from: MacIntegrationPlugin.launchServices, to: "applications " + url.path,
+                        cancellation: monitor.cancellation
+                    ) { _ in applications(url) }
+                },
+                completion: { [self] found in
+                    guard let candidates = found else { return }
+                    let rows = candidates.enumerated().map {
+                        MacIntegrationPlugin.applicationName($0.element) + ($0.offset == 0 ? " (default)" : "")
+                    }
+                    guard
+                        let row = kernel.ui.pickRow(
+                            "Open “\(DisplayText.oneLine(url.lastPathComponent))” with", rows: rows + ["Other…"],
+                            button: "Open")
+                    else { return }
+                    guard
+                        let application = candidates.indices.contains(row)
+                            ? candidates[row]
+                            : chooseApplication(title: "Choose an application")
+                    else { return }
+                    remember("open-with \(MacIntegrationPlugin.applicationName(application)) \(url.path)")
+                    open([url], with: application)
+                })
         }
-        commands.register(Command(.revealInFinder, "Reveal in Finder", [.cmd("r", .shift)], runsDuringJobs: true),
-                          enabled: { model().directory.isFileURL }) { [self] in
+        commands.register(
+            Command(.revealInFinder, "Reveal in Finder", [.cmd("r", .shift)], runsDuringJobs: true),
+            enabled: { model().directory.isFileURL }
+        ) { [self] in
             let directory = model().directory
             let launches = launchesApplications
             // Finder is shown the first items of a very large selection; it could not show more.
@@ -239,8 +279,10 @@ public final class MacIntegrationPlugin: Plugin {
             }
         }
 
-        commands.register(Command(MacIntegrationPlugin.quickLook, "Quick Look", [.cmd("y")], runsDuringJobs: true),
-                          enabled: hasLocalOperands, checked: { [self] in launchesApplications && quickLook.isVisible }) { [self] in
+        commands.register(
+            Command(MacIntegrationPlugin.quickLook, "Quick Look", [.cmd("y")], runsDuringJobs: true),
+            enabled: hasLocalOperands, checked: { [self] in launchesApplications && quickLook.isVisible }
+        ) { [self] in
             withLocalOperands(of: model(), { $0 }) { [self] urls in
                 remember("quicklook " + MacIntegrationPlugin.described(urls))
                 followed = nil
@@ -249,32 +291,46 @@ public final class MacIntegrationPlugin: Plugin {
         }
         // The open Quick Look panel follows the cursor and the active panel.
         subscription = kernel.panelEvents.subscribe { [weak self] _, panel in
-            guard let self, self.launchesApplications, self.quickLook.isVisible, panel === kernel.panels.source else { return }
+            guard let self, self.launchesApplications, self.quickLook.isVisible, panel === kernel.panels.source else {
+                return
+            }
             self.follow(panel.model)
         }
 
-        commands.register(Command(MacIntegrationPlugin.share, "Share…", runsDuringJobs: true), enabled: hasLocalOperands) { [self] in
+        commands.register(
+            Command(MacIntegrationPlugin.share, "Share…", runsDuringJobs: true), enabled: hasLocalOperands
+        ) { [self] in
             withLocalOperands(of: model(), { $0 }) { [self] urls in
                 // The sharing panel looks at every item; nobody shares a hundred thousand at once.
                 guard urls.count <= MacIntegrationPlugin.shareLimit else {
-                    return kernel.ui.inform("Too many items to share", detail: "\(urls.count) items are selected. "
-                                            + "At most \(MacIntegrationPlugin.shareLimit) can be shared at a time.", style: .warning)
+                    return kernel.ui.inform(
+                        "Too many items to share",
+                        detail: "\(urls.count) items are selected. "
+                            + "At most \(MacIntegrationPlugin.shareLimit) can be shared at a time.", style: .warning)
                 }
                 remember("share " + MacIntegrationPlugin.described(urls))
                 guard launchesApplications, let view = NSApp?.keyWindow?.contentView else { return }
                 let picker = NSSharingServicePicker(items: urls)
                 sharingPicker = picker
-                picker.show(relativeTo: NSRect(x: view.bounds.midX, y: view.bounds.midY, width: 1, height: 1), of: view, preferredEdge: .minY)
+                picker.show(
+                    relativeTo: NSRect(x: view.bounds.midX, y: view.bounds.midY, width: 1, height: 1), of: view,
+                    preferredEdge: .minY)
             }
         }
         commands.register(Command(MacIntegrationPlugin.editTags, "Finder Tags…"), enabled: hasLocalOperands) { [self] in
             withLocalOperands(of: model(), { $0 }) { [self] urls in editTags(of: urls, in: kernel) }
         }
-        commands.register(Command(MacIntegrationPlugin.copyAsPathname, "Copy as Pathname", [Shortcut(.character("c"), [.command, .option])],
-                                  runsDuringJobs: true), enabled: { model().directory.isFileURL }) { [self] in
+        commands.register(
+            Command(
+                MacIntegrationPlugin.copyAsPathname, "Copy as Pathname",
+                [Shortcut(.character("c"), [.command, .option])],
+                runsDuringJobs: true), enabled: { model().directory.isFileURL }
+        ) { [self] in
             let directory = model().directory
             // The paths of a large selection are put together off the main thread.
-            withLocalOperands(of: model(), { urls in (urls.isEmpty ? [directory] : urls).map(\.path).joined(separator: "\n") }) { [self] text in
+            withLocalOperands(
+                of: model(), { urls in (urls.isEmpty ? [directory] : urls).map(\.path).joined(separator: "\n") }
+            ) { [self] text in
                 pasteboard.clearContents()
                 pasteboard.setString(text, forType: .string)
             }
@@ -282,25 +338,42 @@ public final class MacIntegrationPlugin: Plugin {
 
         let macSection = MenuSection(.files, order: 12)
         kernel.menus.add([.edit], to: .filesOpen)
-        kernel.menus.add([MacIntegrationPlugin.openWith, MacIntegrationPlugin.openWithDefault, MacIntegrationPlugin.quickLook], to: macSection)
-        kernel.menus.add([.revealInFinder, MacIntegrationPlugin.share, MacIntegrationPlugin.editTags, MacIntegrationPlugin.copyAsPathname],
-                         to: .filesTools)
+        kernel.menus.add(
+            [MacIntegrationPlugin.openWith, MacIntegrationPlugin.openWithDefault, MacIntegrationPlugin.quickLook],
+            to: macSection)
+        kernel.menus.add(
+            [
+                .revealInFinder, MacIntegrationPlugin.share, MacIntegrationPlugin.editTags,
+                MacIntegrationPlugin.copyAsPathname
+            ],
+            to: .filesTools)
         kernel.menus.add([MacIntegrationPlugin.chooseEditor], to: .configurationCustomize)
         kernel.menus.addToContextMenu([.edit], in: .open, onItemOnly: true)
         kernel.menus.addToContextMenu([.revealInFinder], in: .tools)
-        kernel.menus.addToContextMenu([MacIntegrationPlugin.openWith, MacIntegrationPlugin.quickLook, MacIntegrationPlugin.share,
-                                       MacIntegrationPlugin.editTags, MacIntegrationPlugin.copyAsPathname],
-                                      in: ContextMenuSection(order: 55), onItemOnly: true)
-        kernel.toolbar.add(MacIntegrationPlugin.quickLook, symbol: "eye", group: 60, hint: "Preview the selected file with macOS Quick Look.")
-        kernel.toolbar.add(MacIntegrationPlugin.share, symbol: "square.and.arrow.up", group: 60, hint: "Share the selected files: AirDrop, Mail, Messages and more.")
+        kernel.menus.addToContextMenu(
+            [
+                MacIntegrationPlugin.openWith, MacIntegrationPlugin.quickLook, MacIntegrationPlugin.share,
+                MacIntegrationPlugin.editTags, MacIntegrationPlugin.copyAsPathname
+            ],
+            in: ContextMenuSection(order: 55), onItemOnly: true)
+        kernel.toolbar.add(
+            MacIntegrationPlugin.quickLook, symbol: "eye", group: 60,
+            hint: "Preview the selected file with macOS Quick Look.")
+        kernel.toolbar.add(
+            MacIntegrationPlugin.share, symbol: "square.and.arrow.up", group: 60,
+            hint: "Share the selected files: AirDrop, Mail, Messages and more.")
         kernel.toolbar.setSymbol("tag", for: MacIntegrationPlugin.editTags)
         kernel.toolbar.setSymbol("arrow.up.forward.app", for: MacIntegrationPlugin.openWith)
         kernel.toolbar.setSymbol("folder", for: .revealInFinder)
         kernel.toolbar.setSymbol("pencil", for: .edit)
-        kernel.preferences.add(PreferencePage(title: "Edit (F4)", preferences: [
-            Preference(MacIntegrationPlugin.editorKey, "Editor (application name, path or bundle identifier):",
-                       .text(default: MacIntegrationPlugin.defaultEditor)),
-        ]))
+        kernel.preferences.add(
+            PreferencePage(
+                title: "Edit (F4)",
+                preferences: [
+                    Preference(
+                        MacIntegrationPlugin.editorKey, "Editor (application name, path or bundle identifier):",
+                        .text(default: MacIntegrationPlugin.defaultEditor))
+                ]))
     }
 
     public func stop() {
@@ -335,7 +408,8 @@ public final class MacIntegrationPlugin: Plugin {
     /// The tags as the user types them: separated by commas, no empty ones, none twice.
     static func tags(from text: String) -> [String] {
         var tags: [String] = []
-        for tag in text.split(separator: ",").map({ $0.trimmingCharacters(in: .whitespaces) }) where !tag.isEmpty && !tags.contains(tag) {
+        for tag in text.split(separator: ",").map({ $0.trimmingCharacters(in: .whitespaces) })
+        where !tag.isEmpty && !tags.contains(tag) {
             tags.append(tag)
         }
         return tags
@@ -345,26 +419,35 @@ public final class MacIntegrationPlugin: Plugin {
     /// disk is read and written as jobs, off the main thread.
     private func editTags(of urls: [URL], in kernel: Kernel) {
         guard let first = urls.first else { return }
-        kernel.jobs.run(title: "Reading tags", work: { _ in MacIntegrationPlugin.tags(of: first) }, completion: { [self] current in
-            let subject = urls.count == 1 ? "“\(DisplayText.oneLine(first.lastPathComponent))”" : "\(urls.count) items"
-            guard let text = kernel.ui.prompt("Finder tags of \(subject):", value: current.joined(separator: ", "),
-                                              detail: "Separate tags with commas. An empty line removes all tags.") else { return }
-            let tags = MacIntegrationPlugin.tags(from: text)
-            kernel.jobs.run(title: "Setting tags", work: { monitor -> (error: Error?, folders: [URL]) in
-                var failure: Error?
-                for url in urls where !monitor.cancellation.isCancelled {
-                    do { try MacIntegrationPlugin.setTags(tags, of: url) } catch {
-                        failure = error
-                        break
-                    }
-                }
-                // The folders to show again are worked out here, not on the main thread.
-                return (failure, Array(Set(urls.map { $0.deletingLastPathComponent() })))
-            }, completion: { [self] result in
-                if let error = result.error { kernel.ui.report(error, title: "The tags could not be set") }
-                remember("tags " + MacIntegrationPlugin.described(urls) + ": " + tags.joined(separator: ", "))
-                kernel.panels.refresh(result.folders)
+        kernel.jobs.run(
+            title: "Reading tags", work: { _ in MacIntegrationPlugin.tags(of: first) },
+            completion: { [self] current in
+                let subject =
+                    urls.count == 1 ? "“\(DisplayText.oneLine(first.lastPathComponent))”" : "\(urls.count) items"
+                guard
+                    let text = kernel.ui.prompt(
+                        "Finder tags of \(subject):", value: current.joined(separator: ", "),
+                        detail: "Separate tags with commas. An empty line removes all tags.")
+                else { return }
+                let tags = MacIntegrationPlugin.tags(from: text)
+                kernel.jobs.run(
+                    title: "Setting tags",
+                    work: { monitor -> (error: Error?, folders: [URL]) in
+                        var failure: Error?
+                        for url in urls where !monitor.cancellation.isCancelled {
+                            do { try MacIntegrationPlugin.setTags(tags, of: url) } catch {
+                                failure = error
+                                break
+                            }
+                        }
+                        // The folders to show again are worked out here, not on the main thread.
+                        return (failure, Array(Set(urls.map { $0.deletingLastPathComponent() })))
+                    },
+                    completion: { [self] result in
+                        if let error = result.error { kernel.ui.report(error, title: "The tags could not be set") }
+                        remember("tags " + MacIntegrationPlugin.described(urls) + ": " + tags.joined(separator: ", "))
+                        kernel.panels.refresh(result.folders)
+                    })
             })
-        })
     }
 }

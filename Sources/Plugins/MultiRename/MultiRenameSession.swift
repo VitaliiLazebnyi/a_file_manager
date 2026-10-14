@@ -154,8 +154,11 @@ final class MultiRenameSession {
         }
     }
 
-    init(kernel: Kernel, items: [FileItem], store: RenameStore, settings: RenameSettings, logDirectory: URL,
-         previewsInBackground: Bool = true, clipboard: @escaping () -> String? = { nil }, clipboardChangeCount: (() -> Int)? = nil) {
+    init(
+        kernel: Kernel, items: [FileItem], store: RenameStore, settings: RenameSettings, logDirectory: URL,
+        previewsInBackground: Bool = true, clipboard: @escaping () -> String? = { nil },
+        clipboardChangeCount: (() -> Int)? = nil
+    ) {
         self.kernel = kernel
         self.store = store
         self.settings = settings
@@ -215,10 +218,13 @@ final class MultiRenameSession {
         let cancellation = CancellationFlag()
         previewCancellation = cancellation
         let cache = self.cache
-        let (entries, settings, context, given, fileSystems) = (self.entries, self.settings, makeContext(cache: cache), givenNames, kernel.fileSystems)
+        let (entries, settings, context, given, fileSystems) = (
+            self.entries, self.settings, makeContext(cache: cache), givenNames, kernel.fileSystems
+        )
         func compute() -> RenamePreview {
-            RenameComputation.preview(entries, settings: settings, context: context, given: given, fileSystems: fileSystems, cache: cache,
-                                      cancellation: cancellation, isCancelled: { cancellation.isCancelled })
+            RenameComputation.preview(
+                entries, settings: settings, context: context, given: given, fileSystems: fileSystems, cache: cache,
+                cancellation: cancellation, isCancelled: { cancellation.isCancelled })
         }
         guard previewsInBackground else {
             apply(compute())
@@ -292,9 +298,11 @@ final class MultiRenameSession {
         func makeKeys() -> [Keys] {
             rows.map { entry -> Keys in
                 let item = entry.item
-                return Keys(name: Sorter.key(of: entry.name, numeric: true),
-                            ext: Sorter.key(of: key == .ext && !item.isFolder ? FileItem.split(entry.name).ext : "", numeric: true),
-                            size: item.size, modified: item.modified)
+                return Keys(
+                    name: Sorter.key(of: entry.name, numeric: true),
+                    ext: Sorter.key(
+                        of: key == .ext && !item.isFolder ? FileItem.split(entry.name).ext : "", numeric: true),
+                    size: item.size, modified: item.modified)
             }
         }
         func inOrder(_ first: Keys, _ second: Keys) -> Bool {
@@ -320,7 +328,9 @@ final class MultiRenameSession {
             listChanged(keepingFolders: true)
         }
         sortRequest += 1
-        guard previewsInBackground, entries.count >= MultiRenameSession.backgroundSortThreshold else { return apply(permutation()) }
+        guard previewsInBackground, entries.count >= MultiRenameSession.backgroundSortThreshold else {
+            return apply(permutation())
+        }
         let (generation, request) = (listGeneration, sortRequest)
         isComputing = true
         sortQueue.async { [weak self] in
@@ -344,7 +354,8 @@ final class MultiRenameSession {
     @discardableResult
     func move(_ indexes: IndexSet, by offset: Int) -> IndexSet {
         guard !isBusy, offset == 1 || offset == -1, let first = indexes.first, let last = indexes.last,
-              offset < 0 ? first > 0 : last < entries.count - 1 else { return indexes }
+            offset < 0 ? first > 0 : last < entries.count - 1
+        else { return indexes }
         for index in offset < 0 ? Array(indexes) : indexes.reversed() {
             entries.swapAt(index, index + offset)
             newNames.swapAt(index, index + offset)
@@ -397,7 +408,9 @@ final class MultiRenameSession {
             if settings == .unchanged { listChanged(keepingFolders: true) } else { settings = .unchanged }
             onChange?()
         }
-        guard previewsInBackground, oldEntries.count >= MultiRenameSession.backgroundSortThreshold else { return finish(renamed()) }
+        guard previewsInBackground, oldEntries.count >= MultiRenameSession.backgroundSortThreshold else {
+            return finish(renamed())
+        }
         let generation = listGeneration
         isComputing = true
         sortQueue.async { [weak self] in
@@ -462,13 +475,19 @@ final class MultiRenameSession {
         guard !isBusy else { return }
         func ask(_ text: String) {
             let fields = [FormField.lines("names", "", text)]
-            guard let answer = kernel.ui.form("Edit names", detail: "One name per line, in the order of the list.", fields: fields, buttons: ["OK"]) else {
+            guard
+                let answer = kernel.ui.form(
+                    "Edit names", detail: "One name per line, in the order of the list.", fields: fields,
+                    buttons: ["OK"])
+            else {
                 return
             }
             loadNames(fromText: answer.text("names"))
         }
         // The text of a long list is put together in the background.
-        guard previewsInBackground, entries.count >= MultiRenameSession.backgroundSortThreshold else { return ask(targetNames.joined(separator: "\n")) }
+        guard previewsInBackground, entries.count >= MultiRenameSession.backgroundSortThreshold else {
+            return ask(targetNames.joined(separator: "\n"))
+        }
         let (current, names, generation) = (entries, newNames, listGeneration)
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             let text = current.indices.map { names[$0] ?? current[$0].name }.joined(separator: "\n")
@@ -552,86 +571,117 @@ final class MultiRenameSession {
         titleRule = store.titleRule
         let (entries, settings, context, given) = (self.entries, self.settings, makeContext(cache: fresh), givenNames)
         let (fileSystems, ui, logURL) = (kernel.fileSystems, kernel.ui, self.logURL)
-        kernel.jobs.run(title: "Multi-Rename:", work: { monitor -> Outcome in
-            let preview = RenameComputation.preview(entries, settings: settings, context: context, given: given, fileSystems: fileSystems,
-                                                    cache: fresh, cancellation: monitor.cancellation, isCancelled: { monitor.cancellation.isCancelled })
-            var outcome = Outcome(entries: entries)
-            outcome.unusable = preview.statuses.filter { $0 == .error || $0.isInvalid }.count
-            guard !monitor.cancellation.isCancelled else {
-                outcome.result.cancelled = true
-                return outcome
-            }
-            // Names that come from a file or were typed can lead anywhere: a name with a slash
-            // moves the file into that folder, a name that starts with one anywhere on the disk.
-            if given != nil {
-                let moving = preview.names.indices.filter { preview.statuses[$0] == .ready && preview.names[$0]?.utf8.contains(0x2F) == true }
-                if !moving.isEmpty {
-                    let examples = moving.prefix(8).map { (preview.names[$0] ?? "") }.joined(separator: "\n") + (moving.count > 8 ? "\n…" : "")
-                    let go = monitor.ask {
-                        ui.choose("\(moving.count) of the names given move the file into another folder.",
-                                  detail: examples + "\n\nA name with a / puts the file in that folder, and one that starts with a / anywhere on the disk. Rename anyway?",
-                                  buttons: ["Rename", "Cancel"], style: .warning) == 0
-                    }
-                    guard go else {
-                        outcome.result.cancelled = true
-                        return outcome
-                    }
-                }
-            }
-            let sources = entries.map(\.item.url)
-            var targets = preview.targets
-            let conflicts = preview.conflicts
-            if !conflicts.isEmpty {
-                let names = conflicts.prefix(12).map { preview.names[$0] ?? "" }.joined(separator: "\n") + (conflicts.count > 12 ? "\n…" : "")
-                let choice = monitor.ask {
-                    ui.pick("Name conflict: \(conflicts.count) file(s) would get a name that is already in use.",
-                            detail: names + "\n\nAuto-rename them to \"name (2).ext\", \"name (3).ext\", …?",
-                            [("Auto-rename", .autoRename), ("Skip these files", .skip), ("Cancel", .cancel)], fallback: ConflictChoice.cancel)
-                }
-                switch choice {
-                case .cancel:
+        kernel.jobs.run(
+            title: "Multi-Rename:",
+            work: { monitor -> Outcome in
+                let preview = RenameComputation.preview(
+                    entries, settings: settings, context: context, given: given, fileSystems: fileSystems,
+                    cache: fresh, cancellation: monitor.cancellation, isCancelled: { monitor.cancellation.isCancelled }
+                )
+                var outcome = Outcome(entries: entries)
+                outcome.unusable = preview.statuses.filter { $0 == .error || $0.isInvalid }.count
+                guard !monitor.cancellation.isCancelled else {
                     outcome.result.cancelled = true
                     return outcome
-                case .autoRename:
-                    targets = preview.planner.autoRenamed(sources: sources, targets: targets, isFolder: entries.map(\.item.isFolder), existing: preview.existing)
-                case .skip:
-                    // Leaving an item where it is can put it in the way of another one.
-                    targets = preview.planner.skippingConflicts(sources: sources, targets: targets, existing: preview.existing)
                 }
-            }
-            let steps = preview.planner.steps(sources: sources, targets: targets, isFolder: entries.map(\.item.isFolder),
-                                              cancelled: { monitor.cancellation.isCancelled })
-            guard !monitor.cancellation.isCancelled else {
-                outcome.result.cancelled = true
-                return outcome
-            }
-            let total = Set(steps.map(\.item)).count
-            let runner = RenameRunner(fileSystems: fileSystems, cancellation: monitor.cancellation)
-            var lastReport = Date.distantPast
-            runner.onProgress = { step, done in
-                // A list of a hundred thousand files must not flood the progress window.
-                guard Date().timeIntervalSince(lastReport) > 0.05 else { return }
-                lastReport = Date()
-                monitor.report(JobProgress(lines: ["From: " + fileSystems.displayPath(sources[step.item]), "To: " + step.to.lastPathComponent],
-                                           itemsDone: done, itemsTotal: total))
-            }
-            outcome.result = runner.run(steps, sources: sources)
-            // What the main thread will need, so that it does not walk the list for it.
-            let from = Set(outcome.result.renamed.map { $0.from.locationKey })
-            outcome.renamed = from.isEmpty ? [] : Parallel.map(entries, serialBelow: RenameComputation.parallelThreshold) { from.contains($0.item.url.locationKey) }
-            var folders = Set<String>()
-            outcome.folders = outcome.result.renamed.flatMap { [$0.from.deletingLastPathComponent(), $0.to.deletingLastPathComponent()] }
+                // Names that come from a file or were typed can lead anywhere: a name with a slash
+                // moves the file into that folder, a name that starts with one anywhere on the disk.
+                if given != nil {
+                    let moving = preview.names.indices.filter {
+                        preview.statuses[$0] == .ready && preview.names[$0]?.utf8.contains(0x2F) == true
+                    }
+                    if !moving.isEmpty {
+                        let examples =
+                            moving.prefix(8).map { (preview.names[$0] ?? "") }.joined(separator: "\n")
+                            + (moving.count > 8 ? "\n…" : "")
+                        let go = monitor.ask {
+                            ui.choose(
+                                "\(moving.count) of the names given move the file into another folder.",
+                                detail: examples
+                                    + "\n\nA name with a / puts the file in that folder, and one that starts with a / anywhere on the disk. Rename anyway?",
+                                buttons: ["Rename", "Cancel"], style: .warning) == 0
+                        }
+                        guard go else {
+                            outcome.result.cancelled = true
+                            return outcome
+                        }
+                    }
+                }
+                let sources = entries.map(\.item.url)
+                var targets = preview.targets
+                let conflicts = preview.conflicts
+                if !conflicts.isEmpty {
+                    let names =
+                        conflicts.prefix(12).map { preview.names[$0] ?? "" }.joined(separator: "\n")
+                        + (conflicts.count > 12 ? "\n…" : "")
+                    let choice = monitor.ask {
+                        ui.pick(
+                            "Name conflict: \(conflicts.count) file(s) would get a name that is already in use.",
+                            detail: names + "\n\nAuto-rename them to \"name (2).ext\", \"name (3).ext\", …?",
+                            [("Auto-rename", .autoRename), ("Skip these files", .skip), ("Cancel", .cancel)],
+                            fallback: ConflictChoice.cancel)
+                    }
+                    switch choice {
+                    case .cancel:
+                        outcome.result.cancelled = true
+                        return outcome
+                    case .autoRename:
+                        targets = preview.planner.autoRenamed(
+                            sources: sources, targets: targets, isFolder: entries.map(\.item.isFolder),
+                            existing: preview.existing)
+                    case .skip:
+                        // Leaving an item where it is can put it in the way of another one.
+                        targets = preview.planner.skippingConflicts(
+                            sources: sources, targets: targets, existing: preview.existing)
+                    }
+                }
+                let steps = preview.planner.steps(
+                    sources: sources, targets: targets, isFolder: entries.map(\.item.isFolder),
+                    cancelled: { monitor.cancellation.isCancelled })
+                guard !monitor.cancellation.isCancelled else {
+                    outcome.result.cancelled = true
+                    return outcome
+                }
+                let total = Set(steps.map(\.item)).count
+                let runner = RenameRunner(fileSystems: fileSystems, cancellation: monitor.cancellation)
+                var lastReport = Date.distantPast
+                runner.onProgress = { step, done in
+                    // A list of a hundred thousand files must not flood the progress window.
+                    guard Date().timeIntervalSince(lastReport) > 0.05 else { return }
+                    lastReport = Date()
+                    monitor.report(
+                        JobProgress(
+                            lines: [
+                                "From: " + fileSystems.displayPath(sources[step.item]),
+                                "To: " + step.to.lastPathComponent
+                            ],
+                            itemsDone: done, itemsTotal: total))
+                }
+                outcome.result = runner.run(steps, sources: sources)
+                // What the main thread will need, so that it does not walk the list for it.
+                let from = Set(outcome.result.renamed.map { $0.from.locationKey })
+                outcome.renamed =
+                    from.isEmpty
+                    ? []
+                    : Parallel.map(entries, serialBelow: RenameComputation.parallelThreshold) {
+                        from.contains($0.item.url.locationKey)
+                    }
+                var folders = Set<String>()
+                outcome.folders = outcome.result.renamed.flatMap {
+                    [$0.from.deletingLastPathComponent(), $0.to.deletingLastPathComponent()]
+                }
                 .filter { folders.insert($0.locationKey).inserted }
-            if !outcome.result.renamed.isEmpty {
-                RenameLog.write(outcome.result.renamed, to: logURL, fileSystems: fileSystems)
-            }
-            return outcome
-        }, completion: { outcome in
-            // The session lives until its job has ended, also when the window was closed meanwhile.
-            self.isBusy = false
-            self.finish(outcome)
-            completion?(outcome.result)
-        })
+                if !outcome.result.renamed.isEmpty {
+                    RenameLog.write(outcome.result.renamed, to: logURL, fileSystems: fileSystems)
+                }
+                return outcome
+            },
+            completion: { outcome in
+                // The session lives until its job has ended, also when the window was closed meanwhile.
+                self.isBusy = false
+                self.finish(outcome)
+                completion?(outcome.result)
+            })
     }
 
     /// A successful run shows no message: the renamed items leave the list and Undo and the
@@ -653,13 +703,16 @@ final class MultiRenameSession {
         }
         if !result.failures.isEmpty {
             let lines = result.failures.prefix(15).map { failure in
-                (outcome.entries.indices.contains(failure.item) ? outcome.entries[failure.item].item.name : "?") + ": " + failure.message
+                (outcome.entries.indices.contains(failure.item) ? outcome.entries[failure.item].item.name : "?") + ": "
+                    + failure.message
             }
-            kernel.ui.inform("\(result.failures.count) file(s) could not be renamed!",
-                             detail: lines.joined(separator: "\n") + (result.failures.count > 15 ? "\n…" : ""), style: .warning)
+            kernel.ui.inform(
+                "\(result.failures.count) file(s) could not be renamed!",
+                detail: lines.joined(separator: "\n") + (result.failures.count > 15 ? "\n…" : ""), style: .warning)
         } else if outcome.unusable > 0, !result.cancelled {
-            kernel.ui.inform("\(outcome.unusable) file(s) were left out because the rename mask gives no valid name for them.",
-                             detail: "", style: .warning)
+            kernel.ui.inform(
+                "\(outcome.unusable) file(s) were left out because the rename mask gives no valid name for them.",
+                detail: "", style: .warning)
         }
         listChanged()
     }
@@ -687,60 +740,80 @@ final class MultiRenameSession {
     }
 
     private func performUndo(completion: (([RenamedItem]) -> Void)?) {
-        guard let last = store.lastUndo else { return isBusy = false }
+        guard let last = store.lastUndo else {
+            isBusy = false
+            return
+        }
         let lines = last.prefix(20).map { "\($0.from.lastPathComponent) -> \($0.to.lastPathComponent)" }
-        let detail = "Undo the following rename action:\n" + lines.joined(separator: "\n") + (last.count > 20 ? "\n… (\(last.count) files)" : "")
-        guard kernel.ui.choose(kernel.productName, detail: detail, buttons: ["Yes", "No"], style: .information) == 0 else { return isBusy = false }
+        let detail =
+            "Undo the following rename action:\n" + lines.joined(separator: "\n")
+            + (last.count > 20 ? "\n… (\(last.count) files)" : "")
+        guard kernel.ui.choose(kernel.productName, detail: detail, buttons: ["Yes", "No"], style: .information) == 0
+        else {
+            isBusy = false
+            return
+        }
         let fileSystems = kernel.fileSystems
         let back = Array(last.reversed())
         let runs = store.undoCount
-        kernel.jobs.run(title: "Undo rename:", work: { monitor -> UndoOutcome in
-            let (sources, targets) = (back.map(\.to), back.map { Optional($0.from) })
-            let survey = RenameSurvey(fileSystems: fileSystems, cancellation: monitor.cancellation)
-            let planner = RenamePlanner(foldsCase: survey.foldsCase(sources.prefix(16).compactMap(fileSystems.item(at:))))
-            let runner = RenameRunner(fileSystems: fileSystems, cancellation: monitor.cancellation)
-            var lastReport = Date.distantPast
-            runner.onProgress = { step, done in
-                guard Date().timeIntervalSince(lastReport) > 0.05 else { return }
-                lastReport = Date()
-                monitor.report(JobProgress(lines: ["From: " + fileSystems.displayPath(step.from), "To: " + step.to.lastPathComponent],
-                                           itemsDone: done, itemsTotal: back.count))
-            }
-            var outcome = UndoOutcome()
-            let steps = planner.steps(sources: sources, targets: targets, cancelled: { monitor.cancellation.isCancelled })
-            guard !monitor.cancellation.isCancelled else {
-                outcome.result.cancelled = true
-                return outcome
-            }
-            outcome.result = runner.run(steps, sources: sources)
-            // What was not put back is kept for another try, unless the file it was to be
-            // taken from is gone: that can never be undone and must not hold up earlier runs.
-            let restored = Set(outcome.result.renamed.map(\.from.locationKey))
-            outcome.attempted = last.filter { !restored.contains($0.to.locationKey) }
-            let present = Parallel.map(outcome.attempted) { fileSystems.item(at: $0.to) != nil }
-            let stillThere = Set(zip(outcome.attempted, present).filter(\.1).map(\.0.to.locationKey))
-            outcome.left = outcome.attempted.filter { stillThere.contains($0.to.locationKey) }
-            var folders = Set<String>()
-            outcome.folders = last.flatMap { [$0.from.deletingLastPathComponent(), $0.to.deletingLastPathComponent()] }
+        kernel.jobs.run(
+            title: "Undo rename:",
+            work: { monitor -> UndoOutcome in
+                let (sources, targets) = (back.map(\.to), back.map { Optional($0.from) })
+                let survey = RenameSurvey(fileSystems: fileSystems, cancellation: monitor.cancellation)
+                let planner = RenamePlanner(
+                    foldsCase: survey.foldsCase(sources.prefix(16).compactMap(fileSystems.item(at:))))
+                let runner = RenameRunner(fileSystems: fileSystems, cancellation: monitor.cancellation)
+                var lastReport = Date.distantPast
+                runner.onProgress = { step, done in
+                    guard Date().timeIntervalSince(lastReport) > 0.05 else { return }
+                    lastReport = Date()
+                    monitor.report(
+                        JobProgress(
+                            lines: ["From: " + fileSystems.displayPath(step.from), "To: " + step.to.lastPathComponent],
+                            itemsDone: done, itemsTotal: back.count))
+                }
+                var outcome = UndoOutcome()
+                let steps = planner.steps(
+                    sources: sources, targets: targets, cancelled: { monitor.cancellation.isCancelled })
+                guard !monitor.cancellation.isCancelled else {
+                    outcome.result.cancelled = true
+                    return outcome
+                }
+                outcome.result = runner.run(steps, sources: sources)
+                // What was not put back is kept for another try, unless the file it was to be
+                // taken from is gone: that can never be undone and must not hold up earlier runs.
+                let restored = Set(outcome.result.renamed.map(\.from.locationKey))
+                outcome.attempted = last.filter { !restored.contains($0.to.locationKey) }
+                let present = Parallel.map(outcome.attempted) { fileSystems.item(at: $0.to) != nil }
+                let stillThere = Set(zip(outcome.attempted, present).filter(\.1).map(\.0.to.locationKey))
+                outcome.left = outcome.attempted.filter { stillThere.contains($0.to.locationKey) }
+                var folders = Set<String>()
+                outcome.folders = last.flatMap {
+                    [$0.from.deletingLastPathComponent(), $0.to.deletingLastPathComponent()]
+                }
                 .filter { folders.insert($0.locationKey).inserted }
-            return outcome
-        }, completion: { outcome in
-            self.isBusy = false
-            // Only the run that was asked about is replaced.
-            if self.store.undoCount == runs { self.store.replaceLastUndo(with: outcome.left) }
-            self.lastRun = []
-            self.kernel.panels.refresh(outcome.folders, focus: outcome.result.renamed.last?.to)
-            if !outcome.left.isEmpty {
-                self.kernel.ui.inform("\(outcome.attempted.count) file(s) could not be renamed back!",
-                                      detail: outcome.result.failures.prefix(15).map(\.message).joined(separator: "\n"), style: .warning)
-            }
-            self.cache = RenameCache()
-            self.listGeneration += 1
-            self.onChange?()
-            // The files are where they were: the marks of conflicts in the list are looked at again.
-            self.refresh()
-            completion?(outcome.attempted)
-        })
+                return outcome
+            },
+            completion: { outcome in
+                self.isBusy = false
+                // Only the run that was asked about is replaced.
+                if self.store.undoCount == runs { self.store.replaceLastUndo(with: outcome.left) }
+                self.lastRun = []
+                self.kernel.panels.refresh(outcome.folders, focus: outcome.result.renamed.last?.to)
+                if !outcome.left.isEmpty {
+                    self.kernel.ui.inform(
+                        "\(outcome.attempted.count) file(s) could not be renamed back!",
+                        detail: outcome.result.failures.prefix(15).map(\.message).joined(separator: "\n"),
+                        style: .warning)
+                }
+                self.cache = RenameCache()
+                self.listGeneration += 1
+                self.onChange?()
+                // The files are where they were: the marks of conflicts in the list are looked at again.
+                self.refresh()
+                completion?(outcome.attempted)
+            })
     }
 
     /// Shows the log of the last run in the viewer.
@@ -751,7 +824,10 @@ final class MultiRenameSession {
         } else if kernel.commands[.view] != nil {
             kernel.commands.perform(.view, .location(logURL))
         } else {
-            _ = kernel.ui.form("Result list", detail: "", fields: [.lines("log", "", RenameLog.text(lastRun, fileSystems: kernel.fileSystems))], buttons: ["Close"])
+            _ = kernel.ui.form(
+                "Result list", detail: "",
+                fields: [.lines("log", "", RenameLog.text(lastRun, fileSystems: kernel.fileSystems))],
+                buttons: ["Close"])
         }
     }
 }
@@ -770,11 +846,15 @@ extension RenameStatus {
 /// be downloaded, and the decoders of ImageIO are not pointed at what is not a picture.
 enum ContentDate {
     static func read(_ url: URL) -> Date? {
-        guard url.isFileURL, isPicture(url), isPlainFileHere(url), let source = CGImageSourceCreateWithURL(url as CFURL, nil),
-              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any] else { return nil }
+        guard url.isFileURL, isPicture(url), isPlainFileHere(url),
+            let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+            let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
+        else { return nil }
         let exif = properties[kCGImagePropertyExifDictionary] as? [CFString: Any]
         let tiff = properties[kCGImagePropertyTIFFDictionary] as? [CFString: Any]
-        let text = exif?[kCGImagePropertyExifDateTimeOriginal] ?? exif?[kCGImagePropertyExifDateTimeDigitized] ?? tiff?[kCGImagePropertyTIFFDateTime]
+        let text =
+            exif?[kCGImagePropertyExifDateTimeOriginal] ?? exif?[kCGImagePropertyExifDateTimeDigitized]
+            ?? tiff?[kCGImagePropertyTIFFDateTime]
         guard let text = text as? String else { return nil }
         return formatter.date(from: text)
     }

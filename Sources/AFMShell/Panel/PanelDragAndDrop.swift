@@ -51,10 +51,11 @@ enum PanelDrop {
             isWrittenLazily = true
             self.marks = marks
             super.init()
-            Background.compute(work: { () -> (items: [FileItem], locations: [URL]) in
-                let items = marks.markedItems()
-                return (items, items.map(\.url))
-            }, then: { [weak self] gathered in self?.take(gathered) })
+            Background.compute(
+                work: { () -> (items: [FileItem], locations: [URL]) in
+                    let items = marks.markedItems()
+                    return (items, items.map(\.url))
+                }, then: { [weak self] gathered in self?.take(gathered) })
         }
 
         private func take(_ result: (items: [FileItem], locations: [URL])) {
@@ -90,7 +91,9 @@ enum PanelDrop {
         }
 
         /// Another program asks for a file: the first one of the local disks.
-        func pasteboard(_ pasteboard: NSPasteboard?, item: NSPasteboardItem, provideDataForType type: NSPasteboard.PasteboardType) {
+        func pasteboard(
+            _ pasteboard: NSPasteboard?, item: NSPasteboardItem, provideDataForType type: NSPasteboard.PasteboardType
+        ) {
             if type == .fileURL, let first = items.first(where: { $0.url.isFileURL }) {
                 item.setString(first.url.absoluteString, forType: .fileURL)
             }
@@ -154,7 +157,9 @@ enum PanelDrop {
     /// The program's own drag, when this pasteboard is its: the ticket on it has to be the
     /// one of the drag under way.
     private static func ownPayload(on pasteboard: NSPasteboard) -> Payload? {
-        guard let current, let ticket = pasteboard.pasteboardItems?.first?.string(forType: itemType), ticket == current.token else { return nil }
+        guard let current, let ticket = pasteboard.pasteboardItems?.first?.string(forType: itemType),
+            ticket == current.token
+        else { return nil }
         return current
     }
 
@@ -164,7 +169,8 @@ enum PanelDrop {
     /// only, so no other program can make a panel name a server or an archive as a source.
     static func locations(on pasteboard: NSPasteboard) -> [URL] {
         if let own = ownPayload(on: pasteboard) { return own.locations }
-        return pasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL] ?? []
+        return pasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL]
+            ?? []
     }
 
     /// What a drag over a panel carries, read once per drag and shared by both panels.
@@ -177,7 +183,8 @@ enum PanelDrop {
             // The program's own drag may still be putting its items together.
             session = DropSession(sequence: info.draggingSequenceNumber, payload: own)
         } else {
-            session = DropSession(sequence: info.draggingSequenceNumber, sources: locations(on: info.draggingPasteboard))
+            session = DropSession(
+                sequence: info.draggingSequenceNumber, sources: locations(on: info.draggingPasteboard))
         }
         self.session = session
         return session
@@ -202,7 +209,8 @@ enum PanelDrop {
         } else {
             wanted = sameVolume ? .move : .copy
         }
-        let canCopy = allowed.contains(.copy), canMove = allowed.contains(.move) || allowed.contains(.generic)
+        let canCopy = allowed.contains(.copy)
+        let canMove = allowed.contains(.move) || allowed.contains(.generic)
         switch wanted {
         case .copy: return canCopy ? .copy : (canMove && !modifiers.contains(.option) ? .move : nil)
         case .move: return canMove ? .move : (canCopy && !modifiers.contains(.command) ? .copy : nil)
@@ -255,7 +263,8 @@ struct DragSources {
 
     init(_ sources: [URL]) {
         isEmpty = sources.isEmpty
-        var places = Set<String>(minimumCapacity: sources.count), folders = Set<String>()
+        var places = Set<String>(minimumCapacity: sources.count)
+        var folders = Set<String>()
         for source in sources {
             let key = source.locationKey
             places.insert(key)
@@ -267,7 +276,8 @@ struct DragSources {
     /// The key of the folder a location lies in, from its key alone; nil at the top.
     private static func parent(of key: String) -> String? {
         guard let scheme = key.range(of: "://"), let pathStart = key[scheme.upperBound...].firstIndex(of: "/"),
-              let slash = key.lastIndex(of: "/"), key.index(after: slash) < key.endIndex else { return nil }
+            let slash = key.lastIndex(of: "/"), key.index(after: slash) < key.endIndex
+        else { return nil }
         // The root keeps its slash; everything else loses the last part of its path.
         return String(slash == pathStart ? key[...slash] : key[..<slash])
     }
@@ -335,9 +345,11 @@ final class DropSession {
         if sources.count < DropSession.backgroundThreshold {
             places = DragSources(sources)
         } else {
-            Background.compute(work: { DragSources(sources) }, then: { [weak self] in
-                if let self, self.places == nil { self.places = $0 }
-            })
+            Background.compute(
+                work: { DragSources(sources) },
+                then: { [weak self] in
+                    if let self, self.places == nil { self.places = $0 }
+                })
         }
     }
 

@@ -68,7 +68,8 @@ struct HexFormat: Equatable {
 
     /// Control characters and bytes without a character show as a dot (spec 10 › Binary, Hex).
     static func printable(_ unit: UInt16) -> UInt16 {
-        unit < 0x20 || (0x7F...0x9F).contains(unit) || unit == CodeTable.leadByte || unit == CodeTable.replacement ? 0x2E : unit
+        unit < 0x20 || (0x7F...0x9F).contains(unit) || unit == CodeTable.leadByte || unit == CodeTable.replacement
+            ? 0x2E : unit
     }
 
     /// Bytes as hexadecimal text for the clipboard: `52 65 70 6F`.
@@ -117,7 +118,10 @@ final class TextDocument {
 
     /// `reusing` is a document of the same bytes laid out otherwise (another width): what is
     /// the same in both is not read again.
-    init(source: ByteSource, encoding: ViewerEncoding, bomLength: Int = 0, layout: ViewerLayout, reusing previous: TextDocument? = nil) {
+    init(
+        source: ByteSource, encoding: ViewerEncoding, bomLength: Int = 0, layout: ViewerLayout,
+        reusing previous: TextDocument? = nil
+    ) {
         self.source = source
         self.layout = layout
         let flag = CancellationFlag()
@@ -129,7 +133,9 @@ final class TextDocument {
             self.encoding = encoding
             let range = min(Int64(bomLength), source.length)..<source.length
             content = range
-            let before = previous?.source === source && previous?.encoding == encoding && previous?.content == range ? previous?.index : nil
+            let before =
+                previous?.source === source && previous?.encoding == encoding && previous?.content == range
+                ? previous?.index : nil
             index = TextRowIndex(start: range.lowerBound, reusing: before)
             tableEncoding = nil
         case .binary, .hex:
@@ -167,10 +173,15 @@ final class TextDocument {
 
     /// Finds the rows of a text. Blocks until done or cancelled (`cancellation`); the byte
     /// layouts need no index and return at once. `progress` is called from working threads.
-    func buildIndex(parallel: Bool, segmentSize: Int = 4 << 20, chunkSize: Int = 1 << 20, rawScan: Bool = true, progress: @escaping () -> Void = {}) {
+    func buildIndex(
+        parallel: Bool, segmentSize: Int = 4 << 20, chunkSize: Int = 1 << 20, rawScan: Bool = true,
+        progress: @escaping () -> Void = {}
+    ) {
         guard let index, case .text(let options) = layout else { return }
-        index.build(source: source, content: content, encoding: encoding, options: options, parallel: parallel, segmentSize: segmentSize,
-                    chunkSize: chunkSize, rawScan: rawScan, cancellation: indexStop.flag, progress: progress)
+        index.build(
+            source: source, content: content, encoding: encoding, options: options, parallel: parallel,
+            segmentSize: segmentSize,
+            chunkSize: chunkSize, rawScan: rawScan, cancellation: indexStop.flag, progress: progress)
     }
 
     /// The flag that ends the building of the index (the document's own ends it too).
@@ -247,7 +258,9 @@ final class TextDocument {
     func row(containing offset: Int64, cancellation: CancellationFlag? = nil) throws -> Int? {
         guard let index else { return min(max(0, rowCount - 1), Int(max(0, offset) / Int64(bytesPerRow))) }
         let offset = min(max(offset, content.lowerBound), content.upperBound)
-        guard let position = index.position(before: offset) else { return index.isComplete && index.rowCount == 0 ? 0 : nil }
+        guard let position = index.position(before: offset) else {
+            return index.isComplete && index.rowCount == 0 ? 0 : nil
+        }
         var found = position.row
         try walk(from: position, cancellation) { row, bytes, _, _, _, _, _ in
             if let end = position.endRow, row >= end { return false }
@@ -273,14 +286,18 @@ final class TextDocument {
     /// Cuts the text into rows from a checkpoint on and hands each to `visit` until it returns
     /// false: the row's number, its bytes, whether it begins a line, the number of its line,
     /// and the decoded piece it is in with its unit range and the byte offset of that piece.
-    private func walk(from position: TextRowIndex.Position, _ cancellation: CancellationFlag?,
-                      visit: (Int, Range<Int64>, Bool, Int, DecodedText, Range<Int>, Int64) -> Bool) throws {
+    private func walk(
+        from position: TextRowIndex.Position, _ cancellation: CancellationFlag?,
+        visit: (Int, Range<Int64>, Bool, Int, DecodedText, Range<Int>, Int64) -> Bool
+    ) throws {
         guard case .text(let options) = layout else { return }
         var splitter = RowSplitter(options)
         splitter.startsLine = position.startsLine
-        var row = position.row, line = position.linesBefore
+        var row = position.row
+        var line = position.linesBefore
         var bytes: [UInt8] = []
-        var base = position.offset, readPosition = position.offset
+        var base = position.offset
+        var readPosition = position.offset
         var text = DecodedText()
         while true {
             let wanted = Int(min(32 * 1024, content.upperBound - readPosition))
@@ -309,20 +326,24 @@ final class TextDocument {
         }
     }
 
-    private func makeRow(_ row: Int, _ bytes: Range<Int64>, _ startsLine: Bool, _ line: Int, _ text: DecodedText, _ units: Range<Int>,
-                         _ base: Int64) -> DisplayRow {
+    private func makeRow(
+        _ row: Int, _ bytes: Range<Int64>, _ startsLine: Bool, _ line: Int, _ text: DecodedText, _ units: Range<Int>,
+        _ base: Int64
+    ) -> DisplayRow {
         guard case .text(let options) = layout else { preconditionFailure("Text rows are made for text only") }
         var end = units.upperBound
         if end > units.lowerBound, text.units[end - 1] == 0x0A { end -= 1 }
         if end > units.lowerBound, text.units[end - 1] == 0x0D { end -= 1 }
         let contentEnd = end < units.upperBound ? base + Int64(text.offsets[end]) : bytes.upperBound
         let rowBase = Int32(truncatingIfNeeded: bytes.lowerBound - base)
-        var shown: [UInt16] = [], offsets: [Int32] = []
+        var shown: [UInt16] = []
+        var offsets: [Int32] = []
         shown.reserveCapacity(end - units.lowerBound)
         offsets.reserveCapacity(end - units.lowerBound)
         var column = 0
         for position in units.lowerBound..<end {
-            let unit = text.units[position], offset = text.offsets[position] - rowBase
+            let unit = text.units[position]
+            let offset = text.offsets[position] - rowBase
             if unit == 0x09 {
                 let width = options.tabWidth - column % options.tabWidth
                 shown.append(contentsOf: repeatElement(0x20, count: width))
@@ -335,8 +356,10 @@ final class TextDocument {
                 if !(0xDC00...0xDFFF).contains(unit) { column += 1 }
             }
         }
-        return DisplayRow(index: row, range: bytes, contentEnd: contentEnd, text: String(decoding: shown, as: UTF16.self), offsets: offsets,
-                          startsLine: startsLine, line: line)
+        return DisplayRow(
+            index: row, range: bytes, contentEnd: contentEnd, text: String(decoding: shown, as: UTF16.self),
+            offsets: offsets,
+            startsLine: startsLine, line: line)
     }
 
     private func fixedRows(from first: Int, count: Int, _ cancellation: CancellationFlag?) throws -> [DisplayRow] {
@@ -354,12 +377,18 @@ final class TextDocument {
             let range = start..<start + Int64(bytes.count)
             let number = first + rows.count
             if layout == .hex {
-                rows.append(DisplayRow(index: number, range: range, contentEnd: range.upperBound,
-                                       text: hexFormat.line(offset: start, bytes: bytes, table: table), offsets: [], startsLine: true, line: number + 1))
+                rows.append(
+                    DisplayRow(
+                        index: number, range: range, contentEnd: range.upperBound,
+                        text: hexFormat.line(offset: start, bytes: bytes, table: table), offsets: [], startsLine: true,
+                        line: number + 1))
             } else {
                 let units = bytes.map { HexFormat.printable(table.single[Int($0)]) }
-                rows.append(DisplayRow(index: number, range: range, contentEnd: range.upperBound, text: String(decoding: units, as: UTF16.self),
-                                       offsets: bytes.indices.map(Int32.init), startsLine: true, line: number + 1))
+                rows.append(
+                    DisplayRow(
+                        index: number, range: range, contentEnd: range.upperBound,
+                        text: String(decoding: units, as: UTF16.self),
+                        offsets: bytes.indices.map(Int32.init), startsLine: true, line: number + 1))
             }
             position += Int(width)
         }
@@ -372,7 +401,9 @@ final class TextDocument {
     func byteOffset(in row: DisplayRow, at textIndex: Int) -> Int64 {
         if layout == .hex {
             let count = Int(row.range.upperBound - row.range.lowerBound)
-            let position = textIndex >= hexFormat.characterColumn(0) ? textIndex - hexFormat.characterColumn(0)
+            let position =
+                textIndex >= hexFormat.characterColumn(0)
+                ? textIndex - hexFormat.characterColumn(0)
                 : (textIndex - hexFormat.hexColumn(0) + 1) / 3
             return row.range.lowerBound + Int64(min(max(position, 0), count))
         }
@@ -384,10 +415,12 @@ final class TextDocument {
     /// when the offset is behind the row's text). In hex rows, the place in the hex part.
     func textIndex(in row: DisplayRow, of offset: Int64) -> Int {
         if layout == .hex {
-            return hexFormat.hexColumn(Int(min(max(offset, row.range.lowerBound), row.range.upperBound) - row.range.lowerBound))
+            return hexFormat.hexColumn(
+                Int(min(max(offset, row.range.lowerBound), row.range.upperBound) - row.range.lowerBound))
         }
         let relative = offset - row.range.lowerBound
-        var low = 0, high = row.offsets.count
+        var low = 0
+        var high = row.offsets.count
         while low < high {
             let middle = (low + high) / 2
             if Int64(row.offsets[middle]) < relative { low = middle + 1 } else { high = middle }
@@ -398,13 +431,19 @@ final class TextDocument {
     /// The parts of a row's text that show bytes of `selection`. A hex row shows them twice:
     /// in the hex part and in the character part (spec 10 › Hex).
     func textRanges(in row: DisplayRow, for selection: Range<Int64>) -> [Range<Int>] {
-        let lower = max(selection.lowerBound, row.range.lowerBound), upper = min(selection.upperBound, row.range.upperBound)
+        let lower = max(selection.lowerBound, row.range.lowerBound)
+        let upper = min(selection.upperBound, row.range.upperBound)
         guard lower < upper else { return [] }
         if layout == .hex {
-            let first = Int(lower - row.range.lowerBound), last = Int(upper - row.range.lowerBound)
-            return [hexFormat.hexColumn(first)..<hexFormat.hexColumn(last - 1) + 2, hexFormat.characterColumn(first)..<hexFormat.characterColumn(last)]
+            let first = Int(lower - row.range.lowerBound)
+            let last = Int(upper - row.range.lowerBound)
+            return [
+                hexFormat.hexColumn(first)..<hexFormat.hexColumn(last - 1) + 2,
+                hexFormat.characterColumn(first)..<hexFormat.characterColumn(last)
+            ]
         }
-        let from = textIndex(in: row, of: lower), to = textIndex(in: row, of: upper)
+        let from = textIndex(in: row, of: lower)
+        let to = textIndex(in: row, of: upper)
         return from < to ? [from..<to] : []
     }
 

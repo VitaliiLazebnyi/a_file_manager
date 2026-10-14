@@ -80,7 +80,8 @@ public struct SearchMask {
         }
         let name = Array(name.lowercased())
         func hit(_ pattern: [Character]) -> Bool { SearchMask.wildcard(pattern, name) }
-        return (includeCharacters.isEmpty || includeCharacters.contains(where: hit)) && !excludeCharacters.contains(where: hit)
+        return (includeCharacters.isEmpty || includeCharacters.contains(where: hit))
+            && !excludeCharacters.contains(where: hit)
     }
 
     /// `*` and `?` as file masks use them, character by character (so a composed and a
@@ -154,8 +155,10 @@ public struct SearchQuery {
     /// file of it in memory.
     public var resultLimit: Int?
 
-    public init(directory: URL, names: String = "", text: String = "", caseSensitive: Bool = false,
-                includeHidden: Bool = false, maxDepth: Int? = nil) {
+    public init(
+        directory: URL, names: String = "", text: String = "", caseSensitive: Bool = false,
+        includeHidden: Bool = false, maxDepth: Int? = nil
+    ) {
         self.directory = directory
         self.names = names
         self.text = text
@@ -170,7 +173,8 @@ public struct SearchQuery {
         let all = [directory] + moreDirectories
         return all.enumerated().filter { index, url in
             !all.enumerated().contains { other, outer in
-                other != index && (url.isSameLocation(as: outer) ? other < index : maxDepth == nil && url.isInside(outer))
+                other != index
+                    && (url.isSameLocation(as: outer) ? other < index : maxDepth == nil && url.isInside(outer))
             }
         }.map(\.element)
     }
@@ -211,7 +215,9 @@ public final class FileSearch {
     private var limitReached = false
 
     /// File names that may be archives; only these are offered to the file systems.
-    static let archiveExtensions: Set<String> = ["zip", "jar", "tar", "gz", "tgz", "bz2", "tbz", "xz", "txz", "7z", "rar", "cab", "lzh", "arj"]
+    static let archiveExtensions: Set<String> = [
+        "zip", "jar", "tar", "gz", "tgz", "bz2", "tbz", "xz", "txz", "7z", "rar", "cab", "lzh", "arj"
+    ]
 
     /// The listed but not yet reported entries that hold back the listing of further folders.
     static let candidateBudget = 200_000
@@ -220,16 +226,22 @@ public final class FileSearch {
     /// The files a duplicate search collects before it stops and says so.
     static let duplicateCandidateLimit = 3_000_000
 
-    public init(_ query: SearchQuery, fileSystems: FileSystemRegistry, columns: ColumnRegistry? = nil, now: Date = Date()) {
+    public init(
+        _ query: SearchQuery, fileSystems: FileSystemRegistry, columns: ColumnRegistry? = nil, now: Date = Date()
+    ) {
         self.query = query
         self.fileSystems = fileSystems
         self.now = now
         mask = SearchMask(query.names, regex: query.namesAreRegex)
         criteria = query.criteria.prepared(now: now)
-        fields = Dictionary(SearchField.all(fileSystems: fileSystems, columns: columns).map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        fields = Dictionary(
+            SearchField.all(fileSystems: fileSystems, columns: columns).map { ($0.id, $0) },
+            uniquingKeysWith: { first, _ in first })
         fieldRules = query.fieldRules.prepared(trip: fieldTrip)
         var problem: Error? = mask.isValid ? nil : TextPattern.Problem.badRegex(query.names)
-        if problem == nil, let rule = query.fieldRules.unusableRule { problem = TextPattern.Problem.badRegex(rule.value) }
+        if problem == nil, let rule = query.fieldRules.unusableRule {
+            problem = TextPattern.Problem.badRegex(rule.value)
+        }
         var pattern: TextPattern?
         if !query.text.isEmpty {
             do {
@@ -253,7 +265,8 @@ public final class FileSearch {
 
     /// Whether the run stopped at `query.resultLimit`; more hits would have followed.
     public var reachedResultLimit: Bool {
-        limitLock.lock(); defer { limitLock.unlock() }
+        limitLock.lock()
+        defer { limitLock.unlock() }
         return limitReached
     }
 
@@ -364,13 +377,18 @@ public final class FileSearch {
     /// (spec 09 › Duplicate finder); empty when the search was cancelled. The files are all
     /// held while they are compared, so a search stops at `duplicateCandidateLimit` of them
     /// and says so (`reachedResultLimit`).
-    public func runForDuplicates(onDirectory: (URL) -> Void = { _ in }, onHashing: ((Int, Int) -> Void)? = nil) -> [[FileItem]] {
+    public func runForDuplicates(onDirectory: (URL) -> Void = { _ in }, onHashing: ((Int, Int) -> Void)? = nil)
+        -> [[FileItem]]
+    {
         var files: [FileItem] = []
-        runWalk(limit: min(query.resultLimit ?? Int.max, FileSearch.duplicateCandidateLimit), onDirectory: onDirectory) {
+        runWalk(
+            limit: min(query.resultLimit ?? Int.max, FileSearch.duplicateCandidateLimit), onDirectory: onDirectory
+        ) {
             if !$0.isDirectory { files.append($0) }
         }
-        return DuplicateFinder.groups(of: files, options: query.duplicates, fileSystems: fileSystems, cancellation: cancellation,
-                                      onProgress: onHashing)
+        return DuplicateFinder.groups(
+            of: files, options: query.duplicates, fileSystems: fileSystems, cancellation: cancellation,
+            onProgress: onHashing)
     }
 
     /// Whether an item found by other means (Spotlight) passes the criteria. Without
@@ -388,11 +406,15 @@ public final class FileSearch {
 
     /// Field rules and text: both may read the file, so they run on all cores.
     private func passesSlowChecks(_ item: FileItem, checkingText: Bool = true) -> Bool {
-        guard !cancellation.isCancelled, fieldRules.matches(item, fields: fields, cancelled: { self.cancellation.isCancelled }) else { return false }
+        guard !cancellation.isCancelled,
+            fieldRules.matches(item, fields: fields, cancelled: { self.cancellation.isCancelled })
+        else { return false }
         guard checkingText, let pattern else { return true }
         // A FIFO would block the open for good, /dev/zero would never end, a cloud stub would
         // be downloaded; a local file is opened without waiting and looked at once opened.
-        guard !item.isSpecial, let reader = fileSystems.searchReader(for: item.url, cancellation: cancellation) else { return false }
+        guard !item.isSpecial, let reader = fileSystems.searchReader(for: item.url, cancellation: cancellation) else {
+            return false
+        }
         defer { reader.close() }
         // A read blocked on a server ends when the search is cancelled.
         let token = cancellation.interrupting(reader)
@@ -461,7 +483,8 @@ public final class FileSearch {
 
         var isStopped: Bool {
             if search.cancellation.isCancelled { return true }
-            budgetLock.lock(); defer { budgetLock.unlock() }
+            budgetLock.lock()
+            defer { budgetLock.unlock() }
             return stopped
         }
 
@@ -474,7 +497,8 @@ public final class FileSearch {
         /// reporting thread is waiting for exactly this one.
         private func shouldHold(_ job: JobStack.Job) -> Bool {
             guard job.isListing else { return false }
-            budgetLock.lock(); defer { budgetLock.unlock() }
+            budgetLock.lock()
+            defer { budgetLock.unlock() }
             return undelivered >= search.budget && job.node !== needed
         }
 
@@ -528,7 +552,9 @@ public final class FileSearch {
             while let node = stack.popLast() {
                 condition.lock()
                 setNeeded(node)
-                while !node.isListed && node.pending > 0 && !isStopped { condition.wait(until: Date(timeIntervalSinceNow: 0.05)) }
+                while !node.isListed && node.pending > 0 && !isStopped {
+                    condition.wait(until: Date(timeIntervalSinceNow: 0.05))
+                }
                 setNeeded(nil)
                 let isListed = node.isListed
                 condition.unlock()
@@ -584,7 +610,9 @@ public final class FileSearch {
             guard let identity = FileIdentity.of(url)?.identity else { return true }
             visitedLock.lock()
             defer { visitedLock.unlock() }
-            guard let before = visited[identity], search.query.maxDepth != nil else { return visited.updateValue(depth, forKey: identity) == nil }
+            guard let before = visited[identity], search.query.maxDepth != nil else {
+                return visited.updateValue(depth, forKey: identity) == nil
+            }
             guard depth < before else { return false }
             visited[identity] = depth
             return true
@@ -598,8 +626,10 @@ public final class FileSearch {
         }
 
         private func list(_ node: Node) {
-            guard let url = node.url, !isStopped, !node.isDuplicateRoot, node.isClaimed || claim(url, depth: node.depth),
-                  let provider = try? search.fileSystems.provider(for: url) else { return finishJob(of: node) }
+            guard let url = node.url, !isStopped, !node.isDuplicateRoot,
+                node.isClaimed || claim(url, depth: node.depth),
+                let provider = try? search.fileSystems.provider(for: url)
+            else { return finishJob(of: node) }
             let descend = search.query.maxDepth.map { node.depth < $0 } ?? true
             var wanted: [FileItem] = []
             var subfolders: [(name: String, url: URL)] = []
@@ -613,14 +643,19 @@ public final class FileSearch {
             // Each batch is looked at as it arrives, so the whole listing of a big folder is
             // never in memory at once; only what passed the quick checks is kept.
             do {
-                try provider.list(url, showHidden: search.query.includeHidden, cancellation: search.cancellation) { batch in
+                try provider.list(url, showHidden: search.query.includeHidden, cancellation: search.cancellation) {
+                    batch in
                     for entry in batch {
-                        if search.passesQuickChecks(entry), search.pattern == nil || !entry.isDirectory { wanted.append(entry) }
+                        if search.passesQuickChecks(entry), search.pattern == nil || !entry.isDirectory {
+                            wanted.append(entry)
+                        }
                         guard descend else { continue }
                         // Links to folders are found but not followed, so the search cannot run in circles.
                         if entry.isRealDirectory {
                             subfolders.append((entry.name, entry.url))
-                        } else if search.query.searchArchives, !entry.isDirectory, let inside = search.archiveRoot(of: entry, in: provider) {
+                        } else if search.query.searchArchives, !entry.isDirectory,
+                            let inside = search.archiveRoot(of: entry, in: provider)
+                        {
                             subfolders.append((entry.name, inside))
                         }
                     }
@@ -638,24 +673,31 @@ public final class FileSearch {
                 // What was reported stays; the folder ends here.
                 return jobs.push(publish(node, candidates: [], children: []))
             }
-            guard !isStopped else { return isStreaming ? jobs.push(publish(node, candidates: [], children: [])) : finishJob(of: node) }
+            guard !isStopped else {
+                return isStreaming ? jobs.push(publish(node, candidates: [], children: [])) : finishJob(of: node)
+            }
             // Only what is reported needs an order, and only the matches are sorted.
             sortedByName(&wanted)
             subfolders = Sorter.sorted(subfolders, byName: \.name)
             let children = subfolders.map { Node(url: $0.url, depth: node.depth + 1) }
             // The tests of this folder go first: they are needed first.
-            jobs.push(publish(node, candidates: wanted, children: children)
-                + children.map { child in JobStack.Job(node: child, isListing: true) { self.list(child) } })
+            jobs.push(
+                publish(node, candidates: wanted, children: children)
+                    + children.map { child in JobStack.Job(node: child, isListing: true) { self.list(child) } })
         }
 
         /// Makes a node's candidates and subfolders known, all at once under the lock (the
         /// reporting thread must never see them without the state that goes with them), and
         /// returns the jobs that test the candidates; the node's pending count is the number of
         /// them. Without slow criteria nothing is left to do.
-        private func publish(_ node: Node, candidates: [FileItem], children: [Node], isFinal: Bool = true) -> [JobStack.Job] {
+        private func publish(_ node: Node, candidates: [FileItem], children: [Node], isFinal: Bool = true) -> [JobStack
+            .Job]
+        {
             let needed = search.pattern != nil || search.query.fieldRules.isActive
             let size = search.pattern == nil ? 32 : 4
-            let ranges = needed ? stride(from: 0, to: candidates.count, by: size).map { $0..<min($0 + size, candidates.count) } : []
+            let ranges =
+                needed
+                ? stride(from: 0, to: candidates.count, by: size).map { $0..<min($0 + size, candidates.count) } : []
             adjust(undelivered: candidates.count)
             condition.lock()
             // The first part of a folder takes the place of the listing job in the count; later ones add to it.
@@ -664,7 +706,11 @@ public final class FileSearch {
             if isFirst { node.candidates = candidates } else { node.candidates.append(contentsOf: candidates) }
             if isFinal { node.children = children }
             if needed {
-                if isFirst { node.state = [UInt8](repeating: 0, count: candidates.count) } else { node.state?.append(contentsOf: [UInt8](repeating: 0, count: candidates.count)) }
+                if isFirst {
+                    node.state = [UInt8](repeating: 0, count: candidates.count)
+                } else {
+                    node.state?.append(contentsOf: [UInt8](repeating: 0, count: candidates.count))
+                }
             } else {
                 node.state = nil
             }

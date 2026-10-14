@@ -42,8 +42,11 @@ public final class ConfigurationPlugin: Plugin {
     /// started and everything happens at once; they also say where list files go.
     /// `settingsKeys` lists the keys the settings store holds, for export and reset; by
     /// default they are read from the macOS preferences of the program.
-    public init(launchesApplications: Bool = true, background: DispatchQueue? = .global(qos: .userInitiated), listFolder: URL? = nil,
-                settingsKeys: (() -> [String])? = nil) {
+    public init(
+        launchesApplications: Bool = true, background: DispatchQueue? = .global(qos: .userInitiated),
+        listFolder: URL? = nil,
+        settingsKeys: (() -> [String])? = nil
+    ) {
         self.launchesApplications = launchesApplications
         self.background = background
         // Lists of this process go to a folder of its own, so another running instance is left alone.
@@ -65,14 +68,18 @@ public final class ConfigurationPlugin: Plugin {
         // begins: reading a large value through would hold up the main thread.
         let beginnings = Set("{[\"-0123456789tfn".utf8)
         return values.compactMap { key, value in
-            guard let data = value as? Data, let first = data.first(where: { $0 != 0x20 && $0 != 0x0A && $0 != 0x0D && $0 != 0x09 }),
-                  beginnings.contains(first) else { return nil }
+            guard let data = value as? Data,
+                let first = data.first(where: { $0 != 0x20 && $0 != 0x0A && $0 != 0x0D && $0 != 0x09 }),
+                beginnings.contains(first)
+            else { return nil }
             return key
         }.sorted()
     }
 
     public func start(in kernel: Kernel) {
-        let runner = CommandRunner(kernel: kernel, launchesApplications: launchesApplications, background: background, listFolder: listFolder)
+        let runner = CommandRunner(
+            kernel: kernel, launchesApplications: launchesApplications, background: background, listFolder: listFolder
+        )
         let keys = settingsKeys ?? { [unowned kernel] in ConfigurationPlugin.storedKeys(of: kernel.settings) }
         let center = ConfigurationCenter(kernel: kernel, runner: runner, enumeratedKeys: keys)
         self.center = center
@@ -92,7 +99,9 @@ public final class ConfigurationPlugin: Plugin {
         for (index, section) in center.startMenuSections().enumerated() {
             kernel.menus.add(section, to: MenuSection(.start, order: 10 + index))
         }
-        kernel.menus.add([ConfigurationPlugin.changeStartMenu, ConfigurationPlugin.stopUserCommands], to: MenuSection(.start, order: 10_000))
+        kernel.menus.add(
+            [ConfigurationPlugin.changeStartMenu, ConfigurationPlugin.stopUserCommands],
+            to: MenuSection(.start, order: 10_000))
     }
 
     private func registerWindows(_ center: ConfigurationCenter, in kernel: Kernel) {
@@ -105,16 +114,28 @@ public final class ConfigurationPlugin: Plugin {
         window(ConfigurationPlugin.buttonBarConfig, "Button Bar…") { center.showOptions(.buttonBar) }
         window(ConfigurationPlugin.changeStartMenu, "Change Start Menu…") { center.showOptions(.startMenu) }
         window(ConfigurationPlugin.commandBrowser, "Choose Command…") { center.browser().show() }
-        window(ConfigurationPlugin.userCommands, "User Commands…") { center.browser().show(category: CommandRow.userCategory) }
+        window(ConfigurationPlugin.userCommands, "User Commands…") {
+            center.browser().show(category: CommandRow.userCategory)
+        }
         window(ConfigurationPlugin.newUserCommand, "New User Command…") { _ = center.editUserCommand(nil) }
-        window(ConfigurationPlugin.keyboardHelp, "Keyboard Shortcuts") { center.showText(center.keyboardHelp(), title: "Keyboard Shortcuts") }
-        window(ConfigurationPlugin.helpIndex, "What Is Where") { center.showText(center.whatIsWhere(), title: "What Is Where") }
+        window(ConfigurationPlugin.keyboardHelp, "Keyboard Shortcuts") {
+            center.showText(center.keyboardHelp(), title: "Keyboard Shortcuts")
+        }
+        window(ConfigurationPlugin.helpIndex, "What Is Where") {
+            center.showText(center.whatIsWhere(), title: "What Is Where")
+        }
         window(ConfigurationPlugin.about, "About \(kernel.productName)") { NSApp?.orderFrontStandardAboutPanel(nil) }
 
         kernel.menus.add([.configuration], to: .configurationOptions)
-        kernel.menus.add([ConfigurationPlugin.redefineHotkeys, ConfigurationPlugin.buttonBarConfig, ConfigurationPlugin.commandBrowser,
-                          ConfigurationPlugin.userCommands, ConfigurationPlugin.newUserCommand], to: .configurationCustomize)
-        kernel.menus.add([ConfigurationPlugin.helpIndex, ConfigurationPlugin.keyboardHelp, ConfigurationPlugin.about], to: .helpTopics)
+        kernel.menus.add(
+            [
+                ConfigurationPlugin.redefineHotkeys, ConfigurationPlugin.buttonBarConfig,
+                ConfigurationPlugin.commandBrowser,
+                ConfigurationPlugin.userCommands, ConfigurationPlugin.newUserCommand
+            ], to: .configurationCustomize)
+        kernel.menus.add(
+            [ConfigurationPlugin.helpIndex, ConfigurationPlugin.keyboardHelp, ConfigurationPlugin.about],
+            to: .helpTopics)
         kernel.toolbar.setSymbol("gearshape", for: .configuration)
         kernel.toolbar.setSymbol("keyboard", for: ConfigurationPlugin.keyboardHelp)
         kernel.toolbar.setSymbol("command", for: ConfigurationPlugin.commandBrowser)
@@ -124,30 +145,48 @@ public final class ConfigurationPlugin: Plugin {
     /// stores a setting the moment it changes, so there is little left to save by hand).
     private func registerSettingsCommands(_ center: ConfigurationCenter, in kernel: Kernel) {
         let commands = kernel.commands
-        commands.register(Command(ConfigurationPlugin.savePosition, "Save Position", runsDuringJobs: true)) { center.savePosition() }
-        commands.register(Command(ConfigurationPlugin.saveSettings, "Save Settings", runsDuringJobs: true)) { center.saveSettingsNow() }
+        commands.register(Command(ConfigurationPlugin.savePosition, "Save Position", runsDuringJobs: true)) {
+            center.savePosition()
+        }
+        commands.register(Command(ConfigurationPlugin.saveSettings, "Save Settings", runsDuringJobs: true)) {
+            center.saveSettingsNow()
+        }
         // `.location`: the file to write or read; without, the user is asked for it.
-        commands.register(Command(ConfigurationPlugin.exportSettings, "Export Settings…", runsDuringJobs: true), parameterized: { argument in
-            // With a file given, the export holds the settings alone and says so afterwards.
-            if let url = argument.location {
-                guard url.isFileURL else { return }
-                return center.exportSettings(to: url)
-            }
-            guard let options = center.askExportOptions(), let url = ConfigurationPlugin.askForFile(saving: true, kernel.productName),
-                  url.isFileURL else { return }
-            center.exportSettings(to: url, options: options, tellsWhatIsIncluded: false)
-        })
-        commands.register(Command(ConfigurationPlugin.importSettings, "Import Settings…"), parameterized: { argument in
-            guard let url = argument.location ?? ConfigurationPlugin.askForFile(saving: false, kernel.productName), url.isFileURL else { return }
-            center.importSettings(from: url)
-        })
+        commands.register(
+            Command(ConfigurationPlugin.exportSettings, "Export Settings…", runsDuringJobs: true),
+            parameterized: { argument in
+                // With a file given, the export holds the settings alone and says so afterwards.
+                if let url = argument.location {
+                    guard url.isFileURL else { return }
+                    return center.exportSettings(to: url)
+                }
+                guard let options = center.askExportOptions(),
+                    let url = ConfigurationPlugin.askForFile(saving: true, kernel.productName),
+                    url.isFileURL
+                else { return }
+                center.exportSettings(to: url, options: options, tellsWhatIsIncluded: false)
+            })
+        commands.register(
+            Command(ConfigurationPlugin.importSettings, "Import Settings…"),
+            parameterized: { argument in
+                guard let url = argument.location ?? ConfigurationPlugin.askForFile(saving: false, kernel.productName),
+                    url.isFileURL
+                else { return }
+                center.importSettings(from: url)
+            })
         commands.register(Command(ConfigurationPlugin.resetSettings, "Reset All Settings…")) { center.resetSettings() }
         // A chain of commands that waits (`cm_wait`, a program it started) can be ended.
-        commands.register(Command(ConfigurationPlugin.stopUserCommands, "Stop Waiting User Commands", runsDuringJobs: true),
-                          enabled: { center.runner.isWaiting }) { center.runner.stopWaiting() }
+        commands.register(
+            Command(ConfigurationPlugin.stopUserCommands, "Stop Waiting User Commands", runsDuringJobs: true),
+            enabled: { center.runner.isWaiting }
+        ) { center.runner.stopWaiting() }
         kernel.menus.add([ConfigurationPlugin.savePosition, ConfigurationPlugin.saveSettings], to: .configurationSave)
-        kernel.menus.add([ConfigurationPlugin.exportSettings, ConfigurationPlugin.importSettings, ConfigurationPlugin.resetSettings],
-                         to: MenuSection(.configuration, order: 40))
+        kernel.menus.add(
+            [
+                ConfigurationPlugin.exportSettings, ConfigurationPlugin.importSettings,
+                ConfigurationPlugin.resetSettings
+            ],
+            to: MenuSection(.configuration, order: 40))
     }
 
     private static func askForFile(saving: Bool, _ productName: String) -> URL? {

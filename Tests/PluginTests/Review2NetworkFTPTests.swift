@@ -1,15 +1,24 @@
 import AFMKernel
 import Foundation
-@testable import NetworkPlugin
 import TestSupport
 import Testing
+
+@testable import NetworkPlugin
 
 /// Collects what threads report, for a test to look at afterwards.
 private final class Notes: @unchecked Sendable {
     private let lock = NSLock()
     private var texts: [String] = []
-    func add(_ text: String) { lock.lock(); texts.append(text); lock.unlock() }
-    var all: [String] { lock.lock(); defer { lock.unlock() }; return texts }
+    func add(_ text: String) {
+        lock.lock()
+        texts.append(text)
+        lock.unlock()
+    }
+    var all: [String] {
+        lock.lock()
+        defer { lock.unlock() }
+        return texts
+    }
 }
 
 /// Renaming onto an existing file never loses it (review 2: N005, N006, N007, N034).
@@ -24,7 +33,9 @@ private final class Notes: @unchecked Sendable {
     }
 
     private func leftovers(_ fixture: FTPFixture) throws -> [String] {
-        try FileManager.default.contentsOfDirectory(atPath: fixture.box.url("srv").path).filter { $0.contains(".replaced-") }
+        try FileManager.default.contentsOfDirectory(atPath: fixture.box.url("srv").path).filter {
+            $0.contains(".replaced-")
+        }
     }
 
     @Test func aSourceThatDoesNotExistLeavesTheDestinationAlone() throws {
@@ -52,8 +63,12 @@ private final class Notes: @unchecked Sendable {
         // The old file was deleted last, under its other name, never under its own.
         let commands = fixture.server.commands
         let deleted = commands.filter { $0.hasPrefix("DELE") }
-        #expect(deleted.count == 1 && deleted[0].contains(".replaced-") && commands.last(where: { $0.hasPrefix("RNTO") }) == "RNTO /keep.txt")
-        let (deletion, renaming) = (try #require(commands.firstIndex(of: deleted[0])), try #require(commands.lastIndex(of: "RNTO /keep.txt")))
+        #expect(
+            deleted.count == 1 && deleted[0].contains(".replaced-")
+                && commands.last(where: { $0.hasPrefix("RNTO") }) == "RNTO /keep.txt")
+        let (deletion, renaming) = (
+            try #require(commands.firstIndex(of: deleted[0])), try #require(commands.lastIndex(of: "RNTO /keep.txt"))
+        )
         #expect(deletion > renaming)
         // The listings follow.
         #expect(try fixture.names("/") == ["keep.txt"])
@@ -140,7 +155,8 @@ private final class Notes: @unchecked Sendable {
         options.appendStartsAnew = true
         let fixture = try FTPFixture(options)
         try fixture.box.file("srv/f.bin", "0123456789")
-        let writer = try fixture.fileSystem.append(to: fixture.url("/f.bin"), at: nil, cancellation: CancellationFlag())
+        let writer = try fixture.fileSystem.append(
+            to: fixture.url("/f.bin"), at: nil, cancellation: CancellationFlag())
         try writer.write(Data("abc".utf8))
         // The file now holds only the tail; "resumed" it is not.
         #expect(throws: NetworkError.self) { try writer.close(attributes: FileAttributes()) }
@@ -242,7 +258,9 @@ private final class Notes: @unchecked Sendable {
             address.sin_port = UInt16(port).bigEndian
             address.sin_addr.s_addr = inet_addr("127.0.0.1")
             _ = withUnsafePointer(to: &address) {
-                $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { Darwin.connect(descriptor, $0, socklen_t(MemoryLayout<sockaddr_in>.size)) }
+                $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                    Darwin.connect(descriptor, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
+                }
             }
             return descriptor
         }
@@ -264,7 +282,9 @@ private final class Notes: @unchecked Sendable {
         let stream = try open.accept(timeout: 10, cancellation: nil)
         stream.close()
 
-        #expect(DataListener.comparable("::ffff:192.0.2.7") == "192.0.2.7" && DataListener.comparable("FE80::1%en0") == "fe80::1")
+        #expect(
+            DataListener.comparable("::ffff:192.0.2.7") == "192.0.2.7"
+                && DataListener.comparable("FE80::1%en0") == "fe80::1")
         #expect(DataListener.comparable("[::1]") == "::1")
     }
 
@@ -276,7 +296,9 @@ private final class Notes: @unchecked Sendable {
         #expect(Array(listed.name.unicodeScalars).contains("\u{308}"))
         #expect(try fixture.download(listed.url.path) == Data("content".utf8))
         let sent = try #require(fixture.server.commands.first { $0.hasPrefix("RETR") })
-        #expect(sent.unicodeScalars.contains("\u{308}"), "the name was sent composed, which is another name to a server that compares bytes")
+        #expect(
+            sent.unicodeScalars.contains("\u{308}"),
+            "the name was sent composed, which is another name to a server that compares bytes")
         // A name that comes from the Mac is composed, as before.
         try fixture.upload("/o\u{308}.txt", Data("x".utf8))
         let stored = try #require(fixture.server.commands.first { $0.hasPrefix("STOR") })
@@ -304,7 +326,9 @@ private final class Notes: @unchecked Sendable {
 
         // A second thread waits behind it, and leaves when it is cancelled.
         let flag = CancellationFlag()
-        let second = AdoptOutcome { _ = try fixture.fileSystem.list(fixture.url("/"), showHidden: false, cancellation: flag) }
+        let second = AdoptOutcome {
+            _ = try fixture.fileSystem.list(fixture.url("/"), showHidden: false, cancellation: flag)
+        }
         #expect(!second.ended(within: 0.5))
         flag.cancel()
         #expect(second.ended(within: 120) && second.failed)
@@ -346,7 +370,9 @@ private final class Notes: @unchecked Sendable {
     @Test func filesHeldOpenDoNotMakeTheNextOneWaitForEver() throws {
         let fixture = try FTPFixture { $0.parallelConnections = 1 }
         // Large enough that a file that is not read on is not finished behind the reader's back.
-        for index in 0..<3 { try Data(repeating: UInt8(index), count: 8_000_000).write(to: fixture.box.url("srv/f\(index).bin")) }
+        for index in 0..<3 {
+            try Data(repeating: UInt8(index), count: 8_000_000).write(to: fixture.box.url("srv/f\(index).bin"))
+        }
         let session = try #require(try fixture.center.session(for: fixture.key) as? FTPSession)
         session.stallLimit = 1
         // Two viewers that paused: all the connections downloads may have.
@@ -501,8 +527,9 @@ private final class Notes: @unchecked Sendable {
         for folder in ["one", "two", "three"] {
             try fixture.box.folder("srv/\(folder)/d")
             for index in 0..<40 {
-                try FileManager.default.createSymbolicLink(at: fixture.box.url("srv/\(folder)/link\(index)"),
-                                                           withDestinationURL: fixture.box.url("srv/\(folder)/d"))
+                try FileManager.default.createSymbolicLink(
+                    at: fixture.box.url("srv/\(folder)/link\(index)"),
+                    withDestinationURL: fixture.box.url("srv/\(folder)/d"))
             }
         }
         // Three folders full of links, read one after the other with a single connection: the
@@ -511,11 +538,14 @@ private final class Notes: @unchecked Sendable {
         for folder in ["one", "two", "three"] { #expect(try fixture.names("/" + folder).count == 41) }
         #expect(Date().timeIntervalSince(started) < 120, "the listings waited for the background work")
         func resolved(_ folder: String) -> Bool {
-            let links = (try? fixture.fileSystem.list(fixture.url("/" + folder), showHidden: false))?.filter(\.isSymlink) ?? []
+            let links =
+                (try? fixture.fileSystem.list(fixture.url("/" + folder), showHidden: false))?.filter(\.isSymlink) ?? []
             return links.count == 40 && links.allSatisfy(\.isDirectory)
         }
         // The last folder, the one the user is in, comes first.
-        guard adoptWait(40, until: { resolved("three") }) else { try Test.cancel("the background work did not get through in time") }
+        guard adoptWait(40, until: { resolved("three") }) else {
+            try Test.cancel("the background work did not get through in time")
+        }
         #expect(fixture.server.mostConnectionsAtOnce == 1)
         let session = try fixture.center.session(for: fixture.key)
         fixture.center.disconnect(fixture.key)
@@ -579,7 +609,8 @@ private final class Notes: @unchecked Sendable {
         // The same text is read again while the user types the password (a panel that refreshes
         // its path field), and another with a password: the session at its question stays.
         #expect(fixture.fileSystem.location(from: text) == fixture.url("/"))
-        #expect(fixture.fileSystem.location(from: "ftp://anna:other@127.0.0.1:\(fixture.server.port)/") == fixture.url("/"))
+        #expect(
+            fixture.fileSystem.location(from: "ftp://anna:other@127.0.0.1:\(fixture.server.port)/") == fixture.url("/"))
         #expect(try fixture.center.session(for: fixture.key) === session)
         answer.signal()
         #expect(login.ended(within: 30) && !login.failed)
@@ -601,7 +632,9 @@ private final class Notes: @unchecked Sendable {
             return allows
         }
         var answers = ["wrong", "right"]
-        fixture.environment.askCredentials = { _, _ in Credentials(user: "anna", password: answers.removeFirst(), remember: true) }
+        fixture.environment.askCredentials = { _, _ in
+            Credentials(user: "anna", password: answers.removeFirst(), remember: true)
+        }
         var remembered: [String] = []
         fixture.environment.rememberPassword = { profile, password in
             if profile.savedID == id { remembered.append(password) }
@@ -615,7 +648,8 @@ private final class Notes: @unchecked Sendable {
         // Asked once, not for each attempt; and only the password the server took is kept.
         #expect(warnings == 2 && remembered == ["right"])
         #expect(fixture.server.commands.filter { $0.hasPrefix("PASS") } == ["PASS wrong", "PASS right"])
-        #expect(FTPSession.isLoopback("127.0.0.1") && FTPSession.isLoopback("localhost") && FTPSession.isLoopback("::1"))
+        #expect(
+            FTPSession.isLoopback("127.0.0.1") && FTPSession.isLoopback("localhost") && FTPSession.isLoopback("::1"))
         #expect(!FTPSession.isLoopback("ftp.example.com") && !FTPSession.isLoopback("10.0.0.1"))
     }
 
@@ -635,7 +669,9 @@ private final class Notes: @unchecked Sendable {
         trust.accept("CC:DD", for: "files.example.com")
         #expect(trust.fingerprints(for: "files.example.com") == ["AA:BB", "CC:DD"])
         trust.replace(with: "EE:FF", for: "Files.example.com")
-        #expect(trust.fingerprints(for: "files.example.com") == ["EE:FF"] && !trust.isAccepted("AA:BB", for: "files.example.com"))
+        #expect(
+            trust.fingerprints(for: "files.example.com") == ["EE:FF"]
+                && !trust.isAccepted("AA:BB", for: "files.example.com"))
     }
 }
 
@@ -649,7 +685,10 @@ private final class Notes: @unchecked Sendable {
         try secondBox.file("srv/second.txt", "2")
         let first = try TLSServer(mode: .implicit, box: firstBox)
         let second = try TLSServer(mode: .implicit, box: secondBox)
-        defer { first.stop(); second.stop() }
+        defer {
+            first.stop()
+            second.stop()
+        }
 
         let environment = SessionEnvironment()
         environment.declineMemory = 0
@@ -661,7 +700,9 @@ private final class Notes: @unchecked Sendable {
         let fileSystem = RemoteFileSystem(scheme: "ftps", center: center)
         defer { center.disconnectAll() }
         func key(_ server: TLSServer) -> ServerKey { ServerKey(scheme: "ftps", host: "127.0.0.1", port: server.port) }
-        for server in [first, second] { center.announce(ConnectionProfile(key: key(server), tls: .implicit, anonymous: true), chosen: true) }
+        for server in [first, second] {
+            center.announce(ConnectionProfile(key: key(server), tls: .implicit, anonymous: true), chosen: true)
+        }
 
         var firstUse: [String] = []
         var changed: [(new: String, known: [String])] = []

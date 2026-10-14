@@ -19,7 +19,9 @@ public struct ContentColumn {
     /// without a flag answers as `value` does.
     public let cancellableValue: (FileItem, CancellationFlag) -> String
 
-    public init(id: String, title: String, width: Int = 120, alignsRight: Bool = false, value: @escaping (FileItem) -> String) {
+    public init(
+        id: String, title: String, width: Int = 120, alignsRight: Bool = false, value: @escaping (FileItem) -> String
+    ) {
         self.id = id
         self.title = title
         self.width = width
@@ -29,8 +31,10 @@ public struct ContentColumn {
     }
 
     /// A column whose text can take long to find out (it reads the file, or asks a server).
-    public init(id: String, title: String, width: Int = 120, alignsRight: Bool = false,
-                cancellableValue: @escaping (FileItem, CancellationFlag) -> String) {
+    public init(
+        id: String, title: String, width: Int = 120, alignsRight: Bool = false,
+        cancellableValue: @escaping (FileItem, CancellationFlag) -> String
+    ) {
         self.id = id
         self.title = title
         self.width = width

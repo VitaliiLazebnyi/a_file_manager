@@ -15,8 +15,10 @@ enum ViewerError: LocalizedError, Equatable {
 
     var errorDescription: String? {
         switch self {
-        case .fileChanged: return "The file changed while it was being read (it became shorter); what is shown may be incomplete."
-        case .notAFile(let name): return "\(name) is not a regular file (a pipe, device or socket), and cannot be shown."
+        case .fileChanged:
+            return "The file changed while it was being read (it became shorter); what is shown may be incomplete."
+        case .notAFile(let name):
+            return "\(name) is not a regular file (a pipe, device or socket), and cannot be shown."
         case .endless(let name): return "\(name) does not end, and cannot be shown."
         case .busy: return "Too many reads are still waiting for a volume that does not answer; this file was not read."
         }
@@ -87,7 +89,8 @@ extension ByteSource {
     }
 
     func read(_ range: Range<Int64>, cancellation: CancellationFlag?) throws -> Data {
-        let lower = max(0, min(range.lowerBound, length)), upper = max(lower, min(range.upperBound, length))
+        let lower = max(0, min(range.lowerBound, length))
+        let upper = max(lower, min(range.upperBound, length))
         return upper > lower ? try read(at: lower, count: Int(upper - lower), interruptedBy: cancellation) : Data()
     }
 }
@@ -131,7 +134,8 @@ final class DataByteSource: ByteSource {
     var length: Int64 { Int64(data.count) }
 
     func read(at offset: Int64, count: Int) throws -> Data {
-        let lower = Int(max(0, min(offset, length))), upper = min(data.count, lower + max(0, count))
+        let lower = Int(max(0, min(offset, length)))
+        let upper = min(data.count, lower + max(0, count))
         return data.subdata(in: lower..<upper)
     }
 }
@@ -160,7 +164,9 @@ final class ProviderByteSource: ByteSource {
     /// disk that the entry only knows as a link is measured by asking for the size of what it
     /// points to; pipes, devices and sockets are refused. Blocks; ends early (throwing) once
     /// `cancellation` is set.
-    static func open(_ url: URL, fileSystems: FileSystemRegistry, cancellation: CancellationFlag = CancellationFlag()) throws -> ByteSource {
+    static func open(_ url: URL, fileSystems: FileSystemRegistry, cancellation: CancellationFlag = CancellationFlag())
+        throws -> ByteSource
+    {
         let provider = try fileSystems.provider(for: url)
         let entry = provider.item(at: url, cancellation: cancellation)
         if let entry, entry.isSpecial { throw ViewerError.notAFile(url.lastPathComponent) }
@@ -179,7 +185,9 @@ final class ProviderByteSource: ByteSource {
             if stat(url.path, &target) == 0 {
                 switch target.st_mode & S_IFMT {
                 case S_IFREG:
-                    return target.st_size > 0 ? ProviderByteSource(url: url, provider: provider, length: Int64(target.st_size)) : DataByteSource(Data())
+                    return target.st_size > 0
+                        ? ProviderByteSource(url: url, provider: provider, length: Int64(target.st_size))
+                        : DataByteSource(Data())
                 case S_IFDIR:
                     break
                 default:
@@ -190,7 +198,8 @@ final class ProviderByteSource: ByteSource {
         let reader = try provider.read(url, cancellation: cancellation)
         defer { reader.close() }
         // Small content of unknown size is simply kept; anything larger is only counted.
-        var kept = Data(), total: Int64 = 0
+        var kept = Data()
+        var total: Int64 = 0
         try cancellation.whileReading(reader) {
             while let block = try autoreleasepool(invoking: { try reader.read(upToCount: 1 << 20) }), !block.isEmpty {
                 try cancellation.throwIfCancelled()
@@ -201,7 +210,8 @@ final class ProviderByteSource: ByteSource {
             }
         }
         try cancellation.throwIfCancelled()
-        return total <= measuredKeepLimit ? DataByteSource(kept) : ProviderByteSource(url: url, provider: provider, length: total)
+        return total <= measuredKeepLimit
+            ? DataByteSource(kept) : ProviderByteSource(url: url, provider: provider, length: total)
     }
 
     /// The most that is read to find the size of a file the file system cannot give.
@@ -228,7 +238,9 @@ final class ProviderByteSource: ByteSource {
                 try Self.reading(reader, flag) {
                     try reader.seek(to: UInt64(max(0, offset)))
                     let wanted = Int(min(Int64(count), length - offset))
-                    while data.count < wanted, let block = try reader.read(upToCount: wanted - data.count), !block.isEmpty {
+                    while data.count < wanted, let block = try reader.read(upToCount: wanted - data.count),
+                        !block.isEmpty
+                    {
                         data.append(block)
                         try flag?.throwIfCancelled()
                     }
@@ -365,7 +377,9 @@ final class DiskBlockCache {
         guard descriptor >= 0, isPresent(block) else { return nil }
         let wanted = size(of: block)
         var data = Data(count: wanted)
-        let got = data.withUnsafeMutableBytes { pread(descriptor, $0.baseAddress, wanted, off_t(block * Int64(blockSize))) }
+        let got = data.withUnsafeMutableBytes {
+            pread(descriptor, $0.baseAddress, wanted, off_t(block * Int64(blockSize)))
+        }
         guard got == wanted else {
             // The block is gone (a failing disk): its room goes back to the budget.
             present[Int(block / 64)] &= ~(1 << UInt64(block % 64))
@@ -380,10 +394,14 @@ final class DiskBlockCache {
     func store(_ block: Int64, _ data: Data) {
         lock.lock()
         defer { lock.unlock() }
-        guard !failed, data.count == size(of: block), data.count > 0, !isPresent(block), held + Int64(data.count) <= limit,
-              DiskBlockCache.reserve(Int64(data.count)) else { return }
+        guard !failed, data.count == size(of: block), data.count > 0, !isPresent(block),
+            held + Int64(data.count) <= limit,
+            DiskBlockCache.reserve(Int64(data.count))
+        else { return }
         if descriptor < 0 {
-            let path = FileManager.default.temporaryDirectory.appendingPathComponent("afm-viewer-p\(getpid())-blocks-\(UUID().uuidString)").path
+            let path = FileManager.default.temporaryDirectory.appendingPathComponent(
+                "afm-viewer-p\(getpid())-blocks-\(UUID().uuidString)"
+            ).path
             let opened = open(path, O_RDWR | O_CREAT | O_EXCL | O_CLOEXEC, 0o600)
             guard opened >= 0 else {
                 failed = true
@@ -394,7 +412,9 @@ final class DiskBlockCache {
             unlink(path)
             descriptor = opened
         }
-        let wrote = data.withUnsafeBytes { pwrite(descriptor, $0.baseAddress, data.count, off_t(block * Int64(blockSize))) }
+        let wrote = data.withUnsafeBytes {
+            pwrite(descriptor, $0.baseAddress, data.count, off_t(block * Int64(blockSize)))
+        }
         guard wrote == data.count else {
             // A full disk: no more is tried.
             failed = true
@@ -441,14 +461,20 @@ final class CachedByteSource: ByteSource {
     /// Block numbers, least recently used first.
     private var order: [Int64] = []
 
-    init(_ base: ByteSource, blockSize: Int = 128 * 1024, capacity: Int = 48, wholeFileLimit: Int64 = 0, spillsToDisk: Bool = false,
-         diskLimit: Int64 = 1 << 30) {
+    init(
+        _ base: ByteSource, blockSize: Int = 128 * 1024, capacity: Int = 48, wholeFileLimit: Int64 = 0,
+        spillsToDisk: Bool = false,
+        diskLimit: Int64 = 1 << 30
+    ) {
         self.base = base
-        let blockSize = max(1, blockSize), capacity = max(2, capacity)
+        let blockSize = max(1, blockSize)
+        let capacity = max(2, capacity)
         self.blockSize = blockSize
         self.capacity = capacity
         keepsWholeFile = base.length <= wholeFileLimit && base.length <= Int64(blockSize) * Int64(capacity)
-        spill = spillsToDisk && !keepsWholeFile && base.length > 0 ? DiskBlockCache(blockSize: blockSize, length: base.length, limit: diskLimit) : nil
+        spill =
+            spillsToDisk && !keepsWholeFile && base.length > 0
+            ? DiskBlockCache(blockSize: blockSize, length: base.length, limit: diskLimit) : nil
     }
 
     var length: Int64 { base.length }
@@ -471,7 +497,8 @@ final class CachedByteSource: ByteSource {
     }
 
     private func readInPool(at offset: Int64, count: Int, flag: CancellationFlag?) throws -> Data {
-        let lower = max(0, min(offset, length)), upper = min(length, lower + Int64(max(0, count)))
+        let lower = max(0, min(offset, length))
+        let upper = min(length, lower + Int64(max(0, count)))
         guard upper > lower else { return Data() }
         try flag?.throwIfCancelled()
         // Four blocks or more is a scan, not a look at what is shown.
@@ -485,7 +512,8 @@ final class CachedByteSource: ByteSource {
         while block * Int64(blockSize) < upper {
             let data = try self.block(block, flag)
             let start = block * Int64(blockSize)
-            let from = Int(max(lower, start) - start), to = Int(min(upper, start + Int64(data.count)) - start)
+            let from = Int(max(lower, start) - start)
+            let to = Int(min(upper, start + Int64(data.count)) - start)
             if to > from { result.append(data.subdata(in: from..<to)) }
             if data.count < blockSize { break }
             block += 1
@@ -494,13 +522,15 @@ final class CachedByteSource: ByteSource {
     }
 
     private func fetch(_ offset: Int64, _ count: Int, _ flag: CancellationFlag?) throws -> Data {
-        try flag.map { try base.read(at: offset, count: count, cancellation: $0) } ?? base.read(at: offset, count: count)
+        try flag.map { try base.read(at: offset, count: count, cancellation: $0) }
+            ?? base.read(at: offset, count: count)
     }
 
     /// A long read in one request to the base, unless all of it is cached; its blocks are kept.
     private func readAndKeep(_ lower: Int64, _ upper: Int64, _ flag: CancellationFlag?) throws -> Data {
         let size = Int64(blockSize)
-        let first = lower / size, last = (upper - 1) / size
+        let first = lower / size
+        let last = (upper - 1) / size
         lock.lock()
         let cached = (first...last).allSatisfy { blocks[$0] != nil }
         lock.unlock()
@@ -509,13 +539,15 @@ final class CachedByteSource: ByteSource {
             for number in first...last {
                 let data = try block(number, flag)
                 let start = number * size
-                let from = Int(max(lower, start) - start), to = Int(min(upper, start + Int64(data.count)) - start)
+                let from = Int(max(lower, start) - start)
+                let to = Int(min(upper, start + Int64(data.count)) - start)
                 if to > from { result.append(data.subdata(in: from..<to)) }
                 if data.count < blockSize { break }
             }
             return result
         }
-        let alignedLower = first * size, alignedUpper = min(length, (last + 1) * size)
+        let alignedLower = first * size
+        let alignedUpper = min(length, (last + 1) * size)
         let data = try fetch(alignedLower, Int(alignedUpper - alignedLower), flag)
         lock.lock()
         for number in first...last {
@@ -523,7 +555,9 @@ final class CachedByteSource: ByteSource {
             guard from < data.count else { break }
             let piece = data.subdata(in: from..<min(data.count, from + blockSize))
             // A short block in the middle would end later reads early.
-            guard piece.count == blockSize || number * size + Int64(piece.count) == length, blocks[number] == nil else { continue }
+            guard piece.count == blockSize || number * size + Int64(piece.count) == length, blocks[number] == nil else {
+                continue
+            }
             blocks[number] = piece
             order.append(number)
             if order.count > capacity { blocks[order.removeFirst()] = nil }
@@ -538,12 +572,14 @@ final class CachedByteSource: ByteSource {
     private func readThroughDisk(_ lower: Int64, _ upper: Int64, _ flag: CancellationFlag?) throws -> Data {
         guard let spill else { return try fetch(lower, Int(upper - lower), flag) }
         let size = Int64(blockSize)
-        let first = lower / size, last = (upper - 1) / size
+        let first = lower / size
+        let last = (upper - 1) / size
         var result = Data(capacity: Int(upper - lower))
         /// Appends the part of block `number` (whose bytes are `data`) that was asked for.
         func take(_ number: Int64, _ data: Data) {
             let start = number * size
-            let from = Int(max(lower, start) - start), to = Int(min(upper, start + Int64(data.count)) - start)
+            let from = Int(max(lower, start) - start)
+            let to = Int(min(upper, start + Int64(data.count)) - start)
             if to > from { result.append(data.subdata(in: from..<to)) }
         }
         var number = first
@@ -556,7 +592,8 @@ final class CachedByteSource: ByteSource {
             }
             var end = number
             while end < last, !spill.contains(end + 1) { end += 1 }
-            let runStart = number * size, runEnd = min(length, (end + 1) * size)
+            let runStart = number * size
+            let runEnd = min(length, (end + 1) * size)
             let data = try fetch(runStart, Int(runEnd - runStart), flag)
             for piece in number...end {
                 let from = Int(piece * size - runStart)

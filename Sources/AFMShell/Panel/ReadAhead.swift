@@ -89,9 +89,17 @@ final class ReadAhead {
         init(target: Target) { self.target = target }
 
         /// A panel waits for the result: the reading is no longer the cursor's to cancel.
-        var isJoined: Bool { lock.lock(); defer { lock.unlock() }; return joined }
+        var isJoined: Bool {
+            lock.lock()
+            defer { lock.unlock() }
+            return joined
+        }
         /// The folder turned out to be larger than the cache takes, and nobody waited for it.
-        var wasGivenUp: Bool { lock.lock(); defer { lock.unlock() }; return givenUp }
+        var wasGivenUp: Bool {
+            lock.lock()
+            defer { lock.unlock() }
+            return givenUp
+        }
 
         /// Reading thread, when it starts.
         func began() {
@@ -113,7 +121,8 @@ final class ReadAhead {
         /// Reading thread: `count` entries have arrived. Returns false when the reading is to
         /// be given up: it has more entries than will be remembered and no panel waits for it.
         func progress(_ count: Int, limit: Int) -> Bool {
-            lock.lock(); defer { lock.unlock() }
+            lock.lock()
+            defer { lock.unlock() }
             lastProgress = ProcessInfo.processInfo.systemUptime
             if count > limit, !joined { givenUp = true }
             return !givenUp
@@ -122,7 +131,8 @@ final class ReadAhead {
         /// Main thread: a panel takes the reading over. False when it was given up meanwhile.
         /// Somebody waits for it now, so it goes on at the user's priority.
         func join() -> Bool {
-            lock.lock(); defer { lock.unlock() }
+            lock.lock()
+            defer { lock.unlock() }
             guard !givenUp else { return false }
             joined = true
             raise()
@@ -138,13 +148,16 @@ final class ReadAhead {
 
         /// Whether nothing has arrived for `time`.
         func isSilent(for time: TimeInterval) -> Bool {
-            lock.lock(); defer { lock.unlock() }
+            lock.lock()
+            defer { lock.unlock() }
             return ProcessInfo.processInfo.systemUptime - lastProgress > time
         }
 
         /// Called with the lock held.
         private func raise() {
-            if boost == nil, let thread { boost = pthread_override_qos_class_start_np(thread, QOS_CLASS_USER_INITIATED, 0) }
+            if boost == nil, let thread {
+                boost = pthread_override_qos_class_start_np(thread, QOS_CLASS_USER_INITIATED, 0)
+            }
         }
     }
 
@@ -211,7 +224,9 @@ final class ReadAhead {
             guard let stopped = reading.cancelledAt, now - stopped > ReadAhead.abandonAfter else { return }
             self.reading = nil
         }
-        if let age = cache.age(of: target.location, showHidden: target.showHidden), age < ReadAhead.freshEnough { return }
+        if let age = cache.age(of: target.location, showHidden: target.showHidden), age < ReadAhead.freshEnough {
+            return
+        }
         let key = target.location.locationKey
         if let until = pauses[key] {
             if now < until { return }
@@ -240,10 +255,12 @@ final class ReadAhead {
             reading.began()
             var outcome: Outcome?
             do {
-                outcome = try PanelLoading.readWhole(target.location, showHidden: target.showHidden, order: target.order,
-                                                     fileSystems: fileSystems, cache: cache, cancellation: reading.cancellation,
-                                                     progress: { reading.progress($0, limit: limit) })
-                    .map { .success($0) }
+                outcome = try PanelLoading.readWhole(
+                    target.location, showHidden: target.showHidden, order: target.order,
+                    fileSystems: fileSystems, cache: cache, cancellation: reading.cancellation,
+                    progress: { reading.progress($0, limit: limit) }
+                )
+                .map { .success($0) }
             } catch {
                 // A file system may end a reading that was told to stop with an error: that is
                 // no failure of the folder.
@@ -264,7 +281,9 @@ final class ReadAhead {
         case .success?:
             // Read, but not remembered (the cache has its reasons): reading it again while the
             // cursor stays would end the same way.
-            if cache.age(of: target.location, showHidden: target.showHidden) == nil { pause(target.location, for: ReadAhead.pauseWhenNotKept) }
+            if cache.age(of: target.location, showHidden: target.showHidden) == nil {
+                pause(target.location, for: ReadAhead.pauseWhenNotKept)
+            }
         case nil:
             if reading.wasGivenUp { pause(target.location, for: ReadAhead.pauseWhenTooLarge) }
         }
@@ -286,7 +305,8 @@ final class ReadAhead {
     func join(_ location: URL, showHidden: Bool) -> Joined? {
         MainThread.assert("Read-ahead")
         guard let reading, !reading.cancellation.isCancelled, reading.target.showHidden == showHidden,
-              reading.target.location.isSameLocation(as: location) else { return nil }
+            reading.target.location.isSameLocation(as: location)
+        else { return nil }
         if reading.isSilent(for: ReadAhead.stalledAfter) {
             cancel(reading)
             return nil
@@ -294,16 +314,18 @@ final class ReadAhead {
         guard reading.join() else { return nil }
         reading.waiters += 1
         var hasLeft = false
-        return Joined(receive: { reading.waiting.append($0) }, leave: { [weak self] in
-            guard !hasLeft else { return }
-            hasLeft = true
-            reading.waiters -= 1
-            guard reading.waiters == 0, let self, self.reading === reading else { return }
-            reading.waiting = []
-            reading.unjoin()
-            // The cursor's again: it goes on only while the cursor rests on its folder.
-            if !(self.resting.map { $0.isSameReading(as: reading.target) } ?? false) { self.cancel(reading) }
-        })
+        return Joined(
+            receive: { reading.waiting.append($0) },
+            leave: { [weak self] in
+                guard !hasLeft else { return }
+                hasLeft = true
+                reading.waiters -= 1
+                guard reading.waiters == 0, let self, self.reading === reading else { return }
+                reading.waiting = []
+                reading.unjoin()
+                // The cursor's again: it goes on only while the cursor rests on its folder.
+                if !(self.resting.map { $0.isSameReading(as: reading.target) } ?? false) { self.cancel(reading) }
+            })
     }
 
     /// Stops everything, when the window goes away.

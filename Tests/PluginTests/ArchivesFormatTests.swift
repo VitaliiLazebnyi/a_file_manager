@@ -1,9 +1,10 @@
 import AFMKernel
-@testable import ArchivesPlugin
 import Foundation
 import LocalFileSystemPlugin
 import TestSupport
 import Testing
+
+@testable import ArchivesPlugin
 
 /// A monitor for packing and unpacking outside a job service.
 final class QuietMonitor: JobMonitor {
@@ -80,7 +81,8 @@ final class ArchiveBench {
     /// A small tree with text, binary data, an empty file, an empty folder and odd names.
     @discardableResult
     func makeTree(_ name: String = "tree") throws -> URL {
-        try box.file("\(name)/readme.txt", String(repeating: "All work and no play makes Jack a dull boy.\n", count: 400))
+        try box.file(
+            "\(name)/readme.txt", String(repeating: "All work and no play makes Jack a dull boy.\n", count: 400))
         try box.file("\(name)/empty.txt", "")
         try box.file("\(name)/sub/deep/übung – ñ 日本.txt", "unicode name")
         try box.file("\(name)/sub/.hidden", "hidden")
@@ -92,8 +94,11 @@ final class ArchiveBench {
         var big = Data()
         for index in 0..<120_000 { big.append(Data("line \(index) of a file that spans several pieces\n".utf8)) }
         try big.write(to: box.url("\(name)/big.log"))
-        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: box.url("\(name)/readme.txt").path)
-        try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSince1970: 1_600_000_000)], ofItemAtPath: box.url("\(name)/readme.txt").path)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o755], ofItemAtPath: box.url("\(name)/readme.txt").path)
+        try FileManager.default.setAttributes(
+            [.modificationDate: Date(timeIntervalSince1970: 1_600_000_000)],
+            ofItemAtPath: box.url("\(name)/readme.txt").path)
         return box.url(name)
     }
 
@@ -102,7 +107,10 @@ final class ArchiveBench {
     }
 
     @discardableResult
-    func pack(_ sources: [URL], to archive: URL, innerFolder: String = "", _ configure: (inout PackOptions) -> Void = { _ in }) throws -> PackResult {
+    func pack(
+        _ sources: [URL], to archive: URL, innerFolder: String = "",
+        _ configure: (inout PackOptions) -> Void = { _ in }
+    ) throws -> PackResult {
         var options = PackOptions()
         options.limits = environment.limits
         configure(&options)
@@ -113,7 +121,9 @@ final class ArchiveBench {
     }
 
     @discardableResult
-    func unpack(_ archive: URL, to target: URL, _ configure: (inout UnpackOptions) -> Void = { _ in }) throws -> UnpackResult {
+    func unpack(_ archive: URL, to target: URL, _ configure: (inout UnpackOptions) -> Void = { _ in }) throws
+        -> UnpackResult
+    {
         var options = UnpackOptions()
         configure(&options)
         let unpacker = Unpacker(fileSystems: fileSystems, monitor: monitor, options: options) { _, _ in .overwrite }
@@ -164,7 +174,9 @@ func snapshot(_ folder: URL) -> [String: Data?] {
         var isDirectory: ObjCBool = false
         FileManager.default.fileExists(atPath: base + "/" + path, isDirectory: &isDirectory)
         if isDirectory.boolValue {
-            if ((try? FileManager.default.contentsOfDirectory(atPath: base + "/" + path)) ?? []).isEmpty { found[path.precomposedStringWithCanonicalMapping] = .some(nil) }
+            if ((try? FileManager.default.contentsOfDirectory(atPath: base + "/" + path)) ?? []).isEmpty {
+                found[path.precomposedStringWithCanonicalMapping] = .some(nil)
+            }
         } else {
             found[path.precomposedStringWithCanonicalMapping] = FileManager.default.contents(atPath: base + "/" + path)
         }
@@ -193,13 +205,22 @@ func snapshot(_ folder: URL) -> [String: Data?] {
 
         let opened = try bench.store.archive(at: archive)
         #expect(opened.format == format)
-        let root = bench.inside(archive, scheme: format == .zip ? ArchiveURL.writableScheme : ArchiveURL.readOnlyScheme)
+        let root = bench.inside(
+            archive, scheme: format == .zip ? ArchiveURL.writableScheme : ArchiveURL.readOnlyScheme)
         #expect(try bench.names(root) == ["tree"])
-        #expect(try bench.names(root.appending(name: "tree")) == ["big.log", "empty.txt", "hollow", "readme.txt", "sub"])
-        #expect(try bench.names(root.appending(name: "tree").appending(name: "sub"), showHidden: false) == ["deep", "random.bin"])
+        #expect(
+            try bench.names(root.appending(name: "tree")) == ["big.log", "empty.txt", "hollow", "readme.txt", "sub"])
+        #expect(
+            try bench.names(root.appending(name: "tree").appending(name: "sub"), showHidden: false) == [
+                "deep", "random.bin"
+            ])
         let readme = try bench.item(root.appending(name: "tree").appending(name: "readme.txt"))
-        #expect(readme.size == 17_600 && readme.permissions == 0o755 && readme.modified == Date(timeIntervalSince1970: 1_600_000_000))
-        #expect(try bench.read(readme.url) == FileManager.default.contents(atPath: tree.appendingPathComponent("readme.txt").path))
+        #expect(
+            readme.size == 17_600 && readme.permissions == 0o755
+                && readme.modified == Date(timeIntervalSince1970: 1_600_000_000))
+        #expect(
+            try bench.read(readme.url)
+                == FileManager.default.contents(atPath: tree.appendingPathComponent("readme.txt").path))
 
         let unpacked = try bench.unpack(archive, to: box.url("back"))
         #expect(unpacked.problems.isEmpty && !unpacked.cancelled)
@@ -230,7 +251,9 @@ func snapshot(_ folder: URL) -> [String: Data?] {
         #expect(try Data(contentsOf: box.url("back/big.log")) == original)
 
         // A folder does not fit into such a file.
-        #expect(throws: ArchiveError.self) { try bench.pack([tree], to: box.url("tree." + format.defaultExtension)) { $0.format = format } }
+        #expect(throws: ArchiveError.self) {
+            try bench.pack([tree], to: box.url("tree." + format.defaultExtension)) { $0.format = format }
+        }
         #expect(!box.exists("tree." + format.defaultExtension))
     }
 
@@ -243,7 +266,8 @@ func snapshot(_ folder: URL) -> [String: Data?] {
         let opened = try bench.store.archive(at: archive)
         #expect(!opened.allowsParallelReads)
         let root = bench.inside(archive, "tree", scheme: ArchiveURL.readOnlyScheme)
-        #expect(try bench.read(root.appending(name: "big.log")) == Data(contentsOf: tree.appendingPathComponent("big.log")))
+        #expect(
+            try bench.read(root.appending(name: "big.log")) == Data(contentsOf: tree.appendingPathComponent("big.log")))
         let reader = try bench.readOnly.read(root.appending(name: "readme.txt"))
         try reader.seek(to: 44)
         #expect(try reader.read(upToCount: 8).map { String(decoding: $0, as: UTF8.self) } == "All work")
@@ -274,7 +298,9 @@ func snapshot(_ folder: URL) -> [String: Data?] {
         try box.folder("unzipped")
         #expect(runTool("/usr/bin/unzip", ["-q", zip.path, "-d", box.url("unzipped").path]).status == 0)
         #expect(snapshot(box.url("unzipped/tree")) == expected)
-        let mode = try FileManager.default.attributesOfItem(atPath: box.url("unzipped/tree/readme.txt").path)[.posixPermissions] as? Int
+        let mode =
+            try FileManager.default.attributesOfItem(atPath: box.url("unzipped/tree/readme.txt").path)[
+                .posixPermissions] as? Int
         #expect(mode == 0o755)
 
         for format in [ArchiveFormat.tar, .compressedTar(.gzip), .compressedTar(.bzip2), .compressedTar(.xz)] {
@@ -298,13 +324,16 @@ func snapshot(_ folder: URL) -> [String: Data?] {
 
     @Test func archivesOfTheSystemToolsAreRead() throws {
         let tree = try bench.makeTree()
-        try FileManager.default.createSymbolicLink(atPath: tree.appendingPathComponent("link").path, withDestinationPath: "readme.txt")
+        try FileManager.default.createSymbolicLink(
+            atPath: tree.appendingPathComponent("link").path, withDestinationPath: "readme.txt")
         let longName = String(repeating: "long-name-", count: 14) + ".txt"
         try box.file("tree/\(longName)", "long")
         var expected = snapshot(tree)
         expected["link"] = nil
 
-        func check(_ archive: URL, _ format: ArchiveFormat, sourceLocation: Testing.SourceLocation = #_sourceLocation) throws {
+        func check(_ archive: URL, _ format: ArchiveFormat, sourceLocation: Testing.SourceLocation = #_sourceLocation)
+            throws
+        {
             let opened = try bench.store.archive(at: archive)
             #expect(opened.format == format, sourceLocation: sourceLocation)
             let folder = try box.folder("out-" + archive.lastPathComponent)
@@ -315,16 +344,21 @@ func snapshot(_ folder: URL) -> [String: Data?] {
             #expect(unpacked == expected, "\(archive.lastPathComponent)", sourceLocation: sourceLocation)
             // Formats that keep links hand them back as links.
             if format != .foreign || archive.pathExtension == "cpio" {
-                #expect((try? FileManager.default.destinationOfSymbolicLink(atPath: folder.appendingPathComponent("tree/link").path)) == "readme.txt",
-                        "\(archive.lastPathComponent)", sourceLocation: sourceLocation)
+                #expect(
+                    (try? FileManager.default.destinationOfSymbolicLink(
+                        atPath: folder.appendingPathComponent("tree/link").path)) == "readme.txt",
+                    "\(archive.lastPathComponent)", sourceLocation: sourceLocation)
             }
-            #expect(ArchiveTester.test(opened, cancellation: CancellationFlag()).isEmpty, sourceLocation: sourceLocation)
+            #expect(
+                ArchiveTester.test(opened, cancellation: CancellationFlag()).isEmpty, sourceLocation: sourceLocation)
         }
 
         #expect(runTool("/usr/bin/zip", ["-qry", "sys.zip", "tree"], in: box.root).status == 0)
         try check(box.url("sys.zip"), .zip)
-        for (name, flags, format) in [("sys.tar", "-cf", ArchiveFormat.tar), ("sys.tgz", "-czf", .compressedTar(.gzip)),
-                                      ("sys.tar.bz2", "-cjf", .compressedTar(.bzip2)), ("sys.tar.xz", "-cJf", .compressedTar(.xz))] {
+        for (name, flags, format) in [
+            ("sys.tar", "-cf", ArchiveFormat.tar), ("sys.tgz", "-czf", .compressedTar(.gzip)),
+            ("sys.tar.bz2", "-cjf", .compressedTar(.bzip2)), ("sys.tar.xz", "-cJf", .compressedTar(.xz))
+        ] {
             #expect(runTool("/usr/bin/tar", [flags, name, "tree"], in: box.root).status == 0)
             try check(box.url(name), format)
         }
@@ -340,10 +374,15 @@ func snapshot(_ folder: URL) -> [String: Data?] {
         try box.file("one.txt", "first ")
         try box.file("two.txt", "second")
         #expect(runTool("/usr/bin/gzip", ["-k", "one.txt", "two.txt"], in: box.root).status == 0)
-        try (Data(contentsOf: box.url("one.txt.gz")) + Data(contentsOf: box.url("two.txt.gz"))).write(to: box.url("both.gz"))
-        #expect(try bench.read(bench.inside(box.url("both.gz"), "one.txt", scheme: ArchiveURL.readOnlyScheme)) == Data("first second".utf8))
+        try (Data(contentsOf: box.url("one.txt.gz")) + Data(contentsOf: box.url("two.txt.gz"))).write(
+            to: box.url("both.gz"))
+        #expect(
+            try bench.read(bench.inside(box.url("both.gz"), "one.txt", scheme: ArchiveURL.readOnlyScheme))
+                == Data("first second".utf8))
         #expect(runTool("/usr/bin/bzip2", ["-k", "one.txt"], in: box.root).status == 0)
-        #expect(try bench.read(bench.inside(box.url("one.txt.bz2"), "one.txt", scheme: ArchiveURL.readOnlyScheme)) == Data("first ".utf8))
+        #expect(
+            try bench.read(bench.inside(box.url("one.txt.bz2"), "one.txt", scheme: ArchiveURL.readOnlyScheme))
+                == Data("first ".utf8))
 
         // A file that is no archive says so.
         #expect(throws: ArchiveError.self) { try bench.store.archive(at: box.url("one.txt")) }
@@ -363,7 +402,8 @@ func snapshot(_ folder: URL) -> [String: Data?] {
             let packer = ZipPacker(output, level: 6, limits: limits)
             for (index, size) in sizes.enumerated() {
                 var sent = false
-                let record = ZipRecord.new(name: "file\(index).txt", isDirectory: false, modified: Date(), permissions: 0o644)
+                let record = ZipRecord.new(
+                    name: "file\(index).txt", isDirectory: false, modified: Date(), permissions: 0o644)
                 try packer.add(record, expectedSize: UInt64(size)) {
                     defer { sent = true }
                     return sent || size == 0 ? nil : Data(repeating: UInt8(65 + index % 26), count: size)
@@ -411,7 +451,9 @@ func snapshot(_ folder: URL) -> [String: Data?] {
         let stamp = Date(timeIntervalSince1970: 1_700_000_000)
         for index in 0..<count {
             var sent = false
-            let record = ZipRecord.new(name: "folder\(index % 100)/file\(index).txt", isDirectory: false, modified: stamp, permissions: 0o644)
+            let record = ZipRecord.new(
+                name: "folder\(index % 100)/file\(index).txt", isDirectory: false, modified: stamp, permissions: 0o644
+            )
             try packer.add(record, expectedSize: 4) {
                 defer { sent = true }
                 return sent ? nil : Data("\(index % 10)abc".utf8)
@@ -446,14 +488,20 @@ func snapshot(_ folder: URL) -> [String: Data?] {
         bench.passwords.set(["wrong", "sesame"])
         #expect(try bench.read(member) == Data(contentsOf: tree.appendingPathComponent("readme.txt")))
         #expect(bench.passwords.asked == 3)
-        #expect(try bench.read(bench.inside(locked, "tree/big.log")) == Data(contentsOf: tree.appendingPathComponent("big.log")))
+        #expect(
+            try bench.read(bench.inside(locked, "tree/big.log"))
+                == Data(contentsOf: tree.appendingPathComponent("big.log")))
         #expect(bench.passwords.asked == 3)
         let unpacked = try bench.unpack(locked, to: box.url("back"))
         #expect(unpacked.problems.isEmpty && snapshot(box.url("back/tree")) == snapshot(tree))
 
         // What is encrypted here the old way, the system's unzip opens with the password and not without.
         let own = box.url("own.zip")
-        try bench.pack([tree], to: own) { $0.password = "open sesame"; $0.encryption = .legacy; $0.verifies = true }
+        try bench.pack([tree], to: own) {
+            $0.password = "open sesame"
+            $0.encryption = .legacy
+            $0.verifies = true
+        }
         #expect(runTool("/usr/bin/unzip", ["-tq", "-P", "open sesame", own.path]).status == 0)
         #expect(runTool("/usr/bin/unzip", ["-tq", "-P", "nope", own.path]).status != 0)
         #expect(try bench.store.archive(at: own).hasEncryptedMembers)
@@ -482,10 +530,13 @@ func snapshot(_ folder: URL) -> [String: Data?] {
         try bytes.write(to: archive)
         opened = try bench.store.archive(at: archive)
         let problems = ArchiveTester.test(opened, cancellation: CancellationFlag())
-        #expect(problems.count == 1 && problems.first?.contains("random.bin") == true && problems.first?.contains("CRC") == true)
+        #expect(
+            problems.count == 1 && problems.first?.contains("random.bin") == true
+                && problems.first?.contains("CRC") == true)
         // Unpacking reports it too and does not leave the damaged file behind.
         let result = try bench.unpack(archive, to: box.url("back"))
-        #expect(result.problems.count == 1 && !box.exists("back/tree/sub/random.bin") && box.exists("back/tree/readme.txt"))
+        #expect(
+            result.problems.count == 1 && !box.exists("back/tree/sub/random.bin") && box.exists("back/tree/readme.txt"))
         #expect(namesOnDisk(box.url("back/tree/sub")) == [".hidden", "deep"])
 
         // A deflated member that is cut short, and a TAR with a broken header.
@@ -494,7 +545,8 @@ func snapshot(_ folder: URL) -> [String: Data?] {
         let log = try #require(deflated.range(of: Data("tree/big.log".utf8))).upperBound
         deflated.replaceSubrange((log + 2000)..<(log + 2040), with: Data(repeating: 0x55, count: 40))
         try deflated.write(to: box.url("deflated.zip"))
-        let broken = ArchiveTester.test(try bench.store.archive(at: box.url("deflated.zip")), cancellation: CancellationFlag())
+        let broken = ArchiveTester.test(
+            try bench.store.archive(at: box.url("deflated.zip")), cancellation: CancellationFlag())
         #expect(broken.count == 1 && broken.first?.contains("big.log") == true)
 
         try bench.pack([tree], to: box.url("tree.tar")) { $0.format = .tar }
@@ -512,7 +564,7 @@ func snapshot(_ folder: URL) -> [String: Data?] {
         let writer = ZipWriter(output)
         var record = ZipRecord()
         record.versionMadeBy = 20
-        record.nameBytes = Data([0x44, 0x49, 0x52, 0x5C, 0x81, 0x62, 0x65, 0x72, 0x2E, 0x74, 0x78, 0x74])   // DIR\über.txt in code page 437
+        record.nameBytes = Data([0x44, 0x49, 0x52, 0x5C, 0x81, 0x62, 0x65, 0x72, 0x2E, 0x74, 0x78, 0x74])  // DIR\über.txt in code page 437
         record.externalAttributes = 0x21
         (record.dosTime, record.dosDate) = DOSTime.encode(DOSTime.date(time: 0x6000, date: 0x5221))
         try writer.end(try writer.begin(record), record, headerChanged: false)
@@ -527,9 +579,13 @@ func snapshot(_ folder: URL) -> [String: Data?] {
         #expect(try bench.names(root) == ["DIR"])
         let file = try #require(try bench.zip.list(root.appending(name: "DIR"), showHidden: true).first)
         #expect(file.name == "über.txt" && file.permissions == 0o444)
-        #expect(Calendar.current.dateComponents([.year, .month, .day, .hour], from: file.modified) == DateComponents(year: 2021, month: 1, day: 1, hour: 12))
+        #expect(
+            Calendar.current.dateComponents([.year, .month, .day, .hour], from: file.modified)
+                == DateComponents(year: 2021, month: 1, day: 1, hour: 12))
         try bench.unpack(url, to: box.url("safe/inner"))
-        #expect(box.exists("safe/inner/DIR/über.txt") && !box.exists("safe/inner/evil.txt") && !box.exists("evil.txt") && !box.exists("safe/evil.txt"))
+        #expect(
+            box.exists("safe/inner/DIR/über.txt") && !box.exists("safe/inner/evil.txt") && !box.exists("evil.txt")
+                && !box.exists("safe/evil.txt"))
         // The comment survives a change of the archive.
         try bench.zip.createDirectory(at: root.appending(name: "new"))
         try bench.store.flush(url)
@@ -537,9 +593,12 @@ func snapshot(_ folder: URL) -> [String: Data?] {
     }
 
     @Test func tarHeadersCarryLongNamesAndLargeSizes() throws {
-        var header = TarHeader(path: "short.txt", size: 5, modified: Date(timeIntervalSince1970: 1_700_000_000), permissions: 0o640)
+        var header = TarHeader(
+            path: "short.txt", size: 5, modified: Date(timeIntervalSince1970: 1_700_000_000), permissions: 0o640)
         var parsed = try #require(TarHeader.parse(header.encoded()))
-        #expect(parsed.header.path == "short.txt" && parsed.header.size == 5 && parsed.header.permissions == 0o640 && parsed.header.kind == .file)
+        #expect(
+            parsed.header.path == "short.txt" && parsed.header.size == 5 && parsed.header.permissions == 0o640
+                && parsed.header.kind == .file)
 
         // A long path is split at a slash when that works, and written as a pax record otherwise.
         let split = String(repeating: "d", count: 90) + "/" + String(repeating: "f", count: 60)
@@ -555,7 +614,8 @@ func snapshot(_ folder: URL) -> [String: Data?] {
         #expect(read.path == unsplittable && read.size == 0o100000000000)
         parsed = try #require(TarHeader.parse(TarHeader(path: "dir", kind: .directory).encoded()))
         #expect(parsed.header.kind == .directory && parsed.header.path == "dir/")
-        #expect(!TarHeader.looksLikeHeader(Data(count: 512)) && !TarHeader.looksLikeHeader(Data(repeating: 65, count: 512)))
+        #expect(
+            !TarHeader.looksLikeHeader(Data(count: 512)) && !TarHeader.looksLikeHeader(Data(repeating: 65, count: 512)))
     }
 
     @Test func parallelCompressionGivesOneValidStream() throws {
@@ -567,7 +627,10 @@ func snapshot(_ folder: URL) -> [String: Data?] {
             line += 1
         }
         data = data.prefix(3 << 20)
-        for (method, name) in [(ParallelCompressor.Method.gzip(level: 6), "p.gz"), (.bzip2(level: 9), "p.bz2"), (.xz, "p.xz"), (.gzip(level: 1), "empty.gz")] {
+        for (method, name) in [
+            (ParallelCompressor.Method.gzip(level: 6), "p.gz"), (.bzip2(level: 9), "p.bz2"), (.xz, "p.xz"),
+            (.gzip(level: 1), "empty.gz")
+        ] {
             let url = box.url(name)
             let output = try OutputFile(creating: url)
             let compressor = try ParallelCompressor(method, to: output)
@@ -589,7 +652,8 @@ func snapshot(_ folder: URL) -> [String: Data?] {
         #expect(runTool("/usr/bin/bzip2", ["-t", box.url("p.bz2").path]).status == 0)
         // The checksum of pieces summed separately is the checksum of the whole.
         let (first, second) = (data.prefix(12_345), data.dropFirst(12_345))
-        #expect(CRC32.combine(CRC32.of(Data(first)), CRC32.of(Data(second)), secondLength: second.count) == CRC32.of(data))
+        #expect(
+            CRC32.combine(CRC32.of(Data(first)), CRC32.of(Data(second)), secondLength: second.count) == CRC32.of(data))
         #expect(CRC32.of(Data("123456789".utf8)) == 0xCBF4_3926)
     }
 
@@ -611,7 +675,11 @@ func snapshot(_ folder: URL) -> [String: Data?] {
         let sum = runTool("/usr/bin/cksum", [source.path]).output.split(separator: " ").prefix(2).joined(separator: " ")
 
         try bench.pack([source], to: box.url("huge.zip"))
-        try bench.pack([source], to: box.url("locked.zip")) { $0.password = "pw"; $0.encryption = .legacy; $0.verifies = true }
+        try bench.pack([source], to: box.url("locked.zip")) {
+            $0.password = "pw"
+            $0.encryption = .legacy
+            $0.verifies = true
+        }
         try bench.pack([source], to: box.url("huge.tgz")) { $0.format = .compressedTar(.gzip) }
         try bench.pack([source], to: box.url("huge.dat.gz")) { $0.format = .compressedFile(.gzip) }
         #expect(try Data(contentsOf: box.url("huge.zip")).count < megabytes << 18)
@@ -621,7 +689,9 @@ func snapshot(_ folder: URL) -> [String: Data?] {
         for name in ["huge.zip", "huge.tgz", "huge.dat.gz"] {
             let folder = try box.folder("out-" + name)
             #expect(try bench.unpack(box.url(name), to: folder).problems.isEmpty)
-            let unpacked = runTool("/usr/bin/cksum", [folder.appendingPathComponent("huge.dat").path]).output.split(separator: " ").prefix(2)
+            let unpacked = runTool("/usr/bin/cksum", [folder.appendingPathComponent("huge.dat").path]).output.split(
+                separator: " "
+            ).prefix(2)
             #expect(unpacked.joined(separator: " ") == sum, "\(name)")
         }
         #expect(bench.monitor.reports.last?.bytesDone == Int64(megabytes << 20 + 4))
@@ -634,12 +704,14 @@ func snapshot(_ folder: URL) -> [String: Data?] {
         #expect(try stream.read(upToCount: 512)?.isEmpty == false)
         stream.close()
         // A tool that fails says why.
-        let failing = try ProcessStream(Tool.bsdtar, ["-cf", "-", "--format", "pax", "@" + box.url("missing.7z").path])
+        let failing = try ProcessStream(
+            Tool.bsdtar, ["-cf", "-", "--format", "pax", "@" + box.url("missing.7z").path])
         #expect(throws: ArchiveError.self) { while try failing.read(upToCount: 4096) != nil {} }
         // Arguments reach the tool as they are: no shell reads the name.
         let odd = try box.file("odd $(touch pwned) ; name's \"x\".txt", "odd")
         #expect(runTool("/usr/bin/bzip2", ["-k", odd.path]).status == 0)
-        let inner = bench.inside(URL(fileURLWithPath: odd.path + ".bz2"), odd.lastPathComponent, scheme: ArchiveURL.readOnlyScheme)
+        let inner = bench.inside(
+            URL(fileURLWithPath: odd.path + ".bz2"), odd.lastPathComponent, scheme: ArchiveURL.readOnlyScheme)
         #expect(try bench.read(inner) == Data("odd".utf8))
         #expect(!box.exists("pwned"))
     }

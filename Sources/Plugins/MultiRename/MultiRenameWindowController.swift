@@ -6,8 +6,10 @@ import AppKit
 /// The window of the Multi-Rename Tool (spec 09 › Window and scope). It only shows a
 /// `MultiRenameSession` and passes on what the user does; everything it does is on the main
 /// thread, and the session keeps the work off it.
-final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, NSTableViewDataSource, NSTableViewDelegate,
-                                         NSTextFieldDelegate, NSComboBoxDelegate {
+final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, NSTableViewDataSource,
+    NSTableViewDelegate,
+    NSTextFieldDelegate, NSComboBoxDelegate
+{
     /// A window that offers its keys to the tool before the focused field sees them: F2, F5
     /// and F10 work wherever the cursor is.
     private final class Window: ToolWindow {
@@ -76,8 +78,9 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
     init(kernel: Kernel, session: MultiRenameSession) {
         self.kernel = kernel
         self.session = session
-        let window = Window(contentRect: NSRect(x: 0, y: 0, width: 980, height: 600),
-                            styleMask: [.titled, .closable, .resizable, .miniaturizable], backing: .buffered, defer: false)
+        let window = Window(
+            contentRect: NSRect(x: 0, y: 0, width: 980, height: 600),
+            styleMask: [.titled, .closable, .resizable, .miniaturizable], backing: .buffered, defer: false)
         window.title = "Multi-Rename Tool"
         window.isReleasedWhenClosed = false
         window.minSize = NSSize(width: 860, height: 420)
@@ -137,18 +140,25 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
         let nameButtons = [
             button("[N] Name", #selector(insertName)), button("[N#-#] Range", #selector(insertNameRange)),
             button("[C] Counter", #selector(insertNameCounter)), button("[YMD] Date", #selector(insertDate)),
-            button("[hms] Time", #selector(insertTime)), button("+", #selector(showMoreFields(_:)), tip: "More fields"),
-            button("#", #selector(showRangeFields(_:)), tip: "Ranges of other fields"),
+            button("[hms] Time", #selector(insertTime)),
+            button("+", #selector(showMoreFields(_:)), tip: "More fields"),
+            button("#", #selector(showRangeFields(_:)), tip: "Ranges of other fields")
         ]
-        let extensionButtons = [button("[E] Ext.", #selector(insertExtension)), button("[E#-#] Range", #selector(insertExtensionRange)),
-                                button("[C] Counter", #selector(insertExtensionCounter))]
+        let extensionButtons = [
+            button("[E] Ext.", #selector(insertExtension)), button("[E#-#] Range", #selector(insertExtensionRange)),
+            button("[C] Counter", #selector(insertExtensionCounter))
+        ]
         maskOnlyButtons = nameButtons + extensionButtons
-        let nameBox = box("Rename mask: file name", [nameMaskBox, row(Array(nameButtons[0..<4])), row(Array(nameButtons[4...]))])
-        let extensionGroup = box("Extension", [extensionField, row(Array(extensionButtons[0..<2])), extensionButtons[2]])
+        let nameBox = box(
+            "Rename mask: file name", [nameMaskBox, row(Array(nameButtons[0..<4])), row(Array(nameButtons[4...]))])
+        let extensionGroup = box(
+            "Extension", [extensionField, row(Array(extensionButtons[0..<2])), extensionButtons[2]])
 
-        for (check, tip) in [(caseBox, "Respect upper/lowercase"), (onceBox, "Replace only the first occurrence (key 1 in the list)"),
-                             (extensionBox, "Also search the extension"), (regexBox, "Search for is a regular expression"),
-                             (substituteBox, "Replace the whole name by Replace with")] {
+        for (check, tip) in [
+            (caseBox, "Respect upper/lowercase"), (onceBox, "Replace only the first occurrence (key 1 in the list)"),
+            (extensionBox, "Also search the extension"), (regexBox, "Search for is a regular expression"),
+            (substituteBox, "Replace the whole name by Replace with")
+        ] {
             check.target = self
             check.action = #selector(optionChanged)
             check.toolTip = tip
@@ -156,12 +166,18 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
         LetterCase.allCases.forEach { letterCasePopup.addItem(withTitle: $0.title) }
         letterCasePopup.target = self
         letterCasePopup.action = #selector(optionChanged)
-        let searchGrid = NSGridView(views: [[NSTextField(labelWithString: "Search for:"), searchBox],
-                                            [NSTextField(labelWithString: "Replace with:"), replaceBox]])
+        let searchGrid = NSGridView(views: [
+            [NSTextField(labelWithString: "Search for:"), searchBox],
+            [NSTextField(labelWithString: "Replace with:"), replaceBox]
+        ])
         searchGrid.column(at: 0).xPlacement = .trailing
         searchGrid.rowSpacing = 6
-        let searchGroup = box("Search & Replace", [searchGrid, row([caseBox, onceBox, extensionBox, regexBox, substituteBox]),
-                                                    row([NSTextField(labelWithString: "Upper/lowercase:"), letterCasePopup])])
+        let searchGroup = box(
+            "Search & Replace",
+            [
+                searchGrid, row([caseBox, onceBox, extensionBox, regexBox, substituteBox]),
+                row([NSTextField(labelWithString: "Upper/lowercase:"), letterCasePopup])
+            ])
 
         for stepper in [startStepper, stepStepper] {
             stepper.minValue = -1_000_000_000
@@ -172,9 +188,11 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
         digitsPopup.addItems(withTitles: (1...10).map(String.init) + ["a (automatic)"])
         digitsPopup.target = self
         digitsPopup.action = #selector(optionChanged)
-        let counterGrid = NSGridView(views: [[NSTextField(labelWithString: "Start at:"), row([startField, startStepper])],
-                                             [NSTextField(labelWithString: "Step by:"), row([stepField, stepStepper])],
-                                             [NSTextField(labelWithString: "Digits:"), digitsPopup]])
+        let counterGrid = NSGridView(views: [
+            [NSTextField(labelWithString: "Start at:"), row([startField, startStepper])],
+            [NSTextField(labelWithString: "Step by:"), row([stepField, stepStepper])],
+            [NSTextField(labelWithString: "Digits:"), digitsPopup]
+        ])
         counterGrid.column(at: 0).xPlacement = .trailing
         counterGrid.rowSpacing = 6
         let counterGroup = box("Define counter [C]", [counterGrid])
@@ -190,8 +208,10 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
         namesPopup.action = #selector(namesChosen(_:))
         let tools = row([NSView(), namesPopup, settingsPopup])
 
-        let columns: [(id: String, title: String, width: CGFloat)] = [("old", "Old name", 190), ("ext", "Ext.", 50), ("new", "New name", 250),
-                                                                      ("size", "Size", 90), ("date", "Date", 150), ("location", "Location", 220)]
+        let columns: [(id: String, title: String, width: CGFloat)] = [
+            ("old", "Old name", 190), ("ext", "Ext.", 50), ("new", "New name", 250),
+            ("size", "Size", 90), ("date", "Date", 150), ("location", "Location", 220)
+        ]
         for column in columns {
             let tableColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(column.id))
             tableColumn.title = column.title
@@ -216,8 +236,10 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
 
         statusLabel.lineBreakMode = .byTruncatingTail
         statusLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        for (control, action) in [(nextStepButton, #selector(nextStep)), (startButton, #selector(start)), (undoButton, #selector(undo)),
-                                  (resultButton, #selector(showResultList)), (closeButton, #selector(closeWindow))] {
+        for (control, action) in [
+            (nextStepButton, #selector(nextStep)), (startButton, #selector(start)), (undoButton, #selector(undo)),
+            (resultButton, #selector(showResultList)), (closeButton, #selector(closeWindow))
+        ] {
             control.target = self
             control.action = action
         }
@@ -269,9 +291,10 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
         settings.regularExpression = regexBox.state == .on
         settings.substitute = substituteBox.state == .on
         settings.letterCase = LetterCase(rawValue: letterCasePopup.indexOfSelectedItem) ?? .unchanged
-        settings.counter = CounterDefinition(start: Int(startField.stringValue.trimmingCharacters(in: .whitespaces)) ?? 1,
-                                             step: Int(stepField.stringValue.trimmingCharacters(in: .whitespaces)) ?? 1,
-                                             digits: digitsPopup.indexOfSelectedItem == 10 ? 0 : digitsPopup.indexOfSelectedItem + 1)
+        settings.counter = CounterDefinition(
+            start: Int(startField.stringValue.trimmingCharacters(in: .whitespaces)) ?? 1,
+            step: Int(stepField.stringValue.trimmingCharacters(in: .whitespaces)) ?? 1,
+            digits: digitsPopup.indexOfSelectedItem == 10 ? 0 : digitsPopup.indexOfSelectedItem + 1)
         return settings
     }
 
@@ -288,7 +311,8 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
     func comboBoxSelectionDidChange(_ notification: Notification) {
         // The box holds the chosen text only after this notification.
         guard let combo = notification.object as? NSComboBox, combo.indexOfSelectedItem >= 0,
-              let text = combo.itemObjectValue(at: combo.indexOfSelectedItem) as? String else { return }
+            let text = combo.itemObjectValue(at: combo.indexOfSelectedItem) as? String
+        else { return }
         combo.stringValue = text
         fieldsChanged()
     }
@@ -327,11 +351,16 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
             statusLabel.stringValue = MultiRenameWindowController.describe(problem)
             statusLabel.textColor = .systemRed
         } else if counts.conflicts > 0 || counts.errors > 0 {
-            statusLabel.stringValue = [counts.conflicts > 0 ? "\(counts.conflicts) name conflict(s)" : nil,
-                                       counts.errors > 0 ? "\(counts.errors) name(s) cannot be used" : nil].compactMap { $0 }.joined(separator: ", ")
+            statusLabel.stringValue = [
+                counts.conflicts > 0 ? "\(counts.conflicts) name conflict(s)" : nil,
+                counts.errors > 0 ? "\(counts.errors) name(s) cannot be used" : nil
+            ].compactMap { $0 }.joined(separator: ", ")
             statusLabel.textColor = .systemRed
         } else {
-            statusLabel.stringValue = usesMasks ? "Please press 'Start!' to start renaming!" : "The names come from a list. Please press 'Start!' to start renaming!"
+            statusLabel.stringValue =
+                usesMasks
+                ? "Please press 'Start!' to start renaming!"
+                : "The names come from a list. Please press 'Start!' to start renaming!"
             statusLabel.textColor = .labelColor
         }
         let selection = table.selectedRowIndexes
@@ -344,13 +373,16 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
         case RenameMaskError.invalidPlaceholder(let text): return "Invalid placeholder: \(text)"
         case RenameMaskError.contentPluginsUnavailable: return "Content-plugin fields [=…] are not available."
         case SearchReplace.Problem.invalidExpression(let text): return "Invalid regular expression: \(text)"
-        case SearchReplace.Problem.tooSlow(let text): return "The regular expression takes too long for these names: \(text)"
+        case SearchReplace.Problem.tooSlow(let text):
+            return "The regular expression takes too long for these names: \(text)"
         default: return "The rename mask is invalid."
         }
     }
 
     private func reloadHistories() {
-        for (combo, history) in [(nameMaskBox, RenameStore.History.nameMask), (searchBox, .search), (replaceBox, .replacement)] {
+        for (combo, history) in [
+            (nameMaskBox, RenameStore.History.nameMask), (searchBox, .search), (replaceBox, .replacement)
+        ] {
             let entries = session.store.history(history)
             if (combo.objectValues as? [String]) != entries {
                 combo.removeAllItems()
@@ -376,11 +408,19 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
             popup.autoenablesItems = false
         }
         let saved = session.store.savedNames
-        fill(settingsPopup, "F2 Load/save settings", [("<default>", "default", true), ("Save settings…", "save", true),
-                                                       ("Delete entry…", "delete", !saved.isEmpty), ("", "", false)]
-            + saved.map { ($0, "load:" + $0, true) })
-        fill(namesPopup, "F10 Names", [("Load names from file…", "load", true), ("Edit names…", "edit", true),
-                                       ("Use the rename masks again", "masks", session.givenNames != nil)])
+        fill(
+            settingsPopup, "F2 Load/save settings",
+            [
+                ("<default>", "default", true), ("Save settings…", "save", true),
+                ("Delete entry…", "delete", !saved.isEmpty), ("", "", false)
+            ]
+                + saved.map { ($0, "load:" + $0, true) })
+        fill(
+            namesPopup, "F10 Names",
+            [
+                ("Load names from file…", "load", true), ("Edit names…", "edit", true),
+                ("Use the rename masks again", "masks", session.givenNames != nil)
+            ])
     }
 
     // MARK: Inserting placeholders
@@ -408,17 +448,19 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
         ("[P]", "Parent folder"), ("[G]", "Grandparent folder"), ("[A]", "Name with extension"), ("[E]", "Extension"),
         ("[d]", "Date (regional format)"), ("[t]", "Time (regional format)"), ("[S]", "Size"),
         ("[T4]", "From here on: date taken (pictures) instead of date changed"),
-        ("[U]", "All characters after this position in uppercase"), ("[L]", "All characters after this position in lowercase"),
+        ("[U]", "All characters after this position in uppercase"),
+        ("[L]", "All characters after this position in lowercase"),
         ("[F]", "First letter of each word uppercase after this position"),
         ("[f]", "First letter of each word uppercase after this position (English in Titles)"),
         ("[n]", "All characters after this position again as in original name"), ("[%USER%]", "User name"),
         ("[[]", "Square bracket: open"), ("[]]", "Square bracket: close"), ("[X]", "Clipboard text"),
-        ("[c]", "Number of files in the list"), ("[I]", "Folders only (on/off): The name [N] includes the extension, [E] is not used"),
+        ("[c]", "Number of files in the list"),
+        ("[I]", "Folders only (on/off): The name [N] includes the extension, [E] is not used")
     ]
 
     private static let rangeFields: [(String, String)] = [
         ("", "Full path+name"), ("P", "Parent folder"), ("G", "Grandparent folder"), ("A", "Name with extension"),
-        ("E", "Extension"), ("X", "Clipboard text"),
+        ("E", "Extension"), ("X", "Clipboard text")
     ]
 
     @objc private func showMoreFields(_ sender: NSButton) {
@@ -435,7 +477,8 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
     @objc private func showRangeFields(_ sender: NSButton) {
         let menu = NSMenu()
         for (letter, label) in MultiRenameWindowController.rangeFields {
-            let item = NSMenuItem(title: "[\(letter)#-#]  \(label)", action: #selector(insertRangeFromMenu(_:)), keyEquivalent: "")
+            let item = NSMenuItem(
+                title: "[\(letter)#-#]  \(label)", action: #selector(insertRangeFromMenu(_:)), keyEquivalent: "")
             item.target = self
             item.representedObject = letter
             menu.addItem(item)
@@ -454,18 +497,22 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
     /// The range picker "Select the characters to insert" (spec 09 › Mask fields, insert
     /// buttons and menus), as a form: positions are typed instead of marked with the mouse.
     private func insertRange(of letter: String, into field: NSTextField) {
-        let sample = (session.rowCount > 0 ? session.row(at: 0) : nil).map { row -> String in
-            let parts = row.entry.item.isFolder ? (row.entry.name, "") : FileItem.split(row.entry.name)
-            return letter == "N" ? parts.0 : letter == "E" ? parts.1 : row.entry.name
-        } ?? ""
+        let sample =
+            (session.rowCount > 0 ? session.row(at: 0) : nil).map { row -> String in
+                let parts = row.entry.item.isFolder ? (row.entry.name, "") : FileItem.split(row.entry.name)
+                return letter == "N" ? parts.0 : letter == "E" ? parts.1 : row.entry.name
+            } ?? ""
         let fields: [FormField] = [
             .text("first", "First character:", "1"), .text("last", "Last character (empty = to the end):", ""),
             .checkbox("firstFromEnd", "Measure first character from the end"),
             .checkbox("lastFromEnd", "Measure last character from the end"),
-            .checkbox("length", "Use [first,length] instead of [first-last]"),
+            .checkbox("length", "Use [first,length] instead of [first-last]")
         ]
-        guard let answer = kernel.ui.form("Select the characters to insert:", detail: sample, fields: fields, buttons: ["OK"]),
-              let first = Int(answer.text("first").trimmingCharacters(in: .whitespaces)), first > 0 else { return }
+        guard
+            let answer = kernel.ui.form(
+                "Select the characters to insert:", detail: sample, fields: fields, buttons: ["OK"]),
+            let first = Int(answer.text("first").trimmingCharacters(in: .whitespaces)), first > 0
+        else { return }
         var range = (answer.flag("firstFromEnd") ? "-" : "") + String(first)
         if let last = Int(answer.text("last").trimmingCharacters(in: .whitespaces)), last > 0 {
             range += answer.flag("length") ? ",\(last)" : "-" + (answer.flag("lastFromEnd") ? "-" : "") + String(last)
@@ -490,7 +537,11 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
             }
         case "delete":
             let names = session.store.savedNames
-            guard let row = kernel.ui.pickRow("Delete entry", rows: names, selected: loadedName.flatMap(names.firstIndex(of:)) ?? 0, button: "Delete") else { return }
+            guard
+                let row = kernel.ui.pickRow(
+                    "Delete entry", rows: names, selected: loadedName.flatMap(names.firstIndex(of:)) ?? 0,
+                    button: "Delete")
+            else { return }
             session.deleteSaved(names[row])
             if loadedName == names[row] { loadedName = nil }
         default:
@@ -552,9 +603,14 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
         } else if Shortcut.f(10).matches(event) {
             namesPopup.performClick(nil)
         } else if Shortcut(.forwardDelete, .shift).matches(event) || Shortcut(.backspace, .shift).matches(event),
-                  let editor = window?.firstResponder as? NSText, let combo = editor.delegate as? NSComboBox {
-            let histories: [(NSComboBox, RenameStore.History)] = [(nameMaskBox, .nameMask), (searchBox, .search), (replaceBox, .replacement)]
-            guard let history = histories.first(where: { $0.0 === combo })?.1, session.store.history(history).contains(combo.stringValue) else { return false }
+            let editor = window?.firstResponder as? NSText, let combo = editor.delegate as? NSComboBox
+        {
+            let histories: [(NSComboBox, RenameStore.History)] = [
+                (nameMaskBox, .nameMask), (searchBox, .search), (replaceBox, .replacement)
+            ]
+            guard let history = histories.first(where: { $0.0 === combo })?.1,
+                session.store.history(history).contains(combo.stringValue)
+            else { return false }
             session.store.forget(combo.stringValue, in: history)
             reloadHistories()
         } else {
@@ -590,12 +646,14 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
 
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
         guard let column = tableColumn?.identifier, row >= 0, row < session.rowCount else { return nil }
-        let cell = tableView.makeView(withIdentifier: column, owner: nil) as? NSTextField ?? {
-            let label = NSTextField(labelWithString: "")
-            label.identifier = column
-            label.lineBreakMode = .byTruncatingMiddle
-            return label
-        }()
+        let cell =
+            tableView.makeView(withIdentifier: column, owner: nil) as? NSTextField
+            ?? {
+                let label = NSTextField(labelWithString: "")
+                label.identifier = column
+                label.lineBreakMode = .byTruncatingMiddle
+                return label
+            }()
         let shown = session.row(at: row)
         let entry = shown.entry
         let status = shown.status
@@ -613,7 +671,8 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
             case .ready: break
             case .error: cell.textColor = .systemRed
             case .invalid(let reason): (cell.textColor, cell.toolTip) = (.systemRed, reason)
-            case .duplicate: (cell.textColor, cell.toolTip) = (.systemRed, "Another file in the list gets the same name.")
+            case .duplicate:
+                (cell.textColor, cell.toolTip) = (.systemRed, "Another file in the list gets the same name.")
             case .exists: (cell.textColor, cell.toolTip) = (.systemRed, "A file with this name already exists.")
             }
         case "size":
@@ -632,7 +691,8 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
         sortAscending = sortColumn == tableColumn.identifier.rawValue ? !sortAscending : true
         sortColumn = tableColumn.identifier.rawValue
         for column in tableView.tableColumns { tableView.setIndicatorImage(nil, in: column) }
-        tableView.setIndicatorImage(NSImage(named: sortAscending ? "NSAscendingSortIndicator" : "NSDescendingSortIndicator"), in: tableColumn)
+        tableView.setIndicatorImage(
+            NSImage(named: sortAscending ? "NSAscendingSortIndicator" : "NSDescendingSortIndicator"), in: tableColumn)
         session.sort(by: key, ascending: sortAscending)
     }
 
@@ -642,13 +702,19 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
         return item
     }
 
-    func tableView(_ tableView: NSTableView, validateDrop info: NSDraggingInfo, proposedRow row: Int,
-                   proposedDropOperation dropOperation: NSTableView.DropOperation) -> NSDragOperation {
+    func tableView(
+        _ tableView: NSTableView, validateDrop info: NSDraggingInfo, proposedRow row: Int,
+        proposedDropOperation dropOperation: NSTableView.DropOperation
+    ) -> NSDragOperation {
         (info.draggingSource as? NSTableView) === table && dropOperation == .above ? .move : []
     }
 
-    func tableView(_ tableView: NSTableView, acceptDrop info: NSDraggingInfo, row: Int, dropOperation: NSTableView.DropOperation) -> Bool {
-        let rows = (info.draggingPasteboard.pasteboardItems ?? []).compactMap { $0.string(forType: MultiRenameWindowController.rowType).flatMap(Int.init) }
+    func tableView(
+        _ tableView: NSTableView, acceptDrop info: NSDraggingInfo, row: Int, dropOperation: NSTableView.DropOperation
+    ) -> Bool {
+        let rows = (info.draggingPasteboard.pasteboardItems ?? []).compactMap {
+            $0.string(forType: MultiRenameWindowController.rowType).flatMap(Int.init)
+        }
         guard !rows.isEmpty else { return false }
         // A reordered list is no longer sorted by any column.
         for column in tableView.tableColumns { tableView.setIndicatorImage(nil, in: column) }

@@ -24,8 +24,10 @@ public struct Place {
     /// it said nothing). Never the start-up disk or a system volume, and never a disk built
     /// into the Mac; a USB stick, a card, a disk image, an external disk and a server's share
     /// may. A disk the system does not call external is taken for an internal one.
-    public static func isEjectable(path: String, isRootFileSystem: Bool?, isInternal: Bool?, isLocal: Bool?, isRemovable: Bool?,
-                                   isEjectable: Bool?) -> Bool {
+    public static func isEjectable(
+        path: String, isRootFileSystem: Bool?, isInternal: Bool?, isLocal: Bool?, isRemovable: Bool?,
+        isEjectable: Bool?
+    ) -> Bool {
         if isRootFileSystem == true || path == "/" || path.hasPrefix("/System/") { return false }
         // A card in the Mac's own reader is internal and removable: it may go.
         if isEjectable == true || isRemovable == true { return true }
@@ -159,7 +161,9 @@ public struct DirectoryEntry: Equatable {
     public let isPackage: Bool
     public let isHidden: Bool
 
-    public init(name: String, isDirectory: Bool, isSymlink: Bool = false, isPackage: Bool = false, isHidden: Bool = false) {
+    public init(
+        name: String, isDirectory: Bool, isSymlink: Bool = false, isPackage: Bool = false, isHidden: Bool = false
+    ) {
         self.name = name
         self.isDirectory = isDirectory
         self.isSymlink = isSymlink
@@ -214,7 +218,8 @@ public protocol FileSystemProvider: AnyObject {
     /// locations; with `foldersOnly`, only the entries that are directories (links to
     /// directories among them). In no particular order. The default lists in full; a file
     /// system that can read less offers that.
-    func entries(of directory: URL, showHidden: Bool, foldersOnly: Bool, cancellation: CancellationFlag) throws -> [DirectoryEntry]
+    func entries(of directory: URL, showHidden: Bool, foldersOnly: Bool, cancellation: CancellationFlag) throws
+        -> [DirectoryEntry]
     /// The entry at `url` itself (a link is not followed); nil when nothing is there.
     func item(at url: URL) -> FileItem?
     /// `item(at:)`, ended early (with nil) once `cancellation` is set.
@@ -420,20 +425,32 @@ extension FileSystemProvider {
         try list(directory, showHidden: showHidden)
     }
 
-    public func list(_ directory: URL, showHidden: Bool, cancellation: CancellationFlag, receive: ([FileItem]) -> Bool) throws {
-        try list(directory, showHidden: showHidden) { items in !cancellation.isCancelled && receive(items) && !cancellation.isCancelled }
+    public func list(_ directory: URL, showHidden: Bool, cancellation: CancellationFlag, receive: ([FileItem]) -> Bool)
+        throws
+    {
+        try list(directory, showHidden: showHidden) { items in
+            !cancellation.isCancelled && receive(items) && !cancellation.isCancelled
+        }
     }
 
-    public func entries(of directory: URL, showHidden: Bool, foldersOnly: Bool, cancellation: CancellationFlag) throws -> [DirectoryEntry] {
-        try entriesByListing(of: directory, showHidden: showHidden, foldersOnly: foldersOnly, cancellation: cancellation)
+    public func entries(of directory: URL, showHidden: Bool, foldersOnly: Bool, cancellation: CancellationFlag) throws
+        -> [DirectoryEntry]
+    {
+        try entriesByListing(
+            of: directory, showHidden: showHidden, foldersOnly: foldersOnly, cancellation: cancellation)
     }
 
     /// The lean listing as any file system can give it: from the full one.
-    public func entriesByListing(of directory: URL, showHidden: Bool, foldersOnly: Bool, cancellation: CancellationFlag) throws -> [DirectoryEntry] {
+    public func entriesByListing(
+        of directory: URL, showHidden: Bool, foldersOnly: Bool, cancellation: CancellationFlag
+    ) throws -> [DirectoryEntry] {
         try list(directory, showHidden: showHidden, cancellation: cancellation).compactMap { item in
-            foldersOnly && !item.isDirectory ? nil
-                : DirectoryEntry(name: item.name, isDirectory: item.isDirectory, isSymlink: item.isSymlink, isPackage: item.isPackage,
-                                 isHidden: item.isHidden)
+            foldersOnly && !item.isDirectory
+                ? nil
+                : DirectoryEntry(
+                    name: item.name, isDirectory: item.isDirectory, isSymlink: item.isSymlink,
+                    isPackage: item.isPackage,
+                    isHidden: item.isHidden)
         }
     }
 
@@ -455,7 +472,9 @@ extension FileSystemProvider {
         throw FileSystemError.notSupported("Continuing a file")
     }
 
-    public func copyMetadata(from source: URL, to destination: URL) throws { throw FileSystemError.notSupported("Copying metadata") }
+    public func copyMetadata(from source: URL, to destination: URL) throws {
+        throw FileSystemError.notSupported("Copying metadata")
+    }
     public func commit(_ url: URL, cancellation: CancellationFlag) throws {}
     public func commit(_ url: URL, cancellation: CancellationFlag, progress: (Int64, Int64) -> Bool) throws {
         if cancellation.isCancelled || !progress(0, 0) { throw CocoaError(.userCancelled) }
@@ -465,10 +484,14 @@ extension FileSystemProvider {
     public func setQuarantine(_ value: Data, of url: URL) throws {}
 
     public func trash(_ url: URL) throws { throw FileSystemError.notSupported("Moving to the Trash") }
-    public func setAttributes(_ attributes: FileAttributes, of url: URL) throws { throw FileSystemError.notSupported("Changing attributes") }
+    public func setAttributes(_ attributes: FileAttributes, of url: URL) throws {
+        throw FileSystemError.notSupported("Changing attributes")
+    }
     public func displayPath(_ url: URL) -> String { url.absoluteString }
     public func location(from text: String) -> URL? {
-        guard text.lowercased().hasPrefix(scheme + ":"), let url = URL(string: text), url.scheme == scheme else { return nil }
+        guard text.lowercased().hasPrefix(scheme + ":"), let url = URL(string: text), url.scheme == scheme else {
+            return nil
+        }
         return url
     }
     public var readsRootedPaths: Bool { scheme == "file" }
@@ -531,7 +554,9 @@ extension FileSystemProvider {
     public var connectsToServer: Bool { false }
     public func readOrder(of urls: [URL]) -> [URL] { urls }
 
-    public func copy(_ source: URL, to destination: URL, cancellation: CancellationFlag, progress: (Int64) -> Bool) throws {
+    public func copy(_ source: URL, to destination: URL, cancellation: CancellationFlag, progress: (Int64) -> Bool)
+        throws
+    {
         if cancellation.isCancelled { throw CocoaError(.userCancelled) }
         do {
             try copy(source, to: destination) { progress($0) && !cancellation.isCancelled }
@@ -565,13 +590,19 @@ extension FileSystemProvider {
     /// never lists a location twice. What was counted by then is the answer.
     public func totalSizeByListing(of directory: URL, cancellation: CancellationFlag) -> Int64 {
         let depth = TreeWalk.nesting
-        guard depth < TreeWalk.deepestNesting else { return totalSizeLevelByLevel(of: directory, cancellation: cancellation) }
+        guard depth < TreeWalk.deepestNesting else {
+            return totalSizeLevelByLevel(of: directory, cancellation: cancellation)
+        }
         TreeWalk.nesting = depth + 1
         defer { TreeWalk.nesting = depth }
-        guard !cancellation.isCancelled, let items = try? list(directory, showHidden: true, cancellation: cancellation),
-              !cancellation.isCancelled else { return 0 }
+        guard !cancellation.isCancelled,
+            let items = try? list(directory, showHidden: true, cancellation: cancellation),
+            !cancellation.isCancelled
+        else { return 0 }
         let files = items.reduce(Int64(0)) { $1.isRealDirectory ? $0 : $0.addingSaturated($1.size) }
-        let folders = Parallel.map(items.filter(\.isRealDirectory)) { cancellation.isCancelled ? 0 : self.totalSize(of: $0.url, cancellation: cancellation) }
+        let folders = Parallel.map(items.filter(\.isRealDirectory)) {
+            cancellation.isCancelled ? 0 : self.totalSize(of: $0.url, cancellation: cancellation)
+        }
         return cancellation.isCancelled ? 0 : folders.reduce(files) { $0.addingSaturated($1) }
     }
 
@@ -584,7 +615,8 @@ extension FileSystemProvider {
         var depth = 0
         while !level.isEmpty, depth < TreeWalk.deepestTree, !cancellation.isCancelled {
             let listings = Parallel.map(level) { folder -> [FileItem] in
-                cancellation.isCancelled ? [] : (try? self.list(folder, showHidden: true, cancellation: cancellation)) ?? []
+                cancellation.isCancelled
+                    ? [] : (try? self.list(folder, showHidden: true, cancellation: cancellation)) ?? []
             }
             var next: [URL] = []
             for items in listings {
@@ -630,7 +662,9 @@ public final class FileSystemRegistry {
     public init() {}
 
     public func register(_ provider: FileSystemProvider) {
-        precondition(!providers.contains { $0.scheme == provider.scheme }, "A file system for \(provider.scheme): is registered twice")
+        precondition(
+            !providers.contains { $0.scheme == provider.scheme },
+            "A file system for \(provider.scheme): is registered twice")
         providers.append(provider)
     }
 
@@ -671,7 +705,8 @@ public final class FileSystemRegistry {
         var current = url
         // No honest chain is long; a circle among file systems ends here.
         for _ in 0..<16 {
-            guard let next = (try? provider(for: current))?.realLocation(of: current), !next.isSameLocation(as: current) else { break }
+            guard let next = (try? provider(for: current))?.realLocation(of: current), !next.isSameLocation(as: current)
+            else { break }
             current = next
         }
         return current

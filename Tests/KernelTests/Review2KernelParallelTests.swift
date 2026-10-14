@@ -1,28 +1,56 @@
-@testable import AFMKernel
 import Foundation
 import Testing
+
+@testable import AFMKernel
 
 /// Counts its instances that are still alive.
 private final class Tracked {
     static let lock = NSLock()
     static var alive = 0
-    init() { Tracked.lock.lock(); Tracked.alive += 1; Tracked.lock.unlock() }
-    deinit { Tracked.lock.lock(); Tracked.alive -= 1; Tracked.lock.unlock() }
-    static var count: Int { lock.lock(); defer { lock.unlock() }; return alive }
+    init() {
+        Tracked.lock.lock()
+        Tracked.alive += 1
+        Tracked.lock.unlock()
+    }
+    deinit {
+        Tracked.lock.lock()
+        Tracked.alive -= 1
+        Tracked.lock.unlock()
+    }
+    static var count: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return alive
+    }
 }
 
 private final class Counter {
     private let lock = NSLock()
     private var value = 0
     private var threads = Set<UInt64>()
-    func add() { lock.lock(); value += 1; lock.unlock() }
+    func add() {
+        lock.lock()
+        value += 1
+        lock.unlock()
+    }
     func note() {
         var id: UInt64 = 0
         pthread_threadid_np(nil, &id)
-        lock.lock(); threads.insert(id); value += 1; lock.unlock()
+        lock.lock()
+        threads.insert(id)
+        value += 1
+        lock.unlock()
     }
-    var count: Int { lock.lock(); defer { lock.unlock() }; return value }
-    var threadCount: Int { lock.lock(); defer { lock.unlock() }; return threads.count }
+    var count: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return value
+    }
+    var threadCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return threads.count
+    }
 }
 
 private func waitUntil(seconds: TimeInterval = 60, _ condition: () -> Bool) -> Bool {
@@ -55,7 +83,8 @@ private func waitUntil(seconds: TimeInterval = 60, _ condition: () -> Bool) -> B
         let width = ParallelPool.shared.width
         guard width > 1 else { return }
         let release = DispatchSemaphore(value: 0)
-        let stalled = Counter(), finished = DispatchSemaphore(value: 0)
+        let stalled = Counter()
+        let finished = DispatchSemaphore(value: 0)
         let pieces = width * 40
         Thread.detachNewThread {
             _ = Parallel.map(Array(0..<pieces)) { _ in
@@ -154,7 +183,8 @@ private func waitUntil(seconds: TimeInterval = 60, _ condition: () -> Bool) -> B
         guard Thread.isMainThread else { return }
         let inside = Parallel.map(Array(0..<256)) { _ -> Bool in
             // Nested calls belong to the same wait.
-            Parallel.map([1, 2, 3]) { _ in Parallel.isHoldingUpMainThread }.allSatisfy { $0 } && Parallel.isHoldingUpMainThread
+            Parallel.map([1, 2, 3]) { _ in Parallel.isHoldingUpMainThread }.allSatisfy { $0 }
+                && Parallel.isHoldingUpMainThread
         }
         #expect(inside.allSatisfy { $0 })
         #expect(!Parallel.isHoldingUpMainThread)
@@ -167,7 +197,10 @@ private func waitUntil(seconds: TimeInterval = 60, _ condition: () -> Bool) -> B
 
     @Test func theSameQuestionIsAskedOnceForAllWhoWait() {
         let owner = Owner()
-        let asked = Counter(), release = DispatchSemaphore(value: 0), answers = Counter(), done = DispatchSemaphore(value: 0)
+        let asked = Counter()
+        let release = DispatchSemaphore(value: 0)
+        let answers = Counter()
+        let done = DispatchSemaphore(value: 0)
         for _ in 0..<12 {
             Thread.detachNewThread {
                 let answer = BlockingCalls.answer(from: owner, to: "volume /dead") { _ -> Int in
@@ -192,7 +225,8 @@ private func waitUntil(seconds: TimeInterval = 60, _ condition: () -> Bool) -> B
 
     @Test func aQuestionThatWasGivenUpIsNotAskedAgainUntilItComesBack() {
         let owner = Owner()
-        let asked = Counter(), release = DispatchSemaphore(value: 0)
+        let asked = Counter()
+        let release = DispatchSemaphore(value: 0)
         var flags: [CancellationFlag] = []
         let lock = NSLock()
         // Fifty tries at a location that does not answer, each given up.
@@ -200,8 +234,11 @@ private func waitUntil(seconds: TimeInterval = 60, _ condition: () -> Bool) -> B
             let cancellation = CancellationFlag()
             let returned = DispatchSemaphore(value: 0)
             Thread.detachNewThread {
-                let answer = BlockingCalls.answer(from: owner, to: "volume /dead", cancellation: cancellation) { flag -> Int in
-                    lock.lock(); flags.append(flag); lock.unlock()
+                let answer = BlockingCalls.answer(from: owner, to: "volume /dead", cancellation: cancellation) {
+                    flag -> Int in
+                    lock.lock()
+                    flags.append(flag)
+                    lock.unlock()
                     asked.add()
                     release.wait()
                     return 1
@@ -227,14 +264,20 @@ private func waitUntil(seconds: TimeInterval = 60, _ condition: () -> Bool) -> B
         release.signal()
         #expect(waitUntil { BlockingCalls.unanswered(for: owner) == 0 })
         release.signal()
-        #expect(BlockingCalls.answer(from: owner, to: "volume /dead") { _ -> Int in release.wait(); return 4 } == 4)
+        #expect(
+            BlockingCalls.answer(from: owner, to: "volume /dead") { _ -> Int in
+                release.wait()
+                return 4
+            } == 4)
         #expect(asked.count == 1)
     }
 
     @Test func oneOwnerHasABoundedNumberOfQuestionsUnderWay() {
         let owner = Owner()
         let limit = BlockingCalls.limit
-        let started = Counter(), release = DispatchSemaphore(value: 0), done = DispatchSemaphore(value: 0)
+        let started = Counter()
+        let release = DispatchSemaphore(value: 0)
+        let done = DispatchSemaphore(value: 0)
         let total = limit + 10
         for index in 0..<total {
             Thread.detachNewThread {

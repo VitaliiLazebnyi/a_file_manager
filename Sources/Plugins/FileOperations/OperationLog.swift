@@ -24,7 +24,8 @@ public final class OperationLog {
     /// What the Log file page of the configuration holds.
     public struct Configuration: Equatable {
         public var isEnabled = false
-        public var file = URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Library/Logs/A File Manager/operations.log")
+        public var file = URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent(
+            "Library/Logs/A File Manager/operations.log")
         public var logsTransfers = true
         public var logsDeletes = true
         public var logsFolders = true
@@ -170,7 +171,9 @@ public final class OperationLog {
     /// character in a file name or an error text is written out (`<U+000A>`), so that no name
     /// can add lines of its own to the log.
     public static func line(for record: OperationRecord, at time: String) -> String {
-        let what = record.verb.rawValue + ": " + DisplayName.escaped(record.source) + (record.target.map { " -> " + DisplayName.escaped($0) } ?? "")
+        let what =
+            record.verb.rawValue + ": " + DisplayName.escaped(record.source)
+            + (record.target.map { " -> " + DisplayName.escaped($0) } ?? "")
         switch record.status {
         case .done: return "\(time): \(what)\n"
         case .failed(let message): return "\(time): Error: \(what): \(DisplayName.escaped(message))\n"
@@ -265,7 +268,8 @@ public final class OperationLog {
         guard fm.fileExists(atPath: file.path) else { return }
         let (base, ext) = (file.deletingPathExtension().lastPathComponent, file.pathExtension)
         func copy(_ tag: String) -> URL {
-            file.deletingLastPathComponent().appendingPathComponent(ext.isEmpty ? "\(base).\(tag)" : "\(base).\(tag).\(ext)")
+            file.deletingLastPathComponent().appendingPathComponent(
+                ext.isEmpty ? "\(base).\(tag)" : "\(base).\(tag).\(ext)")
         }
         switch configuration.rotation {
         case .never:
@@ -286,9 +290,18 @@ public final class OperationLog {
         guard configuration.keepCount > 0 else { return }
         // The oldest copies beyond the limit go. Only files named the way this log names its
         // copies: a neighbour such as `operations.backup.log` is somebody else's.
-        let siblings = (try? fm.contentsOfDirectory(at: file.deletingLastPathComponent(), includingPropertiesForKeys: [.contentModificationDateKey])) ?? []
+        let siblings =
+            (try? fm.contentsOfDirectory(
+                at: file.deletingLastPathComponent(), includingPropertiesForKeys: [.contentModificationDateKey]))
+            ?? []
         let copies = siblings.filter { OperationLog.isRotatedCopy($0.lastPathComponent, of: file.lastPathComponent) }
-            .map { ($0, (try? $0.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast) }
+            .map {
+                (
+                    $0,
+                    (try? $0.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate)
+                        ?? .distantPast
+                )
+            }
             .sorted { $0.1 > $1.1 }
         for (url, _) in copies.dropFirst(configuration.keepCount) { try? fm.removeItem(at: url) }
     }
@@ -299,7 +312,9 @@ public final class OperationLog {
         let url = URL(fileURLWithPath: log)
         let (base, ext) = (url.deletingPathExtension().lastPathComponent, url.pathExtension)
         let suffix = ext.isEmpty ? "" : "." + ext
-        guard name != log, name.hasPrefix(base + "."), name.hasSuffix(suffix), name.count > base.count + 1 + suffix.count else { return false }
+        guard name != log, name.hasPrefix(base + "."), name.hasSuffix(suffix),
+            name.count > base.count + 1 + suffix.count
+        else { return false }
         let tag = name.dropFirst(base.count + 1).dropLast(suffix.count)
         return tag.range(of: #"^(\d{4}-\d{2}-\d{2}(-\d+)?|\d+)$"#, options: .regularExpression) != nil
     }

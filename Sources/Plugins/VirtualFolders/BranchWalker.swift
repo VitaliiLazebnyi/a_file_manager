@@ -39,10 +39,11 @@ public struct BranchWalker {
         var info = statfs()
         guard statfs(path, &info) == 0 else { return false }
         // The system names the mount point by its real path.
-        let real = realpath(path, nil).map { pointer -> String in
-            defer { free(pointer) }
-            return String(cString: pointer)
-        } ?? path
+        let real =
+            realpath(path, nil).map { pointer -> String in
+                defer { free(pointer) }
+                return String(cString: pointer)
+            } ?? path
         return withUnsafePointer(to: &info.f_mntonname) {
             $0.withMemoryRebound(to: CChar.self, capacity: Int(MAXPATHLEN)) { String(cString: $0) }
         } == real
@@ -63,7 +64,9 @@ public struct BranchWalker {
     /// Walks into packages (`.app` and the like) instead of listing them as one item.
     public var entersPackages: Bool
 
-    public init(fileSystems: FileSystemRegistry, showHidden: Bool, listsFolders: Bool = false, entersPackages: Bool = false) {
+    public init(
+        fileSystems: FileSystemRegistry, showHidden: Bool, listsFolders: Bool = false, entersPackages: Bool = false
+    ) {
         self.fileSystems = fileSystems
         self.showHidden = showHidden
         self.listsFolders = listsFolders
@@ -96,8 +99,10 @@ public struct BranchWalker {
     /// Returns the directories that were read, for whoever wants to watch them: the first
     /// `keeping` of them (a walk of a million folders does not hold a million locations).
     @discardableResult
-    public func walk(_ starts: [Start], mustRead: Bool = false, keeping: Int = Int.max, cancellation: CancellationFlag? = nil,
-                     receive: ([FileItem]) -> Bool) throws -> [URL] {
+    public func walk(
+        _ starts: [Start], mustRead: Bool = false, keeping: Int = Int.max, cancellation: CancellationFlag? = nil,
+        receive: ([FileItem]) -> Bool
+    ) throws -> [URL] {
         func isCancelled() -> Bool { cancellation?.isCancelled == true }
         var visited: [URL] = []
         // Every directory is entered once, however many paths lead to it, and the walk stays on
@@ -108,7 +113,9 @@ public struct BranchWalker {
             if start.directory.isFileURL {
                 var info = stat()
                 if stat(start.directory.path, &info) == 0 {
-                    guard entered.insert(DirectoryKey(device: info.st_dev, inode: info.st_ino)).inserted else { continue }
+                    guard entered.insert(DirectoryKey(device: info.st_dev, inode: info.st_ino)).inserted else {
+                        continue
+                    }
                     start.device = info.st_dev
                     start.ownDevice = info.st_dev
                     start.crossesDisks = start.directory.path == "/"
@@ -125,10 +132,13 @@ public struct BranchWalker {
                 let listings = Parallel.map(chunk) { start in
                     Result {
                         let provider = try self.fileSystems.provider(for: start.directory)
-                        guard let cancellation else { return try provider.list(start.directory, showHidden: self.showHidden) }
+                        guard let cancellation else {
+                            return try provider.list(start.directory, showHidden: self.showHidden)
+                        }
                         // Piece by piece: a provider can give up half-way through a huge folder.
                         var items: [FileItem] = []
-                        try provider.list(start.directory, showHidden: self.showHidden, cancellation: cancellation) { batch in
+                        try provider.list(start.directory, showHidden: self.showHidden, cancellation: cancellation) {
+                            batch in
                             items += batch
                             return true
                         }
@@ -146,7 +156,9 @@ public struct BranchWalker {
                         for item in items {
                             let name = start.prefix + item.name
                             let isWalked = item.isRealDirectory && (entersPackages || !item.isPackage)
-                            if isWalked, let child = enter(item.url, name: name, from: start, entered: &entered) { next.append(child) }
+                            if isWalked, let child = enter(item.url, name: name, from: start, entered: &entered) {
+                                next.append(child)
+                            }
                             if !isWalked || listsFolders { batch.append(item.named(name)) }
                         }
                     }
@@ -163,7 +175,10 @@ public struct BranchWalker {
 extension FileItem {
     /// The same entry under another name: its place in a virtual folder.
     func named(_ name: String) -> FileItem {
-        FileItem(url: url, name: name, isDirectory: isDirectory, isSymlink: isSymlink, isPackage: isPackage, isHidden: isHidden,
-                 size: size, modified: modified, permissions: permissions, computedSize: computedSize, isSpecial: isSpecial)
+        FileItem(
+            url: url, name: name, isDirectory: isDirectory, isSymlink: isSymlink, isPackage: isPackage,
+            isHidden: isHidden,
+            size: size, modified: modified, permissions: permissions, computedSize: computedSize, isSpecial: isSpecial
+        )
     }
 }

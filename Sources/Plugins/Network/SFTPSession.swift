@@ -21,11 +21,14 @@ enum SSHQuestion: Equatable {
         /// `user@host`, cut at the last `@`: a host has none, a user name may.
         func login(_ text: Substring) -> (user: String, host: String)? {
             guard let at = text.lastIndex(of: "@") else { return nil }
-            let host = String(text[text.index(after: at)...]).trimmingCharacters(in: CharacterSet(charactersIn: "[]")).lowercased()
+            let host = String(text[text.index(after: at)...]).trimmingCharacters(in: CharacterSet(charactersIn: "[]"))
+                .lowercased()
             guard at > text.startIndex, !host.isEmpty, !host.contains(where: { $0.isWhitespace }) else { return nil }
             return (String(text[..<at]), host)
         }
-        if text.hasPrefix("("), let close = text.range(of: ") "), let login = login(text[text.index(after: text.startIndex)..<close.lowerBound]) {
+        if text.hasPrefix("("), let close = text.range(of: ") "),
+            let login = login(text[text.index(after: text.startIndex)..<close.lowerBound])
+        {
             self = .server(user: login.user, host: login.host, text: String(text[close.upperBound...]))
         } else if text.hasPrefix("("), text.hasSuffix(")"), let login = login(text.dropFirst().dropLast()) {
             self = .server(user: login.user, host: login.host, text: "")
@@ -35,8 +38,10 @@ enum SSHQuestion: Equatable {
             self = .hostKey
         } else if text.hasPrefix("Enter passphrase for ") || text.hasPrefix("Enter PIN for ") {
             self = .passphrase
-        } else if let end = text.range(of: "'s password:", options: [.caseInsensitive, .backwards]), end.upperBound == text.endIndex,
-                  !text.contains("\n"), let login = login(text[..<end.lowerBound]) {
+        } else if let end = text.range(of: "'s password:", options: [.caseInsensitive, .backwards]),
+            end.upperBound == text.endIndex,
+            !text.contains("\n"), let login = login(text[..<end.lowerBound])
+        {
             self = .password(user: login.user, host: login.host)
         } else {
             self = .other
@@ -99,17 +104,20 @@ final class SFTPSession: RemoteSession {
     }
 
     var profile: ConnectionProfile {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         return currentProfile
     }
 
     var isConnected: Bool {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         return hasConnected && !isClosed
     }
 
     var isConnecting: Bool {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         return opening != nil && !isClosed
     }
 
@@ -122,15 +130,18 @@ final class SFTPSession: RemoteSession {
         // ssh notices a dead connection by its own probes, also when the user wants no
         // keep-alive of ours: without them it would never end on a line that swallows everything.
         let probe = options.keepAliveInterval > 0 ? Int(options.keepAliveInterval) : max(15, Int(options.timeout))
-        var arguments = ["-o", "ConnectTimeout=\(Int(options.timeout))", "-o", "NumberOfPasswordPrompts=1", "-o", "ForwardAgent=no",
-                         "-o", "ForwardX11=no", "-o", "ClearAllForwardings=yes",
-                         // Nothing but the file transfer: no command, no terminal, and not through (or as)
-                         // a shared connection of the user's, which ending this one would take down.
-                         "-o", "RemoteCommand=none", "-o", "PermitLocalCommand=no", "-o", "ControlMaster=no", "-o", "ControlPath=none",
-                         "-o", "RequestTTY=no",
-                         // Errors only: the server's banner is not among them, so it cannot pass for one.
-                         "-o", "LogLevel=ERROR",
-                         "-o", "ServerAliveInterval=\(probe)", "-o", "ServerAliveCountMax=3", "-p", String(profile.key.port)]
+        var arguments = [
+            "-o", "ConnectTimeout=\(Int(options.timeout))", "-o", "NumberOfPasswordPrompts=1", "-o", "ForwardAgent=no",
+            "-o", "ForwardX11=no", "-o", "ClearAllForwardings=yes",
+            // Nothing but the file transfer: no command, no terminal, and not through (or as)
+            // a shared connection of the user's, which ending this one would take down.
+            "-o", "RemoteCommand=none", "-o", "PermitLocalCommand=no", "-o", "ControlMaster=no", "-o",
+            "ControlPath=none",
+            "-o", "RequestTTY=no",
+            // Errors only: the server's banner is not among them, so it cannot pass for one.
+            "-o", "LogLevel=ERROR",
+            "-o", "ServerAliveInterval=\(probe)", "-o", "ServerAliveCountMax=3", "-p", String(profile.key.port)
+        ]
         if let user = profile.user, !user.isEmpty { arguments += ["-l", user] }
         // After `--` nothing is taken for an option, whatever the host is called.
         return arguments + ["-T", "-s", "--", profile.key.host, "sftp"]
@@ -173,7 +184,8 @@ final class SFTPSession: RemoteSession {
         let began = Date()
         let patience = max(60, 2 * environment.options.values.timeout) + environment.options.values.timeout + 30
         try lockPatiently(connectLock, cancellation: cancellation) {
-            self.lock.lock(); defer { self.lock.unlock() }
+            self.lock.lock()
+            defer { self.lock.unlock() }
             if self.isClosed { return NetworkError.notConnected(self.currentProfile.key.description) }
             // The time the user takes to answer a question does not count.
             if !self.isAsking, Date().timeIntervalSince(began) > patience {
@@ -183,7 +195,9 @@ final class SFTPSession: RemoteSession {
         }
         defer { connectLock.unlock() }
         lock.lock()
-        let (existing, closed, recent, asksFirst) = (channel, isClosed, declined, currentProfile.asksBeforeConnecting && !mayConnect)
+        let (existing, closed, recent, asksFirst) = (
+            channel, isClosed, declined, currentProfile.asksBeforeConnecting && !mayConnect
+        )
         var profile = currentProfile
         lock.unlock()
         if closed { throw NetworkError.notConnected(profile.key.description) }
@@ -191,8 +205,14 @@ final class SFTPSession: RemoteSession {
         if let recent, Date().timeIntervalSince(recent.at) < environment.declineMemory { throw recent.error }
 
         func asking<Answer>(_ question: () -> Answer) -> Answer {
-            lock.lock(); isAsking = true; lock.unlock()
-            defer { lock.lock(); isAsking = false; lock.unlock() }
+            lock.lock()
+            isAsking = true
+            lock.unlock()
+            defer {
+                lock.lock()
+                isAsking = false
+                lock.unlock()
+            }
             return question()
         }
         func decline(_ error: Error) -> Error {
@@ -232,7 +252,11 @@ final class SFTPSession: RemoteSession {
                         helper.reply(password, to: question)
                         return true
                     }
-                    guard let answer = asking({ environment.askSecret(profile, kind.shown(question.text), !isConfirmation) }) else {
+                    guard
+                        let answer = asking({
+                            environment.askSecret(profile, kind.shown(question.text), !isConfirmation)
+                        })
+                    else {
                         refused = true
                         return false
                     }
@@ -261,7 +285,9 @@ final class SFTPSession: RemoteSession {
                 lock.lock()
                 opening = nil
                 lock.unlock()
-                if case NetworkError.loginFailed = error, offeredPassword, !storedWasRefused, !refused, cancellation?.isCancelled != true {
+                if case NetworkError.loginFailed = error, offeredPassword, !storedWasRefused, !refused,
+                    cancellation?.isCancelled != true
+                {
                     storedWasRefused = true
                     profile.password = nil
                     continue
@@ -274,17 +300,24 @@ final class SFTPSession: RemoteSession {
 
     /// Starts ssh, answers its questions through `answer`, and returns the channel and the
     /// directory the login leads to.
-    private func start(_ profile: ConnectionProfile, cancellation: CancellationFlag?,
-                       answer: (AskpassHelper, AskpassHelper.Question) -> Bool) throws -> (channel: SFTPChannel, home: String) {
+    private func start(
+        _ profile: ConnectionProfile, cancellation: CancellationFlag?,
+        answer: (AskpassHelper, AskpassHelper.Question) -> Bool
+    ) throws -> (channel: SFTPChannel, home: String) {
         let options = environment.options.values
         let askpass = transport?.asksQuestions ?? true ? try AskpassHelper() : nil
         let created: SFTPChannel
         if let transport {
-            created = SFTPChannel(executable: transport.executable, arguments: transport.arguments, environment: askpass?.environment ?? [:])
+            created = SFTPChannel(
+                executable: transport.executable, arguments: transport.arguments,
+                environment: askpass?.environment ?? [:])
         } else {
-            guard profile.user?.hasPrefix("-") != true else { throw NetworkError.loginFailed("The user name is not valid.") }
-            created = SFTPChannel(executable: "/usr/bin/ssh", arguments: SFTPSession.sshArguments(for: profile, options: options),
-                                  environment: askpass?.environment ?? [:])
+            guard profile.user?.hasPrefix("-") != true else {
+                throw NetworkError.loginFailed("The user name is not valid.")
+            }
+            created = SFTPChannel(
+                executable: "/usr/bin/ssh", arguments: SFTPSession.sshArguments(for: profile, options: options),
+                environment: askpass?.environment ?? [:])
         }
         created.writeTimeout = max(10, options.timeout)
         created.names = names
@@ -300,7 +333,9 @@ final class SFTPSession: RemoteSession {
                 guard let askpass, let question = askpass.pendingQuestion() else { return true }
                 return answer(askpass, question)
             }
-            let packet = try created.request(.realpath, timeout: options.timeout, cancellation: cancellation ?? closing) { $0.string(".") }
+            let packet = try created.request(
+                .realpath, timeout: options.timeout, cancellation: cancellation ?? closing
+            ) { $0.string(".") }
             var names = try packet.expect(.name)
             _ = try names.u32()
             return (created, try names.string())
@@ -318,13 +353,16 @@ final class SFTPSession: RemoteSession {
     }
 
     /// Runs requests on the channel. A channel that was dropped while idle is opened again.
-    fileprivate func perform<Result>(cancellation: CancellationFlag? = nil, _ work: (SFTPChannel) throws -> Result) throws -> Result {
+    fileprivate func perform<Result>(cancellation: CancellationFlag? = nil, _ work: (SFTPChannel) throws -> Result)
+        throws -> Result
+    {
         try work(try open(cancellation: cancellation))
     }
 
     func connect(cancellation: CancellationFlag?) throws -> String {
         _ = try open(cancellation: cancellation)
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         return home
     }
 
@@ -342,15 +380,21 @@ final class SFTPSession: RemoteSession {
 
     // MARK: Requests
 
-    private func attributes(of path: String, following: Bool, on channel: SFTPChannel, cancellation: CancellationFlag? = nil) throws -> SFTPAttributes? {
-        let packet = try channel.request(following ? .stat : .lstat, timeout: timeout, cancellation: cancellation) { $0.string(path) }
+    private func attributes(
+        of path: String, following: Bool, on channel: SFTPChannel, cancellation: CancellationFlag? = nil
+    ) throws -> SFTPAttributes? {
+        let packet = try channel.request(following ? .stat : .lstat, timeout: timeout, cancellation: cancellation) {
+            $0.string(path)
+        }
         if packet.statusCode == SFTPError.noSuchFile { return nil }
         var decoder = try packet.expect(.attributes)
         return try decoder.attributes()
     }
 
-    fileprivate func openHandle(_ type: SFTPRequest, on channel: SFTPChannel, cancellation: CancellationFlag? = nil,
-                                _ build: (inout SFTPEncoder) -> Void) throws -> Data {
+    fileprivate func openHandle(
+        _ type: SFTPRequest, on channel: SFTPChannel, cancellation: CancellationFlag? = nil,
+        _ build: (inout SFTPEncoder) -> Void
+    ) throws -> Data {
         var decoder = try channel.request(type, timeout: timeout, cancellation: cancellation, build).expect(.handle)
         return Data(try decoder.bytes())
     }
@@ -362,12 +406,16 @@ final class SFTPSession: RemoteSession {
         channel.sendWithoutAnswer(.close) { $0.bytes(handle) }
     }
 
-    func list(_ path: String, showHidden: Bool, cancellation: CancellationFlag?, receive: ([RemoteEntry]) -> Bool) throws {
+    func list(_ path: String, showHidden: Bool, cancellation: CancellationFlag?, receive: ([RemoteEntry]) -> Bool)
+        throws
+    {
         try perform(cancellation: cancellation) { channel in
             let handle = try openHandle(.opendir, on: channel, cancellation: cancellation) { $0.string(path) }
             defer { closeHandle(handle, on: channel) }
             while true {
-                let packet = try channel.request(.readdir, timeout: timeout, cancellation: cancellation) { $0.bytes(handle) }
+                let packet = try channel.request(.readdir, timeout: timeout, cancellation: cancellation) {
+                    $0.bytes(handle)
+                }
                 if packet.statusCode == SFTPError.endOfFile { return }
                 var decoder = try packet.expect(.name)
                 var entries: [RemoteEntry] = []
@@ -376,7 +424,9 @@ final class SFTPSession: RemoteSession {
                     _ = try decoder.bytes()
                     let attributes = try decoder.attributes()
                     guard RemoteEntry.isSafeName(name.text) else { continue }
-                    if NameMemory.needsRemembering(name.text, readAs: name.encoding, sending: .utf8) { names.remember(name.text, encoding: name.encoding) }
+                    if NameMemory.needsRemembering(name.text, readAs: name.encoding, sending: .utf8) {
+                        names.remember(name.text, encoding: name.encoding)
+                    }
                     entries.append(attributes.entry(named: name.text))
                 }
                 // Whether a link leads to a directory is asked for all links of the batch at
@@ -385,7 +435,10 @@ final class SFTPSession: RemoteSession {
                 var answers: [SFTPChannel.Ticket] = []
                 do {
                     for index in links {
-                        answers.append(try channel.send(.stat, cancellation: cancellation) { $0.string(RemotePath.join(path, entries[index].name)) })
+                        answers.append(
+                            try channel.send(.stat, cancellation: cancellation) {
+                                $0.string(RemotePath.join(path, entries[index].name))
+                            })
                     }
                 } catch {
                     // The requests that did go out are not waited for any more.
@@ -396,7 +449,8 @@ final class SFTPSession: RemoteSession {
                 for (position, (index, answer)) in zip(links, answers).enumerated() {
                     do {
                         let left = max(0.05, deadline.timeIntervalSinceNow)
-                        var target = try channel.wait(for: answer, timeout: left, cancellation: cancellation).expect(.attributes)
+                        var target = try channel.wait(for: answer, timeout: left, cancellation: cancellation).expect(
+                            .attributes)
                         entries[index].isDirectory = try target.attributes().isDirectory
                     } catch NetworkError.cancelled {
                         answers[position...].forEach(channel.abandon)
@@ -414,11 +468,16 @@ final class SFTPSession: RemoteSession {
     func entry(at path: String, cancellation: CancellationFlag?) throws -> RemoteEntry? {
         let path = RemotePath.normalized(path)
         return try perform(cancellation: cancellation) { channel in
-            guard let attributes = try attributes(of: path, following: false, on: channel, cancellation: cancellation) else { return nil }
+            guard let attributes = try attributes(of: path, following: false, on: channel, cancellation: cancellation)
+            else { return nil }
             var entry = attributes.entry(named: path == "/" ? "/" : RemotePath.name(of: path))
             if entry.isSymlink {
                 do {
-                    if let target = try self.attributes(of: path, following: true, on: channel, cancellation: cancellation) { entry.isDirectory = target.isDirectory }
+                    if let target = try self.attributes(
+                        of: path, following: true, on: channel, cancellation: cancellation)
+                    {
+                        entry.isDirectory = target.isDirectory
+                    }
                 } catch NetworkError.cancelled {
                     throw NetworkError.cancelled
                 } catch {}
@@ -433,7 +492,10 @@ final class SFTPSession: RemoteSession {
     func makeDirectory(_ path: String, cancellation: CancellationFlag?) throws {
         try withEither(closing, cancellation) { closing in
             try perform(cancellation: closing) {
-                try $0.request(.mkdir, timeout: timeout, cancellation: closing) { $0.string(path); $0.attributes() }.checkStatus()
+                try $0.request(.mkdir, timeout: timeout, cancellation: closing) {
+                    $0.string(path)
+                    $0.attributes()
+                }.checkStatus()
             }
         }
     }
@@ -442,8 +504,14 @@ final class SFTPSession: RemoteSession {
         try withEither(closing, cancellation) { closing in
             try perform(cancellation: closing) { channel in
                 var isFolder = isDirectory
-                if isFolder == nil { isFolder = try attributes(of: path, following: false, on: channel, cancellation: closing)?.isDirectory ?? false }
-                try channel.request(isFolder == true ? .rmdir : .remove, timeout: timeout, cancellation: closing) { $0.string(path) }.checkStatus()
+                if isFolder == nil {
+                    isFolder =
+                        try attributes(of: path, following: false, on: channel, cancellation: closing)?.isDirectory
+                        ?? false
+                }
+                try channel.request(isFolder == true ? .rmdir : .remove, timeout: timeout, cancellation: closing) {
+                    $0.string(path)
+                }.checkStatus()
             }
         }
     }
@@ -463,7 +531,10 @@ final class SFTPSession: RemoteSession {
                         $0.string(destination)
                     }.checkStatus()
                 } else {
-                    try channel.request(.rename, timeout: timeout, cancellation: closing) { $0.string(source); $0.string(destination) }.checkStatus()
+                    try channel.request(.rename, timeout: timeout, cancellation: closing) {
+                        $0.string(source)
+                        $0.string(destination)
+                    }.checkStatus()
                 }
             }
         }
@@ -475,14 +546,21 @@ final class SFTPSession: RemoteSession {
         changes.permissions = attributes.permissions.map { UInt32($0 & 0o7777) }
         try withEither(closing, cancellation) { closing in
             try perform(cancellation: closing) {
-                try $0.request(.setstat, timeout: timeout, cancellation: closing) { $0.string(path); $0.attributes(changes) }.checkStatus()
+                try $0.request(.setstat, timeout: timeout, cancellation: closing) {
+                    $0.string(path)
+                    $0.attributes(changes)
+                }.checkStatus()
             }
         }
     }
 
     func openRead(_ path: String, cancellation: CancellationFlag?) throws -> FileReader {
         try perform(cancellation: cancellation) { channel in
-            let handle = try openHandle(.open, on: channel, cancellation: cancellation) { $0.string(path); $0.u32(1); $0.attributes() }
+            let handle = try openHandle(.open, on: channel, cancellation: cancellation) {
+                $0.string(path)
+                $0.u32(1)
+                $0.attributes()
+            }
             return SFTPFileReader(session: self, channel: channel, handle: handle)
         }
     }
@@ -490,7 +568,11 @@ final class SFTPSession: RemoteSession {
     func openWrite(_ path: String, cancellation: CancellationFlag?) throws -> FileWriter {
         try perform(cancellation: cancellation) { channel in
             // Write, create, and fail if the file exists.
-            let handle = try openHandle(.open, on: channel, cancellation: cancellation) { $0.string(path); $0.u32(0x02 | 0x08 | 0x20); $0.attributes() }
+            let handle = try openHandle(.open, on: channel, cancellation: cancellation) {
+                $0.string(path)
+                $0.u32(0x02 | 0x08 | 0x20)
+                $0.attributes()
+            }
             return SFTPFileWriter(session: self, channel: channel, handle: handle)
         }
     }
@@ -500,20 +582,35 @@ final class SFTPSession: RemoteSession {
 
     /// Opens the file for writing without creating or emptying it, cuts it to `offset` when it is
     /// longer (`fsetstat` with a size), and writes from there.
-    func openAppend(_ path: String, at offset: Int64?, cancellation: CancellationFlag?) throws -> (writer: FileWriter, size: Int64) {
+    func openAppend(_ path: String, at offset: Int64?, cancellation: CancellationFlag?) throws -> (
+        writer: FileWriter, size: Int64
+    ) {
         try perform(cancellation: cancellation) { channel in
-            let handle = try openHandle(.open, on: channel, cancellation: cancellation) { $0.string(path); $0.u32(0x02); $0.attributes() }
+            let handle = try openHandle(.open, on: channel, cancellation: cancellation) {
+                $0.string(path)
+                $0.u32(0x02)
+                $0.attributes()
+            }
             do {
-                var found = try channel.request(.fstat, timeout: timeout, cancellation: cancellation) { $0.bytes(handle) }.expect(.attributes)
+                var found = try channel.request(.fstat, timeout: timeout, cancellation: cancellation) {
+                    $0.bytes(handle)
+                }.expect(.attributes)
                 let size = Int64(clamping: try found.attributes().size ?? 0)
                 let target = offset ?? size
-                guard target >= 0, target <= size else { throw FileSystemError.notSupported("Continuing \(path) at \(target), it has \(size) bytes") }
+                guard target >= 0, target <= size else {
+                    throw FileSystemError.notSupported("Continuing \(path) at \(target), it has \(size) bytes")
+                }
                 if target < size {
                     var cut = SFTPAttributes()
                     cut.size = UInt64(target)
-                    try channel.request(.fsetstat, timeout: timeout, cancellation: cancellation) { $0.bytes(handle); $0.attributes(cut) }.checkStatus()
+                    try channel.request(.fsetstat, timeout: timeout, cancellation: cancellation) {
+                        $0.bytes(handle)
+                        $0.attributes(cut)
+                    }.checkStatus()
                 }
-                return (SFTPFileWriter(session: self, channel: channel, handle: handle, position: UInt64(target)), target)
+                return (
+                    SFTPFileWriter(session: self, channel: channel, handle: handle, position: UInt64(target)), target
+                )
             } catch {
                 closeHandle(handle, on: channel)
                 throw error
@@ -708,7 +805,9 @@ private final class SFTPFileReader: FileReader {
                 if data.count < chunk.length {
                     // A short answer leaves a gap before the requests behind it; the rest of
                     // this piece is asked for first.
-                    let rest = try sendRequest(at: chunk.offset + UInt64(data.count), length: chunk.length - data.count, isRest: true, handle)
+                    let rest = try sendRequest(
+                        at: chunk.offset + UInt64(data.count), length: chunk.length - data.count, isRest: true, handle
+                    )
                     requests.insert(rest, at: 0)
                 }
                 // Kept full while the caller still waits for more.
@@ -808,7 +907,10 @@ private final class SFTPFileWriter: FileWriter {
         guard let handle else { return }
         var cut = SFTPAttributes()
         cut.size = firstUnconfirmed
-        channel.sendWithoutAnswer(.fsetstat) { $0.bytes(handle); $0.attributes(cut) }
+        channel.sendWithoutAnswer(.fsetstat) {
+            $0.bytes(handle)
+            $0.attributes(cut)
+        }
     }
 
     /// Takes the answers that have arrived, and waits for the oldest while more than `keep`
@@ -883,8 +985,12 @@ private final class SFTPFileWriter: FileWriter {
         let length: SFTPChannel.Ticket
         do {
             // Date and permissions are a courtesy; a server that refuses them still has the file.
-            courtesy = changes.modified != nil || changes.permissions != nil
-                ? try channel.send(.fsetstat, cancellation: abort) { $0.bytes(handle); $0.attributes(changes) } : nil
+            courtesy =
+                changes.modified != nil || changes.permissions != nil
+                ? try channel.send(.fsetstat, cancellation: abort) {
+                    $0.bytes(handle)
+                    $0.attributes(changes)
+                } : nil
             length = try channel.send(.fstat, cancellation: abort) { $0.bytes(handle) }
             closing = try channel.send(.close, cancellation: abort) { $0.bytes(handle) }
         } catch {
@@ -895,7 +1001,9 @@ private final class SFTPFileWriter: FileWriter {
         let measured = try? channel.wait(for: length, timeout: session.timeout, cancellation: abort)
         // The closing is the server's last word on the file: an error here is an error of the upload.
         if let closing { try channel.wait(for: closing, timeout: session.timeout, cancellation: abort).checkStatus() }
-        if let measured, var found = try? measured.expect(.attributes), let size = try? found.attributes().size, size != position {
+        if let measured, var found = try? measured.expect(.attributes), let size = try? found.attributes().size,
+            size != position
+        {
             throw NetworkError.unexpected("the file on the server has \(size) bytes after the upload, not \(position)")
         }
     }

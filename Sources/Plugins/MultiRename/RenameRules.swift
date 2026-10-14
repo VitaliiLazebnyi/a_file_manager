@@ -18,7 +18,9 @@ struct TitleCaseRule: Equatable {
         allowsLowercaseLastWord = label.hasSuffix("!")
         if allowsLowercaseLastWord { label.removeLast() }
         self.label = label
-        words = Set((parts.last ?? "").split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces).lowercased() }.filter { !$0.isEmpty })
+        words = Set(
+            (parts.last ?? "").split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces).lowercased() }.filter
+            { !$0.isEmpty })
     }
 }
 
@@ -49,11 +51,13 @@ enum LetterCase: Int, Codable, CaseIterable {
         case .upper: return text.uppercased()
         case .firstUpper:
             guard let first = text.firstIndex(where: { $0.isLetter || $0.isNumber }) else { return text }
-            return String(text[..<first]) + text[first...first].uppercased() + text[text.index(after: first)...].lowercased()
+            return String(text[..<first]) + text[first...first].uppercased()
+                + text[text.index(after: first)...].lowercased()
         case .words:
             return LetterCase.capitalizingWords(text)
         case .titleWords:
-            var words = LetterCase.capitalizingWords(text).split(separator: " ", omittingEmptySubsequences: false).map(String.init)
+            var words = LetterCase.capitalizingWords(text).split(separator: " ", omittingEmptySubsequences: false).map(
+                String.init)
             let real = words.indices.filter { !words[$0].isEmpty }
             for index in real.dropFirst() where index != real.last || rule.allowsLowercaseLastWord {
                 let core = words[index].trimmingCharacters(in: CharacterSet.letters.inverted)
@@ -158,15 +162,21 @@ struct SearchReplace {
             guard let expression = try? NSRegularExpression(pattern: pattern, options: options) else {
                 throw Problem.invalidExpression(settings.search)
             }
-            pairs = [Pair(finder: .regex(expression), replacement: SearchReplace.template(settings.replacement, groups: expression.numberOfCaptureGroups))]
+            pairs = [
+                Pair(
+                    finder: .regex(expression),
+                    replacement: SearchReplace.template(
+                        settings.replacement, groups: expression.numberOfCaptureGroups))
+            ]
         } else {
             // Several pairs are separated by `|` in both fields and matched up by position.
             let searches = settings.search.components(separatedBy: "|")
             let replacements = settings.replacement.components(separatedBy: "|")
             pairs = searches.enumerated().compactMap { index, search in
                 guard !search.isEmpty else { return nil }
-                return Pair(finder: .wildcard(WildcardMatcher(search, caseSensitive: settings.caseSensitive)),
-                            replacement: [.text(replacements.indices.contains(index) ? replacements[index] : "")])
+                return Pair(
+                    finder: .wildcard(WildcardMatcher(search, caseSensitive: settings.caseSensitive)),
+                    replacement: [.text(replacements.indices.contains(index) ? replacements[index] : "")])
             }
         }
     }
@@ -186,7 +196,11 @@ struct SearchReplace {
             let whole = NSRange(location: 0, length: source.length)
             switch pair.finder {
             case .regex(let expression):
-                guard let matches = RenameRegex.matches(expression, in: text, firstOnly: firstOnly || substitute, guardian: guardian, cancelled: cancelled) else {
+                guard
+                    let matches = RenameRegex.matches(
+                        expression, in: text, firstOnly: firstOnly || substitute, guardian: guardian,
+                        cancelled: cancelled)
+                else {
                     return nil
                 }
                 if substitute {
@@ -197,14 +211,18 @@ struct SearchReplace {
                 var result = ""
                 var position = 0
                 for match in matches {
-                    result += source.substring(with: NSRange(location: position, length: match.range.location - position))
+                    result += source.substring(
+                        with: NSRange(location: position, length: match.range.location - position))
                     result += expand(pair.replacement, match, source)
                     position = match.range.location + match.range.length
                 }
                 text = result + source.substring(from: position)
             case .wildcard(let matcher):
                 // Bounded like a regular expression: a long search in a long name is the name times the search.
-                guard let ranges = matcher.matches(in: text, firstOnly: firstOnly, guardian: guardian, cancelled: cancelled) else { return nil }
+                guard
+                    let ranges = matcher.matches(
+                        in: text, firstOnly: firstOnly, guardian: guardian, cancelled: cancelled)
+                else { return nil }
                 guard !ranges.isEmpty, case .text(let replacement)? = pair.replacement.first else { continue }
                 var result = ""
                 var position = 0
@@ -259,7 +277,8 @@ struct SearchReplace {
         }
         func rewrite(_ expression: String, _ template: String) {
             guard let regex = try? NSRegularExpression(pattern: expression) else { return }
-            pattern = regex.stringByReplacingMatches(in: pattern, range: NSRange(pattern.startIndex..., in: pattern), withTemplate: template)
+            pattern = regex.stringByReplacingMatches(
+                in: pattern, range: NSRange(pattern.startIndex..., in: pattern), withTemplate: template)
         }
         rewrite(#"\(\?P=(\w+)\)"#, #"\\k<$1>"#)
         rewrite(#"\(\?'(\w+)'"#, "(?<$1>")
@@ -276,13 +295,17 @@ struct SearchReplace {
         var pending = LetterCase.unchanged
         let characters = Array(text)
         var position = 0
-        func isDigit(_ index: Int) -> Bool { characters.indices.contains(index) && characters[index].isASCII && characters[index].isNumber }
+        func isDigit(_ index: Int) -> Bool {
+            characters.indices.contains(index) && characters[index].isASCII && characters[index].isNumber
+        }
         while position < characters.count {
             let character = characters[position]
             if character == "\\", position + 1 < characters.count {
                 let next = characters[position + 1]
                 let cases: [Character: LetterCase] = ["U": .upper, "L": .lower, "F": .words, "n": .unchanged]
-                if let letterCase = cases[next], position + 2 < characters.count, characters[position + 2] == "$", isDigit(position + 3) {
+                if let letterCase = cases[next], position + 2 < characters.count, characters[position + 2] == "$",
+                    isDigit(position + 3)
+                {
                     pending = letterCase
                 } else {
                     literal.append(next)
@@ -291,7 +314,9 @@ struct SearchReplace {
             } else if character == "$", isDigit(position + 1) {
                 var number = Int(String(characters[position + 1])) ?? 0
                 var length = 2
-                if isDigit(position + 2), let wide = Int(String(characters[(position + 1)...(position + 2)])), wide <= groups {
+                if isDigit(position + 2), let wide = Int(String(characters[(position + 1)...(position + 2)])),
+                    wide <= groups
+                {
                     number = wide
                     length = 3
                 }
@@ -368,7 +393,8 @@ struct RenameEngine {
             var state = MaskState()
             do {
                 name = try nameMask.evaluate(subject, index: index, context: context, formats: formats, state: &state)
-                ext = try extensionMask.evaluate(subject, index: index, context: context, formats: formats, state: &state)
+                ext = try extensionMask.evaluate(
+                    subject, index: index, context: context, formats: formats, state: &state)
             } catch {
                 return nil
             }
@@ -376,7 +402,9 @@ struct RenameEngine {
         func joined(_ name: String, _ ext: String) -> String { ext.isEmpty ? name : name + "." + ext }
         var full: String
         if settings.searchesExtension {
-            guard let replaced = searchReplace.replacing(in: joined(name, ext), cancelled: cancelled) else { return nil }
+            guard let replaced = searchReplace.replacing(in: joined(name, ext), cancelled: cancelled) else {
+                return nil
+            }
             full = replaced
         } else {
             guard let replaced = searchReplace.replacing(in: name, cancelled: cancelled) else { return nil }
@@ -388,9 +416,10 @@ struct RenameEngine {
 
     /// Control characters become spaces and slashes at the end are dropped.
     static func tidied(_ name: String) -> String {
-        var name = String(name.map { character in
-            character.unicodeScalars.contains { $0.value < 32 || $0.value == 127 } ? " " : character
-        })
+        var name = String(
+            name.map { character in
+                character.unicodeScalars.contains { $0.value < 32 || $0.value == 127 } ? " " : character
+            })
         while name.hasSuffix("/") { name.removeLast() }
         return name
     }
@@ -401,7 +430,8 @@ struct RenameEngine {
         if name.isEmpty { return "The name is empty." }
         // Cut at the `/` byte, not at the character: a combining mark after a slash makes one
         // character with it, and the file system reads the slash all the same.
-        let components = name.utf8.split(separator: 0x2F, omittingEmptySubsequences: false).dropFirst(name.utf8.first == 0x2F ? 1 : 0)
+        let components = name.utf8.split(separator: 0x2F, omittingEmptySubsequences: false).dropFirst(
+            name.utf8.first == 0x2F ? 1 : 0)
         for component in components {
             if component.isEmpty { return "A folder name is empty." }
             if component.elementsEqual(".".utf8) || component.elementsEqual("..".utf8) {

@@ -15,7 +15,9 @@ struct DescriptIon: Equatable {
     /// How the file is written. A new file is plain text, and becomes UTF-16 only when a name
     /// or a comment needs it (`CommentPreferredFormat=4`, the default).
     enum Encoding: Equatable {
-        case ansi, utf8(bom: Bool), utf16LittleEndian, utf16BigEndian
+        case ansi
+        case utf8(bom: Bool)
+        case utf16LittleEndian, utf16BigEndian
     }
 
     struct Entry: Equatable {
@@ -53,9 +55,15 @@ struct DescriptIon: Equatable {
 
     private static func decode(_ data: Data) -> (String, Encoding)? {
         func text(_ data: Data, _ encoding: String.Encoding) -> String? { String(data: data, encoding: encoding) }
-        if data.starts(with: [0xFF, 0xFE]) { return text(data.dropFirst(2), .utf16LittleEndian).map { ($0, .utf16LittleEndian) } }
-        if data.starts(with: [0xFE, 0xFF]) { return text(data.dropFirst(2), .utf16BigEndian).map { ($0, .utf16BigEndian) } }
-        if data.starts(with: [0xEF, 0xBB, 0xBF]) { return text(data.dropFirst(3), .utf8).map { ($0, .utf8(bom: true)) } }
+        if data.starts(with: [0xFF, 0xFE]) {
+            return text(data.dropFirst(2), .utf16LittleEndian).map { ($0, .utf16LittleEndian) }
+        }
+        if data.starts(with: [0xFE, 0xFF]) {
+            return text(data.dropFirst(2), .utf16BigEndian).map { ($0, .utf16BigEndian) }
+        }
+        if data.starts(with: [0xEF, 0xBB, 0xBF]) {
+            return text(data.dropFirst(3), .utf8).map { ($0, .utf8(bom: true)) }
+        }
         // Plain ASCII reads the same either way. Text that is valid UTF-8 is taken as such;
         // anything else is the Windows code page Total Commander writes by default.
         if let utf8 = String(data: data, encoding: .utf8) {
@@ -85,7 +93,8 @@ struct DescriptIon: Equatable {
         var comment = String(Substring(rest))
         let marker = Array(multilineMarker.unicodeScalars)
         if rest.count >= marker.count, Array(rest.suffix(marker.count)) == marker {
-            comment = String(Substring(rest.dropLast(marker.count))).replacingOccurrences(of: "\\n", with: "\n", options: .literal)
+            comment = String(Substring(rest.dropLast(marker.count))).replacingOccurrences(
+                of: "\\n", with: "\n", options: .literal)
         }
         return Entry(name: String(Substring(name)), comment: comment)
     }
@@ -142,7 +151,9 @@ struct DescriptIon: Equatable {
             text += entry.name.unicodeScalars.contains(" ") ? "\"\(entry.name)\"" : entry.name
             text += " "
             if entry.comment.unicodeScalars.contains("\n") {
-                text += entry.comment.replacingOccurrences(of: "\n", with: "\\n", options: .literal) + DescriptIon.multilineMarker
+                text +=
+                    entry.comment.replacingOccurrences(of: "\n", with: "\\n", options: .literal)
+                    + DescriptIon.multilineMarker
             } else {
                 text += entry.comment
             }
@@ -251,7 +262,9 @@ final class CommentStore {
         if remembered.count > 256 { remembered.removeAll() }
         // Changed here while it was being read: what was read is returned, but not kept.
         // Nor is a reading that was cut short: it is not what the file holds.
-        if (generations[key] ?? 0) == generation, !cancellation.isCancelled { remembered[key] = Remembered(comments: comments, read: Date()) }
+        if (generations[key] ?? 0) == generation, !cancellation.isCancelled {
+            remembered[key] = Remembered(comments: comments, read: Date())
+        }
         beingRead.remove(key)
         condition.broadcast()
         condition.unlock()
@@ -274,7 +287,8 @@ final class CommentStore {
         let url = directory.appending(name: DescriptIon.fileName)
         // Something that is called `descript.ion` and is a pipe would never finish being read.
         guard !cancellation.isCancelled, LocalInfo.canBeRead(url),
-              let reader = try? fileSystems.provider(for: url).read(url, cancellation: cancellation) else { return DescriptIon() }
+            let reader = try? fileSystems.provider(for: url).read(url, cancellation: cancellation)
+        else { return DescriptIon() }
         defer { reader.close() }
         let token = cancellation.interrupting(reader)
         defer { withExtendedLifetime(token) {} }
@@ -299,7 +313,9 @@ final class CommentStore {
             reader = try provider.read(url, cancellation: cancellation)
         } catch {
             // "Not there" must be known, not guessed from a question that was cut short.
-            if provider.item(at: url, cancellation: cancellation) == nil, !cancellation.isCancelled { return DescriptIon() }
+            if provider.item(at: url, cancellation: cancellation) == nil, !cancellation.isCancelled {
+                return DescriptIon()
+            }
             throw cancellation.isCancelled ? CocoaError(.userCancelled) : CommentFileError.unreadable
         }
         defer { reader.close() }
@@ -324,8 +340,10 @@ final class CommentStore {
     /// then takes its place in one step, so a failure leaves the old comments as they were. A
     /// file without comments is removed. With `hidden`, the file gets the hidden flag where the
     /// file system has one (a new `descript.ion` is hidden in Total Commander).
-    func setComment(_ comment: String, for name: String, in directory: URL, hidden: Bool,
-                    cancellation: CancellationFlag = CancellationFlag()) throws {
+    func setComment(
+        _ comment: String, for name: String, in directory: URL, hidden: Bool,
+        cancellation: CancellationFlag = CancellationFlag()
+    ) throws {
         let provider = try fileSystems.provider(for: directory)
         let listed = directory.appending(name: DescriptIon.fileName)
         var file = try loadForUpdate(directory, cancellation: cancellation)
@@ -337,13 +355,16 @@ final class CommentStore {
         // A comment file that is a link stays one: the file it points to is the one written.
         let url = LocalInfo.isSymlink(listed) ? listed.resolvingSymlinksInPath() : listed
         if file.isEmpty {
-            if provider.item(at: listed, cancellation: cancellation) != nil { try provider.remove(listed, cancellation: cancellation) }
+            if provider.item(at: listed, cancellation: cancellation) != nil {
+                try provider.remove(listed, cancellation: cancellation)
+            }
             return
         }
         let wasHidden = LocalInfo.details(url)?.isHidden ?? false
         let existed = provider.item(at: url, cancellation: cancellation) != nil
         if cancellation.isCancelled { throw CocoaError(.userCancelled) }
-        let draft = url.deletingLastPathComponent().appending(name: ".\(DescriptIon.fileName).\(UUID().uuidString.prefix(8)).tmp")
+        let draft = url.deletingLastPathComponent().appending(
+            name: ".\(DescriptIon.fileName).\(UUID().uuidString.prefix(8)).tmp")
         do {
             let writer = try provider.write(draft, cancellation: cancellation)
             do {
@@ -374,9 +395,11 @@ enum CommentFileError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .unreadable:
-            return "The comment file descript.ion cannot be read completely, so it was left as it is. Writing it now would lose its other comments."
+            return
+                "The comment file descript.ion cannot be read completely, so it was left as it is. Writing it now would lose its other comments."
         case .unnameable:
-            return "A name with a line break, or with both a space and a quotation mark, cannot be written to the comment file descript.ion."
+            return
+                "A name with a line break, or with both a space and a quotation mark, cannot be written to the comment file descript.ion."
         }
     }
 }

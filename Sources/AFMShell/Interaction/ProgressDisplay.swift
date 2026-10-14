@@ -55,9 +55,10 @@ final class ProgressDisplay {
             self.show()
         }
         observers = [
-            center.addObserver(forName: NSWindow.didDeminiaturizeNotification, object: window, queue: .main, using: retry),
+            center.addObserver(
+                forName: NSWindow.didDeminiaturizeNotification, object: window, queue: .main, using: retry),
             center.addObserver(forName: NSWindow.didBecomeKeyNotification, object: window, queue: .main, using: retry),
-            center.addObserver(forName: NSApplication.didUnhideNotification, object: nil, queue: .main, using: retry),
+            center.addObserver(forName: NSApplication.didUnhideNotification, object: nil, queue: .main, using: retry)
         ]
     }
 
@@ -84,8 +85,9 @@ final class ProgressDisplay {
     func show() {
         guard panel == nil, let monitor, let window, window.isVisible else { return }
         let inBackground = service?.runsInBackground ?? false
-        let panel = NSPanel(contentRect: .zero, styleMask: inBackground ? [.titled, .miniaturizable] : [.titled],
-                            backing: .buffered, defer: false)
+        let panel = NSPanel(
+            contentRect: .zero, styleMask: inBackground ? [.titled, .miniaturizable] : [.titled],
+            backing: .buffered, defer: false)
         panel.isReleasedWhenClosed = false
         content.arrange(compact: inBackground)
         panel.contentView = content
@@ -125,7 +127,10 @@ final class ProgressDisplay {
         let state = ProgressContentView.State(
             title: monitor?.title ?? "",
             progress: monitor?.latest,
-            speed: service.isPaused ? "Paused" : monitor.flatMap { monitor in monitor.latest.map { ProgressSheet.speedLine(monitor.rate, for: $0) } } ?? " ",
+            speed: service.isPaused
+                ? "Paused"
+                : monitor.flatMap { monitor in monitor.latest.map { ProgressSheet.speedLine(monitor.rate, for: $0) } }
+                    ?? " ",
             showsRemaining: showsRemaining,
             queue: ProgressSheet.queueLine(service.queueLength),
             isPaused: service.isPaused,
@@ -213,13 +218,16 @@ final class ProgressContentView: NSView {
         widthConstraint = width
         NSLayoutConstraint.activate([
             stack.topAnchor.constraint(equalTo: topAnchor), stack.bottomAnchor.constraint(equalTo: bottomAnchor),
-            stack.leadingAnchor.constraint(equalTo: leadingAnchor), stack.trailingAnchor.constraint(equalTo: trailingAnchor),
+            stack.leadingAnchor.constraint(equalTo: leadingAnchor),
+            stack.trailingAnchor.constraint(equalTo: trailingAnchor),
             width,
             barRow.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -32),
             footer.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -32),
-            percentLabel.widthAnchor.constraint(equalToConstant: 44),
+            percentLabel.widthAnchor.constraint(equalToConstant: 44)
         ])
-        for label in lineLabels { label.widthAnchor.constraint(lessThanOrEqualTo: stack.widthAnchor, constant: -32).isActive = true }
+        for label in lineLabels {
+            label.widthAnchor.constraint(lessThanOrEqualTo: stack.widthAnchor, constant: -32).isActive = true
+        }
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
@@ -242,7 +250,8 @@ final class ProgressContentView: NSView {
             // A shortened name is shown in full when the mouse rests on it.
             label.toolTip = label.stringValue.isEmpty ? nil : label.stringValue
         }
-        countLabel.stringValue = state.progress.map { ProgressSheet.countLine(for: $0, remaining: state.showsRemaining) } ?? ""
+        countLabel.stringValue =
+            state.progress.map { ProgressSheet.countLine(for: $0, remaining: state.showsRemaining) } ?? ""
         percentLabel.stringValue = state.progress.map { "\(Int(($0.fraction * 100).rounded(.down))) %" } ?? ""
         bar.doubleValue = state.progress?.fraction ?? 0
         speedLabel.stringValue = state.isCancelled ? "Stopping…" : state.speed

@@ -48,7 +48,8 @@ enum ViewerDetection {
     static func guessUTF16(_ bytes: [UInt8]) -> ViewerEncoding? {
         let pairs = bytes.count / 2
         guard pairs >= 2 else { return nil }
-        var zeroEven = 0, zeroOdd = 0
+        var zeroEven = 0
+        var zeroOdd = 0
         for pair in 0..<pairs {
             if bytes[pair * 2] == 0 { zeroEven += 1 }
             if bytes[pair * 2 + 1] == 0 { zeroOdd += 1 }
@@ -96,9 +97,11 @@ enum ViewerDetection {
     static func looksLikeDOS(_ bytes: [UInt8]) -> Bool {
         func isLetter(_ byte: UInt8) -> Bool { (0x41...0x5A).contains(byte) || (0x61...0x7A).contains(byte) }
         func isBox(_ byte: UInt8) -> Bool { (0xB0...0xDF).contains(byte) }
-        var dos = 0, windows = 0
+        var dos = 0
+        var windows = 0
         for (index, byte) in bytes.enumerated() where byte >= 0x80 {
-            let before = index > 0 ? bytes[index - 1] : 0x20, after = index + 1 < bytes.count ? bytes[index + 1] : 0x20
+            let before = index > 0 ? bytes[index - 1] : 0x20
+            let after = index + 1 < bytes.count ? bytes[index + 1] : 0x20
             let inWord = isLetter(before) || isLetter(after)
             if isBox(byte), isBox(before) || isBox(after) {
                 dos += 1
@@ -116,15 +119,21 @@ enum ViewerDetection {
         case image, media, pdf, html, rtf, other
     }
 
-    static let imageExtensions: Set<String> = ["png", "jpg", "jpeg", "jpe", "jfif", "gif", "bmp", "dib", "tif", "tiff", "heic", "heif", "webp",
-                                              "icns", "ico", "cur", "psd", "tga", "jp2", "j2k", "avif", "dng", "cr2", "nef", "arw", "raf", "orf"]
-    static let mediaExtensions: Set<String> = ["mp3", "m4a", "aac", "wav", "aif", "aiff", "aifc", "caf", "flac", "mp4", "m4v", "mov", "mpg",
-                                              "mpeg", "avi", "3gp", "m4b", "mp2", "au", "snd", "ac3", "amr"]
+    static let imageExtensions: Set<String> = [
+        "png", "jpg", "jpeg", "jpe", "jfif", "gif", "bmp", "dib", "tif", "tiff", "heic", "heif", "webp",
+        "icns", "ico", "cur", "psd", "tga", "jp2", "j2k", "avif", "dng", "cr2", "nef", "arw", "raf", "orf"
+    ]
+    static let mediaExtensions: Set<String> = [
+        "mp3", "m4a", "aac", "wav", "aif", "aiff", "aifc", "caf", "flac", "mp4", "m4v", "mov", "mpg",
+        "mpeg", "avi", "3gp", "m4b", "mp2", "au", "snd", "ac3", "amr"
+    ]
     static let htmlExtensions: Set<String> = ["html", "htm", "xhtml", "shtml"]
 
     /// `additionalMedia` and `vetoed` are lists of extensions from the configuration
     /// (spec 10 › Type lists and vetoes).
-    static func content(name: String, sample: Data, additionalMedia: Set<String> = [], vetoed: Set<String> = []) -> Content {
+    static func content(name: String, sample: Data, additionalMedia: Set<String> = [], vetoed: Set<String> = [])
+        -> Content
+    {
         let ext = (name as NSString).pathExtension.lowercased()
         let head = [UInt8](sample.prefix(16))
         func starts(_ signature: [UInt8], at offset: Int = 0) -> Bool {
@@ -133,20 +142,27 @@ enum ViewerDetection {
         if starts(Array("%PDF-".utf8)) || ext == "pdf" { return .pdf }
         if starts(Array("{\\rtf".utf8)) { return .rtf }
         if !vetoed.contains(ext) {
-            let isImageByContent = starts([0x89, 0x50, 0x4E, 0x47]) || starts([0xFF, 0xD8, 0xFF]) || starts(Array("GIF8".utf8))
-                || (starts(Array("BM".utf8)) && ext == "bmp") || (starts(Array("RIFF".utf8)) && starts(Array("WEBP".utf8), at: 8))
+            let isImageByContent =
+                starts([0x89, 0x50, 0x4E, 0x47]) || starts([0xFF, 0xD8, 0xFF]) || starts(Array("GIF8".utf8))
+                || (starts(Array("BM".utf8)) && ext == "bmp")
+                || (starts(Array("RIFF".utf8)) && starts(Array("WEBP".utf8), at: 8))
             if isImageByContent || imageExtensions.contains(ext) { return .image }
             if mediaExtensions.contains(ext) || additionalMedia.contains(ext) { return .media }
         }
         if htmlExtensions.contains(ext) { return .html }
-        let start = String(decoding: sample.prefix(256), as: UTF8.self).lowercased().drop { $0.isWhitespace || $0 == "\u{FEFF}" }
+        let start = String(decoding: sample.prefix(256), as: UTF8.self).lowercased().drop {
+            $0.isWhitespace || $0 == "\u{FEFF}"
+        }
         if start.hasPrefix("<!doctype html") || start.hasPrefix("<html") { return .html }
         return .other
     }
 
     /// The extensions in a list such as `*.mkv *.wmv` or `mkv, wmv`.
     static func extensions(in list: String) -> Set<String> {
-        Set(list.lowercased().split(whereSeparator: { " ,;|".contains($0) }).map { String($0.drop { "*.".contains($0) }) }.filter { !$0.isEmpty })
+        Set(
+            list.lowercased().split(whereSeparator: { " ,;|".contains($0) }).map {
+                String($0.drop { "*.".contains($0) })
+            }.filter { !$0.isEmpty })
     }
 
     /// The character set an HTML file names in its head (`<meta charset=…>`, or the
@@ -154,7 +170,9 @@ enum ViewerDetection {
     static func htmlCharset(_ sample: Data) -> ViewerEncoding? {
         let head = String(decoding: sample.prefix(4096), as: UTF8.self).lowercased()
         guard let range = head.range(of: "charset=") else { return nil }
-        let name = head[range.upperBound...].drop { "\"' ".contains($0) }.prefix { $0.isLetter || $0.isNumber || "-_".contains($0) }
+        let name = head[range.upperBound...].drop { "\"' ".contains($0) }.prefix {
+            $0.isLetter || $0.isNumber || "-_".contains($0)
+        }
         switch name {
         case "utf-8", "utf8": return .utf8
         case "utf-16", "utf-16le": return .utf16LE
@@ -162,7 +180,9 @@ enum ViewerDetection {
         case "iso-8859-1", "latin1": return .latin1
         case "macintosh": return .macRoman
         default:
-            if name.hasPrefix("windows-"), let number = Int(name.dropFirst(8)) { return ViewerEncoding.codePage(number) }
+            if name.hasPrefix("windows-"), let number = Int(name.dropFirst(8)) {
+                return ViewerEncoding.codePage(number)
+            }
             return nil
         }
     }

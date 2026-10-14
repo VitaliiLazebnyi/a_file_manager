@@ -36,12 +36,16 @@ public final class AlertInteraction: UserInteraction {
     /// changes nothing, so a reflexive Return never answers it with yes. Esc takes the last
     /// button in every question.
     public func choose(_ message: String, detail: String, buttons: [String], style: QuestionStyle) -> Int {
-        choose(message, detail: detail, buttons: buttons, style: style, defaultButton: AlertInteraction.defaultButton(for: style, of: buttons))
+        choose(
+            message, detail: detail, buttons: buttons, style: style,
+            defaultButton: AlertInteraction.defaultButton(for: style, of: buttons))
     }
 
     /// The same with the caller's say in which button Return presses; nil for none, where the
     /// user has to click, or to press Esc for the last one.
-    public func choose(_ message: String, detail: String, buttons: [String], style: QuestionStyle, defaultButton: Int?) -> Int {
+    public func choose(_ message: String, detail: String, buttons: [String], style: QuestionStyle, defaultButton: Int?)
+        -> Int
+    {
         let alert = makeQuestion(message, detail: detail, buttons: buttons, style: style, defaultButton: defaultButton)
         // Esc on a last button that is also Return's: a button has one key of its own.
         var monitor: Any?
@@ -66,7 +70,9 @@ public final class AlertInteraction: UserInteraction {
     /// Builds a question without showing it. The keys are set here for every button, whatever
     /// the system would give them by their titles: Return for `defaultButton` and for no
     /// other, Esc for the last one (unless that is Return's already; `choose` sees to Esc then).
-    func makeQuestion(_ message: String, detail: String, buttons: [String], style: QuestionStyle, defaultButton: Int?) -> NSAlert {
+    func makeQuestion(_ message: String, detail: String, buttons: [String], style: QuestionStyle, defaultButton: Int?)
+        -> NSAlert
+    {
         let alert = alert(message, detail, style)
         buttons.forEach { alert.addButton(withTitle: DisplayText.clean($0)) }
         let wanted = defaultButton.flatMap { alert.buttons.indices.contains($0) ? $0 : nil }
@@ -121,7 +127,8 @@ public final class UserDefaultsSettings: SettingsStore {
     /// Application Support; any other store keeps them with the rest unless it is given a folder.
     public init(defaults: UserDefaults = .standard, largeFolder: URL? = nil) {
         self.defaults = defaults
-        self.largeFolder = largeFolder ?? (defaults === UserDefaults.standard ? UserDefaultsSettings.standardLargeFolder : nil)
+        self.largeFolder =
+            largeFolder ?? (defaults === UserDefaults.standard ? UserDefaultsSettings.standardLargeFolder : nil)
     }
 
     static var standardLargeFolder: URL? {
@@ -139,7 +146,9 @@ public final class UserDefaultsSettings: SettingsStore {
         guard let largeFolder else { return nil }
         var name = ""
         for byte in key.utf8 {
-            let isPlain = (0x30...0x39).contains(byte) || (0x41...0x5A).contains(byte) || (0x61...0x7A).contains(byte) || byte == 0x2D || byte == 0x5F
+            let isPlain =
+                (0x30...0x39).contains(byte) || (0x41...0x5A).contains(byte) || (0x61...0x7A).contains(byte)
+                || byte == 0x2D || byte == 0x5F
                 || (byte == 0x2E && !name.isEmpty)
             name += isPlain ? String(UnicodeScalar(byte)) : String(format: "%%%02X", byte)
         }
@@ -184,8 +193,9 @@ public final class UserDefaultsSettings: SettingsStore {
             lock.unlock()
             if let file = largeFile(forKey: key) {
                 if let value {
-                    try? FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true,
-                                                             attributes: [.posixPermissions: 0o700])
+                    try? FileManager.default.createDirectory(
+                        at: file.deletingLastPathComponent(), withIntermediateDirectories: true,
+                        attributes: [.posixPermissions: 0o700])
                     // A history may hold what nobody else should read.
                     if (try? value.write(to: file, options: .atomic)) != nil {
                         try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: file.path)

@@ -23,7 +23,10 @@ struct SystemInformation: Equatable {
     var text: String {
         let width = sections.flatMap(\.rows).map(\.label.count).max() ?? 0
         return sections.map { section in
-            ([section.title] + section.rows.map { "  " + ($0.label + ":").padding(toLength: width + 2, withPad: " ", startingAt: 0) + $0.value })
+            ([section.title]
+                + section.rows.map {
+                    "  " + ($0.label + ":").padding(toLength: width + 2, withPad: " ", startingAt: 0) + $0.value
+                })
                 .joined(separator: "\n")
         }.joined(separator: "\n\n")
     }
@@ -73,11 +76,15 @@ struct SystemInformation: Equatable {
         var statistics = vm_statistics64()
         var count = mach_msg_type_number_t(MemoryLayout<vm_statistics64>.size / MemoryLayout<integer_t>.size)
         let result = withUnsafeMutablePointer(to: &statistics) { pointer in
-            pointer.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { host_statistics64(mach_host_self(), HOST_VM_INFO64, $0, &count) }
+            pointer.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+                host_statistics64(mach_host_self(), HOST_VM_INFO64, $0, &count)
+            }
         }
         guard result == KERN_SUCCESS, total > 0 else { return nil }
         let pageSize = UInt64(systemNumber("hw.pagesize") ?? 4096)
-        let free = (UInt64(statistics.free_count) + UInt64(statistics.inactive_count) + UInt64(statistics.speculative_count)) * pageSize
+        let free =
+            (UInt64(statistics.free_count) + UInt64(statistics.inactive_count) + UInt64(statistics.speculative_count))
+            * pageSize
         let load = 100 - Int(Double(min(free, total)) / Double(total) * 100)
         return "\(Format.bytes(Int64(free / (1024 * 1024)))) M (\(load) %)"
     }
@@ -95,7 +102,9 @@ struct SystemInformation: Equatable {
         var hardware = [Row(label: "Model", value: systemText("hw.model") ?? "unknown")]
         hardware.append(Row(label: "Processor", value: systemText("machdep.cpu.brand_string") ?? "unknown"))
         var cores = "\(process.processorCount)"
-        if let performance = systemNumber("hw.perflevel0.physicalcpu"), let efficiency = systemNumber("hw.perflevel1.physicalcpu") {
+        if let performance = systemNumber("hw.perflevel0.physicalcpu"),
+            let efficiency = systemNumber("hw.perflevel1.physicalcpu")
+        {
             cores += " (\(performance) performance, \(efficiency) efficiency)"
         } else if let physical = systemNumber("hw.physicalcpu"), physical != process.processorCount {
             cores += " (\(physical) physical)"
@@ -107,10 +116,18 @@ struct SystemInformation: Equatable {
         }
 
         let version = process.operatingSystemVersion
-        var software = [Row(label: "macOS version", value: "\(version.majorVersion).\(version.minorVersion).\(version.patchVersion)")]
+        var software = [
+            Row(
+                label: "macOS version",
+                value: "\(version.majorVersion).\(version.minorVersion).\(version.patchVersion)")
+        ]
         if let build = systemText("kern.osversion") { software.append(Row(label: "Build", value: build)) }
-        if let kernel = systemText("kern.osrelease") { software.append(Row(label: "Kernel", value: "Darwin \(kernel)")) }
-        if let free = freeMemory(of: process.physicalMemory) { software.append(Row(label: "Free memory", value: free)) }
+        if let kernel = systemText("kern.osrelease") {
+            software.append(Row(label: "Kernel", value: "Darwin \(kernel)"))
+        }
+        if let free = freeMemory(of: process.physicalMemory) {
+            software.append(Row(label: "Free memory", value: free))
+        }
         software.append(Row(label: "Time since start", value: uptime(process.systemUptime)))
         software.append(Row(label: "Temporary folder", value: NSTemporaryDirectory()))
         software.append(Row(label: "User name", value: NSUserName()))
@@ -118,8 +135,10 @@ struct SystemInformation: Equatable {
 
         let mounted = volumes(cancellation: cancellation)
         guard !cancellation.isCancelled else { return nil }
-        return SystemInformation(sections: [Section(title: "Hardware", rows: hardware), Section(title: "Software", rows: software),
-                                            Section(title: "Volumes", rows: mounted)])
+        return SystemInformation(sections: [
+            Section(title: "Hardware", rows: hardware), Section(title: "Software", rows: software),
+            Section(title: "Volumes", rows: mounted)
+        ])
     }
 
     /// Stands for the volumes in `BlockingCalls`.
@@ -132,17 +151,26 @@ struct SystemInformation: Equatable {
     /// therefore asked through `BlockingCalls`: it goes on alone, and this function comes back
     /// as soon as `cancellation` is set, so the job that called it can end.
     static func volumes(cancellation: CancellationFlag = CancellationFlag()) -> [Row] {
-        let keys: Set<URLResourceKey> = [.volumeNameKey, .volumeTotalCapacityKey, .volumeAvailableCapacityKey,
-                                         .volumeLocalizedFormatDescriptionKey]
-        let urls = FileManager.default.mountedVolumeURLs(includingResourceValuesForKeys: nil, options: [.skipHiddenVolumes]) ?? []
+        let keys: Set<URLResourceKey> = [
+            .volumeNameKey, .volumeTotalCapacityKey, .volumeAvailableCapacityKey,
+            .volumeLocalizedFormatDescriptionKey
+        ]
+        let urls =
+            FileManager.default.mountedVolumeURLs(includingResourceValuesForKeys: nil, options: [.skipHiddenVolumes])
+            ?? []
         return Parallel.map(urls) { url in
-            let answer = BlockingCalls.answer(from: volumeCalls, to: "space " + url.path, cancellation: cancellation) { _ in
+            let answer = BlockingCalls.answer(from: volumeCalls, to: "space " + url.path, cancellation: cancellation) {
+                _ in
                 try? url.resourceValues(forKeys: keys)
             }
-            guard let values = answer else { return Row(label: url.lastPathComponent, value: "\(url.path): not answering") }
+            guard let values = answer else {
+                return Row(label: url.lastPathComponent, value: "\(url.path): not answering")
+            }
             let name = values?.volumeName ?? url.lastPathComponent
             let format = values?.volumeLocalizedFormatDescription.map { ", \($0)" } ?? ""
-            let free = space(free: values?.volumeAvailableCapacity.map(Int64.init), total: values?.volumeTotalCapacity.map(Int64.init))
+            let free = space(
+                free: values?.volumeAvailableCapacity.map(Int64.init),
+                total: values?.volumeTotalCapacity.map(Int64.init))
             return Row(label: name, value: "\(url.path): \(free)\(format)")
         }
     }

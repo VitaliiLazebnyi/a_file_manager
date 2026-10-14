@@ -4,7 +4,8 @@ import Foundation
 /// The formats of Encode File (spec 08 › Encode). The raw values are those of the spec's
 /// `EncodeMethod` setting.
 enum EncodeMethod: Int, CaseIterable {
-    case mime = 0, uue, xxe
+    case mime = 0
+    case uue, xxe
 
     var title: String {
         switch self {
@@ -133,7 +134,8 @@ enum Encoder {
         switch method {
         case .mime:
             let quoted = name.replacingOccurrences(of: "\"", with: "_")
-            return "MIME-Version: 1.0\r\nContent-Type: application/octet-stream; name=\"\(quoted)\"\r\nContent-Transfer-Encoding: base64\r\n"
+            return
+                "MIME-Version: 1.0\r\nContent-Type: application/octet-stream; name=\"\(quoted)\"\r\nContent-Transfer-Encoding: base64\r\n"
                 + "Content-Disposition: attachment; filename=\"\(quoted)\"\r\n\r\n"
         case .uue, .xxe:
             return "begin 644 \(name)\r\n"
@@ -143,15 +145,20 @@ enum Encoder {
     /// Encodes `source` into `directory` and returns the files written; on failure or cancel
     /// none of them is left, and a file that was there before is never touched (see `Splitter.split`).
     @discardableResult
-    static func encode(_ source: FileItem, into directory: URL, method: EncodeMethod, linesPerFile: Int = 0, bytesPerFile: Int64 = 0,
-                       run: ToolRun) throws -> [URL] {
+    static func encode(
+        _ source: FileItem, into directory: URL, method: EncodeMethod, linesPerFile: Int = 0, bytesPerFile: Int64 = 0,
+        run: ToolRun
+    ) throws -> [URL] {
         run.carriesOrigin = true
         let limit = Encoder.linesPerFile(lines: linesPerFile, bytes: bytesPerFile, method: method)
         // (The size is what a file system says and the limit what the user typed: neither may overflow a sum.)
-        let totalLines = Int(max(0, source.size).addingSaturated(Int64(method.bytesPerLine) - 1) / Int64(method.bytesPerLine))
+        let totalLines = Int(
+            max(0, source.size).addingSaturated(Int64(method.bytesPerLine) - 1) / Int64(method.bytesPerLine))
         // Counted before the names are made: a size of exabytes, said by a server, is not a list of that many names.
         let parts = limit > 0 ? max(1, totalLines.addingSaturated(limit - 1) / limit) : 1
-        guard parts <= 999 else { throw ToolError.failed("With these limits the file would be encoded into more than 999 parts.") }
+        guard parts <= 999 else {
+            throw ToolError.failed("With these limits the file would be encoded into more than 999 parts.")
+        }
         let names = outputNames(for: source.name, method: method, parts: parts)
         // No output may be the source itself (encoding `notes.b64` as MIME in place): it would be replaced.
         guard !names.contains(where: { ToolRun.isSameFile(directory.appending(name: $0), source.url) }) else {
@@ -178,10 +185,13 @@ enum Encoder {
             func open() throws -> ToolOutput {
                 // The source may have grown since the panel listed it; more parts than names are not made up.
                 guard written.count < names.count else {
-                    throw ToolError.failed("\(source.name) changed while it was encoded (it needs more parts than planned).")
+                    throw ToolError.failed(
+                        "\(source.name) changed while it was encoded (it needs more parts than planned).")
                 }
                 let url = directory.appending(name: names[written.count])
-                run.show(["From: " + run.fileSystems.displayPath(source.url), "To: " + run.fileSystems.displayPath(url)])
+                run.show([
+                    "From: " + run.fileSystems.displayPath(source.url), "To: " + run.fileSystems.displayPath(url)
+                ])
                 guard let part = try run.create(url, deferred: true) else { throw ToolError.cancelled }
                 written.append(part.url)
                 bodyBytes = 0
@@ -206,7 +216,10 @@ enum Encoder {
 
             func encoded(_ data: Data) -> Data {
                 switch method {
-                case .mime: return data.base64EncodedData(options: [.lineLength76Characters, .endLineWithCarriageReturn, .endLineWithLineFeed]) + Data([13, 10])
+                case .mime:
+                    return data.base64EncodedData(options: [
+                        .lineLength76Characters, .endLineWithCarriageReturn, .endLineWithLineFeed
+                    ]) + Data([13, 10])
                 case .uue, .xxe: return SixBitText.encode(data, xx: method == .xxe)
                 }
             }
@@ -219,7 +232,9 @@ enum Encoder {
                 if method != .mime {
                     // The checksum of Unix `sum -r`: a 16-bit sum that is rotated before every byte.
                     block.withUnsafeBytes { bytes in
-                        for byte in bytes { checksum = ((checksum >> 1) + ((checksum & 1) << 15) + UInt32(byte)) & 0xFFFF }
+                        for byte in bytes {
+                            checksum = ((checksum >> 1) + ((checksum & 1) << 15) + UInt32(byte)) & 0xFFFF
+                        }
                     }
                 }
                 carry.append(block)
@@ -335,7 +350,9 @@ final class DecodeMachine {
     /// The value of each byte as a Base64 character; 255 for the others.
     private static let base64Values: [UInt8] = {
         var values = [UInt8](repeating: 255, count: 256)
-        for (index, character) in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/".utf8.enumerated() { values[Int(character)] = UInt8(index) }
+        for (index, character) in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/".utf8.enumerated() {
+            values[Int(character)] = UInt8(index)
+        }
         // The URL-safe alphabet is read as well.
         values[Int(UInt8(ascii: "-"))] = 62
         values[Int(UInt8(ascii: "_"))] = 63
@@ -391,7 +408,8 @@ final class DecodeMachine {
         switch state {
         case .sixBit: report("the end line is missing: the text is incomplete (a part may be missing)")
         case .yEnc: report("the =yend line is missing: the text is incomplete (a part may be missing)")
-        case .base64(let endsAtMark, _): if endsAtMark, !sawEndMark { report("the end mark is missing: the text is incomplete") }
+        case .base64(let endsAtMark, _):
+            if endsAtMark, !sawEndMark { report("the end mark is missing: the text is incomplete") }
         case .searching, .mimeHeaders: break
         }
         if isInsideFile { try close() }
@@ -413,8 +431,14 @@ final class DecodeMachine {
                 length = groups * 3
                 if final {
                     let rest = s.count - groups * 4
-                    if rest >= 2 { out[length] = s[groups * 4] << 2 | s[groups * 4 + 1] >> 4; length += 1 }
-                    if rest == 3 { out[length] = s[groups * 4 + 1] << 4 | s[groups * 4 + 2] >> 2; length += 1 }
+                    if rest >= 2 {
+                        out[length] = s[groups * 4] << 2 | s[groups * 4 + 1] >> 4
+                        length += 1
+                    }
+                    if rest == 3 {
+                        out[length] = s[groups * 4 + 1] << 4 | s[groups * 4 + 2] >> 2
+                        length += 1
+                    }
                 }
             }
         }
@@ -432,18 +456,23 @@ final class DecodeMachine {
     private func parameter(_ key: String, in line: String) -> String? {
         guard let range = line.range(of: key + "=", options: .caseInsensitive) else { return nil }
         // `filename=` must not be found inside another word, nor `name=` inside `filename=`.
-        if range.lowerBound > line.startIndex, case let before = line[line.index(before: range.lowerBound)], before.isLetter || before == "-" {
+        if range.lowerBound > line.startIndex, case let before = line[line.index(before: range.lowerBound)],
+            before.isLetter || before == "-"
+        {
             return parameter(key, in: String(line[range.upperBound...]))
         }
         let rest = line[range.upperBound...]
-        if rest.hasPrefix("\"") { return rest.dropFirst().split(separator: "\"", omittingEmptySubsequences: false).first.map(String.init) }
+        if rest.hasPrefix("\"") {
+            return rest.dropFirst().split(separator: "\"", omittingEmptySubsequences: false).first.map(String.init)
+        }
         return rest.split(whereSeparator: { $0 == ";" || $0 == " " }).first.map(String.init)
     }
 
     /// The value of ` key=` in a yEnc line (up to the next space).
     private func yParameter(_ key: String, in line: String) -> String? {
         guard let range = line.range(of: " " + key + "=") else { return nil }
-        return line[range.upperBound...].split(separator: " ", maxSplits: 1, omittingEmptySubsequences: false).first.map(String.init)
+        return line[range.upperBound...].split(separator: " ", maxSplits: 1, omittingEmptySubsequences: false).first
+            .map(String.init)
     }
 
     /// `sum -r/size 12345/450`
@@ -460,12 +489,16 @@ final class DecodeMachine {
         let name = pending.name ?? "(no name)"
         if let trailer {
             if trailer.size != pending.size {
-                problems.append("\(name): \(pending.size) bytes were decoded, but the text says \(trailer.size): lines are missing or damaged")
+                problems.append(
+                    "\(name): \(pending.size) bytes were decoded, but the text says \(trailer.size): lines are missing or damaged"
+                )
             } else if trailer.sum != pending.sum {
                 problems.append("\(name): the checksum (sum -r) does not match: the data is damaged")
             }
         } else if pending.skippedLines > 0 || pending.shortLinesInside > 0 {
-            problems.append("\(name): \(pending.skippedLines + pending.shortLinesInside) lines could not be read or are out of place and nothing confirms the size")
+            problems.append(
+                "\(name): \(pending.skippedLines + pending.shortLinesInside) lines could not be read or are out of place and nothing confirms the size"
+            )
         }
     }
 
@@ -498,10 +531,14 @@ final class DecodeMachine {
                 let header = text(line)
                 try open(header.range(of: " name=").map { String(header[$0.upperBound...]) }, .yEnc)
                 yHeaderSize = yParameter("size", in: header).flatMap { Int64($0) }
-            } else if case let lowered = text(line.prefix(40)).lowercased(), lowered.hasPrefix("mime-version:") || lowered.hasPrefix("content-") {
+            } else if case let lowered = text(line.prefix(40)).lowercased(),
+                lowered.hasPrefix("mime-version:") || lowered.hasPrefix("content-")
+            {
                 state = .mimeHeaders(name: nil, isBase64: false)
                 try feed(line)
-            } else if !sawText, filesDecoded == 0, line.allSatisfy({ DecodeMachine.base64Values[Int($0)] != 255 || $0 == UInt8(ascii: "=") }) {
+            } else if !sawText, filesDecoded == 0,
+                line.allSatisfy({ DecodeMachine.base64Values[Int($0)] != 255 || $0 == UInt8(ascii: "=") })
+            {
                 // Nothing but Base64 from the first line on: the output of `base64`.
                 try open(nil, .base64(endsAtMark: false, mime: false))
                 try feed(line)
@@ -512,7 +549,9 @@ final class DecodeMachine {
                 return
             }
             let header = text(line)
-            if header.lowercased().hasPrefix("content-transfer-encoding:") { isBase64 = header.lowercased().contains("base64") }
+            if header.lowercased().hasPrefix("content-transfer-encoding:") {
+                isBase64 = header.lowercased().contains("base64")
+            }
             name = parameter("filename", in: header) ?? name ?? parameter("name", in: header)
             state = .mimeHeaders(name: name, isBase64: isBase64)
         case .base64(let endsAtMark, let mime):
@@ -564,7 +603,8 @@ final class DecodeMachine {
             guard !line.isEmpty else { return }
             if xx == nil {
                 // A line that fits UUEncode exactly is UUEncode; XXEncode has no character below `+`.
-                let asUU = SixBitText.decode(line, xx: false), asXX = SixBitText.decode(line, xx: true)
+                let asUU = SixBitText.decode(line, xx: false)
+                let asXX = SixBitText.decode(line, xx: true)
                 let fitsUU = asUU != nil && line.count - 1 == ((asUU?.count ?? 0) + 2) / 3 * 4
                 xx = fitsUU ? false : asXX != nil ? true : asUU != nil ? false : nil
                 state = .sixBit(xx: xx)
@@ -599,7 +639,9 @@ final class DecodeMachine {
                 // be worked out (`end - begin` of numbers from anywhere overflows). Anything
                 // else is a damaged header, and is said to be one.
                 let (beginText, endText) = (yParameter("begin", in: header), yParameter("end", in: header))
-                if let begin = beginText.flatMap({ Int64($0) }), let end = endText.flatMap({ Int64($0) }), begin >= 1, end >= begin {
+                if let begin = beginText.flatMap({ Int64($0) }), let end = endText.flatMap({ Int64($0) }), begin >= 1,
+                    end >= begin
+                {
                     yPartLength = (end - begin).addingSaturated(1)
                 } else if beginText != nil || endText != nil {
                     yPartLength = nil
@@ -608,7 +650,7 @@ final class DecodeMachine {
                 return
             }
             if line.starts(with: Array("=ybegin".utf8)) { return }
-            var bytes = [UInt8]()
+            var bytes: [UInt8] = []
             bytes.reserveCapacity(line.count)
             var escaped = false
             for character in line {
@@ -646,8 +688,12 @@ final class DecodeMachine {
             report("\(yBytes) bytes were decoded, but =ybegin says \(total): the text is incomplete or damaged")
         }
         // A part carries the CRC32 of the part; a single file has only crc32.
-        let crcText = yHasPart ? yParameter("pcrc32", in: line) : (yParameter("crc32", in: line) ?? yParameter("pcrc32", in: line))
-        if let crcText, let expected = UInt32(crcText.trimmingCharacters(in: .whitespaces), radix: 16), expected != yCRC.checksum {
+        let crcText =
+            yHasPart
+            ? yParameter("pcrc32", in: line) : (yParameter("crc32", in: line) ?? yParameter("pcrc32", in: line))
+        if let crcText, let expected = UInt32(crcText.trimmingCharacters(in: .whitespaces), radix: 16),
+            expected != yCRC.checksum
+        {
             report("the CRC32 does not match: the data is damaged")
         }
     }
@@ -705,7 +751,10 @@ enum Decoder {
         func begin(name: String?) throws {
             // The name is a name: whatever the text says, the file lands in the target folder.
             // `appending(safeName:)` is the last word: one name, no `/` or NUL byte, never `.` or `..`.
-            guard let url = Decoder.safeName(name).flatMap({ directory.appending(safeName: $0) }) ?? directory.appending(safeName: fallbackName) else {
+            guard
+                let url = Decoder.safeName(name).flatMap({ directory.appending(safeName: $0) })
+                    ?? directory.appending(safeName: fallbackName)
+            else {
                 throw ToolError.failed("The decoded file has no usable name.")
             }
             run.show(["To: " + run.fileSystems.displayPath(url)])
@@ -745,7 +794,9 @@ enum Decoder {
         }
         let result = String(cleaned).trimmingCharacters(in: .whitespaces)
         // A name longer than the file system takes is cut at a code point, not refused.
-        guard let name = result.utf8.count > 255 ? trimmedToLimit(result) : result, !name.isEmpty, name != ".", name != ".." else { return nil }
+        guard let name = result.utf8.count > 255 ? trimmedToLimit(result) : result, !name.isEmpty, name != ".",
+            name != ".."
+        else { return nil }
         return name
     }
 
@@ -800,10 +851,13 @@ enum Decoder {
     }
 
     /// Like `decode`, and says what is incomplete or damaged: the files are kept all the same.
-    static func decodeChecked(_ first: FileItem, into directory: URL, autoRename: Bool = false, run: ToolRun) throws -> Outcome {
+    static func decodeChecked(_ first: FileItem, into directory: URL, autoRename: Bool = false, run: ToolRun) throws
+        -> Outcome
+    {
         let provider = try run.provider(for: first.url)
         run.carriesOrigin = true
-        let sink = FolderSink(directory: directory, fallbackName: fallbackName(for: first.name), autoRename: autoRename, run: run)
+        let sink = FolderSink(
+            directory: directory, fallbackName: fallbackName(for: first.name), autoRename: autoRename, run: run)
         let machine = DecodeMachine(sink: sink)
         let candidates = PartSeries.parts(startingAt: first, provider: provider, cancellation: run.cancellation)
         run.expect(bytes: first.size, items: 0)
@@ -821,7 +875,9 @@ enum Decoder {
             try machine.finish()
             return sink.written
         }
-        guard machine.filesDecoded > 0 else { throw ToolError.failed("\(first.name) holds no encoded file (MIME/Base64, UUEncode, XXEncode, yEnc).") }
+        guard machine.filesDecoded > 0 else {
+            throw ToolError.failed("\(first.name) holds no encoded file (MIME/Base64, UUEncode, XXEncode, yEnc).")
+        }
         return Outcome(files: files, problems: machine.problems)
     }
 }

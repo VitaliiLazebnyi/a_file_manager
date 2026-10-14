@@ -1,13 +1,16 @@
 import AFMKernel
 import Foundation
 import Testing
+
 @testable import ViewerPlugin
 
 /// `HTMLText.plainText(units:)` as it was before it was made fast: unit by unit, with the strings
 /// of the tags made for every one. What the fast one must give exactly.
 enum HTMLReference {
-    static let blockTags: Set<String> = ["p", "div", "br", "li", "tr", "h1", "h2", "h3", "h4", "h5", "h6", "table", "ul", "ol",
-                                         "blockquote", "pre", "hr", "section", "article", "header", "footer", "title", "dt", "dd"]
+    static let blockTags: Set<String> = [
+        "p", "div", "br", "li", "tr", "h1", "h2", "h3", "h4", "h5", "h6", "table", "ul", "ol",
+        "blockquote", "pre", "hr", "section", "article", "header", "footer", "title", "dt", "dd"
+    ]
     static let skippedElements: Set<String> = ["script", "style", "noscript", "template", "svg"]
 
     @inline(__always) static func referenceIsWhitespace(_ unit: UInt16) -> Bool {
@@ -27,7 +30,8 @@ enum HTMLReference {
         var endsInWhitespace = true
         html.withUnsafeBufferPointer { input in
             let count = input.count
-            var index = 0, checked = 0
+            var index = 0
+            var checked = 0
 
             func append(_ string: String) {
                 text.append(contentsOf: string.utf16)
@@ -84,7 +88,8 @@ enum HTMLReference {
             /// itself. Returns where to go on.
             func entity(at ampersand: Int) -> Int {
                 // `;` within the next 12 units of the same piece of text.
-                var semicolon = -1, position = ampersand + 1
+                var semicolon = -1
+                var position = ampersand + 1
                 while position < count, position <= ampersand + 12, input[position] != 0x3C {
                     if input[position] == 0x3B {
                         semicolon = position
@@ -96,7 +101,8 @@ enum HTMLReference {
                     emit(0x26)
                     return ampersand + 1
                 }
-                let name = String(decoding: UnsafeBufferPointer(rebasing: input[ampersand + 1..<semicolon]), as: UTF16.self)
+                let name = String(
+                    decoding: UnsafeBufferPointer(rebasing: input[ampersand + 1..<semicolon]), as: UTF16.self)
                 if let replacement = HTMLText.decodeEntity(name) {
                     for unit in replacement.utf16 { emit(unit) }
                     return semicolon + 1
@@ -108,7 +114,6 @@ enum HTMLReference {
             while index < count {
                 if index &- checked > 1 << 20 {
                     checked = index
-
                 }
                 let unit = input[index]
                 if unit == 0x26 {
@@ -123,7 +128,10 @@ enum HTMLReference {
                 let open = index
                 // A `<` that no tag name follows is a character of the text.
                 let after: UInt16 = open + 1 < count ? input[open + 1] : 0
-                guard after == 0x2F || after == 0x21 || after == 0x3F || (after >= 0x41 && after <= 0x5A) || (after >= 0x61 && after <= 0x7A) else {
+                guard
+                    after == 0x2F || after == 0x21 || after == 0x3F || (after >= 0x41 && after <= 0x5A)
+                        || (after >= 0x61 && after <= 0x7A)
+                else {
                     emit(0x3C)
                     index += 1
                     continue
@@ -144,7 +152,9 @@ enum HTMLReference {
                 // The end of the tag: a `>` inside a value in quotes after `=` does not end it, if
                 // the quote closes within 512 units.
                 var close = count
-                var quote: UInt16 = 0, before: UInt16 = 0, scan = open + 1
+                var quote: UInt16 = 0
+                var before: UInt16 = 0
+                var scan = open + 1
                 while scan < min(count, open + 512) {
                     let unit = input[scan]
                     if quote != 0 {
@@ -193,8 +203,11 @@ enum HTMLReference {
                         append(linkBraces ? " {\(link)}" : " \(link)")
                         pendingLink = nil
                     } else if !isClosing {
-                        let tag = String(decoding: UnsafeBufferPointer(rebasing: input[open + 1..<close]), as: UTF16.self)
-                        if let link = HTMLText.attribute("href", in: Substring(tag)), !link.isEmpty, !link.hasPrefix("#") {
+                        let tag = String(
+                            decoding: UnsafeBufferPointer(rebasing: input[open + 1..<close]), as: UTF16.self)
+                        if let link = HTMLText.attribute("href", in: Substring(tag)), !link.isEmpty,
+                            !link.hasPrefix("#")
+                        {
                             pendingLink = HTMLText.decodeEntities(Substring(link))
                             links.append(pendingLink ?? link)
                         }
@@ -207,7 +220,8 @@ enum HTMLReference {
                 }
             }
         }
-        var lower = 0, upper = text.count
+        var lower = 0
+        var upper = text.count
         while lower < upper, referenceIsWhitespace(text[lower]) { lower += 1 }
         while upper > lower, referenceIsWhitespace(text[upper - 1]) { upper -= 1 }
         let trimmed = String(decoding: text[lower..<upper], as: UTF16.self)

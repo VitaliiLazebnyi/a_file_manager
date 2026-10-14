@@ -1,7 +1,8 @@
-@testable import AFMKernel
 import Foundation
 import TestSupport
 import Testing
+
+@testable import AFMKernel
 
 // Review round 2, integration: what the kernel gained when the round was closed — entering a
 // folder through `prepare`/`apply` (shell-p2 request 2), and the comparison of names that
@@ -15,7 +16,8 @@ private func entry(_ name: String, in folder: URL, size: Int64 = 1, folder isFol
 }
 
 private func listing(_ folder: URL, _ items: [FileItem]) -> Listing {
-    Listing(directory: folder, items: items, parent: folder.deletingLastPathComponent(), root: URL(fileURLWithPath: "/"))
+    Listing(
+        directory: folder, items: items, parent: folder.deletingLastPathComponent(), root: URL(fileURLWithPath: "/"))
 }
 
 private func elsewhere<Value>(_ work: @escaping () -> Value) -> Value {
@@ -37,8 +39,11 @@ private func elsewhere<Value>(_ work: @escaping () -> Value) -> Value {
     }
 
     private var arrival: [FileItem] {
-        [entry("zeta.txt", in: other, size: 3), entry("Docs", in: other, folder: true), entry("alpha.log", in: other, size: 5),
-         entry("mid.txt", in: other, size: 7)]
+        [
+            entry("zeta.txt", in: other, size: 3), entry("Docs", in: other, folder: true),
+            entry("alpha.log", in: other, size: 5),
+            entry("mid.txt", in: other, size: 7)
+        ]
     }
 
     @Test func aFolderEnteredThroughPrepareIsTheFolderShowWouldHaveEntered() {
@@ -63,7 +68,9 @@ private func elsewhere<Value>(_ work: @escaping () -> Value) -> Value {
         // An order the user asked for and the list is not in yet.
         model.requestSort(ListOrder(key: .size, descending: true))
         let basis = model.basis
-        let change = elsewhere { PanelModel.prepare(basis, show: listing(other, self.arrival), history: .keep, remembered: true) }
+        let change = elsewhere {
+            PanelModel.prepare(basis, show: listing(other, self.arrival), history: .keep, remembered: true)
+        }
         #expect(model.apply(change) == .changed)
         // Filtered (folders stay), in the order that was asked for, which is the panel's now.
         #expect(model.items.map(\.name) == ["Docs", "mid.txt", "zeta.txt"])
@@ -72,7 +79,9 @@ private func elsewhere<Value>(_ work: @escaping () -> Value) -> Value {
         #expect(model.isRefreshing && !model.isComplete && model.isListed)
         #expect(model.backLocation == nil)
         #expect(model.update(with: listing(other, arrival + [entry("new.txt", in: other, size: 9)])))
-        #expect(model.isComplete && !model.isRefreshing && model.items.map(\.name) == ["Docs", "new.txt", "mid.txt", "zeta.txt"])
+        #expect(
+            model.isComplete && !model.isRefreshing
+                && model.items.map(\.name) == ["Docs", "new.txt", "mid.txt", "zeta.txt"])
     }
 
     @Test func aPanelThatChangedMeanwhileRefusesTheEnteringAndTakesTheNextOne() {
@@ -118,17 +127,25 @@ private func elsewhere<Value>(_ work: @escaping () -> Value) -> Value {
 
     @Test func theOrderIsOneInTheStrictSenseWhereTheLocalizedOneIsNot() {
         // Letters for which the localized comparison says "descending" in both directions (K023).
-        let names = ["й", "ий", "и", "е", "ё", "ž", "z", "ñ", "n", "å", "a", "aa", "Й", "ИЙ", "A", "Z", "file2", "file10", "File1"]
+        let names = [
+            "й", "ий", "и", "е", "ё", "ž", "z", "ñ", "n", "å", "a", "aa", "Й", "ИЙ", "A", "Z", "file2", "file10",
+            "File1"
+        ]
         for numeric in [false, true] {
             for a in names {
                 for b in names {
-                    let (forward, backward) = (Sorter.compare(a, b, numeric: numeric), Sorter.compare(b, a, numeric: numeric))
+                    let (forward, backward) = (
+                        Sorter.compare(a, b, numeric: numeric), Sorter.compare(b, a, numeric: numeric)
+                    )
                     #expect(forward.rawValue == -backward.rawValue, "\(a) \(b)")
                     #expect((forward == .orderedSame) == (a == b), "\(a) \(b)")
                     // The keys say what the comparison says.
                     let (x, y) = (Sorter.key(of: a, numeric: numeric), Sorter.key(of: b, numeric: numeric))
-                    #expect((x < y) == (forward == .orderedAscending) && (x == y) == (forward == .orderedSame), "\(a) \(b)")
-                    for c in names where forward == .orderedAscending && Sorter.compare(b, c, numeric: numeric) == .orderedAscending {
+                    #expect(
+                        (x < y) == (forward == .orderedAscending) && (x == y) == (forward == .orderedSame), "\(a) \(b)"
+                    )
+                    for c in names
+                    where forward == .orderedAscending && Sorter.compare(b, c, numeric: numeric) == .orderedAscending {
                         #expect(Sorter.compare(a, c, numeric: numeric) == .orderedAscending, "\(a) \(b) \(c)")
                     }
                 }
@@ -138,9 +155,15 @@ private func elsewhere<Value>(_ work: @escaping () -> Value) -> Value {
 
     @Test func digitsCountByTheirValueOnlyWhenThatIsAskedFor() {
         let names = ["file10.txt", "file2.txt", "File1.txt", "file1000000000000000000000.txt", "file9.txt"]
-        #expect(Sorter.sorted(names, numeric: true) { $0 } == ["File1.txt", "file2.txt", "file9.txt", "file10.txt", "file1000000000000000000000.txt"])
+        #expect(
+            Sorter.sorted(names, numeric: true) { $0 } == [
+                "File1.txt", "file2.txt", "file9.txt", "file10.txt", "file1000000000000000000000.txt"
+            ])
         // As the panels' lists have names: character by character.
-        #expect(Sorter.sorted(names) { $0 } == ["File1.txt", "file10.txt", "file1000000000000000000000.txt", "file2.txt", "file9.txt"])
+        #expect(
+            Sorter.sorted(names) { $0 } == [
+                "File1.txt", "file10.txt", "file1000000000000000000000.txt", "file2.txt", "file9.txt"
+            ])
         // Items of one name keep the order they came in.
         let pairs = [("b", 1), ("a", 2), ("b", 3), ("a", 4)]
         #expect(Sorter.sorted(pairs) { $0.0 }.map(\.1) == [2, 4, 1, 3])

@@ -53,7 +53,9 @@ final class PreferencesPage: NSObject, OptionsPage, NSTextFieldDelegate {
                 control = field
             case .choice(let options, _):
                 let popUp = NSPopUpButton(frame: .zero, pullsDown: false)
-                for option in options { popUp.menu?.addItem(NSMenuItem(title: option, action: nil, keyEquivalent: "")) }
+                for option in options {
+                    popUp.menu?.addItem(NSMenuItem(title: option, action: nil, keyEquivalent: ""))
+                }
                 popUp.target = self
                 popUp.action = #selector(changed)
                 control = popUp
@@ -70,8 +72,10 @@ final class PreferencesPage: NSObject, OptionsPage, NSTextFieldDelegate {
         grid.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(grid)
         NSLayoutConstraint.activate([
-            grid.topAnchor.constraint(equalTo: view.topAnchor), grid.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            grid.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor), grid.bottomAnchor.constraint(lessThanOrEqualTo: view.bottomAnchor),
+            grid.topAnchor.constraint(equalTo: view.topAnchor),
+            grid.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            grid.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor),
+            grid.bottomAnchor.constraint(lessThanOrEqualTo: view.bottomAnchor)
         ])
         show()
     }
@@ -132,12 +136,17 @@ final class KeyboardPage: NSObject, OptionsPage, NSSearchFieldDelegate {
             ActionButton("Reset All") { [unowned self] in
                 editor.resetAll()
                 edited()
-            },
+            }
         ]
         status.lineBreakMode = .byTruncatingTail
-        return filledStack([filter, editorView(table, buttons: buttons), status,
-                            note("A key belongs to one command. Menus show the new keys at once; the function-key bar after a restart.")],
-                           vertical: true)
+        return filledStack(
+            [
+                filter, editorView(table, buttons: buttons), status,
+                note(
+                    "A key belongs to one command. Menus show the new keys at once; the function-key bar after a restart."
+                )
+            ],
+            vertical: true)
     }()
     var onEdit: () -> Void = {}
 
@@ -152,7 +161,8 @@ final class KeyboardPage: NSObject, OptionsPage, NSSearchFieldDelegate {
 
     private func reload() {
         let kernel = center.kernel
-        let all = CommandCatalog.rows(commands: kernel.commands.all, menus: kernel.menus.menus, shortcuts: editor.shortcuts(for:))
+        let all = CommandCatalog.rows(
+            commands: kernel.commands.all, menus: kernel.menus.menus, shortcuts: editor.shortcuts(for:))
         rows = CommandCatalog.filter(all, text: filter.stringValue)
         table.show(rows.map { [$0.title, $0.id.rawValue, $0.keys + (editor.isCustomized($0.id) ? "  •" : "")] })
     }
@@ -194,11 +204,16 @@ final class KeyboardPage: NSObject, OptionsPage, NSSearchFieldDelegate {
             if event.modifierFlags.contains(.option) { modifiers.insert(.option) }
             if event.modifierFlags.contains(.command) { modifiers.insert(.command) }
             let isEscape = event.keyCode == 53 && modifiers.isEmpty
-            guard !isEscape, let shortcut = ShortcutText.shortcut(keyCode: event.keyCode, characters: event.charactersIgnoringModifiers,
-                                                                  modifiers: modifiers) else { return nil }
+            guard !isEscape,
+                let shortcut = ShortcutText.shortcut(
+                    keyCode: event.keyCode, characters: event.charactersIgnoringModifiers,
+                    modifiers: modifiers)
+            else { return nil }
             // The question about a key that is in use is asked after the key press is dealt with.
             MainLoop.perform {
-                if self.editor.assign(shortcut, to: row.id, adding: adding, asking: self.center.kernel.ui) { self.edited() }
+                if self.editor.assign(shortcut, to: row.id, adding: adding, asking: self.center.kernel.ui) {
+                    self.edited()
+                }
             }
             return nil
         }
@@ -233,29 +248,37 @@ final class ButtonBarPage: NSObject, OptionsPage {
     private let editor: ToolbarEditor
     private let table = RowsTable(columns: [("Button", 250), ("Command", 200)])
     let title = "Button Bar"
-    private(set) lazy var view: NSView = editorView(table, buttons: [
-        ActionButton("Add Command…") { [unowned self] in
-            guard let id = center.pickCommand() else { return }
-            edited(selecting: editor.insert(id, after: table.selectedRow))
-        },
-        ActionButton("Add Separator") { [unowned self] in edited(selecting: editor.insert(nil, after: table.selectedRow)) },
-        ActionButton("Add Line Break") { [unowned self] in
-            edited(selecting: editor.insert(ToolbarRegistry.lineBreak, after: table.selectedRow))
-        },
-        ActionButton("Remove") { [unowned self] in
-            guard let row = table.selectedRow else { return NSSound.beep() }
-            editor.remove(at: row)
-            edited(selecting: row)
-        },
-        ActionButton("Move Up") { [unowned self] in move(-1) },
-        ActionButton("Move Down") { [unowned self] in move(1) },
-        ActionButton("Symbol…") { [unowned self] in chooseSymbol() },
-        ActionButton("Reset to Default") { [unowned self] in
-            editor.resetToDefault()
-            edited(selecting: nil)
-        },
-    ], below: [note("A new button goes directly after the selected one. A program with parameters goes on the bar as a user command "
-                    + "(Configuration › User Commands).")])
+    private(set) lazy var view: NSView = editorView(
+        table,
+        buttons: [
+            ActionButton("Add Command…") { [unowned self] in
+                guard let id = center.pickCommand() else { return }
+                edited(selecting: editor.insert(id, after: table.selectedRow))
+            },
+            ActionButton("Add Separator") { [unowned self] in
+                edited(selecting: editor.insert(nil, after: table.selectedRow))
+            },
+            ActionButton("Add Line Break") { [unowned self] in
+                edited(selecting: editor.insert(ToolbarRegistry.lineBreak, after: table.selectedRow))
+            },
+            ActionButton("Remove") { [unowned self] in
+                guard let row = table.selectedRow else { return NSSound.beep() }
+                editor.remove(at: row)
+                edited(selecting: row)
+            },
+            ActionButton("Move Up") { [unowned self] in move(-1) },
+            ActionButton("Move Down") { [unowned self] in move(1) },
+            ActionButton("Symbol…") { [unowned self] in chooseSymbol() },
+            ActionButton("Reset to Default") { [unowned self] in
+                editor.resetToDefault()
+                edited(selecting: nil)
+            }
+        ],
+        below: [
+            note(
+                "A new button goes directly after the selected one. A program with parameters goes on the bar as a user command "
+                    + "(Configuration › User Commands).")
+        ])
     var onEdit: () -> Void = {}
 
     init(center: ConfigurationCenter) {
@@ -268,10 +291,15 @@ final class ButtonBarPage: NSObject, OptionsPage {
 
     private func reload(selecting row: Int? = nil) {
         let commands = center.kernel.commands
-        table.show(editor.items.map { id in
-            guard let id else { return ["———", ""] }
-            return id == ToolbarRegistry.lineBreak ? ["═══ New line ═══", ""] : [commands[id]?.title ?? "(unknown command)", id.rawValue]
-        }, symbols: editor.items.map { id in id.flatMap { $0 == ToolbarRegistry.lineBreak ? nil : editor.symbol(for: $0) } }, selecting: row)
+        table.show(
+            editor.items.map { id in
+                guard let id else { return ["———", ""] }
+                return id == ToolbarRegistry.lineBreak
+                    ? ["═══ New line ═══", ""] : [commands[id]?.title ?? "(unknown command)", id.rawValue]
+            },
+            symbols: editor.items.map { id in
+                id.flatMap { $0 == ToolbarRegistry.lineBreak ? nil : editor.symbol(for: $0) }
+            }, selecting: row)
     }
 
     private func edited(selecting row: Int?) {
@@ -286,15 +314,22 @@ final class ButtonBarPage: NSObject, OptionsPage {
 
     /// The picture of a button is a system symbol, chosen by its name.
     private func chooseSymbol() {
-        guard let row = table.selectedRow, editor.items.indices.contains(row), let id = editor.items[row], id != ToolbarRegistry.lineBreak else {
+        guard let row = table.selectedRow, editor.items.indices.contains(row), let id = editor.items[row],
+            id != ToolbarRegistry.lineBreak
+        else {
             return NSSound.beep()
         }
         let ui = center.kernel.ui
-        guard let name = ui.prompt("Symbol for “\(center.kernel.commands[id]?.title ?? id.rawValue)”:", value: editor.symbol(for: id),
-                                   detail: "The name of a system symbol (SF Symbols), such as folder.badge.plus. Empty: the command's own.")?
-            .trimmingCharacters(in: .whitespaces) else { return }
+        guard
+            let name = ui.prompt(
+                "Symbol for “\(center.kernel.commands[id]?.title ?? id.rawValue)”:", value: editor.symbol(for: id),
+                detail:
+                    "The name of a system symbol (SF Symbols), such as folder.badge.plus. Empty: the command's own.")?
+                .trimmingCharacters(in: .whitespaces)
+        else { return }
         guard name.isEmpty || NSImage(systemSymbolName: name, accessibilityDescription: nil) != nil else {
-            return ui.inform("No symbol is called “\(name)”", detail: "The SF Symbols app lists the names.", style: .warning)
+            return ui.inform(
+                "No symbol is called “\(name)”", detail: "The SF Symbols app lists the names.", style: .warning)
         }
         editor.setSymbol(name, for: id)
         edited(selecting: row)
@@ -315,22 +350,32 @@ final class StartMenuPage: NSObject, OptionsPage {
     private var draft = StartMenuDraft()
     private let table = RowsTable(columns: [("Nr.", 34), ("Title", 170), ("Command", 190), ("Key", 80)])
     let title = "Start Menu"
-    private(set) lazy var view: NSView = editorView(table, buttons: [
-        ActionButton("Add Item…") { [unowned self] in add(center.editStartMenuRow(nil)) },
-        ActionButton("Add Command…") { [unowned self] in
-            guard let id = center.pickCommand() else { return }
-            add(center.editStartMenuRow(nil, proposing: CommandAction(command: id.rawValue), title: center.kernel.commands[id]?.title ?? ""))
-        },
-        ActionButton("Add Separator") { [unowned self] in add(StartMenuDraft.Row(entry: .separator)) },
-        ActionButton("Change…") { [unowned self] in change() },
-        ActionButton("Remove") { [unowned self] in
-            guard let row = table.selectedRow else { return NSSound.beep() }
-            draft.rows.remove(at: row)
-            edited(selecting: row)
-        },
-        ActionButton("Move Up") { [unowned self] in move(-1) },
-        ActionButton("Move Down") { [unowned self] in move(1) },
-    ], below: [note(ConfigurationCenter.startMenuHint + "\nThe n-th entry also runs as the command cm_UserMenu<n>. Submenus are not available.")])
+    private(set) lazy var view: NSView = editorView(
+        table,
+        buttons: [
+            ActionButton("Add Item…") { [unowned self] in add(center.editStartMenuRow(nil)) },
+            ActionButton("Add Command…") { [unowned self] in
+                guard let id = center.pickCommand() else { return }
+                add(
+                    center.editStartMenuRow(
+                        nil, proposing: CommandAction(command: id.rawValue),
+                        title: center.kernel.commands[id]?.title ?? ""))
+            },
+            ActionButton("Add Separator") { [unowned self] in add(StartMenuDraft.Row(entry: .separator)) },
+            ActionButton("Change…") { [unowned self] in change() },
+            ActionButton("Remove") { [unowned self] in
+                guard let row = table.selectedRow else { return NSSound.beep() }
+                draft.rows.remove(at: row)
+                edited(selecting: row)
+            },
+            ActionButton("Move Up") { [unowned self] in move(-1) },
+            ActionButton("Move Down") { [unowned self] in move(1) }
+        ],
+        below: [
+            note(
+                ConfigurationCenter.startMenuHint
+                    + "\nThe n-th entry also runs as the command cm_UserMenu<n>. Submenus are not available.")
+        ])
     var onEdit: () -> Void = {}
 
     init(center: ConfigurationCenter) {
@@ -342,10 +387,15 @@ final class StartMenuPage: NSObject, OptionsPage {
     var isChanged: Bool { draft != stored }
 
     private func reload(selecting row: Int? = nil) {
-        table.show(draft.rows.enumerated().map { index, row in
-            row.entry.isSeparator ? ["\(index + 1)", "———", "", ""]
-                : ["\(index + 1)", row.entry.title, row.entry.action.command, ShortcutText.parse(row.shortcut).map(ShortcutText.display) ?? ""]
-        }, selecting: row)
+        table.show(
+            draft.rows.enumerated().map { index, row in
+                row.entry.isSeparator
+                    ? ["\(index + 1)", "———", "", ""]
+                    : [
+                        "\(index + 1)", row.entry.title, row.entry.action.command,
+                        ShortcutText.parse(row.shortcut).map(ShortcutText.display) ?? ""
+                    ]
+            }, selecting: row)
     }
 
     private func edited(selecting row: Int?) {
@@ -359,7 +409,8 @@ final class StartMenuPage: NSObject, OptionsPage {
     }
 
     private func change() {
-        guard let index = table.selectedRow, draft.rows.indices.contains(index), !draft.rows[index].entry.isSeparator else { return NSSound.beep() }
+        guard let index = table.selectedRow, draft.rows.indices.contains(index), !draft.rows[index].entry.isSeparator
+        else { return NSSound.beep() }
         guard let row = center.editStartMenuRow(draft.rows[index]) else { return }
         draft.rows[index] = row
         edited(selecting: index)
@@ -393,23 +444,28 @@ final class SettingsFilePage: NSObject, OptionsPage {
 
     init(center: ConfigurationCenter) {
         let commands = center.kernel.commands
-        let buttons = filledStack([
-            ActionButton("Export Settings…") { commands.perform(ConfigurationPlugin.exportSettings) },
-            ActionButton("Import Settings…") { commands.perform(ConfigurationPlugin.importSettings) },
-            ActionButton("Reset All Settings…") { commands.perform(ConfigurationPlugin.resetSettings) },
-            spacer(),
-        ], vertical: false)
-        view = filledStack([
-            NSTextField(wrappingLabelWithString: "Settings are stored the moment they change; there is nothing to save by hand. "
+        let buttons = filledStack(
+            [
+                ActionButton("Export Settings…") { commands.perform(ConfigurationPlugin.exportSettings) },
+                ActionButton("Import Settings…") { commands.perform(ConfigurationPlugin.importSettings) },
+                ActionButton("Reset All Settings…") { commands.perform(ConfigurationPlugin.resetSettings) },
+                spacer()
+            ], vertical: false)
+        view = filledStack(
+            [
+                NSTextField(
+                    wrappingLabelWithString:
+                        "Settings are stored the moment they change; there is nothing to save by hand. "
                         + "To keep a copy or to take the settings to another Mac, export them to a file."),
-            buttons,
-            note("The file holds the options of all pages, the key bindings, the button bar, the user commands, the Start menu, the directory "
-                 + "hotlist and the panels' tabs. Histories (typed command lines, visited folders) and saved connections are in it only if you "
-                 + "ask for them; passwords never are. Only you can read the file. Window positions are kept by macOS and are not in it.\n"
-                 + "An import shows what it would change first. User commands, key bindings, programs, connections and trusted certificates "
-                 + "from a file are taken over only when you tick them."),
-            spacer(),
-        ], vertical: true, spacing: 12)
+                buttons,
+                note(
+                    "The file holds the options of all pages, the key bindings, the button bar, the user commands, the Start menu, the directory "
+                        + "hotlist and the panels' tabs. Histories (typed command lines, visited folders) and saved connections are in it only if you "
+                        + "ask for them; passwords never are. Only you can read the file. Window positions are kept by macOS and are not in it.\n"
+                        + "An import shows what it would change first. User commands, key bindings, programs, connections and trusted certificates "
+                        + "from a file are taken over only when you tick them."),
+                spacer()
+            ], vertical: true, spacing: 12)
         super.init()
     }
 
@@ -439,9 +495,14 @@ final class OptionsWindowController: NSWindowController, NSWindowDelegate {
             PreferencesPage(model: PreferencePageModel(page: $0, settings: center.kernel.settings))
         }
         firstOwnPage = registered.count
-        pages = registered + [KeyboardPage(center: center), ButtonBarPage(center: center), StartMenuPage(center: center), SettingsFilePage(center: center)]
-        let window = ToolWindow(contentRect: NSRect(x: 0, y: 0, width: 900, height: 560),
-                                styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
+        pages =
+            registered + [
+                KeyboardPage(center: center), ButtonBarPage(center: center), StartMenuPage(center: center),
+                SettingsFilePage(center: center)
+            ]
+        let window = ToolWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 900, height: 560),
+            styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
         window.title = "Options"
         window.isReleasedWhenClosed = false
         window.minSize = NSSize(width: 760, height: 420)
@@ -459,7 +520,8 @@ final class OptionsWindowController: NSWindowController, NSWindowDelegate {
         pageList.widthAnchor.constraint(equalToConstant: 170).isActive = true
         caption.font = .boldSystemFont(ofSize: 14)
         container.translatesAutoresizingMaskIntoConstraints = false
-        let top = filledStack([pageList, filledStack([caption, container], vertical: true, spacing: 10)], vertical: false, spacing: 14)
+        let top = filledStack(
+            [pageList, filledStack([caption, container], vertical: true, spacing: 10)], vertical: false, spacing: 14)
 
         let ok = ActionButton("OK") { [unowned self] in
             apply()
@@ -467,7 +529,9 @@ final class OptionsWindowController: NSWindowController, NSWindowDelegate {
         }
         ok.keyEquivalent = "\r"
         applyButton = ActionButton("Apply") { [unowned self] in apply() }
-        let bottom = filledStack([spacer(), ActionButton("Cancel") { [unowned self] in self.window?.close() }, applyButton, ok], vertical: false)
+        let bottom = filledStack(
+            [spacer(), ActionButton("Cancel") { [unowned self] in self.window?.close() }, applyButton, ok],
+            vertical: false)
         window.contentView = padded(filledStack([top, bottom], vertical: true, spacing: 12))
     }
 
@@ -508,8 +572,10 @@ final class OptionsWindowController: NSWindowController, NSWindowDelegate {
         view.translatesAutoresizingMaskIntoConstraints = false
         container.addSubview(view)
         NSLayoutConstraint.activate([
-            view.topAnchor.constraint(equalTo: container.topAnchor), view.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-            view.trailingAnchor.constraint(equalTo: container.trailingAnchor), view.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+            view.topAnchor.constraint(equalTo: container.topAnchor),
+            view.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            view.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            view.bottomAnchor.constraint(equalTo: container.bottomAnchor)
         ])
     }
 

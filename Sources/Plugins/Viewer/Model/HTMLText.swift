@@ -5,14 +5,19 @@ import Foundation
 /// the targets of links are written behind their text, in braces when asked for. A pure
 /// function; nothing is loaded and no script runs.
 enum HTMLText {
-    private static let blockTags: Set<String> = ["p", "div", "br", "li", "tr", "h1", "h2", "h3", "h4", "h5", "h6", "table", "ul", "ol",
-                                                 "blockquote", "pre", "hr", "section", "article", "header", "footer", "title", "dt", "dd"]
+    private static let blockTags: Set<String> = [
+        "p", "div", "br", "li", "tr", "h1", "h2", "h3", "h4", "h5", "h6", "table", "ul", "ol",
+        "blockquote", "pre", "hr", "section", "article", "header", "footer", "title", "dt", "dd"
+    ]
     private static let skippedElements: Set<String> = ["script", "style", "noscript", "template", "svg"]
     private static let entities: [String: String] = [
-        "amp": "&", "lt": "<", "gt": ">", "quot": "\"", "apos": "'", "nbsp": " ", "copy": "©", "reg": "®", "trade": "™", "hellip": "…",
-        "mdash": "—", "ndash": "–", "laquo": "«", "raquo": "»", "euro": "€", "auml": "ä", "ouml": "ö", "uuml": "ü", "Auml": "Ä",
-        "Ouml": "Ö", "Uuml": "Ü", "szlig": "ß", "eacute": "é", "egrave": "è", "agrave": "à", "ccedil": "ç", "bull": "•", "middot": "·",
-        "lsquo": "‘", "rsquo": "’", "ldquo": "“", "rdquo": "”", "deg": "°", "times": "×",
+        "amp": "&", "lt": "<", "gt": ">", "quot": "\"", "apos": "'", "nbsp": " ", "copy": "©", "reg": "®", "trade": "™",
+        "hellip": "…",
+        "mdash": "—", "ndash": "–", "laquo": "«", "raquo": "»", "euro": "€", "auml": "ä", "ouml": "ö", "uuml": "ü",
+        "Auml": "Ä",
+        "Ouml": "Ö", "Uuml": "Ü", "szlig": "ß", "eacute": "é", "egrave": "è", "agrave": "à", "ccedil": "ç", "bull": "•",
+        "middot": "·",
+        "lsquo": "‘", "rsquo": "’", "ldquo": "“", "rdquo": "”", "deg": "°", "times": "×"
     ]
 
     struct Result: Equatable {
@@ -51,7 +56,11 @@ enum HTMLText {
         }
 
         @inline(__always) mutating func append(_ letter: UInt8) {
-            if length < 8 { first |= UInt64(letter) << UInt64(length * 8) } else { second |= UInt64(letter) << UInt64((length - 8) * 8) }
+            if length < 8 {
+                first |= UInt64(letter) << UInt64(length * 8)
+            } else {
+                second |= UInt64(letter) << UInt64((length - 8) * 8)
+            }
             length += 1
         }
     }
@@ -77,7 +86,8 @@ enum HTMLText {
         }
 
         @inline(__always) private static func slot(_ key: TagKey) -> Int {
-            let mixed = (key.first &* 0x9E37_79B9_7F4A_7C15) ^ (key.second &* 0xC2B2_AE3D_27D4_EB4F) ^ UInt64(key.length)
+            let mixed =
+                (key.first &* 0x9E37_79B9_7F4A_7C15) ^ (key.second &* 0xC2B2_AE3D_27D4_EB4F) ^ UInt64(key.length)
             return Int(truncatingIfNeeded: (mixed &* 0xFF51_AFD7_ED55_8CCD) >> 57)
         }
 
@@ -101,7 +111,9 @@ enum HTMLText {
     @inline(__always)
     private static func commonEntity(_ name: UnsafeBufferPointer<UInt16>) -> [UInt16]? {
         guard name.count >= 2, name.count <= 4 else { return nil }
-        for entity in commonEntities where entity.name.count == name.count && entity.name.elementsEqual(name) { return entity.replacement }
+        for entity in commonEntities where entity.name.count == name.count && entity.name.elementsEqual(name) {
+            return entity.replacement
+        }
         return nil
     }
 
@@ -165,7 +177,9 @@ enum HTMLText {
     private static func tagEnd(_ input: UnsafeBufferPointer<UInt16>, from open: Int) -> Int {
         let count = input.count
         let limit = min(count, open + quotedTagLimit)
-        var position = open + 1, quote: UInt16 = 0, previous: UInt16 = 0
+        var position = open + 1
+        var quote: UInt16 = 0
+        var previous: UInt16 = 0
         while position < limit {
             let unit = input[position]
             if quote != 0 {
@@ -200,7 +214,8 @@ enum HTMLText {
             index += 1
             guard unit == 0x26 else { continue }
             // `;` within the next 12 characters.
-            var semicolon = -1, position = index
+            var semicolon = -1
+            var position = index
             while position < link.count, position < index + 12 {
                 if link[position] == 0x3B {
                     semicolon = position
@@ -210,7 +225,9 @@ enum HTMLText {
             }
             guard semicolon >= 0 else { continue }
             let name = UnsafeBufferPointer(rebasing: link[index..<semicolon])
-            if let replacement = commonEntity(name) ?? decodeEntity(String(decoding: name, as: UTF16.self)).map({ Array($0.utf16) }) {
+            if let replacement = commonEntity(name)
+                ?? decodeEntity(String(decoding: name, as: UTF16.self)).map({ Array($0.utf16) })
+            {
                 result.removeLast()
                 result.append(contentsOf: replacement)
                 index = semicolon + 1
@@ -221,7 +238,9 @@ enum HTMLText {
 
     /// The same for text that is decoded already, scanned unit by unit (hundreds of megabytes a
     /// second). Nil when `cancellation` was set.
-    static func plainText(units html: [UInt16], linkBraces: Bool = true, cancellation: CancellationFlag? = nil) -> Result? {
+    static func plainText(units html: [UInt16], linkBraces: Bool = true, cancellation: CancellationFlag? = nil)
+        -> Result?
+    {
         var text: [UInt16] = []
         text.reserveCapacity(html.count + 16)
         var links: [String] = []
@@ -233,7 +252,8 @@ enum HTMLText {
         let tags = tagTable
         html.withUnsafeBufferPointer { input in
             let count = input.count
-            var index = 0, checked = 0
+            var index = 0
+            var checked = 0
 
             func append(_ units: [UInt16]) {
                 text.append(contentsOf: units)
@@ -290,7 +310,8 @@ enum HTMLText {
             /// itself. Returns where to go on.
             func entity(at ampersand: Int) -> Int {
                 // `;` within the next 12 units of the same piece of text.
-                var semicolon = -1, position = ampersand + 1
+                var semicolon = -1
+                var position = ampersand + 1
                 while position < count, position <= ampersand + 12, input[position] != 0x3C {
                     if input[position] == 0x3B {
                         semicolon = position
@@ -317,7 +338,8 @@ enum HTMLText {
             /// The link of an opening `<a ...>` whose text is `input[open + 1..<close]`.
             func link(open: Int, close: Int) -> (units: [UInt16], text: String)? {
                 let tag = UnsafeBufferPointer(rebasing: input[open + 1..<close])
-                guard let range = attributeRange(hrefName, in: tag), !range.isEmpty, tag[range.lowerBound] != 0x23 else { return nil }
+                guard let range = attributeRange(hrefName, in: tag), !range.isEmpty, tag[range.lowerBound] != 0x23
+                else { return nil }
                 let value = UnsafeBufferPointer(rebasing: tag[range])
                 // A CR next to a LF is one character: left to the general code.
                 if isASCII(value), !value.contains(0x0D) {
@@ -413,7 +435,9 @@ enum HTMLText {
                 let kind = tags.kind(of: key)
                 if !isClosing, kind == .skipped {
                     // Everything up to the matching end tag is not text.
-                    let name = (0..<key.length).map { UInt8(truncatingIfNeeded: ($0 < 8 ? key.first : key.second) >> UInt64(($0 % 8) * 8)) }
+                    let name = (0..<key.length).map {
+                        UInt8(truncatingIfNeeded: ($0 < 8 ? key.first : key.second) >> UInt64(($0 % 8) * 8))
+                    }
                     if let end = findClosing(name, from: index) {
                         let after = find(0x3E, from: end)
                         index = after < count ? after + 1 : count
@@ -437,7 +461,8 @@ enum HTMLText {
             }
         }
         if cancelled { return nil }
-        var lower = 0, upper = text.count
+        var lower = 0
+        var upper = text.count
         while lower < upper, isWhitespace(text[lower]) { lower += 1 }
         while upper > lower, isWhitespace(text[upper - 1]) { upper -= 1 }
         let trimmed = String(decoding: text[lower..<upper], as: UTF16.self)
@@ -491,7 +516,8 @@ enum HTMLText {
     /// Whether a piece of text is a link as the context menu understands it (spec 10 ›
     /// Context menu rules): it starts with `http://`, `https://` or `www.`.
     static func url(from text: String) -> URL? {
-        let trimmed = text.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: "{}<>\"'()[],;")))
+        let trimmed = text.trimmingCharacters(
+            in: CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: "{}<>\"'()[],;")))
         let lowered = trimmed.lowercased()
         guard !trimmed.contains(" ") else { return nil }
         if lowered.hasPrefix("http://") || lowered.hasPrefix("https://") { return URL(string: trimmed) }

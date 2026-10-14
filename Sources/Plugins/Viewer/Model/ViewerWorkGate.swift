@@ -13,7 +13,8 @@ import Foundation
 ///   instead of the work) instead of making one thread more.
 final class ViewerWorkGate {
     /// Index builds of text documents.
-    static let indexBuilds = ViewerWorkGate(live: max(2, min(4, ProcessInfo.processInfo.activeProcessorCount / 2)), stuck: 8)
+    static let indexBuilds = ViewerWorkGate(
+        live: max(2, min(4, ProcessInfo.processInfo.activeProcessorCount / 2)), stuck: 8)
 
     let live: Int
     let stuck: Int

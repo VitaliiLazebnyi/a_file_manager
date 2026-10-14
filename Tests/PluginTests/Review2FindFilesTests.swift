@@ -1,8 +1,9 @@
 import AFMKernel
-@testable import FindFilesPlugin
 import Foundation
 import TestSupport
 import Testing
+
+@testable import FindFilesPlugin
 
 /// Round 2 of the review, Find Files: bounded patterns, a walk without races that reports as
 /// it goes, the long text, numbers that used to trap, files seen twice.
@@ -17,7 +18,10 @@ import Testing
     /// Runs `work` on another thread and fails instead of hanging if it does not end.
     func finishes(within seconds: Double = 60, _ work: @escaping () -> Void) -> Bool {
         let done = DispatchSemaphore(value: 0)
-        Thread { work(); done.signal() }.start()
+        Thread {
+            work()
+            done.signal()
+        }.start()
         return done.wait(timeout: .now() + seconds) == .success
     }
 
@@ -121,10 +125,11 @@ import Testing
         for index in 0..<70 { memory.addFile(String(format: "/many/f%02d.txt", index)) }
         let release = DispatchSemaphore(value: 0)
         let columns = ColumnRegistry()
-        columns.register(ContentColumn(id: "gate", title: "Gate") { item in
-            if item.name >= "f64" { _ = release.wait(timeout: .now() + 30) }
-            return "open"
-        })
+        columns.register(
+            ContentColumn(id: "gate", title: "Gate") { item in
+                if item.name >= "f64" { _ = release.wait(timeout: .now() + 30) }
+                return "open"
+            })
         var query = SearchQuery(directory: memory.url("/many"))
         query.fieldRules = FieldRules(isEnabled: true, rules: [FieldRule("gate", .equals, "open")])
         let search = FileSearch(query, fileSystems: fileSystems, columns: columns)
@@ -150,13 +155,16 @@ import Testing
     }
 
     @Test func aSlowFrontJobDoesNotLetTheOthersListTheWholeTree() throws {
-        for folder in 0..<200 { for file in 0..<10 { memory.addFile(String(format: "/wide/d%03d/f%d.txt", folder, file)) } }
+        for folder in 0..<200 {
+            for file in 0..<10 { memory.addFile(String(format: "/wide/d%03d/f%d.txt", folder, file)) }
+        }
         let release = DispatchSemaphore(value: 0)
         let columns = ColumnRegistry()
-        columns.register(ContentColumn(id: "gate", title: "Gate") { item in
-            if item.url.path == "/wide/d000/f0.txt" { _ = release.wait(timeout: .now() + 60) }
-            return "open"
-        })
+        columns.register(
+            ContentColumn(id: "gate", title: "Gate") { item in
+                if item.url.path == "/wide/d000/f0.txt" { _ = release.wait(timeout: .now() + 60) }
+                return "open"
+            })
         var query = SearchQuery(directory: memory.url("/wide"))
         query.fieldRules = FieldRules(isEnabled: true, rules: [FieldRule("gate", .equals, "open")])
         let search = FileSearch(query, fileSystems: fileSystems, columns: columns)
@@ -178,7 +186,9 @@ import Testing
 
     @Test func cancellingAContentSearchWhileItRunsIsSafe() {
         for folder in 0..<12 {
-            for file in 0..<40 { memory.addFile("/tree/d\(folder)/f\(file).txt", String(repeating: "lorem ipsum ", count: 50)) }
+            for file in 0..<40 {
+                memory.addFile("/tree/d\(folder)/f\(file).txt", String(repeating: "lorem ipsum ", count: 50))
+            }
         }
         for round in 0..<20 {
             var query = SearchQuery(directory: memory.url("/tree"), text: "needle-\(round)")
@@ -226,12 +236,20 @@ import Testing
     // MARK: Files seen twice, special files
 
     @Test func theSameRemotePlaceWrittenTwoWaysIsNotADuplicateOfItself() {
-        func item(_ text: String) -> FileItem { FileItem(url: URL(string: text)!, name: "same.txt", isDirectory: false, size: 5, modified: Date(timeIntervalSince1970: 1)) }
+        func item(_ text: String) -> FileItem {
+            FileItem(
+                url: URL(string: text)!, name: "same.txt", isDirectory: false, size: 5,
+                modified: Date(timeIntervalSince1970: 1))
+        }
         let options = DuplicateOptions(isEnabled: true, sameName: true, sameSize: true, sameContents: false)
-        let twice = DuplicateFinder.groups(of: [item("sftp://HOST/a/same.txt"), item("sftp://host/a/same.txt")], options: options, fileSystems: fileSystems)
+        let twice = DuplicateFinder.groups(
+            of: [item("sftp://HOST/a/same.txt"), item("sftp://host/a/same.txt")], options: options,
+            fileSystems: fileSystems)
         #expect(twice.isEmpty)
         // Two different files of one name are still a group.
-        let two = DuplicateFinder.groups(of: [item("sftp://host/a/same.txt"), item("sftp://host/b/same.txt")], options: options, fileSystems: fileSystems)
+        let two = DuplicateFinder.groups(
+            of: [item("sftp://host/a/same.txt"), item("sftp://host/b/same.txt")], options: options,
+            fileSystems: fileSystems)
         #expect(two.count == 1 && two[0].count == 2)
     }
 
@@ -277,7 +295,9 @@ import Testing
         let query = settings.query(relativeTo: memory.url("/"), fileSystems: fileSystems, includeHidden: false)
         #expect(query.maxDepth == 0)
         settings.depth = Int.max
-        #expect(settings.query(relativeTo: memory.url("/"), fileSystems: fileSystems, includeHidden: false).maxDepth == Int.max)
+        #expect(
+            settings.query(relativeTo: memory.url("/"), fileSystems: fileSystems, includeHidden: false).maxDepth
+                == Int.max)
         #expect(SizeRule(.greater, .infinity, .gigabytes).bytes == Int64.max && SizeRule(.less, .nan).bytes == 0)
     }
 

@@ -39,8 +39,9 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation, NSSp
         driveBar = DriveBarView(kernel: kernel, places: panels.places)
         commandLine = CommandLineView(kernel: kernel, panels: panels)
         functionKeyBar = FunctionKeyBar(kernel: kernel)
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1180, height: 700),
-                              styleMask: [.titled, .closable, .resizable, .miniaturizable], backing: .buffered, defer: false)
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 1180, height: 700),
+            styleMask: [.titled, .closable, .resizable, .miniaturizable], backing: .buffered, defer: false)
         window.minSize = NSSize(width: 640, height: 360)
         window.isReleasedWhenClosed = false
         window.collectionBehavior.insert(.fullScreenPrimary)
@@ -87,7 +88,8 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation, NSSp
 
     private func observe() {
         let center = NotificationCenter.default
-        center.addObserver(self, selector: #selector(appBecameActive), name: NSApplication.didBecomeActiveNotification, object: nil)
+        center.addObserver(
+            self, selector: #selector(appBecameActive), name: NSApplication.didBecomeActiveNotification, object: nil)
         // Reading ahead follows whether this window is the one in use.
         for name in [NSApplication.didBecomeActiveNotification, NSApplication.didResignActiveNotification] {
             center.addObserver(self, selector: #selector(activityChanged), name: name, object: nil)
@@ -95,7 +97,9 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation, NSSp
         for name in [NSWindow.didBecomeKeyNotification, NSWindow.didResignKeyNotification] {
             center.addObserver(self, selector: #selector(activityChanged), name: name, object: window)
         }
-        for name in [NSWindow.didMoveNotification, NSWindow.didEndLiveResizeNotification, NSWindow.willCloseNotification] {
+        for name in [
+            NSWindow.didMoveNotification, NSWindow.didEndLiveResizeNotification, NSWindow.willCloseNotification
+        ] {
             center.addObserver(self, selector: #selector(rememberFrame), name: name, object: window)
         }
         for name in [NSWindow.didEnterFullScreenNotification, NSWindow.didExitFullScreenNotification] {
@@ -105,7 +109,8 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation, NSSp
         // most part (the panels, the jobs, a command that ran), and then they are checked at
         // once (`scheduleValidation`). For the rest (a plugin's own state, the pasteboard) they
         // are looked at now and then while events arrive, not after every single event.
-        center.addObserver(self, selector: #selector(windowUpdated), name: NSWindow.didUpdateNotification, object: window)
+        center.addObserver(
+            self, selector: #selector(windowUpdated), name: NSWindow.didUpdateNotification, object: window)
     }
 
     // MARK: Layout
@@ -153,7 +158,9 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation, NSSp
         positionDivider()
     }
 
-    func splitView(_ splitView: NSSplitView, constrainSplitPosition proposedPosition: CGFloat, ofSubviewAt dividerIndex: Int) -> CGFloat {
+    func splitView(
+        _ splitView: NSSplitView, constrainSplitPosition proposedPosition: CGFloat, ofSubviewAt dividerIndex: Int
+    ) -> CGFloat {
         guard splitExtent > 0 else { return proposedPosition }
         return min(splitExtent * 0.9, max(splitExtent * 0.1, proposedPosition))
     }
@@ -162,7 +169,9 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation, NSSp
         // Only a divider the user dragged changes the stored position (spec 02 › Panel divider);
         // the same notification follows every resizing of the window.
         let isDragging = NSApp.currentEvent?.type == .leftMouseDragged
-        guard isDragging, !isPositioningDivider, notification.userInfo?["NSSplitViewDividerIndex"] != nil, splitExtent > 0 else { return }
+        guard isDragging, !isPositioningDivider, notification.userInfo?["NSSplitViewDividerIndex"] != nil,
+            splitExtent > 0
+        else { return }
         let first = splitView.isVertical ? panels.leftPanel.view.frame.width : panels.leftPanel.view.frame.height
         layout.rememberDivider(Int((first / splitExtent * 1000).rounded()))
     }

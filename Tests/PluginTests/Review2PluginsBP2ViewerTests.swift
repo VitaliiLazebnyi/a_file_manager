@@ -8,15 +8,21 @@ import PDFKit
 import TestSupport
 import Testing
 import UniformTypeIdentifiers
+
 @testable import ViewerPlugin
 
 /// Review round 2, second pass, the viewer: wide characters, the sequential scan of a giant line,
 /// the limit on index builds, EUC-JP and GB 18030, printing, links, the pixel limit and a FIFO
 /// that takes the place of a file.
 @Suite struct Review2PluginsBP2Viewer {
-    private func document(_ data: Data, encoding: ViewerEncoding = .utf8, columns: Int, wrap: Bool = true, segment: Int = 4 << 20, chunk: Int = 1 << 20,
-                          parallel: Bool = false, raw: Bool = true) -> TextDocument {
-        let document = TextDocument(source: DataByteSource(data), encoding: encoding, layout: .text(TextLayoutOptions(columns: columns, wordWrap: wrap)))
+    private func document(
+        _ data: Data, encoding: ViewerEncoding = .utf8, columns: Int, wrap: Bool = true, segment: Int = 4 << 20,
+        chunk: Int = 1 << 20,
+        parallel: Bool = false, raw: Bool = true
+    ) -> TextDocument {
+        let document = TextDocument(
+            source: DataByteSource(data), encoding: encoding,
+            layout: .text(TextLayoutOptions(columns: columns, wordWrap: wrap)))
         document.buildIndex(parallel: parallel, segmentSize: segment, chunkSize: chunk, rawScan: raw)
         return document
     }
@@ -28,11 +34,15 @@ import UniformTypeIdentifiers
     // MARK: East Asian width (V035)
 
     @Test func theEastAsianWidthTableKnowsWideAndNarrowCharacters() {
-        for scalar: UInt32 in [0x1100, 0x3042, 0x4E00, 0xAC00, 0xFF21, 0xFFE0, 0x1F600, 0x20000, 0x2FFFD, 0x3000, 0x231A] {
+        for scalar: UInt32 in [
+            0x1100, 0x3042, 0x4E00, 0xAC00, 0xFF21, 0xFFE0, 0x1F600, 0x20000, 0x2FFFD, 0x3000, 0x231A
+        ] {
             #expect(EastAsianWidth.isWide(scalar), "U+\(String(scalar, radix: 16))")
         }
-        for scalar: UInt32 in [0x41, 0xE9, 0x20A0, 0x0E01, 0xFF61 + 0x20, 0x1D400, 0xE000, 0x2FFFE, 0xFFE8, 0x10FFFF, 0x30, 0x300, 0xD7A4] {
-            if scalar == 0xFF61 + 0x20 { continue }   // U+FF81, a half-width katakana, is narrow
+        for scalar: UInt32 in [
+            0x41, 0xE9, 0x20A0, 0x0E01, 0xFF61 + 0x20, 0x1D400, 0xE000, 0x2FFFE, 0xFFE8, 0x10FFFF, 0x30, 0x300, 0xD7A4
+        ] {
+            if scalar == 0xFF61 + 0x20 { continue }  // U+FF81, a half-width katakana, is narrow
             #expect(!EastAsianWidth.isWide(scalar), "U+\(String(scalar, radix: 16))")
         }
         #expect(!EastAsianWidth.isWide(0xFF81))
@@ -54,13 +64,17 @@ import UniformTypeIdentifiers
     @Test func characterOutsideTheBasicPlaneAreMeasuredAsOneCharacter() throws {
         // Emoji and U+20000 are wide; a mathematical letter is not.
         #expect(try rows(document(Data("😀😀😀\n".utf8), columns: 4)) == ["😀😀", "😀"])
-        #expect(try rows(document(Data("\u{20000}\u{20000}\u{20000}\n".utf8), columns: 4)) == ["\u{20000}\u{20000}", "\u{20000}"])
+        #expect(
+            try rows(document(Data("\u{20000}\u{20000}\u{20000}\n".utf8), columns: 4)) == [
+                "\u{20000}\u{20000}", "\u{20000}"
+            ])
         #expect(try rows(document(Data("𝐀𝐀𝐀𝐀\n".utf8), columns: 2)) == ["𝐀𝐀", "𝐀𝐀"])
         // In a row of one column a wide character is past the width at once; its second half stays with it.
         #expect(try rows(document(Data("😀😀\n".utf8), columns: 1)) == ["😀", "😀"])
         #expect(try rows(document(Data("日\u{301}日\n".utf8), columns: 1)) == ["日\u{301}", "日"])
         // A combining mark after a wide character adds no column.
-        #expect(try rows(document(Data("日\u{301}日\u{301}日\u{301}\n".utf8), columns: 4)) == ["日\u{301}日\u{301}", "日\u{301}"])
+        #expect(
+            try rows(document(Data("日\u{301}日\u{301}日\u{301}\n".utf8), columns: 4)) == ["日\u{301}日\u{301}", "日\u{301}"])
     }
 
     @Test func wideCharactersInUTF16AreCutLikeThoseInUTF8() throws {
@@ -76,7 +90,7 @@ import UniformTypeIdentifiers
         let pieces = ["a", "日", "😀", "\u{301}", "漢字", " ", "x", "é", "ｱ", "\t", "한", "𝐀"]
         var state: UInt64 = 0x1234_5678
         func next() -> Int {
-            state = state &* 6364136223846793005 &+ 1442695040888963407
+            state = state &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
             return Int(state >> 33)
         }
         for round in 0..<40 {
@@ -87,10 +101,15 @@ import UniformTypeIdentifiers
             }
             let columns = 1 + next() % 12
             for encoding in [ViewerEncoding.utf8, .utf16LE, .utf16BE] {
-                let data = try #require(text.data(using: encoding == .utf8 ? .utf8 : encoding == .utf16LE ? .utf16LittleEndian : .utf16BigEndian))
-                let fast = document(data, encoding: encoding, columns: columns, wrap: false, segment: 64, chunk: 40, raw: true)
+                let data = try #require(
+                    text.data(
+                        using: encoding == .utf8 ? .utf8 : encoding == .utf16LE ? .utf16LittleEndian : .utf16BigEndian))
+                let fast = document(
+                    data, encoding: encoding, columns: columns, wrap: false, segment: 64, chunk: 40, raw: true)
                 let plain = document(data, encoding: encoding, columns: columns, wrap: false, raw: false)
-                #expect(fast.rowCount == plain.rowCount && fast.lineCount == plain.lineCount, "round \(round) \(encoding.name) columns \(columns)")
+                #expect(
+                    fast.rowCount == plain.rowCount && fast.lineCount == plain.lineCount,
+                    "round \(round) \(encoding.name) columns \(columns)")
                 #expect(try rows(fast) == rows(plain), "round \(round) \(encoding.name) columns \(columns)")
             }
         }
@@ -123,7 +142,8 @@ import UniformTypeIdentifiers
         var data = Data(repeating: UInt8(ascii: "a"), count: 400_000)
         data.append(Data("\nsecond line\nthird\n".utf8))
         let source = CountingSource(DataByteSource(data))
-        let counted = TextDocument(source: source, encoding: .utf8, layout: .text(TextLayoutOptions(columns: 80, wordWrap: true)))
+        let counted = TextDocument(
+            source: source, encoding: .utf8, layout: .text(TextLayoutOptions(columns: 80, wordWrap: true)))
         counted.buildIndex(parallel: false, segmentSize: 64 << 10, chunkSize: 32 << 10)
         #expect(counted.isIndexComplete && counted.readError == nil)
         // The first segment reads the line to its end; the segments inside the line are not read at all.
@@ -137,7 +157,7 @@ import UniformTypeIdentifiers
     @Test func sequentialAndParallelScansGiveTheSameRowsWhateverTheLinesAndSegments() throws {
         var state: UInt64 = 99
         func next() -> Int {
-            state = state &* 6364136223846793005 &+ 1442695040888963407
+            state = state &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
             return Int(state >> 33)
         }
         for round in 0..<30 {
@@ -155,8 +175,12 @@ import UniformTypeIdentifiers
             let sequential = document(data, columns: columns, segment: segment, chunk: chunk, parallel: false)
             let parallel = document(data, columns: columns, segment: segment, chunk: chunk, parallel: true)
             let whole = document(data, columns: columns)
-            #expect(sequential.rowCount == whole.rowCount && sequential.lineCount == whole.lineCount, "round \(round) segment \(segment)")
-            #expect(parallel.rowCount == whole.rowCount && parallel.lineCount == whole.lineCount, "round \(round) segment \(segment)")
+            #expect(
+                sequential.rowCount == whole.rowCount && sequential.lineCount == whole.lineCount,
+                "round \(round) segment \(segment)")
+            #expect(
+                parallel.rowCount == whole.rowCount && parallel.lineCount == whole.lineCount,
+                "round \(round) segment \(segment)")
             #expect(try rows(sequential) == rows(whole), "round \(round) segment \(segment) chunk \(chunk)")
         }
     }
@@ -239,8 +263,11 @@ import UniformTypeIdentifiers
             // Cancelled, and still inside its read.
             flag.cancel()
         }
-        let refused = Locked(false), ran = Locked(false)
-        gate.submit(cancellation: CancellationFlag(), refused: { refused.withValue { $0 = true } }, { ran.withValue { $0 = true } })
+        let refused = Locked(false)
+        let ran = Locked(false)
+        gate.submit(
+            cancellation: CancellationFlag(), refused: { refused.withValue { $0 = true } },
+            { ran.withValue { $0 = true } })
         #expect(refused.withValue { $0 } && !ran.withValue { $0 })
         #expect(gate.threadsInUse == 2)
         latch.release()
@@ -260,7 +287,8 @@ import UniformTypeIdentifiers
 
     /// The characters one by one: their bytes, so the start of every character is known without the decoder.
     private func encode(_ characters: [String], _ encoding: ViewerEncoding) throws -> (data: Data, starts: [Int]) {
-        var data = Data(), starts: [Int] = []
+        var data = Data()
+        var starts: [Int] = []
         for character in characters {
             starts.append(data.count)
             data.append(contentsOf: try #require(encoding.encode(character), "\(character) in \(encoding.name)"))
@@ -269,7 +297,8 @@ import UniformTypeIdentifiers
     }
 
     @Test func eucJPAndGB18030AreOffered() throws {
-        let euc = try #require(ViewerEncoding.codePage(51932)), gb = try #require(ViewerEncoding.codePage(54936))
+        let euc = try #require(ViewerEncoding.codePage(51932))
+        let gb = try #require(ViewerEncoding.codePage(54936))
         #expect(euc.kind == .doubleByte && euc.shape == .eucJP && gb.kind == .doubleByte && gb.shape == .gb18030)
         #expect(euc.isAvailable && gb.isAvailable)
         let offered = ViewerEncoding.codePages.map(\.codePage)
@@ -309,7 +338,9 @@ import UniformTypeIdentifiers
         #expect(decoded.string == characters.joined())
         // The two halves of a character beyond the plane share their offset.
         var expected: [Int] = []
-        for (character, start) in zip(characters, starts) { expected += Array(repeating: start, count: character.utf16.count) }
+        for (character, start) in zip(characters, starts) {
+            expected += Array(repeating: start, count: character.utf16.count)
+        }
         #expect(decoded.offsets.map(Int.init) == expected)
         // Four-byte structure that does not hold up: stray bytes, and what follows keeps its own meaning (0x8141 is a pair).
         var stray = DecodedText()
@@ -318,14 +349,20 @@ import UniformTypeIdentifiers
     }
 
     @Test func textDecodedInPiecesEqualsTextDecodedWhole() throws {
-        let euc = try #require(ViewerEncoding.codePage(51932)), gb = try #require(ViewerEncoding.codePage(54936))
-        let eucData = try encode(["日", "本", "a", "ｱ", "語", "\n", "テ", "ス", "ト", "漢"], euc).data + Data([0x8F, 0xB0, 0xA1, 0x41, 0x8E])
-        let gbData = try encode(["中", "\u{80}", "a", "😀", "文", "\n", "龙", "9", "\u{FFFF}", "€"], gb).data + Data([0x81, 0x30, 0x81])
+        let euc = try #require(ViewerEncoding.codePage(51932))
+        let gb = try #require(ViewerEncoding.codePage(54936))
+        let eucData =
+            try encode(["日", "本", "a", "ｱ", "語", "\n", "テ", "ス", "ト", "漢"], euc).data
+            + Data([0x8F, 0xB0, 0xA1, 0x41, 0x8E])
+        let gbData =
+            try encode(["中", "\u{80}", "a", "😀", "文", "\n", "龙", "9", "\u{FFFF}", "€"], gb).data
+            + Data([0x81, 0x30, 0x81])
         for (encoding, data) in [(euc, eucData), (gb, gbData)] {
             var whole = DecodedText()
             encoding.decode(data, final: true, into: &whole)
             for cut in 1...9 {
-                var units: [UInt16] = [], offsets: [Int] = []
+                var units: [UInt16] = []
+                var offsets: [Int] = []
                 var at = 0
                 var piece = DecodedText()
                 while at < data.count {
@@ -348,7 +385,8 @@ import UniformTypeIdentifiers
     }
 
     @Test func characterBoundariesAreExactInEUCJPAndGB18030() throws {
-        let euc = try #require(ViewerEncoding.codePage(51932)), gb = try #require(ViewerEncoding.codePage(54936))
+        let euc = try #require(ViewerEncoding.codePage(51932))
+        let gb = try #require(ViewerEncoding.codePage(54936))
         // Long runs without a byte that stands by itself: the boundary cannot be guessed from the neighbours.
         let kanji = (0..<400).map { ["日", "本", "語", "漢", "字", "龍"][$0 % 6] }
         let rareGB = (0..<400).map { ["\u{20000}", "龙", "\u{80}", "文", "😀", "中"][$0 % 6] }
@@ -357,41 +395,59 @@ import UniformTypeIdentifiers
         for (encoding, characters) in [(euc, kanji), (gb, rareGB), (gb, mixedGB), (euc, mixedEUC)] {
             let (data, starts) = try encode(characters, encoding)
             for spacing in [16, 17, 50, 1 << 14] {
-                let boundaries = CharacterBoundaries(source: DataByteSource(data), content: 0..<Int64(data.count), encoding: encoding, spacing: spacing)
+                let boundaries = CharacterBoundaries(
+                    source: DataByteSource(data), content: 0..<Int64(data.count), encoding: encoding, spacing: spacing
+                )
                 var expected = 0
                 for offset in stride(from: data.count - 1, through: 0, by: -3) {
                     while expected + 1 < starts.count, starts[expected + 1] <= offset { expected += 1 }
                     // Walk back to the character offset is in.
                     let want = starts.last(where: { $0 <= offset })!
-                    #expect(try boundaries.characterStart(atOrBefore: Int64(offset)) == Int64(want), "\(encoding.name) spacing \(spacing) offset \(offset)")
+                    #expect(
+                        try boundaries.characterStart(atOrBefore: Int64(offset)) == Int64(want),
+                        "\(encoding.name) spacing \(spacing) offset \(offset)")
                 }
             }
         }
     }
 
     @Test func aSearchInEUCJPAndGB18030FindsWholeCharactersWhateverTheChunkSize() throws {
-        let euc = try #require(ViewerEncoding.codePage(51932)), gb = try #require(ViewerEncoding.codePage(54936))
-        for (encoding, characters, needle) in [(euc, (0..<300).map { ["日", "本", "語", "漢", "字"][$0 % 5] } + ["龍", "亀"] + (0..<20).map { _ in "日" }, "龍亀"),
-                                               (gb, (0..<300).map { ["\u{20000}", "龙", "\u{80}", "文"][$0 % 4] } + ["龙", "亀"] + (0..<20).map { _ in "文" }, "龙亀")] {
+        let euc = try #require(ViewerEncoding.codePage(51932))
+        let gb = try #require(ViewerEncoding.codePage(54936))
+        for (encoding, characters, needle) in [
+            (
+                euc, (0..<300).map { ["日", "本", "語", "漢", "字"][$0 % 5] } + ["龍", "亀"] + (0..<20).map { _ in "日" }, "龍亀"
+            ),
+            (
+                gb,
+                (0..<300).map { ["\u{20000}", "龙", "\u{80}", "文"][$0 % 4] } + ["龙", "亀"] + (0..<20).map { _ in "文" },
+                "龙亀"
+            )
+        ] {
             let (data, starts) = try encode(characters, encoding)
             let at = starts[300]
             let want = Int64(at)..<Int64(starts[302])
             for chunk in [3, 7, 16, 61, 4096] {
                 let pattern = try SearchPattern(needle, options: SearchOptions(), encoding: encoding)
-                let found = try ViewerSearch.find(pattern, in: DataByteSource(data), content: 0..<Int64(data.count), from: 0, backwards: false, encoding: encoding,
-                                                  chunkSize: chunk)
+                let found = try ViewerSearch.find(
+                    pattern, in: DataByteSource(data), content: 0..<Int64(data.count), from: 0, backwards: false,
+                    encoding: encoding,
+                    chunkSize: chunk)
                 #expect(found == want, "\(encoding.name) chunk \(chunk)")
                 var backwards = SearchOptions()
                 backwards.backwards = true
-                let last = try ViewerSearch.find(try SearchPattern(needle, options: backwards, encoding: encoding), in: DataByteSource(data),
-                                                 content: 0..<Int64(data.count), from: Int64(data.count), backwards: true, encoding: encoding, chunkSize: chunk)
+                let last = try ViewerSearch.find(
+                    try SearchPattern(needle, options: backwards, encoding: encoding), in: DataByteSource(data),
+                    content: 0..<Int64(data.count), from: Int64(data.count), backwards: true, encoding: encoding,
+                    chunkSize: chunk)
                 #expect(last == want, "\(encoding.name) backwards chunk \(chunk)")
             }
         }
     }
 
     @Test func aTextDocumentInGB18030AndEUCJPShowsItsRows() throws {
-        let euc = try #require(ViewerEncoding.codePage(51932)), gb = try #require(ViewerEncoding.codePage(54936))
+        let euc = try #require(ViewerEncoding.codePage(51932))
+        let gb = try #require(ViewerEncoding.codePage(54936))
         let eucText = "日本語のテキスト\nｱｲｳ abc\n漢字\n"
         let gbText = "中文 \u{20000} 文本\n€ 龙\n"
         for (encoding, text) in [(euc, eucText), (gb, gbText)] {
@@ -430,7 +486,8 @@ import UniformTypeIdentifiers
         var range = NSRange()
         #expect(view.knowsPageRange(&range) && range == NSRange(location: 1, length: view.pageCount))
         let second = view.rectForPage(2)
-        #expect(second.origin.y == CGFloat(perPage) * TextPrintView.lineHeight(of: font) && second.height <= page.height)
+        #expect(
+            second.origin.y == CGFloat(perPage) * TextPrintView.lineHeight(of: font) && second.height <= page.height)
         // The last page holds what is left, and every page can be drawn.
         for number in 1...view.pageCount {
             let rect = view.rectForPage(number)
@@ -447,17 +504,27 @@ import UniformTypeIdentifiers
         let opened = Locked<[URL]>([])
         let gate = LinkGate(opener: { url in opened.withValue { $0.append(url) } })
         let textView = NSTextView()
-        for link: Any in [URL(string: "https://example.com/a")!, "http://example.org", URL(string: "mailto:me@example.com")!, NSURL(string: "https://nsurl.example")!] {
+        for link: Any in [
+            URL(string: "https://example.com/a")!, "http://example.org", URL(string: "mailto:me@example.com")!,
+            NSURL(string: "https://nsurl.example")!
+        ] {
             #expect(gate.textView(textView, clickedOnLink: link, at: 0))
         }
-        for link: Any in [URL(string: "file:///etc/passwd")!, "smb://server/share", URL(string: "afp://x")!, "javascript:alert(1)", URL(string: "x-apple.systempreferences:")!, 42] {
+        for link: Any in [
+            URL(string: "file:///etc/passwd")!, "smb://server/share", URL(string: "afp://x")!, "javascript:alert(1)",
+            URL(string: "x-apple.systempreferences:")!, 42
+        ] {
             // Handled all the same: the text view does not open it by itself.
             #expect(gate.textView(textView, clickedOnLink: link, at: 0))
         }
         gate.pdfViewWillClick(onLink: PDFView(), with: URL(string: "https://pdf.example/x.pdf")!)
         gate.pdfViewWillClick(onLink: PDFView(), with: URL(string: "file:///Users/someone/secret")!)
         gate.pdfViewWillClick(onLink: PDFView(), with: URL(string: "ssh://host")!)
-        #expect(opened.withValue { $0.map(\.absoluteString) } == ["https://example.com/a", "http://example.org", "mailto:me@example.com", "https://nsurl.example", "https://pdf.example/x.pdf"])
+        #expect(
+            opened.withValue { $0.map(\.absoluteString) } == [
+                "https://example.com/a", "http://example.org", "mailto:me@example.com", "https://nsurl.example",
+                "https://pdf.example/x.pdf"
+            ])
     }
 
     @MainActor @Test func theRichViewsAreGivenTheGateAsTheirDelegate() {
@@ -469,12 +536,16 @@ import UniformTypeIdentifiers
     // MARK: The pixel limit (V034)
 
     private func png(_ width: Int, _ height: Int) throws -> Data {
-        let context = try #require(CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpace(name: CGColorSpace.sRGB)!,
-                                             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+        let context = try #require(
+            CGContext(
+                data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
+                space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
         context.setFillColor(CGColor(red: 0.3, green: 0.6, blue: 0.1, alpha: 1))
         context.fill(CGRect(x: 0, y: 0, width: width, height: height))
         let data = NSMutableData()
-        let destination = try #require(CGImageDestinationCreateWithData(data, UTType.png.identifier as CFString, 1, nil))
+        let destination = try #require(
+            CGImageDestinationCreateWithData(data, UTType.png.identifier as CFString, 1, nil))
         CGImageDestinationAddImage(destination, try #require(context.makeImage()), nil)
         #expect(CGImageDestinationFinalize(destination))
         return data as Data
@@ -511,12 +582,15 @@ import UniformTypeIdentifiers
         func move(_ source: URL, to destination: URL, replacing: Bool) throws {}
         func copy(_ source: URL, to destination: URL, progress: (Int64) -> Bool) throws {}
         func item(at url: URL) -> FileItem? { entry }
-        func read(_ url: URL) throws -> FileReader { throw FileSystemError.notSupported("a link whose target size is known is not read to be measured") }
+        func read(_ url: URL) throws -> FileReader {
+            throw FileSystemError.notSupported("a link whose target size is known is not read to be measured")
+        }
     }
 
     @Test func aLinkWhoseTargetSizeIsKnownIsNotReadToMeasureIt() throws {
         let url = URL(string: "link:///current.log")!
-        let entry = FileItem(url: url, name: "current.log", isDirectory: false, isSymlink: true, size: 0, linkTargetSize: 123_456)
+        let entry = FileItem(
+            url: url, name: "current.log", isDirectory: false, isSymlink: true, size: 0, linkTargetSize: 123_456)
         let registry = FileSystemRegistry()
         registry.register(LinkProvider(entry))
         let source = try ProviderByteSource.open(url, fileSystems: registry)
@@ -532,7 +606,11 @@ import UniformTypeIdentifiers
         let registry = FileSystemRegistry()
         registry.register(memory)
         let owner = ObjectIdentifier(copies)
-        guard case .success(let local) = copies.localCopy(for: memory.url("/remote/clip.mov"), fileSystems: registry, owner: owner, cancellation: CancellationFlag()) else {
+        guard
+            case .success(let local) = copies.localCopy(
+                for: memory.url("/remote/clip.mov"), fileSystems: registry, owner: owner,
+                cancellation: CancellationFlag())
+        else {
             Issue.record("no copy")
             return
         }

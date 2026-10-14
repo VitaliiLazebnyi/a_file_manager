@@ -69,8 +69,10 @@ private final class FakeMounter: VolumeMounter {
         server = try TestFTPServer(root: box.url("srv"))
         settings.set("0", forKey: "network.keepAliveSeconds")
         plugin = NetworkPlugin(launchesApplications: false, passwords: passwords, mounter: mounter)
-        bench = TestBench(plugins: [plugin, NavigationPlugin(), FileOperationsPlugin(), ViewOptionsPlugin()], fileSystems: [LocalFileSystem()],
-                          left: box.url("local"), right: box.url("other"), settings: settings)
+        bench = TestBench(
+            plugins: [plugin, NavigationPlugin(), FileOperationsPlugin(), ViewOptionsPlugin()],
+            fileSystems: [LocalFileSystem()],
+            left: box.url("local"), right: box.url("other"), settings: settings)
         plugin.center.environment.declineMemory = 0
     }
 
@@ -88,8 +90,11 @@ private final class FakeMounter: VolumeMounter {
 
     @Test func registersCommandsMenusAndFileSystems() throws {
         let net = try #require(bench.kernel.menus.menus.first { $0.title == "Net" })
-        #expect(net.items == [.ftpConnect, .ftpNew, .ftpDisconnect, .ftpHiddenFiles, nil,
-                              .ftpSelectTransferMode, .ftpAddToList, .ftpDownloadList, nil, .netConnect, .netDisconnect])
+        #expect(
+            net.items == [
+                .ftpConnect, .ftpNew, .ftpDisconnect, .ftpHiddenFiles, nil,
+                .ftpSelectTransferMode, .ftpAddToList, .ftpDownloadList, nil, .netConnect, .netDisconnect
+            ])
         #expect(net.items.compactMap { $0 }.allSatisfy { commands[$0] != nil })
         #expect(bench.kernel.keyBindings.conflicts.isEmpty)
         #expect(commands[.ftpConnect]?.defaultShortcuts == [Shortcut(.character("f"), .control)])
@@ -100,7 +105,9 @@ private final class FakeMounter: VolumeMounter {
         #expect(bench.kernel.toolbar.defaultLayout.compactMap { $0?.command }.filter(ours.contains) == ours)
         #expect(bench.kernel.preferences.pages.map(\.title).contains("FTP and Network"))
         // Nothing is connected: nothing to disconnect, no server among the volumes, no eject on the startup disk.
-        #expect(!commands.isEnabled(.ftpDisconnect) && !commands.isEnabled(.ftpHiddenFiles) && !commands.isEnabled(.netDisconnect))
+        #expect(
+            !commands.isEnabled(.ftpDisconnect) && !commands.isEnabled(.ftpHiddenFiles)
+                && !commands.isEnabled(.netDisconnect))
         #expect(bench.kernel.fileSystems.all.flatMap { $0.places() }.filter { !$0.url.isFileURL }.isEmpty)
     }
 
@@ -161,9 +168,11 @@ private final class FakeMounter: VolumeMounter {
         // Ctrl+F: New Connection…, fill in the details, then Connect on the new entry.
         ui.formAnswers = [
             .values([:], button: 1),
-            .values(["name": .text("Work"), "host": .text(address), "user": .text("anna"), "password": .text("s3cret-pw"),
-                     "remote": .text("/pub"), "local": .text(box.url("other").path)]),
-            .accept,
+            .values([
+                "name": .text("Work"), "host": .text(address), "user": .text("anna"), "password": .text("s3cret-pw"),
+                "remote": .text("/pub"), "local": .text(box.url("other").path)
+            ]),
+            .accept
         ]
         commands.perform(.ftpConnect)
         let saved = try #require(plugin.connections.first)
@@ -172,8 +181,11 @@ private final class FakeMounter: VolumeMounter {
         plugin.waitForStoredSecrets()
         let account = PasswordVault.account(of: saved)
         #expect(account.contains(saved.id.uuidString) && account.contains("anna@127.0.0.1:\(server.port)"))
-        #expect(passwords.password(for: account) == "s3cret-pw" && passwords.accounts == [PasswordVault.boundAccount, account].sorted())
-        #expect(settings.everything.range(of: Data("s3cret-pw".utf8)) == nil, "the password never reaches the settings")
+        #expect(
+            passwords.password(for: account) == "s3cret-pw"
+                && passwords.accounts == [PasswordVault.boundAccount, account].sorted())
+        #expect(
+            settings.everything.range(of: Data("s3cret-pw".utf8)) == nil, "the password never reaches the settings")
         #expect(ui.forms[1].contains { $0.label.contains("master password is not needed") })
         // Connected with the stored password, in the remote folder, the other panel in the local one.
         #expect(left.model.directory == url("/pub") && right.model.directory == box.url("other"))
@@ -183,26 +195,34 @@ private final class FakeMounter: VolumeMounter {
         commands.perform(.ftpDisconnect)
 
         // Duplicate, Edit and Delete in the list.
-        ui.formAnswers = [.values([:], button: 3), .values(["name": .text("Work copy")]),
-                          .values(["connection": .index(1)], button: 4), .values(["name": .text("Second"), "savePassword": .flag(false)]),
-                          .values(["connection": .index(0)], button: 5)]
+        ui.formAnswers = [
+            .values([:], button: 3), .values(["name": .text("Work copy")]),
+            .values(["connection": .index(1)], button: 4),
+            .values(["name": .text("Second"), "savePassword": .flag(false)]),
+            .values(["connection": .index(0)], button: 5)
+        ]
         ui.choiceAnswers = [0]
         commands.perform(.ftpConnect)
         #expect(plugin.connections.map(\.name) == ["Second"])
         plugin.waitForStoredSecrets()
-        #expect(passwords.accounts == [PasswordVault.boundAccount], "deleting a connection and unticking the box both remove the password")
-        #expect(ui.forms.last?.first.map { field -> Bool in
-            if case .list(let rows, _) = field.kind { return rows.count == 1 && rows[0].hasPrefix("Second") }
-            return false
-        } == true)
+        #expect(
+            passwords.accounts == [PasswordVault.boundAccount],
+            "deleting a connection and unticking the box both remove the password")
+        #expect(
+            ui.forms.last?.first.map { field -> Bool in
+                if case .list(let rows, _) = field.kind { return rows.count == 1 && rows[0].hasPrefix("Second") }
+                return false
+            } == true)
     }
 
     @Test func asksForAPasswordThatIsNotStored() throws {
         server.options.user = "anna"
         server.options.password = "pw"
         // Not anonymous and no user in the address: user name and password are asked while connecting.
-        ui.formAnswers = [.values(["address": .text(address), "anonymous": .flag(false)]),
-                          .values(["user": .text("anna"), "password": .text("pw")])]
+        ui.formAnswers = [
+            .values(["address": .text(address), "anonymous": .flag(false)]),
+            .values(["user": .text("anna"), "password": .text("pw")])
+        ]
         commands.perform(.ftpNew)
         #expect(left.model.directory == url("/") && ui.log.contains("form: ftp://\(address)"))
         ui.choiceAnswers = [1]
@@ -262,9 +282,13 @@ private final class FakeMounter: VolumeMounter {
         profile.asksBeforeConnecting = true
         ui.choiceAnswers = [1, 0]
         #expect(!environment.askToConnect(profile) && environment.askToConnect(profile))
-        #expect(ui.log.filter { $0.hasPrefix("choose: Connect to ftp://\(address)? / ") && $0.contains("did not choose to connect") }.count == 2)
+        #expect(
+            ui.log.filter {
+                $0.hasPrefix("choose: Connect to ftp://\(address)? / ") && $0.contains("did not choose to connect")
+            }.count == 2)
         // A password over plain FTP: asked, and not again for a server the user said so for.
-        let secret = ConnectionProfile(key: ServerKey(scheme: "ftp", host: "files.example.com"), user: "anna", password: "pw")
+        let secret = ConnectionProfile(
+            key: ServerKey(scheme: "ftp", host: "files.example.com"), user: "anna", password: "pw")
         ui.formAnswers = [.cancel, .values(["always": .flag(true)])]
         #expect(!environment.askToSendPasswordUnprotected(secret) && environment.askToSendPasswordUnprotected(secret))
         #expect(environment.askToSendPasswordUnprotected(secret), "no third question")
@@ -310,13 +334,16 @@ private final class FakeMounter: VolumeMounter {
         ui.promptAnswers = [.accept]
         ui.choiceAnswers = [0]
         commands.perform(.copy)
-        #expect(ui.log.contains { $0.hasPrefix("choose: Overwrite:") } && box.read("srv/pub/up.txt") == "second version")
+        #expect(
+            ui.log.contains { $0.hasPrefix("choose: Overwrite:") } && box.read("srv/pub/up.txt") == "second version")
 
         bench.panelSet.source = left
         // Rename in place, new folder, delete a tree.
         left.moveCursor(toName: "up.txt")
         commands.perform(.renameOnly, .text("renamed.txt"))
-        #expect(box.exists("srv/pub/renamed.txt") && !box.exists("srv/pub/up.txt") && left.model.cursorItem?.name == "renamed.txt")
+        #expect(
+            box.exists("srv/pub/renamed.txt") && !box.exists("srv/pub/up.txt")
+                && left.model.cursorItem?.name == "renamed.txt")
         ui.promptAnswers = [.text("new/nested")]
         commands.perform(.makeDirectory)
         #expect(box.exists("srv/pub/new/nested"))
@@ -362,7 +389,9 @@ private final class FakeMounter: VolumeMounter {
         settings.set("15", forKey: "network.timeoutSeconds")
         page.onChange()
         let values = plugin.center.environment.options.values
-        #expect(!values.passiveByDefault && values.parallelConnections == 8 && values.timeout == 15 && values.transferMode == .text)
+        #expect(
+            !values.passiveByDefault && values.parallelConnections == 8 && values.timeout == 15
+                && values.transferMode == .text)
     }
 
     // MARK: Download list
@@ -377,7 +406,8 @@ private final class FakeMounter: VolumeMounter {
         #expect(!box.exists("other/report.txt"), "download later downloads nothing")
 
         // More lines: a target with another name, one without a target, an upload, and one that cannot be done.
-        try (box.read("list.txt")! + "ftp://\(address)/readme.txt -> \(box.url("other/README.md").path)\n"
+        try
+            (box.read("list.txt")! + "ftp://\(address)/readme.txt -> \(box.url("other/README.md").path)\n"
             + "ftp://\(address)/pub/sub/deep.txt\nput:\(box.url("local/up.txt").path) -> ftp://\(address)/pub/sub/up.txt\nheader: X: y\n")
             .write(to: list, atomically: true, encoding: .utf8)
         ui.promptAnswers = [.accept]

@@ -45,8 +45,9 @@ struct ArchiveEntry {
     var name: String { ArchiveTree.name(of: path) }
 
     func item(at url: URL) -> FileItem {
-        FileItem(url: url, name: name, isDirectory: isDirectory, isSymlink: isSymbolicLink, isHidden: name.hasPrefix("."),
-                 size: isDirectory ? 0 : size, modified: modified, permissions: permissions, isSpecial: isSpecial)
+        FileItem(
+            url: url, name: name, isDirectory: isDirectory, isSymlink: isSymbolicLink, isHidden: name.hasPrefix("."),
+            size: isDirectory ? 0 : size, modified: modified, permissions: permissions, isSpecial: isSpecial)
     }
 }
 
@@ -131,7 +132,9 @@ struct ArchiveTree {
     static func relative(_ path: String, to folder: String) -> String? {
         if folder.isEmpty { return path }
         let (bytes, prefix) = (path.utf8, folder.utf8)
-        guard bytes.count > prefix.count + 1, bytes.starts(with: prefix), bytes[bytes.index(bytes.startIndex, offsetBy: prefix.count)] == 0x2F else {
+        guard bytes.count > prefix.count + 1, bytes.starts(with: prefix),
+            bytes[bytes.index(bytes.startIndex, offsetBy: prefix.count)] == 0x2F
+        else {
             return nil
         }
         return String(decoding: bytes.dropFirst(prefix.count + 1), as: UTF8.self)
@@ -337,8 +340,10 @@ struct ArchiveTree {
                 if let known = index[parent] {
                     folder = known
                 } else {
-                    folder = seat(ArchiveEntry(path: parent, isDirectory: true, isImplicit: true, modified: entry.modified,
-                                               permissions: 0o755, order: nextOrder))
+                    folder = seat(
+                        ArchiveEntry(
+                            path: parent, isDirectory: true, isImplicit: true, modified: entry.modified,
+                            permissions: 0o755, order: nextOrder))
                     implicitBytes += parent.utf8.count
                     nextOrder += 1
                 }

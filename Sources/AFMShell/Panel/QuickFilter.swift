@@ -30,7 +30,8 @@ struct QuickFilter {
     /// from what it shows.
     static func narrows(from old: String, to new: String) -> Bool {
         guard !old.isEmpty, old.utf8.allSatisfy({ $0 < 0x80 && $0 != 0x2A && $0 != 0x3F }),
-              new.utf8.allSatisfy({ $0 < 0x80 && $0 != 0x2A && $0 != 0x3F }) else { return false }
+            new.utf8.allSatisfy({ $0 < 0x80 && $0 != 0x2A && $0 != 0x3F })
+        else { return false }
         return new.lowercased().contains(old.lowercased())
     }
 
@@ -42,7 +43,9 @@ struct QuickFilter {
             return { fnmatch(pattern, $0.lowercased(), 0) == 0 }
         }
         let needle = Array(pattern.utf8)
-        guard needle.allSatisfy({ $0 < 0x80 }) else { return { $0.range(of: pattern, options: .caseInsensitive) != nil } }
+        guard needle.allSatisfy({ $0 < 0x80 }) else {
+            return { $0.range(of: pattern, options: .caseInsensitive) != nil }
+        }
         // Typed text is mostly plain ASCII, as most names are: those are compared byte by byte,
         // a good deal faster than Foundation does it (every key press looks at every name).
         // A name with anything else in it is left to Foundation.
@@ -102,7 +105,8 @@ final class QuickFilterBar: NSView, NSTextFieldDelegate {
         addSubview(stack)
         NSLayoutConstraint.activate([
             stack.topAnchor.constraint(equalTo: topAnchor), stack.bottomAnchor.constraint(equalTo: bottomAnchor),
-            stack.leadingAnchor.constraint(equalTo: leadingAnchor), stack.trailingAnchor.constraint(equalTo: trailingAnchor),
+            stack.leadingAnchor.constraint(equalTo: leadingAnchor),
+            stack.trailingAnchor.constraint(equalTo: trailingAnchor)
         ])
     }
 
@@ -127,7 +131,8 @@ final class QuickFilterBar: NSView, NSTextFieldDelegate {
         switch selector {
         case #selector(NSResponder.cancelOperation(_:)):
             onCancel?()
-        case #selector(NSResponder.insertNewline(_:)), #selector(NSResponder.moveUp(_:)), #selector(NSResponder.moveDown(_:)):
+        case #selector(NSResponder.insertNewline(_:)), #selector(NSResponder.moveUp(_:)),
+            #selector(NSResponder.moveDown(_:)):
             onReturn?()
         default:
             return false

@@ -3,6 +3,7 @@ import AFMKernel
 import Foundation
 import TestSupport
 import Testing
+
 @testable import ViewOptionsPlugin
 
 /// The Show menu's commands, driven against fake panels: views, plugin columns, display
@@ -21,7 +22,8 @@ import Testing
         let name = "Columns"
         func start(in kernel: Kernel) {
             kernel.columns.register(ContentColumn(id: "upper", title: "Upper") { $0.name.uppercased() })
-            kernel.columns.register(ContentColumn(id: "length", title: "Length", alignsRight: true) { "\($0.name.count)" })
+            kernel.columns.register(
+                ContentColumn(id: "length", title: "Length", alignsRight: true) { "\($0.name.count)" })
         }
     }
 
@@ -33,8 +35,9 @@ import Testing
         memory.addFile("/A/docs/in.txt")
         memory.addFile("/A/.cvs/entries")
         memory.addFile("/B/other.txt")
-        bench = TestBench(plugins: [ColumnsPlugin(), ViewOptionsPlugin()], fileSystems: [memory], left: memory.url("/A"),
-                          right: memory.url("/B"), settings: settings)
+        bench = TestBench(
+            plugins: [ColumnsPlugin(), ViewOptionsPlugin()], fileSystems: [memory], left: memory.url("/A"),
+            right: memory.url("/B"), settings: settings)
     }
 
     // MARK: Registration
@@ -42,15 +45,24 @@ import Testing
     @Test func registersCommandsKeysMenusToolbarAndPreferences() {
         let kernel = bench.kernel
         #expect(kernel.keyBindings.conflicts.isEmpty)
-        #expect(kernel.keyBindings.command(for: .f(1, .control)) == .viewBrief && kernel.keyBindings.command(for: .f(2, .control)) == .viewFull)
+        #expect(
+            kernel.keyBindings.command(for: .f(1, .control)) == .viewBrief
+                && kernel.keyBindings.command(for: .f(2, .control)) == .viewFull)
         #expect(kernel.keyBindings.command(for: .f(1, [.control, .shift])) == .viewThumbnails)
-        #expect(kernel.keyBindings.command(for: .f(10, .control)) == "cm_SrcAllFiles" && kernel.keyBindings.command(for: .f(11, .control)) == "cm_SrcExecs")
-        #expect(kernel.keyBindings.command(for: .f(12, .control)) == "cm_SrcUserDef" && kernel.keyBindings.command(for: .f(1, .shift)) == "cm_CustomColumnConfig")
+        #expect(
+            kernel.keyBindings.command(for: .f(10, .control)) == "cm_SrcAllFiles"
+                && kernel.keyBindings.command(for: .f(11, .control)) == "cm_SrcExecs")
+        #expect(
+            kernel.keyBindings.command(for: .f(12, .control)) == "cm_SrcUserDef"
+                && kernel.keyBindings.command(for: .f(1, .shift)) == "cm_CustomColumnConfig")
         let show = kernel.menus.menus.first { $0.title == "Show" }?.items ?? []
         #expect(show.starts(with: [.viewBrief, .viewFull, .viewThumbnails, "cm_CustomColumnConfig", nil, .sortByName]))
-        #expect(show.contains("cm_SrcUserDef") && show.contains(.showHidden) && show.compactMap { $0 }.allSatisfy { commands[$0] != nil })
+        #expect(
+            show.contains("cm_SrcUserDef") && show.contains(.showHidden)
+                && show.compactMap { $0 }.allSatisfy { commands[$0] != nil })
         #expect(kernel.toolbar.defaultLayout.compactMap { $0?.command } == [.viewBrief, .viewFull, .viewThumbnails])
-        #expect(kernel.preferences.pages.map(\.title) == ["Display"] && kernel.preferences.pages[0].preferences.count == 3)
+        #expect(
+            kernel.preferences.pages.map(\.title) == ["Display"] && kernel.preferences.pages[0].preferences.count == 3)
     }
 
     // MARK: Views and columns
@@ -58,7 +70,9 @@ import Testing
     @Test func theViewCommandsSwitchTheSourcePanel() {
         #expect(commands.isChecked(.viewFull) && !commands.isChecked(.viewBrief))
         commands.perform(.viewBrief)
-        #expect(left.viewMode == .brief && right.viewMode == .full && commands.isChecked(.viewBrief) && !commands.isChecked(.viewFull))
+        #expect(
+            left.viewMode == .brief && right.viewMode == .full && commands.isChecked(.viewBrief)
+                && !commands.isChecked(.viewFull))
         right.focus()
         #expect(commands.isChecked(.viewFull))
         commands.perform(.viewThumbnails)
@@ -91,8 +105,9 @@ import Testing
     }
 
     @Test func withoutPluginColumnsThereIsNothingToChoose() {
-        let bare = TestBench(plugins: [ViewOptionsPlugin()], fileSystems: [MemoryFileSystem()], left: URL(string: "mem:///")!,
-                             right: URL(string: "mem:///")!)
+        let bare = TestBench(
+            plugins: [ViewOptionsPlugin()], fileSystems: [MemoryFileSystem()], left: URL(string: "mem:///")!,
+            right: URL(string: "mem:///")!)
         #expect(!bare.commands.isEnabled("cm_CustomColumnConfig"))
     }
 
@@ -101,13 +116,16 @@ import Testing
     @Test func programsShowsWhatCanBeRun() {
         #expect(left.names == ["docs", "one.txt", "run.sh", "tool", "two.md"] && commands.isChecked("cm_SrcAllFiles"))
         commands.perform("cm_SrcExecs")
-        #expect(left.names == ["docs", "run.sh", "tool"] && commands.isChecked("cm_SrcExecs") && !commands.isChecked("cm_SrcAllFiles"))
+        #expect(
+            left.names == ["docs", "run.sh", "tool"] && commands.isChecked("cm_SrcExecs")
+                && !commands.isChecked("cm_SrcAllFiles"))
         #expect(left.model.filter?.title == "<programs>" && right.model.filter == nil)
         // The filter belongs to the tab and stays when the folder changes.
         left.show(memory.url("/B"))
         #expect(left.names.isEmpty && left.model.listedItems.count == 1)
         commands.perform("cm_SrcAllFiles")
-        #expect(left.names == ["other.txt"] && commands.isChecked("cm_SrcAllFiles") && !commands.isChecked("cm_SrcExecs"))
+        #expect(
+            left.names == ["other.txt"] && commands.isChecked("cm_SrcAllFiles") && !commands.isChecked("cm_SrcExecs"))
         // The user's masks decide what else counts as a program.
         settings.set("*.md", forKey: "viewOptions.programMasks")
         left.show(memory.url("/A"))
@@ -120,10 +138,13 @@ import Testing
         bench.ui.promptAnswers = [.text("*.txt *.md")]
         commands.perform("cm_SrcUserDef")
         #expect(bench.ui.log == ["prompt: Enter file types (e.g. *.doc *.txt) [*.*]"])
-        #expect(left.names == ["docs", "one.txt", "two.md"] && commands.isChecked("cm_SrcUserDef") && left.model.filter?.title == "*.txt *.md")
+        #expect(
+            left.names == ["docs", "one.txt", "two.md"] && commands.isChecked("cm_SrcUserDef")
+                && left.model.filter?.title == "*.txt *.md")
         // `*.*` shows everything again; the last real mask is proposed the next time.
         commands.perform("cm_SrcUserDef", .text("*.*"))
-        #expect(left.model.filter == nil && commands.isChecked("cm_SrcAllFiles") && !commands.isChecked("cm_SrcUserDef"))
+        #expect(
+            left.model.filter == nil && commands.isChecked("cm_SrcAllFiles") && !commands.isChecked("cm_SrcUserDef"))
         bench.ui.promptAnswers = [.cancel]
         commands.perform("cm_SrcUserDef")
         #expect(bench.ui.log.last == "prompt: Enter file types (e.g. *.doc *.txt) [*.*]" && left.model.filter == nil)
@@ -139,7 +160,9 @@ import Testing
         #expect(!commands.isEnabled("cm_ShowOnlySelected"))
         left.model.select(mask: "*.txt *.sh")
         commands.perform("cm_ShowOnlySelected")
-        #expect(left.names == ["one.txt", "run.sh"] && commands.isChecked("cm_ShowOnlySelected") && left.model.selection.count == 2)
+        #expect(
+            left.names == ["one.txt", "run.sh"] && commands.isChecked("cm_ShowOnlySelected")
+                && left.model.selection.count == 2)
         left.model.clearSelection()
         #expect(left.names == ["one.txt", "run.sh"])
         commands.perform("cm_SrcAllFiles")
@@ -162,17 +185,24 @@ import Testing
             FileItem(url: URL(fileURLWithPath: "/x/" + name), name: name, isDirectory: folder)
         }
         let images = DisplayMask("*.bmp *.gif;*.JPG")
-        #expect(images.matches(item("a.jpg")) && !images.matches(item("a.txt")) && images.matches(item("pictures", folder: true)))
+        #expect(
+            images.matches(item("a.jpg")) && !images.matches(item("a.txt"))
+                && images.matches(item("pictures", folder: true)))
         let noImages = DisplayMask("*.* | *.bmp *.gif")
         #expect(noImages.matches(item("a.txt")) && !noImages.matches(item("a.gif")) && !noImages.showsEverything)
         let noCvs = DisplayMask("*.* | .cvs/")
-        #expect(noCvs.matches(item("a.txt")) && !noCvs.matches(item(".cvs", folder: true)) && noCvs.matches(item("src", folder: true)))
+        #expect(
+            noCvs.matches(item("a.txt")) && !noCvs.matches(item(".cvs", folder: true))
+                && noCvs.matches(item("src", folder: true)))
         #expect(noCvs.matches(item(".cvs")))
         let textOnly = DisplayMask("*.txt | *\\")
-        #expect(textOnly.matches(item("a.txt")) && !textOnly.matches(item("docs", folder: true)) && !textOnly.matches(item("a.md")))
+        #expect(
+            textOnly.matches(item("a.txt")) && !textOnly.matches(item("docs", folder: true))
+                && !textOnly.matches(item("a.md")))
         // Only exclusions: everything else is shown.
         #expect(DisplayMask("| *.bak").matches(item("a.txt")) && !DisplayMask("| *.bak").matches(item("a.bak")))
-        #expect(DisplayMask("*.*").showsEverything && DisplayMask(" * ").showsEverything && DisplayMask("").showsEverything)
+        #expect(
+            DisplayMask("*.*").showsEverything && DisplayMask(" * ").showsEverything && DisplayMask("").showsEverything)
         #expect(DisplayMask("*.*").filter == nil && DisplayMask("*.txt").filter?.title == "*.txt")
     }
 

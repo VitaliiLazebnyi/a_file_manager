@@ -19,7 +19,9 @@ public enum Format {
         init() {
             let names = [NSLocale.currentLocaleDidChangeNotification, .NSSystemTimeZoneDidChange]
             observers = names.map { name in
-                NotificationCenter.default.addObserver(forName: name, object: nil, queue: nil) { [weak self] _ in self?.forget() }
+                NotificationCenter.default.addObserver(forName: name, object: nil, queue: nil) { [weak self] _ in
+                    self?.forget()
+                }
             }
         }
 
@@ -52,7 +54,7 @@ public enum Format {
     /// between threads.
     public static func bytes(_ value: Int64) -> String {
         let digits = Array(String(value.magnitude).utf8)
-        var text = [UInt8]()
+        var text: [UInt8] = []
         text.reserveCapacity(digits.count + digits.count / 3 + 1)
         if value < 0 { text.append(0x2D) }
         for (index, digit) in digits.enumerated() {

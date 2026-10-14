@@ -2,16 +2,18 @@ import AFMContracts
 import AFMKernel
 import AppKit
 import LocalFileSystemPlugin
-@testable import SelectionPlugin
 import TestSupport
 import Testing
+
+@testable import SelectionPlugin
 
 /// The pure parts of the Mark menu: masks, selection types, selection files and the
 /// comparison of two lists.
 @Suite struct SelectionMoreRules {
     func matching(_ mask: String, _ names: [String], folders: Set<String> = []) -> [String] {
         let mask = SelectionMask(mask)
-        return zip(names, mask.selected(names.map { MaskEntry(name: $0, isFolder: folders.contains($0)) })).filter(\.1).map(\.0)
+        return zip(names, mask.selected(names.map { MaskEntry(name: $0, isFolder: folders.contains($0)) })).filter(\.1)
+            .map(\.0)
     }
 
     @Test func wildcardsIncludesAndExcludes() {
@@ -43,10 +45,15 @@ import Testing
         let names = ["IMG_1057.JPG", "IMG_1057.CR2", "CRW_1057.CR2", "IMG_2000.CR2", "notes.txt"]
         #expect(matching("*.jpg>*.cr2", names) == ["IMG_1057.JPG", "IMG_1057.CR2"])
         #expect(matching("*.jpg>crw*.cr2", names) == ["IMG_1057.JPG", "CRW_1057.CR2"])
-        #expect(Wildcard.rename("report.txt", with: "*.bak") == "report.bak" && Wildcard.rename("abc.txt", with: "x?*.*") == "xbc.txt")
+        #expect(
+            Wildcard.rename("report.txt", with: "*.bak") == "report.bak"
+                && Wildcard.rename("abc.txt", with: "x?*.*") == "xbc.txt")
         // Related files are looked for in the same folder only.
         let mask = SelectionMask("*.jpg>*.cr2")
-        let entries = [MaskEntry(name: "a.jpg", directory: ["one"]), MaskEntry(name: "a.cr2", directory: ["two"]), MaskEntry(name: "a.cr2", directory: ["one"])]
+        let entries = [
+            MaskEntry(name: "a.jpg", directory: ["one"]), MaskEntry(name: "a.cr2", directory: ["two"]),
+            MaskEntry(name: "a.cr2", directory: ["one"])
+        ]
         #expect(mask.selected(entries) == [true, false, true])
     }
 
@@ -55,9 +62,15 @@ import Testing
             SelectionMask(mask).matches(MaskEntry(name: name, directory: directory))
         }
         #expect(matches("\\*.txt", "a.txt", in: []) && !matches("\\*.txt", "a.txt", in: ["sub"]))
-        #expect(matches("/sub1/sub2/*.txt", "a.txt", in: ["sub1", "sub2"]) && !matches("/sub1/sub2/*.txt", "a.txt", in: ["x", "sub1", "sub2"]))
-        #expect(matches("sub1\\sub2\\*.txt", "a.txt", in: ["x", "sub1", "sub2"]) && !matches("sub1\\sub2\\*.txt", "a.txt", in: ["sub1"]))
-        #expect(matches("subdir/**/*.txt", "test.txt", in: ["subdir", "subdir2", "subdir3"]) && matches("subdir/**/*.txt", "test.txt", in: ["subdir"]))
+        #expect(
+            matches("/sub1/sub2/*.txt", "a.txt", in: ["sub1", "sub2"])
+                && !matches("/sub1/sub2/*.txt", "a.txt", in: ["x", "sub1", "sub2"]))
+        #expect(
+            matches("sub1\\sub2\\*.txt", "a.txt", in: ["x", "sub1", "sub2"])
+                && !matches("sub1\\sub2\\*.txt", "a.txt", in: ["sub1"]))
+        #expect(
+            matches("subdir/**/*.txt", "test.txt", in: ["subdir", "subdir2", "subdir3"])
+                && matches("subdir/**/*.txt", "test.txt", in: ["subdir"]))
         #expect(!matches("subdir/**/*.txt", "test.txt", in: ["other"]))
         #expect(SelectionMask("a/*.txt").needsDirectories && !SelectionMask("*.txt|*.bak").needsDirectories)
     }
@@ -70,21 +83,31 @@ import Testing
         }
         let items = [item("a.txt"), item("sub/b.txt"), item("sub/deep/c.txt")]
         #expect(SelectionRule(mask: "/*.txt").names(among: items, base: base) == ["a.txt"])
-        #expect(SelectionRule(mask: "sub/**/*.txt").names(among: items, base: base) == ["sub-b.txt", "sub-deep-c.txt"])
+        #expect(
+            SelectionRule(mask: "sub/**/*.txt").names(among: items, base: base) == ["sub-b.txt", "sub-deep-c.txt"])
         #expect(SelectionRule(mask: "deep/*.txt").names(among: items, base: base) == ["sub-deep-c.txt"])
     }
 
     @Test func selectionTypes() {
         let now = Date(timeIntervalSince1970: 2_000_000_000)
-        func file(_ name: String, size: Int64, daysOld: Double, hidden: Bool = false, folder: Bool = false) -> FileItem {
-            FileItem(url: URL(fileURLWithPath: "/x/" + name), name: name, isDirectory: folder, isHidden: hidden, size: size,
-                     modified: now.addingTimeInterval(-daysOld * 86_400))
+        func file(_ name: String, size: Int64, daysOld: Double, hidden: Bool = false, folder: Bool = false) -> FileItem
+        {
+            FileItem(
+                url: URL(fileURLWithPath: "/x/" + name), name: name, isDirectory: folder, isHidden: hidden, size: size,
+                modified: now.addingTimeInterval(-daysOld * 86_400))
         }
-        let items = [file("small.txt", size: 10, daysOld: 1), file("big.txt", size: 5000, daysOld: 40), file("big.md", size: 9000, daysOld: 2),
-                     file(".secret.txt", size: 2000, daysOld: 0.5, hidden: true), file("dir.txt", size: 0, daysOld: 0, folder: true)]
+        let items = [
+            file("small.txt", size: 10, daysOld: 1), file("big.txt", size: 5000, daysOld: 40),
+            file("big.md", size: 9000, daysOld: 2),
+            file(".secret.txt", size: 2000, daysOld: 0.5, hidden: true),
+            file("dir.txt", size: 0, daysOld: 0, folder: true)
+        ]
         var type = SelectionType(name: "big", mask: "*.txt")
         type.minSize = 1024
-        #expect(SelectionRule(type).names(among: items, base: URL(fileURLWithPath: "/x"), now: now) == ["big.txt", ".secret.txt"])
+        #expect(
+            SelectionRule(type).names(among: items, base: URL(fileURLWithPath: "/x"), now: now) == [
+                "big.txt", ".secret.txt"
+            ])
         type.notOlderThanDays = 7
         type.hidden = .no
         #expect(SelectionRule(type).names(among: items, base: URL(fileURLWithPath: "/x"), now: now).isEmpty)
@@ -95,21 +118,33 @@ import Testing
         recent.modifiedFrom = now.addingTimeInterval(-3 * 86_400)
         recent.modifiedTo = now.addingTimeInterval(-86_400)
         recent.maxSize = 9000
-        #expect(SelectionRule(recent).names(among: items, base: URL(fileURLWithPath: "/x"), now: now) == ["small.txt", "big.md"])
+        #expect(
+            SelectionRule(recent).names(among: items, base: URL(fileURLWithPath: "/x"), now: now) == [
+                "small.txt", "big.md"
+            ])
 
-        #expect(SelectionType.size(from: "10k") == 10_240 && SelectionType.size(from: "1.5 M") == 1_572_864 && SelectionType.size(from: "12") == 12)
-        #expect(SelectionType.size(from: "big") == nil && SelectionType.text(ofSize: 10_240) == "10k" && SelectionType.text(ofSize: 1500) == "1500")
+        #expect(
+            SelectionType.size(from: "10k") == 10_240 && SelectionType.size(from: "1.5 M") == 1_572_864
+                && SelectionType.size(from: "12") == 12)
+        #expect(
+            SelectionType.size(from: "big") == nil && SelectionType.text(ofSize: 10_240) == "10k"
+                && SelectionType.text(ofSize: 1500) == "1500")
         let day = SelectionType.date(from: "2026-10-11")
-        #expect(day != nil && SelectionType.date(from: "2026-10-11", endOfDay: true) == day?.addingTimeInterval(86_399))
-        #expect(SelectionType.date(from: SelectionType.text(ofDate: day)) == day && SelectionType.date(from: "tomorrow") == nil)
+        #expect(
+            day != nil && SelectionType.date(from: "2026-10-11", endOfDay: true) == day?.addingTimeInterval(86_399))
+        #expect(
+            SelectionType.date(from: SelectionType.text(ofDate: day)) == day
+                && SelectionType.date(from: "tomorrow") == nil)
         let data = try? JSONEncoder().encode(type)
         #expect(data.flatMap { try? JSONDecoder().decode(SelectionType.self, from: $0) } == type)
     }
 
     @Test func selectionFiles() {
-        let items = [FileItem(url: URL(fileURLWithPath: "/x/dir1"), name: "dir1", isDirectory: true),
-                     FileItem(url: URL(fileURLWithPath: "/x/ro.txt"), name: "ro.txt", isDirectory: false),
-                     FileItem(url: URL(fileURLWithPath: "/x/sél.txt"), name: "sél.txt", isDirectory: false)]
+        let items = [
+            FileItem(url: URL(fileURLWithPath: "/x/dir1"), name: "dir1", isDirectory: true),
+            FileItem(url: URL(fileURLWithPath: "/x/ro.txt"), name: "ro.txt", isDirectory: false),
+            FileItem(url: URL(fileURLWithPath: "/x/sél.txt"), name: "sél.txt", isDirectory: false)
+        ]
         let unicode = SelectionFile.encode(items, as: .unicode)
         #expect(Array(unicode.prefix(8)) == [0xFF, 0xFE, 0x64, 0, 0x69, 0, 0x72, 0])
         #expect(SelectionFile.text(from: unicode) == "dir1\\\r\nro.txt\r\nsél.txt")
@@ -121,28 +156,52 @@ import Testing
 
         let known: Set = ["dir1", "ro.txt", "sél.txt", "odd\\"]
         #expect(SelectionFile.names(in: "dir1\\\r\nro.txt\r\nmissing.txt", among: known) == ["dir1", "ro.txt"])
-        #expect(SelectionFile.names(in: "/x/dir1/\n/x/sél.txt\nodd\\\n", among: known) == ["dir1", "sél.txt", "odd\\"])
+        #expect(
+            SelectionFile.names(in: "/x/dir1/\n/x/sél.txt\nodd\\\n", among: known) == ["dir1", "sél.txt", "odd\\"])
         #expect(SelectionFile.names(in: "", among: known).isEmpty)
     }
 
     @Test func comparingTwoLists() {
         func file(_ name: String, _ size: Int64, _ time: TimeInterval) -> FileItem {
-            FileItem(url: URL(fileURLWithPath: "/x/" + name), name: name, isDirectory: false, size: size, modified: Date(timeIntervalSince1970: time))
+            FileItem(
+                url: URL(fileURLWithPath: "/x/" + name), name: name, isDirectory: false, size: size,
+                modified: Date(timeIntervalSince1970: time))
         }
-        func folder(_ name: String) -> FileItem { FileItem(url: URL(fileURLWithPath: "/x/" + name), name: name, isDirectory: true) }
-        let left = [file("same", 1, 100), file("newer", 1, 200.9), file("older", 1, 100), file("size", 1, 100), file("onlyLeft", 1, 1),
-                    file("hour", 1, 3700), folder("both"), folder("leftDir"), file("kind", 1, 1)]
-        let right = [file("same", 1, 100.4), file("newer", 1, 100), file("older", 2, 200), file("size", 2, 100), file("onlyRight", 1, 1),
-                     file("hour", 1, 100), folder("both"), folder("rightDir"), folder("kind")]
+        func folder(_ name: String) -> FileItem {
+            FileItem(url: URL(fileURLWithPath: "/x/" + name), name: name, isDirectory: true)
+        }
+        let left = [
+            file("same", 1, 100), file("newer", 1, 200.9), file("older", 1, 100), file("size", 1, 100),
+            file("onlyLeft", 1, 1),
+            file("hour", 1, 3700), folder("both"), folder("leftDir"), file("kind", 1, 1)
+        ]
+        let right = [
+            file("same", 1, 100.4), file("newer", 1, 100), file("older", 2, 200), file("size", 2, 100),
+            file("onlyRight", 1, 1),
+            file("hour", 1, 100), folder("both"), folder("rightDir"), folder("kind")
+        ]
         typealias Marks = DirectoryComparison.Marks
-        #expect(DirectoryComparison.compare(left: left, right: right, mode: .newerOrDifferent)
-                == Marks(left: ["newer", "size", "onlyLeft", "hour", "kind"], right: ["older", "size", "onlyRight"], same: ["same", "both"]))
-        #expect(DirectoryComparison.compare(left: left, right: right, mode: .newer)
-                == Marks(left: ["newer", "onlyLeft", "hour", "kind"], right: ["older", "onlyRight"], same: ["same", "both"]))
-        #expect(DirectoryComparison.compare(left: left, right: right, mode: .missing, withSubdirectories: true)
-                == Marks(left: ["onlyLeft", "kind", "leftDir"], right: ["onlyRight", "rightDir", "kind"], same: ["same", "both"]))
-        #expect(DirectoryComparison.compare(left: left, right: right, mode: .sizeOrMissing)
-                == Marks(left: ["older", "size", "onlyLeft", "kind"], right: ["older", "size", "onlyRight"], same: ["same", "both"]))
+        #expect(
+            DirectoryComparison.compare(left: left, right: right, mode: .newerOrDifferent)
+                == Marks(
+                    left: ["newer", "size", "onlyLeft", "hour", "kind"], right: ["older", "size", "onlyRight"],
+                    same: ["same", "both"]))
+        #expect(
+            DirectoryComparison.compare(left: left, right: right, mode: .newer)
+                == Marks(
+                    left: ["newer", "onlyLeft", "hour", "kind"], right: ["older", "onlyRight"], same: ["same", "both"]
+                )
+        )
+        #expect(
+            DirectoryComparison.compare(left: left, right: right, mode: .missing, withSubdirectories: true)
+                == Marks(
+                    left: ["onlyLeft", "kind", "leftDir"], right: ["onlyRight", "rightDir", "kind"],
+                    same: ["same", "both"]))
+        #expect(
+            DirectoryComparison.compare(left: left, right: right, mode: .sizeOrMissing)
+                == Marks(
+                    left: ["older", "size", "onlyLeft", "kind"], right: ["older", "size", "onlyRight"],
+                    same: ["same", "both"]))
         let lenient = DirectoryComparison.compare(left: left, right: right, mode: .newer, ignoringOneHour: true)
         #expect(!lenient.left.contains("hour") && lenient.same.contains("hour"))
     }
@@ -174,8 +233,10 @@ import Testing
     }
 
     func makeBench() -> TestBench {
-        TestBench(plugins: [SelectionPlugin(pasteboard: pasteboard, background: false)], fileSystems: [LocalFileSystem(), memory],
-                  left: memory.url("/A"), right: memory.url("/B"), settings: settings)
+        TestBench(
+            plugins: [SelectionPlugin(pasteboard: pasteboard, background: false)],
+            fileSystems: [LocalFileSystem(), memory],
+            left: memory.url("/A"), right: memory.url("/B"), settings: settings)
     }
 
     func data(_ path: String) -> Data {
@@ -195,7 +256,8 @@ import Testing
         let menus = bench.kernel.menus.menus
         #expect(menus.map(\.title) == ["Mark"])
         #expect(menus[0].items.compactMap { $0 }.allSatisfy { bench.commands[$0] != nil })
-        #expect(menus[0].items.contains(Ids.loadSelectionFromClipboard) && menus[0].items.contains(Ids.markNewerHideSame))
+        #expect(
+            menus[0].items.contains(Ids.loadSelectionFromClipboard) && menus[0].items.contains(Ids.markNewerHideSame))
         #expect(bench.kernel.preferences.pages.map(\.title) == ["Selection"])
         let proposed = bench.kernel.toolbar.defaultLayout.compactMap { $0 }.map(\.command)
         #expect(proposed == [.selectGroup, .unselectGroup, .invertSelection, Ids.compareDirectories])
@@ -222,12 +284,15 @@ import Testing
         left.moveCursor(toName: "three.md")
         bench.ui.promptAnswers = [.accept]
         commands.perform(Ids.selectGroupCurrentExtension)
-        #expect(left.model.selection == ["two.txt", "two.md", "three.md"] && bench.ui.log.last == "prompt: Expand selection [*.md]")
+        #expect(
+            left.model.selection == ["two.txt", "two.md", "three.md"]
+                && bench.ui.log.last == "prompt: Expand selection [*.md]")
         bench.ui.promptAnswers = [.cancel]
         commands.perform(Ids.clearFolders)
         #expect(left.model.selection.count == 3)
         commands.perform(.selectGroup, .text("<("))
-        #expect(bench.ui.log.last == "inform: The regular expression cannot be read." && left.model.selection.count == 3)
+        #expect(
+            bench.ui.log.last == "inform: The regular expression cannot be read." && left.model.selection.count == 3)
     }
 
     @Test func foldersAsConfigured() {
@@ -314,7 +379,9 @@ import Testing
         commands.perform(.unselectAll)
 
         // Define a type: files of at least 1k.
-        ui.formAnswers = [.values(["name": .text("large"), "mask": .text("*.*"), "kind": .index(1), "minSize": .text("1k")])]
+        ui.formAnswers = [
+            .values(["name": .text("large"), "mask": .text("*.*"), "kind": .index(1), "minSize": .text("1k")])
+        ]
         commands.perform(Ids.defineSelectionType)
         commands.perform(.selectGroup, .text(">Large"))
         #expect(left.model.selection == ["big.bin"])
@@ -324,7 +391,11 @@ import Testing
         // The list holds the types first, then the masks, newest first.
         ui.formAnswers = [.values(["row": .index(1)], button: 0)]
         commands.perform(Ids.selectFromList)
-        if case .list(let rows, _)? = ui.forms.last?.first?.kind { #expect(rows == [">large", "*.md", "*.*"]) } else { Issue.record("no list") }
+        if case .list(let rows, _)? = ui.forms.last?.first?.kind {
+            #expect(rows == [">large", "*.md", "*.*"])
+        } else {
+            Issue.record("no list")
+        }
         #expect(left.model.selection == ["big.bin", "two.md", "three.md"])
         ui.formAnswers = [.values(["row": .index(0)], button: 1)]
         commands.perform(Ids.selectFromList)
@@ -336,13 +407,20 @@ import Testing
         let again = makeBench()
         again.ui.formAnswers = [.cancel]
         again.commands.perform(Ids.selectFromList)
-        if case .list(let rows, _)? = again.ui.forms.last?.first?.kind { #expect(rows == [">large", "*.md"]) } else { Issue.record("no list") }
+        if case .list(let rows, _)? = again.ui.forms.last?.first?.kind {
+            #expect(rows == [">large", "*.md"])
+        } else {
+            Issue.record("no list")
+        }
 
         // Editing: the type is picked, changed and refused when a field cannot be read.
         ui.formAnswers = [.values(["row": .index(0)]), .values(["name": .text("small"), "maxSize": .text("lots")])]
         commands.perform(Ids.defineSelectionType)
         #expect(ui.log.last == "inform: The selection type was not saved.")
-        ui.formAnswers = [.values(["row": .index(0)]), .values(["name": .text("small"), "maxSize": .text("3"), "from": .text("1970-01-02")])]
+        ui.formAnswers = [
+            .values(["row": .index(0)]),
+            .values(["name": .text("small"), "maxSize": .text("3"), "from": .text("1970-01-02")])
+        ]
         commands.perform(Ids.defineSelectionType)
         commands.perform(.unselectAll)
         commands.perform(.selectGroup, .text(">small"))
@@ -361,7 +439,11 @@ import Testing
         commands.perform(Ids.saveSelectionToFile)
         #expect(bench.jobService.titles == ["Saving selection:"])
         let saved = data("/A/sel.txt")
-        #expect(saved.starts(with: [0xFF, 0xFE]) && Set(SelectionFile.text(from: saved).components(separatedBy: "\r\n")) == ["docs\\", "two.md", "three.md"])
+        #expect(
+            saved.starts(with: [0xFF, 0xFE])
+                && Set(SelectionFile.text(from: saved).components(separatedBy: "\r\n")) == [
+                    "docs\\", "two.md", "three.md"
+                ])
         // The panel shows the new file and keeps its selection.
         #expect(left.names.contains("sel.txt") && left.model.selection == ["docs", "two.md", "three.md"])
 
@@ -381,7 +463,9 @@ import Testing
         #expect(memory.contents("/B/list.txt") == "one.txt" && bench.right.names.contains("list.txt"))
         left.moveCursor(toName: "two.txt")
         commands.perform(Ids.saveSelectionToFileANSI, .location(memory.url("/B/list.txt")))
-        #expect(memory.contents("/B/list.txt") == "one.txt" && ui.log.last == "choose: mem:/B/list.txt already exists. / Do you want to overwrite it?")
+        #expect(
+            memory.contents("/B/list.txt") == "one.txt"
+                && ui.log.last == "choose: mem:/B/list.txt already exists. / Do you want to overwrite it?")
         ui.choiceAnswers = [0]
         commands.perform(Ids.saveSelectionToFileUnicode, .location(memory.url("/B/list.txt")))
         #expect(SelectionFile.text(from: data("/B/list.txt")) == "two.txt")
@@ -431,13 +515,18 @@ import Testing
         // The previous selection is replaced on both sides.
         right.model.selectAll()
         commands.perform(Ids.compareDirectories)
-        #expect(left.model.selection == ["one.txt", "two.md", "big.bin", "three.md"] && right.model.selection == ["only_b.txt", "three.md"])
+        #expect(
+            left.model.selection == ["one.txt", "two.md", "big.bin", "three.md"]
+                && right.model.selection == ["only_b.txt", "three.md"])
         commands.perform(Ids.compareDirectories, .index(1))
         #expect(left.model.selection == ["two.md", "big.bin"] && right.model.selection == ["only_b.txt"])
         commands.perform(Ids.compareDirectories, .index(2))
-        #expect(left.model.selection == ["two.md", "big.bin", "three.md"] && right.model.selection == ["only_b.txt", "three.md"])
+        #expect(
+            left.model.selection == ["two.md", "big.bin", "three.md"]
+                && right.model.selection == ["only_b.txt", "three.md"])
         commands.perform(Ids.compareDirectoriesWithSubdirectories, .index(1))
-        #expect(left.model.selection == ["two.md", "big.bin", "docs"] && right.model.selection == ["only_b.txt", "extra"])
+        #expect(
+            left.model.selection == ["two.md", "big.bin", "docs"] && right.model.selection == ["only_b.txt", "extra"])
         // Both panels on the same folder: nothing differs.
         right.show(memory.url("/A"))
         commands.perform(Ids.compareDirectories)
@@ -448,14 +537,20 @@ import Testing
         let bench = makeBench()
         let (commands, left, right) = (bench.commands, bench.left, bench.right)
         commands.perform(Ids.markNewerHideSame)
-        #expect(left.model.filter?.title == "Comparison: mem:/A/*.*" && right.model.filter?.title == "Comparison: mem:/B/*.*")
-        #expect(Set(left.names) == ["docs", "one.txt", "two.md", "three.md", "big.bin"] && Set(right.names) == ["extra", "one.txt", "three.md", "only_b.txt"])
+        #expect(
+            left.model.filter?.title == "Comparison: mem:/A/*.*"
+                && right.model.filter?.title == "Comparison: mem:/B/*.*")
+        #expect(
+            Set(left.names) == ["docs", "one.txt", "two.md", "three.md", "big.bin"]
+                && Set(right.names) == ["extra", "one.txt", "three.md", "only_b.txt"])
         // Same time but another size: shown, not marked.
         #expect(left.model.selection == ["one.txt", "two.md", "big.bin"] && right.model.selection == ["only_b.txt"])
         #expect(commands.isChecked(Ids.markNewerHideSame) && memory.exists("/A/two.txt"))
         // Choosing it again shows everything.
         commands.perform(Ids.markNewerHideSame)
-        #expect(left.model.filter == nil && right.model.filter == nil && left.names.count == 7 && !commands.isChecked(Ids.markNewerHideSame))
+        #expect(
+            left.model.filter == nil && right.model.filter == nil && left.names.count == 7
+                && !commands.isChecked(Ids.markNewerHideSame))
 
         // The view ends when the panel goes elsewhere; the other panel keeps it.
         commands.perform(Ids.markNewerHideSame)

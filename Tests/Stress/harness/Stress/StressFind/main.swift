@@ -1,10 +1,11 @@
 import AFMKernel
 import AppKit
-@testable import FindFilesPlugin
 import Foundation
 import LocalFileSystemPlugin
 import StressKit
 import TestSupport
+
+@testable import FindFilesPlugin
 
 // Scenario 6: the Find Files engine and its window controller (headless, never shown).
 //
@@ -16,7 +17,10 @@ import TestSupport
 // the results to the main queue.
 
 let arguments = CommandLine.arguments
-guard arguments.count >= 3 else { say("usage"); exit(2) }
+guard arguments.count >= 3 else {
+    say("usage")
+    exit(2)
+}
 let fm = FileManager.default
 let needle = "NEEDLE_XYZ"
 
@@ -65,7 +69,10 @@ if arguments[1] == "gen" {
     exit(0)
 }
 
-guard arguments.count >= 6 else { say("usage"); exit(2) }
+guard arguments.count >= 6 else {
+    say("usage")
+    exit(2)
+}
 let tree = URL(fileURLWithPath: arguments[2], isDirectory: true)
 let million: URL? = arguments[3] == "-" ? nil : URL(fileURLWithPath: arguments[3], isDirectory: true)
 let resultsDirectory = arguments[4]
@@ -96,7 +103,9 @@ func allFiles(_ root: URL) -> [String] {
     while let directory = stack.popLast() {
         guard let handle = opendir(directory) else { continue }
         while let entry = readdir(handle) {
-            let name = withUnsafePointer(to: &entry.pointee.d_name) { $0.withMemoryRebound(to: CChar.self, capacity: Int(MAXNAMLEN) + 1) { String(cString: $0) } }
+            let name = withUnsafePointer(to: &entry.pointee.d_name) {
+                $0.withMemoryRebound(to: CChar.self, capacity: Int(MAXNAMLEN) + 1) { String(cString: $0) }
+            }
             if name == "." || name == ".." || name.hasPrefix(".") { continue }
             let path = directory + "/" + name
             if entry.pointee.d_type == DT_DIR { stack.append(path) } else { result.append(path) }
@@ -118,7 +127,9 @@ func contains(_ path: String, _ pattern: [UInt8], caseInsensitive: Bool) -> Bool
         process.waitUntilExit()
         return process.terminationStatus == 0
     }
-    guard let data = try? Data(contentsOf: URL(fileURLWithPath: path)), data.count >= pattern.count else { return false }
+    guard let data = try? Data(contentsOf: URL(fileURLWithPath: path)), data.count >= pattern.count else {
+        return false
+    }
     let lower = pattern.map { $0 >= 65 && $0 <= 90 ? $0 + 32 : $0 }
     return data.withUnsafeBytes { (raw: UnsafeRawBufferPointer) -> Bool in
         let bytes = raw.bindMemory(to: UInt8.self)
@@ -151,7 +162,9 @@ func parallelFilter(_ paths: [String], _ test: @escaping (String) -> Bool) -> Se
     DispatchQueue.concurrentPerform(iterations: (paths.count + chunk - 1) / chunk) { part in
         var own: [String] = []
         for path in paths[(part * chunk)..<min(paths.count, (part + 1) * chunk)] where test(path) { own.append(path) }
-        lock.lock(); found.formUnion(own); lock.unlock()
+        lock.lock()
+        found.formUnion(own)
+        lock.unlock()
     }
     return found
 }
@@ -189,7 +202,8 @@ if let million {
         let withText = parallelFilter(nonEmpty) { contains($0, Array("xxxx".utf8), caseInsensitive: true) }
         cases.append(Case(label: "million name *7.png", directory: million, names: "*7.png", text: "", expected: png))
         cases.append(Case(label: "million text xxxx", directory: million, names: "", text: "xxxx", expected: withText))
-        cases.append(Case(label: "million name * (all)", directory: million, names: "", text: "", expected: Set(files)))
+        cases.append(
+            Case(label: "million name * (all)", directory: million, names: "", text: "", expected: Set(files)))
         say("million: *7.png \(png.count), with xxxx \(withText.count), all files \(files.count)")
     }
 }
@@ -197,7 +211,8 @@ if let million {
 let memory = MemoryFileSystem()
 memory.addFile("/A/one.txt", "x")
 let plugin = FindFilesPlugin()
-let bench = TestBench(plugins: [plugin], fileSystems: [LocalFileSystem(), memory], left: memory.url("/A"), right: memory.url("/A"))
+let bench = TestBench(
+    plugins: [plugin], fileSystems: [LocalFileSystem(), memory], left: memory.url("/A"), right: memory.url("/A"))
 let fileSystems = bench.kernel.fileSystems
 
 func verify(_ label: String, _ items: [FileItem], against expected: Set<String>, filesOnly: Bool) {
@@ -207,16 +222,23 @@ func verify(_ label: String, _ items: [FileItem], against expected: Set<String>,
     let unique = Set(paths)
     if unique.count != paths.count { fail("\(label): \(paths.count - unique.count) duplicate results") }
     if unique != expected {
-        let missing = expected.subtracting(unique), extra = unique.subtracting(expected)
-        fail("\(label): expected \(expected.count), got \(unique.count); missing \(missing.count) e.g. \(missing.prefix(2)), extra \(extra.count) e.g. \(extra.prefix(2))")
+        let missing = expected.subtracting(unique)
+        let extra = unique.subtracting(expected)
+        fail(
+            "\(label): expected \(expected.count), got \(unique.count); missing \(missing.count) e.g. \(missing.prefix(2)), extra \(extra.count) e.g. \(extra.prefix(2))"
+        )
     }
 }
 
 func heapLine(_ label: String) {
     var stats = malloc_statistics_t()
     malloc_zone_statistics(nil, &stats)
-    say("HEAP " + pad(label, 44) + String(format: " footprint %6.0f MB; malloc in use %6.0f MB, allocated from the system %6.0f MB; threads %d", footprintMB(),
-               Double(stats.size_in_use) / 1_048_576, Double(stats.size_allocated) / 1_048_576, threadCount()))
+    say(
+        "HEAP " + pad(label, 44)
+            + String(
+                format: " footprint %6.0f MB; malloc in use %6.0f MB, allocated from the system %6.0f MB; threads %d",
+                footprintMB(),
+                Double(stats.size_in_use) / 1_048_576, Double(stats.size_allocated) / 1_048_576, threadCount()))
 }
 
 // MARK: 1. The engine alone
@@ -226,7 +248,8 @@ let baselineThreads = threadCount()
 say("threads at baseline: \(baselineThreads)")
 
 func runEngine(_ test: Case) -> (items: [FileItem], seconds: Double, first: Double) {
-    let search = FileSearch(SearchQuery(directory: test.directory, names: test.names, text: test.text), fileSystems: fileSystems)
+    let search = FileSearch(
+        SearchQuery(directory: test.directory, names: test.names, text: test.text), fileSystems: fileSystems)
     var items: [FileItem] = []
     var first = -1.0
     var done = false
@@ -249,10 +272,15 @@ for test in cases {
     for round in 0..<2 {
         step("engine: \(test.label) #\(round)", limit: 900) {
             let (items, seconds, first) = runEngine(test)
-            say(String(format: "  engine %@: %d results in %.3fs, first after %.3fs", test.label, items.count, seconds, first))
+            say(
+                String(
+                    format: "  engine %@: %d results in %.3fs, first after %.3fs", test.label, items.count, seconds,
+                    first))
             verify("engine " + test.label, items, against: test.expected, filesOnly: true)
             let order = test.expected.count > 200_000 ? [] : items.map { $0.url.path }
-            if let before = engineOrders[test.label], before != order { fail("engine \(test.label): two runs gave a different order") }
+            if let before = engineOrders[test.label], before != order {
+                fail("engine \(test.label): two runs gave a different order")
+            }
             engineOrders[test.label] = order
         }
     }
@@ -268,17 +296,22 @@ step("engine: 8 concurrent searches of the tree", limit: 600) {
         group.enter()
         Thread.detachNewThread {
             let test = cases[index % 2]
-            let search = FileSearch(SearchQuery(directory: test.directory, names: test.names, text: test.text), fileSystems: fileSystems)
+            let search = FileSearch(
+                SearchQuery(directory: test.directory, names: test.names, text: test.text), fileSystems: fileSystems)
             var own: [FileItem] = []
             search.run { own.append($0) }
-            lock.lock(); outcomes.append((index % 2, own)); lock.unlock()
+            lock.lock()
+            outcomes.append((index % 2, own))
+            lock.unlock()
             group.leave()
         }
     }
     var finished = false
     group.notify(queue: .main) { finished = true }
     pump(upTo: 600) { finished }
-    for (which, items) in outcomes { verify("concurrent " + cases[which].label, items, against: cases[which].expected, filesOnly: true) }
+    for (which, items) in outcomes {
+        verify("concurrent " + cases[which].label, items, against: cases[which].expected, filesOnly: true)
+    }
 }
 heapLine("after the engine runs")
 step("threads settle after engine runs") {
@@ -319,7 +352,10 @@ for test in cases {
         pump(for: 0.3)
         MainWatchdog.shared.setPhase("(harness: checking results)")
         let items = window.resultItems
-        say(String(format: "  window %@: %d results in %.3fs, first rows after %.3fs, threads %d", test.label, items.count, seconds, first, threadCount()))
+        say(
+            String(
+                format: "  window %@: %d results in %.3fs, first rows after %.3fs, threads %d", test.label, items.count,
+                seconds, first, threadCount()))
         verify("window " + test.label, items, against: test.expected, filesOnly: true)
         pump(for: 0.3)
     }
@@ -345,24 +381,33 @@ step("window: \(cancels) searches cancelled at random", limit: Double(cancels) *
             completedInstead += 1
             let phase = "window: \(cancels) searches cancelled at random"
             defer { MainWatchdog.shared.setPhase(phase) }
-            verify("uncancelled in torture: " + test.label, window.resultItems, against: test.expected, filesOnly: true)
+            verify(
+                "uncancelled in torture: " + test.label, window.resultItems, against: test.expected, filesOnly: true)
         } else {
             let asked = now()
             window.cancelSearch()
             if !pump(upTo: 30, until: { finishedCount > before }) {
-                fail("round \(round) \(test.label): a cancelled search did not end within 30 s (cancelled after \(delay)s)")
+                fail(
+                    "round \(round) \(test.label): a cancelled search did not end within 30 s (cancelled after \(delay)s)"
+                )
                 HangGuard.shared.arm("cancelled search does not end", seconds: 0)
                 pump(for: 600)
             }
             let latency = now() - asked
             cancelLatencies.append(latency)
-            if latency > worstCancel.0 { worstCancel = (latency, String(format: "%@ cancelled after %.3fs", test.label, delay)) }
+            if latency > worstCancel.0 {
+                worstCancel = (latency, String(format: "%@ cancelled after %.3fs", test.label, delay))
+            }
             // What a cancelled search shows must still be a duplicate-free part of the truth.
             MainWatchdog.shared.setPhase("(harness: checking results)")
             defer { MainWatchdog.shared.setPhase("window: \(cancels) searches cancelled at random") }
             let paths = window.resultItems.filter { !$0.isDirectory }.map { $0.url.path }
-            if Set(paths).count != paths.count { fail("round \(round) \(test.label): duplicates in a cancelled search's results") }
-            if !Set(paths).isSubset(of: test.expected) { fail("round \(round) \(test.label): a cancelled search lists files that do not match") }
+            if Set(paths).count != paths.count {
+                fail("round \(round) \(test.label): duplicates in a cancelled search's results")
+            }
+            if !Set(paths).isSubset(of: test.expected) {
+                fail("round \(round) \(test.label): a cancelled search lists files that do not match")
+            }
         }
         // The next search starts right away half of the time, as a user retyping would.
         if random.next() % 2 == 0 { pump(for: 0.02) }
@@ -371,9 +416,14 @@ step("window: \(cancels) searches cancelled at random", limit: Double(cancels) *
 }
 let sorted = cancelLatencies.sorted()
 if !sorted.isEmpty {
-    say(String(format: "cancel -> finished: n=%d median=%.1fms p95=%.1fms max=%.1fms (%@); %d ended before the cancel",
-               sorted.count, sorted[sorted.count / 2] * 1000, sorted[Int(Double(sorted.count) * 0.95)] * 1000, sorted.last! * 1000, worstCancel.1, completedInstead))
-    say("threads right after each round: min \(threadsAfter.min()!) max \(threadsAfter.max()!) last \(threadsAfter.last!)")
+    say(
+        String(
+            format: "cancel -> finished: n=%d median=%.1fms p95=%.1fms max=%.1fms (%@); %d ended before the cancel",
+            sorted.count, sorted[sorted.count / 2] * 1000, sorted[Int(Double(sorted.count) * 0.95)] * 1000,
+            sorted.last! * 1000, worstCancel.1, completedInstead))
+    say(
+        "threads right after each round: min \(threadsAfter.min()!) max \(threadsAfter.max()!) last \(threadsAfter.last!)"
+    )
 }
 
 heapLine("after the window's cancelled searches")
@@ -383,7 +433,8 @@ step("engine: \(cancels) runs cancelled from another thread", limit: Double(canc
     for round in 0..<cancels {
         let test = cases[Int(random.next() % UInt64(cases.count))]
         let delay = Double(random.next() % 1000) / 1000 * (typical[test.label] ?? 1)
-        let search = FileSearch(SearchQuery(directory: test.directory, names: test.names, text: test.text), fileSystems: fileSystems)
+        let search = FileSearch(
+            SearchQuery(directory: test.directory, names: test.names, text: test.text), fileSystems: fileSystems)
         var returned = false
         var returnedAt = 0.0
         var count = 0
@@ -410,7 +461,12 @@ step("engine: \(cancels) runs cancelled from another thread", limit: Double(canc
 }
 let returns = engineReturn.sorted()
 if !returns.isEmpty {
-    say(String(format: "engine cancel -> run returned: median=%.1fms p95=%.1fms max=%.1fms", returns[returns.count / 2] * 1000, returns[Int(Double(returns.count) * 0.95)] * 1000, returns.last! * 1000))
+    say(
+        String(
+            format: "engine cancel -> run returned: median=%.1fms p95=%.1fms max=%.1fms",
+            returns[returns.count / 2] * 1000, returns[Int(Double(returns.count) * 0.95)] * 1000, returns.last! * 1000
+        )
+    )
 }
 
 heapLine("after the engine's cancelled runs")

@@ -108,10 +108,14 @@ enum CommandLanguage {
     /// The steps of a Command field. `resolve` finds a registered command by its name, whatever
     /// its case. A field in which not every comma-separated item is a command of the program
     /// is one external line, commas included.
-    static func steps(_ command: String, environment: [String: String] = [:], resolve: (String) -> CommandID?) -> [CommandStep] {
+    static func steps(_ command: String, environment: [String: String] = [:], resolve: (String) -> CommandID?)
+        -> [CommandStep]
+    {
         let command = expandingEnvironment(command, environment).trimmingCharacters(in: .whitespaces)
         guard !command.isEmpty else { return [] }
-        let items = ShellWords.split(command, at: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+        let items = ShellWords.split(command, at: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter {
+            !$0.isEmpty
+        }
         let steps = items.map { step($0, resolve: resolve) }
         return steps.contains(nil) ? [.external(command)] : steps.compactMap { $0 }
     }
@@ -137,7 +141,9 @@ enum CommandLanguage {
         if let index = Int(text), text.allSatisfy(\.isNumber) { return .index(index) }
         let plain = ShellWords.unquoted(text)
         let isOneWord = ShellWords.split(text).count == 1
-        if isOneWord, plain.hasPrefix("/") || plain.hasPrefix("~") || plain.contains("://") { return .location(location(plain)) }
+        if isOneWord, plain.hasPrefix("/") || plain.hasPrefix("~") || plain.contains("://") {
+            return .location(location(plain))
+        }
         return .text(plain)
     }
 }

@@ -50,7 +50,9 @@ public struct TabFile: Equatable {
                 let path = URL(string: tab.location).map(displayPath) ?? tab.location
                 lines.append("\(index)_path=\(TabFile.value(path))")
                 if let title = tab.title, !title.isEmpty { lines.append("\(index)_caption=\(TabFile.value(title))") }
-                let fields = [1, tab.sortKey, tab.descending ? 1 : 0, 0, 0, tab.locked == true ? 1 : 0, tab.showHidden ? 1 : 0]
+                let fields = [
+                    1, tab.sortKey, tab.descending ? 1 : 0, 0, 0, tab.locked == true ? 1 : 0, tab.showHidden ? 1 : 0
+                ]
                 lines.append("\(index)_options=" + fields.map(String.init).joined(separator: "|"))
             }
             lines.append("activetab=\(state.active)")
@@ -68,7 +70,8 @@ public struct TabFile: Equatable {
             default: return false
             }
         }
-        let needsQuotes = scalars.first == "\"" || scalars.contains(where: unsafe)
+        let needsQuotes =
+            scalars.first == "\"" || scalars.contains(where: unsafe)
             || scalars.first?.properties.isWhitespace == true || scalars.last?.properties.isWhitespace == true
         guard needsQuotes else { return text }
         var quoted = "\""
@@ -80,7 +83,11 @@ public struct TabFile: Equatable {
             case "\r": quoted += "\\r"
             case "\t": quoted += "\\t"
             default:
-                if unsafe(scalar) { quoted += "\\u{" + String(scalar.value, radix: 16) + "}" } else { quoted.unicodeScalars.append(scalar) }
+                if unsafe(scalar) {
+                    quoted += "\\u{" + String(scalar.value, radix: 16) + "}"
+                } else {
+                    quoted.unicodeScalars.append(scalar)
+                }
             }
         }
         return quoted + "\""
@@ -110,9 +117,13 @@ public struct TabFile: Equatable {
             case "r": result.append("\r")
             case "t": result.append("\t")
             case "u":
-                guard index < scalars.count - 1, scalars[index] == "{", let close = scalars[index...].firstIndex(of: "}"), close < scalars.count - 1 else { return value }
+                guard index < scalars.count - 1, scalars[index] == "{",
+                    let close = scalars[index...].firstIndex(of: "}"), close < scalars.count - 1
+                else { return value }
                 let digits = String(String.UnicodeScalarView(scalars[(index + 1)..<close]))
-                guard !digits.isEmpty, digits.count <= 6, let number = UInt32(digits, radix: 16), let unicode = Unicode.Scalar(number) else { return value }
+                guard !digits.isEmpty, digits.count <= 6, let number = UInt32(digits, radix: 16),
+                    let unicode = Unicode.Scalar(number)
+                else { return value }
                 result.append(unicode)
                 index = close + 1
             default: return value
@@ -142,25 +153,34 @@ public struct TabFile: Equatable {
             if line.hasPrefix("["), line.hasSuffix("]") {
                 current = line.dropFirst().dropLast().lowercased()
             } else if let equals = line.firstIndex(of: "="), !line.hasPrefix(";") {
-                sections[current, default: [:]][line[..<equals].lowercased()] = String(line[line.index(after: equals)...])
+                sections[current, default: [:]][line[..<equals].lowercased()] = String(
+                    line[line.index(after: equals)...])
             }
         }
 
         func state(_ name: String) -> PanelTabs.State? {
             guard let keys = sections[name] else { return nil }
-            let numbers = keys.keys.compactMap { key in key.hasSuffix("_path") ? Int(key.dropLast("_path".count)) : nil }.sorted()
+            let numbers = keys.keys.compactMap { key in key.hasSuffix("_path") ? Int(key.dropLast("_path".count)) : nil
+            }.sorted()
             var tabs: [PanelTabs.State.Tab] = []
             var active = 0
             let wanted = keys["activetab"].flatMap(Int.init) ?? 0
             for number in numbers {
                 guard tabs.count < TabFile.tabLimit else { break }
-                guard let path = keys["\(number)_path"].map(TabFile.unquoted), path.count <= TabFile.pathLimit, let url = location(path) else { continue }
-                let fields = (keys["\(number)_options"] ?? "").split(separator: "|", omittingEmptySubsequences: false).map { Int($0) ?? 0 }
+                guard let path = keys["\(number)_path"].map(TabFile.unquoted), path.count <= TabFile.pathLimit,
+                    let url = location(path)
+                else { continue }
+                let fields = (keys["\(number)_options"] ?? "").split(separator: "|", omittingEmptySubsequences: false)
+                    .map { Int($0) ?? 0 }
                 func field(_ index: Int) -> Int { fields.indices.contains(index) ? fields[index] : 0 }
                 if number == wanted { active = tabs.count }
-                tabs.append(PanelTabs.State.Tab(location: url, sortKey: field(1), descending: field(2) == 1, showHidden: field(6) == 1,
-                                                title: keys["\(number)_caption"].map(TabFile.unquoted).flatMap { $0.isEmpty || $0.count > TabFile.captionLimit ? nil : $0 },
-                                                locked: field(5) == 1 ? true : nil))
+                tabs.append(
+                    PanelTabs.State.Tab(
+                        location: url, sortKey: field(1), descending: field(2) == 1, showHidden: field(6) == 1,
+                        title: keys["\(number)_caption"].map(TabFile.unquoted).flatMap {
+                            $0.isEmpty || $0.count > TabFile.captionLimit ? nil : $0
+                        },
+                        locked: field(5) == 1 ? true : nil))
             }
             return tabs.isEmpty ? nil : PanelTabs.State(tabs: tabs, active: active)
         }

@@ -1,8 +1,9 @@
 import AFMKernel
 import Foundation
-@testable import NetworkPlugin
 import TestSupport
 import Testing
+
+@testable import NetworkPlugin
 
 /// Uploads over SFTP are only a success when the server has all of the file
 /// (review 2: N038, N040, and the length of every upload).
@@ -71,7 +72,8 @@ import Testing
         #expect(throws: NetworkError.self) { _ = try session.entry(at: "/hang") }
         // The next request opens a new channel and is answered.
         #expect(try session.entry(at: "/f.bin")?.size == 1000)
-        let starts = try String(contentsOf: suite.box.url("sftp-requests.log"), encoding: .utf8).split(separator: "\n").filter { $0 == "16" }
+        let starts = try String(contentsOf: suite.box.url("sftp-requests.log"), encoding: .utf8).split(separator: "\n")
+            .filter { $0 == "16" }
         #expect(starts.count == 2, "a second login was made")
     }
 
@@ -86,7 +88,8 @@ import Testing
             // Asked right after the closing: the server sees the closing first.
             #expect(try session.entry(at: "/f.bin")?.size == 200_000)
         }
-        let log = try String(contentsOf: suite.box.url("sftp-requests.log"), encoding: .utf8).split(separator: "\n").map(String.init)
+        let log = try String(contentsOf: suite.box.url("sftp-requests.log"), encoding: .utf8).split(separator: "\n")
+            .map(String.init)
         // open (3) … close (4) … lstat (7): never an lstat between a file's last read and its close.
         var open = 0
         for kind in log {
@@ -103,8 +106,10 @@ import Testing
         values.timeout = 60
         environment.options.values = values
         // A "server" that never says a word.
-        let session = SFTPSession(profile: ConnectionProfile(key: ServerKey(scheme: "sftp", host: "silent.invalid")), environment: environment,
-                                  transport: SFTPTransport(executable: "/bin/sleep", arguments: ["600"]))
+        let session = SFTPSession(
+            profile: ConnectionProfile(key: ServerKey(scheme: "sftp", host: "silent.invalid")),
+            environment: environment,
+            transport: SFTPTransport(executable: "/bin/sleep", arguments: ["600"]))
         let login = AdoptOutcome { _ = try session.connect(cancellation: nil) }
         #expect(adoptWait(30) { session.isConnecting })
         // A second caller without a flag waits behind the login.
@@ -122,14 +127,16 @@ import Testing
     @Test func aPacketThatIsNotSFTPEndsTheChannelAndItsProcess() throws {
         // Announces a packet far larger than any the protocol has, after the greeting.
         let box = try Sandbox()
-        let script = try box.file("big.py", """
-        import os, struct, sys, time
-        os.read(0, 9)
-        os.write(1, struct.pack(">IBI", 5, 2, 3))
-        os.read(0, 1 << 16)
-        os.write(1, struct.pack(">I", 0x7fffffff) + b"x" * 1000)
-        time.sleep(600)
-        """)
+        let script = try box.file(
+            "big.py",
+            """
+            import os, struct, sys, time
+            os.read(0, 9)
+            os.write(1, struct.pack(">IBI", 5, 2, 3))
+            os.read(0, 1 << 16)
+            os.write(1, struct.pack(">I", 0x7fffffff) + b"x" * 1000)
+            time.sleep(600)
+            """)
         let channel = SFTPChannel(executable: FakeSFTPServer.python, arguments: [script.path], environment: [:])
         try channel.start(timeout: 30, cancellation: nil) { true }
         #expect(throws: NetworkError.self) { _ = try channel.request(.realpath, timeout: 30) { $0.string(".") } }
@@ -153,7 +160,8 @@ import Testing
         // The channel is the same one, and still carries the others.
         #expect(session.isConnected)
         #expect(try session.entry(at: "/f.bin")?.size == 400_000)
-        let logins = try String(contentsOf: suite.box.url("sftp-requests.log"), encoding: .utf8).split(separator: "\n").filter { $0 == "16" }
+        let logins = try String(contentsOf: suite.box.url("sftp-requests.log"), encoding: .utf8).split(separator: "\n")
+            .filter { $0 == "16" }
         #expect(logins.count == 1, "the channel was closed by a cancelled upload")
     }
 }
@@ -175,16 +183,24 @@ import Testing
         try suite.box.file("srv/locked", "new")
         try suite.box.file("srv/keep.txt", "old")
         // The source cannot be renamed at all; the file in the way is moved aside and put back.
-        #expect(throws: (any Error).self) { try suite.fileSystem.move(suite.url("/locked"), to: suite.url("/keep.txt"), replacing: true) }
+        #expect(throws: (any Error).self) {
+            try suite.fileSystem.move(suite.url("/locked"), to: suite.url("/keep.txt"), replacing: true)
+        }
         #expect(suite.box.read("srv/keep.txt") == "old" && suite.box.read("srv/locked") == "new")
-        #expect(try FileManager.default.contentsOfDirectory(atPath: suite.box.url("srv").path).sorted() == ["keep.txt", "locked"])
+        #expect(
+            try FileManager.default.contentsOfDirectory(atPath: suite.box.url("srv").path).sorted() == [
+                "keep.txt", "locked"
+            ])
         // A source that is not there.
-        #expect(throws: (any Error).self) { try suite.fileSystem.move(suite.url("/none"), to: suite.url("/keep.txt"), replacing: true) }
+        #expect(throws: (any Error).self) {
+            try suite.fileSystem.move(suite.url("/none"), to: suite.url("/keep.txt"), replacing: true)
+        }
         #expect(suite.box.read("srv/keep.txt") == "old")
     }
 }
 
-@Suite(.enabled(if: FileManager.default.isExecutableFile(atPath: systemSFTPServer))) struct Review2NetworkSFTPSystemServer {
+@Suite(.enabled(if: FileManager.default.isExecutableFile(atPath: systemSFTPServer)))
+struct Review2NetworkSFTPSystemServer {
     let box: Sandbox
     let center: ConnectionCenter
     let fileSystem: RemoteFileSystem
@@ -198,7 +214,9 @@ import Testing
         environment.options.values = values
         center = ConnectionCenter(environment: environment)
         center.makeSession = { profile, environment in
-            SFTPSession(profile: profile, environment: environment, transport: SFTPTransport(executable: systemSFTPServer, arguments: ["-e"]))
+            SFTPSession(
+                profile: profile, environment: environment,
+                transport: SFTPTransport(executable: systemSFTPServer, arguments: ["-e"]))
         }
         fileSystem = RemoteFileSystem(scheme: "sftp", center: center)
     }
@@ -212,14 +230,19 @@ import Testing
         // A file made by somebody else after the folder was read: the listing does not know it,
         // the server does, and a rename that must not replace does not.
         try box.file("fresh.txt", "theirs")
-        #expect(throws: FileSystemError.self) { try fileSystem.move(url("new.txt"), to: url("fresh.txt"), replacing: false) }
+        #expect(throws: FileSystemError.self) {
+            try fileSystem.move(url("new.txt"), to: url("fresh.txt"), replacing: false)
+        }
         #expect(box.read("fresh.txt") == "theirs" && box.read("new.txt") == "new")
         // Asked to replace, it does, in one step.
         try fileSystem.move(url("new.txt"), to: url("keep.txt"), replacing: true)
         #expect(box.read("keep.txt") == "new" && !box.exists("new.txt"))
-        #expect(try FileManager.default.contentsOfDirectory(atPath: box.root.path).sorted() == ["fresh.txt", "keep.txt"])
+        #expect(
+            try FileManager.default.contentsOfDirectory(atPath: box.root.path).sorted() == ["fresh.txt", "keep.txt"])
         // A source that does not exist loses nothing.
-        #expect(throws: (any Error).self) { try fileSystem.move(url("none.txt"), to: url("keep.txt"), replacing: true) }
+        #expect(throws: (any Error).self) {
+            try fileSystem.move(url("none.txt"), to: url("keep.txt"), replacing: true)
+        }
         #expect(box.read("keep.txt") == "new")
     }
 
@@ -227,12 +250,14 @@ import Testing
         let content = Data((0..<300_000).map { UInt8(truncatingIfNeeded: $0 &* 13) })
         let writer = try fileSystem.write(url("up.bin"))
         try writer.write(content)
-        try writer.close(attributes: FileAttributes(modified: Date(timeIntervalSince1970: 1_600_000_000), permissions: 0o640))
+        try writer.close(
+            attributes: FileAttributes(modified: Date(timeIntervalSince1970: 1_600_000_000), permissions: 0o640))
         #expect(try Data(contentsOf: box.url("up.bin")) == content)
         #expect(fileSystem.item(at: url("up.bin"))?.size == 300_000)
         // A name stored decomposed is found again under the name the listing showed.
         try box.file("u\u{308}ber.txt", "content")
-        let listed = try #require(try fileSystem.list(url(""), showHidden: true).first { $0.name.hasSuffix("ber.txt") })
+        let listed = try #require(
+            try fileSystem.list(url(""), showHidden: true).first { $0.name.hasSuffix("ber.txt") })
         let reader = try fileSystem.read(listed.url)
         #expect(try reader.read(upToCount: 100) == Data("content".utf8))
         reader.close()
@@ -262,16 +287,18 @@ import Testing
     /// Stands in for `ssh`: asks for the password the way ssh does, through the same helper, and
     /// is the system's SFTP server once the right one came. `prompt` is the question it asks.
     private func fakeShell(_ box: Sandbox, prompt: String, password: String) throws -> SFTPTransport {
-        let script = try box.file("fake-ssh.sh", """
-        #!/bin/sh
-        answer=$("$SSH_ASKPASS" "\(prompt)")
-        if [ "$answer" != "\(password)" ]; then
-          echo "Permission denied (password)." >&2
-          exit 255
-        fi
-        exec \(systemSFTPServer) -e
+        let script = try box.file(
+            "fake-ssh.sh",
+            """
+            #!/bin/sh
+            answer=$("$SSH_ASKPASS" "\(prompt)")
+            if [ "$answer" != "\(password)" ]; then
+              echo "Permission denied (password)." >&2
+              exit 255
+            fi
+            exec \(systemSFTPServer) -e
 
-        """)
+            """)
         try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: script.path)
         return SFTPTransport(executable: script.path, asksQuestions: true)
     }
@@ -284,8 +311,9 @@ import Testing
         environment.declineMemory = 0
         let key = ServerKey(scheme: "sftp", host: "files.example")
         let profile = ConnectionProfile(key: key, savedID: UUID(), user: "anna", password: "stale")
-        let session = SFTPSession(profile: profile, environment: environment,
-                                  transport: try fakeShell(box, prompt: "anna@files.example's password: ", password: "right"))
+        let session = SFTPSession(
+            profile: profile, environment: environment,
+            transport: try fakeShell(box, prompt: "anna@files.example's password: ", password: "right"))
         defer { session.disconnect() }
         var questions: [String] = []
         var answers = ["right"]
@@ -304,16 +332,18 @@ import Testing
 
         // A stored password that is right asks nothing.
         questions = []
-        let good = SFTPSession(profile: ConnectionProfile(key: key, user: "anna", password: "right"), environment: environment,
-                               transport: try fakeShell(box, prompt: "anna@files.example's password: ", password: "right"))
+        let good = SFTPSession(
+            profile: ConnectionProfile(key: key, user: "anna", password: "right"), environment: environment,
+            transport: try fakeShell(box, prompt: "anna@files.example's password: ", password: "right"))
         defer { good.disconnect() }
         _ = try good.connect(cancellation: nil)
         #expect(questions.isEmpty && remembered == ["right"])
 
         // The user gives up: remembered as a refusal, nothing stored.
         environment.declineMemory = 600
-        let refused = SFTPSession(profile: profile, environment: environment,
-                                  transport: try fakeShell(box, prompt: "anna@files.example's password: ", password: "right"))
+        let refused = SFTPSession(
+            profile: profile, environment: environment,
+            transport: try fakeShell(box, prompt: "anna@files.example's password: ", password: "right"))
         defer { refused.disconnect() }
         #expect(throws: NetworkError.self) { _ = try refused.connect(cancellation: nil) }
         #expect(questions.count == 1 && remembered == ["right"])
@@ -326,7 +356,8 @@ import Testing
         let box = try Sandbox()
         let environment = SessionEnvironment()
         environment.declineMemory = 0
-        let profile = ConnectionProfile(key: ServerKey(scheme: "sftp", host: "files.example"), user: "anna", password: "stored")
+        let profile = ConnectionProfile(
+            key: ServerKey(scheme: "sftp", host: "files.example"), user: "anna", password: "stored")
         var shown: [String] = []
         environment.askSecret = { _, question, _ in
             shown.append(question)
@@ -335,8 +366,13 @@ import Testing
         // A jump host, a question that names nobody, and a server that writes what looks like a
         // question about a key on this Mac: none of them gets the stored password, and the
         // user sees whose words they are.
-        for prompt in ["anna@jump.example's password: ", "Password: ", "(anna@files.example) Enter passphrase for key '/Users/a/.ssh/id': "] {
-            let session = SFTPSession(profile: profile, environment: environment, transport: try fakeShell(box, prompt: prompt, password: "typed"))
+        for prompt in [
+            "anna@jump.example's password: ", "Password: ",
+            "(anna@files.example) Enter passphrase for key '/Users/a/.ssh/id': "
+        ] {
+            let session = SFTPSession(
+                profile: profile, environment: environment,
+                transport: try fakeShell(box, prompt: prompt, password: "typed"))
             _ = try session.connect(cancellation: nil)
             session.disconnect()
         }
@@ -345,8 +381,9 @@ import Testing
         #expect(shown[1].contains("may come from the server") && shown[1].hasSuffix("Password: "))
         #expect(shown[2].contains("The server files.example asks") && shown[2].contains("comes from the server"))
         // Asked by this server for this login, the stored one is given without a question.
-        let own = SFTPSession(profile: profile, environment: environment,
-                              transport: try fakeShell(box, prompt: "(anna@files.example) Password: ", password: "stored"))
+        let own = SFTPSession(
+            profile: profile, environment: environment,
+            transport: try fakeShell(box, prompt: "(anna@files.example) Password: ", password: "stored"))
         _ = try own.connect(cancellation: nil)
         own.disconnect()
         #expect(shown.count == 3)
@@ -354,7 +391,9 @@ import Testing
 
     /// The real `ssh` with the options the program gives it, against a secure-shell server of
     /// the system on 127.0.0.1 that shows a banner made to look like an error.
-    @Test(.enabled(if: LocalSSHServer.isAvailable)) func theRealShellTakesTheOptionsAndTheBannerIsNotShownAsTheError() throws {
+    @Test(.enabled(if: LocalSSHServer.isAvailable)) func theRealShellTakesTheOptionsAndTheBannerIsNotShownAsTheError()
+        throws
+    {
         let box = try Sandbox()
         let banner = "BANNER-TEXT: your account is locked, run this command to unlock it"
         let server = try LocalSSHServer(box: box, passphrase: "open sesame", banner: banner)
@@ -366,15 +405,17 @@ import Testing
         // What only the test needs (its own keys and known hosts) first, then the program's own
         // arguments as they are: ssh takes the first value it is given for an option.
         let own = Array(server.clientArguments.dropLast(6))
-        let arguments = own + SFTPSession.sshArguments(for: ConnectionProfile(key: key, user: NSUserName()), options: values)
+        let arguments =
+            own + SFTPSession.sshArguments(for: ConnectionProfile(key: key, user: NSUserName()), options: values)
         let environment = SessionEnvironment()
         environment.options.values = values
         environment.declineMemory = 0
         var passphrase = "wrong"
         environment.askSecret = { _, _, isSecret in isSecret ? passphrase : "yes" }
         func session() -> SFTPSession {
-            SFTPSession(profile: ConnectionProfile(key: key, user: NSUserName()), environment: environment,
-                        transport: SFTPTransport(executable: "/usr/bin/ssh", arguments: arguments, asksQuestions: true))
+            SFTPSession(
+                profile: ConnectionProfile(key: key, user: NSUserName()), environment: environment,
+                transport: SFTPTransport(executable: "/usr/bin/ssh", arguments: arguments, asksQuestions: true))
         }
         // A login that fails: the message is ssh's own, not the server's banner.
         let failing = session()
@@ -383,7 +424,9 @@ import Testing
             Issue.record("the login with a wrong passphrase went through")
         } catch {
             #expect(!error.localizedDescription.contains("BANNER-TEXT"), "\(error.localizedDescription)")
-            #expect(error.localizedDescription.lowercased().contains("permission denied"), "\(error.localizedDescription)")
+            #expect(
+                error.localizedDescription.lowercased().contains("permission denied"), "\(error.localizedDescription)"
+            )
         }
         failing.disconnect()
         // With the right passphrase ssh accepts every option it was given and the files are there.

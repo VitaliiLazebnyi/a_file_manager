@@ -110,11 +110,19 @@ final class CommandRunner {
     /// away at the next start, when this process is gone.
     func removeListFilesNow() {
         let fm = FileManager.default
-        let files = (try? fm.contentsOfDirectory(at: listFolder, includingPropertiesForKeys: [.contentModificationDateKey])) ?? []
+        let files =
+            (try? fm.contentsOfDirectory(at: listFolder, includingPropertiesForKeys: [.contentModificationDateKey]))
+            ?? []
         var kept = 0
         for file in files {
-            let written = (try? file.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? .distantPast
-            if Date().timeIntervalSince(written) < CommandRunner.listGrace { kept += 1 } else { try? fm.removeItem(at: file) }
+            let written =
+                (try? file.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
+                ?? .distantPast
+            if Date().timeIntervalSince(written) < CommandRunner.listGrace {
+                kept += 1
+            } else {
+                try? fm.removeItem(at: file)
+            }
         }
         if kept == 0 { try? fm.removeItem(at: listFolder) }
     }
@@ -138,13 +146,17 @@ final class CommandRunner {
 
     /// A panel as the placeholders see it, and, when its marked names are many, how to gather
     /// them away from the main thread.
-    private func snapshot(of panel: PanelHandle, withSelection: Bool) -> (snapshot: PanelSnapshot, gather: (() -> [String])?) {
+    private func snapshot(of panel: PanelHandle, withSelection: Bool) -> (
+        snapshot: PanelSnapshot, gather: (() -> [String])?
+    ) {
         let model = panel.model
         // A branch view or a file list shows real files under display paths and relative
         // names; its items are given by their real paths, and the panel has no path of its own.
         let showsFiles = !model.directory.isFileURL && model.items.first?.url.isFileURL == true
         func name(of item: FileItem) -> String { showsFiles && item.url.isFileURL ? item.url.path : item.name }
-        var path = showsFiles ? "" : model.directory.isFileURL ? model.directory.path : kernel.fileSystems.displayPath(model.directory)
+        var path =
+            showsFiles
+            ? "" : model.directory.isFileURL ? model.directory.path : kernel.fileSystems.displayPath(model.directory)
         if !path.isEmpty, !path.hasSuffix("/") { path += "/" }
         var snapshot = PanelSnapshot(path: path, cursorName: model.cursorItem.map(name(of:)))
         let count = model.selectionCount
@@ -162,22 +174,29 @@ final class CommandRunner {
 
     /// Replaces the placeholders of `template`. With many marked names the work is done away
     /// from the main thread; `completion` is called on it either way.
-    private func expand(_ template: [ExpandedPiece], arguments: [ExpandedPiece], then completion: @escaping (ExpandedParameters) -> Void) {
+    private func expand(
+        _ template: [ExpandedPiece], arguments: [ExpandedPiece],
+        then completion: @escaping (ExpandedParameters) -> Void
+    ) {
         let panels = kernel.panels
         let needsSelection = ParameterExpander.usesSelection(template)
         let left = snapshot(of: panels.left, withSelection: needsSelection)
         let right = snapshot(of: panels.right, withSelection: needsSelection)
-        var context = ExpansionContext(left: left.snapshot, right: right.snapshot, sourceIsRight: panels.source === panels.right,
-                                       environment: environment, arguments: ShellLine.display(arguments), listFolder: listFolder)
+        var context = ExpansionContext(
+            left: left.snapshot, right: right.snapshot, sourceIsRight: panels.source === panels.right,
+            environment: environment, arguments: ShellLine.display(arguments), listFolder: listFolder)
         context.argumentPieces = arguments
-        guard left.gather != nil || right.gather != nil else { return completion(ParameterExpander(context: context).expand(template)) }
+        guard left.gather != nil || right.gather != nil else {
+            return completion(ParameterExpander(context: context).expand(template))
+        }
         let prepared = context
-        offMain({
-            var context = prepared
-            if let gather = left.gather { context.left.selection = gather() }
-            if let gather = right.gather { context.right.selection = gather() }
-            return ParameterExpander(context: context).expand(template)
-        }, then: completion)
+        offMain(
+            {
+                var context = prepared
+                if let gather = left.gather { context.left.selection = gather() }
+                if let gather = right.gather { context.right.selection = gather() }
+                return ParameterExpander(context: context).expand(template)
+            }, then: completion)
     }
 
     private func location(_ text: String) -> URL {
@@ -209,28 +228,40 @@ final class CommandRunner {
     /// `completion` is called, on the main thread, when everything it started has ended; it is
     /// not called when the command was not run because the user gave up or it was refused
     /// for another reason than calling itself.
-    func run(_ action: CommandAction, arguments: String = "", as name: String? = nil, title: String, completion: (() -> Void)? = nil) {
+    func run(
+        _ action: CommandAction, arguments: String = "", as name: String? = nil, title: String,
+        completion: (() -> Void)? = nil
+    ) {
         // Started from inside a running user command, this one is a call of that one.
-        run(action, arguments: arguments.isEmpty ? [] : [.text(arguments)], as: name, title: title,
+        run(
+            action, arguments: arguments.isEmpty ? [] : [.text(arguments)], as: name, title: title,
             call: Call(names: active, budget: Budget(), generation: generation), completion: completion)
     }
 
-    private func run(_ action: CommandAction, arguments: [ExpandedPiece], as name: String?, title: String, call: Call, completion: (() -> Void)?) {
+    private func run(
+        _ action: CommandAction, arguments: [ExpandedPiece], as name: String?, title: String, call: Call,
+        completion: (() -> Void)?
+    ) {
         let title = DisplayText.oneLine(title, limit: 80)
         if let name, call.names.contains(name) {
-            kernel.ui.inform("“\(title)” calls itself", detail: "The command \(name) was not run again.", style: .warning)
+            kernel.ui.inform(
+                "“\(title)” calls itself", detail: "The command \(name) was not run again.", style: .warning)
             return completion?() ?? ()
         }
         guard call.names.count < CommandRunner.depthLimit else {
-            kernel.ui.inform("“\(title)” is nested too deeply", detail: "User commands call each other more than \(CommandRunner.depthLimit) levels deep. "
-                             + "The command was not run.", style: .warning)
+            kernel.ui.inform(
+                "“\(title)” is nested too deeply",
+                detail: "User commands call each other more than \(CommandRunner.depthLimit) levels deep. "
+                    + "The command was not run.", style: .warning)
             return completion?() ?? ()
         }
         let steps = CommandLanguage.steps(action.command, environment: environment, resolve: resolve)
         guard !steps.isEmpty else { return }
         let template: [ExpandedPiece] = action.parameters.isEmpty ? arguments : [.text(action.parameters)]
         expand(template, arguments: arguments) { [weak self] expanded in
-            self?.start(steps, action, arguments: arguments, expanded: expanded, as: name, title: title, call: call, completion: completion)
+            self?.start(
+                steps, action, arguments: arguments, expanded: expanded, as: name, title: title, call: call,
+                completion: completion)
         }
     }
 
@@ -244,14 +275,20 @@ final class CommandRunner {
         return parameters.isEmpty ? line : line + [.text(" ")] + parameters
     }
 
-    private func start(_ steps: [CommandStep], _ action: CommandAction, arguments: [ExpandedPiece], expanded: ExpandedParameters, as name: String?,
-                       title: String, call: Call, completion: (() -> Void)?) {
+    private func start(
+        _ steps: [CommandStep], _ action: CommandAction, arguments: [ExpandedPiece], expanded: ExpandedParameters,
+        as name: String?,
+        title: String, call: Call, completion: (() -> Void)?
+    ) {
         guard call.generation == generation else { return }
         var pieces = expanded.pieces
         // A name code with no name stands for the folder (`rm -rf %P%N`): nothing is run.
         if expanded.missingName {
-            kernel.ui.inform("“\(title)” needs a file", detail: "There is no file under the cursor, only the parent row or an empty list. The command was not run.",
-                             style: .warning)
+            kernel.ui.inform(
+                "“\(title)” needs a file",
+                detail:
+                    "There is no file under the cursor, only the parent row or an empty list. The command was not run.",
+                style: .warning)
             return
         }
         if let problem = expanded.problem { return refuse(title, problem) }
@@ -261,39 +298,55 @@ final class CommandRunner {
         if expanded.asksFirst {
             // Names a shell could read as something else are shown as references to them.
             let shown = ShellLine.prompt(pieces)
-            guard let edited = kernel.ui.prompt("Parameters for “\(title)”:", value: shown.text, detail: shown.legend) else { return }
+            guard let edited = kernel.ui.prompt("Parameters for “\(title)”:", value: shown.text, detail: shown.legend)
+            else { return }
             pieces = ShellLine.pieces(fromPrompt: edited, values: shown.values)
         }
-        let isExternal = steps.contains { if case .external = $0 { return true } else { return false } }
+        let isExternal = steps.contains {
+            guard case .external = $0 else { return false }
+            return true
+        }
         // The line is checked before anything of the command runs. (A line with thousands of
         // names is checked where it is started; a refusal is reported from there.)
         if isExternal, pieces.count <= CommandRunner.checkedHereLimit,
-           case .failure(let refusal) = ShellLine.script(externalLine(action.command, parameters: pieces)) {
-            return refuse(title, refusal.explanation + " A file name is handed to the shell as data, and that is not possible at this place of the line.")
+            case .failure(let refusal) = ShellLine.script(externalLine(action.command, parameters: pieces))
+        {
+            return refuse(
+                title,
+                refusal.explanation
+                    + " A file name is handed to the shell as data, and that is not possible at this place of the line."
+            )
         }
         let listURL = expanded.listFile?.url
-        let chain = Chain(isChain: steps.count > 1, parameters: pieces, command: action.command, startPath: action.startPath, listURL: listURL,
-                          title: title, call: Call(names: call.names + (name.map { [$0] } ?? []), budget: call.budget, generation: call.generation))
+        let chain = Chain(
+            isChain: steps.count > 1, parameters: pieces, command: action.command, startPath: action.startPath,
+            listURL: listURL,
+            title: title,
+            call: Call(
+                names: call.names + (name.map { [$0] } ?? []), budget: call.budget, generation: call.generation))
         let begin = { [self] in
             perform(steps[...], chain, then: completion)
             // Commands of the program have read the list by now; a started process removes it itself.
             if !isExternal { removeListFile(listURL, after: CommandRunner.listGrace) }
         }
         guard let list = expanded.listFile else { return begin() }
-        onListQueue({
-            Result {
-                try FileManager.default.createDirectory(at: list.url.deletingLastPathComponent(), withIntermediateDirectories: true,
-                                                        attributes: [.posixPermissions: 0o700])
-                // The names of the user's files are for the started program alone.
-                try list.contents.write(to: list.url)
-                try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: list.url.path)
-            }
-        }, then: { [self] result in
-            if case .failure(let error) = result {
-                return kernel.ui.report(error, title: "The list of files for “\(title)” could not be written")
-            }
-            begin()
-        })
+        onListQueue(
+            {
+                Result {
+                    try FileManager.default.createDirectory(
+                        at: list.url.deletingLastPathComponent(), withIntermediateDirectories: true,
+                        attributes: [.posixPermissions: 0o700])
+                    // The names of the user's files are for the started program alone.
+                    try list.contents.write(to: list.url)
+                    try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: list.url.path)
+                }
+            },
+            then: { [self] result in
+                if case .failure(let error) = result {
+                    return kernel.ui.report(error, title: "The list of files for “\(title)” could not be written")
+                }
+                begin()
+            })
     }
 
     /// Runs the steps in the written order. A `cm_wait` hands the rest to a timer, so the
@@ -309,8 +362,10 @@ final class CommandRunner {
             chain.call.budget.steps += 1
             guard chain.call.budget.steps <= CommandRunner.stepLimit else {
                 chain.call.budget.isSpent = true
-                return kernel.ui.inform("“\(chain.title)” was stopped", detail: "It ran \(CommandRunner.stepLimit) steps with the commands it calls, "
-                                        + "which looks like a loop. The remaining steps were not run.", style: .warning)
+                return kernel.ui.inform(
+                    "“\(chain.title)” was stopped",
+                    detail: "It ran \(CommandRunner.stepLimit) steps with the commands it calls, "
+                        + "which looks like a loop. The remaining steps were not run.", style: .warning)
             }
             switch step {
             case .wait(let milliseconds):
@@ -327,12 +382,14 @@ final class CommandRunner {
                 return
             case .perform(let id, let written):
                 // A chained command takes only what is written after its name.
-                let pieces: [ExpandedPiece] = chain.isChain || !written.isEmpty ? (written.isEmpty ? [] : [.text(written)]) : chain.parameters
+                let pieces: [ExpandedPiece] =
+                    chain.isChain || !written.isEmpty ? (written.isEmpty ? [] : [.text(written)]) : chain.parameters
                 if let found = chained(id.rawValue) {
                     // A user command or Start-menu entry is run here: what it starts is waited
                     // for, and the values it is given stay values.
                     let later = rest
-                    run(found.action, arguments: pieces, as: found.name, title: found.title, call: chain.call) { [weak self] in
+                    run(found.action, arguments: pieces, as: found.name, title: found.title, call: chain.call) {
+                        [weak self] in
                         self?.perform(later, chain, then: done)
                     }
                     return
@@ -353,13 +410,16 @@ final class CommandRunner {
                 let later = rest
                 // The next step of a chain (`em_build, cm_RereadSource`) runs when the program has ended.
                 let waits = (!later.isEmpty || done != nil) && launchesApplications
-                launch(externalLine(chain.command, parameters: chain.parameters), chain, waits: waits) { [weak self] started in
+                launch(externalLine(chain.command, parameters: chain.parameters), chain, waits: waits) {
+                    [weak self] started in
                     guard started else { return }
                     self?.perform(later, chain, then: done)
                 }
                 if waits { return }
             case .unknown(let command):
-                kernel.ui.inform("Unknown command", detail: "No command is called \(DisplayText.oneLine(command, limit: 80)).", style: .warning)
+                kernel.ui.inform(
+                    "Unknown command", detail: "No command is called \(DisplayText.oneLine(command, limit: 80)).",
+                    style: .warning)
             }
         }
         done?()
@@ -368,7 +428,9 @@ final class CommandRunner {
     /// What a command of a chain is made of when it is a user command or a Start-menu entry;
     /// nil for every other command.
     private func chained(_ id: String) -> (action: CommandAction, name: String, title: String)? {
-        if id.hasPrefix(UserCommand.prefix), let found = userCommand?(id) { return (found.action, found.name, found.caption) }
+        if id.hasPrefix(UserCommand.prefix), let found = userCommand?(id) {
+            return (found.action, found.name, found.caption)
+        }
         if let found = startMenuEntry?(id) { return (found.action, id, found.title) }
         return nil
     }
@@ -387,14 +449,18 @@ final class CommandRunner {
         }
         let source = kernel.panels.source.model.directory
         let directory = folder ?? (source.isFileURL ? source.path : NSHomeDirectory())
-        let (grace, listURL, generation, children) = (CommandRunner.listGrace, chain.listURL, chain.call.generation, self.children)
+        let (grace, listURL, generation, children) = (
+            CommandRunner.listGrace, chain.listURL, chain.call.generation, self.children
+        )
         let program = DisplayText.oneLine(ShellWords.unquoted(ShellWords.firstWord(of: line).word), limit: 80)
         if waits { waiting += 1 }
         let finished = { [weak self] (failure: String?) in
             MainLoop.perform {
                 guard let self else { return }
                 self.removeListFile(listURL, after: grace)
-                if let failure { self.kernel.ui.inform("“\(program)” cannot be started!", detail: failure, style: .warning) }
+                if let failure {
+                    self.kernel.ui.inform("“\(program)” cannot be started!", detail: failure, style: .warning)
+                }
                 // A chain the user stopped meanwhile does not go on.
                 guard waits, generation == self.generation else { return }
                 self.waiting -= 1
@@ -404,7 +470,9 @@ final class CommandRunner {
         // On a thread of the kernel's own: the start folder may lie on a share that does not answer.
         BlockingCalls.run {
             var isFolder: ObjCBool = false
-            if let folder, !(FileManager.default.fileExists(atPath: folder, isDirectory: &isFolder) && isFolder.boolValue) {
+            if let folder,
+                !(FileManager.default.fileExists(atPath: folder, isDirectory: &isFolder) && isFolder.boolValue)
+            {
                 return finished("The start folder \(DisplayText.oneLine(folder)) does not exist.")
             }
             let script: ShellScript
@@ -413,8 +481,10 @@ final class CommandRunner {
             case .success(let made): script = made
             }
             let shell = LoginShell.posix
-            switch ChildProcess.spawn(executable: shell.executable, arguments: shell.options + script.arguments,
-                                      environment: LoginShell.environment(), directory: directory) {
+            switch ChildProcess.spawn(
+                executable: shell.executable, arguments: shell.options + script.arguments,
+                environment: LoginShell.environment(), directory: directory)
+            {
             case .failure(let failure):
                 finished(failure.message)
             case .success(let pid):
@@ -442,7 +512,9 @@ final class CommandRunner {
         let fm = FileManager.default
         if first.lowercased().hasSuffix(".app") {
             let path = NSString(string: first).expandingTildeInPath
-            let exists = first.contains("/") ? fm.fileExists(atPath: path)
+            let exists =
+                first.contains("/")
+                ? fm.fileExists(atPath: path)
                 : applicationFolders.contains { fm.fileExists(atPath: $0.appendingPathComponent(first).path) }
             return exists ? [.text("/usr/bin/open -a "), .value(path)] + rest : nil
         }
@@ -451,7 +523,10 @@ final class CommandRunner {
             return false
         }
         guard isAlone, !first.contains("/") else { return nil }
-        guard applicationFolders.contains(where: { fm.fileExists(atPath: $0.appendingPathComponent(first + ".app").path) }) else { return nil }
+        guard
+            applicationFolders.contains(where: { fm.fileExists(atPath: $0.appendingPathComponent(first + ".app").path) }
+            )
+        else { return nil }
         return [.text("if command -v "), .value(first), .text(" >/dev/null 2>&1\nthen ")] + line
             + [.text("\nelse /usr/bin/open -a "), .value(first), .text("\nfi")]
     }
@@ -461,8 +536,10 @@ final class CommandRunner {
         applicationLine(for: [.text(line)]).map(ShellLine.display)
     }
 
-    private static let applicationFolders: [URL] = ["/Applications", "/System/Applications", "/System/Applications/Utilities", "/Applications/Utilities",
-                                                    NSHomeDirectory() + "/Applications"].map { URL(fileURLWithPath: $0) }
+    private static let applicationFolders: [URL] = [
+        "/Applications", "/System/Applications", "/System/Applications/Utilities", "/Applications/Utilities",
+        NSHomeDirectory() + "/Applications"
+    ].map { URL(fileURLWithPath: $0) }
 }
 
 /// Hands a block to the main thread through the run loop (all modes that count), not through

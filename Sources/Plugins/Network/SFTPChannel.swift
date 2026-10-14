@@ -49,8 +49,10 @@ struct SFTPAttributes {
     var isSpecial: Bool { [0o010000, 0o020000, 0o060000, 0o140000].contains((permissions ?? 0) & 0o170000) }
 
     func entry(named name: String) -> RemoteEntry {
-        var entry = RemoteEntry(name: name, isDirectory: isDirectory, isSymlink: isSymlink, size: Int64(clamping: size ?? 0),
-                                modified: modified.map { Date(timeIntervalSince1970: TimeInterval($0)) }, permissions: permissions.map { UInt16($0 & 0o7777) })
+        var entry = RemoteEntry(
+            name: name, isDirectory: isDirectory, isSymlink: isSymlink, size: Int64(clamping: size ?? 0),
+            modified: modified.map { Date(timeIntervalSince1970: TimeInterval($0)) },
+            permissions: permissions.map { UInt16($0 & 0o7777) })
         entry.isSpecial = isSpecial
         return entry
     }
@@ -93,7 +95,9 @@ struct SFTPEncoder {
         for (index, piece) in Array(value.utf8).split(separator: 0x2F, omittingEmptySubsequences: false).enumerated() {
             if index > 0 { result.append(0x2F) }
             let name = String(decoding: piece, as: UTF8.self)
-            if let spelled = names.encoding(of: piece), let kept = name.data(using: spelled, allowLossyConversion: false) {
+            if let spelled = names.encoding(of: piece),
+                let kept = name.data(using: spelled, allowLossyConversion: false)
+            {
                 result.append(kept)
             } else {
                 result.append(Data(name.precomposedStringWithCanonicalMapping.utf8))
@@ -125,7 +129,9 @@ struct SFTPDecoder {
     }
 
     private mutating func take(_ count: Int) throws -> Data {
-        guard count >= 0, data.endIndex - offset >= count else { throw NetworkError.unexpected("a damaged SFTP packet") }
+        guard count >= 0, data.endIndex - offset >= count else {
+            throw NetworkError.unexpected("a damaged SFTP packet")
+        }
         defer { offset += count }
         return data[offset..<offset + count]
     }
@@ -166,7 +172,13 @@ struct SFTPDecoder {
 /// One answer of the server: its type and what follows the request number.
 struct SFTPPacket {
     enum Kind: UInt8 {
-        case version = 2, status = 101, handle = 102, data = 103, name = 104, attributes = 105, extendedReply = 201
+        case version = 2
+        case status = 101
+        case handle = 102
+        case data = 103
+        case name = 104
+        case attributes = 105
+        case extendedReply = 201
         /// Not a packet: the channel closed before an answer came.
         case closed = 0
     }
@@ -201,8 +213,23 @@ struct SFTPPacket {
 
 /// The request types of SFTP version 3.
 enum SFTPRequest: UInt8 {
-    case open = 3, close = 4, read = 5, write = 6, lstat = 7, fstat = 8, setstat = 9, fsetstat = 10, opendir = 11, readdir = 12
-    case remove = 13, mkdir = 14, rmdir = 15, realpath = 16, stat = 17, rename = 18, extended = 200
+    case open = 3
+    case close = 4
+    case read = 5
+    case write = 6
+    case lstat = 7
+    case fstat = 8
+    case setstat = 9
+    case fsetstat = 10
+    case opendir = 11
+    case readdir = 12
+    case remove = 13
+    case mkdir = 14
+    case rmdir = 15
+    case realpath = 16
+    case stat = 17
+    case rename = 18
+    case extended = 200
 }
 
 /// Lets `ssh` ask its questions (a password, the passphrase of a key, an unknown host key)
@@ -240,32 +267,35 @@ final class AskpassHelper {
 
     init() throws {
         directory = FileManager.default.temporaryDirectory.appendingPathComponent("afm-askpass-\(UUID().uuidString)")
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
-        let (questionPath, answerPath) = (directory.appendingPathComponent("question").path, directory.appendingPathComponent("answer").path)
+        try FileManager.default.createDirectory(
+            at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+        let (questionPath, answerPath) = (
+            directory.appendingPathComponent("question").path, directory.appendingPathComponent("answer").path
+        )
         guard mkfifo(questionPath, 0o600) == 0, mkfifo(answerPath, 0o600) == 0 else { throw POSIXError(.EIO) }
         // Opened for reading and writing, so neither end blocks or sees an end of file while
         // the script comes and goes.
         question = open(questionPath, O_RDWR | O_NONBLOCK)
         answer = open(answerPath, O_RDWR | O_NONBLOCK)
         let script = """
-        #!/bin/sh
-        id="$$.$(date +%s)"
-        kind="${SSH_ASKPASS_PROMPT:-}"
-        printf '%s\\n%s\\n%s\\n%s\\n' "$id" "$kind" "$1" "$AFM_ASKPASS_END" > "$AFM_ASKPASS_QUESTION"
-        exec 3< "$AFM_ASKPASS_ANSWER"
-        reply=
-        while IFS= read -r line <&3; do
-          case "$line" in
-            "$id "*) reply=${line#"$id "}; break ;;
-          esac
-        done
-        if [ "$kind" = confirm ]; then
-          [ "$reply" = yes ] && exit 0
-          exit 1
-        fi
-        printf '%s\\n' "$reply"
+            #!/bin/sh
+            id="$$.$(date +%s)"
+            kind="${SSH_ASKPASS_PROMPT:-}"
+            printf '%s\\n%s\\n%s\\n%s\\n' "$id" "$kind" "$1" "$AFM_ASKPASS_END" > "$AFM_ASKPASS_QUESTION"
+            exec 3< "$AFM_ASKPASS_ANSWER"
+            reply=
+            while IFS= read -r line <&3; do
+              case "$line" in
+                "$id "*) reply=${line#"$id "}; break ;;
+              esac
+            done
+            if [ "$kind" = confirm ]; then
+              [ "$reply" = yes ] && exit 0
+              exit 1
+            fi
+            printf '%s\\n' "$reply"
 
-        """
+            """
         let scriptURL = directory.appendingPathComponent("askpass.sh")
         try script.write(to: scriptURL, atomically: true, encoding: .utf8)
         try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: scriptURL.path)
@@ -279,9 +309,11 @@ final class AskpassHelper {
 
     /// What the child process needs in its environment.
     var environment: [String: String] {
-        ["SSH_ASKPASS": directory.appendingPathComponent("askpass.sh").path, "SSH_ASKPASS_REQUIRE": "force",
-         "AFM_ASKPASS_QUESTION": directory.appendingPathComponent("question").path,
-         "AFM_ASKPASS_ANSWER": directory.appendingPathComponent("answer").path, "AFM_ASKPASS_END": endMarker]
+        [
+            "SSH_ASKPASS": directory.appendingPathComponent("askpass.sh").path, "SSH_ASKPASS_REQUIRE": "force",
+            "AFM_ASKPASS_QUESTION": directory.appendingPathComponent("question").path,
+            "AFM_ASKPASS_ANSWER": directory.appendingPathComponent("answer").path, "AFM_ASKPASS_END": endMarker
+        ]
     }
 
     /// A question that has arrived completely; nil when there is none.
@@ -291,7 +323,9 @@ final class AskpassHelper {
             let count = read(question, &buffer, buffer.count)
             guard count > 0 else { break }
             received.append(buffer, count: count)
-            if received.count > AskpassHelper.longestQuestion { received.removeFirst(received.count - AskpassHelper.longestQuestion) }
+            if received.count > AskpassHelper.longestQuestion {
+                received.removeFirst(received.count - AskpassHelper.longestQuestion)
+            }
         }
         let text = String(decoding: received, as: UTF8.self)
         guard let end = text.range(of: "\n" + endMarker + "\n") else { return nil }
@@ -361,14 +395,17 @@ final class SFTPChannel {
     deinit { close() }
 
     var isClosed: Bool {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         return closed
     }
 
     /// What the child process wrote to its error output, e.g. why the login failed.
     var errorMessage: String {
-        lock.lock(); defer { lock.unlock() }
-        return String(decoding: errorText, as: UTF8.self).split(whereSeparator: \.isNewline).suffix(3).joined(separator: "\n")
+        lock.lock()
+        defer { lock.unlock() }
+        return String(decoding: errorText, as: UTF8.self).split(whereSeparator: \.isNewline).suffix(3).joined(
+            separator: "\n")
     }
 
     /// `errorMessage` once the child process has had its say: when the dialogue broke off, the
@@ -377,7 +414,9 @@ final class SFTPChannel {
     func errorMessageAtTheEnd() -> String {
         // The reading thread comes to the end once the process has gone; on a busy machine that
         // can take a moment longer than the process itself, so it is given a few seconds.
-        if lastWords.wait(timeout: .now() + SFTPChannel.lastWordsTime + SFTPChannel.endTime) == .success { lastWords.signal() }
+        if lastWords.wait(timeout: .now() + SFTPChannel.lastWordsTime + SFTPChannel.endTime) == .success {
+            lastWords.signal()
+        }
         return errorMessage
     }
 
@@ -388,7 +427,8 @@ final class SFTPChannel {
             // Reading and keeping are one step under `errorReading`: whoever reads the rest at
             // the end (`drainErrors`) must not find the pipe empty while a piece that was
             // taken out of it here is not kept yet.
-            errorReading.lock(); defer { errorReading.unlock() }
+            errorReading.lock()
+            defer { errorReading.unlock() }
             let data = handle.availableData
             guard let self, !data.isEmpty else { return handle.readabilityHandler = nil }
             lock.lock()
@@ -436,7 +476,9 @@ final class SFTPChannel {
             if let packet = try version.wait(timeout: 0.1, cancellation: cancellation) {
                 var decoder = try packet.expect(.version)
                 _ = try decoder.u32()
-                while !decoder.isAtEnd, let name = try? decoder.string(), let value = try? decoder.string() { extensions[name] = value }
+                while !decoder.isAtEnd, let name = try? decoder.string(), let value = try? decoder.string() {
+                    extensions[name] = value
+                }
                 return
             }
             let asked = Date()
@@ -457,7 +499,8 @@ final class SFTPChannel {
         _ = fcntl(descriptor, F_SETFL, fcntl(descriptor, F_GETFL) | O_NONBLOCK)
         let deadline = Date().addingTimeInterval(SFTPChannel.lastWordsTime)
         var buffer = [UInt8](repeating: 0, count: 4096)
-        errorReading.lock(); defer { errorReading.unlock() }
+        errorReading.lock()
+        defer { errorReading.unlock() }
         while Date() < deadline {
             var waiting = pollfd(fd: descriptor, events: Int16(POLLIN), revents: 0)
             guard Darwin.poll(&waiting, 1, 50) > 0 else { continue }
@@ -493,7 +536,9 @@ final class SFTPChannel {
             let length = Int(header.reduce(UInt32(0)) { $0 << 8 | UInt32($1) })
             // Nothing the protocol sends is this large (a read brings 32 KB, OpenSSH never sends more
             // than 256 KB); a wrong length means the stream is not SFTP, and is not made room for.
-            guard length >= 1, length <= SFTPChannel.largestPacket, let payload = readExactly(length), let kind = SFTPPacket.Kind(rawValue: payload[0]) else { return }
+            guard length >= 1, length <= SFTPChannel.largestPacket, let payload = readExactly(length),
+                let kind = SFTPPacket.Kind(rawValue: payload[0])
+            else { return }
             // The body is a view of the payload; nothing is copied.
             if !handle(SFTPPacket(kind: kind, body: payload.dropFirst())) { return }
         }
@@ -597,7 +642,9 @@ final class SFTPChannel {
                 let descriptor = toServer.fileHandleForWriting.fileDescriptor
                 for packet in queued { try writeAll(packet, to: descriptor, cancellation: nil) }
             }
-            if let packet { try writeAll(packet, to: toServer.fileHandleForWriting.fileDescriptor, cancellation: cancellation) }
+            if let packet {
+                try writeAll(packet, to: toServer.fileHandleForWriting.fileDescriptor, cancellation: cancellation)
+            }
         } catch NetworkError.cancelled {
             throw NetworkError.cancelled
         } catch {
@@ -636,7 +683,9 @@ final class SFTPChannel {
     }
 
     /// Sends a request without waiting; several can be under way and are answered in any order.
-    func send(_ type: SFTPRequest, cancellation: CancellationFlag? = nil, _ build: (inout SFTPEncoder) -> Void) throws -> Ticket {
+    func send(_ type: SFTPRequest, cancellation: CancellationFlag? = nil, _ build: (inout SFTPEncoder) -> Void) throws
+        -> Ticket
+    {
         if cancellation?.isCancelled == true { throw NetworkError.cancelled }
         let answer = Pending<SFTPPacket>()
         lock.lock()
@@ -701,8 +750,10 @@ final class SFTPChannel {
         return packet
     }
 
-    func request(_ type: SFTPRequest, timeout: TimeInterval, cancellation: CancellationFlag? = nil,
-                 _ build: (inout SFTPEncoder) -> Void) throws -> SFTPPacket {
+    func request(
+        _ type: SFTPRequest, timeout: TimeInterval, cancellation: CancellationFlag? = nil,
+        _ build: (inout SFTPEncoder) -> Void
+    ) throws -> SFTPPacket {
         let ticket = try send(type, cancellation: cancellation, build)
         do {
             return try wait(for: ticket, timeout: timeout, cancellation: cancellation)

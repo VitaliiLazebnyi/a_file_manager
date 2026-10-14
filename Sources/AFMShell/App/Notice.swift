@@ -34,7 +34,8 @@ enum Notice {
         label.frame = NSRect(x: 16, y: 9, width: frame.width - 32, height: size.height)
         background.addSubview(label)
 
-        let panel = NSPanel(contentRect: frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        let panel = NSPanel(
+            contentRect: frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = true
@@ -49,17 +50,26 @@ enum Notice {
         panel.alphaValue = 0
         if let window { window.addChildWindow(panel, ordered: .above) } else { panel.orderFrontRegardless() }
         shown = panel
-        NSAccessibility.post(element: panel, notification: .announcementRequested,
-                             userInfo: [.announcement: message, .priority: NSAccessibilityPriorityLevel.high.rawValue])
-        NSAnimationContext.runAnimationGroup { $0.duration = 0.15; panel.animator().alphaValue = 1 }
+        NSAccessibility.post(
+            element: panel, notification: .announcementRequested,
+            userInfo: [.announcement: message, .priority: NSAccessibilityPriorityLevel.high.rawValue])
+        NSAnimationContext.runAnimationGroup {
+            $0.duration = 0.15
+            panel.animator().alphaValue = 1
+        }
         DispatchQueue.main.asyncAfter(deadline: .now() + duration) {
             guard current == generation else { return }
-            NSAnimationContext.runAnimationGroup({ $0.duration = 0.4; panel.animator().alphaValue = 0 }, completionHandler: {
-                guard current == generation else { return }
-                panel.parent?.removeChildWindow(panel)
-                panel.orderOut(nil)
-                shown = nil
-            })
+            NSAnimationContext.runAnimationGroup(
+                {
+                    $0.duration = 0.4
+                    panel.animator().alphaValue = 0
+                },
+                completionHandler: {
+                    guard current == generation else { return }
+                    panel.parent?.removeChildWindow(panel)
+                    panel.orderOut(nil)
+                    shown = nil
+                })
         }
     }
 }

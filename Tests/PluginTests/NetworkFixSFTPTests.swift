@@ -1,8 +1,9 @@
 import AFMKernel
 import Foundation
-@testable import NetworkPlugin
 import TestSupport
 import Testing
+
+@testable import NetworkPlugin
 
 /// An SFTP server written for these tests, run by the Python that comes with the developer
 /// tools. Unlike the system's `sftp-server` it can be made to behave badly: every answer comes
@@ -37,181 +38,182 @@ final class FakeSFTPServer {
     init(root: URL, box: Sandbox, mode: Mode = .normal, delay: ClosedRange<Int> = 20...60) throws {
         let script = box.url("fake-sftp.py")
         try FakeSFTPServer.script.write(to: script, atomically: true, encoding: .utf8)
-        transport = SFTPTransport(executable: FakeSFTPServer.python,
-                                  arguments: [script.path, mode.rawValue, root.path, String(delay.lowerBound), String(delay.upperBound)])
+        transport = SFTPTransport(
+            executable: FakeSFTPServer.python,
+            arguments: [script.path, mode.rawValue, root.path, String(delay.lowerBound), String(delay.upperBound)])
     }
 
     static let script = """
-    import heapq, os, random, select, struct, sys, time
-    mode, root, low, high = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4])
-    handles = {}
-    written = set()
-    nextHandle = [1]
-    log = open(os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), "sftp-requests.log"), "a")
-    due = []
-    counter = [0]
-    peak = [0]
-    peakPath = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), "sftp-peak.log")
-    buffer = b""
+        import heapq, os, random, select, struct, sys, time
+        mode, root, low, high = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4])
+        handles = {}
+        written = set()
+        nextHandle = [1]
+        log = open(os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), "sftp-requests.log"), "a")
+        due = []
+        counter = [0]
+        peak = [0]
+        peakPath = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), "sftp-peak.log")
+        buffer = b""
 
-    def u32(value): return struct.pack(">I", value)
-    def string(value):
-        if isinstance(value, str): value = value.encode()
-        return u32(len(value)) + value
-    def packet(kind, body): return u32(len(body) + 1) + bytes([kind]) + body
-    def status(ident, code, message=""): return packet(101, u32(ident) + u32(code) + string(message) + string(""))
-    def attributes(path):
-        info = os.lstat(path)
-        return u32(1 | 4 | 8) + struct.pack(">Q", info.st_size) + u32(info.st_mode) + u32(int(info.st_atime)) + u32(int(info.st_mtime))
+        def u32(value): return struct.pack(">I", value)
+        def string(value):
+            if isinstance(value, str): value = value.encode()
+            return u32(len(value)) + value
+        def packet(kind, body): return u32(len(body) + 1) + bytes([kind]) + body
+        def status(ident, code, message=""): return packet(101, u32(ident) + u32(code) + string(message) + string(""))
+        def attributes(path):
+            info = os.lstat(path)
+            return u32(1 | 4 | 8) + struct.pack(">Q", info.st_size) + u32(info.st_mode) + u32(int(info.st_atime)) + u32(int(info.st_mtime))
 
-    def send_later(data):
-        delay = random.uniform(low, high) / 1000.0
-        counter[0] += 1
-        heapq.heappush(due, (time.time() + delay, counter[0], data))
-        # The most answers that were owed at one moment: what a test reads to see requests overlap.
-        if len(due) > peak[0]:
-            peak[0] = len(due)
-            with open(peakPath, "w") as out: out.write(str(peak[0]))
+        def send_later(data):
+            delay = random.uniform(low, high) / 1000.0
+            counter[0] += 1
+            heapq.heappush(due, (time.time() + delay, counter[0], data))
+            # The most answers that were owed at one moment: what a test reads to see requests overlap.
+            if len(due) > peak[0]:
+                peak[0] = len(due)
+                with open(peakPath, "w") as out: out.write(str(peak[0]))
 
-    def take_string(data, at):
-        (length,) = struct.unpack_from(">I", data, at)
-        return data[at + 4:at + 4 + length], at + 4 + length
+        def take_string(data, at):
+            (length,) = struct.unpack_from(">I", data, at)
+            return data[at + 4:at + 4 + length], at + 4 + length
 
-    def handle(kind, body):
-        if kind == 1:
-            os.write(1, packet(2, u32(3)))
-            if mode == "stall":
-                time.sleep(600)
-            return
-        (ident,) = struct.unpack_from(">I", body, 0)
-        at = 4
-        log.write(str(kind) + "\\n")
-        log.flush()
-        if kind == 16:
-            name, at = take_string(body, at)
-            send_later(packet(104, u32(ident) + u32(1) + string("/") + string("/") + u32(0)))
-        elif kind in (7, 17):
-            name, at = take_string(body, at)
-            path = os.path.join(root, name.decode().lstrip("/"))
-            if name.decode().endswith("hang") and mode in ("hang", "hangio"):
+        def handle(kind, body):
+            if kind == 1:
+                os.write(1, packet(2, u32(3)))
+                if mode == "stall":
+                    time.sleep(600)
                 return
-            if os.path.lexists(path):
-                send_later(packet(105, u32(ident) + attributes(path)))
-            else:
-                send_later(status(ident, 2, "No such file"))
-        elif kind == 3:
-            name, at = take_string(body, at)
-            (flags,) = struct.unpack_from(">I", body, at)
-            path = os.path.join(root, name.decode().lstrip("/"))
-            try:
-                if flags & 2:
-                    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644)
+            (ident,) = struct.unpack_from(">I", body, 0)
+            at = 4
+            log.write(str(kind) + "\\n")
+            log.flush()
+            if kind == 16:
+                name, at = take_string(body, at)
+                send_later(packet(104, u32(ident) + u32(1) + string("/") + string("/") + u32(0)))
+            elif kind in (7, 17):
+                name, at = take_string(body, at)
+                path = os.path.join(root, name.decode().lstrip("/"))
+                if name.decode().endswith("hang") and mode in ("hang", "hangio"):
+                    return
+                if os.path.lexists(path):
+                    send_later(packet(105, u32(ident) + attributes(path)))
                 else:
-                    descriptor = os.open(path, os.O_RDONLY)
-            except OSError as error:
-                send_later(status(ident, 2 if error.errno == 2 else 4, str(error)))
-                return
-            number = nextHandle[0]
-            nextHandle[0] += 1
-            handles[number] = descriptor
-            send_later(packet(102, u32(ident) + string(str(number))))
-        elif kind == 5:
-            name, at = take_string(body, at)
-            offset, length = struct.unpack_from(">QI", body, at)
-            descriptor = handles[int(name)]
-            if mode == "hangio" and offset >= 98304:
-                return
-            if mode == "failread" and offset >= 98304:
-                send_later(status(ident, 4, "Read failed"))
-                return
-            # Some answers are shorter than asked for.
-            if random.random() < 0.3:
-                length = random.randint(1, length)
-            data = os.pread(descriptor, length, offset)
-            if not data:
-                send_later(status(ident, 1, "EOF"))
-            else:
-                send_later(packet(103, u32(ident) + string(data)))
-        elif kind == 6:
-            name, at = take_string(body, at)
-            (offset,) = struct.unpack_from(">Q", body, at)
-            data, at = take_string(body, at + 8)
-            if mode == "hangio":
-                return
-            descriptor = handles[int(name)]
-            written.add(int(name))
-            if mode == "failwrite" and offset == 65536:
-                send_later(status(ident, 4, "No space left on device"))
-                return
-            if not (mode == "forgetwrite" and offset >= 65536):
-                os.pwrite(descriptor, data, offset)
-            send_later(status(ident, 0))
-        elif kind == 4:
-            name, at = take_string(body, at)
-            descriptor = handles.pop(int(name), None)
-            if descriptor is not None:
-                os.close(descriptor)
-            if mode == "failclose" and int(name) in written:
-                send_later(status(ident, 4, "Disk quota exceeded"))
-            else:
+                    send_later(status(ident, 2, "No such file"))
+            elif kind == 3:
+                name, at = take_string(body, at)
+                (flags,) = struct.unpack_from(">I", body, at)
+                path = os.path.join(root, name.decode().lstrip("/"))
+                try:
+                    if flags & 2:
+                        descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644)
+                    else:
+                        descriptor = os.open(path, os.O_RDONLY)
+                except OSError as error:
+                    send_later(status(ident, 2 if error.errno == 2 else 4, str(error)))
+                    return
+                number = nextHandle[0]
+                nextHandle[0] += 1
+                handles[number] = descriptor
+                send_later(packet(102, u32(ident) + string(str(number))))
+            elif kind == 5:
+                name, at = take_string(body, at)
+                offset, length = struct.unpack_from(">QI", body, at)
+                descriptor = handles[int(name)]
+                if mode == "hangio" and offset >= 98304:
+                    return
+                if mode == "failread" and offset >= 98304:
+                    send_later(status(ident, 4, "Read failed"))
+                    return
+                # Some answers are shorter than asked for.
+                if random.random() < 0.3:
+                    length = random.randint(1, length)
+                data = os.pread(descriptor, length, offset)
+                if not data:
+                    send_later(status(ident, 1, "EOF"))
+                else:
+                    send_later(packet(103, u32(ident) + string(data)))
+            elif kind == 6:
+                name, at = take_string(body, at)
+                (offset,) = struct.unpack_from(">Q", body, at)
+                data, at = take_string(body, at + 8)
+                if mode == "hangio":
+                    return
+                descriptor = handles[int(name)]
+                written.add(int(name))
+                if mode == "failwrite" and offset == 65536:
+                    send_later(status(ident, 4, "No space left on device"))
+                    return
+                if not (mode == "forgetwrite" and offset >= 65536):
+                    os.pwrite(descriptor, data, offset)
                 send_later(status(ident, 0))
-        elif kind == 8:
-            name, at = take_string(body, at)
-            info = os.fstat(handles[int(name)])
-            send_later(packet(105, u32(ident) + u32(1 | 4 | 8) + struct.pack(">Q", info.st_size) + u32(info.st_mode) + u32(int(info.st_atime)) + u32(int(info.st_mtime))))
-        elif kind == 10:
-            name, at = take_string(body, at)
-            (flags,) = struct.unpack_from(">I", body, at)
-            if flags & 1 and int(name) in handles:
-                (size,) = struct.unpack_from(">Q", body, at + 4)
-                os.ftruncate(handles[int(name)], size)
-            send_later(status(ident, 0))
-        elif kind == 18:
-            old, at = take_string(body, at)
-            new, at = take_string(body, at)
-            source = os.path.join(root, old.decode().lstrip("/"))
-            target = os.path.join(root, new.decode().lstrip("/"))
-            if os.path.lexists(target) or (mode == "strictrename" and old.decode().endswith("locked")):
-                send_later(status(ident, 4, "Failure"))
+            elif kind == 4:
+                name, at = take_string(body, at)
+                descriptor = handles.pop(int(name), None)
+                if descriptor is not None:
+                    os.close(descriptor)
+                if mode == "failclose" and int(name) in written:
+                    send_later(status(ident, 4, "Disk quota exceeded"))
+                else:
+                    send_later(status(ident, 0))
+            elif kind == 8:
+                name, at = take_string(body, at)
+                info = os.fstat(handles[int(name)])
+                send_later(packet(105, u32(ident) + u32(1 | 4 | 8) + struct.pack(">Q", info.st_size) + u32(info.st_mode) + u32(int(info.st_atime)) + u32(int(info.st_mtime))))
+            elif kind == 10:
+                name, at = take_string(body, at)
+                (flags,) = struct.unpack_from(">I", body, at)
+                if flags & 1 and int(name) in handles:
+                    (size,) = struct.unpack_from(">Q", body, at + 4)
+                    os.ftruncate(handles[int(name)], size)
+                send_later(status(ident, 0))
+            elif kind == 18:
+                old, at = take_string(body, at)
+                new, at = take_string(body, at)
+                source = os.path.join(root, old.decode().lstrip("/"))
+                target = os.path.join(root, new.decode().lstrip("/"))
+                if os.path.lexists(target) or (mode == "strictrename" and old.decode().endswith("locked")):
+                    send_later(status(ident, 4, "Failure"))
+                else:
+                    os.rename(source, target)
+                    send_later(status(ident, 0))
+            elif kind == 13:
+                name, at = take_string(body, at)
+                try:
+                    os.remove(os.path.join(root, name.decode().lstrip("/")))
+                    send_later(status(ident, 0))
+                except OSError as error:
+                    send_later(status(ident, 2 if error.errno == 2 else 4, str(error)))
+            elif kind == 11 and mode == "hangio":
+                return
+            elif kind in (9, 10):
+                send_later(status(ident, 0))
             else:
-                os.rename(source, target)
-                send_later(status(ident, 0))
-        elif kind == 13:
-            name, at = take_string(body, at)
-            try:
-                os.remove(os.path.join(root, name.decode().lstrip("/")))
-                send_later(status(ident, 0))
-            except OSError as error:
-                send_later(status(ident, 2 if error.errno == 2 else 4, str(error)))
-        elif kind == 11 and mode == "hangio":
-            return
-        elif kind in (9, 10):
-            send_later(status(ident, 0))
-        else:
-            send_later(status(ident, 8, "Not supported"))
+                send_later(status(ident, 8, "Not supported"))
 
-    while True:
-        wait = None
-        if due:
-            wait = max(0, due[0][0] - time.time())
-        ready, _, _ = select.select([0], [], [], wait)
-        if ready:
-            chunk = os.read(0, 1 << 20)
-            if not chunk:
-                break
-            buffer += chunk
-            while len(buffer) >= 4:
-                (length,) = struct.unpack_from(">I", buffer, 0)
-                if len(buffer) < 4 + length:
+        while True:
+            wait = None
+            if due:
+                wait = max(0, due[0][0] - time.time())
+            ready, _, _ = select.select([0], [], [], wait)
+            if ready:
+                chunk = os.read(0, 1 << 20)
+                if not chunk:
                     break
-                body = buffer[5:4 + length]
-                kind = buffer[4]
-                buffer = buffer[4 + length:]
-                handle(kind, body)
-        while due and due[0][0] <= time.time():
-            _, _, data = heapq.heappop(due)
-            os.write(1, data)
-    """
+                buffer += chunk
+                while len(buffer) >= 4:
+                    (length,) = struct.unpack_from(">I", buffer, 0)
+                    if len(buffer) < 4 + length:
+                        break
+                    body = buffer[5:4 + length]
+                    kind = buffer[4]
+                    buffer = buffer[4 + length:]
+                    handle(kind, body)
+            while due and due[0][0] <= time.time():
+                _, _, data = heapq.heappop(due)
+                os.write(1, data)
+        """
 }
 
 /// The SFTP client against the delaying test server: a window of requests, answers out of
@@ -231,7 +233,9 @@ final class FakeSFTPServer {
         values.timeout = timeout
         environment.options.values = values
         center = ConnectionCenter(environment: environment)
-        center.makeSession = { profile, environment in SFTPSession(profile: profile, environment: environment, transport: server.transport) }
+        center.makeSession = { profile, environment in
+            SFTPSession(profile: profile, environment: environment, transport: server.transport)
+        }
         fileSystem = RemoteFileSystem(scheme: "sftp", center: center)
     }
 
@@ -272,7 +276,9 @@ final class FakeSFTPServer {
         // other, 250 requests at 20 to 60 ms each would also take far longer than this did on an
         // idle machine; the time is not asserted, it says little on a busy one.)
         let peak = Int((try? String(contentsOf: box.url("sftp-peak.log"), encoding: .utf8)) ?? "") ?? 0
-        #expect(peak >= 4, "at most \(peak) requests were unanswered at a time, after \(Date().timeIntervalSince(started)) s")
+        #expect(
+            peak >= 4,
+            "at most \(peak) requests were unanswered at a time, after \(Date().timeIntervalSince(started)) s")
     }
 
     @Test func aFailingReadDeliversWhatCameBeforeIt() throws {
@@ -325,7 +331,8 @@ final class FakeSFTPServer {
     @Test func aStalledPipeFailsInsteadOfHanging() throws {
         let box = try Sandbox()
         let server = try FakeSFTPServer(root: box.url("."), box: box, mode: .stalled)
-        let channel = SFTPChannel(executable: server.transport.executable, arguments: server.transport.arguments, environment: [:])
+        let channel = SFTPChannel(
+            executable: server.transport.executable, arguments: server.transport.arguments, environment: [:])
         channel.writeTimeout = 1
         try channel.start(timeout: 10, cancellation: nil) { true }
         defer { channel.close() }

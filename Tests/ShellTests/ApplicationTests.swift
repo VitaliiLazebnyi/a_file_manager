@@ -1,10 +1,11 @@
 import AFMContracts
 import AFMKernel
-@testable import AFMShell
 import AppKit
 import StandardPlugins
 import TestSupport
 import Testing
+
+@testable import AFMShell
 
 /// The real kernel, the standard plugins and the real window shell, started without showing
 /// anything and driven through commands and key presses. The parts have their own tests; these
@@ -23,7 +24,9 @@ import Testing
         try box.file("A/docs/in.txt", "inside")
         try box.file("B/one.txt", "old")
         try box.file("home/welcome.txt")
-        func state(_ folder: String) -> PanelTabs.State { PanelTabs.State(tabs: [.init(location: box.url(folder))], active: 0) }
+        func state(_ folder: String) -> PanelTabs.State {
+            PanelTabs.State(tabs: [.init(location: box.url(folder))], active: 0)
+        }
         settings.set(state("A"), forKey: "left.tabs")
         settings.set(state("B"), forKey: "right.tabs")
     }
@@ -59,7 +62,9 @@ import Testing
         }
 
         func names(_ panel: PanelViewController) -> [String] { panel.model.items.map(\.name) }
-        func cursor(_ panel: PanelViewController, on name: String) { panel.model.row(ofName: name).map(panel.model.moveCursor(to:)) }
+        func cursor(_ panel: PanelViewController, on name: String) {
+            panel.model.row(ofName: name).map(panel.model.moveCursor(to:))
+        }
     }
 
     func start() async -> Running {
@@ -76,9 +81,12 @@ import Testing
         await wait { !app.shell.panelCoordinator.isLoading && !app.kernel.jobs.isBusy }
     }
 
-    func press(_ app: Running, _ keyCode: UInt16, _ flags: NSEvent.ModifierFlags = [], in panel: PanelViewController? = nil) -> Bool {
-        let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: flags, timestamp: 0, windowNumber: 0, context: nil,
-                                     characters: "", charactersIgnoringModifiers: "", isARepeat: false, keyCode: keyCode)!
+    func press(
+        _ app: Running, _ keyCode: UInt16, _ flags: NSEvent.ModifierFlags = [], in panel: PanelViewController? = nil
+    ) -> Bool {
+        let event = NSEvent.keyEvent(
+            with: .keyDown, location: .zero, modifierFlags: flags, timestamp: 0, windowNumber: 0, context: nil,
+            characters: "", charactersIgnoringModifiers: "", isARepeat: false, keyCode: keyCode)!
         return (panel ?? app.shell.panelCoordinator.sourcePanel).handleKey(event)
     }
 
@@ -90,7 +98,9 @@ import Testing
         #expect(app.names(app.left) == ["docs", "one.txt", "two.txt"] && app.names(app.right) == ["one.txt"])
         #expect(app.kernel.panels.source === app.left && app.left.isActive && !app.right.isActive)
         #expect(app.left.tableView.numberOfRows == 4)
-        #expect(app.kernel.plugins.count >= 21 && Array(app.kernel.fileSystems.all.map(\.scheme).prefix(2)) == ["mem", "file"])
+        #expect(
+            app.kernel.plugins.count >= 21
+                && Array(app.kernel.fileSystems.all.map(\.scheme).prefix(2)) == ["mem", "file"])
     }
 
     @Test func aFolderThatIsGoneIsReplacedAtStartUp() async {
@@ -107,20 +117,30 @@ import Testing
         let menu = app.shell.makeMainMenu()
         let titles = menu.items.map(\.title)
         #expect(titles.first == "A File Manager" && titles.contains("Window"))
-        #expect(titles.filter(["Files", "Edit", "Mark", "Commands", "Show"].contains) == ["Files", "Edit", "Mark", "Commands", "Show"])
+        #expect(
+            titles.filter(["Files", "Edit", "Mark", "Commands", "Show"].contains) == [
+                "Files", "Edit", "Mark", "Commands", "Show"
+            ])
         let menuCommands = menu.items.flatMap { $0.submenu?.items ?? [] }.compactMap(MenuBuilder.command(of:))
         #expect(Set(menuCommands).count == menuCommands.count)
-        let contributed = app.kernel.menus.menus.flatMap(\.items).compactMap { $0 } + app.kernel.menus.contextMenu(onItem: true).compactMap { $0 }
+        let contributed =
+            app.kernel.menus.menus.flatMap(\.items).compactMap { $0 }
+            + app.kernel.menus.contextMenu(onItem: true).compactMap { $0 }
         #expect(contributed.allSatisfy { app.commands[$0] != nil })
         #expect(app.kernel.keyBindings.conflicts.isEmpty)
-        #expect(app.shell.mainWindow.functionKeyTitles == ["F3 View", "F4 Edit", "F5 Copy", "F6 Move", "F7 NewFolder", "F8 Delete", "⌘Q Exit"])
+        #expect(
+            app.shell.mainWindow.functionKeyTitles == [
+                "F3 View", "F4 Edit", "F5 Copy", "F6 Move", "F7 NewFolder", "F8 Delete", "⌘Q Exit"
+            ])
         let copyItem = MenuBuilder.item(app.commands[.copy]!, keys: app.kernel.keyBindings)
         #expect(app.shell.mainWindow.validateMenuItem(copyItem) == false)
         app.cursor(app.left, on: "one.txt")
         #expect(app.shell.mainWindow.validateMenuItem(copyItem) == true)
         // The context menu on an item and on empty space.
         let onItem = app.left.contextMenu(forRow: 2)?.items.filter { !$0.isSeparatorItem }.map(\.title) ?? []
-        #expect(onItem.starts(with: ["Open", "View", "Edit", "Open Folder in New Tab", "Copy…"]) && onItem.contains("Paste"))
+        #expect(
+            onItem.starts(with: ["Open", "View", "Edit", "Open Folder in New Tab", "Copy…"]) && onItem.contains("Paste")
+        )
         let onSpace = app.left.contextMenu(forRow: -1)?.items.filter { !$0.isSeparatorItem }.map(\.title) ?? []
         #expect(onSpace.first == "Paste" && !onSpace.contains("Open"))
     }
@@ -129,7 +149,10 @@ import Testing
         settings.set(["cm_Copy": ["f9"], "cm_List": ["f5"]], forKey: KeyBindings.settingsKey)
         let app = await start()
         defer { app.stop() }
-        #expect(app.shell.mainWindow.functionKeyTitles == ["F4 Edit", "F5 View", "F6 Move", "F7 NewFolder", "F8 Delete", "F9 Copy", "⌘Q Exit"])
+        #expect(
+            app.shell.mainWindow.functionKeyTitles == [
+                "F4 Edit", "F5 View", "F6 Move", "F7 NewFolder", "F8 Delete", "F9 Copy", "⌘Q Exit"
+            ])
         let copyItem = MenuBuilder.item(app.commands[.copy]!, keys: app.kernel.keyBindings)
         #expect(copyItem.keyEquivalent == String(UnicodeScalar(UInt32(NSF9FunctionKey))!))
         // F9 (key code 101) now copies: with the cursor on a file the prompt appears.
@@ -144,16 +167,18 @@ import Testing
     @Test func cursorAndMarkingKeys() async {
         let app = await start()
         defer { app.stop() }
-        #expect(press(app, 124) && app.left.model.cursorItem?.name == "two.txt")       // →
-        #expect(press(app, 123) && app.left.model.cursorItem?.name == "docs")          // ←
-        #expect(press(app, 115) && app.left.model.cursorIsOnParentRow)                 // Home
-        #expect(press(app, 119) && app.left.model.cursorItem?.name == "two.txt")       // End
-        #expect(press(app, 116) && app.left.model.cursor == 0)                         // Page Up
+        #expect(press(app, 124) && app.left.model.cursorItem?.name == "two.txt")  // →
+        #expect(press(app, 123) && app.left.model.cursorItem?.name == "docs")  // ←
+        #expect(press(app, 115) && app.left.model.cursorIsOnParentRow)  // Home
+        #expect(press(app, 119) && app.left.model.cursorItem?.name == "two.txt")  // End
+        #expect(press(app, 116) && app.left.model.cursor == 0)  // Page Up
         #expect(app.left.tableView.selectedRow == 0)
-        #expect(press(app, 125, .shift) && app.left.model.selection.isEmpty)           // Shift+↓ on [..]
-        #expect(press(app, 125, .shift) && app.left.model.selection == ["docs"] && app.left.model.cursorItem?.name == "one.txt")
-        #expect(press(app, 126, .shift) && app.left.model.selection == ["docs", "one.txt"])   // Shift+↑
-        #expect(press(app, 114) && app.left.model.selection == ["one.txt"])            // Insert on docs
+        #expect(press(app, 125, .shift) && app.left.model.selection.isEmpty)  // Shift+↓ on [..]
+        #expect(
+            press(app, 125, .shift) && app.left.model.selection == ["docs"]
+                && app.left.model.cursorItem?.name == "one.txt")
+        #expect(press(app, 126, .shift) && app.left.model.selection == ["docs", "one.txt"])  // Shift+↑
+        #expect(press(app, 114) && app.left.model.selection == ["one.txt"])  // Insert on docs
         // A letter is bound to nothing: it goes on to the table, which finds files by typing.
         #expect(!press(app, 0))
         // Tab makes the other panel the source.
@@ -175,14 +200,16 @@ import Testing
     @Test func aClickOnAColumnHeaderSorts() async {
         let app = await start()
         defer { app.stop() }
-        let sizeColumn = app.left.tableView.tableColumns[2], nameColumn = app.left.tableView.tableColumns[0]
+        let sizeColumn = app.left.tableView.tableColumns[2]
+        let nameColumn = app.left.tableView.tableColumns[0]
         app.left.tableView(app.left.tableView, didClick: sizeColumn)
         #expect(app.left.model.sort == ListOrder(key: .size, descending: true))
         app.left.tableView(app.left.tableView, didClick: sizeColumn)
         #expect(app.left.model.sort == ListOrder(key: .size, descending: false))
         // A click in the other panel sorts that panel, which becomes the source.
         app.right.tableView(app.right.tableView, didClick: nameColumn)
-        #expect(app.kernel.panels.source === app.right && app.right.model.sort == ListOrder(key: .name, descending: true))
+        #expect(
+            app.kernel.panels.source === app.right && app.right.model.sort == ListOrder(key: .name, descending: true))
         #expect(app.left.model.sort.key == .size)
     }
 
@@ -212,11 +239,13 @@ import Testing
         app.cursor(app.left, on: "two.txt")
         app.commands.perform(.renameOnly, .text("renamed.txt"))
         await settle(app)
-        #expect(box.exists("A/renamed.txt") && !box.exists("A/two.txt") && app.left.model.cursorItem?.name == "renamed.txt")
+        #expect(
+            box.exists("A/renamed.txt") && !box.exists("A/two.txt") && app.left.model.cursorItem?.name == "renamed.txt")
         ui.promptAnswers = [.accept]
         app.commands.perform(.renameMove)
         await settle(app)
-        #expect(box.exists("B/renamed.txt") && !box.exists("A/renamed.txt") && app.names(app.right).contains("renamed.txt"))
+        #expect(
+            box.exists("B/renamed.txt") && !box.exists("A/renamed.txt") && app.names(app.right).contains("renamed.txt"))
 
         ui.promptAnswers = [.text("made/inner")]
         app.commands.perform(.makeDirectory)
@@ -272,7 +301,9 @@ import Testing
         app.commands.perform(.closeTab)
         app.commands.perform(.closeTab)
         await settle(app)
-        #expect(app.left.tabs.count == 1 && app.left.model.directory.lastPathComponent == "A" && !app.commands.isEnabled(.closeTab))
+        #expect(
+            app.left.tabs.count == 1 && app.left.model.directory.lastPathComponent == "A"
+                && !app.commands.isEnabled(.closeTab))
         app.shell.saveState()
         #expect(settings.value(PanelTabs.State.self, forKey: "left.tabs")?.tabs.count == 1)
     }
@@ -319,7 +350,9 @@ import Testing
         let slow = ScriptedFileSystem()
         let arriving = (0..<count).map { String(format: "file%04d.txt", ($0 * 7919) % count) } + ["zz-folder"]
         slow.batches = stride(from: 0, to: arriving.count, by: 250).map { start in
-            arriving[start..<min(start + 250, arriving.count)].map { slow.item(named: $0, in: "/slow", isDirectory: $0 == "zz-folder") }
+            arriving[start..<min(start + 250, arriving.count)].map {
+                slow.item(named: $0, in: "/slow", isDirectory: $0 == "zz-folder")
+            }
         }
         slow.holdBefore = 2
         slow.pauseBeforeSecondBatch = 0.25
@@ -351,7 +384,9 @@ import Testing
         #expect(app.left.model.cursorItem?.name == underCursor && app.left.model.selection == [underCursor])
         // Everything is in order, the folder first.
         let names = app.names(app.left)
-        #expect(names.first == "zz-folder" && Array(names.dropFirst()) == (0..<count).map { String(format: "file%04d.txt", $0) })
+        #expect(
+            names.first == "zz-folder"
+                && Array(names.dropFirst()) == (0..<count).map { String(format: "file%04d.txt", $0) })
         #expect(app.commands.isEnabled(.selectAll))
     }
 
@@ -372,7 +407,9 @@ import Testing
         #expect(app.left.tableView.numberOfRows == 1 && app.left.showsActivity)
         #expect(app.left.statusLineText == "Reading \(app.kernel.fileSystems.displayPath(late.url("/late")))…")
         // Commands that need the entries wait; the way back is open.
-        #expect(!app.commands.isEnabled(.copy) && !app.commands.isEnabled(.selectAll) && app.commands.isEnabled(.goToParent))
+        #expect(
+            !app.commands.isEnabled(.copy) && !app.commands.isEnabled(.selectAll) && app.commands.isEnabled(.goToParent)
+        )
         #expect(app.left.model.backLocation?.lastPathComponent == "A")
 
         late.open()
@@ -397,7 +434,9 @@ import Testing
         // Backspace: up again, without waiting for the answer about this folder.
         app.commands.perform(.goToParent)
         await settle(app)
-        #expect(app.left.model.directory.path == "/" && app.left.model.cursorItem?.name == "late" && !app.left.showsActivity)
+        #expect(
+            app.left.model.directory.path == "/" && app.left.model.cursorItem?.name == "late" && !app.left.showsActivity
+        )
         // The abandoned reading is ended, and the answer it might have given changes nothing.
         #expect(await wait(upTo: 60) { late.listingsBegun == 2 && late.listingsEnded == 2 })
         late.open()
@@ -421,7 +460,8 @@ import Testing
         await settle(app)
         _ = await wait(upTo: 2) { !ui.log.isEmpty }
         // Back in the folder it came from, with the cursor where it was, and the user is told.
-        #expect(app.left.model.directory.lastPathComponent == "A" && app.names(app.left) == ["docs", "one.txt", "two.txt"])
+        #expect(
+            app.left.model.directory.lastPathComponent == "A" && app.names(app.left) == ["docs", "one.txt", "two.txt"])
         #expect(app.left.model.cursorItem?.name == "one.txt" && app.left.model.isComplete && !app.left.showsActivity)
         #expect(app.left.model.forwardLocation == nil && ui.log == ["inform: The folder cannot be read!"])
         #expect(app.left.tableView.numberOfRows == 4)
@@ -456,7 +496,9 @@ import Testing
         app.left.show(memory.url("/quick"))
         await wait(upTo: 600) { app.left.model.directory.path == "/quick" && app.left.model.isComplete }
         await settle(app)
-        #expect(app.left.model.directory.path == "/quick" && app.names(app.left) == ["only.txt"] && app.left.model.isComplete)
+        #expect(
+            app.left.model.directory.path == "/quick" && app.names(app.left) == ["only.txt"]
+                && app.left.model.isComplete)
         // Nothing of the abandoned listing arrives later (its next piece would have been due within 2 s).
         await wait(upTo: 3) { false }
         #expect(app.names(app.left) == ["only.txt"])
@@ -469,10 +511,12 @@ import Testing
         defer { app.stop() }
         app.cursor(app.left, on: "one.txt")
         var log: [String] = []
-        let first = app.kernel.jobs.run(title: "First", work: { _ -> String in
-            Thread.sleep(forTimeInterval: 0.2)
-            return "first on main: \(Thread.isMainThread)"
-        }, completion: { log.append($0) })
+        let first = app.kernel.jobs.run(
+            title: "First",
+            work: { _ -> String in
+                Thread.sleep(forTimeInterval: 0.2)
+                return "first on main: \(Thread.isMainThread)"
+            }, completion: { log.append($0) })
         let second = app.kernel.jobs.run(title: "Second", work: { _ in "second" }, completion: { log.append($0) })
         #expect(app.kernel.jobs.isBusy && !first.isFinished && !second.isFinished && log.isEmpty)
         // Commands that change files or panels wait; viewing and moving the cursor do not.
@@ -488,10 +532,12 @@ import Testing
         defer { app.stop() }
         var log: [String] = []
         func job(_ name: String) {
-            app.kernel.jobs.run(title: name, work: { monitor -> String in
-                for _ in 0..<200 where !monitor.cancellation.isCancelled { Thread.sleep(forTimeInterval: 0.01) }
-                return monitor.cancellation.isCancelled ? "\(name) cancelled" : "\(name) finished"
-            }, completion: { log.append($0) })
+            app.kernel.jobs.run(
+                title: name,
+                work: { monitor -> String in
+                    for _ in 0..<200 where !monitor.cancellation.isCancelled { Thread.sleep(forTimeInterval: 0.01) }
+                    return monitor.cancellation.isCancelled ? "\(name) cancelled" : "\(name) finished"
+                }, completion: { log.append($0) })
         }
         job("first")
         job("second")
@@ -511,16 +557,20 @@ import Testing
         defer { app.stop() }
         ui.choiceAnswers = [1]
         var answer = -1
-        app.kernel.jobs.run(title: "Asking", work: { monitor in
-            monitor.ask { self.ui.choose("Really?", detail: "", buttons: ["Yes", "No"], style: .warning) }
-        }, completion: { answer = $0 })
+        app.kernel.jobs.run(
+            title: "Asking",
+            work: { monitor in
+                monitor.ask { self.ui.choose("Really?", detail: "", buttons: ["Yes", "No"], style: .warning) }
+            }, completion: { answer = $0 })
         await settle(app)
         #expect(answer == 1 && ui.log == ["choose: Really? / "])
         // The same from a plugin that has no job at hand.
         ui.choiceAnswers = [0]
         var viaKernel = -1
         DispatchQueue.global().async {
-            let result = app.kernel.askUser { $0.choose("Password?", detail: "", buttons: ["OK", "Cancel"], style: .information) }
+            let result = app.kernel.askUser {
+                $0.choose("Password?", detail: "", buttons: ["OK", "Cancel"], style: .information)
+            }
             DispatchQueue.main.async { viaKernel = result }
         }
         let reached7 = await wait { viaKernel == 0 }

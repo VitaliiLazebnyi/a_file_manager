@@ -6,6 +6,7 @@ import ImageIO
 import TestSupport
 import Testing
 import UniformTypeIdentifiers
+
 @testable import ViewerPlugin
 
 /// Review round 2, the pane and its views on the main thread: nothing waits for a server, a page
@@ -19,7 +20,8 @@ import UniformTypeIdentifiers
     init() throws {
         _ = NSApplication.shared
         plugin = ViewerPlugin(overlayHost: { _ in nil }, quickViewDelay: 0.01, showsWindows: false)
-        bench = TestBench(plugins: [plugin], fileSystems: [memory, hook], left: memory.url("/A"), right: memory.url("/B"))
+        bench = TestBench(
+            plugins: [plugin], fileSystems: [memory, hook], left: memory.url("/A"), right: memory.url("/B"))
         memory.addFile("/A/small.txt", "small file\nsecond line")
         memory.addFile("/A/index.html", "<html><body><a href=\"next.html\">next</a></body></html>")
         memory.addFile("/A/next.html", "<html><body>next page</body></html>")
@@ -35,7 +37,9 @@ import UniformTypeIdentifiers
     }
 
     private func pane() -> ViewerPane {
-        ViewerPane(kernel: bench.kernel, settings: ListerSettings(bench.kernel.settings), temporaryCopies: TemporaryCopies(), isEmbedded: true)
+        ViewerPane(
+            kernel: bench.kernel, settings: ListerSettings(bench.kernel.settings), temporaryCopies: TemporaryCopies(),
+            isEmbedded: true)
     }
 
     // MARK: Nothing waits for the server
@@ -83,7 +87,9 @@ import UniformTypeIdentifiers
         pane.load(ViewerItem(source: .file(memory.url("/A/index.html")), title: "index"))
         #expect(await wait { pane.loaded != nil })
         let shown = pane.item?.url
-        for text in ["sftp://evil/x", "ftp://evil/x", "smb://evil/share", "file:///etc/passwd", "../outside.html", "..%2F..%2Fx"] {
+        for text in [
+            "sftp://evil/x", "ftp://evil/x", "smb://evil/share", "file:///etc/passwd", "../outside.html", "..%2F..%2Fx"
+        ] {
             pane.followLink(URL(string: text)!)
             #expect(pane.item?.url == shown, "\(text)")
         }
@@ -120,7 +126,11 @@ import UniformTypeIdentifiers
         try writer.write(rtf)
         try writer.close(attributes: FileAttributes())
         pane.load(ViewerItem(source: .file(memory.url("/A/huge.rtf")), title: "huge rtf"))
-        #expect(await wait(upTo: 60) { pane.loaded != nil && (pane.mode.isTextual ? pane.pager.document != nil : pane.richText != nil || pane.webView != nil) })
+        #expect(
+            await wait(upTo: 60) {
+                pane.loaded != nil
+                    && (pane.mode.isTextual ? pane.pager.document != nil : pane.richText != nil || pane.webView != nil)
+            })
         #expect(pane.richText == nil)
         pane.stopWork()
     }
@@ -128,8 +138,11 @@ import UniformTypeIdentifiers
     // MARK: Images
 
     private func picture(_ width: Int, _ height: Int) throws -> CGImage {
-        let context = try #require(CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpace(name: CGColorSpace.sRGB)!,
-                                             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+        let context = try #require(
+            CGContext(
+                data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
+                space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
         context.setFillColor(CGColor(red: 0.2, green: 0.4, blue: 0.9, alpha: 1))
         context.fill(CGRect(x: 0, y: 0, width: width, height: height))
         return try #require(context.makeImage())
@@ -152,9 +165,12 @@ import UniformTypeIdentifiers
         #expect(cache.image(for: frame, width: last.width, height: last.height)?.width == last.width)
     }
 
-    private func encoded(_ images: [CGImage], type: UTType, properties: [CFString: Any] = [:], frameProperties: [CFString: Any] = [:]) throws -> Data {
+    private func encoded(
+        _ images: [CGImage], type: UTType, properties: [CFString: Any] = [:], frameProperties: [CFString: Any] = [:]
+    ) throws -> Data {
         let data = NSMutableData()
-        let destination = try #require(CGImageDestinationCreateWithData(data, type.identifier as CFString, images.count, nil))
+        let destination = try #require(
+            CGImageDestinationCreateWithData(data, type.identifier as CFString, images.count, nil))
         if !properties.isEmpty { CGImageDestinationSetProperties(destination, properties as CFDictionary) }
         for image in images { CGImageDestinationAddImage(destination, image, frameProperties as CFDictionary) }
         #expect(CGImageDestinationFinalize(destination))
@@ -168,9 +184,10 @@ import UniformTypeIdentifiers
     }
 
     @Test func aGIFWithSeveralFramesIsStillAnAnimation() throws {
-        let gif = try encoded([try picture(20, 20), try picture(20, 20), try picture(20, 20)], type: .gif,
-                              properties: [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFLoopCount: 0]],
-                              frameProperties: [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFDelayTime: 0.2]])
+        let gif = try encoded(
+            [try picture(20, 20), try picture(20, 20), try picture(20, 20)], type: .gif,
+            properties: [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFLoopCount: 0]],
+            frameProperties: [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFDelayTime: 0.2]])
         let animation = try #require(ImageDecoder.decode(gif, minimumDelay: 0.05))
         #expect(animation.frames.count == 3)
     }
@@ -182,7 +199,10 @@ import UniformTypeIdentifiers
         #expect(result.text == "if a < b then c\ndone\n", "\(result.text.debugDescription)")
         // A lone `<` at the very end does not drop the rest of the document before it.
         #expect(HTMLText.plainText(from: "kept text <").text == "kept text <\n")
-        let links = HTMLText.plainText(from: "<a data-href=\"decoy\" href=\"real\">x</a> <a title=\"a>b\" href=\"two\">y</a> <a title='href=\"nope\"' href=three>z</a>")
+        let links = HTMLText.plainText(
+            from:
+                "<a data-href=\"decoy\" href=\"real\">x</a> <a title=\"a>b\" href=\"two\">y</a> <a title='href=\"nope\"' href=three>z</a>"
+        )
         #expect(links.links == ["real", "two", "three"], "\(links.links)")
     }
 }

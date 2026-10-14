@@ -3,6 +3,7 @@ import Darwin
 import Foundation
 import TestSupport
 import Testing
+
 @testable import ViewerPlugin
 
 /// A function that runs on a thread of its own, for work that is meant to block: it says when
@@ -33,7 +34,9 @@ final class ViewerAdoptWorker {
         var info = thread_basic_info()
         var count = mach_msg_type_number_t(MemoryLayout<thread_basic_info>.size / MemoryLayout<integer_t>.size)
         let result = withUnsafeMutablePointer(to: &info) { pointer in
-            pointer.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { thread_info(port, thread_flavor_t(THREAD_BASIC_INFO), $0, &count) }
+            pointer.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+                thread_info(port, thread_flavor_t(THREAD_BASIC_INFO), $0, &count)
+            }
         }
         return result == KERN_SUCCESS && info.run_state == TH_STATE_WAITING
     }
@@ -97,8 +100,12 @@ final class ViewerRemoteLike: ByteSource {
     var requests: Int { counter.value.requests }
 
     func read(at offset: Int64, count: Int) throws -> Data {
-        let lower = Int(max(0, min(offset, length))), upper = min(data.count, lower + max(0, count))
-        counter.mutate { $0.bytes += Int64(upper - lower); $0.requests += 1 }
+        let lower = Int(max(0, min(offset, length)))
+        let upper = min(data.count, lower + max(0, count))
+        counter.mutate {
+            $0.bytes += Int64(upper - lower)
+            $0.requests += 1
+        }
         return data.subdata(in: lower..<upper)
     }
 
@@ -112,7 +119,10 @@ final class ViewerRemoteLike: ByteSource {
             state ^= state << 17
             return Int(truncatingIfNeeded: state >> 11) & 0x7FFF_FFFF
         }
-        let words = ["alpha", "beta", "gamma", "delta", "epsilon", "request", "handled", "user", "session", "0x7fff", "ä", "größe", "x"]
+        let words = [
+            "alpha", "beta", "gamma", "delta", "epsilon", "request", "handled", "user", "session", "0x7fff", "ä",
+            "größe", "x"
+        ]
         var bytes: [UInt8] = []
         bytes.reserveCapacity(megabytes << 20)
         while bytes.count < megabytes << 20 {
@@ -137,13 +147,16 @@ final class ViewerRemoteLike: ByteSource {
     @Test func blocksAreKeptOnDiskAndGivenBack() {
         let cache = DiskBlockCache(blockSize: 1000, length: 4500)
         #expect(!cache.isOpen && cache.read(0) == nil && !cache.contains(0))
-        let first = Data((0..<1000).map { UInt8($0 % 251) }), tail = Data(repeating: 7, count: 500)
+        let first = Data((0..<1000).map { UInt8($0 % 251) })
+        let tail = Data(repeating: 7, count: 500)
         cache.store(2, first)
         cache.store(4, tail)
         // A block of the wrong size (a short read in the middle) is not kept.
         cache.store(1, Data(repeating: 1, count: 999))
         cache.store(3, Data(repeating: 1, count: 1001))
-        #expect(cache.isOpen && cache.contains(2) && cache.contains(4) && !cache.contains(1) && !cache.contains(3) && !cache.contains(0))
+        #expect(
+            cache.isOpen && cache.contains(2) && cache.contains(4) && !cache.contains(1) && !cache.contains(3)
+                && !cache.contains(0))
         #expect(cache.read(2) == first && cache.read(4) == tail && cache.read(0) == nil)
         #expect(cache.storedBytes == 1500)
         cache.discard()
@@ -164,18 +177,23 @@ final class ViewerRemoteLike: ByteSource {
     @Test func aBigFileOfASlowSourceIsNotFetchedAgainWhenItIsLaidOutAgain() throws {
         let data = ViewerRemoteLike.text(megabytes: 24)
         let remote = ViewerRemoteLike(data)
-        let cached = CachedByteSource(remote, blockSize: 64 << 10, capacity: 16, wholeFileLimit: 1 << 20, spillsToDisk: true)
+        let cached = CachedByteSource(
+            remote, blockSize: 64 << 10, capacity: 16, wholeFileLimit: 1 << 20, spillsToDisk: true)
         defer { cached.close() }
         // Index it once: every byte comes from the "server".
-        var previous = TextDocument(source: cached, encoding: .utf8, layout: .text(TextLayoutOptions(columns: 80, wordWrap: true)))
+        var previous = TextDocument(
+            source: cached, encoding: .utf8, layout: .text(TextLayoutOptions(columns: 80, wordWrap: true)))
         previous.buildIndex(parallel: false)
         let fetchedOnce = remote.fetched
         #expect(previous.isIndexComplete && fetchedOnce >= remote.length && fetchedOnce <= remote.length + 2 * 64 << 10)
         #expect(cached.diskBytes >= remote.length && cached.diskCacheIsOpen)
         // Another width, another zoom, wrapping off: not one more byte, and the same rows as a
         // text in memory gets.
-        for options in [TextLayoutOptions(columns: 120, wordWrap: true), TextLayoutOptions(columns: 40, wordWrap: true),
-                        TextLayoutOptions(columns: 200, wordWrap: false), TextLayoutOptions(columns: 80, wordWrap: true, tabWidth: 4)] {
+        for options in [
+            TextLayoutOptions(columns: 120, wordWrap: true), TextLayoutOptions(columns: 40, wordWrap: true),
+            TextLayoutOptions(columns: 200, wordWrap: false),
+            TextLayoutOptions(columns: 80, wordWrap: true, tabWidth: 4)
+        ] {
             let document = TextDocument(source: cached, encoding: .utf8, layout: .text(options), reusing: previous)
             document.buildIndex(parallel: false)
             let reference = TextDocument(source: DataByteSource(data), encoding: .utf8, layout: .text(options))
@@ -183,7 +201,9 @@ final class ViewerRemoteLike: ByteSource {
             #expect(remote.fetched == fetchedOnce, "relayout \(options)")
             #expect(document.rowCount == reference.rowCount && document.lineCount == reference.lineCount)
             for first in [0, 1_000, reference.rowCount / 2, reference.rowCount - 3] {
-                #expect(try document.rows(from: first, count: 40).map(\.range) == reference.rows(from: first, count: 40).map(\.range))
+                #expect(
+                    try document.rows(from: first, count: 40).map(\.range)
+                        == reference.rows(from: first, count: 40).map(\.range))
             }
             #expect(remote.fetched == fetchedOnce, "rows after relayout \(options)")
             previous = document
@@ -198,23 +218,33 @@ final class ViewerRemoteLike: ByteSource {
     @Test func aSearchOfAFileThatIsOnDiskAsksTheServerForNothing() throws {
         let data = ViewerRemoteLike.text(megabytes: 6)
         let remote = ViewerRemoteLike(data)
-        let cached = CachedByteSource(remote, blockSize: 32 << 10, capacity: 8, wholeFileLimit: 1 << 20, spillsToDisk: true)
+        let cached = CachedByteSource(
+            remote, blockSize: 32 << 10, capacity: 8, wholeFileLimit: 1 << 20, spillsToDisk: true)
         defer { cached.close() }
         let needle = "zzz-not-there"
         let pattern = try SearchPattern(needle, options: SearchOptions(), encoding: .utf8)
-        #expect(try ViewerSearch.find(pattern, in: cached, content: 0..<cached.length, from: 0, backwards: false, encoding: .utf8, chunkSize: 1 << 20) == nil)
+        #expect(
+            try ViewerSearch.find(
+                pattern, in: cached, content: 0..<cached.length, from: 0, backwards: false, encoding: .utf8,
+                chunkSize: 1 << 20) == nil)
         let first = remote.fetched
         #expect(first >= remote.length)
-        #expect(try ViewerSearch.find(pattern, in: cached, content: 0..<cached.length, from: 0, backwards: false, encoding: .utf8, chunkSize: 1 << 20) == nil)
-        #expect(try ViewerSearch.find(pattern, in: cached, content: 0..<cached.length, from: cached.length, backwards: true, encoding: .utf8,
-                                      chunkSize: 300_000) == nil)
+        #expect(
+            try ViewerSearch.find(
+                pattern, in: cached, content: 0..<cached.length, from: 0, backwards: false, encoding: .utf8,
+                chunkSize: 1 << 20) == nil)
+        #expect(
+            try ViewerSearch.find(
+                pattern, in: cached, content: 0..<cached.length, from: cached.length, backwards: true, encoding: .utf8,
+                chunkSize: 300_000) == nil)
         #expect(remote.fetched == first)
     }
 
     @Test func aSourceWhoseDiskIsFullGoesOnWithoutIt() throws {
         let data = ViewerRemoteLike.text(megabytes: 2)
         let remote = ViewerRemoteLike(data)
-        let cached = CachedByteSource(remote, blockSize: 16 << 10, capacity: 4, wholeFileLimit: 0, spillsToDisk: true, diskLimit: 100 << 10)
+        let cached = CachedByteSource(
+            remote, blockSize: 16 << 10, capacity: 4, wholeFileLimit: 0, spillsToDisk: true, diskLimit: 100 << 10)
         defer { cached.close() }
         #expect(try cached.read(at: 0, count: data.count) == data)
         #expect(cached.diskBytes <= 100 << 10 && cached.diskBytes > 0)
@@ -238,7 +268,9 @@ final class ViewerRemoteLike: ByteSource {
         for attempt in 1...5 {
             let flag = CancellationFlag()
             let outcome = ViewerAdoptBox<Result<Data, Error>?>(nil)
-            let worker = ViewerAdoptWorker { outcome.value = Result { try source.read(at: 10, count: 5000, cancellation: flag) } }
+            let worker = ViewerAdoptWorker {
+                outcome.value = Result { try source.read(at: 10, count: 5000, cancellation: flag) }
+            }
             worker.start()
             #expect(worker.waitUntilWaiting())
             let before = memory.interruptions
@@ -257,8 +289,10 @@ final class ViewerRemoteLike: ByteSource {
     @Test func aFlagOnlyEndsTheReadsItWasGiven() throws {
         let memory = MemoryFileSystem()
         let (registry, url) = try stalledFile(memory, size: 50_000)
-        let source = CachedByteSource(try ProviderByteSource.open(url, fileSystems: registry), blockSize: 4096, capacity: 4)
-        let other = CancellationFlag(), mine = CancellationFlag()
+        let source = CachedByteSource(
+            try ProviderByteSource.open(url, fileSystems: registry), blockSize: 4096, capacity: 4)
+        let other = CancellationFlag()
+        let mine = CancellationFlag()
         mine.cancel()
         #expect(throws: (any Error).self) { try source.read(at: 0, count: 100, cancellation: mine) }
         #expect(try source.read(at: 0, count: 100, cancellation: other).count == 100)
@@ -271,7 +305,8 @@ final class ViewerRemoteLike: ByteSource {
         let (registry, url) = try stalledFile(memory, size: 400_000)
         let source = CachedByteSource(try ProviderByteSource.open(url, fileSystems: registry))
         memory.stallsReads = true
-        let document = TextDocument(source: source, encoding: .utf8, layout: .text(TextLayoutOptions(columns: 80, wordWrap: true)))
+        let document = TextDocument(
+            source: source, encoding: .utf8, layout: .text(TextLayoutOptions(columns: 80, wordWrap: true)))
         let worker = ViewerAdoptWorker { document.buildIndex(parallel: false) }
         worker.start()
         #expect(worker.waitUntilWaiting())
@@ -284,14 +319,17 @@ final class ViewerRemoteLike: ByteSource {
         let memory = MemoryFileSystem()
         let (registry, url) = try stalledFile(memory, size: 100_000)
         let source = try ProviderByteSource.open(url, fileSystems: registry)
-        let document = TextDocument(source: source, encoding: .utf8, layout: .text(TextLayoutOptions(columns: 80, wordWrap: true)))
+        let document = TextDocument(
+            source: source, encoding: .utf8, layout: .text(TextLayoutOptions(columns: 80, wordWrap: true)))
         document.buildIndex(parallel: false)
         // The readers the index used are not stalled; new ones are.
         source.close()
         memory.stallsReads = true
         let fetch = LinkedCancellation(document.cancellation)
         let outcome = ViewerAdoptBox<Result<[DisplayRow], Error>?>(nil)
-        let worker = ViewerAdoptWorker { outcome.value = Result { try document.rows(from: 3000, count: 20, cancellation: fetch.flag) } }
+        let worker = ViewerAdoptWorker {
+            outcome.value = Result { try document.rows(from: 3000, count: 20, cancellation: fetch.flag) }
+        }
         worker.start()
         #expect(worker.waitUntilWaiting())
         // The next fetch replaces this one.
@@ -302,7 +340,9 @@ final class ViewerRemoteLike: ByteSource {
         // A fetch tied to the document ends with it.
         let tied = LinkedCancellation(document.cancellation)
         let second = ViewerAdoptBox<Result<Int?, Error>?>(nil)
-        let again = ViewerAdoptWorker { second.value = Result { try document.row(containing: 90_000, cancellation: tied.flag) } }
+        let again = ViewerAdoptWorker {
+            second.value = Result { try document.row(containing: 90_000, cancellation: tied.flag) }
+        }
         again.start()
         #expect(again.waitUntilWaiting())
         document.cancellation.cancel()
@@ -319,8 +359,10 @@ final class ViewerRemoteLike: ByteSource {
         let outcome = ViewerAdoptBox<Result<Range<Int64>?, Error>?>(nil)
         let worker = ViewerAdoptWorker {
             outcome.value = Result {
-                try ViewerSearch.find(pattern, in: source, content: 0..<source.length, from: 0, backwards: false, encoding: .utf8, chunkSize: 50_000,
-                                      parallelism: 1, cancellation: flag)
+                try ViewerSearch.find(
+                    pattern, in: source, content: 0..<source.length, from: 0, backwards: false, encoding: .utf8,
+                    chunkSize: 50_000,
+                    parallelism: 1, cancellation: flag)
             }
         }
         worker.start()
@@ -343,7 +385,10 @@ final class ViewerRemoteLike: ByteSource {
         defer { copies.removeAll() }
         let flag = CancellationFlag()
         let outcome = ViewerAdoptBox<URL?>(URL(fileURLWithPath: "/unset"))
-        let worker = ViewerAdoptWorker { outcome.value = copies.localURL(for: url, fileSystems: registry, owner: ObjectIdentifier(copies), cancellation: flag) }
+        let worker = ViewerAdoptWorker {
+            outcome.value = copies.localURL(
+                for: url, fileSystems: registry, owner: ObjectIdentifier(copies), cancellation: flag)
+        }
         worker.start()
         #expect(worker.waitUntilWaiting())
         flag.cancel()
@@ -351,12 +396,15 @@ final class ViewerRemoteLike: ByteSource {
         #expect(outcome.value == nil && memory.interruptions >= 1)
         // Nothing was kept: copying again (the server answers now) makes a whole copy.
         memory.stallsReads = false
-        let copy = try #require(copies.localURL(for: url, fileSystems: registry, owner: ObjectIdentifier(copies), cancellation: CancellationFlag()))
+        let copy = try #require(
+            copies.localURL(
+                for: url, fileSystems: registry, owner: ObjectIdentifier(copies), cancellation: CancellationFlag()))
         #expect(try Data(contentsOf: copy).count == 200_000 / 13 * 13)
     }
 
     @Test func aLinkedFlagFollowsItsParentsAndLetsGoWhenReleased() {
-        let first = CancellationFlag(), second = CancellationFlag()
+        let first = CancellationFlag()
+        let second = CancellationFlag()
         var linked: LinkedCancellation? = LinkedCancellation(first, second)
         let flag = linked!.flag
         #expect(!flag.isCancelled)

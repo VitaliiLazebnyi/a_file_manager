@@ -91,7 +91,9 @@ public final class Kernel {
     /// left alone.
     private static let ignoreBrokenPipes: Void = {
         var current = sigaction()
-        guard sigaction(SIGPIPE, nil, &current) == 0, unsafeBitCast(current.__sigaction_u.__sa_handler, to: Int.self) == 0 else { return }
+        guard sigaction(SIGPIPE, nil, &current) == 0,
+            unsafeBitCast(current.__sigaction_u.__sa_handler, to: Int.self) == 0
+        else { return }
         var action = sigaction()
         action.__sigaction_u.__sa_handler = { _ in }
         sigemptyset(&action.sa_mask)
@@ -151,7 +153,9 @@ public final class Kernel {
     }
 
     private var attachedShell: ShellServices {
-        guard let shell else { preconditionFailure("The shell is not attached yet; use panels and jobs inside command handlers only.") }
+        guard let shell else {
+            preconditionFailure("The shell is not attached yet; use panels and jobs inside command handlers only.")
+        }
         return shell
     }
 
@@ -254,7 +258,8 @@ public final class SettingsKeyRegistry {
 
     /// What was declared for a key: the key itself, else the longest family it belongs to.
     public func declaration(for key: String) -> Declaration? {
-        exact[key] ?? families.filter { key.utf8.starts(with: $0.key.utf8) }.max { $0.key.utf8.count < $1.key.utf8.count }
+        exact[key]
+            ?? families.filter { key.utf8.starts(with: $0.key.utf8) }.max { $0.key.utf8.count < $1.key.utf8.count }
     }
 
     public func kind(of key: String) -> SettingsKeyKind? { declaration(for: key)?.kind }

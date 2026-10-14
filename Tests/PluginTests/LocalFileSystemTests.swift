@@ -27,15 +27,18 @@ import Testing
 
     @Test func theBulkListingAgreesWithLookingAtEachEntry() throws {
         let box = try Sandbox()
-        try box.file("plain.txt", String(repeating: "p", count: 1234), modified: Date(timeIntervalSince1970: 1_700_000_000))
+        try box.file(
+            "plain.txt", String(repeating: "p", count: 1234), modified: Date(timeIntervalSince1970: 1_700_000_000))
         try box.file("script.sh", "#!/bin/sh")
         try FileManager.default.setAttributes([.posixPermissions: 0o750], ofItemAtPath: box.url("script.sh").path)
         try box.file(".dotfile", "h")
         try box.folder("folder/inner")
         try box.folder("Tool.app/Contents")
         try box.file("name with spaces and ünïcödé.md", "u")
-        try FileManager.default.createSymbolicLink(at: box.url("link-to-folder"), withDestinationURL: box.url("folder"))
-        try FileManager.default.createSymbolicLink(at: box.url("link-to-file"), withDestinationURL: box.url("plain.txt"))
+        try FileManager.default.createSymbolicLink(
+            at: box.url("link-to-folder"), withDestinationURL: box.url("folder"))
+        try FileManager.default.createSymbolicLink(
+            at: box.url("link-to-file"), withDestinationURL: box.url("plain.txt"))
         try FileManager.default.createSymbolicLink(at: box.url("broken-link"), withDestinationURL: box.url("nowhere"))
         try box.file("flagged.txt")
         #expect(chflags(box.url("flagged.txt").path, UInt32(UF_HIDDEN)) == 0)
@@ -48,14 +51,20 @@ import Testing
             #expect(item == single, "\(item.name) differs")
         }
         let byName = Dictionary(uniqueKeysWithValues: listed.map { ($0.name, $0) })
-        #expect(byName["plain.txt"]?.size == 1234 && byName["plain.txt"]?.modified == Date(timeIntervalSince1970: 1_700_000_000))
+        #expect(
+            byName["plain.txt"]?.size == 1234
+                && byName["plain.txt"]?.modified == Date(timeIntervalSince1970: 1_700_000_000))
         #expect(byName["script.sh"]?.permissions == 0o750)
         #expect(byName["Tool.app"]?.isPackage == true && byName["folder"]?.isPackage == false)
         #expect(byName["link-to-folder"]?.isDirectory == true && byName["link-to-file"]?.isDirectory == false)
         #expect(byName["broken-link"]?.isSymlink == true && byName["broken-link"]?.isDirectory == false)
         #expect(byName["flagged.txt"]?.isHidden == true && byName[".dotfile"]?.isHidden == true)
-        #expect(Set(try local.list(box.root, showHidden: false).map(\.name))
-                == ["plain.txt", "script.sh", "folder", "Tool.app", "name with spaces and ünïcödé.md", "link-to-folder", "link-to-file", "broken-link"])
+        #expect(
+            Set(try local.list(box.root, showHidden: false).map(\.name))
+                == [
+                    "plain.txt", "script.sh", "folder", "Tool.app", "name with spaces and ünïcödé.md", "link-to-folder",
+                    "link-to-file", "broken-link"
+                ])
         #expect(try local.list(box.url("folder/inner"), showHidden: true).isEmpty)
     }
 
@@ -78,7 +87,10 @@ import Testing
         #expect(batches.count >= 3 && names.count == count)
         // Stopping early stops the reading.
         var received = 0
-        try local.list(box.root, showHidden: true) { _ in received += 1; return false }
+        try local.list(box.root, showHidden: true) { _ in
+            received += 1
+            return false
+        }
         #expect(received == 1)
     }
 
@@ -122,7 +134,9 @@ import Testing
         let box = try Sandbox()
         try box.file("a.txt", "a")
         try box.file("b.txt", "b")
-        #expect(throws: FileSystemError.self) { try local.move(box.url("a.txt"), to: box.url("b.txt"), replacing: false) }
+        #expect(throws: FileSystemError.self) {
+            try local.move(box.url("a.txt"), to: box.url("b.txt"), replacing: false)
+        }
         #expect(box.read("a.txt") == "a" && box.read("b.txt") == "b")
         try local.move(box.url("a.txt"), to: box.url("b.txt"), replacing: true)
         #expect(box.read("b.txt") == "a" && !box.exists("a.txt"))

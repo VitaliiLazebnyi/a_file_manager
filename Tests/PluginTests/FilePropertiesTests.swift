@@ -1,10 +1,11 @@
 import AFMContracts
 import AFMKernel
-@testable import FilePropertiesPlugin
 import Foundation
 import LocalFileSystemPlugin
 import TestSupport
 import Testing
+
+@testable import FilePropertiesPlugin
 
 /// The pure parts of the file-properties plugin: the comment file format, permission and date
 /// entries, command parameters, link paths and the wording of the space report.
@@ -33,7 +34,9 @@ import Testing
         file.setComment("", for: "b.txt")
         file.setComment("", for: "missing")
         #expect(file.entries.map(\.name) == ["a.txt", "my file"])
-        #expect(String(data: file.data(), encoding: .windowsCP1252) == "a.txt changed\r\n\"my file\" new\\nlines\u{04}\u{C2}\r\n")
+        #expect(
+            String(data: file.data(), encoding: .windowsCP1252)
+                == "a.txt changed\r\n\"my file\" new\\nlines\u{04}\u{C2}\r\n")
         file.setComment("", for: "a.txt")
         file.setComment("", for: "my file")
         #expect(file.isEmpty)
@@ -48,10 +51,14 @@ import Testing
         let wide = plain.data()
         #expect(wide.starts(with: [0xFF, 0xFE]))
         let again = DescriptIon(data: wide)
-        #expect(again.encoding == .utf16LittleEndian && again.comment(for: "b.txt") == "日本語" && again.comment(for: "a.txt") == "größer")
+        #expect(
+            again.encoding == .utf16LittleEndian && again.comment(for: "b.txt") == "日本語"
+                && again.comment(for: "a.txt") == "größer")
         // A UTF-8 file stays UTF-8, with or without its mark.
         let utf8 = DescriptIon(data: Data([0xEF, 0xBB, 0xBF]) + Data("a.txt größer\r\n".utf8))
-        #expect(utf8.encoding == .utf8(bom: true) && utf8.comment(for: "a.txt") == "größer" && utf8.data().starts(with: [0xEF, 0xBB, 0xBF]))
+        #expect(
+            utf8.encoding == .utf8(bom: true) && utf8.comment(for: "a.txt") == "größer"
+                && utf8.data().starts(with: [0xEF, 0xBB, 0xBF]))
         #expect(DescriptIon(data: Data("a.txt größer\n".utf8)).encoding == .utf8(bom: false))
         #expect(DescriptIon(data: Data([0xFE, 0xFF, 0x00, 0x61, 0x00, 0x20, 0x00, 0x62])).comment(for: "a") == "b")
     }
@@ -72,7 +79,9 @@ import Testing
         #expect(PermissionChange("a+X")?.applied(to: 0o644, isDirectory: false) == 0o644)
         #expect(PermissionChange("a+X")?.applied(to: 0o644, isDirectory: true) == 0o755)
         #expect(PermissionChange("a+X")?.applied(to: 0o744, isDirectory: false) == 0o755)
-        for wrong in ["9", "75", "888", "rwxrwxrw", "rwxrwxrwz", "u+q", "z+r", "u"] { #expect(PermissionChange(wrong) == nil, "\(wrong)") }
+        for wrong in ["9", "75", "888", "rwxrwxrw", "rwxrwxrwz", "u+q", "z+r", "u"] {
+            #expect(PermissionChange(wrong) == nil, "\(wrong)")
+        }
     }
 
     // MARK: Date and time
@@ -84,9 +93,11 @@ import Testing
     }
 
     @Test func partialDatesKeepTheOtherParts() throws {
-        let original = try #require(utc.date(from: DateComponents(year: 2026, month: 10, day: 11, hour: 9, minute: 58, second: 52)))
+        let original = try #require(
+            utc.date(from: DateComponents(year: 2026, month: 10, day: 11, hour: 9, minute: 58, second: 52)))
         func change(_ date: String, _ time: String) -> String? {
-            guard let new = TimestampChange(date: date, time: time)?.applied(to: original, now: Date(), calendar: utc) else { return nil }
+            guard let new = TimestampChange(date: date, time: time)?.applied(to: original, now: Date(), calendar: utc)
+            else { return nil }
             let texts = TimestampChange.fieldTexts(for: new, calendar: utc)
             return texts.date + " " + texts.time
         }
@@ -97,7 +108,8 @@ import Testing
         #expect(change("", "12:30") == "2026-10-11 12:30:00")
         #expect(change("2021/2/3", "") == "2021-02-03 09:58:52")
         #expect(change("2021-02-31", "") == nil)
-        #expect(TimestampChange(date: "2021-13-01", time: "") == nil && TimestampChange(date: "2021-01", time: "") == nil)
+        #expect(
+            TimestampChange(date: "2021-13-01", time: "") == nil && TimestampChange(date: "2021-01", time: "") == nil)
         #expect(TimestampChange(date: "", time: "25:00") == nil && TimestampChange(date: "x-1-y", time: "") != nil)
         #expect(TimestampChange(date: "", time: "")?.changesNothing == true)
         let now = Date(timeIntervalSince1970: 1_700_000_000)
@@ -106,14 +118,18 @@ import Testing
 
     @Test func readsCommandParameters() throws {
         let parsed = try #require(AttributeChange.parse(parameters: "= +h -r +f +m640 +a -s +d2020-01-02 +t03:04"))
-        #expect(parsed.applyAtOnce && parsed.change.hidden == true && parsed.change.locked == false && parsed.change.recurse)
+        #expect(
+            parsed.applyAtOnce && parsed.change.hidden == true && parsed.change.locked == false && parsed.change.recurse
+        )
         #expect(parsed.change.permissions == .absolute(0o640, keepingSpecialBits: false))
         #expect(parsed.change.timestamp?.parts == [2020, 1, 2, 3, 4, 0])
         let dialog = try #require(AttributeChange.parse(parameters: "-h +mu+x"))
         #expect(!dialog.applyAtOnce && dialog.change.hidden == false && dialog.change.timestamp == nil)
         // `+c +t`: the current date, and the time as it is.
         let dateOnly = try #require(AttributeChange.parse(parameters: "=+c +t"))
-        #expect(dateOnly.applyAtOnce && dateOnly.change.timestamp?.parts[0] != nil && dateOnly.change.timestamp?.parts[3] == nil)
+        #expect(
+            dateOnly.applyAtOnce && dateOnly.change.timestamp?.parts[0] != nil
+                && dateOnly.change.timestamp?.parts[3] == nil)
         #expect(AttributeChange.parse(parameters: "+q") == nil && AttributeChange.parse(parameters: "h") == nil)
         #expect(AttributeChange.parse(parameters: "+m999") == nil && AttributeChange.parse(parameters: "+d2020") == nil)
         #expect(AttributeChange.parse(parameters: "")?.change.isEmpty == true)
@@ -132,21 +148,29 @@ import Testing
     }
 
     @Test func spaceReportWording() {
-        let small = SpaceReport.text(SpaceTotals(bytes: 23, allocated: 4096, rounded: 4096, files: 1), sourceIsLocal: true, targetCluster: 4096,
-                                     volume: VolumeInfo(name: "Disk", freeBytes: 2048 * 1024, totalBytes: 4096 * 1024), cancelled: false)
-        #expect(small == """
-        23 bytes in 1 file(s)
+        let small = SpaceReport.text(
+            SpaceTotals(bytes: 23, allocated: 4096, rounded: 4096, files: 1), sourceIsLocal: true, targetCluster: 4096,
+            volume: VolumeInfo(name: "Disk", freeBytes: 2048 * 1024, totalBytes: 4096 * 1024), cancelled: false)
+        #expect(
+            small == """
+                23 bytes in 1 file(s)
 
-        Actual space used on source volume: 4,096 bytes
-        Required on target volume: 4,096 bytes
+                Actual space used on source volume: 4,096 bytes
+                Required on target volume: 4,096 bytes
 
-        Disk: 2,048 k of 4,096 k free
-        """)
-        let large = SpaceReport.text(SpaceTotals(bytes: 23_332_990, files: 101, folders: 14, unreadable: 1), sourceIsLocal: false, targetCluster: nil,
-                                     volume: nil, cancelled: true)
+                Disk: 2,048 k of 4,096 k free
+                """)
+        let large = SpaceReport.text(
+            SpaceTotals(bytes: 23_332_990, files: 101, folders: 14, unreadable: 1), sourceIsLocal: false,
+            targetCluster: nil,
+            volume: nil, cancelled: true)
         #expect(large.hasPrefix("23,332,990 bytes in 101 file(s),\nin 14 directories\n(= 22,786 k, 22.25 M)"))
-        #expect(large.contains("1 folder(s) could not be read") && large.contains("stopped") && !large.contains("Actual space"))
-        #expect(SpaceCalculator.round(1, to: 4096) == 4096 && SpaceCalculator.round(4096, to: 4096) == 4096 && SpaceCalculator.round(0, to: 4096) == 0)
+        #expect(
+            large.contains("1 folder(s) could not be read") && large.contains("stopped")
+                && !large.contains("Actual space"))
+        #expect(
+            SpaceCalculator.round(1, to: 4096) == 4096 && SpaceCalculator.round(4096, to: 4096) == 4096
+                && SpaceCalculator.round(0, to: 4096) == 0)
         #expect(SpaceCalculator.round(5, to: nil) == 5)
     }
 }
@@ -173,7 +197,9 @@ import Testing
 
     @Test func measuresATreeOnAllCores() throws {
         for folder in 0..<40 {
-            for file in 0..<25 { memory.addFile("/tree/d\(folder)/sub\(file % 3)/f\(file).bin", String(repeating: "x", count: file)) }
+            for file in 0..<25 {
+                memory.addFile("/tree/d\(folder)/sub\(file % 3)/f\(file).bin", String(repeating: "x", count: file))
+            }
         }
         memory.addFile("/tree/top.bin", "12345")
         memory.addDirectory("/tree/empty")
@@ -188,21 +214,27 @@ import Testing
         let allBytes: Int = 40 * (0..<25).reduce(0, +) + 5
         let expectedBytes: Int = allBytes - unreadableFiles.reduce(0, +)
         #expect(totals[0].bytes == Int64(expectedBytes))
-        #expect(totals[0].allocated == totals[0].bytes && totals[0].rounded >= totals[0].bytes && totals[0].rounded % 16 == 0)
+        #expect(
+            totals[0].allocated == totals[0].bytes && totals[0].rounded >= totals[0].bytes
+                && totals[0].rounded % 16 == 0)
         #expect(totals[1] == SpaceTotals(bytes: 5, allocated: 5, rounded: 16, files: 1))
         // A cancelled calculation stops descending.
         let cancelled = CancellationFlag()
         cancelled.cancel()
-        #expect(SpaceCalculator(fileSystems: fileSystems, cancellation: cancelled).measure(directory: memory.url("/tree")) == SpaceTotals())
+        #expect(
+            SpaceCalculator(fileSystems: fileSystems, cancellation: cancelled).measure(directory: memory.url("/tree"))
+                == SpaceTotals())
     }
 
     @Test func measuresRealAllocationOnTheLocalDisk() throws {
         let box = try Sandbox()
         try box.file("a/one.txt", String(repeating: "x", count: 5000))
         try box.file("a/deep/two.txt", "2")
-        try FileManager.default.createSymbolicLink(atPath: box.url("a/link").path, withDestinationPath: box.url("a/deep").path)
+        try FileManager.default.createSymbolicLink(
+            atPath: box.url("a/link").path, withDestinationPath: box.url("a/deep").path)
         let folder = try #require(fileSystems.item(at: box.url("a")))
-        let totals = SpaceCalculator(fileSystems: fileSystems, targetCluster: LocalInfo.clusterSize(at: box.root)).measure([folder])[0]
+        let totals = SpaceCalculator(fileSystems: fileSystems, targetCluster: LocalInfo.clusterSize(at: box.root))
+            .measure([folder])[0]
         // The link is counted as a link, not followed.
         #expect(totals.files == 3 && totals.folders == 2 && totals.bytes == 5001)
         #expect(totals.allocated >= 5001 && totals.rounded >= 5001 && totals.rounded % 512 == 0)
@@ -217,15 +249,26 @@ import Testing
         memory.addFile("/m/descript.ion", "a.png a picture\r\n")
         let columns = ColumnRegistry()
         PropertyColumns.register(in: columns, comments: CommentStore(fileSystems: fileSystems))
-        #expect(columns.all.map(\.id) == ["comment", "owner", "group", "created", "accessed", "octal", "linkTarget", "kind", "tags", "xattrCount",
-                                          "sizeOnDisk"])
-        let items = try fileSystems.provider(for: box.root).list(box.root, showHidden: true) + memory.list(memory.url("/m"), showHidden: true)
+        #expect(
+            columns.all.map(\.id) == [
+                "comment", "owner", "group", "created", "accessed", "octal", "linkTarget", "kind", "tags", "xattrCount",
+                "sizeOnDisk"
+            ])
+        let items =
+            try fileSystems.provider(for: box.root).list(box.root, showHidden: true)
+            + memory.list(memory.url("/m"), showHidden: true)
         // Every column for every item, all at once, as a panel asks.
-        let cells = Parallel.map(items.flatMap { item in columns.all.map { (item, $0) } }) { item, column in (item.name, column.id, column.value(item)) }
+        let cells = Parallel.map(items.flatMap { item in columns.all.map { (item, $0) } }) { item, column in
+            (item.name, column.id, column.value(item))
+        }
         func cell(_ name: String, _ column: String) -> String? { cells.first { $0.0 == name && $0.1 == column }?.2 }
-        #expect(cell("f7.txt", "comment") == "comment 7" && cell("a.png", "comment") == "a picture" && cell("link", "comment") == "")
+        #expect(
+            cell("f7.txt", "comment") == "comment 7" && cell("a.png", "comment") == "a picture"
+                && cell("link", "comment") == "")
         #expect(cell("f7.txt", "owner") == NSUserName() && cell("a.png", "owner") == "")
-        #expect(cell("f7.txt", "group")?.isEmpty == false && cell("f7.txt", "created")?.isEmpty == false && cell("f7.txt", "accessed")?.isEmpty == false)
+        #expect(
+            cell("f7.txt", "group")?.isEmpty == false && cell("f7.txt", "created")?.isEmpty == false
+                && cell("f7.txt", "accessed")?.isEmpty == false)
         #expect(cell("f7.txt", "octal") == "644" && cell("a.png", "octal") == "644")
         #expect(cell("link", "linkTarget") == "f1.txt" && cell("f7.txt", "linkTarget") == "")
         #expect(cell("f7.txt", "kind")?.isEmpty == false && cell("a.png", "kind")?.isEmpty == false)
@@ -238,7 +281,9 @@ import Testing
     @Test func commentStoreReadsAFolderOnceForManyReaders() throws {
         memory.addFile("/c/descript.ion", "a.txt first\r\nb.txt second\r\n")
         let store = CommentStore(fileSystems: fileSystems)
-        let answers = Parallel.map(Array(0..<200)) { index in store.comments(in: memory.url("/c"))[index % 2 == 0 ? "a.txt" : "b.txt"] }
+        let answers = Parallel.map(Array(0..<200)) { index in
+            store.comments(in: memory.url("/c"))[index % 2 == 0 ? "a.txt" : "b.txt"]
+        }
         #expect(answers.filter { $0 == "first" }.count == 100 && answers.filter { $0 == "second" }.count == 100)
         // A change made through the store is seen at once; the file disappears with its last comment.
         try store.setComment("changed", for: "A.TXT", in: memory.url("/c"), hidden: true)
@@ -272,7 +317,9 @@ import Testing
         change.permissions = try #require(PermissionChange("u+rwX"))
         let restored = AttributeJob(change: change, fileSystems: fileSystems).run([tree])
         #expect(restored.failed == 0 && restored.changed == 809)
-        #expect(fileSystems.item(at: box.url("t/d3/f42.txt"))?.permissions == 0o600 && fileSystems.item(at: box.url("t/d3"))?.permissions == 0o700)
+        #expect(
+            fileSystems.item(at: box.url("t/d3/f42.txt"))?.permissions == 0o600
+                && fileSystems.item(at: box.url("t/d3"))?.permissions == 0o700)
     }
 }
 
@@ -297,7 +344,8 @@ import Testing
         try box.file("B/other.txt", "other", modified: Date(timeIntervalSince1970: 86_400 * 365))
         memory.addFile("/M/a.txt", "abc")
         memory.addFile("/M/sub/b.txt", "defgh")
-        bench = TestBench(plugins: [plugin], fileSystems: [LocalFileSystem(), memory], left: box.url("A"), right: box.url("B"))
+        bench = TestBench(
+            plugins: [plugin], fileSystems: [LocalFileSystem(), memory], left: box.url("A"), right: box.url("B"))
     }
 
     private func flags(_ path: String) -> UInt32 { LocalInfo.details(box.url(path))?.flags ?? 0 }
@@ -307,13 +355,19 @@ import Testing
     @Test func registersCommandsMenusKeysAndColumns() {
         let keys = bench.kernel.keyBindings
         #expect(keys.conflicts.isEmpty)
-        #expect(keys.command(for: Shortcut(.returnKey, .option)) == .properties && keys.command(for: .cmd("i")) == .properties)
+        #expect(
+            keys.command(for: Shortcut(.returnKey, .option)) == .properties
+                && keys.command(for: .cmd("i")) == .properties)
         #expect(keys.command(for: Shortcut(.character("l"), .control)) == .occupiedSpace)
         #expect(keys.command(for: Shortcut(.character("z"), .control)) == "cm_EditComment")
         #expect(keys.command(for: .f(5, [.control, .shift])) == "cm_CreateShortcut")
         let files = bench.kernel.menus.menus.first { $0.title == "Files" }?.items ?? []
-        #expect(files == [.setAttributes, .properties, "afm_FinderInfo", .occupiedSpace, "cm_CountDirContent", "cm_EditComment", nil,
-                          "cm_CreateShortcut", "afm_ShowLinkTarget"])
+        #expect(
+            files == [
+                .setAttributes, .properties, "afm_FinderInfo", .occupiedSpace, "cm_CountDirContent", "cm_EditComment",
+                nil,
+                "cm_CreateShortcut", "afm_ShowLinkTarget"
+            ])
         #expect(files.compactMap { $0 }.allSatisfy { commands[$0] != nil })
         #expect(bench.kernel.columns["comment"] != nil && bench.kernel.columns.all.count == 11)
         #expect(bench.kernel.toolbar.defaultLayout.compactMap { $0?.command } == [.properties, .occupiedSpace])
@@ -324,14 +378,21 @@ import Testing
 
     @Test func changesPermissionsDateAndFlagsOfOneFile() {
         left.moveCursor(toName: "one.txt")
-        ui.formAnswers = [.values(["permissions": .text("600"), "changeDate": .flag(true), "date": .text("2001-02-03"), "time": .text("hh:00"),
-                                   "locked": .index(1)])]
+        ui.formAnswers = [
+            .values([
+                "permissions": .text("600"), "changeDate": .flag(true), "date": .text("2001-02-03"),
+                "time": .text("hh:00"),
+                "locked": .index(1)
+            ])
+        ]
         commands.perform(.setAttributes)
         #expect(ui.log.contains("form: Change attributes: one.txt"))
         // The dialog showed the file's own state.
         let form = ui.forms[0]
         #expect(form.first { $0.key == "permissions" }?.initialValue == .text("644"))
-        if case .choice(let options, _)? = form.first(where: { $0.key == "hidden" })?.kind { #expect(options[0] == "Unchanged (not set)") }
+        if case .choice(let options, _)? = form.first(where: { $0.key == "hidden" })?.kind {
+            #expect(options[0] == "Unchanged (not set)")
+        }
         #expect(notes(form).contains { $0.hasPrefix("Owner (now \(NSUserName()))") })
         #expect(mode("A/one.txt") == 0o600 && flags("A/one.txt") & UInt32(UF_IMMUTABLE) != 0)
         let texts = TimestampChange.fieldTexts(for: left.model.items.first { $0.name == "one.txt" }?.modified ?? Date())
@@ -367,8 +428,11 @@ import Testing
     @Test func wrongEntriesAreAskedAgainAndTargetFileCanBeLoaded() {
         left.moveCursor(toName: "two.txt")
         right.moveCursor(toName: "other.txt")
-        ui.formAnswers = [.values(["permissions": .text("abc")]), .values(["permissions": .text(""), "changeDate": .flag(true), "date": .text("soon")]),
-                          .values([:], button: 1), .accept]
+        ui.formAnswers = [
+            .values(["permissions": .text("abc")]),
+            .values(["permissions": .text(""), "changeDate": .flag(true), "date": .text("soon")]),
+            .values([:], button: 1), .accept
+        ]
         commands.perform(.setAttributes)
         #expect(ui.log.filter { $0.hasPrefix("form: Change attributes") }.count == 4)
         #expect(ui.log.contains("inform: The permissions \"abc\" cannot be read!"))
@@ -395,8 +459,12 @@ import Testing
         ui.formAnswers = [.accept]
         commands.perform(.setAttributes, .text("+r +f +d2020-01-02"))
         let form = ui.forms[0]
-        #expect(form.first { $0.key == "recurse" }?.initialValue == .flag(true) && form.first { $0.key == "locked" }?.initialValue == .index(1))
-        #expect(form.first { $0.key == "date" }?.initialValue == .text("2020-01-02") && form.first { $0.key == "time" }?.initialValue == .text("hh:mm:ss"))
+        #expect(
+            form.first { $0.key == "recurse" }?.initialValue == .flag(true)
+                && form.first { $0.key == "locked" }?.initialValue == .index(1))
+        #expect(
+            form.first { $0.key == "date" }?.initialValue == .text("2020-01-02")
+                && form.first { $0.key == "time" }?.initialValue == .text("hh:mm:ss"))
         #expect(flags("A/one.txt") & UInt32(UF_IMMUTABLE) != 0)
         commands.perform(.setAttributes, .text("=-r"))
 
@@ -432,10 +500,16 @@ import Testing
         commands.perform(.properties)
         #expect(ui.log.last == "form: Properties: one.txt")
         var rows = notes(ui.forms[0])
-        #expect(rows.contains("Name: one.txt") && rows.contains("Size: 5 bytes") && rows.contains("Permissions: rw-r--r-- (644)"))
+        #expect(
+            rows.contains("Name: one.txt") && rows.contains("Size: 5 bytes")
+                && rows.contains("Permissions: rw-r--r-- (644)"))
         #expect(rows.contains("Where: \(box.url("A").path)") && rows.contains("Comment: the first"))
-        #expect(rows.contains { $0.hasPrefix("Owner: \(NSUserName()) (") } && rows.contains { $0.hasPrefix("Size on disk: ") })
-        for label in ["Kind", "Created", "Modified", "Accessed", "Group", "Volume"] { #expect(rows.contains { $0.hasPrefix(label + ": ") }, "\(label)") }
+        #expect(
+            rows.contains { $0.hasPrefix("Owner: \(NSUserName()) (") }
+                && rows.contains { $0.hasPrefix("Size on disk: ") })
+        for label in ["Kind", "Created", "Modified", "Accessed", "Group", "Volume"] {
+            #expect(rows.contains { $0.hasPrefix(label + ": ") }, "\(label)")
+        }
         #expect(plugin.finderInfoRequests.isEmpty)
 
         // A folder is counted with everything below it; the second button asks Finder.
@@ -482,7 +556,9 @@ import Testing
     @Test func occupiedSpaceMeasuresTheOperandsAndShowsFolderSizes() {
         left.moveCursor(toName: "docs")
         commands.perform(.occupiedSpace)
-        #expect(ui.log.last == "inform: Total space occupied:" && bench.jobService.titles == ["Calculating occupied space:"])
+        #expect(
+            ui.log.last == "inform: Total space occupied:" && bench.jobService.titles == ["Calculating occupied space:"]
+        )
         #expect(left.model.items.first { $0.name == "docs" }?.computedSize == 10 && left.model.selection == ["docs"])
         // With a selection, the selection is measured, not the cursor item.
         left.model.clearSelection()
@@ -526,7 +602,9 @@ import Testing
         ui.formAnswers = [.accept, .cancel, .values(["comment": .text("")])]
         commands.perform("cm_EditComment")
         commands.perform("cm_EditComment")
-        #expect(ui.forms[1].first?.initialValue == .text("first line\nsecond line") && bench.jobService.titles.filter { $0 == "Saving comment:" }.count == 1)
+        #expect(
+            ui.forms[1].first?.initialValue == .text("first line\nsecond line")
+                && bench.jobService.titles.filter { $0 == "Saving comment:" }.count == 1)
         // An empty comment removes the entry, and the file with its last entry.
         commands.perform("cm_EditComment")
         #expect(!box.exists("A/descript.ion") && left.model.cursorItem.map { column?.value($0) } == "")
@@ -540,9 +618,13 @@ import Testing
         commands.perform("cm_EditComment")
         #expect(memory.contents("/M/descript.ion") == "sub a folder\r\n")
         left.moveCursor(toName: "b.txt")
-        ui.formAnswers = [.values(["comment": .text(String(repeating: "x", count: 5000))]), .values(["comment": .text("größer")])]
+        ui.formAnswers = [
+            .values(["comment": .text(String(repeating: "x", count: 5000))]), .values(["comment": .text("größer")])
+        ]
         commands.perform("cm_EditComment")
-        #expect(ui.log.contains("inform: The comment is too long!") && ui.log.filter { $0 == "form: File comment" }.count == 3)
+        #expect(
+            ui.log.contains("inform: The comment is too long!")
+                && ui.log.filter { $0 == "form: File comment" }.count == 3)
         #expect(memory.allPaths.filter { $0.contains("descript") } == ["/M/descript.ion", "/M/sub/descript.ion"])
         memory.capabilities = []
         #expect(!commands.isEnabled("cm_EditComment"))
@@ -554,18 +636,24 @@ import Testing
         left.moveCursor(toName: "one.txt")
         ui.formAnswers = [.accept]
         commands.perform("cm_CreateShortcut")
-        #expect(ui.log.last == "form: Create link" && ui.forms[0].first?.initialValue == .text(box.url("B").path + "/one.txt"))
+        #expect(
+            ui.log.last == "form: Create link"
+                && ui.forms[0].first?.initialValue == .text(box.url("B").path + "/one.txt"))
         #expect(LocalInfo.linkTarget(box.url("B/one.txt")) == box.url("A/one.txt").path)
         #expect(right.names == ["one.txt", "other.txt"] && right.model.cursorItem?.name == "one.txt")
 
         // Another name, relative, and the other kinds of link.
-        ui.formAnswers = [.values(["target": .text(box.url("B").path + "/rel.txt"), "relative": .flag(true)]),
-                          .values(["target": .text(box.url("B").path + "/hard.txt"), "kind": .index(LinkKind.hard.rawValue)]),
-                          .values(["target": .text(box.url("B").path + "/alias"), "kind": .index(LinkKind.alias.rawValue)])]
+        ui.formAnswers = [
+            .values(["target": .text(box.url("B").path + "/rel.txt"), "relative": .flag(true)]),
+            .values(["target": .text(box.url("B").path + "/hard.txt"), "kind": .index(LinkKind.hard.rawValue)]),
+            .values(["target": .text(box.url("B").path + "/alias"), "kind": .index(LinkKind.alias.rawValue)])
+        ]
         for _ in 0..<3 { commands.perform("cm_CreateShortcut") }
         #expect(LocalInfo.linkTarget(box.url("B/rel.txt")) == "../A/one.txt" && box.read("B/rel.txt") == "12345")
         #expect(LocalInfo.details(box.url("A/one.txt"))?.linkCount == 2 && box.read("B/hard.txt") == "12345")
-        #expect(LocalInfo.resolvedLinkTarget(box.url("B/alias"))?.resolvingSymlinksInPath().path == box.url("A/one.txt").path)
+        #expect(
+            LocalInfo.resolvedLinkTarget(box.url("B/alias"))?.resolvingSymlinksInPath().path
+                == box.url("A/one.txt").path)
 
         // An existing name is never replaced; several operands go into the folder under their names.
         ui.formAnswers = [.accept]
@@ -584,7 +672,8 @@ import Testing
     }
 
     @Test func goesToTheTargetOfALink() throws {
-        try FileManager.default.createSymbolicLink(atPath: box.url("A/to-more").path, withDestinationPath: "docs/deep/more.txt")
+        try FileManager.default.createSymbolicLink(
+            atPath: box.url("A/to-more").path, withDestinationPath: "docs/deep/more.txt")
         left.reload()
         left.moveCursor(toName: "to-more")
         commands.perform("afm_ShowLinkTarget")

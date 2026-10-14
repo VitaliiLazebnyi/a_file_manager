@@ -62,8 +62,10 @@ public final class PanelModel {
         public var selectedFiles = 0, totalFiles = 0
         public var selectedFolders = 0, totalFolders = 0
 
-        public init(selectedBytes: Int64 = 0, totalBytes: Int64 = 0, selectedFiles: Int = 0, totalFiles: Int = 0,
-                    selectedFolders: Int = 0, totalFolders: Int = 0) {
+        public init(
+            selectedBytes: Int64 = 0, totalBytes: Int64 = 0, selectedFiles: Int = 0, totalFiles: Int = 0,
+            selectedFolders: Int = 0, totalFolders: Int = 0
+        ) {
             self.selectedBytes = selectedBytes
             self.totalBytes = totalBytes
             self.selectedFiles = selectedFiles
@@ -254,7 +256,9 @@ public final class PanelModel {
     /// shows it reads the directory for it.
     public func duplicate() -> PanelModel {
         let copy = PanelModel(directory: directory, sort: sort, showHidden: showHidden)
-        (copy.items, copy.listedItems, copy.shownPlaces, copy.filter, copy.cursor) = (items, listedItems, shownPlaces, filter, cursor)
+        (copy.items, copy.listedItems, copy.shownPlaces, copy.filter, copy.cursor) = (
+            items, listedItems, shownPlaces, filter, cursor
+        )
         (copy.isListed, copy.isComplete, copy.isRefreshing) = (isListed, isComplete, isRefreshing)
         (copy.marks, copy.nameIndex) = (Bitset(size: listedItems.count), nameIndex)
         (copy.parent, copy.root, copy.volume, copy.isInArrivalOrder) = (parent, root, volume, isInArrivalOrder)
@@ -350,7 +354,8 @@ public final class PanelModel {
             alikeLookups += 1
             guard alikeLookups > 2, items.count > 64 else { return items.firstIndex { $0.name == name } }
             var index: [String: Int] = [:]
-            for (row, item) in items.enumerated() where !item.name.utf8.allSatisfy({ $0 < 0x80 }) && index[item.name] == nil {
+            for (row, item) in items.enumerated()
+            where !item.name.utf8.allSatisfy({ $0 < 0x80 }) && index[item.name] == nil {
                 index[item.name] = row
             }
             alikeIndex = index
@@ -391,7 +396,8 @@ public final class PanelModel {
         // (the item is an older reading), the likeliest of those that are shown.
         if let own = found.first(where: { listedItems[$0] == item }) { return marks.contains(own) }
         let shown = found.filter { shownIndex(ofPlace: $0) != nil }
-        return ListWork.twin(of: item, among: shown.isEmpty ? found : shown, in: listedItems).map(marks.contains) ?? false
+        return ListWork.twin(of: item, among: shown.isEmpty ? found : shown, in: listedItems).map(marks.contains)
+            ?? false
     }
 
     /// Moves the cursor from a command; the row is kept inside the list.
@@ -484,8 +490,10 @@ public final class PanelModel {
     /// Takes a list in the place of the present one, of which it is another order or a later
     /// reading: the marks, the saved marks and the calculated sizes stay with their entries.
     /// A later reading (`isNewReading`) takes the sizes for its folders only.
-    private func replace(listed: inout [FileItem], shown: inout [FileItem], places: [UInt32]?, moves: Moves, index: NameIndex?,
-                         tally: Tally?, keepsTotals: Bool, isNewReading: Bool) {
+    private func replace(
+        listed: inout [FileItem], shown: inout [FileItem], places: [UInt32]?, moves: Moves, index: NameIndex?,
+        tally: Tally?, keepsTotals: Bool, isNewReading: Bool
+    ) {
         let (oldMarks, oldSized) = (marks, sizedPlaces())
         let oldTotals = (listTotals, listTotalsArePlain, selectedTotals)
         take(listed: &listed, shown: &shown, places: places)
@@ -570,10 +578,12 @@ public final class PanelModel {
     }
 
     public func snapshot() -> Snapshot {
-        Snapshot(directory: directory, lists: Remains(listedItems, items), places: shownPlaces, index: nameIndex, cursor: cursor, marks: marks,
-                 sized: sized, filter: filter, sort: sort, parent: parent, root: root, volume: volume, isListed: isListed,
-                 isComplete: isComplete, isRefreshing: isRefreshing, history: history, historyIndex: historyIndex,
-                 isInArrivalOrder: isInArrivalOrder)
+        Snapshot(
+            directory: directory, lists: Remains(listedItems, items), places: shownPlaces, index: nameIndex,
+            cursor: cursor, marks: marks,
+            sized: sized, filter: filter, sort: sort, parent: parent, root: root, volume: volume, isListed: isListed,
+            isComplete: isComplete, isRefreshing: isRefreshing, history: history, historyIndex: historyIndex,
+            isInArrivalOrder: isInArrivalOrder)
     }
 
     /// Goes back to what the panel showed when the snapshot was taken: the same entries
@@ -593,7 +603,9 @@ public final class PanelModel {
         arrangementChanged(list: true, index: snapshot.index)
         (parent, root, volume) = (snapshot.parent, snapshot.root, snapshot.volume)
         (isListed, isComplete, isRefreshing) = (snapshot.isListed, snapshot.isComplete, snapshot.isRefreshing)
-        (history, historyIndex, isInArrivalOrder) = (snapshot.history, snapshot.historyIndex, snapshot.isInArrivalOrder)
+        (history, historyIndex, isInArrivalOrder) = (
+            snapshot.history, snapshot.historyIndex, snapshot.isInArrivalOrder
+        )
         (isOpening, pendingFocus) = (false, nil)
         let wanted = requestedSort ?? sort
         requestedSort = nil
@@ -658,8 +670,10 @@ public final class PanelModel {
     ///
     /// `presorted` names the order the listing's items are already in, when they were sorted in
     /// the background; they are then taken as they are if that is still the panel's order.
-    public func show(_ listing: Listing, focus: String? = nil, history effect: HistoryEffect = .record, complete: Bool = true,
-                     presorted: ListOrder? = nil) {
+    public func show(
+        _ listing: Listing, focus: String? = nil, history effect: HistoryEffect = .record, complete: Bool = true,
+        presorted: ListOrder? = nil
+    ) {
         present(listing, focus: focus, history: effect, complete: complete, remembered: false, presorted: presorted)
     }
 
@@ -667,16 +681,20 @@ public final class PanelModel {
     /// afresh. The list can be used at once; until the fresh reading arrives through
     /// `update(with:)`, `isRefreshing` is true and `isComplete` false. Should the fresh reading
     /// fail, the caller goes back with `restore`.
-    public func showRemembered(_ listing: Listing, focus: String? = nil, history effect: HistoryEffect = .record,
-                               presorted: ListOrder? = nil) {
+    public func showRemembered(
+        _ listing: Listing, focus: String? = nil, history effect: HistoryEffect = .record,
+        presorted: ListOrder? = nil
+    ) {
         present(listing, focus: focus, history: effect, complete: false, remembered: true, presorted: presorted)
     }
 
     /// `arranged` is what the filter shows of the listing's items, when the caller has
     /// worked that out (the items are then in the panel's order).
-    private func present(_ listing: Listing, focus: String?, history effect: HistoryEffect, complete: Bool, remembered: Bool,
-                         presorted: ListOrder?, adoptingRequest: Bool = true, arranged: (shown: [FileItem], places: [UInt32]?)? = nil,
-                         index: NameIndex? = nil, tally: Tally? = nil) {
+    private func present(
+        _ listing: Listing, focus: String?, history effect: HistoryEffect, complete: Bool, remembered: Bool,
+        presorted: ListOrder?, adoptingRequest: Bool = true, arranged: (shown: [FileItem], places: [UInt32]?)? = nil,
+        index: NameIndex? = nil, tally: Tally? = nil
+    ) {
         // The list that arrives is taken in the order the user asked for, if one is waiting.
         if adoptingRequest, let requestedSort { adoptSort(requestedSort) }
         // After `open` the history already holds this visit; the directory just read may still
@@ -722,10 +740,15 @@ public final class PanelModel {
         extend(to: &grown, shown: &shown, places: places, moves: .byName, index: nil, tally: nil)
     }
 
-    private func extend(to listed: inout [FileItem], shown: inout [FileItem], places: [UInt32]?, moves: Moves, index: NameIndex?, tally: Tally?) {
+    private func extend(
+        to listed: inout [FileItem], shown: inout [FileItem], places: [UInt32]?, moves: Moves, index: NameIndex?,
+        tally: Tally?
+    ) {
         let cursorName = cursorItem?.name
         let wasOnParentRow = cursorIsOnParentRow
-        replace(listed: &listed, shown: &shown, places: places, moves: moves, index: index, tally: tally, keepsTotals: false, isNewReading: true)
+        replace(
+            listed: &listed, shown: &shown, places: places, moves: moves, index: index, tally: tally,
+            keepsTotals: false, isNewReading: true)
         isInArrivalOrder = sort.key == .unsorted
         if let focus = pendingFocus, let row = row(ofName: focus) {
             // The item the panel was asked to show has arrived.
@@ -760,7 +783,10 @@ public final class PanelModel {
     /// background and `apply` here.
     @discardableResult
     public func update(with listing: Listing, focus: String? = nil, presorted: ListOrder? = nil) -> Bool {
-        take(PanelModel.prepare(Basis(self, discards: false), update: listing, focus: focus, presorted: presorted, tabulating: false)) == .changed
+        take(
+            PanelModel.prepare(
+                Basis(self, discards: false), update: listing, focus: focus, presorted: presorted, tabulating: false))
+            == .changed
     }
 
     private func adopt(_ listing: Listing) {
@@ -800,7 +826,9 @@ public final class PanelModel {
         private let discards: Bool
 
         fileprivate init(_ model: PanelModel, discards: Bool) {
-            (listVersion, directory, listedItems, items) = (model.listVersion, model.directory, model.listedItems, model.items)
+            (listVersion, directory, listedItems, items) = (
+                model.listVersion, model.directory, model.listedItems, model.items
+            )
             (filter, sort, stamp, places) = (model.filter, model.sort, model.stamp, model.shownPlaces)
             (sizeStamp, requestedSort) = (model.sizeStamp, model.requestedSort)
             (index, sized) = (model.nameIndex, model.sized.flatMap { $0.size == model.listedItems.count ? $0 : nil })
@@ -847,8 +875,11 @@ public final class PanelModel {
         fileprivate let filter: PanelFilter?
         fileprivate let moves: Moves
 
-        fileprivate init(_ kind: Kind, from basis: Basis, listed: [FileItem], shown: [FileItem], places: [UInt32]?, index: NameIndex?,
-                         tally: Tally?, sort: ListOrder, filter: PanelFilter?, moves: Moves) {
+        fileprivate init(
+            _ kind: Kind, from basis: Basis, listed: [FileItem], shown: [FileItem], places: [UInt32]?,
+            index: NameIndex?,
+            tally: Tally?, sort: ListOrder, filter: PanelFilter?, moves: Moves
+        ) {
             (self.kind, stamp, self.listed, self.shown, self.places) = (kind, basis.stamp, listed, shown, places)
             (self.index, self.tally, self.sort, self.filter, self.moves) = (index, tally, sort, filter, moves)
         }
@@ -898,8 +929,10 @@ public final class PanelModel {
         let old = basis.listedItems
         // The list is in the order of its basis: asked for that order again, it stays.
         guard order != basis.sort, let indexes = Sorter.resortedIndexes(of: old, from: basis.sort, to: order) else {
-            return Prepared(.sort, from: basis, listed: old, shown: basis.items, places: basis.places, index: basis.index, tally: nil,
-                            sort: order, filter: basis.filter, moves: .same)
+            return Prepared(
+                .sort, from: basis, listed: old, shown: basis.items, places: basis.places, index: basis.index,
+                tally: nil,
+                sort: order, filter: basis.filter, moves: .same)
         }
         let listed = Sorter.permute(old, by: indexes)
         let table = [UInt32](unsafeUninitializedCapacity: indexes.count) { buffer, count in
@@ -915,9 +948,12 @@ public final class PanelModel {
             let kept = (0..<indexes.count).filter { isShown.contains(Int(indexes[$0])) }.map { UInt32($0) }
             (shown, places) = (ListWork.picked(listed, at: kept), kept)
         }
-        let index = basis.index.map { $0.moved(by: table) } ?? (indexing && listed.count > indexedAbove ? NameIndex(listed) : nil)
-        return Prepared(.sort, from: basis, listed: listed, shown: shown, places: places, index: index, tally: nil, sort: order,
-                        filter: basis.filter, moves: .table(table))
+        let index =
+            basis.index.map { $0.moved(by: table) }
+            ?? (indexing && listed.count > indexedAbove ? NameIndex(listed) : nil)
+        return Prepared(
+            .sort, from: basis, listed: listed, shown: shown, places: places, index: index, tally: nil, sort: order,
+            filter: basis.filter, moves: .table(table))
     }
 
     /// The list through another filter; nil shows everything. **For any thread**: a long
@@ -925,8 +961,9 @@ public final class PanelModel {
     /// once and must be a function of the entry alone.
     public static func prepare(_ basis: Basis, filter: PanelFilter?) -> Prepared {
         let (shown, places) = ListWork.arrange(basis.listedItems, by: filter)
-        return Prepared(.filter, from: basis, listed: basis.listedItems, shown: shown, places: places, index: basis.index,
-                        tally: ListWork.tally(shown), sort: basis.sort, filter: filter, moves: .same)
+        return Prepared(
+            .filter, from: basis, listed: basis.listedItems, shown: shown, places: places, index: basis.index,
+            tally: ListWork.tally(shown), sort: basis.sort, filter: filter, moves: .same)
     }
 
     /// A fresh listing of the directory the panel shows, as `update(with:focus:presorted:)`
@@ -934,25 +971,34 @@ public final class PanelModel {
     /// sorting (unless `presorted` is the panel's order), comparing with what the panel has,
     /// carrying over calculated folder sizes, filtering, and finding the place every old
     /// entry has in the new list, so that `apply` only moves the marks.
-    public static func prepare(_ basis: Basis, update listing: Listing, focus: String? = nil, presorted: ListOrder? = nil) -> Prepared {
+    public static func prepare(
+        _ basis: Basis, update listing: Listing, focus: String? = nil, presorted: ListOrder? = nil
+    ) -> Prepared {
         prepare(basis, update: listing, focus: focus, presorted: presorted, tabulating: true)
     }
 
-    fileprivate static func prepare(_ basis: Basis, update listing: Listing, focus: String?, presorted: ListOrder?, tabulating: Bool) -> Prepared {
+    fileprivate static func prepare(
+        _ basis: Basis, update listing: Listing, focus: String?, presorted: ListOrder?, tabulating: Bool
+    ) -> Prepared {
         // A list that arrives is put into the order the user asked for, if one is waiting.
         let order = basis.wantedSort
         var listed = presorted == order ? listing.items : Sorter.sort(listing.items, by: order)
         let old = basis.listedItems
         guard listing.directory.isSameLocation(as: basis.directory) else {
             let (shown, places) = ListWork.arrange(listed, by: basis.filter)
-            return Prepared(.show(listing, focus: focus, history: .keep, complete: true, remembered: false), from: basis, listed: listed,
-                            shown: shown, places: places,
-                            index: tabulating && listed.count > indexedAbove ? NameIndex(listed) : nil, tally: ListWork.tally(shown),
-                            sort: order, filter: basis.filter, moves: .byName)
+            return Prepared(
+                .show(listing, focus: focus, history: .keep, complete: true, remembered: false), from: basis,
+                listed: listed,
+                shown: shown, places: places,
+                index: tabulating && listed.count > indexedAbove ? NameIndex(listed) : nil,
+                tally: ListWork.tally(shown),
+                sort: order, filter: basis.filter, moves: .byName)
         }
         if order == basis.sort, ListWork.areSameEntries(listed, old) {
-            return Prepared(.update(listing, focus: focus, isSame: true), from: basis, listed: old, shown: basis.items, places: basis.places,
-                            index: basis.index, tally: nil, sort: basis.sort, filter: basis.filter, moves: .same)
+            return Prepared(
+                .update(listing, focus: focus, isSame: true), from: basis, listed: old, shown: basis.items,
+                places: basis.places,
+                index: basis.index, tally: nil, sort: basis.sort, filter: basis.filter, moves: .same)
         }
         let finder = NameFinder(listed)
         // Folder sizes calculated with Space are carried over to the fresh entries.
@@ -969,9 +1015,10 @@ public final class PanelModel {
         }
         let table = tabulating ? ListWork.moves(from: old, to: finder) : nil
         let (shown, places) = ListWork.arrange(listed, by: basis.filter)
-        return Prepared(.update(listing, focus: focus, isSame: false), from: basis, listed: listed, shown: shown, places: places,
-                        index: finder.index, tally: ListWork.tally(shown), sort: order, filter: basis.filter,
-                        moves: table.map(Moves.table) ?? .byName)
+        return Prepared(
+            .update(listing, focus: focus, isSame: false), from: basis, listed: listed, shown: shown, places: places,
+            index: finder.index, tally: ListWork.tally(shown), sort: order, filter: basis.filter,
+            moves: table.map(Moves.table) ?? .byName)
     }
 
     /// Entering a directory that was read (or, with `remembered`, read earlier and kept), as
@@ -984,14 +1031,20 @@ public final class PanelModel {
     /// `apply` answers `.stale` when the panel's list, filter or order changed since the
     /// basis was taken (the folder it showed was read again, another order was chosen):
     /// the caller takes a new basis and prepares again, in the background.
-    public static func prepare(_ basis: Basis, show listing: Listing, focus: String? = nil, history: HistoryEffect = .record,
-                               complete: Bool = true, remembered: Bool = false, presorted: ListOrder? = nil) -> Prepared {
+    public static func prepare(
+        _ basis: Basis, show listing: Listing, focus: String? = nil, history: HistoryEffect = .record,
+        complete: Bool = true, remembered: Bool = false, presorted: ListOrder? = nil
+    ) -> Prepared {
         let order = basis.wantedSort
         let listed = presorted == order ? listing.items : Sorter.sort(listing.items, by: order)
         let (shown, places) = ListWork.arrange(listed, by: basis.filter)
-        return Prepared(.show(listing, focus: focus, history: history, complete: remembered ? false : complete, remembered: remembered),
-                        from: basis, listed: listed, shown: shown, places: places, index: listed.count > indexedAbove ? NameIndex(listed) : nil,
-                        tally: ListWork.tally(shown), sort: order, filter: basis.filter, moves: .byName)
+        return Prepared(
+            .show(
+                listing, focus: focus, history: history, complete: remembered ? false : complete,
+                remembered: remembered),
+            from: basis, listed: listed, shown: shown, places: places,
+            index: listed.count > indexedAbove ? NameIndex(listed) : nil,
+            tally: ListWork.tally(shown), sort: order, filter: basis.filter, moves: .byName)
     }
 
     /// A directory that is arriving piece by piece, grown to `listed` (sorted by `order`), as
@@ -1002,8 +1055,10 @@ public final class PanelModel {
         let finder = NameFinder(grown)
         let table = ListWork.moves(from: basis.listedItems, to: finder)
         let (shown, places) = ListWork.arrange(grown, by: basis.filter)
-        return Prepared(.extend, from: basis, listed: grown, shown: shown, places: places, index: finder.index, tally: ListWork.tally(shown),
-                        sort: wanted, filter: basis.filter, moves: .table(table))
+        return Prepared(
+            .extend, from: basis, listed: grown, shown: shown, places: places, index: finder.index,
+            tally: ListWork.tally(shown),
+            sort: wanted, filter: basis.filter, moves: .table(table))
     }
 
     /// Calculated folder sizes for entries of the list, by name, as `setComputedSizes` takes
@@ -1030,8 +1085,10 @@ public final class PanelModel {
         }
         var known = basis.sized ?? ListWork.sized(old)
         guard !targets.isEmpty else {
-            return Prepared(.sizes(sizeStamp: basis.sizeStamp, sized: known), from: basis, listed: [], shown: [], places: basis.places,
-                            index: finder.index, tally: nil, sort: basis.sort, filter: basis.filter, moves: .same)
+            return Prepared(
+                .sizes(sizeStamp: basis.sizeStamp, sized: known), from: basis, listed: [], shown: [],
+                places: basis.places,
+                index: finder.index, tally: nil, sort: basis.sort, filter: basis.filter, moves: .same)
         }
         // The basis holds the list too, so the first write below makes the copy: here, not
         // on the main thread.
@@ -1052,8 +1109,10 @@ public final class PanelModel {
                 if low < places.count, Int(places[low]) == place { shown[low].computedSize = size }
             }
         }
-        return Prepared(.sizes(sizeStamp: basis.sizeStamp, sized: known), from: basis, listed: listed, shown: shown, places: basis.places,
-                        index: finder.index, tally: ListWork.tally(shown), sort: basis.sort, filter: basis.filter, moves: .same)
+        return Prepared(
+            .sizes(sizeStamp: basis.sizeStamp, sized: known), from: basis, listed: listed, shown: shown,
+            places: basis.places,
+            index: finder.index, tally: ListWork.tally(shown), sort: basis.sort, filter: basis.filter, moves: .same)
     }
 
     /// Takes a prepared change, if the model's list, filter and order are still what they
@@ -1071,11 +1130,14 @@ public final class PanelModel {
         guard prepared.stamp == stamp else { return .stale }
         switch prepared.kind {
         case .show(let listing, let focus, let history, let complete, let remembered):
-            let sorted = Listing(directory: listing.directory, items: prepared.listed, parent: listing.parent, root: listing.root,
-                                 volume: listing.volume)
+            let sorted = Listing(
+                directory: listing.directory, items: prepared.listed, parent: listing.parent, root: listing.root,
+                volume: listing.volume)
             adoptSort(prepared.sort)
-            present(sorted, focus: focus, history: history, complete: complete, remembered: remembered, presorted: sort, adoptingRequest: false,
-                    arranged: (prepared.shown, prepared.places), index: prepared.index, tally: prepared.tally)
+            present(
+                sorted, focus: focus, history: history, complete: complete, remembered: remembered, presorted: sort,
+                adoptingRequest: false,
+                arranged: (prepared.shown, prepared.places), index: prepared.index, tally: prepared.tally)
             prepared.forget()
             return .changed
 
@@ -1091,10 +1153,14 @@ public final class PanelModel {
                 changed(.contents)
                 return .changed
             }
-            replace(listed: &prepared.listed, shown: &prepared.shown, places: prepared.places, moves: prepared.moves, index: prepared.index,
-                    tally: nil, keepsTotals: true, isNewReading: false)
+            replace(
+                listed: &prepared.listed, shown: &prepared.shown, places: prepared.places, moves: prepared.moves,
+                index: prepared.index,
+                tally: nil, keepsTotals: true, isNewReading: false)
             var shift = 0
-            if let cursorPlace, let to = destination(of: cursorPlace, in: [], by: prepared.moves, shift: &shift), let index = shownIndex(ofPlace: to) {
+            if let cursorPlace, let to = destination(of: cursorPlace, in: [], by: prepared.moves, shift: &shift),
+                let index = shownIndex(ofPlace: to)
+            {
                 cursor = index + offset
             }
             changed(.contents)
@@ -1112,7 +1178,9 @@ public final class PanelModel {
             // the copies the filter made.
             if shownPlaces != nil, let sized, !sized.isEmpty {
                 sized.forEach { place in
-                    if let shown = shownIndex(ofPlace: place), items[shown].computedSize != listedItems[place].computedSize {
+                    if let shown = shownIndex(ofPlace: place),
+                        items[shown].computedSize != listedItems[place].computedSize
+                    {
                         items[shown].computedSize = listedItems[place].computedSize
                     }
                 }
@@ -1122,35 +1190,45 @@ public final class PanelModel {
             setListTotals(prepared.tally)
             selectedTotals = nil
             arrangementChanged(list: false)
-            cursor = cursorPlace.flatMap(shownIndex(ofPlace:)).map { $0 + offset } ?? min(cursor, max(rowCount - 1, 0))
+            cursor =
+                cursorPlace.flatMap(shownIndex(ofPlace:)).map { $0 + offset } ?? min(cursor, max(rowCount - 1, 0))
             changed(.contents)
             return .changed
 
         case .update(let listing, let focus, let isSame):
             let focusName = focus ?? cursorItem?.name
-            let (oldCursor, oldVolume, wasListed, wasComplete, wasRefreshing) = (cursor, volume, isListed, isComplete, isRefreshing)
+            let (oldCursor, oldVolume, wasListed, wasComplete, wasRefreshing) = (
+                cursor, volume, isListed, isComplete, isRefreshing
+            )
             adopt(listing)
             if isSame {
                 prepared.forget()
             } else {
                 adoptSort(prepared.sort)
-                replace(listed: &prepared.listed, shown: &prepared.shown, places: prepared.places, moves: prepared.moves, index: prepared.index,
-                        tally: prepared.tally, keepsTotals: false, isNewReading: true)
+                replace(
+                    listed: &prepared.listed, shown: &prepared.shown, places: prepared.places, moves: prepared.moves,
+                    index: prepared.index,
+                    tally: prepared.tally, keepsTotals: false, isNewReading: true)
                 isInArrivalOrder = sort.key == .unsorted
             }
             // A vanished cursor item leaves the cursor on the row that took its place (07 › State changes).
             // In a list that did not change, the item is where it was.
-            cursor = focusName.flatMap { index(ofName: $0, near: oldCursor - offset) }.map { $0 + offset } ?? min(oldCursor, max(rowCount - 1, 0))
+            cursor =
+                focusName.flatMap { index(ofName: $0, near: oldCursor - offset) }.map { $0 + offset }
+                ?? min(oldCursor, max(rowCount - 1, 0))
             // The flags count as well: whoever shows "refreshing" has to hear that it is over.
-            let isDifferent = !isSame || cursor != oldCursor || volume != oldVolume || !wasListed || isComplete != wasComplete
+            let isDifferent =
+                !isSame || cursor != oldCursor || volume != oldVolume || !wasListed || isComplete != wasComplete
                 || isRefreshing != wasRefreshing
             if isDifferent { changed(.contents) }
             return isDifferent ? .changed : .unchanged
 
         case .extend:
             adoptSort(prepared.sort)
-            extend(to: &prepared.listed, shown: &prepared.shown, places: prepared.places, moves: prepared.moves, index: prepared.index,
-                   tally: prepared.tally)
+            extend(
+                to: &prepared.listed, shown: &prepared.shown, places: prepared.places, moves: prepared.moves,
+                index: prepared.index,
+                tally: prepared.tally)
             return .changed
 
         case .sizes(let sizeStamp, let sized):
@@ -1243,7 +1321,9 @@ public final class PanelModel {
         if order.key != .unsorted { isInArrivalOrder = false }
         var listed = sorted
         var (shown, places) = ListWork.arrange(listed, by: filter)
-        replace(listed: &listed, shown: &shown, places: places, moves: .byName, index: nil, tally: nil, keepsTotals: false, isNewReading: false)
+        replace(
+            listed: &listed, shown: &shown, places: places, moves: .byName, index: nil, tally: nil, keepsTotals: false,
+            isNewReading: false)
         if let cursorName, let row = row(ofName: cursorName) { cursor = row }
         changed(.contents)
     }
@@ -1269,10 +1349,16 @@ public final class PanelModel {
     /// background, then `apply`.
     public func setFilter(_ filter: PanelFilter?, narrowing: Bool = false) {
         let basis = Basis(self, discards: false)
-        guard narrowing, let filter else { return _ = take(PanelModel.prepare(basis, filter: filter)) }
+        guard narrowing, let filter else {
+            _ = take(PanelModel.prepare(basis, filter: filter))
+            return
+        }
         let (shown, places) = ListWork.narrow(items, at: shownPlaces, by: filter)
-        _ = take(Prepared(.filter, from: basis, listed: listedItems, shown: shown, places: places, index: nameIndex, tally: ListWork.tally(shown),
-                          sort: sort, filter: filter, moves: .same))
+        _ = take(
+            Prepared(
+                .filter, from: basis, listed: listedItems, shown: shown, places: places, index: nameIndex,
+                tally: ListWork.tally(shown),
+                sort: sort, filter: filter, moves: .same))
     }
 
     /// What `setFilter` shows of a list: the entries that pass `filter`, in the list's order.
@@ -1296,12 +1382,17 @@ public final class PanelModel {
     /// **not for the main thread on long lists** either.
     @discardableResult
     public func setFilter(_ filter: PanelFilter?, prefiltered shown: [FileItem], listVersion version: Int) -> Bool {
-        guard version == listVersion, filter != nil, shown.count != listedItems.count, let places = ListWork.places(of: shown, in: listedItems) else {
+        guard version == listVersion, filter != nil, shown.count != listedItems.count,
+            let places = ListWork.places(of: shown, in: listedItems)
+        else {
             setFilter(filter)
             return version == listVersion
         }
-        _ = take(Prepared(.filter, from: Basis(self, discards: false), listed: listedItems, shown: shown, places: places, index: nameIndex,
-                          tally: nil, sort: sort, filter: filter, moves: .same))
+        _ = take(
+            Prepared(
+                .filter, from: Basis(self, discards: false), listed: listedItems, shown: shown, places: places,
+                index: nameIndex,
+                tally: nil, sort: sort, filter: filter, moves: .same))
         return true
     }
 
@@ -1362,7 +1453,11 @@ public final class PanelModel {
     /// Keeps the selected half of the totals in step with one item's mark.
     private func count(_ item: FileItem, selected: Bool) {
         guard var totals = selectedTotals else { return }
-        if item.isFolder { totals.selectedFolders += selected ? 1 : -1 } else { totals.selectedFiles += selected ? 1 : -1 }
+        if item.isFolder {
+            totals.selectedFolders += selected ? 1 : -1
+        } else {
+            totals.selectedFiles += selected ? 1 : -1
+        }
         let size = item.isFolder ? (item.computedSize ?? 0) : item.size
         // A size below zero makes the sum depend on its order: counted afresh.
         selectedTotals = size < 0 ? nil : totals.adding(bytes: selected ? size : -size, selected: true)
@@ -1390,7 +1485,11 @@ public final class PanelModel {
     /// marks are one bit per entry, and the figures of the status line are those of the list.
     public func selectAll() {
         _ = totals
-        let all = listTotalsArePlain ? listTotals.map { Totals(selectedBytes: $0.totalBytes, selectedFiles: $0.totalFiles, selectedFolders: $0.totalFolders) } : nil
+        let all =
+            listTotalsArePlain
+            ? listTotals.map {
+                Totals(selectedBytes: $0.totalBytes, selectedFiles: $0.totalFiles, selectedFolders: $0.totalFolders)
+            } : nil
         setMarks(shownBits(), totals: all)
     }
 
@@ -1401,8 +1500,10 @@ public final class PanelModel {
         let (list, selected) = (totals, selectedTotals)
         var rest: Totals?
         if listTotalsArePlain, let selected {
-            rest = Totals(selectedBytes: list.totalBytes - selected.selectedBytes, selectedFiles: list.totalFiles - selected.selectedFiles,
-                          selectedFolders: list.totalFolders - selected.selectedFolders)
+            rest = Totals(
+                selectedBytes: list.totalBytes - selected.selectedBytes,
+                selectedFiles: list.totalFiles - selected.selectedFiles,
+                selectedFolders: list.totalFolders - selected.selectedFolders)
         }
         var bits = shownBits()
         bits.subtract(marks)
@@ -1503,10 +1604,14 @@ public final class PanelModel {
         case .names(let names):
             if names.count < items.count / 4 {
                 for name in names {
-                    for place in places(ofExactly: name.name) where shownIndex(ofPlace: place) != nil { bits.insert(place) }
+                    for place in places(ofExactly: name.name) where shownIndex(ofPlace: place) != nil {
+                        bits.insert(place)
+                    }
                 }
             } else {
-                for index in items.indices where names.contains(ExactName(items[index].name)) { bits.insert(place(ofShown: index)) }
+                for index in items.indices where names.contains(ExactName(items[index].name)) {
+                    bits.insert(place(ofShown: index))
+                }
             }
         case .remains(let remains, let places):
             let old = remains.lists[0]
@@ -1522,7 +1627,9 @@ public final class PanelModel {
                 if shownPlaces != nil { bits.formIntersection(shownBits()) }
             } else {
                 places.forEach { place in
-                    for found in self.places(ofExactly: old[place].name) where shownIndex(ofPlace: found) != nil { bits.insert(found) }
+                    for found in self.places(ofExactly: old[place].name) where shownIndex(ofPlace: found) != nil {
+                        bits.insert(found)
+                    }
                 }
             }
         }
@@ -1622,8 +1729,10 @@ public final class PanelModel {
     }
 
     public func operandsSnapshot() -> Operands {
-        Operands(shownItems: items, cursorItem: cursorItem, markedCount: marks.count, shownVersion: stamp, listed: listedItems, marks: marks,
-                 places: shownPlaces)
+        Operands(
+            shownItems: items, cursorItem: cursorItem, markedCount: marks.count, shownVersion: stamp,
+            listed: listedItems, marks: marks,
+            places: shownPlaces)
     }
 
     /// Counts the changes of what is shown (`items`): of the list, of the filter and of the
@@ -1725,7 +1834,9 @@ public final class PanelModel {
                 selectedTotals = nil
             } else {
                 listTotals = listTotals.flatMap { $0.adding(bytes: difference, selected: false) }
-                if marks.contains(place) { selectedTotals = selectedTotals.flatMap { $0.adding(bytes: difference, selected: true) } }
+                if marks.contains(place) {
+                    selectedTotals = selectedTotals.flatMap { $0.adding(bytes: difference, selected: true) }
+                }
             }
         }
         if isShared { items = listedItems }
@@ -1743,11 +1854,13 @@ public final class PanelModel {
         if listTotals == nil { setListTotals(ListWork.tally(items)) }
         if selectedTotals == nil {
             let tally = marks.isEmpty ? Tally() : ListWork.tally(listedItems, at: marks)
-            selectedTotals = Totals(selectedBytes: tally.bytes, selectedFiles: tally.files, selectedFolders: tally.folders)
+            selectedTotals = Totals(
+                selectedBytes: tally.bytes, selectedFiles: tally.files, selectedFolders: tally.folders)
         }
         let (list, selected) = (listTotals ?? Totals(), selectedTotals ?? Totals())
-        return Totals(selectedBytes: selected.selectedBytes, totalBytes: list.totalBytes, selectedFiles: selected.selectedFiles,
-                      totalFiles: list.totalFiles, selectedFolders: selected.selectedFolders, totalFolders: list.totalFolders)
+        return Totals(
+            selectedBytes: selected.selectedBytes, totalBytes: list.totalBytes, selectedFiles: selected.selectedFiles,
+            totalFiles: list.totalFiles, selectedFolders: selected.selectedFolders, totalFolders: list.totalFolders)
     }
 }
 
@@ -1777,7 +1890,8 @@ struct ExactName: Hashable {
     static func areSame(_ a: String, _ b: String) -> Bool {
         let same = a.utf8.withContiguousStorageIfAvailable { first in
             b.utf8.withContiguousStorageIfAvailable { second in
-                first.count == second.count && (first.isEmpty || memcmp(first.baseAddress!, second.baseAddress!, first.count) == 0)
+                first.count == second.count
+                    && (first.isEmpty || memcmp(first.baseAddress!, second.baseAddress!, first.count) == 0)
             }
         }
         return (same ?? nil) ?? a.utf8.elementsEqual(b.utf8)

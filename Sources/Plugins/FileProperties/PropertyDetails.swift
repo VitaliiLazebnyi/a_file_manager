@@ -17,27 +17,50 @@ enum PropertyColumns {
         }
         // The comment file may lie on a server: the reading, and the wait of the other rows
         // for it, end when the panel no longer wants the answer.
-        columns.register(ContentColumn(id: "comment", title: "Comment", width: 220, cancellableValue: { item, cancellation in
-            comments.comment(for: item, cancellation: cancellation).replacingOccurrences(of: "\n", with: " ")
-        }))
-        columns.register(ContentColumn(id: "owner", title: "Owner", width: 90) { item in local(item) { LocalInfo.userName($0.ownerID) } })
-        columns.register(ContentColumn(id: "group", title: "Group", width: 90) { item in local(item) { LocalInfo.groupName($0.groupID) } })
-        columns.register(ContentColumn(id: "created", title: "Created", width: 120) { item in local(item) { Format.date($0.created) } })
-        columns.register(ContentColumn(id: "accessed", title: "Accessed", width: 120) { item in local(item) { Format.date($0.accessed) } })
-        columns.register(ContentColumn(id: "octal", title: "Mode", width: 50, alignsRight: true) { item in PropertyText.octal(item.permissions) })
-        columns.register(ContentColumn(id: "linkTarget", title: "Link Target", width: 200) { item in
-            item.isSymlink ? LocalInfo.linkTarget(item.url) ?? "" : ""
-        })
+        columns.register(
+            ContentColumn(
+                id: "comment", title: "Comment", width: 220,
+                cancellableValue: { item, cancellation in
+                    comments.comment(for: item, cancellation: cancellation).replacingOccurrences(of: "\n", with: " ")
+                }))
+        columns.register(
+            ContentColumn(id: "owner", title: "Owner", width: 90) { item in
+                local(item) { LocalInfo.userName($0.ownerID) }
+            })
+        columns.register(
+            ContentColumn(id: "group", title: "Group", width: 90) { item in
+                local(item) { LocalInfo.groupName($0.groupID) }
+            })
+        columns.register(
+            ContentColumn(id: "created", title: "Created", width: 120) { item in local(item) { Format.date($0.created) }
+            })
+        columns.register(
+            ContentColumn(id: "accessed", title: "Accessed", width: 120) { item in
+                local(item) { Format.date($0.accessed) }
+            })
+        columns.register(
+            ContentColumn(id: "octal", title: "Mode", width: 50, alignsRight: true) { item in
+                PropertyText.octal(item.permissions)
+            })
+        columns.register(
+            ContentColumn(id: "linkTarget", title: "Link Target", width: 200) { item in
+                item.isSymlink ? LocalInfo.linkTarget(item.url) ?? "" : ""
+            })
         columns.register(ContentColumn(id: "kind", title: "Kind", width: 140) { item in LocalInfo.kind(of: item) })
-        columns.register(ContentColumn(id: "tags", title: "Tags", width: 120) { item in LocalInfo.tags(item.url).joined(separator: ", ") })
-        columns.register(ContentColumn(id: "xattrCount", title: "Ext. Attributes", width: 60, alignsRight: true) { item in
-            let count = LocalInfo.extendedAttributeNames(item.url).count
-            return count > 0 ? String(count) : ""
-        })
-        columns.register(ContentColumn(id: "sizeOnDisk", title: "Size on Disk", width: 100, alignsRight: true) { item in
-            // A folder's own entry says nothing about its contents; measuring those is a command.
-            item.isRealDirectory ? "" : local(item) { Format.bytes($0.allocated) }
-        })
+        columns.register(
+            ContentColumn(id: "tags", title: "Tags", width: 120) { item in
+                LocalInfo.tags(item.url).joined(separator: ", ")
+            })
+        columns.register(
+            ContentColumn(id: "xattrCount", title: "Ext. Attributes", width: 60, alignsRight: true) { item in
+                let count = LocalInfo.extendedAttributeNames(item.url).count
+                return count > 0 ? String(count) : ""
+            })
+        columns.register(
+            ContentColumn(id: "sizeOnDisk", title: "Size on Disk", width: 100, alignsRight: true) { item in
+                // A folder's own entry says nothing about its contents; measuring those is a command.
+                item.isRealDirectory ? "" : local(item) { Format.bytes($0.allocated) }
+            })
     }
 }
 
@@ -90,20 +113,29 @@ struct PropertySheet {
     var cancellation = CancellationFlag()
     var meter: ProgressMeter?
 
-    private var calculator: SpaceCalculator { SpaceCalculator(fileSystems: fileSystems, cancellation: cancellation, meter: meter) }
+    private var calculator: SpaceCalculator {
+        SpaceCalculator(fileSystems: fileSystems, cancellation: cancellation, meter: meter)
+    }
 
     func rows(for item: FileItem) -> [PropertyRow] {
         let url = item.url
         let details = LocalInfo.details(url)
         let parent = url.deletingLastPathComponent()
-        var rows = [PropertyRow("Name", item.name), PropertyRow("Kind", LocalInfo.kind(of: item)),
-                    PropertyRow("Where", fileSystems.displayPath(parent))]
+        var rows = [
+            PropertyRow("Name", item.name), PropertyRow("Kind", LocalInfo.kind(of: item)),
+            PropertyRow("Where", fileSystems.displayPath(parent))
+        ]
         if item.isRealDirectory {
             let totals = calculator.measure(directory: url)
-            let note = cancellation.isCancelled ? " (stopped; incomplete)" : totals.unreadable > 0 ? " (\(totals.unreadable) folder(s) unreadable)" : ""
+            let note =
+                cancellation.isCancelled
+                ? " (stopped; incomplete)" : totals.unreadable > 0 ? " (\(totals.unreadable) folder(s) unreadable)" : ""
             rows.append(PropertyRow("Size", PropertyText.size(totals.bytes) + note))
             if details != nil { rows.append(PropertyRow("Size on disk", PropertyText.size(totals.allocated))) }
-            rows.append(PropertyRow("Contains", "\(Format.bytes(Int64(totals.files))) file(s), \(Format.bytes(Int64(totals.folders))) folder(s)"))
+            rows.append(
+                PropertyRow(
+                    "Contains",
+                    "\(Format.bytes(Int64(totals.files))) file(s), \(Format.bytes(Int64(totals.folders))) folder(s)"))
         } else {
             rows.append(PropertyRow("Size", PropertyText.size(item.size)))
             if let details { rows.append(PropertyRow("Size on disk", PropertyText.size(details.allocated))) }
@@ -111,13 +143,17 @@ struct PropertySheet {
         if let details { rows.append(PropertyRow("Created", PropertyText.longDate(details.created))) }
         rows.append(PropertyRow("Modified", PropertyText.longDate(item.modified)))
         if let details { rows.append(PropertyRow("Accessed", PropertyText.longDate(details.accessed))) }
-        rows.append(PropertyRow("Permissions", "\(Format.permissions(item.permissions)) (\(PropertyText.octal(item.permissions)))"))
+        rows.append(
+            PropertyRow(
+                "Permissions", "\(Format.permissions(item.permissions)) (\(PropertyText.octal(item.permissions)))"))
         if let details {
             rows.append(PropertyRow("Owner", "\(LocalInfo.userName(details.ownerID)) (\(details.ownerID))"))
             rows.append(PropertyRow("Group", "\(LocalInfo.groupName(details.groupID)) (\(details.groupID))"))
             let flags = [(details.isHidden, "Hidden"), (details.isLocked, "Locked")].filter(\.0).map(\.1)
             if !flags.isEmpty { rows.append(PropertyRow("Flags", flags.joined(separator: ", "))) }
-            if details.linkCount > 1, !item.isDirectory { rows.append(PropertyRow("Hard links", String(details.linkCount))) }
+            if details.linkCount > 1, !item.isDirectory {
+                rows.append(PropertyRow("Hard links", String(details.linkCount)))
+            }
         }
         if let written = LocalInfo.linkTarget(url) {
             rows.append(PropertyRow("Link target", written))
@@ -127,7 +163,10 @@ struct PropertySheet {
         let tags = LocalInfo.tags(url)
         if !tags.isEmpty { rows.append(PropertyRow("Tags", tags.joined(separator: ", "))) }
         let attributes = LocalInfo.extendedAttributeNames(url)
-        if !attributes.isEmpty { rows.append(PropertyRow("Extended attributes", "\(attributes.count): " + attributes.joined(separator: ", "))) }
+        if !attributes.isEmpty {
+            rows.append(
+                PropertyRow("Extended attributes", "\(attributes.count): " + attributes.joined(separator: ", ")))
+        }
         if let volume = volumeText(for: url) { rows.append(PropertyRow("Volume", volume)) }
         let comment = comments.comment(for: item, cancellation: cancellation)
         if !comment.isEmpty { rows.append(PropertyRow("Comment", comment)) }
@@ -138,24 +177,44 @@ struct PropertySheet {
     func rows(forSeveral items: [FileItem]) -> [PropertyRow] {
         let totals = calculator.measure(items).reduce(SpaceTotals(), +)
         let isLocal = items.allSatisfy { $0.url.isFileURL }
-        var rows = [PropertyRow("Items", "\(items.count): " + items.prefix(4).map(\.name).joined(separator: ", ") + (items.count > 4 ? ", …" : ""))]
-        if let first = items.first { rows.append(PropertyRow("Where", fileSystems.displayPath(first.url.deletingLastPathComponent()))) }
-        rows.append(PropertyRow("Size", PropertyText.size(totals.bytes) + (cancellation.isCancelled ? " (stopped; incomplete)" : "")))
+        var rows = [
+            PropertyRow(
+                "Items",
+                "\(items.count): " + items.prefix(4).map(\.name).joined(separator: ", ")
+                    + (items.count > 4 ? ", …" : ""))
+        ]
+        if let first = items.first {
+            rows.append(PropertyRow("Where", fileSystems.displayPath(first.url.deletingLastPathComponent())))
+        }
+        rows.append(
+            PropertyRow(
+                "Size", PropertyText.size(totals.bytes) + (cancellation.isCancelled ? " (stopped; incomplete)" : "")))
         if isLocal { rows.append(PropertyRow("Size on disk", PropertyText.size(totals.allocated))) }
-        rows.append(PropertyRow("Contains", "\(Format.bytes(Int64(totals.files))) file(s), \(Format.bytes(Int64(totals.folders))) folder(s)"))
+        rows.append(
+            PropertyRow(
+                "Contains",
+                "\(Format.bytes(Int64(totals.files))) file(s), \(Format.bytes(Int64(totals.folders))) folder(s)"))
         if let newest = items.map(\.modified).max(), let oldest = items.map(\.modified).min() {
-            rows.append(PropertyRow("Modified", oldest == newest ? PropertyText.longDate(newest) : "\(Format.date(oldest)) – \(Format.date(newest))"))
+            rows.append(
+                PropertyRow(
+                    "Modified",
+                    oldest == newest
+                        ? PropertyText.longDate(newest) : "\(Format.date(oldest)) – \(Format.date(newest))"))
         }
         let modes = Set(items.map(\.permissions))
         if modes.count == 1, let mode = modes.first {
             rows.append(PropertyRow("Permissions", "\(Format.permissions(mode)) (\(PropertyText.octal(mode)))"))
         }
-        if let first = items.first, let volume = volumeText(for: first.url) { rows.append(PropertyRow("Volume", volume)) }
+        if let first = items.first, let volume = volumeText(for: first.url) {
+            rows.append(PropertyRow("Volume", volume))
+        }
         return rows
     }
 
     private func volumeText(for url: URL) -> String? {
-        guard let volume = (try? fileSystems.provider(for: url))?.volume(of: url, cancellation: cancellation) else { return nil }
+        guard let volume = (try? fileSystems.provider(for: url))?.volume(of: url, cancellation: cancellation) else {
+            return nil
+        }
         guard let free = volume.freeBytes, let total = volume.totalBytes else { return volume.name }
         return "\(volume.name): \(Format.shortSize(free)) of \(Format.shortSize(total)) free"
     }
@@ -186,12 +245,14 @@ enum LinkMaker {
         if lstat(destination.path, &existing) == 0 { throw FileSystemError.alreadyExists(destination.path) }
         switch kind {
         case .symbolic:
-            let target = relative ? relativePath(from: destination.deletingLastPathComponent(), to: source) : source.path
+            let target =
+                relative ? relativePath(from: destination.deletingLastPathComponent(), to: source) : source.path
             if symlink(target, destination.path) != 0 { throw LocalInfo.posixError(errno, destination) }
         case .hard:
             if link(source.path, destination.path) != 0 { throw LocalInfo.posixError(errno, destination) }
         case .alias:
-            let bookmark = try source.bookmarkData(options: .suitableForBookmarkFile, includingResourceValuesForKeys: nil, relativeTo: nil)
+            let bookmark = try source.bookmarkData(
+                options: .suitableForBookmarkFile, includingResourceValuesForKeys: nil, relativeTo: nil)
             try URL.writeBookmarkData(bookmark, to: destination)
         }
     }

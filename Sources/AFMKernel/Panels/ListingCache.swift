@@ -87,7 +87,8 @@ public final class ListingCache {
     }
 
     private func locked<T>(_ body: () -> T) -> T {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         return body()
     }
 
@@ -153,7 +154,9 @@ public final class ListingCache {
     /// (`invalidate`, `forget`; any folder's, to keep this simple: it only costs one chance to
     /// remember), or before the reading that is remembered already.
     @discardableResult
-    public func store(_ listing: Listing, sortedBy order: ListOrder, showHidden: Bool, readTime: TimeInterval, since ticket: Ticket) -> Bool {
+    public func store(
+        _ listing: Listing, sortedBy order: ListOrder, showHidden: Bool, readTime: TimeInterval, since ticket: Ticket
+    ) -> Bool {
         let key = Key(location: listing.directory.locationKey, showHidden: showHidden)
         let isRemote = listing.volume.map { !$0.isLocal } ?? false
         let entry = Entry(listing: listing, order: order, showHidden: showHidden, readAt: now())
@@ -172,7 +175,8 @@ public final class ListingCache {
             // The least recently used folders make room. The one just stored is the most
             // recently used and fits on its own, so it is never the one to go.
             while slots.count > limits.maxFolders || totalEntries() > limits.maxEntries,
-                  let oldest = slots.min(by: { $0.value.lastUsed < $1.value.lastUsed })?.key {
+                let oldest = slots.min(by: { $0.value.lastUsed < $1.value.lastUsed })?.key
+            {
                 dropped += remove { $0 == oldest }
             }
             return true
@@ -214,9 +218,11 @@ public final class ListingCache {
         guard found.order != order else { return found }
         let old = found.listing
         // Sorted outside the lock.
-        let sorted = Entry(listing: Listing(directory: old.directory, items: Sorter.sort(old.items, by: order), parent: old.parent,
-                                            root: old.root, volume: old.volume),
-                           order: order, showHidden: showHidden, readAt: found.readAt)
+        let sorted = Entry(
+            listing: Listing(
+                directory: old.directory, items: Sorter.sort(old.items, by: order), parent: old.parent,
+                root: old.root, volume: old.volume),
+            order: order, showHidden: showHidden, readAt: found.readAt)
         locked {
             // Kept only if nobody stored a newer reading or dropped the entry meanwhile.
             if slots[key]?.started == slot.started { slots[key]?.entry = sorted }

@@ -45,7 +45,9 @@ final class FlowView: NSView {
     /// of zero (not laid out yet) means one row.
     func arrangement(forWidth width: CGFloat) -> (frames: [NSRect], height: CGFloat) {
         var frames: [NSRect] = []
-        var x = inset, y = inset, rowHeight: CGFloat = 0
+        var x = inset
+        var y = inset
+        var rowHeight: CGFloat = 0
         for (index, item) in items.enumerated() {
             let size = item.frame.size
             if x > inset, lineBreaks.contains(index) || (width > 0 && x + size.width + inset > width) {

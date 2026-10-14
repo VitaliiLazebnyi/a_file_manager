@@ -91,14 +91,17 @@ final class ProgressJobService: JobService {
     }
 
     @discardableResult
-    func run<Result>(title: String, work: @escaping (JobMonitor) -> Result, completion: @escaping (Result) -> Void) -> JobHandle {
+    func run<Result>(title: String, work: @escaping (JobMonitor) -> Result, completion: @escaping (Result) -> Void)
+        -> JobHandle
+    {
         MainThread.assert("The job service")
         let job = QueuedJob(title: title)
         // What the plugin handed in may hold panels and windows: it is let go of on the main
         // thread, whichever thread is done with it last.
         let (work, completion) = (MainOwned(work), MainOwned(completion))
         job.start = { [self, job] in
-            let progress = ProgressSheet(title: title, cancellation: job.cancellation, gate: job.gate, display: display)
+            let progress = ProgressSheet(
+                title: title, cancellation: job.cancellation, gate: job.gate, display: display)
             job.monitor = progress
             display.begin(progress)
             Background.start(named: "afm.job", qos: .userInitiated) {
@@ -240,7 +243,9 @@ final class ProgressJobService: JobService {
     /// asked to stop is not held.
     func setPaused(_ paused: Bool) {
         MainThread.assert("The job service")
-        guard let running, paused != running.gate.isPaused, !(paused && running.cancellation.isCancelled) else { return }
+        guard let running, paused != running.gate.isPaused, !(paused && running.cancellation.isCancelled) else {
+            return
+        }
         running.gate.set(paused: paused)
         // The pause must not count as slow copying.
         if !paused { running.monitor?.restartMeasuring() }
@@ -319,7 +324,8 @@ final class ProgressSheet: JobMonitor {
     private var lastReport: TimeInterval = 0
     private var reportCount = 0
 
-    init(title: String, cancellation: CancellationFlag, gate: PauseGate = PauseGate(), display: ProgressDisplay? = nil) {
+    init(title: String, cancellation: CancellationFlag, gate: PauseGate = PauseGate(), display: ProgressDisplay? = nil)
+    {
         self.title = title
         self.cancellation = cancellation
         self.gate = gate
@@ -406,7 +412,10 @@ final class ProgressSheet: JobMonitor {
         let items = remaining ? "-\(max(0, progress.itemsTotal - progress.itemsDone))" : "\(progress.itemsDone)"
         var count = "\(items) / \(progress.itemsTotal)"
         if progress.measuresBytes {
-            let bytes = remaining ? "-" + Format.shortSize(max(0, progress.bytesTotal - progress.bytesDone)) : Format.shortSize(progress.bytesDone)
+            let bytes =
+                remaining
+                ? "-" + Format.shortSize(max(0, progress.bytesTotal - progress.bytesDone))
+                : Format.shortSize(progress.bytesDone)
             count += "     \(bytes) of \(Format.shortSize(progress.bytesTotal))"
         }
         return count

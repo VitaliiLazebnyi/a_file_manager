@@ -12,7 +12,9 @@ enum LoginShell {
     /// The shell the user logs in with.
     static var usersShell: String {
         var path = ProcessInfo.processInfo.environment["SHELL"] ?? ""
-        if path.isEmpty, let entry = getpwuid(getuid()), let shell = entry.pointee.pw_shell { path = String(cString: shell) }
+        if path.isEmpty, let entry = getpwuid(getuid()), let shell = entry.pointee.pw_shell {
+            path = String(cString: shell)
+        }
         return path.isEmpty ? "/bin/zsh" : path
     }
 
@@ -22,7 +24,9 @@ enum LoginShell {
     /// waits up to a few seconds for it: never for the main thread.
     static let foreignPath: String? = {
         let shell = usersShell
-        guard URL(fileURLWithPath: shell).lastPathComponent != "zsh", FileManager.default.isExecutableFile(atPath: shell) else { return nil }
+        guard URL(fileURLWithPath: shell).lastPathComponent != "zsh",
+            FileManager.default.isExecutableFile(atPath: shell)
+        else { return nil }
         // `csh` and `tcsh` take `-c` but not `-l` with it.
         return path(from: shell, ["-l", "-c", "printenv PATH"]) ?? path(from: shell, ["-c", "printenv PATH"])
     }()
@@ -65,14 +69,17 @@ enum ChildProcess {
     struct Failure: Error {
         let code: Int32
         var message: String {
-            code == E2BIG ? "The command line is too long. Pass many names through a list file (%L) instead."
+            code == E2BIG
+                ? "The command line is too long. Pass many names through a list file (%L) instead."
                 : String(cString: strerror(code))
         }
     }
 
     /// Starts `executable` in `directory`, with nothing to read and its output discarded.
     /// Returns the process number. Blocks for the time the start takes: not for the main thread.
-    static func spawn(executable: String, arguments: [String], environment: [String: String], directory: String) -> Result<pid_t, Failure> {
+    static func spawn(executable: String, arguments: [String], environment: [String: String], directory: String)
+        -> Result<pid_t, Failure>
+    {
         var actions: posix_spawn_file_actions_t?
         var attributes: posix_spawnattr_t?
         guard posix_spawn_file_actions_init(&actions) == 0 else { return .failure(Failure(code: errno)) }
@@ -91,7 +98,8 @@ enum ChildProcess {
         sigemptyset(&none)
         posix_spawnattr_setsigdefault(&attributes, &all)
         posix_spawnattr_setsigmask(&attributes, &none)
-        posix_spawnattr_setflags(&attributes, Int16(POSIX_SPAWN_CLOEXEC_DEFAULT | POSIX_SPAWN_SETSIGDEF | POSIX_SPAWN_SETSIGMASK))
+        posix_spawnattr_setflags(
+            &attributes, Int16(POSIX_SPAWN_CLOEXEC_DEFAULT | POSIX_SPAWN_SETSIGDEF | POSIX_SPAWN_SETSIGMASK))
 
         var argv: [UnsafeMutablePointer<CChar>?] = ([executable] + arguments).map { strdup($0) } + [nil]
         var envp: [UnsafeMutablePointer<CChar>?] = environment.map { strdup($0.key + "=" + $0.value) } + [nil]

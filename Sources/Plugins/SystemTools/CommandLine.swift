@@ -56,7 +56,8 @@ struct TypedCommand: Equatable {
     /// A path as typed (`~/x`, `/x`, `x/y`) as a location; relative paths start at `directory`.
     static func location(of path: String, relativeTo directory: URL) -> URL {
         let expanded = NSString(string: path).expandingTildeInPath
-        return (expanded.hasPrefix("/") ? URL(fileURLWithPath: expanded) : directory.appendingPathComponent(expanded)).standardizedFileURL
+        return (expanded.hasPrefix("/") ? URL(fileURLWithPath: expanded) : directory.appendingPathComponent(expanded))
+            .standardizedFileURL
     }
 
     /// Where an application of that name would be, when the first word names one: a path ending
@@ -67,8 +68,10 @@ struct TypedCommand: Equatable {
     /// name that lies in the panel's folder (a downloaded folder, a memory stick) is opened
     /// only when no installed one has the name, or when it is asked for by path (`./Preview.app`).
     /// `path` is the PATH that decides whether a bare name is a program instead.
-    func application(relativeTo directory: URL, searching folders: [URL] = TypedCommand.applicationFolders,
-                     path: String = TypedCommand.processPath) -> URL? {
+    func application(
+        relativeTo directory: URL, searching folders: [URL] = TypedCommand.applicationFolders,
+        path: String = TypedCommand.processPath
+    ) -> URL? {
         let fm = FileManager.default
         func bundle(at url: URL) -> URL? {
             var isDirectory: ObjCBool = false
@@ -77,7 +80,8 @@ struct TypedCommand: Equatable {
         if firstWord.lowercased().hasSuffix(".app") {
             let here = TypedCommand.location(of: firstWord, relativeTo: directory)
             if firstWord.contains("/") || firstWord.hasPrefix("~") { return bundle(at: here) }
-            return folders.lazy.compactMap { bundle(at: $0.appendingPathComponent(self.firstWord)) }.first ?? bundle(at: here)
+            return folders.lazy.compactMap { bundle(at: $0.appendingPathComponent(self.firstWord)) }.first
+                ?? bundle(at: here)
         }
         // A bare name is an application only when nothing else is asked of it; `open -a` and
         // the like stay with the shell.
@@ -100,7 +104,7 @@ struct TypedCommand: Equatable {
     static let applicationFolders: [URL] = [
         URL(fileURLWithPath: "/Applications"), URL(fileURLWithPath: "/System/Applications"),
         URL(fileURLWithPath: "/System/Applications/Utilities"), URL(fileURLWithPath: "/Applications/Utilities"),
-        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications"),
+        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications")
     ]
 }
 
@@ -141,14 +145,16 @@ struct ProcessRunner {
         private var truncated = false
 
         func append(_ block: Data) {
-            lock.lock(); defer { lock.unlock() }
+            lock.lock()
+            defer { lock.unlock() }
             let room = ProcessRunner.outputLimit - data.count
             if block.count > room { truncated = true }
             if room > 0 { data.append(block.prefix(room)) }
         }
 
         var contents: (data: Data, truncated: Bool) {
-            lock.lock(); defer { lock.unlock() }
+            lock.lock()
+            defer { lock.unlock() }
             return (data, truncated)
         }
     }

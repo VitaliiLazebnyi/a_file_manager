@@ -48,8 +48,10 @@ final class Answers: FileJobDelegate {
 }
 
 @discardableResult
-func runJob(_ kind: JobKind, _ sources: [URL], to target: TargetSpec? = nil, answers: Answers = Answers(),
-            fileSystems: FileSystemRegistry = makeFileSystems().0) -> JobResult {
+func runJob(
+    _ kind: JobKind, _ sources: [URL], to target: TargetSpec? = nil, answers: Answers = Answers(),
+    fileSystems: FileSystemRegistry = makeFileSystems().0
+) -> JobResult {
     let job = FileJob(kind: kind, sources: sources, target: target, fileSystems: fileSystems)
     job.delegate = answers
     return job.run()

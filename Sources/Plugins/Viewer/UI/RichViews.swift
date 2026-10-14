@@ -1,7 +1,7 @@
 import AFMContracts
 import AFMKernel
-import AppKit
 import AVKit
+import AppKit
 import PDFKit
 import Quartz
 import WebKit
@@ -38,7 +38,8 @@ final class TemporaryCopies {
             switch self {
             case .cancelled: return ""
             case .tooLarge(let size):
-                return "The file (\(Format.shortSize(size))) is too large to be copied from its file system for this mode (the limit is \(Format.shortSize(TemporaryCopies.sizeLimit))). "
+                return
+                    "The file (\(Format.shortSize(size))) is too large to be copied from its file system for this mode (the limit is \(Format.shortSize(TemporaryCopies.sizeLimit))). "
                     + "Choose a text mode (1, 2 or 3)."
             case .noRoom: return "There is not enough free space on the disk to copy the file for this mode."
             case .unreadable: return "The file cannot be shown in this mode."
@@ -73,14 +74,18 @@ final class TemporaryCopies {
     /// The file itself when it is on the local disk, else a copy of it read through its
     /// provider, kept for `owner` until it is released. Nil when it cannot be read or
     /// `cancellation` was set.
-    func localURL(for url: URL, fileSystems: FileSystemRegistry, owner: ObjectIdentifier = ObjectIdentifier(TemporaryCopies.self),
-                  cancellation: CancellationFlag) -> URL? {
+    func localURL(
+        for url: URL, fileSystems: FileSystemRegistry, owner: ObjectIdentifier = ObjectIdentifier(TemporaryCopies.self),
+        cancellation: CancellationFlag
+    ) -> URL? {
         try? localCopy(for: url, fileSystems: fileSystems, owner: owner, cancellation: cancellation).get()
     }
 
     /// `localURL`, with the reason when there is none.
-    func localCopy(for url: URL, fileSystems: FileSystemRegistry, owner: ObjectIdentifier = ObjectIdentifier(TemporaryCopies.self),
-                   cancellation: CancellationFlag) -> Result<URL, Refusal> {
+    func localCopy(
+        for url: URL, fileSystems: FileSystemRegistry, owner: ObjectIdentifier = ObjectIdentifier(TemporaryCopies.self),
+        cancellation: CancellationFlag
+    ) -> Result<URL, Refusal> {
         if url.isFileURL { return .success(url) }
         guard let provider = try? fileSystems.provider(for: url) else { return .failure(.unreadable) }
         let item = provider.item(at: url, cancellation: cancellation)
@@ -91,8 +96,12 @@ final class TemporaryCopies {
         if let size = item?.size, size > TemporaryCopies.sizeLimit { return .failure(.tooLarge(size)) }
         let started = begin(owner)
         // Changes that a plugin still holds back for this file (an archive written after a delay) are written first.
-        do { try fileSystems.flushPendingWrites(to: url, cancellation: cancellation) } catch { return .failure(cancellation.isCancelled ? .cancelled : .unreadable) }
-        guard let reader = try? provider.read(url, cancellation: cancellation) else { return .failure(cancellation.isCancelled ? .cancelled : .unreadable) }
+        do { try fileSystems.flushPendingWrites(to: url, cancellation: cancellation) } catch {
+            return .failure(cancellation.isCancelled ? .cancelled : .unreadable)
+        }
+        guard let reader = try? provider.read(url, cancellation: cancellation) else {
+            return .failure(cancellation.isCancelled ? .cancelled : .unreadable)
+        }
         defer { reader.close() }
         guard let folder = newFolder() else { return .failure(.unreadable) }
         if let size = item?.size, let free = freeSpace(), free - size < TemporaryCopies.freeSpaceMargin {
@@ -118,7 +127,8 @@ final class TemporaryCopies {
         var refusal: Refusal?
         let copied = cancellation.whileReading(reader) { () -> Bool in
             do {
-                while let block = try autoreleasepool(invoking: { try reader.read(upToCount: 1 << 20) }), !block.isEmpty {
+                while let block = try autoreleasepool(invoking: { try reader.read(upToCount: 1 << 20) }), !block.isEmpty
+                {
                     guard !cancellation.isCancelled else { return false }
                     written += Int64(block.count)
                     // A size that the listing did not tell is limited as it is read.
@@ -139,7 +149,9 @@ final class TemporaryCopies {
         }
         // A file that came from a server keeps saying so; the copy is a plain local file, so the mark
         // can go on while the handle is still open (a mark that cannot be put on does not stop the viewing).
-        if let mark = provider.quarantine(of: url), let local = try? fileSystems.provider(for: target) { try? local.setQuarantine(mark, of: target) }
+        if let mark = provider.quarantine(of: url), let local = try? fileSystems.provider(for: target) {
+            try? local.setQuarantine(mark, of: target)
+        }
         lock.lock()
         // `removeAll` ran while the file was copied: the folder it made is gone, and so is this.
         guard started.epoch == epoch else {
@@ -165,9 +177,12 @@ final class TemporaryCopies {
     /// A file name for a copy: one path component, whatever the name of the file was (it may
     /// be anything a server sent, decoded: `..`, `a/b`, a very long name).
     static func safeName(_ name: String) -> String {
-        var cleaned = String(String.UnicodeScalarView(name.unicodeScalars.map { scalar in
-            scalar == "/" || scalar == ":" || scalar == "\\" || scalar.value < 0x20 || scalar.value == 0x7F ? "_" : scalar
-        }))
+        var cleaned = String(
+            String.UnicodeScalarView(
+                name.unicodeScalars.map { scalar in
+                    scalar == "/" || scalar == ":" || scalar == "\\" || scalar.value < 0x20 || scalar.value == 0x7F
+                        ? "_" : scalar
+                }))
         cleaned = cleaned.trimmingCharacters(in: .whitespaces)
         if cleaned.isEmpty || cleaned.allSatisfy({ $0 == "." }) { return "file" }
         // A name is at most 255 bytes: keep the end, which holds the extension that picks the player.
@@ -215,7 +230,8 @@ final class TemporaryCopies {
         lock.lock()
         let idle = copies.filter { $0.value.owners.isEmpty }.sorted { $0.value.lastUsed > $1.value.lastUsed }
         var doomed: [URL] = []
-        var kept = 0, keptBytes: Int64 = 0
+        var kept = 0
+        var keptBytes: Int64 = 0
         for (key, copy) in idle {
             if kept < TemporaryCopies.idleLimit, keptBytes + copy.size <= TemporaryCopies.idleByteLimit {
                 kept += 1
@@ -274,8 +290,12 @@ final class TemporaryCopies {
         var base = root
         lock.unlock()
         if base == nil {
-            let created = directory.appendingPathComponent("\(TemporaryCopies.prefix)p\(getpid())-\(UUID().uuidString)", isDirectory: true)
-            guard (try? FileManager.default.createDirectory(at: created, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])) != nil else { return nil }
+            let created = directory.appendingPathComponent(
+                "\(TemporaryCopies.prefix)p\(getpid())-\(UUID().uuidString)", isDirectory: true)
+            guard
+                (try? FileManager.default.createDirectory(
+                    at: created, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])) != nil
+            else { return nil }
             lock.lock()
             if root == nil { root = created }
             base = root
@@ -284,7 +304,10 @@ final class TemporaryCopies {
         }
         guard let base else { return nil }
         let folder = base.appendingPathComponent(UUID().uuidString, isDirectory: true)
-        return (try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])) != nil ? folder : nil
+        return
+            (try? FileManager.default.createDirectory(
+                at: folder, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])) != nil
+            ? folder : nil
     }
 
     deinit { removeAll() }
@@ -307,7 +330,9 @@ final class TemporaryCopies {
             let rest = name.dropFirst(prefix.count)
             if rest.hasPrefix("p"), let pid = Int32(rest.dropFirst().prefix { $0 != "-" }) {
                 if pid != getpid(), kill(pid, 0) != 0, errno == ESRCH { try? manager.removeItem(at: folder) }
-            } else if let modified = (try? manager.attributesOfItem(atPath: folder.path))?[.modificationDate] as? Date, now.timeIntervalSince(modified) > 86_400 {
+            } else if let modified = (try? manager.attributesOfItem(atPath: folder.path))?[.modificationDate] as? Date,
+                now.timeIntervalSince(modified) > 86_400
+            {
                 try? manager.removeItem(at: folder)
             }
         }
@@ -342,7 +367,9 @@ final class MediaView: NSView {
     func play(_ url: URL, volume: Float) {
         let item = AVPlayerItem(url: url)
         if let endObserver { NotificationCenter.default.removeObserver(endObserver) }
-        endObserver = NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: item, queue: .main) { [weak self] _ in
+        endObserver = NotificationCenter.default.addObserver(
+            forName: .AVPlayerItemDidPlayToEndTime, object: item, queue: .main
+        ) { [weak self] _ in
             self?.onEnd()
         }
         player.replaceCurrentItem(with: item)
@@ -409,7 +436,8 @@ final class WebContentView: NSView, WKNavigationDelegate {
     /// Whether the load of the page itself is still to come.
     private var expectsPage = false
     /// Forbids every load but inline styles and images that are part of the page itself.
-    static let policy = "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src 'unsafe-inline'; img-src data:\">"
+    static let policy =
+        "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src 'unsafe-inline'; img-src data:\">"
 
     override init(frame: NSRect) {
         let configuration = WKWebViewConfiguration()
@@ -436,7 +464,11 @@ final class WebContentView: NSView, WKNavigationDelegate {
     }
 
     static func decide(isMainFrame: Bool, isLinkClick: Bool, url: URL?, expectsPage: Bool) -> Decision {
-        let isBlank = url.map { $0.scheme == "about" && ($0.absoluteString == "about:blank" || $0.absoluteString.hasPrefix("about:blank#")) } ?? false
+        let isBlank =
+            url.map {
+                $0.scheme == "about"
+                    && ($0.absoluteString == "about:blank" || $0.absoluteString.hasPrefix("about:blank#"))
+            } ?? false
         if isLinkClick {
             // A jump inside the page stays in the page.
             if isMainFrame, isBlank, url?.fragment != nil { return .allow }
@@ -449,10 +481,14 @@ final class WebContentView: NSView, WKNavigationDelegate {
         return .cancel
     }
 
-    func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
-        let decision = WebContentView.decide(isMainFrame: navigationAction.targetFrame?.isMainFrame ?? false,
-                                             isLinkClick: navigationAction.navigationType == .linkActivated,
-                                             url: navigationAction.request.url, expectsPage: expectsPage)
+    func webView(
+        _ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
+        decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
+    ) {
+        let decision = WebContentView.decide(
+            isMainFrame: navigationAction.targetFrame?.isMainFrame ?? false,
+            isLinkClick: navigationAction.navigationType == .linkActivated,
+            url: navigationAction.request.url, expectsPage: expectsPage)
         switch decision {
         case .allow:
             if navigationAction.navigationType != .linkActivated { expectsPage = false }
@@ -491,10 +527,14 @@ enum LinkPolicy {
         parts.query = nil
         parts.fragment = nil
         guard let target = parts.url, target.scheme?.lowercased() == base.scheme?.lowercased(),
-              (target.host ?? "").lowercased() == (base.host ?? "").lowercased(), target.port == base.port, target.user == base.user else { return nil }
+            (target.host ?? "").lowercased() == (base.host ?? "").lowercased(), target.port == base.port,
+            target.user == base.user
+        else { return nil }
         // No component holds a separator or goes up: `..%2F..%2Fx` is one component after decoding.
         let components = Array(target.pathComponents.drop { $0 == "/" })
-        guard !components.contains(where: { $0 == ".." || $0 == "." || $0.contains("/") || $0.contains("\0") }) else { return nil }
+        guard !components.contains(where: { $0 == ".." || $0 == "." || $0.contains("/") || $0.contains("\0") }) else {
+            return nil
+        }
         let folder = base.deletingLastPathComponent()
         guard target.isInside(folder) else { return nil }
         return target
@@ -579,8 +619,9 @@ enum RichViews {
         let view = NSView()
         view.addSubview(label)
         NSLayoutConstraint.activate([
-            label.centerXAnchor.constraint(equalTo: view.centerXAnchor), label.centerYAnchor.constraint(equalTo: view.centerYAnchor),
-            label.widthAnchor.constraint(lessThanOrEqualTo: view.widthAnchor, constant: -40),
+            label.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            label.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            label.widthAnchor.constraint(lessThanOrEqualTo: view.widthAnchor, constant: -40)
         ])
         return view
     }

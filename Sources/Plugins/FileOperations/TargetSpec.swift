@@ -20,23 +20,33 @@ public enum TargetMask {
     }
 
     static func expand(_ source: String, mask: String) -> String {
-        let src = Array(source), mask = Array(mask)
-        var out = "", p = 0, i = 0
+        let src = Array(source)
+        let mask = Array(mask)
+        var out = ""
+        var p = 0
+        var i = 0
         while i < mask.count {
             let c = mask[i]
             let next: Character? = i + 1 < mask.count ? mask[i + 1] : nil
             if c == "?" {
                 if p < src.count { out.append(src[p]) }
-                p += 1; i += 1
+                p += 1
+                i += 1
             } else if c == "*" && next == "*" {
-                out += source; p = src.count; i += 2
+                out += source
+                p = src.count
+                i += 2
             } else if c == "*" && next == "?" {
-                p = 0; i += 2
+                p = 0
+                i += 2
             } else if c == "*" {
                 if p < src.count { out += String(src[p...]) }
-                p = src.count; i += 1
+                p = src.count
+                i += 1
             } else {
-                out.append(c); p += 1; i += 1
+                out.append(c)
+                p += 1
+                i += 1
             }
         }
         return out
@@ -73,8 +83,10 @@ public struct TargetSpec: Equatable {
     /// Looks at the file system to tell a folder from a new name, so it is not for the main thread.
     /// With a `cancellation` flag that look ends when the flag is set (a target on a server
     /// that has stopped answering); the text is then read as if nothing were there.
-    public static func parse(_ text: String, sourceDirectory: URL, operandCount: Int, fileSystems: FileSystemRegistry,
-                             cancellation: CancellationFlag? = nil) -> TargetSpec {
+    public static func parse(
+        _ text: String, sourceDirectory: URL, operandCount: Int, fileSystems: FileSystemRegistry,
+        cancellation: CancellationFlag? = nil
+    ) -> TargetSpec {
         let text = text.trimmingCharacters(in: .whitespaces)
         if text.isEmpty { return TargetSpec(directory: sourceDirectory) }
         let last = (text as NSString).lastPathComponent
@@ -83,12 +95,15 @@ public struct TargetSpec: Equatable {
             return TargetSpec(directory: fileSystems.location(from: folder, relativeTo: sourceDirectory), mask: last)
         }
         let url = fileSystems.location(from: text, relativeTo: sourceDirectory)
-        if text.hasSuffix("/") || last == ".." || last == "." || UniqueName.item(at: url, in: fileSystems, cancellation)?.isDirectory == true {
+        if text.hasSuffix("/") || last == ".." || last == "."
+            || UniqueName.item(at: url, in: fileSystems, cancellation)?.isDirectory == true
+        {
             return TargetSpec(directory: url)
         }
         // A plain new name renames a single item; for several items it names a folder to create.
-        return operandCount == 1 ? TargetSpec(directory: url.deletingLastPathComponent(), mask: last)
-                                 : TargetSpec(directory: url)
+        return operandCount == 1
+            ? TargetSpec(directory: url.deletingLastPathComponent(), mask: last)
+            : TargetSpec(directory: url)
     }
 }
 
@@ -97,8 +112,10 @@ public enum UniqueName {
     /// `isTaken` names locations that are spoken for although nothing is there yet.
     /// With a `cancellation` flag the looks at the file system end when it is set; the name
     /// that comes back then is not known to be free, and whoever asked is being stopped.
-    public static func available(for url: URL, in fileSystems: FileSystemRegistry, cancellation: CancellationFlag? = nil,
-                                 isTaken: (URL) -> Bool = { _ in false }) -> URL {
+    public static func available(
+        for url: URL, in fileSystems: FileSystemRegistry, cancellation: CancellationFlag? = nil,
+        isTaken: (URL) -> Bool = { _ in false }
+    ) -> URL {
         available(for: url) { item(at: $0, in: fileSystems, cancellation) != nil || isTaken($0) }
     }
 
@@ -155,7 +172,10 @@ public enum OperationText {
     }
 
     public static func deleteQuestion(count: Int, single: FileItem?, toTrash: Bool) -> String {
-        let what = single.flatMap { count == 1 ? $0 : nil }.map { "the selected \($0.isFolder ? "directory" : "file") \(DisplayName.escaped($0.name))" }
+        let what =
+            single.flatMap { count == 1 ? $0 : nil }.map {
+                "the selected \($0.isFolder ? "directory" : "file") \(DisplayName.escaped($0.name))"
+            }
             ?? "the \(count) selected files/directories"
         return toTrash ? "Do you really want to move \(what) to the Trash?" : "Do you really want to delete \(what)?"
     }
@@ -163,16 +183,23 @@ public enum OperationText {
     /// How the file being copied compares with the one at the target, for the Overwrite
     /// dialog: `The file being copied is newer and larger.`
     public static func comparison(source: FileItem, target: FileItem) -> String {
-        let age = source.modified > target.modified ? "newer" : (source.modified < target.modified ? "older" : "of the same age")
+        let age =
+            source.modified > target.modified
+            ? "newer" : (source.modified < target.modified ? "older" : "of the same age")
         let size = source.size > target.size ? "larger" : (source.size < target.size ? "smaller" : "of the same size")
         return "The file being copied is \(age) and \(size)."
     }
 
     /// The second question about a protected item (spec 07 › Read-only, hidden and system
     /// targets; Delete › Questions), in the Mac's terms.
-    public static func protection(_ question: ProtectionQuestion, path: String) -> (message: String, detail: String, action: String) {
+    public static func protection(_ question: ProtectionQuestion, path: String) -> (
+        message: String, detail: String, action: String
+    ) {
         if question.reason == .noTrash {
-            return ("\(path) cannot be moved to the Trash.", "This volume has no Trash. Do you want to delete it permanently?", "Delete")
+            return (
+                "\(path) cannot be moved to the Trash.",
+                "This volume has no Trash. Do you want to delete it permanently?", "Delete"
+            )
         }
         let state: String
         switch question.reason {

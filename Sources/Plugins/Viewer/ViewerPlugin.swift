@@ -39,8 +39,11 @@ public final class ViewerPlugin: Plugin, ViewerService {
     /// `quickViewDelay` is how long the quick view waits for the cursor to rest before it
     /// loads a file; with `showsWindows` off, Lister windows are created but not put on
     /// screen (for tests).
-    public init(overlayHost: @escaping (PanelHandle) -> PanelOverlayHost? = { $0 as? PanelOverlayHost }, quickViewDelay: TimeInterval = 0.12,
-                showsWindows: Bool = true) {
+    public init(
+        overlayHost: @escaping (PanelHandle) -> PanelOverlayHost? = { $0 as? PanelOverlayHost },
+        quickViewDelay: TimeInterval = 0.12,
+        showsWindows: Bool = true
+    ) {
         self.overlayHost = overlayHost
         self.quickViewDelay = quickViewDelay
         self.showsWindows = showsWindows
@@ -57,49 +60,81 @@ public final class ViewerPlugin: Plugin, ViewerService {
         let markedFiles = { model().operands().filter { !$0.isDirectory }.map(\.url) }
         /// The toolbar asks `enabled` ten times a second, so it must not resolve the operands
         /// (an O(n) pass with items marked); `canView` is a cheap test, `files` runs with the command.
-        func viewer(_ id: CommandID, _ title: String, _ shortcuts: [Shortcut], barLabel: String? = nil, internalOnly: Bool = false,
-                    canView: (() -> Bool)? = nil, files: @escaping () -> [URL]) {
-            commands.register(Command(id, title, shortcuts, barLabel: barLabel, runsDuringJobs: true), enabled: { canView?() ?? !files().isEmpty },
-                              parameterized: { [weak self] argument in
-                let urls = argument.location.map { [$0] } ?? files()
-                guard !urls.isEmpty else { return }
-                self?.open(urls.map { ViewerItem(source: .file($0), title: kernel.fileSystems.displayPath($0)) }, internalOnly: internalOnly)
-            })
+        func viewer(
+            _ id: CommandID, _ title: String, _ shortcuts: [Shortcut], barLabel: String? = nil,
+            internalOnly: Bool = false,
+            canView: (() -> Bool)? = nil, files: @escaping () -> [URL]
+        ) {
+            commands.register(
+                Command(id, title, shortcuts, barLabel: barLabel, runsDuringJobs: true),
+                enabled: { canView?() ?? !files().isEmpty },
+                parameterized: { [weak self] argument in
+                    let urls = argument.location.map { [$0] } ?? files()
+                    guard !urls.isEmpty else { return }
+                    self?.open(
+                        urls.map { ViewerItem(source: .file($0), title: kernel.fileSystems.displayPath($0)) },
+                        internalOnly: internalOnly)
+                })
         }
         // Something marked must be a file, or without marks the cursor must be on one (the list of files is made when the command runs).
         let canView = { model().hasOperandFile }
         viewer(.view, "View", [.f(3)], barLabel: "View", canView: canView, files: markedFiles)
         viewer(.viewSingle, "View File Under Cursor", [.f(3, .shift)]) { cursorFile().map { [$0] } ?? [] }
         viewer(.viewMarked, "View Marked Files", [], canView: canView, files: markedFiles)
-        viewer(.viewInternalSingle, "View as Text Only", [.f(3, [.option, .shift])], internalOnly: true) { cursorFile().map { [$0] } ?? [] }
-        viewer(.viewInternalMarked, "View Marked Files as Text Only", [], internalOnly: true, canView: canView, files: markedFiles)
+        viewer(.viewInternalSingle, "View as Text Only", [.f(3, [.option, .shift])], internalOnly: true) {
+            cursorFile().map { [$0] } ?? []
+        }
+        viewer(
+            .viewInternalMarked, "View Marked Files as Text Only", [], internalOnly: true, canView: canView,
+            files: markedFiles)
 
         let isOn = { [weak self] in self?.quickView != nil }
-        commands.register(Command(.quickView, "Quick View Panel", [Shortcut(.character("q"), .control)], runsDuringJobs: true), checked: isOn) { [weak self] in
+        commands.register(
+            Command(.quickView, "Quick View Panel", [Shortcut(.character("q"), .control)], runsDuringJobs: true),
+            checked: isOn
+        ) { [weak self] in
             self?.toggleQuickView(internalOnly: false)
         }
-        commands.register(Command(.quickViewInternalOnly, "Quick View Panel, Text Only", runsDuringJobs: true), checked: isOn) { [weak self] in
+        commands.register(
+            Command(.quickViewInternalOnly, "Quick View Panel, Text Only", runsDuringJobs: true), checked: isOn
+        ) { [weak self] in
             self?.toggleQuickView(internalOnly: true)
         }
-        commands.register(Command(.hideQuickView, "Quick View Panel Off", runsDuringJobs: true), enabled: isOn) { [weak self] in self?.hideQuickView() }
-        commands.register(Command(.updateQuickView, "Reload Quick View", runsDuringJobs: true),
-                          enabled: { [weak self] in self?.quickView != nil || self?.windows.contains(where: \.followsCursor) == true }) { [weak self] in
+        commands.register(Command(.hideQuickView, "Quick View Panel Off", runsDuringJobs: true), enabled: isOn) {
+            [weak self] in self?.hideQuickView()
+        }
+        commands.register(
+            Command(.updateQuickView, "Reload Quick View", runsDuringJobs: true),
+            enabled: { [weak self] in self?.quickView != nil || self?.windows.contains(where: \.followsCursor) == true
+            }
+        ) { [weak self] in
             self?.quickView?.refresh()
             self?.windows.filter(\.followsCursor).forEach { $0.refreshFollowing() }
         }
         let separateIsOpen = { [weak self] in self?.windows.contains(where: \.followsCursor) == true }
-        commands.register(Command(.separateQuickView, "Separate Quick View Window", [Shortcut(.character("q"), [.control, .shift])], runsDuringJobs: true),
-                          checked: separateIsOpen) { [weak self] in self?.toggleSeparateQuickView(internalOnly: false) }
-        commands.register(Command(.separateQuickViewInternalOnly, "Separate Quick View Window, Text Only", runsDuringJobs: true),
-                          checked: separateIsOpen) { [weak self] in self?.toggleSeparateQuickView(internalOnly: true) }
-        commands.register(Command(.configureLister, "Configure Lister…", runsDuringJobs: true)) { [weak self] in self?.configure() }
+        commands.register(
+            Command(
+                .separateQuickView, "Separate Quick View Window", [Shortcut(.character("q"), [.control, .shift])],
+                runsDuringJobs: true),
+            checked: separateIsOpen
+        ) { [weak self] in self?.toggleSeparateQuickView(internalOnly: false) }
+        commands.register(
+            Command(.separateQuickViewInternalOnly, "Separate Quick View Window, Text Only", runsDuringJobs: true),
+            checked: separateIsOpen
+        ) { [weak self] in self?.toggleSeparateQuickView(internalOnly: true) }
+        commands.register(Command(.configureLister, "Configure Lister…", runsDuringJobs: true)) { [weak self] in
+            self?.configure()
+        }
 
         // The Files menu lists View only; the other ways of viewing have their keys.
         kernel.menus.add([.view], to: .filesOpen)
         kernel.menus.addToContextMenu([.view], in: .open, onItemOnly: true)
         kernel.menus.add([.quickView, .separateQuickView], to: .showViewType)
-        kernel.toolbar.add(.view, symbol: "doc.text.magnifyingglass", group: 20, hint: "Open the selected file in the viewer.")
-        kernel.toolbar.add(.quickView, symbol: "sidebar.right", group: 20, hint: "Show the file under the cursor in the other panel, as you move through the list.")
+        kernel.toolbar.add(
+            .view, symbol: "doc.text.magnifyingglass", group: 20, hint: "Open the selected file in the viewer.")
+        kernel.toolbar.add(
+            .quickView, symbol: "sidebar.right", group: 20,
+            hint: "Show the file under the cursor in the other panel, as you move through the list.")
         kernel.toolbar.setSymbol("macwindow.on.rectangle", for: .separateQuickView)
         kernel.toolbar.setSymbol("gearshape", for: .configureLister)
         kernel.preferences.add(ListerSettings.preferencePage { [weak self] in self?.settingsChanged() })
@@ -140,8 +175,10 @@ public final class ViewerPlugin: Plugin, ViewerService {
     @discardableResult
     func open(_ items: [ViewerItem], internalOnly: Bool, followsCursor: Bool = false) -> ViewerWindowController? {
         guard let kernel, let settings else { return nil }
-        let controller = ViewerWindowController(kernel: kernel, settings: settings, temporaryCopies: temporaryCopies, internalOnly: internalOnly,
-                                                followsCursor: followsCursor, followDelay: quickViewDelay) { [weak self] closed in
+        let controller = ViewerWindowController(
+            kernel: kernel, settings: settings, temporaryCopies: temporaryCopies, internalOnly: internalOnly,
+            followsCursor: followsCursor, followDelay: quickViewDelay
+        ) { [weak self] closed in
             self?.windows.removeAll { $0 === closed }
         }
         controller.pane.onConfigure = { [weak self] in self?.configure() }
@@ -173,13 +210,17 @@ public final class ViewerPlugin: Plugin, ViewerService {
             return
         }
         guard let kernel, let settings else { return }
-        let source = kernel.panels.source, target = kernel.panels.target
+        let source = kernel.panels.source
+        let target = kernel.panels.target
         guard let host = overlayHost(target) else {
             kernel.commands.onRejected()
             return
         }
-        quickView = QuickViewPanel(kernel: kernel, settings: settings, temporaryCopies: temporaryCopies, host: host, covering: target, following: source,
-                                   internalOnly: internalOnly, delay: quickViewDelay) { [weak self] in self?.hideQuickView() }
+        quickView = QuickViewPanel(
+            kernel: kernel, settings: settings, temporaryCopies: temporaryCopies, host: host, covering: target,
+            following: source,
+            internalOnly: internalOnly, delay: quickViewDelay
+        ) { [weak self] in self?.hideQuickView() }
         quickView?.pane.onConfigure = { [weak self] in self?.configure() }
     }
 
@@ -190,7 +231,8 @@ public final class ViewerPlugin: Plugin, ViewerService {
             guard let url, url.isFileURL else { return false }
             return url.isSameLocation(as: volume) || url.isInside(volume)
         }
-        for window in windows where isOnVolume(window.pane.item?.url) || window.items.contains(where: { isOnVolume($0.url) }) {
+        for window in windows
+        where isOnVolume(window.pane.item?.url) || window.items.contains(where: { isOnVolume($0.url) }) {
             window.pane.clear()
             window.close()
         }
@@ -215,12 +257,15 @@ public final class ViewerPlugin: Plugin, ViewerService {
         let fields = page.preferences.map { preference -> FormField in
             switch (preference.kind, kernel.settings.value(of: preference)) {
             case (.flag, .flag(let isOn)): return .checkbox(preference.key, preference.label, isOn)
-            case (.choice(let options, _), .index(let index)): return .choice(preference.key, preference.label, options, selected: index)
+            case (.choice(let options, _), .index(let index)):
+                return .choice(preference.key, preference.label, options, selected: index)
             case (_, .text(let text)): return .text(preference.key, preference.label, text)
             default: return .note(preference.label)
             }
         }
-        guard let answer = kernel.ui.form("Configure Lister", detail: "", fields: fields, buttons: ["OK"]) else { return }
+        guard let answer = kernel.ui.form("Configure Lister", detail: "", fields: fields, buttons: ["OK"]) else {
+            return
+        }
         for preference in page.preferences {
             if let value = answer.values[preference.key] { kernel.settings.set(value, for: preference) }
         }

@@ -1,6 +1,7 @@
-@testable import AFMKernel
 import Foundation
 import Testing
+
+@testable import AFMKernel
 
 private let folder = URL(fileURLWithPath: "/review2/folder")
 
@@ -13,12 +14,16 @@ private func dir(_ name: String) -> FileItem {
 }
 
 private func listing(_ items: [FileItem], at directory: URL = folder) -> Listing {
-    Listing(directory: directory, items: items, parent: directory.deletingLastPathComponent(), root: URL(fileURLWithPath: "/"))
+    Listing(
+        directory: directory, items: items, parent: directory.deletingLastPathComponent(),
+        root: URL(fileURLWithPath: "/"))
 }
 
 /// Folders `dir0…`, files `file0.txt…` with sizes that tell them apart.
 private func sample(_ count: Int) -> [FileItem] {
-    (0..<count).map { $0 % 10 == 0 ? dir("dir\($0)") : file("file\($0).\($0 % 3 == 0 ? "txt" : "md")", size: Int64($0 % 97 + 1)) }
+    (0..<count).map {
+        $0 % 10 == 0 ? dir("dir\($0)") : file("file\($0).\($0 % 3 == 0 ? "txt" : "md")", size: Int64($0 % 97 + 1))
+    }
 }
 
 private func panel(_ items: [FileItem], sort: ListOrder = ListOrder()) -> PanelModel {
@@ -44,10 +49,13 @@ private func counted(_ model: PanelModel) -> PanelModel.Totals {
 
 /// Everything a panel shows, to compare two models by.
 private func state(_ model: PanelModel) -> [String] {
-    [model.items.map(\.name).joined(separator: "|"), model.listedItems.map(\.name).joined(separator: "|"),
-     model.selectedNames.joined(separator: "|"), "\(model.cursor)", model.cursorItem?.name ?? "-", "\(model.totals)",
-     model.filter?.title ?? "-", "\(model.sort)", model.items.map { "\($0.computedSize ?? -1)" }.joined(separator: ","),
-     model.listedItems.map { "\($0.computedSize ?? -1)" }.joined(separator: ",")]
+    [
+        model.items.map(\.name).joined(separator: "|"), model.listedItems.map(\.name).joined(separator: "|"),
+        model.selectedNames.joined(separator: "|"), "\(model.cursor)", model.cursorItem?.name ?? "-", "\(model.totals)",
+        model.filter?.title ?? "-", "\(model.sort)",
+        model.items.map { "\($0.computedSize ?? -1)" }.joined(separator: ","),
+        model.listedItems.map { "\($0.computedSize ?? -1)" }.joined(separator: ",")
+    ]
 }
 
 /// Runs work on another thread and waits for it, as a panel does with long lists.
@@ -78,7 +86,9 @@ private func elsewhere<Value>(_ work: @escaping () -> Value) -> Value {
         // Calculated sizes, filters, marks.
         model.setComputedSizes([(name: "dir0", size: 500), (name: "dir10", size: 7)])
         model.setFilter(PanelFilter.mask("*.txt"))
-        _ = model.setFilter(PanelFilter.mask("*.md"), prefiltered: PanelModel.filtered(model.listedItems, by: .mask("*.md")), listVersion: version)
+        _ = model.setFilter(
+            PanelFilter.mask("*.md"), prefiltered: PanelModel.filtered(model.listedItems, by: .mask("*.md")),
+            listVersion: version)
         model.setFilter(nil)
         model.selectAll()
         #expect(model.listVersion == version)
@@ -109,12 +119,21 @@ private func elsewhere<Value>(_ work: @escaping () -> Value) -> Value {
         let fresh = listing(Array(items.dropFirst(4)) + [file("new3.txt", size: 9), dir("newdir")])
         let grown = Sorter.sort(items + [file("zz3.txt"), file("aa.md")], by: ListOrder(key: .ext))
         let changes: [(String, (PanelModel) -> Void, (PanelModel.Basis) -> PanelModel.Prepared)] = [
-            ("sort", { $0.setSort(ListOrder(key: .size, descending: true)) }, { PanelModel.prepare($0, sort: ListOrder(key: .size, descending: true)) }),
-            ("turn", { $0.setSort(ListOrder(key: .name, descending: true)) }, { PanelModel.prepare($0, sort: ListOrder(key: .name, descending: true)) }),
+            (
+                "sort", { $0.setSort(ListOrder(key: .size, descending: true)) },
+                { PanelModel.prepare($0, sort: ListOrder(key: .size, descending: true)) }
+            ),
+            (
+                "turn", { $0.setSort(ListOrder(key: .name, descending: true)) },
+                { PanelModel.prepare($0, sort: ListOrder(key: .name, descending: true)) }
+            ),
             ("filter", { $0.setFilter(filter) }, { PanelModel.prepare($0, filter: filter) }),
             ("no filter", { $0.setFilter(nil) }, { PanelModel.prepare($0, filter: nil) }),
             ("update", { $0.update(with: fresh) }, { PanelModel.prepare($0, update: fresh) }),
-            ("extend", { $0.extend(to: grown, sortedBy: ListOrder(key: .ext)) }, { PanelModel.prepare($0, extendingTo: grown, sortedBy: ListOrder(key: .ext)) }),
+            (
+                "extend", { $0.extend(to: grown, sortedBy: ListOrder(key: .ext)) },
+                { PanelModel.prepare($0, extendingTo: grown, sortedBy: ListOrder(key: .ext)) }
+            )
         ]
         for (name, direct, prepare) in changes {
             let (one, two) = (prepared(), prepared())
@@ -137,8 +156,11 @@ private func elsewhere<Value>(_ work: @escaping () -> Value) -> Value {
     @Test func aPreparedChangeOfAModelThatMovedOnIsNotTaken() {
         let items = sample(400)
         let model = panel(items)
-        let stale = [PanelModel.prepare(model.basis, sort: ListOrder(key: .size)), PanelModel.prepare(model.basis, filter: .mask("*.txt")),
-                     PanelModel.prepare(model.basis, update: listing(Array(items.dropFirst())))]
+        let stale = [
+            PanelModel.prepare(model.basis, sort: ListOrder(key: .size)),
+            PanelModel.prepare(model.basis, filter: .mask("*.txt")),
+            PanelModel.prepare(model.basis, update: listing(Array(items.dropFirst())))
+        ]
         let rows = PanelModel.rows(of: model.basis) { $0.name.hasSuffix("txt") }
         model.setSort(ListOrder(key: .ext))
         let before = state(model)
@@ -146,7 +168,9 @@ private func elsewhere<Value>(_ work: @escaping () -> Value) -> Value {
         model.onChange = { _ in announced += 1 }
         for prepared in stale { #expect(model.apply(prepared) == .stale) }
         #expect(!model.setSelection(rows))
-        #expect(!model.setSort(ListOrder(), presorted: Sorter.sort(items, by: ListOrder()), listVersion: model.listVersion - 1))
+        #expect(
+            !model.setSort(
+                ListOrder(), presorted: Sorter.sort(items, by: ListOrder()), listVersion: model.listVersion - 1))
         #expect(state(model) == before && announced == 0)
         // What only touches marks, the cursor or sizes does not make a prepared change stale.
         let basis = model.basis
@@ -156,7 +180,9 @@ private func elsewhere<Value>(_ work: @escaping () -> Value) -> Value {
         model.moveCursor(to: model.row(ofName: "file8.md")!)
         #expect(model.apply(prepared) == .changed)
         #expect(model.selectedNames.sorted() == ["file7.md", "file8.md"] && model.cursorItem?.name == "file8.md")
-        #expect(model.item(atRow: model.row(ofName: "dir20")!)?.computedSize == 20 && model.listedItems.first { $0.name == "dir30" }?.computedSize == 30)
+        #expect(
+            model.item(atRow: model.row(ofName: "dir20")!)?.computedSize == 20
+                && model.listedItems.first { $0.name == "dir30" }?.computedSize == 30)
         #expect(model.totals == counted(model) && model.totals.totalBytes == counted(model).totalBytes)
     }
 
@@ -171,7 +197,9 @@ private func elsewhere<Value>(_ work: @escaping () -> Value) -> Value {
         #expect(announced == 0 && model.listVersion == version && model.selectionCount == 1)
         // Another directory is shown, as `update` does it.
         let other = URL(fileURLWithPath: "/review2/other")
-        #expect(model.apply(PanelModel.prepare(model.basis, update: listing([file("x.txt", in: other)], at: other))) == .changed)
+        #expect(
+            model.apply(PanelModel.prepare(model.basis, update: listing([file("x.txt", in: other)], at: other)))
+                == .changed)
         #expect(model.directory.path == other.path && model.items.map(\.name) == ["x.txt"] && model.selectionCount == 0)
     }
 
@@ -189,7 +217,9 @@ private func elsewhere<Value>(_ work: @escaping () -> Value) -> Value {
         #expect(model.selectionCount == count - 1 && model.totals == counted(model))
         model.saveSelection()
         model.select(where: { $0.isFolder }, select: false)
-        #expect(model.selectionCount == count - 1 - count / 10 && model.totals == counted(model) && model.totals.selectedFolders == 0)
+        #expect(
+            model.selectionCount == count - 1 - count / 10 && model.totals == counted(model)
+                && model.totals.selectedFolders == 0)
         model.select(mask: "*.txt", select: false)
         #expect(model.operands().allSatisfy { $0.name.hasSuffix(".md") } && model.totals == counted(model))
         model.restoreSelection()
@@ -204,7 +234,8 @@ private func elsewhere<Value>(_ work: @escaping () -> Value) -> Value {
         let basis = model.basis
         let rows = elsewhere { PanelModel.rows(of: basis) { !$0.isFolder && $0.size > 50 } }
         #expect(model.setSelection(rows) && model.selectionCount == rows.count && rows.count > 0)
-        #expect(model.operands().allSatisfy { $0.size > 50 && $0.name.hasSuffix(".txt") } && model.totals == counted(model))
+        #expect(
+            model.operands().allSatisfy { $0.size > 50 && $0.name.hasSuffix(".txt") } && model.totals == counted(model))
         #expect(model.setSelection(rows, .remove) && model.selectionCount == 0)
         #expect(model.setSelection(rows, .add) && model.selectionCount == rows.count)
     }
@@ -213,7 +244,11 @@ private func elsewhere<Value>(_ work: @escaping () -> Value) -> Value {
         // A list gathered from several folders: two files of the very same name.
         let (first, second) = (URL(fileURLWithPath: "/review2/a"), URL(fileURLWithPath: "/review2/b"))
         for others in [0, 300] {
-            let items = [file("twin.txt", size: 2, in: first), file("twin.txt", size: 5, in: second), file("single.txt", size: 1)]
+            let items =
+                [
+                    file("twin.txt", size: 2, in: first), file("twin.txt", size: 5, in: second),
+                    file("single.txt", size: 1)
+                ]
                 + (0..<others).map { file("other\($0).txt") }
             let model = panel(items)
             let rows = model.items.indices.filter { model.items[$0].name == "twin.txt" }.map { $0 + 1 }
@@ -227,7 +262,9 @@ private func elsewhere<Value>(_ work: @escaping () -> Value) -> Value {
             // A name stands for every entry written like it.
             model.clearSelection()
             model.setSelected(true, names: ["twin.txt"])
-            #expect(model.selectionCount == 2 && model.totals.selectedFiles == 2 && model.totals.selectedBytes == 7 && model.operands().count == 2)
+            #expect(
+                model.selectionCount == 2 && model.totals.selectedFiles == 2 && model.totals.selectedBytes == 7
+                    && model.operands().count == 2)
             for _ in 0..<4 { _ = model.row(ofName: "single.txt") }
             #expect(model.totals == counted(model) && model.selectionCount == 2)
             model.setSelected(false, names: ["twin.txt"])
@@ -260,11 +297,18 @@ private func elsewhere<Value>(_ work: @escaping () -> Value) -> Value {
         let items = [dir(composed), dir(decomposed), dir("plain"), file("x.txt")] + (0..<200).map { dir("f\($0)") }
         let model = panel(items)
         model.setFilter(PanelFilter(title: "not decomposed") { !ExactName.areSame($0.name, decomposed) })
-        model.setComputedSizes([(name: decomposed, size: 11), (name: composed, size: 22), (name: "plain", size: 33), (name: "f7", size: 7)])
+        model.setComputedSizes([
+            (name: decomposed, size: 11), (name: composed, size: 22), (name: "plain", size: 33), (name: "f7", size: 7)
+        ])
         func sizes(_ items: [FileItem]) -> [[UInt8]: Int64] {
-            Dictionary(uniqueKeysWithValues: items.compactMap { item in item.computedSize.map { (Array(item.name.utf8), $0) } })
+            Dictionary(
+                uniqueKeysWithValues: items.compactMap { item in item.computedSize.map { (Array(item.name.utf8), $0) } }
+            )
         }
-        #expect(sizes(model.listedItems) == [Array(decomposed.utf8): 11, Array(composed.utf8): 22, Array("plain".utf8): 33, Array("f7".utf8): 7])
+        #expect(
+            sizes(model.listedItems) == [
+                Array(decomposed.utf8): 11, Array(composed.utf8): 22, Array("plain".utf8): 33, Array("f7".utf8): 7
+            ])
         #expect(sizes(model.items) == [Array(composed.utf8): 22, Array("plain".utf8): 33, Array("f7".utf8): 7])
         #expect(model.totals == counted(model) && model.totals.totalBytes == 22 + 33 + 7 + 1)
         // What is shown is still the listed entries the filter lets through, sizes and all.
@@ -292,8 +336,15 @@ private func elsewhere<Value>(_ work: @escaping () -> Value) -> Value {
         let model = panel(items)
         model.setComputedSizes([(name: "dir0", size: 5), (name: "dir290", size: 9)])
         model.update(with: listing(Array(items.dropFirst(3)) + [dir("dir0"), file("fresh.txt")]))
-        #expect(model.listedItems.first { $0.name == "dir0" }?.computedSize == 5 && model.listedItems.first { $0.name == "dir290" }?.computedSize == 9)
-        model.setSort(ListOrder(key: .date), presorted: Sorter.sort(model.listedItems.map { FileItem(url: $0.url, name: $0.name, isDirectory: $0.isDirectory, size: $0.size) }, by: ListOrder(key: .date)))
+        #expect(
+            model.listedItems.first { $0.name == "dir0" }?.computedSize == 5
+                && model.listedItems.first { $0.name == "dir290" }?.computedSize == 9)
+        model.setSort(
+            ListOrder(key: .date),
+            presorted: Sorter.sort(
+                model.listedItems.map {
+                    FileItem(url: $0.url, name: $0.name, isDirectory: $0.isDirectory, size: $0.size)
+                }, by: ListOrder(key: .date)))
         #expect(model.listedItems.filter { $0.computedSize != nil }.map(\.name).sorted() == ["dir0", "dir290"])
         #expect(model.totals == counted(model))
     }
@@ -316,7 +367,8 @@ private func elsewhere<Value>(_ work: @escaping () -> Value) -> Value {
         model.setSort(ListOrder(key: .size, descending: true))
         model.restore(snapshot)
         #expect(model.filter?.title == "7" && model.items.count == shown.count && model.listedItems.count == 1000)
-        #expect(Set(model.items.map(\.name)) == Set(shown) && model.selectedNames.sorted() == ["file17.md", "file7.md"])
+        #expect(
+            Set(model.items.map(\.name)) == Set(shown) && model.selectedNames.sorted() == ["file17.md", "file7.md"])
         // The list is in the order the panel names.
         #expect(model.sort == ListOrder(key: .size, descending: true))
         #expect(model.listedItems.map(\.name) == Sorter.sort(items, by: model.sort).map(\.name))
@@ -347,7 +399,12 @@ private func elsewhere<Value>(_ work: @escaping () -> Value) -> Value {
         model.saveSelection()
         #expect(model.savedSelection == ["file1.md", "file2.md", "dir10"])
         let other = URL(fileURLWithPath: "/review2/other")
-        model.show(listing([file("file2.md", in: other), file("zzz", in: other), FileItem(url: other.appendingPathComponent("dir10"), name: "dir10", isDirectory: true)], at: other))
+        model.show(
+            listing(
+                [
+                    file("file2.md", in: other), file("zzz", in: other),
+                    FileItem(url: other.appendingPathComponent("dir10"), name: "dir10", isDirectory: true)
+                ], at: other))
         #expect(model.savedSelection == ["file1.md", "file2.md", "dir10"])
         model.restoreSelection()
         #expect(model.selectedNames.sorted() == ["dir10", "file2.md"])

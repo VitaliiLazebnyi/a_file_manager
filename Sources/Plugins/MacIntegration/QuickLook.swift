@@ -10,7 +10,9 @@ final class QuickLookController: NSResponder, QLPreviewPanelDataSource, QLPrevie
     private weak var host: NSWindow?
 
     private var visiblePanel: QLPreviewPanel? {
-        guard QLPreviewPanel.sharedPreviewPanelExists(), let panel = QLPreviewPanel.shared(), panel.isVisible else { return nil }
+        guard QLPreviewPanel.sharedPreviewPanelExists(), let panel = QLPreviewPanel.shared(), panel.isVisible else {
+            return nil
+        }
         return panel
     }
 
@@ -69,7 +71,9 @@ final class QuickLookController: NSResponder, QLPreviewPanelDataSource, QLPrevie
     }
 
     func previewPanel(_ panel: QLPreviewPanel!, handle event: NSEvent!) -> Bool {
-        guard let event, event.type == .keyDown, let responder = host?.firstResponder, responder !== self else { return false }
+        guard let event, event.type == .keyDown, let responder = host?.firstResponder, responder !== self else {
+            return false
+        }
         responder.keyDown(with: event)
         return true
     }

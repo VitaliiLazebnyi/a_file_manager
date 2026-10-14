@@ -90,14 +90,16 @@ enum Background {
 
     /// The lanes that have work right now, for checks.
     static var busyLanes: Int {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         return lanes.count
     }
 
     /// Whether the lane of this purpose and location is at work or has work waiting.
     static func isBusy(_ purpose: String, at location: URL) -> Bool {
         let key = laneKey(purpose, location)
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         return lanes[key] != nil
     }
 
@@ -109,7 +111,9 @@ enum Background {
     /// purpose and location: after whatever was handed in for it before. A lane at work has
     /// one of the kernel's threads for calls that block (`BlockingCalls.run`), which are kept
     /// for the next lane when this one is done, so a run of short calls starts no thread each.
-    static func storage(_ purpose: String, at location: URL, qos: QualityOfService = .userInitiated, _ work: @escaping () -> Void) {
+    static func storage(
+        _ purpose: String, at location: URL, qos: QualityOfService = .userInitiated, _ work: @escaping () -> Void
+    ) {
         let key = laneKey(purpose, location)
         lock.lock()
         if lanes[key] != nil {
@@ -126,7 +130,9 @@ enum Background {
             Thread.current.name = "afm." + purpose
             defer { Thread.current.name = borrowed }
             let lowered = qos == .utility || qos == .background
-            if lowered { pthread_set_qos_class_self_np(qos == .background ? QOS_CLASS_BACKGROUND : QOS_CLASS_UTILITY, 0) }
+            if lowered {
+                pthread_set_qos_class_self_np(qos == .background ? QOS_CLASS_BACKGROUND : QOS_CLASS_UTILITY, 0)
+            }
             var next: (() -> Void)? = work
             while let job = next {
                 autoreleasepool { job() }
@@ -146,8 +152,10 @@ enum Background {
     /// The same for work with a result: `work` runs in the lane and must hold nothing that
     /// belongs to the main thread; `then` receives what it returned on the main thread, from
     /// the run loop (`MainLoop`), and is let go of there.
-    static func storage<Value>(_ purpose: String, at location: URL, qos: QualityOfService = .userInitiated,
-                               work: @escaping () -> Value, then: @escaping (Value) -> Void) {
+    static func storage<Value>(
+        _ purpose: String, at location: URL, qos: QualityOfService = .userInitiated,
+        work: @escaping () -> Value, then: @escaping (Value) -> Void
+    ) {
         let receiver = MainOwned(then)
         storage(purpose, at: location, qos: qos) {
             let value = work()
@@ -229,7 +237,8 @@ enum Mounts {
     static let lifetime: TimeInterval = 2
 
     static func volumes() -> [Volume] {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         let now = ProcessInfo.processInfo.systemUptime
         if let cached, now - cached.at < lifetime { return cached.volumes }
         // The system's list lives in a buffer of its own that the next call overwrites; the
@@ -253,8 +262,11 @@ enum Mounts {
     /// The volume a local path lies on: the one with the longest mount point that is a prefix of it.
     static func volume(of path: String, among volumes: [Volume]) -> Volume? {
         var best: Volume?
-        for volume in volumes where volume.path == "/" || path == volume.path || (path.hasPrefix(volume.path) && path.utf8.count > volume.path.utf8.count
-            && path.utf8[path.utf8.index(path.utf8.startIndex, offsetBy: volume.path.utf8.count)] == 0x2F) {
+        for volume in volumes
+        where volume.path == "/" || path == volume.path
+            || (path.hasPrefix(volume.path) && path.utf8.count > volume.path.utf8.count
+                && path.utf8[path.utf8.index(path.utf8.startIndex, offsetBy: volume.path.utf8.count)] == 0x2F)
+        {
             if best == nil || volume.path.utf8.count > best!.path.utf8.count { best = volume }
         }
         return best

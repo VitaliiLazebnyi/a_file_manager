@@ -2,9 +2,10 @@ import AFMKernel
 import FileOperationsPlugin
 import Foundation
 import LocalFileSystemPlugin
-@testable import NetworkPlugin
 import TestSupport
 import Testing
+
+@testable import NetworkPlugin
 
 /// A test server on a sandbox folder with the FTP file system connected to it.
 final class FTPFixture {
@@ -14,7 +15,10 @@ final class FTPFixture {
     let fileSystem: RemoteFileSystem
     var environment: SessionEnvironment { center.environment }
 
-    init(_ options: TestFTPServer.Options = TestFTPServer.Options(), configure: (inout NetworkOptions.Values) -> Void = { _ in }) throws {
+    init(
+        _ options: TestFTPServer.Options = TestFTPServer.Options(),
+        configure: (inout NetworkOptions.Values) -> Void = { _ in }
+    ) throws {
         box = try Sandbox()
         try box.folder("srv")
         server = try TestFTPServer(root: box.url("srv"), options: options)
@@ -166,7 +170,9 @@ final class FTPFixture {
 
         try fs.move(fixture.url("/a.txt"), to: fixture.url("/x/moved.txt"), replacing: false)
         #expect(fixture.box.read("srv/x/moved.txt") == "a" && !fixture.box.exists("srv/a.txt"))
-        #expect(throws: FileSystemError.self) { try fs.move(fixture.url("/b.txt"), to: fixture.url("/x/moved.txt"), replacing: false) }
+        #expect(throws: FileSystemError.self) {
+            try fs.move(fixture.url("/b.txt"), to: fixture.url("/x/moved.txt"), replacing: false)
+        }
         #expect(fixture.box.read("srv/x/moved.txt") == "a")
         try fs.move(fixture.url("/b.txt"), to: fixture.url("/x/moved.txt"), replacing: true)
         #expect(fixture.box.read("srv/x/moved.txt") == "b")
@@ -190,7 +196,8 @@ final class FTPFixture {
         let fixture = try FTPFixture()
         try fixture.box.file("srv/a.txt", "a")
         let stamp = Date(timeIntervalSince1970: 1_400_000_000)
-        try fixture.fileSystem.setAttributes(FileAttributes(modified: stamp, permissions: 0o640), of: fixture.url("/a.txt"))
+        try fixture.fileSystem.setAttributes(
+            FileAttributes(modified: stamp, permissions: 0o640), of: fixture.url("/a.txt"))
         let item = try #require(fixture.fileSystem.item(at: fixture.url("/a.txt")))
         #expect(item.modified == stamp && item.permissions == 0o640)
     }
@@ -274,7 +281,9 @@ final class FTPFixture {
         let fixture = try FTPFixture(options)
         try fixture.box.file("srv/a.txt", "a")
         var questions: [String] = []
-        var answers: [Credentials?] = [Credentials(user: "anna", password: "wrong"), Credentials(user: "anna", password: "s3cret")]
+        var answers: [Credentials?] = [
+            Credentials(user: "anna", password: "wrong"), Credentials(user: "anna", password: "s3cret")
+        ]
         fixture.environment.askCredentials = { _, message in
             questions.append(message)
             return answers.isEmpty ? nil : answers.removeFirst()
@@ -288,7 +297,8 @@ final class FTPFixture {
         #expect(!fixture.center.isConnected(fixture.key))
         #expect(throws: (any Error).self) { try fixture.names("/") }
         // A password in the typed address goes to the connection, not into the URL.
-        let typed = try #require(fixture.fileSystem.location(from: "ftp://anna:s3cret@127.0.0.1:\(fixture.server.port)/"))
+        let typed = try #require(
+            fixture.fileSystem.location(from: "ftp://anna:s3cret@127.0.0.1:\(fixture.server.port)/"))
         #expect(typed == fixture.url("/") && !typed.absoluteString.contains("anna"))
         #expect(try fixture.names("/") == ["a.txt"])
     }
@@ -346,7 +356,10 @@ final class FTPFixture {
         fixture.environment.options.values = patient
         let cancellation = CancellationFlag()
         // On a thread of its own: a busy machine can keep a dispatch queue waiting for seconds.
-        let canceller = Thread { Thread.sleep(forTimeInterval: 0.3); cancellation.cancel() }
+        let canceller = Thread {
+            Thread.sleep(forTimeInterval: 0.3)
+            cancellation.cancel()
+        }
         canceller.start()
         started = Date()
         #expect { try fixture.center.connect(key, cancellation: cancellation) } throws: { error in
@@ -358,7 +371,10 @@ final class FTPFixture {
         let closed = try TestFTPServer.listen()
         let port = TestFTPServer.port(of: closed)
         close(closed)
-        #expect(throws: NetworkError.self) { try fixture.fileSystem.list(ServerKey(scheme: "ftp", host: "127.0.0.1", port: port).url(), showHidden: true) }
+        #expect(throws: NetworkError.self) {
+            try fixture.fileSystem.list(
+                ServerKey(scheme: "ftp", host: "127.0.0.1", port: port).url(), showHidden: true)
+        }
     }
 
     @Test func disconnectInterruptsARunningTransfer() throws {
@@ -393,7 +409,9 @@ final class FTPFixture {
         result = runJob(.copy, [fixture.box.url("big.bin")], to: target, answers: answers, fileSystems: fileSystems)
         #expect(result.cancelled && namesOnDisk(fixture.box.url("srv")) == ["small.txt"])
         // And the way back, under another name.
-        result = runJob(.copy, [fixture.url("/small.txt")], to: TargetSpec(directory: fixture.box.url("srv"), mask: "copy.txt"), fileSystems: fileSystems)
+        result = runJob(
+            .copy, [fixture.url("/small.txt")], to: TargetSpec(directory: fixture.box.url("srv"), mask: "copy.txt"),
+            fileSystems: fileSystems)
         #expect(result.completed.count == 1 && fixture.box.read("srv/copy.txt") == "small")
         #expect(try fixture.names("/") == ["copy.txt", "small.txt"])
     }

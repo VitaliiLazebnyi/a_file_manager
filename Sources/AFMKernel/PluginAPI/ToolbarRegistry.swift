@@ -62,9 +62,14 @@ public final class ToolbarRegistry {
 
     /// The bar as it is to be drawn: the user's layout when there is one, else the proposal.
     public func layout(from settings: SettingsStore) -> [Button?] {
-        guard let names = settings.value([String].self, forKey: ToolbarRegistry.settingsKey) else { return defaultLayout }
+        guard let names = settings.value([String].self, forKey: ToolbarRegistry.settingsKey) else {
+            return defaultLayout
+        }
         return names.map { name in
-            name.isEmpty ? nil : Button(command: CommandID(rawValue: name), symbol: symbols[CommandID(rawValue: name)] ?? "square.dashed")
+            name.isEmpty
+                ? nil
+                : Button(
+                    command: CommandID(rawValue: name), symbol: symbols[CommandID(rawValue: name)] ?? "square.dashed")
         }
     }
 

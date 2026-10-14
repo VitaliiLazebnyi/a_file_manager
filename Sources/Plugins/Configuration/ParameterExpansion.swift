@@ -77,14 +77,16 @@ struct ExpandedParameters: Equatable {
 /// works on Unicode scalars: a quote followed by a combining mark is still a quote to a shell.
 enum ShellWords {
     /// What may stand in a word without quotes.
-    private static let plain = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789%+,-./:@_^")
+    private static let plain = CharacterSet(
+        charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789%+,-./:@_^")
     private static let quoteSpecial = CharacterSet(charactersIn: "\"\\$`")
 
     static func needsQuoting(_ text: String) -> Bool {
         text.unicodeScalars.contains { scalar in
             if scalar.isASCII { return !plain.contains(scalar) }
             switch scalar.properties.generalCategory {
-            case .uppercaseLetter, .lowercaseLetter, .titlecaseLetter, .modifierLetter, .otherLetter, .nonspacingMark, .spacingMark, .decimalNumber:
+            case .uppercaseLetter, .lowercaseLetter, .titlecaseLetter, .modifierLetter, .otherLetter, .nonspacingMark,
+                .spacingMark, .decimalNumber:
                 return false
             default:
                 return true
@@ -276,8 +278,9 @@ struct ParameterExpander {
         }
         var run = Run(context: context, tokens: tokens)
         run.expand()
-        return ExpandedParameters(pieces: ParameterExpander.trimmed(run.pieces), asksFirst: asksFirst, listFile: run.listFile,
-                                  usedArguments: run.usedArguments, missingName: run.missingName, problem: run.problem)
+        return ExpandedParameters(
+            pieces: ParameterExpander.trimmed(run.pieces), asksFirst: asksFirst, listFile: run.listFile,
+            usedArguments: run.usedArguments, missingName: run.missingName, problem: run.problem)
     }
 
     /// Whether a text has a code that needs the marked names of a panel. Making that list
@@ -369,7 +372,9 @@ struct ParameterExpander {
             var index = 0
             while index < tokens.count {
                 defer { index += 1 }
-                guard case .scalar("%") = tokens[index], index + 1 < tokens.count, case .scalar(let code) = tokens[index + 1] else { continue }
+                guard case .scalar("%") = tokens[index], index + 1 < tokens.count,
+                    case .scalar(let code) = tokens[index + 1]
+                else { continue }
                 index += 1
                 if code != "%" { found(code) }
             }
@@ -466,7 +471,11 @@ struct ParameterExpander {
             }
             write(character)
             guard character == "\"" else { return }
-            if !wasInside, isInsideDoubleQuotes { openQuote = opened } else if wasInside, !isInsideDoubleQuotes { openQuote = nil }
+            if !wasInside, isInsideDoubleQuotes {
+                openQuote = opened
+            } else if wasInside, !isInsideDoubleQuotes {
+                openQuote = nil
+            }
         }
 
         private mutating func write(_ character: Unicode.Scalar) {
@@ -553,7 +562,9 @@ struct ParameterExpander {
         }
 
         /// Positions `from`…`to` (1-based) of a list, counted from the start or from the end.
-        private static func slice<Element>(_ items: [Element], fromEnd: Bool, _ start: Int, _ end: Int?, open: Bool) -> [Element] {
+        private static func slice<Element>(_ items: [Element], fromEnd: Bool, _ start: Int, _ end: Int?, open: Bool)
+            -> [Element]
+        {
             // The numbers are the user's and may be as large as an `Int`: nothing here may overflow.
             func fromTheEnd(_ index: Int) -> Int { index > items.count ? 0 : items.count - index + 1 }
             let from = fromEnd ? fromTheEnd(start) : start
@@ -620,7 +631,9 @@ struct ParameterExpander {
                 var to = all.count
                 if let length {
                     // `from + length` with a length as large as an `Int` would overflow.
-                    to = lengthIsNegative ? all.count - min(length, all.count) : (length >= all.count - from ? all.count : from + length)
+                    to =
+                        lengthIsNegative
+                        ? all.count - min(length, all.count) : (length >= all.count - from ? all.count : from + length)
                 }
                 return from < to ? String(all[from..<to]) : ""
             }
@@ -713,7 +726,8 @@ struct ParameterExpander {
                 before.forEach { emit($0) }
                 if let affixes {
                     let parts = FileItem.split(name)
-                    let base = prefix.isEmpty && before.isEmpty && startsWord ? protected(parts.base) : prefix + parts.base
+                    let base =
+                        prefix.isEmpty && before.isEmpty && startsWord ? protected(parts.base) : prefix + parts.base
                     emit(value: base)
                     affixes.before.forEach { emit($0) }
                     if !parts.ext.isEmpty { emit(value: "." + parts.ext) }
@@ -772,7 +786,9 @@ struct ParameterExpander {
             guard number <= 2 else { return single(selected.count >= number ? source.path + selected[number - 1] : "") }
             let firstName = selected.first ?? source.cursorName
             var one = firstName.map { source.path + $0 } ?? ""
-            var two = selected.count >= 2 ? source.path + selected[1]
+            var two =
+                selected.count >= 2
+                ? source.path + selected[1]
                 : (target.selection.first ?? firstName).map { target.path + $0 } ?? ""
             if context.sourceIsRight && selected.count < 2 { swap(&one, &two) }
             single(number == 1 ? one : two)
@@ -821,7 +837,9 @@ struct ParameterExpander {
             let panel = first
             guard let names = chosen(of: panel, forList: true) else { return }
             // Without a path a name that begins with `-` would be an option to whoever reads the list.
-            func line(_ name: String, of panel: PanelSnapshot) -> String { withPath ? panel.path + name : protected(name) }
+            func line(_ name: String, of panel: PanelSnapshot) -> String {
+                withPath ? panel.path + name : protected(name)
+            }
             var lines = names.map { line($0, of: panel) }
             if includesTargetSelection { lines += second.selection.map { line($0, of: second) } }
             // The list has one name per line, so a name with a line break in it would be read
@@ -835,7 +853,8 @@ struct ParameterExpander {
                 }
             }
             if let broken = lines.first(where: { $0.unicodeScalars.contains(where: endsALine) }) {
-                problem = "The name “\(DisplayText.oneLine(broken))” contains a line break and cannot be passed in a list file."
+                problem =
+                    "The name “\(DisplayText.oneLine(broken))” contains a line break and cannot be passed in a list file."
             }
             let text = lines.map { $0 + "\n" }.joined()
             var contents = Data()
@@ -867,7 +886,9 @@ struct ParameterExpander {
     }
 
     /// What stands before and after the first `marker` in the text of the pieces; nil without one.
-    fileprivate static func split(_ pieces: [ExpandedPiece], at marker: String) -> (before: [ExpandedPiece], after: [ExpandedPiece])? {
+    fileprivate static func split(_ pieces: [ExpandedPiece], at marker: String) -> (
+        before: [ExpandedPiece], after: [ExpandedPiece]
+    )? {
         for (index, piece) in pieces.enumerated() {
             guard case .text(let text) = piece, let found = text.range(of: marker, options: .literal) else { continue }
             let before = Array(pieces[..<index]) + [.text(String(text[..<found.lowerBound]))]

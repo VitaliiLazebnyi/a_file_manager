@@ -1,10 +1,11 @@
 import AFMContracts
 import AFMKernel
-@testable import FileOperationsPlugin
 import Foundation
 import LocalFileSystemPlugin
 import TestSupport
 import Testing
+
+@testable import FileOperationsPlugin
 
 // Review round 2, integration: the kernel calls that arrived after the file-operation pass
 // was over, now used by `FileJob` — removal below a folder without following links (F043)
@@ -25,7 +26,9 @@ final class IntegrationRacingLocalFileSystem: FileSystemProvider {
     var removals: (below: [String], byPath: [String]) { lock.withLock { (rooted, plain) } }
 
     func capabilities(for url: URL) -> FileSystemCapabilities { local.capabilities(for: url) }
-    func list(_ directory: URL, showHidden: Bool) throws -> [FileItem] { try local.list(directory, showHidden: showHidden) }
+    func list(_ directory: URL, showHidden: Bool) throws -> [FileItem] {
+        try local.list(directory, showHidden: showHidden)
+    }
     func list(_ directory: URL, showHidden: Bool, cancellation: CancellationFlag) throws -> [FileItem] {
         try local.list(directory, showHidden: showHidden, cancellation: cancellation)
     }
@@ -33,10 +36,18 @@ final class IntegrationRacingLocalFileSystem: FileSystemProvider {
     func parent(of directory: URL) -> URL? { local.parent(of: directory) }
     func read(_ url: URL) throws -> FileReader { try local.read(url) }
     func write(_ url: URL) throws -> FileWriter { try local.write(url) }
-    func move(_ source: URL, to destination: URL, replacing: Bool) throws { try local.move(source, to: destination, replacing: replacing) }
-    func copy(_ source: URL, to destination: URL, progress: (Int64) -> Bool) throws { try local.copy(source, to: destination, progress: progress) }
-    func setAttributes(_ attributes: FileAttributes, of url: URL) throws { try local.setAttributes(attributes, of: url) }
-    func copyMetadata(from source: URL, to destination: URL) throws { try local.copyMetadata(from: source, to: destination) }
+    func move(_ source: URL, to destination: URL, replacing: Bool) throws {
+        try local.move(source, to: destination, replacing: replacing)
+    }
+    func copy(_ source: URL, to destination: URL, progress: (Int64) -> Bool) throws {
+        try local.copy(source, to: destination, progress: progress)
+    }
+    func setAttributes(_ attributes: FileAttributes, of url: URL) throws {
+        try local.setAttributes(attributes, of: url)
+    }
+    func copyMetadata(from source: URL, to destination: URL) throws {
+        try local.copyMetadata(from: source, to: destination)
+    }
     func displayPath(_ url: URL) -> String { local.displayPath(url) }
     func location(from text: String) -> URL? { local.location(from: text) }
     func volume(of url: URL) -> VolumeInfo? { local.volume(of: url) }
@@ -103,7 +114,8 @@ final class IntegrationReplies: FileJobDelegate {
         try box.file("tree/sub/deep/c.txt", "c")
         try box.file("alone.txt", "x")
         let replies = IntegrationReplies()
-        let job = FileJob(kind: .delete(toTrash: false), sources: [box.url("tree"), box.url("alone.txt")], fileSystems: registry)
+        let job = FileJob(
+            kind: .delete(toTrash: false), sources: [box.url("tree"), box.url("alone.txt")], fileSystems: registry)
         job.delegate = replies
         _ = job.run()
         #expect(replies.errors.isEmpty && !box.exists("tree") && !box.exists("alone.txt"))
@@ -141,8 +153,11 @@ final class IntegrationReplies: FileJobDelegate {
         // Nothing of the folder the link leads to is gone, and the user was told.
         #expect(names("outside") == ["a.txt", "b.txt"] && box.read("outside/a.txt") == "not the job's")
         #expect(!replies.errors.isEmpty)
-        #expect(replies.errors.allSatisfy { $0.contains("no longer a folder") || $0.contains("not empty") || $0.contains("Directory not empty") },
-                "\(replies.errors)")
+        #expect(
+            replies.errors.allSatisfy {
+                $0.contains("no longer a folder") || $0.contains("not empty") || $0.contains("Directory not empty")
+            },
+            "\(replies.errors)")
         // The files that were moved aside are as they were; the tree could not be emptied, so it stays.
         #expect(names("victim/sub.real") == ["a.txt", "b.txt"] && box.exists("victim"))
     }
@@ -157,15 +172,22 @@ final class IntegrationReplies: FileJobDelegate {
         from.addFile("/s/single.txt", "s")
         to.addDirectory("/t")
         let replies = IntegrationReplies()
-        let job = FileJob(kind: .move, sources: [from.url("/s/tree"), from.url("/s/single.txt")], target: TargetSpec(directory: to.url("/t")),
-                          fileSystems: registry)
+        let job = FileJob(
+            kind: .move, sources: [from.url("/s/tree"), from.url("/s/single.txt")],
+            target: TargetSpec(directory: to.url("/t")),
+            fileSystems: registry)
         job.delegate = replies
         _ = job.run()
-        #expect(replies.errors.isEmpty && to.contents("/t/tree/sub/b.txt") == "b" && to.contents("/t/single.txt") == "s")
+        #expect(
+            replies.errors.isEmpty && to.contents("/t/tree/sub/b.txt") == "b" && to.contents("/t/single.txt") == "s")
         #expect(from.allPaths.filter { $0.hasPrefix("/s/") }.isEmpty)
         let removals = Set(from.flaggedChanges.filter { $0.hasPrefix("remove") })
-        #expect(removals == ["remove below /s/tree /s/tree/a.txt", "remove below /s/tree /s/tree/sub/b.txt", "remove below /s/tree /s/tree/sub",
-                             "remove /s/tree", "remove /s/single.txt"])
+        #expect(
+            removals == [
+                "remove below /s/tree /s/tree/a.txt", "remove below /s/tree /s/tree/sub/b.txt",
+                "remove below /s/tree /s/tree/sub",
+                "remove /s/tree", "remove /s/single.txt"
+            ])
     }
 
     // MARK: F046 — a commit that takes long reports, can be paused and can be ended
@@ -192,8 +214,10 @@ final class IntegrationReplies: FileJobDelegate {
             // Where a paused job would be held: the report is made from inside the commit.
             if progress.lines.first?.hasPrefix("Writing:") == true { lock.withLock { duringCommit += 1 } }
         }
-        let job = FileJob(kind: .move, sources: [from.url("/s/a.txt"), from.url("/s/b.txt")], target: TargetSpec(directory: to.url("/t")),
-                          fileSystems: registry)
+        let job = FileJob(
+            kind: .move, sources: [from.url("/s/a.txt"), from.url("/s/b.txt")],
+            target: TargetSpec(directory: to.url("/t")),
+            fileSystems: registry)
         job.delegate = replies
         _ = job.run()
         #expect(replies.errors.isEmpty && to.commits == ["/t"])
@@ -205,8 +229,10 @@ final class IntegrationReplies: FileJobDelegate {
     @Test func aCommitThatIsStoppedWhileItRunsRemovesNoOriginal() throws {
         let (from, to, registry) = slowTarget()
         let replies = IntegrationReplies()
-        let job = FileJob(kind: .move, sources: [from.url("/s/a.txt"), from.url("/s/b.txt")], target: TargetSpec(directory: to.url("/t")),
-                          fileSystems: registry)
+        let job = FileJob(
+            kind: .move, sources: [from.url("/s/a.txt"), from.url("/s/b.txt")],
+            target: TargetSpec(directory: to.url("/t")),
+            fileSystems: registry)
         job.delegate = replies
         var reportsOfTheCommit = 0
         replies.onProgress = { [weak job] progress in

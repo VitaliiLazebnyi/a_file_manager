@@ -1,18 +1,21 @@
 import AFMContracts
 import AFMKernel
 import Foundation
-@testable import PlacesPlugin
 import TestSupport
 import Testing
+
+@testable import PlacesPlugin
 
 /// The hotlist as a value: entries, submenus, moving, hiding and what an entry's command means.
 @Suite struct PlacesHotlistModel {
     func sample() -> Hotlist {
         Hotlist(entries: [
             .item("&Work", command: "cd /work"),
-            .submenu("Projects", [.item("App", command: "cd /src/app/:"), .submenu("Old", [.item("Legacy", command: "cd /old")])]),
+            .submenu(
+                "Projects",
+                [.item("App", command: "cd /src/app/:"), .submenu("Old", [.item("Legacy", command: "cd /old")])]),
             .separator,
-            .item("?Secret", command: "cd /secret"),
+            .item("?Secret", command: "cd /secret")
         ])
     }
 
@@ -66,7 +69,9 @@ import Testing
         var list = sample()
         // Down from the top: into the submenu, through it, into the inner one, and out again.
         var path = list.move(at: [0], by: 1)
-        #expect(path == [0, 0] && list.rows.map(\.entry.title) == ["Projects", "&Work", "App", "Old", "Legacy", "-", "?Secret"])
+        #expect(
+            path == [0, 0]
+                && list.rows.map(\.entry.title) == ["Projects", "&Work", "App", "Old", "Legacy", "-", "?Secret"])
         path = list.move(at: path, by: 1)
         #expect(path == [0, 1])
         path = list.move(at: path, by: 1)
@@ -97,7 +102,11 @@ import Testing
         list.toggleHideMark(at: [2])
         #expect(list.entries[2] == .separator)
         let menu = HotlistMenu(list) { _ in false }
-        #expect(menu.titles == ["    Work", HotlistMenu.separatorTitle, "    Secret", HotlistMenu.separatorTitle, "+ Add current dir", "* Configure…"])
+        #expect(
+            menu.titles == [
+                "    Work", HotlistMenu.separatorTitle, "    Secret", HotlistMenu.separatorTitle, "+ Add current dir",
+                "* Configure…"
+            ])
     }
 
     @Test func storedAsJSONAndReadBack() throws {
@@ -121,20 +130,29 @@ import Testing
     @Test func menuMarksTheCurrentDirectoryAndTheSubmenusHoldingIt() {
         let list = sample()
         let top = HotlistMenu(list, offersFavorites: true) { $0.command == "cd /old" }
-        #expect(top.titles == ["    Work", "✓ Projects  ▸", HotlistMenu.separatorTitle, "    ?Secret", HotlistMenu.separatorTitle,
-                               "    Favorites  ▸", "+ Add current dir", "* Configure…"])
+        #expect(
+            top.titles == [
+                "    Work", "✓ Projects  ▸", HotlistMenu.separatorTitle, "    ?Secret", HotlistMenu.separatorTitle,
+                "    Favorites  ▸", "+ Add current dir", "* Configure…"
+            ])
         #expect(top.selected == 1 && top.rows[1].action == .open([1]) && top.rows[5].action == .openFavorites)
         let inner = HotlistMenu(list, at: [1, 1], offersFavorites: true) { $0.command == "cd /old" }
         #expect(inner.titles == ["✓ Legacy", HotlistMenu.separatorTitle, "− Remove current dir", "* Configure…"])
         #expect(inner.rows[2].action == .removeCurrent([1, 1, 0]))
         #expect(HotlistMenu(Hotlist()) { _ in false }.titles == ["+ Add current dir", "* Configure…"])
-        let places = HotlistMenu(places: MacFavorites.entries(home: URL(fileURLWithPath: "/Users/x"))) { $0.command == "cd /Users/x/Desktop" }
+        let places = HotlistMenu(places: MacFavorites.entries(home: URL(fileURLWithPath: "/Users/x"))) {
+            $0.command == "cd /Users/x/Desktop"
+        }
         #expect(places.titles.prefix(3) == ["    Home", "    Applications", "✓ Desktop"] && places.selected == 2)
     }
 
     @Test func editorListIndentsSubmenus() {
-        #expect(sample().rows.map(HotlistEditorWindowController.title(of:))
-                == ["&Work", "▾ Projects", "      App", "      ▾ Old", "            Legacy", HotlistMenu.separatorTitle, "?Secret"])
+        #expect(
+            sample().rows.map(HotlistEditorWindowController.title(of:))
+                == [
+                    "&Work", "▾ Projects", "      App", "      ▾ Old", "            Legacy", HotlistMenu.separatorTitle,
+                    "?Secret"
+                ])
     }
 }
 
@@ -144,7 +162,9 @@ import Testing
 
     @Test func recordsEveryPlaceOnceTheLastVisitedLast() {
         var history = DirectoryHistory()
-        let (first, again) = (history.record(url("/a"), stayedInPrevious: false), history.record(url("/a/"), stayedInPrevious: true))
+        let (first, again) = (
+            history.record(url("/a"), stayedInPrevious: false), history.record(url("/a/"), stayedInPrevious: true)
+        )
         #expect(first && !again)
         history.record(url("/b"), stayedInPrevious: true)
         history.record(url("/c"), stayedInPrevious: false)
@@ -158,9 +178,9 @@ import Testing
     @Test func thinningHidesFoldersThatWereOnlyPassedThrough() {
         var history = DirectoryHistory()
         history.record(url("/a"), stayedInPrevious: false)
-        history.record(url("/a/b"), stayedInPrevious: true)      // stayed in /a
-        history.record(url("/a/b/c"), stayedInPrevious: false)   // passed through /a/b
-        history.record(url("/a/b/c/d"), stayedInPrevious: false) // passed through /a/b/c
+        history.record(url("/a/b"), stayedInPrevious: true)  // stayed in /a
+        history.record(url("/a/b/c"), stayedInPrevious: false)  // passed through /a/b
+        history.record(url("/a/b/c/d"), stayedInPrevious: false)  // passed through /a/b/c
         #expect(history.shown(thinning: true).map(\.path) == ["/a/b/c/d", "/a"])
         #expect(history.shown(thinning: false).count == 4)
         // A folder that once counted keeps counting when it is passed through later.
@@ -173,7 +193,9 @@ import Testing
 
     @Test func keepsNoMoreThanTheStoredLimit() {
         var history = DirectoryHistory()
-        for index in 0..<(DirectoryHistory.storedLimit + 20) { history.record(url("/d\(index)"), stayedInPrevious: true) }
+        for index in 0..<(DirectoryHistory.storedLimit + 20) {
+            history.record(url("/d\(index)"), stayedInPrevious: true)
+        }
         #expect(history.visits.count == DirectoryHistory.storedLimit)
         #expect(history.visits.first?.location == "file:///d20")
     }
@@ -191,7 +213,9 @@ import Testing
     }
 
     @Test func menuListsHistoryThenFrequentFolders() {
-        let menu = HistoryMenu(history: [url("/b"), url("/a")], frequent: [(url("/a"), 7)], current: url("/a")) { $0.path }
+        let menu = HistoryMenu(history: [url("/b"), url("/a")], frequent: [(url("/a"), 7)], current: url("/a")) {
+            $0.path
+        }
         #expect(menu.titles == ["    /b", "➤ /a", "──────  Frequently used  ──────", "    /a   (7)"])
         #expect(menu.rows == [.visit(url("/b")), .visit(url("/a")), .separator, .frequent(url("/a"))])
         #expect(menu.selected == 1 && menu.rows[2].directory == nil)
@@ -253,7 +277,8 @@ import Testing
         var arguments: [CommandArgument] = []
 
         func start(in kernel: Kernel) {
-            kernel.commands.register(Command("cm_Recorded", "Recorded"), parameterized: { [self] in arguments.append($0) })
+            kernel.commands.register(
+                Command("cm_Recorded", "Recorded"), parameterized: { [self] in arguments.append($0) })
         }
     }
 
@@ -271,7 +296,9 @@ import Testing
         memory.addDirectory("/C")
         let favorites = [HotlistEntry.item("Desktop", command: "cd mem:/C")]
         plugin = PlacesPlugin(keepsTreesOnDisk: false, favorites: favorites, now: { [clock] in clock.time })
-        bench = TestBench(plugins: [plugin, recorder], fileSystems: [memory], left: memory.url("/A"), right: memory.url("/B"), settings: settings)
+        bench = TestBench(
+            plugins: [plugin, recorder], fileSystems: [memory], left: memory.url("/A"), right: memory.url("/B"),
+            settings: settings)
     }
 
     func pick(_ row: Int, button: Int = 0) -> ScriptedInteraction.FormAnswer {
@@ -302,8 +329,14 @@ import Testing
         #expect(keys.command(for: Shortcut(.down, [.option, .shift])) == .directoryHistoryUnthinned)
         #expect(keys.command(for: .f(10, .option)) == .directoryTree)
         #expect(keys.conflicts.isEmpty)
-        #expect(bench.kernel.menus.menus.first { $0.title == "Commands" }?.items == [.directoryTree, .directoryHotlist, .directoryHistory])
-        #expect(bench.kernel.toolbar.defaultLayout.compactMap { $0?.command } == [.directoryHotlist, .directoryHistory, .directoryTree])
+        #expect(
+            bench.kernel.menus.menus.first { $0.title == "Commands" }?.items == [
+                .directoryTree, .directoryHotlist, .directoryHistory
+            ])
+        #expect(
+            bench.kernel.toolbar.defaultLayout.compactMap { $0?.command } == [
+                .directoryHotlist, .directoryHistory, .directoryTree
+            ])
         #expect(bench.kernel.preferences.pages.map(\.title) == ["Hotlist and History"])
         #expect(CommandID.directoryTree.rawValue == "cm_CDtree")
     }
@@ -317,7 +350,8 @@ import Testing
         // The entry of the current directory is marked, and the fixed item now removes it.
         ui.formAnswers = [pick(3)]
         commands.perform(.directoryHotlist)
-        #expect(lastRows == ["✓ A", HotlistMenu.separatorTitle, "    Favorites  ▸", "− Remove current dir", "* Configure…"])
+        #expect(
+            lastRows == ["✓ A", HotlistMenu.separatorTitle, "    Favorites  ▸", "− Remove current dir", "* Configure…"])
         #expect(hotlist.entries.isEmpty)
 
         commands.perform(.toggleHotlistEntry)
@@ -329,7 +363,11 @@ import Testing
     }
 
     @Test func choosingAnEntryChangesDirectoryAndTheTargetPanel() {
-        store(Hotlist(entries: [.item("Docs", command: "cd mem:/A/docs", target: "cd mem:/C"), .item("Focus", command: "cd mem:/A/docs/:")]))
+        store(
+            Hotlist(entries: [
+                .item("Docs", command: "cd mem:/A/docs", target: "cd mem:/C"),
+                .item("Focus", command: "cd mem:/A/docs/:")
+            ]))
         ui.formAnswers = [pick(0)]
         commands.perform(.directoryHotlist)
         #expect(left.model.directory == memory.url("/A/docs") && right.model.directory == memory.url("/C"))
@@ -350,8 +388,11 @@ import Testing
     }
 
     @Test func entriesRunCommands() {
-        store(Hotlist(entries: [.item("Run", command: "cm_Recorded 3"), .item("Plain", command: "cm_Recorded"),
-                                .item("Unknown", command: "cm_NoSuchCommand")]))
+        store(
+            Hotlist(entries: [
+                .item("Run", command: "cm_Recorded 3"), .item("Plain", command: "cm_Recorded"),
+                .item("Unknown", command: "cm_NoSuchCommand")
+            ]))
         var rejected = 0
         commands.onRejected = { rejected += 1 }
         for row in 0..<3 {
@@ -367,8 +408,11 @@ import Testing
         // Into the submenu, back out with Cancel, onto the separator (nothing), in again, add here.
         ui.formAnswers = [pick(0), .cancel, pick(1), pick(0), pick(2)]
         commands.perform(.directoryHotlist)
-        #expect(ui.log.filter { $0.hasPrefix("form:") } == ["form: Directory Hotlist", "form: Directory Hotlist › Sub", "form: Directory Hotlist",
-                                                            "form: Directory Hotlist", "form: Directory Hotlist › Sub"])
+        #expect(
+            ui.log.filter { $0.hasPrefix("form:") } == [
+                "form: Directory Hotlist", "form: Directory Hotlist › Sub", "form: Directory Hotlist",
+                "form: Directory Hotlist", "form: Directory Hotlist › Sub"
+            ])
         #expect(lastRows == ["    C", HotlistMenu.separatorTitle, "+ Add current dir", "* Configure…"])
         #expect(hotlist.children(of: [0]).map(\.title) == ["C", "A"])
 
@@ -394,7 +438,11 @@ import Testing
     }
 
     @Test func hiddenEntriesStayOutOfTheMenu() {
-        store(Hotlist(entries: [.item("?Secret", command: "cd mem:/C"), .item("B", command: "cd mem:/B")], hidesMarked: true))
+        store(
+            Hotlist(
+                entries: [.item("?Secret", command: "cd mem:/C"), .item("B", command: "cd mem:/B")], hidesMarked: true
+            )
+        )
         ui.formAnswers = [pick(0)]
         commands.perform(.directoryHotlist)
         #expect(lastRows.first == "    B" && left.model.directory == memory.url("/B"))
@@ -404,7 +452,9 @@ import Testing
         var shown: [Hotlist] = []
         plugin.editHotlist = { list in
             shown.append(list)
-            return Hotlist(entries: list.entries + [.item("Edited", command: "cd mem:/B")], hideCharacter: "!", hidesMarked: true)
+            return Hotlist(
+                entries: list.entries + [.item("Edited", command: "cd mem:/B")], hideCharacter: "!", hidesMarked: true
+            )
         }
         ui.formAnswers = [pick(2)]
         commands.perform(.directoryHotlist)
@@ -424,8 +474,12 @@ import Testing
         // /A/docs/deep was only passed through; the source panel's own history is shown.
         ui.formAnswers = [pick(1)]
         commands.perform(.directoryHistory)
-        #expect(lastRows == ["➤ mem:/C", "    mem:/A/docs", "──────  Frequently used  ──────", "    mem:/C   (2)", "    mem:/A/docs   (1)",
-                             "    mem:/A/docs/deep   (1)"])
+        #expect(
+            lastRows == [
+                "➤ mem:/C", "    mem:/A/docs", "──────  Frequently used  ──────", "    mem:/C   (2)",
+                "    mem:/A/docs   (1)",
+                "    mem:/A/docs/deep   (1)"
+            ])
         #expect(left.model.directory == memory.url("/A/docs"))
 
         ui.formAnswers = [.cancel]
@@ -488,6 +542,8 @@ import Testing
         plugin.flushHistory()
         #expect(settings.data(forKey: "places.history.left") == nil)
         commands.perform(.saveDirectoryHistory)
-        #expect(settings.scoped(to: "places").value(DirectoryHistory.self, forKey: "history.left")?.current == memory.url("/B"))
+        #expect(
+            settings.scoped(to: "places").value(DirectoryHistory.self, forKey: "history.left")?.current
+                == memory.url("/B"))
     }
 }

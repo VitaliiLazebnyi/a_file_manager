@@ -3,6 +3,7 @@ import AFMKernel
 import Foundation
 import TestSupport
 import Testing
+
 @testable import ViewOptionsPlugin
 
 /// Sorting and filtering of long lists (review 2, C063 and its kin): the work is done away
@@ -36,7 +37,9 @@ import Testing
     var model: PanelModel { bench.left.model }
 
     init() {
-        for number in 0..<ViewOptionsPlugin.backgroundSortThreshold { memory.addFile("/Big/f\(number).txt", String(repeating: "x", count: number % 7)) }
+        for number in 0..<ViewOptionsPlugin.backgroundSortThreshold {
+            memory.addFile("/Big/f\(number).txt", String(repeating: "x", count: number % 7))
+        }
         memory.addFile("/Big/tool", permissions: 0o755)
         memory.addDirectory("/B")
         bench = TestBench(plugins: [plugin], fileSystems: [memory], left: memory.url("/Big"), right: memory.url("/B"))
@@ -116,7 +119,9 @@ import Testing
         commands.perform(ViewOptionsPlugin.onlySelected)
         steps.runBackground()
         steps.runMain()
-        #expect(model.items.map(\.name).sorted() == ["f1.txt", "tool"] && commands.isChecked(ViewOptionsPlugin.onlySelected))
+        #expect(
+            model.items.map(\.name).sorted() == ["f1.txt", "tool"] && commands.isChecked(ViewOptionsPlugin.onlySelected)
+        )
         // The last custom filter is offered when one is stored, whatever it holds.
         #expect(!commands.isEnabled(ViewOptionsPlugin.lastCustomFilter))
         bench.kernel.settings.set("*.md", forKey: ViewOptionsPlugin.lastMaskKey)

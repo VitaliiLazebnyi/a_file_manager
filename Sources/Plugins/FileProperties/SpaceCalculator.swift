@@ -17,9 +17,11 @@ struct SpaceTotals: Equatable {
     var unreadable = 0
 
     static func + (left: SpaceTotals, right: SpaceTotals) -> SpaceTotals {
-        SpaceTotals(bytes: left.bytes.addingSaturated(right.bytes), allocated: left.allocated.addingSaturated(right.allocated),
-                    rounded: left.rounded.addingSaturated(right.rounded),
-                    files: left.files + right.files, folders: left.folders + right.folders, unreadable: left.unreadable + right.unreadable)
+        SpaceTotals(
+            bytes: left.bytes.addingSaturated(right.bytes), allocated: left.allocated.addingSaturated(right.allocated),
+            rounded: left.rounded.addingSaturated(right.rounded),
+            files: left.files + right.files, folders: left.folders + right.folders,
+            unreadable: left.unreadable + right.unreadable)
     }
 }
 
@@ -79,8 +81,11 @@ struct SpaceCalculator {
 
     private func measure(file item: FileItem) -> SpaceTotals {
         // Only the Mac's own file system says how much room a file really takes.
-        let allocated = measuresAllocated && item.url.isFileURL ? LocalInfo.details(item.url)?.allocated ?? item.size : item.size
-        return SpaceTotals(bytes: item.size, allocated: allocated, rounded: SpaceCalculator.round(item.size, to: targetCluster), files: 1)
+        let allocated =
+            measuresAllocated && item.url.isFileURL ? LocalInfo.details(item.url)?.allocated ?? item.size : item.size
+        return SpaceTotals(
+            bytes: item.size, allocated: allocated, rounded: SpaceCalculator.round(item.size, to: targetCluster),
+            files: 1)
     }
 
     static func round(_ size: Int64, to cluster: Int64?) -> Int64 {
@@ -94,7 +99,10 @@ struct SpaceCalculator {
         guard !cancellation.isCancelled else { return SpaceTotals() }
         // Listed with the flag: a folder on a server that has stopped answering ends when the
         // job is cancelled, and does not keep a thread of the pool.
-        guard let items = try? fileSystems.provider(for: directory).list(directory, showHidden: true, cancellation: cancellation) else {
+        guard
+            let items = try? fileSystems.provider(for: directory).list(
+                directory, showHidden: true, cancellation: cancellation)
+        else {
             return cancellation.isCancelled ? SpaceTotals() : SpaceTotals(unreadable: 1)
         }
         // A listing that ended because of the cancel is not the whole folder.
@@ -116,17 +124,23 @@ struct SpaceCalculator {
 
 /// The wording of the result box of Calculate Occupied Space.
 enum SpaceReport {
-    static func text(_ totals: SpaceTotals, sourceIsLocal: Bool, targetCluster: Int64?, volume: VolumeInfo?, cancelled: Bool) -> String {
+    static func text(
+        _ totals: SpaceTotals, sourceIsLocal: Bool, targetCluster: Int64?, volume: VolumeInfo?, cancelled: Bool
+    ) -> String {
         var lines = ["\(Format.bytes(totals.bytes)) bytes in \(Format.bytes(Int64(totals.files))) file(s)"]
         if totals.folders > 0 { lines[0] += ",\nin \(Format.bytes(Int64(totals.folders))) directories" }
-        if totals.bytes >= 1024 { lines.append("(= \(Format.kilobytes(totals.bytes)), \(Format.shortSize(totals.bytes)))") }
+        if totals.bytes >= 1024 {
+            lines.append("(= \(Format.kilobytes(totals.bytes)), \(Format.shortSize(totals.bytes)))")
+        }
         if sourceIsLocal || targetCluster != nil { lines.append("") }
         if sourceIsLocal { lines.append("Actual space used on source volume: \(Format.bytes(totals.allocated)) bytes") }
         if targetCluster != nil { lines.append("Required on target volume: \(Format.bytes(totals.rounded)) bytes") }
         if let volume, let free = volume.freeBytes, let total = volume.totalBytes {
             lines += ["", "\(volume.name): \(Format.kilobytes(free)) of \(Format.kilobytes(total)) free"]
         }
-        if totals.unreadable > 0 { lines += ["", "\(totals.unreadable) folder(s) could not be read and are not counted."] }
+        if totals.unreadable > 0 {
+            lines += ["", "\(totals.unreadable) folder(s) could not be read and are not counted."]
+        }
         if cancelled { lines += ["", "The calculation was stopped; the figures are incomplete."] }
         return lines.joined(separator: "\n")
     }

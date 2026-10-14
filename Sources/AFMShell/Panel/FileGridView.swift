@@ -48,8 +48,14 @@ struct GridGeometry: Equatable {
     func frame(of index: Int) -> CGRect {
         let (line, offset) = place(of: index)
         switch flow {
-        case .columns: return CGRect(x: CGFloat(line) * cell.width, y: CGFloat(offset) * cell.height, width: cell.width, height: cell.height)
-        case .rows: return CGRect(x: CGFloat(offset) * cell.width, y: CGFloat(line) * cell.height, width: cell.width, height: cell.height)
+        case .columns:
+            return CGRect(
+                x: CGFloat(line) * cell.width, y: CGFloat(offset) * cell.height, width: cell.width, height: cell.height
+            )
+        case .rows:
+            return CGRect(
+                x: CGFloat(offset) * cell.width, y: CGFloat(line) * cell.height, width: cell.width, height: cell.height
+            )
         }
     }
 
@@ -66,7 +72,9 @@ struct GridGeometry: Equatable {
     /// The cells that may touch a rectangle, for drawing: all cells of the lines it crosses.
     func indexes(in rect: CGRect) -> Range<Int> {
         guard count > 0 else { return 0..<0 }
-        let (start, end) = flow == .columns ? (rect.minX / cell.width, rect.maxX / cell.width) : (rect.minY / cell.height, rect.maxY / cell.height)
+        let (start, end) =
+            flow == .columns
+            ? (rect.minX / cell.width, rect.maxX / cell.width) : (rect.minY / cell.height, rect.maxY / cell.height)
         let first = min(max(Int(start.rounded(.down)), 0), lines)
         let last = min(max(Int(end.rounded(.up)), first), lines)
         return min(first * perLine, count)..<min(last * perLine, count)
@@ -94,7 +102,8 @@ struct GridGeometry: Equatable {
 
     /// The cells one Page Up or Page Down passes.
     var pageSize: Int {
-        let visibleLines = flow == .columns ? Int(viewport.width / max(cell.width, 1)) : Int(viewport.height / max(cell.height, 1))
+        let visibleLines =
+            flow == .columns ? Int(viewport.width / max(cell.width, 1)) : Int(viewport.height / max(cell.height, 1))
         return max(1, max(1, visibleLines) * perLine - (flow == .columns ? 1 : 0))
     }
 }
@@ -136,7 +145,9 @@ struct TypeSelect {
 
     /// The same for the entries of a panel, **for any thread**: a long list is looked through
     /// in the background. Gives up, with nil, once `cancellation` is set.
-    static func row(matching prefix: String, in items: [FileItem], from cursor: Int, cancellation: CancellationFlag? = nil) -> Int? {
+    static func row(
+        matching prefix: String, in items: [FileItem], from cursor: Int, cancellation: CancellationFlag? = nil
+    ) -> Int? {
         let count = items.count
         guard count > 0, !prefix.isEmpty else { return nil }
         let start = ((prefix.count > 1 ? cursor : cursor + 1) % count + count) % count
@@ -211,7 +222,8 @@ enum CursorBar {
 /// Main thread only.
 final class FileGridView: NSView, NSDraggingSource, NSUserInterfaceValidations {
     weak var panel: PanelViewController?
-    private(set) var geometry = GridGeometry(flow: .columns, count: 0, cell: CGSize(width: 100, height: 20), viewport: .zero)
+    private(set) var geometry = GridGeometry(
+        flow: .columns, count: 0, cell: CGSize(width: 100, height: 20), viewport: .zero)
     private var flow = GridGeometry.Flow.columns
     /// The width of the widest of the longest names, measured when the list was last taken from
     /// the model; nil until measured.
@@ -257,8 +269,10 @@ final class FileGridView: NSView, NSDraggingSource, NSUserInterfaceValidations {
             // the panel being resized asks for the layout on every step.
             let widest = widestName ?? FileGridView.widestBriefName(in: model.items)
             widestName = widest
-            cell = CGSize(width: FileGridView.briefColumnWidth(widest: widest, limit: panel?.settings.briefWidthLimit, viewport: viewport.width),
-                          height: FileGridView.briefRowHeight)
+            cell = CGSize(
+                width: FileGridView.briefColumnWidth(
+                    widest: widest, limit: panel?.settings.briefWidthLimit, viewport: viewport.width),
+                height: FileGridView.briefRowHeight)
         case .rows:
             cell = CGSize(width: tileSide + 20, height: tileSide + 40)
         }
@@ -307,8 +321,10 @@ final class FileGridView: NSView, NSDraggingSource, NSUserInterfaceValidations {
         guard let clip = superview as? NSClipView else { return }
         clip.postsFrameChangedNotifications = true
         clip.postsBoundsChangedNotifications = true
-        NotificationCenter.default.addObserver(self, selector: #selector(viewportResized), name: NSView.frameDidChangeNotification, object: clip)
-        NotificationCenter.default.addObserver(self, selector: #selector(scrolled), name: NSView.boundsDidChangeNotification, object: clip)
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(viewportResized), name: NSView.frameDidChangeNotification, object: clip)
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(scrolled), name: NSView.boundsDidChangeNotification, object: clip)
     }
 
     @objc private func viewportResized() {
@@ -362,7 +378,9 @@ final class FileGridView: NSView, NSDraggingSource, NSUserInterfaceValidations {
             if row == model.cursor, panel.isActive { CursorBar.draw(in: frame) }
             let item = model.item(atRow: row)
             // The name under the rename box is left out.
-            let color = row == panel.renamingRow ? NSColor.clear : panel.nameColor(for: item, selected: model.isSelected(row: row))
+            let color =
+                row == panel.renamingRow
+                ? NSColor.clear : panel.nameColor(for: item, selected: model.isSelected(row: row))
             switch flow {
             case .columns: drawBriefCell(item, in: frame, color: color, ownIcons: ownIcons)
             case .rows: drawTile(item, in: frame, color: color, ownIcons: ownIcons)
@@ -391,12 +409,17 @@ final class FileGridView: NSView, NSDraggingSource, NSUserInterfaceValidations {
 
     private func drawBriefCell(_ item: FileItem?, in frame: NSRect, color: NSColor, ownIcons: Bool) {
         let icon = item.map { FileListColumn.icon(for: $0, own: ownIcons) } ?? FileGridView.parentIcon
-        icon?.draw(in: NSRect(x: frame.minX + 3, y: frame.midY - 8, width: 16, height: 16), from: .zero, operation: .sourceOver,
-                   fraction: item?.isHidden == true ? 0.5 : 1, respectFlipped: true, hints: nil)
+        icon?.draw(
+            in: NSRect(x: frame.minX + 3, y: frame.midY - 8, width: 16, height: 16), from: .zero,
+            operation: .sourceOver,
+            fraction: item?.isHidden == true ? 0.5 : 1, respectFlipped: true, hints: nil)
         let text = FileGridView.caption(for: item) as NSString
-        text.draw(with: NSRect(x: frame.minX + 24, y: frame.minY + 2, width: frame.width - 30, height: frame.height - 4),
-                  options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine],
-                  attributes: [.font: FileGridView.nameFont, .foregroundColor: color, .paragraphStyle: FileGridView.briefStyle])
+        text.draw(
+            with: NSRect(x: frame.minX + 24, y: frame.minY + 2, width: frame.width - 30, height: frame.height - 4),
+            options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine],
+            attributes: [
+                .font: FileGridView.nameFont, .foregroundColor: color, .paragraphStyle: FileGridView.briefStyle
+            ])
     }
 
     /// A tile: the picture of the file, or its icon until the picture is there and where a
@@ -413,18 +436,26 @@ final class FileGridView: NSView, NSDraggingSource, NSUserInterfaceValidations {
         if let picture {
             let scale = min(side / max(picture.size.width, 1), side / max(picture.size.height, 1), 1)
             let size = NSSize(width: picture.size.width * scale, height: picture.size.height * scale)
-            picture.draw(in: NSRect(x: box.midX - size.width / 2, y: box.midY - size.height / 2, width: size.width, height: size.height),
-                         from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
+            picture.draw(
+                in: NSRect(
+                    x: box.midX - size.width / 2, y: box.midY - size.height / 2, width: size.width, height: size.height
+                ),
+                from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
         } else {
             let icon = item.map { FileListColumn.icon(for: $0, own: ownIcons) } ?? FileGridView.parentIcon
             let iconSide = min(side, max(32, side / 2))
-            icon?.draw(in: NSRect(x: box.midX - iconSide / 2, y: box.midY - iconSide / 2, width: iconSide, height: iconSide), from: .zero,
-                       operation: .sourceOver, fraction: item?.isHidden == true ? 0.5 : 1, respectFlipped: true, hints: nil)
+            icon?.draw(
+                in: NSRect(x: box.midX - iconSide / 2, y: box.midY - iconSide / 2, width: iconSide, height: iconSide),
+                from: .zero,
+                operation: .sourceOver, fraction: item?.isHidden == true ? 0.5 : 1, respectFlipped: true, hints: nil)
         }
         let text = FileGridView.caption(for: item) as NSString
-        text.draw(with: NSRect(x: frame.minX + 3, y: box.maxY + 4, width: frame.width - 6, height: 16),
-                  options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine],
-                  attributes: [.font: FileGridView.captionFont, .foregroundColor: color, .paragraphStyle: FileGridView.captionStyle])
+        text.draw(
+            with: NSRect(x: frame.minX + 3, y: box.maxY + 4, width: frame.width - 6, height: 16),
+            options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine],
+            attributes: [
+                .font: FileGridView.captionFont, .foregroundColor: color, .paragraphStyle: FileGridView.captionStyle
+            ])
     }
 
     // MARK: Keyboard
@@ -454,7 +485,8 @@ final class FileGridView: NSView, NSDraggingSource, NSUserInterfaceValidations {
     /// The characters of a key press that types something; nil for function and control keys.
     static func typedText(of event: NSEvent) -> String? {
         guard let characters = event.characters, let scalar = characters.unicodeScalars.first,
-              scalar.value >= 0x20, scalar.value != 0x7F, !(0xF700...0xF8FF).contains(scalar.value) else { return nil }
+            scalar.value >= 0x20, scalar.value != 0x7F, !(0xF700...0xF8FF).contains(scalar.value)
+        else { return nil }
         return characters
     }
 
@@ -498,7 +530,8 @@ final class FileGridView: NSView, NSDraggingSource, NSUserInterfaceValidations {
         // of very many items is one item on the pasteboard (`PanelDrop.beginDrag`).
         let frame = geometry.frame(of: pressed.row)
         let image = dragImage(ofRow: pressed.row)
-        let items = panel.draggingItems(forRow: pressed.row).enumerated().map { index, pasteboardItem -> NSDraggingItem in
+        let items = panel.draggingItems(forRow: pressed.row).enumerated().map {
+            index, pasteboardItem -> NSDraggingItem in
             let dragged = NSDraggingItem(pasteboardWriter: pasteboardItem)
             dragged.setDraggingFrame(frame, contents: index < FileGridView.imagedDragItems ? image : nil)
             return dragged
@@ -541,7 +574,9 @@ final class FileGridView: NSView, NSDraggingSource, NSUserInterfaceValidations {
 
     // MARK: Drag and drop
 
-    func draggingSession(_ session: NSDraggingSession, sourceOperationMaskFor context: NSDraggingContext) -> NSDragOperation {
+    func draggingSession(_ session: NSDraggingSession, sourceOperationMaskFor context: NSDraggingContext)
+        -> NSDragOperation
+    {
         [.copy, .move, .generic]
     }
 
@@ -595,7 +630,9 @@ final class SortHeaderView: NSView {
     override var intrinsicContentSize: NSSize { NSSize(width: NSView.noIntrinsicMetric, height: 22) }
 
     private func frame(of index: Int) -> NSRect {
-        NSRect(x: CGFloat(index) * SortHeaderView.buttonWidth, y: 0, width: SortHeaderView.buttonWidth, height: bounds.height)
+        NSRect(
+            x: CGFloat(index) * SortHeaderView.buttonWidth, y: 0, width: SortHeaderView.buttonWidth,
+            height: bounds.height)
     }
 
     override func draw(_ dirtyRect: NSRect) {
@@ -608,9 +645,12 @@ final class SortHeaderView: NSView {
             NSRect(x: frame.maxX - 1, y: 4, width: 1, height: frame.height - 8).fill()
             let isSortKey = column.sortKey == order.key
             let title = (isSortKey ? (order.descending ? "↓" : "↑") : "") + column.title
-            (title as NSString).draw(at: NSPoint(x: frame.minX + 8, y: 4), withAttributes: [
-                .font: NSFont.systemFont(ofSize: 11, weight: isSortKey ? .semibold : .regular), .foregroundColor: NSColor.headerTextColor,
-            ])
+            (title as NSString).draw(
+                at: NSPoint(x: frame.minX + 8, y: 4),
+                withAttributes: [
+                    .font: NSFont.systemFont(ofSize: 11, weight: isSortKey ? .semibold : .regular),
+                    .foregroundColor: NSColor.headerTextColor
+                ])
         }
     }
 

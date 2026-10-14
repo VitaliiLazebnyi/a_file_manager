@@ -1,8 +1,9 @@
 import AFMKernel
-@testable import ArchivesPlugin
 import Foundation
 import TestSupport
 import Testing
+
+@testable import ArchivesPlugin
 
 /// Review round 2, second pass: what the directory of a large archive costs in memory
 /// (A051, A076), and that the compact form of it behaves like the plain one.
@@ -34,7 +35,8 @@ import Testing
         private static nonisolated(unsafe) var table: UnsafeMutablePointer<UInt>?
         private static nonisolated(unsafe) var thread: pthread_t?
         private static nonisolated(unsafe) var (entries, overflowed, calls) = (0, false, 0)
-        private static let slot: UnsafeMutablePointer<Logger?>? = dlsym(UnsafeMutableRawPointer(bitPattern: -2), "malloc_logger")?
+        private static let slot: UnsafeMutablePointer<Logger?>? = dlsym(
+            UnsafeMutableRawPointer(bitPattern: -2), "malloc_logger")?
             .assumingMemoryBound(to: Logger?.self)
 
         private static let tombstone = UInt.max
@@ -45,7 +47,10 @@ import Testing
 
         private static func insert(_ pointer: UInt) {
             guard let table, pointer != 0 else { return }
-            guard entries < capacity / 2 else { return overflowed = true }
+            guard entries < capacity / 2 else {
+                overflowed = true
+                return
+            }
             var place = index(of: pointer)
             while table[place] != 0, table[place] != tombstone { place = (place + 1) & (capacity - 1) }
             entries += 1
@@ -119,8 +124,9 @@ import Testing
         let writer = ZipWriter(output)
         let modified = Date(timeIntervalSince1970: 1_700_000_000)
         for index in 0..<members {
-            var record = ZipRecord.new(name: "project-\(index / 40_000)/module-\(index / 400)/source-file-\(index).swift", isDirectory: false,
-                                       modified: modified, permissions: 0o644)
+            var record = ZipRecord.new(
+                name: "project-\(index / 40_000)/module-\(index / 400)/source-file-\(index).swift", isDirectory: false,
+                modified: modified, permissions: 0o644)
             var extra = record.extra
             extra.append(contentsOf: [0x75, 0x78, 11, 0, 1, 4, 0xF5, 1, 0, 0, 4, 0x14, 0, 0, 0])
             record.extra = extra
@@ -143,7 +149,9 @@ import Testing
         var folders = 0
         for _ in 0..<3 {
             let (bytes, archive) = try ThreadAllocations.measure {
-                try OpenArchive(archiveURL: url, localURL: url, fetchedCopy: nil, remoteStamp: nil, environment: bench.environment)
+                try OpenArchive(
+                    archiveURL: url, localURL: url, fetchedCopy: nil, remoteStamp: nil, environment: bench.environment
+                )
             }
             folders = archive.entries.count - members
             #expect(archive.entry("project-1/module-149/source-file-59999.swift")?.size == 0)
@@ -156,8 +164,9 @@ import Testing
             #expect(folders == 2 + 150)
             return
         }
-        print("A051/A076: \(best) bytes per member (\(members) members, \(folders) folders); an entry is \(MemoryLayout<ArchiveEntry?>.stride) bytes, "
-            + "of which the ZIP record \(MemoryLayout<ZipRecord>.size)")
+        print(
+            "A051/A076: \(best) bytes per member (\(members) members, \(folders) folders); an entry is \(MemoryLayout<ArchiveEntry?>.stride) bytes, "
+                + "of which the ZIP record \(MemoryLayout<ZipRecord>.size)")
         #expect(folders == 2 + 150)
         // Measured alone before this round's fix: 975. A reading far below what the entries
         // themselves take would mean nothing was counted.

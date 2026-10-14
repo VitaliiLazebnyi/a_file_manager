@@ -16,7 +16,9 @@ public final class KeychainPasswords: PasswordStore {
     /// The four calls of the Security framework this class makes; tests put a recording
     /// stand-in in their place, so the order of the calls is tested without a Keychain.
     struct Calls {
-        var copy: (_ query: CFDictionary, _ result: UnsafeMutablePointer<CFTypeRef?>?) -> OSStatus = { SecItemCopyMatching($0, $1) }
+        var copy: (_ query: CFDictionary, _ result: UnsafeMutablePointer<CFTypeRef?>?) -> OSStatus = {
+            SecItemCopyMatching($0, $1)
+        }
         var update: (_ query: CFDictionary, _ changes: CFDictionary) -> OSStatus = { SecItemUpdate($0, $1) }
         var add: (_ item: CFDictionary) -> OSStatus = { SecItemAdd($0, nil) }
         var delete: (_ query: CFDictionary) -> OSStatus = { SecItemDelete($0) }
@@ -43,7 +45,9 @@ public final class KeychainPasswords: PasswordStore {
         query[kSecReturnData] = true
         query[kSecMatchLimit] = kSecMatchLimitOne
         var result: CFTypeRef?
-        guard calls.copy(query as CFDictionary, &result) == errSecSuccess, let data = result as? Data else { return nil }
+        guard calls.copy(query as CFDictionary, &result) == errSecSuccess, let data = result as? Data else {
+            return nil
+        }
         return String(data: data, encoding: .utf8)
     }
 
@@ -122,7 +126,8 @@ public final class PasswordVault {
     }
 
     private func account(of id: UUID) -> String? {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         return accounts[id]
     }
 
@@ -176,7 +181,9 @@ public final class PasswordVault {
     }
 
     private static func decode(_ text: String?) -> [String: [String]] {
-        guard let text, let all = try? JSONDecoder().decode([String: [String]].self, from: Data(text.utf8)) else { return [:] }
+        guard let text, let all = try? JSONDecoder().decode([String: [String]].self, from: Data(text.utf8)) else {
+            return [:]
+        }
         return all
     }
 
@@ -194,17 +201,20 @@ public final class MemoryPasswords: PasswordStore {
     public init() {}
 
     public func password(for account: String) -> String? {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         return passwords[account]
     }
 
     public func setPassword(_ password: String?, for account: String) {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         passwords[account] = password
     }
 
     public var accounts: [String] {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         return passwords.keys.sorted()
     }
 }
@@ -250,7 +260,9 @@ public struct SavedConnection: Codable, Equatable {
         }
 
         public init(scheme: String, tls: TLSMode) {
-            self = scheme == "sftp" ? .sftp : tls == .implicit ? .ftpImplicitTLS : tls == .explicit ? .ftpExplicitTLS : .ftp
+            self =
+                scheme == "sftp"
+                ? .sftp : tls == .implicit ? .ftpImplicitTLS : tls == .explicit ? .ftpExplicitTLS : .ftp
         }
     }
 
@@ -286,7 +298,8 @@ public struct SavedConnection: Codable, Equatable {
     public init() {}
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, kind, host, port, user, anonymous, remoteDirectory, localDirectory, passive, encoding, listing, initCommands
+        case id, name, kind, host, port, user, anonymous, remoteDirectory, localDirectory, passive, encoding, listing,
+            initCommands
     }
 
     /// Reads a connection from the settings, which a damaged or foreign file may have filled
@@ -301,7 +314,9 @@ public struct SavedConnection: Codable, Equatable {
         name = read(.name, "")
         kind = read(.kind, Kind.ftp)
         host = read(.host, "")
-        port = (try? values.decodeIfPresent(Int.self, forKey: .port)).flatMap { ServerKey.validPorts.contains($0) ? $0 : nil }
+        port = (try? values.decodeIfPresent(Int.self, forKey: .port)).flatMap {
+            ServerKey.validPorts.contains($0) ? $0 : nil
+        }
         user = read(.user, "")
         anonymous = read(.anonymous, false)
         remoteDirectory = read(.remoteDirectory, "")
@@ -324,11 +339,13 @@ public struct SavedConnection: Codable, Equatable {
     public var listTitle: String { "\(name)  —  \(key.description)" }
 
     public var profile: ConnectionProfile {
-        ConnectionProfile(key: key, name: name.isEmpty ? nil : name, savedID: id, tls: kind.tls, user: anonymous || user.isEmpty ? nil : user,
-                          anonymous: anonymous, passive: passive, encoding: encoding,
-                          remoteDirectory: remoteDirectory.isEmpty ? nil : RemotePath.normalized(remoteDirectory),
-                          initCommands: FTPServerConfig.initCommands(from: initCommands),
-                          usesMLSD: listing == .automatic ? nil : listing == .mlsd)
+        ConnectionProfile(
+            key: key, name: name.isEmpty ? nil : name, savedID: id, tls: kind.tls,
+            user: anonymous || user.isEmpty ? nil : user,
+            anonymous: anonymous, passive: passive, encoding: encoding,
+            remoteDirectory: remoteDirectory.isEmpty ? nil : RemotePath.normalized(remoteDirectory),
+            initCommands: FTPServerConfig.initCommands(from: initCommands),
+            usesMLSD: listing == .automatic ? nil : listing == .mlsd)
     }
 
     /// Fills host, port, protocol and user from what was typed into the host field, which may
@@ -382,7 +399,11 @@ public final class ConnectionStore {
     /// Adds the connection, or replaces the one with the same id.
     public func save(_ connection: SavedConnection) {
         var all = connections
-        if let index = all.firstIndex(where: { $0.id == connection.id }) { all[index] = connection } else { all.append(connection) }
+        if let index = all.firstIndex(where: { $0.id == connection.id }) {
+            all[index] = connection
+        } else {
+            all.append(connection)
+        }
         connections = all
     }
 
@@ -409,7 +430,9 @@ public final class ConnectionStore {
 
     public func remember(address: ServerAddress) {
         let text = address.textWithoutPassword
-        settings.set(Array(([text] + history.filter { $0 != text }).prefix(ConnectionStore.historyLimit)), forKey: ConnectionStore.historyKey)
+        settings.set(
+            Array(([text] + history.filter { $0 != text }).prefix(ConnectionStore.historyLimit)),
+            forKey: ConnectionStore.historyKey)
     }
 
     /// What an earlier version kept in the settings: certificates to always trust, by host.

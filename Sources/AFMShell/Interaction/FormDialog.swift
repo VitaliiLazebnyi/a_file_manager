@@ -43,7 +43,9 @@ final class FormDialog: NSObject, NSTextViewDelegate {
     }
 
     /// Builds the dialog without showing it.
-    func makeAlert(title: String, detail: String, buttons: [String], maximumHeight: CGFloat = FormDialog.maximumHeight) -> NSAlert {
+    func makeAlert(title: String, detail: String, buttons: [String], maximumHeight: CGFloat = FormDialog.maximumHeight)
+        -> NSAlert
+    {
         let alert = NSAlert()
         // Titles and texts may name files and servers; see `AlertInteraction`.
         alert.messageText = DisplayText.clean(title, keepingLines: true)
@@ -72,7 +74,9 @@ final class FormDialog: NSObject, NSTextViewDelegate {
         grid.rowSpacing = 8
         grid.columnSpacing = 8
         for (index, row) in rows.enumerated() where row.count == 1 {
-            grid.mergeCells(inHorizontalRange: NSRange(location: 0, length: grid.numberOfColumns), verticalRange: NSRange(location: index, length: 1))
+            grid.mergeCells(
+                inHorizontalRange: NSRange(location: 0, length: grid.numberOfColumns),
+                verticalRange: NSRange(location: index, length: 1))
         }
         if grid.numberOfColumns > 1 { grid.column(at: 0).xPlacement = .trailing }
         grid.rowAlignment = .firstBaseline
@@ -283,7 +287,9 @@ final class FormList: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
     func filter(_ text: String) {
         let chosen = selectedRow
         let text = text.trimmingCharacters(in: .whitespaces)
-        shown = rows.indices.filter { text.isEmpty || rows[$0].range(of: text, options: [.caseInsensitive, .diacriticInsensitive]) != nil }
+        shown = rows.indices.filter {
+            text.isEmpty || rows[$0].range(of: text, options: [.caseInsensitive, .diacriticInsensitive]) != nil
+        }
         table.reloadData()
         table.deselectAll(nil)
         select(shown.contains(chosen) ? chosen : shown.first ?? -1)
@@ -322,7 +328,9 @@ final class FormList: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
 
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
         let identifier = NSUserInterfaceItemIdentifier("cell")
-        let label = tableView.makeView(withIdentifier: identifier, owner: nil) as? NSTextField ?? NSTextField(labelWithString: "")
+        let label =
+            tableView.makeView(withIdentifier: identifier, owner: nil) as? NSTextField
+            ?? NSTextField(labelWithString: "")
         label.identifier = identifier
         label.lineBreakMode = .byTruncatingMiddle
         let text = shown.indices.contains(row) ? rows[shown[row]] : ""

@@ -1,7 +1,8 @@
-@testable import AFMKernel
 import Foundation
 import TestSupport
 import Testing
+
+@testable import AFMKernel
 
 private let folder = URL(fileURLWithPath: "/review2/second")
 
@@ -14,7 +15,8 @@ private func dir(_ name: String) -> FileItem {
 }
 
 private func listing(_ items: [FileItem]) -> Listing {
-    Listing(directory: folder, items: items, parent: folder.deletingLastPathComponent(), root: URL(fileURLWithPath: "/"))
+    Listing(
+        directory: folder, items: items, parent: folder.deletingLastPathComponent(), root: URL(fileURLWithPath: "/"))
 }
 
 private func panel(_ items: [FileItem], sort: ListOrder = ListOrder()) -> PanelModel {
@@ -46,14 +48,17 @@ private final class RootedFileSystem: FileSystemProvider {
     init(knowsItsTop: Bool) { self.knowsItsTop = knowsItsTop }
 
     var parentQuestions: Int {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         return climbs
     }
 
     func list(_ directory: URL, showHidden: Bool) throws -> [FileItem] { [] }
     func item(at url: URL) -> FileItem? { nil }
     func parent(of directory: URL) -> URL? {
-        lock.lock(); climbs += 1; lock.unlock()
+        lock.lock()
+        climbs += 1
+        lock.unlock()
         return directory.path == "/" ? nil : directory.deletingLastPathComponent()
     }
     func read(_ url: URL) throws -> FileReader { throw FileSystemError.notSupported("Reading") }
@@ -137,7 +142,9 @@ private final class RootedFileSystem: FileSystemProvider {
             plain.setSelected(true, names: ["dir30", "file1.txt"])
             model.moveCursor(to: 7)
             plain.moveCursor(to: 7)
-            let sizes: [(name: String, size: Int64)] = [("dir0", 1000), ("dir30", 500), ("dir3", 70), ("nobody", 9)]
+            let sizes: [(name: String, size: Int64)] = [
+                ("dir0", 1000), ("dir30", 500), ("dir3", 70), ("nobody", 9)
+            ]
             // The basis holds the list as well: the copy is made where `prepare` runs.
             let basis = model.basis
             let (version, shown) = (model.listVersion, model.shownVersion)
@@ -148,7 +155,9 @@ private final class RootedFileSystem: FileSystemProvider {
             plain.setComputedSizes(sizes)
             // Exactly what the direct call gives: sizes in both lists, totals, marks, cursor.
             #expect(model.items == plain.items && model.listedItems == plain.listedItems)
-            #expect(model.totals == plain.totals && model.selectedNames == plain.selectedNames && model.cursor == plain.cursor)
+            #expect(
+                model.totals == plain.totals && model.selectedNames == plain.selectedNames
+                    && model.cursor == plain.cursor)
             #expect(model.listedItems.first { $0.name == "dir3" }?.computedSize == 70)
             // The list is not another list for it.
             #expect(model.listVersion == version && model.shownVersion == shown && announced.count == 1)
@@ -166,11 +175,15 @@ private final class RootedFileSystem: FileSystemProvider {
         var prepared = PanelModel.prepare(model.basis, computedSizes: [(name: "dir1", size: 10)])
         model.setComputedSize(5, forName: "dir2")
         #expect(model.apply(prepared) == .stale)
-        #expect(model.listedItems.first { $0.name == "dir2" }?.computedSize == 5 && model.listedItems.first { $0.name == "dir1" }?.computedSize == nil)
+        #expect(
+            model.listedItems.first { $0.name == "dir2" }?.computedSize == 5
+                && model.listedItems.first { $0.name == "dir1" }?.computedSize == nil)
         // Prepared again from the model as it is now, both are there.
         prepared = PanelModel.prepare(model.basis, computedSizes: [(name: "dir1", size: 10)])
         #expect(model.apply(prepared) == .changed)
-        #expect(model.listedItems.first { $0.name == "dir2" }?.computedSize == 5 && model.listedItems.first { $0.name == "dir1" }?.computedSize == 10)
+        #expect(
+            model.listedItems.first { $0.name == "dir2" }?.computedSize == 5
+                && model.listedItems.first { $0.name == "dir1" }?.computedSize == 10)
         // The list changed meanwhile.
         prepared = PanelModel.prepare(model.basis, computedSizes: [(name: "dir3", size: 1)])
         model.setSort(ListOrder(key: .name, descending: true))
@@ -183,14 +196,18 @@ private final class RootedFileSystem: FileSystemProvider {
         let sorted = PanelModel.prepare(basis, sort: ListOrder(key: .name))
         #expect(model.apply(PanelModel.prepare(model.basis, computedSizes: [(name: "dir7", size: 77)])) == .changed)
         #expect(model.apply(sorted) == .changed)
-        #expect(model.listedItems.first { $0.name == "dir7" }?.computedSize == 77 && model.listedItems.first { $0.name == "dir1" }?.computedSize == 10)
+        #expect(
+            model.listedItems.first { $0.name == "dir7" }?.computedSize == 77
+                && model.listedItems.first { $0.name == "dir1" }?.computedSize == 10)
     }
 
     @Test func aNameWrittenInAnotherFormFindsItsFolderWhenSizesArePrepared() {
         // `é` as one character in the list, as `e` and an accent in the question.
         let model = panel([dir("caf\u{E9}"), dir("plain")])
         let prepared = PanelModel.prepare(model.basis, computedSizes: [(name: "cafe\u{301}", size: 42)])
-        #expect(model.apply(prepared) == .changed && model.listedItems.first { $0.name.hasPrefix("caf") }?.computedSize == 42)
+        #expect(
+            model.apply(prepared) == .changed
+                && model.listedItems.first { $0.name.hasPrefix("caf") }?.computedSize == 42)
     }
 
     // MARK: S011 — is a file among the operands?
@@ -242,9 +259,14 @@ private final class RootedFileSystem: FileSystemProvider {
         model.saveSelection()
         // Another folder with most of the names, some gone, some new, in another order.
         let other = URL(fileURLWithPath: "/review2/elsewhere")
-        let there = (0..<count).reversed().compactMap { index -> FileItem? in
-            index % 11 == 0 ? nil : FileItem(url: other.appendingPathComponent("f\(index).dat"), name: "f\(index).dat", isDirectory: false, size: 3)
-        } + [FileItem(url: other.appendingPathComponent("new.dat"), name: "new.dat", isDirectory: false)]
+        let there =
+            (0..<count).reversed().compactMap { index -> FileItem? in
+                index % 11 == 0
+                    ? nil
+                    : FileItem(
+                        url: other.appendingPathComponent("f\(index).dat"), name: "f\(index).dat", isDirectory: false,
+                        size: 3)
+            } + [FileItem(url: other.appendingPathComponent("new.dat"), name: "new.dat", isDirectory: false)]
         model.show(Listing(directory: other, items: there, parent: folder, root: URL(fileURLWithPath: "/")))
         #expect(!model.hasSelection)
         model.restoreSelection()
@@ -266,7 +288,9 @@ private final class RootedFileSystem: FileSystemProvider {
             fileSystems.register(provider)
             let location = URL(string: "rooted://" + deep)!
             let result = try PanelLoader.load(location, showHidden: false, fileSystems: fileSystems)
-            #expect(result.listing.root.path == "/" && result.listing.parent?.path == (deep as NSString).deletingLastPathComponent)
+            #expect(
+                result.listing.root.path == "/"
+                    && result.listing.parent?.path == (deep as NSString).deletingLastPathComponent)
             // One question for the directory above; the top is asked of the file system.
             if knows { #expect(provider.parentQuestions == 1) } else { #expect(provider.parentQuestions >= 400) }
         }
@@ -310,7 +334,12 @@ private final class RootedFileSystem: FileSystemProvider {
         let set = CancellationFlag()
         set.cancel()
         var asked = 0
-        #expect(throws: CocoaError.self) { try provider.copy(from, to: to, cancellation: set) { _ in asked += 1; return true } }
+        #expect(throws: CocoaError.self) {
+            try provider.copy(from, to: to, cancellation: set) { _ in
+                asked += 1
+                return true
+            }
+        }
         #expect(asked == 0 && !memory.exists("/b.bin"))
         // Set while it runs, by somebody other than `progress`: the copy stops at the next block.
         let flag = CancellationFlag()
@@ -334,14 +363,17 @@ private final class RootedFileSystem: FileSystemProvider {
         try provider.createDirectory(at: memory.url("/new/inner"), exclusive: true, cancellation: CancellationFlag())
         #expect(memory.exists("/new/inner"))
         #expect(throws: FileSystemError.self) {
-            try provider.createDirectory(at: memory.url("/new/inner"), exclusive: true, cancellation: CancellationFlag())
+            try provider.createDirectory(
+                at: memory.url("/new/inner"), exclusive: true, cancellation: CancellationFlag())
         }
         // Not exclusive: as before, with the flag passed on.
         try provider.createDirectory(at: memory.url("/new/inner"), exclusive: false, cancellation: CancellationFlag())
         #expect(memory.flaggedChanges == ["createDirectory /new/inner"])
         let set = CancellationFlag()
         set.cancel()
-        #expect(throws: CocoaError.self) { try provider.createDirectory(at: memory.url("/other"), exclusive: true, cancellation: set) }
+        #expect(throws: CocoaError.self) {
+            try provider.createDirectory(at: memory.url("/other"), exclusive: true, cancellation: set)
+        }
         #expect(!memory.exists("/other"))
     }
 
@@ -357,7 +389,8 @@ private final class RootedFileSystem: FileSystemProvider {
         // Asking costs nothing and shows nothing.
         model.requestSort(bySize)
         #expect(model.requestedSort == bySize && model.wantedSort == bySize && model.sort == byName)
-        #expect(announced == 0 && model.listVersion == version && model.items.map(\.name) == ["a.txt", "m.txt", "z.txt"])
+        #expect(
+            announced == 0 && model.listVersion == version && model.items.map(\.name) == ["a.txt", "m.txt", "z.txt"])
         // A sort for the wanted order is made in the background; meanwhile the directory
         // changes, so the sort is stale…
         let sorted = elsewhere { [basis = model.basis] in PanelModel.prepare(basis, sort: bySize) }
@@ -371,17 +404,25 @@ private final class RootedFileSystem: FileSystemProvider {
         // The same through the calls that do everything at once, and for a list in pieces.
         model.requestSort(byName)
         model.update(with: listing(fresh + [file("b.txt")]))
-        #expect(model.sort == byName && model.requestedSort == nil && model.items.map(\.name) == ["a.txt", "b.txt", "k.txt", "m.txt", "z.txt"])
+        #expect(
+            model.sort == byName && model.requestedSort == nil
+                && model.items.map(\.name) == ["a.txt", "b.txt", "k.txt", "m.txt", "z.txt"])
         model.requestSort(bySize)
         model.extend(to: Sorter.sort(fresh, by: byName), sortedBy: byName)
-        #expect(model.sort == bySize && model.requestedSort == nil && model.items.map(\.name) == Sorter.sort(fresh, by: bySize).map(\.name))
+        #expect(
+            model.sort == bySize && model.requestedSort == nil
+                && model.items.map(\.name) == Sorter.sort(fresh, by: bySize).map(\.name))
         model.requestSort(byName)
-        let grown = elsewhere { [basis = model.basis] in PanelModel.prepare(basis, extendingTo: Sorter.sort(fresh, by: byName), sortedBy: byName) }
+        let grown = elsewhere { [basis = model.basis] in
+            PanelModel.prepare(basis, extendingTo: Sorter.sort(fresh, by: byName), sortedBy: byName)
+        }
         #expect(model.apply(grown) == .changed && model.sort == byName && model.requestedSort == nil)
         // Another folder shown while an order is wanted is shown in it.
         model.requestSort(bySize)
         model.show(listing(came))
-        #expect(model.sort == bySize && model.requestedSort == nil && model.items.map(\.name) == Sorter.sort(came, by: bySize).map(\.name))
+        #expect(
+            model.sort == bySize && model.requestedSort == nil
+                && model.items.map(\.name) == Sorter.sort(came, by: bySize).map(\.name))
     }
 
     @Test func aSortThatIsNoLongerTheOneAskedForIsRefused() {
@@ -411,7 +452,9 @@ private final class RootedFileSystem: FileSystemProvider {
         model.open(URL(fileURLWithPath: "/review2/other"), parent: folder, root: URL(fileURLWithPath: "/"))
         model.requestSort(byName)
         model.restore(snapshot)
-        #expect(model.sort == byName && model.requestedSort == nil && model.items.map(\.name) == Sorter.sort(came, by: byName).map(\.name))
+        #expect(
+            model.sort == byName && model.requestedSort == nil
+                && model.items.map(\.name) == Sorter.sort(came, by: byName).map(\.name))
     }
 
     // MARK: Rows by index
@@ -450,7 +493,9 @@ private final class RootedFileSystem: FileSystemProvider {
         }
         #expect(reports.count == 1 && reports[0] == (0, 0) && memory.commits == ["/"])
         // Stopped by its progress, or by its flag: not committed.
-        #expect(throws: CocoaError.self) { try provider.commit(memory.url("/"), cancellation: CancellationFlag()) { _, _ in false } }
+        #expect(throws: CocoaError.self) {
+            try provider.commit(memory.url("/"), cancellation: CancellationFlag()) { _, _ in false }
+        }
         let set = CancellationFlag()
         set.cancel()
         #expect(throws: CocoaError.self) { try provider.commit(memory.url("/"), cancellation: set) { _, _ in true } }
@@ -458,7 +503,9 @@ private final class RootedFileSystem: FileSystemProvider {
         // Deleting below a root is plain deleting where a file system knows no links.
         try provider.remove(memory.url("/a.txt"), below: memory.url("/"), cancellation: CancellationFlag())
         #expect(!memory.exists("/a.txt") && memory.flaggedChanges == ["remove below / /a.txt"])
-        #expect(FileSystemCapabilities([.write, .removeOnly]).contains(.removeOnly) && !memory.capabilities.contains(.removeOnly))
+        #expect(
+            FileSystemCapabilities([.write, .removeOnly]).contains(.removeOnly)
+                && !memory.capabilities.contains(.removeOnly))
     }
 
     // MARK: The fake file system the other areas test with
@@ -480,7 +527,8 @@ private final class RootedFileSystem: FileSystemProvider {
         #expect(memory.exists("/a.txt"))
         flag.cancel()
         ended.wait()
-        #expect((failure as? CocoaError)?.code == .userCancelled && memory.exists("/a.txt") && memory.stalledChanges == 0)
+        #expect(
+            (failure as? CocoaError)?.code == .userCancelled && memory.exists("/a.txt") && memory.stalledChanges == 0)
         // Let go, a held call goes on and does its work.
         let other = CancellationFlag()
         Thread.detachNewThread {
@@ -500,7 +548,10 @@ private final class RootedFileSystem: FileSystemProvider {
         memory.addFile("/alive/b.txt")
         memory.stallsListings = true
         memory.stalledPaths = ["/dead"]
-        #expect(try memory.list(memory.url("/alive"), showHidden: true, cancellation: CancellationFlag()).map(\.name) == ["b.txt"])
+        #expect(
+            try memory.list(memory.url("/alive"), showHidden: true, cancellation: CancellationFlag()).map(\.name) == [
+                "b.txt"
+            ])
         let flag = CancellationFlag()
         let ended = DispatchSemaphore(value: 0)
         var names: [String]?

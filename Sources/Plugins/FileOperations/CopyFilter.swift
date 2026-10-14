@@ -44,7 +44,11 @@ public struct CopyFilter: Equatable {
     public init(_ text: String = "") {
         let halves = text.split(separator: "|", maxSplits: 1, omittingEmptySubsequences: false).map(String.init)
         for token in CopyFilter.tokens(halves.first ?? "") {
-            if let folder = CopyFilter.folderPattern(token) { includedFolders.append(folder) } else { includedFiles.append(token.lowercased()) }
+            if let folder = CopyFilter.folderPattern(token) {
+                includedFolders.append(folder)
+            } else {
+                includedFiles.append(token.lowercased())
+            }
         }
         for token in CopyFilter.tokens(halves.count > 1 ? halves[1] : "") {
             if token == "/" {
@@ -61,7 +65,8 @@ public struct CopyFilter: Equatable {
 
     /// True when the filter lets everything through.
     public var isEmpty: Bool {
-        includedFolders.isEmpty && excludedFolders.isEmpty && excludedFiles.isEmpty && !excludesBaseFiles && !skipsEmptyFolders
+        includedFolders.isEmpty && excludedFolders.isEmpty && excludedFiles.isEmpty && !excludesBaseFiles
+            && !skipsEmptyFolders
             && includedFiles.allSatisfy { $0 == "*" || $0 == "*.*" }
     }
 
@@ -84,7 +89,8 @@ public struct CopyFilter: Equatable {
             return Position(depth: next, admitted: true, wholeSubtree: pattern.recursive)
         }
         // A folder that is not wanted itself may still hold wanted folders further down.
-        return includedFolders.contains { !$0.anchored } ? Position(depth: next, admitted: false, wholeSubtree: false) : nil
+        return includedFolders.contains { !$0.anchored }
+            ? Position(depth: next, admitted: false, wholeSubtree: false) : nil
     }
 
     public func admitsFile(_ name: String, at position: Position) -> Bool {

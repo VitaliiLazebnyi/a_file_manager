@@ -1,10 +1,11 @@
 import AFMContracts
 import AFMKernel
-@testable import AFMShell
 import AppKit
 import StandardPlugins
 import TestSupport
 import Testing
+
+@testable import AFMShell
 
 /// A plugin that has a say when the program quits: it can refuse, and it can take its time
 /// finishing, until it is told or until the user does not want to wait.
@@ -52,7 +53,9 @@ private final class ConsentPlugin: Plugin, ServerConsentService {
 
     func start(in kernel: Kernel) {
         kernel.services.register(ServerConsentService.self, self)
-        kernel.commands.register(Command(.runCommandLine, "Run Command Line"), parameterized: { [self] in ranLines.append($0.text ?? "?") })
+        kernel.commands.register(
+            Command(.runCommandLine, "Run Command Line"), parameterized: { [self] in ranLines.append($0.text ?? "?") }
+        )
     }
 
     func userChose(_ location: URL) { chosen.append(location) }
@@ -77,8 +80,12 @@ private final class ServerFileSystem: FileSystemProvider {
     func createDirectory(at url: URL) throws { try inner.createDirectory(at: url) }
     func write(_ url: URL) throws -> FileWriter { try inner.write(url) }
     func remove(_ url: URL) throws { try inner.remove(url) }
-    func move(_ source: URL, to destination: URL, replacing: Bool) throws { try inner.move(source, to: destination, replacing: replacing) }
-    func copy(_ source: URL, to destination: URL, progress: (Int64) -> Bool) throws { try inner.copy(source, to: destination, progress: progress) }
+    func move(_ source: URL, to destination: URL, replacing: Bool) throws {
+        try inner.move(source, to: destination, replacing: replacing)
+    }
+    func copy(_ source: URL, to destination: URL, progress: (Int64) -> Bool) throws {
+        try inner.copy(source, to: destination, progress: progress)
+    }
 }
 
 /// Counts on which threads a filter was asked.
@@ -92,8 +99,16 @@ private final class FilterProbe: @unchecked Sendable {
         lock.unlock()
     }
 
-    var counts: (onMain: Int, elsewhere: Int) { lock.lock(); defer { lock.unlock() }; return (onMain, elsewhere) }
-    func reset() { lock.lock(); (onMain, elsewhere) = (0, 0); lock.unlock() }
+    var counts: (onMain: Int, elsewhere: Int) {
+        lock.lock()
+        defer { lock.unlock() }
+        return (onMain, elsewhere)
+    }
+    func reset() {
+        lock.lock()
+        (onMain, elsewhere) = (0, 0)
+        lock.unlock()
+    }
 }
 
 /// The second pass of review round 2, through the real program: long lists change in the
@@ -119,10 +134,16 @@ extension Application {
     /// A folder of `count` files on a scripted file system, already listed in the left panel.
     private func startInALongFolder(_ script: ScriptedFileSystem, count: Int) async -> Running {
         script.inner.addDirectory("/long")
-        script.batches = [(0..<count).map { script.item(named: String(format: "f%06d.%@", $0, $0 % 2 == 0 ? "txt" : "dat"), in: "/long") }]
+        script.batches = [
+            (0..<count).map {
+                script.item(named: String(format: "f%06d.%@", $0, $0 % 2 == 0 ? "txt" : "dat"), in: "/long")
+            }
+        ]
         let app = await start(with: script)
         app.left.show(script.url("/long"))
-        await wait(upTo: 60) { app.left.model.directory.path == "/long" && app.left.model.isComplete && !app.left.isLoading }
+        await wait(upTo: 60) {
+            app.left.model.directory.path == "/long" && app.left.model.isComplete && !app.left.isLoading
+        }
         return app
     }
 
@@ -138,7 +159,9 @@ extension Application {
         #expect(model.totals.totalFiles == count)
         #expect(app.left.statusLineText.contains("\(count) file(s)"))
         // The list is in order, as the reader sorted it.
-        #expect(model.items.first?.name == "f000000.txt" && model.items.last?.name == String(format: "f%06d.dat", count - 1))
+        #expect(
+            model.items.first?.name == "f000000.txt"
+                && model.items.last?.name == String(format: "f%06d.dat", count - 1))
     }
 
     @Test func filteringAndReadingALongListAgainNeverAsksTheFilterOnTheMainThread() async {
@@ -195,7 +218,9 @@ extension Application {
         script.inner.addDirectory("/long")
         script.inner.addDirectory("/small")
         let count = PanelViewController.backgroundSortThreshold + 4_000
-        let all = (0..<count).map { script.item(named: String(format: "f%06d.%@", $0, $0 % 2 == 0 ? "txt" : "dat"), in: "/long") }
+        let all = (0..<count).map {
+            script.item(named: String(format: "f%06d.%@", $0, $0 % 2 == 0 ? "txt" : "dat"), in: "/long")
+        }
         // A first piece of two batches, then the rest only when the test lets it come.
         script.batches = [Array(all[..<600]), Array(all[600..<1_000]), Array(all[1_000...])]
         script.batchesAt = ["/small": [[script.item(named: "s.txt", in: "/small")]]]
@@ -207,10 +232,11 @@ extension Application {
         await settle(app)
         let model = app.left.model
         let probe = FilterProbe()
-        model.setFilter(PanelFilter(title: "*.txt") { item in
-            probe.note()
-            return item.name.hasSuffix(".txt")
-        })
+        model.setFilter(
+            PanelFilter(title: "*.txt") { item in
+                probe.note()
+                return item.name.hasSuffix(".txt")
+            })
         probe.reset()
         app.left.show(script.url("/long"))
         let first = await wait(upTo: 60) { model.directory.path == "/long" && model.items.count == 500 }
@@ -278,7 +304,11 @@ extension Application {
         let script = ScriptedFileSystem()
         let count = PanelDrop.itemsWrittenSingly + 1_500
         let app = await startInALongFolder(script, count: count)
-        defer { app.stop(); PanelDrop.endDrag(); PanelDrop.endSession() }
+        defer {
+            app.stop()
+            PanelDrop.endDrag()
+            PanelDrop.endSession()
+        }
         let model = app.left.model
         model.selectAll()
         model.toggleSelection(row: 2)
@@ -294,8 +324,12 @@ extension Application {
         let session = DropSession(sequence: 41, payload: payload!)
         let ready = await wait(upTo: 60) { payload?.isReady == true && session.isReady }
         #expect(ready && session.sources.count == count - 1)
-        #expect(session.sources.first?.lastPathComponent == "f000000.txt" && !session.sources.contains { $0.lastPathComponent == "f000001.dat" })
-        #expect(session.isPointless(.move, into: script.url("/long")) && !session.isPointless(.copy, into: script.url("/elsewhere")))
+        #expect(
+            session.sources.first?.lastPathComponent == "f000000.txt"
+                && !session.sources.contains { $0.lastPathComponent == "f000001.dat" })
+        #expect(
+            session.isPointless(.move, into: script.url("/long"))
+                && !session.isPointless(.copy, into: script.url("/elsewhere")))
 
         // A drop that comes before the background has got there is not turned away.
         PanelDrop.endDrag()
@@ -307,7 +341,9 @@ extension Application {
         model.clearSelection()
         model.setSelected(true, rows: 1...3)
         let few = app.left.dragPayload(fromRow: 2)
-        #expect(few?.isReady == true && few?.isWrittenLazily == false && few?.items.map(\.name) == ["f000000.txt", "f000001.dat", "f000002.txt"])
+        #expect(
+            few?.isReady == true && few?.isWrittenLazily == false
+                && few?.items.map(\.name) == ["f000000.txt", "f000001.dat", "f000002.txt"])
     }
 
     // MARK: Quitting (tools 1, archives 1, fileops 6, shell 6)
@@ -407,10 +443,12 @@ extension Application {
         let app = await start(plugins: [plugin])
         defer { app.stop() }
         let stopped = Shared(false)
-        app.kernel.jobs.run(title: "Long", work: { monitor in
-            while !monitor.cancellation.isCancelled { Thread.sleep(forTimeInterval: 0.005) }
-            stopped.value = true
-        }, completion: { _ in })
+        app.kernel.jobs.run(
+            title: "Long",
+            work: { monitor in
+                while !monitor.cancellation.isCancelled { Thread.sleep(forTimeInterval: 0.005) }
+                stopped.value = true
+            }, completion: { _ in })
         var order: [String] = []
         app.shell.finishToQuit(patience: 30, progressDelay: 5) { order.append("reply \($0)") }
         let prepared = await wait { plugin.pending != nil }
@@ -433,8 +471,12 @@ extension Application {
         settings.set(PanelTabs.State(tabs: [remote], active: 0), forKey: "right.tabs")
         let app = await start(plugins: [], fileSystems: [server])
         defer { app.stop() }
-        #expect(app.left.tabs.count == 2 && app.left.tabs.activeIndex == 1 && app.left.model.directory.lastPathComponent == "A")
-        #expect(app.right.tabs.count == 2 && app.right.tabs.activeIndex == 0 && app.right.model.directory.lastPathComponent == "home")
+        #expect(
+            app.left.tabs.count == 2 && app.left.tabs.activeIndex == 1
+                && app.left.model.directory.lastPathComponent == "A")
+        #expect(
+            app.right.tabs.count == 2 && app.right.tabs.activeIndex == 0
+                && app.right.model.directory.lastPathComponent == "home")
         #expect(app.names(app.right) == ["welcome.txt"])
         // Nobody asked the server anything, and the tabs kept their places.
         #expect(server.listings.isEmpty && app.right.tabs.tabs[1].directory.path == "/pub")
@@ -443,20 +485,28 @@ extension Application {
         app.commands.perform(.activateTab, .index(1))
         let read = await wait { app.right.model.isComplete && !app.right.isLoading }
         // (Once at least: a folder whose watch took long to set up is read once more.)
-        #expect(read && app.names(app.right) == ["a.txt"] && !server.listings.isEmpty && server.listings.allSatisfy { $0 == "/pub" })
+        #expect(
+            read && app.names(app.right) == ["a.txt"] && !server.listings.isEmpty
+                && server.listings.allSatisfy { $0 == "/pub" })
     }
 
     @Test func aLongListTakesCalculatedSizesFromTheBackground() async {
         let script = ScriptedFileSystem()
         script.inner.addDirectory("/long")
         let count = PanelViewController.backgroundSortThreshold + 100
-        script.batches = [[script.item(named: "sub", in: "/long", isDirectory: true)]
-            + (0..<count).map { script.item(named: String(format: "f%06d.txt", $0), in: "/long") }]
-        script.batchesAt = ["/long/sub": [[FileItem(url: script.url("/long/sub/in.bin"), name: "in.bin", isDirectory: false, size: 7)]]]
+        script.batches = [
+            [script.item(named: "sub", in: "/long", isDirectory: true)]
+                + (0..<count).map { script.item(named: String(format: "f%06d.txt", $0), in: "/long") }
+        ]
+        script.batchesAt = [
+            "/long/sub": [[FileItem(url: script.url("/long/sub/in.bin"), name: "in.bin", isDirectory: false, size: 7)]]
+        ]
         let app = await start(with: script)
         defer { app.stop() }
         app.left.show(script.url("/long"))
-        await wait(upTo: 60) { app.left.model.isComplete && !app.left.isLoading && app.left.model.directory.path == "/long" }
+        await wait(upTo: 60) {
+            app.left.model.isComplete && !app.left.isLoading && app.left.model.directory.path == "/long"
+        }
         let model = app.left.model
         app.cursor(app.left, on: "sub")
         #expect(model.cursorItem?.name == "sub" && model.items.count == count + 1)
@@ -529,39 +579,53 @@ extension Application {
         let ui = AlertInteraction()
         // An ordinary question: Return is the first button, Esc the last.
         #expect(AlertInteraction.defaultButton(for: .warning, of: ["Replace", "Skip", "Cancel"]) == 0)
-        let ordinary = ui.makeQuestion("Replace?", detail: "", buttons: ["Replace", "Skip", "Cancel"], style: .warning,
-                                       defaultButton: AlertInteraction.defaultButton(for: .warning, of: ["Replace", "Skip", "Cancel"]))
+        let ordinary = ui.makeQuestion(
+            "Replace?", detail: "", buttons: ["Replace", "Skip", "Cancel"], style: .warning,
+            defaultButton: AlertInteraction.defaultButton(for: .warning, of: ["Replace", "Skip", "Cancel"]))
         #expect(keys(ordinary) == ["\r", "", "\u{1b}"])
         // A critical one: Return is the last button, the one that changes nothing.
         #expect(AlertInteraction.defaultButton(for: .critical, of: ["Yes", "No"]) == 1)
-        let critical = ui.makeQuestion("Permanently delete?", detail: "", buttons: ["Yes", "No"], style: .critical,
-                                       defaultButton: AlertInteraction.defaultButton(for: .critical, of: ["Yes", "No"]))
+        let critical = ui.makeQuestion(
+            "Permanently delete?", detail: "", buttons: ["Yes", "No"], style: .critical,
+            defaultButton: AlertInteraction.defaultButton(for: .critical, of: ["Yes", "No"]))
         #expect(keys(critical) == ["", "\r"] && critical.alertStyle == .critical)
         // A critical message with one button is still answered with Return.
-        #expect(AlertInteraction.defaultButton(for: .critical, of: ["OK"]) == 0 && AlertInteraction.defaultButton(for: .critical, of: []) == nil)
+        #expect(
+            AlertInteraction.defaultButton(for: .critical, of: ["OK"]) == 0
+                && AlertInteraction.defaultButton(for: .critical, of: []) == nil)
     }
 
     @Test func theCallerSaysWhichButtonReturnPressesOrThatNoneDoes() {
         let ui = AlertInteraction()
-        let middle = ui.makeQuestion("Overwrite?", detail: "", buttons: ["Overwrite", "Skip", "Cancel"], style: .warning, defaultButton: 1)
+        let middle = ui.makeQuestion(
+            "Overwrite?", detail: "", buttons: ["Overwrite", "Skip", "Cancel"], style: .warning, defaultButton: 1)
         #expect(keys(middle) == ["", "\r", "\u{1b}"])
         // No default at all: Return presses nothing, Esc still the last, and the keyboard
         // starts on the button that changes nothing.
-        let none = ui.makeQuestion("Trust the new certificate?", detail: "", buttons: ["Trust", "Cancel"], style: .critical, defaultButton: nil)
+        let none = ui.makeQuestion(
+            "Trust the new certificate?", detail: "", buttons: ["Trust", "Cancel"], style: .critical,
+            defaultButton: nil)
         #expect(keys(none) == ["", "\u{1b}"] && none.window.initialFirstResponder === none.buttons.last)
         // A button titled like one the system gives a key of its own gets none here.
-        let titled = ui.makeQuestion("Close?", detail: "", buttons: ["Cancel", "Don't Save", "Save"], style: .warning, defaultButton: 2)
+        let titled = ui.makeQuestion(
+            "Close?", detail: "", buttons: ["Cancel", "Don't Save", "Save"], style: .warning, defaultButton: 2)
         #expect(keys(titled) == ["", "", "\r"] && titled.buttons.allSatisfy { $0.keyEquivalentModifierMask.isEmpty })
         // An index that is no button is no default.
-        #expect(keys(ui.makeQuestion("?", detail: "", buttons: ["A", "B"], style: .information, defaultButton: 7)) == ["", "\u{1b}"])
+        #expect(
+            keys(ui.makeQuestion("?", detail: "", buttons: ["A", "B"], style: .information, defaultButton: 7)) == [
+                "", "\u{1b}"
+            ])
         // Names in a question cannot write lines of their own, in the buttons either.
-        let named = ui.makeQuestion("Delete a\u{202E}txt.exe?", detail: "", buttons: ["Delete\u{0007}", "Keep"], style: .warning, defaultButton: 1)
+        let named = ui.makeQuestion(
+            "Delete a\u{202E}txt.exe?", detail: "", buttons: ["Delete\u{0007}", "Keep"], style: .warning,
+            defaultButton: 1)
         #expect(named.messageText == "Delete a\u{FFFD}txt.exe?" && named.buttons[0].title == "Delete\u{2407}")
     }
 
     // MARK: Large settings (find 6, kernel 5)
 
-    private func makeStore() throws -> (store: UserDefaultsSettings, defaults: UserDefaults, folder: URL, suite: String) {
+    private func makeStore() throws -> (store: UserDefaultsSettings, defaults: UserDefaults, folder: URL, suite: String)
+    {
         let suite = "afm-tests-" + UUID().uuidString
         let defaults = try #require(UserDefaults(suiteName: suite))
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(suite, isDirectory: true)
@@ -581,13 +645,15 @@ extension Application {
         #expect(store.waitForWrites(atMost: 60))
         let file = try #require(store.largeFile(forKey: "multiRename.undo"))
         #expect((try? Data(contentsOf: file)) == big && defaults.object(forKey: "multiRename.undo") == nil)
-        let mode = (try FileManager.default.attributesOfItem(atPath: file.path)[.posixPermissions] as? NSNumber)?.intValue
+        let mode = (try FileManager.default.attributesOfItem(atPath: file.path)[.posixPermissions] as? NSNumber)?
+            .intValue
         #expect(mode == 0o600)
         // Another store (the next start) finds it; small values are where they were.
         let next = UserDefaultsSettings(defaults: defaults, largeFolder: folder)
         #expect(next.largeData(forKey: "multiRename.undo") == big && next.data(forKey: "multiRename.undo") == nil)
         store.set(Data("small".utf8), forKey: "plain")
-        #expect(store.data(forKey: "plain") == Data("small".utf8) && store.largeData(forKey: "plain") == Data("small".utf8))
+        #expect(
+            store.data(forKey: "plain") == Data("small".utf8) && store.largeData(forKey: "plain") == Data("small".utf8))
         // Set many times in a row, the last value is the one in the file.
         for index in 0..<50 { store.setLarge(Data("v\(index)".utf8), forKey: "multiRename.undo") }
         #expect(store.waitForWrites(atMost: 60) && (try? Data(contentsOf: file)) == Data("v49".utf8))
@@ -607,7 +673,9 @@ extension Application {
         #expect(store.largeData(forKey: "history") == Data("old".utf8))
         store.setLarge(Data("new".utf8), forKey: "history")
         #expect(store.waitForWrites(atMost: 60) && defaults.object(forKey: "history") == nil)
-        #expect(UserDefaultsSettings(defaults: defaults, largeFolder: folder).largeData(forKey: "history") == Data("new".utf8))
+        #expect(
+            UserDefaultsSettings(defaults: defaults, largeFolder: folder).largeData(forKey: "history")
+                == Data("new".utf8))
     }
 
     @Test func noKeyNamesAFileOutsideTheFolder() throws {
@@ -616,7 +684,10 @@ extension Application {
             defaults.removePersistentDomain(forName: suite)
             try? FileManager.default.removeItem(at: folder)
         }
-        for key in ["../../escape", "/etc/passwd", "..", ".", "a/b", ".hidden", "with space", "é", String(repeating: "x", count: 1_000)] {
+        for key in [
+            "../../escape", "/etc/passwd", "..", ".", "a/b", ".hidden", "with space", "é",
+            String(repeating: "x", count: 1_000)
+        ] {
             let file = try #require(store.largeFile(forKey: key))
             #expect(file.deletingLastPathComponent().path == folder.path)
             let name = file.lastPathComponent
@@ -639,14 +710,17 @@ extension Application {
         history.add(" export TOKEN=secret")
         history.add("\tmysql -psecret")
         history.add("ls -l  ")
-        #expect(history.entries == ["ls -l"] && CommandLineHistory.isPrivate(" x") && !CommandLineHistory.isPrivate("x "))
+        #expect(
+            history.entries == ["ls -l"] && CommandLineHistory.isPrivate(" x") && !CommandLineHistory.isPrivate("x "))
         #expect(history.isRecording)
         settings.set(false, forKey: CommandLineHistory.recordKey)
         history.add("pwd")
         #expect(history.entries.isEmpty && settings.data(forKey: CommandLineHistory.settingsKey) == nil)
         // What an earlier session remembered goes as soon as the history is looked at.
         settings.set(["old line"], forKey: CommandLineHistory.settingsKey)
-        #expect(CommandLineHistory(settings: settings).entries.isEmpty && settings.data(forKey: CommandLineHistory.settingsKey) == nil)
+        #expect(
+            CommandLineHistory(settings: settings).entries.isEmpty
+                && settings.data(forKey: CommandLineHistory.settingsKey) == nil)
     }
 
     // MARK: Threads (kernel request 1)
@@ -673,11 +747,13 @@ extension Application {
     @Test func aColumnIsToldWhenThePanelHasLeftTheFolder() async {
         let flags = Shared<[CancellationFlag]>([])
         let gate = DispatchSemaphore(value: 0)
-        let column = ContentColumn(id: "slow", title: "Slow", cancellableValue: { item, flag in
-            flags.change { $0.append(flag) }
-            gate.wait()
-            return item.name
-        })
+        let column = ContentColumn(
+            id: "slow", title: "Slow",
+            cancellableValue: { item, flag in
+                flags.change { $0.append(flag) }
+                gate.wait()
+                return item.name
+            })
         let store = ColumnValueStore()
         store.reset(folder: URL(string: "cols://host/a")!)
         _ = store.text(of: column, for: FileItem(url: URL(string: "cols://host/a/x")!, name: "x", isDirectory: false))

@@ -6,6 +6,7 @@ import LocalFileSystemPlugin
 import TestSupport
 import Testing
 import UniformTypeIdentifiers
+
 @testable import ViewerPlugin
 
 /// A file system of a few made-up files, for what the memory file system cannot do: readers that
@@ -36,8 +37,10 @@ final class Review2HookProvider: FileSystemProvider {
     func copy(_ source: URL, to destination: URL, progress: (Int64) -> Bool) throws {}
 
     func item(at url: URL) -> FileItem? {
-        FileItem(url: url, name: url.lastPathComponent, isDirectory: false, size: sizes[url.path] ?? Int64(contents[url.path]?.count ?? 0),
-                 isSpecial: special.contains(url.path))
+        FileItem(
+            url: url, name: url.lastPathComponent, isDirectory: false,
+            size: sizes[url.path] ?? Int64(contents[url.path]?.count ?? 0),
+            isSpecial: special.contains(url.path))
     }
 
     private final class Reader: FileReader {
@@ -68,7 +71,9 @@ final class Review2HookProvider: FileSystemProvider {
     }
 
     func read(_ url: URL) throws -> FileReader {
-        Reader(self, data: endless.contains(url.path) ? nil : contents[url.path] ?? Data(count: Int(sizes[url.path] ?? 0)))
+        Reader(
+            self, data: endless.contains(url.path) ? nil : contents[url.path] ?? Data(count: Int(sizes[url.path] ?? 0))
+        )
     }
 }
 
@@ -76,7 +81,8 @@ final class Review2HookProvider: FileSystemProvider {
 /// calling thread, saving, the copies for the players, and the rules for links in a viewed file.
 @Suite struct Review2ViewerSource {
     private func folder() throws -> URL {
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("afm-r2viewer-\(UUID().uuidString)", isDirectory: true)
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "afm-r2viewer-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         return url
     }
@@ -112,7 +118,9 @@ final class Review2HookProvider: FileSystemProvider {
         let directory = try folder()
         defer { try? FileManager.default.removeItem(at: directory) }
         for path in ["/dev/zero", "/dev/null"] {
-            #expect(throws: ViewerError.self) { try ProviderByteSource.open(URL(fileURLWithPath: path), fileSystems: local()) }
+            #expect(throws: ViewerError.self) {
+                try ProviderByteSource.open(URL(fileURLWithPath: path), fileSystems: local())
+            }
         }
         let zero = directory.appendingPathComponent("zero-link")
         try FileManager.default.createSymbolicLink(at: zero, withDestinationURL: URL(fileURLWithPath: "/dev/zero"))
@@ -121,7 +129,9 @@ final class Review2HookProvider: FileSystemProvider {
         let fifo = directory.appendingPathComponent("pipe")
         #expect(mkfifo(fifo.path, 0o600) == 0)
         let outcome = ViewerAdoptBox<Bool>(false)
-        let worker = ViewerAdoptWorker { outcome.value = (try? ProviderByteSource.open(fifo, fileSystems: local())) == nil }
+        let worker = ViewerAdoptWorker {
+            outcome.value = (try? ProviderByteSource.open(fifo, fileSystems: local())) == nil
+        }
         worker.start()
         #expect(worker.waitUntilFinished(timeout: 20) && outcome.value)
     }
@@ -134,7 +144,9 @@ final class Review2HookProvider: FileSystemProvider {
         let flag = CancellationFlag()
         let outcome = ViewerAdoptBox<Result<ByteSource, Error>?>(nil)
         let worker = ViewerAdoptWorker {
-            outcome.value = Result { try ProviderByteSource.open(URL(string: "hook:///stream")!, fileSystems: registry, cancellation: flag) }
+            outcome.value = Result {
+                try ProviderByteSource.open(URL(string: "hook:///stream")!, fileSystems: registry, cancellation: flag)
+            }
         }
         worker.start()
         usleep(30_000)
@@ -149,7 +161,9 @@ final class Review2HookProvider: FileSystemProvider {
         provider.special = ["/stream"]
         let registry = FileSystemRegistry()
         registry.register(provider)
-        #expect(throws: ViewerError.self) { try ProviderByteSource.open(URL(string: "hook:///stream")!, fileSystems: registry) }
+        #expect(throws: ViewerError.self) {
+            try ProviderByteSource.open(URL(string: "hook:///stream")!, fileSystems: registry)
+        }
     }
 
     // MARK: Closing
@@ -189,7 +203,8 @@ final class Review2HookProvider: FileSystemProvider {
         ViewerCleanup.drain()
         #expect(provider.closeCount == 2)
         // Letting go of the source closes what it holds, off the thread that lets go.
-        var again: ProviderByteSource? = try #require(try ProviderByteSource.open(URL(string: "hook:///a")!, fileSystems: registry) as? ProviderByteSource)
+        var again: ProviderByteSource? = try #require(
+            try ProviderByteSource.open(URL(string: "hook:///a")!, fileSystems: registry) as? ProviderByteSource)
         _ = try again?.read(at: 0, count: 10)
         again = nil
         ViewerCleanup.drain()
@@ -236,8 +251,12 @@ final class Review2HookProvider: FileSystemProvider {
         try FileManager.default.createSymbolicLink(at: link, withDestinationURL: file)
         let hard = directory.appendingPathComponent("hard.txt")
         try FileManager.default.linkItem(at: file, to: hard)
-        #expect(ViewerSave.isSameFile(file, file) && ViewerSave.isSameFile(file, link) && ViewerSave.isSameFile(link, file) && ViewerSave.isSameFile(file, hard))
-        #expect(!ViewerSave.isSameFile(file, directory.appendingPathComponent("other.txt")) && !ViewerSave.isSameFile(nil, file))
+        #expect(
+            ViewerSave.isSameFile(file, file) && ViewerSave.isSameFile(file, link) && ViewerSave.isSameFile(link, file)
+                && ViewerSave.isSameFile(file, hard))
+        #expect(
+            !ViewerSave.isSameFile(file, directory.appendingPathComponent("other.txt"))
+                && !ViewerSave.isSameFile(nil, file))
         // A target that does not exist yet, spelled differently.
         #expect(ViewerSave.isSameFile(directory.appendingPathComponent("x/../a.txt"), file))
     }
@@ -265,13 +284,17 @@ final class Review2HookProvider: FileSystemProvider {
         defer { try? FileManager.default.removeItem(at: directory) }
         let target = directory.appendingPathComponent("copy.bin")
         try Data("old".utf8).write(to: target)
-        #expect(throws: ViewerError.fileChanged) { try ViewerSave.save(Short(), to: target, cancellation: CancellationFlag()) }
+        #expect(throws: ViewerError.fileChanged) {
+            try ViewerSave.save(Short(), to: target, cancellation: CancellationFlag())
+        }
         #expect(try Data(contentsOf: target) == Data("old".utf8))
         #expect(try FileManager.default.contentsOfDirectory(atPath: directory.path) == ["copy.bin"])
         // Cancelled: the same.
         let flag = CancellationFlag()
         flag.cancel()
-        #expect(throws: (any Error).self) { try ViewerSave.save(DataByteSource(Data(count: 100)), to: target, cancellation: flag) }
+        #expect(throws: (any Error).self) {
+            try ViewerSave.save(DataByteSource(Data(count: 100)), to: target, cancellation: flag)
+        }
         #expect(try Data(contentsOf: target) == Data("old".utf8))
         #expect(try FileManager.default.contentsOfDirectory(atPath: directory.path) == ["copy.bin"])
     }
@@ -279,9 +302,14 @@ final class Review2HookProvider: FileSystemProvider {
     // MARK: Temporary copies
 
     @Test func theNameOfACopyIsOneSafeComponent() {
-        for name in ["..", ".", "", "../../x", "a/b", "a\\b", "x:y", "..%2F..%2Fx", "\u{0}evil", String(repeating: "n", count: 400) + ".mov"] {
+        for name in [
+            "..", ".", "", "../../x", "a/b", "a\\b", "x:y", "..%2F..%2Fx", "\u{0}evil",
+            String(repeating: "n", count: 400) + ".mov"
+        ] {
             let safe = TemporaryCopies.safeName(name)
-            #expect(!safe.isEmpty && safe != "." && safe != ".." && !safe.contains("/") && !safe.contains(":") && !safe.contains("\u{0}"), "\(name.debugDescription) -> \(safe.debugDescription)")
+            #expect(
+                !safe.isEmpty && safe != "." && safe != ".." && !safe.contains("/") && !safe.contains(":")
+                    && !safe.contains("\u{0}"), "\(name.debugDescription) -> \(safe.debugDescription)")
             #expect(safe.utf8.count <= 255)
         }
         #expect(TemporaryCopies.safeName("../../x") == "_.._.._x")
@@ -314,8 +342,13 @@ final class Review2HookProvider: FileSystemProvider {
         registry.register(provider)
         let copies = TemporaryCopies()
         defer { copies.removeAll() }
-        let result = copies.localCopy(for: URL(string: "hook:///huge.mov")!, fileSystems: registry, cancellation: CancellationFlag())
-        if case .failure(let refusal) = result { #expect(refusal == .tooLarge(50 << 30) && refusal.message.contains("too large")) } else { Issue.record("copied") }
+        let result = copies.localCopy(
+            for: URL(string: "hook:///huge.mov")!, fileSystems: registry, cancellation: CancellationFlag())
+        if case .failure(let refusal) = result {
+            #expect(refusal == .tooLarge(50 << 30) && refusal.message.contains("too large"))
+        } else {
+            Issue.record("copied")
+        }
         #expect(provider.closeCount == 0)
     }
 
@@ -327,21 +360,28 @@ final class Review2HookProvider: FileSystemProvider {
         let copies = TemporaryCopies()
         defer { copies.removeAll() }
         let owner = ObjectIdentifier(copies)
-        let first = try #require(copies.localURL(for: url, fileSystems: registry, owner: owner, cancellation: CancellationFlag()))
+        let first = try #require(
+            copies.localURL(for: url, fileSystems: registry, owner: owner, cancellation: CancellationFlag()))
         copies.removeAll()
         copies.waitForCleanup()
         // The folder is gone with its entry: copying again makes a new one.
         #expect(!FileManager.default.fileExists(atPath: first.path))
-        let second = try #require(copies.localURL(for: url, fileSystems: registry, owner: owner, cancellation: CancellationFlag()))
+        let second = try #require(
+            copies.localURL(for: url, fileSystems: registry, owner: owner, cancellation: CancellationFlag()))
         #expect(FileManager.default.fileExists(atPath: second.path))
     }
 
     // MARK: Links
 
     @Test func onlyWebAndMailLinksOpenInTheBrowser() {
-        #expect(LinkPolicy.opensInBrowser(URL(string: "https://example.com/a")!) && LinkPolicy.opensInBrowser(URL(string: "http://example.com")!))
+        #expect(
+            LinkPolicy.opensInBrowser(URL(string: "https://example.com/a")!)
+                && LinkPolicy.opensInBrowser(URL(string: "http://example.com")!))
         #expect(LinkPolicy.opensInBrowser(URL(string: "mailto:a@example.com")!))
-        for text in ["file:///Applications/Calculator.app", "smb://evil/share", "sftp://evil/x", "ftp://evil/x", "x-evil-scheme://run", "javascript:alert(1)", "tel:123", "relative.html"] {
+        for text in [
+            "file:///Applications/Calculator.app", "smb://evil/share", "sftp://evil/x", "ftp://evil/x",
+            "x-evil-scheme://run", "javascript:alert(1)", "tel:123", "relative.html"
+        ] {
             #expect(!LinkPolicy.opensInBrowser(URL(string: text)!), "\(text)")
         }
     }
@@ -351,15 +391,22 @@ final class Review2HookProvider: FileSystemProvider {
         func target(_ text: String) -> String? { LinkPolicy.target(of: URL(string: text)!, relativeTo: base)?.path }
         #expect(target("other.html") == "/Users/me/pages/other.html")
         #expect(target("sub/page.html#part") == "/Users/me/pages/sub/page.html")
-        for text in ["../secret.html", "../../etc/passwd", "file:///etc/passwd", "file:///Users/me/other/x.html", "sftp://evil/x", "ftp://evil/x", "smb://evil/x",
-                     "http://evil/x", "..%2F..%2Fx", "sub/..%2F..%2Fx", "/etc/passwd", "//evil/x"] {
+        for text in [
+            "../secret.html", "../../etc/passwd", "file:///etc/passwd", "file:///Users/me/other/x.html",
+            "sftp://evil/x", "ftp://evil/x", "smb://evil/x",
+            "http://evil/x", "..%2F..%2Fx", "sub/..%2F..%2Fx", "/etc/passwd", "//evil/x"
+        ] {
             #expect(target(text) == nil, "\(text) -> \(target(text) ?? "nil")")
         }
         // The same file system and host only.
         let remote = URL(string: "sftp://host/pub/doc/index.html")!
-        func remoteTarget(_ text: String) -> String? { LinkPolicy.target(of: URL(string: text)!, relativeTo: remote)?.absoluteString }
+        func remoteTarget(_ text: String) -> String? {
+            LinkPolicy.target(of: URL(string: text)!, relativeTo: remote)?.absoluteString
+        }
         #expect(remoteTarget("next.html") == "sftp://host/pub/doc/next.html")
-        #expect(remoteTarget("sftp://other/pub/doc/next.html") == nil && remoteTarget("ftp://host/pub/doc/next.html") == nil && remoteTarget("../up.html") == nil)
+        #expect(
+            remoteTarget("sftp://other/pub/doc/next.html") == nil && remoteTarget("ftp://host/pub/doc/next.html") == nil
+                && remoteTarget("../up.html") == nil)
     }
 
     @Test func aPageShownFromAStringNavigatesOnceAndThenNowhere() {
@@ -369,15 +416,24 @@ final class Review2HookProvider: FileSystemProvider {
         #expect(Page.decide(isMainFrame: true, isLinkClick: false, url: blank, expectsPage: true) == .allow)
         // A meta refresh, a redirect, a script-less load of the web or of a file, a frame: refused.
         for text in ["https://evil.example/x", "http://127.0.0.1:18473/refresh", "file:///etc/passwd", "ftp://evil/x"] {
-            #expect(Page.decide(isMainFrame: true, isLinkClick: false, url: URL(string: text), expectsPage: false) == .cancel, "\(text)")
-            #expect(Page.decide(isMainFrame: true, isLinkClick: false, url: URL(string: text), expectsPage: true) == .cancel, "\(text)")
+            #expect(
+                Page.decide(isMainFrame: true, isLinkClick: false, url: URL(string: text), expectsPage: false)
+                    == .cancel, "\(text)")
+            #expect(
+                Page.decide(isMainFrame: true, isLinkClick: false, url: URL(string: text), expectsPage: true)
+                    == .cancel, "\(text)")
         }
         #expect(Page.decide(isMainFrame: true, isLinkClick: false, url: nil, expectsPage: true) == .allow)
         #expect(Page.decide(isMainFrame: true, isLinkClick: false, url: blank, expectsPage: false) == .cancel)
         #expect(Page.decide(isMainFrame: false, isLinkClick: false, url: blank, expectsPage: true) == .cancel)
         // A click is handed on, and a jump inside the page stays.
-        #expect(Page.decide(isMainFrame: true, isLinkClick: true, url: URL(string: "https://example.com"), expectsPage: false) == .followLink)
-        #expect(Page.decide(isMainFrame: true, isLinkClick: true, url: URL(string: "about:blank#part"), expectsPage: false) == .allow)
+        #expect(
+            Page.decide(
+                isMainFrame: true, isLinkClick: true, url: URL(string: "https://example.com"), expectsPage: false)
+                == .followLink)
+        #expect(
+            Page.decide(isMainFrame: true, isLinkClick: true, url: URL(string: "about:blank#part"), expectsPage: false)
+                == .allow)
     }
 
     // MARK: Encodings
@@ -387,7 +443,9 @@ final class Review2HookProvider: FileSystemProvider {
         // code pages of many bytes (ISO-2022, EUC-KR, HZ ...) are still not offered.
         #expect(ViewerEncoding.codePage(51932) != nil && ViewerEncoding.codePage(54936) != nil)
         for page in [50220, 50221, 50222, 51949, 52936] { #expect(ViewerEncoding.codePage(page) == nil, "\(page)") }
-        for page in [1252, 437, 866, 932, 936, 949, 950, 28591, 20866, 65001] { #expect(ViewerEncoding.codePage(page) != nil, "\(page)") }
+        for page in [1252, 437, 866, 932, 936, 949, 950, 28591, 20866, 65001] {
+            #expect(ViewerEncoding.codePage(page) != nil, "\(page)")
+        }
         #expect(ViewerEncoding.codePages.contains(.ansi) && ViewerEncoding.codePages.contains { $0.codePage == 932 })
     }
 
@@ -400,7 +458,8 @@ final class Review2HookProvider: FileSystemProvider {
         }
         let all = FolderSummary.measure(memory.url("/tree"), provider: memory, cancellation: CancellationFlag())
         #expect(all.files == 100 && all.folders == 5 && !all.isPartial)
-        let limited = FolderSummary.measure(memory.url("/tree"), provider: memory, cancellation: CancellationFlag(), limit: 30)
+        let limited = FolderSummary.measure(
+            memory.url("/tree"), provider: memory, cancellation: CancellationFlag(), limit: 30)
         #expect(limited.isPartial && limited.files < 100 && limited.text.hasPrefix("At least "))
     }
 }

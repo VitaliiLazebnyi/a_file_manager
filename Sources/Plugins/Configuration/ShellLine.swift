@@ -23,7 +23,8 @@ struct ShellContext {
 
     /// Why no value can stand at a place.
     enum Refusal: Error, Equatable {
-        case ansiQuote, backtick, hereDocument, comment, backslash, dollar, arithmetic, parameterExpansion, caseInSubstitution
+        case ansiQuote, backtick, hereDocument, comment, backslash, dollar, arithmetic, parameterExpansion,
+            caseInSubstitution
 
         var explanation: String {
             switch self {
@@ -33,9 +34,11 @@ struct ShellContext {
             case .comment: return "A placeholder stands in a comment (after #)."
             case .backslash: return "A placeholder cannot follow a backslash. Put it in quotes instead."
             case .dollar: return "A placeholder cannot follow a $ sign."
-            case .arithmetic: return "A placeholder cannot stand where the shell works out a number: in $((…)), ((…)), $[…], "
-                + "in the subscript of $name[…], or in a test that compares numbers (-eq, -lt …)."
-            case .parameterExpansion: return "A placeholder cannot stand in or after a ${…} expression with an operator."
+            case .arithmetic:
+                return "A placeholder cannot stand where the shell works out a number: in $((…)), ((…)), $[…], "
+                    + "in the subscript of $name[…], or in a test that compares numbers (-eq, -lt …)."
+            case .parameterExpansion:
+                return "A placeholder cannot stand in or after a ${…} expression with an operator."
             case .caseInSubstitution: return "A placeholder cannot stand after a case statement inside $(…)."
             }
         }
@@ -182,7 +185,9 @@ struct ShellContext {
             }
             return
         }
-        let (wasDollar, wasSubstitution, wasParenthesis, hadLessThans) = (dollar, openedSubstitution, openedParenthesis, lessThans)
+        let (wasDollar, wasSubstitution, wasParenthesis, hadLessThans) = (
+            dollar, openedSubstitution, openedParenthesis, lessThans
+        )
         dollar = false
         openedSubstitution = false
         openedParenthesis = false
@@ -193,7 +198,9 @@ struct ShellContext {
         switch frames[frames.count - 1] {
         case .code, .doubleQuote:
             if !escaped {
-                let isLetter = (scalar.value >= 65 && scalar.value <= 90) || (scalar.value >= 97 && scalar.value <= 122) || scalar == "_"
+                let isLetter =
+                    (scalar.value >= 65 && scalar.value <= 90) || (scalar.value >= 97 && scalar.value <= 122)
+                    || scalar == "_"
                 let isDigit = scalar.value >= 48 && scalar.value <= 57
                 if (wasDollar && isLetter) || (wasVariableName && (isLetter || isDigit)) {
                     variableName = true
@@ -469,8 +476,11 @@ enum ShellLine {
     /// Whether a value may be shown, and typed over, as part of the line: it holds nothing
     /// that a shell or the placeholders give a meaning to, so as text it says what it says.
     static func isTame(_ value: String) -> Bool {
-        guard let first = value.unicodeScalars.first, let last = value.unicodeScalars.last, first != " ", last != " " else { return false }
-        return value.unicodeScalars.allSatisfy { $0 == " " || ($0 != "%" && $0 != "^" && !ShellWords.needsQuoting(String($0))) }
+        guard let first = value.unicodeScalars.first, let last = value.unicodeScalars.last, first != " ", last != " "
+        else { return false }
+        return value.unicodeScalars.allSatisfy {
+            $0 == " " || ($0 != "%" && $0 != "^" && !ShellWords.needsQuoting(String($0)))
+        }
     }
 
     /// What the user is shown when the parameters begin with `?`: the line with harmless
@@ -494,7 +504,9 @@ enum ShellLine {
                     line += place == .word ? ShellWords.quoted(value) : value
                 } else {
                     line += place.map { reference(values.count, at: $0) } ?? "${" + variable(values.count) + "}"
-                    if legend.count < 12 { legend.append("${\(variable(values.count))} = \(DisplayText.oneLine(value, limit: 120))") }
+                    if legend.count < 12 {
+                        legend.append("${\(variable(values.count))} = \(DisplayText.oneLine(value, limit: 120))")
+                    }
                     values.append(value)
                 }
             }
@@ -513,8 +525,10 @@ enum ShellLine {
             let after = rest[found.upperBound...]
             let digits = after.unicodeScalars.prefix { $0.value >= 48 && $0.value <= 57 }
             let end = after.unicodeScalars.index(after.unicodeScalars.startIndex, offsetBy: digits.count)
-            guard digits.count <= 9, let number = Int(String(String.UnicodeScalarView(digits))), number >= 1, number <= values.count,
-                  end < after.unicodeScalars.endIndex, after.unicodeScalars[end] == "}" else {
+            guard digits.count <= 9, let number = Int(String(String.UnicodeScalarView(digits))), number >= 1,
+                number <= values.count,
+                end < after.unicodeScalars.endIndex, after.unicodeScalars[end] == "}"
+            else {
                 pieces.append(.text(String(rest[..<found.upperBound])))
                 rest = after
                 continue

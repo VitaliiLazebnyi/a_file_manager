@@ -86,7 +86,12 @@ final class WrappedFileSystem: FileSystemProvider {
     /// The largest number of files that were being written at the same time.
     var mostWritesAtOnce: Int { lock.withLock { mostAtOnce } }
 
-    private func began() { lock.withLock { running += 1; mostAtOnce = max(mostAtOnce, running) } }
+    private func began() {
+        lock.withLock {
+            running += 1
+            mostAtOnce = max(mostAtOnce, running)
+        }
+    }
     private func ended() { lock.withLock { running -= 1 } }
 
     private final class Writer: FileWriter {
@@ -113,7 +118,9 @@ final class WrappedFileSystem: FileSystemProvider {
         }
     }
 
-    func list(_ directory: URL, showHidden: Bool) throws -> [FileItem] { try base.list(directory, showHidden: showHidden) }
+    func list(_ directory: URL, showHidden: Bool) throws -> [FileItem] {
+        try base.list(directory, showHidden: showHidden)
+    }
     func item(at url: URL) -> FileItem? { base.item(at: url) }
     func parent(of directory: URL) -> URL? { base.parent(of: directory) }
     func read(_ url: URL) throws -> FileReader { try base.read(url) }
@@ -124,7 +131,9 @@ final class WrappedFileSystem: FileSystemProvider {
         return writer
     }
     func remove(_ url: URL) throws { try base.remove(url) }
-    func move(_ source: URL, to destination: URL, replacing: Bool) throws { try base.move(source, to: destination, replacing: replacing) }
+    func move(_ source: URL, to destination: URL, replacing: Bool) throws {
+        try base.move(source, to: destination, replacing: replacing)
+    }
     func copy(_ source: URL, to destination: URL, progress: (Int64) -> Bool) throws {
         began()
         defer { ended() }
@@ -147,8 +156,11 @@ func makeWrappedFileSystems() -> (FileSystemRegistry, WrappedFileSystem) {
 
 /// Runs a job whose questions `replies` answers; `configure` sets its options first.
 @discardableResult
-func runJob(_ kind: JobKind, _ sources: [URL], to target: TargetSpec? = nil, replies: Replies, fileSystems: FileSystemRegistry = makeFileSystems().0,
-            configure: ((FileJob) -> Void)? = nil) -> JobResult {
+func runJob(
+    _ kind: JobKind, _ sources: [URL], to target: TargetSpec? = nil, replies: Replies,
+    fileSystems: FileSystemRegistry = makeFileSystems().0,
+    configure: ((FileJob) -> Void)? = nil
+) -> JobResult {
     let job = FileJob(kind: kind, sources: sources, target: target, fileSystems: fileSystems)
     let delegate: FileJobDelegate = replies
     job.delegate = delegate
@@ -195,7 +207,9 @@ func runJob(_ kind: JobKind, _ sources: [URL], to target: TargetSpec? = nil, rep
         let replies = Replies(.rename("two.txt"), .rename("fresh.txt"), .skip)
         runJob(.copy, [box.url("A/one.txt")], to: target, replies: replies)
         #expect(replies.conflicts == ["one.txt", "two.txt"])
-        #expect(box.read("B/fresh.txt") == "source one" && box.read("B/one.txt") == "target" && box.read("B/two.txt") == "target two")
+        #expect(
+            box.read("B/fresh.txt") == "source one" && box.read("B/one.txt") == "target"
+                && box.read("B/two.txt") == "target two")
     }
 
     @Test func renameExistingMovesTheTargetAsideFirst() {
@@ -241,19 +255,23 @@ func runJob(_ kind: JobKind, _ sources: [URL], to target: TargetSpec? = nil, rep
 
     @Test func cancelLeavesEverythingAsItWas() {
         let result = runJob(.copy, sources, to: target, replies: Replies(.cancel))
-        #expect(result.cancelled && box.read("B/one.txt") == "target" && namesOnDisk(box.url("B")) == ["one.txt", "two.txt"])
+        #expect(
+            result.cancelled && box.read("B/one.txt") == "target"
+                && namesOnDisk(box.url("B")) == ["one.txt", "two.txt"])
     }
 
     @Test func aPresetAnswersWithoutAsking() {
         let presets: [(OverwriteMode, String, String)] = [
-            (.skipAll, "target", "target two"), (.overwriteOlder, "source one", "target two"), (.overwriteAll, "source one", "s2"),
+            (.skipAll, "target", "target two"), (.overwriteOlder, "source one", "target two"),
+            (.overwriteAll, "source one", "s2")
         ]
         for (mode, one, two) in presets {
             _ = try? box.file("B/one.txt", "target", modified: old)
             _ = try? box.file("B/two.txt", "target two", modified: new)
             let replies = Replies()
             runJob(.copy, sources, to: target, replies: replies) { $0.options.overwrite = mode }
-            #expect(replies.conflicts.isEmpty && box.read("B/one.txt") == one && box.read("B/two.txt") == two, "\(mode)")
+            #expect(
+                replies.conflicts.isEmpty && box.read("B/one.txt") == one && box.read("B/two.txt") == two, "\(mode)")
         }
         let replies = Replies()
         runJob(.copy, sources, to: target, replies: replies) { $0.options.overwrite = .autoRenameCopied }
@@ -270,7 +288,9 @@ func runJob(_ kind: JobKind, _ sources: [URL], to target: TargetSpec? = nil, rep
         let (fileSystems, memory) = makeFileSystems()
         memory.addFile("/out/big.bin", "0123456789", modified: new, permissions: 0o600)
         try box.file("B/big.bin", "0123", modified: old)
-        let result = runJob(.copy, [memory.url("/out/big.bin")], to: target, replies: Replies(.resume), fileSystems: fileSystems) {
+        let result = runJob(
+            .copy, [memory.url("/out/big.bin")], to: target, replies: Replies(.resume), fileSystems: fileSystems
+        ) {
             $0.options.verifies = true
         }
         #expect(result.completed.count == 1 && box.read("B/big.bin") == "0123456789")
@@ -302,7 +322,9 @@ func runJob(_ kind: JobKind, _ sources: [URL], to target: TargetSpec? = nil, rep
         let keep = Replies(.overwrite)
         keep.protection = .skip
         let skipped = runJob(.copy, [box.url("A/one.txt")], to: TargetSpec(directory: box.url("B")), replies: keep)
-        #expect(keep.protections == ["readOnly overwrite one.txt"] && box.read("B/one.txt") == "old" && skipped.completed.isEmpty)
+        #expect(
+            keep.protections == ["readOnly overwrite one.txt"] && box.read("B/one.txt") == "old"
+                && skipped.completed.isEmpty)
 
         let replace = Replies(.overwrite)
         runJob(.copy, [box.url("A/one.txt")], to: TargetSpec(directory: box.url("B")), replies: replace)
@@ -311,7 +333,9 @@ func runJob(_ kind: JobKind, _ sources: [URL], to target: TargetSpec? = nil, rep
         // "Overwrite/Delete read only/hidden" in the dialog takes the question away.
         try FileManager.default.setAttributes([.posixPermissions: 0o444], ofItemAtPath: box.url("B/one.txt").path)
         let quiet = Replies(.overwrite)
-        runJob(.copy, [box.url("A/one.txt")], to: TargetSpec(directory: box.url("B")), replies: quiet) { $0.options.ignoresProtection = true }
+        runJob(.copy, [box.url("A/one.txt")], to: TargetSpec(directory: box.url("B")), replies: quiet) {
+            $0.options.ignoresProtection = true
+        }
         #expect(quiet.protections.isEmpty)
     }
 
@@ -323,7 +347,9 @@ func runJob(_ kind: JobKind, _ sources: [URL], to target: TargetSpec? = nil, rep
         let sources = [memory.url("/a/ro.txt"), memory.url("/a/.hidden"), memory.url("/a/plain.txt")]
         let keep = Replies()
         keep.protection = .skip
-        let kept = runJob(.delete(toTrash: false), sources, replies: keep, fileSystems: fileSystems) { $0.options.asksAboutHidden = true }
+        let kept = runJob(.delete(toTrash: false), sources, replies: keep, fileSystems: fileSystems) {
+            $0.options.asksAboutHidden = true
+        }
         #expect(Set(keep.protections) == ["readOnly delete ro.txt", "hidden delete .hidden"])
         #expect(memory.allPaths == ["/a", "/a/.hidden", "/a/ro.txt"] && kept.completed.count == 1)
 
@@ -343,7 +369,9 @@ func runJob(_ kind: JobKind, _ sources: [URL], to target: TargetSpec? = nil, rep
         let keep = Replies()
         keep.protection = .skip
         let kept = runJob(.delete(toTrash: false), [locked], replies: keep)
-        #expect(keep.protections == ["locked delete locked.txt"] && box.exists("A/locked.txt") && kept.completed.isEmpty && keep.errors.isEmpty)
+        #expect(
+            keep.protections == ["locked delete locked.txt"] && box.exists("A/locked.txt") && kept.completed.isEmpty
+                && keep.errors.isEmpty)
         let delete = Replies()
         let deleted = runJob(.delete(toTrash: false), [locked], replies: delete)
         #expect(delete.protections.count == 1 && !box.exists("A/locked.txt") && deleted.completed.count == 1)
@@ -356,10 +384,14 @@ func runJob(_ kind: JobKind, _ sources: [URL], to target: TargetSpec? = nil, rep
         let skip = Replies()
         skip.merge = .skip
         let target = TargetSpec(directory: memory.url("/b"))
-        let skipped = runJob(.copy, [memory.url("/a/docs")], to: target, replies: skip, fileSystems: fileSystems) { $0.options.asksBeforeMerging = true }
+        let skipped = runJob(.copy, [memory.url("/a/docs")], to: target, replies: skip, fileSystems: fileSystems) {
+            $0.options.asksBeforeMerging = true
+        }
         #expect(skip.merges == ["docs"] && !memory.exists("/b/docs/one.txt") && skipped.completed.isEmpty)
         let merge = Replies()
-        runJob(.copy, [memory.url("/a/docs")], to: target, replies: merge, fileSystems: fileSystems) { $0.options.asksBeforeMerging = true }
+        runJob(.copy, [memory.url("/a/docs")], to: target, replies: merge, fileSystems: fileSystems) {
+            $0.options.asksBeforeMerging = true
+        }
         #expect(memory.exists("/b/docs/one.txt") && memory.exists("/b/docs/keep.txt"))
         // Without the option folders merge silently, as before.
         let silent = Replies(.overwrite)
@@ -372,21 +404,29 @@ func runJob(_ kind: JobKind, _ sources: [URL], to target: TargetSpec? = nil, rep
 @Suite struct TransferOptionsInJobs {
     @Test func theFilterChoosesWhatIsCopied() throws {
         let (fileSystems, memory) = makeFileSystems()
-        for path in ["/a/one.txt", "/a/two.bak", "/a/docs/in.txt", "/a/docs/pic.jpg", "/a/docs/build/out.txt", "/a/empty/none.jpg"] {
+        for path in [
+            "/a/one.txt", "/a/two.bak", "/a/docs/in.txt", "/a/docs/pic.jpg", "/a/docs/build/out.txt",
+            "/a/empty/none.jpg"
+        ] {
             memory.addFile(path, "x")
         }
         memory.addDirectory("/b")
         let sources = ["one.txt", "two.bak", "docs", "empty"].map { memory.url("/a/" + $0) }
-        let result = runJob(.copy, sources, to: TargetSpec(directory: memory.url("/b")), replies: Replies(), fileSystems: fileSystems) {
+        let result = runJob(
+            .copy, sources, to: TargetSpec(directory: memory.url("/b")), replies: Replies(), fileSystems: fileSystems
+        ) {
             $0.options.filter = CopyFilter("*.txt | build/")
         }
-        #expect(memory.allPaths.filter { $0.hasPrefix("/b/") } == ["/b/docs", "/b/docs/in.txt", "/b/empty", "/b/one.txt"])
+        #expect(
+            memory.allPaths.filter { $0.hasPrefix("/b/") } == ["/b/docs", "/b/docs/in.txt", "/b/empty", "/b/one.txt"])
         // A file the filter left out stays selected; a folder that was entered does not.
         #expect(Set(result.completed.map(\.lastPathComponent)) == ["one.txt", "docs", "empty"])
 
         memory.removeTree("/b")
         memory.addDirectory("/b")
-        runJob(.copy, sources, to: TargetSpec(directory: memory.url("/b")), replies: Replies(), fileSystems: fileSystems) {
+        runJob(
+            .copy, sources, to: TargetSpec(directory: memory.url("/b")), replies: Replies(), fileSystems: fileSystems
+        ) {
             $0.options.filter = CopyFilter("*.txt | build/ **/")
         }
         #expect(memory.allPaths.filter { $0.hasPrefix("/b/") } == ["/b/docs", "/b/docs/in.txt", "/b/one.txt"])
@@ -397,7 +437,10 @@ func runJob(_ kind: JobKind, _ sources: [URL], to target: TargetSpec? = nil, rep
         memory.addFile("/a/docs/in.txt", "t")
         memory.addFile("/a/docs/pic.jpg", "j")
         memory.addDirectory("/b")
-        runJob(.move, [memory.url("/a/docs")], to: TargetSpec(directory: memory.url("/b")), replies: Replies(), fileSystems: fileSystems) {
+        runJob(
+            .move, [memory.url("/a/docs")], to: TargetSpec(directory: memory.url("/b")), replies: Replies(),
+            fileSystems: fileSystems
+        ) {
             $0.options.filter = CopyFilter("*.txt")
         }
         #expect(memory.allPaths == ["/a", "/a/docs", "/a/docs/pic.jpg", "/b", "/b/docs", "/b/docs/in.txt"])
@@ -409,18 +452,24 @@ func runJob(_ kind: JobKind, _ sources: [URL], to target: TargetSpec? = nil, rep
         try box.file("A/report.txt", "r")
         try box.file("A/notes.md", "n")
         let sources = [box.url("A/report.txt"), box.url("A/notes.md")]
-        let spec = TargetSpec.parse("mem:/backup/*.bak", sourceDirectory: box.url("A"), operandCount: 2, fileSystems: fileSystems)
+        let spec = TargetSpec.parse(
+            "mem:/backup/*.bak", sourceDirectory: box.url("A"), operandCount: 2, fileSystems: fileSystems)
         try memory.createDirectory(at: spec.directory)
         runJob(.copy, sources, to: spec, replies: Replies(), fileSystems: fileSystems)
         #expect(memory.allPaths == ["/backup", "/backup/notes.bak", "/backup/report.bak"])
         // Relative to the source folder, with a prefix mask.
-        let relative = TargetSpec.parse("../old_**.*", sourceDirectory: box.url("A"), operandCount: 2, fileSystems: fileSystems)
+        let relative = TargetSpec.parse(
+            "../old_**.*", sourceDirectory: box.url("A"), operandCount: 2, fileSystems: fileSystems)
         runJob(.copy, sources, to: relative, replies: Replies(), fileSystems: fileSystems)
         #expect(box.read("old_notes.md") == "n" && box.read("old_report.txt") == "r")
         // Two sources that land on one name: the second meets the first as a conflict.
         let replies = Replies(.autoRenameCopied)
-        runJob(.copy, sources, to: TargetSpec(directory: memory.url("/backup"), mask: "same.txt"), replies: replies, fileSystems: fileSystems)
-        #expect(replies.conflicts == ["same.txt"] && memory.contents("/backup/same.txt") == "n" && memory.contents("/backup/same (2).txt") == "r")
+        runJob(
+            .copy, sources, to: TargetSpec(directory: memory.url("/backup"), mask: "same.txt"), replies: replies,
+            fileSystems: fileSystems)
+        #expect(
+            replies.conflicts == ["same.txt"] && memory.contents("/backup/same.txt") == "n"
+                && memory.contents("/backup/same (2).txt") == "r")
     }
 
     @Test func attributesAndFolderDates() throws {
@@ -428,13 +477,24 @@ func runJob(_ kind: JobKind, _ sources: [URL], to target: TargetSpec? = nil, rep
         let stamp = Date(timeIntervalSince1970: 1_500_000_000)
         try box.file("A/docs/tool.sh", "#!/bin/sh", modified: stamp)
         try FileManager.default.setAttributes([.posixPermissions: 0o750], ofItemAtPath: box.url("A/docs/tool.sh").path)
-        try FileManager.default.setAttributes([.modificationDate: stamp, .posixPermissions: 0o700], ofItemAtPath: box.url("A/docs").path)
-        func date(_ path: String) -> Date? { (try? FileManager.default.attributesOfItem(atPath: box.url(path).path))?[.modificationDate] as? Date }
-        func mode(_ path: String) -> Int? { (try? FileManager.default.attributesOfItem(atPath: box.url(path).path))?[.posixPermissions] as? Int }
-        runJob(.copy, [box.url("A/docs")], to: TargetSpec(directory: box.url("B")), replies: Replies()) { $0.options.preservesFolderDates = true }
-        #expect(date("B/docs") == stamp && mode("B/docs") == 0o700 && date("B/docs/tool.sh") == stamp && mode("B/docs/tool.sh") == 0o750)
+        try FileManager.default.setAttributes(
+            [.modificationDate: stamp, .posixPermissions: 0o700], ofItemAtPath: box.url("A/docs").path)
+        func date(_ path: String) -> Date? {
+            (try? FileManager.default.attributesOfItem(atPath: box.url(path).path))?[.modificationDate] as? Date
+        }
+        func mode(_ path: String) -> Int? {
+            (try? FileManager.default.attributesOfItem(atPath: box.url(path).path))?[.posixPermissions] as? Int
+        }
+        runJob(.copy, [box.url("A/docs")], to: TargetSpec(directory: box.url("B")), replies: Replies()) {
+            $0.options.preservesFolderDates = true
+        }
+        #expect(
+            date("B/docs") == stamp && mode("B/docs") == 0o700 && date("B/docs/tool.sh") == stamp
+                && mode("B/docs/tool.sh") == 0o750)
 
-        runJob(.copy, [box.url("A/docs")], to: TargetSpec(directory: box.url("C")), replies: Replies()) { $0.options.preservesAttributes = false }
+        runJob(.copy, [box.url("A/docs")], to: TargetSpec(directory: box.url("C")), replies: Replies()) {
+            $0.options.preservesAttributes = false
+        }
         #expect(mode("C/docs/tool.sh") == 0o644 && (date("C/docs/tool.sh") ?? stamp) > Date(timeIntervalSinceNow: -60))
         #expect(date("C/docs") != stamp)
     }
@@ -447,11 +507,15 @@ func runJob(_ kind: JobKind, _ sources: [URL], to target: TargetSpec? = nil, rep
         try FileManager.default.createSymbolicLink(at: box.url("A/dir-link"), withDestinationURL: box.url("real"))
         try FileManager.default.createSymbolicLink(at: box.url("A/file-link"), withDestinationURL: box.url("real.txt"))
         let sources = [box.url("A/dir-link"), box.url("A/file-link")]
-        func isLink(_ path: String) -> Bool { (try? FileManager.default.destinationOfSymbolicLink(atPath: box.url(path).path)) != nil }
+        func isLink(_ path: String) -> Bool {
+            (try? FileManager.default.destinationOfSymbolicLink(atPath: box.url(path).path)) != nil
+        }
         runJob(.copy, sources, to: TargetSpec(directory: box.url("B")), replies: Replies())
         #expect(isLink("B/dir-link") && isLink("B/file-link"))
         let replies = Replies()
-        runJob(.copy, sources, to: TargetSpec(directory: box.url("C")), replies: replies) { $0.options.links = .followLinks }
+        runJob(.copy, sources, to: TargetSpec(directory: box.url("C")), replies: replies) {
+            $0.options.links = .followLinks
+        }
         #expect(!isLink("C/dir-link") && !isLink("C/file-link"))
         #expect(box.read("C/dir-link/inside.txt") == "i" && box.read("C/file-link") == "content")
         #expect(replies.progress.last?.itemsTotal == 3 && replies.progress.last?.bytesTotal == 8)
@@ -462,17 +526,22 @@ func runJob(_ kind: JobKind, _ sources: [URL], to target: TargetSpec? = nil, rep
         let (fileSystems, wrapped) = makeWrappedFileSystems()
         try box.file("A/data.bin", String(repeating: "d", count: 3000))
         wrapped.base.addDirectory("/inbox")
-        let source = [box.url("A/data.bin")], target = TargetSpec(directory: wrapped.base.url("/inbox"))
+        let source = [box.url("A/data.bin")]
+        let target = TargetSpec(directory: wrapped.base.url("/inbox"))
 
         wrapped.corruptsWrites = true
         // Without Verify the damage goes unnoticed.
         runJob(.copy, source, to: target, replies: Replies(), fileSystems: fileSystems)
         // (The damaged bytes are no text any more, so there is nothing to read back as a string.)
-        #expect(wrapped.base.item(at: wrapped.base.url("/inbox/data.bin"))?.size == 3000 && wrapped.base.contents("/inbox/data.bin") == nil)
+        #expect(
+            wrapped.base.item(at: wrapped.base.url("/inbox/data.bin"))?.size == 3000
+                && wrapped.base.contents("/inbox/data.bin") == nil)
         wrapped.base.removeTree("/inbox/data.bin")
 
         let replies = Replies()
-        let failed = runJob(.copy, source, to: target, replies: replies, fileSystems: fileSystems) { $0.options.verifies = true }
+        let failed = runJob(.copy, source, to: target, replies: replies, fileSystems: fileSystems) {
+            $0.options.verifies = true
+        }
         #expect(replies.errors.count == 1 && replies.errors[0].hasPrefix("Verify failed"))
         // Neither the damaged file nor its temporary name remains, and the source is untouched.
         #expect(wrapped.base.allPaths == ["/inbox"] && failed.completed.isEmpty && failed.failureCount == 1)
@@ -483,8 +552,12 @@ func runJob(_ kind: JobKind, _ sources: [URL], to target: TargetSpec? = nil, rep
         runJob(.move, source, to: target, replies: moving, fileSystems: fileSystems) { $0.options.verifies = true }
         #expect(box.exists("A/data.bin") && wrapped.base.allPaths == ["/inbox"])
         wrapped.corruptsWrites = false
-        let good = runJob(.move, source, to: target, replies: Replies(), fileSystems: fileSystems) { $0.options.verifies = true }
-        #expect(good.completed.count == 1 && !box.exists("A/data.bin") && wrapped.base.contents("/inbox/data.bin")?.count == 3000)
+        let good = runJob(.move, source, to: target, replies: Replies(), fileSystems: fileSystems) {
+            $0.options.verifies = true
+        }
+        #expect(
+            good.completed.count == 1 && !box.exists("A/data.bin")
+                && wrapped.base.contents("/inbox/data.bin")?.count == 3000)
     }
 
     @Test func checksumsCompareContents() throws {
@@ -495,8 +568,12 @@ func runJob(_ kind: JobKind, _ sources: [URL], to target: TargetSpec? = nil, rep
         memory.addFile("/c.txt", "samf")
         #expect(try Checksum.sameContents(box.url("a.txt"), memory.url("/b.txt"), in: fileSystems) == true)
         #expect(try Checksum.sameContents(box.url("a.txt"), memory.url("/c.txt"), in: fileSystems) == false)
-        #expect(try Checksum.sameContents(box.url("a.txt"), memory.url("/b.txt"), in: fileSystems, isCancelled: { true }) == nil)
-        #expect(try Checksum.sha256(of: memory.url("/b.txt"), in: fileSystems)?.map { String(format: "%02x", $0) }.joined().hasPrefix("0967115f") == true)
+        #expect(
+            try Checksum.sameContents(box.url("a.txt"), memory.url("/b.txt"), in: fileSystems, isCancelled: { true })
+                == nil)
+        #expect(
+            try Checksum.sha256(of: memory.url("/b.txt"), in: fileSystems)?.map { String(format: "%02x", $0) }.joined()
+                .hasPrefix("0967115f") == true)
     }
 
     @Test func keepingGoingOnErrorsSkipsWithoutAskingAndCounts() throws {
@@ -504,9 +581,12 @@ func runJob(_ kind: JobKind, _ sources: [URL], to target: TargetSpec? = nil, rep
         memory.addFile("/a/one.txt", "1")
         memory.addDirectory("/b")
         let replies = Replies()
-        let result = runJob(.copy, [memory.url("/a/gone.txt"), memory.url("/a/one.txt")], to: TargetSpec(directory: memory.url("/b")),
-                            replies: replies, fileSystems: fileSystems) { $0.options.skipsErrors = true }
-        #expect(replies.errors.isEmpty && result.failureCount == 1 && result.failures.first?.contains("gone.txt") == true)
+        let result = runJob(
+            .copy, [memory.url("/a/gone.txt"), memory.url("/a/one.txt")], to: TargetSpec(directory: memory.url("/b")),
+            replies: replies, fileSystems: fileSystems
+        ) { $0.options.skipsErrors = true }
+        #expect(
+            replies.errors.isEmpty && result.failureCount == 1 && result.failures.first?.contains("gone.txt") == true)
         #expect(memory.exists("/b/one.txt") && result.completed.count == 1)
     }
 
@@ -519,10 +599,16 @@ func runJob(_ kind: JobKind, _ sources: [URL], to target: TargetSpec? = nil, rep
         let target = TargetSpec(directory: memory.url("/inbox"))
         let replies = Replies()
         replies.cancelAtBytes = 2 << 20
-        let cancelled = runJob(.copy, [box.url("A/big.bin")], to: target, replies: replies, fileSystems: fileSystems) { $0.options.keepsPartialFiles = true }
+        let cancelled = runJob(.copy, [box.url("A/big.bin")], to: target, replies: replies, fileSystems: fileSystems) {
+            $0.options.keepsPartialFiles = true
+        }
         let partial = memory.item(at: memory.url("/inbox/big.bin"))?.size ?? 0
-        #expect(cancelled.cancelled && partial > 0 && partial < Int64(content.count) && memory.allPaths == ["/inbox", "/inbox/big.bin"])
-        let resumed = runJob(.copy, [box.url("A/big.bin")], to: target, replies: Replies(.resume), fileSystems: fileSystems) { $0.options.verifies = true }
+        #expect(
+            cancelled.cancelled && partial > 0 && partial < Int64(content.count)
+                && memory.allPaths == ["/inbox", "/inbox/big.bin"])
+        let resumed = runJob(
+            .copy, [box.url("A/big.bin")], to: target, replies: Replies(.resume), fileSystems: fileSystems
+        ) { $0.options.verifies = true }
         #expect(resumed.completed.count == 1 && memory.contents("/inbox/big.bin") == content)
     }
 
@@ -533,22 +619,36 @@ func runJob(_ kind: JobKind, _ sources: [URL], to target: TargetSpec? = nil, rep
         memory.addFile("/b/one.txt", "old")
         let lock = NSLock()
         var lines: [String] = []
-        let collect = { (record: OperationRecord) in lock.withLock { lines.append(OperationLog.line(for: record, at: "T")) } }
+        let collect = { (record: OperationRecord) in
+            lock.withLock { lines.append(OperationLog.line(for: record, at: "T")) }
+        }
         let sources = [memory.url("/a/docs"), memory.url("/a/one.txt"), memory.url("/a/gone.txt")]
-        runJob(.copy, sources, to: TargetSpec(directory: memory.url("/b")), replies: Replies(.skip), fileSystems: fileSystems) { $0.onRecord = collect }
-        #expect(Set(lines) == [
-            "T: New folder: mem:/b/docs\n", "T: Copy: mem:/a/docs/in.txt -> mem:/b/docs/in.txt\n",
-            "T: Skipped: Copy: mem:/a/one.txt -> mem:/b/one.txt\n",
-            "T: Error: Copy: mem:/a/gone.txt: mem:/a/gone.txt does not exist any more!\n", "T: Skipped: Copy: mem:/a/gone.txt\n",
-        ])
+        runJob(
+            .copy, sources, to: TargetSpec(directory: memory.url("/b")), replies: Replies(.skip),
+            fileSystems: fileSystems
+        ) { $0.onRecord = collect }
+        #expect(
+            Set(lines) == [
+                "T: New folder: mem:/b/docs\n", "T: Copy: mem:/a/docs/in.txt -> mem:/b/docs/in.txt\n",
+                "T: Skipped: Copy: mem:/a/one.txt -> mem:/b/one.txt\n",
+                "T: Error: Copy: mem:/a/gone.txt: mem:/a/gone.txt does not exist any more!\n",
+                "T: Skipped: Copy: mem:/a/gone.txt\n"
+            ])
         lines = []
-        runJob(.delete(toTrash: false), [memory.url("/b/docs")], replies: Replies(), fileSystems: fileSystems) { $0.onRecord = collect }
-        #expect(lines == ["T: Delete: mem:/b/docs/in.txt\n", "T: Delete folder: mem:/b/docs\n"])
-        lines = []
-        runJob(.move, [memory.url("/a/one.txt")], to: TargetSpec(directory: memory.url("/b")), replies: Replies(.append), fileSystems: fileSystems) {
+        runJob(.delete(toTrash: false), [memory.url("/b/docs")], replies: Replies(), fileSystems: fileSystems) {
             $0.onRecord = collect
         }
-        #expect(lines == ["T: Append: mem:/a/one.txt -> mem:/b/one.txt\n"] && memory.contents("/b/one.txt") == "oldnew" && !memory.exists("/a/one.txt"))
+        #expect(lines == ["T: Delete: mem:/b/docs/in.txt\n", "T: Delete folder: mem:/b/docs\n"])
+        lines = []
+        runJob(
+            .move, [memory.url("/a/one.txt")], to: TargetSpec(directory: memory.url("/b")), replies: Replies(.append),
+            fileSystems: fileSystems
+        ) {
+            $0.onRecord = collect
+        }
+        #expect(
+            lines == ["T: Append: mem:/a/one.txt -> mem:/b/one.txt\n"] && memory.contents("/b/one.txt") == "oldnew"
+                && !memory.exists("/a/one.txt"))
     }
 }
 
@@ -570,18 +670,27 @@ func runJob(_ kind: JobKind, _ sources: [URL], to target: TargetSpec? = nil, rep
         wrapped.base.addDirectory("/dst")
         wrapped.delay = 0.002
         let replies = Replies()
-        let result = runJob(.copy, [wrapped.base.url("/src")], to: TargetSpec(directory: wrapped.base.url("/dst")), replies: replies,
-                            fileSystems: fileSystems) { $0.parallelWidth = 4 }
+        let result = runJob(
+            .copy, [wrapped.base.url("/src")], to: TargetSpec(directory: wrapped.base.url("/dst")), replies: replies,
+            fileSystems: fileSystems
+        ) { $0.parallelWidth = 4 }
         #expect(result.completed.count == 1 && !result.cancelled)
         #expect(wrapped.mostWritesAtOnce > 1 && wrapped.mostWritesAtOnce <= 4)
         for index in 0..<ParallelCopies.count {
             #expect(wrapped.base.contents(String(format: "/dst/src/file%03d.txt", index)) == "content \(index)")
         }
-        #expect(wrapped.base.allPaths.filter { $0.hasPrefix("/dst/") }.count == ParallelCopies.count + ParallelCopies.count / 4 + 2)
+        #expect(
+            wrapped.base.allPaths.filter { $0.hasPrefix("/dst/") }.count == ParallelCopies.count + ParallelCopies.count
+                / 4 + 2)
         // The counters stay consistent: they never go back, and they end at the totals.
         let progress = replies.progress
-        #expect(zip(progress, progress.dropFirst()).allSatisfy { $0.itemsDone <= $1.itemsDone && $0.bytesDone <= $1.bytesDone })
-        #expect(progress.last?.itemsDone == progress.last?.itemsTotal && progress.last?.bytesDone == progress.last?.bytesTotal)
+        #expect(
+            zip(progress, progress.dropFirst()).allSatisfy {
+                $0.itemsDone <= $1.itemsDone && $0.bytesDone <= $1.bytesDone
+            })
+        #expect(
+            progress.last?.itemsDone == progress.last?.itemsTotal
+                && progress.last?.bytesDone == progress.last?.bytesTotal)
         #expect(progress.last?.itemsTotal == ParallelCopies.count + ParallelCopies.count / 4 + 2)
     }
 
@@ -591,14 +700,19 @@ func runJob(_ kind: JobKind, _ sources: [URL], to target: TargetSpec? = nil, rep
         wrapped.base.addDirectory("/dst")
         wrapped.base.isLocal = false
         wrapped.delay = 0.001
-        runJob(.copy, [wrapped.base.url("/src")], to: TargetSpec(directory: wrapped.base.url("/dst")), replies: Replies(), fileSystems: fileSystems)
+        runJob(
+            .copy, [wrapped.base.url("/src")], to: TargetSpec(directory: wrapped.base.url("/dst")), replies: Replies(),
+            fileSystems: fileSystems)
         #expect(wrapped.mostWritesAtOnce == 1 && wrapped.base.exists("/dst/src/file119.txt"))
         // The same when the option is switched off.
         let (others, local) = makeWrappedFileSystems()
         fill(local.base)
         local.base.addDirectory("/dst")
         local.delay = 0.001
-        runJob(.copy, [local.base.url("/src")], to: TargetSpec(directory: local.base.url("/dst")), replies: Replies(), fileSystems: others) {
+        runJob(
+            .copy, [local.base.url("/src")], to: TargetSpec(directory: local.base.url("/dst")), replies: Replies(),
+            fileSystems: others
+        ) {
             $0.options.copiesSmallFilesInParallel = false
         }
         #expect(local.mostWritesAtOnce == 1)
@@ -607,12 +721,20 @@ func runJob(_ kind: JobKind, _ sources: [URL], to target: TargetSpec? = nil, rep
     @Test func conflictsAreAskedOneAtATimeInProcessingOrder() {
         let (fileSystems, wrapped) = makeWrappedFileSystems()
         fill(wrapped.base)
-        for index in stride(from: 0, to: ParallelCopies.count, by: 10) { wrapped.base.addFile(String(format: "/dst/src/file%03d.txt", index), "old") }
+        for index in stride(from: 0, to: ParallelCopies.count, by: 10) {
+            wrapped.base.addFile(String(format: "/dst/src/file%03d.txt", index), "old")
+        }
         wrapped.delay = 0.001
         let replies = Replies(.overwrite, .skip)
-        runJob(.copy, [wrapped.base.url("/src")], to: TargetSpec(directory: wrapped.base.url("/dst")), replies: replies, fileSystems: fileSystems)
-        #expect(replies.conflicts == stride(from: 0, to: ParallelCopies.count, by: 10).map { String(format: "file%03d.txt", $0) })
-        #expect(wrapped.base.contents("/dst/src/file000.txt") == "content 0" && wrapped.base.contents("/dst/src/file010.txt") == "old")
+        runJob(
+            .copy, [wrapped.base.url("/src")], to: TargetSpec(directory: wrapped.base.url("/dst")), replies: replies,
+            fileSystems: fileSystems)
+        #expect(
+            replies.conflicts
+                == stride(from: 0, to: ParallelCopies.count, by: 10).map { String(format: "file%03d.txt", $0) })
+        #expect(
+            wrapped.base.contents("/dst/src/file000.txt") == "content 0"
+                && wrapped.base.contents("/dst/src/file010.txt") == "old")
         #expect(wrapped.base.contents("/dst/src/file011.txt") == "content 11")
     }
 
@@ -620,11 +742,17 @@ func runJob(_ kind: JobKind, _ sources: [URL], to target: TargetSpec? = nil, rep
         let box = try Sandbox()
         let (fileSystems, wrapped) = makeWrappedFileSystems()
         // Streams from memory onto the disk: each file arrives under a temporary name first.
-        for index in 0..<ParallelCopies.count { wrapped.base.addFile(String(format: "/src/file%03d.txt", index), String(repeating: "\(index % 10)", count: 3000)) }
+        for index in 0..<ParallelCopies.count {
+            wrapped.base.addFile(
+                String(format: "/src/file%03d.txt", index), String(repeating: "\(index % 10)", count: 3000))
+        }
         try box.folder("B")
         let replies = Replies()
         replies.cancelAtItems = 30
-        let result = runJob(.copy, [wrapped.base.url("/src")], to: TargetSpec(directory: box.url("B")), replies: replies, fileSystems: fileSystems) {
+        let result = runJob(
+            .copy, [wrapped.base.url("/src")], to: TargetSpec(directory: box.url("B")), replies: replies,
+            fileSystems: fileSystems
+        ) {
             $0.parallelWidth = 6
         }
         #expect(result.cancelled && result.completed.isEmpty)
@@ -640,15 +768,25 @@ func runJob(_ kind: JobKind, _ sources: [URL], to target: TargetSpec? = nil, rep
     @Test func manySmallFilesOnDiskArriveCompleteInBothDirections() throws {
         let box = try Sandbox()
         let (fileSystems, memory) = makeFileSystems()
-        for index in 0..<200 { try box.file(String(format: "A/tree/d%d/f%03d.txt", index % 7, index), "disk \(index)") }
-        let onDisk = runJob(.copy, [box.url("A/tree")], to: TargetSpec(directory: box.url("B")), replies: Replies(), fileSystems: fileSystems)
+        for index in 0..<200 {
+            try box.file(String(format: "A/tree/d%d/f%03d.txt", index % 7, index), "disk \(index)")
+        }
+        let onDisk = runJob(
+            .copy, [box.url("A/tree")], to: TargetSpec(directory: box.url("B")), replies: Replies(),
+            fileSystems: fileSystems)
         #expect(onDisk.completed.count == 1)
         memory.addDirectory("/in")
-        let toMemory = runJob(.copy, [box.url("B/tree")], to: TargetSpec(directory: memory.url("/in")), replies: Replies(), fileSystems: fileSystems)
+        let toMemory = runJob(
+            .copy, [box.url("B/tree")], to: TargetSpec(directory: memory.url("/in")), replies: Replies(),
+            fileSystems: fileSystems)
         #expect(toMemory.completed.count == 1 && memory.allPaths.count == 1 + 1 + 7 + 200)
-        let back = runJob(.move, [memory.url("/in/tree")], to: TargetSpec(directory: box.url("C")), replies: Replies(), fileSystems: fileSystems)
+        let back = runJob(
+            .move, [memory.url("/in/tree")], to: TargetSpec(directory: box.url("C")), replies: Replies(),
+            fileSystems: fileSystems)
         #expect(back.completed.count == 1 && memory.allPaths == ["/in"])
-        for index in 0..<200 { #expect(box.read(String(format: "C/tree/d%d/f%03d.txt", index % 7, index)) == "disk \(index)") }
+        for index in 0..<200 {
+            #expect(box.read(String(format: "C/tree/d%d/f%03d.txt", index % 7, index)) == "disk \(index)")
+        }
         #expect(namesOnDisk(box.url("C/tree/d3")).allSatisfy { $0.hasPrefix("f") })
     }
 
@@ -660,8 +798,10 @@ func runJob(_ kind: JobKind, _ sources: [URL], to target: TargetSpec? = nil, rep
         wrapped.base.refusesInternalCopy = true
         let replies = Replies()
         replies.failure = .abort
-        let result = runJob(.copy, [wrapped.base.url("/src")], to: TargetSpec(directory: wrapped.base.url("/dst")), replies: replies,
-                            fileSystems: fileSystems) { $0.options.verifies = true }
+        let result = runJob(
+            .copy, [wrapped.base.url("/src")], to: TargetSpec(directory: wrapped.base.url("/dst")), replies: replies,
+            fileSystems: fileSystems
+        ) { $0.options.verifies = true }
         #expect(result.cancelled && replies.errors.count == 1)
         #expect(wrapped.base.allPaths.filter { $0.hasPrefix("/dst/src/") && !$0.hasSuffix("/sub") }.isEmpty)
     }

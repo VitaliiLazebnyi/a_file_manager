@@ -3,9 +3,10 @@ import AFMKernel
 import Foundation
 import LocalFileSystemPlugin
 import SelectionPlugin
-@testable import SystemToolsPlugin
 import TestSupport
 import Testing
+
+@testable import SystemToolsPlugin
 
 /// The system tools after review 2: what is remembered of typed lines, which application a
 /// name means, and jobs that end when they are cancelled.
@@ -23,7 +24,9 @@ import Testing
         try box.file("A/one.txt", "1")
         try box.folder("A/sub")
         try box.folder("B")
-        bench = TestBench(plugins: [tools, SelectionPlugin()], fileSystems: [LocalFileSystem()], left: box.url("A"), right: box.url("B"), settings: settings)
+        bench = TestBench(
+            plugins: [tools, SelectionPlugin()], fileSystems: [LocalFileSystem()], left: box.url("A"),
+            right: box.url("B"), settings: settings)
     }
 
     var history: [String]? { settings.value([String].self, forKey: "systemTools.history") }
@@ -61,12 +64,16 @@ import Testing
         let planted = try box.folder("Here/Tool.app")
         let only = try box.folder("Here/Only.app")
         let (here, folders) = (box.url("Here"), [box.url("Apps")])
-        func found(_ line: String) -> String? { TypedCommand(line)?.application(relativeTo: here, searching: folders)?.path }
+        func found(_ line: String) -> String? {
+            TypedCommand(line)?.application(relativeTo: here, searching: folders)?.path
+        }
         #expect(found("Tool.app") == installed.path && found("Tool.app notes.txt") == installed.path)
         // Asked for by path, the one in the folder is meant.
         #expect(found("./Tool.app") == planted.standardizedFileURL.path && found(planted.path) == planted.path)
         // A name no installed application has is still found where the panel is.
-        #expect(found("Only.app") == only.standardizedFileURL.path && found("None.app") == nil && found("sub/None.app") == nil)
+        #expect(
+            found("Only.app") == only.standardizedFileURL.path && found("None.app") == nil
+                && found("sub/None.app") == nil)
     }
 
     @Test func whetherABareNameIsAProgramIsDecidedByThePathItIsGiven() throws {
@@ -75,8 +82,14 @@ import Testing
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: program.path)
         let typed = try #require(TypedCommand("mytool"))
         // On the PATH of the login shell: a program for the shell. Not on it: the application.
-        #expect(typed.application(relativeTo: box.root, searching: [box.url("Apps")], path: "/nonexistent:" + box.url("bin").path) == nil)
-        #expect(typed.application(relativeTo: box.root, searching: [box.url("Apps")], path: "/nonexistent")?.lastPathComponent == "mytool.app")
+        #expect(
+            typed.application(
+                relativeTo: box.root, searching: [box.url("Apps")], path: "/nonexistent:" + box.url("bin").path)
+                == nil
+        )
+        #expect(
+            typed.application(relativeTo: box.root, searching: [box.url("Apps")], path: "/nonexistent")?
+                .lastPathComponent == "mytool.app")
     }
 
     @Test func systemInformationEndsWhenItIsCancelled() {
@@ -85,18 +98,23 @@ import Testing
         #expect(SystemInformation.gather(displays: [], cancellation: cancelled) == nil)
         #expect(SystemInformation.volumes(cancellation: cancelled).allSatisfy { $0.value.hasSuffix("not answering") })
         let information = SystemInformation.gather(displays: ["1x1"], cancellation: CancellationFlag())
-        #expect(information?.sections.map(\.title) == ["Hardware", "Software", "Volumes"] && information?.sections[2].rows.isEmpty == false)
+        #expect(
+            information?.sections.map(\.title) == ["Hardware", "Software", "Volumes"]
+                && information?.sections[2].rows.isEmpty == false)
     }
 
     @Test func aCancelledListWithSubfoldersEntersNoFolder() throws {
         try box.file("A/sub/deep/far.txt")
         let fileSystems = bench.kernel.fileSystems
         let items = try fileSystems.provider(for: box.url("A")).list(box.url("A"), showHidden: false)
-        let running = ListCollector(fileSystems: fileSystems, showHidden: false, mask: ListMask("*.*"), depth: -1, cancellation: CancellationFlag())
+        let running = ListCollector(
+            fileSystems: fileSystems, showHidden: false, mask: ListMask("*.*"), depth: -1,
+            cancellation: CancellationFlag())
         #expect(running.rows(of: items).map(\.name) == ["one.txt", "sub", "sub/deep", "sub/deep/far.txt"])
         let cancelled = CancellationFlag()
         cancelled.cancel()
-        let stopped = ListCollector(fileSystems: fileSystems, showHidden: false, mask: ListMask("*.*"), depth: -1, cancellation: cancelled)
+        let stopped = ListCollector(
+            fileSystems: fileSystems, showHidden: false, mask: ListMask("*.*"), depth: -1, cancellation: cancelled)
         #expect(stopped.rows(of: items).map(\.name) == ["one.txt", "sub"])
     }
 

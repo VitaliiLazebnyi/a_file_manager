@@ -103,7 +103,8 @@ enum FileListColumn: String, CaseIterable {
     private static var typeIcons = TwoGenerationCache<String, NSImage>(limit: 2000)
 
     /// The icon of the `[..]` row.
-    static let parentIcon = NSImage(systemSymbolName: "arrow.turn.left.up", accessibilityDescription: "Parent directory")
+    static let parentIcon = NSImage(
+        systemSymbolName: "arrow.turn.left.up", accessibilityDescription: "Parent directory")
 
     /// On a local disk a file shows its own icon. Asking the system for it reads the file's
     /// surroundings, which takes 30 µs for a plain file on a good day and for ever on a disk
@@ -115,12 +116,16 @@ enum FileListColumn: String, CaseIterable {
     static func icon(for item: FileItem, own: Bool) -> NSImage {
         if own, item.url.isFileURL {
             let path = item.url.path
-            if Mounts.isLocal(path: path), let icon = IconStore.shared.icon(forPath: path, modified: item.modified) { return icon }
+            if Mounts.isLocal(path: path), let icon = IconStore.shared.icon(forPath: path, modified: item.modified) {
+                return icon
+            }
         }
         let key = item.isFolder ? "/folder" : item.url.pathExtension.lowercased()
         if let cached = typeIcons[key] { return cached }
-        let icon = item.isFolder ? NSWorkspace.shared.icon(for: .folder)
-                                 : NSWorkspace.shared.icon(for: UTType(filenameExtension: key) ?? .data)
+        let icon =
+            item.isFolder
+            ? NSWorkspace.shared.icon(for: .folder)
+            : NSWorkspace.shared.icon(for: UTType(filenameExtension: key) ?? .data)
         typeIcons[key] = icon
         return icon
     }
@@ -143,7 +148,9 @@ enum FileListColumn: String, CaseIterable {
         cell.identifier = identifier
         let label = NSTextField(labelWithString: "")
         label.lineBreakMode = self == .name ? .byTruncatingMiddle : .byTruncatingTail
-        label.font = self == .name || self == .ext ? .systemFont(ofSize: 12)
+        label.font =
+            self == .name || self == .ext
+            ? .systemFont(ofSize: 12)
             : .monospacedDigitSystemFont(ofSize: 12, weight: .regular)
         label.alignment = self == .size ? .right : .left
         var leading: CGFloat = 0
@@ -157,7 +164,8 @@ enum FileListColumn: String, CaseIterable {
             leading = 2 + 16 + 5
         }
         let height = min(size.height, max(14, ceil(label.intrinsicContentSize.height)))
-        label.frame = NSRect(x: leading, y: ((size.height - height) / 2).rounded(), width: size.width - leading, height: height)
+        label.frame = NSRect(
+            x: leading, y: ((size.height - height) / 2).rounded(), width: size.width - leading, height: height)
         // As wide as the cell from where it starts, in the middle of the row's height.
         label.autoresizingMask = [.width, .minYMargin, .maxYMargin]
         cell.addSubview(label)
@@ -278,16 +286,19 @@ final class IconStore {
         waiting[folder] = line.isEmpty ? nil : line
         busy.insert(folder)
         let source = source
-        Background.storage("icons", at: URL(fileURLWithPath: folder, isDirectory: true), qos: .utility,
-                           work: { batch.map { source($0.path) } }, then: { [weak self] fetched in
-            guard let self else { return }
-            self.busy.remove(folder)
-            for (key, icon) in zip(batch, fetched) {
-                self.asked.remove(key)
-                self.icons[key] = icon
-            }
-            NotificationCenter.default.post(name: IconStore.didArrive, object: self, userInfo: [IconStore.pathsKey: Set(batch.map(\.path))])
-            self.fetch(in: folder)
-        })
+        Background.storage(
+            "icons", at: URL(fileURLWithPath: folder, isDirectory: true), qos: .utility,
+            work: { batch.map { source($0.path) } },
+            then: { [weak self] fetched in
+                guard let self else { return }
+                self.busy.remove(folder)
+                for (key, icon) in zip(batch, fetched) {
+                    self.asked.remove(key)
+                    self.icons[key] = icon
+                }
+                NotificationCenter.default.post(
+                    name: IconStore.didArrive, object: self, userInfo: [IconStore.pathsKey: Set(batch.map(\.path))])
+                self.fetch(in: folder)
+            })
     }
 }

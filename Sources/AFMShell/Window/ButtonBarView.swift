@@ -56,14 +56,17 @@ final class BarCommandButton: NSButton {
     }
 
     override func mouseDown(with event: NSEvent) {
-        guard event.modifierFlags.contains(.command), let onCommandMouseDown else { return super.mouseDown(with: event) }
+        guard event.modifierFlags.contains(.command), let onCommandMouseDown else {
+            return super.mouseDown(with: event)
+        }
         onCommandMouseDown(event)
     }
 
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
         if let hoverArea { removeTrackingArea(hoverArea) }
-        let area = NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeInActiveApp, .inVisibleRect], owner: self)
+        let area = NSTrackingArea(
+            rect: .zero, options: [.mouseEnteredAndExited, .activeInActiveApp, .inVisibleRect], owner: self)
         addTrackingArea(area)
         hoverArea = area
         if let window {
@@ -165,7 +168,8 @@ final class ButtonBarView: NSView, NSDraggingSource {
     /// The commands offered by a right click on the bar, when a plugin provides them
     /// (spec 05 › Horizontal button bar); the visibility switches are the shell's own.
     static let contextCommands: [CommandID?] = [
-        .changeButtonBar, .configuration, .resetButtonBar, nil, .showButtonBar, .showDriveButtons, .showCommandLine, .showFunctionKeys,
+        .changeButtonBar, .configuration, .resetButtonBar, nil, .showButtonBar, .showDriveButtons, .showCommandLine,
+        .showFunctionKeys
     ]
 
     init(kernel: Kernel) {
@@ -175,7 +179,8 @@ final class ButtonBarView: NSView, NSDraggingSource {
         addSubview(flow)
         NSLayoutConstraint.activate([
             flow.topAnchor.constraint(equalTo: topAnchor), flow.bottomAnchor.constraint(equalTo: bottomAnchor),
-            flow.leadingAnchor.constraint(equalTo: leadingAnchor), flow.trailingAnchor.constraint(equalTo: trailingAnchor),
+            flow.leadingAnchor.constraint(equalTo: leadingAnchor),
+            flow.trailingAnchor.constraint(equalTo: trailingAnchor)
         ])
         indicator.wantsLayer = true
         indicator.layer?.cornerRadius = 1
@@ -191,7 +196,9 @@ final class ButtonBarView: NSView, NSDraggingSource {
     /// left out, and so are the separators and line breaks that would then stand at an end,
     /// side by side, or around an empty line.
     static func entries(of layout: [ToolbarRegistry.Button?], commands: CommandRegistry) -> [ToolbarRegistry.Button?] {
-        let shown = layout.filter { $0.map { $0.command == ToolbarRegistry.lineBreak || commands[$0.command] != nil } ?? true }
+        let shown = layout.filter {
+            $0.map { $0.command == ToolbarRegistry.lineBreak || commands[$0.command] != nil } ?? true
+        }
         var buttons = shown.compactMap { $0 }.filter { $0.command != ToolbarRegistry.lineBreak }.makeIterator()
         return ButtonBarArrangement(entries: shown.map { $0?.command }).entries.map { id in
             guard let id else { return nil }
@@ -202,7 +209,8 @@ final class ButtonBarView: NSView, NSDraggingSource {
     /// The command's title and its main key, `Find Files… (⌥F7)`, and below them what the
     /// button does, when its plugin says.
     static func toolTip(for command: Command, keys: KeyBindings, hint: String? = nil) -> String {
-        let title = keys.shortcuts(for: command.id).first.map { "\(command.title) (\($0.displayText))" } ?? command.title
+        let title =
+            keys.shortcuts(for: command.id).first.map { "\(command.title) (\($0.displayText))" } ?? command.title
         return hint.map { "\(title)\n\($0)" } ?? title
     }
 
@@ -242,7 +250,8 @@ final class ButtonBarView: NSView, NSDraggingSource {
                 continue
             }
             guard let command = kernel.commands[entry.command] else { continue }
-            let button = BarButton.style(BarCommandButton(title: "", target: self, action: #selector(buttonPressed(_:))))
+            let button = BarButton.style(
+                BarCommandButton(title: "", target: self, action: #selector(buttonPressed(_:))))
             button.isBordered = false
             let dragged = Dragged.button(line: line, group: group, index: index)
             button.onCommandMouseDown = { [weak self, weak button] event in
@@ -264,7 +273,8 @@ final class ButtonBarView: NSView, NSDraggingSource {
                 button.frame.size.height = side
             }
             button.identifier = NSUserInterfaceItemIdentifier(command.id.rawValue)
-            button.toolTip = ButtonBarView.toolTip(for: command, keys: kernel.keyBindings, hint: kernel.toolbar.hint(for: command.id))
+            button.toolTip = ButtonBarView.toolTip(
+                for: command, keys: kernel.keyBindings, hint: kernel.toolbar.hint(for: command.id))
             button.setAccessibilityLabel(command.title)
             buttons.append(button)
             items.append(button)
@@ -279,7 +289,8 @@ final class ButtonBarView: NSView, NSDraggingSource {
         for button in buttons {
             guard let name = button.identifier?.rawValue else { continue }
             let id = CommandID(rawValue: name)
-            let isEnabled = kernel.commands.isEnabled(id), state: NSControl.StateValue = kernel.commands.isChecked(id) ? .on : .off
+            let isEnabled = kernel.commands.isEnabled(id)
+            let state: NSControl.StateValue = kernel.commands.isChecked(id) ? .on : .off
             if button.isEnabled != isEnabled { button.isEnabled = isEnabled }
             if button.state != state { button.state = state }
         }
@@ -302,9 +313,12 @@ final class ButtonBarView: NSView, NSDraggingSource {
     func apply(_ dragged: Dragged, to target: DropTarget?) {
         var arrangement = ButtonBarArrangement(entries: entries)
         switch (dragged, target) {
-        case (.button(let line, let group, let index), .button(let to)?): arrangement.moveButton(line: line, group: group, index: index, to: to)
-        case (.button(let line, let group, let index), nil): arrangement.removeButton(line: line, group: group, index: index)
-        case (.group(let line, let group), .group(let place)?): arrangement.moveGroup(line: line, group: group, to: place)
+        case (.button(let line, let group, let index), .button(let to)?):
+            arrangement.moveButton(line: line, group: group, index: index, to: to)
+        case (.button(let line, let group, let index), nil):
+            arrangement.removeButton(line: line, group: group, index: index)
+        case (.group(let line, let group), .group(let place)?):
+            arrangement.moveGroup(line: line, group: group, to: place)
         default: return
         }
         guard arrangement.entries != entries else { return }
@@ -333,7 +347,8 @@ final class ButtonBarView: NSView, NSDraggingSource {
             switch (item, slot) {
             case (.button(let l, let g, let i), .button(let line, let group, let index)):
                 return (l, g, i) == (line, group, index) ? view : nil
-            case (.group(let l, let g), .handle(let line, let group)), (.group(let l, let g), .button(let line, let group, _)):
+            case (.group(let l, let g), .handle(let line, let group)),
+                (.group(let l, let g), .button(let line, let group, _)):
                 return (l, g) == (line, group) ? view : nil
             default: return nil
             }
@@ -347,7 +362,8 @@ final class ButtonBarView: NSView, NSDraggingSource {
         let pasteboardItem = NSPasteboardItem()
         pasteboardItem.setString("", forType: ButtonBarView.pasteboardType)
         let draggingItem = NSDraggingItem(pasteboardWriter: pasteboardItem)
-        draggingItem.setDraggingFrame(NSRect(origin: convert(first.frame, from: flow).origin, size: image.size), contents: image)
+        draggingItem.setDraggingFrame(
+            NSRect(origin: convert(first.frame, from: flow).origin, size: image.size), contents: image)
         dragged = item
         views.forEach { $0.alphaValue = 0.3 }
         // Room for a new line below the bar while the drag lasts.
@@ -397,18 +413,27 @@ final class ButtonBarView: NSView, NSDraggingSource {
             // The nearest handle, or the end of a line.
             var anchors: [(place: ButtonBarArrangement.Place, point: NSPoint)] = []
             for (index, (slot, frame)) in zip(slots, frames).enumerated() {
-                if case .handle(let line, let group) = slot { anchors.append((.line(line, at: group), NSPoint(x: frame.midX, y: frame.midY))) }
-                if endsLine(index) { anchors.append((.line(slot.line, at: lines[slot.line].count), NSPoint(x: frame.maxX, y: frame.midY))) }
+                if case .handle(let line, let group) = slot {
+                    anchors.append((.line(line, at: group), NSPoint(x: frame.midX, y: frame.midY)))
+                }
+                if endsLine(index) {
+                    anchors.append(
+                        (.line(slot.line, at: lines[slot.line].count), NSPoint(x: frame.maxX, y: frame.midY)))
+                }
             }
             func distance(_ anchor: NSPoint) -> CGFloat { hypot(anchor.x - point.x, 3 * (anchor.y - point.y)) }
             return anchors.min { distance($0.point) < distance($1.point) }.map { .group($0.place) }
         case .button:
             // The row under the mouse, or the nearest one.
-            func distance(to frame: NSRect) -> CGFloat { frame.minY > point.y ? frame.minY - point.y : max(point.y - frame.maxY, 0) }
+            func distance(to frame: NSRect) -> CGFloat {
+                frame.minY > point.y ? frame.minY - point.y : max(point.y - frame.maxY, 0)
+            }
             guard let nearest = frames.min(by: { distance(to: $0) < distance(to: $1) }) else { return nil }
             let inRow = frames.indices.filter { frames[$0].minY == nearest.minY }
             for index in inRow {
-                if case .handle(let line, let group) = slots[index], abs(point.x - frames[index].midX) <= ButtonBarView.handleSnap {
+                if case .handle(let line, let group) = slots[index],
+                    abs(point.x - frames[index].midX) <= ButtonBarView.handleSnap
+                {
                     return .button(.newGroup(.line(line, at: group)))
                 }
             }
@@ -422,7 +447,9 @@ final class ButtonBarView: NSView, NSDraggingSource {
             case .button(let line, let group, let position):
                 return .button(.inGroup(line: line, group: group, at: before ? position : position + 1))
             case .handle(let line, let group):
-                if before, group > 0 { return .button(.inGroup(line: line, group: group - 1, at: lines[line][group - 1].count)) }
+                if before, group > 0 {
+                    return .button(.inGroup(line: line, group: group - 1, at: lines[line][group - 1].count))
+                }
                 return .button(.inGroup(line: line, group: group, at: 0))
             }
         }
@@ -439,19 +466,25 @@ final class ButtonBarView: NSView, NSDraggingSource {
         func place(_ place: ButtonBarArrangement.Place, width: CGFloat) -> NSRect? {
             switch place {
             case .line(let line, let group):
-                if let handle = frame(of: .handle(line: line, group: group)) { return mark(atX: handle.midX, around: handle, width: width) }
+                if let handle = frame(of: .handle(line: line, group: group)) {
+                    return mark(atX: handle.midX, around: handle, width: width)
+                }
                 guard let last = slots.lastIndex(where: { $0.line == line }) else { return nil }
                 return mark(atX: frames[last].maxX + 2, around: frames[last], width: width)
             case .newLine:
                 guard let first = frames.first, let bottom = frames.map(\.maxY).max() else { return nil }
-                return NSRect(x: first.minX, y: bottom + 4, width: max(flow.bounds.width - 2 * first.minX, 0), height: first.height - 4)
+                return NSRect(
+                    x: first.minX, y: bottom + 4, width: max(flow.bounds.width - 2 * first.minX, 0),
+                    height: first.height - 4)
             }
         }
         switch target {
         case .group(let target): return place(target, width: 3)
         case .button(.newGroup(let target)): return place(target, width: 7)
         case .button(.inGroup(let line, let group, let at)):
-            if let next = frame(of: .button(line: line, group: group, index: at)) { return mark(atX: next.minX - 1, around: next, width: 2) }
+            if let next = frame(of: .button(line: line, group: group, index: at)) {
+                return mark(atX: next.minX - 1, around: next, width: 2)
+            }
             if let previous = frame(of: .button(line: line, group: group, index: at - 1)) {
                 return mark(atX: previous.maxX + 1, around: previous, width: 2)
             }
@@ -460,7 +493,10 @@ final class ButtonBarView: NSView, NSDraggingSource {
     }
 
     private func showIndicator(for target: DropTarget?) {
-        guard let target, let frame = indicatorFrame(for: target) else { indicator.isHidden = true; return }
+        guard let target, let frame = indicatorFrame(for: target) else {
+            indicator.isHidden = true
+            return
+        }
         indicator.frame = convert(frame, from: flow)
         var alpha: CGFloat = 1
         switch target {
@@ -472,7 +508,9 @@ final class ButtonBarView: NSView, NSDraggingSource {
         indicator.isHidden = false
     }
 
-    private func isOurs(_ info: NSDraggingInfo) -> Bool { (info.draggingSource as? ButtonBarView) === self && dragged != nil }
+    private func isOurs(_ info: NSDraggingInfo) -> Bool {
+        (info.draggingSource as? ButtonBarView) === self && dragged != nil
+    }
 
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation { draggingUpdated(sender) }
 
@@ -493,7 +531,9 @@ final class ButtonBarView: NSView, NSDraggingSource {
         return true
     }
 
-    func draggingSession(_ session: NSDraggingSession, sourceOperationMaskFor context: NSDraggingContext) -> NSDragOperation {
+    func draggingSession(_ session: NSDraggingSession, sourceOperationMaskFor context: NSDraggingContext)
+        -> NSDragOperation
+    {
         context == .withinApplication ? .move : []
     }
 
@@ -533,7 +573,8 @@ final class DriveBarView: NSView {
         addSubview(flow)
         NSLayoutConstraint.activate([
             flow.topAnchor.constraint(equalTo: topAnchor), flow.bottomAnchor.constraint(equalTo: bottomAnchor),
-            flow.leadingAnchor.constraint(equalTo: leadingAnchor), flow.trailingAnchor.constraint(equalTo: trailingAnchor),
+            flow.leadingAnchor.constraint(equalTo: leadingAnchor),
+            flow.trailingAnchor.constraint(equalTo: trailingAnchor)
         ])
         // Volumes come and go, and the file systems answer in their own time: the bar follows the store.
         store.observe { [weak self] in self?.rebuild() }
@@ -559,7 +600,8 @@ final class DriveBarView: NSView {
         buttons = places.enumerated().map { index, place in
             let button = BarButton.make(target: self, action: #selector(buttonPressed(_:)))
             button.title = DisplayText.clean(place.name)
-            button.image = NSImage(systemSymbolName: DriveBarView.symbol(for: place.kind), accessibilityDescription: nil)
+            button.image = NSImage(
+                systemSymbolName: DriveBarView.symbol(for: place.kind), accessibilityDescription: nil)
             button.imagePosition = .imageLeading
             button.tag = index
             button.toolTip = DisplayText.clean(kernel.fileSystems.displayPath(place.url))

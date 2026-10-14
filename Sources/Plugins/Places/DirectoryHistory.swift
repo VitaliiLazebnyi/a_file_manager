@@ -26,7 +26,9 @@ public struct DirectoryHistory: Codable, Equatable {
     /// in the settings, which are exported and shared.
     static func stored(_ directory: URL) -> String {
         let text = directory.absoluteString
-        guard text.contains("@"), var components = URLComponents(string: text), components.password != nil else { return text }
+        guard text.contains("@"), var components = URLComponents(string: text), components.password != nil else {
+            return text
+        }
         components.password = nil
         return components.string ?? text
     }
@@ -52,7 +54,9 @@ public struct DirectoryHistory: Codable, Equatable {
         let earlier = visits.firstIndex { $0.key == key }
         let wasVisible = earlier.map { visits.remove(at: $0).isVisible } ?? false
         visits.append(Visit(location: DirectoryHistory.stored(directory), isVisible: wasVisible))
-        if visits.count > DirectoryHistory.storedLimit { visits.removeFirst(visits.count - DirectoryHistory.storedLimit) }
+        if visits.count > DirectoryHistory.storedLimit {
+            visits.removeFirst(visits.count - DirectoryHistory.storedLimit)
+        }
         return true
     }
 
@@ -77,8 +81,9 @@ public struct DirectoryHistory: Codable, Equatable {
 extension DirectoryHistory.Visit {
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        self.init(location: try container.decode(String.self, forKey: .location),
-                  isVisible: try container.decodeIfPresent(Bool.self, forKey: .isVisible) ?? false)
+        self.init(
+            location: try container.decode(String.self, forKey: .location),
+            isVisible: try container.decodeIfPresent(Bool.self, forKey: .isVisible) ?? false)
     }
 }
 
@@ -88,7 +93,9 @@ extension DirectoryHistory {
     public init(from decoder: Decoder) throws {
         self.init()
         let container = try decoder.container(keyedBy: Keys.self)
-        visits = Array((try container.decodeIfPresent(LenientElements<Visit>.self, forKey: .visits)?.elements ?? []).suffix(DirectoryHistory.storedLimit))
+        visits = Array(
+            (try container.decodeIfPresent(LenientElements<Visit>.self, forKey: .visits)?.elements ?? []).suffix(
+                DirectoryHistory.storedLimit))
     }
 }
 
@@ -100,7 +107,8 @@ extension FrequentFolders {
         let container = try decoder.container(keyedBy: Keys.self)
         let stored = try container.decodeIfPresent([String: Int].self, forKey: .counts) ?? [:]
         // No negative count, and no more than are kept: the most visited stay.
-        let kept = stored.count > FrequentFolders.storedLimit
+        let kept =
+            stored.count > FrequentFolders.storedLimit
             ? Array(stored.sorted { ($1.value, $0.key) < ($0.value, $1.key) }.prefix(FrequentFolders.storedLimit))
             : Array(stored)
         counts = Dictionary(uniqueKeysWithValues: kept.map { ($0.key, max($0.value, 0)) })
@@ -211,9 +219,13 @@ public final class DirectoryHistoryTracker {
         self.settings = settings
         self.now = now
         for side in Side.allCases {
-            histories[side] = StoredSettings.load(DirectoryHistory.self, key: DirectoryHistoryTracker.key(side), in: settings, problem: problem)
+            histories[side] = StoredSettings.load(
+                DirectoryHistory.self, key: DirectoryHistoryTracker.key(side), in: settings, problem: problem)
         }
-        frequent = StoredSettings.load(FrequentFolders.self, key: DirectoryHistoryTracker.frequentKey, in: settings, problem: problem) ?? FrequentFolders()
+        frequent =
+            StoredSettings.load(
+                FrequentFolders.self, key: DirectoryHistoryTracker.frequentKey, in: settings, problem: problem)
+            ?? FrequentFolders()
     }
 
     private static func key(_ side: Side) -> String { "history." + side.rawValue }
@@ -255,7 +267,9 @@ public final class DirectoryHistoryTracker {
         if isFrequent { frequentChanged = true }
         guard !writeIsScheduled else { return }
         writeIsScheduled = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + DirectoryHistoryTracker.writeDelay) { [weak self] in self?.writeChanges() }
+        DispatchQueue.main.asyncAfter(deadline: .now() + DirectoryHistoryTracker.writeDelay) { [weak self] in
+            self?.writeChanges()
+        }
     }
 
     /// Writes what is waiting to be written now.

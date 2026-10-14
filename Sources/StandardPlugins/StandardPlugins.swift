@@ -50,7 +50,7 @@ public enum StandardPlugins {
             SelectionPlugin(),
             ViewOptionsPlugin(),
             FolderTabsPlugin(),
-            ConfigurationPlugin(),
+            ConfigurationPlugin()
         ]
     }
 }

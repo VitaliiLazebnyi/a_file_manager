@@ -2,9 +2,10 @@ import AFMContracts
 import AFMKernel
 import AppKit
 import LocalFileSystemPlugin
-@testable import SelectionPlugin
 import TestSupport
 import Testing
+
+@testable import SelectionPlugin
 
 /// Round 2 of the review, Selection: regular expressions that cannot hang, a `**` that is not
 /// exponential, work off the main thread with a list-version guard, numbers that used to trap,
@@ -12,7 +13,10 @@ import Testing
 @Suite struct Review2FindSelectionRules {
     func finishes(within seconds: Double = 60, _ work: @escaping () -> Void) -> Bool {
         let done = DispatchSemaphore(value: 0)
-        Thread { work(); done.signal() }.start()
+        Thread {
+            work()
+            done.signal()
+        }.start()
         return done.wait(timeout: .now() + seconds) == .success
     }
 
@@ -48,16 +52,19 @@ import Testing
         #expect(result == [false])
         #expect(mask.selected([MaskEntry(name: "x.txt", directory: directory)]) == [true])
         // The chain still means what it did.
-        #expect(SelectionMask("a/**/c/*.txt").selected([
-            MaskEntry(name: "f.txt", directory: ["a", "c"]), MaskEntry(name: "f.txt", directory: ["a", "b", "b", "c"]),
-            MaskEntry(name: "f.txt", directory: ["a", "b"]), MaskEntry(name: "f.txt", directory: ["x", "a", "c"]),
-        ]) == [true, true, false, true])
+        #expect(
+            SelectionMask("a/**/c/*.txt").selected([
+                MaskEntry(name: "f.txt", directory: ["a", "c"]),
+                MaskEntry(name: "f.txt", directory: ["a", "b", "b", "c"]),
+                MaskEntry(name: "f.txt", directory: ["a", "b"]), MaskEntry(name: "f.txt", directory: ["x", "a", "c"])
+            ]) == [true, true, false, true])
     }
 
     @Test func aNameAnsiCannotWriteDoesNotRaise() {
         let name = "\u{3000}\u{0300}"
         let item = FileItem(url: URL(fileURLWithPath: "/tmp/x"), name: name, isDirectory: false)
-        let data = SelectionFile.encode([item, FileItem(url: URL(fileURLWithPath: "/tmp/y"), name: "sél ą.txt", isDirectory: false)], as: .ansi)
+        let data = SelectionFile.encode(
+            [item, FileItem(url: URL(fileURLWithPath: "/tmp/y"), name: "sél ą.txt", isDirectory: false)], as: .ansi)
         #expect(data.count == "??\r\nsél a.txt".unicodeScalars.count)
         #expect(data.contains(0xE9))
         #expect(SelectionFile.windows1252("plain") == Data("plain".utf8))
@@ -71,8 +78,10 @@ import Testing
     let pasteboard = NSPasteboard.withUniqueName()
 
     func makeBench(background: Bool) -> TestBench {
-        TestBench(plugins: [SelectionPlugin(pasteboard: pasteboard, background: background)], fileSystems: [LocalFileSystem(), memory],
-                  left: memory.url("/A"), right: memory.url("/B"))
+        TestBench(
+            plugins: [SelectionPlugin(pasteboard: pasteboard, background: background)],
+            fileSystems: [LocalFileSystem(), memory],
+            left: memory.url("/A"), right: memory.url("/B"))
     }
 
     /// Gives the main run loop the time to hand the result of background work back.
@@ -99,7 +108,9 @@ import Testing
         bench.left.show(memory.url("/A"), focus: nil, history: .keep, completion: nil)
         bench.commands.perform(.selectGroup, .text("<(a+)+$"))
         await settle { bench.ui.log.contains { $0.hasPrefix("inform:") } }
-        #expect(bench.ui.log.last == "inform: The regular expression takes too long." && bench.left.model.selectionCount == 0)
+        #expect(
+            bench.ui.log.last == "inform: The regular expression takes too long."
+                && bench.left.model.selectionCount == 0)
     }
 
     /// The list is read again before the answer comes back: the model refuses the rows made for the

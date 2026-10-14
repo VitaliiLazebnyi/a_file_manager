@@ -115,23 +115,27 @@ final class FTPSession: RemoteSession {
     deinit { keepAlive?.cancel() }
 
     var profile: ConnectionProfile {
-        condition.lock(); defer { condition.unlock() }
+        condition.lock()
+        defer { condition.unlock() }
         return currentProfile
     }
 
     var isConnected: Bool {
-        condition.lock(); defer { condition.unlock() }
+        condition.lock()
+        defer { condition.unlock() }
         return hasConnected && !isClosed
     }
 
     var isConnecting: Bool {
-        condition.lock(); defer { condition.unlock() }
+        condition.lock()
+        defer { condition.unlock() }
         return loggingIn > 0 && !isClosed
     }
 
     /// How many connections are open, for tests.
     var connectionCount: Int {
-        condition.lock(); defer { condition.unlock() }
+        condition.lock()
+        defer { condition.unlock() }
         return total
     }
 
@@ -162,10 +166,11 @@ final class FTPSession: RemoteSession {
 
     private func config(for profile: ConnectionProfile) -> FTPServerConfig {
         let options = environment.options.values
-        return FTPServerConfig(host: profile.key.host, port: profile.key.port, tls: profile.tls, user: profile.user ?? "anonymous",
-                               password: profile.password ?? "", passive: profile.passive ?? options.passiveByDefault,
-                               encoding: profile.encoding, timeout: options.timeout, initCommands: profile.initCommands,
-                               usesMLSD: profile.usesMLSD)
+        return FTPServerConfig(
+            host: profile.key.host, port: profile.key.port, tls: profile.tls, user: profile.user ?? "anonymous",
+            password: profile.password ?? "", passive: profile.passive ?? options.passiveByDefault,
+            encoding: profile.encoding, timeout: options.timeout, initCommands: profile.initCommands,
+            usesMLSD: profile.usesMLSD)
     }
 
     /// The user said no to a question; the connection is not made.
@@ -176,9 +181,11 @@ final class FTPSession: RemoteSession {
     private func takeLoginLock(cancellation: CancellationFlag?) throws {
         let began = Date()
         try lockPatiently(loginLock, cancellation: cancellation) {
-            self.condition.lock(); defer { self.condition.unlock() }
+            self.condition.lock()
+            defer { self.condition.unlock() }
             if self.isClosed { return NetworkError.notConnected(self.currentProfile.key.description) }
-            return self.stalled(since: began, "Another login to \(self.currentProfile.key.description) is still under way.")
+            return self.stalled(
+                since: began, "Another login to \(self.currentProfile.key.description) is still under way.")
         }
     }
 
@@ -186,7 +193,9 @@ final class FTPSession: RemoteSession {
     /// held, so several threads do not each raise a dialog; `holdsLock` tells whether this
     /// thread has it already and is set when it is taken here. Work in the background asks
     /// nothing. Nil is the user's refusal.
-    private func ask<Answer>(holdsLock: inout Bool, background: Bool, cancellation: CancellationFlag?, _ question: () -> Answer?) throws -> Answer? {
+    private func ask<Answer>(
+        holdsLock: inout Bool, background: Bool, cancellation: CancellationFlag?, _ question: () -> Answer?
+    ) throws -> Answer? {
         if background { throw NetworkError.busy("A question to the user is not asked from the background.") }
         if !holdsLock {
             try takeLoginLock(cancellation: cancellation)
@@ -260,7 +269,8 @@ final class FTPSession: RemoteSession {
         func credentials(_ message: String) throws {
             let tried = (profile.user, profile.password)
             let hadLock = holdsLock
-            let answer = try ask(holdsLock: &holdsLock, background: background, cancellation: cancellation) { () -> Credentials?? in
+            let answer = try ask(holdsLock: &holdsLock, background: background, cancellation: cancellation) {
+                () -> Credentials?? in
                 if !hadLock {
                     // Waited for another thread's question: its answer, once a login accepted it, is used.
                     condition.lock()
@@ -279,7 +289,9 @@ final class FTPSession: RemoteSession {
                 remember = answer.remember
             } else {
                 condition.lock()
-                (profile.user, profile.password, profile.anonymous) = (currentProfile.user, currentProfile.password, currentProfile.anonymous)
+                (profile.user, profile.password, profile.anonymous) = (
+                    currentProfile.user, currentProfile.password, currentProfile.anonymous
+                )
                 condition.unlock()
             }
         }
@@ -289,7 +301,11 @@ final class FTPSession: RemoteSession {
             let (asksFirst, knowsUnprotected) = (profile.asksBeforeConnecting && !mayConnect, mayGoUnprotected)
             condition.unlock()
             if asksFirst {
-                guard try ask(holdsLock: &holdsLock, background: background, cancellation: cancellation, { environment.askToConnect(profile) ? true : nil }) != nil else {
+                guard
+                    try ask(
+                        holdsLock: &holdsLock, background: background, cancellation: cancellation,
+                        { environment.askToConnect(profile) ? true : nil }) != nil
+                else {
                     refused = true
                     throw NetworkError.cancelled
                 }
@@ -311,10 +327,15 @@ final class FTPSession: RemoteSession {
             while true {
                 attempts += 1
                 // A password on plain FTP can be read by anyone on the way.
-                if profile.tls == .none, profile.user != "anonymous", !(profile.password ?? "").isEmpty, !askedUnprotected,
-                   environment.asksAboutUnprotectedLoopback || !FTPSession.isLoopback(profile.key.host) {
-                    guard try ask(holdsLock: &holdsLock, background: background, cancellation: cancellation,
-                                  { environment.askToSendPasswordUnprotected(profile) ? true : nil }) != nil else {
+                if profile.tls == .none, profile.user != "anonymous", !(profile.password ?? "").isEmpty,
+                    !askedUnprotected,
+                    environment.asksAboutUnprotectedLoopback || !FTPSession.isLoopback(profile.key.host)
+                {
+                    guard
+                        try ask(
+                            holdsLock: &holdsLock, background: background, cancellation: cancellation,
+                            { environment.askToSendPasswordUnprotected(profile) ? true : nil }) != nil
+                    else {
                         refused = true
                         throw NetworkError.cancelled
                     }
@@ -350,7 +371,8 @@ final class FTPSession: RemoteSession {
                     guard attempts < 4 else { throw NetworkError.untrustedCertificate(certificate) }
                     let host = profile.key.host
                     let hadLock = holdsLock
-                    let accepted = try ask(holdsLock: &holdsLock, background: background, cancellation: cancellation) { () -> Bool? in
+                    let accepted = try ask(holdsLock: &holdsLock, background: background, cancellation: cancellation) {
+                        () -> Bool? in
                         // Another thread's answer to the same certificate is enough.
                         if !hadLock, environment.trust.isAccepted(certificate.fingerprint, for: host) { return true }
                         let known = environment.trust.fingerprints(for: host)
@@ -387,8 +409,10 @@ final class FTPSession: RemoteSession {
     /// nothing has moved on any connection for `patience` seconds (then with an error that says
     /// what is in the way). `background` work never waits at all: it takes a connection that is
     /// free now, or fails.
-    private func acquire(transfer: TransferKind?, fresh: Bool = false, background: Bool = false,
-                         cancellation: CancellationFlag?) throws -> (connection: FTPConnection, reused: Bool) {
+    private func acquire(
+        transfer: TransferKind?, fresh: Bool = false, background: Bool = false,
+        cancellation: CancellationFlag?
+    ) throws -> (connection: FTPConnection, reused: Bool) {
         let began = Date()
         /// After the server said it has no room for another connection (421): when to ask
         /// again, how often that was done, and what it said.
@@ -415,11 +439,15 @@ final class FTPSession: RemoteSession {
                         candidate = connection
                         break
                     }
-                    let serverHasRoom = busyRetries <= FTPSession.busyDelays.count && (openNotBefore.map { Date() >= $0 } ?? true)
+                    let serverHasRoom =
+                        busyRetries <= FTPSession.busyDelays.count && (openNotBefore.map { Date() >= $0 } ?? true)
                     // A connection that is on its way back is waited for, for a moment.
-                    let oneIsComing = (returning > 0 || pinged != nil) && !fresh && Date().timeIntervalSince(began) < returnGrace
+                    let oneIsComing =
+                        (returning > 0 || pinged != nil) && !fresh && Date().timeIntervalSince(began) < returnGrace
                     // Connections held by open files are not coming back soon, and one the keep-alive tests is nobody's.
-                    if serverHasRoom, !oneIsComing, transfer != nil || total - transfers - (pinged == nil ? 0 : 1) < limit || fresh {
+                    if serverHasRoom, !oneIsComing,
+                        transfer != nil || total - transfers - (pinged == nil ? 0 : 1) < limit || fresh
+                    {
                         total += 1
                         mayOpen = true
                         break
@@ -427,9 +455,12 @@ final class FTPSession: RemoteSession {
                 }
                 if background { throw leave(NetworkError.busy("No connection to \(server) is free.")) }
                 if cancellation?.isCancelled == true { throw leave(NetworkError.cancelled) }
-                if let error = stalled(since: began, hasSlot
-                    ? "All connections to \(server) are in use and none came free."
-                    : "All connections to \(server) for \(transfer == .read ? "downloads" : "uploads") are held by open files.") {
+                if let error = stalled(
+                    since: began,
+                    hasSlot
+                        ? "All connections to \(server) are in use and none came free."
+                        : "All connections to \(server) for \(transfer == .read ? "downloads" : "uploads") are held by open files."
+                ) {
                     throw leave(busyReply.map { NetworkError.refused($0) } ?? error)
                 }
                 condition.wait(until: Date().addingTimeInterval(returning > 0 || pinged != nil ? 0.05 : 0.2))
@@ -443,7 +474,9 @@ final class FTPSession: RemoteSession {
 
             if let connection = candidate {
                 // A connection that sat idle may have been dropped by the server or a router.
-                if Date().timeIntervalSince(connection.lastUsed) > FTPSession.trustedIdleTime, !connection.isAlive(cancellation: cancellation ?? closing) {
+                if Date().timeIntervalSince(connection.lastUsed) > FTPSession.trustedIdleTime,
+                    !connection.isAlive(cancellation: cancellation ?? closing)
+                {
                     discard(connection, wasInUse: false, transfer: transfer)
                     continue
                 }
@@ -460,12 +493,16 @@ final class FTPSession: RemoteSession {
                     total -= 1
                     if let transfer { adjust(transfer, by: -1) }
                     var again = false
-                    if case NetworkError.refused(let reply) = error, reply.code == 421, hasConnected, !isClosed, !background {
+                    if case NetworkError.refused(let reply) = error, reply.code == 421, hasConnected, !isClosed,
+                        !background
+                    {
                         // Too many connections from here. The slot is given back, and this
                         // thread takes a connection that comes free, or asks the server again
                         // after a while; when the server keeps saying no, only the former.
                         busyReply = reply
-                        if busyRetries < FTPSession.busyDelays.count { openNotBefore = Date().addingTimeInterval(FTPSession.busyDelays[busyRetries]) }
+                        if busyRetries < FTPSession.busyDelays.count {
+                            openNotBefore = Date().addingTimeInterval(FTPSession.busyDelays[busyRetries])
+                        }
                         busyRetries += 1
                         again = true
                     }
@@ -524,18 +561,24 @@ final class FTPSession: RemoteSession {
     /// turns out to be dead, the work is done once more on a new one (spec: reconnect on a
     /// dropped control connection). `mayRetry` is asked first, because work that already had
     /// an effect outside must not be repeated.
-    private func perform<Result>(transfer: TransferKind? = nil, cancellation: CancellationFlag? = nil,
-                                 mayRetry: (FTPConnection) -> Bool = { _ in true },
-                                 _ work: (FTPConnection) throws -> Result) throws -> (result: Result, connection: FTPConnection) {
+    private func perform<Result>(
+        transfer: TransferKind? = nil, cancellation: CancellationFlag? = nil,
+        mayRetry: (FTPConnection) -> Bool = { _ in true },
+        _ work: (FTPConnection) throws -> Result
+    ) throws -> (result: Result, connection: FTPConnection) {
         var (connection, reused) = try acquire(transfer: transfer, cancellation: cancellation)
         while true {
             do {
                 let result = try work(connection)
                 if transfer == nil { release(connection, transfer: nil) }
                 return (result, connection)
-            } catch let error as NetworkError where error.isConnectionLevel && reused && !connection.isUsable && mayRetry(connection) {
+            } catch let error as NetworkError
+                where error.isConnectionLevel && reused && !connection.isUsable && mayRetry(connection)
+            {
                 discard(connection, wasInUse: true, transfer: transfer)
-                (connection, reused) = (try acquire(transfer: transfer, fresh: true, cancellation: cancellation).connection, false)
+                (connection, reused) = (
+                    try acquire(transfer: transfer, fresh: true, cancellation: cancellation).connection, false
+                )
             } catch {
                 release(connection, transfer: transfer)
                 throw error
@@ -547,8 +590,10 @@ final class FTPSession: RemoteSession {
     /// removes or renames) is repeated on a new connection only when the old one failed before
     /// the command was sent, or the server said it was closing (421): after a reply that did not
     /// come, the command may well have been carried out.
-    private func command<Result>(repeatable: Bool = true, cancellation: CancellationFlag? = nil,
-                                 _ work: (FTPConnection) throws -> Result) throws -> Result {
+    private func command<Result>(
+        repeatable: Bool = true, cancellation: CancellationFlag? = nil,
+        _ work: (FTPConnection) throws -> Result
+    ) throws -> Result {
         try perform(cancellation: cancellation, mayRetry: { repeatable || !$0.commandMayHaveRun }, work).result
     }
 
@@ -571,7 +616,9 @@ final class FTPSession: RemoteSession {
             let start = !isPinging && !isClosed
             if start { isPinging = true }
             condition.unlock()
-            if start { Background.run(lane: self) { [weak self] in self?.keepIdleConnectionsAlive(interval: interval) } }
+            if start {
+                Background.run(lane: self) { [weak self] in self?.keepIdleConnectionsAlive(interval: interval) }
+            }
         }
         timer.resume()
         keepAlive = timer
@@ -586,7 +633,11 @@ final class FTPSession: RemoteSession {
         while true {
             let now = Date()
             condition.lock()
-            guard !isClosed, let index = idle.firstIndex(where: { now.timeIntervalSince($0.lastUsed) >= interval && !tested.contains(ObjectIdentifier($0)) }) else {
+            guard !isClosed,
+                let index = idle.firstIndex(where: {
+                    now.timeIntervalSince($0.lastUsed) >= interval && !tested.contains(ObjectIdentifier($0))
+                })
+            else {
                 isPinging = false
                 condition.unlock()
                 return
@@ -619,7 +670,8 @@ final class FTPSession: RemoteSession {
 
     func connect(cancellation: CancellationFlag?) throws -> String {
         _ = try perform(cancellation: cancellation) { _ in }
-        condition.lock(); defer { condition.unlock() }
+        condition.lock()
+        defer { condition.unlock() }
         return home
     }
 
@@ -642,7 +694,9 @@ final class FTPSession: RemoteSession {
         if !resting.isEmpty { Background.run(lane: self) { resting.forEach { $0.close() } } }
     }
 
-    func list(_ path: String, showHidden: Bool, cancellation: CancellationFlag?, receive: ([RemoteEntry]) -> Bool) throws {
+    func list(_ path: String, showHidden: Bool, cancellation: CancellationFlag?, receive: ([RemoteEntry]) -> Bool)
+        throws
+    {
         var delivered = false
         var unresolved: [String] = []
         _ = try perform(cancellation: cancellation, mayRetry: { _ in !delivered }) { connection in
@@ -666,7 +720,8 @@ final class FTPSession: RemoteSession {
     private func resolveLinksLater(_ paths: [String]) {
         condition.lock()
         var seen = Set<String>()
-        pendingLinks = Array((paths + pendingLinks).filter { seen.insert($0).inserted }.prefix(FTPSession.backgroundLinks))
+        pendingLinks = Array(
+            (paths + pendingLinks).filter { seen.insert($0).inserted }.prefix(FTPSession.backgroundLinks))
         linkDeadline = Date().addingTimeInterval(FTPSession.backgroundLinkTime)
         let start = !isResolving && !isClosed
         if start { isResolving = true }
@@ -693,7 +748,8 @@ final class FTPSession: RemoteSession {
             pendingLinks.removeFirst(batch.count)
             condition.unlock()
 
-            guard let connection = try? acquire(transfer: nil, background: true, cancellation: closing).connection else {
+            guard let connection = try? acquire(transfer: nil, background: true, cancellation: closing).connection
+            else {
                 // Nothing is free right now; the links wait.
                 condition.lock()
                 pendingLinks = batch + pendingLinks
@@ -724,14 +780,19 @@ final class FTPSession: RemoteSession {
             let name = RemotePath.name(of: path)
             if connection.offers("SIZE") {
                 if let size = try connection.size(of: path, cancellation: cancellation) {
-                    let modified = connection.offers("MDTM") ? try connection.modificationTime(of: path, cancellation: cancellation) : nil
+                    let modified =
+                        connection.offers("MDTM")
+                        ? try connection.modificationTime(of: path, cancellation: cancellation) : nil
                     return RemoteEntry(name: name, isDirectory: false, size: size, modified: modified)
                 }
-                if (try? connection.changeDirectory(path, cancellation: cancellation)) != nil { return RemoteEntry(name: name, isDirectory: true) }
+                if (try? connection.changeDirectory(path, cancellation: cancellation)) != nil {
+                    return RemoteEntry(name: name, isDirectory: true)
+                }
                 // Neither a file whose size the server tells nor a directory to enter: the listing decides.
             }
             var found: RemoteEntry?
-            try connection.list(RemotePath.parent(of: path) ?? "/", showHidden: true, cancellation: cancellation) { entries in
+            try connection.list(RemotePath.parent(of: path) ?? "/", showHidden: true, cancellation: cancellation) {
+                entries in
                 found = entries.first { $0.name == name }
                 return found == nil
             }
@@ -772,22 +833,30 @@ final class FTPSession: RemoteSession {
     /// FTP has one rename, and what it does to an existing destination is the server's choice.
     func rename(_ source: String, to destination: String, replacing: Bool, cancellation: CancellationFlag?) throws {
         try withEither(closing, cancellation) { closing in
-            try command(repeatable: false, cancellation: closing) { try $0.rename(source, to: destination, cancellation: closing) }
+            try command(repeatable: false, cancellation: closing) {
+                try $0.rename(source, to: destination, cancellation: closing)
+            }
         }
     }
 
     func setAttributes(_ attributes: FileAttributes, of path: String, cancellation: CancellationFlag?) throws {
         try withEither(closing, cancellation) { closing in
             try command(cancellation: closing) { connection in
-                if let modified = attributes.modified { try connection.setModificationTime(modified, of: path, cancellation: closing) }
-                if let permissions = attributes.permissions { try connection.setPermissions(permissions, of: path, cancellation: closing) }
+                if let modified = attributes.modified {
+                    try connection.setModificationTime(modified, of: path, cancellation: closing)
+                }
+                if let permissions = attributes.permissions {
+                    try connection.setPermissions(permissions, of: path, cancellation: closing)
+                }
             }
         }
     }
 
     func openRead(_ path: String, cancellation: CancellationFlag?) throws -> FileReader {
         if cancellation?.isCancelled == true { throw NetworkError.cancelled }
-        return FTPReader(session: self, path: RemotePath.normalized(path), asText: environment.options.transfersAsText(RemotePath.name(of: path)))
+        return FTPReader(
+            session: self, path: RemotePath.normalized(path),
+            asText: environment.options.transfersAsText(RemotePath.name(of: path)))
     }
 
     func openWrite(_ path: String, cancellation: CancellationFlag?) throws -> FileWriter {
@@ -802,44 +871,65 @@ final class FTPSession: RemoteSession {
     /// Continuing needs a transfer in binary, so that the offsets are those of the file on the server.
     func canAppend(_ path: String) -> Bool {
         guard !environment.options.transfersAsText(RemotePath.name(of: path)) else { return false }
-        condition.lock(); defer { condition.unlock() }
+        condition.lock()
+        defer { condition.unlock() }
         return !hasConnected || offersRestart
     }
 
     /// `APPE` where the file is continued at its end, else `REST` and `STOR` (RFC 3659). A server
     /// does not cut a file there, and one that does not know `APPE` may start the file anew, so
     /// the length is checked when the file is closed, as after every upload.
-    func openAppend(_ path: String, at offset: Int64?, cancellation: CancellationFlag?) throws -> (writer: FileWriter, size: Int64) {
+    func openAppend(_ path: String, at offset: Int64?, cancellation: CancellationFlag?) throws -> (
+        writer: FileWriter, size: Int64
+    ) {
         let path = RemotePath.normalized(path)
-        if environment.options.transfersAsText(RemotePath.name(of: path)) { throw FileSystemError.notSupported("Continuing a transfer in text mode") }
+        if environment.options.transfersAsText(RemotePath.name(of: path)) {
+            throw FileSystemError.notSupported("Continuing a transfer in text mode")
+        }
         let known = try command(cancellation: cancellation) { connection in
             connection.offers("SIZE") ? try connection.size(of: path, cancellation: cancellation) : nil
         }
-        guard let size = try known ?? entry(at: path, cancellation: cancellation).flatMap({ $0.isDirectory ? nil : $0.size }) else {
+        guard
+            let size = try known
+                ?? entry(at: path, cancellation: cancellation).flatMap({ $0.isDirectory ? nil : $0.size })
+        else {
             throw NetworkError.refused(FTPReply(code: 550, lines: ["No such file"]))
         }
         let target = offset ?? size
-        guard target >= 0, target <= size else { throw FileSystemError.notSupported("Continuing \(path) at \(target), it has \(size) bytes") }
-        let (stream, connection) = try perform(transfer: .write, cancellation: cancellation) { connection in
-            guard target == size || connection.offers("REST") else { throw FileSystemError.notSupported("Continuing a file on this server") }
-            return try connection.beginTransfer(target == size ? "APPE \(path)" : "STOR \(path)", type: "I",
-                                                restartAt: target == size ? 0 : UInt64(target), cancellation: cancellation)
+        guard target >= 0, target <= size else {
+            throw FileSystemError.notSupported("Continuing \(path) at \(target), it has \(size) bytes")
         }
-        return (FTPWriter(session: self, connection: connection, stream: stream, path: path, asText: false, start: target), target)
+        let (stream, connection) = try perform(transfer: .write, cancellation: cancellation) { connection in
+            guard target == size || connection.offers("REST") else {
+                throw FileSystemError.notSupported("Continuing a file on this server")
+            }
+            return try connection.beginTransfer(
+                target == size ? "APPE \(path)" : "STOR \(path)", type: "I",
+                restartAt: target == size ? 0 : UInt64(target), cancellation: cancellation)
+        }
+        return (
+            FTPWriter(session: self, connection: connection, stream: stream, path: path, asText: false, start: target),
+            target
+        )
     }
 
     /// Starts a download at `offset` on a connection of its own.
-    fileprivate func beginDownload(_ path: String, asText: Bool, offset: UInt64,
-                                   cancellation: CancellationFlag?) throws -> (stream: NetStream, connection: FTPConnection) {
+    fileprivate func beginDownload(
+        _ path: String, asText: Bool, offset: UInt64,
+        cancellation: CancellationFlag?
+    ) throws -> (stream: NetStream, connection: FTPConnection) {
         let (stream, connection) = try perform(transfer: .read, cancellation: cancellation) {
-            try $0.beginTransfer("RETR \(path)", type: asText ? "A" : "I", restartAt: offset, cancellation: cancellation)
+            try $0.beginTransfer(
+                "RETR \(path)", type: asText ? "A" : "I", restartAt: offset, cancellation: cancellation)
         }
         return (stream, connection)
     }
 
     /// Date and permissions of a file that was just uploaded, as far as the server takes them.
     fileprivate func applyAfterUpload(_ attributes: FileAttributes, to path: String, on connection: FTPConnection) {
-        if let modified = attributes.modified, connection.offers("MFMT") { try? connection.setModificationTime(modified, of: path) }
+        if let modified = attributes.modified, connection.offers("MFMT") {
+            try? connection.setModificationTime(modified, of: path)
+        }
         condition.lock()
         let triesChmod = !refusesChmod
         condition.unlock()
@@ -856,7 +946,8 @@ final class FTPSession: RemoteSession {
 
     /// False for a server without MLST, where one question costs several commands and a listing.
     var singleLookupsAreCheap: Bool {
-        condition.lock(); defer { condition.unlock() }
+        condition.lock()
+        defer { condition.unlock() }
         return knowsMLST
     }
 
@@ -916,7 +1007,8 @@ private final class FTPReader: FileReader {
 
     /// Marks a call of the owning thread as under way; false after `close`.
     private func begin() -> Bool {
-        stateLock.lock(); defer { stateLock.unlock() }
+        stateLock.lock()
+        defer { stateLock.unlock() }
         guard !wasClosed else { return false }
         isBusy = true
         return true
@@ -936,10 +1028,14 @@ private final class FTPReader: FileReader {
         guard begin() else { return nil }
         defer { end() }
         while !atEnd {
-            if active == nil { setActive(try session.beginDownload(path, asText: asText, offset: position, cancellation: abort)) }
+            if active == nil {
+                setActive(try session.beginDownload(path, asText: asText, offset: position, cancellation: abort))
+            }
             guard let active else { break }
             do {
-                guard let block = try active.stream.read(upToCount: count, timeout: session.timeout, cancellation: abort) else {
+                guard
+                    let block = try active.stream.read(upToCount: count, timeout: session.timeout, cancellation: abort)
+                else {
                     setActive(nil)
                     atEnd = true
                     defer { session.release(active.connection, transfer: .read) }
@@ -972,7 +1068,10 @@ private final class FTPReader: FileReader {
             var left = Int(offset - position)
             do {
                 while left > 0 {
-                    guard let block = try active.stream.read(upToCount: left, timeout: session.timeout, cancellation: abort) else { break }
+                    guard
+                        let block = try active.stream.read(
+                            upToCount: left, timeout: session.timeout, cancellation: abort)
+                    else { break }
                     left -= block.count
                     position += UInt64(block.count)
                 }
@@ -989,7 +1088,8 @@ private final class FTPReader: FileReader {
 
     /// Takes the running transfer out of this reader's hands; nil when there is none.
     private func detach() -> (stream: NetStream, connection: FTPConnection)? {
-        stateLock.lock(); defer { stateLock.unlock() }
+        stateLock.lock()
+        defer { stateLock.unlock() }
         let running = active
         active = nil
         return running
@@ -1081,10 +1181,14 @@ private final class FTPWriter: FileWriter {
     }
 
     func write(_ data: Data) throws {
-        if abort.isCancelled { failed = true; throw NetworkError.cancelled }
+        if abort.isCancelled {
+            failed = true
+            throw NetworkError.cancelled
+        }
         guard let active else { throw NetworkError.connectionLost }
         do {
-            try active.stream.write(asText ? converter.toNetwork(data) : data, timeout: session.timeout, cancellation: abort)
+            try active.stream.write(
+                asText ? converter.toNetwork(data) : data, timeout: session.timeout, cancellation: abort)
             written += Int64(data.count)
             session.noteProgress()
         } catch {
@@ -1117,10 +1221,13 @@ private final class FTPWriter: FileWriter {
             var length: Int64?
             if active.connection.offers("SIZE") { length = try active.connection.size(of: path, cancellation: abort) }
             if length == nil, active.connection.offers("MLST") {
-                length = try active.connection.status(of: path, cancellation: abort).flatMap { $0.isDirectory ? nil : $0.size }
+                length = try active.connection.status(of: path, cancellation: abort).flatMap {
+                    $0.isDirectory ? nil : $0.size
+                }
             }
             if let length, length != start + written {
-                throw NetworkError.unexpected("the file on the server has \(length) bytes after the upload, not \(start + written)")
+                throw NetworkError.unexpected(
+                    "the file on the server has \(length) bytes after the upload, not \(start + written)")
             }
         }
         // On the connection the file came through, which is free again.

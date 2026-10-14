@@ -23,8 +23,10 @@ import Testing
         memory.addFile("/A/notes.bak", "b")
         memory.addFile("/A/docs/in.txt", "inside")
         memory.addFile("/B/one.txt", "old")
-        bench = TestBench(plugins: [FileOperationsPlugin()], fileSystems: [LocalFileSystem(), memory], left: memory.url("/A"), right: memory.url("/B"),
-                          settings: settings)
+        bench = TestBench(
+            plugins: [FileOperationsPlugin()], fileSystems: [LocalFileSystem(), memory], left: memory.url("/A"),
+            right: memory.url("/B"),
+            settings: settings)
     }
 
     func select(_ names: String...) {
@@ -38,15 +40,21 @@ import Testing
 
     @Test func commandsKeysPagesAndButtons() {
         let expected: [(CommandID, [Shortcut])] = [
-            ("cm_Copy", [.f(5)]), ("cm_CopySamepanel", [.f(5, .shift)]), ("cm_CopyOtherpanel", []), ("cm_RenMov", [.f(6)]), ("cm_MoveOnly", []),
-            ("cm_RenameOnly", [.f(6, .shift)]), ("cm_RenameSingleFile", []), ("cm_MkDir", [.f(7)]), ("cm_MkDirOther", [.f(7, .shift)]),
-            ("cm_EditNewFile", [.f(4, .shift)]), ("afm_CopyWithOptions", []), ("afm_MoveWithOptions", []), ("afm_CopyNoAsk", []), ("afm_MoveNoAsk", []),
+            ("cm_Copy", [.f(5)]), ("cm_CopySamepanel", [.f(5, .shift)]), ("cm_CopyOtherpanel", []),
+            ("cm_RenMov", [.f(6)]), ("cm_MoveOnly", []),
+            ("cm_RenameOnly", [.f(6, .shift)]), ("cm_RenameSingleFile", []), ("cm_MkDir", [.f(7)]),
+            ("cm_MkDirOther", [.f(7, .shift)]),
+            ("cm_EditNewFile", [.f(4, .shift)]), ("afm_CopyWithOptions", []), ("afm_MoveWithOptions", []),
+            ("afm_CopyNoAsk", []), ("afm_MoveNoAsk", [])
         ]
         for (id, shortcuts) in expected {
             #expect(commands[id]?.defaultShortcuts == shortcuts, "\(id)")
         }
         #expect(bench.kernel.preferences.pages.map(\.title) == ["Copy/Delete", "Log file"])
-        #expect(bench.kernel.toolbar.defaultLayout.compactMap { $0?.command } == [.copy, .renameMove, .makeDirectory, .delete])
+        #expect(
+            bench.kernel.toolbar.defaultLayout.compactMap { $0?.command } == [
+                .copy, .renameMove, .makeDirectory, .delete
+            ])
         #expect(bench.kernel.menus.contextMenu(onItem: true).contains(.copy))
     }
 
@@ -54,11 +62,14 @@ import Testing
 
     @Test func theOptionsDialogCarriesFilterAndOverwriteMode() {
         left.model.selectAll()
-        ui.formAnswers = [.values(["filter": .text("*.txt | docs/"), "overwrite": .index(OverwriteMode.skipAll.rawValue)])]
+        ui.formAnswers = [
+            .values(["filter": .text("*.txt | docs/"), "overwrite": .index(OverwriteMode.skipAll.rawValue)])
+        ]
         commands.perform("afm_CopyWithOptions")
         #expect(ui.log.contains("form: Copy"))
         let keys = ui.forms[0].map(\.key)
-        #expect(keys.contains("target") && keys.contains("verify") && keys.contains("links") && keys.contains("skipErrors"))
+        #expect(
+            keys.contains("target") && keys.contains("verify") && keys.contains("links") && keys.contains("skipErrors"))
         // Nothing was asked: the preset skipped one.txt; the filter left docs and the .bak file out.
         #expect(!ui.log.contains { $0.hasPrefix("choose:") })
         #expect(memory.contents("/B/one.txt") == "old" && memory.contents("/B/two.txt") == "2")
@@ -73,7 +84,9 @@ import Testing
         commands.perform("afm_MoveWithOptions")
         #expect(ui.log.contains("form: Rename/Move") && !ui.forms[0].map(\.key).contains("links"))
         #expect(memory.exists("/B/two.txt") && !memory.exists("/A/two.txt"))
-        #expect(settings.flag("fileOperations.verify", default: false) && settings.index("fileOperations.overwriteMode", default: 0) == 1)
+        #expect(
+            settings.flag("fileOperations.verify", default: false)
+                && settings.index("fileOperations.overwriteMode", default: 0) == 1)
 
         // The stored defaults hold for the plain F5 too: one.txt is overwritten without a question.
         left.moveCursor(toName: "one.txt")
@@ -91,7 +104,9 @@ import Testing
         left.model.selectAll()
         commands.perform(.copy, .text("/O2 G W=\"*.txt\" T=\"mem:/B/sub/\""))
         #expect(ui.log.isEmpty)
-        #expect(memory.contents("/B/sub/one.txt") == "new" && memory.contents("/B/sub/docs/in.txt") == "inside" && !memory.exists("/B/sub/notes.bak"))
+        #expect(
+            memory.contents("/B/sub/one.txt") == "new" && memory.contents("/B/sub/docs/in.txt") == "inside"
+                && !memory.exists("/B/sub/notes.bak"))
         // Without G the switches only fill the dialog.
         left.model.deselect(left.model.selection)
         left.moveCursor(toName: "two.txt")
@@ -121,7 +136,8 @@ import Testing
         ui.choiceAnswers = [5]
         commands.perform(.copy)
         let question = ui.log.first { $0.hasPrefix("choose: Overwrite:") } ?? ""
-        #expect(question.contains("mem:/B/one.txt\n3 bytes") && question.contains("With file:\nmem:/A/one.txt")
+        #expect(
+            question.contains("mem:/B/one.txt\n3 bytes") && question.contains("With file:\nmem:/A/one.txt")
                 && question.contains("The file being copied is of the same age and of the same size."))
         #expect(ui.log.contains("prompt: New name for the file being copied: [one.txt]"))
         #expect(memory.contents("/B/one copy.txt") == "new" && memory.contents("/B/one.txt") == "old")
@@ -184,7 +200,9 @@ import Testing
         select("one.txt", "two.txt")
         ui.formAnswers = [.values(["mask": .text("*.old")])]
         commands.perform(.renameOnly)
-        #expect(ui.log == ["form: Rename"] && memory.contents("/A/one.old") == "new" && memory.contents("/A/two.old") == "2")
+        #expect(
+            ui.log == ["form: Rename"] && memory.contents("/A/one.old") == "new" && memory.contents("/A/two.old") == "2"
+        )
         #expect(left.names == ["docs", "notes.bak", "one.old", "two.old"] && left.model.selection.isEmpty)
 
         select("one.old", "two.old")
@@ -199,7 +217,9 @@ import Testing
         select("first.txt", "notes.bak")
         left.moveCursor(toName: "notes.bak")
         commands.perform("cm_RenameSingleFile", .text("notes.txt"))
-        #expect(memory.exists("/A/notes.txt") && memory.exists("/A/first.txt") && left.model.cursorItem?.name == "notes.txt")
+        #expect(
+            memory.exists("/A/notes.txt") && memory.exists("/A/first.txt") && left.model.cursorItem?.name == "notes.txt"
+        )
     }
 
     // MARK: New folder and new file
@@ -208,7 +228,9 @@ import Testing
         left.moveCursor(toName: "docs")
         ui.promptAnswers = [.text("<1-3>part[C]")]
         commands.perform(.makeDirectory)
-        #expect(["part1", "part2", "part3"].allSatisfy { memory.exists("/A/" + $0) } && left.model.cursorItem?.name == "part3")
+        #expect(
+            ["part1", "part2", "part3"].allSatisfy { memory.exists("/A/" + $0) }
+                && left.model.cursorItem?.name == "part3")
         // The optional digit takes the first free name; [N] is the name under the cursor.
         left.moveCursor(toName: "docs")
         ui.promptAnswers = [.text("<docs[C]|Copy of [N]/[U]in")]
@@ -235,10 +257,14 @@ import Testing
     @Test func newFilesSeveralAtOnce() {
         ui.promptAnswers = [.text("\"a 1.txt\" \"a 2.txt\"|sub/a3.txt")]
         commands.perform(.newTextFile)
-        #expect(memory.contents("/A/a 1.txt") == "" && memory.contents("/A/a 2.txt") == "" && memory.contents("/A/sub/a3.txt") == "")
+        #expect(
+            memory.contents("/A/a 1.txt") == "" && memory.contents("/A/a 2.txt") == ""
+                && memory.contents("/A/sub/a3.txt") == "")
         ui.promptAnswers = [.text("<1-2>note[C:2].md")]
         commands.perform(.newTextFile, .text("1"))
-        #expect(memory.exists("/A/note01.md") && memory.exists("/A/note02.md") && left.model.cursorItem?.name == "note02.md")
+        #expect(
+            memory.exists("/A/note01.md") && memory.exists("/A/note02.md") && left.model.cursorItem?.name == "note02.md"
+        )
         // An existing file is left as it is.
         ui.promptAnswers = [.text("one.txt")]
         commands.perform(.newTextFile, .index(1))
@@ -253,7 +279,9 @@ import Testing
         left.moveCursor(toName: "ro.txt")
         ui.choiceAnswers = [0, 2]
         commands.perform(.delete)
-        #expect(ui.log.contains("choose: Delete: mem:/A/ro.txt is READ ONLY! / Delete anyway?") && memory.exists("/A/ro.txt"))
+        #expect(
+            ui.log.contains("choose: Delete: mem:/A/ro.txt is READ ONLY! / Delete anyway?")
+                && memory.exists("/A/ro.txt"))
         ui.choiceAnswers = [0, 0]
         commands.perform(.delete)
         #expect(!memory.exists("/A/ro.txt"))
@@ -313,7 +341,11 @@ import Testing
             text = box.read("log/ops.log") ?? ""
         }
         let lines = text.split(separator: "\n").map { String($0.dropFirst(21)) }
-        #expect(lines == ["Copy: mem:/A/two.txt -> mem:/B/two.txt", "New folder: mem:/A/made", "Rename: mem:/A/two.txt -> mem:/A/zwei.txt",
-                          "Delete folder: mem:/A/made"])
+        #expect(
+            lines == [
+                "Copy: mem:/A/two.txt -> mem:/B/two.txt", "New folder: mem:/A/made",
+                "Rename: mem:/A/two.txt -> mem:/A/zwei.txt",
+                "Delete folder: mem:/A/made"
+            ])
     }
 }

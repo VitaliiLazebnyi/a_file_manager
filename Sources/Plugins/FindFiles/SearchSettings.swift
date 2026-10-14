@@ -27,16 +27,21 @@ public struct SearchSettings: Codable, Equatable {
 
     /// The start directories typed into "Search in"; relative ones count from `base`.
     public func directories(relativeTo base: URL, fileSystems: FileSystemRegistry) -> [URL] {
-        let typed = searchIn.split(separator: ";").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+        let typed = searchIn.split(separator: ";").map { $0.trimmingCharacters(in: .whitespaces) }.filter {
+            !$0.isEmpty
+        }
         return typed.isEmpty ? [base] : typed.map { fileSystems.location(from: $0, relativeTo: base) }
     }
 
     /// The search these settings describe. `selected` are the panel's marked items, used with
     /// "Only search in selected directories/files". Works on the text alone.
-    public func query(relativeTo base: URL, fileSystems: FileSystemRegistry, includeHidden: Bool, selected: [URL] = []) -> SearchQuery {
+    public func query(relativeTo base: URL, fileSystems: FileSystemRegistry, includeHidden: Bool, selected: [URL] = [])
+        -> SearchQuery
+    {
         let directories = directories(relativeTo: base, fileSystems: fileSystems)
-        var query = SearchQuery(directory: directories[0], names: searchFor, text: findText ? text : "", caseSensitive: caseSensitive,
-                                includeHidden: includeHidden, maxDepth: depth.map { max($0, 0) })
+        var query = SearchQuery(
+            directory: directories[0], names: searchFor, text: findText ? text : "", caseSensitive: caseSensitive,
+            includeHidden: includeHidden, maxDepth: depth.map { max($0, 0) })
         query.moreDirectories = Array(directories.dropFirst())
         query.onlyItems = onlySelected && !selected.isEmpty ? selected : nil
         query.namesAreRegex = namesAreRegex
@@ -55,7 +60,11 @@ public struct SearchSettings: Codable, Equatable {
         if !searchFor.isEmpty { parts.append(searchFor) }
         if namesAreRegex { parts.append("regex") }
         if findText && !text.isEmpty { parts.append("text \"\(text)\"") }
-        if criteria.dateFrom != nil || criteria.dateTo != nil || criteria.notOlderThan != nil || criteria.olderThan != nil { parts.append("date") }
+        if criteria.dateFrom != nil || criteria.dateTo != nil || criteria.notOlderThan != nil
+            || criteria.olderThan != nil
+        {
+            parts.append("date")
+        }
         if searchArchives { parts.append("zip") }
         if criteria.size != nil { parts.append("size") }
         if criteria.hasAttributes { parts.append("attr") }
@@ -112,11 +121,14 @@ public final class SearchStore {
 
     /// Saves under a name; a search of that name is replaced.
     public func save(_ search: SavedSearch) {
-        settings.set(searches.filter { $0.name.caseInsensitiveCompare(search.name) != .orderedSame } + [search], forKey: SearchStore.searchesKey)
+        settings.set(
+            searches.filter { $0.name.caseInsensitiveCompare(search.name) != .orderedSame } + [search],
+            forKey: SearchStore.searchesKey)
     }
 
     public func delete(named name: String) {
-        settings.set(searches.filter { $0.name.caseInsensitiveCompare(name) != .orderedSame }, forKey: SearchStore.searchesKey)
+        settings.set(
+            searches.filter { $0.name.caseInsensitiveCompare(name) != .orderedSame }, forKey: SearchStore.searchesKey)
     }
 
     /// What was typed into a field before, newest first.
@@ -127,7 +139,9 @@ public final class SearchStore {
     /// Puts an entry at the front of a field's history, which keeps `limit` entries.
     public func remember(_ text: String, in field: Field, limit: Int = 20) {
         guard !text.isEmpty else { return }
-        settings.set(Array(([text] + history(field).filter { $0 != text }).prefix(max(limit, 1))), forKey: "history." + field.rawValue)
+        settings.set(
+            Array(([text] + history(field).filter { $0 != text }).prefix(max(limit, 1))),
+            forKey: "history." + field.rawValue)
     }
 
     public func forget(_ text: String, in field: Field) {

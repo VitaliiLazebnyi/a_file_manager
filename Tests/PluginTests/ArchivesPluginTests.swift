@@ -1,6 +1,5 @@
 import AFMContracts
 import AFMKernel
-@testable import ArchivesPlugin
 import FileOperationsPlugin
 import Foundation
 import LocalFileSystemPlugin
@@ -8,6 +7,8 @@ import MacIntegrationPlugin
 import NavigationPlugin
 import TestSupport
 import Testing
+
+@testable import ArchivesPlugin
 
 /// The archives plugin driven through its commands and through the commands of the plugins
 /// it cooperates with (Enter, F5, F7, F8, rename), in panels without a window.
@@ -26,7 +27,8 @@ import Testing
 
     init() throws {
         box = try Sandbox()
-        try box.file("A/tree/readme.txt", String(repeating: "All work and no play makes Jack a dull boy.\n", count: 400))
+        try box.file(
+            "A/tree/readme.txt", String(repeating: "All work and no play makes Jack a dull boy.\n", count: 400))
         try box.file("A/tree/sub/inner.txt", "inner")
         try box.file("A/tree/sub/data.bin", String(repeating: "0123456789", count: 30_000))
         try box.folder("A/tree/hollow")
@@ -34,8 +36,10 @@ import Testing
         try box.file("A/todo.txt", "todo")
         try box.folder("B")
         #expect(runTool("/usr/bin/zip", ["-qr", "tree.zip", "tree"], in: box.url("A")).status == 0)
-        bench = TestBench(plugins: [NavigationPlugin(), mac, FileOperationsPlugin(), archives], fileSystems: [LocalFileSystem(), memory],
-                          left: box.url("A"), right: box.url("B"), settings: settings)
+        bench = TestBench(
+            plugins: [NavigationPlugin(), mac, FileOperationsPlugin(), archives],
+            fileSystems: [LocalFileSystem(), memory],
+            left: box.url("A"), right: box.url("B"), settings: settings)
     }
 
     /// Enter on an item of the left panel.
@@ -60,16 +64,27 @@ import Testing
         let kernel = bench.kernel
         #expect(kernel.fileSystems.all.map(\.scheme) == ["file", "mem", "zip", "archive"])
         #expect(kernel.keyBindings.conflicts.isEmpty)
-        #expect(kernel.keyBindings.command(for: .f(5, .option)) == .packFiles && kernel.keyBindings.command(for: .f(9, .option)) == .unpackFiles)
+        #expect(
+            kernel.keyBindings.command(for: .f(5, .option)) == .packFiles
+                && kernel.keyBindings.command(for: .f(9, .option)) == .unpackFiles)
         #expect(kernel.keyBindings.command(for: .f(9, [.option, .shift])) == "cm_TestArchive")
         #expect(kernel.keyBindings.command(for: .f(5, [.option, .shift])) == "cm_MoveToArchive")
         let files = kernel.menus.menus.first { $0.title == "Files" }?.items ?? []
-        #expect(files.suffix(6) == [nil, .packFiles, "cm_MoveToArchive", .unpackFiles, "cm_TestArchive", "afm_OpenAsArchive"])
-        #expect(kernel.menus.contextMenu(onItem: true).contains(.packFiles) && !kernel.menus.contextMenu(onItem: false).contains(.packFiles))
-        #expect(kernel.toolbar.defaultLayout.compactMap { $0?.command }.filter { [.packFiles, .unpackFiles].contains($0) } == [.packFiles, .unpackFiles])
+        #expect(
+            files.suffix(6) == [
+                nil, .packFiles, "cm_MoveToArchive", .unpackFiles, "cm_TestArchive", "afm_OpenAsArchive"
+            ])
+        #expect(
+            kernel.menus.contextMenu(onItem: true).contains(.packFiles)
+                && !kernel.menus.contextMenu(onItem: false).contains(.packFiles))
+        #expect(
+            kernel.toolbar.defaultLayout.compactMap { $0?.command }.filter { [.packFiles, .unpackFiles].contains($0) }
+                == [.packFiles, .unpackFiles])
         let page = kernel.preferences.pages.first { $0.title == "Packer" }
         #expect(page?.preferences.count == 12 && page?.preferences.allSatisfy { $0.key.hasPrefix("archives.") } == true)
-        #expect(commands.all.filter { ["cm_PackFiles", "cm_UnpackFiles", "cm_TestArchive"].contains($0.id.rawValue) }.count == 3)
+        #expect(
+            commands.all.filter { ["cm_PackFiles", "cm_UnpackFiles", "cm_TestArchive"].contains($0.id.rawValue) }.count
+                == 3)
     }
 
     // MARK: Archives as folders
@@ -77,7 +92,9 @@ import Testing
     @Test func enterGoesIntoAnArchiveAndTheParentRowLeavesIt() {
         enter("tree.zip")
         #expect(left.failures.isEmpty && left.model.directory.scheme == "zip" && left.names == ["tree"])
-        #expect(left.model.hasParentRow && bench.kernel.fileSystems.displayPath(left.model.directory) == box.url("A/tree.zip").path)
+        #expect(
+            left.model.hasParentRow
+                && bench.kernel.fileSystems.displayPath(left.model.directory) == box.url("A/tree.zip").path)
         enter("tree")
         #expect(left.names == ["hollow", "sub", "readme.txt"])
         #expect(left.model.items.last?.size == 17_600)
@@ -114,7 +131,9 @@ import Testing
         // A file that is no archive says so and leaves the panel where it was.
         left.moveCursor(toName: "notes.txt")
         commands.perform("afm_OpenAsArchive")
-        #expect(left.failures.count == 1 && left.failures.first?.contains("not an archive") == true && left.model.directory.isFileURL)
+        #expect(
+            left.failures.count == 1 && left.failures.first?.contains("not an archive") == true
+                && left.model.directory.isFileURL)
 
         // The list of endings and the switch are read from the settings.
         let page = try #require(bench.kernel.preferences.pages.first { $0.title == "Packer" })
@@ -138,7 +157,8 @@ import Testing
         ui.choiceAnswers = [1]
         enter("readme.txt")
         let sheet = ui.log.last ?? ""
-        #expect(sheet.hasPrefix("choose: readme.txt") && sheet.contains("Size: 17,600 bytes") && sheet.contains("Packed:"))
+        #expect(
+            sheet.hasPrefix("choose: readme.txt") && sheet.contains("Size: 17,600 bytes") && sheet.contains("Packed:"))
         #expect(mac.opened.isEmpty)
         // "Unpack and Open" would hand a temporary copy to its application.
         ui.choiceAnswers = [0]
@@ -228,7 +248,8 @@ import Testing
 
         left.moveCursor(toName: "readme.txt")
         commands.perform(.renameOnly, .text("LIESMICH.txt"))
-        #expect(left.names == ["hollow", "made", "sub", "LIESMICH.txt"] && left.model.cursorItem?.name == "LIESMICH.txt")
+        #expect(
+            left.names == ["hollow", "made", "sub", "LIESMICH.txt"] && left.model.cursorItem?.name == "LIESMICH.txt")
         // F6 with a new name renames; into a folder of the same archive it moves.
         left.moveCursor(toName: "sub")
         ui.promptAnswers = [.text("unter")]
@@ -251,7 +272,10 @@ import Testing
         // Nothing of this has touched the archive file yet; one write brings it all.
         #expect(unzipList("A/tree.zip").contains("tree/readme.txt"))
         #expect(archives.flushPendingChanges().isEmpty && isSound("A/tree.zip"))
-        #expect(unzipList("A/tree.zip") == ["tree/", "tree/unter/", "tree/unter/LIESMICH.txt", "tree/unter/data.bin", "tree/unter/inner.txt"])
+        #expect(
+            unzipList("A/tree.zip") == [
+                "tree/", "tree/unter/", "tree/unter/LIESMICH.txt", "tree/unter/data.bin", "tree/unter/inner.txt"
+            ])
         // Quitting writes what is still waiting.
         ui.promptAnswers = [.text("last")]
         commands.perform(.makeDirectory)
@@ -267,12 +291,20 @@ import Testing
         commands.perform(.packFiles)
         let fields = try #require(ui.forms.last)
         // The proposal: named after the operand, in the target panel's folder (spec 08 › Pack dialog).
-        #expect(fields.first?.label == "Pack 1 file(s) to the archive" && fields.first?.initialValue == .text(box.url("B/tree.zip").path))
-        #expect(fields.map(\.key) == ["archive", "format", "level", "paths", "recurse", "move", "separate", "skipBase", "tarFirst", "encrypt"])
+        #expect(
+            fields.first?.label == "Pack 1 file(s) to the archive"
+                && fields.first?.initialValue == .text(box.url("B/tree.zip").path))
+        #expect(
+            fields.map(\.key) == [
+                "archive", "format", "level", "paths", "recurse", "move", "separate", "skipBase", "tarFirst", "encrypt"
+            ])
         #expect(bench.jobService.titles == ["Packing:"] && ui.log.last == "form: Pack files")
         // No message; the archive appears in the target panel with the cursor on it.
         #expect(right.names == ["tree.zip"] && isSound("B/tree.zip"))
-        #expect(unzipList("B/tree.zip") == ["tree/", "tree/hollow/", "tree/readme.txt", "tree/sub/", "tree/sub/data.bin", "tree/sub/inner.txt"])
+        #expect(
+            unzipList("B/tree.zip") == [
+                "tree/", "tree/hollow/", "tree/readme.txt", "tree/sub/", "tree/sub/data.bin", "tree/sub/inner.txt"
+            ])
         #expect(bench.jobService.reports.last?.itemsDone == 6 && bench.jobService.reports.last?.bytesDone == 317_605)
         #expect(box.exists("A/tree"))
 
@@ -316,16 +348,21 @@ import Testing
         #expect(runTool("/usr/bin/gzip", ["-dc", box.url("B/todo.txt.gz").path]).output == "todo")
         left.model.clearSelection()
         left.moveCursor(toName: "tree")
-        ui.formAnswers = [.values(["separate": .flag(true), "skipBase": .flag(true), "archive": .text(box.url("B/sep/").path + "/")])]
+        ui.formAnswers = [
+            .values(["separate": .flag(true), "skipBase": .flag(true), "archive": .text(box.url("B/sep/").path + "/")])
+        ]
         commands.perform(.packFiles)
         #expect(unzipList("B/sep/tree.zip") == ["hollow/", "readme.txt", "sub/", "sub/data.bin", "sub/inner.txt"])
         // A folder into a single-file format: only through a TAR.
         ui.formAnswers = [.values(["format": .index(7), "archive": .text(box.url("B/x").path)])]
         commands.perform(.packFiles)
         #expect(ui.log.last == "inform: Packing failed!" && !box.exists("B/x.xz"))
-        ui.formAnswers = [.values(["format": .index(7), "tarFirst": .flag(true), "archive": .text(box.url("B/x").path)])]
+        ui.formAnswers = [
+            .values(["format": .index(7), "tarFirst": .flag(true), "archive": .text(box.url("B/x").path)])
+        ]
         commands.perform(.packFiles)
-        #expect(runTool("/usr/bin/tar", ["-tJf", box.url("B/x.tar.xz").path]).output.split(separator: "\n").count == 6)
+        #expect(
+            runTool("/usr/bin/tar", ["-tJf", box.url("B/x.tar.xz").path]).output.split(separator: "\n").count == 6)
 
         // Move to archive deletes what was packed, after the archive is complete and tested.
         left.model.select(mask: "*.txt")
@@ -342,8 +379,10 @@ import Testing
     @Test func packEncryptedAndIntoAnExistingArchive() throws {
         left.moveCursor(toName: "notes.txt")
         // The password is asked for twice; a mismatch asks again.
-        ui.formAnswers = [.values(["encrypt": .flag(true)]), .values(["password": .text("one"), "repeat": .text("two")]),
-                          .values(["password": .text("sesame"), "repeat": .text("sesame"), "legacy": .flag(true)])]
+        ui.formAnswers = [
+            .values(["encrypt": .flag(true)]), .values(["password": .text("one"), "repeat": .text("two")]),
+            .values(["password": .text("sesame"), "repeat": .text("sesame"), "legacy": .flag(true)])
+        ]
         commands.perform(.packFiles)
         #expect(ui.log.suffix(3) == ["form: Pack files", "form: Encrypt", "form: Encrypt"])
         #expect(runTool("/usr/bin/unzip", ["-p", "-P", "sesame", box.url("B/notes.zip").path]).output == "notes")
@@ -359,7 +398,9 @@ import Testing
         ui.formAnswers = [.values(["archive": .text(box.url("B/notes.zip").path)])]
         commands.perform(.packFiles)
         #expect(unzipList("B/notes.zip") == ["notes.txt", "todo.txt"])
-        #expect(runTool("/usr/bin/unzip", ["-p", box.url("B/notes.zip").path, "notes.txt"]).output == "notes, second edition")
+        #expect(
+            runTool("/usr/bin/unzip", ["-p", box.url("B/notes.zip").path, "notes.txt"]).output
+                == "notes, second edition")
 
         // With a ZIP open in the target panel, the proposal is that archive and the folder shown.
         right.show(box.url("A"))
@@ -373,7 +414,9 @@ import Testing
         commands.perform(.packFiles)
         #expect(ui.forms.last?.first?.initialValue == .text(box.url("A/tree.zip").path + "/tree/sub"))
         #expect(right.names == ["data.bin", "inner.txt", "todo.txt"])
-        #expect(isSound("A/tree.zip") && unzipList("A/tree.zip").contains("tree/sub/todo.txt") && unzipList("A/tree.zip").count == 7)
+        #expect(
+            isSound("A/tree.zip") && unzipList("A/tree.zip").contains("tree/sub/todo.txt")
+                && unzipList("A/tree.zip").count == 7)
     }
 
     // MARK: Unpack and test
@@ -384,7 +427,9 @@ import Testing
         commands.perform(.unpackFiles)
         let fields = try #require(ui.forms.last)
         #expect(fields.map(\.key) == ["target", "mask", "paths", "separate", "overwrite"])
-        #expect(fields.first?.initialValue == .text(box.url("B").path) && fields.first?.label == "Unpack specific files from archive to:")
+        #expect(
+            fields.first?.initialValue == .text(box.url("B").path)
+                && fields.first?.label == "Unpack specific files from archive to:")
         #expect(snapshot(box.url("B/tree")) == snapshot(box.url("A/tree")) && right.names == ["tree"])
         #expect(bench.jobService.reports.last?.bytesDone == 317_605)
 
@@ -393,26 +438,38 @@ import Testing
         ui.formAnswers = [.accept]
         ui.choiceAnswers = [3]
         commands.perform(.unpackFiles)
-        #expect(ui.log.filter { $0.hasPrefix("choose: Overwrite:") }.count == 1 && box.read("B/tree/readme.txt") == "changed here")
+        #expect(
+            ui.log.filter { $0.hasPrefix("choose: Overwrite:") }.count == 1
+                && box.read("B/tree/readme.txt") == "changed here")
         ui.formAnswers = [.values(["overwrite": .flag(true)])]
         commands.perform(.unpackFiles)
         #expect(box.read("B/tree/readme.txt")?.count == 17_600)
 
         // A mask, without paths, into a folder per archive; several archives at once.
-        #expect(runTool("/usr/bin/tar", ["-cjf", "second.tar.bz2", "notes.txt", "todo.txt"], in: box.url("A")).status == 0)
+        #expect(
+            runTool("/usr/bin/tar", ["-cjf", "second.tar.bz2", "notes.txt", "todo.txt"], in: box.url("A")).status == 0)
         left.reload()
         left.model.select(mask: "*.zip *.bz2")
-        ui.formAnswers = [.values(["mask": .text("*.txt"), "paths": .flag(false), "separate": .flag(true), "target": .text(box.url("B/out").path)])]
+        ui.formAnswers = [
+            .values([
+                "mask": .text("*.txt"), "paths": .flag(false), "separate": .flag(true),
+                "target": .text(box.url("B/out").path)
+            ])
+        ]
         commands.perform(.unpackFiles)
         #expect(namesOnDisk(box.url("B/out")) == ["second", "tree"])
-        #expect(namesOnDisk(box.url("B/out/tree")) == ["inner.txt", "readme.txt"] && namesOnDisk(box.url("B/out/second")) == ["notes.txt", "todo.txt"])
+        #expect(
+            namesOnDisk(box.url("B/out/tree")) == ["inner.txt", "readme.txt"]
+                && namesOnDisk(box.url("B/out/second")) == ["notes.txt", "todo.txt"])
         #expect(left.model.selection.isEmpty)
 
         // Something that is no archive is reported; the rest is unpacked.
         left.model.select(mask: "notes.txt *.bz2")
         ui.formAnswers = [.values(["target": .text(box.url("B/mixed").path)])]
         commands.perform(.unpackFiles)
-        #expect(ui.log.last == "inform: Some files could not be unpacked!" && namesOnDisk(box.url("B/mixed")) == ["notes.txt", "todo.txt"])
+        #expect(
+            ui.log.last == "inform: Some files could not be unpacked!"
+                && namesOnDisk(box.url("B/mixed")) == ["notes.txt", "todo.txt"])
         // An empty target is the archive's own folder.
         left.model.clearSelection()
         left.moveCursor(toName: "second.tar.bz2")
@@ -430,12 +487,16 @@ import Testing
         ui.formAnswers = [.accept]
         commands.perform(.unpackFiles)
         #expect(ui.forms.last?.first?.label == "Unpack 2 file(s) to")
-        #expect(namesOnDisk(box.url("B")) == ["hollow", "sub"] && namesOnDisk(box.url("B/sub")) == ["data.bin", "inner.txt"])
+        #expect(
+            namesOnDisk(box.url("B")) == ["hollow", "sub"]
+                && namesOnDisk(box.url("B/sub")) == ["data.bin", "inner.txt"])
         // Nothing marked: everything below the folder shown that fits the mask.
         left.model.clearSelection()
         ui.formAnswers = [.values(["mask": .text("*.txt"), "target": .text(box.url("B/texts").path)])]
         commands.perform(.unpackFiles)
-        #expect(namesOnDisk(box.url("B/texts")) == ["readme.txt", "sub"] && namesOnDisk(box.url("B/texts/sub")) == ["inner.txt"])
+        #expect(
+            namesOnDisk(box.url("B/texts")) == ["readme.txt", "sub"]
+                && namesOnDisk(box.url("B/texts/sub")) == ["inner.txt"])
     }
 
     @Test func testArchivesReportsWhatIsDamaged() throws {
@@ -483,7 +544,8 @@ import Testing
         #expect(left.names.contains("made") && archives.flushPendingChanges().isEmpty)
         commands.perform(.goToParent)
         commands.perform(.goToParent)
-        #expect(left.model.directory.isSameLocation(as: memory.url("/store")) && left.model.cursorItem?.name == "tree.zip")
+        #expect(
+            left.model.directory.isSameLocation(as: memory.url("/store")) && left.model.cursorItem?.name == "tree.zip")
         #expect(left.model.cursorItem?.size != Int64(bytes.count))
         // Pack onto that file system.
         left.show(box.url("A"))
@@ -492,6 +554,8 @@ import Testing
         left.moveCursor(toName: "notes.txt")
         ui.formAnswers = [.accept]
         commands.perform(.packFiles)
-        #expect(ui.forms.last?.first?.initialValue == .text("mem:/store/notes.zip") && right.names == ["notes.zip", "tree.zip"])
+        #expect(
+            ui.forms.last?.first?.initialValue == .text("mem:/store/notes.zip")
+                && right.names == ["notes.zip", "tree.zip"])
     }
 }

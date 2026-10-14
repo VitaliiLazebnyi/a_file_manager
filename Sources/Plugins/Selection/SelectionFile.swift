@@ -29,7 +29,8 @@ enum SelectionFile {
         bytes.reserveCapacity(text.utf8.count)
         var known: [UInt32: UInt8] = [:]
         func code(_ scalar: Unicode.Scalar) -> UInt8? {
-            guard let data = String(scalar).data(using: .windowsCP1252, allowLossyConversion: false), data.count == 1 else { return nil }
+            guard let data = String(scalar).data(using: .windowsCP1252, allowLossyConversion: false), data.count == 1
+            else { return nil }
             return data[data.startIndex]
         }
         for scalar in text.unicodeScalars {
@@ -38,7 +39,9 @@ enum SelectionFile {
             } else if let byte = known[scalar.value] {
                 bytes.append(byte)
             } else {
-                let byte = code(scalar) ?? String(scalar).decomposedStringWithCanonicalMapping.unicodeScalars.first.flatMap(code) ?? UInt8(ascii: "?")
+                let byte =
+                    code(scalar) ?? String(scalar).decomposedStringWithCanonicalMapping.unicodeScalars.first.flatMap(
+                        code) ?? UInt8(ascii: "?")
                 known[scalar.value] = byte
                 bytes.append(byte)
             }
@@ -49,7 +52,9 @@ enum SelectionFile {
     /// The text of a selection file: UTF-16 or UTF-8 by its byte-order mark, else UTF-8 when
     /// the bytes are valid UTF-8, else Windows-1252.
     static func text(from data: Data) -> String {
-        if data.starts(with: [0xFF, 0xFE]) { return String(data: data.dropFirst(2), encoding: .utf16LittleEndian) ?? "" }
+        if data.starts(with: [0xFF, 0xFE]) {
+            return String(data: data.dropFirst(2), encoding: .utf16LittleEndian) ?? ""
+        }
         if data.starts(with: [0xFE, 0xFF]) { return String(data: data.dropFirst(2), encoding: .utf16BigEndian) ?? "" }
         if data.starts(with: [0xEF, 0xBB, 0xBF]) { return String(data: data.dropFirst(3), encoding: .utf8) ?? "" }
         return String(data: data, encoding: .utf8) ?? String(data: data, encoding: .windowsCP1252) ?? ""
@@ -97,7 +102,8 @@ struct NameBytes: Hashable {
     static func == (a: NameBytes, b: NameBytes) -> Bool {
         let same = a.name.utf8.withContiguousStorageIfAvailable { first in
             b.name.utf8.withContiguousStorageIfAvailable { second in
-                first.count == second.count && (first.isEmpty || memcmp(first.baseAddress!, second.baseAddress!, first.count) == 0)
+                first.count == second.count
+                    && (first.isEmpty || memcmp(first.baseAddress!, second.baseAddress!, first.count) == 0)
             }
         }
         return (same ?? nil) ?? a.name.utf8.elementsEqual(b.name.utf8)
@@ -155,10 +161,13 @@ enum DirectoryComparison {
         var sameRight: [Int] = []
     }
 
-    static func compare(left: [FileItem], right: [FileItem], mode: Mode = .newer, withSubdirectories: Bool = false,
-                        ignoringOneHour: Bool = false, foldingCase: Bool = false) -> Marks {
-        let found = compareIndices(left: left, right: right, mode: mode, withSubdirectories: withSubdirectories,
-                                   ignoringOneHour: ignoringOneHour, foldingCase: foldingCase)
+    static func compare(
+        left: [FileItem], right: [FileItem], mode: Mode = .newer, withSubdirectories: Bool = false,
+        ignoringOneHour: Bool = false, foldingCase: Bool = false
+    ) -> Marks {
+        let found = compareIndices(
+            left: left, right: right, mode: mode, withSubdirectories: withSubdirectories,
+            ignoringOneHour: ignoringOneHour, foldingCase: foldingCase)
         var marks = Marks()
         marks.leftNames = found.left.map { left[$0].name }
         marks.rightNames = found.right.map { right[$0].name }
@@ -176,11 +185,15 @@ enum DirectoryComparison {
     /// does not tell `Photo.JPG` from `photo.jpg`) names are paired without regard to case.
     /// `cancelled` is looked at every few thousand entries; a cancelled comparison returns
     /// what it had.
-    static func compareIndices(left: [FileItem], right: [FileItem], mode: Mode = .newer, withSubdirectories: Bool = false,
-                               ignoringOneHour: Bool = false, foldingCase: Bool = false,
-                               cancelled: () -> Bool = { false }) -> IndexMarks {
+    static func compareIndices(
+        left: [FileItem], right: [FileItem], mode: Mode = .newer, withSubdirectories: Bool = false,
+        ignoringOneHour: Bool = false, foldingCase: Bool = false,
+        cancelled: () -> Bool = { false }
+    ) -> IndexMarks {
         var marks = IndexMarks()
-        func key(_ name: String) -> String { foldingCase ? name.precomposedStringWithCanonicalMapping.lowercased() : name }
+        func key(_ name: String) -> String {
+            foldingCase ? name.precomposedStringWithCanonicalMapping.lowercased() : name
+        }
         // Names are paired by their exact bytes first, so that twins that differ only in
         // normalisation each find their own; a name with no such partner takes the first one
         // that reads the same.
@@ -201,9 +214,13 @@ enum DirectoryComparison {
         // Only what found no partner by its bytes is looked at again by the way it reads.
         var readAlike: [String: [Int]] = [:]
         if taken.count < right.count && taken.count < left.count {
-            for (index, item) in right.enumerated() where !taken.contains(index) { readAlike[key(item.name), default: []].append(index) }
+            for (index, item) in right.enumerated() where !taken.contains(index) {
+                readAlike[key(item.name), default: []].append(index)
+            }
             for (index, item) in left.enumerated() where partner[index] == nil {
-                if let other = readAlike[key(item.name)]?.first(where: { taken.insert($0).inserted }) { partner[index] = other }
+                if let other = readAlike[key(item.name)]?.first(where: { taken.insert($0).inserted }) {
+                    partner[index] = other
+                }
             }
         }
         var paired = Set<Int>()
@@ -225,7 +242,9 @@ enum DirectoryComparison {
                 markSame(position, index)
                 continue
             }
-            var difference = Int64(item.modified.timeIntervalSince1970.rounded(.down)) - Int64(other.modified.timeIntervalSince1970.rounded(.down))
+            var difference =
+                Int64(item.modified.timeIntervalSince1970.rounded(.down))
+                - Int64(other.modified.timeIntervalSince1970.rounded(.down))
             if ignoringOneHour && abs(difference) == 3600 { difference = 0 }
             let sameSize = item.size == other.size
             if difference == 0 && sameSize { markSame(position, index) }
@@ -246,7 +265,8 @@ enum DirectoryComparison {
                 }
             }
         }
-        for (index, item) in right.enumerated() where !paired.contains(index) && (!item.isFolder || withSubdirectories) {
+        for (index, item) in right.enumerated() where !paired.contains(index) && (!item.isFolder || withSubdirectories)
+        {
             marks.right.append(index)
         }
         // The right-hand marks of paired entries came in the order of the left list.

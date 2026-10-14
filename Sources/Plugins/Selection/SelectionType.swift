@@ -44,7 +44,9 @@ struct SelectionType: Codable, Equatable {
         }
         if let modifiedFrom, item.modified < modifiedFrom { return false }
         if let modifiedTo, item.modified > modifiedTo { return false }
-        if let notOlderThanDays, item.modified < now.addingTimeInterval(-Double(notOlderThanDays) * 86_400) { return false }
+        if let notOlderThanDays, item.modified < now.addingTimeInterval(-Double(notOlderThanDays) * 86_400) {
+            return false
+        }
         return hidden.accepts(item.isHidden) && links.accepts(item.isSymlink)
     }
 
@@ -135,8 +137,10 @@ struct SelectionRule {
     var isPairwise: Bool { mask.pairsRelatedFiles }
 
     /// The same as places in `items`, of the entries `scope` lets through.
-    func matchingIndices(among items: [FileItem], base: URL, now: Date = Date(), scope: SelectionScope = .both,
-                         cancelled: () -> Bool) -> [Int] {
+    func matchingIndices(
+        among items: [FileItem], base: URL, now: Date = Date(), scope: SelectionScope = .both,
+        cancelled: () -> Bool
+    ) -> [Int] {
         let entry = entryMaker(base: base)
         let entries = items.map(entry)
         var found: [Int] = []

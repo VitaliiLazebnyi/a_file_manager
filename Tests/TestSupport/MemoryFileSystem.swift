@@ -169,8 +169,10 @@ public final class MemoryFileSystem: FileSystemProvider {
     }
 
     @discardableResult
-    public func addFile(_ path: String, _ content: String = "x", modified: Date = Date(timeIntervalSince1970: 1_000_000),
-                        permissions: UInt16 = 0o644) -> URL {
+    public func addFile(
+        _ path: String, _ content: String = "x", modified: Date = Date(timeIntervalSince1970: 1_000_000),
+        permissions: UInt16 = 0o644
+    ) -> URL {
         let url = url(path)
         try? createDirectory(at: url.deletingLastPathComponent())
         synchronized { nodes[key(url)] = .file(Data(content.utf8), modified, permissions) }
@@ -199,7 +201,9 @@ public final class MemoryFileSystem: FileSystemProvider {
     public func removeTree(_ path: String) {
         let path = key(url(path))
         synchronized {
-            for candidate in nodes.keys where candidate == path || candidate.hasPrefix(path + "/") { nodes[candidate] = nil }
+            for candidate in nodes.keys where candidate == path || candidate.hasPrefix(path + "/") {
+                nodes[candidate] = nil
+            }
         }
     }
 
@@ -284,7 +288,9 @@ public final class MemoryFileSystem: FileSystemProvider {
     }
 
     private func makeStall() -> Stall {
-        Stall(stall, isReleased: { [unowned self] in self.stallsReleased }, onInterrupt: { [weak self] in self?.synchronized { self?.interrupted += 1 } })
+        Stall(
+            stall, isReleased: { [unowned self] in self.stallsReleased },
+            onInterrupt: { [weak self] in self?.synchronized { self?.interrupted += 1 } })
     }
 
     /// The largest number of such listings that were ever under way at the same time.
@@ -296,7 +302,8 @@ public final class MemoryFileSystem: FileSystemProvider {
     }
 
     private func synchronized<T>(_ body: () throws -> T) rethrows -> T {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         return try body()
     }
 
@@ -306,7 +313,11 @@ public final class MemoryFileSystem: FileSystemProvider {
         let trimmed = path.utf8.count > 1 && path.hasSuffix("/") ? String(path.dropLast()) : path
         guard trimmed.utf8.contains(where: { $0 >= 0x80 || $0 == 0x25 }) else { return trimmed }
         return trimmed.utf8.reduce(into: "") { key, byte in
-            if byte >= 0x80 || byte == 0x25 { key += String(format: "%%%02X", byte) } else { key.unicodeScalars.append(Unicode.Scalar(byte)) }
+            if byte >= 0x80 || byte == 0x25 {
+                key += String(format: "%%%02X", byte)
+            } else {
+                key.unicodeScalars.append(Unicode.Scalar(byte))
+            }
         }
     }
 
@@ -338,10 +349,12 @@ public final class MemoryFileSystem: FileSystemProvider {
         let name = key == "/" ? key : String(key[key.index(after: key.lastIndex(of: "/") ?? key.startIndex)...])
         switch node {
         case .directory:
-            return FileItem(url: url(key), name: name, isDirectory: true, isHidden: name.hasPrefix("."), permissions: 0o755)
+            return FileItem(
+                url: url(key), name: name, isDirectory: true, isHidden: name.hasPrefix("."), permissions: 0o755)
         case .file(let data, let modified, let permissions):
-            return FileItem(url: url(key), name: name, isDirectory: false, isHidden: name.hasPrefix("."),
-                            size: Int64(data.count), modified: modified, permissions: permissions)
+            return FileItem(
+                url: url(key), name: name, isDirectory: false, isHidden: name.hasPrefix("."),
+                size: Int64(data.count), modified: modified, permissions: permissions)
         }
     }
 
@@ -356,7 +369,9 @@ public final class MemoryFileSystem: FileSystemProvider {
                 .map { makeItem($0.key, $0.value) }
                 .filter { showHidden || !$0.isHidden }
                 // Names that read the same keep one order: by their bytes.
-                .sorted { $0.name != $1.name ? $0.name < $1.name : $0.name.utf8.lexicographicallyPrecedes($1.name.utf8) }
+                .sorted {
+                    $0.name != $1.name ? $0.name < $1.name : $0.name.utf8.lexicographicallyPrecedes($1.name.utf8)
+                }
         }
     }
 
@@ -364,20 +379,30 @@ public final class MemoryFileSystem: FileSystemProvider {
         try list(directory, showHidden: showHidden, cancellation: nil, receive: receive)
     }
 
-    public func list(_ directory: URL, showHidden: Bool, cancellation: CancellationFlag, receive: ([FileItem]) -> Bool) throws {
+    public func list(_ directory: URL, showHidden: Bool, cancellation: CancellationFlag, receive: ([FileItem]) -> Bool)
+        throws
+    {
         try list(directory, showHidden: showHidden, cancellation: Optional(cancellation), receive: receive)
     }
 
     /// With a flag, a listing that stalls or pauses ends as soon as the flag is set, having
     /// delivered what it had: quietly, as a file system may.
-    private func list(_ directory: URL, showHidden: Bool, cancellation: CancellationFlag?, receive: ([FileItem]) -> Bool) throws {
+    private func list(
+        _ directory: URL, showHidden: Bool, cancellation: CancellationFlag?, receive: ([FileItem]) -> Bool
+    ) throws {
         synchronized {
             listed.append(decoded(key(directory)))
             listing += 1
             mostListingAtOnce = max(mostListingAtOnce, listing)
         }
         defer { synchronized { listing -= 1 } }
-        let waiting = cancellation.map { flag in flag.onCancel { [stall] in stall.lock(); stall.broadcast(); stall.unlock() } }
+        let waiting = cancellation.map { flag in
+            flag.onCancel { [stall] in
+                stall.lock()
+                stall.broadcast()
+                stall.unlock()
+            }
+        }
         defer { _ = waiting }
         /// False when the flag was set meanwhile.
         func pause(_ time: TimeInterval, stalling: Bool = false) -> Bool {
@@ -412,7 +437,11 @@ public final class MemoryFileSystem: FileSystemProvider {
     /// The whole directory at once, as sizes are added up; it stalls like the other, and is
     /// not counted among the `listRequests`, like `list(_:showHidden:)`.
     public func list(_ directory: URL, showHidden: Bool, cancellation: CancellationFlag) throws -> [FileItem] {
-        let waiting = cancellation.onCancel { [stall] in stall.lock(); stall.broadcast(); stall.unlock() }
+        let waiting = cancellation.onCancel { [stall] in
+            stall.lock()
+            stall.broadcast()
+            stall.unlock()
+        }
         defer { _ = waiting }
         let path = decoded(key(directory))
         let stalls = stallsListings && (stalledPaths?.contains(path) ?? true)
@@ -511,7 +540,9 @@ public final class MemoryFileSystem: FileSystemProvider {
             nodes[path] = .file(Data(), Date(), 0o644)
         }
         return Writer(stall: makeStall(), stalls: stallsWrites) { [weak self] data, attributes in
-            self?.synchronized { self?.nodes[path] = .file(data, attributes.modified ?? Date(), attributes.permissions ?? 0o644) }
+            self?.synchronized {
+                self?.nodes[path] = .file(data, attributes.modified ?? Date(), attributes.permissions ?? 0o644)
+            }
         }
     }
 
@@ -521,14 +552,20 @@ public final class MemoryFileSystem: FileSystemProvider {
         guard capabilities(for: url).contains(.append) else { throw FileSystemError.notSupported("Continuing a file") }
         let path = key(url)
         let (head, modified, permissions): (Data, Date, UInt16) = try synchronized {
-            guard case .file(let data, let modified, let permissions)? = nodes[path] else { throw NotFound(path: decoded(path)) }
+            guard case .file(let data, let modified, let permissions)? = nodes[path] else {
+                throw NotFound(path: decoded(path))
+            }
             guard let offset else { return (data, modified, permissions) }
-            guard offset >= 0, offset <= Int64(data.count) else { throw FileSystemError.notSupported("Continuing \(decoded(path)) at \(offset)") }
+            guard offset >= 0, offset <= Int64(data.count) else {
+                throw FileSystemError.notSupported("Continuing \(decoded(path)) at \(offset)")
+            }
             nodes[path] = .file(data.prefix(Int(offset)), modified, permissions)
             return (data.prefix(Int(offset)), modified, permissions)
         }
         return Writer(head, stall: makeStall(), stalls: stallsWrites) { [weak self] data, attributes in
-            self?.synchronized { self?.nodes[path] = .file(data, attributes.modified ?? modified, attributes.permissions ?? permissions) }
+            self?.synchronized {
+                self?.nodes[path] = .file(data, attributes.modified ?? modified, attributes.permissions ?? permissions)
+            }
         }
     }
 
@@ -554,7 +591,8 @@ public final class MemoryFileSystem: FileSystemProvider {
     private var _commitSteps: Int = 0
 
     public func commit(_ url: URL, cancellation: CancellationFlag, progress: (Int64, Int64) -> Bool) throws {
-        for step in 0..<max(commitSteps, 1) where cancellation.isCancelled || !progress(Int64(step), Int64(commitSteps)) {
+        for step in 0..<max(commitSteps, 1)
+        where cancellation.isCancelled || !progress(Int64(step), Int64(commitSteps)) {
             throw CocoaError(.userCancelled)
         }
         try commit(url, cancellation: cancellation)
@@ -573,7 +611,9 @@ public final class MemoryFileSystem: FileSystemProvider {
         let path = key(url)
         try synchronized {
             guard nodes[path] != nil else { throw NotFound(path: decoded(path)) }
-            guard !nodes.keys.contains(where: { $0.hasPrefix(path + "/") }) else { throw FileSystemError.notSupported("Removing the non-empty \(decoded(path))") }
+            guard !nodes.keys.contains(where: { $0.hasPrefix(path + "/") }) else {
+                throw FileSystemError.notSupported("Removing the non-empty \(decoded(path))")
+            }
             nodes[path] = nil
         }
     }
@@ -593,7 +633,9 @@ public final class MemoryFileSystem: FileSystemProvider {
     public func copy(_ source: URL, to destination: URL, progress: (Int64) -> Bool) throws {
         if refusesInternalCopy { throw FileSystemError.crossesVolumes }
         let (data, modified, permissions): (Data, Date, UInt16) = try synchronized {
-            guard case .file(let data, let modified, let permissions)? = nodes[key(source)] else { throw NotFound(path: decoded(key(source))) }
+            guard case .file(let data, let modified, let permissions)? = nodes[key(source)] else {
+                throw NotFound(path: decoded(key(source)))
+            }
             guard nodes[key(destination)] == nil else { throw FileSystemError.alreadyExists(decoded(key(destination))) }
             return (data, modified, permissions)
         }
@@ -612,7 +654,11 @@ public final class MemoryFileSystem: FileSystemProvider {
         synchronized { flagged.append(what + " " + decoded(key(url))) }
         if cancellation.isCancelled { throw CocoaError(.userCancelled) }
         guard stallsChanges else { return }
-        let waiting = cancellation.onCancel { [stall] in stall.lock(); stall.broadcast(); stall.unlock() }
+        let waiting = cancellation.onCancel { [stall] in
+            stall.lock()
+            stall.broadcast()
+            stall.unlock()
+        }
         defer { _ = waiting }
         stall.lock()
         waitingChanges += 1
@@ -657,7 +703,9 @@ public final class MemoryFileSystem: FileSystemProvider {
         try setQuarantine(value, of: url)
     }
 
-    public func copy(_ source: URL, to destination: URL, cancellation: CancellationFlag, progress: (Int64) -> Bool) throws {
+    public func copy(_ source: URL, to destination: URL, cancellation: CancellationFlag, progress: (Int64) -> Bool)
+        throws
+    {
         try flaggedChange("copy", destination, cancellation)
         try copy(source, to: destination) { progress($0) && !cancellation.isCancelled }
     }

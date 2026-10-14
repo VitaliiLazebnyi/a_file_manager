@@ -1,9 +1,10 @@
 import AFMKernel
 import Foundation
 import LocalFileSystemPlugin
-@testable import PlacesPlugin
 import TestSupport
 import Testing
+
+@testable import PlacesPlugin
 
 /// Stored hotlists and histories survive missing keys, unknown keys and bad elements.
 @Suite struct ConfigPlacesFixStoredData {
@@ -46,11 +47,16 @@ import Testing
 
     @Test func historiesReadLeniently() {
         let settings = MemorySettings()
-        settings.set(Data(#"{"visits":[{"location":"file:///a"},{"isVisible":true},{"location":"file:///b","isVisible":true,"x":1}]}"#.utf8) as Data?, forKey: "history.left")
+        settings.set(
+            Data(
+                #"{"visits":[{"location":"file:///a"},{"isVisible":true},{"location":"file:///b","isVisible":true,"x":1}]}"#
+                    .utf8) as Data?, forKey: "history.left")
         settings.set(Data(#"{"counts":{"file:///a":2},"extra":1}"#.utf8) as Data?, forKey: "history.frequent")
         var told: [String] = []
         let tracker = DirectoryHistoryTracker(settings: settings, problem: { told.append($0) })
-        #expect(tracker.history(of: .left).visits.map(\.location) == ["file:///a", "file:///b"] && tracker.frequent.counts == ["file:///a": 2])
+        #expect(
+            tracker.history(of: .left).visits.map(\.location) == ["file:///a", "file:///b"]
+                && tracker.frequent.counts == ["file:///a": 2])
         #expect(told.count == 1 && settings.data(forKey: "history.left.unreadable") != nil)
     }
 
@@ -89,7 +95,10 @@ import Testing
         #expect(tree.root.children.map(\.name) == ["a", "b", "c", "d", "f"])
         var visited: [String] = []
         var node = tree.root
-        for _ in 0..<5 { node = tree.neighbour(of: node, forward: true); visited.append(node.name) }
+        for _ in 0..<5 {
+            node = tree.neighbour(of: node, forward: true)
+            visited.append(node.name)
+        }
         #expect(visited == ["a", "b", "c", "d", "f"])
         tree.setChildren(["f", "e", "a"], ofPath: "")
         #expect(tree.root.children.map(\.name) == ["a", "e", "f"])
@@ -115,8 +124,8 @@ import Testing
     }
 }
 
-private extension TreeNode {
-    var isRoot: Bool { parent == nil }
+extension TreeNode {
+    fileprivate var isRoot: Bool { parent == nil }
 }
 
 /// The cache: keyed by the hidden flag, partial trees, unscanned folders, debounced writes.
@@ -143,7 +152,9 @@ private extension TreeNode {
         let cache = TreeCache(directory: box.url("cache"))
         cache.store(["a", "a/b", "Volumes"], unscanned: ["Volumes", "a/b"], isComplete: false, for: root)
         let restarted = TreeCache(directory: box.url("cache")).entry(for: root)
-        #expect(restarted == TreeCache.Entry(paths: ["a", "a/b", "Volumes"], unscanned: ["Volumes", "a/b"], isComplete: false))
+        #expect(
+            restarted
+                == TreeCache.Entry(paths: ["a", "a/b", "Volumes"], unscanned: ["Volumes", "a/b"], isComplete: false))
         #expect(TreeCache.parse("root=file:///Volumes/Disk/\n[a]\n(a)\n", root: root) == ["a"])
     }
 
@@ -177,8 +188,11 @@ private extension TreeNode {
             let scanner = TreeScanner(root: box.root, provider: LocalFileSystem(), showHidden: hidden)
             var levels: [TreeScanner.Level] = []
             #expect(scanner.run { levels += $0 })
-            #expect(levels.first?.children == (hidden ? [".hid", "a", "b"] : ["a", "b"]) && levels.allSatisfy(\.isSorted))
-            #expect(scanner.paths == (hidden ? [".hid", "a", "b", ".hid/in", "b/inner"] : ["a", "b", "b/inner"]) && scanner.unscanned.isEmpty)
+            #expect(
+                levels.first?.children == (hidden ? [".hid", "a", "b"] : ["a", "b"]) && levels.allSatisfy(\.isSorted))
+            #expect(
+                scanner.paths == (hidden ? [".hid", "a", "b", ".hid/in", "b/inner"] : ["a", "b", "b/inner"])
+                    && scanner.unscanned.isEmpty)
         }
     }
 

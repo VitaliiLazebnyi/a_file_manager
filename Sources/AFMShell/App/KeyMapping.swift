@@ -6,7 +6,7 @@ extension Key {
     private static let keyCodes: [Key: UInt16] = [
         .returnKey: 36, .enter: 76, .tab: 48, .space: 49, .backspace: 51, .forwardDelete: 117, .insert: 114,
         .home: 115, .end: 119, .pageUp: 116, .pageDown: 121, .left: 123, .right: 124, .down: 125, .up: 126,
-        .keypadPlus: 69, .keypadMinus: 78, .keypadMultiply: 67, .keypadDivide: 75,
+        .keypadPlus: 69, .keypadMinus: 78, .keypadMultiply: 67, .keypadDivide: 75
     ]
     private static let functionKeyCodes: [UInt16] = [122, 120, 99, 118, 96, 97, 98, 100, 101, 109, 103, 111]
     private static let namedKeys: [UInt16: Key] = {
@@ -94,7 +94,7 @@ extension Shortcut {
     private static let keyNames: [Key: String] = [
         .returnKey: "↩", .enter: "⌤", .tab: "⇥", .space: "Space", .backspace: "⌫", .forwardDelete: "⌦", .insert: "Ins",
         .home: "↖", .end: "↘", .pageUp: "⇞", .pageDown: "⇟", .left: "←", .right: "→", .up: "↑", .down: "↓",
-        .keypadPlus: "Num +", .keypadMinus: "Num −", .keypadMultiply: "Num ×", .keypadDivide: "Num ÷",
+        .keypadPlus: "Num +", .keypadMinus: "Num −", .keypadMultiply: "Num ×", .keypadDivide: "Num ÷"
     ]
 
     /// Whether the main menu may own this shortcut. Plain typing keys (Return, Space, Backspace,

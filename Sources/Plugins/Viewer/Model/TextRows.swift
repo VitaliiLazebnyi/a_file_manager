@@ -34,29 +34,42 @@ struct RowSplitter {
     /// begins a line, until `row` returns false. Returns the index of the first unit that is
     /// not part of a reported row: the start of the unfinished row to hand in again. With
     /// `final`, the text ends here and the last row is reported too.
-    mutating func split(_ units: UnsafeBufferPointer<UInt16>, final: Bool, row: (_ start: Int, _ end: Int, _ startsLine: Bool) -> Bool) -> Int {
+    mutating func split(
+        _ units: UnsafeBufferPointer<UInt16>, final: Bool, row: (_ start: Int, _ end: Int, _ startsLine: Bool) -> Bool
+    ) -> Int {
         runUnits(units, final: final) { start, end, startsLine, _ in row(start, end, startsLine) }
     }
 
     /// `split`, which also tells how many columns each row takes (its line end not counted).
-    mutating func splitMeasuring(_ units: UnsafeBufferPointer<UInt16>, final: Bool,
-                                 row: (_ start: Int, _ end: Int, _ startsLine: Bool, _ width: Int) -> Bool) -> Int {
+    mutating func splitMeasuring(
+        _ units: UnsafeBufferPointer<UInt16>, final: Bool,
+        row: (_ start: Int, _ end: Int, _ startsLine: Bool, _ width: Int) -> Bool
+    ) -> Int {
         runUnits(units, final: final, row: row)
     }
 
     /// The same for text that is plain ASCII, cut straight from its bytes: no decoding, no
     /// table of offsets (a byte is a unit).
-    mutating func splitMeasuring(_ bytes: UnsafeBufferPointer<UInt8>, final: Bool,
-                                 row: (_ start: Int, _ end: Int, _ startsLine: Bool, _ width: Int) -> Bool) -> Int {
+    mutating func splitMeasuring(
+        _ bytes: UnsafeBufferPointer<UInt8>, final: Bool,
+        row: (_ start: Int, _ end: Int, _ startsLine: Bool, _ width: Int) -> Bool
+    ) -> Int {
         runBytes(bytes, final: final, row: row)
     }
 
     // The same code twice, for 16-bit units and for bytes: a generic one is slow where nothing is optimised.
-    private mutating func runUnits(_ units: UnsafeBufferPointer<UInt16>, final: Bool, row: (Int, Int, Bool, Int) -> Bool) -> Int {
-        let count = units.count, columns = options.columns, tabWidth = options.tabWidth
+    private mutating func runUnits(
+        _ units: UnsafeBufferPointer<UInt16>, final: Bool, row: (Int, Int, Bool, Int) -> Bool
+    ) -> Int {
+        let count = units.count
+        let columns = options.columns
+        let tabWidth = options.tabWidth
         // Spaces may hang over the edge instead of opening a row of their own, within reason.
         let hangLimit = columns * 2
-        var rowStart = 0, index = 0, column = 0, lastBreak = -1
+        var rowStart = 0
+        var index = 0
+        var column = 0
+        var lastBreak = -1
         // Whether the unit before was a zero width joiner: what it joins stays with it.
         var joined = false
         while index < count {
@@ -86,8 +99,12 @@ struct RowSplitter {
             // pair, and what a joiner joins take no column: a row is never cut in front of them.
             let isSecondHalf = (0xDC00...0xDFFF).contains(unit)
             let takesNone = isSecondHalf || joined || RowSplitter.takesNoColumn(unit)
-            let width = unit == 0x09 ? tabWidth - column % tabWidth : takesNone ? 0
-                : unit >= 0x1100 && EastAsianWidth.isWide(units, at: index) ? 2 : 1
+            let width =
+                unit == 0x09
+                ? tabWidth - column % tabWidth
+                : takesNone
+                    ? 0
+                    : unit >= 0x1100 && EastAsianWidth.isWide(units, at: index) ? 2 : 1
             joined = unit == 0x200D
             // A run of marks with nothing to hold them is cut after a while: a row is never unbounded.
             let endless = takesNone && !isSecondHalf && index - rowStart >= columns * 4 + 16
@@ -123,17 +140,25 @@ struct RowSplitter {
     private static func takesNoColumn(_ unit: UInt16) -> Bool {
         guard unit >= 0x0300 else { return false }
         switch unit {
-        case 0x0300...0x036F, 0x1AB0...0x1AFF, 0x1DC0...0x1DFF, 0x200B...0x200F, 0x20D0...0x20FF, 0x3099...0x309A, 0xFE00...0xFE0F, 0xFE20...0xFE2F:
+        case 0x0300...0x036F, 0x1AB0...0x1AFF, 0x1DC0...0x1DFF, 0x200B...0x200F, 0x20D0...0x20FF, 0x3099...0x309A,
+            0xFE00...0xFE0F, 0xFE20...0xFE2F:
             return true
         default: return false
         }
     }
 
-    private mutating func runBytes(_ units: UnsafeBufferPointer<UInt8>, final: Bool, row: (Int, Int, Bool, Int) -> Bool) -> Int {
-        let count = units.count, columns = options.columns, tabWidth = options.tabWidth
+    private mutating func runBytes(
+        _ units: UnsafeBufferPointer<UInt8>, final: Bool, row: (Int, Int, Bool, Int) -> Bool
+    ) -> Int {
+        let count = units.count
+        let columns = options.columns
+        let tabWidth = options.tabWidth
         // Spaces may hang over the edge instead of opening a row of their own, within reason.
         let hangLimit = columns * 2
-        var rowStart = 0, index = 0, column = 0, lastBreak = -1
+        var rowStart = 0
+        var index = 0
+        var column = 0
+        var lastBreak = -1
         while index < count {
             let unit = units[index]
             if unit == 0x0A || unit == 0x0D {
@@ -238,7 +263,8 @@ final class TextRowIndex {
         }
 
         subscript(index: Int) -> Checkpoint {
-            let chunk = index >> CheckpointList.chunkShift, inChunk = index & (CheckpointList.chunkSize - 1)
+            let chunk = index >> CheckpointList.chunkShift
+            let inChunk = index & (CheckpointList.chunkSize - 1)
             let mark = marks[chunk][inChunk]
             return Checkpoint(offset: mark >> 1, linesBefore: Int(lines[chunk][inChunk]), startsLine: mark & 1 == 1)
         }
@@ -281,7 +307,8 @@ final class TextRowIndex {
             let count = checkpoints.count
             guard count > 1 else { return }
             let span = max(1, bytes)
-            let (product, overflow) = Int64(count).multipliedReportingOverflow(by: Int64(TextRowIndex.minimumCheckpointDistance))
+            let (product, overflow) = Int64(count).multipliedReportingOverflow(
+                by: Int64(TextRowIndex.minimumCheckpointDistance))
             let byDistance = overflow ? Int.max : Int(product / span + (product % span == 0 ? 0 : 1))
             let byCount = (count + TextRowIndex.maximumCheckpoints - 1) / TextRowIndex.maximumCheckpoints
             let wanted = max(byDistance, byCount)
@@ -392,7 +419,8 @@ final class TextRowIndex {
     /// Copies the counters to what the main thread reads. Called with the lock held, after any
     /// of them changed.
     private func mirror() {
-        overview.store(rows: rows, lines: lines, covered: coveredEnd, complete: complete, failure: firstFailure, reused: reused)
+        overview.store(
+            rows: rows, lines: lines, covered: coveredEnd, complete: complete, failure: firstFailure, reused: reused)
     }
 
     // None of these waits for the index lock: they are read on the main thread.
@@ -418,9 +446,11 @@ final class TextRowIndex {
     /// (each through a reader of its own); otherwise one after another. `progress` is called
     /// from the working threads whenever more of the start of the file is known. `rawScan`
     /// off decodes every byte (the reference the fast scan is tested against).
-    func build(source: ByteSource, content: Range<Int64>, encoding: ViewerEncoding, options: TextLayoutOptions, parallel: Bool,
-               segmentSize: Int = 4 << 20, chunkSize: Int = 1 << 20, rawScan: Bool = true, cancellation: CancellationFlag,
-               progress: @escaping () -> Void = {}) {
+    func build(
+        source: ByteSource, content: Range<Int64>, encoding: ViewerEncoding, options: TextLayoutOptions, parallel: Bool,
+        segmentSize: Int = 4 << 20, chunkSize: Int = 1 << 20, rawScan: Bool = true, cancellation: CancellationFlag,
+        progress: @escaping () -> Void = {}
+    ) {
         let unit = Int64(encoding.unitSize)
         let size = max(unit, Int64(segmentSize) / unit * unit)
         let now = Parameters(content: content, encoding: encoding, tabWidth: options.tabWidth, segmentSize: size)
@@ -467,13 +497,17 @@ final class TextRowIndex {
                 do {
                     // The segment that comes next in file order shows what it has found so far, so a
                     // file whose first line is gigabytes long is not blank until it is all read.
-                    segment = try TextRowIndex.scan(source: source, content: content, segment: bounds[number], isFirst: number == 0, encoding: encoding,
-                                                    options: options, chunkSize: chunkSize, rawScan: rawScan, cancellation: cancellation,
-                                                    from: lineStart, partial: { partial, covered in
-                        if self.publishPartial(number, partial, coveredEnd: covered) { progress() }
-                    }, changed: {
-                        if !cancellation.isCancelled { self.recordFailure(ViewerError.fileChanged) }
-                    })
+                    segment = try TextRowIndex.scan(
+                        source: source, content: content, segment: bounds[number], isFirst: number == 0,
+                        encoding: encoding,
+                        options: options, chunkSize: chunkSize, rawScan: rawScan, cancellation: cancellation,
+                        from: lineStart,
+                        partial: { partial, covered in
+                            if self.publishPartial(number, partial, coveredEnd: covered) { progress() }
+                        },
+                        changed: {
+                            if !cancellation.isCancelled { self.recordFailure(ViewerError.fileChanged) }
+                        })
                 } catch {
                     // A read that was ended because the work is dropped is no failure of the file.
                     if !cancellation.isCancelled { recordFailure(error) }
@@ -625,7 +659,9 @@ final class TextRowIndex {
             }
             if skipping { return true }
             lastOffset = offset
-            if result.rowCount % result.stride == 0 { addCheckpoint(Checkpoint(offset: offset, linesBefore: result.lineCount, startsLine: startsLine)) }
+            if result.rowCount % result.stride == 0 {
+                addCheckpoint(Checkpoint(offset: offset, linesBefore: result.lineCount, startsLine: startsLine))
+            }
             if startsLine {
                 result.lineCount += 1
                 if width > result.widest { result.widest = width }
@@ -668,7 +704,10 @@ final class TextRowIndex {
             let first = result.rowCount
             var row = (first + result.stride - 1) / result.stride * result.stride
             while row < first + count {
-                addCheckpoint(Checkpoint(offset: offset + Int64(row - first), linesBefore: result.lineCount + row - first, startsLine: true))
+                addCheckpoint(
+                    Checkpoint(
+                        offset: offset + Int64(row - first), linesBefore: result.lineCount + row - first,
+                        startsLine: true))
                 // The stride may have doubled meanwhile.
                 row = (row / result.stride + 1) * result.stride
             }
@@ -682,7 +721,9 @@ final class TextRowIndex {
     private static func isASCII(_ start: UnsafePointer<UInt8>, _ count: Int) -> Bool {
         var index = 0
         while index + 8 <= count {
-            if UnsafeRawPointer(start + index).loadUnaligned(as: UInt64.self) & 0x8080_8080_8080_8080 != 0 { return false }
+            if UnsafeRawPointer(start + index).loadUnaligned(as: UInt64.self) & 0x8080_8080_8080_8080 != 0 {
+                return false
+            }
             index += 8
         }
         while index < count {
@@ -704,9 +745,11 @@ final class TextRowIndex {
     /// segment), wherever it ends, so the segments need nothing from each other: each looks
     /// for the first line start behind its lower bound and reads on past its upper bound to
     /// the end of its last line. `partial` is handed what is found so far, every few megabytes.
-    static func scan(source: ByteSource, content: Range<Int64>, segment: Range<Int64>, isFirst: Bool, encoding: ViewerEncoding,
-                     options: TextLayoutOptions, chunkSize: Int, rawScan: Bool = true, cancellation: CancellationFlag,
-                     from lineStart: Int64? = nil, partial: ((Segment, Int64) -> Void)? = nil, changed: (() -> Void)? = nil) throws -> Segment {
+    static func scan(
+        source: ByteSource, content: Range<Int64>, segment: Range<Int64>, isFirst: Bool, encoding: ViewerEncoding,
+        options: TextLayoutOptions, chunkSize: Int, rawScan: Bool = true, cancellation: CancellationFlag,
+        from lineStart: Int64? = nil, partial: ((Segment, Int64) -> Void)? = nil, changed: (() -> Void)? = nil
+    ) throws -> Segment {
         let unit = encoding.unitSize
         // With `lineStart`, a line is known to begin there (inside the segment): nothing before it is read.
         let startsAtLine = isFirst || lineStart != nil
@@ -714,7 +757,8 @@ final class TextRowIndex {
         var splitter = RowSplitter(options)
         splitter.startsLine = startsAtLine
         var bytes: [UInt8] = []
-        var base = lineStart ?? segment.lowerBound, readPosition = base
+        var base = lineStart ?? segment.lowerBound
+        var readPosition = base
         var text = DecodedText()
         var sincePartial = 0
         let bigEndian = encoding.kind == .utf16BE
@@ -723,7 +767,8 @@ final class TextRowIndex {
         func cut(_ buffer: UnsafeBufferPointer<UInt8>, _ range: Range<Int>, final: Bool) -> Int {
             let origin = base + Int64(range.lowerBound)
             if rawScan, unit == 1, let start = buffer.baseAddress, isASCII(start + range.lowerBound, range.count) {
-                return splitter.splitMeasuring(UnsafeBufferPointer(rebasing: buffer[range]), final: final) { first, _, startsLine, width in
+                return splitter.splitMeasuring(UnsafeBufferPointer(rebasing: buffer[range]), final: final) {
+                    first, _, startsLine, width in
                     state.take(offset: origin + Int64(first), startsLine: startsLine, width: width)
                 }
             }
@@ -751,9 +796,12 @@ final class TextRowIndex {
                 // is wanted of them, so only the line ends are looked for in the raw bytes.
                 // Decoding is left to the lines that may need more than one row (longer than a
                 // row, or with tabs) and to the ends of unfinished lines.
-                let count = buffer.count, columns = options.columns
+                let count = buffer.count
+                let columns = options.columns
                 guard let start = buffer.baseAddress else { return 0 }
-                @inline(__always) func load(_ at: Int) -> UInt64 { UnsafeRawPointer(start + at).loadUnaligned(as: UInt64.self) }
+                @inline(__always) func load(_ at: Int) -> UInt64 {
+                    UnsafeRawPointer(start + at).loadUnaligned(as: UInt64.self)
+                }
                 /// The first position at or after `from` of a unit that is `byte` (a line end).
                 func find(_ byte: UInt8, from: Int) -> Int {
                     var position = from
@@ -762,15 +810,23 @@ final class TextRowIndex {
                         if unit == 1 { return at }
                         // A 16-bit unit: the byte is its low half and the other one is zero.
                         let first = bigEndian ? at - 1 : at
-                        if first >= from, first % 2 == 0, first + 1 < count, buffer[bigEndian ? first : first + 1] == 0 { return first }
+                        if first >= from, first % 2 == 0, first + 1 < count, buffer[bigEndian ? first : first + 1] == 0
+                        {
+                            return first
+                        }
                         position = at + 1
                     }
                     return count
                 }
                 func isUnit(_ at: Int, _ byte: UInt8) -> Bool {
-                    unit == 1 ? buffer[at] == byte : bigEndian ? buffer[at] == 0 && buffer[at + 1] == byte : buffer[at] == byte && buffer[at + 1] == 0
+                    unit == 1
+                        ? buffer[at] == byte
+                        : bigEndian
+                            ? buffer[at] == 0 && buffer[at + 1] == byte : buffer[at] == byte && buffer[at + 1] == 0
                 }
-                var position = 0, nextLF = -1, nextCR = -1
+                var position = 0
+                var nextLF = -1
+                var nextCR = -1
                 while position < count, !state.stopped {
                     if unit == 1, splitter.startsLine, buffer[position] == 0x0A {
                         // A run of empty lines costs no more than looking at its bytes.
@@ -826,7 +882,9 @@ final class TextRowIndex {
                     // The width is bounded by the bytes for 8-bit units (a wide character takes 2 columns and
                     // at least 2 bytes, except in UTF-8 where it takes 3), but a 16-bit unit may be 2 columns wide.
                     let widthBound = unit == 2 ? length : length / unit
-                    if splitter.startsLine, widthBound <= columns, plainShort || length == 0 || memchr(start + position, 0x09, length) == nil {
+                    if splitter.startsLine, widthBound <= columns,
+                        plainShort || length == 0 || memchr(start + position, 0x09, length) == nil
+                    {
                         _ = state.take(offset: base + Int64(position), startsLine: true, width: widthBound)
                     } else {
                         _ = cut(buffer, position..<end, final: true)
@@ -869,7 +927,9 @@ final class TextRowIndex {
     /// The last checkpoint at or before a byte offset; nil when that part is not indexed yet.
     func position(before offset: Int64) -> Position? {
         synchronized {
-            guard offset < coveredEnd || complete, let segment = lastSegment(where: { $0.checkpoints[0].offset <= offset }) else { return nil }
+            guard offset < coveredEnd || complete,
+                let segment = lastSegment(where: { $0.checkpoints[0].offset <= offset })
+            else { return nil }
             return position(segment, TextRowIndex.lastIndex(in: segment.checkpoints) { $0.offset <= offset } ?? 0)
         }
     }
@@ -877,15 +937,21 @@ final class TextRowIndex {
     /// The last checkpoint at or before the first row of a line (counted from 0).
     func position(beforeLine line: Int) -> Position? {
         synchronized {
-            guard line >= 0, line < lines, let segment = lastSegment(where: { $0.firstLine <= line }) else { return nil }
-            return position(segment, TextRowIndex.lastIndex(in: segment.checkpoints) { $0.linesBefore <= line - segment.firstLine } ?? 0)
+            guard line >= 0, line < lines, let segment = lastSegment(where: { $0.firstLine <= line }) else {
+                return nil
+            }
+            return position(
+                segment,
+                TextRowIndex.lastIndex(in: segment.checkpoints) { $0.linesBefore <= line - segment.firstLine } ?? 0)
         }
     }
 
     private func position(_ segment: Segment, _ checkpoint: Int) -> Position {
         let point = segment.checkpoints[checkpoint]
-        return Position(offset: point.offset, row: segment.firstRow + checkpoint * segment.stride, startsLine: point.startsLine,
-                        linesBefore: segment.firstLine + point.linesBefore, endRow: segment.endsAtGap ? segment.firstRow + segment.rowCount : nil)
+        return Position(
+            offset: point.offset, row: segment.firstRow + checkpoint * segment.stride, startsLine: point.startsLine,
+            linesBefore: segment.firstLine + point.linesBefore,
+            endRow: segment.endsAtGap ? segment.firstRow + segment.rowCount : nil)
     }
 
     private func lastSegment(where matches: (Segment) -> Bool) -> Segment? {
@@ -893,9 +959,12 @@ final class TextRowIndex {
     }
 
     /// The last element of a sorted array for which `matches` holds (it holds for a prefix).
-    private static func lastIndex<Elements: RandomAccessCollection>(in elements: Elements, where matches: (Elements.Element) -> Bool) -> Int?
-        where Elements.Index == Int {
-        var low = 0, high = elements.count
+    private static func lastIndex<Elements: RandomAccessCollection>(
+        in elements: Elements, where matches: (Elements.Element) -> Bool
+    ) -> Int?
+    where Elements.Index == Int {
+        var low = 0
+        var high = elements.count
         while low < high {
             let middle = (low + high) / 2
             if matches(elements[middle]) { low = middle + 1 } else { high = middle }
@@ -931,13 +1000,14 @@ enum EastAsianWidth {
         (0x1F6DC, 0x1F6DF), (0x1F6EB, 0x1F6EC), (0x1F6F4, 0x1F6FC), (0x1F7E0, 0x1F7EB), (0x1F7F0, 0x1F7F0),
         (0x1F90C, 0x1F93A), (0x1F93C, 0x1F945), (0x1F947, 0x1F9FF), (0x1FA70, 0x1FA7C), (0x1FA80, 0x1FA88),
         (0x1FA90, 0x1FABD), (0x1FABF, 0x1FAC5), (0x1FACE, 0x1FADB), (0x1FAE0, 0x1FAE8), (0x1FAF0, 0x1FAF8),
-        (0x20000, 0x2FFFD), (0x30000, 0x3FFFD),
+        (0x20000, 0x2FFFD), (0x30000, 0x3FFFD)
     ]
 
     /// Whether the code point takes two columns.
     static func isWide(_ scalar: UInt32) -> Bool {
         guard scalar >= 0x1100 else { return false }
-        var low = 0, high = wide.count
+        var low = 0
+        var high = wide.count
         while low < high {
             let middle = (low + high) / 2
             if wide[middle].1 < scalar { low = middle + 1 } else { high = middle }

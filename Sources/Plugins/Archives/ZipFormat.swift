@@ -115,14 +115,28 @@ struct ZipRecord {
     var name: String {
         if nameRaw.isEmpty {
             if flags & ZipRecord.flagUTF8 != 0 || nameText.utf8.allSatisfy({ $0 < 0x80 }) { return nameText }
-            if let field = ZipRecord.field(0x7075, in: extra), field.count > 5, let text = String(data: field.dropFirst(5), encoding: .utf8) { return text }
+            if let field = ZipRecord.field(0x7075, in: extra), field.count > 5,
+                let text = String(data: field.dropFirst(5), encoding: .utf8)
+            {
+                return text
+            }
             return nameText
         }
         let nameBytes = self.nameBytes
-        if flags & ZipRecord.flagUTF8 != 0 || nameBytes.allSatisfy({ $0 < 0x80 }), let text = String(data: nameBytes, encoding: .utf8) { return text }
-        if let field = ZipRecord.field(0x7075, in: extra), field.count > 5, let text = String(data: field.dropFirst(5), encoding: .utf8) { return text }
+        if flags & ZipRecord.flagUTF8 != 0 || nameBytes.allSatisfy({ $0 < 0x80 }),
+            let text = String(data: nameBytes, encoding: .utf8)
+        {
+            return text
+        }
+        if let field = ZipRecord.field(0x7075, in: extra), field.count > 5,
+            let text = String(data: field.dropFirst(5), encoding: .utf8)
+        {
+            return text
+        }
         if let text = String(data: nameBytes, encoding: .utf8) { return text }
-        let dos = String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(CFStringEncoding(CFStringEncodings.dosLatinUS.rawValue)))
+        let dos = String.Encoding(
+            rawValue: CFStringConvertEncodingToNSStringEncoding(CFStringEncoding(CFStringEncodings.dosLatinUS.rawValue))
+        )
         return String(data: nameBytes, encoding: dos) ?? String(decoding: nameBytes, as: Unicode.ASCII.self)
     }
 
@@ -131,7 +145,8 @@ struct ZipRecord {
     private var unixMode: UInt32 { isFromUnix ? externalAttributes >> 16 : 0 }
 
     var isDirectory: Bool {
-        lastNameByte == 0x2F || lastNameByte == 0x5C || unixMode & 0o170000 == 0o040000 || (!isFromUnix && externalAttributes & 0x10 != 0)
+        lastNameByte == 0x2F || lastNameByte == 0x5C || unixMode & 0o170000 == 0o040000
+            || (!isFromUnix && externalAttributes & 0x10 != 0)
     }
 
     var isSymbolicLink: Bool { unixMode & 0o170000 == 0o120000 }
@@ -188,7 +203,11 @@ struct ZipRecord {
     mutating func setName(_ name: String) {
         (nameText, nameRaw) = (name, [])
         nameText.makeContiguousUTF8()
-        if nameText.utf8.contains(where: { $0 >= 0x80 }) { flags |= ZipRecord.flagUTF8 } else { flags &= ~ZipRecord.flagUTF8 }
+        if nameText.utf8.contains(where: { $0 >= 0x80 }) {
+            flags |= ZipRecord.flagUTF8
+        } else {
+            flags &= ~ZipRecord.flagUTF8
+        }
         // The Unicode name field would contradict the new name.
         extra = ZipRecord.removing(0x7075, from: extra)
         unwritten.insert(.name)
@@ -196,13 +215,17 @@ struct ZipRecord {
 
     /// Whether everything a header holds is the same in both records.
     func hasSameHeader(as other: ZipRecord) -> Bool {
-        nameText.utf8.elementsEqual(other.nameText.utf8) && nameRaw == other.nameRaw && dosTime == other.dosTime && dosDate == other.dosDate
+        nameText.utf8.elementsEqual(other.nameText.utf8) && nameRaw == other.nameRaw && dosTime == other.dosTime
+            && dosDate == other.dosDate
             && extraStore == other.extraStore
-            && externalAttributes == other.externalAttributes && versionMadeBy == other.versionMadeBy && flags == other.flags
+            && externalAttributes == other.externalAttributes && versionMadeBy == other.versionMadeBy
+            && flags == other.flags
     }
 
     /// A new member as this program writes it: Unix attributes, UTF-8 name, exact time.
-    static func new(name: String, isDirectory: Bool, modified: Date, permissions: UInt16, isSymbolicLink: Bool = false) -> ZipRecord {
+    static func new(name: String, isDirectory: Bool, modified: Date, permissions: UInt16, isSymbolicLink: Bool = false)
+        -> ZipRecord
+    {
         var record = ZipRecord()
         record.setName(isDirectory && !name.hasSuffix("/") ? name + "/" : name)
         let type: UInt32 = isSymbolicLink ? 0o120000 : isDirectory ? 0o040000 : 0o100000
@@ -250,7 +273,10 @@ struct ZipRecord {
         var found = false
         while scan.remaining >= 4, !found {
             let (fieldID, size) = (scan.u16(), Int(scan.u16()))
-            guard size <= scan.remaining else { found = true; break }
+            guard size <= scan.remaining else {
+                found = true
+                break
+            }
             scan.position += size
             found = fieldID == id
         }
@@ -285,7 +311,8 @@ enum DOSTime {
 
     static func encode(_ date: Date) -> (time: UInt16, date: UInt16) {
         guard date.timeIntervalSince1970.isFinite else { return (0, 0x21) }
-        let parts = Calendar(identifier: .gregorian).dateComponents([.year, .month, .day, .hour, .minute, .second], from: date)
+        let parts = Calendar(identifier: .gregorian).dateComponents(
+            [.year, .month, .day, .hour, .minute, .second], from: date)
         guard let year = parts.year, year >= 1980 else { return (0, 0x21) }
         let day = UInt16(min(year - 1980, 127)) << 9 | UInt16(parts.month ?? 1) << 5 | UInt16(parts.day ?? 1)
         let time = UInt16(parts.hour ?? 0) << 11 | UInt16(parts.minute ?? 0) << 5 | UInt16((parts.second ?? 0) / 2)
@@ -372,18 +399,22 @@ enum ZipAES {
             let status = secret.withUnsafeBufferPointer { secret -> Int32 in
                 secret.withMemoryRebound(to: CChar.self) { secret in
                     salt.withUnsafeBytes { salt in
-                        CCKeyDerivationPBKDF(CCPBKDFAlgorithm(kCCPBKDF2), secret.baseAddress, secret.count,
-                                             salt.bindMemory(to: UInt8.self).baseAddress, salt.count,
-                                             CCPseudoRandomAlgorithm(kCCPRFHmacAlgSHA1), 1000, &derived, derived.count)
+                        CCKeyDerivationPBKDF(
+                            CCPBKDFAlgorithm(kCCPBKDF2), secret.baseAddress, secret.count,
+                            salt.bindMemory(to: UInt8.self).baseAddress, salt.count,
+                            CCPseudoRandomAlgorithm(kCCPRFHmacAlgSHA1), 1000, &derived, derived.count)
                     }
                 }
             }
             guard status == kCCSuccess else { throw ArchiveError.unsupported("AES encryption") }
             verifier = Data(derived[(2 * keyLength)...])
-            let made = CCCryptorCreate(CCOperation(kCCEncrypt), CCAlgorithm(kCCAlgorithmAES), CCOptions(kCCOptionECBMode), derived, keyLength,
-                                       nil, &cryptor)
+            let made = CCCryptorCreate(
+                CCOperation(kCCEncrypt), CCAlgorithm(kCCAlgorithmAES), CCOptions(kCCOptionECBMode), derived, keyLength,
+                nil, &cryptor)
             guard made == kCCSuccess, cryptor != nil else { throw ArchiveError.unsupported("AES encryption") }
-            derived.withUnsafeBufferPointer { CCHmacInit(&mac, CCHmacAlgorithm(kCCHmacAlgSHA1), $0.baseAddress! + keyLength, keyLength) }
+            derived.withUnsafeBufferPointer {
+                CCHmacInit(&mac, CCHmacAlgorithm(kCCHmacAlgSHA1), $0.baseAddress! + keyLength, keyLength)
+            }
         }
 
         deinit {
@@ -452,7 +483,9 @@ enum ZipAES {
         init(password: String, method: UInt16) throws {
             field = Field(method: method)
             var salt = Data(count: field.saltLength)
-            let status = salt.withUnsafeMutableBytes { SecRandomCopyBytes(kSecRandomDefault, $0.count, $0.baseAddress!) }
+            let status = salt.withUnsafeMutableBytes {
+                SecRandomCopyBytes(kSecRandomDefault, $0.count, $0.baseAddress!)
+            }
             guard status == errSecSuccess else { throw ArchiveError.unsupported("AES encryption (no random numbers)") }
             cipher = try Cipher(password: password, salt: salt, keyLength: field.keyLength)
             header = salt + cipher.verifier
@@ -491,15 +524,25 @@ final class ZipAESDecryptStream: ByteStream {
     /// Reads the salt and checks the two bytes behind it. `length` is the member's whole
     /// stored size. `onFailure` is told when the data turns out not to be what was encrypted
     /// with this password, before the error is thrown.
-    init(_ source: ByteStream, length: UInt64, field: ZipAES.Field, password: String, name: String, onFailure: (() -> Void)? = nil) throws {
+    init(
+        _ source: ByteStream, length: UInt64, field: ZipAES.Field, password: String, name: String,
+        onFailure: (() -> Void)? = nil
+    ) throws {
         self.source = source
         self.name = name
         self.onFailure = onFailure
-        guard length >= field.overhead else { throw ArchiveError.damaged("the encryption header of \(name) is missing") }
+        guard length >= field.overhead else {
+            throw ArchiveError.damaged("the encryption header of \(name) is missing")
+        }
         let head = try source.readFully(field.saltLength + ZipAES.verifierLength)
-        guard head.count == field.saltLength + ZipAES.verifierLength else { throw ArchiveError.damaged("the encryption header of \(name) is missing") }
-        cipher = try ZipAES.Cipher(password: password, salt: Data(head.prefix(field.saltLength)), keyLength: field.keyLength)
-        guard Data(head.suffix(ZipAES.verifierLength)) == cipher.verifier else { throw ArchiveError.wrongPassword(name) }
+        guard head.count == field.saltLength + ZipAES.verifierLength else {
+            throw ArchiveError.damaged("the encryption header of \(name) is missing")
+        }
+        cipher = try ZipAES.Cipher(
+            password: password, salt: Data(head.prefix(field.saltLength)), keyLength: field.keyLength)
+        guard Data(head.suffix(ZipAES.verifierLength)) == cipher.verifier else {
+            throw ArchiveError.wrongPassword(name)
+        }
         left = length - field.overhead
     }
 
@@ -602,7 +645,9 @@ final class ZipDecryptStream: ByteStream {
         self.source = source
         crypto = ZipCrypto(password: password)
         let header = crypto.decrypt(try source.readFully(ZipCrypto.headerSize))
-        guard header.count == ZipCrypto.headerSize else { throw ArchiveError.damaged("the encryption header of \(name) is missing") }
+        guard header.count == ZipCrypto.headerSize else {
+            throw ArchiveError.damaged("the encryption header of \(name) is missing")
+        }
         guard header.last == check else { throw ArchiveError.wrongPassword(name) }
     }
 
@@ -678,9 +723,12 @@ enum ZipDirectory {
 
     /// `maxEntries` bounds what is read into memory; `check` is called now and then while a
     /// long directory is read, and may throw to end the reading.
-    static func read(_ file: RandomAccessFile, maxEntries: Int = .max, check: (() throws -> Void)? = nil) throws -> Contents {
+    static func read(_ file: RandomAccessFile, maxEntries: Int = .max, check: (() throws -> Void)? = nil) throws
+        -> Contents
+    {
         var records: [ZipRecord] = []
-        var contents = try scan(file, maxEntries: maxEntries, check: check, expecting: { records.reserveCapacity($0) }) { records.append($0) }
+        var contents = try scan(file, maxEntries: maxEntries, check: check, expecting: { records.reserveCapacity($0) })
+        { records.append($0) }
         contents.records = records
         return contents
     }
@@ -689,8 +737,10 @@ enum ZipDirectory {
     /// that a caller who keeps them in a form of its own never holds a second list of them;
     /// the result has no records. `expecting` hears beforehand how many there will be at
     /// most. A directory that turns out to be damaged throws after some records were handed out.
-    static func scan(_ file: RandomAccessFile, maxEntries: Int = .max, check: (() throws -> Void)? = nil,
-                     expecting: (Int) -> Void = { _ in }, _ each: (ZipRecord) throws -> Void) throws -> Contents {
+    static func scan(
+        _ file: RandomAccessFile, maxEntries: Int = .max, check: (() throws -> Void)? = nil,
+        expecting: (Int) -> Void = { _ in }, _ each: (ZipRecord) throws -> Void
+    ) throws -> Contents {
         // The end record is the last thing in the file, followed only by a comment of up to 64 KB.
         let tailSize = Int(min(file.size, 22 + 0xFFFF))
         let tailStart = file.size - UInt64(tailSize)
@@ -749,7 +799,9 @@ enum ZipDirectory {
                 }
             }
         }
-        guard directorySize <= directoryEnd else { throw ArchiveError.damaged("the ZIP directory is larger than the file") }
+        guard directorySize <= directoryEnd else {
+            throw ArchiveError.damaged("the ZIP directory is larger than the file")
+        }
         // Data in front of the archive (a self-extracting program) shifts every offset.
         let actualStart = directoryEnd - directorySize
         let shift = actualStart >= directoryOffset ? actualStart - directoryOffset : 0
@@ -763,7 +815,9 @@ enum ZipDirectory {
         var reader = ByteReader(directory)
         while reader.remaining >= 46 {
             guard reader.u32() == centralSignature else { break }
-            guard count < maxEntries else { throw ArchiveError.unsupported("An archive with more than \(maxEntries) entries") }
+            guard count < maxEntries else {
+                throw ArchiveError.unsupported("An archive with more than \(maxEntries) entries")
+            }
             if count & 0x1FFF == 0x1FFF { try check?() }
             var record = ZipRecord()
             record.versionMadeBy = reader.u16()
@@ -780,7 +834,9 @@ enum ZipDirectory {
             record.internalAttributes = reader.u16()
             record.externalAttributes = reader.u32()
             var offset = UInt64(reader.u32())
-            guard reader.remaining >= nameLength + extraLength + commentLength else { throw ArchiveError.damaged("the ZIP directory is cut off") }
+            guard reader.remaining >= nameLength + extraLength + commentLength else {
+                throw ArchiveError.damaged("the ZIP directory is cut off")
+            }
             record.nameBytes = reader.bytes(nameLength)
             let extra = reader.bytes(extraLength)
             record.comment = reader.bytes(commentLength)
@@ -806,11 +862,15 @@ enum ZipDirectory {
 
     /// Reads a member's local header: where its data starts, and its own extra fields
     /// (without the 64-bit field).
-    static func localHeader(of record: ZipRecord, at offset: UInt64, in file: RandomAccessFile) throws -> (dataOffset: UInt64, extra: Data) {
+    static func localHeader(of record: ZipRecord, at offset: UInt64, in file: RandomAccessFile) throws -> (
+        dataOffset: UInt64, extra: Data
+    ) {
         // An offset inside the file also keeps the sums below far from the end of the numbers.
         guard offset < file.size else { throw ArchiveError.damaged("the entry \(record.name) lies outside the file") }
         var header = ByteReader(try file.read(at: offset, count: 30))
-        guard header.u32() == localSignature else { throw ArchiveError.damaged("the entry \(record.name) is not where the directory says") }
+        guard header.u32() == localSignature else {
+            throw ArchiveError.damaged("the entry \(record.name) is not where the directory says")
+        }
         header.position = 26
         let (nameLength, extraLength) = (UInt64(header.u16()), Int(header.u16()))
         let extra = try file.read(at: offset + 30 + nameLength, count: extraLength)
@@ -839,7 +899,9 @@ final class ZipWriter {
     }
 
     private static func nameLength(of record: ZipRecord) throws -> UInt16 {
-        guard let length = UInt16(exactly: record.nameLength) else { throw ArchiveError.unsupported("A name of more than 65535 bytes") }
+        guard let length = UInt16(exactly: record.nameLength) else {
+            throw ArchiveError.unsupported("A name of more than 65535 bytes")
+        }
         return length
     }
 
@@ -875,7 +937,8 @@ final class ZipWriter {
     /// the real values.
     func begin(_ record: ZipRecord, localExtra: Data? = nil, expectedSize: UInt64? = nil) throws -> OpenMember {
         let largest = max(record.uncompressedSize, record.compressedSize, expectedSize.map { $0 + $0 / 8 + 1024 } ?? 0)
-        let member = OpenMember(offset: output.position, wide: largest > limits.maxField, localExtra: localExtra ?? record.extra)
+        let member = OpenMember(
+            offset: output.position, wide: largest > limits.maxField, localExtra: localExtra ?? record.extra)
         try output.write(try localHeader(record, wide: member.wide, extra: member.localExtra))
         return member
     }
@@ -899,7 +962,10 @@ final class ZipWriter {
         guard member.wide || max(record.compressedSize, record.uncompressedSize) <= limits.maxField else {
             throw ArchiveError.unsupported("A file that grew past 4 GB while it was packed")
         }
-        if headerChanged { try output.rewrite(try localHeader(record, wide: member.wide, extra: member.localExtra), at: member.offset) }
+        if headerChanged {
+            try output.rewrite(
+                try localHeader(record, wide: member.wide, extra: member.localExtra), at: member.offset)
+        }
         if record.flags & ZipRecord.flagDescriptor != 0 {
             var descriptor = Data()
             descriptor.appendLE(UInt32(0x0807_4B50))
@@ -943,8 +1009,10 @@ final class ZipWriter {
             header.appendLE(record.dosTime)
             header.appendLE(record.dosDate)
             header.appendLE(record.crc)
-            header.appendLE(record.compressedSize > limits.maxField ? UInt32(0xFFFF_FFFF) : UInt32(record.compressedSize))
-            header.appendLE(record.uncompressedSize > limits.maxField ? UInt32(0xFFFF_FFFF) : UInt32(record.uncompressedSize))
+            header.appendLE(
+                record.compressedSize > limits.maxField ? UInt32(0xFFFF_FFFF) : UInt32(record.compressedSize))
+            header.appendLE(
+                record.uncompressedSize > limits.maxField ? UInt32(0xFFFF_FFFF) : UInt32(record.uncompressedSize))
             header.appendLE(nameLength)
             header.appendLE(UInt16(fields.count))
             header.appendLE(UInt16(truncatingIfNeeded: min(record.comment.count, 0xFFFF)))
@@ -958,7 +1026,8 @@ final class ZipWriter {
             try output.write(header)
         }
         let directorySize = output.position - directoryOffset
-        let needs64 = written.count > limits.maxEntries || directorySize > limits.maxField || directoryOffset > limits.maxField
+        let needs64 =
+            written.count > limits.maxEntries || directorySize > limits.maxField || directoryOffset > limits.maxField
         if needs64 {
             usedZip64 = true
             let end64Offset = output.position
@@ -1029,7 +1098,9 @@ extension ZipWriter {
             try append(block)
             copied += UInt64(block.count)
         }
-        guard copied == record.compressedSize else { throw ArchiveError.damaged("the data of \(record.name) is cut off") }
+        guard copied == record.compressedSize else {
+            throw ArchiveError.damaged("the data of \(record.name) is cut off")
+        }
         try end(member, record, headerChanged: false)
         return member.offset
     }

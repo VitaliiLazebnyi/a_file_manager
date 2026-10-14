@@ -1,8 +1,9 @@
 import AFMKernel
-@testable import ArchivesPlugin
 import Foundation
 import TestSupport
 import Testing
+
+@testable import ArchivesPlugin
 
 /// Review round 2: nothing that was put into an archive is lost, written twice or written
 /// where it does not belong, whatever happens while it is written.
@@ -63,7 +64,8 @@ import Testing
             #expect(bench.store.flushAll().isEmpty && !bench.store.hasPendingChanges)
             bench.store.close()
             try? FileManager.default.removeItem(at: box.url("check"))
-            #expect(runTool("/usr/bin/unzip", ["-qo", box.url("outer.zip").path, "-d", box.url("check").path]).status == 0)
+            #expect(
+                runTool("/usr/bin/unzip", ["-qo", box.url("outer.zip").path, "-d", box.url("check").path]).status == 0)
             #expect(listed(box.url("check/inner.zip")).contains("tree/new\(round).txt"), "round \(round)")
         }
     }
@@ -123,7 +125,8 @@ import Testing
         let archive = try makeZip()
         let tree = bench.inside(archive, "tree")
         let temporary = tree.appending(name: ".afm-\(UUID().uuidString).tmp")
-        #expect(OpenArchive.isTransferName(temporary.lastPathComponent) && !OpenArchive.isTransferName(".afm-short.tmp"))
+        #expect(
+            OpenArchive.isTransferName(temporary.lastPathComponent) && !OpenArchive.isTransferName(".afm-short.tmp"))
         try write("on its way", to: temporary)
         try write("already there", to: tree.appending(name: "done.txt"))
         let open = try bench.store.archive(at: archive)
@@ -228,7 +231,9 @@ import Testing
         var names: [URL: Set<String>] = [:]
         for archive in archives { names[archive] = Set(listed(archive)) }
         let missing = written.filter { names[$0.archive]?.contains("seed/" + $0.name) != true }
-        #expect(missing.isEmpty && written.count == total - total / 3, "\(missing.count) of \(written.count) writes are missing")
+        #expect(
+            missing.isEmpty && written.count == total - total / 3,
+            "\(missing.count) of \(written.count) writes are missing")
     }
 
     // MARK: Pack into an archive on a server (A018, A019, A020, A095)
@@ -237,13 +242,19 @@ import Testing
         let local = try makeZip()
         let onServer = try upload(local, to: "/store/s.zip")
         let secret = try box.file("secret.txt", String(repeating: "top secret line\n", count: 200))
-        try bench.pack([secret], to: onServer) { $0.password = "pw"; $0.verifies = true }
+        try bench.pack([secret], to: onServer) {
+            $0.password = "pw"
+            $0.verifies = true
+        }
         let fetched = try download(onServer, as: "s-back.zip")
-        let record = try #require(ZipDirectory.read(try RandomAccessFile(fetched)).records.first { $0.name == "secret.txt" })
+        let record = try #require(
+            ZipDirectory.read(try RandomAccessFile(fetched)).records.first { $0.name == "secret.txt" })
         #expect(record.isEncrypted && record.method == ZipAES.method)
         // Not readable without the password, by anyone.
         #expect(!runTool("/usr/bin/unzip", ["-p", fetched.path, "secret.txt"]).output.contains("top secret"))
-        #expect(runTool("/usr/bin/bsdtar", ["-xOf", fetched.path, "--passphrase", "pw", "secret.txt"]).output.hasPrefix("top secret line"))
+        #expect(
+            runTool("/usr/bin/bsdtar", ["-xOf", fetched.path, "--passphrase", "pw", "secret.txt"]).output.hasPrefix(
+                "top secret line"))
         #expect(!listed(fetched).contains { $0.contains(".afm-") })
     }
 
@@ -254,8 +265,12 @@ import Testing
         // The file that is to replace the member cannot be read.
         let source = try box.folder("again/tree")
         try Data("new readme".utf8).write(to: source.appendingPathComponent("readme.txt"))
-        try FileManager.default.setAttributes([.posixPermissions: 0], ofItemAtPath: source.appendingPathComponent("readme.txt").path)
-        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: source.appendingPathComponent("readme.txt").path) }
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0], ofItemAtPath: source.appendingPathComponent("readme.txt").path)
+        defer {
+            try? FileManager.default.setAttributes(
+                [.posixPermissions: 0o644], ofItemAtPath: source.appendingPathComponent("readme.txt").path)
+        }
         #expect(throws: (any Error).self) { try bench.pack([source], to: onServer) }
         let open = try bench.store.archive(at: onServer)
         #expect(!open.isBusy)
@@ -266,10 +281,13 @@ import Testing
         #expect(runTool("/usr/bin/unzip", ["-tq", fetched.path]).status == 0)
 
         // Cancelled while the replacement is read: the same.
-        try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: source.appendingPathComponent("readme.txt").path)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o644], ofItemAtPath: source.appendingPathComponent("readme.txt").path)
         bench.monitor.cancellation.cancel()
-        let result = Packer(fileSystems: bench.fileSystems, store: bench.store, monitor: bench.monitor, options: PackOptions())
-            .run([try bench.item(source)], archive: onServer)
+        let result = Packer(
+            fileSystems: bench.fileSystems, store: bench.store, monitor: bench.monitor, options: PackOptions()
+        )
+        .run([try bench.item(source)], archive: onServer)
         #expect(result.cancelled || result.failure != nil)
         #expect(try bench.read(bench.inside(onServer, "tree/readme.txt")) == before && !open.isBusy)
     }
@@ -304,7 +322,9 @@ import Testing
 
     @Test func anArchiveKeepsItsRightsAndANewOneIsNoMoreOpenThanItsSources() throws {
         let archive = try makeZip()
-        func mode(_ url: URL) -> Int { (try? FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions] as? Int) ?? -1 }
+        func mode(_ url: URL) -> Int {
+            (try? FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions] as? Int) ?? -1
+        }
         try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: archive.path)
         // Added to (the file is cloned and continued), and with a member replaced (written anew).
         let extra = try box.file("extra.txt", "extra")
@@ -325,7 +345,9 @@ import Testing
         try bench.pack([secret], to: box.url("private.zip"))
         try bench.pack([extra], to: box.url("public.zip"))
         #expect(mode(box.url("private.zip")) == 0o600)
-        #expect(mode(box.url("public.zip")) & 0o600 == 0o600 && mode(box.url("public.zip")) & 0o044 == (0o044 & ~Int(umaskNow())))
+        #expect(
+            mode(box.url("public.zip")) & 0o600 == 0o600
+                && mode(box.url("public.zip")) & 0o044 == (0o044 & ~Int(umaskNow())))
         // No temporary file of a write is left next to the archives.
         #expect(try FileManager.default.contentsOfDirectory(atPath: box.root.path).allSatisfy { !$0.hasSuffix(".tmp") })
     }
@@ -346,7 +368,8 @@ import Testing
         // A file that someone else replaces while the pack writes is not overwritten.
         var replaced = false
         let stranger = try Data(contentsOf: archive)
-        let packer = Packer(fileSystems: bench.fileSystems, store: bench.store, monitor: bench.monitor, options: PackOptions())
+        let packer = Packer(
+            fileSystems: bench.fileSystems, store: bench.store, monitor: bench.monitor, options: PackOptions())
         let source = try box.file("late.txt", "late")
         // (The moment between the pack's own writing and its putting the file in place is
         // not reachable from here; the check it makes there is.)
@@ -368,20 +391,29 @@ import Testing
         let url = box.url("crossed.zip")
         let output = try OutputFile(creating: url)
         let writer = ZipWriter(output)
-        var first = ZipRecord.new(name: "first.txt", isDirectory: false, modified: Date(timeIntervalSince1970: 1_600_000_000), permissions: 0o644)
+        var first = ZipRecord.new(
+            name: "first.txt", isDirectory: false, modified: Date(timeIntervalSince1970: 1_600_000_000),
+            permissions: 0o644)
         let payload = Data("first member data".utf8)
-        (first.crc, first.compressedSize, first.uncompressedSize) = (CRC32.of(payload), UInt64(payload.count), UInt64(payload.count))
+        (first.crc, first.compressedSize, first.uncompressedSize) = (
+            CRC32.of(payload), UInt64(payload.count), UInt64(payload.count)
+        )
         let opened = try writer.begin(first)
         try writer.append(payload)
         try writer.end(opened, first, headerChanged: false)
-        var second = ZipRecord.new(name: "second.txt", isDirectory: false, modified: Date(timeIntervalSince1970: 1_600_000_000), permissions: 0o644)
-        (second.crc, second.compressedSize, second.uncompressedSize) = (first.crc, first.compressedSize, first.uncompressedSize)
+        var second = ZipRecord.new(
+            name: "second.txt", isDirectory: false, modified: Date(timeIntervalSince1970: 1_600_000_000),
+            permissions: 0o644)
+        (second.crc, second.compressedSize, second.uncompressedSize) = (
+            first.crc, first.compressedSize, first.uncompressedSize
+        )
         writer.adopt(second, at: 0)
         try writer.finish()
         try output.close()
         let before = try Data(contentsOf: url)
         // Changing the time of the second would patch the header at the offset it claims.
-        try bench.zip.setAttributes(FileAttributes(modified: Date(timeIntervalSince1970: 1_700_000_000)), of: bench.inside(url, "second.txt"))
+        try bench.zip.setAttributes(
+            FileAttributes(modified: Date(timeIntervalSince1970: 1_700_000_000)), of: bench.inside(url, "second.txt"))
         _ = bench.store.flushAll()
         let after = try Data(contentsOf: url)
         // Whatever the write did, the first member's header and data are what they were.
@@ -433,7 +465,8 @@ import Testing
         let lists = try FileManager.default.contentsOfDirectory(atPath: folder.path).filter { $0.hasPrefix("index-") }
         let index = try String(contentsOf: folder.appendingPathComponent(try #require(lists.first)), encoding: .utf8)
         // The member with its name, and not the one a job had not finished.
-        #expect(index.contains("\ttree/one.txt\t") && !index.contains(".afm-") && index.contains(archive.lastPathComponent))
+        #expect(
+            index.contains("\ttree/one.txt\t") && !index.contains(".afm-") && index.contains(archive.lastPathComponent))
         let file = try #require(index.split(separator: "\n").last?.split(separator: "\t").first)
         #expect(FileManager.default.fileExists(atPath: folder.appendingPathComponent(String(file)).path))
     }
@@ -464,7 +497,9 @@ import Testing
             return false
         }
         // And the rescue waits no longer than it is given.
-        if case .nothingToSave = open.rescue(quickly: true, before: Date()) { Issue.record("the pending member was not seen") }
+        if case .nothingToSave = open.rescue(quickly: true, before: Date()) {
+            Issue.record("the pending member was not seen")
+        }
         release.signal()
         done.wait()
         bench.environment.whileWriting = nil

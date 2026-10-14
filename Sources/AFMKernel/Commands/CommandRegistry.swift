@@ -19,8 +19,10 @@ public struct Command {
     /// neither files nor panels should say yes.
     public let runsDuringJobs: Bool
 
-    public init(_ id: CommandID, _ title: String, _ defaultShortcuts: [Shortcut] = [], editingRole: EditingRole? = nil,
-                barLabel: String? = nil, runsDuringJobs: Bool = false) {
+    public init(
+        _ id: CommandID, _ title: String, _ defaultShortcuts: [Shortcut] = [], editingRole: EditingRole? = nil,
+        barLabel: String? = nil, runsDuringJobs: Bool = false
+    ) {
         self.id = id
         self.title = title
         self.defaultShortcuts = defaultShortcuts
@@ -55,16 +57,20 @@ public final class CommandRegistry {
     }
 
     /// Registers a command whose handler looks at its argument.
-    public func register(_ command: Command, enabled: @escaping () -> Bool = { true }, checked: @escaping () -> Bool = { false },
-                         parameterized run: @escaping (CommandArgument) -> Void) {
+    public func register(
+        _ command: Command, enabled: @escaping () -> Bool = { true }, checked: @escaping () -> Bool = { false },
+        parameterized run: @escaping (CommandArgument) -> Void
+    ) {
         precondition(entries[command.id] == nil, "Command \(command.id) is registered twice")
         entries[command.id] = Entry(command: command, run: run, isEnabled: enabled, isChecked: checked)
         order.append(command.id)
         command.defaultShortcuts.forEach { keyBindings.bindDefault($0, to: command.id) }
     }
 
-    public func register(_ command: Command, enabled: @escaping () -> Bool = { true }, checked: @escaping () -> Bool = { false },
-                         _ run: @escaping () -> Void) {
+    public func register(
+        _ command: Command, enabled: @escaping () -> Bool = { true }, checked: @escaping () -> Bool = { false },
+        _ run: @escaping () -> Void
+    ) {
         register(command, enabled: enabled, checked: checked, parameterized: { _ in run() })
     }
 

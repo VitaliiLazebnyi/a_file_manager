@@ -1,12 +1,13 @@
 import AFMContracts
 import AFMKernel
 import AppKit
-@testable import ClipboardPlugin
 import FileOperationsPlugin
 import LocalFileSystemPlugin
 import SelectionPlugin
 import TestSupport
 import Testing
+
+@testable import ClipboardPlugin
 
 /// Names and details as text, and pasting a text or picture as a new file
 /// (spec 07 › File clipboard and name lists).
@@ -25,8 +26,9 @@ import Testing
         memory.addFile("/A/two.txt", "2", permissions: 0o600)
         memory.addFile("/A/docs/in.txt", "inside")
         memory.addDirectory("/B")
-        bench = TestBench(plugins: [FileOperationsPlugin(), ClipboardPlugin(pasteboard: pasteboard), SelectionPlugin()],
-                          fileSystems: [LocalFileSystem(), memory], left: memory.url("/A"), right: memory.url("/B"))
+        bench = TestBench(
+            plugins: [FileOperationsPlugin(), ClipboardPlugin(pasteboard: pasteboard), SelectionPlugin()],
+            fileSystems: [LocalFileSystem(), memory], left: memory.url("/A"), right: memory.url("/B"))
     }
 
     @Test func namesAreOneLineEachAndFoldersEndWithASlash() {
@@ -36,8 +38,12 @@ import Testing
         commands.perform(.copyFullNames)
         #expect(text == "mem:/A/docs/\nmem:/A/one.txt\nmem:/A/two.txt")
         commands.perform(ClipboardCommands.copyNetNames)
-        #expect(text == [memory.url("/A/docs").absoluteString + "/", memory.url("/A/one.txt").absoluteString,
-                         memory.url("/A/two.txt").absoluteString].joined(separator: "\n"))
+        #expect(
+            text
+                == [
+                    memory.url("/A/docs").absoluteString + "/", memory.url("/A/one.txt").absoluteString,
+                    memory.url("/A/two.txt").absoluteString
+                ].joined(separator: "\n"))
         commands.perform(ClipboardCommands.copyPathOfFiles)
         #expect(text == "mem:/A\nmem:/A\nmem:/A")
         commands.perform(ClipboardCommands.copySourcePath)
@@ -61,8 +67,9 @@ import Testing
         let date = Format.date(modified)
         commands.perform(.selectAll)
         commands.perform(ClipboardCommands.copyDetails)
-        #expect(text == "docs/\t<DIR>\t\(Format.date(Date(timeIntervalSince1970: 0)))\trwxr-xr-x\n"
-            + "one.txt\t3\t\(date)\trw-r--r--\ntwo.txt\t1\t\(date)\trw-------")
+        #expect(
+            text == "docs/\t<DIR>\t\(Format.date(Date(timeIntervalSince1970: 0)))\trwxr-xr-x\n"
+                + "one.txt\t3\t\(date)\trw-r--r--\ntwo.txt\t1\t\(date)\trw-------")
         commands.perform(.unselectAll)
         left.moveCursor(toName: "one.txt")
         commands.perform(ClipboardCommands.copyDetailsWithPath)
@@ -98,7 +105,9 @@ import Testing
     @Test func detailsCanBeSavedToAFile() {
         left.moveCursor(toName: "one.txt")
         commands.perform(ClipboardCommands.saveDetailsWithHeaders, .text("details.txt"))
-        #expect(memory.contents("/A/details.txt") == "Name\tSize\tDate\tAttr\none.txt\t3\t\(Format.date(modified))\trw-r--r--")
+        #expect(
+            memory.contents("/A/details.txt")
+                == "Name\tSize\tDate\tAttr\none.txt\t3\t\(Format.date(modified))\trw-r--r--")
         #expect(left.model.cursorItem?.name == "details.txt")
         // The name is asked for; an existing file is replaced only after a question.
         left.moveCursor(toName: "two.txt")
@@ -123,12 +132,16 @@ import Testing
         commands.perform(.pasteFromClipboard)
         #expect(memory.contents("/A/Clipboard.txt") == "hello\nworld" && left.model.cursorItem?.name == "Clipboard.txt")
         commands.perform(.pasteFromClipboard)
-        #expect(memory.contents("/A/Clipboard (2).txt") == "hello\nworld" && left.model.cursorItem?.name == "Clipboard (2).txt")
+        #expect(
+            memory.contents("/A/Clipboard (2).txt") == "hello\nworld"
+                && left.model.cursorItem?.name == "Clipboard (2).txt")
     }
 
     @Test func aPictureOnTheClipboardIsPastedAsPNG() throws {
-        let bitmap = try #require(NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 2, pixelsHigh: 2, bitsPerSample: 8, samplesPerPixel: 4,
-                                                   hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0))
+        let bitmap = try #require(
+            NSBitmapImageRep(
+                bitmapDataPlanes: nil, pixelsWide: 2, pixelsHigh: 2, bitsPerSample: 8, samplesPerPixel: 4,
+                hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0))
         pasteboard.clearContents()
         pasteboard.setData(bitmap.tiffRepresentation, forType: .tiff)
         pasteboard.setString("picture", forType: .string)
@@ -168,14 +181,21 @@ import Testing
     }
 
     @Test func registration() {
-        let inMenus = bench.kernel.menus.menus.flatMap(\.items).compactMap { $0 } + bench.kernel.menus.contextMenu(onItem: true).compactMap { $0 }
+        let inMenus =
+            bench.kernel.menus.menus.flatMap(\.items).compactMap { $0 }
+            + bench.kernel.menus.contextMenu(onItem: true).compactMap { $0 }
         #expect(inMenus.allSatisfy { commands[$0] != nil })
         #expect(bench.kernel.keyBindings.conflicts.isEmpty)
         #expect(bench.kernel.preferences.pages.map(\.title).contains("Clipboard"))
-        for id in ["cm_CopyNamesToClip", "cm_CopyFullNamesToClip", "cm_CopyNetNamesToClip", "cm_CopyPathOfFilesToClip", "cm_CopySrcPathToClip",
-                   "cm_CopyTrgPathToClip", "cm_CopyFileDetailsToClip", "cm_CopyFpFileDetailsToClip", "cm_CopyNetFileDetailsToClip",
-                   "cm_CopyHdrFileDetailsToClip", "cm_CopyHdrFpFileDetailsToClip", "cm_CopyHdrNetFileDetailsToClip", "cm_SaveDetailsToFile",
-                   "cm_SaveHdrDetailsToFile"] {
+        for id in [
+            "cm_CopyNamesToClip", "cm_CopyFullNamesToClip", "cm_CopyNetNamesToClip", "cm_CopyPathOfFilesToClip",
+            "cm_CopySrcPathToClip",
+            "cm_CopyTrgPathToClip", "cm_CopyFileDetailsToClip", "cm_CopyFpFileDetailsToClip",
+            "cm_CopyNetFileDetailsToClip",
+            "cm_CopyHdrFileDetailsToClip", "cm_CopyHdrFpFileDetailsToClip", "cm_CopyHdrNetFileDetailsToClip",
+            "cm_SaveDetailsToFile",
+            "cm_SaveHdrDetailsToFile"
+        ] {
             #expect(commands[CommandID(rawValue: id)] != nil, "\(id)")
         }
     }
@@ -195,7 +215,8 @@ import Testing
         folder.computedSize = 4096
         #expect(list.details([folder], .name, headers: false, mask: 3) == "docs/\t4096")
         // A package is listed like a file and gets no slash.
-        let app = FileItem(url: URL(fileURLWithPath: "/x/A.app"), name: "A.app", isDirectory: true, isPackage: true, size: 7)
+        let app = FileItem(
+            url: URL(fileURLWithPath: "/x/A.app"), name: "A.app", isDirectory: true, isPackage: true, size: 7)
         #expect(list.names([app], .name) == "A.app")
     }
 }

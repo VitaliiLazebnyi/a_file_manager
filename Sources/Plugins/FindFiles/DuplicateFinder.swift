@@ -37,12 +37,16 @@ public enum DuplicateFinder {
     /// The groups of two or more files that are equal by the ticked criteria. Groups are in
     /// the order of the first ticked criterion (name, then size), the files of a group in path
     /// order. A cancelled run returns nothing, so no half-compared files are shown.
-    public static func groups(of items: [FileItem], options: DuplicateOptions, fileSystems: FileSystemRegistry,
-                              cancellation: CancellationFlag = CancellationFlag(), onProgress: ((Int, Int) -> Void)? = nil) -> [[FileItem]] {
+    public static func groups(
+        of items: [FileItem], options: DuplicateOptions, fileSystems: FileSystemRegistry,
+        cancellation: CancellationFlag = CancellationFlag(), onProgress: ((Int, Int) -> Void)? = nil
+    ) -> [[FileItem]] {
         guard options.isActive else { return [] }
         func key(_ item: FileItem) -> Key {
             // Equal contents imply equal sizes, so the size narrows the candidates for free.
-            Key(name: options.sameName ? item.name.lowercased() : "", size: options.sameSize || options.sameContents ? item.size : -1)
+            Key(
+                name: options.sameName ? item.name.lowercased() : "",
+                size: options.sameSize || options.sameContents ? item.size : -1)
         }
         var keyed = items.filter { !$0.isDirectory && !$0.isSpecial }.map { (key: key($0), item: $0) }
         keyed = withoutSingles(keyed)
@@ -60,26 +64,33 @@ public enum DuplicateFinder {
                 return digest
             }
             // A file that could not be read is equal to nothing.
-            keyed = withoutSingles(zip(keyed, digests).compactMap { entry, digest in
-                digest.map { digest in
-                    var key = entry.key
-                    key.digest = digest
-                    return (key, entry.item)
-                }
-            })
+            keyed = withoutSingles(
+                zip(keyed, digests).compactMap { entry, digest in
+                    digest.map { digest in
+                        var key = entry.key
+                        key.digest = digest
+                        return (key, entry.item)
+                    }
+                })
         }
         guard !cancellation.isCancelled else { return [] }
         let groups = Dictionary(grouping: keyed, by: \.key).values.map { group in
             Sorter.sorted(group.map(\.item), numeric: true) { $0.url.path }
         }
         // The keys of the names and paths are made once per group, not once per comparison.
-        let ordered = groups.map { group -> (group: [FileItem], lowered: String, name: Sorter.NameKey?, path: Sorter.NameKey) in
+        let ordered = groups.map {
+            group -> (group: [FileItem], lowered: String, name: Sorter.NameKey?, path: Sorter.NameKey) in
             let first = group[0]
-            return (group, options.sameName ? first.name.lowercased() : "", options.sameName ? Sorter.key(of: first.name) : nil,
-                    Sorter.key(of: first.url.path, numeric: true))
+            return (
+                group, options.sameName ? first.name.lowercased() : "",
+                options.sameName ? Sorter.key(of: first.name) : nil,
+                Sorter.key(of: first.url.path, numeric: true)
+            )
         }
         return ordered.sorted { first, second in
-            if options.sameName, first.lowered != second.lowered, let a = first.name, let b = second.name { return a < b }
+            if options.sameName, first.lowered != second.lowered, let a = first.name, let b = second.name {
+                return a < b
+            }
             if first.group[0].size != second.group[0].size { return first.group[0].size < second.group[0].size }
             return first.path < second.path
         }.map { $0.group }
@@ -131,9 +142,13 @@ public enum DuplicateFinder {
         /// The mount that holds `url`, when it is not a local disk; nil otherwise.
         static func of(_ url: URL) -> Mount? {
             var info = statfs()
-            guard url.withUnsafeFileSystemRepresentation({ $0.map { statfs($0, &info) } ?? -1 }) == 0, info.f_flags & UInt32(MNT_LOCAL) == 0 else { return nil }
+            guard url.withUnsafeFileSystemRepresentation({ $0.map { statfs($0, &info) } ?? -1 }) == 0,
+                info.f_flags & UInt32(MNT_LOCAL) == 0
+            else { return nil }
             func text<T>(_ field: T) -> String {
-                withUnsafePointer(to: field) { $0.withMemoryRebound(to: CChar.self, capacity: MemoryLayout<T>.size) { String(cString: $0) } }
+                withUnsafePointer(to: field) {
+                    $0.withMemoryRebound(to: CChar.self, capacity: MemoryLayout<T>.size) { String(cString: $0) }
+                }
             }
             let (from, on) = (text(info.f_mntfromname), text(info.f_mntonname))
             return from.isEmpty ? nil : Mount(from: text(info.f_fstypename) + ":" + from, on: on)
@@ -141,7 +156,9 @@ public enum DuplicateFinder {
 
         /// The file in the share, as the same text for every place the share is mounted at.
         func place(of path: String) -> String {
-            let inside = path.utf8.starts(with: on.utf8) ? String(decoding: Array(path.utf8.dropFirst(on.utf8.count)), as: UTF8.self) : path
+            let inside =
+                path.utf8.starts(with: on.utf8)
+                ? String(decoding: Array(path.utf8.dropFirst(on.utf8.count)), as: UTF8.self) : path
             return from + (inside.hasPrefix("/") ? "" : "/") + inside
         }
     }
@@ -154,10 +171,13 @@ public enum DuplicateFinder {
 
     /// The SHA-256 of a file's contents, read in blocks; nil when it cannot be read or the
     /// work was cancelled.
-    static func digest(of url: URL, fileSystems: FileSystemRegistry, cancellation: CancellationFlag = CancellationFlag()) -> Data? {
+    static func digest(
+        of url: URL, fileSystems: FileSystemRegistry, cancellation: CancellationFlag = CancellationFlag()
+    ) -> Data? {
         // A local file is opened without waiting and looked at once opened; one that is only a
         // stub of a file in the cloud is not read (that would download it).
-        guard !cancellation.isCancelled, let reader = fileSystems.searchReader(for: url, cancellation: cancellation) else { return nil }
+        guard !cancellation.isCancelled, let reader = fileSystems.searchReader(for: url, cancellation: cancellation)
+        else { return nil }
         defer { reader.close() }
         // A read blocked on a server ends when the run is cancelled.
         let token = cancellation.interrupting(reader)

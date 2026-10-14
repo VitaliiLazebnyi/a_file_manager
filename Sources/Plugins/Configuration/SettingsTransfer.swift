@@ -17,9 +17,11 @@ struct SettingsSchema {
     /// The corners of the settings the parts of the program keep their values in. A key of
     /// none of them is nobody's and is not imported.
     static let namespaces: Set<String> = [
-        "window", "panel", "listingCache", "toolbar", "configuration", "systemTools", "viewOptions", "macIntegration", "folderTabs", "clipboard",
-        "virtualFolders", "findFiles", "places", "network", "selection", "multirename", "directorySync", "compareContent", "filetools", "viewer",
-        "archives", "fileOperations", "fileProperties",
+        "window", "panel", "listingCache", "toolbar", "configuration", "systemTools", "viewOptions", "macIntegration",
+        "folderTabs", "clipboard",
+        "virtualFolders", "findFiles", "places", "network", "selection", "multirename", "directorySync",
+        "compareContent", "filetools", "viewer",
+        "archives", "fileOperations", "fileProperties"
     ]
     static let tabKeys: Set<String> = ["left.tabs", "right.tabs"]
     static let userCommandsKey = ConfigurationStore.owner + "." + ConfigurationStore.userCommandsKey
@@ -31,8 +33,14 @@ struct SettingsSchema {
     static let lastConnectionKey = "network.lastUsed"
 
     func isKnown(_ key: String) -> Bool {
-        if preferences[key] != nil || known.contains(key) || key == keyBindingsKey || SettingsSchema.tabKeys.contains(key) { return true }
-        guard !isBackup(key), let dot = key.firstIndex(of: "."), key[key.index(after: dot)...].contains(where: { $0 != "." }) else { return false }
+        if preferences[key] != nil || known.contains(key) || key == keyBindingsKey
+            || SettingsSchema.tabKeys.contains(key)
+        {
+            return true
+        }
+        guard !isBackup(key), let dot = key.firstIndex(of: "."),
+            key[key.index(after: dot)...].contains(where: { $0 != "." })
+        else { return false }
         return SettingsSchema.namespaces.contains(String(key[..<dot]))
     }
 
@@ -52,7 +60,8 @@ struct SettingsSchema {
 
     /// Servers, user names and the certificates accepted for them.
     func isConnectionData(_ key: String) -> Bool {
-        key == SettingsSchema.connectionsKey || key == SettingsSchema.lastConnectionKey || group(of: key, value: nil) == .trust
+        key == SettingsSchema.connectionsKey || key == SettingsSchema.lastConnectionKey
+            || group(of: key, value: nil) == .trust
     }
 
     // MARK: What an import asks about
@@ -81,17 +90,22 @@ struct SettingsSchema {
         default: break
         }
         let lowered = key.lowercased()
-        if lowered.hasPrefix("network."), ["certificate", "trust", "tls"].contains(where: lowered.contains) { return .trust }
+        if lowered.hasPrefix("network."), ["certificate", "trust", "tls"].contains(where: lowered.contains) {
+            return .trust
+        }
         if SettingsSchema.tabKeys.contains(key) {
             // Tabs on this Mac's disks are ordinary; one on a server makes the program connect.
             guard let state = value as? [String: Any], let tabs = state["tabs"] as? [[String: Any]] else { return nil }
-            let isRemote = tabs.contains { tab in (tab["location"] as? String).map { !$0.lowercased().hasPrefix("file:") } ?? false }
+            let isRemote = tabs.contains { tab in
+                (tab["location"] as? String).map { !$0.lowercased().hasPrefix("file:") } ?? false
+            }
             return isRemote ? .tabs : nil
         }
         // A text that names a program, a command or a file the program then starts or writes to.
         if value is String {
             let name = lowered.split(separator: ".").last.map(String.init) ?? lowered
-            let namesAProgram = ["editor", "terminal", "program", "command", "tool", "shell", "exec", "path", "file"].contains(where: name.contains)
+            let namesAProgram = ["editor", "terminal", "program", "command", "tool", "shell", "exec", "path", "file"]
+                .contains(where: name.contains)
             if namesAProgram, !isHistory(key) { return .programs }
         }
         return nil
@@ -124,8 +138,10 @@ struct CheckedSettings {
 
         var errorDescription: String? {
             switch self {
-            case .tooLarge: "The file is larger than \(CheckedSettings.fileLimit / 1024 / 1024) MB; a settings file is never that large. Nothing was imported."
-            case .unreadable(let key): "The value of “\(DisplayText.oneLine(key, limit: 80))” in this file cannot be read, so nothing was imported."
+            case .tooLarge:
+                "The file is larger than \(CheckedSettings.fileLimit / 1024 / 1024) MB; a settings file is never that large. Nothing was imported."
+            case .unreadable(let key):
+                "The value of “\(DisplayText.oneLine(key, limit: 80))” in this file cannot be read, so nothing was imported."
             }
         }
     }
@@ -148,12 +164,17 @@ struct CheckedSettings {
                 unknown.append(key)
                 continue
             }
-            guard data.count <= CheckedSettings.fileLimit, let parsed = try? JSONSerialization.jsonObject(with: data, options: .fragmentsAllowed) else {
+            guard data.count <= CheckedSettings.fileLimit,
+                let parsed = try? JSONSerialization.jsonObject(with: data, options: .fragmentsAllowed)
+            else {
                 throw Problem.unreadable(key)
             }
             var object = CheckedSettings.limitingNumbers(parsed, &limited)
             if key == SettingsSchema.frequentFoldersKey { object = CheckedSettings.limitingCounts(object, &limited) }
-            guard let clean = try? JSONSerialization.data(withJSONObject: object, options: [.fragmentsAllowed, .sortedKeys]) else {
+            guard
+                let clean = try? JSONSerialization.data(
+                    withJSONObject: object, options: [.fragmentsAllowed, .sortedKeys])
+            else {
                 throw Problem.unreadable(key)
             }
             try CheckedSettings.checkShape(of: key, clean, object, schema: schema)
@@ -177,7 +198,9 @@ struct CheckedSettings {
 
     /// The visit counters of the frequently used folders are counted on with every visit.
     private static func limitingCounts(_ object: Any, _ limited: inout Int) -> Any {
-        guard var frequent = object as? [String: Any], let counts = frequent["counts"] as? [String: Any] else { return object }
+        guard var frequent = object as? [String: Any], let counts = frequent["counts"] as? [String: Any] else {
+            return object
+        }
         frequent["counts"] = counts.mapValues { value -> Any in
             guard let number = value as? NSNumber, !isBoolean(number) else { return value }
             let count = number.doubleValue
@@ -201,7 +224,8 @@ struct CheckedSettings {
             case .flag: try require(object is NSNumber && isBoolean(object as! NSNumber))
             case .text: try require((object as? String).map { $0.utf8.count <= textLimit } ?? false)
             case .choice(let options, _):
-                guard let number = object as? NSNumber, !isBoolean(number), let index = Int(exactly: number.doubleValue) else { throw Problem.unreadable(key) }
+                guard let number = object as? NSNumber, !isBoolean(number), let index = Int(exactly: number.doubleValue)
+                else { throw Problem.unreadable(key) }
                 try require(options.indices.contains(index))
             }
             return
@@ -213,7 +237,10 @@ struct CheckedSettings {
         case SettingsSchema.userCommandsKey:
             let list = try decoded(LenientList<UserCommand>.self)
             try require(list.skipped == 0 && list.elements.count <= userCommandLimit)
-            try require(list.elements.allSatisfy { UserCommand.name(from: $0.name) == $0.name && $0.title.utf8.count <= textLimit && isShort($0.action) })
+            try require(
+                list.elements.allSatisfy {
+                    UserCommand.name(from: $0.name) == $0.name && $0.title.utf8.count <= textLimit && isShort($0.action)
+                })
         case SettingsSchema.startMenuKey:
             let list = try decoded(LenientList<StartMenuEntry>.self)
             try require(list.skipped == 0 && list.elements.count <= startMenuLimit)
@@ -263,7 +290,9 @@ struct SettingsImportPlan {
         unknown = checked.unknown
         limited = checked.limited
         func same(_ key: String, _ object: Any) -> Bool {
-            guard let data = current[key], let stored = try? JSONSerialization.jsonObject(with: data, options: .fragmentsAllowed) else { return false }
+            guard let data = current[key],
+                let stored = try? JSONSerialization.jsonObject(with: data, options: .fragmentsAllowed)
+            else { return false }
             return (stored as AnyObject).isEqual(object)
         }
         var grouped: [SettingsSchema.Group: [String]] = [:]
@@ -274,7 +303,9 @@ struct SettingsImportPlan {
         // under that number: the password in the keychain is found by the number alone, and
         // must never go to another server because a file reused it.
         if let imported = objects[SettingsSchema.connectionsKey] as? [[String: Any]] {
-            let stored = (current[SettingsSchema.connectionsKey].flatMap { try? JSONSerialization.jsonObject(with: $0) } as? [[String: Any]]) ?? []
+            let stored =
+                (current[SettingsSchema.connectionsKey].flatMap { try? JSONSerialization.jsonObject(with: $0) }
+                    as? [[String: Any]]) ?? []
             var renumbered: [String: String] = [:]
             let fresh = imported.map { connection -> [String: Any] in
                 guard let id = connection["id"] as? String else { return connection }
@@ -286,10 +317,13 @@ struct SettingsImportPlan {
                 return connection
             }
             objects[SettingsSchema.connectionsKey] = fresh
-            values[SettingsSchema.connectionsKey] = try? JSONSerialization.data(withJSONObject: fresh, options: [.sortedKeys])
-            if let last = objects[SettingsSchema.lastConnectionKey] as? String, let new = renumbered[last.uppercased()] {
+            values[SettingsSchema.connectionsKey] = try? JSONSerialization.data(
+                withJSONObject: fresh, options: [.sortedKeys])
+            if let last = objects[SettingsSchema.lastConnectionKey] as? String, let new = renumbered[last.uppercased()]
+            {
                 objects[SettingsSchema.lastConnectionKey] = new
-                values[SettingsSchema.lastConnectionKey] = try? JSONSerialization.data(withJSONObject: new, options: [.fragmentsAllowed])
+                values[SettingsSchema.lastConnectionKey] = try? JSONSerialization.data(
+                    withJSONObject: new, options: [.fragmentsAllowed])
             }
         }
 
@@ -311,9 +345,12 @@ struct SettingsImportPlan {
         // What an export leaves out by default is not removed for being absent, and neither
         // is anything the user is asked about separately.
         removed = knownKeys.filter { key in
-            guard values[key] == nil, let stored = current[key], !SettingsSchema.tabKeys.contains(key), !schema.isHistory(key),
-                  !schema.isConnectionData(key), !schema.isBackup(key) else { return false }
-            return schema.group(of: key, value: try? JSONSerialization.jsonObject(with: stored, options: .fragmentsAllowed)) == nil
+            guard values[key] == nil, let stored = current[key], !SettingsSchema.tabKeys.contains(key),
+                !schema.isHistory(key),
+                !schema.isConnectionData(key), !schema.isBackup(key)
+            else { return false }
+            return schema.group(
+                of: key, value: try? JSONSerialization.jsonObject(with: stored, options: .fragmentsAllowed)) == nil
         }.sorted()
         parts = SettingsSchema.Group.allCases.compactMap { group in
             guard let keys = grouped[group]?.sorted(), !keys.isEmpty else { return nil }
@@ -330,7 +367,9 @@ struct SettingsImportPlan {
             for key in keys {
                 for entry in objects[key] as? [[String: Any]] ?? [] {
                     let action = entry["action"] as? [String: Any] ?? [:]
-                    let name = key == SettingsSchema.userCommandsKey ? show(entry["name"]) : "Start menu “\(show(entry["title"]))”"
+                    let name =
+                        key == SettingsSchema.userCommandsKey
+                        ? show(entry["name"]) : "Start menu “\(show(entry["title"]))”"
                     guard show(entry["title"]) != "-" || key == SettingsSchema.userCommandsKey else { continue }
                     var line = "\(name):  \(show(action["command"]))"
                     if !show(action["parameters"]).isEmpty { line += "   parameters: \(show(action["parameters"]))" }
@@ -341,12 +380,16 @@ struct SettingsImportPlan {
             title = "Import the user commands and the Start menu (\(lines.count)). They run programs and shell lines."
         case .keys:
             for (command, keys) in (objects[keys[0]] as? [String: [String]] ?? [:]).sorted(by: { $0.key < $1.key }) {
-                lines.append("\(DisplayText.oneLine(command, limit: 80)):  " + (keys.isEmpty ? "no key" : keys.map { DisplayText.oneLine($0, limit: 40) }.joined(separator: ", ")))
+                lines.append(
+                    "\(DisplayText.oneLine(command, limit: 80)):  "
+                        + (keys.isEmpty
+                            ? "no key" : keys.map { DisplayText.oneLine($0, limit: 40) }.joined(separator: ", ")))
             }
             title = "Import the key bindings (\(lines.count) commands). They decide what every key does."
         case .programs:
             lines = keys.map { "\($0):  \(show(objects[$0]))" }
-            title = "Import the programs and files other settings name (\(lines.count)): the editor, the terminal, files that are written."
+            title =
+                "Import the programs and files other settings name (\(lines.count)): the editor, the terminal, files that are written."
         case .trust:
             for key in keys {
                 if let hosts = objects[key] as? [String: Any] {
@@ -358,13 +401,15 @@ struct SettingsImportPlan {
                     lines.append(key)
                 }
             }
-            title = "Import what is trusted of servers (\(lines.count)): certificates accepted for good, and servers a password may be sent to "
+            title =
+                "Import what is trusted of servers (\(lines.count)): certificates accepted for good, and servers a password may be sent to "
                 + "without protection. Such a server is connected to, or sent the password, without a question."
         case .connections:
             for connection in objects[SettingsSchema.connectionsKey] as? [[String: Any]] ?? [] {
                 lines.append("\(show(connection["name"])):  \(show(connection["user"]))@\(show(connection["host"]))")
             }
-            title = "Import the saved connections (\(lines.count)). Their passwords are not in the file and are asked for again."
+            title =
+                "Import the saved connections (\(lines.count)). Their passwords are not in the file and are asked for again."
         case .hotlist:
             func walk(_ object: Any) {
                 if let list = object as? [Any] { return list.forEach(walk) }
@@ -383,10 +428,13 @@ struct SettingsImportPlan {
                     if !location.lowercased().hasPrefix("file:") { lines.append("\(key):  \(location)") }
                 }
             }
-            title = "Import the panels' tabs. \(lines.count) of them are on servers, which the program then connects to."
+            title =
+                "Import the panels' tabs. \(lines.count) of them are on servers, which the program then connects to."
         }
         let shownLimit = 200
-        if lines.count > shownLimit { lines = Array(lines.prefix(shownLimit)) + ["… and \(lines.count - shownLimit) more"] }
+        if lines.count > shownLimit {
+            lines = Array(lines.prefix(shownLimit)) + ["… and \(lines.count - shownLimit) more"]
+        }
         return Part(group: group, title: title, lines: lines, keys: keys)
     }
 
@@ -396,15 +444,27 @@ struct SettingsImportPlan {
             let shown = keys.prefix(12).map { DisplayText.oneLine($0, limit: 60) }.joined(separator: ", ")
             return keys.count > 12 ? shown + ", … (\(keys.count - 12) more)" : shown
         }
-        var lines = ["“\(DisplayText.oneLine(fileName, limit: 120))” holds \(ordinary.count + guarded.count) settings the program knows."]
-        lines.append(changed.isEmpty ? "None of the ordinary settings differs from the present ones."
-            : "\(changed.count) ordinary settings differ from the present ones and are replaced: \(listed(changed)).")
-        if !removed.isEmpty { lines.append("\(removed.count) settings are not in the file and go back to how the program came: \(listed(removed)).") }
-        if !unknown.isEmpty { lines.append("\(unknown.count) entries the program does not know are left out: \(listed(unknown)).") }
+        var lines = [
+            "“\(DisplayText.oneLine(fileName, limit: 120))” holds \(ordinary.count + guarded.count) settings the program knows."
+        ]
+        lines.append(
+            changed.isEmpty
+                ? "None of the ordinary settings differs from the present ones."
+                : "\(changed.count) ordinary settings differ from the present ones and are replaced: \(listed(changed))."
+        )
+        if !removed.isEmpty {
+            lines.append(
+                "\(removed.count) settings are not in the file and go back to how the program came: \(listed(removed))."
+            )
+        }
+        if !unknown.isEmpty {
+            lines.append("\(unknown.count) entries the program does not know are left out: \(listed(unknown)).")
+        }
         if limited > 0 { lines.append("\(limited) numbers were out of range and were limited.") }
         if !parts.isEmpty {
-            lines.append("The parts below can make the program run something, change what a key does or change whom it trusts. "
-                         + "Each is imported only if you tick it; otherwise it stays as it is now.")
+            lines.append(
+                "The parts below can make the program run something, change what a key does or change whom it trusts. "
+                    + "Each is imported only if you tick it; otherwise it stays as it is now.")
         }
         return lines.joined(separator: "\n")
     }
@@ -444,7 +504,8 @@ struct SettingsExportOptions: Equatable {
         var left: [String] = []
         if !includesHistory { left.append(SettingsExportOptions.historyNote) }
         if !includesConnections { left.append(SettingsExportOptions.connectionsNote) }
-        var text = "The file holds \(count) settings: the options of all pages, the key bindings, the button bar, the user commands, the Start menu, "
+        var text =
+            "The file holds \(count) settings: the options of all pages, the key bindings, the button bar, the user commands, the Start menu, "
             + "the directory hotlist and the panels' tabs. Passwords are never in it. Only you can read the file."
         if !left.isEmpty { text += "\nLeft out: " + left.joined(separator: "; ") + "." }
         return text
@@ -456,14 +517,17 @@ extension SettingsArchive {
     /// it: a failure leaves an earlier file whole. Blocks: not for the main thread.
     func write(to url: URL) throws {
         let data = try encoded()
-        let temporary = url.deletingLastPathComponent().appendingPathComponent(".\(url.lastPathComponent).\(UUID().uuidString).tmp")
+        let temporary = url.deletingLastPathComponent().appendingPathComponent(
+            ".\(url.lastPathComponent).\(UUID().uuidString).tmp")
         let descriptor = open(temporary.path, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0o600)
         guard descriptor >= 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
         let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
         do {
             try handle.write(contentsOf: data)
             try handle.close()
-            guard rename(temporary.path, url.path) == 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+            guard rename(temporary.path, url.path) == 0 else {
+                throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+            }
         } catch {
             try? FileManager.default.removeItem(at: temporary)
             throw error

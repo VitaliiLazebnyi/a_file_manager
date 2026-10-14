@@ -63,9 +63,12 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
         kernel = session.kernel
         settings = kernel.settings.scoped(to: CompareSettingsKey.scope)
         let size = CGFloat(Double(settings.text(CompareSettingsKey.fontSize, default: "12")) ?? 12)
-        font = NSFont(name: settings.text(CompareSettingsKey.fontName, default: ""), size: size) ?? .monospacedSystemFont(ofSize: size, weight: .regular)
-        let window = ToolWindow(contentRect: NSRect(x: 0, y: 0, width: 1100, height: 680),
-                                styleMask: [.titled, .closable, .resizable, .miniaturizable], backing: .buffered, defer: false)
+        font =
+            NSFont(name: settings.text(CompareSettingsKey.fontName, default: ""), size: size)
+            ?? .monospacedSystemFont(ofSize: size, weight: .regular)
+        let window = ToolWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 1100, height: 680),
+            styleMask: [.titled, .closable, .resizable, .miniaturizable], backing: .buffered, defer: false)
         window.title = "Compare contents"
         window.isReleasedWhenClosed = false
         window.minSize = NSSize(width: 700, height: 360)
@@ -105,29 +108,46 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
             field.action = #selector(compare)
             field.lineBreakMode = .byTruncatingHead
         }
-        let paths = NSStackView(views: [leftField, button(">>", #selector(pickLeft), tip: "Choose the left file"),
-                                        rightField, button(">>", #selector(pickRight), tip: "Choose the right file")])
+        let paths = NSStackView(views: [
+            leftField, button(">>", #selector(pickLeft), tip: "Choose the left file"),
+            rightField, button(">>", #selector(pickRight), tip: "Choose the right file")
+        ])
         leftField.widthAnchor.constraint(equalTo: rightField.widthAnchor).isActive = true
 
-        differenceButtons = [button("Next difference", #selector(nextDifference), tip: "Option+Down"),
-                             button("Previous difference", #selector(previousDifference), tip: "Option+Up")]
+        differenceButtons = [
+            button("Next difference", #selector(nextDifference), tip: "Option+Down"),
+            button("Previous difference", #selector(previousDifference), tip: "Option+Up")
+        ]
         searchField.placeholderString = "Search in both files"
         searchField.target = self
         searchField.action = #selector(searchNext)
         searchField.widthAnchor.constraint(equalToConstant: 180).isActive = true
         bytesPopup.addItems(withTitles: CompareSettingsKey.bytesPerLineChoices.map { "\($0) bytes" })
-        let first = NSStackView(views: [button("Compare", #selector(compare))] + differenceButtons
-            + [button("Font…", #selector(chooseFont)), searchField, NSView(), binaryBox, bytesPopup, verticalBox])
+        let first = NSStackView(
+            views: [button("Compare", #selector(compare))] + differenceButtons
+                + [button("Font…", #selector(chooseFont)), searchField, NSView(), binaryBox, bytesPopup, verticalBox])
 
-        editButtons = [button("Copy ->", #selector(copyToRight), tip: "Copy the difference or the selected lines to the right (Option+Right)"),
-                       button("Copy <-", #selector(copyToLeft), tip: "Copy the difference or the selected lines to the left (Option+Left)"),
-                       button("Undo", #selector(undoEdit))]
+        editButtons = [
+            button(
+                "Copy ->", #selector(copyToRight),
+                tip: "Copy the difference or the selected lines to the right (Option+Right)"),
+            button(
+                "Copy <-", #selector(copyToLeft),
+                tip: "Copy the difference or the selected lines to the left (Option+Left)"),
+            button("Undo", #selector(undoEdit))
+        ]
         saveButton.target = self
         saveButton.action = #selector(save)
-        let resync = button("Resync", #selector(markResync),
-                            tip: "Mark the selected line of the pane that has the focus; with a line marked on each side, the two are taken to belong together")
-        let second = NSStackView(views: [editBox] + editButtons + [saveButton, resync, button("Swap", #selector(swapSides), tip: "Swap panels (Ctrl+U)"),
-                                                                     NSView(), caseBox, spacesBox, endingsBox])
+        let resync = button(
+            "Resync", #selector(markResync),
+            tip:
+                "Mark the selected line of the pane that has the focus; with a line marked on each side, the two are taken to belong together"
+        )
+        let second = NSStackView(
+            views: [editBox] + editButtons + [
+                saveButton, resync, button("Swap", #selector(swapSides), tip: "Swap panels (Ctrl+U)"),
+                NSView(), caseBox, spacesBox, endingsBox
+            ])
         for box in [binaryBox, caseBox, spacesBox, endingsBox, verticalBox, editBox] {
             box.target = self
             box.action = #selector(optionChanged(_:))
@@ -174,8 +194,9 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
         scroll.hasHorizontalScroller = true
         scroll.borderType = .bezelBorder
         scroll.contentView.postsBoundsChangedNotifications = true
-        NotificationCenter.default.addObserver(self, selector: #selector(paneScrolled(_:)), name: NSView.boundsDidChangeNotification,
-                                               object: scroll.contentView)
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(paneScrolled(_:)), name: NSView.boundsDidChangeNotification,
+            object: scroll.contentView)
         return scroll
     }
 
@@ -222,9 +243,11 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
             }
             pullControls()
         } else {
-            session.options = DiffOptions(ignoreCase: caseBox.state == .on, ignoreRepeatedSpaces: spacesBox.state == .on,
-                                          ignoreLineEndings: endingsBox.state == .on)
-            session.bytesPerLine = CompareSettingsKey.bytesPerLineChoices[max(0, min(3, bytesPopup.indexOfSelectedItem))]
+            session.options = DiffOptions(
+                ignoreCase: caseBox.state == .on, ignoreRepeatedSpaces: spacesBox.state == .on,
+                ignoreLineEndings: endingsBox.state == .on)
+            session.bytesPerLine =
+                CompareSettingsKey.bytesPerLineChoices[max(0, min(3, bytesPopup.indexOfSelectedItem))]
             session.optionsChanged()
         }
     }
@@ -236,8 +259,9 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
             action()
             return
         }
-        let choice = kernel.ui.pick("Save the changes?", detail: "The compared files were edited.",
-                                    [("Save", 0), ("Don't Save", 1), ("Cancel", 2)], fallback: 2, style: .warning)
+        let choice = kernel.ui.pick(
+            "Save the changes?", detail: "The compared files were edited.",
+            [("Save", 0), ("Don't Save", 1), ("Cancel", 2)], fallback: 2, style: .warning)
         if choice == 0 {
             session.save { saved in if saved { action() } }
         } else if choice == 1 {
@@ -274,7 +298,9 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
         panel.beginSheetModal(for: window) { [weak self] response in
             guard response == .OK, let url = panel.url else { return }
             field.stringValue = url.path
-            if self?.leftField.stringValue.isEmpty == false, self?.rightField.stringValue.isEmpty == false { self?.compare() }
+            if self?.leftField.stringValue.isEmpty == false, self?.rightField.stringValue.isEmpty == false {
+                self?.compare()
+            }
         }
     }
 
@@ -376,7 +402,9 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
         guard !isMirroring, let moved = notification.object as? NSClipView else { return }
         isMirroring = true
         for table in [leftTable, rightTable] {
-            guard let clip = table.enclosingScrollView?.contentView, clip !== moved, clip.bounds.origin != moved.bounds.origin else { continue }
+            guard let clip = table.enclosingScrollView?.contentView, clip !== moved,
+                clip.bounds.origin != moved.bounds.origin
+            else { continue }
             clip.scroll(to: moved.bounds.origin)
             table.enclosingScrollView?.reflectScrolledClipView(clip)
         }
@@ -432,7 +460,8 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
             resyncMarks = (nil, nil)
             session.resync(leftRow: left, rightRow: right)
         } else {
-            statusLabel.stringValue = "Line marked on the \(focusedSide == .left ? "left" : "right"). "
+            statusLabel.stringValue =
+                "Line marked on the \(focusedSide == .left ? "left" : "right"). "
                 + "Now select the line that belongs to it in the other pane and choose Resync again."
         }
     }
@@ -456,22 +485,37 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
 
     /// The keys of the panes (spec 09 › Compare by content › Keys).
     private func handleKey(_ event: NSEvent, in table: NSTableView) -> Bool {
-        func key(_ character: String, _ modifiers: KeyModifiers) -> Bool { Shortcut(.character(character), modifiers).matches(event) }
-        if Shortcut(.down, .option).matches(event) { nextDifference()
-        } else if Shortcut(.up, .option).matches(event) { previousDifference()
+        func key(_ character: String, _ modifiers: KeyModifiers) -> Bool {
+            Shortcut(.character(character), modifiers).matches(event)
+        }
+        if Shortcut(.down, .option).matches(event) {
+            nextDifference()
+        } else if Shortcut(.up, .option).matches(event) {
+            previousDifference()
         } else if Shortcut.f(6).matches(event) {
             session.setEditing(!session.isEditing)
             pullControls()
-        } else if Shortcut.f(3).matches(event) { search(forward: true)
-        } else if Shortcut.f(3, .shift).matches(event) { search(forward: false)
-        } else if key("f", .control) || key("f", .command) || Shortcut.f(7).matches(event) { window?.makeFirstResponder(searchField)
-        } else if key("s", .control) || key("s", .command) { save()
-        } else if key("z", .control) || key("z", .command) || Shortcut(.backspace, .option).matches(event) { undoEdit()
-        } else if key("u", .control) { swapSides()
-        } else if key("c", .command) || key("c", .control) { copySelection()
-        } else if session.isEditing, Shortcut(.right, .option).matches(event) { copyToRight()
-        } else if session.isEditing, Shortcut(.left, .option).matches(event) { copyToLeft()
-        } else { return false }
+        } else if Shortcut.f(3).matches(event) {
+            search(forward: true)
+        } else if Shortcut.f(3, .shift).matches(event) {
+            search(forward: false)
+        } else if key("f", .control) || key("f", .command) || Shortcut.f(7).matches(event) {
+            window?.makeFirstResponder(searchField)
+        } else if key("s", .control) || key("s", .command) {
+            save()
+        } else if key("z", .control) || key("z", .command) || Shortcut(.backspace, .option).matches(event) {
+            undoEdit()
+        } else if key("u", .control) {
+            swapSides()
+        } else if key("c", .command) || key("c", .control) {
+            copySelection()
+        } else if session.isEditing, Shortcut(.right, .option).matches(event) {
+            copyToRight()
+        } else if session.isEditing, Shortcut(.left, .option).matches(event) {
+            copyToLeft()
+        } else {
+            return false
+        }
         return true
     }
 
@@ -483,16 +527,22 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
 
     func tableView(_ tableView: NSTableView, rowViewForRow row: Int) -> NSTableRowView? {
         let identifier = NSUserInterfaceItemIdentifier("row")
-        let view = tableView.makeView(withIdentifier: identifier, owner: nil) as? DiffRowView ?? {
-            let view = DiffRowView()
-            view.identifier = identifier
-            return view
-        }()
+        let view =
+            tableView.makeView(withIdentifier: identifier, owner: nil) as? DiffRowView
+            ?? {
+                let view = DiffRowView()
+                view.identifier = identifier
+                return view
+            }()
         let hasLine = session.text(side(of: tableView), row: row) != nil
         switch session.kind(ofRow: row) {
         case .equal: view.fill = nil
-        case .changed: view.fill = hasLine ? NSColor.systemYellow.withAlphaComponent(0.16) : NSColor.systemGray.withAlphaComponent(0.14)
-        case .added, .removed: view.fill = hasLine ? NSColor.systemRed.withAlphaComponent(0.14) : NSColor.systemGray.withAlphaComponent(0.14)
+        case .changed:
+            view.fill =
+                hasLine ? NSColor.systemYellow.withAlphaComponent(0.16) : NSColor.systemGray.withAlphaComponent(0.14)
+        case .added, .removed:
+            view.fill =
+                hasLine ? NSColor.systemRed.withAlphaComponent(0.14) : NSColor.systemGray.withAlphaComponent(0.14)
         }
         return view
     }
@@ -501,15 +551,17 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
         let side = side(of: tableView)
         let isNumber = tableColumn?.identifier.rawValue == "number"
         let identifier = NSUserInterfaceItemIdentifier(isNumber ? "number" : "text")
-        let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? NSTextField ?? {
-            let label = NSTextField(labelWithString: "")
-            label.identifier = identifier
-            label.lineBreakMode = .byClipping
-            label.cell?.usesSingleLineMode = true
-            label.target = self
-            label.action = #selector(cellEdited(_:))
-            return label
-        }()
+        let cell =
+            tableView.makeView(withIdentifier: identifier, owner: nil) as? NSTextField
+            ?? {
+                let label = NSTextField(labelWithString: "")
+                label.identifier = identifier
+                label.lineBreakMode = .byClipping
+                label.cell?.usesSingleLineMode = true
+                label.target = self
+                label.action = #selector(cellEdited(_:))
+                return label
+            }()
         let differs = session.kind(ofRow: row) != .equal
         if isNumber {
             cell.alignment = .right
@@ -524,10 +576,14 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
         // An edited cell that was cut is not editable, so that the cut part cannot be lost.
         let shown = text.map { $0.utf8.count > 4 * TextDiff.inlineLimit ? String($0.prefix(TextDiff.inlineLimit)) : $0 }
         if let text, let shown, shown.utf8.count != text.utf8.count { cell.isEditable = false }
-        let attributed = NSMutableAttributedString(string: shown ?? "", attributes: [.font: font, .foregroundColor: NSColor.labelColor])
+        let attributed = NSMutableAttributedString(
+            string: shown ?? "", attributes: [.font: font, .foregroundColor: NSColor.labelColor])
         for range in session.highlights(side, row: row) where range.lowerBound < attributed.length {
-            attributed.addAttributes([.backgroundColor: NSColor.systemRed.withAlphaComponent(0.30), .foregroundColor: NSColor.labelColor],
-                                     range: NSRange(location: range.lowerBound, length: min(range.upperBound, attributed.length) - range.lowerBound))
+            attributed.addAttributes(
+                [.backgroundColor: NSColor.systemRed.withAlphaComponent(0.30), .foregroundColor: NSColor.labelColor],
+                range: NSRange(
+                    location: range.lowerBound, length: min(range.upperBound, attributed.length) - range.lowerBound)
+            )
         }
         cell.attributedStringValue = attributed
         return cell

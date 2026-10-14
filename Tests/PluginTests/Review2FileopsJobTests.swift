@@ -1,11 +1,12 @@
 import AFMContracts
 import AFMKernel
-@testable import FileOperationsPlugin
 import Foundation
 import LocalFileSystemPlugin
 import TestSupport
 import Testing
 import VirtualFoldersPlugin
+
+@testable import FileOperationsPlugin
 
 // Regression tests of review round 2 for the file-operation engine (findings F001 … F073 of
 // documentation/review-2/findings/fileops.md).
@@ -33,7 +34,9 @@ final class FlakyFileSystem: FileSystemProvider {
         let fails: Bool
         let hook: (() -> Void)?
         var blocks = 0
-        init(_ inner: FileReader, fails: Bool, hook: (() -> Void)?) { (self.inner, self.fails, self.hook) = (inner, fails, hook) }
+        init(_ inner: FileReader, fails: Bool, hook: (() -> Void)?) {
+            (self.inner, self.fails, self.hook) = (inner, fails, hook)
+        }
         func read(upToCount count: Int) throws -> Data? {
             if blocks == 1 {
                 hook?()
@@ -47,13 +50,18 @@ final class FlakyFileSystem: FileSystemProvider {
         func close() { inner.close() }
     }
 
-    func list(_ directory: URL, showHidden: Bool) throws -> [FileItem] { try base.list(directory, showHidden: showHidden) }
+    func list(_ directory: URL, showHidden: Bool) throws -> [FileItem] {
+        try base.list(directory, showHidden: showHidden)
+    }
     func item(at url: URL) -> FileItem? { base.item(at: url) }
     func parent(of directory: URL) -> URL? { base.parent(of: directory) }
     func read(_ url: URL) throws -> FileReader {
         let (fails, hook): (Bool, (() -> Void)?) = lock.withLock {
             defer { afterFirstBlock = nil }
-            if failures > 0 { failures -= 1; return (true, afterFirstBlock) }
+            if failures > 0 {
+                failures -= 1
+                return (true, afterFirstBlock)
+            }
             return (false, afterFirstBlock)
         }
         return Reader(try base.read(url), fails: fails, hook: hook)
@@ -61,8 +69,12 @@ final class FlakyFileSystem: FileSystemProvider {
     func createDirectory(at url: URL) throws { try base.createDirectory(at: url) }
     func write(_ url: URL) throws -> FileWriter { try base.write(url) }
     func remove(_ url: URL) throws { try base.remove(url) }
-    func move(_ source: URL, to destination: URL, replacing: Bool) throws { try base.move(source, to: destination, replacing: replacing) }
-    func copy(_ source: URL, to destination: URL, progress: (Int64) -> Bool) throws { throw FileSystemError.crossesVolumes }
+    func move(_ source: URL, to destination: URL, replacing: Bool) throws {
+        try base.move(source, to: destination, replacing: replacing)
+    }
+    func copy(_ source: URL, to destination: URL, progress: (Int64) -> Bool) throws {
+        throw FileSystemError.crossesVolumes
+    }
     func displayPath(_ url: URL) -> String { base.displayPath(url) }
     func location(from text: String) -> URL? { base.location(from: text) }
     func volume(of url: URL) -> VolumeInfo? { base.volume(of: url) }
@@ -143,8 +155,10 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
         fileSystems.register(virtual)
     }
 
-    private func run(_ kind: JobKind, _ sources: [URL], to target: TargetSpec, replies: Review2Replies = Review2Replies(),
-                     configure: (FileJob) -> Void = { _ in }) -> JobResult {
+    private func run(
+        _ kind: JobKind, _ sources: [URL], to target: TargetSpec, replies: Review2Replies = Review2Replies(),
+        configure: (FileJob) -> Void = { _ in }
+    ) -> JobResult {
         let job = FileJob(kind: kind, sources: sources, target: target, fileSystems: fileSystems)
         job.delegate = replies
         configure(job)
@@ -162,22 +176,27 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
     }
 
     @Test func aTargetInABranchViewIsTheRealFolder() throws {
-        let job = FileJob(kind: .move, sources: [try box.file("d/a.txt")], target: TargetSpec(directory: virtual.branch(of: box.url("d"))),
-                          fileSystems: fileSystems)
+        let job = FileJob(
+            kind: .move, sources: [try box.file("d/a.txt")],
+            target: TargetSpec(directory: virtual.branch(of: box.url("d"))),
+            fileSystems: fileSystems)
         #expect(job.target?.directory.isFileURL == true && job.target?.directory.path == box.url("d").path)
         #expect(job.targetsSourceFolder)
         #expect(RealLocation.resolve(box.url("d"), in: fileSystems) == box.url("d"))
         // A list of files has no folder of its own, and no name can be written into it.
         let list = virtual.register(files: [box.url("d/a.txt")], title: "Found", origin: box.url("d"))
         #expect(RealLocation.resolve(list, in: fileSystems) == list)
-        #expect(!RealLocation.takesNames(list, in: fileSystems) && RealLocation.takesNames(box.url("d"), in: fileSystems))
+        #expect(
+            !RealLocation.takesNames(list, in: fileSystems) && RealLocation.takesNames(box.url("d"), in: fileSystems))
     }
 
     @Test func aRenameToAnotherLetterCaseInABranchViewIsARename() throws {
         let file = try box.file("d/a.txt", "precious")
         let before = try #require(inode(file))
         let replies = Review2Replies()
-        let result = run(.move, [file], to: TargetSpec(directory: virtual.branch(of: box.url("d")), exactName: "A.TXT"), replies: replies)
+        let result = run(
+            .move, [file], to: TargetSpec(directory: virtual.branch(of: box.url("d")), exactName: "A.TXT"),
+            replies: replies)
         #expect(replies.errors.isEmpty && replies.conflicts.isEmpty && result.completed.count == 1)
         #expect(namesOnDisk(box.url("d")) == ["A.TXT"] && box.read("d/A.TXT") == "precious")
         // The same file, renamed: not a copy that took its place.
@@ -188,7 +207,8 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
         let file = try box.file("d/a.txt", "precious")
         let before = try #require(inode(file))
         #expect(setxattr(file.path, "user.afm.test", "v", 1, 0, 0) == 0)
-        let result = run(.move, [file], to: TargetSpec(directory: virtual.branch(of: box.url("d")), exactName: "b.txt"))
+        let result = run(
+            .move, [file], to: TargetSpec(directory: virtual.branch(of: box.url("d")), exactName: "b.txt"))
         #expect(result.completed.count == 1 && namesOnDisk(box.url("d")) == ["b.txt"])
         #expect(inode(box.url("d/b.txt")) == before)
         #expect(getxattr(box.url("d/b.txt").path, "user.afm.test", nil, 0, 0, 0) == 1)
@@ -198,8 +218,11 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
         try box.file("d/sub/in.txt", "inside")
         let replies = Review2Replies()
         // Into itself under its own name, and into its own subfolder.
-        _ = run(.move, [box.url("d/sub")], to: TargetSpec(directory: virtual.branch(of: box.url("d"))), replies: replies)
-        _ = run(.move, [box.url("d/sub")], to: TargetSpec(directory: virtual.branch(of: box.url("d/sub"))), replies: replies)
+        _ = run(
+            .move, [box.url("d/sub")], to: TargetSpec(directory: virtual.branch(of: box.url("d"))), replies: replies)
+        _ = run(
+            .move, [box.url("d/sub")], to: TargetSpec(directory: virtual.branch(of: box.url("d/sub"))),
+            replies: replies)
         #expect(box.read("d/sub/in.txt") == "inside" && replies.errors.count == 2)
     }
 
@@ -216,13 +239,17 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
         try box.folder("t")
         try FileManager.default.linkItem(at: file, to: box.url("t/a.txt"))
         let replies = Review2Replies()
-        _ = run(.move, [file], to: TargetSpec(directory: box.url("t")), replies: replies) { $0.options.overwrite = .overwriteAll }
+        _ = run(.move, [file], to: TargetSpec(directory: box.url("t")), replies: replies) {
+            $0.options.overwrite = .overwriteAll
+        }
         #expect(box.read("d/a.txt") == "precious" && box.read("t/a.txt") == "precious" && replies.errors.count == 1)
     }
 
     // F006: a rename of several items to one name.
     @Test func severalItemsRenamedToOneNameAreAllKept() throws {
-        let sources = [try box.file("d/a.doc", "doc"), try box.file("d/a.pdf", "pdf"), try box.file("d/sub/a.rtf", "rtf")]
+        let sources = [
+            try box.file("d/a.doc", "doc"), try box.file("d/a.pdf", "pdf"), try box.file("d/sub/a.rtf", "rtf")
+        ]
         let replies = Review2Replies()
         let result = run(.move, sources, to: TargetSpec(directory: box.url("d")), replies: replies) { job in
             job.newNames = Dictionary(uniqueKeysWithValues: sources.map { ($0.locationKey, "a.txt") })
@@ -257,12 +284,15 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
             let descriptor = open(pipe.path, O_WRONLY | O_NONBLOCK)
             if descriptor >= 0 { close(descriptor) }
         }) {
-            let job = FileJob(kind: .copy, sources: [box.url("s")], target: TargetSpec(directory: memory.url("/t")), fileSystems: fileSystems)
+            let job = FileJob(
+                kind: .copy, sources: [box.url("s")], target: TargetSpec(directory: memory.url("/t")),
+                fileSystems: fileSystems)
             job.delegate = replies
             _ = job.run()
         }
         #expect(ended, "the copy of a folder with a pipe did not end")
-        #expect(memory.contents("/t/s/real.txt") == "data" && !memory.exists("/t/s/pipe") && !memory.exists("/t/s/toPipe"))
+        #expect(
+            memory.contents("/t/s/real.txt") == "data" && !memory.exists("/t/s/pipe") && !memory.exists("/t/s/toPipe"))
         #expect(replies.errors.count == 2 && replies.errors.allSatisfy { $0.contains("pipe") })
     }
 
@@ -280,7 +310,9 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
             let descriptor = open(pipe.path, O_WRONLY | O_NONBLOCK)
             if descriptor >= 0 { close(descriptor) }
         }) {
-            let job = FileJob(kind: .copy, sources: [box.url("s/link")], target: TargetSpec(directory: box.url("t")), fileSystems: fileSystems)
+            let job = FileJob(
+                kind: .copy, sources: [box.url("s/link")], target: TargetSpec(directory: box.url("t")),
+                fileSystems: fileSystems)
             job.options.links = .followLinks
             job.delegate = replies
             _ = job.run()
@@ -298,7 +330,8 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
         let sources = [try box.file("s/a/x.txt", "from-a"), try box.file("s/b/x.txt", "from-b")]
         try box.folder("t")
         let answers = Answers()
-        let job = FileJob(kind: .move, sources: sources, target: TargetSpec(directory: box.url("t")), fileSystems: fileSystems)
+        let job = FileJob(
+            kind: .move, sources: sources, target: TargetSpec(directory: box.url("t")), fileSystems: fileSystems)
         job.options.overwrite = .overwriteAll
         job.delegate = answers
         let result = job.run()
@@ -310,18 +343,26 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
 
     @Test func aMaskThatGivesSeveralSourcesOneNameLosesNone() throws {
         let (fileSystems, _) = makeFileSystems()
-        let sources = [try box.file("s/a.doc", "doc"), try box.file("s/a.pdf", "pdf"), try box.file("s/a.rtf", "rtf")]
+        let sources = [
+            try box.file("s/a.doc", "doc"), try box.file("s/a.pdf", "pdf"), try box.file("s/a.rtf", "rtf")
+        ]
         try box.folder("t")
         for mode in [OverwriteMode.overwriteAll, .overwriteOlder, .overwriteOlderOrSame, .copyLarger] {
             let target = box.url("t/\(mode.rawValue)")
             try FileManager.default.createDirectory(at: target, withIntermediateDirectories: true)
-            let job = FileJob(kind: .copy, sources: sources, target: TargetSpec(directory: target, mask: "*.txt"), fileSystems: fileSystems)
+            let job = FileJob(
+                kind: .copy, sources: sources, target: TargetSpec(directory: target, mask: "*.txt"),
+                fileSystems: fileSystems)
             job.options.overwrite = mode
             let answers = Answers()
             job.delegate = answers
             _ = job.run()
             #expect(namesOnDisk(target) == ["a (2).txt", "a (3).txt", "a.txt"], "mode \(mode)")
-            #expect(Set(namesOnDisk(target).map { try? String(contentsOf: target.appendingPathComponent($0), encoding: .utf8) }) == ["doc", "pdf", "rtf"])
+            #expect(
+                Set(
+                    namesOnDisk(target).map {
+                        try? String(contentsOf: target.appendingPathComponent($0), encoding: .utf8)
+                    }) == ["doc", "pdf", "rtf"])
         }
     }
 
@@ -348,8 +389,10 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
         try box.file("s/one/sub/only1.txt", "1")
         try box.file("s/two/sub/x.txt", "second")
         try box.file("t/sub/old.txt", "old")
-        let job = FileJob(kind: .move, sources: [box.url("s/one/sub"), box.url("s/two/sub")], target: TargetSpec(directory: box.url("t")),
-                          fileSystems: fileSystems)
+        let job = FileJob(
+            kind: .move, sources: [box.url("s/one/sub"), box.url("s/two/sub")],
+            target: TargetSpec(directory: box.url("t")),
+            fileSystems: fileSystems)
         job.options.overwrite = .overwriteAll
         let answers = Answers()
         job.delegate = answers
@@ -362,7 +405,9 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
         let (fileSystems, _) = makeFileSystems()
         try box.file("s/x.txt", "new")
         try box.file("t/x.txt", "old")
-        let job = FileJob(kind: .copy, sources: [box.url("s/x.txt")], target: TargetSpec(directory: box.url("t")), fileSystems: fileSystems)
+        let job = FileJob(
+            kind: .copy, sources: [box.url("s/x.txt")], target: TargetSpec(directory: box.url("t")),
+            fileSystems: fileSystems)
         job.options.overwrite = .overwriteAll
         _ = job.run()
         #expect(namesOnDisk(box.url("t")) == ["x.txt"] && box.read("t/x.txt") == "new")
@@ -377,13 +422,19 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
         memory.addFile("/s/f.txt", String(repeating: "source-bytes ", count: 20))
         try box.folder("t")
         try FileManager.default.createSymbolicLink(at: box.url("t/f.txt"), withDestinationURL: victim)
-        for (choice, source) in [(ConflictChoice.resume, box.url("s/f.txt")), (.append, box.url("s/f.txt")), (.resume, memory.url("/s/f.txt")),
-                                 (.append, memory.url("/s/f.txt"))] {
+        for (choice, source) in [
+            (ConflictChoice.resume, box.url("s/f.txt")), (.append, box.url("s/f.txt")),
+            (.resume, memory.url("/s/f.txt")),
+            (.append, memory.url("/s/f.txt"))
+        ] {
             let replies = Review2Replies(conflict: choice)
-            let job = FileJob(kind: .copy, sources: [source], target: TargetSpec(directory: box.url("t")), fileSystems: fileSystems)
+            let job = FileJob(
+                kind: .copy, sources: [source], target: TargetSpec(directory: box.url("t")), fileSystems: fileSystems)
             job.delegate = replies
             let result = job.run()
-            #expect(box.read("elsewhere/victim.txt") == "the victim's own, longer contents: fifty-three bytes.", "\(choice)")
+            #expect(
+                box.read("elsewhere/victim.txt") == "the victim's own, longer contents: fifty-three bytes.",
+                "\(choice)")
             #expect(FileIdentity.isSymlink(box.url("t/f.txt")) && result.completed.isEmpty && replies.errors.count == 1)
         }
     }
@@ -398,12 +449,16 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
         flaky.base.addFile("/t/f.txt", "0123")
         flaky.base.addFile("/u/f.txt", "9999")
         let good = Review2Replies(conflict: .resume)
-        var job = FileJob(kind: .copy, sources: [box.url("s/f.txt")], target: TargetSpec(directory: flaky.base.url("/t")), fileSystems: fileSystems)
+        var job = FileJob(
+            kind: .copy, sources: [box.url("s/f.txt")], target: TargetSpec(directory: flaky.base.url("/t")),
+            fileSystems: fileSystems)
         job.delegate = good
         _ = job.run()
         #expect(flaky.base.contents("/t/f.txt") == "0123456789" && good.errors.isEmpty)
         let bad = Review2Replies(conflict: .resume)
-        job = FileJob(kind: .copy, sources: [box.url("s/f.txt")], target: TargetSpec(directory: flaky.base.url("/u")), fileSystems: fileSystems)
+        job = FileJob(
+            kind: .copy, sources: [box.url("s/f.txt")], target: TargetSpec(directory: flaky.base.url("/u")),
+            fileSystems: fileSystems)
         job.delegate = bad
         _ = job.run()
         #expect(flaky.base.contents("/u/f.txt") == "9999" && bad.errors.count == 1)
@@ -422,7 +477,8 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
         #expect(chflags(box.url("locked").path, UInt32(UF_IMMUTABLE)) == 0)
         defer { chflags(box.url("locked").path, 0) }
         let replies = Review2Replies()
-        let job = FileJob(kind: .delete(toTrash: false), sources: [box.url("locked/link"), plain], fileSystems: fileSystems)
+        let job = FileJob(
+            kind: .delete(toTrash: false), sources: [box.url("locked/link"), plain], fileSystems: fileSystems)
         job.options.asksAboutReadOnly = false
         job.delegate = replies
         let result = job.run()
@@ -454,12 +510,16 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
         try box.file("t/newer.txt", "old", modified: base)
         try box.file("s/same.txt", "new", modified: base)
         try box.file("t/same.txt", "old", modified: base.addingTimeInterval(1.5))
-        var job = FileJob(kind: .copy, sources: [box.url("s/newer.txt")], target: TargetSpec(directory: box.url("t")), fileSystems: fileSystems)
+        var job = FileJob(
+            kind: .copy, sources: [box.url("s/newer.txt")], target: TargetSpec(directory: box.url("t")),
+            fileSystems: fileSystems)
         job.options.overwrite = .overwriteOlder
         _ = job.run()
         // A source that is a second and a half newer is newer.
         #expect(box.read("t/newer.txt") == "new")
-        job = FileJob(kind: .copy, sources: [box.url("s/same.txt")], target: TargetSpec(directory: box.url("t")), fileSystems: fileSystems)
+        job = FileJob(
+            kind: .copy, sources: [box.url("s/same.txt")], target: TargetSpec(directory: box.url("t")),
+            fileSystems: fileSystems)
         job.options.overwrite = .overwriteOlderOrSame
         _ = job.run()
         // And a target that is a second and a half newer is not "of the same age".
@@ -470,7 +530,8 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
         let (_, memory) = makeFileSystems()
         #expect(FileIdentity.timestampGrain(of: memory.url("/a/b.txt")) == 2)
         // A place that does not exist yet answers for the folder above it.
-        #expect(FileIdentity.timestampGrain(of: box.url("no/such/file.txt")) == FileIdentity.timestampGrain(of: box.root))
+        #expect(
+            FileIdentity.timestampGrain(of: box.url("no/such/file.txt")) == FileIdentity.timestampGrain(of: box.root))
     }
 
     // MARK: F019, F031
@@ -482,7 +543,9 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
         try box.folder("s")
         try FileManager.default.createSymbolicLink(at: box.url("s/X"), withDestinationURL: box.url("Y"))
         try box.folder("t")
-        let job = FileJob(kind: .copy, sources: [box.url("s")], target: TargetSpec(directory: box.url("t")), fileSystems: fileSystems)
+        let job = FileJob(
+            kind: .copy, sources: [box.url("s")], target: TargetSpec(directory: box.url("t")), fileSystems: fileSystems
+        )
         job.options.links = .followLinks
         let answers = Answers()
         job.delegate = answers
@@ -504,12 +567,16 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
         try box.folder("t")
         flaky.failNextReads(1)
         let replies = Review2Replies(failures: [.retry, .skip])
-        let job = FileJob(kind: .copy, sources: [flaky.base.url("/s/big.bin")], target: TargetSpec(directory: box.url("t")), fileSystems: fileSystems)
+        let job = FileJob(
+            kind: .copy, sources: [flaky.base.url("/s/big.bin")], target: TargetSpec(directory: box.url("t")),
+            fileSystems: fileSystems)
         job.options.keepsPartialFiles = true
         job.delegate = replies
         let result = job.run()
         #expect(replies.errors == ["the connection broke"])
-        #expect(result.completed.count == 1 && box.read("t/big.bin") == "0123456789abcdef" && namesOnDisk(box.url("t")) == ["big.bin"])
+        #expect(
+            result.completed.count == 1 && box.read("t/big.bin") == "0123456789abcdef"
+                && namesOnDisk(box.url("t")) == ["big.bin"])
     }
 
     @Test func aSkipAfterAFailedCopyKeepsThePartialFileWhenAskedTo() throws {
@@ -520,7 +587,9 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
         flaky.base.addFile("/s/big.bin", "0123456789abcdef")
         try box.folder("t")
         flaky.failNextReads(1)
-        let job = FileJob(kind: .copy, sources: [flaky.base.url("/s/big.bin")], target: TargetSpec(directory: box.url("t")), fileSystems: fileSystems)
+        let job = FileJob(
+            kind: .copy, sources: [flaky.base.url("/s/big.bin")], target: TargetSpec(directory: box.url("t")),
+            fileSystems: fileSystems)
         job.options.keepsPartialFiles = true
         let replies = Review2Replies()
         job.delegate = replies
@@ -538,17 +607,20 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
             try box.file("t/big.bin", "the old file")
             let flag = CancellationFlag()
             flaky.afterFirstBlock = { flag.cancel() }
-            let job = FileJob(kind: .copy, sources: [flaky.base.url("/s/big.bin")], target: TargetSpec(directory: box.url("t")),
-                              fileSystems: fileSystems, cancellation: flag)
+            let job = FileJob(
+                kind: .copy, sources: [flaky.base.url("/s/big.bin")], target: TargetSpec(directory: box.url("t")),
+                fileSystems: fileSystems, cancellation: flag)
             job.options.keepsPartialFiles = keepsPartial
             job.options.overwrite = .overwriteAll
             let result = job.run()
-            #expect(result.cancelled && box.read("t/big.bin") == "the old file" && namesOnDisk(box.url("t")) == ["big.bin"])
+            #expect(
+                result.cancelled && box.read("t/big.bin") == "the old file" && namesOnDisk(box.url("t")) == ["big.bin"])
             // The same when the copy fails and is retried: the old file is there until the new one is whole.
             flaky.failNextReads(1)
             let replies = Review2Replies(failures: [.skip])
-            let failing = FileJob(kind: .copy, sources: [flaky.base.url("/s/big.bin")], target: TargetSpec(directory: box.url("t")),
-                                  fileSystems: fileSystems)
+            let failing = FileJob(
+                kind: .copy, sources: [flaky.base.url("/s/big.bin")], target: TargetSpec(directory: box.url("t")),
+                fileSystems: fileSystems)
             failing.options.keepsPartialFiles = keepsPartial
             failing.options.overwrite = .overwriteAll
             failing.delegate = replies
@@ -562,8 +634,10 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
     @Test func abortAlsoSetsTheJobsOwnFlagSoThatNothingWaitsOnIt() throws {
         let (fileSystems, memory) = makeFileSystems()
         let flag = CancellationFlag()
-        let job = FileJob(kind: .copy, sources: [memory.url("/gone.txt")], target: TargetSpec(directory: box.root), fileSystems: fileSystems,
-                          cancellation: flag)
+        let job = FileJob(
+            kind: .copy, sources: [memory.url("/gone.txt")], target: TargetSpec(directory: box.root),
+            fileSystems: fileSystems,
+            cancellation: flag)
         let replies = Review2Replies(failures: [.abort])
         job.delegate = replies
         #expect(job.run().cancelled && flag.isCancelled)
@@ -576,7 +650,9 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
         try box.folder("t")
         let lock = NSLock()
         var verbs: [OperationRecord.Verb] = []
-        let job = FileJob(kind: .copy, sources: [box.url("s")], target: TargetSpec(directory: box.url("t")), fileSystems: fileSystems)
+        let job = FileJob(
+            kind: .copy, sources: [box.url("s")], target: TargetSpec(directory: box.url("t")), fileSystems: fileSystems
+        )
         job.wantsRecord = { verb, _ in verb == .makeFolder }
         job.onRecord = { record in lock.withLock { verbs.append(record.verb) } }
         _ = job.run()
@@ -596,8 +672,10 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
         #expect(hostile.lastPathComponent == "..")
         for kind in [JobKind.copy, .move, .delete(toTrash: false)] {
             let replies = Review2Replies()
-            let job = FileJob(kind: kind, sources: [hostile], target: kind == .delete(toTrash: false) ? nil : TargetSpec(directory: memory.url("/B")),
-                              fileSystems: fileSystems)
+            let job = FileJob(
+                kind: kind, sources: [hostile],
+                target: kind == .delete(toTrash: false) ? nil : TargetSpec(directory: memory.url("/B")),
+                fileSystems: fileSystems)
             job.delegate = replies
             let result = job.run()
             #expect(result.completed.isEmpty && replies.errors.count == 1 && memory.contents("/A/keep.txt") == "keep")
@@ -610,7 +688,9 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
         memory.addFile("/s/tool", "#!", permissions: 0o6777)
         memory.addFile("/s/plain.txt", "x", permissions: 0o640)
         try box.folder("t")
-        runJob(.copy, [memory.url("/s/tool"), memory.url("/s/plain.txt")], to: TargetSpec(directory: box.url("t")), fileSystems: fileSystems)
+        runJob(
+            .copy, [memory.url("/s/tool"), memory.url("/s/plain.txt")], to: TargetSpec(directory: box.url("t")),
+            fileSystems: fileSystems)
         let mask = umask(0o022)
         umask(mask)
         #expect(mode(box.url("t/tool")) == 0o777 & ~UInt16(mask))
@@ -632,7 +712,8 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
         defer { chflags(file.path, 0) }
         memory.addDirectory("/t")
         let replies = Review2Replies()
-        let job = FileJob(kind: .move, sources: [file], target: TargetSpec(directory: memory.url("/t")), fileSystems: fileSystems)
+        let job = FileJob(
+            kind: .move, sources: [file], target: TargetSpec(directory: memory.url("/t")), fileSystems: fileSystems)
         job.delegate = replies
         let result = job.run()
         #expect(replies.locked == 1 && replies.errors.isEmpty && result.completed.count == 1)
@@ -646,7 +727,9 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
         memory.addFile("/t/log.txt", "start")
         memory.keepsMetadata = true
         let replies = Review2Replies(conflict: .append)
-        let job = FileJob(kind: .copy, sources: [box.url("s/log.txt")], target: TargetSpec(directory: memory.url("/t")), fileSystems: fileSystems)
+        let job = FileJob(
+            kind: .copy, sources: [box.url("s/log.txt")], target: TargetSpec(directory: memory.url("/t")),
+            fileSystems: fileSystems)
         job.delegate = replies
         _ = job.run()
         #expect(memory.contents("/t/log.txt") == "start-more" && replies.errors.isEmpty)
@@ -663,7 +746,9 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
             private let lock = NSLock()
             private var asked: [String: Int] = [:]
             func lookups(_ path: String) -> Int { lock.withLock { asked[path] ?? 0 } }
-            func list(_ directory: URL, showHidden: Bool) throws -> [FileItem] { try base.list(directory, showHidden: showHidden) }
+            func list(_ directory: URL, showHidden: Bool) throws -> [FileItem] {
+                try base.list(directory, showHidden: showHidden)
+            }
             func item(at url: URL) -> FileItem? {
                 lock.withLock { asked[url.path, default: 0] += 1 }
                 return base.item(at: url)
@@ -673,8 +758,12 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
             func createDirectory(at url: URL) throws { try base.createDirectory(at: url) }
             func write(_ url: URL) throws -> FileWriter { try base.write(url) }
             func remove(_ url: URL) throws { try base.remove(url) }
-            func move(_ source: URL, to destination: URL, replacing: Bool) throws { try base.move(source, to: destination, replacing: replacing) }
-            func copy(_ source: URL, to destination: URL, progress: (Int64) -> Bool) throws { try base.copy(source, to: destination, progress: progress) }
+            func move(_ source: URL, to destination: URL, replacing: Bool) throws {
+                try base.move(source, to: destination, replacing: replacing)
+            }
+            func copy(_ source: URL, to destination: URL, progress: (Int64) -> Bool) throws {
+                try base.copy(source, to: destination, progress: progress)
+            }
         }
         let fileSystems = FileSystemRegistry()
         let server = Counting()
@@ -683,8 +772,9 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
         server.base.addFile("/s/a.txt", "a")
         server.base.addFile("/s/b.txt", "b")
         try box.folder("t")
-        let result = runJob(.copy, [server.base.url("/s/a.txt"), server.base.url("/s/b.txt")], to: TargetSpec(directory: box.url("t")),
-                            fileSystems: fileSystems)
+        let result = runJob(
+            .copy, [server.base.url("/s/a.txt"), server.base.url("/s/b.txt")], to: TargetSpec(directory: box.url("t")),
+            fileSystems: fileSystems)
         #expect(result.completed.count == 2 && box.read("t/b.txt") == "b")
         #expect(server.lookups("/s/a.txt") == 1 && server.lookups("/s/b.txt") == 1)
     }
@@ -695,13 +785,17 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
         try box.file("t/.afm-not-a-uuid.tmp", "mine")
         try box.file("t/keep.txt", "keep")
         try box.folder("t/.afm-\(UUID().uuidString).tmp")
-        #expect(FileJob.isTemporaryName(stale) && !FileJob.isTemporaryName(".afm-not-a-uuid.tmp") && !FileJob.isTemporaryName("a.tmp"))
+        #expect(
+            FileJob.isTemporaryName(stale) && !FileJob.isTemporaryName(".afm-not-a-uuid.tmp")
+                && !FileJob.isTemporaryName("a.tmp"))
         // Fresh: it may belong to a copy that is running.
         FileJob.sweepStaleTemporaries(in: box.url("t"))
         #expect(box.exists("t/\(stale)"))
         FileJob.sweepStaleTemporaries(in: box.url("t"), now: Date().addingTimeInterval(FileJob.staleTemporaryAge + 60))
         #expect(!box.exists("t/\(stale)"))
-        #expect(namesOnDisk(box.url("t")).count == 3 && box.read("t/keep.txt") == "keep" && box.read("t/.afm-not-a-uuid.tmp") == "mine")
+        #expect(
+            namesOnDisk(box.url("t")).count == 3 && box.read("t/keep.txt") == "keep"
+                && box.read("t/.afm-not-a-uuid.tmp") == "mine")
     }
 
     @Test func aTreeAsDeepAsPathsAllowIsCopiedAndDeleted() throws {
@@ -717,15 +811,20 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
         try "bottom".write(to: deep.appendingPathComponent("b"), atomically: false, encoding: .utf8)
         try box.folder("t/x")
         let answers = Answers()
-        let result = runJob(.move, [box.url("s")], to: TargetSpec(directory: box.url("t/x")), answers: answers, fileSystems: fileSystems)
+        let result = runJob(
+            .move, [box.url("s")], to: TargetSpec(directory: box.url("t/x")), answers: answers,
+            fileSystems: fileSystems)
         #expect(levels > 300 && result.completed.count == 1 && answers.errors.isEmpty && !box.exists("s"))
         // Copied level by level (a folder with a filter is never moved whole), then deleted.
-        let copy = FileJob(kind: .copy, sources: [box.url("t/x/s")], target: TargetSpec(directory: box.root), fileSystems: fileSystems)
+        let copy = FileJob(
+            kind: .copy, sources: [box.url("t/x/s")], target: TargetSpec(directory: box.root), fileSystems: fileSystems
+        )
         copy.options.filter = CopyFilter("*")
         copy.delegate = answers
         #expect(copy.run().completed.count == 1 && answers.errors.isEmpty)
         #expect((try? String(contentsOf: URL(fileURLWithPath: deep.path + "/b"), encoding: .utf8)) == "bottom")
-        let delete = runJob(.delete(toTrash: false), [box.url("s"), box.url("t")], answers: answers, fileSystems: fileSystems)
+        let delete = runJob(
+            .delete(toTrash: false), [box.url("s"), box.url("t")], answers: answers, fileSystems: fileSystems)
         #expect(delete.completed.count == 2 && answers.errors.isEmpty && namesOnDisk(box.root).isEmpty)
     }
 
@@ -738,7 +837,9 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
         memory.addFile("/deep/top.txt", "top")
         memory.addDirectory("/t")
         let copying = Review2Replies()
-        let job = FileJob(kind: .copy, sources: [memory.url("/deep")], target: TargetSpec(directory: memory.url("/t")), fileSystems: fileSystems)
+        let job = FileJob(
+            kind: .copy, sources: [memory.url("/deep")], target: TargetSpec(directory: memory.url("/t")),
+            fileSystems: fileSystems)
         job.depthLimit = limit
         job.delegate = copying
         let result = job.run()
@@ -749,7 +850,9 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
         let delete = FileJob(kind: .delete(toTrash: false), sources: [memory.url("/deep")], fileSystems: fileSystems)
         delete.depthLimit = limit
         delete.delegate = deleting
-        #expect(delete.run().completed.isEmpty && deleting.errors.count == 1 && memory.contents(path + "/bottom.txt") == "bottom")
+        #expect(
+            delete.run().completed.isEmpty && deleting.errors.count == 1
+                && memory.contents(path + "/bottom.txt") == "bottom")
         #expect(!memory.exists("/deep/top.txt"))
     }
 
@@ -760,7 +863,9 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
         try box.file("s/a.txt", "a")
         memory.addFile("/m/b.txt", "b")
         try box.folder("t")
-        let result = runJob(.copy, [box.url("s/a.txt"), memory.url("/m/b.txt")], to: TargetSpec(directory: box.url("t")), fileSystems: fileSystems)
+        let result = runJob(
+            .copy, [box.url("s/a.txt"), memory.url("/m/b.txt")], to: TargetSpec(directory: box.url("t")),
+            fileSystems: fileSystems)
         #expect(result.completed.count == 2 && namesOnDisk(box.url("t")) == ["a.txt", "b.txt"])
     }
 
@@ -769,13 +874,19 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
         for index in 0..<300 { try box.file("s/f\(index).txt", "contents \(index)") }
         try box.folder("t")
         let answers = Answers()
-        let job = FileJob(kind: .copy, sources: [box.url("s")], target: TargetSpec(directory: box.url("t")), fileSystems: fileSystems)
+        let job = FileJob(
+            kind: .copy, sources: [box.url("s")], target: TargetSpec(directory: box.url("t")), fileSystems: fileSystems
+        )
         job.delegate = answers
         let result = job.run()
-        #expect(result.completed.count == 1 && namesOnDisk(box.url("t/s")).count == 300 && box.read("t/s/f299.txt") == "contents 299")
+        #expect(
+            result.completed.count == 1 && namesOnDisk(box.url("t/s")).count == 300
+                && box.read("t/s/f299.txt") == "contents 299")
         // The reports come one at a time and never go backwards.
         let done = answers.progress.map(\.itemsDone)
-        #expect(done == done.sorted() && answers.progress.last?.itemsDone == 301 && answers.progress.last?.itemsTotal == 301)
+        #expect(
+            done == done.sorted() && answers.progress.last?.itemsDone == 301 && answers.progress.last?.itemsTotal == 301
+        )
     }
 }
 
@@ -802,9 +913,13 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
             process.waitUntilExit()
             return process.terminationStatus == 0
         }
-        attached = hdiutil(["create", "-size", "4m", "-fs", "HFS+", "-volname", "afmtest", image.path])
+        attached =
+            hdiutil(["create", "-size", "4m", "-fs", "HFS+", "-volname", "afmtest", image.path])
             && hdiutil(["attach", image.path, "-mountpoint", mount.path, "-nobrowse", "-noautoopen"])
-        if attached { try "on the volume".write(to: mount.appendingPathComponent("precious.txt"), atomically: true, encoding: .utf8) }
+        if attached {
+            try "on the volume".write(
+                to: mount.appendingPathComponent("precious.txt"), atomically: true, encoding: .utf8)
+        }
     }
 
     private func detach() {
@@ -830,14 +945,18 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
         job.delegate = quiet
         var result = job.run()
         #expect(FileManager.default.fileExists(atPath: mount.appendingPathComponent("precious.txt").path))
-        #expect(result.completed.isEmpty && result.failureCount == 1 && result.failures.first?.contains("another volume") == true)
+        #expect(
+            result.completed.isEmpty && result.failureCount == 1
+                && result.failures.first?.contains("another volume") == true)
         #expect(!box.exists("tree/beside.txt"))
         // Asked, and answered with Skip.
         let replies = Review2Replies(volume: .skip)
         job = FileJob(kind: .delete(toTrash: false), sources: [box.url("tree")], fileSystems: fileSystems)
         job.delegate = replies
         result = job.run()
-        #expect(replies.volumes == ["mnt"] && FileManager.default.fileExists(atPath: mount.appendingPathComponent("precious.txt").path))
+        #expect(
+            replies.volumes == ["mnt"]
+                && FileManager.default.fileExists(atPath: mount.appendingPathComponent("precious.txt").path))
     }
 
     @Test func movingAFolderDoesNotEmptyAVolumeMountedInsideIt() throws {
@@ -847,7 +966,9 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
         // The target folder exists, so the move goes item by item.
         try box.folder("t/tree")
         let replies = Review2Replies(volume: .skip)
-        let job = FileJob(kind: .move, sources: [box.url("tree")], target: TargetSpec(directory: box.url("t")), fileSystems: fileSystems)
+        let job = FileJob(
+            kind: .move, sources: [box.url("tree")], target: TargetSpec(directory: box.url("t")),
+            fileSystems: fileSystems)
         job.delegate = replies
         let result = job.run()
         #expect(replies.volumes == ["mnt"] && result.completed.isEmpty)
@@ -863,6 +984,8 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
         let job = FileJob(kind: .delete(toTrash: false), sources: [box.url("tree")], fileSystems: fileSystems)
         job.delegate = replies
         _ = job.run()
-        #expect(replies.volumes == ["mnt"] && !FileManager.default.fileExists(atPath: mount.appendingPathComponent("precious.txt").path))
+        #expect(
+            replies.volumes == ["mnt"]
+                && !FileManager.default.fileExists(atPath: mount.appendingPathComponent("precious.txt").path))
     }
 }

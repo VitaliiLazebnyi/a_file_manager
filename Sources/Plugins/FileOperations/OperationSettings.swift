@@ -35,41 +35,56 @@ enum OperationSettings {
     static let linkTitles = ["Copy the link itself", "Copy what the link points to"]
 
     static var copyDeletePage: PreferencePage {
-        PreferencePage(title: "Copy/Delete", preferences: [
-            Preference(overwrite, "When a file exists at the target", .choice(OverwriteMode.allCases.map(\.title), default: 0)),
-            Preference(attributes, "Copies keep dates and permissions", .flag(default: true)),
-            Preference(folderDates, "Copy date/time of folders", .flag(default: false)),
-            Preference(links, "Symbolic links", .choice(linkTitles, default: 0)),
-            Preference(verify, "Verify after copy (SHA-256 checksum)", .flag(default: false)),
-            Preference(skipErrors, "Keep going on errors (skip what fails, report at the end)", .flag(default: false)),
-            Preference(parallel, "Copy several small files at once on fast local disks", .flag(default: true)),
-            Preference(keepPartial, "Keep a partly copied file when a copy between file systems is interrupted (to resume it)",
-                       .flag(default: false)),
-            Preference(alwaysOptions, "F5/F6 always show the copy options", .flag(default: false)),
-            Preference(useTrash, "F8/Del moves to the Trash (Shift = delete permanently)", .flag(default: true)),
-            Preference(askReadOnly, "Ask before overwriting/deleting read-only files", .flag(default: true)),
-            Preference(askHidden, "Ask before overwriting/deleting hidden files", .flag(default: false)),
-            Preference(askNonEmpty, "Ask before deleting non-empty folders", .flag(default: true)),
-            Preference(askMerge, "Ask before copying into an existing folder of the same name", .flag(default: false)),
-        ])
+        PreferencePage(
+            title: "Copy/Delete",
+            preferences: [
+                Preference(
+                    overwrite, "When a file exists at the target",
+                    .choice(OverwriteMode.allCases.map(\.title), default: 0)),
+                Preference(attributes, "Copies keep dates and permissions", .flag(default: true)),
+                Preference(folderDates, "Copy date/time of folders", .flag(default: false)),
+                Preference(links, "Symbolic links", .choice(linkTitles, default: 0)),
+                Preference(verify, "Verify after copy (SHA-256 checksum)", .flag(default: false)),
+                Preference(
+                    skipErrors, "Keep going on errors (skip what fails, report at the end)", .flag(default: false)),
+                Preference(parallel, "Copy several small files at once on fast local disks", .flag(default: true)),
+                Preference(
+                    keepPartial,
+                    "Keep a partly copied file when a copy between file systems is interrupted (to resume it)",
+                    .flag(default: false)),
+                Preference(alwaysOptions, "F5/F6 always show the copy options", .flag(default: false)),
+                Preference(useTrash, "F8/Del moves to the Trash (Shift = delete permanently)", .flag(default: true)),
+                Preference(askReadOnly, "Ask before overwriting/deleting read-only files", .flag(default: true)),
+                Preference(askHidden, "Ask before overwriting/deleting hidden files", .flag(default: false)),
+                Preference(askNonEmpty, "Ask before deleting non-empty folders", .flag(default: true)),
+                Preference(
+                    askMerge, "Ask before copying into an existing folder of the same name", .flag(default: false))
+            ])
     }
 
     static var logPage: PreferencePage {
-        PreferencePage(title: "Log file", preferences: [
-            Preference(logEnabled, "Create a log file of file operations", .flag(default: false)),
-            Preference(logFile, "Log file", .text(default: defaultLogFile)),
-            Preference(logTransfers, "Log copy/move/rename/new file", .flag(default: true)),
-            Preference(logDeletes, "Log delete", .flag(default: true)),
-            Preference(logFolders, "Log create/delete folders", .flag(default: true)),
-            Preference(logSuccess, "Log successful operations", .flag(default: true)),
-            Preference(logErrors, "Log errors", .flag(default: true)),
-            Preference(logSkipped, "Log skipped files (when choosing skip or skip all)", .flag(default: true)),
-            Preference(logRotation, "Start a new log file",
-                       .choice(["Never (always log to the same file)", "Every day after midnight", "When the file becomes larger than the limit"],
-                               default: 0)),
-            Preference(logSizeLimit, "Size limit (kBytes)", .text(default: "1000")),
-            Preference(logKeepCount, "Keep a maximum of log file copies (0 = all)", .text(default: "30")),
-        ])
+        PreferencePage(
+            title: "Log file",
+            preferences: [
+                Preference(logEnabled, "Create a log file of file operations", .flag(default: false)),
+                Preference(logFile, "Log file", .text(default: defaultLogFile)),
+                Preference(logTransfers, "Log copy/move/rename/new file", .flag(default: true)),
+                Preference(logDeletes, "Log delete", .flag(default: true)),
+                Preference(logFolders, "Log create/delete folders", .flag(default: true)),
+                Preference(logSuccess, "Log successful operations", .flag(default: true)),
+                Preference(logErrors, "Log errors", .flag(default: true)),
+                Preference(logSkipped, "Log skipped files (when choosing skip or skip all)", .flag(default: true)),
+                Preference(
+                    logRotation, "Start a new log file",
+                    .choice(
+                        [
+                            "Never (always log to the same file)", "Every day after midnight",
+                            "When the file becomes larger than the limit"
+                        ],
+                        default: 0)),
+                Preference(logSizeLimit, "Size limit (kBytes)", .text(default: "1000")),
+                Preference(logKeepCount, "Keep a maximum of log file copies (0 = all)", .text(default: "30"))
+            ])
     }
 
     /// The options of a job as the configuration has them.
@@ -94,7 +109,8 @@ enum OperationSettings {
         var configuration = OperationLog.Configuration()
         configuration.isEnabled = settings.flag(logEnabled, default: false)
         let path = settings.text(logFile, default: defaultLogFile).trimmingCharacters(in: .whitespaces)
-        configuration.file = URL(fileURLWithPath: NSString(string: path.isEmpty ? defaultLogFile : path).expandingTildeInPath)
+        configuration.file = URL(
+            fileURLWithPath: NSString(string: path.isEmpty ? defaultLogFile : path).expandingTildeInPath)
         configuration.logsTransfers = settings.flag(logTransfers, default: true)
         configuration.logsDeletes = settings.flag(logDeletes, default: true)
         configuration.logsFolders = settings.flag(logFolders, default: true)
@@ -103,7 +119,8 @@ enum OperationSettings {
         configuration.logsSkipped = settings.flag(logSkipped, default: true)
         switch settings.index(logRotation, default: 0) {
         case 1: configuration.rotation = .daily
-        case 2: configuration.rotation = .size(max(1, Int(settings.text(logSizeLimit, default: "1000")) ?? 1000) * 1024)
+        case 2:
+            configuration.rotation = .size(max(1, Int(settings.text(logSizeLimit, default: "1000")) ?? 1000) * 1024)
         default: configuration.rotation = .never
         }
         configuration.keepCount = max(0, Int(settings.text(logKeepCount, default: "30")) ?? 30)
@@ -133,7 +150,9 @@ public enum CommandSwitches {
                         value.append(next)
                     }
                 } else {
-                    while let next = characters.first, next != " ", next != "/" { value.append(characters.removeFirst()) }
+                    while let next = characters.first, next != " ", next != "/" {
+                        value.append(characters.removeFirst())
+                    }
                 }
                 switches[letter] = value
             } else {

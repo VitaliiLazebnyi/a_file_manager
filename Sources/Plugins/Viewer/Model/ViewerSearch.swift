@@ -18,7 +18,8 @@ enum SearchError: LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .empty: return "There is nothing to search for."
-        case .badHex(let text): return "\"\(text)\" is not a hex string. Write bytes as 00 FF 12, literal text in quotes: \"PK\"0102."
+        case .badHex(let text):
+            return "\"\(text)\" is not a hex string. Write bytes as 00 FF 12, literal text in quotes: \"PK\"0102."
         case .badExpression(let reason): return "The regular expression cannot be used: \(reason)"
         }
     }
@@ -46,7 +47,8 @@ struct SearchPattern {
         let insensitive: NSRegularExpression.Options = options.caseSensitive ? [] : [.caseInsensitive]
         func expression(_ pattern: String) throws -> Kind {
             do {
-                return .expression(try NSRegularExpression(pattern: pattern, options: insensitive.union(.anchorsMatchLines)))
+                return .expression(
+                    try NSRegularExpression(pattern: pattern, options: insensitive.union(.anchorsMatchLines)))
             } catch {
                 throw SearchError.badExpression(error.localizedDescription)
             }
@@ -61,7 +63,8 @@ struct SearchPattern {
             // `\n` stands for a line break. The specification's Lister finds CR+LF only; files
             // on a Mac end their lines with LF, so every kind of line break is found.
             if plain.contains(SearchPattern.lineBreak) {
-                let parts = plain.components(separatedBy: String(SearchPattern.lineBreak)).map(NSRegularExpression.escapedPattern(for:))
+                let parts = plain.components(separatedBy: String(SearchPattern.lineBreak)).map(
+                    NSRegularExpression.escapedPattern(for:))
                 kind = try expression(parts.joined(separator: "(?:\\r\\n|\\r|\\n)"))
             } else {
                 kind = .text(plain)
@@ -143,17 +146,26 @@ enum ViewerSearch {
     /// searched, on the calling thread. `boundaries` is what a text in a double-byte code page
     /// is cut into characters with; a search that is repeated keeps it between the calls.
     /// `rawBytes` off decodes every chunk (the reference the raw searches are tested against).
-    static func find(_ pattern: SearchPattern, in source: ByteSource, content: Range<Int64>, from start: Int64, backwards: Bool,
-                     encoding: ViewerEncoding, chunkSize: Int = 1 << 20, parallelism: Int = ProcessInfo.processInfo.activeProcessorCount,
-                     cancellation: CancellationFlag = CancellationFlag(), boundaries: CharacterBoundaries? = nil, rawBytes: Bool = true,
-                     progress: (Double) -> Void = { _ in }) throws -> Range<Int64>? {
-        let boundaries = encoding.kind == .doubleByte ? boundaries ?? CharacterBoundaries(source: source, content: content, encoding: encoding) : nil
-        let context = Context(source: source, content: content, encoding: encoding, cancellation: cancellation, boundaries: boundaries, rawBytes: rawBytes)
+    static func find(
+        _ pattern: SearchPattern, in source: ByteSource, content: Range<Int64>, from start: Int64, backwards: Bool,
+        encoding: ViewerEncoding, chunkSize: Int = 1 << 20,
+        parallelism: Int = ProcessInfo.processInfo.activeProcessorCount,
+        cancellation: CancellationFlag = CancellationFlag(), boundaries: CharacterBoundaries? = nil,
+        rawBytes: Bool = true,
+        progress: (Double) -> Void = { _ in }
+    ) throws -> Range<Int64>? {
+        let boundaries =
+            encoding.kind == .doubleByte
+            ? boundaries ?? CharacterBoundaries(source: source, content: content, encoding: encoding) : nil
+        let context = Context(
+            source: source, content: content, encoding: encoding, cancellation: cancellation, boundaries: boundaries,
+            rawBytes: rawBytes)
         let unit = Int64(encoding.unitSize)
         let size = max(unit, Int64(chunkSize) / unit * unit)
         let start = min(max(start, content.lowerBound), content.upperBound)
         // Chunk borders stay on whole code units, counted from the start of the text.
-        let origin = backwards ? start + (start - content.lowerBound) % unit : start - (start - content.lowerBound) % unit
+        let origin =
+            backwards ? start + (start - content.lowerBound) % unit : start - (start - content.lowerBound) % unit
         let total = backwards ? origin - content.lowerBound : content.upperBound - origin
         guard total > 0 else { return nil }
         let chunkCount = Int((total + size - 1) / size)
@@ -161,10 +173,13 @@ enum ViewerSearch {
         while next < chunkCount, !cancellation.isCancelled {
             let wave = Array(next..<min(chunkCount, next + max(1, parallelism)))
             let results: [Result<Range<Int64>?, Error>] = Parallel.map(wave) { number in
-                let owned: Range<Int64> = backwards
+                let owned: Range<Int64> =
+                    backwards
                     ? max(content.lowerBound, origin - Int64(number + 1) * size)..<origin - Int64(number) * size
                     : origin + Int64(number) * size..<min(content.upperBound, origin + Int64(number + 1) * size)
-                let accepted = backwards ? owned.lowerBound..<min(owned.upperBound, start) : max(owned.lowerBound, start)..<owned.upperBound
+                let accepted =
+                    backwards
+                    ? owned.lowerBound..<min(owned.upperBound, start) : max(owned.lowerBound, start)..<owned.upperBound
                 // Each chunk frees what it read and decoded when it is done: the threads of the
                 // pool live on, and a search of gigabytes would keep every buffer until they idle.
                 return autoreleasepool { Result { try search(pattern, context, accepted: accepted, last: backwards) } }
@@ -196,32 +211,49 @@ enum ViewerSearch {
 
     /// The first (or last) match that begins inside `accepted`. Reads a little before it, for
     /// the character a whole word must not touch, and enough behind it for a match to end.
-    private static func search(_ pattern: SearchPattern, _ context: Context, accepted: Range<Int64>, last: Bool) throws -> Range<Int64>? {
+    private static func search(_ pattern: SearchPattern, _ context: Context, accepted: Range<Int64>, last: Bool) throws
+        -> Range<Int64>?
+    {
         guard !accepted.isEmpty else { return nil }
-        let (source, content, encoding, cancellation) = (context.source, context.content, context.encoding, context.cancellation)
+        let (source, content, encoding, cancellation) = (
+            context.source, context.content, context.encoding, context.cancellation
+        )
         switch pattern.kind {
         case .bytes(let needle):
             let lower = accepted.lowerBound
-            let data = try source.read(lower..<min(content.upperBound, accepted.upperBound + Int64(needle.count - 1)), cancellation: cancellation)
+            let data = try source.read(
+                lower..<min(content.upperBound, accepted.upperBound + Int64(needle.count - 1)),
+                cancellation: cancellation)
             return bytes(needle, in: data, base: lower, accepted: accepted, last: last)
         case .text(let needle):
             // Matching case, the needle's bytes in a UTF-8 or one-byte-per-character file are
             // searched for in the raw bytes: no decoding, and no characters in between to go wrong.
             if pattern.caseSensitive, !pattern.wholeWords, encoding.kind == .utf8 || encoding.kind == .singleByte,
-               let encoded = encoding.encode(needle), !encoded.isEmpty {
+                let encoded = encoding.encode(needle), !encoded.isEmpty
+            {
                 let lower = accepted.lowerBound
-                let data = try source.read(lower..<min(content.upperBound, accepted.upperBound + Int64(encoded.count - 1)), cancellation: cancellation)
+                let data = try source.read(
+                    lower..<min(content.upperBound, accepted.upperBound + Int64(encoded.count - 1)),
+                    cancellation: cancellation)
                 return bytes(encoded, in: data, base: lower, accepted: accepted, last: last)
             }
             // Letters of the other case and whole words need only the neighbours of an ASCII needle.
-            if context.rawBytes, encoding.kind == .utf8 || encoding.kind == .singleByte, needle.utf8.allSatisfy({ $0 < 0x80 }) {
-                if case .answer(let found) = try rawASCII(Array(needle.utf8), pattern, context, accepted: accepted, last: last) { return found }
+            if context.rawBytes, encoding.kind == .utf8 || encoding.kind == .singleByte,
+                needle.utf8.allSatisfy({ $0 < 0x80 })
+            {
+                if case .answer(let found) = try rawASCII(
+                    Array(needle.utf8), pattern, context, accepted: accepted, last: last)
+                {
+                    return found
+                }
             }
             let length = needle.utf16.count
             let matcher = TextMatcher(needle, caseSensitive: pattern.caseSensitive)
             // Folding can lengthen a match to several times the needle (ß for ss, ﬃ for ffi).
             return try decoded(context, accepted, Int64(max(4096, length * 12 + 32))) { text, units, first, end in
-                matcher.find(in: units, from: first, before: end, last: last) { !pattern.wholeWords || isWholeWord($0, in: text) }
+                matcher.find(in: units, from: first, before: end, last: last) {
+                    !pattern.wholeWords || isWholeWord($0, in: text)
+                }
             }
         case .expression(let expression):
             return try decoded(context, accepted, Int64(expressionOverlap)) { text, _, first, end in
@@ -230,8 +262,12 @@ enum ViewerSearch {
                 // with the default options the range start would count as the start of the text,
                 // and `^` and `\b` would match falsely there. `.reportProgress` lets a regular
                 // expression that backtracks for ages be stopped.
-                let options: NSRegularExpression.MatchingOptions = [.withTransparentBounds, .withoutAnchoringBounds, .reportProgress]
-                expression.enumerateMatches(in: text as String, options: options, range: NSRange(location: first, length: text.length - first)) { match, _, stop in
+                let options: NSRegularExpression.MatchingOptions = [
+                    .withTransparentBounds, .withoutAnchoringBounds, .reportProgress
+                ]
+                expression.enumerateMatches(
+                    in: text as String, options: options, range: NSRange(location: first, length: text.length - first)
+                ) { match, _, stop in
                     if cancellation.isCancelled {
                         result = nil
                         stop.pointee = true
@@ -253,8 +289,10 @@ enum ViewerSearch {
     /// Decodes the surroundings of `accepted` and lets `match` look for a match that begins in
     /// the UTF-16 units `first..<end`, whose bytes are those of `accepted`; maps what it finds
     /// back to bytes.
-    private static func decoded(_ context: Context, _ accepted: Range<Int64>, _ overlap: Int64,
-                                match: (_ text: NSString, _ units: [UInt16], _ first: Int, _ end: Int) -> NSRange?) throws -> Range<Int64>? {
+    private static func decoded(
+        _ context: Context, _ accepted: Range<Int64>, _ overlap: Int64,
+        match: (_ text: NSString, _ units: [UInt16], _ first: Int, _ end: Int) -> NSRange?
+    ) throws -> Range<Int64>? {
         let (source, content, encoding) = (context.source, context.content, context.encoding)
         var lower = max(content.lowerBound, accepted.lowerBound - 8)
         lower -= (lower - content.lowerBound) % Int64(encoding.unitSize)
@@ -269,7 +307,8 @@ enum ViewerSearch {
         var text = DecodedText()
         let used = encoding.decode(data, final: true, into: &text)
         func firstUnit(at offset: Int64) -> Int {
-            var low = 0, high = text.offsets.count
+            var low = 0
+            var high = text.offsets.count
             while low < high {
                 let middle = (low + high) / 2
                 if lower + Int64(text.offsets[middle]) < offset { low = middle + 1 } else { high = middle }
@@ -278,9 +317,14 @@ enum ViewerSearch {
         }
         guard !text.units.isEmpty else { return nil }
         let string = text.units.withUnsafeBufferPointer { NSString(characters: $0.baseAddress!, length: $0.count) }
-        guard let found = match(string, text.units, firstUnit(at: accepted.lowerBound), firstUnit(at: accepted.upperBound)) else { return nil }
+        guard
+            let found = match(
+                string, text.units, firstUnit(at: accepted.lowerBound), firstUnit(at: accepted.upperBound))
+        else { return nil }
         let from = lower + Int64(text.offsets[found.location])
-        let to = found.location + found.length < text.offsets.count ? lower + Int64(text.offsets[found.location + found.length]) : lower + Int64(used)
+        let to =
+            found.location + found.length < text.offsets.count
+            ? lower + Int64(text.offsets[found.location + found.length]) : lower + Int64(used)
         return from..<to
     }
 
@@ -323,7 +367,9 @@ enum ViewerSearch {
         @inline(__always)
         private static func character(_ units: [UInt16], at index: Int) -> (value: UInt32, width: Int) {
             let unit = units[index]
-            if unit >= 0xD800, unit <= 0xDBFF, index + 1 < units.count, units[index + 1] >= 0xDC00, units[index + 1] <= 0xDFFF {
+            if unit >= 0xD800, unit <= 0xDBFF, index + 1 < units.count, units[index + 1] >= 0xDC00,
+                units[index + 1] <= 0xDFFF
+            {
                 return (0x10000 + ((UInt32(unit) - 0xD800) << 10) + (UInt32(units[index + 1]) - 0xDC00), 2)
             }
             return (UInt32(unit), 1)
@@ -341,8 +387,10 @@ enum ViewerSearch {
         /// Where the match of the needle that begins at `start` ends, if there is one: the folded
         /// characters from `start` on are exactly the needle, and its last character is whole.
         private func end(ofMatchAt start: Int, in units: [UInt16], _ cache: inout [UInt32: [UInt16]]) -> Int? {
-            var matched = 0, index = start
-            let count = units.count, length = needle.count
+            var matched = 0
+            var index = start
+            let count = units.count
+            let length = needle.count
             while matched < length {
                 guard index < count else { return nil }
                 let unit = units[index]
@@ -358,7 +406,9 @@ enum ViewerSearch {
                     for offset in 0..<folded.count where needle[matched + offset] != folded[offset] { return nil }
                     matched += folded.count
                 } else {
-                    guard matched + width <= length, needle[matched] == unit, width == 1 || needle[matched + 1] == units[index + 1] else { return nil }
+                    guard matched + width <= length, needle[matched] == unit,
+                        width == 1 || needle[matched + 1] == units[index + 1]
+                    else { return nil }
                     matched += width
                 }
                 index += width
@@ -368,7 +418,9 @@ enum ViewerSearch {
 
         /// The first (or last) match that begins in the units `first..<end`, and ends in `units`
         /// (it may reach behind `end`) and for which `accepts` holds; units are indexes into `units`.
-        func find(in units: [UInt16], from first: Int, before end: Int, last: Bool, accepts: (NSRange) -> Bool) -> NSRange? {
+        func find(in units: [UInt16], from first: Int, before end: Int, last: Bool, accepts: (NSRange) -> Bool)
+            -> NSRange?
+        {
             guard !needle.isEmpty, first >= 0, first < end, first < units.count else { return nil }
             let end = min(end, units.count)
             if caseSensitive {
@@ -392,11 +444,15 @@ enum ViewerSearch {
                 var width = 1
                 if unit < 0x80 {
                     // Most characters are told apart by the first unit alone.
-                    if (unit >= 0x41 && unit <= 0x5A ? unit | 0x20 : unit) == initial, let stop = self.end(ofMatchAt: index, in: units, &cache) {
+                    if (unit >= 0x41 && unit <= 0x5A ? unit | 0x20 : unit) == initial,
+                        let stop = self.end(ofMatchAt: index, in: units, &cache)
+                    {
                         let range = NSRange(location: index, length: stop - index)
                         if accepts(range) { return range }
                     }
-                } else if last, unit >= 0xDC00, unit <= 0xDFFF, index > first, units[index - 1] >= 0xD800, units[index - 1] <= 0xDBFF {
+                } else if last, unit >= 0xDC00, unit <= 0xDFFF, index > first, units[index - 1] >= 0xD800,
+                    units[index - 1] <= 0xDBFF
+                {
                     // The second half of a pair is no place for a match to begin.
                     index -= 1
                     continue
@@ -430,7 +486,9 @@ enum ViewerSearch {
     /// The characters other than ASCII letters that a literal, case-insensitive search of
     /// `NSString` takes for ASCII letters: ß and ẞ for `ss`, the long s, the Kelvin sign,
     /// the ligatures ﬀ…ﬆ. A chunk that has one is left to the decoded search.
-    private static let caseFolded: Set<UInt16> = [0xDF, 0x17F, 0x1E9E, 0x212A, 0xFB00, 0xFB01, 0xFB02, 0xFB03, 0xFB04, 0xFB05, 0xFB06]
+    private static let caseFolded: Set<UInt16> = [
+        0xDF, 0x17F, 0x1E9E, 0x212A, 0xFB00, 0xFB01, 0xFB02, 0xFB03, 0xFB04, 0xFB05, 0xFB06
+    ]
 
     /// Whether `data` has the UTF-8 form of one of `caseFolded`.
     private static func hasCaseFolded(utf8 data: Data) -> Bool {
@@ -439,16 +497,20 @@ enum ViewerSearch {
             guard let start = raw.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return false }
             var index = 0
             while index < count {
-                if index + 8 <= count, UnsafeRawPointer(start + index).loadUnaligned(as: UInt64.self) & 0x8080_8080_8080_8080 == 0 {
+                if index + 8 <= count,
+                    UnsafeRawPointer(start + index).loadUnaligned(as: UInt64.self) & 0x8080_8080_8080_8080 == 0
+                {
                     index += 8
                     continue
                 }
                 let byte = start[index]
                 if byte >= 0xC3, index + 1 < count {
-                    let second = start[index + 1], third = index + 2 < count ? start[index + 2] : 0
+                    let second = start[index + 1]
+                    let third = index + 2 < count ? start[index + 2] : 0
                     switch byte {
                     case 0xC3 where second == 0x9F, 0xC5 where second == 0xBF: return true
-                    case 0xE1 where second == 0xBA && third == 0x9E, 0xE2 where second == 0x84 && third == 0xAA: return true
+                    case 0xE1 where second == 0xBA && third == 0x9E, 0xE2 where second == 0x84 && third == 0xAA:
+                        return true
                     case 0xEF where second == 0xAC && (0x80...0x86).contains(third): return true
                     default: break
                     }
@@ -463,8 +525,10 @@ enum ViewerSearch {
     /// raw bytes of a UTF-8 or one-byte-per-character text: a byte is compared with both cases
     /// of the letter, and for a whole word the characters on either side are looked at. The same
     /// answer as the decoded search gives; `undecided` where it could not be sure to.
-    private static func rawASCII(_ needle: [UInt8], _ pattern: SearchPattern, _ context: Context, accepted: Range<Int64>,
-                                 last: Bool) throws -> RawAnswer {
+    private static func rawASCII(
+        _ needle: [UInt8], _ pattern: SearchPattern, _ context: Context, accepted: Range<Int64>,
+        last: Bool
+    ) throws -> RawAnswer {
         let (content, encoding) = (context.content, context.encoding)
         let isUTF8 = encoding.kind == .utf8
         // Four bytes either side are a character; a match is at most three bytes a letter long.
@@ -476,7 +540,9 @@ enum ViewerSearch {
             if hasCaseFolded(utf8: data) { return .undecided }
         } else if let table {
             let folded = (0x80...0xFF).filter { caseFolded.contains(table.single[$0]) }.map(UInt8.init)
-            let hasOne = data.withUnsafeBytes { raw in folded.contains { memchr(raw.baseAddress, Int32($0), raw.count) != nil } }
+            let hasOne = data.withUnsafeBytes { raw in
+                folded.contains { memchr(raw.baseAddress, Int32($0), raw.count) != nil }
+            }
             if hasOne { return .undecided }
         }
         let folded = !pattern.caseSensitive
@@ -484,8 +550,12 @@ enum ViewerSearch {
         let count = data.count
         var result: Range<Int64>?
         data.withUnsafeBytes { raw in
-            guard let start = raw.baseAddress?.assumingMemoryBound(to: UInt8.self), count >= needle.count else { return }
-            @inline(__always) func fold(_ byte: UInt8) -> UInt8 { folded && byte >= 0x41 && byte <= 0x5A ? byte | 0x20 : byte }
+            guard let start = raw.baseAddress?.assumingMemoryBound(to: UInt8.self), count >= needle.count else {
+                return
+            }
+            @inline(__always) func fold(_ byte: UInt8) -> UInt8 {
+                folded && byte >= 0x41 && byte <= 0x5A ? byte | 0x20 : byte
+            }
             /// The classification of the character that ends at `end`, or begins at `begin`.
             func isWordUnit(_ unit: UInt16) -> Bool {
                 guard let scalar = Unicode.Scalar(unit) else { return false }
@@ -500,7 +570,8 @@ enum ViewerSearch {
                 while begin > 0, end - begin < 4, start[begin] & 0xC0 == 0x80 { begin -= 1 }
                 var text = DecodedText()
                 text.tracksOffsets = false
-                _ = ViewerEncoding.utf8.decode(UnsafeBufferPointer(start: start + begin, count: end - begin), final: true, into: &text)
+                _ = ViewerEncoding.utf8.decode(
+                    UnsafeBufferPointer(start: start + begin, count: end - begin), final: true, into: &text)
                 return text.units.last.map(isWordUnit) ?? false
             }
             func characterAfter(_ begin: Int) -> Bool {
@@ -510,14 +581,16 @@ enum ViewerSearch {
                 guard isUTF8 else { return isWordUnit(table?.single[Int(byte)] ?? 0xFFFD) }
                 var text = DecodedText()
                 text.tracksOffsets = false
-                _ = ViewerEncoding.utf8.decode(UnsafeBufferPointer(start: start + begin, count: min(4, count - begin)), final: true, into: &text)
+                _ = ViewerEncoding.utf8.decode(
+                    UnsafeBufferPointer(start: start + begin, count: min(4, count - begin)), final: true, into: &text)
                 return text.units.first.map(isWordUnit) ?? false
             }
             let first = wanted[0]
             let alternative: UInt8 = folded && first >= 0x61 && first <= 0x7A ? first & ~0x20 : first
             var position = Int(accepted.lowerBound - lower)
             let limit = Int(min(Int64(count), accepted.upperBound - lower))
-            var nextLower = -1, nextUpper = -1
+            var nextLower = -1
+            var nextUpper = -1
             func find(_ byte: UInt8, from: Int) -> Int {
                 guard from < count, let found = memchr(start + from, Int32(byte), count - from) else { return count }
                 return start.distance(to: found.assumingMemoryBound(to: UInt8.self))
@@ -532,7 +605,9 @@ enum ViewerSearch {
                     matches = false
                     break
                 }
-                if matches, !pattern.wholeWords || !(characterBefore(position) || characterAfter(position + needle.count)) {
+                if matches,
+                    !pattern.wholeWords || !(characterBefore(position) || characterAfter(position + needle.count))
+                {
                     result = lower + Int64(position)..<lower + Int64(position + needle.count)
                     if !last { return }
                 }
@@ -547,21 +622,26 @@ enum ViewerSearch {
     /// A whole word is not part of a longer one: `man` is not found in `manager`.
     private static func isWholeWord(_ range: NSRange, in text: NSString) -> Bool {
         func isWordCharacter(at index: Int) -> Bool {
-            guard index >= 0, index < text.length, let scalar = Unicode.Scalar(text.character(at: index)) else { return false }
+            guard index >= 0, index < text.length, let scalar = Unicode.Scalar(text.character(at: index)) else {
+                return false
+            }
             return wordCharacters.contains(scalar)
         }
         return !isWordCharacter(at: range.location - 1) && !isWordCharacter(at: range.location + range.length)
     }
 
     /// The first (or last) place `needle` is in `data` at an offset inside `accepted`.
-    static func bytes(_ needle: [UInt8], in data: Data, base: Int64, accepted: Range<Int64>, last: Bool) -> Range<Int64>? {
+    static func bytes(_ needle: [UInt8], in data: Data, base: Int64, accepted: Range<Int64>, last: Bool) -> Range<
+        Int64
+    >? {
         guard !needle.isEmpty, data.count >= needle.count else { return nil }
         return data.withUnsafeBytes { (haystack: UnsafeRawBufferPointer) -> Range<Int64>? in
             guard let start = haystack.baseAddress else { return nil }
             var position = Int(max(0, accepted.lowerBound - base))
             var result: Range<Int64>?
             while position + needle.count <= haystack.count,
-                  let found = memmem(start + position, haystack.count - position, needle, needle.count) {
+                let found = memmem(start + position, haystack.count - position, needle, needle.count)
+            {
                 let index = start.distance(to: UnsafeRawPointer(found))
                 let offset = base + Int64(index)
                 guard offset < accepted.upperBound else { break }

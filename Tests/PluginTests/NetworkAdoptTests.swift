@@ -1,8 +1,9 @@
 import AFMKernel
 import Foundation
-@testable import NetworkPlugin
 import TestSupport
 import Testing
+
+@testable import NetworkPlugin
 
 /// A call made on a thread of its own, so that one which does not come back fails the test
 /// instead of hanging it. (Threads rather than `DispatchQueue.global()`, which stalls for
@@ -15,8 +16,14 @@ final class AdoptOutcome: @unchecked Sendable {
 
     init(_ work: @escaping () throws -> Void) {
         Thread { [self] in
-            do { try work() } catch { lock.lock(); self.error = error; lock.unlock() }
-            lock.lock(); finished = true; lock.unlock()
+            do { try work() } catch {
+                lock.lock()
+                self.error = error
+                lock.unlock()
+            }
+            lock.lock()
+            finished = true
+            lock.unlock()
             done.signal()
         }.start()
     }
@@ -25,7 +32,11 @@ final class AdoptOutcome: @unchecked Sendable {
     /// run beside many others, and what they show is that a call ends at all where the fault
     /// would be a wait of ten minutes or for ever, not how fast it ends.
     func ended(within seconds: TimeInterval = 120) -> Bool { done.wait(timeout: .now() + seconds) == .success }
-    var failed: Bool { lock.lock(); defer { lock.unlock() }; return finished && error != nil }
+    var failed: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return finished && error != nil
+    }
 }
 
 func adoptWait(_ seconds: TimeInterval = 120, until condition: () -> Bool) -> Bool {
@@ -79,9 +90,15 @@ func adoptCancel(_ flag: CancellationFlag, after delay: TimeInterval = 0.3) {
         let flag = CancellationFlag()
         flag.cancel()
         #expect(fixture.fileSystem.item(at: fixture.url("/f.txt"), cancellation: flag) == nil)
-        #expect(throws: (any Error).self) { _ = try fixture.fileSystem.list(fixture.url("/"), showHidden: false, cancellation: flag) }
-        #expect(throws: (any Error).self) { _ = try fixture.fileSystem.read(fixture.url("/f.txt"), cancellation: flag) }
-        #expect(throws: (any Error).self) { _ = try fixture.fileSystem.write(fixture.url("/g.txt"), cancellation: flag) }
+        #expect(throws: (any Error).self) {
+            _ = try fixture.fileSystem.list(fixture.url("/"), showHidden: false, cancellation: flag)
+        }
+        #expect(throws: (any Error).self) {
+            _ = try fixture.fileSystem.read(fixture.url("/f.txt"), cancellation: flag)
+        }
+        #expect(throws: (any Error).self) {
+            _ = try fixture.fileSystem.write(fixture.url("/g.txt"), cancellation: flag)
+        }
         #expect(!fixture.box.exists("srv/g.txt"))
     }
 
@@ -91,7 +108,9 @@ func adoptCancel(_ flag: CancellationFlag, after delay: TimeInterval = 0.3) {
         let fixture = try FTPFixture(options) { $0.timeout = 600 }
         try fixture.box.file("srv/f.txt", "x")
         let flag = CancellationFlag()
-        let outcome = AdoptOutcome { _ = try fixture.fileSystem.list(fixture.url("/"), showHidden: true, cancellation: flag) }
+        let outcome = AdoptOutcome {
+            _ = try fixture.fileSystem.list(fixture.url("/"), showHidden: true, cancellation: flag)
+        }
         #expect(adoptWait { fixture.server.commands.contains { $0.hasPrefix("MLSD") } })
         adoptCancel(flag)
         #expect(outcome.ended())
@@ -198,7 +217,9 @@ func adoptCancel(_ flag: CancellationFlag, after delay: TimeInterval = 0.3) {
 
         // A file that is shorter than the offset, and one that is not there, are errors.
         #expect(throws: (any Error).self) { _ = try fs.append(to: url, at: 99, cancellation: CancellationFlag()) }
-        #expect(throws: (any Error).self) { _ = try fs.append(to: fixture.url("/none.bin"), at: nil, cancellation: CancellationFlag()) }
+        #expect(throws: (any Error).self) {
+            _ = try fs.append(to: fixture.url("/none.bin"), at: nil, cancellation: CancellationFlag())
+        }
         #expect(fixture.box.read("srv/f.bin") == "0123abcdefXYZ")
     }
 
@@ -222,13 +243,17 @@ func adoptCancel(_ flag: CancellationFlag, after delay: TimeInterval = 0.3) {
         _ = try fixture.fileSystem.list(fixture.url("/"), showHidden: false)
         #expect(!fixture.fileSystem.capabilities(for: url).contains(.append))
         #expect(fixture.fileSystem.capabilities(for: url).contains(.write))
-        #expect(throws: FileSystemError.self) { _ = try fixture.fileSystem.append(to: url, at: 4, cancellation: CancellationFlag()) }
+        #expect(throws: FileSystemError.self) {
+            _ = try fixture.fileSystem.append(to: url, at: 4, cancellation: CancellationFlag())
+        }
         #expect(fixture.box.read("srv/f.bin") == "0123456789")
 
         let text = try FTPFixture { $0.transferMode = .text }
         _ = try text.fileSystem.list(text.url("/"), showHidden: false)
         #expect(!text.fileSystem.capabilities(for: text.url("/f.txt")).contains(.append))
-        #expect(throws: FileSystemError.self) { _ = try text.fileSystem.append(to: text.url("/f.txt"), at: nil, cancellation: CancellationFlag()) }
+        #expect(throws: FileSystemError.self) {
+            _ = try text.fileSystem.append(to: text.url("/f.txt"), at: nil, cancellation: CancellationFlag())
+        }
         // Another scheme's location is not this provider's business.
         #expect(text.fileSystem.capabilities(for: URL(fileURLWithPath: "/tmp")) == text.fileSystem.capabilities)
     }
@@ -241,7 +266,8 @@ func adoptCancel(_ flag: CancellationFlag, after delay: TimeInterval = 0.3) {
         let fixture = try FTPFixture(options)
         try fixture.box.folder("srv/d")
         for index in 0..<40 {
-            try FileManager.default.createSymbolicLink(at: fixture.box.url("srv/link\(index)"), withDestinationURL: fixture.box.url("srv/d"))
+            try FileManager.default.createSymbolicLink(
+                at: fixture.box.url("srv/link\(index)"), withDestinationURL: fixture.box.url("srv/d"))
         }
         let first = try fixture.fileSystem.list(fixture.url("/"), showHidden: false).filter(\.isSymlink)
         #expect(first.count == 40)
@@ -261,7 +287,8 @@ func adoptCancel(_ flag: CancellationFlag, after delay: TimeInterval = 0.3) {
         let fixture = try FTPFixture(options)
         try fixture.box.folder("srv/d")
         for index in 0..<40 {
-            try FileManager.default.createSymbolicLink(at: fixture.box.url("srv/link\(index)"), withDestinationURL: fixture.box.url("srv/d"))
+            try FileManager.default.createSymbolicLink(
+                at: fixture.box.url("srv/link\(index)"), withDestinationURL: fixture.box.url("srv/d"))
         }
         // The listing is remembered by the file system, with some links not resolved yet.
         let stored = Date()
@@ -270,10 +297,14 @@ func adoptCancel(_ flag: CancellationFlag, after delay: TimeInterval = 0.3) {
         // The server has been asked about every link once the background work is through. That
         // work gives up after a while (20 s); on a machine so busy that it did, there is nothing to check.
         func asked() -> Int { Set(fixture.server.commands.filter { $0.hasPrefix("CWD /link") }).count }
-        guard adoptWait(40, until: { asked() == 40 }) else { try Test.cancel("the background work did not get through in time") }
+        guard adoptWait(40, until: { asked() == 40 }) else {
+            try Test.cancel("the background work did not get through in time")
+        }
         // A moment later the remembered entries say so, too. After the lifetime of a remembered
         // listing the file system asks the server again, which would prove nothing about them.
-        func allFolders() -> Bool { (0..<40).allSatisfy { fixture.fileSystem.item(at: fixture.url("/link\($0)"))?.isDirectory == true } }
+        func allFolders() -> Bool {
+            (0..<40).allSatisfy { fixture.fileSystem.item(at: fixture.url("/link\($0)"))?.isDirectory == true }
+        }
         let patched = adoptWait(max(0, 8 - Date().timeIntervalSince(stored)), until: allFolders)
         if Date().timeIntervalSince(stored) < 9 { #expect(patched) }
     }
@@ -282,7 +313,9 @@ func adoptCancel(_ flag: CancellationFlag, after delay: TimeInterval = 0.3) {
         func reply(_ code: Int, _ text: String) -> FTPReply { FTPReply(code: code, lines: [text]) }
         #expect(FTPConnection.requiresSessionReuse(reply(522, "SSL connection failed; session reuse required")))
         #expect(FTPConnection.requiresSessionReuse(reply(522, "Data connection must use cached TLS session")))
-        #expect(FTPConnection.requiresSessionReuse(reply(425, "Unable to build data connection: TLS session of data connection not resumed.")))
+        #expect(
+            FTPConnection.requiresSessionReuse(
+                reply(425, "Unable to build data connection: TLS session of data connection not resumed.")))
         #expect(FTPConnection.requiresSessionReuse(reply(421, "TLS session reuse required")))
         #expect(!FTPConnection.requiresSessionReuse(reply(425, "Can't open data connection")))
         #expect(!FTPConnection.requiresSessionReuse(reply(550, "No such file")))
@@ -299,7 +332,9 @@ func adoptCancel(_ flag: CancellationFlag, after delay: TimeInterval = 0.3) {
         let suite = try NetworkFixSFTP(mode: .hangingIO, timeout: 600)
         try NetworkFixSFTP.pattern(1000).write(to: suite.box.url("srv/f.bin"))
         let flag = CancellationFlag()
-        let outcome = AdoptOutcome { _ = try suite.fileSystem.list(suite.url("/"), showHidden: false, cancellation: flag) }
+        let outcome = AdoptOutcome {
+            _ = try suite.fileSystem.list(suite.url("/"), showHidden: false, cancellation: flag)
+        }
         Thread.sleep(forTimeInterval: 0.6)
         let started = Date()
         adoptCancel(flag, after: 0)
@@ -387,13 +422,16 @@ func adoptCancel(_ flag: CancellationFlag, after delay: TimeInterval = 0.3) {
     @Test func aSendThatIsCancelledOnAFullPipeEnds() throws {
         let box = try Sandbox()
         let server = try FakeSFTPServer(root: box.url("."), box: box, mode: .stalled)
-        let channel = SFTPChannel(executable: server.transport.executable, arguments: server.transport.arguments, environment: [:])
+        let channel = SFTPChannel(
+            executable: server.transport.executable, arguments: server.transport.arguments, environment: [:])
         channel.writeTimeout = 600
         try channel.start(timeout: 10, cancellation: nil) { true }
         defer { channel.close() }
         let flag = CancellationFlag()
         // Nobody reads the pipe: the packet gets stuck half way and the writer must not wait the full minute.
-        let outcome = AdoptOutcome { _ = try channel.send(.write, cancellation: flag) { $0.bytes(Data(count: 1_000_000)) } }
+        let outcome = AdoptOutcome {
+            _ = try channel.send(.write, cancellation: flag) { $0.bytes(Data(count: 1_000_000)) }
+        }
         Thread.sleep(forTimeInterval: 0.5)
         let started = Date()
         adoptCancel(flag, after: 0)
@@ -417,7 +455,9 @@ func adoptCancel(_ flag: CancellationFlag, after delay: TimeInterval = 0.3) {
         environment.options.values = values
         let center = ConnectionCenter(environment: environment)
         center.makeSession = { profile, environment in
-            SFTPSession(profile: profile, environment: environment, transport: SFTPTransport(executable: systemSFTPServer, arguments: ["-e"]))
+            SFTPSession(
+                profile: profile, environment: environment,
+                transport: SFTPTransport(executable: systemSFTPServer, arguments: ["-e"]))
         }
         fileSystem = RemoteFileSystem(scheme: "sftp", center: center)
     }
@@ -449,8 +489,12 @@ func adoptCancel(_ flag: CancellationFlag, after delay: TimeInterval = 0.3) {
         #expect(fileSystem.item(at: url("f.bin"))?.size == 7 && fileSystem.item(at: url("f.bin"))?.permissions == 0o600)
 
         // Longer than the file, and not there: errors, and the file stays as it is.
-        #expect(throws: (any Error).self) { _ = try fileSystem.append(to: url("f.bin"), at: 99, cancellation: CancellationFlag()) }
-        #expect(throws: (any Error).self) { _ = try fileSystem.append(to: url("none.bin"), at: nil, cancellation: CancellationFlag()) }
+        #expect(throws: (any Error).self) {
+            _ = try fileSystem.append(to: url("f.bin"), at: 99, cancellation: CancellationFlag())
+        }
+        #expect(throws: (any Error).self) {
+            _ = try fileSystem.append(to: url("none.bin"), at: nil, cancellation: CancellationFlag())
+        }
         #expect(box.read("f.bin") == "01Z+end")
         #expect(!box.exists("none.bin"))
     }

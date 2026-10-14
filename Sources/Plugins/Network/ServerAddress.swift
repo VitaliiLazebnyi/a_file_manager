@@ -23,14 +23,17 @@ public struct ServerKey: Hashable, CustomStringConvertible {
         self.scheme = scheme.lowercased()
         self.host = ServerKey.canonical(host)
         // A port outside the range (a damaged or imported settings file) is not a port.
-        self.port = port.flatMap { ServerKey.validPorts.contains($0) ? $0 : nil } ?? ServerKey.defaultPort(of: self.scheme)
+        self.port =
+            port.flatMap { ServerKey.validPorts.contains($0) ? $0 : nil } ?? ServerKey.defaultPort(of: self.scheme)
     }
 
     public static let validPorts = 1...65535
 
     /// Nil when the URL does not name a server of one of the network schemes.
     public init?(_ url: URL) {
-        guard let scheme = url.scheme?.lowercased(), ServerKey.schemes.contains(scheme), let host = url.host, !host.isEmpty else { return nil }
+        guard let scheme = url.scheme?.lowercased(), ServerKey.schemes.contains(scheme), let host = url.host,
+            !host.isEmpty
+        else { return nil }
         self.init(scheme: scheme, host: host, port: url.port)
     }
 
@@ -66,7 +69,9 @@ public struct ServerKey: Hashable, CustomStringConvertible {
         if port != ServerKey.defaultPort(of: scheme), ServerKey.validPorts.contains(port) { components.port = port }
         components.path = RemotePath.normalized(path)
         // The URL must name this server again, or it is not a location on it.
-        guard let url = components.url, let back = url.host, ServerKey.bare(back).lowercased() == host else { return nil }
+        guard let url = components.url, let back = url.host, ServerKey.bare(back).lowercased() == host else {
+            return nil
+        }
         return url
     }
 
@@ -99,7 +104,10 @@ public enum RemotePath {
         var names: [ArraySlice<UInt8>] = []
         for name in Array(path.utf8).split(separator: 0x2F) {
             if name.elementsEqual([0x2E]) { continue }
-            if name.elementsEqual([0x2E, 0x2E]) { _ = names.popLast(); continue }
+            if name.elementsEqual([0x2E, 0x2E]) {
+                _ = names.popLast()
+                continue
+            }
             names.append(name)
         }
         return names
@@ -142,9 +150,13 @@ public enum RemotePath {
         var result = String.UnicodeScalarView()
         for (index, scalar) in scalars.enumerated() {
             if scalar == "/" {
-                if index > 0, scalars[index - 1] != "/", !areApart(scalars[index - 1], scalar) { result.append("\u{FFFD}") }
+                if index > 0, scalars[index - 1] != "/", !areApart(scalars[index - 1], scalar) {
+                    result.append("\u{FFFD}")
+                }
                 result.append(scalar)
-                if index + 1 < scalars.count, scalars[index + 1] != "/", !areApart(scalar, scalars[index + 1]) { result.append("\u{FFFD}") }
+                if index + 1 < scalars.count, scalars[index + 1] != "/", !areApart(scalar, scalars[index + 1]) {
+                    result.append("\u{FFFD}")
+                }
             } else {
                 result.append(scalar)
             }
@@ -160,7 +172,9 @@ public enum RemotePath {
         let scalars = Array(path.unicodeScalars)
         for (index, scalar) in scalars.enumerated() where scalar == "/" {
             if index > 0, scalars[index - 1] != "/", !areApart(scalars[index - 1], scalar) { return false }
-            if index + 1 < scalars.count, scalars[index + 1] != "/", !areApart(scalar, scalars[index + 1]) { return false }
+            if index + 1 < scalars.count, scalars[index + 1] != "/", !areApart(scalar, scalars[index + 1]) {
+                return false
+            }
         }
         // The first and the last name have a slash next to them once the path is joined to another.
         if let first = scalars.first, first != "/", !areApart("/", first) { return false }
@@ -259,8 +273,11 @@ public struct ServerAddress: Equatable {
             host = String(authority[..<colon])
             port = number
         }
-        guard !host.isEmpty, host.rangeOfCharacter(from: CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: "/@\\[]"))) == nil,
-              port.map({ ServerKey.validPorts.contains($0) }) ?? true else { return nil }
+        guard !host.isEmpty,
+            host.rangeOfCharacter(from: CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: "/@\\[]")))
+                == nil,
+            port.map({ ServerKey.validPorts.contains($0) }) ?? true
+        else { return nil }
         // A host that cannot be written in a URL (`%`, `#`, `?`, quotes, direction marks) has no
         // location a panel could show.
         guard ServerKey(scheme: scheme, host: host, port: port).validURL() != nil else { return nil }

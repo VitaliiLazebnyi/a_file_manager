@@ -43,7 +43,8 @@ public enum VirtualLocation: Equatable {
         case "list":
             guard let id else { return nil }
             let folder = (path as NSString).deletingLastPathComponent
-            let origin = prefix.isEmpty ? nil : VirtualLocation.realURL(prefix: prefix, path: folder.isEmpty ? "/" : folder)
+            let origin =
+                prefix.isEmpty ? nil : VirtualLocation.realURL(prefix: prefix, path: folder.isEmpty ? "/" : folder)
             self = .list(id: id, title: (path as NSString).lastPathComponent, origin: origin)
         default:
             return nil
@@ -61,7 +62,8 @@ public enum VirtualLocation: Equatable {
             components.host = "pick.n\(id)" + VirtualLocation.hexLabels(VirtualLocation.prefix(of: real))
             components.path = VirtualLocation.path(of: real)
         case .list(let id, let title, let origin):
-            components.host = "list.n\(id)" + (origin.map { VirtualLocation.hexLabels(VirtualLocation.prefix(of: $0)) } ?? "")
+            components.host =
+                "list.n\(id)" + (origin.map { VirtualLocation.hexLabels(VirtualLocation.prefix(of: $0)) } ?? "")
             let folder = origin.map(VirtualLocation.path(of:)) ?? ""
             components.path = (folder == "/" ? "" : folder) + "/" + VirtualLocation.pathComponent(title)
         }
@@ -98,7 +100,9 @@ public enum VirtualLocation: Equatable {
     /// password is left out: this is written into tabs, history and the hotlist, which must
     /// not hold one.
     private static func prefix(of real: URL) -> String {
-        guard var components = URLComponents(url: real, resolvingAgainstBaseURL: true) else { return (real.scheme ?? "file") + "://" }
+        guard var components = URLComponents(url: real, resolvingAgainstBaseURL: true) else {
+            return (real.scheme ?? "file") + "://"
+        }
         if components.host == nil { components.host = "" }
         (components.path, components.query, components.fragment, components.password) = ("", nil, nil, nil)
         return components.string ?? (real.scheme ?? "file") + "://"
@@ -110,7 +114,8 @@ public enum VirtualLocation: Equatable {
         if prefix == "file://" { return URL(fileURLWithPath: path, isDirectory: false) }
         // The prefix holds scheme, user, host and port only; anything else in it is not ours.
         guard var components = URLComponents(string: prefix), components.scheme != nil,
-              components.path.isEmpty, components.query == nil, components.fragment == nil, components.password == nil else { return nil }
+            components.path.isEmpty, components.query == nil, components.fragment == nil, components.password == nil
+        else { return nil }
         components.path = path.hasPrefix("/") ? path : "/" + path
         return components.url
     }
@@ -121,7 +126,10 @@ public enum VirtualLocation: Equatable {
         // By scalars: a slash followed by a combining mark is not a separator to `Character`.
         for scalars in path.unicodeScalars.split(separator: "/", omittingEmptySubsequences: true) {
             let component = String(String.UnicodeScalarView(scalars))
-            if component.utf8.elementsEqual("..".utf8) { _ = kept.popLast(); continue }
+            if component.utf8.elementsEqual("..".utf8) {
+                _ = kept.popLast()
+                continue
+            }
             if component.utf8.elementsEqual(".".utf8) { continue }
             kept.append(component)
         }

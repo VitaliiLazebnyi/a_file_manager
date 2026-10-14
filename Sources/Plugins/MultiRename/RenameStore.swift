@@ -79,7 +79,9 @@ final class RenameStore {
     /// The saved settings the tool opens with; empty for the last used ones (`MultiRenameLoadSettings`).
     var startupSettingsName: String { all.text(RenameStore.startupSettingsKey, default: "") }
 
-    var titleRule: TitleCaseRule { TitleCaseRule(setting: all.text(RenameStore.lowercaseWordsKey, default: TitleCaseRule.defaultSetting)) }
+    var titleRule: TitleCaseRule {
+        TitleCaseRule(setting: all.text(RenameStore.lowercaseWordsKey, default: TitleCaseRule.defaultSetting))
+    }
 
     // MARK: Saved settings
 
@@ -135,7 +137,11 @@ final class RenameStore {
     /// after the tool, and the program, were closed.
     var undoHistory: [[RenamedItem]] {
         get {
-            if memory.undo == nil { memory.undo = own.largeData(forKey: "undo").flatMap { try? JSONDecoder().decode([[RenamedItem]].self, from: $0) } ?? [] }
+            if memory.undo == nil {
+                memory.undo =
+                    own.largeData(forKey: "undo").flatMap { try? JSONDecoder().decode([[RenamedItem]].self, from: $0) }
+                    ?? []
+            }
             return memory.undo ?? []
         }
         set {
@@ -239,10 +245,13 @@ enum RenameNameList {
             return String(data: data, encoding: .utf16) ?? ""
         }
         // UTF-16 without a mark shows in the zero bytes between Latin letters.
-        if data.count >= 2, data.count % 2 == 0, data[data.startIndex + 1] == 0, let text = String(data: data, encoding: .utf16LittleEndian) {
+        if data.count >= 2, data.count % 2 == 0, data[data.startIndex + 1] == 0,
+            let text = String(data: data, encoding: .utf16LittleEndian)
+        {
             return text
         }
-        return String(data: data, encoding: .utf8) ?? String(data: data, encoding: .windowsCP1252) ?? String(decoding: data, as: UTF8.self)
+        return String(data: data, encoding: .utf8) ?? String(data: data, encoding: .windowsCP1252)
+            ?? String(decoding: data, as: UTF8.self)
     }
 
     /// One name per line; empty lines at the end do not count.

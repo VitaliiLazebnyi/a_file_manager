@@ -36,8 +36,9 @@ enum LocalInfo {
     }
 
     static func posixError(_ code: Int32, _ url: URL) -> Error {
-        NSError(domain: NSPOSIXErrorDomain, code: Int(code),
-                userInfo: [NSLocalizedDescriptionKey: String(cString: strerror(code)) + ": " + url.path])
+        NSError(
+            domain: NSPOSIXErrorDomain, code: Int(code),
+            userInfo: [NSLocalizedDescriptionKey: String(cString: strerror(code)) + ": " + url.path])
     }
 
     /// The item itself; a link is not followed. Nil when nothing is there.
@@ -45,9 +46,11 @@ enum LocalInfo {
         guard url.isFileURL else { return nil }
         var st = stat()
         guard lstat(url.path, &st) == 0 else { return nil }
-        return LocalDetails(mode: UInt16(st.st_mode & 0o7777), ownerID: st.st_uid, groupID: st.st_gid, created: date(st.st_birthtimespec),
-                            modified: date(st.st_mtimespec), accessed: date(st.st_atimespec), flags: st.st_flags,
-                            allocated: Int64(st.st_blocks) * 512, linkCount: Int(st.st_nlink))
+        return LocalDetails(
+            mode: UInt16(st.st_mode & 0o7777), ownerID: st.st_uid, groupID: st.st_gid,
+            created: date(st.st_birthtimespec),
+            modified: date(st.st_mtimespec), accessed: date(st.st_atimespec), flags: st.st_flags,
+            allocated: Int64(st.st_blocks) * 512, linkCount: Int(st.st_nlink))
     }
 
     /// Whether the entry itself is a symbolic link, asked from the disk now.
@@ -82,7 +85,9 @@ enum LocalInfo {
         var entry = passwd()
         var result: UnsafeMutablePointer<passwd>?
         var buffer = [CChar](repeating: 0, count: 4096)
-        let name = getpwuid_r(id, &entry, &buffer, buffer.count, &result) == 0 && result != nil ? String(cString: entry.pw_name) : String(id)
+        let name =
+            getpwuid_r(id, &entry, &buffer, buffer.count, &result) == 0 && result != nil
+            ? String(cString: entry.pw_name) : String(id)
         lock.lock()
         userNames[id] = name
         lock.unlock()
@@ -98,7 +103,9 @@ enum LocalInfo {
         var entry = group()
         var result: UnsafeMutablePointer<group>?
         var buffer = [CChar](repeating: 0, count: 4096)
-        let name = getgrgid_r(id, &entry, &buffer, buffer.count, &result) == 0 && result != nil ? String(cString: entry.gr_name) : String(id)
+        let name =
+            getgrgid_r(id, &entry, &buffer, buffer.count, &result) == 0 && result != nil
+            ? String(cString: entry.gr_name) : String(id)
         lock.lock()
         groupNames[id] = name
         lock.unlock()
@@ -140,9 +147,12 @@ enum LocalInfo {
             return URL(fileURLWithPath: target, relativeTo: url.deletingLastPathComponent()).standardizedFileURL
         }
         guard url.isFileURL, (try? url.resourceValues(forKeys: [.isAliasFileKey]).isAliasFile) == true,
-              let bookmark = try? URL.bookmarkData(withContentsOf: url) else { return nil }
+            let bookmark = try? URL.bookmarkData(withContentsOf: url)
+        else { return nil }
         var isStale = false
-        return try? URL(resolvingBookmarkData: bookmark, options: [.withoutUI, .withoutMounting], relativeTo: nil, bookmarkDataIsStale: &isStale)
+        return try? URL(
+            resolvingBookmarkData: bookmark, options: [.withoutUI, .withoutMounting], relativeTo: nil,
+            bookmarkDataIsStale: &isStale)
     }
 
     /// The names of the item's extended attributes; a link is not followed.
@@ -164,13 +174,17 @@ enum LocalInfo {
     /// What kind of file this is, in the user's language: "PNG image", "Folder". Local files
     /// are asked from the system; elsewhere the extension decides.
     static func kind(of item: FileItem) -> String {
-        if item.url.isFileURL, let kind = try? item.url.resourceValues(forKeys: [.localizedTypeDescriptionKey]).localizedTypeDescription {
+        if item.url.isFileURL,
+            let kind = try? item.url.resourceValues(forKeys: [.localizedTypeDescriptionKey]).localizedTypeDescription
+        {
             return kind
         }
         if item.isSymlink { return "Symbolic link" }
         if item.isFolder { return "Folder" }
         let ext = FileItem.split(item.name).ext
-        if !ext.isEmpty, let type = UTType(filenameExtension: ext), let description = type.localizedDescription { return description }
+        if !ext.isEmpty, let type = UTType(filenameExtension: ext), let description = type.localizedDescription {
+            return description
+        }
         return ext.isEmpty ? "Document" : "\(ext.uppercased()) file"
     }
 

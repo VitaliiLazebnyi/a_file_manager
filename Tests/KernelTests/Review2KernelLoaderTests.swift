@@ -1,7 +1,8 @@
-@testable import AFMKernel
 import Foundation
 import TestSupport
 import Testing
+
+@testable import AFMKernel
 
 private func waitUntil(seconds: TimeInterval = 60, _ condition: () -> Bool) -> Bool {
     let end = Date(timeIntervalSinceNow: seconds)
@@ -26,8 +27,16 @@ private final class StalledFileSystem: FileSystemProvider {
     /// What blocks at the dead folder.
     var stallsVolume = true, stallsListing = false
 
-    func count(_ what: String) -> Int { lock.lock(); defer { lock.unlock() }; return counts[what] ?? 0 }
-    var handedFlags: [CancellationFlag] { lock.lock(); defer { lock.unlock() }; return flags }
+    func count(_ what: String) -> Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return counts[what] ?? 0
+    }
+    var handedFlags: [CancellationFlag] {
+        lock.lock()
+        defer { lock.unlock() }
+        return flags
+    }
     private func note(_ what: String, _ flag: CancellationFlag? = nil) {
         lock.lock()
         counts[what, default: 0] += 1
@@ -45,8 +54,11 @@ private final class StalledFileSystem: FileSystemProvider {
         return VolumeInfo(name: "back")
     }
 
-    func list(_ directory: URL, showHidden: Bool) throws -> [FileItem] { try inner.list(directory, showHidden: showHidden) }
-    func list(_ directory: URL, showHidden: Bool, cancellation: CancellationFlag, receive: ([FileItem]) -> Bool) throws {
+    func list(_ directory: URL, showHidden: Bool) throws -> [FileItem] {
+        try inner.list(directory, showHidden: showHidden)
+    }
+    func list(_ directory: URL, showHidden: Bool, cancellation: CancellationFlag, receive: ([FileItem]) -> Bool) throws
+    {
         if isDead(directory), stallsListing {
             note("list", cancellation)
             release.wait()
@@ -59,8 +71,12 @@ private final class StalledFileSystem: FileSystemProvider {
     func createDirectory(at url: URL) throws { try inner.createDirectory(at: url) }
     func write(_ url: URL) throws -> FileWriter { try inner.write(url) }
     func remove(_ url: URL) throws { try inner.remove(url) }
-    func move(_ source: URL, to destination: URL, replacing: Bool) throws { try inner.move(source, to: destination, replacing: replacing) }
-    func copy(_ source: URL, to destination: URL, progress: (Int64) -> Bool) throws { try inner.copy(source, to: destination, progress: progress) }
+    func move(_ source: URL, to destination: URL, replacing: Bool) throws {
+        try inner.move(source, to: destination, replacing: replacing)
+    }
+    func copy(_ source: URL, to destination: URL, progress: (Int64) -> Bool) throws {
+        try inner.copy(source, to: destination, progress: progress)
+    }
 }
 
 /// Review 2, K004/K007/K039/K040: reading a panel's directory from a location that does not answer.
@@ -76,11 +92,15 @@ private final class StalledFileSystem: FileSystemProvider {
     }
 
     /// One try at reading a location, on a thread of its own; `ended` is signalled when it returns.
-    private func load(_ path: String, _ stalled: StalledFileSystem, _ registry: FileSystemRegistry, cancellation: CancellationFlag,
-                      ended: DispatchSemaphore, names: @escaping ([String]) -> Void = { _ in }) {
+    private func load(
+        _ path: String, _ stalled: StalledFileSystem, _ registry: FileSystemRegistry, cancellation: CancellationFlag,
+        ended: DispatchSemaphore, names: @escaping ([String]) -> Void = { _ in }
+    ) {
         Thread.detachNewThread {
             var seen: [String] = []
-            try? PanelLoader.stream(stalled.inner.url(path), showHidden: true, fileSystems: registry, cancellation: cancellation) { batch in
+            try? PanelLoader.stream(
+                stalled.inner.url(path), showHidden: true, fileSystems: registry, cancellation: cancellation
+            ) { batch in
                 seen += batch.listing.items.map(\.name)
                 return true
             }
@@ -107,7 +127,10 @@ private final class StalledFileSystem: FileSystemProvider {
         // A healthy folder of the same file system still loads.
         let (ended, got) = (DispatchSemaphore(value: 0), DispatchSemaphore(value: 0))
         var names: [String] = []
-        load("/alive", stalled, registry, cancellation: CancellationFlag(), ended: ended) { names = $0; got.signal() }
+        load("/alive", stalled, registry, cancellation: CancellationFlag(), ended: ended) {
+            names = $0
+            got.signal()
+        }
         #expect(got.wait(timeout: .now() + 60) == .success)
         #expect(names.sorted() == ["b.txt", "c.txt"])
         // The share comes back: the stuck question ends, and the folder can be read.
@@ -133,7 +156,10 @@ private final class StalledFileSystem: FileSystemProvider {
         // old listing has come back, and then reads it afresh.
         let (ended, got) = (DispatchSemaphore(value: 0), DispatchSemaphore(value: 0))
         var names: [String] = []
-        load("/dead", stalled, registry, cancellation: CancellationFlag(), ended: ended) { names = $0; got.signal() }
+        load("/dead", stalled, registry, cancellation: CancellationFlag(), ended: ended) {
+            names = $0
+            got.signal()
+        }
         usleep(50_000)
         #expect(stalled.count("list") == 1)
         stalled.stallsListing = false
@@ -170,8 +196,12 @@ private final class StalledFileSystem: FileSystemProvider {
         }
         #expect(taken == 1)
         // A folder that is not there: the error is thrown here, and with climbing the folder above is read.
-        #expect(throws: (any Error).self) { try PanelLoader.load(memory.url("/big/none"), showHidden: true, fileSystems: registry) }
-        #expect(try PanelLoader.load(memory.url("/big/none"), showHidden: true, fileSystems: registry, climbing: true).listing.items.count == 50)
+        #expect(throws: (any Error).self) {
+            try PanelLoader.load(memory.url("/big/none"), showHidden: true, fileSystems: registry)
+        }
+        #expect(
+            try PanelLoader.load(memory.url("/big/none"), showHidden: true, fileSystems: registry, climbing: true)
+                .listing.items.count == 50)
         // The location of a file leads to its folder.
         let atFile = try PanelLoader.load(memory.url("/big/file3.txt"), showHidden: true, fileSystems: registry)
         #expect(atFile.focus == "file3.txt" && atFile.listing.items.count == 50)
@@ -188,12 +218,18 @@ private final class DeepFileSystem: FileSystemProvider {
     var isEndless = false
     private let lock = NSLock()
     private var listed = 0
-    var listings: Int { lock.lock(); defer { lock.unlock() }; return listed }
+    var listings: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return listed
+    }
 
     init(depth: Int) { self.depth = depth }
 
     func list(_ directory: URL, showHidden: Bool) throws -> [FileItem] {
-        lock.lock(); listed += 1; lock.unlock()
+        lock.lock()
+        listed += 1
+        lock.unlock()
         let level = directory.pathComponents.count - 1
         var items = [FileItem(url: directory.appendingPathComponent("f"), name: "f", isDirectory: false, size: 3)]
         if isEndless {
@@ -204,7 +240,9 @@ private final class DeepFileSystem: FileSystemProvider {
         return items
     }
     func item(at url: URL) -> FileItem? { nil }
-    func parent(of directory: URL) -> URL? { directory.pathComponents.count > 1 ? directory.deletingLastPathComponent() : nil }
+    func parent(of directory: URL) -> URL? {
+        directory.pathComponents.count > 1 ? directory.deletingLastPathComponent() : nil
+    }
     func read(_ url: URL) throws -> FileReader { throw FileSystemError.notSupported("Reading") }
     func createDirectory(at url: URL) throws {}
     func write(_ url: URL) throws -> FileWriter { throw FileSystemError.notSupported("Writing") }
@@ -239,7 +277,9 @@ private final class DeepFileSystem: FileSystemProvider {
         // Twenty thousand levels crashed the program; now the walk ends at its limit.
         let hostile = DeepFileSystem(depth: 20_000)
         let size = onSmallStack { hostile.totalSize(of: top) }
-        #expect(size != nil && size! >= 3 * Int64(TreeWalk.deepestTree) && size! <= 3 * Int64(TreeWalk.deepestTree + TreeWalk.deepestNesting * 80))
+        #expect(
+            size != nil && size! >= 3 * Int64(TreeWalk.deepestTree)
+                && size! <= 3 * Int64(TreeWalk.deepestTree + TreeWalk.deepestNesting * 80))
         // A folder inside itself is listed once.
         let endless = DeepFileSystem(depth: 0)
         endless.isEndless = true
@@ -264,12 +304,17 @@ private final class DeepFileSystem: FileSystemProvider {
             #expect(PathSafety.isSafeName(name), "\(name.debugDescription)")
         }
         // The separator is a byte: one that carries an accent is still a separator.
-        for name in ["", ".", "..", "a/b", "/", "/a", "a/", "a\u{0}b", "\u{0}", "/\u{301}", "a/\u{301}b", "../x", "..\u{2F}\u{301}"] {
+        for name in [
+            "", ".", "..", "a/b", "/", "/a", "a/", "a\u{0}b", "\u{0}", "/\u{301}", "a/\u{301}b", "../x",
+            "..\u{2F}\u{301}"
+        ] {
             #expect(!PathSafety.isSafeName(name), "\(name.debugDescription)")
         }
         let root = URL(fileURLWithPath: "/tmp/review2-root")
         #expect(root.appending(safeName: "x.txt")?.path == "/tmp/review2-root/x.txt")
-        #expect(root.appending(safeName: "../x") == nil && root.appending(safeName: "a/b") == nil && root.appending(safeName: "..") == nil)
+        #expect(
+            root.appending(safeName: "../x") == nil && root.appending(safeName: "a/b") == nil
+                && root.appending(safeName: "..") == nil)
     }
 
     @Test func aPathIsCutAtTheByteAndEveryPartChecked() {
@@ -278,7 +323,10 @@ private final class DeepFileSystem: FileSystemProvider {
         #expect(PathSafety.components(ofRelativePath: "a/\u{301}b") == ["a", "\u{301}b"])
         // What the archive and split-file reproducers held: `..`, then a `/` with a combining
         // mark, which one character-based split took for part of a name.
-        for path in ["../x", "a/../b", "..", ".", "a/./b", "/abs", "a//b", "a/", "", "a/\u{0}", "..\u{2F}\u{301}x", "..\u{2F}\u{301}/..\u{2F}\u{301}/x", "a/..\u{2F}\u{301}"] {
+        for path in [
+            "../x", "a/../b", "..", ".", "a/./b", "/abs", "a//b", "a/", "", "a/\u{0}", "..\u{2F}\u{301}x",
+            "..\u{2F}\u{301}/..\u{2F}\u{301}/x", "a/..\u{2F}\u{301}"
+        ] {
             #expect(PathSafety.components(ofRelativePath: path) == nil, "\(path.debugDescription)")
         }
         #expect(PathSafety.components(ofRelativePath: "a/b//", allowingTrailingSeparator: true) == nil)
@@ -301,17 +349,22 @@ private final class DeepFileSystem: FileSystemProvider {
         #expect(!PathSafety.isContained(URL(string: "ftp://other/pub/a")!, in: URL(string: "ftp://host/pub")!))
         // Two folders whose names read the same are two folders, where the file system keeps
         // both (a server; the Mac's own disks write every name one way).
-        let composed = URL(string: "ftp://host/caf%C3%A9")!, decomposed = URL(string: "ftp://host/cafe%CC%81/x")!
+        let composed = URL(string: "ftp://host/caf%C3%A9")!
+        let decomposed = URL(string: "ftp://host/cafe%CC%81/x")!
         #expect(composed.path == decomposed.deletingLastPathComponent().path)
         #expect(!PathSafety.isContained(decomposed, in: composed) && !decomposed.isInside(composed))
-        #expect(URL(string: "ftp://host/caf%C3%A9/x")!.isInside(composed) && PathSafety.isContained(URL(string: "ftp://host/caf%C3%A9/x")!, in: composed))
+        #expect(
+            URL(string: "ftp://host/caf%C3%A9/x")!.isInside(composed)
+                && PathSafety.isContained(URL(string: "ftp://host/caf%C3%A9/x")!, in: composed))
         #expect(!URL(fileURLWithPath: "/tmp/review2-root\u{301}/a").isInside(root))
         // A link inside the folder that points out of it.
         let sandbox = try Sandbox()
-        let inside = sandbox.root.appendingPathComponent("inside"), outside = sandbox.root.appendingPathComponent("outside")
+        let inside = sandbox.root.appendingPathComponent("inside")
+        let outside = sandbox.root.appendingPathComponent("outside")
         try FileManager.default.createDirectory(at: inside, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
-        try FileManager.default.createSymbolicLink(at: inside.appendingPathComponent("link"), withDestinationURL: outside)
+        try FileManager.default.createSymbolicLink(
+            at: inside.appendingPathComponent("link"), withDestinationURL: outside)
         let through = inside.appendingPathComponent("link/file.txt")
         #expect(PathSafety.isContained(through, in: inside))
         #expect(!PathSafety.isContained(through, in: inside, resolvingLinks: true))
@@ -330,7 +383,9 @@ private final class DeepFileSystem: FileSystemProvider {
     }
 
     @Test func aQuestionMarkIsOneCharacterOfAnySize() {
-        #expect(FileMask("?.txt").matches("😀.txt") && FileMask("?.txt").matches("写.txt") && FileMask("?.txt").matches("a.txt"))
+        #expect(
+            FileMask("?.txt").matches("😀.txt") && FileMask("?.txt").matches("写.txt")
+                && FileMask("?.txt").matches("a.txt"))
         #expect(!FileMask("?.txt").matches("ab.txt") && !FileMask("??.txt").matches("😀.txt"))
         #expect(FileMask("写?.jpg").matches("写真.jpg") && FileMask("*?真.JPG").matches("写真.jpg"))
     }
@@ -338,21 +393,29 @@ private final class DeepFileSystem: FileSystemProvider {
     @Test func bracketsAndBackslashesStandForThemselves() {
         #expect(FileMask("report[1].txt").matches("report[1].txt") && !FileMask("report[1].txt").matches("report1.txt"))
         #expect(FileMask("[a-c]*").matches("[a-c] notes.md") && !FileMask("[a-c]*").matches("b.md"))
-        #expect(FileMask("a\\b*").matches("a\\b.txt") && FileMask("*[*").matches("x[y") && FileMask("\\*").matches("\\anything"))
+        #expect(
+            FileMask("a\\b*").matches("a\\b.txt") && FileMask("*[*").matches("x[y")
+                && FileMask("\\*").matches("\\anything"))
     }
 
     @Test func caseDoesNotCountInAnyScript() {
         #expect(FileMask("STRASSE*").matches("straße.txt") && FileMask("straße*").matches("STRASSE.TXT"))
-        #expect(FileMask("*ФАЙЛ*").matches("мой файл.txt") && FileMask("*.TXT").matches("отчёт.txt") && FileMask("É*").matches("été"))
-        #expect(FileMask("*.").matches("noext") && !FileMask("*.").matches("has.ext") && FileMask("name.").matches("NAME"))
+        #expect(
+            FileMask("*ФАЙЛ*").matches("мой файл.txt") && FileMask("*.TXT").matches("отчёт.txt")
+                && FileMask("É*").matches("été"))
+        #expect(
+            FileMask("*.").matches("noext") && !FileMask("*.").matches("has.ext") && FileMask("name.").matches("NAME"))
     }
 
     @Test func noMaskTakesLongOnAnyName() {
         // The shapes that make a matcher go back and forth: many `*` against a name that
         // nearly fits. Bounded by the two lengths multiplied, whatever they hold.
         let name = String(repeating: "a", count: 4000)
-        let masks = [String(repeating: "*a", count: 60) + "*b", String(repeating: "a*", count: 100) + "?b", "*" + String(repeating: "?", count: 300) + "b",
-                     String(repeating: "*", count: 500) + "b"]
+        let masks = [
+            String(repeating: "*a", count: 60) + "*b", String(repeating: "a*", count: 100) + "?b",
+            "*" + String(repeating: "?", count: 300) + "b",
+            String(repeating: "*", count: 500) + "b"
+        ]
         for mask in masks {
             #expect(!FileMask(mask).matches(name))
             #expect(!FileMask(mask).matches(name + "é"))

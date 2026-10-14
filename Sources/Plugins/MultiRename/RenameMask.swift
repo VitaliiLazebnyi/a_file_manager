@@ -14,14 +14,17 @@ struct RenameSubject {
     /// Where the item is; only handed to `RenameContext.contentDate`.
     var url: URL?
 
-    init(name: String, isFolder: Bool = false, size: Int64 = 0, modified: Date = Date(timeIntervalSince1970: 0),
-         directoryPath: String = "", folders: [String]? = nil, url: URL? = nil) {
+    init(
+        name: String, isFolder: Bool = false, size: Int64 = 0, modified: Date = Date(timeIntervalSince1970: 0),
+        directoryPath: String = "", folders: [String]? = nil, url: URL? = nil
+    ) {
         self.name = name
         self.isFolder = isFolder
         self.size = size
         self.modified = modified
         self.directoryPath = directoryPath
-        self.folders = folders ?? Array(directoryPath.utf8).split(separator: 0x2F).map { String(decoding: $0, as: UTF8.self) }
+        self.folders =
+            folders ?? Array(directoryPath.utf8).split(separator: 0x2F).map { String(decoding: $0, as: UTF8.self) }
         self.url = url
     }
 
@@ -139,7 +142,8 @@ struct InlineCounter: Equatable {
 struct RenameMask {
     enum Source: Equatable {
         case name, ext, nameWithExt, fullPath, parent, grandparent
-        case folderFromRight(Int), folderFromLeft(Int)
+        case folderFromRight(Int)
+        case folderFromLeft(Int)
         case clipboard(optional: Bool)
         case environment(String, EnvironmentForm)
     }
@@ -153,8 +157,19 @@ struct RenameMask {
     }
 
     enum DateField: Character {
-        case year4 = "Y", year2 = "y", month = "M", day = "D", hour24 = "h", hour12 = "H", minute = "m", second = "s"
-        case millisecond = "v", date = "d", time = "t", amPm = "i", amPmShort = "I"
+        case year4 = "Y"
+        case year2 = "y"
+        case month = "M"
+        case day = "D"
+        case hour24 = "h"
+        case hour12 = "H"
+        case minute = "m"
+        case second = "s"
+        case millisecond = "v"
+        case date = "d"
+        case time = "t"
+        case amPm = "i"
+        case amPmShort = "I"
     }
 
     struct TimeOffset: Equatable {
@@ -198,7 +213,8 @@ struct RenameMask {
             }
             // `[[]` and `[]]` are the brackets themselves.
             if position + 2 < characters.count, characters[position + 2] == "]",
-               characters[position + 1] == "[" || characters[position + 1] == "]" {
+                characters[position + 1] == "[" || characters[position + 1] == "]"
+            {
                 literal.append(characters[position + 1])
                 position += 3
                 continue
@@ -292,8 +308,12 @@ struct RenameMask {
         }
     }
 
-    private static let letterCases: [Character: LetterCase] = ["U": .upper, "L": .lower, "F": .words, "f": .titleWords, "n": .unchanged]
-    private static let sources: [Character: Source] = ["N": .name, "E": .ext, "A": .nameWithExt, "P": .parent, "G": .grandparent]
+    private static let letterCases: [Character: LetterCase] = [
+        "U": .upper, "L": .lower, "F": .words, "f": .titleWords, "n": .unchanged
+    ]
+    private static let sources: [Character: Source] = [
+        "N": .name, "E": .ext, "A": .nameWithExt, "P": .parent, "G": .grandparent
+    ]
 
     /// The commands inside one pair of brackets; several may share it: `[YMD]`, `[hms]`.
     private static func commands(_ content: [Character]) -> [Token] {
@@ -342,11 +362,15 @@ struct RenameMask {
                     guard (1...3).contains(kind) else { return fail() }
                     tokens.append(.count(kind))
                 case "T":
-                    guard let source = scanner.next().flatMap({ Int(String($0)) }), (1...4).contains(source) else { return fail() }
+                    guard let source = scanner.next().flatMap({ Int(String($0)) }), (1...4).contains(source) else {
+                        return fail()
+                    }
                     var offset: TimeOffset?
                     if scanner.peek() == "+" || scanner.peek() == "-" {
                         let negative = scanner.next() == "-"
-                        guard let value = scanner.number(), let unit = scanner.next(), "smhDMY".contains(unit) else { return fail() }
+                        guard let value = scanner.number(), let unit = scanner.next(), "smhDMY".contains(unit) else {
+                            return fail()
+                        }
                         offset = TimeOffset(value: negative ? -value : value, unit: unit)
                     }
                     tokens.append(.timeSource(source, offset))
@@ -362,7 +386,8 @@ struct RenameMask {
                     if scanner.startsRange {
                         tokens.append(.text(.environment(name, .whole), scanner.range()))
                     } else if let form = scanner.next() {
-                        tokens.append(.text(.environment(name, form == "\\" || form == "/" ? .lastPart : .separator(form)), nil))
+                        tokens.append(
+                            .text(.environment(name, form == "\\" || form == "/" ? .lastPart : .separator(form)), nil))
                     } else {
                         tokens.append(.text(.environment(name, .whole), nil))
                     }
@@ -452,8 +477,10 @@ final class RenameFormats {
 extension RenameMask {
     /// The text the mask gives for one item. `index` is the item's place in the list, from 0.
     /// Safe to call from several threads at once.
-    func evaluate(_ subject: RenameSubject, index: Int, context: RenameContext, formats: RenameFormats,
-                  state: inout MaskState) throws -> String {
+    func evaluate(
+        _ subject: RenameSubject, index: Int, context: RenameContext, formats: RenameFormats,
+        state: inout MaskState
+    ) throws -> String {
         var pieces: [(text: String, letterCase: LetterCase)] = []
         var letterCase = LetterCase.unchanged
         var precompose = false
@@ -473,10 +500,15 @@ extension RenameMask {
             default: date = subject.modified
             }
             if let offset = state.timeOffset {
-                let units: [Character: Calendar.Component] = ["s": .second, "m": .minute, "h": .hour, "D": .day, "M": .month, "Y": .year]
-                date = formats.calendar.date(byAdding: units[offset.unit] ?? .second, value: offset.value, to: date) ?? date
+                let units: [Character: Calendar.Component] = [
+                    "s": .second, "m": .minute, "h": .hour, "D": .day, "M": .month, "Y": .year
+                ]
+                date =
+                    formats.calendar.date(byAdding: units[offset.unit] ?? .second, value: offset.value, to: date)
+                    ?? date
             }
-            let components = formats.calendar.dateComponents([.year, .month, .day, .hour, .minute, .second, .nanosecond], from: date)
+            let components = formats.calendar.dateComponents(
+                [.year, .month, .day, .hour, .minute, .second, .nanosecond], from: date)
             cachedDate = (state.timeSource, state.timeOffset, components, date)
             return (components, date)
         }
@@ -497,10 +529,13 @@ extension RenameMask {
                 text = try RenameMask.counterText(inline, index: index, context: context)
             case .count(let kind):
                 switch kind {
-                case 2: text = RenameMask.padded(context.count, digits: RenameMask.width(context.counter.digits, context))
+                case 2:
+                    text = RenameMask.padded(context.count, digits: RenameMask.width(context.counter.digits, context))
                 case 3:
-                    text = RenameMask.padded(try RenameMask.number(context.counter.start, plus: context.counter.step, times: max(context.count - 1, 0)),
-                                             digits: RenameMask.width(context.counter.digits, context))
+                    text = RenameMask.padded(
+                        try RenameMask.number(
+                            context.counter.start, plus: context.counter.step, times: max(context.count - 1, 0)),
+                        digits: RenameMask.width(context.counter.digits, context))
                 default: text = String(context.count)
                 }
             case .date(let field):
@@ -552,13 +587,18 @@ extension RenameMask {
         // As in `FileItem.split`: a leading dot starts no extension, a trailing dot ends none
         // (`Acme Inc.` keeps its dot in the name).
         guard let dot = subject.name.lastIndex(of: "."), dot != subject.name.startIndex,
-              subject.name.index(after: dot) != subject.name.endIndex else { return (subject.name, "") }
+            subject.name.index(after: dot) != subject.name.endIndex
+        else { return (subject.name, "") }
         return (String(subject.name[..<dot]), String(subject.name[subject.name.index(after: dot)...]))
     }
 
-    private static func value(of source: Source, _ subject: RenameSubject, _ context: RenameContext, _ state: MaskState) throws -> String {
+    private static func value(
+        of source: Source, _ subject: RenameSubject, _ context: RenameContext, _ state: MaskState
+    ) throws -> String {
         let folders = subject.folders
-        func fromRight(_ level: Int) -> String { folders.indices.contains(folders.count - 1 - level) ? folders[folders.count - 1 - level] : "" }
+        func fromRight(_ level: Int) -> String {
+            folders.indices.contains(folders.count - 1 - level) ? folders[folders.count - 1 - level] : ""
+        }
         switch source {
         case .name: return parts(of: subject, state).name
         case .ext: return parts(of: subject, state).ext
@@ -568,7 +608,8 @@ extension RenameMask {
         case .grandparent: return fromRight(1)
         case .folderFromRight(let level): return fromRight(level)
         // `[B+0]` is the drive letter on Windows; a Mac path has nothing in that place.
-        case .folderFromLeft(let level): return level >= 1 && folders.indices.contains(level - 1) ? folders[level - 1] : ""
+        case .folderFromLeft(let level):
+            return level >= 1 && folders.indices.contains(level - 1) ? folders[level - 1] : ""
         case .clipboard(let optional):
             guard let text = context.clipboard ?? context.clipboardLoader?(), !text.isEmpty else {
                 if optional { return "" }
@@ -603,7 +644,8 @@ extension RenameMask {
 
     static func padded(_ value: Int, digits: Int) -> String {
         let text = value == Int.min ? String(value.magnitude) : String(abs(value))
-        return (value < 0 ? "-" : "") + String(repeating: "0", count: max(0, min(digits, widestFill) - text.count)) + text
+        return (value < 0 ? "-" : "") + String(repeating: "0", count: max(0, min(digits, widestFill) - text.count))
+            + text
     }
 
     /// `start + step * times`; a result beyond the range of numbers is an error of the mask
@@ -617,8 +659,9 @@ extension RenameMask {
 
     private static func counterText(_ inline: InlineCounter?, index: Int, context: RenameContext) throws -> String {
         guard let inline else {
-            return padded(try number(context.counter.start, plus: context.counter.step, times: index),
-                          digits: width(context.counter.digits, context))
+            return padded(
+                try number(context.counter.start, plus: context.counter.step, times: index),
+                digits: width(context.counter.digits, context))
         }
         let steps = try number(0, plus: inline.step, times: index / inline.divisor)
         if let letters = inline.letters { return try alphabetic(letters, advancedBy: steps) }

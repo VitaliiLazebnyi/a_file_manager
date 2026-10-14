@@ -21,11 +21,14 @@ enum CommandLineAction: Equatable {
             return
         }
         let parts = line.split(separator: " ", maxSplits: 1, omittingEmptySubsequences: true).map(String.init)
-        let word = parts[0], rest = parts.count > 1 ? parts[1].trimmingCharacters(in: .whitespaces) : ""
+        let word = parts[0]
+        let rest = parts.count > 1 ? parts[1].trimmingCharacters(in: .whitespaces) : ""
         if word.lowercased() == "cd" {
             // `cd` alone goes home, as it does in a shell.
             self = .changeDirectory(rest.isEmpty ? "~" : CommandLineAction.unquoted(rest))
-        } else if let command = commands[CommandID(rawValue: word)] ?? commands.all.first(where: { $0.id.rawValue.lowercased() == word.lowercased() }) {
+        } else if let command = commands[CommandID(rawValue: word)]
+            ?? commands.all.first(where: { $0.id.rawValue.lowercased() == word.lowercased() })
+        {
             self = .command(command.id, CommandLineAction.argument(from: rest))
         } else {
             self = .run(line)
@@ -34,7 +37,9 @@ enum CommandLineAction: Equatable {
 
     /// A path in quotes, as needed elsewhere for names with spaces, is taken without them.
     static func unquoted(_ text: String) -> String {
-        guard text.count >= 2, let first = text.first, first == text.last, first == "\"" || first == "'" else { return text }
+        guard text.count >= 2, let first = text.first, first == text.last, first == "\"" || first == "'" else {
+            return text
+        }
         return String(text.dropFirst().dropLast())
     }
 
@@ -75,7 +80,9 @@ final class CommandLineHistory {
 
     init(settings: SettingsStore) {
         self.settings = settings
-        entries = Array((settings.value([String].self, forKey: CommandLineHistory.settingsKey) ?? []).prefix(CommandLineHistory.limit))
+        entries = Array(
+            (settings.value([String].self, forKey: CommandLineHistory.settingsKey) ?? []).prefix(
+                CommandLineHistory.limit))
         forgetIfSwitchedOff()
     }
 

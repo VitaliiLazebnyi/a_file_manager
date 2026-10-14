@@ -4,6 +4,7 @@ import Foundation
 import LocalFileSystemPlugin
 import StressKit
 import TestSupport
+
 @testable import ViewerPlugin
 
 // Scenario 7: the viewer's text model (TextDocument / TextRowIndex / ViewerSearch) and the real
@@ -16,14 +17,19 @@ import TestSupport
 //   StressViewer truncate <dir> <resultsDir> [rounds]   a file cut short (and removed) while it is indexed
 
 let arguments = CommandLine.arguments
-guard arguments.count >= 3 else { say("usage"); exit(2) }
+guard arguments.count >= 3 else {
+    say("usage")
+    exit(2)
+}
 let marker = "ENDMARKER_QZX"
 
 // MARK: Files
 
 func denseBlock(_ size: Int, seed: UInt64) -> (data: Data, lines: Int) {
     var random = Random(seed: seed)
-    let words = ["lorem", "ipsum", "dolor", "sit", "amet", "consectetur", "adipiscing", "elit", "sed", "do", "eiusmod", "tempor"]
+    let words = [
+        "lorem", "ipsum", "dolor", "sit", "amet", "consectetur", "adipiscing", "elit", "sed", "do", "eiusmod", "tempor"
+    ]
     var bytes: [UInt8] = []
     bytes.reserveCapacity(size)
     var lines = 0
@@ -62,7 +68,10 @@ func generate(_ directory: URL) {
     try! FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     var t = now()
     let lines = writeDense(directory.appendingPathComponent("dense4g.txt"), megabytes: 4096)
-    say(String(format: "dense4g.txt: 4 GiB, %d lines (the marker line is cut out of the last one), %.1fs", lines, now() - t))
+    say(
+        String(
+            format: "dense4g.txt: 4 GiB, %d lines (the marker line is cut out of the last one), %.1fs", lines,
+            now() - t))
 
     // 4 GiB, of which every 8 MiB begin with 2 MiB of text; the rest was never written (holes of NUL).
     t = now()
@@ -75,14 +84,17 @@ func generate(_ directory: URL) {
         two.withUnsafeBytes { _ = pwrite(descriptor, $0.baseAddress, $0.count, off_t(stretch) * (8 << 20)) }
     }
     close(descriptor)
-    say(String(format: "sparse4g.txt: 4 GiB apparent, 512 x 2 MiB of text (%d lines each) with 6 MiB holes, %.1fs", twoLines, now() - t))
+    say(
+        String(
+            format: "sparse4g.txt: 4 GiB apparent, 512 x 2 MiB of text (%d lines each) with 6 MiB holes, %.1fs",
+            twoLines, now() - t))
 
     t = now()
     let single = directory.appendingPathComponent("line2g.txt")
     FileManager.default.createFile(atPath: single.path, contents: nil)
     var handle = try! FileHandle(forWritingTo: single)
     let phrase = Array("lorem ipsum dolor sit amet ".utf8)
-    var block = [UInt8]()
+    var block: [UInt8] = []
     while block.count < 1 << 20 { block.append(contentsOf: phrase) }
     block.removeLast(block.count - (1 << 20))
     let data = Data(block)
@@ -175,7 +187,11 @@ final class Hammer {
         self.label = label
     }
 
-    var isStopped: Bool { lock.lock(); defer { lock.unlock() }; return stopped }
+    var isStopped: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return stopped
+    }
 
     private func note(_ op: String, _ seconds: Double, cancelled: Bool, threw: Bool) {
         lock.lock()
@@ -191,12 +207,22 @@ final class Hammer {
 
     func check(_ rows: [DisplayRow], first: Int, flagCancelled: Bool) {
         for (position, row) in rows.enumerated() {
-            if row.index != first + position { fail("\(label): row number", "asked from \(first), got index \(row.index) at position \(position)") }
-            if position > 0, row.range.lowerBound != rows[position - 1].range.upperBound {
-                fail("\(label): rows not contiguous", "row \(row.index) begins at \(row.range.lowerBound), the one before ends at \(rows[position - 1].range.upperBound)")
+            if row.index != first + position {
+                fail("\(label): row number", "asked from \(first), got index \(row.index) at position \(position)")
             }
-            if row.text.utf16.count > columns * 2 { fail("\(label): row wider than the layout", "row \(row.index) has \(row.text.utf16.count) units, layout \(columns)") }
-            if row.range.upperBound > document.content.upperBound || row.range.lowerBound < document.content.lowerBound {
+            if position > 0, row.range.lowerBound != rows[position - 1].range.upperBound {
+                fail(
+                    "\(label): rows not contiguous",
+                    "row \(row.index) begins at \(row.range.lowerBound), the one before ends at \(rows[position - 1].range.upperBound)"
+                )
+            }
+            if row.text.utf16.count > columns * 2 {
+                fail(
+                    "\(label): row wider than the layout",
+                    "row \(row.index) has \(row.text.utf16.count) units, layout \(columns)")
+            }
+            if row.range.upperBound > document.content.upperBound || row.range.lowerBound < document.content.lowerBound
+            {
                 fail("\(label): row outside the content", "row \(row.index) \(row.range)")
             }
         }
@@ -209,62 +235,85 @@ final class Hammer {
             let thread = Thread { [self] in
                 var random = Random(seed: seed &* 1000 &+ UInt64(index))
                 let isSearcher = index >= threads
-                while !isStopped { autoreleasepool {
-                    let flag = CancellationFlag()
-                    let cancels = random.next() % 10 < 3
-                    if cancels {
-                        let delay = Int(random.next() % (isSearcher ? 50_000 : 3_000))
-                        DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + .microseconds(delay)) { flag.cancel() }
-                    }
-                    let started = now()
-                    var threw = false
-                    var op = ""
-                    do {
-                        if isSearcher {
-                            op = "search(absent)"
-                            let pattern = try SearchPattern("zzz_not_there_" + String(random.next() % 10), options: SearchOptions(), encoding: document.encoding)
-                            let from = Int64(random.next() % UInt64(max(1, document.content.upperBound)))
-                            // Bounded: at most 256 MiB from a random place, so one call ends in time.
-                            let end = min(document.content.upperBound, from + (256 << 20))
-                            if let hit = try ViewerSearch.find(pattern, in: document.source, content: document.content.lowerBound..<end, from: from, backwards: random.next() % 4 == 0,
-                                                               encoding: document.encoding, cancellation: flag) {
-                                fail("\(label): found a text that is not there", "\(hit)")
+                while !isStopped {
+                    autoreleasepool {
+                        let flag = CancellationFlag()
+                        let cancels = random.next() % 10 < 3
+                        if cancels {
+                            let delay = Int(random.next() % (isSearcher ? 50_000 : 3_000))
+                            DispatchQueue.global(qos: .userInitiated).asyncAfter(
+                                deadline: .now() + .microseconds(delay)
+                            ) { flag.cancel() }
+                        }
+                        let started = now()
+                        var threw = false
+                        var op = ""
+                        do {
+                            if isSearcher {
+                                op = "search(absent)"
+                                let pattern = try SearchPattern(
+                                    "zzz_not_there_" + String(random.next() % 10), options: SearchOptions(),
+                                    encoding: document.encoding)
+                                let from = Int64(random.next() % UInt64(max(1, document.content.upperBound)))
+                                // Bounded: at most 256 MiB from a random place, so one call ends in time.
+                                let end = min(document.content.upperBound, from + (256 << 20))
+                                if let hit = try ViewerSearch.find(
+                                    pattern, in: document.source, content: document.content.lowerBound..<end,
+                                    from: from, backwards: random.next() % 4 == 0,
+                                    encoding: document.encoding, cancellation: flag)
+                                {
+                                    fail("\(label): found a text that is not there", "\(hit)")
+                                }
+                            } else {
+                                let count = document.rowCount
+                                switch random.next() % 4 {
+                                case 0, 1:
+                                    op = "rows(from:count:100)"
+                                    guard count > 0 else { break }
+                                    let first = Int(random.next() % UInt64(count))
+                                    let rows = try document.rows(from: first, count: 100, cancellation: flag)
+                                    check(rows, first: first, flagCancelled: flag.isCancelled)
+                                    if rows.isEmpty, !flag.isCancelled, first < document.rowCount,
+                                        document.readError == nil
+                                    {
+                                        fail(
+                                            "\(label): no rows for a known row", "row \(first) of \(document.rowCount)"
+                                        )
+                                    }
+                                case 2:
+                                    op = "row(containing:)"
+                                    let offset = Int64(random.next() % UInt64(max(1, document.content.upperBound)))
+                                    let row = try document.row(containing: offset, cancellation: flag)
+                                    if let row, row < 0 || row >= max(1, document.rowCount) {
+                                        fail(
+                                            "\(label): row(containing:) out of range", "\(row) of \(document.rowCount)"
+                                        )
+                                    }
+                                    if row == nil, document.isIndexComplete, !flag.isCancelled, document.rowCount > 0,
+                                        document.readError == nil
+                                    {
+                                        fail("\(label): no row for an offset of a complete index", "offset \(offset)")
+                                    }
+                                default:
+                                    op = "row(ofLine:)"
+                                    let lines = document.lineCount
+                                    guard lines > 0 else { break }
+                                    let line = 1 + Int(random.next() % UInt64(lines))
+                                    let row = try document.row(ofLine: line, cancellation: flag)
+                                    if let row, row < 0 || row >= document.rowCount {
+                                        fail("\(label): row(ofLine:) out of range", "\(row) of \(document.rowCount)")
+                                    }
+                                }
                             }
-                        } else {
-                            let count = document.rowCount
-                            switch random.next() % 4 {
-                            case 0, 1:
-                                op = "rows(from:count:100)"
-                                guard count > 0 else { break }
-                                let first = Int(random.next() % UInt64(count))
-                                let rows = try document.rows(from: first, count: 100, cancellation: flag)
-                                check(rows, first: first, flagCancelled: flag.isCancelled)
-                                if rows.isEmpty, !flag.isCancelled, first < document.rowCount, document.readError == nil {
-                                    fail("\(label): no rows for a known row", "row \(first) of \(document.rowCount)")
-                                }
-                            case 2:
-                                op = "row(containing:)"
-                                let offset = Int64(random.next() % UInt64(max(1, document.content.upperBound)))
-                                let row = try document.row(containing: offset, cancellation: flag)
-                                if let row, row < 0 || row >= max(1, document.rowCount) { fail("\(label): row(containing:) out of range", "\(row) of \(document.rowCount)") }
-                                if row == nil, document.isIndexComplete, !flag.isCancelled, document.rowCount > 0, document.readError == nil {
-                                    fail("\(label): no row for an offset of a complete index", "offset \(offset)")
-                                }
-                            default:
-                                op = "row(ofLine:)"
-                                let lines = document.lineCount
-                                guard lines > 0 else { break }
-                                let line = 1 + Int(random.next() % UInt64(lines))
-                                let row = try document.row(ofLine: line, cancellation: flag)
-                                if let row, row < 0 || row >= document.rowCount { fail("\(label): row(ofLine:) out of range", "\(row) of \(document.rowCount)") }
+                        } catch {
+                            threw = true
+                            if !flag.isCancelled, !document.cancellation.isCancelled {
+                                fail("\(label): \(op) threw without a cancel", "\(error)")
                             }
                         }
-                    } catch {
-                        threw = true
-                        if !flag.isCancelled, !document.cancellation.isCancelled { fail("\(label): \(op) threw without a cancel", "\(error)") }
+                        if !op.isEmpty { note(op, now() - started, cancelled: flag.isCancelled, threw: threw) }
                     }
-                    if !op.isEmpty { note(op, now() - started, cancelled: flag.isCancelled, threw: threw) }
-                } }
+                }
                 group.leave()
             }
             thread.name = "Stress.Hammer"
@@ -276,23 +325,33 @@ final class Hammer {
     /// they do not end.
     @discardableResult
     func stop(upTo seconds: Double = 60) -> Bool {
-        lock.lock(); stopped = true; lock.unlock()
+        lock.lock()
+        stopped = true
+        lock.unlock()
         var done = false
         group.notify(queue: .main) { done = true }
         return pump(upTo: seconds) { done }
     }
 
     func report() {
-        lock.lock(); let copy = stats; lock.unlock()
+        lock.lock()
+        let copy = stats
+        lock.unlock()
         for (op, s) in copy.sorted(by: { $0.key < $1.key }) {
-            say("  " + pad("[\(label)] \(op)", 58) + String(format: " n=%7d mean=%8.3fms max=%9.1fms cancelled=%d threw=%d", s.count, s.total / Double(max(1, s.count)) * 1000, s.maxMs, s.cancelled, s.threw))
+            say(
+                "  " + pad("[\(label)] \(op)", 58)
+                    + String(
+                        format: " n=%7d mean=%8.3fms max=%9.1fms cancelled=%d threw=%d", s.count,
+                        s.total / Double(max(1, s.count)) * 1000, s.maxMs, s.cancelled, s.threw))
         }
     }
 }
 
 /// What a user does at the pager, on the main thread, once per tick of the run loop.
 let environment = ProcessInfo.processInfo.environment
-let noHammer = environment["STRESS_NO_HAMMER"] != nil, noUser = environment["STRESS_NO_USER"] != nil, noSearchers = environment["STRESS_NO_SEARCHERS"] != nil
+let noHammer = environment["STRESS_NO_HAMMER"] != nil
+let noUser = environment["STRESS_NO_USER"] != nil
+let noSearchers = environment["STRESS_NO_SEARCHERS"] != nil
 
 func userAction(_ pager: TextPagerView, _ random: inout Random, mayStop: Bool = false) {
     guard !noUser, let document = pager.document else { return }
@@ -301,7 +360,7 @@ func userAction(_ pager: TextPagerView, _ random: inout Random, mayStop: Bool = 
     case 2: pager.scroll(toLine: 1 + Int(random.next() % UInt64(max(1, document.lineCount))))
     case 3: pager.reveal(offset: Int64(random.next() % UInt64(max(1, document.length))))
     case 4: _ = (pager.percent, pager.position, pager.indexingProgress, pager.isIndexing)
-    case 5: pager.stopReading()   // Esc: about once a second
+    case 5: pager.stopReading()  // Esc: about once a second
     default: userAction(pager, &random)
     }
 }
@@ -313,7 +372,9 @@ func runFile(_ url: URL, seed: UInt64) {
     let name = url.lastPathComponent
     step("idle baseline") { pump(for: 1) }
     let baselineThreads = threadCount()
-    say("file \(name): \(((try? FileManager.default.attributesOfItem(atPath: url.path)[.size]) as? Int64) ?? -1) bytes; threads at baseline \(baselineThreads)")
+    say(
+        "file \(name): \(((try? FileManager.default.attributesOfItem(atPath: url.path)[.size]) as? Int64) ?? -1) bytes; threads at baseline \(baselineThreads)"
+    )
 
     let pager = TextPagerView(frame: NSRect(x: 0, y: 0, width: 1000, height: 700))
     let fit = pager.columnsThatFit
@@ -333,9 +394,13 @@ func runFile(_ url: URL, seed: UInt64) {
         return pump(upTo: limit) {
             if now() - last > 5 {
                 last = now()
-                say(String(format: "    ... %.0fs: indexed through %.1f%% (%.0f MiB/s), rows %d, footprint %.0f MB", last - started,
-                           Double(document.indexedThrough) / Double(max(1, document.length)) * 100,
-                           Double(document.indexedThrough) / 1_048_576 / (last - started), document.rowCount, footprintMB()))
+                say(
+                    String(
+                        format: "    ... %.0fs: indexed through %.1f%% (%.0f MiB/s), rows %d, footprint %.0f MB",
+                        last - started,
+                        Double(document.indexedThrough) / Double(max(1, document.length)) * 100,
+                        Double(document.indexedThrough) / 1_048_576 / (last - started), document.rowCount,
+                        footprintMB()))
             }
             return document.isIndexComplete && pager.document === document
         }
@@ -347,14 +412,22 @@ func runFile(_ url: URL, seed: UInt64) {
         let opened = now() - started
         firstDocument = show(TextLayoutOptions(columns: fit, wordWrap: true), keeping: false)
         let got = pump(upTo: 880) { pager.document === firstDocument && pager.position != nil }
-        say(String(format: "  open %.3fs; first rows on screen after %.3fs (%@); rows known then: %d", opened, now() - started, got ? "ok" : "NOT within 880 s", firstDocument.rowCount))
+        say(
+            String(
+                format: "  open %.3fs; first rows on screen after %.3fs (%@); rows known then: %d", opened,
+                now() - started, got ? "ok" : "NOT within 880 s", firstDocument.rowCount))
         if !got { fail("\(name): no first rows", "nothing to show within 880 s") }
     }
     step("index to the end (parallel)", limit: 1000) {
         let started = now()
         let done = waitIndexed(firstDocument)
-        say(String(format: "  index %@ after %.3fs more: rows %d, lines %d, checkpoints %d, footprint %.0f MB, read error: %@", done ? "complete" : "NOT complete",
-                   now() - started, firstDocument.rowCount, firstDocument.lineCount, firstDocument.checkpointCount, footprintMB(), String(describing: firstDocument.readError)))
+        say(
+            String(
+                format:
+                    "  index %@ after %.3fs more: rows %d, lines %d, checkpoints %d, footprint %.0f MB, read error: %@",
+                done ? "complete" : "NOT complete",
+                now() - started, firstDocument.rowCount, firstDocument.lineCount, firstDocument.checkpointCount,
+                footprintMB(), String(describing: firstDocument.readError)))
         if !done { fail("\(name): index not complete", "not within the limit") }
     }
 
@@ -362,7 +435,10 @@ func runFile(_ url: URL, seed: UInt64) {
         let hammer = Hammer(firstDocument, columns: fit, label: "indexed")
         hammer.start(threads: 6, searchers: 0, seed: seed)
         let end = now() + 4
-        pump(upTo: 10) { userAction(pager, &random); return now() > end }
+        pump(upTo: 10) {
+            userAction(pager, &random)
+            return now() > end
+        }
         if !hammer.stop() { fail("\(name): hammer threads do not end", "after the index was complete") }
         hammer.report()
     }
@@ -380,21 +456,36 @@ func runFile(_ url: URL, seed: UInt64) {
                     continue
                 }
                 if let back = try? document.row(containing: first.range.lowerBound), back != row, !first.range.isEmpty {
-                    fail("\(name): row(containing:) disagrees with rows(from:)", "row \(row) begins at \(first.range.lowerBound), which is said to be in row \(String(describing: back))")
+                    fail(
+                        "\(name): row(containing:) disagrees with rows(from:)",
+                        "row \(row) begins at \(first.range.lowerBound), which is said to be in row \(String(describing: back))"
+                    )
                 }
                 if let lineRow = try? document.row(ofLine: first.line) {
-                    if lineRow > row { fail("\(name): row(ofLine:) behind the row of that line", "line \(first.line): row \(lineRow) > \(row)") }
-                } else { fail("\(name): row(ofLine:) finds no row", "line \(first.line) of row \(row)") }
+                    if lineRow > row {
+                        fail(
+                            "\(name): row(ofLine:) behind the row of that line",
+                            "line \(first.line): row \(lineRow) > \(row)")
+                    }
+                } else {
+                    fail("\(name): row(ofLine:) finds no row", "line \(first.line) of row \(row)")
+                }
             }
-            if let last = try? document.rows(from: max(0, count - 1), count: 1).first, last.range.upperBound != document.content.upperBound {
-                fail("\(name): the last row does not end at the end of the file", "\(last.range) vs \(document.content.upperBound)")
+            if let last = try? document.rows(from: max(0, count - 1), count: 1).first,
+                last.range.upperBound != document.content.upperBound
+            {
+                fail(
+                    "\(name): the last row does not end at the end of the file",
+                    "\(last.range) vs \(document.content.upperBound)")
             }
             DispatchQueue.main.async { done = true }
         }
         pump(upTo: 280) { done }
     }
 
-    func search(_ text: String, from start: Int64, backwards: Bool = false, cancelAfter: Double? = nil) -> (Range<Int64>?, Double) {
+    func search(_ text: String, from start: Int64, backwards: Bool = false, cancelAfter: Double? = nil) -> (
+        Range<Int64>?, Double
+    ) {
         let document = firstDocument!
         let pattern = try! SearchPattern(text, options: SearchOptions(), encoding: document.encoding)
         let cancel = CancellationFlag()
@@ -404,14 +495,20 @@ func runFile(_ url: URL, seed: UInt64) {
         DispatchQueue.global(qos: .userInitiated).async {
             var lastReport = Date.distantPast
             // As ViewerPane.search: progress to the main queue at most ten times a second.
-            let found = try? ViewerSearch.find(pattern, in: document.source, content: document.content, from: start, backwards: backwards,
-                                               encoding: document.encoding, parallelism: ProcessInfo.processInfo.activeProcessorCount, cancellation: cancel) { _ in
+            let found = try? ViewerSearch.find(
+                pattern, in: document.source, content: document.content, from: start, backwards: backwards,
+                encoding: document.encoding, parallelism: ProcessInfo.processInfo.activeProcessorCount,
+                cancellation: cancel
+            ) { _ in
                 guard Date().timeIntervalSince(lastReport) > 0.1 else { return }
                 lastReport = Date()
                 DispatchQueue.main.async {}
             }
             let at = now()
-            DispatchQueue.main.async { result = .some(found ?? nil); ended = at }
+            DispatchQueue.main.async {
+                result = .some(found ?? nil)
+                ended = at
+            }
         }
         if let cancelAfter {
             pump(upTo: cancelAfter) { result != nil }
@@ -426,8 +523,13 @@ func runFile(_ url: URL, seed: UInt64) {
     step("search forward: marker at the very end", limit: 700) {
         let (hit, seconds) = search(marker, from: 0)
         fullSearch = seconds
-        say(String(format: "  marker %@ in %.3fs (%.0f MiB/s)", hit.map { "found at \($0.lowerBound)" } ?? "NOT found", seconds, Double(firstDocument.length) / 1_048_576 / seconds))
-        if name != "sparse4g.txt" && name != "newlines1g.txt", hit?.upperBound != firstDocument.length - (name.hasPrefix("dense") ? 1 : 0) {
+        say(
+            String(
+                format: "  marker %@ in %.3fs (%.0f MiB/s)", hit.map { "found at \($0.lowerBound)" } ?? "NOT found",
+                seconds, Double(firstDocument.length) / 1_048_576 / seconds))
+        if name != "sparse4g.txt" && name != "newlines1g.txt",
+            hit?.upperBound != firstDocument.length - (name.hasPrefix("dense") ? 1 : 0)
+        {
             fail("\(name): the marker at the end was not found where it is", "\(String(describing: hit))")
         }
     }
@@ -439,7 +541,8 @@ func runFile(_ url: URL, seed: UInt64) {
     step("search cancelled at random, 30 times", limit: 700) {
         var worst = 0.0
         for _ in 0..<30 {
-            let (_, latency) = search("zzz_not_there", from: 0, cancelAfter: Double(random.next() % 1000) / 1000 * min(fullSearch, 2))
+            let (_, latency) = search(
+                "zzz_not_there", from: 0, cancelAfter: Double(random.next() % 1000) / 1000 * min(fullSearch, 2))
             worst = max(worst, latency)
         }
         say(String(format: "  cancel -> search returned: worst %.1f ms; threads now %d", worst * 1000, threadCount()))
@@ -453,10 +556,19 @@ func runFile(_ url: URL, seed: UInt64) {
             let done = waitIndexed(document)
             let seconds = now() - started
             relayout.append((label, seconds, document.segmentsReused))
-            say(String(format: "  %@: %@ in %.3fs, segments reused %d, rows %d, lines %d, checkpoints %d, footprint %.0f MB", label, done ? "complete" : "NOT complete",
-                       seconds, document.segmentsReused, document.rowCount, document.lineCount, document.checkpointCount, footprintMB()))
+            say(
+                String(
+                    format:
+                        "  %@: %@ in %.3fs, segments reused %d, rows %d, lines %d, checkpoints %d, footprint %.0f MB",
+                    label, done ? "complete" : "NOT complete",
+                    seconds, document.segmentsReused, document.rowCount, document.lineCount, document.checkpointCount,
+                    footprintMB()))
             if !done { fail("\(name): relayout not complete", label) }
-            if document.lineCount != firstDocument.lineCount { fail("\(name): another layout counts other lines", "\(label): \(document.lineCount) vs \(firstDocument.lineCount)") }
+            if document.lineCount != firstDocument.lineCount {
+                fail(
+                    "\(name): another layout counts other lines",
+                    "\(label): \(document.lineCount) vs \(firstDocument.lineCount)")
+            }
         }
     }
     timedLayout("wider, wrap at \(fit + 23)", TextLayoutOptions(columns: fit + 23, wordWrap: true))
@@ -470,12 +582,17 @@ func runFile(_ url: URL, seed: UInt64) {
         var peakThreads = 0
         for round in 0..<40 {
             let columns = 30 + Int(random.next() % 200)
-            let document = show(TextLayoutOptions(columns: columns, wordWrap: random.next() % 4 != 0), keeping: random.next() % 2 == 0)
+            let document = show(
+                TextLayoutOptions(columns: columns, wordWrap: random.next() % 4 != 0), keeping: random.next() % 2 == 0
+            )
             let hammer = Hammer(document, columns: columns, label: "during indexing")
             hammer.start(threads: 6, searchers: round % 4 == 0 ? 2 : 0, seed: seed + UInt64(round))
             hammers.append(hammer)
             let end = now() + Double(random.next() % 400) / 1000
-            pump(upTo: 5) { userAction(pager, &random, mayStop: true); return now() > end }
+            pump(upTo: 5) {
+                userAction(pager, &random, mayStop: true)
+                return now() > end
+            }
             peakThreads = max(peakThreads, threadCount())
             // The readers of the layout that is replaced go on for a while, as a view's would.
             if hammers.count > 2 {
@@ -485,17 +602,26 @@ func runFile(_ url: URL, seed: UInt64) {
             }
         }
         say("  threads at most during the storm: \(peakThreads)")
-        for hammer in hammers where !hammer.stop() { fail("\(name): hammer threads do not end", "at the end of the storm") }
+        for hammer in hammers where !hammer.stop() {
+            fail("\(name): hammer threads do not end", "at the end of the storm")
+        }
         hammers.last?.report()
-        say(String(format: "  footprint at the end of the storm %.0f MB, peak RSS %.0f MB", footprintMB(), peakRSSMB()))
+        say(
+            String(format: "  footprint at the end of the storm %.0f MB, peak RSS %.0f MB", footprintMB(), peakRSSMB()))
         // One last layout that nobody stops (a layout stopped with Esc stays unfinished by design).
         let last = show(TextLayoutOptions(columns: fit, wordWrap: true), keeping: true)
         let started = now()
         let done = pump(upTo: 900) { !pager.isIndexing }
-        say(String(format: "  the last layout was %@ %.3fs after the storm; shown document is the last one: %@", done ? "indexed" : "NOT indexed", now() - started,
-                   String(describing: last === pager.document)))
+        say(
+            String(
+                format: "  the last layout was %@ %.3fs after the storm; shown document is the last one: %@",
+                done ? "indexed" : "NOT indexed", now() - started,
+                String(describing: last === pager.document)))
         if done, last.lineCount != firstDocument.lineCount || last.rowCount != firstDocument.rowCount {
-            fail("\(name): the same layout after the storm has other rows", "rows \(last.rowCount) vs \(firstDocument.rowCount), lines \(last.lineCount) vs \(firstDocument.lineCount)")
+            fail(
+                "\(name): the same layout after the storm has other rows",
+                "rows \(last.rowCount) vs \(firstDocument.rowCount), lines \(last.lineCount) vs \(firstDocument.lineCount)"
+            )
         }
         if !done { fail("\(name): the last layout of the storm is not indexed", "") }
     }
@@ -511,10 +637,14 @@ func runFile(_ url: URL, seed: UInt64) {
             pump(for: 0.5)
         }
         say("  threads after closing: " + trace.joined(separator: " ") + " (baseline \(baselineThreads))")
-        if threadCount() > baselineThreads + 4 { fail("\(name): threads do not return to the baseline", "\(baselineThreads) -> \(threadCount())") }
+        if threadCount() > baselineThreads + 4 {
+            fail("\(name): threads do not return to the baseline", "\(baselineThreads) -> \(threadCount())")
+        }
         say(String(format: "  footprint after closing %.0f MB, peak RSS %.0f MB", footprintMB(), peakRSSMB()))
     }
-    say("RELAYOUT " + relayout.map { String(format: "%@: %.3fs (reused %d)", $0.0, $0.1, $0.2) }.joined(separator: "; "))
+    say(
+        "RELAYOUT "
+            + relayout.map { String(format: "%@: %.3fs (reused %d)", $0.0, $0.1, $0.2) }.joined(separator: "; "))
 }
 
 // MARK: A file that shrinks under the index
@@ -530,7 +660,9 @@ func runTruncation(_ directory: URL, rounds: Int) {
             let pager = TextPagerView(frame: NSRect(x: 0, y: 0, width: 1000, height: 700))
             let source = openSource(url)
             let columns = round % 3 == 2 ? 1024 : pager.columnsThatFit
-            let document = TextDocument(source: source, encoding: .utf8, layout: .text(TextLayoutOptions(columns: columns, wordWrap: round % 3 != 2)))
+            let document = TextDocument(
+                source: source, encoding: .utf8,
+                layout: .text(TextLayoutOptions(columns: columns, wordWrap: round % 3 != 2)))
             pager.show(document, parallel: true)
             let hammer = Hammer(document, columns: columns, label: "truncated")
             hammer.start(threads: 4, searchers: 1, seed: UInt64(round))
@@ -541,19 +673,30 @@ func runTruncation(_ directory: URL, rounds: Int) {
                 switch kind {
                 case 0: truncate(url.path, 300 << 20)
                 case 1: truncate(url.path, 0)
-                case 2: truncate(url.path, 12345); usleep(20_000); truncate(url.path, 2 << 30)
+                case 2:
+                    truncate(url.path, 12345)
+                    usleep(20_000)
+                    truncate(url.path, 2 << 30)
                 default: unlink(url.path)
                 }
             }
             cutter.start()
             let started = now()
             let end = now() + 1.5
-            pump(upTo: 5) { userAction(pager, &random); return now() > end }
+            pump(upTo: 5) {
+                userAction(pager, &random)
+                return now() > end
+            }
             let done = pump(upTo: 120) { !pager.isIndexing }
             let action = ["cut to 300 MiB", "cut to 0", "cut to 12345 bytes, then grown to 2 GiB", "removed"][kind]
-            say(String(format: "  round %d: %@ after %.0f ms; indexing %@ %.2fs after the start; rows %d, lines %d, indexed through %d of %d, complete %@, read error: %@",
-                       round, action, delay * 1000, done ? "ended" : "DID NOT END", now() - started, document.rowCount, document.lineCount, document.indexedThrough, document.length,
-                       String(describing: document.isIndexComplete), document.readError.map { "\($0)".prefix(120).description } ?? "none"))
+            say(
+                String(
+                    format:
+                        "  round %d: %@ after %.0f ms; indexing %@ %.2fs after the start; rows %d, lines %d, indexed through %d of %d, complete %@, read error: %@",
+                    round, action, delay * 1000, done ? "ended" : "DID NOT END", now() - started, document.rowCount,
+                    document.lineCount, document.indexedThrough, document.length,
+                    String(describing: document.isIndexComplete),
+                    document.readError.map { "\($0)".prefix(120).description } ?? "none"))
             if !done { fail("truncation: indexing does not end", action) }
             // The rows the index knows are asked for after the file has shrunk.
             pump(for: 0.3)
@@ -573,44 +716,79 @@ func runTruncation(_ directory: URL, rounds: Int) {
 /// Which call keeps memory: each kind of call 20,000 times from one thread, the footprint after each.
 func runLeak(_ url: URL) {
     let source = openSource(url)
-    let document = TextDocument(source: source, encoding: .utf8, layout: .text(TextLayoutOptions(columns: 131, wordWrap: true)))
+    let document = TextDocument(
+        source: source, encoding: .utf8, layout: .text(TextLayoutOptions(columns: 131, wordWrap: true)))
     document.buildIndex(parallel: true)
     var random = Random(seed: 3)
     say(String(format: "indexed: rows %d, footprint %.0f MB", document.rowCount, footprintMB()))
     func measure(_ label: String, _ count: Int = 20_000, _ body: (inout Random) -> Void) {
         let before = footprintMB()
         for _ in 0..<count { autoreleasepool { body(&random) } }
-        say(pad(label, 70) + String(format: " footprint %7.0f -> %7.0f MB  (%+.1f KB per call)", before, footprintMB(), (footprintMB() - before) * 1024 / Double(count)))
+        say(
+            pad(label, 70)
+                + String(
+                    format: " footprint %7.0f -> %7.0f MB  (%+.1f KB per call)", before, footprintMB(),
+                    (footprintMB() - before) * 1024 / Double(count)))
     }
-    let rows = document.rowCount, lines = document.lineCount, length = document.length
-    measure("rows(from:count:100), no flag") { _ = try? document.rows(from: Int($0.next() % UInt64(rows)), count: 100) }
-    measure("rows(from:count:100), flag never set") { _ = try? document.rows(from: Int($0.next() % UInt64(rows)), count: 100, cancellation: CancellationFlag()) }
-    measure("rows(from:count:100), flag set before the call") { let flag = CancellationFlag(); flag.cancel(); _ = try? document.rows(from: Int($0.next() % UInt64(rows)), count: 100, cancellation: flag) }
+    let rows = document.rowCount
+    let lines = document.lineCount
+    let length = document.length
+    measure("rows(from:count:100), no flag") {
+        _ = try? document.rows(from: Int($0.next() % UInt64(rows)), count: 100)
+    }
+    measure("rows(from:count:100), flag never set") {
+        _ = try? document.rows(from: Int($0.next() % UInt64(rows)), count: 100, cancellation: CancellationFlag())
+    }
+    measure("rows(from:count:100), flag set before the call") {
+        let flag = CancellationFlag()
+        flag.cancel()
+        _ = try? document.rows(from: Int($0.next() % UInt64(rows)), count: 100, cancellation: flag)
+    }
     measure("rows(from:count:100), flag set from another thread during the call") { random in
         let flag = CancellationFlag()
         DispatchQueue.global().asyncAfter(deadline: .now() + .microseconds(Int(random.next() % 300))) { flag.cancel() }
         _ = try? document.rows(from: Int(random.next() % UInt64(rows)), count: 100, cancellation: flag)
     }
     measure("row(containing:), no flag") { _ = try? document.row(containing: Int64($0.next() % UInt64(length))) }
-    measure("row(containing:), flag never set") { _ = try? document.row(containing: Int64($0.next() % UInt64(length)), cancellation: CancellationFlag()) }
-    measure("row(ofLine:), flag never set") { _ = try? document.row(ofLine: 1 + Int($0.next() % UInt64(lines)), cancellation: CancellationFlag()) }
-    measure("source.read(at:count:32K), no flag") { _ = try? source.read(at: Int64($0.next() % UInt64(length)), count: 32 * 1024) }
-    measure("source.read(at:count:32K, cancellation:), flag never set") { _ = try? source.read(at: Int64($0.next() % UInt64(length)), count: 32 * 1024, cancellation: CancellationFlag()) }
+    measure("row(containing:), flag never set") {
+        _ = try? document.row(containing: Int64($0.next() % UInt64(length)), cancellation: CancellationFlag())
+    }
+    measure("row(ofLine:), flag never set") {
+        _ = try? document.row(ofLine: 1 + Int($0.next() % UInt64(lines)), cancellation: CancellationFlag())
+    }
+    measure("source.read(at:count:32K), no flag") {
+        _ = try? source.read(at: Int64($0.next() % UInt64(length)), count: 32 * 1024)
+    }
+    measure("source.read(at:count:32K, cancellation:), flag never set") {
+        _ = try? source.read(at: Int64($0.next() % UInt64(length)), count: 32 * 1024, cancellation: CancellationFlag())
+    }
     let pattern = try! SearchPattern("zzz_not_there", options: SearchOptions(), encoding: .utf8)
     // With one chunk at a time everything runs on the calling thread, inside this loop's autorelease pool.
     measure("ViewerSearch.find over the whole file, parallelism 1 (calling thread only)", 100) { _ in
-        _ = try? ViewerSearch.find(pattern, in: source, content: document.content, from: 0, backwards: false, encoding: .utf8, parallelism: 1)
+        _ = try? ViewerSearch.find(
+            pattern, in: source, content: document.content, from: 0, backwards: false, encoding: .utf8, parallelism: 1
+        )
     }
-    measure("ViewerSearch.find over the whole file, flag never set", 100) { _ in _ = try? ViewerSearch.find(pattern, in: source, content: document.content, from: 0, backwards: false, encoding: .utf8) }
+    measure("ViewerSearch.find over the whole file, flag never set", 100) { _ in
+        _ = try? ViewerSearch.find(
+            pattern, in: source, content: document.content, from: 0, backwards: false, encoding: .utf8)
+    }
     measure("new TextDocument + buildIndex (another width each time)", 100) { random in
-        let other = TextDocument(source: source, encoding: .utf8, layout: .text(TextLayoutOptions(columns: 40 + Int(random.next() % 100), wordWrap: true)))
+        let other = TextDocument(
+            source: source, encoding: .utf8,
+            layout: .text(TextLayoutOptions(columns: 40 + Int(random.next() % 100), wordWrap: true)))
         other.buildIndex(parallel: true)
     }
     func heapLine(_ label: String) {
         var stats = malloc_statistics_t()
         malloc_zone_statistics(nil, &stats)
-        say(pad(label, 44) + String(format: " footprint %6.0f MB; malloc in use %6.0f MB, allocated from the system %6.0f MB; threads %d", footprintMB(),
-                   Double(stats.size_in_use) / 1_048_576, Double(stats.size_allocated) / 1_048_576, threadCount()))
+        say(
+            pad(label, 44)
+                + String(
+                    format:
+                        " footprint %6.0f MB; malloc in use %6.0f MB, allocated from the system %6.0f MB; threads %d",
+                    footprintMB(),
+                    Double(stats.size_in_use) / 1_048_576, Double(stats.size_allocated) / 1_048_576, threadCount()))
     }
     heapLine("right after")
     usleep(5_000_000)
@@ -618,7 +796,10 @@ func runLeak(_ url: URL) {
     let freed = malloc_zone_pressure_relief(nil, 0)
     heapLine("after malloc_zone_pressure_relief (\(freed >> 20) MB)")
     // Once more, to see whether a second round adds to it or uses what was kept.
-    measure("ViewerSearch.find over the whole file, again", 100) { _ in _ = try? ViewerSearch.find(pattern, in: source, content: document.content, from: 0, backwards: false, encoding: .utf8) }
+    measure("ViewerSearch.find over the whole file, again", 100) { _ in
+        _ = try? ViewerSearch.find(
+            pattern, in: source, content: document.content, from: 0, backwards: false, encoding: .utf8)
+    }
     heapLine("right after the second round")
     usleep(5_000_000)
     heapLine("5 s later")
@@ -633,7 +814,8 @@ case "run":
 case "truncate":
     runTruncation(URL(fileURLWithPath: arguments[2]), rounds: arguments.count > 4 ? Int(arguments[4])! : 12)
 default:
-    say("usage"); exit(2)
+    say("usage")
+    exit(2)
 }
 
 if let hold = environment["STRESS_HOLD"].flatMap(Double.init) {

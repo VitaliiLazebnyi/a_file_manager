@@ -41,13 +41,20 @@ public protocol VolumeAccess: AnyObject {
 /// The volumes of this Mac.
 final class SystemVolumes: VolumeAccess {
     func facts(of directory: URL) -> VolumeFacts {
-        let keys: Set<URLResourceKey> = [.volumeURLKey, .volumeNameKey, .volumeIsEjectableKey, .volumeIsRemovableKey, .volumeIsInternalKey,
-                                         .volumeIsLocalKey, .volumeIsRootFileSystemKey]
-        guard let values = try? directory.resourceValues(forKeys: keys), let url = values.volume else { return VolumeFacts() }
-        let canBeEjected = Place.isEjectable(path: url.path, isRootFileSystem: values.volumeIsRootFileSystem, isInternal: values.volumeIsInternal,
-                                             isLocal: values.volumeIsLocal, isRemovable: values.volumeIsRemovable, isEjectable: values.volumeIsEjectable)
-        return VolumeFacts(url: url, name: values.volumeName ?? url.lastPathComponent, canBeEjected: canBeEjected,
-                           isNetwork: values.volumeIsLocal == false)
+        let keys: Set<URLResourceKey> = [
+            .volumeURLKey, .volumeNameKey, .volumeIsEjectableKey, .volumeIsRemovableKey, .volumeIsInternalKey,
+            .volumeIsLocalKey, .volumeIsRootFileSystemKey
+        ]
+        guard let values = try? directory.resourceValues(forKeys: keys), let url = values.volume else {
+            return VolumeFacts()
+        }
+        let canBeEjected = Place.isEjectable(
+            path: url.path, isRootFileSystem: values.volumeIsRootFileSystem, isInternal: values.volumeIsInternal,
+            isLocal: values.volumeIsLocal, isRemovable: values.volumeIsRemovable, isEjectable: values.volumeIsEjectable
+        )
+        return VolumeFacts(
+            url: url, name: values.volumeName ?? url.lastPathComponent, canBeEjected: canBeEjected,
+            isNetwork: values.volumeIsLocal == false)
     }
 
     func eject(_ volume: VolumeFacts) -> EjectRefusal? {
@@ -64,9 +71,11 @@ final class SystemVolumes: VolumeAccess {
         done.wait()
         guard let failure else { return nil }
         let error = failure as NSError
-        let dissenter = (error.userInfo[NSFileManagerUnmountDissentingProcessIdentifierErrorKey] as? NSNumber)?.int32Value
-        return EjectRefusal(program: dissenter.flatMap(SystemVolumes.programName), isThisProgram: dissenter == getpid(),
-                            reason: error.localizedDescription)
+        let dissenter = (error.userInfo[NSFileManagerUnmountDissentingProcessIdentifierErrorKey] as? NSNumber)?
+            .int32Value
+        return EjectRefusal(
+            program: dissenter.flatMap(SystemVolumes.programName), isThisProgram: dissenter == getpid(),
+            reason: error.localizedDescription)
     }
 
     /// The name the user knows a program by: the application's, else the process's.
@@ -122,64 +131,79 @@ final class VolumeEjection {
     /// Ejects the drive `directory` is on.
     func eject(driveOf directory: URL) {
         let access = self.access
-        kernel.jobs.run(title: "Volume:", work: { monitor in Self.ask("volume", of: directory, monitor) { access.facts(of: directory) } },
-                        completion: { [self] answer in
-            // Nil: the question was cancelled.
-            guard let facts = answer else { return }
-            guard let volume = facts.url, facts.canBeEjected else {
-                return ui.inform("\(DisplayText.oneLine(facts.name.isEmpty ? directory.path : facts.name)) cannot be ejected.", detail: "", style: .warning)
-            }
-            leave(volume) { [self] departures in
-                kernel.fileSystems.releaseVolume(volume)
-                eject(facts, volume: volume, departures: departures)
-            }
-        })
+        kernel.jobs.run(
+            title: "Volume:",
+            work: { monitor in Self.ask("volume", of: directory, monitor) { access.facts(of: directory) } },
+            completion: { [self] answer in
+                // Nil: the question was cancelled.
+                guard let facts = answer else { return }
+                guard let volume = facts.url, facts.canBeEjected else {
+                    return ui.inform(
+                        "\(DisplayText.oneLine(facts.name.isEmpty ? directory.path : facts.name)) cannot be ejected.",
+                        detail: "", style: .warning)
+                }
+                leave(volume) { [self] departures in
+                    kernel.fileSystems.releaseVolume(volume)
+                    eject(facts, volume: volume, departures: departures)
+                }
+            })
     }
 
     private func eject(_ facts: VolumeFacts, volume: URL, departures: [Departure]) {
         let name = "“\(DisplayText.oneLine(facts.name, limit: 80))”"
-        let access = self.access, fileSystems = kernel.fileSystems
-        kernel.jobs.run(title: "Ejecting \(name):", work: { monitor -> Result<Void, Error>? in
-            Self.ask("eject", of: volume, monitor) { () -> Result<Void, Error> in
-                do {
-                    try fileSystems.closeFiles(on: volume, cancellation: monitor.cancellation)
-                } catch {
-                    return .failure(error)
+        let access = self.access
+        let fileSystems = kernel.fileSystems
+        kernel.jobs.run(
+            title: "Ejecting \(name):",
+            work: { monitor -> Result<Void, Error>? in
+                Self.ask("eject", of: volume, monitor) { () -> Result<Void, Error> in
+                    do {
+                        try fileSystems.closeFiles(on: volume, cancellation: monitor.cancellation)
+                    } catch {
+                        return .failure(error)
+                    }
+                    var refusal = access.eject(facts)
+                    // What this program let go of may take a moment to be gone (a folder watch
+                    // is closed on a thread of its own).
+                    for _ in 0..<Self.ownRefusalRetries
+                    where refusal?.isThisProgram == true && !monitor.cancellation.isCancelled {
+                        Thread.sleep(forTimeInterval: Self.retryDelay)
+                        refusal = access.eject(facts)
+                    }
+                    return refusal.map { .failure($0) } ?? .success(())
                 }
-                var refusal = access.eject(facts)
-                // What this program let go of may take a moment to be gone (a folder watch
-                // is closed on a thread of its own).
-                for _ in 0..<Self.ownRefusalRetries where refusal?.isThisProgram == true && !monitor.cancellation.isCancelled {
-                    Thread.sleep(forTimeInterval: Self.retryDelay)
-                    refusal = access.eject(facts)
+            },
+            completion: { [self] answer in
+                // Cancelled: the panels stay where they went; the drive may still go.
+                guard let answer else { return }
+                switch answer {
+                case .success:
+                    note("eject: \(volume.path)")
+                    ui.notice("\(name) can now be removed safely.")
+                case .failure(let refusal as EjectRefusal):
+                    comeBack(departures, from: volume)
+                    let detail: String
+                    if refusal.isThisProgram {
+                        detail =
+                            "Something in this program still uses it: a window that shows its files, a search or a comparison. "
+                            + "Close it, then eject the drive again."
+                    } else if let program = refusal.program {
+                        detail = "It is in use by \(program). Close the files of the drive there, then eject it again."
+                    } else {
+                        detail = refusal.reason
+                    }
+                    ui.inform(
+                        "\(name) cannot be ejected", detail: detail + "\nNothing on the drive was changed.",
+                        style: .warning)
+                case .failure(let error):
+                    comeBack(departures, from: volume)
+                    ui.inform(
+                        "\(name) was not ejected",
+                        detail: "What is still to be written to it could not be written: "
+                            + "\(error.localizedDescription)\nThe drive stays connected, so that nothing is lost.",
+                        style: .warning)
                 }
-                return refusal.map { .failure($0) } ?? .success(())
-            }
-        }, completion: { [self] answer in
-            // Cancelled: the panels stay where they went; the drive may still go.
-            guard let answer else { return }
-            switch answer {
-            case .success:
-                note("eject: \(volume.path)")
-                ui.notice("\(name) can now be removed safely.")
-            case .failure(let refusal as EjectRefusal):
-                comeBack(departures, from: volume)
-                let detail: String
-                if refusal.isThisProgram {
-                    detail = "Something in this program still uses it: a window that shows its files, a search or a comparison. "
-                        + "Close it, then eject the drive again."
-                } else if let program = refusal.program {
-                    detail = "It is in use by \(program). Close the files of the drive there, then eject it again."
-                } else {
-                    detail = refusal.reason
-                }
-                ui.inform("\(name) cannot be ejected", detail: detail + "\nNothing on the drive was changed.", style: .warning)
-            case .failure(let error):
-                comeBack(departures, from: volume)
-                ui.inform("\(name) was not ejected", detail: "What is still to be written to it could not be written: "
-                          + "\(error.localizedDescription)\nThe drive stays connected, so that nothing is lost.", style: .warning)
-            }
-        })
+            })
     }
 
     // MARK: Panels
@@ -221,7 +245,8 @@ final class VolumeEjection {
     private func comeBack(_ departures: [Departure], from volume: URL) {
         for departure in departures {
             guard let panel = departure.panel, let tab = departure.tab, panel.tabs.tabs.contains(where: { $0 === tab }),
-                  tab.directory.isSameLocation(as: departure.to) else { continue }
+                tab.directory.isSameLocation(as: departure.to)
+            else { continue }
             if panel.model === tab {
                 panel.show(departure.from, focus: nil, history: .record, completion: nil)
             } else {
@@ -233,7 +258,9 @@ final class VolumeEjection {
     /// Points a tab in the background at another folder; it is read when it is shown.
     private func retarget(_ tab: PanelModel, to location: URL) {
         let provider = try? kernel.fileSystems.provider(for: location)
-        tab.open(location, parent: provider?.parent(of: location), root: provider?.root(of: location) ?? location, history: .record)
+        tab.open(
+            location, parent: provider?.parent(of: location), root: provider?.root(of: location) ?? location,
+            history: .record)
     }
 
     /// Stands for the volumes in `BlockingCalls`: the questions to them are counted together.
@@ -241,7 +268,11 @@ final class VolumeEjection {
 
     /// Asks something of a volume from a job. A volume that has stopped answering may never
     /// return: the question then goes on alone, and the job ends, with nil, once cancelled.
-    private static func ask<Answer>(_ question: String, of url: URL, _ monitor: JobMonitor, _ work: @escaping () -> Answer) -> Answer? {
-        BlockingCalls.answer(from: volumes, to: question + " " + url.path, cancellation: monitor.cancellation) { _ in work() }
+    private static func ask<Answer>(
+        _ question: String, of url: URL, _ monitor: JobMonitor, _ work: @escaping () -> Answer
+    ) -> Answer? {
+        BlockingCalls.answer(from: volumes, to: question + " " + url.path, cancellation: monitor.cancellation) { _ in
+            work()
+        }
     }
 }

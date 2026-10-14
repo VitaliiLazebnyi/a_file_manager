@@ -2,6 +2,7 @@ import AFMKernel
 import AppKit
 import Foundation
 import Testing
+
 @testable import ViewerPlugin
 
 /// HTML as text, made fast without changing what comes out, and the bitmap an image is
@@ -18,19 +19,28 @@ import Testing
     }
 
     private let pieces: [String] = [
-        "text ", "More  words\n", "tab\there ", "\u{A0}", "\u{2003}", "\u{85}", " ", "  \n  ", "\r\n", "x", "é", "日本語 ", "😀", "caf\u{E9} ",
-        "&amp;", "&lt;", "&gt;", "&quot;", "&apos;", "&nbsp;", "&copy;", "&#65;", "&#x41;", "&#xZZ;", "&#0;", "&#xD800;", "&unknown;", "&amp", "&", "&;", "&#;", "&eacute;&auml;",
+        "text ", "More  words\n", "tab\there ", "\u{A0}", "\u{2003}", "\u{85}", " ", "  \n  ", "\r\n", "x", "é", "日本語 ",
+        "😀", "caf\u{E9} ",
+        "&amp;", "&lt;", "&gt;", "&quot;", "&apos;", "&nbsp;", "&copy;", "&#65;", "&#x41;", "&#xZZ;", "&#0;",
+        "&#xD800;", "&unknown;", "&amp", "&", "&;", "&#;", "&eacute;&auml;",
         "&longentitynamethatisfartoolong;", "&a<b>;",
-        "<p>", "</p>", "<div>", "</div>", "<br>", "<br/>", "<li>", "<ul>", "<ol>", "<table>", "<tr>", "<h1>", "</h1>", "<H2>", "<hr>", "<title>", "<dt>", "<blockquote>",
+        "<p>", "</p>", "<div>", "</div>", "<br>", "<br/>", "<li>", "<ul>", "<ol>", "<table>", "<tr>", "<h1>", "</h1>",
+        "<H2>", "<hr>", "<title>", "<dt>", "<blockquote>",
         "<pre>", "</pre>", "<PRE>", "<b>", "</b>", "<i class=\"x\">", "<span>", "<em>", "<h7>", "<p/>",
-        "<a href=\"x\">", "<a href='y&amp;z'>", "<A HREF=u>", "<a href = \"w\">", "<a data-href=\"q\">", "<a href=\"\">", "<a href=\"#frag\">", "<a>", "<a name=\"n\">",
-        "<a title=\"t\" href=\"https://example.com/?a=1&amp;b=2&c=3\" class=\"k\">", "<a\nhref=\"multi\nline\">", "<a\r\nhref=\"crlf\r\nvalue\">", "<a href=\"ü&euro;\">",
-        "<a href='&#65;&#x42;&bogus;&amp'>", "<a href=\"a&amp;b&amp;c&amp;d&amp;e&amp;f&gt;&lt;&quot;&nbsp;\">", "<a href=value-with-dash/and&amp;more>", "<a href=\"x\" href=\"y\">",
-        "<a href=\"日本語\">", "<a href=\"x\u{301}\">", "<a href=\"&;&&amp;;\">", "<a href=\"unterminated>", "</a>", "</A>",
+        "<a href=\"x\">", "<a href='y&amp;z'>", "<A HREF=u>", "<a href = \"w\">", "<a data-href=\"q\">",
+        "<a href=\"\">", "<a href=\"#frag\">", "<a>", "<a name=\"n\">",
+        "<a title=\"t\" href=\"https://example.com/?a=1&amp;b=2&c=3\" class=\"k\">", "<a\nhref=\"multi\nline\">",
+        "<a\r\nhref=\"crlf\r\nvalue\">", "<a href=\"ü&euro;\">",
+        "<a href='&#65;&#x42;&bogus;&amp'>", "<a href=\"a&amp;b&amp;c&amp;d&amp;e&amp;f&gt;&lt;&quot;&nbsp;\">",
+        "<a href=value-with-dash/and&amp;more>", "<a href=\"x\" href=\"y\">",
+        "<a href=\"日本語\">", "<a href=\"x\u{301}\">", "<a href=\"&;&&amp;;\">", "<a href=\"unterminated>", "</a>",
+        "</A>",
         "<!-- comment -->", "<!-- <p>hidden</p> -->", "<!---->", "<!-->", "<!DOCTYPE html>", "<?xml version=\"1.0\"?>",
-        "<script>var a = '<b>';</script>", "<SCRIPT type=text/javascript>x</Script>", "<style>p { color: red }</style>", "<svg><path d=\"M0\"/></svg>", "<noscript>no</noscript>",
-        "<template><p>t</p></template>", "</script>", "<script src=x></script>", "< b>", "<>", "</>", "<3", "a < b", "x > y", "<<p>>", "<a b c>", "<verylongtagnamethatgoesonforever>",
-        "<h1 attr=\"v\"", "<div class='a>b'>",
+        "<script>var a = '<b>';</script>", "<SCRIPT type=text/javascript>x</Script>", "<style>p { color: red }</style>",
+        "<svg><path d=\"M0\"/></svg>", "<noscript>no</noscript>",
+        "<template><p>t</p></template>", "</script>", "<script src=x></script>", "< b>", "<>", "</>", "<3", "a < b",
+        "x > y", "<<p>>", "<a b c>", "<verylongtagnamethatgoesonforever>",
+        "<h1 attr=\"v\"", "<div class='a>b'>"
     ]
 
     private func generate(_ next: (Int) -> Int, count: Int) -> [UInt16] {
@@ -56,7 +66,12 @@ import Testing
             for braces in [true, false] {
                 let fast = HTMLText.plainText(units: units, linkBraces: braces)
                 let reference = HTMLReference.plainText(units: units, linkBraces: braces)
-                #expect(fast == reference, Comment(rawValue: "seed \(seed), braces \(braces): \(String(decoding: units, as: UTF16.self).debugDescription)"))
+                #expect(
+                    fast == reference,
+                    Comment(
+                        rawValue:
+                            "seed \(seed), braces \(braces): \(String(decoding: units, as: UTF16.self).debugDescription)"
+                    ))
                 compared += 1
             }
         }
@@ -68,15 +83,17 @@ import Testing
             let next = random(seed)
             let units = generate(next, count: 4000)
             #expect(HTMLText.plainText(units: units) == HTMLReference.plainText(units: units), "seed \(seed)")
-            #expect(HTMLText.plainText(units: units, linkBraces: false) == HTMLReference.plainText(units: units, linkBraces: false), "seed \(seed)")
+            #expect(
+                HTMLText.plainText(units: units, linkBraces: false)
+                    == HTMLReference.plainText(units: units, linkBraces: false), "seed \(seed)")
         }
     }
 
     @Test func linksAreFoundTheSameWayInEveryFormOfTheAttribute() {
         let html = """
-        <a href="one">1</a> <A HREF='two&amp;2'>2</A> <a href=three>3</a> <a class=x href = "four">4</a> <a data-href="five">5</a> <a href="#six">6</a>
-        <a href="">7</a> <a href="https://e.com/?a=1&amp;b=2&amp;c&amp">8</a> <a title='a href="nested"' href="real">9</a> <a href="ü">10</a>
-        """
+            <a href="one">1</a> <A HREF='two&amp;2'>2</A> <a href=three>3</a> <a class=x href = "four">4</a> <a data-href="five">5</a> <a href="#six">6</a>
+            <a href="">7</a> <a href="https://e.com/?a=1&amp;b=2&amp;c&amp">8</a> <a title='a href="nested"' href="real">9</a> <a href="ü">10</a>
+            """
         let result = HTMLText.plainText(units: Array(html.utf16))
         #expect(result == HTMLReference.plainText(units: Array(html.utf16)))
         // `data-href` is no `href`, and the text `href="nested"` inside the title of a tag is no attribute.
@@ -87,8 +104,11 @@ import Testing
 /// The bitmap an image is drawn from when it is shown smaller than it is.
 @MainActor @Suite struct ViewerAdoptImage {
     private func picture(_ width: Int, _ height: Int) throws -> CGImage {
-        let context = try #require(CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpace(name: CGColorSpace.sRGB)!,
-                                             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+        let context = try #require(
+            CGContext(
+                data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
+                space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
         // Red on the left half, blue on the right (the drawing has its origin at the bottom left).
         context.setFillColor(CGColor(red: 1, green: 0, blue: 0, alpha: 1))
         context.fill(CGRect(x: 0, y: 0, width: width / 2, height: height))
@@ -133,7 +153,9 @@ import Testing
         #expect(await wait { cache.made == 2 })
         #expect(cache.image(for: frame, width: 400, height: 200)?.width == 400)
         // Showing it larger than it is, or at nearly its own size, needs no bitmap; nor does a huge one.
-        #expect(cache.image(for: frame, width: 3000, height: 1500) == nil && cache.image(for: frame, width: 1990, height: 995) == nil)
+        #expect(
+            cache.image(for: frame, width: 3000, height: 1500) == nil
+                && cache.image(for: frame, width: 1990, height: 995) == nil)
         let big = try picture(8000, 6000)
         #expect(cache.image(for: big, width: 7000, height: 5800) == nil)
         await settled(cache)
@@ -153,8 +175,11 @@ import Testing
         let scaled = try #require(ScaledFrameCache.scale(try picture(1000, 500), width: 100, height: 50))
         #expect(scaled.width == 100 && scaled.height == 50)
         let rep = NSBitmapImageRep(cgImage: scaled)
-        let left = try #require(rep.colorAt(x: 10, y: 25)?.usingColorSpace(.sRGB)), right = try #require(rep.colorAt(x: 90, y: 25)?.usingColorSpace(.sRGB))
-        #expect(left.redComponent > 0.9 && left.blueComponent < 0.1 && right.blueComponent > 0.9 && right.redComponent < 0.1)
+        let left = try #require(rep.colorAt(x: 10, y: 25)?.usingColorSpace(.sRGB))
+        let right = try #require(rep.colorAt(x: 90, y: 25)?.usingColorSpace(.sRGB))
+        #expect(
+            left.redComponent > 0.9 && left.blueComponent < 0.1 && right.blueComponent > 0.9 && right.redComponent < 0.1
+        )
     }
 
     @Test func aLargeImageIsResampledOnceWhileItIsScrolledAndDrawnAgain() async throws {
@@ -171,8 +196,12 @@ import Testing
         func sides(_ rep: NSBitmapImageRep) -> (red: Bool, blue: Bool) {
             // The image fits the width: red in the left half, blue in the right one.
             let y = rep.pixelsHigh / 4
-            let left = rep.colorAt(x: rep.pixelsWide / 8, y: y)?.usingColorSpace(.sRGB), right = rep.colorAt(x: rep.pixelsWide * 7 / 8, y: y)?.usingColorSpace(.sRGB)
-            return ((left?.redComponent ?? 0) > 0.9 && (left?.blueComponent ?? 1) < 0.1, (right?.blueComponent ?? 0) > 0.9 && (right?.redComponent ?? 1) < 0.1)
+            let left = rep.colorAt(x: rep.pixelsWide / 8, y: y)?.usingColorSpace(.sRGB)
+            let right = rep.colorAt(x: rep.pixelsWide * 7 / 8, y: y)?.usingColorSpace(.sRGB)
+            return (
+                (left?.redComponent ?? 0) > 0.9 && (left?.blueComponent ?? 1) < 0.1,
+                (right?.blueComponent ?? 0) > 0.9 && (right?.redComponent ?? 1) < 0.1
+            )
         }
         // The queue stands still while the sizes are asked for: only the last one is made, however long that takes.
         view.scalingQueue.suspend()

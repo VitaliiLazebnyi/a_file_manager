@@ -4,7 +4,7 @@ import Foundation
 /// Answers the program's questions from a script and records what was asked.
 public final class ScriptedInteraction: UserInteraction {
     public enum PromptAnswer {
-        case accept              // OK with the proposed text
+        case accept  // OK with the proposed text
         case text(String)
         case cancel
     }
@@ -86,7 +86,8 @@ public final class FakePanel: PanelHandle {
         show(directory, focus: nil, history: .keep, completion: nil)
     }
 
-    public func show(_ location: URL, focus: String?, history: PanelModel.HistoryEffect, completion: ((Bool) -> Void)?) {
+    public func show(_ location: URL, focus: String?, history: PanelModel.HistoryEffect, completion: ((Bool) -> Void)?)
+    {
         do {
             let result = try PanelLoader.load(location, showHidden: model.showHidden, fileSystems: fileSystems)
             model.show(result.listing, focus: focus ?? result.focus, history: history)
@@ -98,7 +99,9 @@ public final class FakePanel: PanelHandle {
     }
 
     public func reload(focus: String?, quietly: Bool, completion: (() -> Void)?) {
-        if let result = try? PanelLoader.load(model.directory, showHidden: model.showHidden, fileSystems: fileSystems, climbing: true) {
+        if let result = try? PanelLoader.load(
+            model.directory, showHidden: model.showHidden, fileSystems: fileSystems, climbing: true)
+        {
             model.update(with: result.listing, focus: focus)
         }
         completion?()
@@ -156,7 +159,9 @@ public final class ImmediateJobService: JobService {
     }
 
     @discardableResult
-    public func run<Result>(title: String, work: @escaping (JobMonitor) -> Result, completion: @escaping (Result) -> Void) -> JobHandle {
+    public func run<Result>(
+        title: String, work: @escaping (JobMonitor) -> Result, completion: @escaping (Result) -> Void
+    ) -> JobHandle {
         titles.append(title)
         let monitor = Monitor()
         isBusy = true
@@ -187,12 +192,16 @@ public final class TestBench: ShellServices {
     public var commands: CommandRegistry { kernel.commands }
 
     /// `fileSystems` are registered before the plugins start, like a file-system plugin would.
-    public init(plugins: [Plugin], fileSystems: [FileSystemProvider], left: URL, right: URL, settings: SettingsStore = MemorySettings()) {
+    public init(
+        plugins: [Plugin], fileSystems: [FileSystemProvider], left: URL, right: URL,
+        settings: SettingsStore = MemorySettings()
+    ) {
         kernel = Kernel(productName: "Test", settings: settings, ui: ui)
         fileSystems.forEach(kernel.fileSystems.register)
         kernel.load(plugins)
-        panelSet = FakePanelSet(left: FakePanel(showing: left, fileSystems: kernel.fileSystems),
-                                right: FakePanel(showing: right, fileSystems: kernel.fileSystems))
+        panelSet = FakePanelSet(
+            left: FakePanel(showing: left, fileSystems: kernel.fileSystems),
+            right: FakePanel(showing: right, fileSystems: kernel.fileSystems))
         kernel.attach(self)
     }
 }

@@ -11,9 +11,11 @@ protocol ThumbnailSource: AnyObject {
 /// Thumbnails from the system's Quick Look, which makes them in its own processes and threads
 /// and keeps the main thread out of it.
 final class QuickLookThumbnails: ThumbnailSource {
-    func thumbnail(for url: URL, side: CGFloat, scale: CGFloat, completion: @escaping (NSImage?) -> Void) -> () -> Void {
-        let request = QLThumbnailGenerator.Request(fileAt: url, size: CGSize(width: side, height: side), scale: scale,
-                                                   representationTypes: .thumbnail)
+    func thumbnail(for url: URL, side: CGFloat, scale: CGFloat, completion: @escaping (NSImage?) -> Void) -> () -> Void
+    {
+        let request = QLThumbnailGenerator.Request(
+            fileAt: url, size: CGSize(width: side, height: side), scale: scale,
+            representationTypes: .thumbnail)
         QLThumbnailGenerator.shared.generateBestRepresentation(for: request) { representation, _ in
             completion(representation?.nsImage)
         }

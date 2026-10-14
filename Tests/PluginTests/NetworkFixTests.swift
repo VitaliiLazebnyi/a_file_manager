@@ -1,9 +1,10 @@
 import AFMKernel
 import Foundation
-@testable import NetworkPlugin
 import Security
 import TestSupport
 import Testing
+
+@testable import NetworkPlugin
 
 /// Names from a server are one path component, whatever the server says (a name with a slash
 /// would put a downloaded file outside the folder the user chose).
@@ -38,7 +39,8 @@ import Testing
         #expect(FTPListParser.list(unix + "a\\b")?.name == "a\\b")
         // A link whose own name is not safe.
         #expect(FTPListParser.list("lrwxrwxrwx   1 owner    group          12 Jan 31  2024 ../l -> target") == nil)
-        #expect(FTPListParser.list("lrwxrwxrwx   1 owner    group          12 Jan 31  2024 l -> ../target")?.name == "l")
+        #expect(
+            FTPListParser.list("lrwxrwxrwx   1 owner    group          12 Jan 31  2024 l -> ../target")?.name == "l")
 
         let dos = "01-31-24  03:04PM              1,234 "
         #expect(FTPListParser.list(dos + "..\\..\\evil.exe") == nil)
@@ -55,10 +57,13 @@ import Testing
     @Test(arguments: [true, false]) func aListingFromAServerKeepsOnlyTheSafeNames(mlsd: Bool) throws {
         var options = TestFTPServer.Options()
         options.offersMLSD = mlsd
-        options.injectedLines = mlsd
+        options.injectedLines =
+            mlsd
             ? ["type=file;size=3; ../../evil", "type=file;size=3; a/b", "type=file;size=3; injected.txt"]
-            : ["-rw-r--r--   1 o g 3 Jan 01  2020 ../../evil", "-rw-r--r--   1 o g 3 Jan 01  2020 a/b",
-               "-rw-r--r--   1 o g 3 Jan 01  2020 injected.txt"]
+            : [
+                "-rw-r--r--   1 o g 3 Jan 01  2020 ../../evil", "-rw-r--r--   1 o g 3 Jan 01  2020 a/b",
+                "-rw-r--r--   1 o g 3 Jan 01  2020 injected.txt"
+            ]
         let fixture = try FTPFixture(options)
         try fixture.box.file("srv/real.txt", "r")
         let items = try fixture.fileSystem.list(fixture.url("/"), showHidden: true)
@@ -77,10 +82,16 @@ import Testing
 /// Addresses and prompts that carry secrets.
 @Suite struct NetworkFixSecrets {
     @Test func aPasswordIsNotRemembered() {
-        #expect(ServerAddress.removingPassword(from: "smb://alice:s3cret@files.example.com/share") == "smb://alice@files.example.com/share")
-        #expect(ServerAddress.removingPassword(from: "https://bob:p%40ss@dav.example.com:8443/a/b?x=1") == "https://bob@dav.example.com:8443/a/b?x=1")
+        #expect(
+            ServerAddress.removingPassword(from: "smb://alice:s3cret@files.example.com/share")
+                == "smb://alice@files.example.com/share")
+        #expect(
+            ServerAddress.removingPassword(from: "https://bob:p%40ss@dav.example.com:8443/a/b?x=1")
+                == "https://bob@dav.example.com:8443/a/b?x=1")
         #expect(ServerAddress.removingPassword(from: "afp://carol@host/vol") == "afp://carol@host/vol")
-        #expect(ServerAddress.removingPassword(from: "nfs://host/export:with:colons@here") == "nfs://host/export:with:colons@here")
+        #expect(
+            ServerAddress.removingPassword(from: "nfs://host/export:with:colons@here")
+                == "nfs://host/export:with:colons@here")
         #expect(ServerAddress.removingPassword(from: "smb://") == "smb://")
         // Also without a scheme, and with a slash in the password.
         #expect(ServerAddress.removingPassword(from: "no scheme:pw@host") == "no scheme@host")
@@ -90,7 +101,8 @@ import Testing
     }
 
     @Test func theStoredPasswordAnswersOnlyThisServersPrompt() {
-        let profile = ConnectionProfile(key: ServerKey(scheme: "sftp", host: "Files.Example.com"), user: "alice", password: "pw")
+        let profile = ConnectionProfile(
+            key: ServerKey(scheme: "sftp", host: "Files.Example.com"), user: "alice", password: "pw")
         let asks = { (question: String) in SFTPSession.asksForPassword(question, of: profile) }
         #expect(asks("alice@files.example.com's password: "))
         #expect(asks("(alice@files.example.com) Password: "))
@@ -128,7 +140,10 @@ import Testing
             }
             return result
         }
-        mutating func finish() -> Data { defer { pendingCR = false }; return pendingCR ? Data([0x0D]) : Data() }
+        mutating func finish() -> Data {
+            defer { pendingCR = false }
+            return pendingCR ? Data([0x0D]) : Data()
+        }
         mutating func toNetwork(_ data: Data) -> Data {
             var result = Data()
             for byte in data {
@@ -145,9 +160,13 @@ import Testing
         let alphabet: [UInt8] = [0x0D, 0x0A, 0x41, 0x0D, 0x0A, 0x20]
         for _ in 0..<300 {
             // Random data cut into random blocks, rich in CR and LF.
-            let data = Data((0..<Int.random(in: 0...120, using: &generator)).map { _ in alphabet.randomElement(using: &generator)! })
+            let data = Data(
+                (0..<Int.random(in: 0...120, using: &generator)).map { _ in alphabet.randomElement(using: &generator)! }
+            )
             var cuts = [0]
-            while cuts.last! < data.count { cuts.append(min(data.count, cuts.last! + Int.random(in: 0...9, using: &generator))) }
+            while cuts.last! < data.count {
+                cuts.append(min(data.count, cuts.last! + Int.random(in: 0...9, using: &generator)))
+            }
             var (local, reference) = (LineEndConverter(), Reference())
             var (got, expected) = (Data(), Data())
             for index in 1..<cuts.count {
@@ -177,7 +196,9 @@ import Testing
 
 /// The directory cache keeps up with what this program does, and the cost of a copy stays linear.
 @Suite struct NetworkFixCache {
-    private func lists(_ fixture: FTPFixture) -> Int { fixture.server.commands.filter { $0 == "LIST -la" || $0 == "LIST" }.count }
+    private func lists(_ fixture: FTPFixture) -> Int {
+        fixture.server.commands.filter { $0 == "LIST -la" || $0 == "LIST" }.count
+    }
 
     @Test func manyUploadsToAServerWithoutMLSTListTheFolderOnce() throws {
         var options = TestFTPServer.Options()
@@ -191,7 +212,9 @@ import Testing
             // The checks a copy job makes before it writes.
             #expect(fixture.fileSystem.item(at: target) == nil)
             #expect(fixture.fileSystem.item(at: target) == nil)
-            try fixture.upload("/in/file\(index).dat", content, attributes: FileAttributes(modified: Date(timeIntervalSince1970: 1_600_000_000)))
+            try fixture.upload(
+                "/in/file\(index).dat", content,
+                attributes: FileAttributes(modified: Date(timeIntervalSince1970: 1_600_000_000)))
             let item = try #require(fixture.fileSystem.item(at: target))
             #expect(item.size == Int64(content.count) && item.modified == Date(timeIntervalSince1970: 1_600_000_000))
         }
@@ -354,7 +377,9 @@ import Testing
         }.start()
         // Until the server has the request, the read is under way but there is nothing to cut.
         let waitUntil = Date().addingTimeInterval(120)
-        while !fixture.server.commands.contains(where: { $0.hasPrefix("RETR") }), Date() < waitUntil { Thread.sleep(forTimeInterval: 0.02) }
+        while !fixture.server.commands.contains(where: { $0.hasPrefix("RETR") }), Date() < waitUntil {
+            Thread.sleep(forTimeInterval: 0.02)
+        }
         Thread.sleep(forTimeInterval: 0.3)
         let started = Date()
         reader.close()
@@ -393,12 +418,16 @@ import Testing
         try fm.createSymbolicLink(atPath: fixture.box.url("srv/lslash").path, withDestinationPath: "realdir/")
 
         let probes = { fixture.server.commands.filter { $0.hasPrefix("CWD /l") }.count }
-        var items = try fixture.fileSystem.list(fixture.url("/"), showHidden: true).filter(\.isSymlink).sorted { $0.name < $1.name }
+        var items = try fixture.fileSystem.list(fixture.url("/"), showHidden: true).filter(\.isSymlink).sorted {
+            $0.name < $1.name
+        }
         #expect(items.map(\.name) == ["ldead", "ldir", "lfile", "lslash"])
         #expect(items.map(\.isDirectory) == [false, true, false, true])
         // The one whose target is spelled as a folder is not asked about; the others once each.
         #expect(probes() == 3)
-        items = try fixture.fileSystem.list(fixture.url("/"), showHidden: true).filter(\.isSymlink).sorted { $0.name < $1.name }
+        items = try fixture.fileSystem.list(fixture.url("/"), showHidden: true).filter(\.isSymlink).sorted {
+            $0.name < $1.name
+        }
         #expect(items.map(\.isDirectory) == [false, true, false, true])
         #expect(probes() == 3)
     }
@@ -408,8 +437,16 @@ import Testing
 final class FailureBox: @unchecked Sendable {
     private let lock = NSLock()
     private var values: [String] = []
-    func add(_ value: String) { lock.lock(); values.append(value); lock.unlock() }
-    var all: [String] { lock.lock(); defer { lock.unlock() }; return values }
+    func add(_ value: String) {
+        lock.lock()
+        values.append(value)
+        lock.unlock()
+    }
+    var all: [String] {
+        lock.lock()
+        defer { lock.unlock() }
+        return values
+    }
 }
 
 /// TLS: the data connections must be protected, and a certificate must be good for an address.
@@ -452,9 +489,12 @@ final class FailureBox: @unchecked Sendable {
         let (pem, der) = (box.url("san.pem"), box.url("san.der"))
         let make = Process()
         make.executableURL = URL(fileURLWithPath: TLSServer.openssl)
-        make.arguments = ["req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", box.url("san.key").path, "-out", pem.path, "-days", "2",
-                          "-subj", "/CN=nobody", "-addext", "subjectAltName=\(altNames)", "-addext", "extendedKeyUsage=serverAuth",
-                          "-addext", "basicConstraints=critical,CA:FALSE"]
+        make.arguments = [
+            "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", box.url("san.key").path, "-out", pem.path,
+            "-days", "2",
+            "-subj", "/CN=nobody", "-addext", "subjectAltName=\(altNames)", "-addext", "extendedKeyUsage=serverAuth",
+            "-addext", "basicConstraints=critical,CA:FALSE"
+        ]
         (make.standardOutput, make.standardError) = (FileHandle.nullDevice, FileHandle.nullDevice)
         try make.run()
         make.waitUntilExit()

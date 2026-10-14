@@ -9,11 +9,17 @@ import Testing
         #expect(Format.kilobytes(.max) == "9,007,199,254,740,992 k")
         #expect(Format.kilobytes(.max - 512) == "9,007,199,254,740,991 k")
         #expect(Format.kilobytes(.min) == "-9,007,199,254,740,992 k")
-        #expect(Format.kilobytes(0) == "0 k" && Format.kilobytes(511) == "0 k" && Format.kilobytes(512) == "1 k" && Format.kilobytes(1535) == "1 k")
+        #expect(
+            Format.kilobytes(0) == "0 k" && Format.kilobytes(511) == "0 k" && Format.kilobytes(512) == "1 k"
+                && Format.kilobytes(1535) == "1 k")
         #expect(Format.kilobytes(1536) == "2 k" && Format.kilobytes(3_693_568) == "3,607 k")
         #expect(Format.bytes(.max) == "9,223,372,036,854,775,807" && Format.bytes(.min) == "-9,223,372,036,854,775,808")
-        #expect(Format.bytes(0) == "0" && Format.bytes(999) == "999" && Format.bytes(1000) == "1,000" && Format.bytes(250_944) == "250,944")
-        #expect(Format.bytes(-1) == "-1" && Format.bytes(-1000) == "-1,000" && Format.bytes(-123_456) == "-123,456" && Format.bytes(100_000) == "100,000")
+        #expect(
+            Format.bytes(0) == "0" && Format.bytes(999) == "999" && Format.bytes(1000) == "1,000"
+                && Format.bytes(250_944) == "250,944")
+        #expect(
+            Format.bytes(-1) == "-1" && Format.bytes(-1000) == "-1,000" && Format.bytes(-123_456) == "-123,456"
+                && Format.bytes(100_000) == "100,000")
         #expect(Format.shortSize(.max).hasSuffix(" T") && Format.shortSize(.min).hasSuffix(" b"))
     }
 
@@ -25,23 +31,37 @@ import Testing
         for time in [Double.nan, .infinity, -.infinity, 1e300, -1e300] {
             #expect(!Format.duration(time).isEmpty)
         }
-        #expect(Format.duration(8) == "8 s" && Format.duration(80) == "1 min 20 s" && Format.duration(7500) == "2 h 05 min")
+        #expect(
+            Format.duration(8) == "8 s" && Format.duration(80) == "1 min 20 s" && Format.duration(7500) == "2 h 05 min")
     }
 
     @Test func sumsOfSizesStopAtTheEndsOfTheRange() {
-        #expect(Int64.max.addingSaturated(1) == .max && Int64.min.addingSaturated(-1) == .min && Int64(5).addingSaturated(-7) == -2)
-        #expect(Int64.min.subtractingSaturated(1) == .min && Int64.max.subtractingSaturated(-1) == .max && Int64(5).subtractingSaturated(7) == -2)
-        #expect(Int64.max.multipliedSaturated(by: 2) == .max && Int64.max.multipliedSaturated(by: -2) == .min && Int64(-3).multipliedSaturated(by: -4) == 12)
+        #expect(
+            Int64.max.addingSaturated(1) == .max && Int64.min.addingSaturated(-1) == .min
+                && Int64(5).addingSaturated(-7) == -2)
+        #expect(
+            Int64.min.subtractingSaturated(1) == .min && Int64.max.subtractingSaturated(-1) == .max
+                && Int64(5).subtractingSaturated(7) == -2)
+        #expect(
+            Int64.max.multipliedSaturated(by: 2) == .max && Int64.max.multipliedSaturated(by: -2) == .min
+                && Int64(-3).multipliedSaturated(by: -4) == 12)
         #expect(Int64(saturating: UInt64.max) == .max && Int64(saturating: UInt32(7)) == 7)
-        #expect(Int.max.addingSaturated(1) == .max && Int.max.multipliedSaturated(by: 3) == .max && Int.min.multipliedSaturated(by: 2) == .min)
+        #expect(
+            Int.max.addingSaturated(1) == .max && Int.max.multipliedSaturated(by: 3) == .max
+                && Int.min.multipliedSaturated(by: 2) == .min)
     }
 
     @Test func namesFromOutsideAreShownWithoutWhatWouldMislead() {
-        #expect(Format.displayName("report.txt") == "report.txt" && Format.displayName("été 写真 👨‍👩‍👧.jpg") == "été 写真 👨‍👩‍👧.jpg")
+        #expect(
+            Format.displayName("report.txt") == "report.txt" && Format.displayName("été 写真 👨‍👩‍👧.jpg") == "été 写真 👨‍👩‍👧.jpg")
         #expect(Format.displayName("a\nb\tc") == "a<U+000A>b<U+0009>c")
         #expect(Format.displayName("photo\u{202E}gpj.exe") == "photo<U+202E>gpj.exe")
-        #expect(Format.displayName("a\u{200B}b\u{2028}c\u{FEFF}\u{7F}\u{0}") == "a<U+200B>b<U+2028>c<U+FEFF><U+007F><U+0000>")
-        #expect(Format.displayName("abcdef", limit: 3) == "abc…" && Format.displayName("abc", limit: 3) == "abc" && Format.displayName("a\nb", limit: 2) == "a<U+000A>…")
+        #expect(
+            Format.displayName("a\u{200B}b\u{2028}c\u{FEFF}\u{7F}\u{0}")
+                == "a<U+200B>b<U+2028>c<U+FEFF><U+007F><U+0000>")
+        #expect(
+            Format.displayName("abcdef", limit: 3) == "abc…" && Format.displayName("abc", limit: 3) == "abc"
+                && Format.displayName("a\nb", limit: 2) == "a<U+000A>…")
         #expect(Format.displayName("", limit: 0) == "" && Format.displayName("x", limit: -4) == "…")
     }
 

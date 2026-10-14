@@ -15,8 +15,9 @@ public protocol FileTransferService {
     /// a copy into the folder it already is in gets a new name (`report (2).txt`) instead of
     /// being refused. The panels showing the folders involved are re-read when it ends, and
     /// `completion` receives the location of the last item that arrived.
-    func transfer(_ kind: TransferKind, _ sources: [URL], into directory: URL, renamingSelfCopies: Bool,
-                  completion: @escaping (_ lastTarget: URL?) -> Void)
+    func transfer(
+        _ kind: TransferKind, _ sources: [URL], into directory: URL, renamingSelfCopies: Bool,
+        completion: @escaping (_ lastTarget: URL?) -> Void)
 }
 
 /// Showing a list of files from anywhere as if it were a folder (spec 09 › Feed to listbox,
@@ -61,7 +62,8 @@ extension Kernel {
     public func userTyped(location text: String, proposal: String? = nil, relativeTo base: URL) {
         let text = text.trimmingCharacters(in: .whitespaces)
         guard text != proposal?.trimmingCharacters(in: .whitespaces), text.contains("://"),
-              let consent = services.find(ServerConsentService.self) else { return }
+            let consent = services.find(ServerConsentService.self)
+        else { return }
         consent.userChose(fileSystems.location(from: text, relativeTo: base))
     }
 }

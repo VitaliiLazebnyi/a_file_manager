@@ -28,7 +28,8 @@ final class FunctionKeyBar: NSView {
         addSubview(stack)
         NSLayoutConstraint.activate([
             stack.topAnchor.constraint(equalTo: topAnchor), stack.bottomAnchor.constraint(equalTo: bottomAnchor),
-            stack.leadingAnchor.constraint(equalTo: leadingAnchor), stack.trailingAnchor.constraint(equalTo: trailingAnchor),
+            stack.leadingAnchor.constraint(equalTo: leadingAnchor),
+            stack.trailingAnchor.constraint(equalTo: trailingAnchor)
         ])
         show([])
     }
@@ -64,7 +65,8 @@ final class FunctionKeyBar: NSView {
         entries = shown
         buttons.forEach { $0.removeFromSuperview() }
         buttons = shown.map { entry in
-            let button = entry.command == nil
+            let button =
+                entry.command == nil
                 ? NSButton(title: entry.title, target: NSApp, action: #selector(NSApplication.terminate(_:)))
                 : NSButton(title: entry.title, target: self, action: #selector(buttonPressed(_:)))
             button.identifier = entry.command.map { NSUserInterfaceItemIdentifier($0.rawValue) }

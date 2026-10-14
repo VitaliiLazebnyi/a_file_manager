@@ -53,8 +53,10 @@ extension PanelViewController {
             part.translatesAutoresizingMaskIntoConstraints = false
             area.addSubview(part)
             NSLayoutConstraint.activate([
-                part.topAnchor.constraint(equalTo: area.topAnchor), part.bottomAnchor.constraint(equalTo: area.bottomAnchor),
-                part.leadingAnchor.constraint(equalTo: area.leadingAnchor), part.trailingAnchor.constraint(equalTo: area.trailingAnchor),
+                part.topAnchor.constraint(equalTo: area.topAnchor),
+                part.bottomAnchor.constraint(equalTo: area.bottomAnchor),
+                part.leadingAnchor.constraint(equalTo: area.leadingAnchor),
+                part.trailingAnchor.constraint(equalTo: area.trailingAnchor)
             ])
         }
         return area
@@ -140,7 +142,9 @@ extension PanelViewController {
         guard isViewLoaded, model.directory.isFileURL || model.volume?.isLocal == true else { return }
         if showsGrid {
             for row in gridView.visibleRows {
-                if let item = model.item(atRow: row), item.url.isFileURL, paths.contains(item.url.path) { gridView.redraw(row: row) }
+                if let item = model.item(atRow: row), item.url.isFileURL, paths.contains(item.url.path) {
+                    gridView.redraw(row: row)
+                }
             }
         } else {
             refreshRows()
@@ -206,18 +210,22 @@ extension PanelViewController {
         typeFind?.cancel()
         typeFind = nil
         guard items.count >= PanelViewController.backgroundSortThreshold else {
-            if let index = TypeSelect.row(matching: prefix, in: items, from: cursor) { tab.moveCursor(to: index + offset) }
+            if let index = TypeSelect.row(matching: prefix, in: items, from: cursor) {
+                tab.moveCursor(to: index + offset)
+            }
             return
         }
         let (flag, version) = (CancellationFlag(), tab.shownVersion)
         typeFind = flag
-        Background.compute(work: { TypeSelect.row(matching: prefix, in: items, from: cursor, cancellation: flag) }, then: { [weak self] index in
-            guard let self, self.typeFind === flag else { return }
-            self.typeFind = nil
-            // The list the rows were counted in is still the one on screen.
-            guard self.model === tab, tab.shownVersion == version, let index else { return }
-            tab.moveCursor(to: index + offset)
-        })
+        Background.compute(
+            work: { TypeSelect.row(matching: prefix, in: items, from: cursor, cancellation: flag) },
+            then: { [weak self] index in
+                guard let self, self.typeFind === flag else { return }
+                self.typeFind = nil
+                // The list the rows were counted in is still the one on screen.
+                guard self.model === tab, tab.shownVersion == version, let index else { return }
+                tab.moveCursor(to: index + offset)
+            })
     }
 
     /// The grid shows other rows now: the pictures of those that went out of sight are no
@@ -227,13 +235,19 @@ extension PanelViewController {
         gridMarks = [:]
         guard viewMode == .thumbnails else { return thumbnails.keepOnly([]) }
         let side = settings.thumbnailSide
-        thumbnails.keepOnly(Set(gridView.visibleRows.compactMap { model.item(atRow: $0) }.map { ThumbnailStore.key(for: $0, side: side) }))
+        thumbnails.keepOnly(
+            Set(
+                gridView.visibleRows.compactMap { model.item(atRow: $0) }.map {
+                    ThumbnailStore.key(for: $0, side: side)
+                }))
     }
 
     func thumbnailArrived(for name: String) {
         guard viewMode == .thumbnails else { return }
         // The tile may have been scrolled out of sight (or not be placed yet) since it was asked for.
-        if let row = gridView.visibleRows.first(where: { model.item(atRow: $0)?.name == name }) ?? model.row(ofName: name) {
+        if let row = gridView.visibleRows.first(where: { model.item(atRow: $0)?.name == name })
+            ?? model.row(ofName: name)
+        {
             gridView.redraw(row: row)
         }
     }
@@ -246,14 +260,20 @@ extension PanelViewController {
     func nameColor(for item: FileItem?, selected: Bool) -> NSColor {
         if selected { return .systemRed }
         guard let item else { return .labelColor }
-        if !settings.colorRules.isEmpty, let color = ColorRule.color(for: item.name, in: settings.colorRules) { return color }
+        if !settings.colorRules.isEmpty, let color = ColorRule.color(for: item.name, in: settings.colorRules) {
+            return color
+        }
         return item.isHidden ? .secondaryLabelColor : .labelColor
     }
 
     /// `nameColor` for the cells of the table: the table asks for every column of a row in a
     /// row, so the colour rules are looked at once per row and not once per column.
     func rowNameColor(for item: FileItem?, selected: Bool) -> NSColor {
-        if let memo = rowColor, memo.name == item?.name, memo.hidden == (item?.isHidden ?? false), memo.selected == selected { return memo.color }
+        if let memo = rowColor, memo.name == item?.name, memo.hidden == (item?.isHidden ?? false),
+            memo.selected == selected
+        {
+            return memo.color
+        }
         let color = nameColor(for: item, selected: selected)
         rowColor = (item?.name, item?.isHidden ?? false, selected, color)
         return color
@@ -266,7 +286,8 @@ extension PanelViewController {
     func rebuildExtraColumns() {
         guard isViewLoaded else { return }
         rememberColumnWidths()
-        for column in tableView.tableColumns where column.identifier.rawValue.hasPrefix(PanelViewController.extraColumnPrefix) {
+        for column in tableView.tableColumns
+        where column.identifier.rawValue.hasPrefix(PanelViewController.extraColumnPrefix) {
             tableView.removeTableColumn(column)
         }
         var shown: Set<String> = []
@@ -300,13 +321,15 @@ extension PanelViewController {
     /// Values of plugin columns were computed: the rows on screen that show them are drawn again.
     func columnValuesArrived(for names: Set<String>) {
         guard !showsGrid else { return }
-        let columns = IndexSet(tableView.tableColumns.indices.filter {
-            tableView.tableColumns[$0].identifier.rawValue.hasPrefix(PanelViewController.extraColumnPrefix)
-        })
+        let columns = IndexSet(
+            tableView.tableColumns.indices.filter {
+                tableView.tableColumns[$0].identifier.rawValue.hasPrefix(PanelViewController.extraColumnPrefix)
+            })
         let visible = tableView.rows(in: tableView.visibleRect)
-        let rows = IndexSet((visible.location..<(visible.location + visible.length)).filter { row in
-            model.item(atRow: row).map { names.contains($0.name) } ?? false
-        })
+        let rows = IndexSet(
+            (visible.location..<(visible.location + visible.length)).filter { row in
+                model.item(atRow: row).map { names.contains($0.name) } ?? false
+            })
         if !rows.isEmpty, !columns.isEmpty { tableView.reloadData(forRowIndexes: rows, columnIndexes: columns) }
     }
 
@@ -337,7 +360,8 @@ extension PanelViewController {
     func fillHeaderMenu() {
         focus()
         headerMenu.removeAllItems()
-        let views = MenuBuilder.menu("", [.viewBrief, .viewFull, .viewThumbnails], commands: commands, keys: kernel.keyBindings)
+        let views = MenuBuilder.menu(
+            "", [.viewBrief, .viewFull, .viewThumbnails], commands: commands, keys: kernel.keyBindings)
         for item in views.items {
             views.removeItem(item)
             item.state = commands.isChecked(MenuBuilder.command(of: item) ?? "") ? .on : .off
@@ -345,7 +369,8 @@ extension PanelViewController {
         }
         if !kernel.columns.all.isEmpty, !headerMenu.items.isEmpty { headerMenu.addItem(.separator()) }
         for column in kernel.columns.all {
-            let item = headerMenu.addItem(withTitle: column.title, action: #selector(extraColumnChosen(_:)), keyEquivalent: "")
+            let item = headerMenu.addItem(
+                withTitle: column.title, action: #selector(extraColumnChosen(_:)), keyEquivalent: "")
             item.target = self
             item.representedObject = column.id
             item.state = extraColumns.contains(column.id) ? .on : .off
@@ -377,7 +402,8 @@ extension PanelViewController {
     /// Row views are used again like cells: scrolling and reloading would otherwise make one
     /// for every row that comes into sight.
     func tableView(_ tableView: NSTableView, rowViewForRow row: Int) -> NSTableRowView? {
-        if let reused = tableView.makeView(withIdentifier: CursorRowView.reuseIdentifier, owner: nil) as? CursorRowView {
+        if let reused = tableView.makeView(withIdentifier: CursorRowView.reuseIdentifier, owner: nil) as? CursorRowView
+        {
             reused.panel = self
             return reused
         }
@@ -409,9 +435,12 @@ extension PanelViewController {
         let color = rowNameColor(for: item, selected: model.isSelected(row: row))
         let cell: NSTableCellView
         if let column = FileListColumn(rawValue: tableColumn.identifier.rawValue) {
-            cell = tableView.makeView(withIdentifier: column.identifier, owner: nil) as? NSTableCellView ?? column.makeCell()
+            cell =
+                tableView.makeView(withIdentifier: column.identifier, owner: nil) as? NSTableCellView
+                ?? column.makeCell()
         } else if contentColumn(of: tableColumn) != nil {
-            cell = tableView.makeView(withIdentifier: FileListColumn.extraCellIdentifier, owner: nil) as? NSTableCellView
+            cell =
+                tableView.makeView(withIdentifier: FileListColumn.extraCellIdentifier, owner: nil) as? NSTableCellView
                 ?? FileListColumn.makeExtraCell()
         } else {
             return nil
@@ -422,7 +451,10 @@ extension PanelViewController {
 
     /// Makes a cell show its row; used for a cell that is new or used again and for one that
     /// stays where it is (`refreshRows`). Nothing is set that is already so.
-    private func fill(_ cell: NSTableCellView, of tableColumn: NSTableColumn, row: Int, item: FileItem?, color: NSColor, ownIcons: Bool) {
+    private func fill(
+        _ cell: NSTableCellView, of tableColumn: NSTableColumn, row: Int, item: FileItem?, color: NSColor,
+        ownIcons: Bool
+    ) {
         if let column = FileListColumn(rawValue: tableColumn.identifier.rawValue) {
             column.fill(cell, with: item, color: color, ownIcons: ownIcons)
             // The rename box stands in for the name and the extension of its row.

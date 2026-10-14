@@ -2,17 +2,23 @@ import AFMKernel
 import Foundation
 import TestSupport
 import Testing
+
 @testable import ViewerPlugin
 
 /// Review round 2, the search: a backwards search never returns the match at its start, the
 /// result does not depend on the size of the chunks or on whether the bytes are compared raw or
 /// decoded, and a file that became shorter does not trap a double-byte search.
 @Suite struct Review2ViewerSearch {
-    private func find(_ text: String, in data: Data, _ options: SearchOptions = SearchOptions(), from start: Int64 = 0, encoding: ViewerEncoding = .utf8,
-                      chunkSize: Int = 1 << 20, rawBytes: Bool = true) throws -> Range<Int64>? {
+    private func find(
+        _ text: String, in data: Data, _ options: SearchOptions = SearchOptions(), from start: Int64 = 0,
+        encoding: ViewerEncoding = .utf8,
+        chunkSize: Int = 1 << 20, rawBytes: Bool = true
+    ) throws -> Range<Int64>? {
         let pattern = try SearchPattern(text, options: options, encoding: encoding)
-        return try ViewerSearch.find(pattern, in: DataByteSource(data), content: 0..<Int64(data.count), from: start, backwards: options.backwards,
-                                     encoding: encoding, chunkSize: chunkSize, rawBytes: rawBytes)
+        return try ViewerSearch.find(
+            pattern, in: DataByteSource(data), content: 0..<Int64(data.count), from: start,
+            backwards: options.backwards,
+            encoding: encoding, chunkSize: chunkSize, rawBytes: rawBytes)
     }
 
     @Test func aBackwardsSearchDoesNotReturnTheMatchThatBeginsAtItsStart() throws {
@@ -23,7 +29,9 @@ import Testing
         for chunk in [1, 2, 3, 5, 8, 64, 1 << 20] {
             #expect(try find("ss", in: data, backwards, from: 4, chunkSize: chunk) == nil, "chunk \(chunk)")
             #expect(try find("ss", in: data, backwards, from: 6, chunkSize: chunk) == 4..<6, "chunk \(chunk)")
-            #expect(try find("strasse", in: Data("Straße Straße".utf8), backwards, from: 8, chunkSize: chunk) == 0..<7, "chunk \(chunk)")
+            #expect(
+                try find("strasse", in: Data("Straße Straße".utf8), backwards, from: 8, chunkSize: chunk) == 0..<7,
+                "chunk \(chunk)")
             #expect(try find("ss", in: data, from: 0, chunkSize: chunk) == 4..<6, "chunk \(chunk)")
         }
     }
@@ -82,10 +90,13 @@ import Testing
     @Test func theAnswerDoesNotDependOnTheChunkSizeOrThePath() throws {
         var state: UInt64 = 20_260_101
         func next(_ bound: Int) -> Int {
-            state = state &* 6364136223846793005 &+ 1442695040888963407
+            state = state &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
             return Int(truncatingIfNeeded: state >> 33) % bound
         }
-        let pieces = ["ss", "ß", "S", "s", "A", "a", "é", "É", "\u{03}", "\u{1B}", "\u{200B}", " ", "ﬁ", "fi", "K", "\u{212A}", "k", "x", "\n", "ẞ"]
+        let pieces = [
+            "ss", "ß", "S", "s", "A", "a", "é", "É", "\u{03}", "\u{1B}", "\u{200B}", " ", "ﬁ", "fi", "K", "\u{212A}",
+            "k", "x", "\n", "ẞ"
+        ]
         let needles = ["ss", "ß", "fi", "k", "ak", "é", "s\u{03}", "x s", "SS"]
         var compared = 0
         for _ in 0..<150 {
@@ -100,10 +111,15 @@ import Testing
                 let start = backwards ? Int64(data.count) : 0
                 let reference = try find(needle, in: data, options, from: start, chunkSize: 1 << 20, rawBytes: false)
                 for chunk in [1, 2, 3, 7, 16, 100] {
-                    #expect(try find(needle, in: data, options, from: start, chunkSize: chunk, rawBytes: false) == reference,
-                            "decoded \(text.debugDescription) \(needle.debugDescription) backwards \(backwards) chunk \(chunk)")
-                    #expect(try find(needle, in: data, options, from: start, chunkSize: chunk, rawBytes: true) == reference,
-                            "raw \(text.debugDescription) \(needle.debugDescription) backwards \(backwards) chunk \(chunk)")
+                    #expect(
+                        try find(needle, in: data, options, from: start, chunkSize: chunk, rawBytes: false)
+                            == reference,
+                        "decoded \(text.debugDescription) \(needle.debugDescription) backwards \(backwards) chunk \(chunk)"
+                    )
+                    #expect(
+                        try find(needle, in: data, options, from: start, chunkSize: chunk, rawBytes: true) == reference,
+                        "raw \(text.debugDescription) \(needle.debugDescription) backwards \(backwards) chunk \(chunk)"
+                    )
                 }
                 compared += 1
             }
@@ -130,7 +146,8 @@ import Testing
         let length: Int64 = 200_000
         func read(at offset: Int64, count: Int) throws -> Data {
             guard offset < 50_000 else { return Data() }
-            return Data((0..<min(count, 50_000 - Int(offset))).map { ($0 + Int(offset)) % 2 == 0 ? UInt8(0x81) : UInt8(0x41) })
+            return Data(
+                (0..<min(count, 50_000 - Int(offset))).map { ($0 + Int(offset)) % 2 == 0 ? UInt8(0x81) : UInt8(0x41) })
         }
     }
 
@@ -141,15 +158,20 @@ import Testing
         let pattern = try SearchPattern("zzzz", options: SearchOptions(), encoding: sjis)
         // Reached through a search, which goes by chunks.
         #expect(throws: (any Error).self) {
-            _ = try ViewerSearch.find(pattern, in: Shrunk(), content: 0..<200_000, from: 0, backwards: false, encoding: sjis, chunkSize: 40_000, parallelism: 1)
+            _ = try ViewerSearch.find(
+                pattern, in: Shrunk(), content: 0..<200_000, from: 0, backwards: false, encoding: sjis,
+                chunkSize: 40_000, parallelism: 1)
         }
     }
 
     @Test func theBoundariesKeepAtMostAFixedNumberOfBlocks() throws {
         let sjis = try #require(ViewerEncoding.codePage(932))
         let data = Data((0..<(1 << 20)).map { $0 % 2 == 0 ? UInt8(0x81) : UInt8(0x41) })
-        let boundaries = CharacterBoundaries(source: DataByteSource(data), content: 0..<Int64(data.count), encoding: sjis, spacing: 16)
-        for offset in stride(from: 0, to: data.count, by: 16) { _ = try boundaries.characterStart(atOrBefore: Int64(offset)) }
+        let boundaries = CharacterBoundaries(
+            source: DataByteSource(data), content: 0..<Int64(data.count), encoding: sjis, spacing: 16)
+        for offset in stride(from: 0, to: data.count, by: 16) {
+            _ = try boundaries.characterStart(atOrBefore: Int64(offset))
+        }
         #expect(boundaries.blockCount <= CharacterBoundaries.keptLimit)
     }
 }

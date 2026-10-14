@@ -61,7 +61,8 @@ public final class VirtualFileSystem: FileSystemProvider {
 
         /// The finished work, waiting for it when another thread is on it.
         func prepared(_ make: ([URL]) -> Prepared) -> Prepared {
-            lock.lock(); defer { lock.unlock() }
+            lock.lock()
+            defer { lock.unlock() }
             if let result { return result }
             let made = make(raw)
             result = made
@@ -113,7 +114,8 @@ public final class VirtualFileSystem: FileSystemProvider {
     }
 
     private func synchronized<T>(_ body: () throws -> T) rethrows -> T {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         return try body()
     }
 
@@ -175,7 +177,9 @@ public final class VirtualFileSystem: FileSystemProvider {
     /// ones it has reported): the list is not looked through for doubles, which for a list of
     /// millions saves a key per file.
     public func register(files: [URL], title: String, origin: URL?, isUnique: Bool) -> URL {
-        register(files, isUnique: isUnique) { .list(id: $0, title: VirtualLocation.pathComponent(title), origin: origin) }
+        register(files, isUnique: isUnique) {
+            .list(id: $0, title: VirtualLocation.pathComponent(title), origin: origin)
+        }
     }
 
     /// Registers the items of `directory` a selected branch view starts from, and returns the
@@ -208,7 +212,11 @@ public final class VirtualFileSystem: FileSystemProvider {
     private func forgetSurplus(keeping id: Int) {
         var total = lists.values.reduce(0) { $0 + $1.raw.count }
         while lists.count > VirtualFileSystem.listLimit || total > VirtualFileSystem.entryLimit {
-            guard let oldest = lists.filter({ $0.key != id && watchedLists[$0.key] == nil }).min(by: { $0.value.stamp < $1.value.stamp }) else { return }
+            guard
+                let oldest = lists.filter({ $0.key != id && watchedLists[$0.key] == nil }).min(by: {
+                    $0.value.stamp < $1.value.stamp
+                })
+            else { return }
             total -= oldest.value.raw.count
             lists[oldest.key] = nil
         }
@@ -245,8 +253,7 @@ public final class VirtualFileSystem: FileSystemProvider {
             var parents: [URL] = []
             var parentKeys = Set<[UInt8]>()
             var providers: [String: FileSystemProvider?] = [:]
-            for url in raw {
-                guard list.isUnique || seen.insert(VirtualFileSystem.identity(of: url)).inserted else { continue }
+            for url in raw where list.isUnique || seen.insert(VirtualFileSystem.identity(of: url)).inserted {
                 if !list.isUnique { entries.append(url) }
                 let scheme = url.scheme ?? "file"
                 if schemes.insert(scheme).inserted { examples.append(url) }
@@ -254,12 +261,15 @@ public final class VirtualFileSystem: FileSystemProvider {
                 // Only as many folders as are watched are looked up.
                 if parents.count < VirtualFileSystem.watchLimit {
                     if providers[scheme] == nil { providers[scheme] = .some(try? fileSystems.provider(for: url)) }
-                    if let parent = providers[scheme]??.parent(of: url), parentKeys.insert(VirtualFileSystem.identity(of: parent)).inserted {
+                    if let parent = providers[scheme]??.parent(of: url),
+                        parentKeys.insert(VirtualFileSystem.identity(of: parent)).inserted
+                    {
                         parents.append(parent)
                     }
                 }
             }
-            return FileList.Prepared(entries: list.isUnique ? raw : entries, examples: examples, parents: parents, isLocal: isLocal)
+            return FileList.Prepared(
+                entries: list.isUnique ? raw : entries, examples: examples, parents: parents, isLocal: isLocal)
         }
     }
 
@@ -288,7 +298,9 @@ public final class VirtualFileSystem: FileSystemProvider {
     /// whose number was given to another list means nothing. Counts as a use of the list.
     private func registered(_ id: Int, as location: VirtualLocation) -> FileList? {
         synchronized {
-            guard let list = lists[id], list.location.url.absoluteString == location.url.absoluteString else { return nil }
+            guard let list = lists[id], list.location.url.absoluteString == location.url.absoluteString else {
+                return nil
+            }
             uses += 1
             list.stamp = uses
             return list
@@ -319,19 +331,26 @@ public final class VirtualFileSystem: FileSystemProvider {
         return items
     }
 
-    public func list(_ directory: URL, showHidden: Bool, cancellation: CancellationFlag, receive: ([FileItem]) -> Bool) throws {
+    public func list(_ directory: URL, showHidden: Bool, cancellation: CancellationFlag, receive: ([FileItem]) -> Bool)
+        throws
+    {
         try listing(directory, showHidden: showHidden, cancellation: cancellation, receive: receive)
     }
 
-    private func listing(_ directory: URL, showHidden: Bool, cancellation: CancellationFlag?, receive: ([FileItem]) -> Bool) throws {
+    private func listing(
+        _ directory: URL, showHidden: Bool, cancellation: CancellationFlag?, receive: ([FileItem]) -> Bool
+    ) throws {
         guard let location = VirtualLocation(directory) else { throw FileSystemError.noProvider(directory) }
         let options = self.options
-        let walker = BranchWalker(fileSystems: fileSystems, showHidden: showHidden, listsFolders: options.listsFolders,
-                                  entersPackages: options.entersPackages)
+        let walker = BranchWalker(
+            fileSystems: fileSystems, showHidden: showHidden, listsFolders: options.listsFolders,
+            entersPackages: options.entersPackages)
         switch location {
         case .branch(let real):
             noteCapabilities(of: [real], for: directory)
-            let visited = try walker.walk([BranchWalker.Start(real)], mustRead: true, keeping: VirtualFileSystem.watchLimit, cancellation: cancellation, receive: receive)
+            let visited = try walker.walk(
+                [BranchWalker.Start(real)], mustRead: true, keeping: VirtualFileSystem.watchLimit,
+                cancellation: cancellation, receive: receive)
             // What a stopped walk read is not the branch.
             if cancellation?.isCancelled != true { remember(visited, for: directory) }
         case .picked(let id, let real):
@@ -349,7 +368,8 @@ public final class VirtualFileSystem: FileSystemProvider {
             }
             if cancellation?.isCancelled == true { return }
             if !files.isEmpty, !receive(files) { return }
-            let visited = try walker.walk(starts, keeping: VirtualFileSystem.watchLimit, cancellation: cancellation, receive: receive)
+            let visited = try walker.walk(
+                starts, keeping: VirtualFileSystem.watchLimit, cancellation: cancellation, receive: receive)
             if cancellation?.isCancelled != true { remember([real] + visited, for: directory) }
         case .list(let id, let title, _):
             guard let list = registered(id, as: location) else { throw ForgottenList(title: title) }
@@ -360,7 +380,9 @@ public final class VirtualFileSystem: FileSystemProvider {
                 if cancellation?.isCancelled == true { return }
                 let chunk = Array(entries[from..<min(from + VirtualFileSystem.entriesPerBatch, entries.count)])
                 // Each file is asked for on its own file system; what has vanished is left out.
-                let items = Parallel.map(chunk) { url in self.realItem(at: url, cancellation: cancellation)?.named(self.fileSystems.displayPath(url)) }
+                let items = Parallel.map(chunk) { url in
+                    self.realItem(at: url, cancellation: cancellation)?.named(self.fileSystems.displayPath(url))
+                }
                 if cancellation?.isCancelled == true || !receive(items.compactMap { $0 }) { return }
             }
         }
@@ -405,7 +427,8 @@ public final class VirtualFileSystem: FileSystemProvider {
         var common: FileSystemCapabilities = [.write, .trash]
         for scheme in Set(locations.map { $0.scheme ?? "file" }) {
             guard let example = locations.first(where: { ($0.scheme ?? "file") == scheme }),
-                  let provider = try? fileSystems.provider(for: example) else { continue }
+                let provider = try? fileSystems.provider(for: example)
+            else { continue }
             common.formIntersection(provider.capabilities(for: example))
         }
         synchronized {
@@ -434,9 +457,13 @@ public final class VirtualFileSystem: FileSystemProvider {
         case .branch(let real)?, .picked(_, let real)?:
             guard let item = realItem(at: real, cancellation: cancellation) else { return nil }
             // A directory is the virtual folder itself; anything else is simply the real file.
-            return item.isDirectory ? FileItem(url: url, name: item.name, isDirectory: true, modified: item.modified, permissions: item.permissions) : item
+            return item.isDirectory
+                ? FileItem(
+                    url: url, name: item.name, isDirectory: true, modified: item.modified,
+                    permissions: item.permissions) : item
         case .list(let id, let title, _)?:
-            return registered(id, as: VirtualLocation(url)!) == nil ? nil : FileItem(url: url, name: title, isDirectory: true, permissions: 0o555)
+            return registered(id, as: VirtualLocation(url)!) == nil
+                ? nil : FileItem(url: url, name: title, isDirectory: true, permissions: 0o555)
         case nil:
             return nil
         }
@@ -549,7 +576,9 @@ public final class VirtualFileSystem: FileSystemProvider {
     }
 
     public func totalSize(of directory: URL, cancellation: CancellationFlag) -> Int64 {
-        guard let target = try? real(directory) else { return totalSizeByListing(of: directory, cancellation: cancellation) }
+        guard let target = try? real(directory) else {
+            return totalSizeByListing(of: directory, cancellation: cancellation)
+        }
         return target.provider.totalSize(of: target.url, cancellation: cancellation)
     }
 
@@ -583,7 +612,8 @@ public final class VirtualFileSystem: FileSystemProvider {
             // text that merely ends alike is not this list.
             switch list.location {
             case .list(_, let title, _): return kind == "list " && front == title ? list.location.url : nil
-            case .picked(_, let real): return kind == "selected branch " && front == fileSystems.displayPath(real) ? list.location.url : nil
+            case .picked(_, let real):
+                return kind == "selected branch " && front == fileSystems.displayPath(real) ? list.location.url : nil
             case .branch: return nil
             }
         }
@@ -596,8 +626,11 @@ public final class VirtualFileSystem: FileSystemProvider {
             return (try? fileSystems.provider(for: real))?.volume(of: real)
         case .list(let id, _, _)?:
             // Asked on the main thread: a list that is not prepared yet is judged by its first file.
-            guard let list = registered(id, as: VirtualLocation(url)!) else { return VolumeInfo(name: "Search result:", isLocal: true) }
-            return VolumeInfo(name: "Search result:", isLocal: list.preparedIfReady?.isLocal ?? list.raw.first?.isFileURL ?? true)
+            guard let list = registered(id, as: VirtualLocation(url)!) else {
+                return VolumeInfo(name: "Search result:", isLocal: true)
+            }
+            return VolumeInfo(
+                name: "Search result:", isLocal: list.preparedIfReady?.isLocal ?? list.raw.first?.isFileURL ?? true)
         case nil:
             return nil
         }
@@ -625,9 +658,11 @@ public final class VirtualFileSystem: FileSystemProvider {
             case .list(let id, _, _)?:
                 // Done by the preparation of the list; a list that is not through yet is
                 // looked at in its first files only, so this takes no time on the main thread.
-                real = registered(id, as: location!).map { list in
-                    list.preparedIfReady?.parents ?? parents(ofFirst: VirtualFileSystem.parentScanLimit, of: list.raw)
-                } ?? []
+                real =
+                    registered(id, as: location!).map { list in
+                        list.preparedIfReady?.parents
+                            ?? parents(ofFirst: VirtualFileSystem.parentScanLimit, of: list.raw)
+                    } ?? []
             case nil:
                 continue
             }
@@ -638,7 +673,8 @@ public final class VirtualFileSystem: FileSystemProvider {
             coalescers.append(coalescer)
             for (_, group) in Dictionary(grouping: real, by: { $0.scheme ?? "file" }) {
                 guard let provider = try? fileSystems.provider(for: group[0]), provider !== self,
-                      let watcher = provider.watch(group, onChange: { _ in coalescer.signal() }) else { continue }
+                    let watcher = provider.watch(group, onChange: { _ in coalescer.signal() })
+                else { continue }
                 watchers.append(watcher)
             }
         }
@@ -664,7 +700,8 @@ public final class VirtualFileSystem: FileSystemProvider {
         var parents: [URL] = []
         for entry in files.prefix(count) {
             guard let parent = (try? fileSystems.provider(for: entry))?.parent(of: entry),
-                  seen.insert(VirtualFileSystem.identity(of: parent)).inserted else { continue }
+                seen.insert(VirtualFileSystem.identity(of: parent)).inserted
+            else { continue }
             parents.append(parent)
             if parents.count >= VirtualFileSystem.watchLimit { break }
         }
@@ -689,7 +726,8 @@ public final class VirtualFileSystem: FileSystemProvider {
         init(_ fire: @escaping () -> Void) { self.fire = fire }
 
         func cancel() {
-            lock.lock(); defer { lock.unlock() }
+            lock.lock()
+            defer { lock.unlock() }
             isCancelled = true
         }
 

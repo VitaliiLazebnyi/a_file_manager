@@ -49,8 +49,14 @@ import Testing
 
     @Test func partsOfTheNameUnderTheCursor() throws {
         #expect(try names("<Copy of [N]") == ["Copy of Holiday pics"])
-        #expect(try names("<[A] ([E]) in [P] of [G], [S] bytes") == ["Holiday pics.jpeg (jpeg) in Photos of Data, 4096 bytes"])
-        #expect(try names("<[N1][N-4][N2-5]|[N2,3]|[N9-]|[N-4-]|[N-8-5]|[N2--5]") == ["Hpolid", "oli", "pics", "pics", "day", "oliday"])
+        #expect(
+            try names("<[A] ([E]) in [P] of [G], [S] bytes") == [
+                "Holiday pics.jpeg (jpeg) in Photos of Data, 4096 bytes"
+            ])
+        #expect(
+            try names("<[N1][N-4][N2-5]|[N2,3]|[N9-]|[N-4-]|[N-8-5]|[N2--5]") == [
+                "Hpolid", "oli", "pics", "pics", "day", "oliday"
+            ])
         #expect(try names("<[E02-9]|[E 1-6]x|[E1-3]") == ["00000peg", "jpegx", "jpe"])
         var folder = context
         folder.cursorName = "My.Folder"
@@ -95,7 +101,9 @@ import Testing
         #expect(try NameTemplate.names(from: "<new[\" (\"C\")\"]", context: taken) == ["new (4)"])
         #expect(try NameTemplate.names(from: "<free[C]|test[C:2]", context: taken) == ["free", "test02"])
         taken.exists = { _ in true }
-        #expect(throws: NameTemplate.Failure.noFreeName("full")) { try NameTemplate.names(from: "<full[C]", context: taken) }
+        #expect(throws: NameTemplate.Failure.noFreeName("full")) {
+            try NameTemplate.names(from: "<full[C]", context: taken)
+        }
     }
 }
 
@@ -104,15 +112,18 @@ import Testing
     /// The relative paths of a small tree that the filter lets through; folders end in `/`.
     func admitted(_ text: String) -> [String] {
         let filter = CopyFilter(text)
-        let tree: [(String, [String])] = [("", ["a.txt", "b.bak", "c.jpg"]), ("docs/", ["d.txt", "e.old"]), ("docs/build/", ["f.txt"]),
-                                          ("src/", ["g.txt"]), ("src/docs/", ["h.txt"]), ("src/docs/deep/", ["i.txt"])]
+        let tree: [(String, [String])] = [
+            ("", ["a.txt", "b.bak", "c.jpg"]), ("docs/", ["d.txt", "e.old"]), ("docs/build/", ["f.txt"]),
+            ("src/", ["g.txt"]), ("src/docs/", ["h.txt"]), ("src/docs/deep/", ["i.txt"])
+        ]
         var result: [String] = []
         var positions: [String: CopyFilter.Position] = ["": filter.base]
         for (folder, files) in tree {
             if !folder.isEmpty {
                 let parts = folder.dropLast().split(separator: "/").map(String.init)
                 let parent = parts.dropLast().map { $0 + "/" }.joined()
-                guard let above = positions[parent], let inside = filter.entering(parts[parts.count - 1], from: above) else { continue }
+                guard let above = positions[parent], let inside = filter.entering(parts[parts.count - 1], from: above)
+                else { continue }
                 positions[folder] = inside
             }
             guard let position = positions[folder] else { continue }
@@ -128,7 +139,11 @@ import Testing
     }
 
     @Test func includeAndExcludeMasks() {
-        #expect(admitted("*.txt *.JPG") == ["a.txt", "c.jpg", "docs/d.txt", "docs/build/f.txt", "src/g.txt", "src/docs/h.txt", "src/docs/deep/i.txt"])
+        #expect(
+            admitted("*.txt *.JPG") == [
+                "a.txt", "c.jpg", "docs/d.txt", "docs/build/f.txt", "src/g.txt", "src/docs/h.txt",
+                "src/docs/deep/i.txt"
+            ])
         #expect(admitted("*.* | *.bak *.old") == admitted("*.txt *.jpg"))
         #expect(admitted("| *.txt") == ["b.bak", "c.jpg", "docs/e.old"])
         #expect(admitted("\"a.txt\" ?.bak") == ["a.txt", "b.bak"])
@@ -142,7 +157,10 @@ import Testing
         #expect(admitted("*.txt /docs/") == ["a.txt", "docs/d.txt"])
         #expect(admitted("*.txt /docs/**/") == ["a.txt", "docs/d.txt", "docs/build/f.txt"])
         #expect(admitted("*.txt docs/") == ["a.txt", "docs/d.txt", "src/docs/h.txt"])
-        #expect(admitted("*.txt docs/**/") == ["a.txt", "docs/d.txt", "docs/build/f.txt", "src/docs/h.txt", "src/docs/deep/i.txt"])
+        #expect(
+            admitted("*.txt docs/**/") == [
+                "a.txt", "docs/d.txt", "docs/build/f.txt", "src/docs/h.txt", "src/docs/deep/i.txt"
+            ])
         #expect(admitted("*.txt docs\\ | /") == ["docs/d.txt", "src/docs/h.txt"])
         #expect(CopyFilter("*.* | **/").skipsEmptyFolders && !CopyFilter("*.*").skipsEmptyFolders)
     }
@@ -183,8 +201,14 @@ import Testing
         log.write(OperationRecord(.move, source: "/a/three.txt", target: "/b/three.txt", status: .skipped))
         log.flush()
         let lines = (box.read("logs/operations.log") ?? "").split(separator: "\n").map { String($0.dropFirst(21)) }
-        #expect(lines == ["Copy: /a/one.txt -> /b/one.txt", "Error: Delete: /a/two.txt: Permission denied", "Skipped: Move: /a/three.txt -> /b/three.txt"])
-        #expect(box.read("logs/operations.log")?.range(of: #"^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d: Copy"#, options: .regularExpression) != nil)
+        #expect(
+            lines == [
+                "Copy: /a/one.txt -> /b/one.txt", "Error: Delete: /a/two.txt: Permission denied",
+                "Skipped: Move: /a/three.txt -> /b/three.txt"
+            ])
+        #expect(
+            box.read("logs/operations.log")?.range(
+                of: #"^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d: Copy"#, options: .regularExpression) != nil)
     }
 
     @Test func manyThreadsCanWriteAtOnce() {
@@ -210,7 +234,9 @@ import Testing
         log.write(OperationRecord(.rename, source: "failed", status: .failed("no")))
         log.flush()
         let text = box.read("logs/operations.log") ?? ""
-        #expect(text.contains("kept") && text.contains("Error: Rename: failed: no") && !text.contains("skipped") && !text.contains("trashed")
+        #expect(
+            text.contains("kept") && text.contains("Error: Rename: failed: no") && !text.contains("skipped")
+                && !text.contains("trashed")
                 && !text.contains("folder"))
 
         var off = configuration
@@ -248,13 +274,16 @@ import Testing
         log.flush()
         // The file was last written two days ago, as far as the disk knows.
         let before = Date(timeIntervalSinceNow: -2 * 86400)
-        try FileManager.default.setAttributes([.modificationDate: before], ofItemAtPath: box.url("logs/operations.log").path)
+        try FileManager.default.setAttributes(
+            [.modificationDate: before], ofItemAtPath: box.url("logs/operations.log").path)
         clock.now = Date()
         log.write(OperationRecord(.copy, source: "later"))
         log.flush()
         let names = namesOnDisk(box.url("logs"))
         #expect(names.count == 2 && box.read("logs/operations.log")?.contains("later") == true)
         let old = try #require(names.first { $0 != "operations.log" })
-        #expect(old.range(of: #"^operations\.\d{4}-\d\d-\d\d\.log$"#, options: .regularExpression) != nil && box.read("logs/" + old)?.contains("today") == true)
+        #expect(
+            old.range(of: #"^operations\.\d{4}-\d\d-\d\d\.log$"#, options: .regularExpression) != nil
+                && box.read("logs/" + old)?.contains("today") == true)
     }
 }

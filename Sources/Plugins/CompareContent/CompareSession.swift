@@ -89,9 +89,10 @@ final class CompareSession {
     init(kernel: Kernel) {
         self.kernel = kernel
         settings = kernel.settings.scoped(to: CompareSettingsKey.scope)
-        options = DiffOptions(ignoreCase: settings.flag(CompareSettingsKey.ignoreCase, default: true),
-                              ignoreRepeatedSpaces: settings.flag(CompareSettingsKey.ignoreSpaces, default: true),
-                              ignoreLineEndings: settings.flag(CompareSettingsKey.ignoreLineEndings, default: true))
+        options = DiffOptions(
+            ignoreCase: settings.flag(CompareSettingsKey.ignoreCase, default: true),
+            ignoreRepeatedSpaces: settings.flag(CompareSettingsKey.ignoreSpaces, default: true),
+            ignoreLineEndings: settings.flag(CompareSettingsKey.ignoreLineEndings, default: true))
         let choice = settings.index(CompareSettingsKey.bytesPerLine, default: 1)
         bytesPerLine = CompareSettingsKey.bytesPerLineChoices[max(0, min(3, choice))]
     }
@@ -108,7 +109,9 @@ final class CompareSession {
 
     /// Runs `work` away from the main thread and hands its result to `finish` on it, unless a
     /// newer request has come in meanwhile.
-    private func background<Value>(_ work: @escaping (CancellationFlag) -> Value, finish: @escaping (Value, _ wasCancelled: Bool) -> Void) {
+    private func background<Value>(
+        _ work: @escaping (CancellationFlag) -> Value, finish: @escaping (Value, _ wasCancelled: Bool) -> Void
+    ) {
         running?.cancel()
         // A search in progress belongs to the texts and rows that are about to change.
         findGeneration += 1
@@ -144,44 +147,51 @@ final class CompareSession {
             completion(false)
             return
         }
-        let (fileSystems, forceBinary, options, bytesPerLine) = (self.fileSystems, self.forceBinary, self.options, self.bytesPerLine)
-        background({ cancellation in
-            CompareLoader.load(left: leftURL, right: rightURL, forceBinary: forceBinary, options: options, bytesPerLine: bytesPerLine,
-                               fileSystems: fileSystems, cancellation: cancellation)
-        }, finish: { [self] result, wasCancelled in
-            running = nil
-            if wasCancelled || result.wasCancelled {
-                // The cut-short result is not installed: what was shown before stays. If that was
-                // edited and its comparison had been given up for this one, it is made again, so
-                // that the rows shown and the texts held agree before anything is edited or copied.
-                status = "Cancelled"
-                if !content.isNone, !diffIsCurrent {
-                    recompute()
-                } else {
-                    phase = content.isNone ? .empty : .ready
-                    onChange()
+        let (fileSystems, forceBinary, options, bytesPerLine) = (
+            self.fileSystems, self.forceBinary, self.options, self.bytesPerLine
+        )
+        background(
+            { cancellation in
+                CompareLoader.load(
+                    left: leftURL, right: rightURL, forceBinary: forceBinary, options: options,
+                    bytesPerLine: bytesPerLine,
+                    fileSystems: fileSystems, cancellation: cancellation)
+            },
+            finish: { [self] result, wasCancelled in
+                running = nil
+                if wasCancelled || result.wasCancelled {
+                    // The cut-short result is not installed: what was shown before stays. If that was
+                    // edited and its comparison had been given up for this one, it is made again, so
+                    // that the rows shown and the texts held agree before anything is edited or copied.
+                    status = "Cancelled"
+                    if !content.isNone, !diffIsCurrent {
+                        recompute()
+                    } else {
+                        phase = content.isNone ? .empty : .ready
+                        onChange()
+                    }
+                    completion(false)
+                    return
                 }
-                completion(false)
-                return
-            }
-            content = result.content
-            diffIsCurrent = true
-            loaded = (result.leftItem, result.rightItem)
-            isIdentical = result.isIdentical
-            modified = (false, false)
-            anchors = []
-            undoStack = []
-            phase = .ready
-            updateStatus()
-            if let message = result.message {
-                status = message
-                kernel.ui.inform("Compare contents", detail: message, style: .warning)
-            } else if result.isIdentical {
-                kernel.ui.inform("Compare contents", detail: "The two files have the same content!", style: .information)
-            }
-            onChange()
-            if case .none = result.content { completion(false) } else { completion(true) }
-        })
+                content = result.content
+                diffIsCurrent = true
+                loaded = (result.leftItem, result.rightItem)
+                isIdentical = result.isIdentical
+                modified = (false, false)
+                anchors = []
+                undoStack = []
+                phase = .ready
+                updateStatus()
+                if let message = result.message {
+                    status = message
+                    kernel.ui.inform("Compare contents", detail: message, style: .warning)
+                } else if result.isIdentical {
+                    kernel.ui.inform(
+                        "Compare contents", detail: "The two files have the same content!", style: .information)
+                }
+                onChange()
+                if case .none = result.content { completion(false) } else { completion(true) }
+            })
     }
 
     /// Compares what is loaded again, after an option or the texts changed.
@@ -192,15 +202,20 @@ final class CompareSession {
             return
         case .binary(let left, let right, _):
             let bytesPerLine = self.bytesPerLine
-            background({ BinaryDiff.compute(left: left, right: right, bytesPerLine: bytesPerLine, cancellation: $0) }, finish: { [self] diff, cancelled in
-                show(.binary(left: left, right: right, diff: diff), cancelled: cancelled)
-            })
+            background(
+                { BinaryDiff.compute(left: left, right: right, bytesPerLine: bytesPerLine, cancellation: $0) },
+                finish: { [self] diff, cancelled in
+                    show(.binary(left: left, right: right, diff: diff), cancelled: cancelled)
+                })
         case .text(let left, let right, _, let width):
             let (options, anchors) = (self.options, self.anchors)
             let work = { (cancellation: CancellationFlag?) in
-                CompareLoader.text(left: left, right: right, options: options, anchors: anchors, cancellation: cancellation)
+                CompareLoader.text(
+                    left: left, right: right, options: options, anchors: anchors, cancellation: cancellation)
             }
-            if left.lines.count + right.lines.count < CompareSession.inlineRecompareBelow, width <= CompareSession.inlineRecompareWidth {
+            if left.lines.count + right.lines.count < CompareSession.inlineRecompareBelow,
+                width <= CompareSession.inlineRecompareWidth
+            {
                 running?.cancel()
                 show(work(nil))
             } else {
@@ -234,7 +249,9 @@ final class CompareSession {
         settings.set(options.ignoreCase, forKey: CompareSettingsKey.ignoreCase)
         settings.set(options.ignoreRepeatedSpaces, forKey: CompareSettingsKey.ignoreSpaces)
         settings.set(options.ignoreLineEndings, forKey: CompareSettingsKey.ignoreLineEndings)
-        settings.set(CompareSettingsKey.bytesPerLineChoices.firstIndex(of: bytesPerLine) ?? 1, forKey: CompareSettingsKey.bytesPerLine)
+        settings.set(
+            CompareSettingsKey.bytesPerLineChoices.firstIndex(of: bytesPerLine) ?? 1,
+            forKey: CompareSettingsKey.bytesPerLine)
         recompute()
     }
 
@@ -244,12 +261,17 @@ final class CompareSession {
             status = isIdentical ? "The two files have the same content!" : ""
         case .text(let left, let right, let diff, _):
             let count = diff.blocks.count
-            let differences = count == 0 ? (isIdentical ? "The two files have the same content!" : "No differences with the current options")
+            let differences =
+                count == 0
+                ? (isIdentical ? "The two files have the same content!" : "No differences with the current options")
                 : "\(count) difference\(count == 1 ? "" : "s")"
-            status = "\(differences)    \(left.encoding.name) <-> \(right.encoding.name)"
+            status =
+                "\(differences)    \(left.encoding.name) <-> \(right.encoding.name)"
                 + (hasUnsavedChanges ? "    [modified]" : "") + (anchors.isEmpty ? "" : "    [resynchronized]")
         case .binary(_, _, let diff):
-            status = diff.isIdentical ? "The two files have the same content!"
+            status =
+                diff.isIdentical
+                ? "The two files have the same content!"
                 : "\(diff.blocks.count) difference\(diff.blocks.count == 1 ? "" : "s"), \(Format.bytes(Int64(diff.differingBytes))) bytes differ    binary"
         }
     }
@@ -307,7 +329,9 @@ final class CompareSession {
     }
 
     private func line(_ side: CompareSide, row: Int) -> TextLine? {
-        guard case .text(let left, let right, let diff, _) = content, diff.rows.indices.contains(row) else { return nil }
+        guard case .text(let left, let right, let diff, _) = content, diff.rows.indices.contains(row) else {
+            return nil
+        }
         let (document, index) = side == .left ? (left, diff.rows[row].left) : (right, diff.rows[row].right)
         return index.flatMap { document.lines.indices.contains($0) ? document.lines[$0] : nil }
     }
@@ -339,7 +363,8 @@ final class CompareSession {
         switch content {
         case .none: return []
         case .text:
-            guard kind(ofRow: row) == .changed, let left = line(.left, row: row), let right = line(.right, row: row) else { return [] }
+            guard kind(ofRow: row) == .changed, let left = line(.left, row: row), let right = line(.right, row: row)
+            else { return [] }
             let ranges: (left: [Range<Int>], right: [Range<Int>])
             if let cached = inlineCache[row] {
                 ranges = cached
@@ -391,7 +416,9 @@ final class CompareSession {
 
     private var searching: CancellationFlag?
 
-    private static func search(_ content: CompareContent, _ needle: String, from row: Int, forward: Bool, cancellation: CancellationFlag?) -> Int? {
+    private static func search(
+        _ content: CompareContent, _ needle: String, from row: Int, forward: Bool, cancellation: CancellationFlag?
+    ) -> Int? {
         let count: Int
         let sides: (Int, CompareSide) -> String?
         switch content {
@@ -400,7 +427,8 @@ final class CompareSession {
         case .text(let left, let right, let diff, _):
             count = diff.rows.count
             sides = { candidate, side in
-                let (document, index) = side == .left ? (left, diff.rows[candidate].left) : (right, diff.rows[candidate].right)
+                let (document, index) =
+                    side == .left ? (left, diff.rows[candidate].left) : (right, diff.rows[candidate].right)
                 return index.flatMap { document.lines.indices.contains($0) ? document.lines[$0].text : nil }
             }
         case .binary(let left, let right, let diff):
@@ -414,7 +442,8 @@ final class CompareSession {
         for step in 1...count {
             if step & 0x3FF == 0, cancellation?.isCancelled == true { return nil }
             let candidate = ((row + (forward ? step : -step)) % count + count) % count
-            for side in [CompareSide.left, .right] where sides(candidate, side)?.range(of: needle, options: .caseInsensitive) != nil {
+            for side in [CompareSide.left, .right]
+            where sides(candidate, side)?.range(of: needle, options: .caseInsensitive) != nil {
                 return candidate
             }
         }
@@ -425,8 +454,10 @@ final class CompareSession {
 
     /// "Resync comparison from here": the lines of the two rows are taken to belong together.
     func resync(leftRow: Int, rightRow: Int) {
-        guard case .text(_, _, let diff, _) = content, diff.rows.indices.contains(leftRow), diff.rows.indices.contains(rightRow),
-              let left = diff.rows[leftRow].left, let right = diff.rows[rightRow].right else { return }
+        guard case .text(_, _, let diff, _) = content, diff.rows.indices.contains(leftRow),
+            diff.rows.indices.contains(rightRow),
+            let left = diff.rows[leftRow].left, let right = diff.rows[rightRow].right
+        else { return }
         // Anchors that the new one crosses are given up.
         anchors.removeAll { ($0.left < left) != ($0.right < right) || $0.left == left || $0.right == right }
         anchors.append((left, right))
@@ -471,7 +502,8 @@ final class CompareSession {
     /// first, so that nothing else holds their lines and they are changed where they are: an edit in
     /// a file of millions of lines does not copy it.
     private func edit(_ change: (inout TextDocument, inout TextDocument, TextDiff) -> [Splice]) {
-        guard isEditing, phase == .ready, diffIsCurrent, case .text(var left, var right, let diff, let width) = content else { return }
+        guard isEditing, phase == .ready, diffIsCurrent, case .text(var left, var right, let diff, let width) = content
+        else { return }
         content = .none
         let splices = change(&left, &right, diff)
         guard !splices.isEmpty else {
@@ -494,7 +526,9 @@ final class CompareSession {
     /// Replaces the text of a row's line on one side, as typed in the pane.
     func setText(_ text: String, _ side: CompareSide, row: Int) {
         edit { left, right, diff in
-            guard diff.rows.indices.contains(row), let index = side == .left ? diff.rows[row].left : diff.rows[row].right else { return [] }
+            guard diff.rows.indices.contains(row),
+                let index = side == .left ? diff.rows[row].left : diff.rows[row].right
+            else { return [] }
             let apply = { (document: inout TextDocument) -> [Splice] in
                 guard document.lines.indices.contains(index), document.lines[index].text != text else { return [] }
                 let old = document.lines[index]
@@ -517,25 +551,38 @@ final class CompareSession {
             var target = side == .left ? left : right
             // Lines arrive with the line break the target file mostly uses, so a file keeps one
             // style (spec 09 › Edit mode and saving); an empty target takes the source's.
-            let ending = target.lines.contains { $0.ending != .none } ? target.usualEnding(sampleLimit: 10_000) : source.usualEnding(sampleLimit: 10_000)
+            let ending =
+                target.lines.contains { $0.ending != .none }
+                ? target.usualEnding(sampleLimit: 10_000) : source.usualEnding(sampleLimit: 10_000)
             // The rows were made from these texts; an index outside them is skipped, never trusted.
-            let incoming = diff.rows[rows].compactMap { index($0, side.other) }.filter { source.lines.indices.contains($0) }
-                .map { TextLine(source.lines[$0].text, ending: ending, number: 0) }
+            let incoming = diff.rows[rows].compactMap { index($0, side.other) }.filter {
+                source.lines.indices.contains($0)
+            }
+            .map { TextLine(source.lines[$0].text, ending: ending, number: 0) }
             let replaced = diff.rows[rows].compactMap { index($0, side) }.filter { target.lines.indices.contains($0) }
             // Where nothing is replaced, the lines go in before the target's next line.
-            let start = replaced.first ?? diff.rows[rows.upperBound...].lazy.compactMap { index($0, side) }.first ?? target.lines.count
+            let start =
+                replaced.first ?? diff.rows[rows.upperBound...].lazy.compactMap { index($0, side) }.first
+                ?? target.lines.count
             let range = start..<(start + replaced.count)
-            guard range.upperBound <= target.lines.count, Array(target.lines[range]).map(\.text) != incoming.map(\.text) else { return [] }
-            let splice = Splice(side: side, start: start, removed: Array(target.lines[range]), insertedCount: incoming.count)
+            guard range.upperBound <= target.lines.count, Array(target.lines[range]).map(\.text) != incoming.map(\.text)
+            else { return [] }
+            let splice = Splice(
+                side: side, start: start, removed: Array(target.lines[range]), insertedCount: incoming.count)
             // Released before the change, so that it is made in the lines of the document itself.
             target = TextDocument()
-            if side == .left { left.lines.replaceSubrange(range, with: incoming) } else { right.lines.replaceSubrange(range, with: incoming) }
+            if side == .left {
+                left.lines.replaceSubrange(range, with: incoming)
+            } else {
+                right.lines.replaceSubrange(range, with: incoming)
+            }
             return [splice]
         }
     }
 
     func undo() {
-        guard isEditing, case .text(var left, var right, let diff, let width) = content, let last = undoStack.popLast() else { return }
+        guard isEditing, case .text(var left, var right, let diff, let width) = content, let last = undoStack.popLast()
+        else { return }
         content = .none
         for splice in last.splices.reversed() {
             let range = splice.start..<(splice.start + splice.insertedCount)
@@ -576,41 +623,53 @@ final class CompareSession {
         if modified.right, let rightURL { files.append((.right, rightURL, right, loaded.right)) }
         // Two edited texts of one file cannot both be written: the second would silently replace the first.
         if files.count == 2, CompareLoader.isSameFile(files[0].url, files[1].url) {
-            kernel.ui.report(CompareLoader.SaveError.sameFile(fileSystems.displayPath(files[0].url)), title: "Nothing was saved.")
+            kernel.ui.report(
+                CompareLoader.SaveError.sameFile(fileSystems.displayPath(files[0].url)), title: "Nothing was saved.")
             completion(false)
             return
         }
         let fileSystems = self.fileSystems
         let generation = editGeneration
-        kernel.jobs.run(title: "Save", work: { monitor -> [Saved] in
-            files.enumerated().map { index, file in
-                monitor.report(JobProgress(lines: ["Save: " + fileSystems.displayPath(file.url)], itemsDone: index, itemsTotal: files.count))
-                do {
-                    let data = try file.document.encodedData(named: file.url.lastPathComponent)
-                    let item = try CompareLoader.replace(file.url, with: data, expected: file.expected, fileSystems: fileSystems)
-                    return Saved(side: file.side, error: nil, item: item)
-                } catch {
-                    return Saved(side: file.side, error: error, item: nil)
-                }
-            }
-        }, completion: { [self] results in
-            for saved in results {
-                if let error = saved.error {
-                    kernel.ui.report(error, title: "\(displayPath(saved.side)) could not be saved.")
-                } else {
-                    // What was written is now the file on disk, whatever was edited since.
-                    if saved.side == .left { loaded.left = saved.item?.isSymlink == true ? nil : saved.item } else { loaded.right = saved.item?.isSymlink == true ? nil : saved.item }
-                    // Only what was saved is settled: an edit made while the job ran is still unsaved.
-                    if editGeneration == generation {
-                        if saved.side == .left { modified.left = false } else { modified.right = false }
+        kernel.jobs.run(
+            title: "Save",
+            work: { monitor -> [Saved] in
+                files.enumerated().map { index, file in
+                    monitor.report(
+                        JobProgress(
+                            lines: ["Save: " + fileSystems.displayPath(file.url)], itemsDone: index,
+                            itemsTotal: files.count))
+                    do {
+                        let data = try file.document.encodedData(named: file.url.lastPathComponent)
+                        let item = try CompareLoader.replace(
+                            file.url, with: data, expected: file.expected, fileSystems: fileSystems)
+                        return Saved(side: file.side, error: nil, item: item)
+                    } catch {
+                        return Saved(side: file.side, error: error, item: nil)
                     }
                 }
-            }
-            kernel.panels.refresh(files.map { $0.url.deletingLastPathComponent() })
-            updateStatus()
-            onChange()
-            completion(results.allSatisfy { $0.error == nil } && !hasUnsavedChanges)
-        })
+            },
+            completion: { [self] results in
+                for saved in results {
+                    if let error = saved.error {
+                        kernel.ui.report(error, title: "\(displayPath(saved.side)) could not be saved.")
+                    } else {
+                        // What was written is now the file on disk, whatever was edited since.
+                        if saved.side == .left {
+                            loaded.left = saved.item?.isSymlink == true ? nil : saved.item
+                        } else {
+                            loaded.right = saved.item?.isSymlink == true ? nil : saved.item
+                        }
+                        // Only what was saved is settled: an edit made while the job ran is still unsaved.
+                        if editGeneration == generation {
+                            if saved.side == .left { modified.left = false } else { modified.right = false }
+                        }
+                    }
+                }
+                kernel.panels.refresh(files.map { $0.url.deletingLastPathComponent() })
+                updateStatus()
+                onChange()
+                completion(results.allSatisfy { $0.error == nil } && !hasUnsavedChanges)
+            })
     }
 
     /// Writes the changed files at once on the calling thread, for the program quitting, where a
@@ -618,8 +677,10 @@ final class CompareSession {
     func saveNow() -> Bool {
         guard case .text(let left, let right, _, _) = content, hasUnsavedChanges else { return true }
         var ok = true
-        for (side, url, document, expected, isModified) in [(CompareSide.left, leftURL, left, loaded.left, modified.left),
-                                                            (.right, rightURL, right, loaded.right, modified.right)] where isModified {
+        for (side, url, document, expected, isModified) in [
+            (CompareSide.left, leftURL, left, loaded.left, modified.left),
+            (.right, rightURL, right, loaded.right, modified.right)
+        ] where isModified {
             guard let url else { continue }
             do {
                 let data = try document.encodedData(named: url.lastPathComponent)

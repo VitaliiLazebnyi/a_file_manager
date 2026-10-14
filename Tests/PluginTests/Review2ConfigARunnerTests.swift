@@ -1,12 +1,13 @@
 import AFMContracts
 import AFMKernel
-@testable import ConfigurationPlugin
 import Foundation
 import LocalFileSystemPlugin
 import NavigationPlugin
 import SelectionPlugin
 import TestSupport
 import Testing
+
+@testable import ConfigurationPlugin
 
 /// User commands as the runner performs them (review 2): values stay values from one command
 /// to the next, loops end, and what cannot run says so.
@@ -21,14 +22,17 @@ import Testing
     }
 
     func bench(launches: Bool = false) -> (plugin: ConfigurationPlugin, bench: TestBench) {
-        let plugin = ConfigurationPlugin(launchesApplications: launches, background: nil, listFolder: box.url("lists"), settingsKeys: { [] })
-        let bench = TestBench(plugins: [NavigationPlugin(), SelectionPlugin(), plugin], fileSystems: [LocalFileSystem()],
-                              left: box.url("A"), right: box.url("B"), settings: settings)
+        let plugin = ConfigurationPlugin(
+            launchesApplications: launches, background: nil, listFolder: box.url("lists"), settingsKeys: { [] })
+        let bench = TestBench(
+            plugins: [NavigationPlugin(), SelectionPlugin(), plugin], fileSystems: [LocalFileSystem()],
+            left: box.url("A"), right: box.url("B"), settings: settings)
         return (plugin, bench)
     }
 
     func define(_ plugin: ConfigurationPlugin, _ name: String, _ command: String, _ parameters: String = "") {
-        plugin.center!.save(UserCommand(name: name, title: "", action: CommandAction(command: command, parameters: parameters)))
+        plugin.center!.save(
+            UserCommand(name: name, title: "", action: CommandAction(command: command, parameters: parameters)))
     }
 
     /// Lets the main actor run until `done`, for at most a minute.
@@ -52,7 +56,10 @@ import Testing
     @Test func aStartMenuEntryThatCallsItselfIsStoppedToo() async {
         let (plugin, bench) = bench()
         var draft = plugin.center!.startMenuDraft()
-        draft.insert(StartMenuDraft.Row(entry: StartMenuEntry(title: "Loop", action: CommandAction(command: "cm_wait 1, cm_UserMenu1"))), after: nil)
+        draft.insert(
+            StartMenuDraft.Row(
+                entry: StartMenuEntry(title: "Loop", action: CommandAction(command: "cm_wait 1, cm_UserMenu1"))),
+            after: nil)
         plugin.center!.commit(draft)
         bench.commands.perform("cm_UserMenu1")
         await wait { bench.ui.log.contains { $0.contains("calls itself") } }
@@ -63,7 +70,9 @@ import Testing
         let (plugin, bench) = bench()
         var probes = 0
         bench.commands.register(Command("cm_ConfigProbe", "Probe")) { probes += 1 }
-        define(plugin, "em_many", Array(repeating: "cm_ConfigProbe", count: CommandRunner.stepLimit + 50).joined(separator: ","))
+        define(
+            plugin, "em_many",
+            Array(repeating: "cm_ConfigProbe", count: CommandRunner.stepLimit + 50).joined(separator: ","))
         bench.commands.perform("em_many")
         #expect(probes == CommandRunner.stepLimit && bench.ui.log == ["inform: “many” was stopped"])
         // Commands nested deeper than the limit are refused, not run.
@@ -134,10 +143,12 @@ import Testing
         let count = CommandRunner.backgroundSelectionThreshold + 3
         for number in 0..<count { memory.addFile("/Big/f\(number) x.txt") }
         memory.addDirectory("/B")
-        let plugin = ConfigurationPlugin(launchesApplications: false, background: .global(qos: .userInitiated), listFolder: box.url("lists-big"),
-                                         settingsKeys: { [] })
-        let bench = TestBench(plugins: [NavigationPlugin(), SelectionPlugin(), plugin], fileSystems: [LocalFileSystem(), memory],
-                              left: memory.url("/Big"), right: memory.url("/B"))
+        let plugin = ConfigurationPlugin(
+            launchesApplications: false, background: .global(qos: .userInitiated), listFolder: box.url("lists-big"),
+            settingsKeys: { [] })
+        let bench = TestBench(
+            plugins: [NavigationPlugin(), SelectionPlugin(), plugin], fileSystems: [LocalFileSystem(), memory],
+            left: memory.url("/Big"), right: memory.url("/B"))
         define(plugin, "em_all", "tool", "%S")
         define(plugin, "em_cursor", "tool", "%N")
         bench.commands.perform(.selectAll)
@@ -165,8 +176,12 @@ import Testing
 
     @Test func theSelectionIsGatheredOnlyForATextThatAsksForIt() {
         #expect(ParameterExpander.usesSelection([.text("%S")]) && ParameterExpander.usesSelection([.text("a %P%s")]))
-        #expect(ParameterExpander.usesSelection([.text("%L")]) && ParameterExpander.usesSelection([.text("%C1")]) && ParameterExpander.usesSelection([.text("%UF")]))
-        #expect(!ParameterExpander.usesSelection([.text("%P%N %T%M %%S %O.%E")]) && !ParameterExpander.usesSelection([.value("%S")]))
+        #expect(
+            ParameterExpander.usesSelection([.text("%L")]) && ParameterExpander.usesSelection([.text("%C1")])
+                && ParameterExpander.usesSelection([.text("%UF")]))
+        #expect(
+            !ParameterExpander.usesSelection([.text("%P%N %T%M %%S %O.%E")])
+                && !ParameterExpander.usesSelection([.value("%S")]))
     }
 
     @Test func anApplicationPathWithASpaceIsOneWord() throws {
@@ -179,19 +194,24 @@ import Testing
         #expect(CommandRunner.applicationLine(for: [.text("ls -l")]) == nil)
         #expect(CommandRunner.applicationLine(for: [.text("\"\(box.url("Apps/None.app").path)\" x")]) == nil)
         #expect(ShellWords.firstWord(of: [.text("  \"a b\"c d e")]).word == [.text("\"a b\"c")])
-        #expect(ShellWords.unquoted(ShellWords.firstWord(of: [.text("pre"), .value("x y"), .text("post rest")]).word) == "prex ypost")
+        #expect(
+            ShellWords.unquoted(ShellWords.firstWord(of: [.text("pre"), .value("x y"), .text("post rest")]).word)
+                == "prex ypost")
     }
 
     @Test func listFilesOfARunThatQuitsAreKeptWhileAProgramMayReadThem() throws {
         let made = bench()
-        let runner = CommandRunner(kernel: made.bench.kernel, launchesApplications: false, background: nil, listFolder: box.url("lists2"))
+        let runner = CommandRunner(
+            kernel: made.bench.kernel, launchesApplications: false, background: nil, listFolder: box.url("lists2"))
         let folder = try box.folder("lists2")
         let old = try box.file("lists2/list-old.txt")
         let fresh = try box.file("lists2/list-new.txt")
-        try FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(-CommandRunner.listGrace * 3)], ofItemAtPath: old.path)
+        try FileManager.default.setAttributes(
+            [.modificationDate: Date().addingTimeInterval(-CommandRunner.listGrace * 3)], ofItemAtPath: old.path)
         runner.removeListFilesNow()
         #expect(!FileManager.default.fileExists(atPath: old.path) && FileManager.default.fileExists(atPath: fresh.path))
-        try FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(-CommandRunner.listGrace * 3)], ofItemAtPath: fresh.path)
+        try FileManager.default.setAttributes(
+            [.modificationDate: Date().addingTimeInterval(-CommandRunner.listGrace * 3)], ofItemAtPath: fresh.path)
         runner.removeListFilesNow()
         #expect(!FileManager.default.fileExists(atPath: folder.path))
     }
@@ -207,9 +227,11 @@ import Testing
         box = try Sandbox()
         try box.folder("A")
         try box.folder("B")
-        plugin = ConfigurationPlugin(launchesApplications: true, background: nil, listFolder: box.url("lists"), settingsKeys: { [] })
-        bench = TestBench(plugins: [NavigationPlugin(), SelectionPlugin(), plugin], fileSystems: [LocalFileSystem()],
-                          left: box.url("A"), right: box.url("B"))
+        plugin = ConfigurationPlugin(
+            launchesApplications: true, background: nil, listFolder: box.url("lists"), settingsKeys: { [] })
+        bench = TestBench(
+            plugins: [NavigationPlugin(), SelectionPlugin(), plugin], fileSystems: [LocalFileSystem()],
+            left: box.url("A"), right: box.url("B"))
     }
 
     func wait(until done: () -> Bool) async {
@@ -225,25 +247,37 @@ import Testing
         let center = plugin.center!
         let out = box.url("out.bin").path
         // The panel's folder is where the line runs: a marker would appear in it.
-        center.save(UserCommand(name: "em_show", title: "", action: CommandAction(command: "printf '%s\\0'", parameters: "%N \"%P%N\" x%Ny > '\(out)'")))
+        center.save(
+            UserCommand(
+                name: "em_show", title: "",
+                action: CommandAction(command: "printf '%s\\0'", parameters: "%N \"%P%N\" x%Ny > '\(out)'")))
         for name in names {
             try? FileManager.default.removeItem(atPath: out)
             bench.left.moveCursor(toName: name)
             bench.commands.perform("em_show")
             func written() -> Data { (try? Data(contentsOf: URL(fileURLWithPath: out))) ?? Data() }
             await wait { written().filter { $0 == 0 }.count == 3 }
-            let words = String(decoding: written(), as: UTF8.self).split(separator: "\0", omittingEmptySubsequences: false).dropLast().map(String.init)
+            let words = String(decoding: written(), as: UTF8.self).split(
+                separator: "\0", omittingEmptySubsequences: false
+            ).dropLast().map(String.init)
             let guarded = name.hasPrefix("-") ? "./" + name : name
             let folder = bench.left.model.directory.path
-            #expect(words.map { Array($0.utf8) } == [guarded, folder + "/" + name, "x" + name + "y"].map { Array($0.utf8) },
-                    "\(name.debugDescription): \(words.map(\.debugDescription))")
+            #expect(
+                words.map { Array($0.utf8) }
+                    == [guarded, folder + "/" + name, "x" + name + "y"].map { Array($0.utf8) },
+                "\(name.debugDescription): \(words.map(\.debugDescription))")
         }
-        let created = try FileManager.default.contentsOfDirectory(atPath: box.url("A").path).filter { $0.hasPrefix("PWNED") }
+        let created = try FileManager.default.contentsOfDirectory(atPath: box.url("A").path).filter {
+            $0.hasPrefix("PWNED")
+        }
         #expect(created.isEmpty && bench.ui.log.isEmpty)
     }
 
     @Test func aProgramTheShellDoesNotFindIsReported() async {
-        plugin.center!.save(UserCommand(name: "em_missing", title: "", action: CommandAction(command: "afm-no-such-program-\(UUID().uuidString)")))
+        plugin.center!.save(
+            UserCommand(
+                name: "em_missing", title: "",
+                action: CommandAction(command: "afm-no-such-program-\(UUID().uuidString)")))
         bench.commands.perform("em_missing")
         await wait { bench.ui.log.contains { $0.hasPrefix("inform:") } }
         #expect(bench.ui.log.count == 1 && bench.ui.log[0].contains("cannot be started"))
@@ -253,10 +287,14 @@ import Testing
         var probes = 0
         bench.commands.register(Command("cm_ConfigProbe", "Probe")) { probes += 1 }
         let center = plugin.center!
-        center.save(UserCommand(name: "em_bad", title: "", action: CommandAction(command: "afm-no-such-program-\(UUID().uuidString)")))
+        center.save(
+            UserCommand(
+                name: "em_bad", title: "", action: CommandAction(command: "afm-no-such-program-\(UUID().uuidString)"))
+        )
         center.save(UserCommand(name: "em_chain", title: "", action: CommandAction(command: "em_bad, cm_ConfigProbe")))
         center.save(UserCommand(name: "em_good", title: "", action: CommandAction(command: "true")))
-        center.save(UserCommand(name: "em_chain2", title: "", action: CommandAction(command: "em_good, cm_ConfigProbe")))
+        center.save(
+            UserCommand(name: "em_chain2", title: "", action: CommandAction(command: "em_good, cm_ConfigProbe")))
         bench.commands.perform("em_chain")
         await wait { bench.ui.log.contains { $0.contains("cannot be started") } }
         bench.commands.perform("em_chain2")

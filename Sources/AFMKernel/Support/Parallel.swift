@@ -22,9 +22,13 @@ public enum Parallel {
     /// Every piece of the work runs inside an autorelease pool of its own, on whatever thread
     /// it runs: what a transform leaves to be released later (data read through Foundation)
     /// is gone when the piece ends.
-    public static func map<Element, Result>(_ items: [Element], serialBelow threshold: Int = 2,
-                                            _ transform: (Element) -> Result) -> [Result] {
-        guard items.count >= threshold, items.count > 1, ParallelPool.shared.width > 0 else { return items.map(transform) }
+    public static func map<Element, Result>(
+        _ items: [Element], serialBelow threshold: Int = 2,
+        _ transform: (Element) -> Result
+    ) -> [Result] {
+        guard items.count >= threshold, items.count > 1, ParallelPool.shared.width > 0 else {
+            return items.map(transform)
+        }
         return [Result](unsafeUninitializedCapacity: items.count) { buffer, count in
             // Each iteration writes its own slot, so the slots need no lock.
             let slots = UnsafeMutablePointer<Result>(buffer.baseAddress!)
@@ -48,8 +52,10 @@ public enum Parallel {
     /// `DispatchQueue.main.sync`): stops, in debug builds, a caller that is part of a `map`
     /// the main thread waits for (see `map`).
     public static func assertMayWaitForMainThread(file: StaticString = #fileID, line: UInt = #line) {
-        assert(!isHoldingUpMainThread, "Work inside a Parallel.map that was called on the main thread must not wait for the main thread",
-               file: file, line: line)
+        assert(
+            !isHoldingUpMainThread,
+            "Work inside a Parallel.map that was called on the main thread must not wait for the main thread",
+            file: file, line: line)
     }
 }
 
@@ -120,7 +126,9 @@ final class ParallelPool {
         /// Scratch for a look: the threads the tree could still take.
         var room = 0
 
-        init(count: Int, grain: Int, parent: Job?, isForMain: Bool, urgency: qos_class_t, body: @escaping (Int) -> Void) {
+        init(
+            count: Int, grain: Int, parent: Job?, isForMain: Bool, urgency: qos_class_t, body: @escaping (Int) -> Void
+        ) {
             (self.count, self.grain, self.parent, self.body) = (count, grain, parent, body)
             top = parent.map(\.root)
             (self.isForMain, self.urgency) = (isForMain, urgency)
@@ -154,8 +162,16 @@ final class ParallelPool {
     private var linger: TimeInterval = 2
     /// The same for tests, which make it short.
     var lingering: TimeInterval {
-        get { condition.lock(); defer { condition.unlock() }; return linger }
-        set { condition.lock(); linger = newValue; condition.unlock() }
+        get {
+            condition.lock()
+            defer { condition.unlock() }
+            return linger
+        }
+        set {
+            condition.lock()
+            linger = newValue
+            condition.unlock()
+        }
     }
     /// Threads that are to leave when they next look for work: more are ready to run than
     /// there are cores.
@@ -181,7 +197,10 @@ final class ParallelPool {
 
     private var current: Job? {
         get { pthread_getspecific(ParallelPool.currentJob).map { Unmanaged<Job>.fromOpaque($0).takeUnretainedValue() } }
-        set { pthread_setspecific(ParallelPool.currentJob, newValue.map { UnsafeRawPointer(Unmanaged.passUnretained($0).toOpaque()) }) }
+        set {
+            pthread_setspecific(
+                ParallelPool.currentJob, newValue.map { UnsafeRawPointer(Unmanaged.passUnretained($0).toOpaque()) })
+        }
     }
 
     /// Whether the calling thread is at a piece of a tree the main thread waits for.
@@ -189,7 +208,8 @@ final class ParallelPool {
 
     /// The pool's threads as they are now; for tests.
     var census: (threads: Int, idle: Int) {
-        condition.lock(); defer { condition.unlock() }
+        condition.lock()
+        defer { condition.unlock() }
         return (threads, idle)
     }
 
@@ -203,9 +223,11 @@ final class ParallelPool {
 
     func run(count: Int, body: @escaping (Int) -> Void) {
         let parent = current
-        let job = Job(count: count, grain: max(1, count / ((width + 1) * 16)), parent: parent,
-                      isForMain: parent == nil && Thread.isMainThread, urgency: parent == nil ? ParallelPool.urgencyOfCaller() : QOS_CLASS_UNSPECIFIED,
-                      body: body)
+        let job = Job(
+            count: count, grain: max(1, count / ((width + 1) * 16)), parent: parent,
+            isForMain: parent == nil && Thread.isMainThread,
+            urgency: parent == nil ? ParallelPool.urgencyOfCaller() : QOS_CLASS_UNSPECIFIED,
+            body: body)
         let root = job.root
         condition.lock()
         open.append(job)
@@ -373,7 +395,9 @@ final class ParallelPool {
         var info = thread_basic_info()
         var count = mach_msg_type_number_t(MemoryLayout<thread_basic_info>.size / MemoryLayout<integer_t>.size)
         let result = withUnsafeMutablePointer(to: &info) { info in
-            info.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { thread_info(thread, thread_flavor_t(THREAD_BASIC_INFO), $0, &count) }
+            info.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+                thread_info(thread, thread_flavor_t(THREAD_BASIC_INFO), $0, &count)
+            }
         }
         guard result == KERN_SUCCESS else { return nil }
         let seconds = UInt64(info.user_time.seconds) + UInt64(info.system_time.seconds)
@@ -501,7 +525,9 @@ final class ParallelPool {
 /// States which thread a piece of state belongs to. Panel state, the registries and everything
 /// on screen belong to the main thread; these checks stop a wrong caller in debug builds.
 public enum MainThread {
-    public static func assert(_ what: @autoclosure () -> String = "This", file: StaticString = #fileID, line: UInt = #line) {
+    public static func assert(
+        _ what: @autoclosure () -> String = "This", file: StaticString = #fileID, line: UInt = #line
+    ) {
         Swift.assert(Thread.isMainThread, "\(what()) must be used on the main thread", file: file, line: line)
     }
 }

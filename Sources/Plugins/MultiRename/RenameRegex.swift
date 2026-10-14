@@ -16,12 +16,14 @@ final class RenameRegexGuard {
     }
 
     var hasTimedOut: Bool {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         return timeouts > 0
     }
 
     var isTripped: Bool {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         return timeouts >= limit
     }
 }
@@ -36,14 +38,18 @@ enum RenameRegex {
 
     /// The matches in `text` (only the first with `firstOnly`); nil when the expression took too
     /// long or the work was cancelled.
-    static func matches(_ regex: NSRegularExpression, in text: String, firstOnly: Bool, guardian: RenameRegexGuard,
-                        cancelled: () -> Bool) -> [NSTextCheckingResult]? {
+    static func matches(
+        _ regex: NSRegularExpression, in text: String, firstOnly: Bool, guardian: RenameRegexGuard,
+        cancelled: () -> Bool
+    ) -> [NSTextCheckingResult]? {
         if guardian.isTripped || cancelled() { return nil }
         // (Processor time of this thread, not the clock: see `ThreadTime`.)
         let deadline = ThreadTime.used + budget
         var found: [NSTextCheckingResult] = []
         var timedOut = false
-        regex.enumerateMatches(in: text, options: [.reportProgress], range: NSRange(location: 0, length: text.utf16.count)) { result, _, stop in
+        regex.enumerateMatches(
+            in: text, options: [.reportProgress], range: NSRange(location: 0, length: text.utf16.count)
+        ) { result, _, stop in
             if let result {
                 found.append(result)
                 if firstOnly { stop.pointee = true }
@@ -90,7 +96,12 @@ struct WildcardMatcher {
             }
         }
         // A lone `*` is the greedy kind (the whole name), not an anchored lazy one.
-        isAnchored = pieces.count > 1 && { if case .star = pieces[0] { return true } else { return false } }()
+        isAnchored =
+            pieces.count > 1
+            && {
+                guard case .star = pieces[0] else { return false }
+                return true
+            }()
         self.pieces = pieces
     }
 
@@ -142,8 +153,9 @@ struct WildcardMatcher {
         let scalars = Array(text.unicodeScalars)
         var offsets = [Int](repeating: 0, count: scalars.count + 1)
         for (index, scalar) in scalars.enumerated() { offsets[index + 1] = offsets[index] + scalar.utf16.count }
-        let subject = Subject(values: scalars.map { caseSensitive ? $0.value : WildcardMatcher.folded($0) },
-                              breaks: scalars.map { WildcardMatcher.isLineBreak($0.value) })
+        let subject = Subject(
+            values: scalars.map { caseSensitive ? $0.value : WildcardMatcher.folded($0) },
+            breaks: scalars.map { WildcardMatcher.isLineBreak($0.value) })
         // Looked at every few thousand steps: the clock is not asked for every character.
         let deadline = budget.isFinite ? ThreadTime.used + budget : .infinity
         var (steps, isOver) = (0, false)
@@ -193,7 +205,9 @@ struct WildcardMatcher {
                     return position
                 }
                 let run = pieces[(index + 1)..<end]
-                guard let found = firstOccurrence(of: run, in: subject, from: position, goesOn: goesOn) else { return nil }
+                guard let found = firstOccurrence(of: run, in: subject, from: position, goesOn: goesOn) else {
+                    return nil
+                }
                 position = found + run.count
                 index = end
             } else {
@@ -225,7 +239,8 @@ struct WildcardMatcher {
 
     /// The first place at or after `from` where `run` fits without a line break lying between
     /// `from` and it (a star does not run over one).
-    private func firstOccurrence(of run: ArraySlice<Piece>, in subject: Subject, from: Int, goesOn: () -> Bool) -> Int? {
+    private func firstOccurrence(of run: ArraySlice<Piece>, in subject: Subject, from: Int, goesOn: () -> Bool) -> Int?
+    {
         var position = from
         while position + run.count <= subject.count, goesOn() {
             if fits(run, in: subject, at: position) { return position }

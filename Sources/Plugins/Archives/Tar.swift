@@ -107,7 +107,9 @@ struct TarHeader {
         var records: [String: String] = [:]
         var rest = data[...]
         while let space = rest.firstIndex(of: 32), space - rest.startIndex <= 20,
-              let length = Int(String(decoding: rest[..<space], as: UTF8.self)), length > space - rest.startIndex + 1, rest.count >= length {
+            let length = Int(String(decoding: rest[..<space], as: UTF8.self)), length > space - rest.startIndex + 1,
+            rest.count >= length
+        {
             let record = rest[rest.index(after: space)..<(rest.startIndex + length)]
             if let equals = record.firstIndex(of: 61) {
                 let value = record[record.index(after: equals)...].dropLast()
@@ -130,8 +132,10 @@ struct TarHeader {
         put(String(padded.suffix(length - 1)), into: &block, at: offset, length: length - 1)
     }
 
-    private static func block(name: String, prefix: String = "", typeFlag: UInt8, size: UInt64, modified: Date, permissions: UInt16,
-                              linkTarget: String = "") -> Data {
+    private static func block(
+        name: String, prefix: String = "", typeFlag: UInt8, size: UInt64, modified: Date, permissions: UInt16,
+        linkTarget: String = ""
+    ) -> Data {
         var block = [UInt8](repeating: 0, count: blockSize)
         put(name, into: &block, at: 0, length: 100)
         putOctal(UInt64(permissions), into: &block, at: 100, length: 8)
@@ -161,8 +165,12 @@ struct TarHeader {
         if storedPath.utf8.count > 100 {
             // ustar splits a long path at a slash into prefix (155) and name (100).
             let bytes = Array(storedPath.utf8)
-            let split = bytes.indices.last { bytes[$0] == 47 && $0 <= 155 && bytes.count - $0 - 1 <= 100 && $0 > 0 && $0 < bytes.count - 1 }
-            if let split, let head = String(bytes: bytes[..<split], encoding: .utf8), let tail = String(bytes: bytes[(split + 1)...], encoding: .utf8) {
+            let split = bytes.indices.last {
+                bytes[$0] == 47 && $0 <= 155 && bytes.count - $0 - 1 <= 100 && $0 > 0 && $0 < bytes.count - 1
+            }
+            if let split, let head = String(bytes: bytes[..<split], encoding: .utf8),
+                let tail = String(bytes: bytes[(split + 1)...], encoding: .utf8)
+            {
                 (name, prefix) = (tail, head)
             } else {
                 extended.append(("path", storedPath))
@@ -178,17 +186,23 @@ struct TarHeader {
                 // The length counts itself, so it is found by trying.
                 let body = " \(key)=\(value)\n"
                 var length = body.utf8.count + 1
-                while String(length).utf8.count + body.utf8.count != length { length = String(length).utf8.count + body.utf8.count }
+                while String(length).utf8.count + body.utf8.count != length {
+                    length = String(length).utf8.count + body.utf8.count
+                }
                 records.append(Data("\(length)\(body)".utf8))
             }
-            data.append(TarHeader.block(name: "PaxHeader/" + String(name.suffix(80)), typeFlag: 120, size: UInt64(records.count),
-                                        modified: modified, permissions: 0o644))
+            data.append(
+                TarHeader.block(
+                    name: "PaxHeader/" + String(name.suffix(80)), typeFlag: 120, size: UInt64(records.count),
+                    modified: modified, permissions: 0o644))
             data.append(records)
             data.append(TarHeader.padding(after: UInt64(records.count)))
         }
         let typeFlag: UInt8 = kind == .directory ? 53 : kind == .symbolicLink ? 50 : kind == .hardLink ? 49 : 48
-        data.append(TarHeader.block(name: name, prefix: prefix, typeFlag: typeFlag, size: kind == .file ? size : 0, modified: modified,
-                                    permissions: permissions, linkTarget: linkTarget))
+        data.append(
+            TarHeader.block(
+                name: name, prefix: prefix, typeFlag: typeFlag, size: kind == .file ? size : 0, modified: modified,
+                permissions: permissions, linkTarget: linkTarget))
         return data
     }
 
@@ -222,14 +236,18 @@ final class TarReader {
         let data = try stream.readFully(TarHeader.blockSize)
         position += UInt64(data.count)
         if data.isEmpty { return nil }
-        guard data.count == TarHeader.blockSize else { throw ArchiveError.damaged("the TAR archive ends in the middle of a header") }
+        guard data.count == TarHeader.blockSize else {
+            throw ArchiveError.damaged("the TAR archive ends in the middle of a header")
+        }
         return data
     }
 
     private func payload(_ size: UInt64) throws -> Data {
         guard size <= 1 << 24 else { throw ArchiveError.damaged("a TAR extension record is too large") }
         let data = try stream.readFully(Int(size))
-        guard data.count == Int(size) else { throw ArchiveError.damaged("the TAR archive ends in the middle of a record") }
+        guard data.count == Int(size) else {
+            throw ArchiveError.damaged("the TAR archive ends in the middle of a record")
+        }
         let padding = UInt64(TarHeader.padding(after: size).count)
         try stream.skip(padding)
         position += size + padding
@@ -239,21 +257,24 @@ final class TarReader {
     /// The next member; nil at the end of the archive.
     func next() throws -> TarHeader? {
         try skipData()
-        var longName: String?, longLink: String?
+        var longName: String?
+        var longLink: String?
         var pax: [String: String] = [:]
         while true {
             try control?.check()
             guard let data = try block() else { return nil }
             // An empty block ends the archive.
             if data.allSatisfy({ $0 == 0 }) { return nil }
-            guard let (parsed, typeFlag) = TarHeader.parse(data) else { throw ArchiveError.damaged("a TAR header has a wrong checksum") }
+            guard let (parsed, typeFlag) = TarHeader.parse(data) else {
+                throw ArchiveError.damaged("a TAR header has a wrong checksum")
+            }
             var header = parsed
             func text(_ data: Data) -> String { String(decoding: data.prefix { $0 != 0 }, as: UTF8.self) }
             switch typeFlag {
-            case 76: longName = text(try payload(header.size))             // GNU long name
-            case 75: longLink = text(try payload(header.size))             // GNU long link
+            case 76: longName = text(try payload(header.size))  // GNU long name
+            case 75: longLink = text(try payload(header.size))  // GNU long link
             case 120: pax.merge(TarHeader.paxRecords(try payload(header.size))) { _, new in new }
-            case 103: _ = try payload(header.size)                         // pax global header
+            case 103: _ = try payload(header.size)  // pax global header
             default:
                 if let longName { header.path = longName }
                 if let longLink { header.linkTarget = longLink }
@@ -264,19 +285,26 @@ final class TarReader {
                 if pax.keys.contains(where: { $0.hasPrefix("GNU.sparse.") }) {
                     header.isSparse = true
                     if let name = pax["GNU.sparse.name"] { header.path = name }
-                    header.realSize = (pax["GNU.sparse.realsize"] ?? pax["GNU.sparse.size"]).flatMap(UInt64.init) ?? header.realSize
+                    header.realSize =
+                        (pax["GNU.sparse.realsize"] ?? pax["GNU.sparse.size"]).flatMap(UInt64.init) ?? header.realSize
                 }
-                guard header.size <= TarHeader.maxSize else { throw ArchiveError.damaged("a TAR header gives an impossible size") }
+                guard header.size <= TarHeader.maxSize else {
+                    throw ArchiveError.damaged("a TAR header gives an impossible size")
+                }
                 // The list of pieces of an old-style sparse file goes on in further blocks.
                 var extended = header.hasSparseExtension
                 while extended {
-                    guard let more = try block() else { throw ArchiveError.damaged("the TAR archive ends in the middle of a header") }
+                    guard let more = try block() else {
+                        throw ArchiveError.damaged("the TAR archive ends in the middle of a header")
+                    }
                     extended = more[more.startIndex + 504] != 0
                 }
                 if header.kind == .file, header.path.hasSuffix("/") { header.kind = .directory }
                 // Only files carry data; a size on anything else is not followed by blocks.
                 pendingData = header.kind == .file || header.kind == .other ? header.size : 0
-                if header.kind == .hardLink || header.kind == .symbolicLink || header.kind == .directory { pendingData = 0 }
+                if header.kind == .hardLink || header.kind == .symbolicLink || header.kind == .directory {
+                    pendingData = 0
+                }
                 pendingPadding = UInt64(TarHeader.padding(after: pendingData).count)
                 return header
             }

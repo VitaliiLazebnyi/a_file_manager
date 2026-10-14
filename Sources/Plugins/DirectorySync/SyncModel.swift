@@ -116,8 +116,11 @@ public struct SyncRow: Equatable {
     public internal(set) var defaultAction: SyncAction
     public var action: SyncAction
 
-    init(directory: String, isDirectory: Bool, left: FileItem?, right: FileItem?, leftDirectory: URL, rightDirectory: URL,
-         state: SyncState, asymmetric: Bool) {
+    init(
+        directory: String, isDirectory: Bool, left: FileItem?, right: FileItem?, leftDirectory: URL,
+        rightDirectory: URL,
+        state: SyncState, asymmetric: Bool
+    ) {
         self.directory = directory
         self.name = left?.name ?? right?.name ?? ""
         self.isDirectory = isDirectory
@@ -174,7 +177,8 @@ public struct SyncRow: Equatable {
     /// direction, then nothing.
     public var nextAction: SyncAction {
         var cycle: [SyncAction] = []
-        for candidate in [defaultAction, .copyToRight, .copyToLeft, SyncAction.none] where accepts(candidate) && !cycle.contains(candidate) {
+        for candidate in [defaultAction, .copyToRight, .copyToLeft, SyncAction.none]
+        where accepts(candidate) && !cycle.contains(candidate) {
             cycle.append(candidate)
         }
         guard let index = cycle.firstIndex(of: action) else { return cycle.first ?? .none }
@@ -225,7 +229,8 @@ public struct SyncSummary: Equatable {
     }
 
     public var text: String {
-        files == 0 ? "Files found: 0"
+        files == 0
+            ? "Files found: 0"
             : "Files found: \(files)  (Identical: \(identical), Different: \(different), Unique left: \(uniqueLeft), Unique right: \(uniqueRight))"
     }
 }

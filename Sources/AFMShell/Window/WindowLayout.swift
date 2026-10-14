@@ -125,11 +125,17 @@ final class WindowLayout {
 
     /// The page of the configuration dialog for these settings (spec 13 › Layout page).
     func preferencePage() -> PreferencePage {
-        var preferences = Region.allCases.map { Preference($0.settingsKey, "Show \($0.caption.lowercased())", .flag(default: $0.isShownByDefault)) }
+        var preferences = Region.allCases.map {
+            Preference($0.settingsKey, "Show \($0.caption.lowercased())", .flag(default: $0.isShownByDefault))
+        }
         preferences.append(Preference(WindowLayout.stackedKey, "Panels one above the other", .flag(default: false)))
-        preferences.append(Preference(BarButton.iconSizeKey, "Size of the button bar's pictures",
-                                      .choice(BarButton.iconSizeNames, default: BarButton.defaultIconSize)))
-        preferences.append(Preference(WindowLayout.titleExtraKey, "Extra text in the window title (*text or $text)", .text(default: "")))
+        preferences.append(
+            Preference(
+                BarButton.iconSizeKey, "Size of the button bar's pictures",
+                .choice(BarButton.iconSizeNames, default: BarButton.defaultIconSize)))
+        preferences.append(
+            Preference(
+                WindowLayout.titleExtraKey, "Extra text in the window title (*text or $text)", .text(default: "")))
         return PreferencePage(title: "Layout", preferences: preferences) { [weak self] in self?.onChange?() }
     }
 }

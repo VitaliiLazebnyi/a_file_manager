@@ -46,21 +46,35 @@ public final class FilePropertiesPlugin: Plugin {
         let isWritable = { kernel.fileSystems.capabilities(for: model().directory).contains(.write) }
         let isLocal = { model().directory.isFileURL }
 
-        commands.register(Command(.setAttributes, "Change Attributes…"), enabled: { hasOperands() && isWritable() },
-                          parameterized: actions.changeAttributes)
-        commands.register(Command(.properties, "Properties…", [Shortcut(.returnKey, .option), .cmd("i")]), enabled: { model().isListed },
-                          actions.showProperties)
-        commands.register(Command(.occupiedSpace, "Calculate Occupied Space…", [Shortcut(.character("l"), .control)]), enabled: hasOperands,
-                          actions.calculateOccupiedSpace)
-        commands.register(Command(.countDirectoryContents, "Calculate All Folder Sizes", [Shortcut(.returnKey, [.option, .shift])]),
-                          enabled: { model().isComplete && model().totals.totalFolders > 0 }, actions.countDirectoryContents)
-        commands.register(Command(.editComment, "Edit Comment…", [Shortcut(.character("z"), .control)]),
-                          enabled: { isWritable() && (model().cursorItem != nil || model().parentTarget != nil) }, actions.editComment)
-        commands.register(Command(.createShortcut, "Create Link…", [.f(5, [.control, .shift])]), enabled: { hasOperands() && isLocal() },
-                          actions.createLinks)
-        commands.register(Command(.showLinkTarget, "Show Link Target"), enabled: { model().cursorItem?.url.isFileURL ?? false },
-                          actions.showLinkTarget)
-        commands.register(Command(.finderInfo, "Finder Info", runsDuringJobs: true), enabled: { isLocal() && model().isListed }) {
+        commands.register(
+            Command(.setAttributes, "Change Attributes…"), enabled: { hasOperands() && isWritable() },
+            parameterized: actions.changeAttributes)
+        commands.register(
+            Command(.properties, "Properties…", [Shortcut(.returnKey, .option), .cmd("i")]),
+            enabled: { model().isListed },
+            actions.showProperties)
+        commands.register(
+            Command(.occupiedSpace, "Calculate Occupied Space…", [Shortcut(.character("l"), .control)]),
+            enabled: hasOperands,
+            actions.calculateOccupiedSpace)
+        commands.register(
+            Command(
+                .countDirectoryContents, "Calculate All Folder Sizes", [Shortcut(.returnKey, [.option, .shift])]),
+            enabled: { model().isComplete && model().totals.totalFolders > 0 }, actions.countDirectoryContents)
+        commands.register(
+            Command(.editComment, "Edit Comment…", [Shortcut(.character("z"), .control)]),
+            enabled: { isWritable() && (model().cursorItem != nil || model().parentTarget != nil) },
+            actions.editComment)
+        commands.register(
+            Command(.createShortcut, "Create Link…", [.f(5, [.control, .shift])]),
+            enabled: { hasOperands() && isLocal() },
+            actions.createLinks)
+        commands.register(
+            Command(.showLinkTarget, "Show Link Target"), enabled: { model().cursorItem?.url.isFileURL ?? false },
+            actions.showLinkTarget)
+        commands.register(
+            Command(.finderInfo, "Finder Info", runsDuringJobs: true), enabled: { isLocal() && model().isListed }
+        ) {
             // Finder opens one window per item: more than a handful is never meant, and the
             // list of a long selection is not made for it.
             let operands = model().operandsSnapshot()
@@ -76,22 +90,37 @@ public final class FilePropertiesPlugin: Plugin {
             actions.showFinderInfo(urls.isEmpty ? [model().directory] : urls)
         }
 
-        kernel.menus.add([.setAttributes, .properties, .finderInfo, .occupiedSpace, .countDirectoryContents, .editComment], to: .filesProperties)
+        kernel.menus.add(
+            [.setAttributes, .properties, .finderInfo, .occupiedSpace, .countDirectoryContents, .editComment],
+            to: .filesProperties)
         kernel.menus.add([.createShortcut, .showLinkTarget], to: .filesAdvanced)
-        kernel.menus.addToContextMenu([.setAttributes, .editComment, .createShortcut], in: .properties, onItemOnly: true)
+        kernel.menus.addToContextMenu(
+            [.setAttributes, .editComment, .createShortcut], in: .properties, onItemOnly: true)
         kernel.menus.addToContextMenu([.occupiedSpace, .properties], in: .properties)
-        kernel.toolbar.add(.properties, symbol: "info.circle", group: 60, hint: "Show the properties of the selected file or folder: size, dates, permissions.")
-        kernel.toolbar.add(.occupiedSpace, symbol: "chart.pie", group: 60, hint: "Calculate how much space the selected folders take, with everything in them.")
+        kernel.toolbar.add(
+            .properties, symbol: "info.circle", group: 60,
+            hint: "Show the properties of the selected file or folder: size, dates, permissions.")
+        kernel.toolbar.add(
+            .occupiedSpace, symbol: "chart.pie", group: 60,
+            hint: "Calculate how much space the selected folders take, with everything in them.")
         kernel.toolbar.setSymbol("slider.horizontal.3", for: .setAttributes)
         kernel.toolbar.setSymbol("text.bubble", for: .editComment)
         kernel.toolbar.setSymbol("link", for: .createShortcut)
 
-        kernel.preferences.add(PreferencePage(title: "File properties", preferences: [
-            Preference(Settings.linkKind, "Create Link proposes:", .choice(LinkKind.allCases.map(\.title), default: LinkKind.symbolic.rawValue)),
-            Preference(Settings.relativeLinks, "Symbolic links point to relative paths", .flag(default: false)),
-            Preference(Settings.selectMeasured, "Calculate Occupied Space selects the measured folders", .flag(default: true)),
-            Preference(Settings.hideCommentFile, "Hide the comment file descript.ion", .flag(default: true)),
-        ]))
+        kernel.preferences.add(
+            PreferencePage(
+                title: "File properties",
+                preferences: [
+                    Preference(
+                        Settings.linkKind, "Create Link proposes:",
+                        .choice(LinkKind.allCases.map(\.title), default: LinkKind.symbolic.rawValue)),
+                    Preference(
+                        Settings.relativeLinks, "Symbolic links point to relative paths", .flag(default: false)),
+                    Preference(
+                        Settings.selectMeasured, "Calculate Occupied Space selects the measured folders",
+                        .flag(default: true)),
+                    Preference(Settings.hideCommentFile, "Hide the comment file descript.ion", .flag(default: true))
+                ]))
     }
 
     /// Opens Finder's Info window for local items. Finder is asked through `osascript`, off
@@ -104,9 +133,11 @@ public final class FilePropertiesPlugin: Plugin {
         guard launchesApplications else { return }
         // Starting a program waits for the system: on a thread for work that waits.
         BlockingCalls.run {
-            let script = ["on run paths", "tell application \"Finder\"", "repeat with itemPath in paths",
-                          "open information window of ((POSIX file (contents of itemPath)) as alias)", "end repeat", "activate",
-                          "end tell", "end run"]
+            let script = [
+                "on run paths", "tell application \"Finder\"", "repeat with itemPath in paths",
+                "open information window of ((POSIX file (contents of itemPath)) as alias)", "end repeat", "activate",
+                "end tell", "end run"
+            ]
             let process = Process()
             process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
             process.arguments = script.flatMap { ["-e", $0] } + urls.map(\.path)
@@ -142,7 +173,9 @@ final class PropertyActions {
     /// selection, so it is worked out on a job's thread.
     private static func folders(of items: [FileItem], and directory: URL) -> [URL] {
         var seen = Set<String>()
-        return ([directory] + items.map { $0.url.deletingLastPathComponent() }).filter { seen.insert($0.locationKey).inserted }
+        return ([directory] + items.map { $0.url.deletingLastPathComponent() }).filter {
+            seen.insert($0.locationKey).inserted
+        }
     }
 
     /// The first failures of an operation as the text of a message: a message is laid out
@@ -173,21 +206,26 @@ final class PropertyActions {
         // is a question to the disk, and turning the owner's number into a name may be one
         // to a directory server. Both are asked here; the dialog then finds the names known.
         let asksAtOnce = parsed?.applyAtOnce == true
-        kernel.jobs.run(title: "Reading attributes:", work: { _ -> (items: [FileItem], details: LocalDetails?) in
-            let items = operands.items()
-            guard !asksAtOnce, items.count == 1, let details = LocalInfo.details(items[0].url) else { return (items, nil) }
-            _ = (LocalInfo.userName(details.ownerID), LocalInfo.groupName(details.groupID))
-            return (items, details)
-        }, completion: { [self] read in
-            let items = read.items
-            guard !items.isEmpty else { return }
-            if let parsed, parsed.applyAtOnce { return apply(parsed.change, to: items, in: directory) }
-            // The panel may show something else by now; a dialog about what it showed would mislead.
-            guard model.directory.isSameLocation(as: directory) else { return }
-            var draft = AttributeDraft(items: items)
-            if let parsed { draft.take(parsed.change) }
-            ask(draft, items: items, directory: directory, details: read.details)
-        })
+        kernel.jobs.run(
+            title: "Reading attributes:",
+            work: { _ -> (items: [FileItem], details: LocalDetails?) in
+                let items = operands.items()
+                guard !asksAtOnce, items.count == 1, let details = LocalInfo.details(items[0].url) else {
+                    return (items, nil)
+                }
+                _ = (LocalInfo.userName(details.ownerID), LocalInfo.groupName(details.groupID))
+                return (items, details)
+            },
+            completion: { [self] read in
+                let items = read.items
+                guard !items.isEmpty else { return }
+                if let parsed, parsed.applyAtOnce { return apply(parsed.change, to: items, in: directory) }
+                // The panel may show something else by now; a dialog about what it showed would mislead.
+                guard model.directory.isSameLocation(as: directory) else { return }
+                var draft = AttributeDraft(items: items)
+                if let parsed { draft.take(parsed.change) }
+                ask(draft, items: items, directory: directory, details: read.details)
+            })
     }
 
     private func ask(_ draft: AttributeDraft, items: [FileItem], directory: URL, details: LocalDetails?) {
@@ -197,7 +235,10 @@ final class PropertyActions {
         let targetFile = kernel.panels.target.model.cursorItem
         while true {
             let buttons = ["OK"] + (targetFile != nil ? ["Load from Target File"] : [])
-            guard let answer = ui.form(title, detail: "", fields: draft.fields(isLocal: isLocal, details: details), buttons: buttons) else { return }
+            guard
+                let answer = ui.form(
+                    title, detail: "", fields: draft.fields(isLocal: isLocal, details: details), buttons: buttons)
+            else { return }
             draft.read(answer)
             if answer.button == 1, let targetFile {
                 // Load from file under cursor › From target (spec 07 › Load from file under cursor).
@@ -211,9 +252,11 @@ final class PropertyActions {
                 // Recurse with the permissions left as they were shown asks for nothing: the
                 // field shows the folder's own mode, not a wish. Said, instead of ending silently.
                 if change.isEmpty, draft.recurse, let shown = draft.untouchedPermissions {
-                    let applies = ui.choose("Nothing was changed.",
-                                            detail: "Do you want to give the permissions \(shown) to everything inside as well?",
-                                            buttons: ["Apply \(shown)", "Back"], style: .warning) == 0
+                    let applies =
+                        ui.choose(
+                            "Nothing was changed.",
+                            detail: "Do you want to give the permissions \(shown) to everything inside as well?",
+                            buttons: ["Apply \(shown)", "Back"], style: .warning) == 0
                     if applies { draft.confirmPermissions() }
                     continue
                 }
@@ -228,17 +271,23 @@ final class PropertyActions {
         model.saveSelection()
         let fileSystems = self.fileSystems
         let title = "Changing attributes:"
-        kernel.jobs.run(title: title, work: { monitor -> (AttributeJob.Outcome, [URL]) in
-            let meter = ProgressMeter(monitor, title: title, total: change.recurse ? 0 : items.count)
-            let outcome = AttributeJob(change: change, fileSystems: fileSystems, cancellation: monitor.cancellation, meter: meter).run(items)
-            return (outcome, PropertyActions.folders(of: items, and: directory))
-        }, completion: { [self] outcome, folders in
-            if outcome.failed > 0 {
-                ui.inform("\(outcome.failed) item(s) could not be changed!",
-                          detail: PropertyActions.summary(of: outcome.failures, total: outcome.failed), style: .warning)
-            }
-            kernel.panels.refresh(folders)
-        })
+        kernel.jobs.run(
+            title: title,
+            work: { monitor -> (AttributeJob.Outcome, [URL]) in
+                let meter = ProgressMeter(monitor, title: title, total: change.recurse ? 0 : items.count)
+                let outcome = AttributeJob(
+                    change: change, fileSystems: fileSystems, cancellation: monitor.cancellation, meter: meter
+                ).run(items)
+                return (outcome, PropertyActions.folders(of: items, and: directory))
+            },
+            completion: { [self] outcome, folders in
+                if outcome.failed > 0 {
+                    ui.inform(
+                        "\(outcome.failed) item(s) could not be changed!",
+                        detail: PropertyActions.summary(of: outcome.failures, total: outcome.failed), style: .warning)
+                }
+                kernel.panels.refresh(folders)
+            })
     }
 
     // MARK: Properties
@@ -253,24 +302,41 @@ final class PropertyActions {
         let cursorItem = model.cursorItem
         let (fileSystems, comments) = (self.fileSystems, self.comments)
         let title = "Properties:"
-        kernel.jobs.run(title: title, work: { monitor -> (name: String, rows: [PropertyRow], urls: [URL]) in
-            let sheet = PropertySheet(fileSystems: fileSystems, comments: comments, cancellation: monitor.cancellation,
-                                      meter: ProgressMeter(monitor, title: title))
-            let selected = operands.markedCount > 1 ? operands.markedItems() : []
-            if !selected.isEmpty { return ("\(selected.count) items", sheet.rows(forSeveral: selected), selected.map(\.url)) }
-            guard let item = cursorItem ?? (try? fileSystems.provider(for: directory))?.item(at: directory, cancellation: monitor.cancellation) else {
-                return (directory.lastPathComponent, [], [])
-            }
-            return (item.name.isEmpty ? fileSystems.displayPath(item.url) : item.name, sheet.rows(for: item), [item.url])
-        }, completion: { [self] report in
-            guard !report.rows.isEmpty else {
-                return ui.inform("The properties of \(PropertyText.shown(report.name)) cannot be read!", detail: "", style: .warning)
-            }
-            let canShowFinderInfo = report.urls.allSatisfy(\.isFileURL)
-            let answer = ui.form("Properties: \(report.name)", detail: "", fields: report.rows.map { .note("\($0.label): \($0.value)") },
-                                 buttons: ["OK"] + (canShowFinderInfo ? ["Finder Info"] : []))
-            if answer?.button == 1 { showFinderInfo(report.urls) }
-        })
+        kernel.jobs.run(
+            title: title,
+            work: { monitor -> (name: String, rows: [PropertyRow], urls: [URL]) in
+                let sheet = PropertySheet(
+                    fileSystems: fileSystems, comments: comments, cancellation: monitor.cancellation,
+                    meter: ProgressMeter(monitor, title: title))
+                let selected = operands.markedCount > 1 ? operands.markedItems() : []
+                if !selected.isEmpty {
+                    return ("\(selected.count) items", sheet.rows(forSeveral: selected), selected.map(\.url))
+                }
+                guard
+                    let item = cursorItem
+                        ?? (try? fileSystems.provider(for: directory))?.item(
+                            at: directory, cancellation: monitor.cancellation)
+                else {
+                    return (directory.lastPathComponent, [], [])
+                }
+                return (
+                    item.name.isEmpty ? fileSystems.displayPath(item.url) : item.name, sheet.rows(for: item),
+                    [item.url]
+                )
+            },
+            completion: { [self] report in
+                guard !report.rows.isEmpty else {
+                    return ui.inform(
+                        "The properties of \(PropertyText.shown(report.name)) cannot be read!", detail: "",
+                        style: .warning)
+                }
+                let canShowFinderInfo = report.urls.allSatisfy(\.isFileURL)
+                let answer = ui.form(
+                    "Properties: \(report.name)", detail: "",
+                    fields: report.rows.map { .note("\($0.label): \($0.value)") },
+                    buttons: ["OK"] + (canShowFinderInfo ? ["Finder Info"] : []))
+                if answer?.button == 1 { showFinderInfo(report.urls) }
+            })
     }
 
     // MARK: Occupied space
@@ -295,34 +361,44 @@ final class PropertyActions {
             var volume: VolumeInfo?
             var cancelled = false
         }
-        kernel.jobs.run(title: title, work: { monitor -> Result in
-            var result = Result()
-            let items = operands.items()
-            result.targetCluster = LocalInfo.clusterSize(at: targetDirectory)
-            let calculator = SpaceCalculator(fileSystems: fileSystems, cancellation: monitor.cancellation, targetCluster: result.targetCluster,
-                                             meter: ProgressMeter(monitor, title: title))
-            let perItem = calculator.measure(items)
-            result.totals = perItem.reduce(SpaceTotals(), +)
-            for (item, measured) in zip(items, perItem) where item.isFolder && item.isRealDirectory {
-                result.sizes.append((item.name, measured.bytes))
-            }
-            result.isLocal = items.allSatisfy { $0.url.isFileURL }
-            if !monitor.cancellation.isCancelled, !result.sizes.isEmpty { result.prepared = PanelModel.prepare(basis, computedSizes: result.sizes) }
-            result.volume = (try? fileSystems.provider(for: directory))?.volume(of: directory, cancellation: monitor.cancellation)
-            result.cancelled = monitor.cancellation.isCancelled
-            return result
-        }, completion: { [self] result in
-            if !result.cancelled, model.directory.isSameLocation(as: directory) {
-                // A measured folder shows its size in the Size column and is drawn as selected.
-                // One change for all of them: each is a search of the list and a redraw.
-                let selects = kernel.settings.flag(FilePropertiesPlugin.Settings.selectMeasured, default: true)
-                PropertyActions.show(result.sizes, prepared: result.prepared, in: model)
-                if selects { model.setSelected(true, names: result.sizes.map(\.name)) }
-            }
-            ui.inform("Total space occupied:", detail: SpaceReport.text(result.totals, sourceIsLocal: result.isLocal,
-                                                                         targetCluster: result.targetCluster, volume: result.volume,
-                                                                         cancelled: result.cancelled), style: .information)
-        })
+        kernel.jobs.run(
+            title: title,
+            work: { monitor -> Result in
+                var result = Result()
+                let items = operands.items()
+                result.targetCluster = LocalInfo.clusterSize(at: targetDirectory)
+                let calculator = SpaceCalculator(
+                    fileSystems: fileSystems, cancellation: monitor.cancellation, targetCluster: result.targetCluster,
+                    meter: ProgressMeter(monitor, title: title))
+                let perItem = calculator.measure(items)
+                result.totals = perItem.reduce(SpaceTotals(), +)
+                for (item, measured) in zip(items, perItem) where item.isFolder && item.isRealDirectory {
+                    result.sizes.append((item.name, measured.bytes))
+                }
+                result.isLocal = items.allSatisfy { $0.url.isFileURL }
+                if !monitor.cancellation.isCancelled, !result.sizes.isEmpty {
+                    result.prepared = PanelModel.prepare(basis, computedSizes: result.sizes)
+                }
+                result.volume = (try? fileSystems.provider(for: directory))?.volume(
+                    of: directory, cancellation: monitor.cancellation)
+                result.cancelled = monitor.cancellation.isCancelled
+                return result
+            },
+            completion: { [self] result in
+                if !result.cancelled, model.directory.isSameLocation(as: directory) {
+                    // A measured folder shows its size in the Size column and is drawn as selected.
+                    // One change for all of them: each is a search of the list and a redraw.
+                    let selects = kernel.settings.flag(FilePropertiesPlugin.Settings.selectMeasured, default: true)
+                    PropertyActions.show(result.sizes, prepared: result.prepared, in: model)
+                    if selects { model.setSelected(true, names: result.sizes.map(\.name)) }
+                }
+                ui.inform(
+                    "Total space occupied:",
+                    detail: SpaceReport.text(
+                        result.totals, sourceIsLocal: result.isLocal,
+                        targetCluster: result.targetCluster, volume: result.volume,
+                        cancelled: result.cancelled), style: .information)
+            })
     }
 
     /// The size of every folder of the source panel, shown in the Size column
@@ -334,16 +410,22 @@ final class PropertyActions {
         let (shown, basis) = (model.items, model.basis)
         let fileSystems = self.fileSystems
         let title = "Calculating folder sizes:"
-        kernel.jobs.run(title: title, work: { monitor -> (sizes: [(name: String, size: Int64)], prepared: PanelModel.Prepared?) in
-            let folders = shown.filter { $0.isFolder && $0.isRealDirectory }
-            let measured = SpaceCalculator(fileSystems: fileSystems, cancellation: monitor.cancellation, meter: ProgressMeter(monitor, title: title),
-                                           measuresAllocated: false).measure(folders)
-            let sizes = zip(folders, measured).map { (name: $0.0.name, size: $0.1.bytes) }
-            return (sizes, sizes.isEmpty ? nil : PanelModel.prepare(basis, computedSizes: sizes))
-        }, completion: { result in
-            guard model.directory.isSameLocation(as: directory) else { return }
-            PropertyActions.show(result.sizes, prepared: result.prepared, in: model)
-        })
+        kernel.jobs.run(
+            title: title,
+            work: { monitor -> (sizes: [(name: String, size: Int64)], prepared: PanelModel.Prepared?) in
+                let folders = shown.filter { $0.isFolder && $0.isRealDirectory }
+                let measured = SpaceCalculator(
+                    fileSystems: fileSystems, cancellation: monitor.cancellation,
+                    meter: ProgressMeter(monitor, title: title),
+                    measuresAllocated: false
+                ).measure(folders)
+                let sizes = zip(folders, measured).map { (name: $0.0.name, size: $0.1.bytes) }
+                return (sizes, sizes.isEmpty ? nil : PanelModel.prepare(basis, computedSizes: sizes))
+            },
+            completion: { result in
+                guard model.directory.isSameLocation(as: directory) else { return }
+                PropertyActions.show(result.sizes, prepared: result.prepared, in: model)
+            })
     }
 
     /// Shows calculated folder sizes in a panel. They were written into a copy of the list on
@@ -372,47 +454,64 @@ final class PropertyActions {
         let (name, folder) = (subject.lastPathComponent, subject.deletingLastPathComponent())
         let comments = self.comments
         let directory = model.directory
-        kernel.jobs.run(title: "Reading comment:", work: { monitor -> String? in
-            let text = comments.load(folder, cancellation: monitor.cancellation).comment(for: name) ?? ""
-            // A reading that was stopped says nothing; the dialog must not show "no comment".
-            return monitor.cancellation.isCancelled ? nil : text
-        }, completion: { [self] read in
-            guard let existing = read else { return }
-            // Asked for in a folder the panel no longer shows: the dialog would come out of nowhere.
-            guard model.directory.isSameLocation(as: directory) else { return }
-            var text = existing
-            while true {
-                guard let answer = ui.form("File comment", detail: "Edit comment for:\n\(PropertyText.shown(name))", fields: [.lines("comment", "", text)],
-                                           buttons: ["OK"]) else { return }
-                text = DescriptIon.normalized(answer.text("comment"))
-                // A line break counts two characters, as it does in the file.
-                let length = text.count + text.filter { $0 == "\n" }.count
-                if length <= DescriptIon.commentLimit { break }
-                ui.inform("The comment is too long!", detail: "It has \(length) characters; \(DescriptIon.commentLimit) can be stored.", style: .warning)
-            }
-            guard text != existing else { return }
-            save(text, for: name, in: folder)
-        })
+        kernel.jobs.run(
+            title: "Reading comment:",
+            work: { monitor -> String? in
+                let text = comments.load(folder, cancellation: monitor.cancellation).comment(for: name) ?? ""
+                // A reading that was stopped says nothing; the dialog must not show "no comment".
+                return monitor.cancellation.isCancelled ? nil : text
+            },
+            completion: { [self] read in
+                guard let existing = read else { return }
+                // Asked for in a folder the panel no longer shows: the dialog would come out of nowhere.
+                guard model.directory.isSameLocation(as: directory) else { return }
+                var text = existing
+                while true {
+                    guard
+                        let answer = ui.form(
+                            "File comment", detail: "Edit comment for:\n\(PropertyText.shown(name))",
+                            fields: [.lines("comment", "", text)],
+                            buttons: ["OK"])
+                    else { return }
+                    text = DescriptIon.normalized(answer.text("comment"))
+                    // A line break counts two characters, as it does in the file.
+                    let length = text.count + text.filter { $0 == "\n" }.count
+                    if length <= DescriptIon.commentLimit { break }
+                    ui.inform(
+                        "The comment is too long!",
+                        detail: "It has \(length) characters; \(DescriptIon.commentLimit) can be stored.",
+                        style: .warning)
+                }
+                guard text != existing else { return }
+                save(text, for: name, in: folder)
+            })
     }
 
     private func save(_ comment: String, for name: String, in folder: URL) {
         let comments = self.comments
         let hidden = kernel.settings.flag(FilePropertiesPlugin.Settings.hideCommentFile, default: true)
-        kernel.jobs.run(title: "Saving comment:", work: { monitor -> Error? in
-            do {
-                try comments.setComment(comment, for: name, in: folder, hidden: hidden, cancellation: monitor.cancellation)
-                return nil
-            } catch {
-                return error
-            }
-        }, completion: { [kernel] error in
-            // Stopped by the user: the old comments are as they were, and there is nothing to tell.
-            if (error as? CocoaError)?.code == .userCancelled { return }
-            if let error { return kernel.ui.report(error, title: "The comment of \(PropertyText.shown(name)) cannot be saved!") }
-            // Saving a comment re-reads both panels.
-            kernel.panels.contentsChanged(in: [folder])
-            kernel.panels.all.forEach { $0.reload() }
-        })
+        kernel.jobs.run(
+            title: "Saving comment:",
+            work: { monitor -> Error? in
+                do {
+                    try comments.setComment(
+                        comment, for: name, in: folder, hidden: hidden, cancellation: monitor.cancellation)
+                    return nil
+                } catch {
+                    return error
+                }
+            },
+            completion: { [kernel] error in
+                // Stopped by the user: the old comments are as they were, and there is nothing to tell.
+                if (error as? CocoaError)?.code == .userCancelled { return }
+                if let error {
+                    return kernel.ui.report(
+                        error, title: "The comment of \(PropertyText.shown(name)) cannot be saved!")
+                }
+                // Saving a comment re-reads both panels.
+                kernel.panels.contentsChanged(in: [folder])
+                kernel.panels.all.forEach { $0.reload() }
+            })
     }
 
     // MARK: Links
@@ -432,48 +531,64 @@ final class PropertyActions {
         let proposal = (targetPath.hasSuffix("/") ? targetPath : targetPath + "/") + (single?.name ?? "")
         let detail = single.map { "Create a link to \"\($0.name)\" as:" } ?? "Create links to \(count) items in:"
         let kinds = LinkKind.allCases
-        guard let answer = ui.form("Create link", detail: detail, fields: [
-            .text("target", "", proposal),
-            .choice("kind", "Type:", kinds.map(\.title), selected: settings.index(FilePropertiesPlugin.Settings.linkKind, default: 0)),
-            .checkbox("relative", "Symbolic link with a relative path", settings.flag(FilePropertiesPlugin.Settings.relativeLinks, default: false)),
-        ], buttons: ["OK"]) else { return }
+        guard
+            let answer = ui.form(
+                "Create link", detail: detail,
+                fields: [
+                    .text("target", "", proposal),
+                    .choice(
+                        "kind", "Type:", kinds.map(\.title),
+                        selected: settings.index(FilePropertiesPlugin.Settings.linkKind, default: 0)),
+                    .checkbox(
+                        "relative", "Symbolic link with a relative path",
+                        settings.flag(FilePropertiesPlugin.Settings.relativeLinks, default: false))
+                ], buttons: ["OK"])
+        else { return }
         let text = answer.text("target").trimmingCharacters(in: .whitespaces)
         let kind = kinds.indices.contains(answer.index("kind")) ? kinds[answer.index("kind")] : .symbolic
         let relative = answer.flag("relative")
         guard !text.isEmpty else { return }
         let fileSystems = self.fileSystems
-        kernel.jobs.run(title: "Creating links:", work: { monitor -> (created: URL?, changed: [URL], failed: Int, failures: [String]) in
-            let items = operands.items()
-            let location = fileSystems.location(from: text, relativeTo: directory)
-            // A target that ends in a slash, or is a folder, or takes several links, is the
-            // folder the links go into under the names of their originals.
-            let isFolder = text.hasSuffix("/") || items.count > 1
-                || (try? fileSystems.provider(for: location))?.item(at: location, cancellation: monitor.cancellation)?.isDirectory == true
-            // What the completion shows is put together here: the first failures only, and
-            // each folder that got a link once.
-            var (created, failed, failures): (URL?, Int, [String]) = (nil, 0, [])
-            var (changed, seen): ([URL], Set<String>) = ([], [])
-            for item in items where !monitor.cancellation.isCancelled {
-                // A branch view names an item by its path; the link gets the item's own name.
-                let destination = isFolder ? location.appending(name: item.url.lastPathComponent) : location
-                do {
-                    try LinkMaker.create(kind, to: item.url, at: destination, relative: relative)
-                    created = destination
-                    let folder = destination.deletingLastPathComponent()
-                    if seen.insert(folder.locationKey).inserted { changed.append(folder) }
-                } catch {
-                    failed += 1
-                    if failures.count < 20 { failures.append("\(PropertyText.shown(item.name)): \(error.localizedDescription)") }
+        kernel.jobs.run(
+            title: "Creating links:",
+            work: { monitor -> (created: URL?, changed: [URL], failed: Int, failures: [String]) in
+                let items = operands.items()
+                let location = fileSystems.location(from: text, relativeTo: directory)
+                // A target that ends in a slash, or is a folder, or takes several links, is the
+                // folder the links go into under the names of their originals.
+                let isFolder =
+                    text.hasSuffix("/") || items.count > 1
+                    || (try? fileSystems.provider(for: location))?.item(
+                        at: location, cancellation: monitor.cancellation)?.isDirectory == true
+                // What the completion shows is put together here: the first failures only, and
+                // each folder that got a link once.
+                var (created, failed, failures): (URL?, Int, [String]) = (nil, 0, [])
+                var (changed, seen): ([URL], Set<String>) = ([], [])
+                for item in items where !monitor.cancellation.isCancelled {
+                    // A branch view names an item by its path; the link gets the item's own name.
+                    let destination = isFolder ? location.appending(name: item.url.lastPathComponent) : location
+                    do {
+                        try LinkMaker.create(kind, to: item.url, at: destination, relative: relative)
+                        created = destination
+                        let folder = destination.deletingLastPathComponent()
+                        if seen.insert(folder.locationKey).inserted { changed.append(folder) }
+                    } catch {
+                        failed += 1
+                        if failures.count < 20 {
+                            failures.append("\(PropertyText.shown(item.name)): \(error.localizedDescription)")
+                        }
+                    }
                 }
-            }
-            return (created, changed, failed, failures)
-        }, completion: { [kernel] result in
-            if result.failed > 0 {
-                kernel.ui.inform("\(result.failed) link(s) could not be created!",
-                                 detail: PropertyActions.summary(of: result.failures, total: result.failed), style: .warning)
-            }
-            kernel.panels.refresh(result.changed, focus: result.created)
-        })
+                return (created, changed, failed, failures)
+            },
+            completion: { [kernel] result in
+                if result.failed > 0 {
+                    kernel.ui.inform(
+                        "\(result.failed) link(s) could not be created!",
+                        detail: PropertyActions.summary(of: result.failures, total: result.failed), style: .warning)
+                }
+                kernel.panels.refresh(result.changed, focus: result.created)
+            })
     }
 
     /// Goes to the item the link under the cursor leads to, with the cursor on it.
@@ -481,12 +596,17 @@ final class PropertyActions {
         guard let item = source.model.cursorItem else { return }
         let panel = source
         let directory = panel.model.directory
-        kernel.jobs.run(title: "Reading link:", work: { _ in LocalInfo.resolvedLinkTarget(item.url) }, completion: { [ui] target in
-            // The answer belongs to the folder it was asked in; elsewhere it would take the panel away.
-            guard panel.model.directory.isSameLocation(as: directory) else { return }
-            guard let target else { return ui.inform("\(PropertyText.shown(item.name)) is not a link.", detail: "", style: .information) }
-            panel.show(target)
-        })
+        kernel.jobs.run(
+            title: "Reading link:", work: { _ in LocalInfo.resolvedLinkTarget(item.url) },
+            completion: { [ui] target in
+                // The answer belongs to the folder it was asked in; elsewhere it would take the panel away.
+                guard panel.model.directory.isSameLocation(as: directory) else { return }
+                guard let target else {
+                    return ui.inform(
+                        "\(PropertyText.shown(item.name)) is not a link.", detail: "", style: .information)
+                }
+                panel.show(target)
+            })
     }
 }
 
@@ -508,7 +628,9 @@ struct AttributeDraft {
 
     /// The permissions as they were pre-filled, while the field still shows them.
     var untouchedPermissions: String? {
-        guard let prefilled = prefilledPermissions, !prefilled.isEmpty, permissions.trimmingCharacters(in: .whitespaces) == prefilled else { return nil }
+        guard let prefilled = prefilledPermissions, !prefilled.isEmpty,
+            permissions.trimmingCharacters(in: .whitespaces) == prefilled
+        else { return nil }
         return prefilled
     }
 
@@ -572,16 +694,17 @@ struct AttributeDraft {
         var fields: [FormField] = [
             .checkbox("recurse", "Recurse into subdirectories", recurse),
             .text("permissions", "Permissions:", permissions),
-            .note("Octal (755), letters (rwxr-xr-x) or changes (u+x,go-w). Empty leaves them unchanged. "
-                + "Octal sets the mode as chmod does: 755 also clears set-user-ID, set-group-ID and sticky; 4755 sets them. "
-                + "Letters and changes keep those three."),
+            .note(
+                "Octal (755), letters (rwxr-xr-x) or changes (u+x,go-w). Empty leaves them unchanged. "
+                    + "Octal sets the mode as chmod does: 755 also clears set-user-ID, set-group-ID and sticky; 4755 sets them. "
+                    + "Letters and changes keep those three.")
         ]
         if isLocal {
             fields += [
                 .choice("hidden", "Hidden:", options(details?.isHidden), selected: hidden),
                 .choice("locked", "Locked (read only):", options(details?.isLocked), selected: locked),
                 .text("owner", "Owner\(now(details.map { LocalInfo.userName($0.ownerID) })):", owner),
-                .text("group", "Group\(now(details.map { LocalInfo.groupName($0.groupID) })):", group),
+                .text("group", "Group\(now(details.map { LocalInfo.groupName($0.groupID) })):", group)
             ]
         }
         fields += [
@@ -589,7 +712,7 @@ struct AttributeDraft {
             .text("date", "Date (yyyy-mm-dd):", date),
             .text("time", "Time (hh:mm:ss):", time),
             .checkbox("current", "Use the current date and time", usesCurrentTime),
-            .note("A part written in letters keeps the file's own value: yyyy-05-dd changes only the month."),
+            .note("A part written in letters keeps the file's own value: yyyy-05-dd changes only the month.")
         ]
         return fields
     }
@@ -615,7 +738,9 @@ struct AttributeDraft {
         if isLocal {
             change.hidden = hidden == 0 ? nil : hidden == 1
             change.locked = locked == 0 ? nil : locked == 1
-            let (owner, group) = (owner.trimmingCharacters(in: .whitespaces), group.trimmingCharacters(in: .whitespaces))
+            let (owner, group) = (
+                owner.trimmingCharacters(in: .whitespaces), group.trimmingCharacters(in: .whitespaces)
+            )
             change.owner = owner.isEmpty ? nil : owner
             change.group = group.isEmpty ? nil : group
         }

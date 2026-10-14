@@ -15,15 +15,19 @@ final class ViewerWindowController: NSWindowController, NSWindowDelegate {
     let followsCursor: Bool
     private var follower: CursorFollower?
 
-    init(kernel: Kernel, settings: ListerSettings, temporaryCopies: TemporaryCopies, internalOnly: Bool = false, followsCursor: Bool = false,
-         followDelay: TimeInterval = 0.12, onClose: @escaping (ViewerWindowController) -> Void) {
+    init(
+        kernel: Kernel, settings: ListerSettings, temporaryCopies: TemporaryCopies, internalOnly: Bool = false,
+        followsCursor: Bool = false,
+        followDelay: TimeInterval = 0.12, onClose: @escaping (ViewerWindowController) -> Void
+    ) {
         self.settings = settings
         self.onClose = onClose
         self.followsCursor = followsCursor
         pane = ViewerPane(kernel: kernel, settings: settings, temporaryCopies: temporaryCopies, isEmbedded: false)
         pane.internalOnly = internalOnly
-        let window = ToolWindow(contentRect: NSRect(x: 0, y: 0, width: 860, height: 620),
-                                styleMask: [.titled, .closable, .resizable, .miniaturizable], backing: .buffered, defer: false)
+        let window = ToolWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 860, height: 620),
+            styleMask: [.titled, .closable, .resizable, .miniaturizable], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.minSize = NSSize(width: 360, height: 220)
         window.title = followsCursor ? "Lister*" : "Lister"
@@ -49,7 +53,8 @@ final class ViewerWindowController: NSWindowController, NSWindowDelegate {
         pane.onTitleChange = { [weak self] in self?.setTitle($0) }
         pane.onSavePosition = { [weak self] in self?.savePosition() }
         if followsCursor {
-            follower = CursorFollower(kernel: kernel, delay: followDelay, panel: { kernel.panels.source }) { [weak self] item in
+            follower = CursorFollower(kernel: kernel, delay: followDelay, panel: { kernel.panels.source }) {
+                [weak self] item in
                 self?.follow(item)
             }
         }
@@ -131,7 +136,8 @@ final class CursorFollower {
 
     /// `panel` names the panel to follow at the time of each event; `show` receives the item
     /// under its cursor (nil on `[..]` or in an empty folder).
-    init(kernel: Kernel, delay: TimeInterval, panel: @escaping () -> PanelHandle?, show: @escaping (FileItem?) -> Void) {
+    init(kernel: Kernel, delay: TimeInterval, panel: @escaping () -> PanelHandle?, show: @escaping (FileItem?) -> Void)
+    {
         self.delay = delay
         self.panel = panel
         self.show = show

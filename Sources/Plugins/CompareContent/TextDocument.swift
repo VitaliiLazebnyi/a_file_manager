@@ -142,8 +142,10 @@ public struct TextDocument: Equatable {
             var start = 0
             var index = 0
             func line(to end: Int, _ ending: LineEnding) {
-                lines.append(TextLine(String(decoding: UnsafeBufferPointer(rebasing: bytes[start..<end]), as: UTF8.self),
-                                      ending: ending, number: lines.count + 1))
+                lines.append(
+                    TextLine(
+                        String(decoding: UnsafeBufferPointer(rebasing: bytes[start..<end]), as: UTF8.self),
+                        ending: ending, number: lines.count + 1))
             }
             while index < bytes.count {
                 let byte = bytes[index]
@@ -194,7 +196,9 @@ public struct TextDocument: Equatable {
     /// hold (they would become question marks), or a file that was not valid when loaded.
     func encodedData(named name: String) throws -> Data {
         guard isLossless else { throw CompareLoader.SaveError.invalidSequences(name, encoding) }
-        guard let data = encoding.encodeExactly(text()) else { throw CompareLoader.SaveError.notRepresentable(name, encoding) }
+        guard let data = encoding.encodeExactly(text()) else {
+            throw CompareLoader.SaveError.notRepresentable(name, encoding)
+        }
         return data
     }
 

@@ -12,13 +12,16 @@ struct FolderSummary: Equatable {
     var isPartial = false
 
     var text: String {
-        (isPartial ? "At least " : "") + "\(Format.bytes(Int64(files))) file\(files == 1 ? "" : "s"), \(Format.bytes(Int64(folders))) folder\(folders == 1 ? "" : "s"), "
+        (isPartial ? "At least " : "")
+            + "\(Format.bytes(Int64(files))) file\(files == 1 ? "" : "s"), \(Format.bytes(Int64(folders))) folder\(folders == 1 ? "" : "s"), "
             + "\(Format.bytes(bytes)) bytes (\(Format.shortSize(bytes)))"
     }
 
     static func + (left: FolderSummary, right: FolderSummary) -> FolderSummary {
-        FolderSummary(files: left.files + right.files, folders: left.folders + right.folders, bytes: left.bytes.addingSaturated(right.bytes),
-                      isPartial: left.isPartial || right.isPartial)
+        FolderSummary(
+            files: left.files + right.files, folders: left.folders + right.folders,
+            bytes: left.bytes.addingSaturated(right.bytes),
+            isPartial: left.isPartial || right.isPartial)
     }
 
     /// Counts everything below `directory` through its file system. The subfolders are walked
@@ -27,7 +30,9 @@ struct FolderSummary: Equatable {
     /// does not answer does not keep the threads). Links are counted, not followed. With
     /// `limit`, counting stops after that many entries, as it does for a tree on a server,
     /// where every folder is a trip; `isPartial` is then set.
-    static func measure(_ directory: URL, provider: FileSystemProvider, cancellation: CancellationFlag, limit: Int? = nil) -> FolderSummary {
+    static func measure(
+        _ directory: URL, provider: FileSystemProvider, cancellation: CancellationFlag, limit: Int? = nil
+    ) -> FolderSummary {
         let budget = limit.map { Budget($0) }
         var result = measure(directory, provider: provider, cancellation: cancellation, budget: budget)
         result.isPartial = budget?.isExhausted == true
@@ -62,9 +67,13 @@ struct FolderSummary: Equatable {
         }
     }
 
-    private static func measure(_ directory: URL, provider: FileSystemProvider, cancellation: CancellationFlag, budget: Budget?) -> FolderSummary {
+    private static func measure(
+        _ directory: URL, provider: FileSystemProvider, cancellation: CancellationFlag, budget: Budget?
+    ) -> FolderSummary {
         guard !cancellation.isCancelled, budget?.exhausted != true,
-              let items = try? provider.list(directory, showHidden: true, cancellation: cancellation), !cancellation.isCancelled else { return FolderSummary() }
+            let items = try? provider.list(directory, showHidden: true, cancellation: cancellation),
+            !cancellation.isCancelled
+        else { return FolderSummary() }
         if let budget, !budget.take(items.count) { return FolderSummary() }
         var summary = FolderSummary()
         for item in items {
@@ -75,7 +84,9 @@ struct FolderSummary: Equatable {
                 summary.bytes = summary.bytes.addingSaturated(item.size)
             }
         }
-        let below = Parallel.map(items.filter(\.isRealDirectory)) { measure($0.url, provider: provider, cancellation: cancellation, budget: budget) }
+        let below = Parallel.map(items.filter(\.isRealDirectory)) {
+            measure($0.url, provider: provider, cancellation: cancellation, budget: budget)
+        }
         return below.reduce(summary, +)
     }
 }

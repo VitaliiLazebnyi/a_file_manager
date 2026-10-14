@@ -32,7 +32,7 @@ final class CommandLineView: NSView, NSComboBoxDelegate {
     /// The commands of the line itself, which keep their keys while it is typed in.
     static let ownCommands: Set<CommandID> = [
         .addNameToCommandLine, .addPathAndNameToCommandLine, .addPathToCommandLine, .commandLineHistory,
-        .clearCommandLine, .previousCommandLine, .nextCommandLine,
+        .clearCommandLine, .previousCommandLine, .nextCommandLine
     ]
 
     init(kernel: Kernel, panels: PanelCoordinator) {
@@ -63,7 +63,7 @@ final class CommandLineView: NSView, NSComboBoxDelegate {
             field.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -6),
             field.widthAnchor.constraint(equalTo: widthAnchor, multiplier: 0.5),
             field.topAnchor.constraint(equalTo: topAnchor, constant: 3),
-            field.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -3),
+            field.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -3)
         ])
         reloadHistory()
         updatePrompt()

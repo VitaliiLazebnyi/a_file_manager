@@ -45,7 +45,9 @@ final class Deflater {
     /// A raw stream, without the zlib or gzip wrapping. Level 1 (fast) … 9 (small).
     init(level: Int) {
         stream.initialize(to: z_stream())
-        deflateInit2_(stream, Int32(max(1, min(level, 9))), Z_DEFLATED, -15, 8, Z_DEFAULT_STRATEGY, ZLIB_VERSION, Int32(MemoryLayout<z_stream>.size))
+        deflateInit2_(
+            stream, Int32(max(1, min(level, 9))), Z_DEFLATED, -15, 8, Z_DEFAULT_STRATEGY, ZLIB_VERSION,
+            Int32(MemoryLayout<z_stream>.size))
     }
 
     deinit {
@@ -197,7 +199,10 @@ final class XZCoder {
 
     private func start() throws {
         if isOpen { compression_stream_destroy(stream) }
-        isOpen = compression_stream_init(stream, encodes ? COMPRESSION_STREAM_ENCODE : COMPRESSION_STREAM_DECODE, COMPRESSION_LZMA) == COMPRESSION_STATUS_OK
+        isOpen =
+            compression_stream_init(
+                stream, encodes ? COMPRESSION_STREAM_ENCODE : COMPRESSION_STREAM_DECODE, COMPRESSION_LZMA)
+            == COMPRESSION_STATUS_OK
         guard isOpen else { throw ArchiveError.unsupported("LZMA compression") }
     }
 
@@ -218,14 +223,17 @@ final class XZCoder {
             while true {
                 stream.pointee.dst_ptr = chunk
                 stream.pointee.dst_size = capacity
-                let status = compression_stream_process(stream, finish ? Int32(COMPRESSION_STREAM_FINALIZE.rawValue) : 0)
+                let status = compression_stream_process(
+                    stream, finish ? Int32(COMPRESSION_STREAM_FINALIZE.rawValue) : 0)
                 output.append(chunk, count: capacity - stream.pointee.dst_size)
                 consumed = bytes.count - stream.pointee.src_size
                 if status == COMPRESSION_STATUS_END {
                     ended = true
                     break
                 }
-                guard status == COMPRESSION_STATUS_OK else { throw ArchiveError.damaged("the LZMA data cannot be decoded") }
+                guard status == COMPRESSION_STATUS_OK else {
+                    throw ArchiveError.damaged("the LZMA data cannot be decoded")
+                }
                 if output.count >= limit { break }
                 if stream.pointee.dst_size != 0 && stream.pointee.src_size == 0 { break }
             }
@@ -478,7 +486,9 @@ enum CompressedSize {
         var (streams, steps) = (0, 0)
         while end > 0 {
             steps += 1
-            guard end >= 32, end % 4 == 0, steps < 1 << 20, let footer = try? file.read(at: end - 12, count: 12), footer.count == 12 else { return nil }
+            guard end >= 32, end % 4 == 0, steps < 1 << 20, let footer = try? file.read(at: end - 12, count: 12),
+                footer.count == 12
+            else { return nil }
             // Zero bytes, four at a time, may stand between streams and after the last.
             if footer.suffix(4).allSatisfy({ $0 == 0 }) {
                 end -= 4
@@ -488,8 +498,10 @@ enum CompressedSize {
             var reader = ByteReader(footer)
             _ = reader.u32()
             let indexSize = (UInt64(reader.u32()) + 1) * 4
-            guard indexSize <= 64 << 20, indexSize <= end - 24, let index = try? file.read(at: end - 12 - indexSize, count: Int(indexSize)),
-                  index.count == Int(indexSize), index[0] == 0 else { return nil }
+            guard indexSize <= 64 << 20, indexSize <= end - 24,
+                let index = try? file.read(at: end - 12 - indexSize, count: Int(indexSize)),
+                index.count == Int(indexSize), index[0] == 0
+            else { return nil }
             var position = 1
             func number() -> UInt64? {
                 var (value, shift) = (UInt64(0), UInt64(0))
@@ -513,7 +525,9 @@ enum CompressedSize {
                 guard packed <= end else { return nil }
             }
             let streamSize = 12 + packed + indexSize + 12
-            guard streamSize <= end, let head = try? file.read(at: end - streamSize, count: 6), [UInt8](head) == [0xFD, 0x37, 0x7A, 0x58, 0x5A, 0x00] else {
+            guard streamSize <= end, let head = try? file.read(at: end - streamSize, count: 6),
+                [UInt8](head) == [0xFD, 0x37, 0x7A, 0x58, 0x5A, 0x00]
+            else {
                 return nil
             }
             end -= streamSize
@@ -527,7 +541,9 @@ enum CompressedSize {
     /// every such file is, but nothing in the file proves it. A number too small for the
     /// compressed data to have come from is raised by the 4 GB steps it must have lost.
     static func claimedByGzip(_ file: RandomAccessFile) -> UInt64? {
-        guard file.size >= 18, let tail = try? file.read(at: file.size - 4, count: 4), tail.count == 4 else { return nil }
+        guard file.size >= 18, let tail = try? file.read(at: file.size - 4, count: 4), tail.count == 4 else {
+            return nil
+        }
         var reader = ByteReader(tail)
         var size = UInt64(reader.u32())
         // Deflate never makes data noticeably larger: the contents are about as large as the
@@ -547,7 +563,9 @@ extension ArchiveFormat.Codec {
         case .xz: return try XZStream(FileRangeStream(file), control: control)
         case .bzip2:
             // The child opens the file by its path: it must still be the file that was listed.
-            guard file.isStillAtItsPath else { throw ArchiveError.changedOutside((file.path as NSString).lastPathComponent) }
+            guard file.isStillAtItsPath else {
+                throw ArchiveError.changedOutside((file.path as NSString).lastPathComponent)
+            }
             return try ProcessStream(Tool.bzip2, ["-dc", "--", file.path], control: control)
         }
     }
@@ -624,11 +642,14 @@ final class ParallelCompressor {
         guard !pieces.isEmpty else { return }
         let method = self.method
         let lastIndex = pieces.count - 1
-        let results = Parallel.map(Array(pieces.enumerated()), serialBelow: 2) { index, piece -> Result<(Data, UInt32), Error> in
+        let results = Parallel.map(Array(pieces.enumerated()), serialBelow: 2) {
+            index, piece -> Result<(Data, UInt32), Error> in
             Result {
                 switch method {
-                case .gzip(let level): return (Deflater.piece(piece, level: level, final: final && index == lastIndex), CRC32.of(piece))
-                case .bzip2(let level): return (try Tool.filter(Tool.bzip2, ["-c", "-\(max(1, min(level, 9)))"], input: piece), 0)
+                case .gzip(let level):
+                    return (Deflater.piece(piece, level: level, final: final && index == lastIndex), CRC32.of(piece))
+                case .bzip2(let level):
+                    return (try Tool.filter(Tool.bzip2, ["-c", "-\(max(1, min(level, 9)))"], input: piece), 0)
                 case .xz: return (try XZCoder.compress(piece), 0)
                 case .none: return (piece, 0)
                 }

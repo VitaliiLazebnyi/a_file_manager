@@ -39,7 +39,9 @@ struct ButtonBarArrangement: Equatable {
     /// The bar in the form the toolbar registry keeps: nil is a separator.
     var entries: [CommandID?] {
         lines.enumerated().flatMap { number, line -> [CommandID?] in
-            let groups = line.enumerated().flatMap { index, group in (index == 0 ? [] : [nil]) + group.map(Optional.init) }
+            let groups = line.enumerated().flatMap { index, group in
+                (index == 0 ? [] : [nil]) + group.map(Optional.init)
+            }
             return (number == 0 ? [] : [ToolbarRegistry.lineBreak]) + groups
         }
     }
@@ -55,7 +57,8 @@ struct ButtonBarArrangement: Equatable {
         switch target {
         case .inGroup(let toLine, let toGroup, let at):
             guard marked.indices.contains(toLine), marked[toLine].indices.contains(toGroup),
-                  (0...marked[toLine][toGroup].count).contains(at) else { return }
+                (0...marked[toLine][toGroup].count).contains(at)
+            else { return }
             marked[toLine][toGroup].insert(command, at: at)
         case .newGroup(let place):
             guard Self.insert([command], at: place, into: &marked) else { return }
@@ -81,7 +84,9 @@ struct ButtonBarArrangement: Equatable {
     }
 
     private func button(line: Int, group: Int, index: Int) -> CommandID? {
-        guard lines.indices.contains(line), lines[line].indices.contains(group), lines[line][group].indices.contains(index) else { return nil }
+        guard lines.indices.contains(line), lines[line].indices.contains(group),
+            lines[line][group].indices.contains(index)
+        else { return nil }
         return lines[line][group][index]
     }
 

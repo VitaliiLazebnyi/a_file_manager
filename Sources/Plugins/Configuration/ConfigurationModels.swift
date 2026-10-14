@@ -108,7 +108,9 @@ final class ConfigurationStore {
         let commands = userCommands
         if userCommandPlaces == nil {
             var places: [String: Int] = [:]
-            for (index, command) in commands.enumerated() where places[command.name] == nil { places[command.name] = index }
+            for (index, command) in commands.enumerated() where places[command.name] == nil {
+                places[command.name] = index
+            }
             userCommandPlaces = places
         }
         return userCommandPlaces?[name].map { commands[$0] }
@@ -117,7 +119,9 @@ final class ConfigurationStore {
     var userCommands: [UserCommand] {
         get {
             if let cachedUserCommands { return cachedUserCommands }
-            let loaded = Array(load(UserCommand.self, key: ConfigurationStore.userCommandsKey, what: "user commands").prefix(ConfigurationStore.userCommandLimit))
+            let loaded = Array(
+                load(UserCommand.self, key: ConfigurationStore.userCommandsKey, what: "user commands").prefix(
+                    ConfigurationStore.userCommandLimit))
             cachedUserCommands = loaded
             return loaded
         }
@@ -130,7 +134,9 @@ final class ConfigurationStore {
     var startMenu: [StartMenuEntry] {
         get {
             if let cachedStartMenu { return cachedStartMenu }
-            let loaded = Array(load(StartMenuEntry.self, key: ConfigurationStore.startMenuKey, what: "Start menu").prefix(ConfigurationStore.startMenuLimit))
+            let loaded = Array(
+                load(StartMenuEntry.self, key: ConfigurationStore.startMenuKey, what: "Start menu").prefix(
+                    ConfigurationStore.startMenuLimit))
             cachedStartMenu = loaded
             return loaded
         }
@@ -150,10 +156,17 @@ final class ConfigurationStore {
         let list = try? JSONDecoder().decode(LenientList<Element>.self, from: data)
         if let list, list.skipped == 0 { return list.elements }
         let backup = key + ".unreadable"
-        if let earlier = settings.data(forKey: backup), earlier != data { settings.set(earlier as Data?, forKey: backup + ".previous") }
+        if let earlier = settings.data(forKey: backup), earlier != data {
+            settings.set(earlier as Data?, forKey: backup + ".previous")
+        }
         settings.set(data as Data?, forKey: backup)
-        let message = list == nil ? "The stored \(what) could not be read." : "\(list!.skipped) of the stored \(what) could not be read and were left out."
-        MainLoop.perform { [onProblem] in onProblem?(message + " The original data is kept in the setting “\(ConfigurationStore.owner).\(backup)”.") }
+        let message =
+            list == nil
+            ? "The stored \(what) could not be read."
+            : "\(list!.skipped) of the stored \(what) could not be read and were left out."
+        MainLoop.perform { [onProblem] in
+            onProblem?(message + " The original data is kept in the setting “\(ConfigurationStore.owner).\(backup)”.")
+        }
         return list?.elements ?? []
     }
 
@@ -319,10 +332,16 @@ struct SettingsArchive: Equatable {
     func validate(keyBindingsKey: String) throws {
         func check<Value: Decodable>(_ key: String, _ type: Value.Type, valid: (Value) -> Bool = { _ in true }) throws {
             guard let data = values[key] else { return }
-            guard let value = try? JSONDecoder().decode(type, from: data), valid(value) else { throw ArchiveError.unreadable(key) }
+            guard let value = try? JSONDecoder().decode(type, from: data), valid(value) else {
+                throw ArchiveError.unreadable(key)
+            }
         }
-        try check(ConfigurationStore.owner + "." + ConfigurationStore.userCommandsKey, LenientList<UserCommand>.self) { $0.skipped == 0 }
-        try check(ConfigurationStore.owner + "." + ConfigurationStore.startMenuKey, LenientList<StartMenuEntry>.self) { $0.skipped == 0 }
+        try check(ConfigurationStore.owner + "." + ConfigurationStore.userCommandsKey, LenientList<UserCommand>.self) {
+            $0.skipped == 0
+        }
+        try check(ConfigurationStore.owner + "." + ConfigurationStore.startMenuKey, LenientList<StartMenuEntry>.self) {
+            $0.skipped == 0
+        }
         try check(ConfigurationStore.owner + "." + ConfigurationStore.symbolsKey, [String: String].self)
         try check(keyBindingsKey, [String: [String]].self)
     }
@@ -330,7 +349,10 @@ struct SettingsArchive: Equatable {
     func encoded() throws -> Data {
         var entries: [String: Any] = [:]
         for (key, data) in values {
-            entries[key] = (try? JSONSerialization.jsonObject(with: data, options: .fragmentsAllowed)) ?? ["$data": data.base64EncodedString()]
+            entries[key] =
+                (try? JSONSerialization.jsonObject(with: data, options: .fragmentsAllowed)) ?? [
+                    "$data": data.base64EncodedString()
+                ]
         }
         let file: [String: Any] = ["format": SettingsArchive.format, "version": 1, "settings": entries]
         return try JSONSerialization.data(withJSONObject: file, options: [.prettyPrinted, .sortedKeys])
@@ -339,12 +361,18 @@ struct SettingsArchive: Equatable {
     init() {}
 
     init(data: Data) throws {
-        guard let file = try? JSONSerialization.jsonObject(with: data) as? [String: Any], file["format"] as? String == SettingsArchive.format,
-              let entries = file["settings"] as? [String: Any] else { throw ArchiveError.notAnArchive }
+        guard let file = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+            file["format"] as? String == SettingsArchive.format,
+            let entries = file["settings"] as? [String: Any]
+        else { throw ArchiveError.notAnArchive }
         for (key, value) in entries {
-            if let wrapped = value as? [String: Any], wrapped.count == 1, let text = wrapped["$data"] as? String, let raw = Data(base64Encoded: text) {
+            if let wrapped = value as? [String: Any], wrapped.count == 1, let text = wrapped["$data"] as? String,
+                let raw = Data(base64Encoded: text)
+            {
                 values[key] = raw
-            } else if let json = try? JSONSerialization.data(withJSONObject: value, options: [.fragmentsAllowed, .sortedKeys]) {
+            } else if let json = try? JSONSerialization.data(
+                withJSONObject: value, options: [.fragmentsAllowed, .sortedKeys])
+            {
                 values[key] = json
             }
         }

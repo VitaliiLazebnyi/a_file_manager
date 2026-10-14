@@ -73,7 +73,9 @@ public struct FileMask {
     /// `fits(token, index)` whether another token takes the element of the name at `index`.
     /// One place to go back to is remembered, the last `*`, so the time is bounded by the two
     /// lengths multiplied.
-    private static func wild(_ tokenCount: Int, _ nameCount: Int, isAny: (Int) -> Bool, _ fits: (Int, Int) -> Bool) -> Bool {
+    private static func wild(_ tokenCount: Int, _ nameCount: Int, isAny: (Int) -> Bool, _ fits: (Int, Int) -> Bool)
+        -> Bool
+    {
         var (token, index) = (0, 0)
         var (star, mark) = (-1, 0)
         while index < nameCount {
@@ -126,7 +128,8 @@ public struct FileMask {
                 func isPlain(_ text: ArraySlice<UInt8>) -> Bool { !text.contains { $0 == 0x2A || $0 == 0x3F } }
                 let characters = copy(bytes.contains(0x3F) ? pattern.unicodeScalars.map(\.value) : [])
                 if bytes.count >= 2, bytes.first == 0x2A, bytes.last == 0x2A, isPlain(bytes[1..<(bytes.count - 1)]) {
-                    return Matcher(shape: .infix, text: copy(Array(bytes[1..<(bytes.count - 1)])), characters: characters)
+                    return Matcher(
+                        shape: .infix, text: copy(Array(bytes[1..<(bytes.count - 1)])), characters: characters)
                 }
                 if bytes.first == 0x2A, isPlain(bytes.dropFirst()) {
                     return Matcher(shape: .suffix, text: copy(Array(bytes.dropFirst())), characters: characters)
@@ -135,7 +138,13 @@ public struct FileMask {
             }
             matchesAll = patterns.contains { $0 == "*.*" || $0 == "*" }
             // `*.` and `name.` match names without an extension.
-            let pairs = patterns.map { (whole: matcher($0), withoutDot: $0.utf8.last == 0x2E ? matcher(String(decoding: $0.utf8.dropLast(), as: UTF8.self)) : nil) }
+            let pairs = patterns.map {
+                (
+                    whole: matcher($0),
+                    withoutDot: $0.utf8.last == 0x2E
+                        ? matcher(String(decoding: $0.utf8.dropLast(), as: UTF8.self)) : nil
+                )
+            }
             asksForDot = pairs.contains { $0.withoutDot != nil }
             countsCharacters = pairs.contains { $0.whole.countsCharacters }
             matchers = copy(pairs)
@@ -151,7 +160,10 @@ public struct FileMask {
 
     /// Several masks are separated by spaces or semicolons. `*.*` matches every name.
     public init(_ text: String) {
-        compiled = Compiled(FileMask.folded(text).utf8.split(whereSeparator: { $0 == 0x20 || $0 == 0x3B }).map { String(decoding: $0, as: UTF8.self) })
+        compiled = Compiled(
+            FileMask.folded(text).utf8.split(whereSeparator: { $0 == 0x20 || $0 == 0x3B }).map {
+                String(decoding: $0, as: UTF8.self)
+            })
     }
 
     public func matches(_ name: String) -> Bool {
@@ -161,7 +173,9 @@ public struct FileMask {
         // An ASCII name is matched as it is, ignoring the case of its letters: that is what
         // folding it, like the masks, comes to.
         var name = name
-        if let matched = name.withUTF8({ bytes in bytes.allSatisfy { $0 < 0x80 } ? FileMask.matches(compiled, bytes, ignoringCase: true) : nil }) {
+        if let matched = name.withUTF8({ bytes in
+            bytes.allSatisfy { $0 < 0x80 } ? FileMask.matches(compiled, bytes, ignoringCase: true) : nil
+        }) {
             return matched
         }
         // Any other name is folded first: case, and the way its accents are written.
@@ -176,7 +190,8 @@ public struct FileMask {
                 let hasDot = bytes.contains(0x2E)
                 return compiled.matchers.contains { matcher in
                     let chosen = hasDot ? matcher.whole : matcher.withoutDot ?? matcher.whole
-                    return chosen.countsCharacters ? chosen.matches(characters) : chosen.matches(bytes, ignoringCase: false)
+                    return chosen.countsCharacters
+                        ? chosen.matches(characters) : chosen.matches(bytes, ignoringCase: false)
                 }
             }
         }
@@ -184,7 +199,8 @@ public struct FileMask {
 
     private static func matches(_ compiled: Compiled, _ name: UnsafeBufferPointer<UInt8>, ignoringCase: Bool) -> Bool {
         let hasDot = !compiled.asksForDot || name.contains(0x2E)
-        for matcher in compiled.matchers where (hasDot ? matcher.whole : matcher.withoutDot ?? matcher.whole).matches(name, ignoringCase: ignoringCase) {
+        for matcher in compiled.matchers
+        where (hasDot ? matcher.whole : matcher.withoutDot ?? matcher.whole).matches(name, ignoringCase: ignoringCase) {
             return true
         }
         return false

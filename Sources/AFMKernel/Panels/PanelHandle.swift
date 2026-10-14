@@ -71,7 +71,8 @@ extension PanelSet {
     public func refresh(_ directories: [URL], focus: URL? = nil) {
         contentsChanged(in: directories)
         for panel in all where directories.contains(where: { $0.isSameLocation(as: panel.model.directory) }) {
-            let inFocusFolder = focus.map { $0.deletingLastPathComponent().isSameLocation(as: panel.model.directory) } ?? false
+            let inFocusFolder =
+                focus.map { $0.deletingLastPathComponent().isSameLocation(as: panel.model.directory) } ?? false
             panel.reload(focus: inFocusFolder ? focus?.lastPathComponent : nil, quietly: false, completion: nil)
         }
     }

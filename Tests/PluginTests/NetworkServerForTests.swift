@@ -67,7 +67,11 @@ final class TestFTPServer {
 
         init(listener: Int32) { self.listener = listener }
 
-        var isStopped: Bool { lock.lock(); defer { lock.unlock() }; return stopped }
+        var isStopped: Bool {
+            lock.lock()
+            defer { lock.unlock() }
+            return stopped
+        }
 
         /// Returns when the socket is closed and nothing is accepted any more.
         func stop() {
@@ -136,20 +140,52 @@ final class TestFTPServer {
     deinit { stop() }
 
     var options: Options {
-        get { lock.lock(); defer { lock.unlock() }; return currentOptions }
-        set { lock.lock(); currentOptions = newValue; lock.unlock() }
+        get {
+            lock.lock()
+            defer { lock.unlock() }
+            return currentOptions
+        }
+        set {
+            lock.lock()
+            currentOptions = newValue
+            lock.unlock()
+        }
     }
 
     /// Every command line received, in order.
-    var commands: [String] { lock.lock(); defer { lock.unlock() }; return commandLog }
+    var commands: [String] {
+        lock.lock()
+        defer { lock.unlock() }
+        return commandLog
+    }
     /// How many control connections were ever opened.
-    var connectionsOpened: Int { lock.lock(); defer { lock.unlock() }; return opened }
-    var openConnections: Int { lock.lock(); defer { lock.unlock() }; return clients.count }
+    var connectionsOpened: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return opened
+    }
+    var openConnections: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return clients.count
+    }
     /// The most control connections that were open at the same moment.
-    var mostConnectionsAtOnce: Int { lock.lock(); defer { lock.unlock() }; return peak }
-    var isStopped: Bool { lock.lock(); defer { lock.unlock() }; return stopped }
+    var mostConnectionsAtOnce: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return peak
+    }
+    var isStopped: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return stopped
+    }
     /// The largest number of listings that ran at the same moment.
-    var mostListingsAtOnce: Int { lock.lock(); defer { lock.unlock() }; return mostListing }
+    var mostListingsAtOnce: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return mostListing
+    }
 
     func stop() {
         lock.lock()
@@ -170,7 +206,11 @@ final class TestFTPServer {
         lock.unlock()
     }
 
-    fileprivate func record(_ command: String) { lock.lock(); commandLog.append(command); lock.unlock() }
+    fileprivate func record(_ command: String) {
+        lock.lock()
+        commandLog.append(command)
+        lock.unlock()
+    }
 
     /// Closes the socket of a session that ended. It leaves the list first (see `dropConnections`).
     fileprivate func closed(_ client: Int32) {
@@ -182,7 +222,8 @@ final class TestFTPServer {
 
     /// True while connections are still to be refused with 421.
     fileprivate func refusesGreeting() -> Bool {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         guard busy < currentOptions.busyGreetings else { return false }
         busy += 1
         return true
@@ -195,7 +236,11 @@ final class TestFTPServer {
         lock.unlock()
     }
 
-    fileprivate func listingEnded() { lock.lock(); listing -= 1; lock.unlock() }
+    fileprivate func listingEnded() {
+        lock.lock()
+        listing -= 1
+        lock.unlock()
+    }
 
     // MARK: Sockets
 
@@ -209,7 +254,9 @@ final class TestFTPServer {
         address.sin_family = sa_family_t(AF_INET)
         address.sin_addr.s_addr = inet_addr("127.0.0.1")
         let bound = withUnsafePointer(to: &address) {
-            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { bind(descriptor, $0, socklen_t(MemoryLayout<sockaddr_in>.size)) }
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                bind(descriptor, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
+            }
         }
         guard bound == 0, Darwin.listen(descriptor, 64) == 0 else {
             close(descriptor)
@@ -235,9 +282,14 @@ final class TestFTPServer {
         address.sin_port = UInt16(port).bigEndian
         address.sin_addr.s_addr = inet_addr(host)
         let result = withUnsafePointer(to: &address) {
-            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { Darwin.connect(descriptor, $0, socklen_t(MemoryLayout<sockaddr_in>.size)) }
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                Darwin.connect(descriptor, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
+            }
         }
-        if result != 0 { close(descriptor); return nil }
+        if result != 0 {
+            close(descriptor)
+            return nil
+        }
         return descriptor
     }
 
@@ -272,7 +324,10 @@ final class TestFTPServer {
     fileprivate func acceptOne(_ listener: Int32, control: Int32) -> Int32? {
         let deadline = Date().addingTimeInterval(60)
         while !isStopped, Date() < deadline {
-            var descriptors = [pollfd(fd: listener, events: Int16(POLLIN), revents: 0), pollfd(fd: control, events: Int16(POLLIN), revents: 0)]
+            var descriptors = [
+                pollfd(fd: listener, events: Int16(POLLIN), revents: 0),
+                pollfd(fd: control, events: Int16(POLLIN), revents: 0)
+            ]
             guard poll(&descriptors, 2, 50) > 0 else { continue }
             if descriptors[0].revents & Int16(POLLIN) != 0 {
                 let client = accept(listener, nil, nil)
@@ -404,7 +459,10 @@ private final class Session {
         switch verb {
         case "SYST": reply("215 UNIX Type: L8")
         case "FEAT":
-            guard options.offersFeatures else { reply("502 Not implemented"); break }
+            guard options.offersFeatures else {
+                reply("502 Not implemented")
+                break
+            }
             var lines = ["211-Features:", " UTF8", " MDTM", " MFMT"]
             if options.offersREST { lines.append(" REST STREAM") }
             if options.offersSize { lines.append(" SIZE") }
@@ -416,64 +474,111 @@ private final class Session {
         case "NOOP": reply("200 OK")
         case "PWD": reply("257 \"\(directory.replacingOccurrences(of: "\"", with: "\"\""))\" is the current directory")
         case "CWD", "CDUP":
-            guard let url = local(verb == "CDUP" ? ".." : argument), isDirectory(url) else { reply("550 No such directory"); break }
+            guard let url = local(verb == "CDUP" ? ".." : argument), isDirectory(url) else {
+                reply("550 No such directory")
+                break
+            }
             directory = virtual(url)
             reply("250 OK")
         case "TYPE": reply("200 Type set")
         case "PASV", "EPSV":
-            guard verb == "PASV" || options.offersEPSV else { reply("500 Unknown command"); break }
+            guard verb == "PASV" || options.offersEPSV else {
+                reply("500 Unknown command")
+                break
+            }
             if let passive { close(passive) }
-            guard let listener = try? TestFTPServer.listen() else { reply("425 No port"); break }
+            guard let listener = try? TestFTPServer.listen() else {
+                reply("425 No port")
+                break
+            }
             passive = listener
             active = nil
             let port = TestFTPServer.port(of: listener)
-            reply(verb == "PASV" ? "227 Entering Passive Mode (127,0,0,1,\(port / 256),\(port % 256))"
-                                 : "229 Entering Extended Passive Mode (|||\(port)|)")
+            reply(
+                verb == "PASV"
+                    ? "227 Entering Passive Mode (127,0,0,1,\(port / 256),\(port % 256))"
+                    : "229 Entering Extended Passive Mode (|||\(port)|)")
         case "PORT":
             let numbers = argument.split(separator: ",").compactMap { Int($0) }
-            guard numbers.count == 6 else { reply("501 Bad address"); break }
+            guard numbers.count == 6 else {
+                reply("501 Bad address")
+                break
+            }
             active = (numbers[0..<4].map(String.init).joined(separator: "."), numbers[4] * 256 + numbers[5])
             reply("200 PORT OK")
         case "EPRT":
             let fields = argument.split(separator: "|")
-            guard fields.count == 3, let port = Int(fields[2]) else { reply("501 Bad address"); break }
+            guard fields.count == 3, let port = Int(fields[2]) else {
+                reply("501 Bad address")
+                break
+            }
             active = (String(fields[1]), port)
             reply("200 EPRT OK")
         case "REST":
             restart = UInt64(argument) ?? 0
             reply("350 Restarting at \(restart)")
         case "LIST", "NLST", "MLSD":
-            guard verb != "MLSD" || options.offersMLSD else { reply("500 Unknown command"); break }
+            guard verb != "MLSD" || options.offersMLSD else {
+                reply("500 Unknown command")
+                break
+            }
             let showHidden = verb == "MLSD" || argument.hasPrefix("-") && argument.contains("a")
             let path = verb == "MLSD" ? argument : (argument.hasPrefix("-") ? "" : argument)
-            guard let url = local(path), isDirectory(url) else { reply("550 No such directory"); break }
+            guard let url = local(path), isDirectory(url) else {
+                reply("550 No such directory")
+                break
+            }
             server.listingStarted()
             if options.listDelay > 0 {
                 // In slices: a server that is stopped does not keep its thread for the whole pause.
                 let end = Date().addingTimeInterval(options.listDelay)
-                while !server.isStopped, Date() < end { Thread.sleep(forTimeInterval: min(0.05, max(0, end.timeIntervalSinceNow))) }
+                while !server.isStopped, Date() < end {
+                    Thread.sleep(forTimeInterval: min(0.05, max(0, end.timeIntervalSinceNow)))
+                }
             }
-            let names = ((try? fm.contentsOfDirectory(atPath: url.path)) ?? []).sorted().filter { showHidden || !$0.hasPrefix(".") }
-            let lines = names.map { line(for: url.appendingPathComponent($0), name: $0, mlsd: verb == "MLSD", dos: options.dosListing) }
+            let names = ((try? fm.contentsOfDirectory(atPath: url.path)) ?? []).sorted().filter {
+                showHidden || !$0.hasPrefix(".")
+            }
+            let lines =
+                names.map {
+                    line(for: url.appendingPathComponent($0), name: $0, mlsd: verb == "MLSD", dos: options.dosListing)
+                }
                 + options.injectedLines
             let preamble = verb == "LIST" && !options.dosListing ? "total \(names.count)\r\n" : ""
             let listing = options.rawListing ?? Data((preamble + lines.map { $0 + "\r\n" }.joined()).utf8)
             transfer { TestFTPServer.sendAll($0, listing) }
             server.listingEnded()
         case "MLST":
-            guard options.offersMLSD else { reply("500 Unknown command"); break }
-            guard let url = local(argument), fm.fileExists(atPath: url.path) else { reply("550 Not found"); break }
+            guard options.offersMLSD else {
+                reply("500 Unknown command")
+                break
+            }
+            guard let url = local(argument), fm.fileExists(atPath: url.path) else {
+                reply("550 Not found")
+                break
+            }
             reply("250-Listing\r\n \(line(for: url, name: virtual(url), mlsd: true, dos: false))\r\n250 End")
         case "SIZE":
-            guard options.offersSize else { reply("500 Unknown command"); break }
-            guard let url = local(argument), fm.fileExists(atPath: url.path), !isDirectory(url) else { reply("550 Not a file"); break }
+            guard options.offersSize else {
+                reply("500 Unknown command")
+                break
+            }
+            guard let url = local(argument), fm.fileExists(atPath: url.path), !isDirectory(url) else {
+                reply("550 Not a file")
+                break
+            }
             reply("213 \(size(of: url))")
         case "MDTM":
-            guard let url = local(argument), fm.fileExists(atPath: url.path), !isDirectory(url) else { reply("550 Not a file"); break }
+            guard let url = local(argument), fm.fileExists(atPath: url.path), !isDirectory(url) else {
+                reply("550 Not a file")
+                break
+            }
             reply("213 \(stamp(modified(url)))")
         case "MFMT":
             let parts = argument.split(separator: " ", maxSplits: 1)
-            guard parts.count == 2, let url = local(String(parts[1])), let date = Session.stampFormat.date(from: String(parts[0])) else {
+            guard parts.count == 2, let url = local(String(parts[1])),
+                let date = Session.stampFormat.date(from: String(parts[0]))
+            else {
                 reply("501 Bad arguments")
                 break
             }
@@ -481,14 +586,19 @@ private final class Session {
             reply("213 Modify=\(parts[0]); \(parts[1])")
         case "SITE":
             let parts = argument.split(separator: " ", maxSplits: 2)
-            guard parts.count == 3, parts[0].uppercased() == "CHMOD", let mode = Int(parts[1], radix: 8), let url = local(String(parts[2])) else {
+            guard parts.count == 3, parts[0].uppercased() == "CHMOD", let mode = Int(parts[1], radix: 8),
+                let url = local(String(parts[2]))
+            else {
                 reply("500 Unknown SITE command")
                 break
             }
             try? fm.setAttributes([.posixPermissions: mode], ofItemAtPath: url.path)
             reply("200 CHMOD OK")
         case "RETR":
-            guard let url = local(argument), !isDirectory(url), let data = try? Data(contentsOf: url) else { reply("550 No such file"); break }
+            guard let url = local(argument), !isDirectory(url), let data = try? Data(contentsOf: url) else {
+                reply("550 No such file")
+                break
+            }
             let offset = Int(min(restart, UInt64(data.count)))
             restart = 0
             if options.stallRETR {
@@ -516,7 +626,9 @@ private final class Session {
             transfer { connection in
                 var received = TestFTPServer.receiveAll(connection)
                 if let kept = options.keepsOfUploads { received = received.prefix(kept) }
-                guard (verb == "APPE" && !options.appendStartsAnew) || offset > 0 else { return (try? received.write(to: url)) != nil }
+                guard (verb == "APPE" && !options.appendStartsAnew) || offset > 0 else {
+                    return (try? received.write(to: url)) != nil
+                }
                 // Continuing: like most servers, nothing beyond the new data is cut off.
                 if !self.fm.fileExists(atPath: url.path) { self.fm.createFile(atPath: url.path, contents: nil) }
                 guard let handle = try? FileHandle(forWritingTo: url) else { return false }
@@ -530,24 +642,50 @@ private final class Session {
                 }
             }
         case "DELE":
-            guard let url = local(argument), fm.fileExists(atPath: url.path), !isDirectory(url) else { reply("550 No such file"); break }
-            if options.refusesDelete { reply("550 Permission denied"); break }
+            guard let url = local(argument), fm.fileExists(atPath: url.path), !isDirectory(url) else {
+                reply("550 No such file")
+                break
+            }
+            if options.refusesDelete {
+                reply("550 Permission denied")
+                break
+            }
             reply((try? fm.removeItem(at: url)) != nil ? "250 Deleted" : "550 Cannot delete")
         case "RMD":
-            guard let url = local(argument), isDirectory(url) else { reply("550 Not a directory"); break }
+            guard let url = local(argument), isDirectory(url) else {
+                reply("550 Not a directory")
+                break
+            }
             reply(rmdir(url.path) == 0 ? "250 Removed" : "550 Directory not empty")
         case "MKD":
-            guard let url = local(argument), !fm.fileExists(atPath: url.path) else { reply("550 Already exists"); break }
-            reply((try? fm.createDirectory(at: url, withIntermediateDirectories: false)) != nil ? "257 \"\(virtual(url))\" created" : "550 Cannot create")
+            guard let url = local(argument), !fm.fileExists(atPath: url.path) else {
+                reply("550 Already exists")
+                break
+            }
+            reply(
+                (try? fm.createDirectory(at: url, withIntermediateDirectories: false)) != nil
+                    ? "257 \"\(virtual(url))\" created" : "550 Cannot create")
         case "RNFR":
-            guard let url = local(argument), fm.fileExists(atPath: url.path) else { reply("550 No such file"); break }
+            guard let url = local(argument), fm.fileExists(atPath: url.path) else {
+                reply("550 No such file")
+                break
+            }
             renameFrom = url.path
             reply("350 Ready for RNTO")
         case "RNTO":
-            guard let from = renameFrom, let url = local(argument) else { reply("503 RNFR first"); break }
+            guard let from = renameFrom, let url = local(argument) else {
+                reply("503 RNFR first")
+                break
+            }
             renameFrom = nil
-            if let refused = options.refusesRenameOf, refused == "*" || from.hasSuffix(refused) { reply("550 Permission denied"); break }
-            if options.renameKeepsExisting, fm.fileExists(atPath: url.path) { reply("550 File exists"); break }
+            if let refused = options.refusesRenameOf, refused == "*" || from.hasSuffix(refused) {
+                reply("550 Permission denied")
+                break
+            }
+            if options.renameKeepsExisting, fm.fileExists(atPath: url.path) {
+                reply("550 File exists")
+                break
+            }
             reply(rename(from, url.path) == 0 ? "250 Renamed" : "550 Cannot rename")
         default:
             reply("500 Unknown command")
@@ -619,10 +757,12 @@ private final class Session {
         let (isFolder, date, bytes) = (isDirectory(url), modified(url), size(of: url))
         let mode = ((try? fm.attributesOfItem(atPath: url.path))?[.posixPermissions] as? NSNumber)?.intValue ?? 0o644
         if mlsd {
-            return "type=\(isFolder ? "dir" : "file");size=\(bytes);modify=\(stamp(date));UNIX.mode=0\(String(mode, radix: 8)); \(name)"
+            return
+                "type=\(isFolder ? "dir" : "file");size=\(bytes);modify=\(stamp(date));UNIX.mode=0\(String(mode, radix: 8)); \(name)"
         }
         if dos {
-            return "\(Session.dosFormat.string(from: date))  \(isFolder ? "     <DIR>         " : String(format: "%19lld", bytes)) \(name)"
+            return
+                "\(Session.dosFormat.string(from: date))  \(isFolder ? "     <DIR>         " : String(format: "%19lld", bytes)) \(name)"
         }
         let letters = (0..<9).map { index -> Character in
             mode & (1 << (8 - index)) != 0 ? Array("rwxrwxrwx")[index] : "-"
@@ -630,10 +770,12 @@ private final class Session {
         if let target = try? fm.destinationOfSymbolicLink(atPath: url.path) {
             let isOld = date < Date().addingTimeInterval(-180 * 86400)
             let when = (isOld ? Session.oldFormat : Session.recentFormat).string(from: date)
-            return "lrwxrwxrwx   1 owner    group    \(String(format: "%10lld", Int64(target.utf8.count))) \(when) \(name) -> \(target)"
+            return
+                "lrwxrwxrwx   1 owner    group    \(String(format: "%10lld", Int64(target.utf8.count))) \(when) \(name) -> \(target)"
         }
         let isOld = date < Date().addingTimeInterval(-180 * 86400) || date > Date().addingTimeInterval(3600)
         let when = (isOld ? Session.oldFormat : Session.recentFormat).string(from: date)
-        return "\(isFolder ? "d" : "-")\(String(letters))   1 owner    group    \(String(format: "%10lld", bytes)) \(when) \(name)"
+        return
+            "\(isFolder ? "d" : "-")\(String(letters))   1 owner    group    \(String(format: "%10lld", bytes)) \(when) \(name)"
     }
 }

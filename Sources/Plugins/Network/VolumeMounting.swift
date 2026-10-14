@@ -37,15 +37,18 @@ public final class SystemVolumeMounter: VolumeMounter {
     struct Calls {
         /// Asks for the mount without waiting. Returns the status of asking and what to cancel
         /// the request with; `answer` gets the status and the mount points, on any thread.
-        var mount: (_ url: URL, _ answer: @escaping (Int32, [String]) -> Void) -> (status: Int32, request: AnyObject?) = { url, answer in
-            var request: AsyncRequestID?
-            // No mount path: the system picks a folder under /Volumes. No options: it shows its
-            // own dialog for the name and password and may use the Keychain.
-            let status = NetFSMountURLAsync(url as CFURL, nil, nil, nil, nil, nil, &request, DispatchQueue.global(qos: .userInitiated)) { status, _, mountPoints in
-                answer(status, (mountPoints as? [String]) ?? [])
+        var mount: (_ url: URL, _ answer: @escaping (Int32, [String]) -> Void) -> (status: Int32, request: AnyObject?) =
+            { url, answer in
+                var request: AsyncRequestID?
+                // No mount path: the system picks a folder under /Volumes. No options: it shows its
+                // own dialog for the name and password and may use the Keychain.
+                let status = NetFSMountURLAsync(
+                    url as CFURL, nil, nil, nil, nil, nil, &request, DispatchQueue.global(qos: .userInitiated)
+                ) { status, _, mountPoints in
+                    answer(status, (mountPoints as? [String]) ?? [])
+                }
+                return (status, request.map { Request(id: $0) })
             }
-            return (status, request.map { Request(id: $0) })
-        }
         var cancel: (_ request: AnyObject) -> Void = { request in
             if let request = request as? Request { NetFSMountURLCancel(request.id) }
         }
@@ -92,7 +95,8 @@ public final class SystemVolumeMounter: VolumeMounter {
         }
 
         var value: (status: Int32, paths: [String])? {
-            lock.lock(); defer { lock.unlock() }
+            lock.lock()
+            defer { lock.unlock() }
             return result
         }
     }
@@ -103,14 +107,20 @@ public final class SystemVolumeMounter: VolumeMounter {
         let outcome = Outcome()
         // Asked for without waiting, so that Cancel can take the request back; the server may never answer.
         let (started, request) = calls.mount(url) { status, mountPoints in outcome.set(status, mountPoints) }
-        guard started == 0 else { throw VolumeError(message: "The server \(shown) could not be connected: \(SystemVolumeMounter.reason(started)).") }
+        guard started == 0 else {
+            throw VolumeError(
+                message: "The server \(shown) could not be connected: \(SystemVolumeMounter.reason(started)).")
+        }
         while outcome.done.wait(timeout: .now() + 0.1) == .timedOut {
             guard cancellation.isCancelled else { continue }
             if let request { calls.cancel(request) }
             throw NetworkError.cancelled
         }
         guard let result = outcome.value, result.status == 0 else {
-            throw VolumeError(message: "The server \(shown) could not be connected: \(SystemVolumeMounter.reason(outcome.value?.status ?? EIO)).")
+            throw VolumeError(
+                message:
+                    "The server \(shown) could not be connected: \(SystemVolumeMounter.reason(outcome.value?.status ?? EIO))."
+            )
         }
         return result.paths.map { URL(fileURLWithPath: $0, isDirectory: true) }
     }
@@ -131,7 +141,10 @@ public final class SystemVolumeMounter: VolumeMounter {
         }
         // The system's answer may never come (a server that is gone); the job does not wait for ever.
         guard outcome.done.wait(timeout: .now() + patience) == .success else {
-            throw VolumeError(message: "\(volume.lastPathComponent) did not answer to being ejected within \(Int(patience.rounded(.up))) seconds.")
+            throw VolumeError(
+                message:
+                    "\(volume.lastPathComponent) did not answer to being ejected within \(Int(patience.rounded(.up))) seconds."
+            )
         }
         lock.lock()
         let error = failure

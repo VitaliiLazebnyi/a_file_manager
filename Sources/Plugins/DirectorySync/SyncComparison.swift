@@ -56,7 +56,9 @@ public final class SyncComparison {
     /// The size of the blocks files are compared in.
     static let blockSize = 256 * 1024
 
-    public init(options: SyncOptions, fileSystems: FileSystemRegistry, cancellation: CancellationFlag = CancellationFlag()) {
+    public init(
+        options: SyncOptions, fileSystems: FileSystemRegistry, cancellation: CancellationFlag = CancellationFlag()
+    ) {
         self.options = options
         self.fileSystems = fileSystems
         self.cancellation = cancellation
@@ -71,12 +73,15 @@ public final class SyncComparison {
         // The dates of two file systems that keep them exactly are compared exactly; the tolerance
         // is for the ones that round (see `toleranceSeconds`). Otherwise a file changed two seconds
         // after its copy would count as unchanged.
-        classifying.toleranceSeconds = SyncComparison.needsTolerance(left, right, fileSystems: fileSystems) ? options.toleranceSeconds : 0
+        classifying.toleranceSeconds =
+            SyncComparison.needsTolerance(left, right, fileSystems: fileSystems) ? options.toleranceSeconds : 0
         var rows = walk(Side(url: left, exists: true), Side(url: right, exists: true), relative: "", isTop: true)
         compareContents(of: &rows)
-        lock.lock(); defer { lock.unlock() }
-        var result = SyncResult(rows: rows, leftDirectories: counters.leftDirectories, rightDirectories: counters.rightDirectories,
-                                errors: errors, wasCancelled: cancellation.isCancelled)
+        lock.lock()
+        defer { lock.unlock() }
+        var result = SyncResult(
+            rows: rows, leftDirectories: counters.leftDirectories, rightDirectories: counters.rightDirectories,
+            errors: errors, wasCancelled: cancellation.isCancelled)
         result.topEntries = (topEntries[0], topEntries[1])
         result.toleranceSeconds = classifying.toleranceSeconds
         return result
@@ -90,7 +95,9 @@ public final class SyncComparison {
             guard url.isFileURL else { return false }
             var info = statfs()
             guard statfs(url.path, &info) == 0 else { return false }
-            let type = withUnsafeBytes(of: info.f_fstypename) { String(decoding: $0.prefix { $0 != 0 }, as: UTF8.self) }
+            let type = withUnsafeBytes(of: info.f_fstypename) {
+                String(decoding: $0.prefix { $0 != 0 }, as: UTF8.self)
+            }
             return type == "apfs" || type == "hfs"
         }
         return !(exact(first) && exact(second))
@@ -100,14 +107,18 @@ public final class SyncComparison {
 
     /// What two files of the same name are to each other, by size and date alone. The second
     /// value says that only reading them can tell (spec 09 › Comparison algorithm).
-    public static func classify(left: FileItem, right: FileItem, options: SyncOptions) -> (state: SyncState, needsContent: Bool) {
+    public static func classify(left: FileItem, right: FileItem, options: SyncOptions) -> (
+        state: SyncState, needsContent: Bool
+    ) {
         if !options.ignoreDate {
-            let difference = left.modified.timeIntervalSince(right.modified.addingTimeInterval(Double(options.timeOffsetHours) * 3600))
+            let difference = left.modified.timeIntervalSince(
+                right.modified.addingTimeInterval(Double(options.timeOffsetHours) * 3600))
             let tolerance = Double(max(0, options.toleranceSeconds))
             // Whole seconds are compared: a file system that keeps less than a nanosecond or
             // millisecond (exFAT, HFS+, SMB) would otherwise show every copy from APFS as older.
             func within(_ seconds: Double) -> Bool { seconds < 1 || seconds <= tolerance }
-            let sameTime = within(abs(difference)) || (options.ignoreOneHourDifference && within(abs(abs(difference) - 3600)))
+            let sameTime =
+                within(abs(difference)) || (options.ignoreOneHourDifference && within(abs(abs(difference) - 3600)))
             if !sameTime { return (difference > 0 ? .leftNewer : .rightNewer, false) }
         }
         guard left.size == right.size else { return (.different, false) }
@@ -132,18 +143,23 @@ public final class SyncComparison {
     }
 
     private func note(_ error: String) {
-        lock.lock(); errors.append(error); lock.unlock()
+        lock.lock()
+        errors.append(error)
+        lock.unlock()
     }
 
     /// The entries of one side that take part; nil when the folder cannot be read.
     private func list(_ side: Side, isTop: Bool, index: Int) -> [FileItem]? {
         guard side.exists else { return [] }
         do {
-            let items = try fileSystems.provider(for: side.url).list(side.url, showHidden: options.includeHidden, cancellation: cancellation)
+            let items = try fileSystems.provider(for: side.url).list(
+                side.url, showHidden: options.includeHidden, cancellation: cancellation)
             // A listing that was ended by the cancel is not an error of the folder.
             if cancellation.isCancelled { return nil }
             if isTop {
-                lock.lock(); topEntries[index] = items.count; lock.unlock()
+                lock.lock()
+                topEntries[index] = items.count
+                lock.unlock()
             }
             return (isTop ? asked(among: items) : items).filter { item in
                 // Links are never followed or copied, so the walk cannot run in circles; they
@@ -161,7 +177,9 @@ public final class SyncComparison {
     private func asked(among items: [FileItem]) -> [FileItem] {
         guard let onlyNames else { return items }
         let exact = Set(items.filter { onlyNames.contains(Array($0.name.utf8)) }.map(\.name))
-        return items.filter { onlyNames.contains(Array($0.name.utf8)) || (onlyAlike.contains($0.name) && !exact.contains($0.name)) }
+        return items.filter {
+            onlyNames.contains(Array($0.name.utf8)) || (onlyAlike.contains($0.name) && !exact.contains($0.name))
+        }
     }
 
     private func walk(_ left: Side, _ right: Side, relative: String, isTop: Bool = false) -> [SyncRow] {
@@ -180,8 +198,9 @@ public final class SyncComparison {
         var folders: [(left: Side, right: Side, name: String)] = []
         for pair in pairs {
             func row(_ state: SyncState, isDirectory: Bool = false) -> SyncRow {
-                SyncRow(directory: relative, isDirectory: isDirectory, left: pair.left, right: pair.right,
-                        leftDirectory: left.url, rightDirectory: right.url, state: state, asymmetric: options.asymmetric)
+                SyncRow(
+                    directory: relative, isDirectory: isDirectory, left: pair.left, right: pair.right,
+                    leftDirectory: left.url, rightDirectory: right.url, state: state, asymmetric: options.asymmetric)
             }
             if pair.left?.isSymlink == true || pair.right?.isSymlink == true {
                 // A link is neither followed nor replaced: facing another entry it is shown, but nothing is done with it.
@@ -194,13 +213,20 @@ public final class SyncComparison {
             } else if leftIsFolder ?? rightIsFolder ?? false {
                 guard options.subdirectories else { continue }
                 let name = (pair.left ?? pair.right)!.name
-                folders.append((Side(url: pair.left?.url ?? left.url.appending(name: name), exists: pair.left != nil),
-                                Side(url: pair.right?.url ?? right.url.appending(name: name), exists: pair.right != nil), name))
+                folders.append(
+                    (
+                        Side(url: pair.left?.url ?? left.url.appending(name: name), exists: pair.left != nil),
+                        Side(url: pair.right?.url ?? right.url.appending(name: name), exists: pair.right != nil), name
+                    ))
                 if options.emptyDirectories, pair.left == nil || pair.right == nil {
                     folderRows.append(row(pair.left == nil ? .rightOnly : .leftOnly, isDirectory: true))
                 }
             } else if let leftFile = pair.left, let rightFile = pair.right {
-                rows.append(row(pair.isExactMatch ? SyncComparison.classify(left: leftFile, right: rightFile, options: classifying).state : .excluded))
+                rows.append(
+                    row(
+                        pair.isExactMatch
+                            ? SyncComparison.classify(left: leftFile, right: rightFile, options: classifying).state
+                            : .excluded))
             } else {
                 // A name that differs only in case from one that is paired elsewhere is not "only here": on a
                 // file system that ignores case, copying it would replace the other.
@@ -235,7 +261,9 @@ public final class SyncComparison {
     /// only in form (NFC and NFD) are two files and keep their own rows.
     static func pair(_ leftItems: [FileItem], _ rightItems: [FileItem]) -> [Pair] {
         var rightByName: [[UInt8]: Int] = [:]
-        for (index, item) in rightItems.enumerated() where rightByName[Array(item.name.utf8)] == nil { rightByName[Array(item.name.utf8)] = index }
+        for (index, item) in rightItems.enumerated() where rightByName[Array(item.name.utf8)] == nil {
+            rightByName[Array(item.name.utf8)] = index
+        }
         var matched = [Bool](repeating: false, count: rightItems.count)
         var pairs: [Pair] = []
         var unmatched: [FileItem] = []
@@ -269,7 +297,10 @@ public final class SyncComparison {
                 pairs.append(Pair(left: item, right: nil, collides: foldedRight.contains(key)))
             }
         }
-        return pairs + leftovers.indices.filter { !taken[$0] }.map { Pair(left: nil, right: leftovers[$0], collides: foldedLeft.contains(folded(leftovers[$0].name))) }
+        return pairs
+            + leftovers.indices.filter { !taken[$0] }.map {
+                Pair(left: nil, right: leftovers[$0], collides: foldedLeft.contains(folded(leftovers[$0].name)))
+            }
     }
 
     private static func folded(_ name: String) -> String { name.folding(options: .caseInsensitive, locale: nil) }
@@ -297,7 +328,9 @@ public final class SyncComparison {
         guard !cancellation.isCancelled, let left = row.left, let right = row.right else { return .pending }
         defer { update { $0.filesCompared += 1 } }
         do {
-            let same = try SyncComparison.sameContent(left.url, right.url, fileSystems: fileSystems, cancellation: cancellation) { bytes in
+            let same = try SyncComparison.sameContent(
+                left.url, right.url, fileSystems: fileSystems, cancellation: cancellation
+            ) { bytes in
                 self.update { $0.bytesCompared += Int64(bytes) }
             }
             return same.map { $0 ? .equal : .different } ?? .pending
@@ -309,8 +342,10 @@ public final class SyncComparison {
 
     /// Reads two files side by side and stops at the first difference. Nil when cancelled.
     /// The blocks a reader hands out may be of any length; they are cut to match.
-    static func sameContent(_ first: URL, _ second: URL, fileSystems: FileSystemRegistry, cancellation: CancellationFlag,
-                            progress: (Int) -> Void = { _ in }) throws -> Bool? {
+    static func sameContent(
+        _ first: URL, _ second: URL, fileSystems: FileSystemRegistry, cancellation: CancellationFlag,
+        progress: (Int) -> Void = { _ in }
+    ) throws -> Bool? {
         if cancellation.isCancelled { return nil }
         var readers: [FileReader] = []
         // A read blocked on a server ends as soon as the flag is set.

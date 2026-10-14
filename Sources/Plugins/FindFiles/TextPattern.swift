@@ -21,7 +21,10 @@ public enum TextEncoding: String, Codable, CaseIterable {
         switch self {
         case .utf8: return .utf8
         case .western: return .windowsCP1252
-        case .dos: return String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(CFStringEncoding(CFStringEncodings.dosLatinUS.rawValue)))
+        case .dos:
+            return String.Encoding(
+                rawValue: CFStringConvertEncodingToNSStringEncoding(
+                    CFStringEncoding(CFStringEncodings.dosLatinUS.rawValue)))
         case .utf16: return .utf16LittleEndian
         }
     }
@@ -40,8 +43,10 @@ public struct TextSearchOptions: Codable, Equatable {
     /// A file matches when the text is found in any of these.
     public var encodings: [TextEncoding]
 
-    public init(wholeWords: Bool = false, regex: Bool = false, hex: Bool = false, notContaining: Bool = false,
-                encodings: [TextEncoding] = [.utf8]) {
+    public init(
+        wholeWords: Bool = false, regex: Bool = false, hex: Bool = false, notContaining: Bool = false,
+        encodings: [TextEncoding] = [.utf8]
+    ) {
         self.wholeWords = wholeWords
         self.regex = regex
         self.hex = hex
@@ -114,9 +119,15 @@ public struct TextPattern {
             var positions = [Int](repeating: 0, count: elements.count + 1)
             var tried = [Int](repeating: 0, count: elements.count)
             for start in skip...(hay.count - minLength) where firstBytes[Int(bytes[start])] {
-                if match(bytes, at: start, positions: &positions, tried: &tried, accept: { end in
-                    !wholeWords || (isBoundary(bytes, before: start) && isBoundary(bytes, after: end, isLast: isLast))
-                }) { return true }
+                if match(
+                    bytes, at: start, positions: &positions, tried: &tried,
+                    accept: { end in
+                        !wholeWords
+                            || (isBoundary(bytes, before: start) && isBoundary(bytes, after: end, isLast: isLast))
+                    })
+                {
+                    return true
+                }
             }
             return false
         }
@@ -124,8 +135,10 @@ public struct TextPattern {
         /// Tries the alternatives of the elements one after the other, going back to the
         /// element before when one has none left. Iterative, with the state in two arrays: a
         /// text of any length is matched on the small stack of a search thread.
-        private func match(_ bytes: UnsafeBufferPointer<UInt8>, at start: Int, positions: inout [Int], tried: inout [Int],
-                           accept: (Int) -> Bool) -> Bool {
+        private func match(
+            _ bytes: UnsafeBufferPointer<UInt8>, at start: Int, positions: inout [Int], tried: inout [Int],
+            accept: (Int) -> Bool
+        ) -> Bool {
             let count = elements.count
             positions[0] = start
             tried[0] = 0
@@ -204,12 +217,18 @@ public struct TextPattern {
         notContaining = options.notContaining
         let encodings = options.encodings.isEmpty ? [TextEncoding.utf8] : options.encodings
         if options.hex {
-            matcher = .bytes([Needle(elements: try TextPattern.hexElements(text, caseSensitive: caseSensitive), wholeWords: options.wholeWords)])
+            matcher = .bytes([
+                Needle(
+                    elements: try TextPattern.hexElements(text, caseSensitive: caseSensitive),
+                    wholeWords: options.wholeWords)
+            ])
             droppedEncodings = []
         } else if options.regex {
             do {
                 let pattern = options.wholeWords ? "\\b(?:\(text))\\b" : text
-                let regex = try NSRegularExpression(pattern: pattern, options: caseSensitive ? [.anchorsMatchLines] : [.anchorsMatchLines, .caseInsensitive])
+                let regex = try NSRegularExpression(
+                    pattern: pattern,
+                    options: caseSensitive ? [.anchorsMatchLines] : [.anchorsMatchLines, .caseInsensitive])
                 matcher = .regex(regex, encodings)
                 droppedEncodings = []
             } catch {
@@ -220,9 +239,11 @@ public struct TextPattern {
             var needles: [Needle] = []
             var dropped: [TextEncoding] = []
             for encoding in encodings {
-                let found = TextPattern.needles(for: plain, in: encoding, caseSensitive: caseSensitive, wholeWords: options.wholeWords)
+                let found = TextPattern.needles(
+                    for: plain, in: encoding, caseSensitive: caseSensitive, wholeWords: options.wholeWords)
                 if found.isEmpty { dropped.append(encoding) }
-                for needle in found where !needles.contains(where: { $0.elements == needle.elements && $0.unit == needle.unit }) {
+                for needle in found
+                where !needles.contains(where: { $0.elements == needle.elements && $0.unit == needle.unit }) {
                     needles.append(needle)
                 }
             }
@@ -242,7 +263,9 @@ public struct TextPattern {
                 case "t": result.append("\t")
                 case "n": result.append("\n")
                 case "\\": result.append("\\")
-                default: result.append("\\"); result.append(character)
+                default:
+                    result.append("\\")
+                    result.append(character)
                 }
                 escaped = false
             } else if character == "\\" {
@@ -255,24 +278,34 @@ public struct TextPattern {
         return result
     }
 
-    private static func needles(for text: String, in encoding: TextEncoding, caseSensitive: Bool, wholeWords: Bool) -> [Needle] {
+    private static func needles(for text: String, in encoding: TextEncoding, caseSensitive: Bool, wholeWords: Bool)
+        -> [Needle]
+    {
         func elements(_ encoding: String.Encoding) -> [[[UInt8]]]? {
             var elements: [[[UInt8]]] = []
             for character in text {
-                let forms = caseSensitive ? [String(character)] : [String(character), String(character).lowercased(), String(character).uppercased()]
+                let forms =
+                    caseSensitive
+                    ? [String(character)]
+                    : [String(character), String(character).lowercased(), String(character).uppercased()]
                 var alternatives: [[UInt8]] = []
                 for form in forms {
-                    guard let data = form.data(using: encoding, allowLossyConversion: false), !data.isEmpty else { continue }
+                    guard let data = form.data(using: encoding, allowLossyConversion: false), !data.isEmpty else {
+                        continue
+                    }
                     if !alternatives.contains(Array(data)) { alternatives.append(Array(data)) }
                 }
                 // The character as typed must exist in the encoding; its other case need not.
-                guard String(character).data(using: encoding, allowLossyConversion: false)?.isEmpty == false else { return nil }
+                guard String(character).data(using: encoding, allowLossyConversion: false)?.isEmpty == false else {
+                    return nil
+                }
                 elements.append(alternatives)
             }
             return elements
         }
         if encoding == .utf16 {
-            return [(String.Encoding.utf16LittleEndian, false), (.utf16BigEndian, true)].compactMap { order, bigEndian in
+            return [(String.Encoding.utf16LittleEndian, false), (.utf16BigEndian, true)].compactMap {
+                order, bigEndian in
                 elements(order).map { Needle(elements: $0, unit: 2, bigEndian: bigEndian, wholeWords: wholeWords) }
             }
         }
@@ -325,7 +358,8 @@ public struct TextPattern {
     }
 
     /// Whether the text occurs in the bytes the reader delivers.
-    public func isFound(in reader: FileReader, cancellation: CancellationFlag? = nil, blockSize: Int = 1 << 20) -> Bool {
+    public func isFound(in reader: FileReader, cancellation: CancellationFlag? = nil, blockSize: Int = 1 << 20) -> Bool
+    {
         search(reader, cancellation: cancellation, blockSize: blockSize) ?? false
     }
 
@@ -337,13 +371,16 @@ public struct TextPattern {
     private func search(_ reader: FileReader, cancellation: CancellationFlag?, blockSize: Int) -> Bool? {
         switch matcher {
         case .bytes(let needles): return TextPattern.search(needles, reader, cancellation, blockSize)
-        case .regex(let regex, let encodings): return TextPattern.search(regex, encodings, reader, cancellation, blockSize, trip)
+        case .regex(let regex, let encodings):
+            return TextPattern.search(regex, encodings, reader, cancellation, blockSize, trip)
         }
     }
 
     /// Reads block by block. The end of each block is looked at again together with the next
     /// one, so a hit across a block border is found, with the characters around it.
-    private static func search(_ needles: [Needle], _ reader: FileReader, _ cancellation: CancellationFlag?, _ blockSize: Int) -> Bool? {
+    private static func search(
+        _ needles: [Needle], _ reader: FileReader, _ cancellation: CancellationFlag?, _ blockSize: Int
+    ) -> Bool? {
         let overlap = (needles.map(\.maxLength).max() ?? 1) + 2
         var carry = Data()
         var carryStartsFile = true
@@ -379,8 +416,10 @@ public struct TextPattern {
     /// `$` standing for the line ends, which is matching line by line without cutting the
     /// text into lines. A piece that takes the expression too long ends the search of the file
     /// (it is not found in it), and a cancelled search ends at once, also in the middle of a piece.
-    private static func search(_ regex: NSRegularExpression, _ encodings: [TextEncoding], _ reader: FileReader,
-                               _ cancellation: CancellationFlag?, _ blockSize: Int, _ trip: RegexTrip) -> Bool? {
+    private static func search(
+        _ regex: NSRegularExpression, _ encodings: [TextEncoding], _ reader: FileReader,
+        _ cancellation: CancellationFlag?, _ blockSize: Int, _ trip: RegexTrip
+    ) -> Bool? {
         var decoders = encodings.map { LineDecoder(encoding: $0) }
         var gaveUp = false
         func matches(_ text: String?) -> Bool {
@@ -389,7 +428,9 @@ public struct TextPattern {
                 gaveUp = true
                 return false
             }
-            switch FindRegex.firstMatch(regex, in: text, budget: pieceBudget, cancelled: { cancellation?.isCancelled == true }) {
+            switch FindRegex.firstMatch(
+                regex, in: text, budget: pieceBudget, cancelled: { cancellation?.isCancelled == true })
+            {
             case .matched: return true
             case .unmatched: return false
             case .timedOut:
@@ -530,8 +571,12 @@ public struct TextPattern {
         private func decode(_ data: Data) -> String? {
             switch encoding {
             case .utf8: return String(decoding: data, as: UTF8.self)
-            case .utf16: return String(data: data.prefix(data.count / 2 * 2), encoding: bigEndian ? .utf16BigEndian : .utf16LittleEndian)
-            case .western, .dos: return String(data: data, encoding: encoding.stringEncoding) ?? String(data: data, encoding: .isoLatin1)
+            case .utf16:
+                return String(
+                    data: data.prefix(data.count / 2 * 2), encoding: bigEndian ? .utf16BigEndian : .utf16LittleEndian)
+            case .western, .dos:
+                return String(data: data, encoding: encoding.stringEncoding)
+                    ?? String(data: data, encoding: .isoLatin1)
             }
         }
     }

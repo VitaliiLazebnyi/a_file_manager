@@ -63,7 +63,9 @@ public enum NameTemplate {
         let dates = DateTexts(context.calendar)
         if let range = leadingRange(&mask) {
             let width = String(range.upperBound).count
-            return try range.map { try expand(mask, context, dates, counter: $0, isFirst: $0 == range.lowerBound, width: width) }.filter { !$0.isEmpty }
+            return try range.map {
+                try expand(mask, context, dates, counter: $0, isFirst: $0 == range.lowerBound, width: width)
+            }.filter { !$0.isEmpty }
         }
         return try mask.split(separator: "|").map(String.init).compactMap { part -> String? in
             let part = part.trimmingCharacters(in: .whitespaces)
@@ -92,16 +94,19 @@ public enum NameTemplate {
         init(_ calendar: Calendar) { self.calendar = calendar }
 
         func text(_ letter: Character, _ moment: Date) -> String {
-            let formatter = formatters[letter] ?? {
-                let formatter = DateFormatter()
-                formatter.calendar = calendar
-                formatter.timeZone = calendar.timeZone
-                formatter.dateStyle = letter == "d" ? .short : .none
-                formatter.timeStyle = letter == "t" ? .short : .none
-                formatters[letter] = formatter
-                return formatter
-            }()
-            return formatter.string(from: moment).replacingOccurrences(of: "/", with: "-").replacingOccurrences(of: ":", with: ".")
+            let formatter =
+                formatters[letter]
+                ?? {
+                    let formatter = DateFormatter()
+                    formatter.calendar = calendar
+                    formatter.timeZone = calendar.timeZone
+                    formatter.dateStyle = letter == "d" ? .short : .none
+                    formatter.timeStyle = letter == "t" ? .short : .none
+                    formatters[letter] = formatter
+                    return formatter
+                }()
+            return formatter.string(from: moment).replacingOccurrences(of: "/", with: "-").replacingOccurrences(
+                of: ":", with: ".")
         }
     }
 
@@ -109,7 +114,8 @@ public enum NameTemplate {
     /// the text is not a range.
     public static func rangePreview(_ text: String, context: Context) -> (first: String, last: String)? {
         guard text.hasPrefix("<"), let names = try? names(from: text, context: context), names.count > 1,
-              let first = names.first, let last = names.last else { return nil }
+            let first = names.first, let last = names.last
+        else { return nil }
         var mask = String(text.dropFirst())
         return leadingRange(&mask) == nil ? nil : (first, last)
     }
@@ -141,7 +147,9 @@ public enum NameTemplate {
     private static func leadingRange(_ mask: inout String) -> ClosedRange<Int>? {
         guard let close = mask.firstIndex(of: ">") else { return nil }
         let bounds = mask[..<close].split(separator: "-", omittingEmptySubsequences: false)
-        guard bounds.count == 2, let from = Int(bounds[0]), let to = Int(bounds[1]), from >= 0, from <= to, to - from < 100_000 else { return nil }
+        guard bounds.count == 2, let from = Int(bounds[0]), let to = Int(bounds[1]), from >= 0, from <= to,
+            to - from < 100_000
+        else { return nil }
         mask = String(mask[mask.index(after: close)...])
         return from...to
     }
@@ -180,14 +188,20 @@ public enum NameTemplate {
 
     private enum Case { case original, upper, lower, title, englishTitle, untouched }
 
-    private static func expand(_ mask: String, _ context: Context, _ dates: DateTexts, counter: Int?, isFirst: Bool, width: Int) throws -> String {
+    private static func expand(
+        _ mask: String, _ context: Context, _ dates: DateTexts, counter: Int?, isFirst: Bool, width: Int
+    ) throws -> String {
         var runs: [(text: String, mode: Case)] = []
         var mode = Case.original
         var moment = context.now
         func emit(_ text: String, as forced: Case? = nil) {
             guard !text.isEmpty else { return }
             let mode = forced ?? mode
-            if let last = runs.last, last.mode == mode { runs[runs.count - 1].text += text } else { runs.append((text, mode)) }
+            if let last = runs.last, last.mode == mode {
+                runs[runs.count - 1].text += text
+            } else {
+                runs.append((text, mode))
+            }
         }
         var rest = Substring(mask)
         while let open = rest.firstIndex(of: "[") {
@@ -240,9 +254,12 @@ public enum NameTemplate {
     /// (`..` would lead out of the folder).
     static func clipboardText(_ clipboard: String) -> String {
         let line = clipboard.components(separatedBy: .newlines).first ?? ""
-        var text = String(line.unicodeScalars.map { scalar -> Character in
-            "*?:|\"<>/\\".unicodeScalars.contains(scalar) || scalar.value < 0x20 || scalar.value == 0x7F ? "_" : Character(scalar)
-        }).trimmingCharacters(in: .whitespaces)
+        var text = String(
+            line.unicodeScalars.map { scalar -> Character in
+                "*?:|\"<>/\\".unicodeScalars.contains(scalar) || scalar.value < 0x20 || scalar.value == 0x7F
+                    ? "_" : Character(scalar)
+            }
+        ).trimmingCharacters(in: .whitespaces)
         if text.hasPrefix("~") { text = "_" + text.dropFirst() }
         if !text.isEmpty, text.allSatisfy({ $0 == "." }) { text = String(repeating: "_", count: text.count) }
         return text
@@ -254,8 +271,13 @@ public enum NameTemplate {
         case .upper: return text.uppercased()
         case .lower: return text.lowercased()
         case .title, .englishTitle:
-            let small: Set<String> = mode == .title ? [] : ["a", "an", "the", "at", "by", "for", "in", "of", "on", "to", "from", "up", "and", "as",
-                                                            "but", "or", "nor", "yet", "so", "vs"]
+            let small: Set<String> =
+                mode == .title
+                ? []
+                : [
+                    "a", "an", "the", "at", "by", "for", "in", "of", "on", "to", "from", "up", "and", "as",
+                    "but", "or", "nor", "yet", "so", "vs"
+                ]
             var words = text.components(separatedBy: " ")
             let real = words.indices.filter { !words[$0].isEmpty }
             for index in real {
@@ -275,7 +297,8 @@ public enum NameTemplate {
     /// name the number comes from the range, so an inline start and step are read and ignored.
     private static func counterParts(_ body: String) -> (prefix: String, suffix: String, width: Int?, hasAffix: Bool)? {
         var core = body
-        var prefix = "", suffix = ""
+        var prefix = ""
+        var suffix = ""
         if core.hasPrefix("\""), let end = core.dropFirst().firstIndex(of: "\"") {
             prefix = String(core[core.index(after: core.startIndex)..<end])
             core = String(core[core.index(after: end)...])
@@ -286,18 +309,26 @@ public enum NameTemplate {
         }
         guard core.hasPrefix("C") else { return nil }
         let options = core.dropFirst()
-        guard options.allSatisfy({ $0.isNumber || $0 == "+" || $0 == "-" || $0 == ":" || $0 == "a" }) else { return nil }
-        let width = options.split(separator: ":", omittingEmptySubsequences: false).dropFirst().first.flatMap { Int($0) }.map { min(max($0, 0), maxWidth) }
+        guard options.allSatisfy({ $0.isNumber || $0 == "+" || $0 == "-" || $0 == ":" || $0 == "a" }) else {
+            return nil
+        }
+        let width = options.split(separator: ":", omittingEmptySubsequences: false).dropFirst().first.flatMap {
+            Int($0)
+        }.map { min(max($0, 0), maxWidth) }
         return (prefix, suffix, width, body.contains("\""))
     }
 
     /// `T1`…`T4`, optionally with an offset such as `+60m` or `-1D`.
     private static func timeSwitch(_ body: String, from now: Date, _ calendar: Calendar) -> Date? {
-        guard body.count >= 2, body.hasPrefix("T"), let source = body.dropFirst().first, "1234".contains(source) else { return nil }
+        guard body.count >= 2, body.hasPrefix("T"), let source = body.dropFirst().first, "1234".contains(source) else {
+            return nil
+        }
         let offset = body.dropFirst(2)
         if offset.isEmpty { return now }
         guard let unit = offset.last, let amount = Int(offset.dropLast()) else { return nil }
-        let components: [Character: Calendar.Component] = ["s": .second, "m": .minute, "h": .hour, "D": .day, "M": .month, "Y": .year]
+        let components: [Character: Calendar.Component] = [
+            "s": .second, "m": .minute, "h": .hour, "D": .day, "M": .month, "Y": .year
+        ]
         guard let component = components[unit] else { return nil }
         return calendar.date(byAdding: component, value: amount, to: now)
     }
@@ -305,7 +336,9 @@ public enum NameTemplate {
     /// A bracket made of date and time letters, with any separators between them.
     private static func dateText(_ body: String, _ moment: Date, _ calendar: Calendar, _ dates: DateTexts) -> String? {
         let letters = "YyMDhHmsvidt"
-        guard body.contains(where: { letters.contains($0) }), body.allSatisfy({ letters.contains($0) || "-_. ,1".contains($0) }) else { return nil }
+        guard body.contains(where: { letters.contains($0) }),
+            body.allSatisfy({ letters.contains($0) || "-_. ,1".contains($0) })
+        else { return nil }
         let parts = calendar.dateComponents([.year, .month, .day, .hour, .minute, .second, .nanosecond], from: moment)
         let (year, hour) = (parts.year ?? 0, parts.hour ?? 0)
         func two(_ value: Int?) -> String { String(format: "%02d", value ?? 0) }
@@ -384,7 +417,9 @@ public enum NameTemplate {
         if text.hasPrefix(",") {
             // A length is a count: never negative, and no longer than a name can be.
             let digits = text.dropFirst()
-            guard !digits.isEmpty, digits.count <= 18, digits.allSatisfy({ $0.isASCII && $0.isNumber }), let typed = Int(digits) else { return nil }
+            guard !digits.isEmpty, digits.count <= 18, digits.allSatisfy({ $0.isASCII && $0.isNumber }),
+                let typed = Int(digits)
+            else { return nil }
             let length = min(typed, maxWidth)
             end = start + length - 1
             width = length

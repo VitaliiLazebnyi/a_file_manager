@@ -1,16 +1,25 @@
 import AFMKernel
 import Foundation
-@testable import NetworkPlugin
 import Security
 import TestSupport
 import Testing
+
+@testable import NetworkPlugin
 
 /// A lock-guarded list for what stand-ins record from several threads.
 private final class Record<Value>: @unchecked Sendable {
     private let lock = NSLock()
     private var values: [Value] = []
-    func add(_ value: Value) { lock.lock(); values.append(value); lock.unlock() }
-    var all: [Value] { lock.lock(); defer { lock.unlock() }; return values }
+    func add(_ value: Value) {
+        lock.lock()
+        values.append(value)
+        lock.unlock()
+    }
+    var all: [Value] {
+        lock.lock()
+        defer { lock.unlock() }
+        return values
+    }
 }
 
 /// The background work of one server never waits behind that of another (second pass: the
@@ -108,8 +117,17 @@ private final class Record<Value>: @unchecked Sendable {
         let calls: [(String, (CancellationFlag) throws -> Void)] = [
             ("createDirectory", { try fs.createDirectory(at: fixture.url("/made"), cancellation: $0) }),
             ("remove", { try fs.remove(fixture.url("/a.txt"), cancellation: $0) }),
-            ("move", { try fs.move(fixture.url("/a.txt"), to: fixture.url("/b.txt"), replacing: true, cancellation: $0) }),
-            ("setAttributes", { try fs.setAttributes(FileAttributes(permissions: 0o600), of: fixture.url("/a.txt"), cancellation: $0) }),
+            (
+                "move",
+                { try fs.move(fixture.url("/a.txt"), to: fixture.url("/b.txt"), replacing: true, cancellation: $0) }
+            ),
+            (
+                "setAttributes",
+                {
+                    try fs.setAttributes(
+                        FileAttributes(permissions: 0o600), of: fixture.url("/a.txt"), cancellation: $0)
+                }
+            )
         ]
         // All four wait behind the login, which nothing ends; each is ended by its own flag
         // alone. No time limit helps them here: the timeout is ten minutes.
@@ -126,7 +144,10 @@ private final class Record<Value>: @unchecked Sendable {
         answer.signal()
         #expect(first.ended(within: 120) && !first.failed)
         #expect(try fixture.names("/") == ["a.txt", "d"])
-        #expect(!fixture.server.commands.contains { $0.hasPrefix("MKD") || $0.hasPrefix("DELE") || $0.hasPrefix("RNFR") || $0.hasPrefix("SITE") })
+        #expect(
+            !fixture.server.commands.contains {
+                $0.hasPrefix("MKD") || $0.hasPrefix("DELE") || $0.hasPrefix("RNFR") || $0.hasPrefix("SITE")
+            })
         // A flag that is set before the call: nothing is asked of the server at all.
         let set = CancellationFlag()
         set.cancel()
@@ -152,7 +173,9 @@ private final class Record<Value>: @unchecked Sendable {
         // A "server" that never says a word: the login never ends, and every call waits behind it.
         let center = ConnectionCenter(environment: environment)
         center.makeSession = { profile, environment in
-            SFTPSession(profile: profile, environment: environment, transport: SFTPTransport(executable: "/bin/sleep", arguments: ["600"]))
+            SFTPSession(
+                profile: profile, environment: environment,
+                transport: SFTPTransport(executable: "/bin/sleep", arguments: ["600"]))
         }
         let key = ServerKey(scheme: "sftp", host: "silent.invalid")
         center.noteChosen(key)
@@ -161,8 +184,20 @@ private final class Record<Value>: @unchecked Sendable {
         let calls: [(String, (CancellationFlag) throws -> Void)] = [
             ("createDirectory", { try fs.createDirectory(at: key.url(path: "/made"), cancellation: $0) }),
             ("remove", { try fs.remove(key.url(path: "/a.txt"), cancellation: $0) }),
-            ("move", { try fs.move(key.url(path: "/a.txt"), to: key.url(path: "/b.txt"), replacing: true, cancellation: $0) }),
-            ("setAttributes", { try fs.setAttributes(FileAttributes(permissions: 0o600), of: key.url(path: "/a.txt"), cancellation: $0) }),
+            (
+                "move",
+                {
+                    try fs.move(
+                        key.url(path: "/a.txt"), to: key.url(path: "/b.txt"), replacing: true, cancellation: $0)
+                }
+            ),
+            (
+                "setAttributes",
+                {
+                    try fs.setAttributes(
+                        FileAttributes(permissions: 0o600), of: key.url(path: "/a.txt"), cancellation: $0)
+                }
+            )
         ]
         for (name, call) in calls {
             let flag = CancellationFlag()
@@ -265,7 +300,8 @@ private final class Record<Value>: @unchecked Sendable {
         consent.userChose(URL(fileURLWithPath: "/tmp"))
         consent.userChose(URL(string: "smb://127.0.0.1:\(fixture.server.port)/share")!)
         // Another port of the same host is another server.
-        consent.userChose(ServerKey(scheme: "ftp", host: "127.0.0.1", port: fixture.server.port == 21 ? 2121 : 21).url(path: "/"))
+        consent.userChose(
+            ServerKey(scheme: "ftp", host: "127.0.0.1", port: fixture.server.port == 21 ? 2121 : 21).url(path: "/"))
         #expect(throws: (any Error).self) { _ = try fixture.names("/") }
         #expect(asked.all == [fixture.key])
     }
@@ -309,14 +345,16 @@ private final class Record<Value>: @unchecked Sendable {
         var calls: KeychainPasswords.Calls {
             var calls = KeychainPasswords.Calls()
             calls.copy = { [self] query, result in
-                lock.lock(); defer { lock.unlock() }
+                lock.lock()
+                defer { lock.unlock() }
                 log.append("copy \(account(query))")
                 guard let data = items[account(query)] else { return errSecItemNotFound }
                 result?.pointee = data as CFData
                 return errSecSuccess
             }
             calls.update = { [self] query, changes in
-                lock.lock(); defer { lock.unlock() }
+                lock.lock()
+                defer { lock.unlock() }
                 log.append("update \(account(query))")
                 if let updateStatus { return updateStatus }
                 guard items[account(query)] != nil else { return errSecItemNotFound }
@@ -324,7 +362,8 @@ private final class Record<Value>: @unchecked Sendable {
                 return errSecSuccess
             }
             calls.add = { [self] item in
-                lock.lock(); defer { lock.unlock() }
+                lock.lock()
+                defer { lock.unlock() }
                 log.append("add \(account(item))")
                 guard addStatus == errSecSuccess else { return addStatus }
                 guard items[account(item)] == nil else { return errSecDuplicateItem }
@@ -332,14 +371,19 @@ private final class Record<Value>: @unchecked Sendable {
                 return errSecSuccess
             }
             calls.delete = { [self] query in
-                lock.lock(); defer { lock.unlock() }
+                lock.lock()
+                defer { lock.unlock() }
                 log.append("delete \(account(query))")
                 return items.removeValue(forKey: account(query)) == nil ? errSecItemNotFound : errSecSuccess
             }
             return calls
         }
 
-        func clearLog() { lock.lock(); log = []; lock.unlock() }
+        func clearLog() {
+            lock.lock()
+            log = []
+            lock.unlock()
+        }
     }
 
     @Test func aStoredPasswordIsChangedInPlaceAndNeverRemovedFirst() {
@@ -424,7 +468,9 @@ private final class Record<Value>: @unchecked Sendable {
         calls.cancel = { cancelled.add(ObjectIdentifier($0)) }
         let mounter = SystemVolumeMounter(calls: calls, unmountTime: 600)
         let flag = CancellationFlag()
-        let outcome = AdoptOutcome { _ = try mounter.mount(URL(string: "smb://anna:secret@dead.invalid/share")!, cancellation: flag) }
+        let outcome = AdoptOutcome {
+            _ = try mounter.mount(URL(string: "smb://anna:secret@dead.invalid/share")!, cancellation: flag)
+        }
         #expect(adoptWait(120) { answers.all.count == 1 })
         #expect(!outcome.ended(within: 0.3), "the mount did not wait for the system")
         flag.cancel()
@@ -452,11 +498,14 @@ private final class Record<Value>: @unchecked Sendable {
             _ = try refused.mount(URL(string: "smb://anna:secret@host.invalid/share")!)
             Issue.record("the mount did not fail")
         } catch {
-            #expect(!error.localizedDescription.contains("secret") && error.localizedDescription.contains("host.invalid"))
+            #expect(
+                !error.localizedDescription.contains("secret") && error.localizedDescription.contains("host.invalid"))
         }
         // The system refuses to even start.
         calls.mount = { _, _ in (EINVAL, nil) }
-        #expect(throws: VolumeError.self) { _ = try SystemVolumeMounter(calls: calls, unmountTime: 600).mount(URL(string: "smb://host.invalid/s")!) }
+        #expect(throws: VolumeError.self) {
+            _ = try SystemVolumeMounter(calls: calls, unmountTime: 600).mount(URL(string: "smb://host.invalid/s")!)
+        }
     }
 
     @Test func anEjectThatIsNeverAnsweredIsGivenUpAfterItsTime() throws {
@@ -474,7 +523,9 @@ private final class Record<Value>: @unchecked Sendable {
         calls.unmount = { _, answer in DispatchQueue.global().async { answer(nil) } }
         try SystemVolumeMounter(calls: calls, unmountTime: 600).unmount(URL(fileURLWithPath: "/Volumes/x"))
         calls.unmount = { _, answer in DispatchQueue.global().async { answer(POSIXError(.EBUSY)) } }
-        #expect(throws: POSIXError.self) { try SystemVolumeMounter(calls: calls, unmountTime: 600).unmount(URL(fileURLWithPath: "/Volumes/x")) }
+        #expect(throws: POSIXError.self) {
+            try SystemVolumeMounter(calls: calls, unmountTime: 600).unmount(URL(fileURLWithPath: "/Volumes/x"))
+        }
     }
 }
 

@@ -19,16 +19,26 @@ final class ThreadPeak {
     init() {
         let thread = Thread { [self] in
             while true {
-                lock.lock(); let go = running; lock.unlock()
+                lock.lock()
+                let go = running
+                lock.unlock()
                 if !go { return }
                 let count = threadCount()
-                lock.lock(); peak = max(peak, count); lock.unlock()
+                lock.lock()
+                peak = max(peak, count)
+                lock.unlock()
                 usleep(5000)
             }
         }
         thread.start()
     }
-    func stop() -> Int { lock.lock(); running = false; let value = peak; lock.unlock(); return value }
+    func stop() -> Int {
+        lock.lock()
+        running = false
+        let value = peak
+        lock.unlock()
+        return value
+    }
 }
 
 func mix(_ value: UInt64) -> UInt64 {
@@ -42,7 +52,10 @@ func mix(_ value: UInt64) -> UInt64 {
 func inBackground(upTo seconds: Double, _ body: @escaping () -> Void) -> Bool {
     let done = DispatchSemaphore(value: 0)
     var finished = false
-    let thread = Thread { body(); done.signal() }
+    let thread = Thread {
+        body()
+        done.signal()
+    }
     thread.stackSize = 8 << 20
     thread.start()
     return pump(upTo: seconds) {
@@ -53,14 +66,26 @@ func inBackground(upTo seconds: Double, _ body: @escaping () -> Void) -> Bool {
 
 // MARK: Nested tree
 
-struct Behaviour { var sleeps = true; var io = true; var mainSync = false }
+struct Behaviour {
+    var sleeps = true
+    var io = true
+    var mainSync = false
+}
 let mainSyncs = ManagedAtomicCounter()
 
 final class ManagedAtomicCounter {
     private var value = 0
     private let lock = NSLock()
-    func add(_ n: Int = 1) { lock.lock(); value += n; lock.unlock() }
-    var count: Int { lock.lock(); defer { lock.unlock() }; return value }
+    func add(_ n: Int = 1) {
+        lock.lock()
+        value += n
+        lock.unlock()
+    }
+    var count: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return value
+    }
 }
 
 /// What the tree below `path` adds up to, computed without `Parallel`.
@@ -75,7 +100,10 @@ func tree(depth: Int, width: Int, path: UInt64, _ behaviour: Behaviour) -> UInt6
     if depth == 0 {
         let kind = mix(path ^ 0xABCD) % 100
         if behaviour.sleeps, kind < 4 { usleep(useconds_t(500 + mix(path) % 3000)) }
-        if behaviour.io, kind >= 4, kind < 10 { var info = stat(); _ = stat("/usr/lib", &info) }
+        if behaviour.io, kind >= 4, kind < 10 {
+            var info = stat()
+            _ = stat("/usr/lib", &info)
+        }
         if behaviour.mainSync, kind >= 10, kind < 11, !Thread.isMainThread {
             DispatchQueue.main.sync { mainSyncs.add() }
         }
@@ -137,7 +165,9 @@ func runChild(_ name: String, patience: Double) {
         process.waitUntilExit()
         say("CHILD \(name): DEADLOCK (no exit within \(patience)s); sample in \(file)")
     } else {
-        say("CHILD \(name): exited status=\(process.terminationStatus) reason=\(process.terminationReason == .uncaughtSignal ? "signal" : "exit")")
+        say(
+            "CHILD \(name): exited status=\(process.terminationStatus) reason=\(process.terminationReason == .uncaughtSignal ? "signal" : "exit")"
+        )
     }
     let output = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
     for line in output.split(separator: "\n").prefix(12) { say("   | " + line) }
@@ -146,12 +176,18 @@ func runChild(_ name: String, patience: Double) {
 // MARK: The run
 
 MainWatchdog.shared.start()
-let baseline = step("0 idle baseline (1 s)") { pump(for: 1); return threadCount() }
+let baseline = step("0 idle baseline (1 s)") {
+    pump(for: 1)
+    return threadCount()
+}
 say("   threads by name at baseline: " + threadNames())
 say("cores=\(ProcessInfo.processInfo.activeProcessorCount) baseline threads=\(baseline)")
 var failures: [String] = []
 func check(_ ok: Bool, _ what: String) {
-    if !ok { failures.append(what); say("FAIL: " + what) }
+    if !ok {
+        failures.append(what)
+        say("FAIL: " + what)
+    }
 }
 
 // 1. 10,000 small maps from 32 threads at once.
@@ -202,8 +238,12 @@ step("3 nested x4 roots + main.sync hops + main in map", limit: 240) {
     var finishedRoots = 0
     for root in 0..<4 {
         let thread = Thread {
-            let value = tree(depth: 4, width: 16, path: UInt64(root + 1), Behaviour(sleeps: true, io: true, mainSync: true))
-            lock.lock(); results[root] = value; finishedRoots += 1; lock.unlock()
+            let value = tree(
+                depth: 4, width: 16, path: UInt64(root + 1), Behaviour(sleeps: true, io: true, mainSync: true))
+            lock.lock()
+            results[root] = value
+            finishedRoots += 1
+            lock.unlock()
         }
         thread.stackSize = 8 << 20
         thread.start()
@@ -216,7 +256,8 @@ step("3 nested x4 roots + main.sync hops + main in map", limit: 240) {
         let output = Parallel.map(input) { mix(UInt64($0)) }
         if output != input.map({ mix(UInt64($0)) }) { mainWrong += 1 }
         mainMaps += 1
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         return finishedRoots == 4
     }
     check(ok, "3: nested maps with main.sync hops did not finish in 220 s (deadlock?)")
@@ -225,7 +266,9 @@ step("3 nested x4 roots + main.sync hops + main in map", limit: 240) {
         check(results[root] == want, "3: root \(root) returned \(results[root]), expected \(want)")
     }
     check(mainWrong == 0, "3: \(mainWrong) main-thread maps wrong")
-    say("   roots=4 leaves=262144 mainSync hops=\(mainSyncs.count) main-thread maps=\(mainMaps) peak threads=\(peak.stop())")
+    say(
+        "   roots=4 leaves=262144 mainSync hops=\(mainSyncs.count) main-thread maps=\(mainMaps) peak threads=\(peak.stop())"
+    )
 }
 
 // 4. Nested map called on the main thread itself (the UI thread is blocked for its length by design).
@@ -239,9 +282,17 @@ step("5 256 bodies that each sleep 100 ms", limit: 120) {
     let peak = ThreadPeak()
     let started = now()
     var out: [Int] = []
-    let ok = inBackground(upTo: 110) { out = Parallel.map(Array(0..<256)) { usleep(100_000); return $0 } }
+    let ok = inBackground(upTo: 110) {
+        out = Parallel.map(Array(0..<256)) {
+            usleep(100_000)
+            return $0
+        }
+    }
     check(ok && out == Array(0..<256), "5: sleeping bodies wrong or late")
-    say(String(format: "   wall=%.2fs (serial would be 25.6 s; 16 threads 1.6 s; 60 threads 0.43 s) peak threads=%d", now() - started, peak.stop()))
+    say(
+        String(
+            format: "   wall=%.2fs (serial would be 25.6 s; 16 threads 1.6 s; 60 threads 0.43 s) peak threads=%d",
+            now() - started, peak.stop()))
 }
 
 // 6. Bursts separated by the pool's idle time (2 s), so helper threads leave while new jobs open.
@@ -272,7 +323,9 @@ step("6 bursts around the 2 s thread retirement", limit: 180) {
     check(wrongCount.count == 0, "6: \(wrongCount.count) wrong results")
 }
 
-let after = step("7 threads return to baseline (wait up to 8 s)") { waitForThreads(atMost: baseline + 2, upTo: 8, onMain: true) }
+let after = step("7 threads return to baseline (wait up to 8 s)") {
+    waitForThreads(atMost: baseline + 2, upTo: 8, onMain: true)
+}
 say("threads: baseline=\(baseline) after=\(after)")
 say("   threads by name after the wait: " + threadNames())
 // The system's own queue threads ("unnamed") come and go by two or three at any time, so the count
@@ -293,13 +346,23 @@ step("7b the main-thread rule can be asked") {
     let helpers = inside.filter { !$0.onMain }
     var fromBackground: [Bool] = []
     let done = DispatchSemaphore(value: 0)
-    Thread { fromBackground = Parallel.map(Array(0..<256)) { (_: Int) -> Bool in usleep(500); return Parallel.isHoldingUpMainThread }; done.signal() }.start()
+    Thread {
+        fromBackground = Parallel.map(Array(0..<256)) { (_: Int) -> Bool in
+            usleep(500)
+            return Parallel.isHoldingUpMainThread
+        }
+        done.signal()
+    }.start()
     done.wait()
     let after = Parallel.isHoldingUpMainThread
-    say("   flag outside any map on main: \(outside); inside a map called on main: true in \(inside.filter(\.flag).count) of \(inside.count) bodies "
-        + "(\(helpers.count) ran on helper threads, true in \(helpers.filter(\.flag).count)); in a map called on a background thread: true in \(fromBackground.filter { $0 }.count) of \(fromBackground.count); after: \(after)")
+    say(
+        "   flag outside any map on main: \(outside); inside a map called on main: true in \(inside.filter(\.flag).count) of \(inside.count) bodies "
+            + "(\(helpers.count) ran on helper threads, true in \(helpers.filter(\.flag).count)); in a map called on a background thread: true in \(fromBackground.filter { $0 }.count) of \(fromBackground.count); after: \(after)"
+    )
     check(!outside && !after, "7b: isHoldingUpMainThread is true on the main thread outside a map")
-    check(inside.allSatisfy(\.flag), "7b: a body of a map called on the main thread was not told that it holds up the main thread")
+    check(
+        inside.allSatisfy(\.flag),
+        "7b: a body of a map called on the main thread was not told that it holds up the main thread")
     check(!helpers.isEmpty, "7b: no body ran on a helper thread, so the rule was not tried there")
     check(!fromBackground.contains(true), "7b: a map called on a background thread says it holds up the main thread")
 }

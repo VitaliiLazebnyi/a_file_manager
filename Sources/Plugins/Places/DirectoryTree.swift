@@ -56,7 +56,9 @@ public final class TreeNode {
         // Trees are mostly built in order, so the folder asked for is usually the last one.
         if let last = children.last, last.name == name { return last }
         guard children.count > 8 else { return children.first { $0.name == name } }
-        if childIndex == nil { childIndex = Dictionary(children.map { ($0.name, $0) }, uniquingKeysWith: { first, _ in first }) }
+        if childIndex == nil {
+            childIndex = Dictionary(children.map { ($0.name, $0) }, uniquingKeysWith: { first, _ in first })
+        }
         return childIndex?[name]
     }
 }
@@ -178,7 +180,11 @@ public final class DirectoryTree {
             var (low, high) = (0, parent.children.count)
             while low < high {
                 let middle = (low + high) / 2
-                if DirectoryTree.compare(name, parent.children[middle].name) { high = middle } else { low = middle + 1 }
+                if DirectoryTree.compare(name, parent.children[middle].name) {
+                    high = middle
+                } else {
+                    low = middle + 1
+                }
             }
             let position = low
             parent.children.insert(node, at: position)
@@ -218,10 +224,12 @@ public final class DirectoryTree {
             let wanted = Set(names)
             for child in node.children where !wanted.contains(child.name) { count -= 1 + folderCount(below: child) }
             node.children = (sorted ? names : DirectoryTree.sorted(names: wanted)).enumerated().map { index, name in
-                let child = known[name] ?? {
-                    count += 1
-                    return TreeNode(name: name, parent: node)
-                }()
+                let child =
+                    known[name]
+                    ?? {
+                        count += 1
+                        return TreeNode(name: name, parent: node)
+                    }()
                 child.indexInParent = index
                 return child
             }
@@ -261,8 +269,9 @@ public final class DirectoryTree {
             // A folder that has children (the folders on the way to the one the window opened
             // are made beforehand) is rebuilt: known ones keep their nodes, and what is below them.
             let old = node.children
-            node.attaching = TreeNode.Attach(known: Dictionary(old.map { ($0.name, $0) }, uniquingKeysWith: { first, _ in first }),
-                                             isMerge: !old.isEmpty)
+            node.attaching = TreeNode.Attach(
+                known: Dictionary(old.map { ($0.name, $0) }, uniquingKeysWith: { first, _ in first }),
+                isMerge: !old.isEmpty)
         }
         let attach = node.attaching ?? TreeNode.Attach(known: [:], isMerge: false)
         node.attaching = attach
@@ -285,9 +294,7 @@ public final class DirectoryTree {
             }
         } else {
             if start == 0 { node.children.reserveCapacity(nodes.count) }
-            for fresh in nodes[start..<end] {
-                // Made meanwhile by `node(at:creating:)`: that node stays, and is put in its place at the end.
-                guard attach.known[fresh.name] == nil else { continue }
+            for fresh in nodes[start..<end] where attach.known[fresh.name] == nil {
                 fresh.parent = node
                 fresh.indexInParent = node.children.count
                 node.children.append(fresh)
@@ -309,7 +316,9 @@ public final class DirectoryTree {
         }
         if attach.isMerge {
             // What was there and is not in the new list has vanished.
-            for (name, child) in attach.known where !attach.seen.contains(name) { count -= 1 + folderCount(below: child) }
+            for (name, child) in attach.known where !attach.seen.contains(name) {
+                count -= 1 + folderCount(below: child)
+            }
             for (known, index) in attach.places { known.indexInParent = index }
             node.children = attach.built
             return
@@ -358,7 +367,9 @@ public final class DirectoryTree {
             if let first = node.children.first { return first }
             var current = node
             while let parent = current.parent {
-                if current.indexInParent + 1 < parent.children.count { return parent.children[current.indexInParent + 1] }
+                if current.indexInParent + 1 < parent.children.count {
+                    return parent.children[current.indexInParent + 1]
+                }
                 current = parent
             }
             return root
@@ -385,7 +396,9 @@ public final class DirectoryTree {
     /// The next folder whose name fits what was typed (spec 12 › Controls and keys), searching
     /// from `start` through the whole tree and around. With `includingStart`, the folder the
     /// cursor is on may be the answer (while the user is still typing).
-    public func find(_ typed: String, from start: TreeNode?, forward: Bool = true, includingStart: Bool = false) -> TreeNode? {
+    public func find(_ typed: String, from start: TreeNode?, forward: Bool = true, includingStart: Bool = false)
+        -> TreeNode?
+    {
         switch search(typed, from: start, forward: forward, includingStart: includingStart, timeBudget: nil) {
         case .found(let node): return node
         case .none, .pending: return nil
@@ -396,12 +409,18 @@ public final class DirectoryTree {
     /// says where it stopped (`pending`), so that a tree of millions of folders never holds the
     /// caller up. To go on, call again with `from` the pending node, `includingStart` true and
     /// `remaining` as given. A nil budget searches to the end.
-    public func search(_ typed: String, from start: TreeNode?, forward: Bool = true, includingStart: Bool = false,
-                       remaining: Int? = nil, timeBudget: TimeInterval?) -> SearchProgress {
+    public func search(
+        _ typed: String, from start: TreeNode?, forward: Bool = true, includingStart: Bool = false,
+        remaining: Int? = nil, timeBudget: TimeInterval?
+    ) -> SearchProgress {
         let pattern = TreeQuickSearch(typed)
         guard !pattern.isEmpty, count > 0 else { return .none }
         // A start that matched nothing anywhere is matched by no longer start either.
-        if let failed = failedSearch, failed.revision == revision, !pattern.hasWildcards, pattern.text.hasPrefix(failed.text) { return .none }
+        if let failed = failedSearch, failed.revision == revision, !pattern.hasWildcards,
+            pattern.text.hasPrefix(failed.text)
+        {
+            return .none
+        }
         let start = start ?? root
         var node = includingStart ? start : neighbour(of: start, forward: forward)
         var left = remaining ?? count + 1
@@ -414,7 +433,9 @@ public final class DirectoryTree {
             sinceClock += 1
             if let timeBudget, sinceClock >= 512 {
                 sinceClock = 0
-                if Date().timeIntervalSince(began) > timeBudget, left > 0 { return .pending(node: node, remaining: left) }
+                if Date().timeIntervalSince(began) > timeBudget, left > 0 {
+                    return .pending(node: node, remaining: left)
+                }
             }
         }
         if !pattern.hasWildcards { failedSearch = (pattern.text, revision) }
@@ -532,8 +553,10 @@ public final class TreeScanner {
     /// Folders for which `isExcluded` answers true are listed in the tree but not read (other
     /// volumes mounted inside this one). Folders on the local disk that are a mount point
     /// themselves are left unread as well, whatever `isExcluded` says. It is called on several threads at once.
-    public init(root: URL, provider: FileSystemProvider, showHidden: Bool = false, batchSize: Int = 256,
-                isExcluded: @escaping (URL) -> Bool = { _ in false }) {
+    public init(
+        root: URL, provider: FileSystemProvider, showHidden: Bool = false, batchSize: Int = 256,
+        isExcluded: @escaping (URL) -> Bool = { _ in false }
+    ) {
         self.root = root
         self.provider = provider
         self.showHidden = showHidden
@@ -565,7 +588,11 @@ public final class TreeScanner {
                     for child in children {
                         let path = folder.path.isEmpty ? child.name : folder.path + "/" + child.name
                         paths.append(path)
-                        if child.isMount || child.isUnread || isExcluded(child.url) { unscanned.append(path) } else { next.append((path, child.url)) }
+                        if child.isMount || child.isUnread || isExcluded(child.url) {
+                            unscanned.append(path)
+                        } else {
+                            next.append((path, child.url))
+                        }
                     }
                 }
             }
@@ -586,11 +613,14 @@ public final class TreeScanner {
         let results = UnsafeMutableBufferPointer<[Subfolder]>.allocate(capacity: batch.count)
         results.initialize(repeating: [])
         defer { results.deallocate() }
-        DispatchQueue.concurrentPerform(iterations: batch.count) { index in autoreleasepool { results[index] = read(batch[index]) } }
+        DispatchQueue.concurrentPerform(iterations: batch.count) { index in
+            autoreleasepool { results[index] = read(batch[index]) }
+        }
         return Array(results)
     }
 
-    private func cancelled(_ unread: ArraySlice<(path: String, url: URL)>, _ found: [(path: String, url: URL)]) -> Bool {
+    private func cancelled(_ unread: ArraySlice<(path: String, url: URL)>, _ found: [(path: String, url: URL)]) -> Bool
+    {
         unscanned += unread.dropFirst(unread.first?.path.isEmpty == true ? 1 : 0).map(\.path) + found.map(\.path)
         return false
     }
@@ -618,14 +648,18 @@ public final class TreeScanner {
     /// and the cloud folders, in the home folder, and the automounts. Whole paths.
     private static let protectedPaths: Set<String> = {
         let home = NSHomeDirectory()
-        var paths: Set<String> = ["/net", "/home", "/Network", "/dev", "/System/Volumes", "/Volumes", "/private/var/db"]
-        for relative in ["Desktop", "Documents", "Downloads", "Movies", "Music", "Pictures", "Public", "Library/Mobile Documents",
-                         "Library/CloudStorage", "Library/Mail", "Library/Messages", "Library/Safari", "Library/Containers",
-                         "Library/Group Containers", "Library/Calendars", "Library/Cookies", "Library/HomeKit", "Library/Metadata",
-                         "Library/Suggestions", "Library/Reminders", "Library/Application Support/AddressBook",
-                         "Library/Application Support/CallHistoryDB", "Library/Application Support/CallHistoryTransactions",
-                         "Library/Application Support/FileProvider", "Library/Application Support/CloudDocs",
-                         "Library/Application Support/com.apple.TCC", "Library/Application Support/Knowledge"] {
+        var paths: Set<String> = [
+            "/net", "/home", "/Network", "/dev", "/System/Volumes", "/Volumes", "/private/var/db"
+        ]
+        for relative in [
+            "Desktop", "Documents", "Downloads", "Movies", "Music", "Pictures", "Public", "Library/Mobile Documents",
+            "Library/CloudStorage", "Library/Mail", "Library/Messages", "Library/Safari", "Library/Containers",
+            "Library/Group Containers", "Library/Calendars", "Library/Cookies", "Library/HomeKit", "Library/Metadata",
+            "Library/Suggestions", "Library/Reminders", "Library/Application Support/AddressBook",
+            "Library/Application Support/CallHistoryDB", "Library/Application Support/CallHistoryTransactions",
+            "Library/Application Support/FileProvider", "Library/Application Support/CloudDocs",
+            "Library/Application Support/com.apple.TCC", "Library/Application Support/Knowledge"
+        ] {
             paths.insert(home + "/" + relative)
         }
         return paths
@@ -641,9 +675,13 @@ public final class TreeScanner {
     /// quality-of-service class's priority), and without the system fetching a file or folder
     /// that is only in the cloud, which a listing would do.
     static func gently<T>(_ body: () -> T) -> T {
-        let (disk, cloud) = (getiopolicy_np(IOPOL_TYPE_DISK, IOPOL_SCOPE_THREAD), getiopolicy_np(IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES, IOPOL_SCOPE_THREAD))
+        let (disk, cloud) = (
+            getiopolicy_np(IOPOL_TYPE_DISK, IOPOL_SCOPE_THREAD),
+            getiopolicy_np(IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES, IOPOL_SCOPE_THREAD)
+        )
         setiopolicy_np(IOPOL_TYPE_DISK, IOPOL_SCOPE_THREAD, IOPOL_THROTTLE)
-        setiopolicy_np(IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES, IOPOL_SCOPE_THREAD, IOPOL_MATERIALIZE_DATALESS_FILES_OFF)
+        setiopolicy_np(
+            IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES, IOPOL_SCOPE_THREAD, IOPOL_MATERIALIZE_DATALESS_FILES_OFF)
         defer {
             // The threads are shared: they go back to what they had.
             if disk >= 0 { setiopolicy_np(IOPOL_TYPE_DISK, IOPOL_SCOPE_THREAD, disk) }
@@ -666,8 +704,10 @@ public final class TreeScanner {
         guard finished != nil, !cancellation.isCancelled else { return [] }
         // A name with a line break could not be written to the cache file, one with a slash
         // not into a relative path.
-        return items.filter { $0.isRealDirectory && !$0.isPackage && !$0.name.utf8.contains(0x0A) && !$0.name.utf8.contains(0x2F) }
-            .map { Subfolder(name: $0.name, url: $0.url) }
+        return items.filter {
+            $0.isRealDirectory && !$0.isPackage && !$0.name.utf8.contains(0x0A) && !$0.name.utf8.contains(0x2F)
+        }
+        .map { Subfolder(name: $0.name, url: $0.url) }
     }
 
     /// The same for a folder of the local disk, without a `FileItem` for every file: only the
@@ -699,7 +739,8 @@ public final class TreeScanner {
                 }
                 isMount = known && ownDevice.map { $0 != info.st_dev } == true && TreeScanner.isMountPoint(url.path)
                 // A folder that is only in the cloud (SF_DATALESS) would be fetched by a listing.
-                isUnread = isScan && (TreeScanner.isProtected(url) || (known && info.st_flags & TreeScanner.dataless != 0))
+                isUnread =
+                    isScan && (TreeScanner.isProtected(url) || (known && info.st_flags & TreeScanner.dataless != 0))
             case DT_UNKNOWN:
                 guard lstat(url.path, &info) == 0, (info.st_mode & S_IFMT) == S_IFDIR else { continue }
                 if !showHidden, name.hasPrefix(".") || info.st_flags & UInt32(UF_HIDDEN) != 0 { continue }
@@ -708,7 +749,9 @@ public final class TreeScanner {
                 continue
             }
             // Only a folder with an extension can be a package.
-            if !url.pathExtension.isEmpty, (try? url.resourceValues(forKeys: [.isPackageKey]).isPackage) == true { continue }
+            if !url.pathExtension.isEmpty, (try? url.resourceValues(forKeys: [.isPackageKey]).isPackage) == true {
+                continue
+            }
             folders.append(Subfolder(name: name, url: url, isMount: isMount, isUnread: isUnread))
         }
         return folders
@@ -724,10 +767,11 @@ public final class TreeScanner {
         var info = statfs()
         guard statfs(path, &info) == 0 else { return false }
         // The system names the mount point by its real path.
-        let real = realpath(path, nil).map { pointer -> String in
-            defer { free(pointer) }
-            return String(cString: pointer)
-        } ?? path
+        let real =
+            realpath(path, nil).map { pointer -> String in
+                defer { free(pointer) }
+                return String(cString: pointer)
+            } ?? path
         return withUnsafePointer(to: &info.f_mntonname) {
             $0.withMemoryRebound(to: CChar.self, capacity: Int(MAXPATHLEN)) { String(cString: $0) }
         } == real

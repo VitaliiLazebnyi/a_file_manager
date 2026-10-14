@@ -1,10 +1,11 @@
 import AFMContracts
 import AFMKernel
-@testable import AFMShell
 import AppKit
 import StandardPlugins
 import TestSupport
 import Testing
+
+@testable import AFMShell
 
 /// Review round 2, integration: a long folder that is remembered is entered through the
 /// model's prepared form (`PanelModel.prepare(_:show:…)`), not in one call on the main
@@ -66,7 +67,9 @@ extension Application {
         let asked = await wait(upTo: 600) { memory.stalledListings(of: "/long") == 1 }
         #expect(asked)
         memory.releaseStalls()
-        let back = await wait(upTo: 600) { !app.left.isLoading && app.left.model.directory.path == "/" && app.left.model.isComplete }
+        let back = await wait(upTo: 600) {
+            !app.left.isLoading && app.left.model.directory.path == "/" && app.left.model.isComplete
+        }
         #expect(back && app.left.model.cursorItem?.name == "long")
         // What could not be read is not remembered any more.
         #expect(remembered(app, "/long") == nil)

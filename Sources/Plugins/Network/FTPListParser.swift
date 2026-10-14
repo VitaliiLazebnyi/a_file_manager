@@ -14,8 +14,10 @@ public struct RemoteEntry: Equatable {
     /// A device, a pipe or a socket, where the listing tells the type (`FileItem.isSpecial`).
     public var isSpecial = false
 
-    public init(name: String, isDirectory: Bool, isSymlink: Bool = false, linkTarget: String? = nil, size: Int64 = 0,
-                modified: Date? = nil, permissions: UInt16? = nil) {
+    public init(
+        name: String, isDirectory: Bool, isSymlink: Bool = false, linkTarget: String? = nil, size: Int64 = 0,
+        modified: Date? = nil, permissions: UInt16? = nil
+    ) {
         self.name = name
         self.isDirectory = isDirectory
         self.isSymlink = isSymlink
@@ -42,9 +44,11 @@ public struct RemoteEntry: Equatable {
 
     /// The entry as a panel shows it.
     func item(in directory: URL) -> FileItem {
-        FileItem(url: directory.appending(name: name), name: name, isDirectory: isDirectory, isSymlink: isSymlink,
-                 isHidden: name.hasPrefix("."), size: isDirectory ? 0 : size, modified: modified ?? Date(timeIntervalSince1970: 0),
-                 permissions: permissions ?? (isDirectory ? 0o755 : 0o644), isSpecial: isSpecial)
+        FileItem(
+            url: directory.appending(name: name), name: name, isDirectory: isDirectory, isSymlink: isSymlink,
+            isHidden: name.hasPrefix("."), size: isDirectory ? 0 : size,
+            modified: modified ?? Date(timeIntervalSince1970: 0),
+            permissions: permissions ?? (isDirectory ? 0o755 : 0o644), isSpecial: isSpecial)
     }
 }
 
@@ -67,8 +71,11 @@ public enum FTPListParser {
     /// A date built from numbers a server sent; nil when they are not a date of our era.
     static func date(_ components: DateComponents, calendar: Calendar) -> Date? {
         guard let year = components.year, (1...9999).contains(year),
-              (components.month ?? 1) >= 1, (components.month ?? 1) <= 12, (components.day ?? 1) >= 1, (components.day ?? 1) <= 31,
-              (0...24).contains(components.hour ?? 0), (0...59).contains(components.minute ?? 0), (0...60).contains(components.second ?? 0) else { return nil }
+            (components.month ?? 1) >= 1, (components.month ?? 1) <= 12, (components.day ?? 1) >= 1,
+            (components.day ?? 1) <= 31,
+            (0...24).contains(components.hour ?? 0), (0...59).contains(components.minute ?? 0),
+            (0...60).contains(components.second ?? 0)
+        else { return nil }
         return calendar.date(from: components)
     }
 
@@ -100,7 +107,9 @@ public enum FTPListParser {
                     entry.isDirectory = true
                 } else if type.hasPrefix("os.unix=slink") || type.hasPrefix("os.unix=symlink") {
                     entry.isSymlink = true
-                    if let colon = value.firstIndex(of: ":") { entry.linkTarget = String(value[value.index(after: colon)...]) }
+                    if let colon = value.firstIndex(of: ":") {
+                        entry.linkTarget = String(value[value.index(after: colon)...])
+                    }
                 }
             case "size", "sizd": entry.size = size(value[...])
             case "modify": entry.modified = FTPSyntax.time(value)
@@ -146,8 +155,11 @@ public enum FTPListParser {
     }
 
     /// A whole listing. Large ones are parsed on all cores.
-    public static func entries(of lines: [String], asMLSD: Bool, now: Date = Date(), calendar: Calendar = localCalendar) -> [RemoteEntry] {
-        Parallel.map(lines, serialBelow: 2000) { asMLSD ? mlsd($0) : list($0, now: now, calendar: calendar) }.compactMap { $0 }
+    public static func entries(
+        of lines: [String], asMLSD: Bool, now: Date = Date(), calendar: Calendar = localCalendar
+    ) -> [RemoteEntry] {
+        Parallel.map(lines, serialBelow: 2000) { asMLSD ? mlsd($0) : list($0, now: now, calendar: calendar) }.compactMap
+        { $0 }
     }
 
     public static let localCalendar: Calendar = {
@@ -174,7 +186,10 @@ public enum FTPListParser {
         var start: Int?
         for (index, scalar) in line.enumerated() {
             if isSpace(scalar) {
-                if let begun = start { tokens.append(begun..<index); start = nil }
+                if let begun = start {
+                    tokens.append(begun..<index)
+                    start = nil
+                }
             } else if start == nil {
                 start = index
             }
@@ -199,14 +214,18 @@ public enum FTPListParser {
     }
 
     /// `12:34` or `12:34:56`, optionally with a fraction of a second.
-    private static func clockTime(_ token: ArraySlice<Unicode.Scalar>, allowsFraction: Bool) -> (hour: Int, minute: Int, second: Int?)? {
+    private static func clockTime(_ token: ArraySlice<Unicode.Scalar>, allowsFraction: Bool) -> (
+        hour: Int, minute: Int, second: Int?
+    )? {
         var parts = token.split(separator: ":", omittingEmptySubsequences: false)
         guard parts.count == 2 || parts.count == 3 else { return nil }
         if allowsFraction, let last = parts.last, let dot = last.firstIndex(of: ".") {
             guard dot + 1 < last.endIndex, last[(dot + 1)...].allSatisfy(isDigit) else { return nil }
             parts[parts.count - 1] = last[..<dot]
         }
-        guard let hour = number(parts[0], digits: 1...2), let minute = number(parts[1], digits: 2...2) else { return nil }
+        guard let hour = number(parts[0], digits: 1...2), let minute = number(parts[1], digits: 2...2) else {
+            return nil
+        }
         if parts.count == 2 { return (hour, minute, nil) }
         guard let second = number(parts[2], digits: 2...2) else { return nil }
         return (hour, minute, second)
@@ -223,9 +242,11 @@ public enum FTPListParser {
 
     private static let months: [String: Int] = {
         let names: [[String]] = [
-            ["jan", "ene", "gen", "janv"], ["feb", "fev", "fév", "févr"], ["mar", "mär", "mrz", "mars"], ["apr", "avr", "abr"],
-            ["may", "mai", "mag", "mei"], ["jun", "juin", "giu"], ["jul", "juil", "lug"], ["aug", "aou", "aoû", "août", "ago"],
-            ["sep", "sept", "set"], ["oct", "okt", "ott", "out"], ["nov"], ["dec", "dez", "déc", "dic"],
+            ["jan", "ene", "gen", "janv"], ["feb", "fev", "fév", "févr"], ["mar", "mär", "mrz", "mars"],
+            ["apr", "avr", "abr"],
+            ["may", "mai", "mag", "mei"], ["jun", "juin", "giu"], ["jul", "juil", "lug"],
+            ["aug", "aou", "aoû", "août", "ago"],
+            ["sep", "sept", "set"], ["oct", "okt", "ott", "out"], ["nov"], ["dec", "dez", "déc", "dic"]
         ]
         var months: [String: Int] = [:]
         for (index, group) in names.enumerated() {
@@ -239,7 +260,10 @@ public enum FTPListParser {
         var letters = token
         if letters.last == "." { letters = letters.dropLast() }
         guard (3...5).contains(letters.count),
-              letters.allSatisfy({ ($0.value >= 0x41 && $0.value <= 0x5A) || ($0.value >= 0x61 && $0.value <= 0x7A) || ($0.value >= 0xC0 && $0.value <= 0x24F) })
+            letters.allSatisfy({
+                ($0.value >= 0x41 && $0.value <= 0x5A) || ($0.value >= 0x61 && $0.value <= 0x7A)
+                    || ($0.value >= 0xC0 && $0.value <= 0x24F)
+            })
         else { return nil }
         return months[text(letters).lowercased()]
     }
@@ -261,7 +285,8 @@ public enum FTPListParser {
         let characters = Array(line.prefix(10))
         guard let type = characters.first, "-dlbcpsDw".unicodeScalars.contains(type) else { return nil }
         // Either a full mode string (`-rwxr-xr-x`) or NetWare's `d [RWCEAFMS]`.
-        let hasMode = characters.count == 10 && characters.dropFirst().allSatisfy { "-rwxsStTlL".unicodeScalars.contains($0) }
+        let hasMode =
+            characters.count == 10 && characters.dropFirst().allSatisfy { "-rwxsStTlL".unicodeScalars.contains($0) }
         guard hasMode || line.dropFirst().drop(while: { $0 == " " }).first == "[" else { return nil }
 
         var entry = RemoteEntry(name: "", isDirectory: type == "d" || type == "D", isSymlink: type == "l")
@@ -274,9 +299,12 @@ public enum FTPListParser {
             var index = 1
             while index + 2 < tokens.count, name == nil {
                 defer { index += 1 }
-                let (monthToken, dayToken) = dayFirst ? (line[tokens[index + 1]], line[tokens[index]]) : (line[tokens[index]], line[tokens[index + 1]])
+                let (monthToken, dayToken) =
+                    dayFirst
+                    ? (line[tokens[index + 1]], line[tokens[index]]) : (line[tokens[index]], line[tokens[index + 1]])
                 guard let month = monthNumber(monthToken), let day = dayNumber(dayToken, allowsStop: dayFirst),
-                      let size = trailingSize(line[tokens[index - 1]]) else { continue }
+                    let size = trailingSize(line[tokens[index - 1]])
+                else { continue }
                 let last = line[tokens[index + 2]]
                 var components = DateComponents()
                 (components.month, components.day) = (month, day)
@@ -299,14 +327,19 @@ public enum FTPListParser {
         while name == nil, index + 1 < tokens.count {
             defer { index += 1 }
             let parts = line[tokens[index]].split(separator: "-", omittingEmptySubsequences: false)
-            guard parts.count == 3, let year = number(parts[0], digits: 4...4), let month = number(parts[1], digits: 2...2),
-                  let dayOfMonth = number(parts[2], digits: 2...2), let time = clockTime(line[tokens[index + 1]], allowsFraction: true),
-                  let size = trailingSize(line[tokens[index - 1]]) else { continue }
+            guard parts.count == 3, let year = number(parts[0], digits: 4...4),
+                let month = number(parts[1], digits: 2...2),
+                let dayOfMonth = number(parts[2], digits: 2...2),
+                let time = clockTime(line[tokens[index + 1]], allowsFraction: true),
+                let size = trailingSize(line[tokens[index - 1]])
+            else { continue }
             var last = tokens[index + 1]
             // A time zone, when exactly one space leads to it and a name follows it.
             if index + 2 < tokens.count, tokens[index + 2].lowerBound == last.upperBound + 1 {
                 let zone = line[tokens[index + 2]]
-                if zone.count == 5, zone.first == "+" || zone.first == "-", zone.dropFirst().allSatisfy(isDigit), tokens[index + 2].upperBound + 1 < line.count {
+                if zone.count == 5, zone.first == "+" || zone.first == "-", zone.dropFirst().allSatisfy(isDigit),
+                    tokens[index + 2].upperBound + 1 < line.count
+                {
                     last = tokens[index + 2]
                 }
             }
@@ -369,7 +402,9 @@ public enum FTPListParser {
             return Int(text(line[position..<end]))
         }
         func separator() -> Bool {
-            guard position < line.count, line[position] == "-" || line[position] == "/" || line[position] == "." else { return false }
+            guard position < line.count, line[position] == "-" || line[position] == "/" || line[position] == "." else {
+                return false
+            }
             position += 1
             return true
         }
@@ -379,8 +414,10 @@ public enum FTPListParser {
             while position < line.count, isSpace(line[position]) { position += 1 }
             return position - start
         }
-        guard let month = digits(2...2), separator(), let day = digits(2...2), separator(), var year = digits(2...4), space() > 0,
-              var hour = digits(1...2), position < line.count, line[position] == ":" else { return nil }
+        guard let month = digits(2...2), separator(), let day = digits(2...2), separator(), var year = digits(2...4),
+            space() > 0,
+            var hour = digits(1...2), position < line.count, line[position] == ":"
+        else { return nil }
         position += 1
         guard let minute = digits(2...2) else { return nil }
         var gap = space()
@@ -405,14 +442,18 @@ public enum FTPListParser {
             guard ["<DIR>", "<JUNCTION>", "<SYMLINK>", "<SYMLINKD>"].contains(kind) else { return nil }
             (isDirectory, isLink) = (true, kind != "<DIR>")
         } else {
-            while position < line.count, isDigit(line[position]) || line[position] == "." || line[position] == "," { position += 1 }
+            while position < line.count, isDigit(line[position]) || line[position] == "." || line[position] == "," {
+                position += 1
+            }
             guard position > kindStart else { return nil }
             size = self.size(Substring(text(line[kindStart..<position].filter(isDigit)[...])))
         }
         guard space() > 0, position < line.count else { return nil }
         if year < 100 { year += year < 70 ? 2000 : 1900 }
         var components = DateComponents()
-        (components.year, components.month, components.day, components.hour, components.minute) = (year, month, day, hour, minute)
+        (components.year, components.month, components.day, components.hour, components.minute) = (
+            year, month, day, hour, minute
+        )
         var entry = RemoteEntry(name: text(line[position...]), isDirectory: isDirectory, isSymlink: isLink)
         entry.modified = date(components, calendar: calendar)
         entry.size = size
@@ -436,7 +477,8 @@ public enum FTPListParser {
                 if value.utf8.count <= 12, let seconds = Int64(value), (0...253_402_300_799).contains(seconds) {
                     entry.modified = Date(timeIntervalSince1970: TimeInterval(seconds))
                 }
-            case "u" where value.hasPrefix("p"): entry.permissions = UInt16(value.dropFirst(), radix: 8).map { $0 & 0o7777 }
+            case "u" where value.hasPrefix("p"):
+                entry.permissions = UInt16(value.dropFirst(), radix: 8).map { $0 & 0o7777 }
             default: break
             }
         }

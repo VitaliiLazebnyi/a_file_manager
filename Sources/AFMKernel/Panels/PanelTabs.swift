@@ -15,8 +15,11 @@ public final class PanelTabs {
             public var title: String?
             public var locked: Bool?
 
-            public init(location: URL, sortKey: Int = 0, descending: Bool = false, showHidden: Bool = false, title: String? = nil,
-                        locked: Bool? = nil) {
+            public init(
+                location: URL, sortKey: Int = 0, descending: Bool = false, showHidden: Bool = false,
+                title: String? = nil,
+                locked: Bool? = nil
+            ) {
                 self.title = title
                 self.locked = locked
                 self.location = location.absoluteString
@@ -62,8 +65,10 @@ public final class PanelTabs {
     public convenience init(restoring state: State?, fallback: URL) {
         let models = (state?.tabs ?? []).compactMap { tab in
             URL(string: tab.location).map {
-                let model = PanelModel(directory: $0, sort: ListOrder(key: SortKey(rawValue: tab.sortKey) ?? .name, descending: tab.descending),
-                                       showHidden: tab.showHidden)
+                let model = PanelModel(
+                    directory: $0,
+                    sort: ListOrder(key: SortKey(rawValue: tab.sortKey) ?? .name, descending: tab.descending),
+                    showHidden: tab.showHidden)
                 (model.customTitle, model.isLocked) = (tab.title, tab.locked ?? false)
                 return model
             }
@@ -74,9 +79,13 @@ public final class PanelTabs {
     }
 
     public var state: State {
-        State(tabs: tabs.map { .init(location: $0.directory, sortKey: $0.sort.key.rawValue, descending: $0.sort.descending,
-                                     showHidden: $0.showHidden, title: $0.customTitle, locked: $0.isLocked ? true : nil) },
-              active: activeIndex)
+        State(
+            tabs: tabs.map {
+                .init(
+                    location: $0.directory, sortKey: $0.sort.key.rawValue, descending: $0.sort.descending,
+                    showHidden: $0.showHidden, title: $0.customTitle, locked: $0.isLocked ? true : nil)
+            },
+            active: activeIndex)
     }
 
     /// The folder name, as shown on the tab.
@@ -90,7 +99,9 @@ public final class PanelTabs {
     /// Opens a tab at the end: a copy of the active tab, or one that will show `directory`.
     @discardableResult
     public func openTab(showing directory: URL? = nil, activate: Bool = true) -> PanelModel {
-        let tab = directory.map { PanelModel(directory: $0, sort: active.sort, showHidden: active.showHidden) } ?? active.duplicate()
+        let tab =
+            directory.map { PanelModel(directory: $0, sort: active.sort, showHidden: active.showHidden) }
+            ?? active.duplicate()
         tabs.append(tab)
         if activate { activeIndex = tabs.count - 1 }
         onChange?()

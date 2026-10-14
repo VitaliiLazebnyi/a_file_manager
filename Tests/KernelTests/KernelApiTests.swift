@@ -1,22 +1,29 @@
-@testable import AFMKernel
 import Foundation
 import TestSupport
 import Testing
+
+@testable import AFMKernel
 
 /// A file system that offers only what it must: everything else is the kernel's default.
 private final class PlainFileSystem: FileSystemProvider {
     let inner = MemoryFileSystem(scheme: "plain")
     var scheme: String { inner.scheme }
     var capabilities: FileSystemCapabilities { [.write] }
-    func list(_ directory: URL, showHidden: Bool) throws -> [FileItem] { try inner.list(directory, showHidden: showHidden) }
+    func list(_ directory: URL, showHidden: Bool) throws -> [FileItem] {
+        try inner.list(directory, showHidden: showHidden)
+    }
     func item(at url: URL) -> FileItem? { inner.item(at: url) }
     func parent(of directory: URL) -> URL? { inner.parent(of: directory) }
     func read(_ url: URL) throws -> FileReader { PlainReader(try inner.read(url)) }
     func createDirectory(at url: URL) throws { try inner.createDirectory(at: url) }
     func write(_ url: URL) throws -> FileWriter { PlainWriter(try inner.write(url)) }
     func remove(_ url: URL) throws { try inner.remove(url) }
-    func move(_ source: URL, to destination: URL, replacing: Bool) throws { try inner.move(source, to: destination, replacing: replacing) }
-    func copy(_ source: URL, to destination: URL, progress: (Int64) -> Bool) throws { try inner.copy(source, to: destination, progress: progress) }
+    func move(_ source: URL, to destination: URL, replacing: Bool) throws {
+        try inner.move(source, to: destination, replacing: replacing)
+    }
+    func copy(_ source: URL, to destination: URL, progress: (Int64) -> Bool) throws {
+        try inner.copy(source, to: destination, progress: progress)
+    }
 
     private final class PlainReader: FileReader {
         let inner: FileReader
@@ -112,7 +119,12 @@ private func onThread(_ work: @escaping () -> Void) {
         }
         var registrations: [AnyObject] = []
         while !flag.isCancelled {
-            registrations.append(flag.onCancel { counter.lock(); calls += 1; counter.unlock() })
+            registrations.append(
+                flag.onCancel {
+                    counter.lock()
+                    calls += 1
+                    counter.unlock()
+                })
             if registrations.count > 64 { registrations.removeFirst(32) }
         }
         #expect(done.wait() == true)
@@ -130,18 +142,29 @@ private func onThread(_ work: @escaping () -> Void) {
         plain.inner.addFile("/a/one.txt", "12345")
         plain.inner.addDirectory("/a/sub")
         plain.inner.addFile("/a/.hidden")
-        let directory = plain.inner.url("/a"), file = plain.inner.url("/a/one.txt")
+        let directory = plain.inner.url("/a")
+        let file = plain.inner.url("/a/one.txt")
         let flag = CancellationFlag()
         #expect(plain.capabilities(for: file) == [.write])
         #expect(try plain.list(directory, showHidden: false, cancellation: flag).map(\.name) == ["one.txt", "sub"])
         var streamed: [String] = []
-        try plain.list(directory, showHidden: true, cancellation: flag) { streamed += $0.map(\.name); return true }
+        try plain.list(directory, showHidden: true, cancellation: flag) {
+            streamed += $0.map(\.name)
+            return true
+        }
         #expect(streamed == [".hidden", "one.txt", "sub"])
         #expect(plain.item(at: file, cancellation: flag)?.size == 5)
         // The lean listing is made from the full one.
-        #expect(try plain.entries(of: directory, showHidden: false, foldersOnly: false, cancellation: flag)
-            == [DirectoryEntry(name: "one.txt", isDirectory: false), DirectoryEntry(name: "sub", isDirectory: true)])
-        #expect(try plain.entries(of: directory, showHidden: true, foldersOnly: true, cancellation: flag).map(\.name) == ["sub"])
+        #expect(
+            try plain.entries(of: directory, showHidden: false, foldersOnly: false, cancellation: flag)
+                == [
+                    DirectoryEntry(name: "one.txt", isDirectory: false),
+                    DirectoryEntry(name: "sub", isDirectory: true)
+                ])
+        #expect(
+            try plain.entries(of: directory, showHidden: true, foldersOnly: true, cancellation: flag).map(\.name) == [
+                "sub"
+            ])
         // Readers and writers can be interrupted to no effect.
         let reader = try plain.read(file, cancellation: flag)
         reader.interrupt()
@@ -162,11 +185,15 @@ private func onThread(_ work: @escaping () -> Void) {
 
     @Test func aFlagThatIsSetEndsTheDefaultsEarly() throws {
         plain.inner.addFile("/a/one.txt")
-        let directory = plain.inner.url("/a"), file = plain.inner.url("/a/one.txt")
+        let directory = plain.inner.url("/a")
+        let file = plain.inner.url("/a/one.txt")
         let flag = CancellationFlag()
         flag.cancel()
         var batches = 0
-        try plain.list(directory, showHidden: true, cancellation: flag) { _ in batches += 1; return true }
+        try plain.list(directory, showHidden: true, cancellation: flag) { _ in
+            batches += 1
+            return true
+        }
         #expect(batches == 0 && plain.item(at: file, cancellation: flag) == nil)
         #expect(throws: CocoaError.self) { try plain.read(file, cancellation: flag) }
         #expect(throws: CocoaError.self) { try plain.write(plain.inner.url("/a/two.txt"), cancellation: flag) }
@@ -182,8 +209,11 @@ private func onThread(_ work: @escaping () -> Void) {
         memory.capabilities = [.write, .trash]
         #expect(registry.capabilities(for: memory.url("/x")) == [.write, .trash])
         memory.capabilitiesAt = { $0.path.hasPrefix("/remote") ? [] : [.write, .append] }
-        #expect(registry.capabilities(for: memory.url("/remote/x")) == [] && registry.capabilities(for: memory.url("/here")) == [.write, .append])
-        #expect(memory.capabilities == [.write, .trash] && registry.capabilities(for: plain.inner.url("/x")) == [.write])
+        #expect(
+            registry.capabilities(for: memory.url("/remote/x")) == []
+                && registry.capabilities(for: memory.url("/here")) == [.write, .append])
+        #expect(
+            memory.capabilities == [.write, .trash] && registry.capabilities(for: plain.inner.url("/x")) == [.write])
         #expect(registry.capabilities(for: URL(string: "ftp://nowhere/x")!) == [])
     }
 }
@@ -207,7 +237,8 @@ private func onThread(_ work: @escaping () -> Void) {
         var batches = 0
         onThread { [memory, fileSystems] in
             do {
-                _ = try PanelLoader.load(memory.url("/far"), showHidden: false, fileSystems: fileSystems, cancellation: flag)
+                _ = try PanelLoader.load(
+                    memory.url("/far"), showHidden: false, fileSystems: fileSystems, cancellation: flag)
                 ended.set("loaded")
             } catch let error as CocoaError where error.code == .userCancelled {
                 ended.set("cancelled")
@@ -223,7 +254,10 @@ private func onThread(_ work: @escaping () -> Void) {
         let streamed = Signal<Bool>()
         let second = CancellationFlag()
         onThread { [memory, fileSystems] in
-            try? PanelLoader.stream(memory.url("/far/sub"), showHidden: false, fileSystems: fileSystems, climbing: true, cancellation: second) { _ in
+            try? PanelLoader.stream(
+                memory.url("/far/sub"), showHidden: false, fileSystems: fileSystems, climbing: true,
+                cancellation: second
+            ) { _ in
                 batches += 1
                 return true
             }
@@ -234,8 +268,13 @@ private func onThread(_ work: @escaping () -> Void) {
         #expect(streamed.wait() == true && batches == 0 && memory.listRequests == ["/far", "/far/sub"])
         // Without a flag, and with one that is never set, everything is as it was.
         memory.stallsListings = false
-        #expect((try? PanelLoader.load(memory.url("/far"), showHidden: false, fileSystems: fileSystems).listing.items.count) == 2)
-        #expect((try? PanelLoader.load(memory.url("/far/a.txt"), showHidden: false, fileSystems: fileSystems, cancellation: CancellationFlag()).focus) == "a.txt")
+        #expect(
+            (try? PanelLoader.load(memory.url("/far"), showHidden: false, fileSystems: fileSystems).listing.items.count)
+                == 2)
+        #expect(
+            (try? PanelLoader.load(
+                memory.url("/far/a.txt"), showHidden: false, fileSystems: fileSystems, cancellation: CancellationFlag()
+            ).focus) == "a.txt")
     }
 
     @Test func aPausedListingStopsBetweenItsBatches() throws {
@@ -243,7 +282,8 @@ private func onThread(_ work: @escaping () -> Void) {
         memory.listBatchSize = 10
         let flag = CancellationFlag()
         var received = 0
-        try PanelLoader.stream(memory.url("/many"), showHidden: false, fileSystems: fileSystems, cancellation: flag) { batch in
+        try PanelLoader.stream(memory.url("/many"), showHidden: false, fileSystems: fileSystems, cancellation: flag) {
+            batch in
             received += batch.listing.items.count
             flag.cancel()
             return true
@@ -280,7 +320,10 @@ private func onThread(_ work: @escaping () -> Void) {
             do { read.set("read \(try reader.read(upToCount: 16)?.count ?? 0)") } catch { read.set("interrupted") }
         }
         onThread {
-            do { try writer.write(Data("x".utf8)); written.set("written") } catch { written.set("interrupted") }
+            do {
+                try writer.write(Data("x".utf8))
+                written.set("written")
+            } catch { written.set("interrupted") }
         }
         Thread.sleep(forTimeInterval: 0.02)
         #expect(memory.interruptions == 0)
@@ -319,7 +362,9 @@ private func onThread(_ work: @escaping () -> Void) {
         #expect(memory.contents("/part.bin") == "0123")
         try resumed.write(Data("abc".utf8))
         try resumed.close(attributes: FileAttributes(modified: Date(timeIntervalSince1970: 5)))
-        #expect(memory.contents("/part.bin") == "0123abc" && memory.item(at: file)?.modified == Date(timeIntervalSince1970: 5))
+        #expect(
+            memory.contents("/part.bin") == "0123abc"
+                && memory.item(at: file)?.modified == Date(timeIntervalSince1970: 5))
         let appended = try memory.append(to: file, at: nil)
         try appended.write(Data("!".utf8))
         try appended.close(attributes: FileAttributes())
@@ -351,19 +396,25 @@ private func onThread(_ work: @escaping () -> Void) {
 
     private func model(_ items: [FileItem]) -> PanelModel {
         let model = PanelModel(directory: directory)
-        model.show(Listing(directory: directory, items: items, parent: URL(fileURLWithPath: "/"), root: URL(fileURLWithPath: "/")))
+        model.show(
+            Listing(
+                directory: directory, items: items, parent: URL(fileURLWithPath: "/"), root: URL(fileURLWithPath: "/")
+            )
+        )
         return model
     }
 
     private func items(_ count: Int) -> [FileItem] {
         (0..<count).map { index in
-            FileItem(url: directory.appending(name: "n\(index)"), name: index % 7 == 0 ? "dir\(index)" : "file\(index).txt",
-                     isDirectory: index % 7 == 0, size: Int64(index))
+            FileItem(
+                url: directory.appending(name: "n\(index)"), name: index % 7 == 0 ? "dir\(index)" : "file\(index).txt",
+                isDirectory: index % 7 == 0, size: Int64(index))
         }
     }
 
     private func isSame(_ a: PanelModel, _ b: PanelModel) -> Bool {
-        a.items.map(\.name) == b.items.map(\.name) && a.listedItems.count == b.listedItems.count && a.selection == b.selection
+        a.items.map(\.name) == b.items.map(\.name) && a.listedItems.count == b.listedItems.count
+            && a.selection == b.selection
             && a.selectionCount == b.selectionCount && a.cursor == b.cursor && a.cursorItem?.name == b.cursorItem?.name
             && a.totals == b.totals && a.filter?.title == b.filter?.title
     }
@@ -392,7 +443,8 @@ private func onThread(_ work: @escaping () -> Void) {
         #expect(handed.selection == ["file3.txt", "dir7", "file13.txt"] && handed.cursorItem?.name == "file23.txt")
         // Taking the filter off again, the same way.
         let off = handed.listVersion
-        #expect(handed.setFilter(nil, prefiltered: PanelModel.filtered(handed.listedItems, by: nil), listVersion: off))
+        #expect(
+            handed.setFilter(nil, prefiltered: PanelModel.filtered(handed.listedItems, by: nil), listVersion: off))
         direct.setFilter(nil)
         #expect(isSame(direct, handed) && handed.items.count == count)
     }
@@ -404,7 +456,9 @@ private func onThread(_ work: @escaping () -> Void) {
         let version = handed.listVersion
         let stale = PanelModel.filtered(handed.listedItems, by: filter)
         // The directory was read again before the filtered list came back.
-        let fresh = Listing(directory: directory, items: Array(all.dropFirst(20)), parent: URL(fileURLWithPath: "/"), root: URL(fileURLWithPath: "/"))
+        let fresh = Listing(
+            directory: directory, items: Array(all.dropFirst(20)), parent: URL(fileURLWithPath: "/"),
+            root: URL(fileURLWithPath: "/"))
         handed.update(with: fresh)
         direct.update(with: fresh)
         #expect(!handed.setFilter(filter, prefiltered: stale, listVersion: version))
@@ -455,14 +509,17 @@ private func onThread(_ work: @escaping () -> Void) {
         #expect(composed == decomposed && Array(composed.utf8) != Array(decomposed.utf8))
         #expect(model.items.count == 4 && Set(bytes(model.items)).count == 4 && Set(model.items.map(\.name)).count == 2)
         #expect(memory.contents("/d/\(composed).txt") == "12" && memory.contents("/d/\(decomposed).txt") == "123")
-        #expect(memory.item(at: memory.url("/d/\(decomposed).txt")).map { Array($0.name.utf8) } == Array("\(decomposed).txt".utf8))
+        #expect(
+            memory.item(at: memory.url("/d/\(decomposed).txt")).map { Array($0.name.utf8) }
+                == Array("\(decomposed).txt".utf8))
     }
 
     // A short list is walked; a long one is looked up through an index. Both must tell the two apart.
     @Test(arguments: [0, 200]) func aMarkOnOneIsNotAMarkOnTheOther(others: Int) throws {
         let model = try panel(others: others)
         let (one, two) = (row(model, "\(composed).txt"), row(model, "\(decomposed).txt"))
-        #expect(one != two && model.row(ofName: "\(composed).txt") == one && model.row(ofName: "\(decomposed).txt") == two)
+        #expect(
+            one != two && model.row(ofName: "\(composed).txt") == one && model.row(ofName: "\(decomposed).txt") == two)
         model.toggleSelection(row: two)
         #expect(model.isSelected(row: two) && !model.isSelected(row: one) && model.selectionCount == 1)
         #expect(bytes(model.operands()) == [Array("\(decomposed).txt".utf8)] && model.operands().first?.size == 3)
@@ -470,7 +527,9 @@ private func onThread(_ work: @escaping () -> Void) {
         // The set of names cannot tell them apart; it says that something of that name is marked.
         #expect(model.selection == ["\(composed).txt"] && model.selection.count == 1)
         model.toggleSelection(row: one)
-        #expect(model.selectionCount == 2 && model.selection.count == 1 && model.totals.selectedBytes == 5 && model.operands().count == 2)
+        #expect(
+            model.selectionCount == 2 && model.selection.count == 1 && model.totals.selectedBytes == 5
+                && model.operands().count == 2)
         model.toggleSelection(row: two)
         #expect(model.isSelected(row: one) && !model.isSelected(row: two) && model.operands().first?.size == 2)
         #expect(model.selection == ["\(decomposed).txt"] && model.totals.selectedBytes == 2)
@@ -485,18 +544,23 @@ private func onThread(_ work: @escaping () -> Void) {
         model.setSelected(true, names: ["\(composed).txt"])
         #expect(model.isSelected(row: one) && !model.isSelected(row: two))
         model.setSelection(names: ["\(decomposed).txt", decomposed])
-        #expect(!model.isSelected(row: one) && model.isSelected(row: two) && model.isSelected(row: row(model, decomposed))
-            && !model.isSelected(row: row(model, composed)) && model.selectionCount == 2 && !model.operands().contains { $0.size == 2 })
+        #expect(
+            !model.isSelected(row: one) && model.isSelected(row: two) && model.isSelected(row: row(model, decomposed))
+                && !model.isSelected(row: row(model, composed)) && model.selectionCount == 2
+                && !model.operands().contains { $0.size == 2 })
         model.deselect([decomposed])
         #expect(model.selectionCount == 1 && model.isSelected(row: two))
         model.deselect(["\(composed).txt"])
         #expect(model.selectionCount == 1 && model.isSelected(row: two))
         // Everything, the opposite, a mask, and what was saved.
         model.invertSelection()
-        #expect(model.selectionCount == model.items.count - 1 && !model.isSelected(row: two) && model.isSelected(row: one))
+        #expect(
+            model.selectionCount == model.items.count - 1 && !model.isSelected(row: two) && model.isSelected(row: one))
         model.saveSelection()
         model.selectAll()
-        #expect(model.selectionCount == model.items.count && model.totals.selectedFiles == others + 2 && model.totals.selectedFolders == 2)
+        #expect(
+            model.selectionCount == model.items.count && model.totals.selectedFiles == others + 2
+                && model.totals.selectedFolders == 2)
         model.select(mask: "caf*.txt", select: false)
         #expect(model.selectionCount == model.items.count - 2)
         model.restoreSelection()
@@ -509,7 +573,8 @@ private func onThread(_ work: @escaping () -> Void) {
         model.toggleSelection(row: row(model, composed))
         model.moveCursor(to: row(model, "\(decomposed).txt"))
         func isRight() -> Bool {
-            model.selectionCount == 2 && bytes(model.operands()) == [Array(composed.utf8), Array("\(decomposed).txt".utf8)]
+            model.selectionCount == 2
+                && bytes(model.operands()) == [Array(composed.utf8), Array("\(decomposed).txt".utf8)]
                 && model.cursorItem.map { Array($0.name.utf8) } == Array("\(decomposed).txt".utf8)
         }
         #expect(isRight())
@@ -522,12 +587,16 @@ private func onThread(_ work: @escaping () -> Void) {
         model.setFilter(nil)
         let snapshot = model.snapshot()
         memory.addFile("/d/zz-new.txt")
-        #expect(model.update(with: try PanelLoader.load(memory.url("/d"), showHidden: false, fileSystems: fileSystems).listing))
+        #expect(
+            model.update(
+                with: try PanelLoader.load(memory.url("/d"), showHidden: false, fileSystems: fileSystems).listing))
         #expect(isRight() && model.items.count == others + 5)
         // The other spelling of a marked file goes away: its mark does not move over.
         try memory.remove(memory.url("/d/\(decomposed).txt"))
         model.update(with: try PanelLoader.load(memory.url("/d"), showHidden: false, fileSystems: fileSystems).listing)
-        #expect(model.selectionCount == 1 && bytes(model.operands()) == [Array(composed.utf8)] && !model.isSelected(row: row(model, "\(composed).txt")))
+        #expect(
+            model.selectionCount == 1 && bytes(model.operands()) == [Array(composed.utf8)]
+                && !model.isSelected(row: row(model, "\(composed).txt")))
         model.restore(snapshot)
         #expect(isRight())
     }
@@ -541,14 +610,18 @@ private func onThread(_ work: @escaping () -> Void) {
         #expect(model.totals.selectedBytes == 7 && model.totals.totalBytes == 107 + 5 + Int64(others) * 7)
         // By one name alone, the folder written like it.
         model.setComputedSize(9, forName: decomposed)
-        #expect(model.item(atRow: one)?.computedSize == 100 && model.item(atRow: two)?.computedSize == 9 && model.totals.selectedBytes == 9)
+        #expect(
+            model.item(atRow: one)?.computedSize == 100 && model.item(atRow: two)?.computedSize == 9
+                && model.totals.selectedBytes == 9)
         // Under a filter the sizes go to both lists, and a fresh reading carries each over to its own.
         model.setFilter(PanelFilter(title: "folders") { $0.isFolder })
         model.setComputedSizes([(name: composed, size: 1), (name: decomposed, size: 2)])
         #expect(model.items.map(\.computedSize) == [1, 2] || model.items.map(\.computedSize) == [2, 1])
         model.setFilter(nil)
         model.update(with: try PanelLoader.load(memory.url("/d"), showHidden: false, fileSystems: fileSystems).listing)
-        #expect(model.item(atRow: row(model, composed))?.computedSize == 1 && model.item(atRow: row(model, decomposed))?.computedSize == 2)
+        #expect(
+            model.item(atRow: row(model, composed))?.computedSize == 1
+                && model.item(atRow: row(model, decomposed))?.computedSize == 2)
         #expect(model.isSelected(row: row(model, decomposed)) && model.selectionCount == 1)
     }
 
@@ -560,7 +633,9 @@ private func onThread(_ work: @escaping () -> Void) {
         // As before: where names are single, either writing means the one entry.
         for _ in 0..<4 { #expect(model.row(ofName: "\(decomposed).txt") == model.row(ofName: "\(composed).txt")) }
         model.setSelected(true, names: ["\(decomposed).txt"])
-        #expect(model.selectionCount == 1 && model.operands().map(\.name) == ["\(composed).txt"] && model.selection.contains("\(decomposed).txt"))
+        #expect(
+            model.selectionCount == 1 && model.operands().map(\.name) == ["\(composed).txt"]
+                && model.selection.contains("\(decomposed).txt"))
         model.deselect(["\(decomposed).txt"])
         #expect(model.selectionCount == 0)
         model.setSelection(names: ["\(decomposed).txt", "f1", "missing"])

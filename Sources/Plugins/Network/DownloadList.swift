@@ -33,14 +33,19 @@ public enum DownloadList {
     public static func parse(_ text: String) -> [Action] {
         text.split(whereSeparator: \.isNewline).prefix(mostLines).compactMap { rawLine in
             // A byte-order mark starts files written by Windows programs.
-            let line = rawLine.trimmingCharacters(in: CharacterSet.whitespaces.union(CharacterSet(charactersIn: "\u{FEFF}")))
+            let line = rawLine.trimmingCharacters(
+                in: CharacterSet.whitespaces.union(CharacterSet(charactersIn: "\u{FEFF}")))
             guard !line.isEmpty else { return nil }
             let lowered = line.lowercased()
-            func body(after prefix: String) -> String { String(line.dropFirst(prefix.count)).trimmingCharacters(in: .whitespaces) }
+            func body(after prefix: String) -> String {
+                String(line.dropFirst(prefix.count)).trimmingCharacters(in: .whitespaces)
+            }
             func pair(_ text: String) -> (String, String?) {
                 guard let range = text.range(of: separator) else { return (text, nil) }
-                return (String(text[..<range.lowerBound]).trimmingCharacters(in: .whitespaces),
-                        String(text[range.upperBound...]).trimmingCharacters(in: .whitespaces))
+                return (
+                    String(text[..<range.lowerBound]).trimmingCharacters(in: .whitespaces),
+                    String(text[range.upperBound...]).trimmingCharacters(in: .whitespaces)
+                )
             }
             if lowered.hasPrefix("sleep:") {
                 let milliseconds = TimeInterval(body(after: "sleep:")) ?? 0
@@ -66,7 +71,10 @@ public enum DownloadList {
     /// two. Names on a server are the server's choice, so this is checked for every line written.
     public static func canHold(source: String, target: String?) -> Bool {
         func isOneLine(_ text: String) -> Bool {
-            !text.isEmpty && !text.unicodeScalars.contains { $0.properties.generalCategory == .control || $0 == "\u{2028}" || $0 == "\u{2029}" }
+            !text.isEmpty
+                && !text.unicodeScalars.contains {
+                    $0.properties.generalCategory == .control || $0 == "\u{2028}" || $0 == "\u{2029}"
+                }
                 && text == text.trimmingCharacters(in: .whitespaces)
         }
         guard isOneLine(source), !source.contains(separator), target.map(isOneLine) ?? true else { return false }

@@ -1,8 +1,9 @@
 import AFMKernel
-@testable import FileToolsPlugin
 import Foundation
 import TestSupport
 import Testing
+
+@testable import FileToolsPlugin
 
 // Review round 2, integration: Split, Combine, Encode and Decode hand on the mark of coming
 // from elsewhere that their source carries (network.md item 2, left open by plugins-b), and
@@ -32,7 +33,9 @@ import Testing
         let parts = try Splitter.split(try item(source), into: target.url("/out"), partSize: 2000, run: run())
         #expect(parts.count == 4)
         let marked = target.quarantineMarks
-        #expect(marked["/out/program.001"] == mark && marked["/out/program.002"] == mark && marked["/out/program.003"] == mark)
+        #expect(
+            marked["/out/program.001"] == mark && marked["/out/program.002"] == mark
+                && marked["/out/program.003"] == mark)
         // Put together from parts that lie on the server, the whole carries it too.
         for name in ["program.001", "program.002", "program.003", "program.crc"] {
             _ = server.addFile("/parts/" + name, target.contents("/out/" + name) ?? "")
@@ -51,7 +54,8 @@ import Testing
         // Decoded from a file on the server.
         _ = server.addFile("/in/tool.b64", target.contents("/out/tool.b64") ?? "")
         target.addDirectory("/decoded")
-        let decoded = try Decoder.decode(try item(server.url("/in/tool.b64")), into: target.url("/decoded"), run: run())
+        let decoded = try Decoder.decode(
+            try item(server.url("/in/tool.b64")), into: target.url("/decoded"), run: run())
         #expect(decoded.count == 1 && target.contents("/decoded/tool.sh") == "#!/bin/sh\necho harmless\n")
         #expect(target.quarantineMarks["/decoded/tool.sh"] == mark)
     }
@@ -69,8 +73,13 @@ import Testing
         #expect(parts.count == 2 && target.contents("/out/small.001") == "small")
         // A file a server says is nearly the largest number of bytes there is.
         let real = try item(source)
-        let huge = FileItem(url: real.url, name: real.name, isDirectory: false, size: .max - 1, modified: real.modified)
-        #expect(throws: ToolError.self) { try Splitter.split(huge, into: target.url("/out"), partSize: 1 << 20, run: run()) }
-        #expect(throws: ToolError.self) { try Encoder.encode(huge, into: target.url("/out"), method: .mime, linesPerFile: 1, run: run()) }
+        let huge = FileItem(
+            url: real.url, name: real.name, isDirectory: false, size: .max - 1, modified: real.modified)
+        #expect(throws: ToolError.self) {
+            try Splitter.split(huge, into: target.url("/out"), partSize: 1 << 20, run: run())
+        }
+        #expect(throws: ToolError.self) {
+            try Encoder.encode(huge, into: target.url("/out"), method: .mime, linesPerFile: 1, run: run())
+        }
     }
 }

@@ -54,7 +54,7 @@ struct NameList {
             item.isFolder ? (item.computedSize.map { String($0) } ?? "<DIR>") : String(item.size)
         },
         Column(title: "Date") { Format.date($0.modified) },
-        Column(title: "Attr") { Format.permissions($0.permissions) },
+        Column(title: "Attr") { Format.permissions($0.permissions) }
     ]
 
     /// All shown columns, tab-separated. `extra` are the plugin columns the panel shows; their
@@ -64,7 +64,8 @@ struct NameList {
     func details(_ items: [FileItem], _ style: Style, headers: Bool, extra: [Column] = [], mask: Int? = nil) -> String {
         var columns = [Column(title: "Name") { self.entry($0, style) }] + NameList.standardColumns + extra
         if let mask, mask > 1 {
-            columns = columns.enumerated().filter { $0.offset < Int.bitWidth - 1 && mask & (1 << $0.offset) != 0 }.map(\.element)
+            columns = columns.enumerated().filter { $0.offset < Int.bitWidth - 1 && mask & (1 << $0.offset) != 0 }.map(
+                \.element)
         }
         let picked = columns
         var lines = Parallel.map(items, serialBelow: extra.isEmpty ? Int.max : 2) { item in

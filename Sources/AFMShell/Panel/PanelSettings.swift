@@ -30,7 +30,8 @@ struct PanelSettings {
 
     static let thumbnailSizes: [CGFloat] = [64, 96, 128, 192, 256]
     /// What the colour list holds until the user writes his own.
-    static let defaultColorRules = "*.zip *.tar *.gz *.tgz *.bz2 *.xz *.7z *.rar *.dmg = purple\n*.app *.command *.sh = green"
+    static let defaultColorRules =
+        "*.zip *.tar *.gz *.tgz *.bz2 *.xz *.7z *.rar *.dmg = purple\n*.app *.command *.sh = green"
 
     /// The cap on the width of a Brief column in points; nil lets the longest name decide
     /// (spec 03 › Brief).
@@ -48,23 +49,33 @@ struct PanelSettings {
         let limit = CGFloat(Double(settings.text(PanelSettings.briefWidthLimitKey, default: "200")) ?? 200)
         briefWidthLimit = settings.flag(PanelSettings.limitsBriefWidthKey, default: true) ? max(60, limit) : nil
         let sizes = PanelSettings.thumbnailSizes
-        thumbnailSide = sizes[min(max(settings.index(PanelSettings.thumbnailSizeKey, default: 1), 0), sizes.count - 1)]
+        thumbnailSide =
+            sizes[min(max(settings.index(PanelSettings.thumbnailSizeKey, default: 1), 0), sizes.count - 1)]
         confirmsDrops = settings.flag(PanelSettings.confirmsDropsKey, default: true)
         if settings.flag(PanelSettings.colorsByTypeKey, default: false) {
-            colorRules = ColorRule.parse(settings.text(PanelSettings.colorRulesKey, default: PanelSettings.defaultColorRules))
+            colorRules = ColorRule.parse(
+                settings.text(PanelSettings.colorRulesKey, default: PanelSettings.defaultColorRules))
         }
     }
 
     /// The configuration page of the file lists.
     static func page(onChange: @escaping () -> Void) -> PreferencePage {
-        PreferencePage(title: "File Panels", preferences: [
-            Preference(limitsBriefWidthKey, "Limit the width of Brief view columns", .flag(default: true)),
-            Preference(briefWidthLimitKey, "Widest Brief view column (points)", .text(default: "200")),
-            Preference(thumbnailSizeKey, "Thumbnail size", .choice(thumbnailSizes.map { "\(Int($0)) × \(Int($0))" }, default: 1)),
-            Preference(confirmsDropsKey, "Ask before copying or moving files dropped with the mouse", .flag(default: true)),
-            Preference(colorsByTypeKey, "Colours by file type", .flag(default: false)),
-            Preference(colorRulesKey, "Colour list, entries as “*.zip *.gz = purple”, separated by “;;”", .text(default: defaultColorRules)),
-        ], onChange: onChange)
+        PreferencePage(
+            title: "File Panels",
+            preferences: [
+                Preference(limitsBriefWidthKey, "Limit the width of Brief view columns", .flag(default: true)),
+                Preference(briefWidthLimitKey, "Widest Brief view column (points)", .text(default: "200")),
+                Preference(
+                    thumbnailSizeKey, "Thumbnail size",
+                    .choice(thumbnailSizes.map { "\(Int($0)) × \(Int($0))" }, default: 1)),
+                Preference(
+                    confirmsDropsKey, "Ask before copying or moving files dropped with the mouse", .flag(default: true)
+                ),
+                Preference(colorsByTypeKey, "Colours by file type", .flag(default: false)),
+                Preference(
+                    colorRulesKey, "Colour list, entries as “*.zip *.gz = purple”, separated by “;;”",
+                    .text(default: defaultColorRules))
+            ], onChange: onChange)
     }
 }
 
@@ -87,9 +98,11 @@ struct ColorRule {
 
     /// The colours that have a name. They follow the light and the dark appearance by themselves.
     static let namedColors: [(name: String, color: NSColor)] = [
-        ("red", .systemRed), ("green", .systemGreen), ("blue", .systemBlue), ("orange", .systemOrange), ("yellow", .systemYellow),
-        ("brown", .systemBrown), ("pink", .systemPink), ("purple", .systemPurple), ("teal", .systemTeal), ("indigo", .systemIndigo),
-        ("gray", .systemGray), ("grey", .systemGray),
+        ("red", .systemRed), ("green", .systemGreen), ("blue", .systemBlue), ("orange", .systemOrange),
+        ("yellow", .systemYellow),
+        ("brown", .systemBrown), ("pink", .systemPink), ("purple", .systemPurple), ("teal", .systemTeal),
+        ("indigo", .systemIndigo),
+        ("gray", .systemGray), ("grey", .systemGray)
     ]
 
     /// A colour by name (`purple`) or as `#RRGGBB`; nil when the text is neither.
@@ -97,8 +110,10 @@ struct ColorRule {
         let text = text.trimmingCharacters(in: .whitespaces).lowercased()
         if let named = namedColors.first(where: { $0.name == text }) { return named.color }
         guard text.hasPrefix("#"), text.count == 7, let value = UInt32(text.dropFirst(), radix: 16) else { return nil }
-        return NSColor(srgbRed: CGFloat((value >> 16) & 0xFF) / 255, green: CGFloat((value >> 8) & 0xFF) / 255, blue: CGFloat(value & 0xFF) / 255,
-                       alpha: 1)
+        return NSColor(
+            srgbRed: CGFloat((value >> 16) & 0xFF) / 255, green: CGFloat((value >> 8) & 0xFF) / 255,
+            blue: CGFloat(value & 0xFF) / 255,
+            alpha: 1)
     }
 
     /// Reads the list: one entry per line (or separated by `;;`), each `masks = colour`. An

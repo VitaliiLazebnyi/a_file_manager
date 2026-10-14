@@ -33,19 +33,24 @@ public final class ArchivesPlugin: Plugin {
         actions.refreshOptions()
 
         environment.fileSystems = { [weak kernel] in kernel?.fileSystems }
-        environment.recoveryFolder = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?
-            .appendingPathComponent(kernel.productName, isDirectory: true).appendingPathComponent("Unsaved archive changes", isDirectory: true)
+        environment.recoveryFolder = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
+            .first?
+            .appendingPathComponent(kernel.productName, isDirectory: true).appendingPathComponent(
+                "Unsaved archive changes", isDirectory: true)
         environment.askPassword = { [weak kernel] archive, retry in
             kernel?.askUser { ui in
-                let answer = ui.form(retry ? "Wrong password" : "Password", detail: "\(archive) is encrypted.",
-                                     fields: [.password("password", "Password:")], buttons: ["OK"])
+                let answer = ui.form(
+                    retry ? "Wrong password" : "Password", detail: "\(archive) is encrypted.",
+                    fields: [.password("password", "Password:")], buttons: ["OK"])
                 return answer.flatMap { $0.text("password").isEmpty ? nil : $0.text("password") }
             }
         }
         // Not waited for: the thread that writes archives goes on (and is not kept from the
         // shared pool) while the message is on the screen.
         environment.reportFailure = { [weak kernel] error, archive in
-            let show: () -> Void = { kernel?.ui.report(error, title: "The changes to \(archive) could not be written!") }
+            let show: () -> Void = {
+                kernel?.ui.report(error, title: "The changes to \(archive) could not be written!")
+            }
             if Thread.isMainThread { show() } else { DispatchQueue.main.async(execute: show) }
         }
         // A copy job that reads a thousand encrypted members asks for the password once.
@@ -58,7 +63,9 @@ public final class ArchivesPlugin: Plugin {
             DispatchQueue.main.async { kernel?.panels.refresh([archive.deletingLastPathComponent()]) }
         }
 
-        for scheme in ArchiveURL.schemes { kernel.fileSystems.register(ArchiveFileSystem(scheme: scheme, store: store)) }
+        for scheme in ArchiveURL.schemes {
+            kernel.fileSystems.register(ArchiveFileSystem(scheme: scheme, store: store))
+        }
         // Changes to a ZIP are written into its file after a delay. Whoever is about to
         // read, copy, move or delete that file (or the folder it lies in) asks for them first.
         kernel.fileSystems.addFlusher { url, cancellation in try store.bringUpToDate(url, cancellation: cancellation) }
@@ -71,35 +78,63 @@ public final class ArchivesPlugin: Plugin {
         let model = { kernel.panels.source.model }
         let hasOperands = { model().hasOperands }
         let isInsideArchive = { ArchiveURL.location(of: model().directory) != nil }
-        commands.register(Command(.packFiles, "Pack…", [.f(5, .option)]), enabled: hasOperands) { actions.pack(move: false) }
-        commands.register(Command(.moveToArchive, "Move to Archive…", [.f(5, [.option, .shift])]), enabled: hasOperands) { actions.pack(move: true) }
-        commands.register(Command(.unpackFiles, "Unpack Specific Files…", [.f(9, .option)]),
-                          enabled: { hasOperands() || isInsideArchive() }, actions.unpack)
-        commands.register(Command(.testArchive, "Test Archive(s)", [.f(9, [.option, .shift])]),
-                          enabled: { hasOperands() || isInsideArchive() }, actions.test)
-        commands.register(Command(.openAsArchive, "Open as Archive"), enabled: { model().cursorFile != nil }, actions.openAsArchive)
+        commands.register(Command(.packFiles, "Pack…", [.f(5, .option)]), enabled: hasOperands) {
+            actions.pack(move: false)
+        }
+        commands.register(
+            Command(.moveToArchive, "Move to Archive…", [.f(5, [.option, .shift])]), enabled: hasOperands
+        ) { actions.pack(move: true) }
+        commands.register(
+            Command(.unpackFiles, "Unpack Specific Files…", [.f(9, .option)]),
+            enabled: { hasOperands() || isInsideArchive() }, actions.unpack)
+        commands.register(
+            Command(.testArchive, "Test Archive(s)", [.f(9, [.option, .shift])]),
+            enabled: { hasOperands() || isInsideArchive() }, actions.test)
+        commands.register(
+            Command(.openAsArchive, "Open as Archive"), enabled: { model().cursorFile != nil }, actions.openAsArchive)
 
         kernel.menus.add([.packFiles, .moveToArchive, .unpackFiles, .testArchive, .openAsArchive], to: .filesArchives)
         kernel.menus.addToContextMenu([.packFiles, .unpackFiles, .testArchive], in: .archives, onItemOnly: true)
-        kernel.toolbar.add(.packFiles, symbol: "archivebox", group: 30, hint: "Pack the selected files into an archive (ZIP, TAR and others).")
+        kernel.toolbar.add(
+            .packFiles, symbol: "archivebox", group: 30,
+            hint: "Pack the selected files into an archive (ZIP, TAR and others).")
         kernel.toolbar.add(.unpackFiles, symbol: "shippingbox", group: 30, hint: "Unpack the selected archives.")
         kernel.toolbar.setSymbol("checkmark.seal", for: .testArchive)
         kernel.toolbar.setSymbol("arrow.down.right.and.arrow.up.left", for: .openAsArchive)
 
-        kernel.preferences.add(PreferencePage(title: "Packer", preferences: [
-            Preference(ArchiveSettings.opensAsFolders, "Treat archives like directories (Enter opens them)", .flag(default: true)),
-            Preference(ArchiveSettings.extensions, "Files that open as archives", .text(default: ArchiveSettings.defaultExtensions)),
-            Preference(ArchiveSettings.entersAnyFile, "Ctrl+PgDn enters any file as an archive", .flag(default: true)),
-            Preference(ArchiveSettings.format, "Default packer", .choice(ArchiveFormat.writable.map(\.title), default: 0)),
-            Preference(ArchiveSettings.level, "Compression rate", .choice(ArchiveSettings.levels, default: 6)),
-            Preference(ArchiveSettings.storesPaths, "Also pack path names (only recursed)", .flag(default: true)),
-            Preference(ArchiveSettings.recurses, "Recursively pack subdirectories", .flag(default: true)),
-            Preference(ArchiveSettings.verifies, "Test ZIP archives after packing", .flag(default: true)),
-            Preference(ArchiveSettings.datesByNewest, "Set archive date to newest file date", .flag(default: false)),
-            Preference(ArchiveSettings.unpackPaths, "Unpack path names if stored with files", .flag(default: true)),
-            Preference(ArchiveSettings.unpackSeparate, "Unpack each archive to a separate subdir", .flag(default: false)),
-            Preference(ArchiveSettings.unpackOverwrite, "Overwrite existing files when unpacking", .flag(default: false)),
-        ], onChange: actions.refreshOptions))
+        kernel.preferences.add(
+            PreferencePage(
+                title: "Packer",
+                preferences: [
+                    Preference(
+                        ArchiveSettings.opensAsFolders, "Treat archives like directories (Enter opens them)",
+                        .flag(default: true)),
+                    Preference(
+                        ArchiveSettings.extensions, "Files that open as archives",
+                        .text(default: ArchiveSettings.defaultExtensions)),
+                    Preference(
+                        ArchiveSettings.entersAnyFile, "Ctrl+PgDn enters any file as an archive", .flag(default: true)
+                    ),
+                    Preference(
+                        ArchiveSettings.format, "Default packer",
+                        .choice(ArchiveFormat.writable.map(\.title), default: 0)),
+                    Preference(
+                        ArchiveSettings.level, "Compression rate", .choice(ArchiveSettings.levels, default: 6)),
+                    Preference(
+                        ArchiveSettings.storesPaths, "Also pack path names (only recursed)", .flag(default: true)),
+                    Preference(ArchiveSettings.recurses, "Recursively pack subdirectories", .flag(default: true)),
+                    Preference(ArchiveSettings.verifies, "Test ZIP archives after packing", .flag(default: true)),
+                    Preference(
+                        ArchiveSettings.datesByNewest, "Set archive date to newest file date", .flag(default: false)),
+                    Preference(
+                        ArchiveSettings.unpackPaths, "Unpack path names if stored with files", .flag(default: true)),
+                    Preference(
+                        ArchiveSettings.unpackSeparate, "Unpack each archive to a separate subdir",
+                        .flag(default: false)),
+                    Preference(
+                        ArchiveSettings.unpackOverwrite, "Overwrite existing files when unpacking",
+                        .flag(default: false))
+                ], onChange: actions.refreshOptions))
     }
 
     /// The kernel's hook for work before quitting: the changes that still wait are written
@@ -149,13 +184,16 @@ public final class ArchivesPlugin: Plugin {
                 // an archive of their own. By archive, not by name: two may be called the same.
                 let late = environment.quitting.isCancelled
                 let rescued = store.rescueAll(quickly: late, before: late ? Date(timeIntervalSinceNow: 2) : deadline)
-                let outcomes = Dictionary(rescued.map { (ObjectIdentifier($0.archive), $0.outcome) }, uniquingKeysWith: { first, _ in first })
+                let outcomes = Dictionary(
+                    rescued.map { (ObjectIdentifier($0.archive), $0.outcome) }, uniquingKeysWith: { first, _ in first }
+                )
                 for failure in failures {
                     var text = failure.error.localizedDescription
                     switch outcomes[ObjectIdentifier(failure.archive)] {
                     case .saved(let url)?: text += "\n\nThe files that were added are in \(url.path)."
                     case .kept(let folder)?:
-                        text += "\n\nThe files that were added could not be saved elsewhere. Their compressed data is in \(folder.path)"
+                        text +=
+                            "\n\nThe files that were added could not be saved elsewhere. Their compressed data is in \(folder.path)"
                             + " (index.txt there says which file is which)."
                     case .nothingToSave?, nil: break
                     }
@@ -167,13 +205,15 @@ public final class ArchivesPlugin: Plugin {
         if !ArchivesPlugin.wait(until: deadline, for: state) {
             // Long enough: the writes end where they are, and what they hold is kept.
             environment.quitting.cancel()
-            _ = ArchivesPlugin.wait(until: Date(timeIntervalSinceNow: min(15, max(1, environment.quitTimeout))), for: state)
+            _ = ArchivesPlugin.wait(
+                until: Date(timeIntervalSinceNow: min(15, max(1, environment.quitTimeout))), for: state)
         }
         guard let reports = state.reports else {
             // Something waits for a disk or a server that does not answer. Its thread is
             // left alone and so is every temporary file: nothing is deleted under it.
             environment.scratch.keep()
-            let text = "Changes to archives were still being written when the program had to quit. "
+            let text =
+                "Changes to archives were still being written when the program had to quit. "
                 + "What was added and not yet written is kept in \(environment.scratch.url.path)."
             environment.reportFailure(ArchiveError.unsaved(text), "archives")
             return
@@ -227,7 +267,9 @@ public final class ArchivesPlugin: Plugin {
     public func writePendingChanges(cancellation: CancellationFlag, completion: @escaping ([String]) -> Void) {
         let store = self.store
         Thread.detachNewThread {
-            let failed = store.flushAll(cancellation: cancellation).map { "\($0.name): \($0.error.localizedDescription)" }
+            let failed = store.flushAll(cancellation: cancellation).map {
+                "\($0.name): \($0.error.localizedDescription)"
+            }
             DispatchQueue.main.async { completion(failed) }
         }
     }
@@ -242,6 +284,7 @@ public final class ArchivesPlugin: Plugin {
 
     /// The location that shows the archive file at `file` as a folder, as Enter would open it.
     public func location(ofArchive file: URL, in kernel: Kernel) -> URL {
-        ArchiveURL.make(scheme: ArchiveFileSystem.scheme(forArchive: file, fileSystems: kernel.fileSystems), archive: file)
+        ArchiveURL.make(
+            scheme: ArchiveFileSystem.scheme(forArchive: file, fileSystems: kernel.fileSystems), archive: file)
     }
 }

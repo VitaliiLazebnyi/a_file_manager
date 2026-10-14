@@ -16,7 +16,10 @@ struct FileIdentity: Hashable {
     /// cannot be examined. Links are followed unless `followingLinks` is off.
     static func of(_ url: URL, followingLinks: Bool = true) -> (identity: FileIdentity, isRegularFile: Bool)? {
         guard let info = status(of: url, followingLinks: followingLinks) else { return nil }
-        return (FileIdentity(device: UInt64(bitPattern: Int64(info.st_dev)), inode: UInt64(info.st_ino)), info.st_mode & S_IFMT == S_IFREG)
+        return (
+            FileIdentity(device: UInt64(bitPattern: Int64(info.st_dev)), inode: UInt64(info.st_ino)),
+            info.st_mode & S_IFMT == S_IFREG
+        )
     }
 
     private static func status(of url: URL, followingLinks: Bool) -> stat? {
@@ -59,7 +62,9 @@ final class LocalFileReader: FileReader {
         }
         guard descriptor >= 0 else { return nil }
         var info = stat()
-        guard fstat(descriptor, &info) == 0, info.st_mode & S_IFMT == S_IFREG, info.st_flags & FileIdentity.datalessFlag == 0 else {
+        guard fstat(descriptor, &info) == 0, info.st_mode & S_IFMT == S_IFREG,
+            info.st_flags & FileIdentity.datalessFlag == 0
+        else {
             Darwin.close(descriptor)
             return nil
         }

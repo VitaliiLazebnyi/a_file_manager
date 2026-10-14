@@ -45,10 +45,14 @@ enum ChecksumFile {
     /// The contents of a checksum file. The Unix format ends lines with LF and keeps `/` in
     /// paths; the other one is that of the Windows original: CRLF and `\`. The text is UTF-8;
     /// `byteOrderMark` puts the mark in front that the original needs to read it as such.
-    static func contents(_ entries: [(name: String, digest: [UInt8])], method: ChecksumMethod, unixFormat: Bool, byteOrderMark: Bool) -> Data {
+    static func contents(
+        _ entries: [(name: String, digest: [UInt8])], method: ChecksumMethod, unixFormat: Bool, byteOrderMark: Bool
+    ) -> Data {
         let end = unixFormat ? "\n" : "\r\n"
         let text = entries.map { entry in
-            line(name: unixFormat ? entry.name : entry.name.replacingOccurrences(of: "/", with: "\\"), digest: entry.digest, method: method) + end
+            line(
+                name: unixFormat ? entry.name : entry.name.replacingOccurrences(of: "/", with: "\\"),
+                digest: entry.digest, method: method) + end
         }.joined()
         return (byteOrderMark ? Data([0xEF, 0xBB, 0xBF]) : Data()) + Data(text.utf8)
     }
@@ -65,7 +69,9 @@ enum ChecksumFile {
         methods["sha1"] = .sha1
         methods["crc32"] = .crc32
         methods["blake3"] = .blake3
-        for method in [ChecksumMethod.sha3_224, .sha3_256, .sha3_384, .sha3_512] { methods[method.fileExtension.replacingOccurrences(of: "_", with: "-")] = method }
+        for method in [ChecksumMethod.sha3_224, .sha3_256, .sha3_384, .sha3_512] {
+            methods[method.fileExtension.replacingOccurrences(of: "_", with: "-")] = method
+        }
         return methods
     }()
 
@@ -93,10 +99,13 @@ enum ChecksumFile {
             return String(data: data, encoding: .utf16) ?? String(decoding: data, as: UTF8.self)
         }
         if data.count >= 2, data.count % 2 == 0 {
-            if data[data.startIndex + 1] == 0, let text = String(data: data, encoding: .utf16LittleEndian) { return text }
+            if data[data.startIndex + 1] == 0, let text = String(data: data, encoding: .utf16LittleEndian) {
+                return text
+            }
             if data[data.startIndex] == 0, let text = String(data: data, encoding: .utf16BigEndian) { return text }
         }
-        return String(data: data, encoding: .utf8) ?? String(data: data, encoding: .windowsCP1252) ?? String(decoding: data, as: UTF8.self)
+        return String(data: data, encoding: .utf8) ?? String(data: data, encoding: .windowsCP1252)
+            ?? String(decoding: data, as: UTF8.self)
     }
 
     private static func isHex(_ text: Substring) -> Bool {
@@ -166,7 +175,8 @@ enum ChecksumFile {
         }
         var parsed = Parsed()
         // Lines end with LF, CR or CRLF only: other line separators of Unicode can be part of a name.
-        let lines = text.split(omittingEmptySubsequences: false, whereSeparator: { $0 == "\n" || $0 == "\r" || $0 == "\r\n" })
+        let lines = text.split(
+            omittingEmptySubsequences: false, whereSeparator: { $0 == "\n" || $0 == "\r" || $0 == "\r\n" })
         for (index, rawLine) in lines.enumerated() {
             var line = rawLine.trimmingCharacters(in: .whitespaces)
             guard !line.isEmpty else { continue }
@@ -175,12 +185,18 @@ enum ChecksumFile {
                 continue
             }
             // GNU tools put a backslash in front of a line whose name holds a backslash or a line feed.
-            let escaped = line.hasPrefix("\\") && line.dropFirst().prefix { $0 != " " && $0 != "\t" }.allSatisfy { $0.isASCII && $0.isHexDigit }
+            let escaped =
+                line.hasPrefix("\\")
+                && line.dropFirst().prefix { $0 != " " && $0 != "\t" }.allSatisfy { $0.isASCII && $0.isHexDigit }
             if escaped { line.removeFirst() }
             func decoded(_ text: String) -> String { escaped ? unescaped(text) : text }
             // SHA256(name)= digest   /   MD5 (name) = digest
-            if let open = line.firstIndex(of: "("), let close = line.range(of: ")", options: .backwards)?.lowerBound, open < close,
-               let tagged = tags[line[..<open].trimmingCharacters(in: .whitespaces).uppercased().replacingOccurrences(of: "_", with: "-")] {
+            if let open = line.firstIndex(of: "("), let close = line.range(of: ")", options: .backwards)?.lowerBound,
+                open < close,
+                let tagged = tags[
+                    line[..<open].trimmingCharacters(in: .whitespaces).uppercased().replacingOccurrences(
+                        of: "_", with: "-")]
+            {
                 let digest = line[line.index(after: close)...].drop { $0 == "=" || $0 == " " }
                 let name = decoded(String(line[line.index(after: open)..<close]))
                 if isHex(digest), digest.count == tagged.digestLength * 2, !name.isEmpty {
@@ -192,7 +208,9 @@ enum ChecksumFile {
             let rest = line[first.endIndex...]
             let known = !ChecksumMethod.candidates(hexDigits: first.count).isEmpty
             // In an SFV file a line is `name crc` even when the name starts like a checksum.
-            if isHex(first), known, rest.count >= 2, fileMethod != .crc32 || first.count != 8 || !isHex(line.suffix(8)) || line.count < 10 {
+            if isHex(first), known, rest.count >= 2,
+                fileMethod != .crc32 || first.count != 8 || !isHex(line.suffix(8)) || line.count < 10
+            {
                 var name = rest.dropFirst()
                 if name.hasPrefix("*") || name.hasPrefix(" ") { name = name.dropFirst() }
                 let isStream = name == "-"
@@ -201,7 +219,8 @@ enum ChecksumFile {
                 if entryName.isEmpty {
                     parsed.unreadableLines.append(index + 1)
                 } else {
-                    parsed.entries.append(Entry(name: entryName, digest: first.lowercased(), method: fittingFileMethod(first)))
+                    parsed.entries.append(
+                        Entry(name: entryName, digest: first.lowercased(), method: fittingFileMethod(first)))
                 }
                 continue
             }
@@ -267,12 +286,15 @@ struct VerifyReport {
         var lines: [String] = []
         for section in sections {
             lines.append(section.title + ":")
-            lines += section.rows.filter { !onlyErrors || $0.result != .ok }.map { VerifyReport.row($0.name, $0.result) }
+            lines += section.rows.filter { !onlyErrors || $0.result != .ok }.map {
+                VerifyReport.row($0.name, $0.result)
+            }
             lines.append("")
         }
         lines.append("Errors: \(errors)")
-        lines.append("OK: \(count(.ok)), not found: \(count(.notFound)), read error: \(count(.readError)), wrong checksum: \(count(.wrongChecksum))"
-            + (count(.unreadable) > 0 ? ", unreadable: \(count(.unreadable))" : ""))
+        lines.append(
+            "OK: \(count(.ok)), not found: \(count(.notFound)), read error: \(count(.readError)), wrong checksum: \(count(.wrongChecksum))"
+                + (count(.unreadable) > 0 ? ", unreadable: \(count(.unreadable))" : ""))
         return lines.joined(separator: "\n") + "\n"
     }
 }
@@ -287,7 +309,9 @@ enum ChecksumRun {
     /// `expected` digest and several methods of that length only the first (the likeliest) is
     /// computed in a first pass over the file; the others, all in one further pass, only when
     /// it does not match. The digests of methods not computed are empty.
-    static func digests(of files: [(url: URL, methods: [ChecksumMethod], expected: String?)], run: ToolRun) -> [Result<[[UInt8]], Error>] {
+    static func digests(of files: [(url: URL, methods: [ChecksumMethod], expected: String?)], run: ToolRun) -> [Result<
+        [[UInt8]], Error
+    >] {
         let busy = BusyFiles()
         return Parallel.map(files) { file -> Result<[[UInt8]], Error> in
             busy.enter()
@@ -298,12 +322,18 @@ enum ChecksumRun {
                     // Several methods in one pass over the file: each block goes to every
                     // hasher at the same time, each on its own thread.
                     // BLAKE3 spreads a block over the cores itself, which pays only for large ones.
-                    try run.read(file.url, counted: counted, blockSize: methods.contains(.blake3) ? 4 << 20 : ToolRun.blockSize) { block in
+                    try run.read(
+                        file.url, counted: counted, blockSize: methods.contains(.blake3) ? 4 << 20 : ToolRun.blockSize
+                    ) { block in
                         // BLAKE3 spreads a large block over the cores on its own; while the files themselves
                         // keep every core busy that only makes more threads than cores, so it is fed pieces too
                         // small to be spread then (the digest is the same).
                         let spread = spreadsBLAKE3(filesInProgress: busy.count)
-                        if hashers.count > 1 { _ = Parallel.map(hashers) { feed($0, block, spread: spread) } } else { hashers.forEach { feed($0, block, spread: spread) } }
+                        if hashers.count > 1 {
+                            _ = Parallel.map(hashers) { feed($0, block, spread: spread) }
+                        } else {
+                            hashers.forEach { feed($0, block, spread: spread) }
+                        }
                     }
                     return hashers.map { $0.finish() }
                 }
@@ -384,7 +414,8 @@ enum ChecksumRun {
         for operand in operands {
             try run.checkCancelled()
             if operand.isRealDirectory {
-                let items = try run.provider(for: operand.url).list(operand.url, showHidden: true, cancellation: run.cancellation)
+                let items = try run.provider(for: operand.url).list(
+                    operand.url, showHidden: true, cancellation: run.cancellation)
                 files += try self.files(below: Sorter.sorted(items, numeric: true, byName: \.name), run: run)
             } else if !operand.isDirectory {
                 files.append(operand)
@@ -406,11 +437,14 @@ enum ChecksumRun {
         if options.separatePerFolder {
             // One file per folder, written into that folder; the target path is not used.
             let folder = file.url.deletingLastPathComponent()
-            let folderName = folder.lastPathComponent.isEmpty || folder.lastPathComponent == "/" ? "checksums" : folder.lastPathComponent
+            let folderName =
+                folder.lastPathComponent.isEmpty || folder.lastPathComponent == "/"
+                ? "checksums" : folder.lastPathComponent
             return folder.appending(name: folderName + "." + options.method.fileExtension)
         }
         if options.separatePerFile {
-            return target.deletingLastPathComponent().appending(name: separateName(for: file.name, pattern: target.lastPathComponent, method: options.method))
+            return target.deletingLastPathComponent().appending(
+                name: separateName(for: file.name, pattern: target.lastPathComponent, method: options.method))
         }
         return target
     }
@@ -472,16 +506,22 @@ enum ChecksumRun {
             throw ToolError.failed("Several files with the same name would get the same checksum file.")
         }
         // A line break in a name cannot be written to an SFV file (it has no escape), and would break the file.
-        if options.method == .crc32, let bad = groups.lazy.flatMap({ $0.entries }).first(where: { ChecksumFile.hasLineBreak($0.name) }) {
-            throw ToolError.failed("\(bad.name.replacingOccurrences(of: "\n", with: " ").replacingOccurrences(of: "\r", with: " ")): a name with a line break cannot be written to an SFV file.")
+        if options.method == .crc32,
+            let bad = groups.lazy.flatMap({ $0.entries }).first(where: { ChecksumFile.hasLineBreak($0.name) })
+        {
+            throw ToolError.failed(
+                "\(bad.name.replacingOccurrences(of: "\n", with: " ").replacingOccurrences(of: "\r", with: " ")): a name with a line break cannot be written to an SFV file."
+            )
         }
         // All checksum files are replaced together at the end, or none: a cancel leaves the old ones as they were.
         return try run.transaction {
             var written: [URL] = []
             for group in groups {
-                let mark = ChecksumFile.needsByteOrderMark(names: group.entries.map(\.name), unixFormat: options.unixFormat, alwaysUTF8: options.alwaysUTF8)
+                let mark = ChecksumFile.needsByteOrderMark(
+                    names: group.entries.map(\.name), unixFormat: options.unixFormat, alwaysUTF8: options.alwaysUTF8)
                 try run.provider(for: group.url).createDirectory(at: group.url.deletingLastPathComponent())
-                let data = ChecksumFile.contents(group.entries, method: options.method, unixFormat: options.unixFormat, byteOrderMark: mark)
+                let data = ChecksumFile.contents(
+                    group.entries, method: options.method, unixFormat: options.unixFormat, byteOrderMark: mark)
                 if let url = try run.write(data, to: group.url, deferred: true) { written.append(url) }
             }
             return written
@@ -507,17 +547,22 @@ enum ChecksumRun {
             report.sections.append(VerifyReport.Section(title: file.name, rows: []))
             let parsed: ChecksumFile.Parsed
             do {
-                parsed = ChecksumFile.parseLines(ChecksumFile.text(from: try run.contents(of: file.url)), fileName: file.name)
+                parsed = ChecksumFile.parseLines(
+                    ChecksumFile.text(from: try run.contents(of: file.url)), fileName: file.name)
             } catch {
                 // A checksum file that cannot be read is an error of its own; the others are still checked.
                 try run.checkCancelled()
-                report.sections[report.sections.count - 1].rows.append(("the file (\(error.localizedDescription))", .unreadable))
+                report.sections[report.sections.count - 1].rows.append(
+                    ("the file (\(error.localizedDescription))", .unreadable))
                 continue
             }
             // What cannot be read is never "no errors": every such line counts, and so does a file without checksums.
-            for number in parsed.unreadableLines { report.sections[report.sections.count - 1].rows.append(("line \(number)", .unreadable)) }
+            for number in parsed.unreadableLines {
+                report.sections[report.sections.count - 1].rows.append(("line \(number)", .unreadable))
+            }
             if parsed.entries.isEmpty, parsed.unreadableLines.isEmpty {
-                report.sections[report.sections.count - 1].rows.append(("any checksum (the file has none)", .unreadable))
+                report.sections[report.sections.count - 1].rows.append(
+                    ("any checksum (the file has none)", .unreadable))
             }
             for entry in parsed.entries {
                 // A name is taken as written; a Windows path is tried with `/` when that finds nothing.
@@ -535,8 +580,10 @@ enum ChecksumRun {
                 let methods = entry.method.map { [$0] } ?? ChecksumMethod.candidates(hexDigits: entry.digest.count)
                 // The title names the method; of several that share a length, the first (SHA-2).
                 if let named = methods.first { report.methods.insert(named) }
-                pending.append(Pending(section: report.sections.count - 1, name: entry.name, url: url, entry: entry, methods: methods,
-                                       size: item.flatMap { $0.isDirectory ? nil : $0.size }))
+                pending.append(
+                    Pending(
+                        section: report.sections.count - 1, name: entry.name, url: url, entry: entry, methods: methods,
+                        size: item.flatMap { $0.isDirectory ? nil : $0.size }))
             }
         }
         let present = pending.filter { $0.size != nil }
@@ -560,20 +607,25 @@ enum ChecksumRun {
 
     /// Checks files against one checksum each, given from outside: the clipboard, or a CRC32
     /// in square brackets in the name. Every method the length of the checksum allows is tried.
-    static func verify(_ files: [(item: FileItem, digest: String)], title: String, run: ToolRun) throws -> VerifyReport {
+    static func verify(_ files: [(item: FileItem, digest: String)], title: String, run: ToolRun) throws -> VerifyReport
+    {
         var report = VerifyReport()
         let methods = files.map { ChecksumMethod.candidates(hexDigits: $0.digest.count) }
         if let first = methods.first?.first { report.methods = [first] }
         run.expect(bytes: files.reduce(0) { $0.addingSaturated($1.item.size) }, items: files.count)
         run.show(["Verifying checksums"])
-        let digests = digests(of: zip(files, methods).map { ($0.0.item.url, $0.1, $0.0.digest.lowercased()) }, run: run)
+        let digests = digests(
+            of: zip(files, methods).map { ($0.0.item.url, $0.1, $0.0.digest.lowercased()) }, run: run)
         try run.checkCancelled()
         var rows: [(name: String, result: VerifyResult)] = []
         for (index, file) in files.enumerated() {
             switch digests[index] {
             case .success(let found):
-                if let match = found.firstIndex(where: { $0.hex == file.digest.lowercased() }) { report.methods = [methods[index][match]] }
-                rows.append((file.item.name, found.contains { $0.hex == file.digest.lowercased() } ? .ok : .wrongChecksum))
+                if let match = found.firstIndex(where: { $0.hex == file.digest.lowercased() }) {
+                    report.methods = [methods[index][match]]
+                }
+                rows.append(
+                    (file.item.name, found.contains { $0.hex == file.digest.lowercased() } ? .ok : .wrongChecksum))
             case .failure:
                 rows.append((file.item.name, .readError))
             }
@@ -587,15 +639,18 @@ enum ChecksumRun {
     /// A CRC32 in square brackets in a file name: `Movie [1A2B3C4D].mkv`.
     static func checksumInName(_ name: String) -> String? {
         guard name.utf8.contains(UInt8(ascii: "[")), let regex = bracketedChecksum,
-              let match = regex.firstMatch(in: name, range: NSRange(name.startIndex..., in: name)),
-              let range = Range(match.range(at: 1), in: name) else { return nil }
+            let match = regex.firstMatch(in: name, range: NSRange(name.startIndex..., in: name)),
+            let range = Range(match.range(at: 1), in: name)
+        else { return nil }
         return name[range].lowercased()
     }
 
     /// A checksum on the clipboard: nothing but hex digits of a known length.
     static func checksum(fromClipboard text: String?) -> String? {
-        guard let text = text?.trimmingCharacters(in: .whitespacesAndNewlines), text.allSatisfy({ $0.isASCII && $0.isHexDigit }),
-              !ChecksumMethod.candidates(hexDigits: text.count).isEmpty else { return nil }
+        guard let text = text?.trimmingCharacters(in: .whitespacesAndNewlines),
+            text.allSatisfy({ $0.isASCII && $0.isHexDigit }),
+            !ChecksumMethod.candidates(hexDigits: text.count).isEmpty
+        else { return nil }
         return text.lowercased()
     }
 }

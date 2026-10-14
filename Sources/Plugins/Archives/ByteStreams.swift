@@ -15,7 +15,9 @@ extension ByteStream {
     func skip(_ count: UInt64) throws {
         var left = count
         while left > 0 {
-            guard let block = try read(upToCount: Int(min(left, 1 << 18))) else { throw ArchiveError.damaged("unexpected end of data") }
+            guard let block = try read(upToCount: Int(min(left, 1 << 18))) else {
+                throw ArchiveError.damaged("unexpected end of data")
+            }
             left -= UInt64(block.count)
         }
     }
@@ -29,7 +31,9 @@ extension ByteStream {
 }
 
 func posixError(_ code: Int32, _ path: String) -> Error {
-    NSError(domain: NSPOSIXErrorDomain, code: Int(code), userInfo: [NSLocalizedDescriptionKey: String(cString: strerror(code)) + ": " + path])
+    NSError(
+        domain: NSPOSIXErrorDomain, code: Int(code),
+        userInfo: [NSLocalizedDescriptionKey: String(cString: strerror(code)) + ": " + path])
 }
 
 /// A file on the local disk that is read at any position, from any number of threads at once
@@ -264,7 +268,9 @@ final class SizeGuardStream: ByteStream {
 
     func read(upToCount count: Int) throws -> Data? {
         guard let block = try source.read(upToCount: count) else { return nil }
-        guard UInt64(block.count) <= left else { throw ArchiveError.damaged("\(name) holds more data than its entry says") }
+        guard UInt64(block.count) <= left else {
+            throw ArchiveError.damaged("\(name) holds more data than its entry says")
+        }
         left -= UInt64(block.count)
         return block
     }
@@ -321,7 +327,9 @@ final class LimitedStream: ByteStream {
 
     func read(upToCount count: Int) throws -> Data? {
         guard left > 0 else { return nil }
-        guard let block = try source.read(upToCount: Int(min(UInt64(count), left))) else { throw ArchiveError.damaged("unexpected end of data") }
+        guard let block = try source.read(upToCount: Int(min(UInt64(count), left))) else {
+            throw ArchiveError.damaged("unexpected end of data")
+        }
         left -= UInt64(block.count)
         return block
     }
@@ -351,7 +359,9 @@ final class OutputFile {
     init(creating url: URL, mode: mode_t = 0o600) throws {
         self.url = url
         descriptor = open(url.path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, mode)
-        guard descriptor >= 0 else { throw errno == EEXIST ? FileSystemError.alreadyExists(url.path) : posixError(errno, url.path) }
+        guard descriptor >= 0 else {
+            throw errno == EEXIST ? FileSystemError.alreadyExists(url.path) : posixError(errno, url.path)
+        }
     }
 
     /// The rights of the file, whatever the process's mask says.
@@ -379,7 +389,9 @@ final class OutputFile {
             throw posixError(EINVAL, url.path)
         }
         _ = fcntl(descriptor, F_SETFL, fcntl(descriptor, F_GETFL) & ~O_NONBLOCK)
-        guard let position = off_t(exactly: offset), ftruncate(descriptor, position) == 0, lseek(descriptor, position, SEEK_SET) >= 0 else {
+        guard let position = off_t(exactly: offset), ftruncate(descriptor, position) == 0,
+            lseek(descriptor, position, SEEK_SET) >= 0
+        else {
             let code = errno
             Darwin.close(descriptor)
             throw posixError(code, url.path)
@@ -422,7 +434,10 @@ final class OutputFile {
         try data.withUnsafeBytes { bytes in
             var done = 0
             while done < bytes.count {
-                let put = offset.map { pwrite(descriptor, bytes.baseAddress! + done, bytes.count - done, off_t($0) + off_t(done)) }
+                let put =
+                    offset.map {
+                        pwrite(descriptor, bytes.baseAddress! + done, bytes.count - done, off_t($0) + off_t(done))
+                    }
                     ?? Darwin.write(descriptor, bytes.baseAddress! + done, bytes.count - done)
                 if put < 0 {
                     if errno == EINTR { continue }
@@ -489,7 +504,10 @@ struct ByteReader {
     var remaining: Int { data.count - position }
 
     mutating func u8() -> UInt8 {
-        guard remaining >= 1 else { position = data.count; return 0 }
+        guard remaining >= 1 else {
+            position = data.count
+            return 0
+        }
         defer { position += 1 }
         return data[data.startIndex + position]
     }
@@ -507,8 +525,14 @@ struct ByteReader {
 
 extension Data {
     mutating func appendLE(_ value: UInt16) { append(contentsOf: [UInt8(value & 0xFF), UInt8(value >> 8)]) }
-    mutating func appendLE(_ value: UInt32) { appendLE(UInt16(value & 0xFFFF)); appendLE(UInt16(value >> 16)) }
-    mutating func appendLE(_ value: UInt64) { appendLE(UInt32(value & 0xFFFF_FFFF)); appendLE(UInt32(value >> 32)) }
+    mutating func appendLE(_ value: UInt32) {
+        appendLE(UInt16(value & 0xFFFF))
+        appendLE(UInt16(value >> 16))
+    }
+    mutating func appendLE(_ value: UInt64) {
+        appendLE(UInt32(value & 0xFFFF_FFFF))
+        appendLE(UInt32(value >> 32))
+    }
 }
 
 /// Watches the room on a volume while something large is written to it: asked for every
@@ -579,7 +603,8 @@ final class ScratchFolder {
     }()
 
     init(in parent: URL = FileManager.default.temporaryDirectory) {
-        url = parent.appendingPathComponent("\(ScratchFolder.prefix)\(getpid())-\(UUID().uuidString)", isDirectory: true)
+        url = parent.appendingPathComponent(
+            "\(ScratchFolder.prefix)\(getpid())-\(UUID().uuidString)", isDirectory: true)
     }
 
     private var listPath: String { url.path + ".external" }
@@ -592,7 +617,8 @@ final class ScratchFolder {
         if !kept { ScratchFolder.folders[url.path] = Paths(externals: externals, list: listPath) }
         ScratchFolder.lock.unlock()
         if made, FileManager.default.fileExists(atPath: url.path) { return }
-        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+        try FileManager.default.createDirectory(
+            at: url, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
         ScratchFolder.lock.lock()
         isMade = true
         ScratchFolder.lock.unlock()
@@ -605,7 +631,8 @@ final class ScratchFolder {
 
     /// The names temporary things get outside the folder; nothing else is ever removed there.
     static func isOwnExternalName(_ name: String) -> Bool {
-        name.hasPrefix(".") && (name.hasSuffix(".afm-zip.tmp") || name.hasSuffix(".afm-pack.tmp") || name.hasPrefix(".afm-spool-"))
+        name.hasPrefix(".")
+            && (name.hasSuffix(".afm-zip.tmp") || name.hasSuffix(".afm-pack.tmp") || name.hasPrefix(".afm-spool-"))
     }
 
     private static func removeExternal(_ path: String) {
@@ -652,8 +679,10 @@ final class ScratchFolder {
         ScratchFolder.folders.removeValue(forKey: url.path)
         ScratchFolder.lock.unlock()
         unlink(listPath)
-        try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
-        FileManager.default.createFile(atPath: url.appendingPathComponent(ScratchFolder.keptMark).path, contents: Data())
+        try? FileManager.default.createDirectory(
+            at: url, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+        FileManager.default.createFile(
+            atPath: url.appendingPathComponent(ScratchFolder.keptMark).path, contents: Data())
     }
 
     /// Removes the folders, and the temporary files noted outside them, of processes that no

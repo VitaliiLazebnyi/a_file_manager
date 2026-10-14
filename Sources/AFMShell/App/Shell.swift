@@ -32,7 +32,9 @@ public final class Shell: ShellServices {
         mainWindow = MainWindowController(kernel: kernel, panels: panelCoordinator, layout: layout)
         jobService.window = mainWindow.window
         // Reading ahead rests while the user works elsewhere and while a job runs.
-        panelCoordinator.isWindowActive = { [weak self] in NSApp.isActive && self?.mainWindow.window?.isKeyWindow == true }
+        panelCoordinator.isWindowActive = { [weak self] in
+            NSApp.isActive && self?.mainWindow.window?.isKeyWindow == true
+        }
         jobService.onBusyChanged = { [weak self, weak jobService] in
             self?.panelCoordinator.updateReadAhead()
             self?.mainWindow.scheduleValidation()
@@ -41,10 +43,12 @@ public final class Shell: ShellServices {
         panelCoordinator.onActivityChanged = { [weak self] in self?.mainWindow.scheduleValidation() }
         let ui = kernel.ui
         jobService.askToAbandon = { title in
-            ui.choose("“\(title)” does not stop.",
-                      detail: "It may be waiting for a disk or a server that does not answer. You can go on waiting, or stop waiting and "
-                          + "use the program again; the operation then ends by itself as soon as the disk or server lets it.",
-                      buttons: ["Stop Waiting", "Keep Waiting"], style: .warning, defaultButton: 1) == 0
+            ui.choose(
+                "“\(title)” does not stop.",
+                detail:
+                    "It may be waiting for a disk or a server that does not answer. You can go on waiting, or stop waiting and "
+                    + "use the program again; the operation then ends by itself as soon as the disk or server lets it.",
+                buttons: ["Stop Waiting", "Keep Waiting"], style: .warning, defaultButton: 1) == 0
         }
     }
 
@@ -82,8 +86,10 @@ public final class Shell: ShellServices {
     /// safe, and they do (the archives keep the new members on the disk and say where).
     /// **Don't Quit** calls the quit off: the program goes on, and what the plugins were
     /// writing they go on writing.
-    public func finishToQuit(patience: TimeInterval = Shell.quitPatience, progressDelay: TimeInterval = Shell.quitProgressDelay,
-                             then reply: @escaping (Bool) -> Void) {
+    public func finishToQuit(
+        patience: TimeInterval = Shell.quitPatience, progressDelay: TimeInterval = Shell.quitProgressDelay,
+        then reply: @escaping (Bool) -> Void
+    ) {
         MainThread.assert("Quitting")
         stopJobsToQuit(patience: patience) { [self] _ in
             let flag = CancellationFlag()
@@ -134,10 +140,13 @@ public final class Shell: ShellServices {
             stopAsking = MainLoop.after(wait) {
                 guard !hasReplied, jobService.isBusy else { return }
                 // Return keeps waiting: quitting anyway may cost a file.
-                let quits = ui.choose("An operation does not stop.",
-                                      detail: "It may be waiting for a disk or a server that does not answer. If you quit anyway, a file "
-                                          + "it was writing may be left incomplete.",
-                                      buttons: ["Quit Anyway", "Keep Waiting"], style: .warning, defaultButton: 1) == 0
+                let quits =
+                    ui.choose(
+                        "An operation does not stop.",
+                        detail:
+                            "It may be waiting for a disk or a server that does not answer. If you quit anyway, a file "
+                            + "it was writing may be left incomplete.",
+                        buttons: ["Quit Anyway", "Keep Waiting"], style: .warning, defaultButton: 1) == 0
                 if quits { answer(true) } else if !hasReplied { ask(after: wait * 2) }
             }
         }

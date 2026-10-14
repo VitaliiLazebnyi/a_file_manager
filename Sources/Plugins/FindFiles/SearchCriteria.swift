@@ -123,7 +123,10 @@ public struct FileCriteria: Codable, Equatable {
     /// A folder shown as a file, such as an application.
     public var package = TriState.any
 
-    public init(dateFrom: Date? = nil, dateTo: Date? = nil, notOlderThan: Age? = nil, olderThan: Age? = nil, size: SizeRule? = nil) {
+    public init(
+        dateFrom: Date? = nil, dateTo: Date? = nil, notOlderThan: Age? = nil, olderThan: Age? = nil,
+        size: SizeRule? = nil
+    ) {
         self.dateFrom = dateFrom
         self.dateTo = dateTo
         self.notOlderThan = notOlderThan
@@ -138,7 +141,9 @@ public struct FileCriteria: Codable, Equatable {
     public func prepared(now: Date, calendar: Calendar = .current) -> PreparedCriteria? {
         isEmpty ? nil : PreparedCriteria(self, now: now, calendar: calendar)
     }
-    public var hasAttributes: Bool { [hidden, directory, symbolicLink, readOnly, executable, package].contains { $0 != .any } }
+    public var hasAttributes: Bool {
+        [hidden, directory, symbolicLink, readOnly, executable, package].contains { $0 != .any }
+    }
 
     /// `now` is the moment the search started, so every file is measured against the same.
     public func matches(_ item: FileItem, now: Date, calendar: Calendar = .current) -> Bool {
@@ -166,8 +171,10 @@ public struct PreparedCriteria {
         if let notOlderCutoff, item.modified < notOlderCutoff { return false }
         if let olderCutoff, item.modified >= olderCutoff { return false }
         if let size = c.size, item.isDirectory || !size.matches(item.size) { return false }
-        return c.hidden.accepts(item.isHidden) && c.directory.accepts(item.isDirectory) && c.symbolicLink.accepts(item.isSymlink)
-            && c.readOnly.accepts(item.permissions & 0o200 == 0) && c.executable.accepts(item.permissions & 0o111 != 0 && !item.isDirectory)
+        return c.hidden.accepts(item.isHidden) && c.directory.accepts(item.isDirectory)
+            && c.symbolicLink.accepts(item.isSymlink)
+            && c.readOnly.accepts(item.permissions & 0o200 == 0)
+            && c.executable.accepts(item.permissions & 0o111 != 0 && !item.isDirectory)
             && c.package.accepts(item.isPackage)
     }
 }
@@ -189,26 +196,31 @@ public struct SearchField {
             SearchField(id: "tc.path", title: "Path") { fileSystems.displayPath($0.url.deletingLastPathComponent()) },
             SearchField(id: "tc.size", title: "Size in bytes") { $0.isDirectory ? "" : String($0.size) },
             SearchField(id: "tc.date", title: "Date") { Format.date($0.modified) },
-            SearchField(id: "tc.attr", title: "Permissions") { Format.permissions($0.permissions) },
+            SearchField(id: "tc.attr", title: "Permissions") { Format.permissions($0.permissions) }
         ]
     }
 
     /// The built-in fields followed by the plugins' columns.
     public static func all(fileSystems: FileSystemRegistry, columns: ColumnRegistry?) -> [SearchField] {
-        builtIn(fileSystems: fileSystems) + (columns?.all ?? []).map { column in
-            SearchField(id: column.id, title: column.title, value: column.value)
-        }
+        builtIn(fileSystems: fileSystems)
+            + (columns?.all ?? []).map { column in
+                SearchField(id: column.id, title: column.title, value: column.value)
+            }
     }
 }
 
 /// One row of the Plugins tab: field, operator, value.
 public struct FieldRule: Codable, Equatable {
     public enum Operator: Int, Codable, CaseIterable {
-        case contains, notContains, containsCase, notContainsCase, equals, notEquals, equalsCase, notEqualsCase, regex, notRegex
+        case contains, notContains, containsCase, notContainsCase, equals, notEquals, equalsCase, notEqualsCase, regex,
+            notRegex
         case greater, less, greaterOrEqual, lessOrEqual
 
         public var title: String {
-            ["contains", "!contains", "cont.(case)", "!cont.(case)", "=", "!=", "=(case)", "!=(case)", "regex", "!regex", ">", "<", ">=", "<="][rawValue]
+            [
+                "contains", "!contains", "cont.(case)", "!cont.(case)", "=", "!=", "=(case)", "!=(case)", "regex",
+                "!regex", ">", "<", ">=", "<="
+            ][rawValue]
         }
     }
 
@@ -329,7 +341,9 @@ struct PreparedFieldRules {
         func holds(_ index: Int) -> Bool {
             let rule = rules.rules[index]
             guard !cancelled() else { return false }
-            return fields[rule.field].map { rule.matches($0.value(item), expression: expressions[index], trip: trip, cancelled: cancelled) } ?? false
+            return fields[rule.field].map {
+                rule.matches($0.value(item), expression: expressions[index], trip: trip, cancelled: cancelled)
+            } ?? false
         }
         return rules.matchAll ? rules.rules.indices.allSatisfy(holds) : rules.rules.indices.contains(where: holds)
     }

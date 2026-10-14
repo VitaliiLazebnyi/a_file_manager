@@ -47,8 +47,16 @@ final class PanelLoading {
         }
 
         var value: ListOrder {
-            get { lock.lock(); defer { lock.unlock() }; return order }
-            set { lock.lock(); order = newValue; lock.unlock() }
+            get {
+                lock.lock()
+                defer { lock.unlock() }
+                return order
+            }
+            set {
+                lock.lock()
+                order = newValue
+                lock.unlock()
+            }
         }
     }
 
@@ -59,8 +67,10 @@ final class PanelLoading {
     private let cache: ListingCache
     private let cancellation: CancellationFlag
 
-    init(location: URL, showHidden: Bool, order: OrderBox, fileSystems: FileSystemRegistry, cache: ListingCache,
-         cancellation: CancellationFlag) {
+    init(
+        location: URL, showHidden: Bool, order: OrderBox, fileSystems: FileSystemRegistry, cache: ListingCache,
+        cancellation: CancellationFlag
+    ) {
         self.location = location
         self.showHidden = showHidden
         self.order = order
@@ -69,10 +79,13 @@ final class PanelLoading {
         self.cancellation = cancellation
     }
 
-    convenience init(location: URL, showHidden: Bool, order: ListOrder, fileSystems: FileSystemRegistry, cache: ListingCache,
-                     cancellation: CancellationFlag) {
-        self.init(location: location, showHidden: showHidden, order: OrderBox(order), fileSystems: fileSystems, cache: cache,
-                  cancellation: cancellation)
+    convenience init(
+        location: URL, showHidden: Bool, order: ListOrder, fileSystems: FileSystemRegistry, cache: ListingCache,
+        cancellation: CancellationFlag
+    ) {
+        self.init(
+            location: location, showHidden: showHidden, order: OrderBox(order), fileSystems: fileSystems, cache: cache,
+            cancellation: cancellation)
     }
 
     /// A location that was read to its end: the listing's items are sorted by `order`.
@@ -89,13 +102,17 @@ final class PanelLoading {
     ///
     /// `progress` is called on the reading thread with the number of entries so far, each
     /// time more have arrived; returning false stops the reading as `cancellation` does.
-    static func readWhole(_ location: URL, showHidden: Bool, order: ListOrder, fileSystems: FileSystemRegistry, cache: ListingCache,
-                          climbing: Bool = false, cancellation: CancellationFlag, progress: ((Int) -> Bool)? = nil) throws -> Whole? {
+    static func readWhole(
+        _ location: URL, showHidden: Bool, order: ListOrder, fileSystems: FileSystemRegistry, cache: ListingCache,
+        climbing: Bool = false, cancellation: CancellationFlag, progress: ((Int) -> Bool)? = nil
+    ) throws -> Whole? {
         let (started, ticket) = (Date(), cache.startReading())
         var items: [FileItem] = []
         var header: PanelLoader.Batch?
-        try PanelLoader.stream(location, showHidden: showHidden, fileSystems: fileSystems, climbing: climbing,
-                                   cancellation: cancellation) { batch in
+        try PanelLoader.stream(
+            location, showHidden: showHidden, fileSystems: fileSystems, climbing: climbing,
+            cancellation: cancellation
+        ) { batch in
             if header == nil { header = batch }
             items += batch.listing.items
             if let progress, !progress(items.count) { cancellation.cancel() }
@@ -103,8 +120,9 @@ final class PanelLoading {
         }
         guard !cancellation.isCancelled, let header else { return nil }
         let readTime = Date().timeIntervalSince(started)
-        let listing = Listing(directory: header.listing.directory, items: Sorter.sort(items, by: order),
-                              parent: header.listing.parent, root: header.listing.root, volume: header.listing.volume)
+        let listing = Listing(
+            directory: header.listing.directory, items: Sorter.sort(items, by: order),
+            parent: header.listing.parent, root: header.listing.root, volume: header.listing.volume)
         cache.store(listing, sortedBy: order, showHidden: showHidden, readTime: readTime, since: ticket)
         return Whole(listing: listing, focus: header.focus, order: order)
     }
@@ -117,7 +135,9 @@ final class PanelLoading {
     /// once, whatever its file system is doing (`PanelLoader.stream`). The callbacks, which hold
     /// the panel, stay with the main thread and are let go of there.
     func start(onPiece: @escaping (Piece) -> Void, onEnd: @escaping (Error?) -> Void) {
-        let (location, showHidden, order, fileSystems, cache, cancellation) = (location, showHidden, order, fileSystems, cache, cancellation)
+        let (location, showHidden, order, fileSystems, cache, cancellation) = (
+            location, showHidden, order, fileSystems, cache, cancellation
+        )
         let receivers = MainOwned((onPiece: onPiece, onEnd: onEnd))
         Background.storage("list", at: location) {
             // Everything below belongs to this background thread.
@@ -152,9 +172,11 @@ final class PanelLoading {
                     sorted.add(pending)
                     pending = []
                 }
-                let listing = Listing(directory: header.listing.directory, items: sorted.items,
-                                      parent: header.listing.parent, root: header.listing.root, volume: header.listing.volume)
-                let piece = Piece(listing: listing, focus: header.focus, order: sorted.order, isFirst: !sentFirst, isLast: isLast)
+                let listing = Listing(
+                    directory: header.listing.directory, items: sorted.items,
+                    parent: header.listing.parent, root: header.listing.root, volume: header.listing.volume)
+                let piece = Piece(
+                    listing: listing, focus: header.focus, order: sorted.order, isFirst: !sentFirst, isLast: isLast)
                 interval = sentFirst ? interval * PanelLoading.intervalGrowth : PanelLoading.secondPieceInterval
                 sentFirst = true
                 lastSent = Date()
@@ -166,7 +188,9 @@ final class PanelLoading {
 
             var failure: Error?
             do {
-                try PanelLoader.stream(location, showHidden: showHidden, fileSystems: fileSystems, cancellation: cancellation) { batch in
+                try PanelLoader.stream(
+                    location, showHidden: showHidden, fileSystems: fileSystems, cancellation: cancellation
+                ) { batch in
                     if header == nil { header = batch }
                     pending += batch.listing.items
                     if Date().timeIntervalSince(lastSent) > interval { send(isLast: false) }
@@ -180,7 +204,9 @@ final class PanelLoading {
             if !cancellation.isCancelled, failure == nil || sentFirst {
                 // Only a listing that arrived whole and without an error is remembered.
                 if let piece = send(isLast: true), failure == nil {
-                    cache.store(piece.listing, sortedBy: piece.order, showHidden: showHidden, readTime: readTime, since: ticket)
+                    cache.store(
+                        piece.listing, sortedBy: piece.order, showHidden: showHidden, readTime: readTime, since: ticket
+                    )
                 }
             }
             MainLoop.perform { receivers.take()?.onEnd(failure) }

@@ -26,8 +26,11 @@ final class QuickViewPanel {
     /// The item that is shown, as the followed panel lists it.
     private(set) var shownItem: FileItem?
 
-    init(kernel: Kernel, settings: ListerSettings, temporaryCopies: TemporaryCopies, host: PanelOverlayHost, covering covered: PanelHandle,
-         following followed: PanelHandle, internalOnly: Bool, delay: TimeInterval, onDismiss: @escaping () -> Void) {
+    init(
+        kernel: Kernel, settings: ListerSettings, temporaryCopies: TemporaryCopies, host: PanelOverlayHost,
+        covering covered: PanelHandle,
+        following followed: PanelHandle, internalOnly: Bool, delay: TimeInterval, onDismiss: @escaping () -> Void
+    ) {
         self.kernel = kernel
         self.host = host
         self.covered = covered
@@ -38,10 +41,14 @@ final class QuickViewPanel {
         host.overlay = container
         pane.onTitleChange = { [weak self] title in
             // A track that names itself replaces the file name (spec 10 › Embedded Lister).
-            guard let self, let item = self.shownItem, title != self.kernel.fileSystems.displayPath(item.url) else { return }
+            guard let self, let item = self.shownItem, title != self.kernel.fileSystems.displayPath(item.url) else {
+                return
+            }
             self.headerText = title
         }
-        follower = CursorFollower(kernel: kernel, delay: delay, panel: { [weak self] in self?.followed }) { [weak self] in self?.show($0) }
+        follower = CursorFollower(kernel: kernel, delay: delay, panel: { [weak self] in self?.followed }) {
+            [weak self] in self?.show($0)
+        }
         subscription = kernel.panelEvents.subscribe { [weak self] event, panel in
             guard let self, panel === self.covered else { return }
             // Switching to the covered panel, or showing another place in it, ends the quick view.
@@ -63,8 +70,10 @@ final class QuickViewPanel {
             header.topAnchor.constraint(equalTo: container.topAnchor, constant: 3),
             header.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 8),
             header.trailingAnchor.constraint(lessThanOrEqualTo: container.trailingAnchor, constant: -8),
-            pane.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 3), pane.bottomAnchor.constraint(equalTo: container.bottomAnchor),
-            pane.leadingAnchor.constraint(equalTo: container.leadingAnchor), pane.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            pane.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 3),
+            pane.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+            pane.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            pane.trailingAnchor.constraint(equalTo: container.trailingAnchor)
         ])
     }
 

@@ -44,11 +44,15 @@ public enum PanelLoader {
     /// readable parent (a folder that vanished while the panel was showing it). Throws
     /// `CocoaError(.userCancelled)` when `cancellation` was set before the end: what had
     /// arrived by then is not a listing.
-    public static func load(_ location: URL, showHidden: Bool, fileSystems: FileSystemRegistry, climbing: Bool = false,
-                            cancellation: CancellationFlag? = nil) throws -> Result {
+    public static func load(
+        _ location: URL, showHidden: Bool, fileSystems: FileSystemRegistry, climbing: Bool = false,
+        cancellation: CancellationFlag? = nil
+    ) throws -> Result {
         var items: [FileItem] = []
         var first: Batch?
-        try stream(location, showHidden: showHidden, fileSystems: fileSystems, climbing: climbing, cancellation: cancellation) { batch in
+        try stream(
+            location, showHidden: showHidden, fileSystems: fileSystems, climbing: climbing, cancellation: cancellation
+        ) { batch in
             if batch.isFirst { first = batch }
             items += batch.listing.items
             return true
@@ -56,8 +60,11 @@ public enum PanelLoader {
         if cancellation?.isCancelled == true { throw CocoaError(.userCancelled) }
         guard let first else { throw FileSystemError.notSupported("Listing \(location.absoluteString)") }
         let header = first.listing
-        return Result(listing: Listing(directory: header.directory, items: items, parent: header.parent, root: header.root, volume: header.volume),
-                      focus: first.focus)
+        return Result(
+            listing: Listing(
+                directory: header.directory, items: items, parent: header.parent, root: header.root,
+                volume: header.volume),
+            focus: first.focus)
     }
 
     /// Reads a location piece by piece, so a large or slow directory can be shown while it is
@@ -86,8 +93,10 @@ public enum PanelLoader {
     /// are asked on the main thread itself as they always were: a file system that turns to
     /// the main thread while it answers, for a password, would otherwise wait for a thread
     /// that waits for it.)
-    public static func stream(_ location: URL, showHidden: Bool, fileSystems: FileSystemRegistry, climbing: Bool = false,
-                              cancellation: CancellationFlag? = nil, receive: (Batch) -> Bool) throws {
+    public static func stream(
+        _ location: URL, showHidden: Bool, fileSystems: FileSystemRegistry, climbing: Bool = false,
+        cancellation: CancellationFlag? = nil, receive: (Batch) -> Bool
+    ) throws {
         let provider = try fileSystems.provider(for: location)
         let location = location.standardized
         let cancellation = cancellation ?? CancellationFlag()
@@ -96,12 +105,15 @@ public enum PanelLoader {
         func list(_ directory: URL, focus: String?) throws {
             let parent = provider.parent(of: directory)
             let root = roots.root(of: directory, parent: parent, in: provider)
-            let volume = ask(provider, "volume " + directory.locationKey, cancellation) { provider.volume(of: directory, cancellation: $0) }
+            let volume = ask(provider, "volume " + directory.locationKey, cancellation) {
+                provider.volume(of: directory, cancellation: $0)
+            }
             if cancellation.isCancelled { return }
             func batch(_ items: [FileItem]) -> Batch {
                 defer { delivered = true }
-                return Batch(listing: Listing(directory: directory, items: items, parent: parent, root: root, volume: volume),
-                             focus: focus, isFirst: !delivered)
+                return Batch(
+                    listing: Listing(directory: directory, items: items, parent: parent, root: root, volume: volume),
+                    focus: focus, isFirst: !delivered)
             }
             try listing(of: directory, showHidden: showHidden, in: provider, cancellation: cancellation) { items in
                 !cancellation.isCancelled && receive(batch(items))
@@ -113,7 +125,9 @@ public enum PanelLoader {
             try list(location, focus: nil)
         } catch {
             guard !delivered, !cancellation.isCancelled else { throw error }
-            let item = ask(provider, "item " + location.locationKey, cancellation) { provider.item(at: location, cancellation: $0) }
+            let item = ask(provider, "item " + location.locationKey, cancellation) {
+                provider.item(at: location, cancellation: $0)
+            }
             if let item, !item.isDirectory, let parent = provider.parent(of: location) {
                 return try list(parent, focus: item.name)
             }
@@ -129,8 +143,10 @@ public enum PanelLoader {
 
     /// A question that may block, asked on a kernel thread and shared with whoever asks the
     /// same; nil when `cancellation` was set before the answer came.
-    private static func ask<Answer>(_ provider: FileSystemProvider, _ question: String, _ cancellation: CancellationFlag,
-                                    _ work: @escaping (CancellationFlag) -> Answer?) -> Answer? {
+    private static func ask<Answer>(
+        _ provider: FileSystemProvider, _ question: String, _ cancellation: CancellationFlag,
+        _ work: @escaping (CancellationFlag) -> Answer?
+    ) -> Answer? {
         if Thread.isMainThread { return work(cancellation) }
         return BlockingCalls.answer(from: provider, to: question, cancellation: cancellation, work) ?? nil
     }
@@ -139,19 +155,22 @@ public enum PanelLoader {
     /// `receive` runs as if the file system had called it. Returns when the listing is over,
     /// when `receive` wanted no more, or, without a word, when `cancellation` is set; the
     /// file system's thread is then left to come back in its own time.
-    private static func listing(of directory: URL, showHidden: Bool, in provider: FileSystemProvider, cancellation: CancellationFlag,
-                                receive: ([FileItem]) -> Bool) throws {
+    private static func listing(
+        of directory: URL, showHidden: Bool, in provider: FileSystemProvider, cancellation: CancellationFlag,
+        receive: ([FileItem]) -> Bool
+    ) throws {
         if cancellation.isCancelled { return }
         if Thread.isMainThread {
             return try provider.list(directory, showHidden: showHidden, cancellation: cancellation, receive: receive)
         }
         let relay = Relay()
-        let ticket = CallBook.shared.ask(owner: provider, question: "list \(showHidden ? "all" : "shown") " + directory.locationKey, shares: false,
-                                         work: { flag -> Any in
-                                             Swift.Result<Void, Error> {
-                                                 try provider.list(directory, showHidden: showHidden, cancellation: flag) { relay.offer($0) }
-                                             }
-                                         }, listener: { relay.finish($0 as? Swift.Result<Void, Error>) })
+        let ticket = CallBook.shared.ask(
+            owner: provider, question: "list \(showHidden ? "all" : "shown") " + directory.locationKey, shares: false,
+            work: { flag -> Any in
+                Swift.Result<Void, Error> {
+                    try provider.list(directory, showHidden: showHidden, cancellation: flag) { relay.offer($0) }
+                }
+            }, listener: { relay.finish($0 as? Swift.Result<Void, Error>) })
         let registration = cancellation.onCancel {
             ticket.cancel()
             relay.abandon()
@@ -264,7 +283,8 @@ public enum PanelLoader {
         }
 
         private func lookUp(_ key: String) -> URL? {
-            lock.lock(); defer { lock.unlock() }
+            lock.lock()
+            defer { lock.unlock() }
             guard let entry = known[key], -entry.made.timeIntervalSinceNow < lifetime else { return nil }
             return entry.root
         }

@@ -5,6 +5,7 @@ import Foundation
 import LocalFileSystemPlugin
 import TestSupport
 import Testing
+
 @testable import FolderTabsPlugin
 @testable import NavigationPlugin
 @testable import PlacesPlugin
@@ -24,11 +25,17 @@ private final class Review2WatchFileSystem: FileSystemProvider {
     let capabilities: FileSystemCapabilities = []
     private let lock = NSLock()
     private var watches: [([URL], ([URL]) -> Void)] = []
-    var watchedCount: Int { lock.lock(); defer { lock.unlock() }; return watches.reduce(0) { $0 + $1.0.count } }
+    var watchedCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return watches.reduce(0) { $0 + $1.0.count }
+    }
 
     func url(_ path: String) -> URL { URL(string: scheme + "://" + path)! }
     func fire() {
-        lock.lock(); let all = watches; lock.unlock()
+        lock.lock()
+        let all = watches
+        lock.unlock()
         for (directories, report) in all { report(directories) }
     }
 
@@ -39,11 +46,17 @@ private final class Review2WatchFileSystem: FileSystemProvider {
     func createDirectory(at url: URL) throws { throw FileSystemError.notSupported("Writing") }
     func write(_ url: URL) throws -> FileWriter { throw FileSystemError.notSupported("Writing") }
     func remove(_ url: URL) throws { throw FileSystemError.notSupported("Writing") }
-    func move(_ source: URL, to destination: URL, replacing: Bool) throws { throw FileSystemError.notSupported("Writing") }
-    func copy(_ source: URL, to destination: URL, progress: (Int64) -> Bool) throws { throw FileSystemError.notSupported("Writing") }
+    func move(_ source: URL, to destination: URL, replacing: Bool) throws {
+        throw FileSystemError.notSupported("Writing")
+    }
+    func copy(_ source: URL, to destination: URL, progress: (Int64) -> Bool) throws {
+        throw FileSystemError.notSupported("Writing")
+    }
 
     func watch(_ directories: [URL], onChange: @escaping ([URL]) -> Void) -> AnyObject? {
-        lock.lock(); watches.append((directories, onChange)); lock.unlock()
+        lock.lock()
+        watches.append((directories, onChange))
+        lock.unlock()
         return self
     }
 }
@@ -121,10 +134,12 @@ private final class Review2WatchFileSystem: FileSystemProvider {
     }
 
     @Test func namesInASelectedBranchNeverClash() {
-        let items = [FileItem(url: URL(fileURLWithPath: "/a/x.txt"), name: "x.txt", isDirectory: false),
-                     FileItem(url: URL(fileURLWithPath: "/b/x.txt"), name: "x.txt", isDirectory: false),
-                     FileItem(url: URL(fileURLWithPath: "/c/y"), name: "y", isDirectory: false),
-                     FileItem(url: URL(fileURLWithPath: "/d/y"), name: "y", isDirectory: false)]
+        let items = [
+            FileItem(url: URL(fileURLWithPath: "/a/x.txt"), name: "x.txt", isDirectory: false),
+            FileItem(url: URL(fileURLWithPath: "/b/x.txt"), name: "x.txt", isDirectory: false),
+            FileItem(url: URL(fileURLWithPath: "/c/y"), name: "y", isDirectory: false),
+            FileItem(url: URL(fileURLWithPath: "/d/y"), name: "y", isDirectory: false)
+        ]
         // Two paths that read alike are told apart as well.
         let names = VirtualFileSystem.uniqueNames(of: items) { _ in "same" }
         #expect(names == ["same", "same (2)", "same (3)", "same (4)"])
@@ -139,7 +154,9 @@ private final class Review2WatchFileSystem: FileSystemProvider {
         let virtual = VirtualFileSystem(fileSystems: registry)
         let first = virtual.register(files: [provider.url("/a/1")], title: "first", origin: nil)
         let second = virtual.register(files: [provider.url("/a/2")], title: "second", origin: nil)
-        for index in 0..<(VirtualFileSystem.listLimit - 2) { _ = virtual.register(files: [provider.url("/x/\(index)")], title: "f\(index)", origin: nil) }
+        for index in 0..<(VirtualFileSystem.listLimit - 2) {
+            _ = virtual.register(files: [provider.url("/x/\(index)")], title: "f\(index)", origin: nil)
+        }
         // Using the first list makes the second the one that has been left alone longest.
         _ = virtual.entries(of: first)
         _ = virtual.register(files: [provider.url("/a/new")], title: "new", origin: nil)
@@ -188,11 +205,13 @@ private final class Review2WatchFileSystem: FileSystemProvider {
         let url = VirtualLocation.branch(of: server).url
         #expect(!url.absoluteString.contains("s3cret"))
         let hostText = try #require(url.host)
-        let hex = hostText.split(separator: ".").dropFirst().filter { $0.hasPrefix("h") }.map { $0.dropFirst() }.joined()
-        let decoded = String(bytes: stride(from: 0, to: hex.count, by: 2).compactMap { index -> UInt8? in
-            let start = hex.index(hex.startIndex, offsetBy: index)
-            return UInt8(hex[start..<hex.index(start, offsetBy: 2)], radix: 16)
-        }, encoding: .utf8)
+        let hex = hostText.split(separator: ".").dropFirst().filter { $0.hasPrefix("h") }.map { $0.dropFirst() }
+            .joined()
+        let decoded = String(
+            bytes: stride(from: 0, to: hex.count, by: 2).compactMap { index -> UInt8? in
+                let start = hex.index(hex.startIndex, offsetBy: index)
+                return UInt8(hex[start..<hex.index(start, offsetBy: 2)], radix: 16)
+            }, encoding: .utf8)
         #expect(decoded?.contains("s3cret") == false)
         #expect(VirtualLocation(url)?.realDirectory?.user == "someone")
     }
@@ -210,8 +229,11 @@ private final class Review2WatchFileSystem: FileSystemProvider {
 
 @Suite struct Review2ConfigBListFiles {
     @Test func namesWithLineBreaksSurviveAListFile() {
-        let names = ["/tmp/plain.txt", "/tmp/with\nbreak.txt", "/tmp/with\r\nboth", "/tmp/tab\there", " /tmp/leading", "/tmp/trailing ", "\"/quoted\"",
-                     "/tmp/back\\slash", "/tmp/ctrl\u{7}bell", "/tmp/sep\u{2028}line"]
+        let names = [
+            "/tmp/plain.txt", "/tmp/with\nbreak.txt", "/tmp/with\r\nboth", "/tmp/tab\there", " /tmp/leading",
+            "/tmp/trailing ", "\"/quoted\"",
+            "/tmp/back\\slash", "/tmp/ctrl\u{7}bell", "/tmp/sep\u{2028}line"
+        ]
         let text = FileListFile.text(for: names)
         #expect(!text.contains("with\nbreak"))
         #expect(FileListFile.lines(in: Data(text.utf8)) == names)
@@ -219,7 +241,10 @@ private final class Review2WatchFileSystem: FileSystemProvider {
 
     @Test func oldListFilesAreReadAsTheyWere() {
         let old = "/a/b.txt\r\nC:\\dir\\file.txt\n  /spaced/path  \n\"half\n\\n/not/an/escape\n\"/with\\q\"\n"
-        #expect(FileListFile.lines(in: Data(old.utf8)) == ["/a/b.txt", "C:\\dir\\file.txt", "/spaced/path", "\"half", "\\n/not/an/escape", "\"/with\\q\""])
+        #expect(
+            FileListFile.lines(in: Data(old.utf8)) == [
+                "/a/b.txt", "C:\\dir\\file.txt", "/spaced/path", "\"half", "\\n/not/an/escape", "\"/with\\q\""
+            ])
     }
 
     @Test func aHugeListFileIsRefused() throws {
@@ -233,7 +258,9 @@ private final class Review2WatchFileSystem: FileSystemProvider {
             _ = try FileListFile.read(memory.url("/L/big.lst"), fileSystems: registry, relativeTo: memory.url("/L"))
         }
         memory.addFile("/L/small.lst", "mem:/A/one\n/Users/x/local\nsftp://evil.example/x\n")
-        let urls = (try? FileListFile.read(memory.url("/L/small.lst"), fileSystems: registry, relativeTo: memory.url("/L"))) ?? []
+        let urls =
+            (try? FileListFile.read(memory.url("/L/small.lst"), fileSystems: registry, relativeTo: memory.url("/L")))
+            ?? []
         // The file's own file system and local files only: no connection is made for the third line.
         #expect(urls.count == 2 && !urls.contains { $0.scheme == "sftp" })
     }
@@ -283,13 +310,17 @@ private final class Review2WatchFileSystem: FileSystemProvider {
         let root = URL(fileURLWithPath: "/Volumes/R2")
         cache.store(["a", "b"], for: root)
         let file = try #require(cache.fileURL(for: root))
-        func mode(_ url: URL) -> Int { ((try? FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions]) as? Int) ?? -1 }
+        func mode(_ url: URL) -> Int {
+            ((try? FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions]) as? Int) ?? -1
+        }
         #expect(mode(file) == 0o600 && mode(box.url("cache")) == 0o700)
         // The newest store wins, and what is left is no temporary file.
         for round in 0..<20 { cache.store((0...round).map { "f\($0)" }, for: root) }
         cache.flush()
         #expect(TreeCache(directory: box.url("cache")).paths(for: root)?.count == 20)
-        let leftovers = try FileManager.default.contentsOfDirectory(atPath: box.url("cache").path).filter { $0.contains(".tmp") }
+        let leftovers = try FileManager.default.contentsOfDirectory(atPath: box.url("cache").path).filter {
+            $0.contains(".tmp")
+        }
         #expect(leftovers.isEmpty)
     }
 
@@ -305,7 +336,8 @@ private final class Review2WatchFileSystem: FileSystemProvider {
         let cache = TreeCache(directory: box.url("cache"))
         let root = URL(fileURLWithPath: "/Volumes/R2")
         let file = try #require(cache.fileURL(for: root))
-        try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(
+            at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
         let line = "[" + String(repeating: "x", count: 1022) + "]\n"
         var text = "root=" + root.absoluteString + "\n"
         text += String(repeating: line, count: TreeCache.fileLimit / line.utf8.count + 10)
@@ -376,7 +408,9 @@ private final class Review2WatchFileSystem: FileSystemProvider {
         #expect(found === blocking && steps >= 1)
         // A name that is nowhere ends with .none, not with a pending slice.
         var missing = tree.search("zzz", from: nil, timeBudget: 0)
-        while case .pending(let node, let left) = missing { missing = tree.search("zzz", from: node, includingStart: true, remaining: left, timeBudget: 0) }
+        while case .pending(let node, let left) = missing {
+            missing = tree.search("zzz", from: node, includingStart: true, remaining: left, timeBudget: 0)
+        }
         if case .none = missing {} else { Issue.record("expected no match") }
     }
 }
@@ -389,13 +423,20 @@ private final class Review2WatchFileSystem: FileSystemProvider {
     @Test func pathsAndCaptionsWithLineBreaksRoundTripWithoutInjectingLines() throws {
         let awkward = memory.url("/tmp/a\n1_path=sftp://evil.example/x")
         let tab = PanelTabs.State.Tab(location: awkward, title: "t\n1_path=/etc")
-        let file = TabFile(active: PanelTabs.State(tabs: [tab, PanelTabs.State.Tab(location: memory.url("/second"), title: " padded ")], active: 0))
+        let file = TabFile(
+            active: PanelTabs.State(
+                tabs: [tab, PanelTabs.State.Tab(location: memory.url("/second"), title: " padded ")], active: 0))
         let text = file.text(displayPath: memory.displayPath)
         // No line of the file starts a tab of its own that was not written as one.
-        #expect(text.split(whereSeparator: \.isNewline).filter { $0.hasPrefix("1_path=sftp") || $0.hasPrefix("1_path=/etc") }.isEmpty)
+        #expect(
+            text.split(whereSeparator: \.isNewline).filter {
+                $0.hasPrefix("1_path=sftp") || $0.hasPrefix("1_path=/etc")
+            }.isEmpty)
         let back = try #require(read(text))
         #expect(back == file)
-        #expect(back.active.tabs.count == 2 && back.active.tabs[0].title == "t\n1_path=/etc" && back.active.tabs[1].title == " padded ")
+        #expect(
+            back.active.tabs.count == 2 && back.active.tabs[0].title == "t\n1_path=/etc"
+                && back.active.tabs[1].title == " padded ")
     }
 
     @Test func aByteOrderMarkAndUTF16FilesAreRead() throws {
@@ -427,12 +468,15 @@ private final class Review2WatchFileSystem: FileSystemProvider {
     init() {
         memory.addFile("/A/one.txt")
         memory.addFile("/B/other.txt")
-        bench = TestBench(plugins: [FolderTabsPlugin()], fileSystems: [memory, Review2WatchFileSystem(scheme: "sftp"), Review2WatchFileSystem(scheme: "ftp")],
-                          left: memory.url("/A"), right: memory.url("/B"))
+        bench = TestBench(
+            plugins: [FolderTabsPlugin()],
+            fileSystems: [memory, Review2WatchFileSystem(scheme: "sftp"), Review2WatchFileSystem(scheme: "ftp")],
+            left: memory.url("/A"), right: memory.url("/B"))
     }
 
     @Test func loadingAFileNeverMakesAServerTabTheShownOne() {
-        memory.addFile("/B/tabs.tab", "[activetabs]\n0_path=mem:/A\n1_path=sftp://evil.example/x\n2_path=mem:/B\nactivetab=1\n")
+        memory.addFile(
+            "/B/tabs.tab", "[activetabs]\n0_path=mem:/A\n1_path=sftp://evil.example/x\n2_path=mem:/B\nactivetab=1\n")
         bench.commands.perform("OPENTABS", .location(memory.url("/B/tabs.tab")))
         let tabs = bench.left.tabs
         #expect(tabs.count == 3)
@@ -441,7 +485,8 @@ private final class Review2WatchFileSystem: FileSystemProvider {
     }
 
     @Test func aFileWhoseTabsAllConnectLeavesTheShownTabAlone() {
-        memory.addFile("/B/tabs.tab", "[activetabs]\n0_path=sftp://evil.example/x\n1_path=ftp://other.example/y\nactivetab=0\n")
+        memory.addFile(
+            "/B/tabs.tab", "[activetabs]\n0_path=sftp://evil.example/x\n1_path=ftp://other.example/y\nactivetab=0\n")
         bench.commands.perform("OPENTABS", .location(memory.url("/B/tabs.tab")))
         let tabs = bench.left.tabs
         #expect(tabs.active.directory == memory.url("/A") && tabs.count == 3)
@@ -473,8 +518,9 @@ private final class Review2WatchFileSystem: FileSystemProvider {
     init() {
         memory.addFile("/A/docs/in.txt")
         memory.addFile("/B/other.txt")
-        bench = TestBench(plugins: [NavigationPlugin(pasteboard: pasteboard, home: memory.url("/home"))], fileSystems: [memory],
-                          left: memory.url("/A"), right: memory.url("/B"))
+        bench = TestBench(
+            plugins: [NavigationPlugin(pasteboard: pasteboard, home: memory.url("/home"))], fileSystems: [memory],
+            left: memory.url("/A"), right: memory.url("/B"))
     }
 
     @Test func goingToANeighbourVolumeAsksTheDisksInAJob() {
@@ -500,6 +546,14 @@ private final class Mutex<Value> {
     private let lock = NSLock()
     private var stored: Value
     init(_ value: Value) { stored = value }
-    var value: Value { lock.lock(); defer { lock.unlock() }; return stored }
-    func mutate(_ change: (inout Value) -> Void) { lock.lock(); change(&stored); lock.unlock() }
+    var value: Value {
+        lock.lock()
+        defer { lock.unlock() }
+        return stored
+    }
+    func mutate(_ change: (inout Value) -> Void) {
+        lock.lock()
+        change(&stored)
+        lock.unlock()
+    }
 }

@@ -37,9 +37,11 @@ public struct SyncPlan: Equatable {
         let offset = Double(timeOffsetHours) * 3600
         for row in rows where row.accepts(row.action) {
             func copy(_ item: FileItem, to target: URL, shift: Double) -> Copy {
-                Copy(source: item.url, target: target, relativePath: row.relativePath, isDirectory: row.isDirectory,
-                     size: row.isDirectory ? 0 : item.size, modified: item.modified, targetModified: item.modified.addingTimeInterval(shift),
-                     permissions: item.permissions)
+                Copy(
+                    source: item.url, target: target, relativePath: row.relativePath, isDirectory: row.isDirectory,
+                    size: row.isDirectory ? 0 : item.size, modified: item.modified,
+                    targetModified: item.modified.addingTimeInterval(shift),
+                    permissions: item.permissions)
             }
             func deletion(_ item: FileItem, into list: inout [Deletion]) {
                 list.append(Deletion(url: item.url, isDirectory: row.isDirectory))
@@ -80,7 +82,8 @@ public struct SyncPlan: Equatable {
     public static func describe(_ copies: [Copy]) -> String {
         let files = copies.filter { !$0.isDirectory }
         let folders = copies.count - files.count
-        return "Copy \(files.count) files, total size: \(Format.bytes(files.reduce(Int64(0)) { $0.addingSaturated($1.size) })) bytes"
+        return
+            "Copy \(files.count) files, total size: \(Format.bytes(files.reduce(Int64(0)) { $0.addingSaturated($1.size) })) bytes"
             + (folders > 0 ? ", create \(folders) directories" : "")
     }
 }
@@ -165,7 +168,10 @@ public final class SyncExecutor {
 
     private struct Cancelled: Error {}
 
-    public init(plan: SyncPlan, options: SyncRunOptions, fileSystems: FileSystemRegistry, cancellation: CancellationFlag = CancellationFlag()) {
+    public init(
+        plan: SyncPlan, options: SyncRunOptions, fileSystems: FileSystemRegistry,
+        cancellation: CancellationFlag = CancellationFlag()
+    ) {
         self.plan = plan
         self.options = options
         self.fileSystems = fileSystems
@@ -183,19 +189,30 @@ public final class SyncExecutor {
         run: do {
             for (caption, copies) in passes {
                 for (index, copy) in copies.enumerated() {
-                    guard step(copy.target, lines: ["\(caption)  (\(index + 1) / \(copies.count))",
-                                                    "From: " + fileSystems.displayPath(copy.source),
-                                                    "To: " + fileSystems.displayPath(copy.target)], { try self.perform(copy) }) else { break run }
+                    guard
+                        step(
+                            copy.target,
+                            lines: [
+                                "\(caption)  (\(index + 1) / \(copies.count))",
+                                "From: " + fileSystems.displayPath(copy.source),
+                                "To: " + fileSystems.displayPath(copy.target)
+                            ], { try self.perform(copy) })
+                    else { break run }
                     bytesDone = bytesDone.addingSaturated(copy.size)
                 }
             }
             // What was written must be where it belongs before anything is deleted.
             if !deletions.isEmpty, !commitWrites() { break run }
             // Files go before the folders that hold them, the deepest folders first.
-            let ordered = deletions.filter { !$0.isDirectory }
+            let ordered =
+                deletions.filter { !$0.isDirectory }
                 + deletions.filter(\.isDirectory).sorted { $0.url.pathComponents.count > $1.url.pathComponents.count }
             for deletion in ordered {
-                guard step(deletion.url, lines: ["Delete: " + fileSystems.displayPath(deletion.url)], { try self.perform(deletion) }) else { break run }
+                guard
+                    step(
+                        deletion.url, lines: ["Delete: " + fileSystems.displayPath(deletion.url)],
+                        { try self.perform(deletion) })
+                else { break run }
             }
             if let root = options.removeEmptyDirectoriesBelow { removeEmptyDirectories(below: root, isRoot: true) }
         }
@@ -218,7 +235,10 @@ public final class SyncExecutor {
         while true {
             if cancellation.isCancelled { return false }
             currentLines = lines
-            onProgress(JobProgress(lines: lines, itemsDone: itemsDone, itemsTotal: itemsTotal, bytesDone: bytesDone, bytesTotal: bytesTotal))
+            onProgress(
+                JobProgress(
+                    lines: lines, itemsDone: itemsDone, itemsTotal: itemsTotal, bytesDone: bytesDone,
+                    bytesTotal: bytesTotal))
             do {
                 if try work() {
                     let folder = url.deletingLastPathComponent()
@@ -304,7 +324,7 @@ public final class SyncExecutor {
             if cancellation.isCancelled { throw Cancelled() }
             do {
                 try targetSystem.move(temporary, to: copy.target, replacing: true)
-            } catch where existing != nil {
+            } catch  where existing != nil {
                 // A file system that cannot replace in one step: the old file steps aside, the
                 // new one takes its place, and the old one comes back if that fails. The aside
                 // name is free: a leftover from an earlier failure may be the only copy of a file.
@@ -318,8 +338,12 @@ public final class SyncExecutor {
                     } catch {
                         // Neither is under the name; the old file is not deleted, and the user is told where it is.
                         try? targetSystem.remove(temporary)
-                        throw NSError(domain: "AFMSync", code: 1, userInfo: [NSLocalizedDescriptionKey:
-                            "The old file could not be put back and is kept as \(fileSystems.displayPath(aside))."])
+                        throw NSError(
+                            domain: "AFMSync", code: 1,
+                            userInfo: [
+                                NSLocalizedDescriptionKey:
+                                    "The old file could not be put back and is kept as \(fileSystems.displayPath(aside))."
+                            ])
                     }
                     throw error
                 }
@@ -362,7 +386,9 @@ public final class SyncExecutor {
             do {
                 try entry.provider.commit(entry.root, cancellation: cancellation)
             } catch {
-                if cancellation.isCancelled { outcome.wasCancelled = true } else {
+                if cancellation.isCancelled {
+                    outcome.wasCancelled = true
+                } else {
                     outcome.errors.append("\(fileSystems.displayPath(entry.root)): \(error.localizedDescription)")
                     outcome.commitFailed = true
                 }
@@ -377,8 +403,10 @@ public final class SyncExecutor {
     private func transfer(_ copy: SyncPlan.Copy, to destination: URL, in targetSystem: FileSystemProvider) throws {
         let sourceSystem = try fileSystems.provider(for: copy.source)
         let report = { (bytes: Int64) in
-            self.onProgress(JobProgress(lines: self.currentLines, itemsDone: self.itemsDone, itemsTotal: self.itemsTotal,
-                                        bytesDone: self.bytesDone.addingSaturated(bytes), bytesTotal: self.bytesTotal))
+            self.onProgress(
+                JobProgress(
+                    lines: self.currentLines, itemsDone: self.itemsDone, itemsTotal: self.itemsTotal,
+                    bytesDone: self.bytesDone.addingSaturated(bytes), bytesTotal: self.bytesTotal))
         }
         if sourceSystem === targetSystem {
             do {
@@ -416,7 +444,9 @@ public final class SyncExecutor {
             // file system between two; a file system that cannot do it does not stop the copy.
             try? targetSystem.copyMetadata(from: copy.source, to: destination)
             // A file that came from elsewhere keeps saying so; a mark that cannot be put on does not stop the copy.
-            if let mark = sourceSystem.quarantine(of: copy.source) { try? targetSystem.setQuarantine(mark, of: destination) }
+            if let mark = sourceSystem.quarantine(of: copy.source) {
+                try? targetSystem.setQuarantine(mark, of: destination)
+            }
         } catch {
             // Closed before the file is removed, whatever stopped the copy.
             try? writer.close(attributes: FileAttributes())
@@ -432,14 +462,17 @@ public final class SyncExecutor {
     /// same amount the target's was.
     private func adjustDate(of copy: SyncPlan.Copy, in targetSystem: FileSystemProvider) {
         guard let arrived = targetSystem.item(at: copy.target), !arrived.isSymlink,
-              abs(arrived.modified.timeIntervalSince(copy.targetModified)) > Double(options.toleranceSeconds) else { return }
+            abs(arrived.modified.timeIntervalSince(copy.targetModified)) > Double(options.toleranceSeconds)
+        else { return }
         do {
             try targetSystem.setAttributes(FileAttributes(modified: copy.targetModified), of: copy.target)
         } catch {
             guard options.mayChangeSourceDates, let sourceSystem = try? fileSystems.provider(for: copy.source),
-                  sourceSystem.item(at: copy.source)?.isSymlink == false else { return }
+                sourceSystem.item(at: copy.source)?.isSymlink == false
+            else { return }
             let shift = copy.modified.timeIntervalSince(copy.targetModified)
-            try? sourceSystem.setAttributes(FileAttributes(modified: arrived.modified.addingTimeInterval(shift)), of: copy.source)
+            try? sourceSystem.setAttributes(
+                FileAttributes(modified: arrived.modified.addingTimeInterval(shift)), of: copy.source)
         }
     }
 
@@ -473,7 +506,9 @@ public final class SyncExecutor {
     @discardableResult
     private func removeEmptyDirectories(below directory: URL, isRoot: Bool = false) -> Bool {
         guard !cancellation.isCancelled, let fileSystem = try? fileSystems.provider(for: directory),
-              let items = try? fileSystem.list(directory, showHidden: true, cancellation: cancellation), !cancellation.isCancelled else { return false }
+            let items = try? fileSystem.list(directory, showHidden: true, cancellation: cancellation),
+            !cancellation.isCancelled
+        else { return false }
         var isEmpty = true
         for item in items {
             guard item.isRealDirectory, removeEmptyDirectories(below: item.url) else {

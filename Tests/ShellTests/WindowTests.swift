@@ -1,10 +1,11 @@
 import AFMContracts
 import AFMKernel
-@testable import AFMShell
 import AppKit
 import StandardPlugins
 import TestSupport
 import Testing
+
+@testable import AFMShell
 
 /// What a test wants from plugins the program does not have yet: buttons for the button bar,
 /// someone who runs command lines, a configuration dialog and a Help menu.
@@ -26,12 +27,15 @@ private final class WindowTestPlugin: Plugin {
         kernel.toolbar.add("cm_NobodyRegisteredThisEither", symbol: "questionmark", group: 3)
         kernel.commands.register(Command(.configuration, "Options…")) { [self] in settingsShown += 1 }
         kernel.commands.register(Command("cm_TestHelp", "Help Index", [.f(1)])) {}
-        kernel.commands.register(Command("cm_TestParameter", "Sort ▸ With Parameter"), parameterized: { [self] in parameters.append($0) })
+        kernel.commands.register(
+            Command("cm_TestParameter", "Sort ▸ With Parameter"), parameterized: { [self] in parameters.append($0) })
         kernel.commands.register(Command("cm_TestSecond", "Sort ▸ Second")) {}
         kernel.menus.add(["cm_TestHelp"], to: .helpTopics)
         kernel.menus.add(["cm_TestParameter", "cm_TestSecond"], to: .commandsTools)
         if runsLines {
-            kernel.commands.register(Command(.runCommandLine, "Run Command Line"), parameterized: { [self] in ranLines.append($0.text ?? "?") })
+            kernel.commands.register(
+                Command(.runCommandLine, "Run Command Line"),
+                parameterized: { [self] in ranLines.append($0.text ?? "?") })
         }
     }
 }
@@ -52,7 +56,9 @@ private final class WindowTestPlugin: Plugin {
         try box.file("A/docs/in.txt", "inside")
         try box.file("B/other.txt", "o")
         try box.file("home/welcome.txt")
-        func state(_ folder: String) -> PanelTabs.State { PanelTabs.State(tabs: [.init(location: box.url(folder))], active: 0) }
+        func state(_ folder: String) -> PanelTabs.State {
+            PanelTabs.State(tabs: [.init(location: box.url(folder))], active: 0)
+        }
         settings.set(state("A"), forKey: "left.tabs")
         settings.set(state("B"), forKey: "right.tabs")
     }
@@ -106,15 +112,23 @@ private final class WindowTestPlugin: Plugin {
         let bar = app.window.buttonBar
         // Commands nobody registered are left out, with the separators they would leave behind.
         let commands = bar.entries.compactMap { $0 }
-        #expect(commands.contains(.copy) && commands.contains(.showHidden) && commands.allSatisfy { app.commands[$0] != nil })
-        #expect(bar.entries.first != nil && bar.entries.last != nil && !zip(bar.entries, bar.entries.dropFirst()).contains { $0 == nil && $1 == nil })
+        #expect(
+            commands.contains(.copy) && commands.contains(.showHidden)
+                && commands.allSatisfy { app.commands[$0] != nil })
+        #expect(
+            bar.entries.first != nil && bar.entries.last != nil
+                && !zip(bar.entries, bar.entries.dropFirst()).contains { $0 == nil && $1 == nil })
         // The name and key of each button, and below them what it does where its plugin says.
         let tips = bar.buttons.map { $0.toolTip ?? "" }
-        #expect(tips.contains("Copy… (F5)\nCopy the selected files to the folder of the other panel.") && tips.contains("Hidden Files (⇧⌘.)"))
+        #expect(
+            tips.contains("Copy… (F5)\nCopy the selected files to the folder of the other panel.")
+                && tips.contains("Hidden Files (⇧⌘.)"))
         #expect(tips.count == commands.count)
         #expect(!bar.isHidden && bar.buttons.allSatisfy { $0.image != nil })
         // The buttons follow their commands: Copy needs something under the cursor.
-        let (copy, hidden) = (bar.buttons[commands.firstIndex(of: .copy) ?? 0], bar.buttons[commands.firstIndex(of: .showHidden) ?? 0])
+        let (copy, hidden) = (
+            bar.buttons[commands.firstIndex(of: .copy) ?? 0], bar.buttons[commands.firstIndex(of: .showHidden) ?? 0]
+        )
         #expect(copy.isEnabled == app.commands.isEnabled(.copy) && hidden.state == .off)
         app.left.model.row(ofName: "one.txt").map(app.left.model.moveCursor(to:))
         app.commands.perform(.showHidden)
@@ -130,7 +144,11 @@ private final class WindowTestPlugin: Plugin {
         #expect(bar.entries == [.showHidden, nil, .showCommandLine] && bar.buttons[1].state == .on)
         // The context menu offers the configuration and the switches of the window.
         let titles = bar.menu(for: NSEvent())?.items.filter { !$0.isSeparatorItem }.map(\.title) ?? []
-        #expect(titles == ["Options…", "Reset Button Bar to Default", "Button Bar", "Drive Buttons", "Command Line", "Function Key Buttons"])
+        #expect(
+            titles == [
+                "Options…", "Reset Button Bar to Default", "Button Bar", "Drive Buttons", "Command Line",
+                "Function Key Buttons"
+            ])
     }
 
     @Test func theButtonBarIsRearrangedByDragging() async {
@@ -138,16 +156,23 @@ private final class WindowTestPlugin: Plugin {
         defer { app.stop() }
         let bar = app.window.buttonBar
         let br = ToolbarRegistry.lineBreak
-        app.kernel.toolbar.setLayout([.copy, .showHidden, nil, .showCommandLine, .showFunctionKeys, br, .showDriveButtons], in: settings)
+        app.kernel.toolbar.setLayout(
+            [.copy, .showHidden, nil, .showCommandLine, .showFunctionKeys, br, .showDriveButtons], in: settings)
         // Every group has a handle in front of it, the first one of a line too.
-        #expect(bar.slots == [.handle(line: 0, group: 0), .button(line: 0, group: 0, index: 0), .button(line: 0, group: 0, index: 1),
-                              .handle(line: 0, group: 1), .button(line: 0, group: 1, index: 0), .button(line: 0, group: 1, index: 1),
-                              .handle(line: 1, group: 0), .button(line: 1, group: 0, index: 0)])
+        #expect(
+            bar.slots == [
+                .handle(line: 0, group: 0), .button(line: 0, group: 0, index: 0), .button(line: 0, group: 0, index: 1),
+                .handle(line: 0, group: 1), .button(line: 0, group: 1, index: 0), .button(line: 0, group: 1, index: 1),
+                .handle(line: 1, group: 0), .button(line: 1, group: 0, index: 0)
+            ])
         // The buttons are square, so the frame under the mouse is one too.
         #expect(bar.buttons.allSatisfy { $0.frame.width == $0.frame.height })
         // Laid out by hand (the window is never shown): wide enough for one row, yet the
         // line break starts a second one.
-        guard let flow = bar.subviews.compactMap({ $0 as? FlowView }).first else { Issue.record("no flow"); return }
+        guard let flow = bar.subviews.compactMap({ $0 as? FlowView }).first else {
+            Issue.record("no flow")
+            return
+        }
         flow.frame.size.width = 2000
         flow.layout()
         let frames = flow.items.map { bar.convert($0.frame, from: flow) }
@@ -155,15 +180,23 @@ private final class WindowTestPlugin: Plugin {
         func middle(_ index: Int) -> NSPoint { NSPoint(x: frames[index].midX, y: frames[index].midY) }
         // A button dropped on the left half of another goes before it; on a handle, into a group of its own.
         let copy = ButtonBarView.Dragged.button(line: 0, group: 0, index: 0)
-        #expect(bar.dropTarget(for: copy, at: NSPoint(x: frames[4].minX + 2, y: frames[4].midY)) == .button(.inGroup(line: 0, group: 1, at: 0)))
-        #expect(bar.dropTarget(for: copy, at: NSPoint(x: frames[5].maxX - 2, y: frames[5].midY)) == .button(.inGroup(line: 0, group: 1, at: 2)))
+        #expect(
+            bar.dropTarget(for: copy, at: NSPoint(x: frames[4].minX + 2, y: frames[4].midY))
+                == .button(.inGroup(line: 0, group: 1, at: 0)))
+        #expect(
+            bar.dropTarget(for: copy, at: NSPoint(x: frames[5].maxX - 2, y: frames[5].midY))
+                == .button(.inGroup(line: 0, group: 1, at: 2)))
         #expect(bar.dropTarget(for: copy, at: middle(3)) == .button(.newGroup(.line(0, at: 1))))
         #expect(bar.dropTarget(for: copy, at: middle(6)) == .button(.newGroup(.line(1, at: 0))))
         // Past the end of the first line: a new group there, though the line has room left.
-        #expect(bar.dropTarget(for: copy, at: NSPoint(x: frames[5].maxX + 200, y: frames[5].midY)) == .button(.newGroup(.line(0, at: 2))))
+        #expect(
+            bar.dropTarget(for: copy, at: NSPoint(x: frames[5].maxX + 200, y: frames[5].midY))
+                == .button(.newGroup(.line(0, at: 2))))
         // A group goes to the nearest handle or line end.
         #expect(bar.dropTarget(for: .group(line: 1, group: 0), at: middle(3)) == .group(.line(0, at: 1)))
-        #expect(bar.dropTarget(for: .group(line: 0, group: 0), at: NSPoint(x: frames[7].maxX + 50, y: frames[7].midY)) == .group(.line(1, at: 1)))
+        #expect(
+            bar.dropTarget(for: .group(line: 0, group: 0), at: NSPoint(x: frames[7].maxX + 50, y: frames[7].midY))
+                == .group(.line(1, at: 1)))
         bar.apply(.group(line: 1, group: 0), to: .group(.line(0, at: 0)))
         // The line it leaves empty disappears.
         #expect(bar.entries == [.showDriveButtons, nil, .copy, .showHidden, nil, .showCommandLine, .showFunctionKeys])
@@ -180,12 +213,18 @@ private final class WindowTestPlugin: Plugin {
         #expect(app.commands.isEnabled(.resetButtonBar))
         app.commands.perform(.resetButtonBar)
         #expect(!app.kernel.toolbar.hasUserLayout(in: settings) && !app.commands.isEnabled(.resetButtonBar))
-        #expect(bar.entries == ButtonBarView.entries(of: app.kernel.toolbar.defaultLayout, commands: app.commands).map { $0?.command })
+        #expect(
+            bar.entries
+                == ButtonBarView.entries(of: app.kernel.toolbar.defaultLayout, commands: app.commands).map {
+                    $0?.command
+                })
     }
 
     @Test func barButtonsKeepTheirToolTips() {
         // The hover frame has a tracking area of its own; the tool tip's must survive it.
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 200, height: 100), styleMask: [.titled], backing: .buffered, defer: false)
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 200, height: 100), styleMask: [.titled], backing: .buffered,
+            defer: false)
         let button = BarCommandButton(frame: NSRect(x: 10, y: 10, width: 40, height: 40))
         let path = PathBarView(frame: NSRect(x: 0, y: 60, width: 200, height: 22))
         for view in [button, path] as [NSView] {
@@ -194,7 +233,9 @@ private final class WindowTestPlugin: Plugin {
             view.updateTrackingAreas()
             view.updateTrackingAreas()
             let owners = view.trackingAreas.map { "\(type(of: $0.owner as AnyObject))" }
-            #expect(owners.contains("NSToolTipManager") && owners.filter { $0 != "NSToolTipManager" }.count == 1, "\(owners)")
+            #expect(
+                owners.contains("NSToolTipManager") && owners.filter { $0 != "NSToolTipManager" }.count == 1,
+                "\(owners)")
         }
     }
 
@@ -206,7 +247,9 @@ private final class WindowTestPlugin: Plugin {
         bar.onEject = { ejected += 1 }
         bar.ejectableVolumeName = "STICK"
         bar.layout()
-        #expect(!bar.ejectButton.isHidden && bar.ejectButton.toolTip == "Eject “STICK”" && bar.ejectButton.frame.maxX == 300)
+        #expect(
+            !bar.ejectButton.isHidden && bar.ejectButton.toolTip == "Eject “STICK”" && bar.ejectButton.frame.maxX == 300
+        )
         bar.ejectButton.performClick(nil)
         #expect(ejected == 1)
         bar.ejectableVolumeName = nil
@@ -214,7 +257,9 @@ private final class WindowTestPlugin: Plugin {
     }
 
     @Test func buttonBarArrangementLeavesNoEmptyGroupOrLine() {
-        let (a, b, c, d, br): (CommandID, CommandID, CommandID, CommandID, CommandID) = ("a", "b", "c", "d", ToolbarRegistry.lineBreak)
+        let (a, b, c, d, br): (CommandID, CommandID, CommandID, CommandID, CommandID) = (
+            "a", "b", "c", "d", ToolbarRegistry.lineBreak
+        )
         var bar = ButtonBarArrangement(entries: [a, b, nil, c, br, d])
         #expect(bar.lines == [[[a, b], [c]], [[d]]])
         // Within its own group, after itself: the original place is accounted for.
@@ -258,9 +303,11 @@ private final class WindowTestPlugin: Plugin {
     }
 
     @Test func thePlaceOfAFolderIsTheOneWithTheLongestPath() {
-        let places = [Place(name: "Disk", url: URL(fileURLWithPath: "/"), kind: .internalDisk),
-                      Place(name: "Home", url: URL(fileURLWithPath: "/Users/me"), kind: .home),
-                      Place(name: "Stick", url: URL(fileURLWithPath: "/Volumes/Stick"), kind: .externalDisk)]
+        let places = [
+            Place(name: "Disk", url: URL(fileURLWithPath: "/"), kind: .internalDisk),
+            Place(name: "Home", url: URL(fileURLWithPath: "/Users/me"), kind: .home),
+            Place(name: "Stick", url: URL(fileURLWithPath: "/Volumes/Stick"), kind: .externalDisk)
+        ]
         #expect(DriveBarView.currentPlace(among: places, for: URL(fileURLWithPath: "/Users/me/Documents")) == 1)
         #expect(DriveBarView.currentPlace(among: places, for: URL(fileURLWithPath: "/Users/merle")) == 0)
         #expect(DriveBarView.currentPlace(among: places, for: URL(fileURLWithPath: "/Volumes/Stick")) == 2)
@@ -273,10 +320,14 @@ private final class WindowTestPlugin: Plugin {
         let plain = ["F3 View", "F4 Edit", "F5 Copy", "F6 Move", "F7 NewFolder", "F8 Delete", "⌘Q Exit"]
         #expect(app.window.functionKeyTitles == plain)
         app.window.modifiersChanged(to: .shift)
-        #expect(["⇧F4 New Text File", "⇧F5 Copy in Same Folder", "⇧F6 Rename"].allSatisfy(app.window.functionKeyTitles.contains))
+        #expect(
+            ["⇧F4 New Text File", "⇧F5 Copy in Same Folder", "⇧F6 Rename"].allSatisfy(
+                app.window.functionKeyTitles.contains))
         #expect(app.window.functionKeyTitles.last == "⌘Q Exit")
         app.window.modifiersChanged(to: .control)
-        #expect(app.window.functionKeyTitles.dropLast().allSatisfy { $0.hasPrefix("⌃F") } && app.window.functionKeyTitles.count > 3)
+        #expect(
+            app.window.functionKeyTitles.dropLast().allSatisfy { $0.hasPrefix("⌃F") }
+                && app.window.functionKeyTitles.count > 3)
         app.window.modifiersChanged(to: [.option])
         #expect(app.window.functionKeyTitles.contains("⌥F7 Find Files"))
         // Cmd shortcuts are not the bar's; letting go brings the plain bar back.
@@ -285,7 +336,9 @@ private final class WindowTestPlugin: Plugin {
         // The buttons are greyed out like the menu entries.
         app.left.model.moveCursor(to: 0)
         app.window.validateBars()
-        #expect(app.window.functionKeyBar.isEnabled(.copy) == false && app.window.functionKeyBar.isEnabled(.makeDirectory) == true)
+        #expect(
+            app.window.functionKeyBar.isEnabled(.copy) == false
+                && app.window.functionKeyBar.isEnabled(.makeDirectory) == true)
         app.left.model.row(ofName: "one.txt").map(app.left.model.moveCursor(to:))
         app.window.validateBars()
         #expect(app.window.functionKeyBar.isEnabled(.copy) == true)
@@ -296,14 +349,26 @@ private final class WindowTestPlugin: Plugin {
     @Test func visibilityAndArrangementAreCommandsAndSurviveARestart() async {
         var app = await start()
         let window = app.window
-        #expect(!window.buttonBar.isHidden && window.driveBar.isHidden && !window.commandLine.isHidden && !window.functionKeyBar.isHidden)
-        #expect(app.commands.isChecked(.showButtonBar) && app.commands.isChecked(.showCommandLine) && app.commands.isChecked(.showFunctionKeys))
-        #expect(app.commands.isChecked(.panelsEqualWidth) && !app.commands.isChecked(.panelsStacked) && !window.panelsAreStacked)
-        for command in [CommandID.showButtonBar, .showCommandLine, .showFunctionKeys, .showDriveButtons, .panelsStacked] {
+        #expect(
+            !window.buttonBar.isHidden && window.driveBar.isHidden && !window.commandLine.isHidden
+                && !window.functionKeyBar.isHidden)
+        #expect(
+            app.commands.isChecked(.showButtonBar) && app.commands.isChecked(.showCommandLine)
+                && app.commands.isChecked(.showFunctionKeys))
+        #expect(
+            app.commands.isChecked(.panelsEqualWidth) && !app.commands.isChecked(.panelsStacked)
+                && !window.panelsAreStacked)
+        for command in [
+            CommandID.showButtonBar, .showCommandLine, .showFunctionKeys, .showDriveButtons, .panelsStacked
+        ] {
             #expect(app.commands.perform(command))
         }
-        #expect(window.buttonBar.isHidden && !window.driveBar.isHidden && window.commandLine.isHidden && window.functionKeyBar.isHidden)
-        #expect(window.panelsAreStacked && app.commands.isChecked(.panelsStacked) && !app.commands.isChecked(.showButtonBar))
+        #expect(
+            window.buttonBar.isHidden && !window.driveBar.isHidden && window.commandLine.isHidden
+                && window.functionKeyBar.isHidden)
+        #expect(
+            window.panelsAreStacked && app.commands.isChecked(.panelsStacked) && !app.commands.isChecked(.showButtonBar)
+        )
         app.shell.layout.divider = 300
         #expect(!app.commands.isChecked(.panelsEqualWidth))
         // The right panel becomes the source.
@@ -317,7 +382,9 @@ private final class WindowTestPlugin: Plugin {
         app = await start(with: WindowTestPlugin())
         defer { app.stop() }
         let again = app.window
-        #expect(again.buttonBar.isHidden && !again.driveBar.isHidden && again.commandLine.isHidden && again.functionKeyBar.isHidden)
+        #expect(
+            again.buttonBar.isHidden && !again.driveBar.isHidden && again.commandLine.isHidden
+                && again.functionKeyBar.isHidden)
         #expect(again.panelsAreStacked && app.shell.layout.divider == 300)
         #expect(app.kernel.panels.source === app.right && app.right.isActive)
         #expect(again.window?.frame.size == frame.size)
@@ -328,7 +395,9 @@ private final class WindowTestPlugin: Plugin {
         #expect(!again.commandLine.isHidden && app.commands.isChecked(.showCommandLine))
         // They are in the Show menu, and they run while a job does.
         let show = app.kernel.menus.menus.first { $0.title == "Show" }?.items ?? []
-        #expect(show.contains(.showButtonBar) && show.contains(.showDriveButtons) && show.contains(.panelsStacked) && show.contains(.panelsEqualWidth))
+        #expect(
+            show.contains(.showButtonBar) && show.contains(.showDriveButtons) && show.contains(.panelsStacked)
+                && show.contains(.panelsEqualWidth))
         #expect(app.commands[.showButtonBar]?.runsDuringJobs == true)
         #expect(app.kernel.preferences.pages.contains { $0.title == "Layout" })
     }
@@ -339,11 +408,15 @@ private final class WindowTestPlugin: Plugin {
         #expect(WindowLayout.title(productName: "AFM", version: "1.2", extra: "*work") == "work AFM 1.2")
         #expect(WindowLayout.title(productName: "AFM", version: nil, extra: "-work") == "work AFM")
         #expect(WindowLayout.title(productName: "AFM", version: nil, extra: "$at home") == "AFM at home")
-        #expect(WindowLayout.title(productName: "AFM", version: nil, extra: "plain") == "AFM" && WindowLayout.title(productName: "AFM", version: nil, extra: "$") == "AFM")
+        #expect(
+            WindowLayout.title(productName: "AFM", version: nil, extra: "plain") == "AFM"
+                && WindowLayout.title(productName: "AFM", version: nil, extra: "$") == "AFM")
         settings.set("$testing", forKey: WindowLayout.titleExtraKey)
         let app = await start()
         defer { app.stop() }
-        #expect(app.window.window?.title.hasPrefix("A File Manager") == true && app.window.window?.title.hasSuffix(" testing") == true)
+        #expect(
+            app.window.window?.title.hasPrefix("A File Manager") == true
+                && app.window.window?.title.hasSuffix(" testing") == true)
     }
 
     // MARK: Command line
@@ -374,8 +447,11 @@ private final class WindowTestPlugin: Plugin {
         // Anything else goes to whoever runs programs.
         line.text = "ls -l  "
         #expect(line.execute() && extra.ranLines == ["ls -l"])
-        #expect(line.history.entries == ["ls -l", "cm_TestParameter some text", "cm_TestParameter 3", "CM_gotoparent", "cd \"../A/docs\"",
-                                         "cd " + box.url("B").path])
+        #expect(
+            line.history.entries == [
+                "ls -l", "cm_TestParameter some text", "cm_TestParameter 3", "CM_gotoparent", "cd \"../A/docs\"",
+                "cd " + box.url("B").path
+            ])
         #expect(line.field.objectValues.count == 6)
         // An empty line is Enter on the item under the cursor.
         #expect(line.execute())
@@ -430,7 +506,9 @@ private final class WindowTestPlugin: Plugin {
         #expect(keys.command(for: Shortcut(.returnKey, .control)) == .addNameToCommandLine)
         #expect(keys.command(for: Shortcut(.returnKey, [.control, .shift])) == .addPathAndNameToCommandLine)
         #expect(keys.command(for: Shortcut(.character("p"), .control)) == .addPathToCommandLine)
-        #expect(keys.command(for: .f(8, .option)) == .commandLineHistory && keys.command(for: Shortcut(.down, .control)) == .commandLineHistory)
+        #expect(
+            keys.command(for: .f(8, .option)) == .commandLineHistory
+                && keys.command(for: Shortcut(.down, .control)) == .commandLineHistory)
         #expect(keys.command(for: .cmd("l")) == .focusCommandLine && keys.conflicts.isEmpty)
         // Ctrl+E walks back through the history, the other command forth again.
         line.clear()
@@ -479,7 +557,9 @@ private final class WindowTestPlugin: Plugin {
         #expect(action("") == .openCursorItem && action("   ") == .openCursorItem)
         #expect(action("cd /tmp/x y") == .changeDirectory("/tmp/x y") && action("CD  ..") == .changeDirectory(".."))
         #expect(action("cd") == .changeDirectory("~") && action("cd '/a b'") == .changeDirectory("/a b"))
-        #expect(action("cm_SearchFor") == .command("cm_SearchFor", .none) && action("cm_searchfor 2") == .command("cm_SearchFor", .index(2)))
+        #expect(
+            action("cm_SearchFor") == .command("cm_SearchFor", .none)
+                && action("cm_searchfor 2") == .command("cm_SearchFor", .index(2)))
         #expect(action("cm_SearchFor \"*.txt\"") == .command("cm_SearchFor", .text("*.txt")))
         #expect(action("cdrom eject") == .run("cdrom eject") && action("cm_Unknown") == .run("cm_Unknown"))
         #expect(CommandLineAction.quoted("a b") == "\"a b\"" && CommandLineAction.quoted("ab") == "ab")
@@ -504,11 +584,20 @@ private final class WindowTestPlugin: Plugin {
         let app = await start()
         defer { app.stop() }
         let menu = app.shell.makeMainMenu()
-        #expect(menu.items.map(\.title) == ["A File Manager", "Files", "Edit", "Mark", "Commands", "Show", "Configuration", "Window", "Help"])
-        func titles(_ index: Int) -> [String] { menu.items[index].submenu?.items.map { $0.isSeparatorItem ? "-" : $0.title } ?? [] }
+        #expect(
+            menu.items.map(\.title) == [
+                "A File Manager", "Files", "Edit", "Mark", "Commands", "Show", "Configuration", "Window", "Help"
+            ])
+        func titles(_ index: Int) -> [String] {
+            menu.items[index].submenu?.items.map { $0.isSeparatorItem ? "-" : $0.title } ?? []
+        }
         // Settings… runs the configuration command.
-        #expect(titles(0) == ["About A File Manager", "-", "Settings…", "-", "Services", "-", "Hide A File Manager", "Hide Others", "Show All",
-                              "-", "Quit A File Manager"])
+        #expect(
+            titles(0) == [
+                "About A File Manager", "-", "Settings…", "-", "Services", "-", "Hide A File Manager", "Hide Others",
+                "Show All",
+                "-", "Quit A File Manager"
+            ])
         let settingsItem = menu.items[0].submenu?.items[2]
         #expect(settingsItem?.keyEquivalent == "," && settingsItem?.keyEquivalentModifierMask == .command)
         #expect(app.shell.canShowSettings)
@@ -518,8 +607,11 @@ private final class WindowTestPlugin: Plugin {
         // the plugins' commands, which travel the same path.
         #expect(titles(2).starts(with: ["Undo", "Redo", "-"]))
         let actions = menu.items.flatMap { $0.submenu?.items ?? [] }.compactMap(\.action)
-        for action in [#selector(NSText.cut(_:)), #selector(NSText.copy(_:)), #selector(NSText.paste(_:)), #selector(NSResponder.selectAll(_:)),
-                       Selector(("undo:")), Selector(("redo:"))] {
+        for action in [
+            #selector(NSText.cut(_:)), #selector(NSText.copy(_:)), #selector(NSText.paste(_:)),
+            #selector(NSResponder.selectAll(_:)),
+            Selector(("undo:")), Selector(("redo:"))
+        ] {
             #expect(actions.filter { $0 == action }.count == 1)
         }
         // The Help menu of the plugins comes last and is the one the system knows as such.
@@ -539,7 +631,10 @@ private final class WindowTestPlugin: Plugin {
         let menu = MenuBuilder.mainMenu(appName: "Bare", kernel: kernel)
         #expect(menu.items.map(\.title) == ["Bare", "Files", "Edit", "Window"])
         let edit = menu.items[2].submenu?.items ?? []
-        #expect(edit.map { $0.isSeparatorItem ? "-" : $0.title } == ["Undo", "Redo", "-", "Cut", "Copy", "Paste", "Select All"])
+        #expect(
+            edit.map { $0.isSeparatorItem ? "-" : $0.title } == [
+                "Undo", "Redo", "-", "Cut", "Copy", "Paste", "Select All"
+            ])
         // A key that belongs to a command is not taken a second time.
         #expect(edit[0].keyEquivalent.isEmpty && edit[1].keyEquivalent == "z" && edit[4].keyEquivalent == "c")
         // No configuration command, no Settings entry.
@@ -654,7 +749,8 @@ private final class WindowTestPlugin: Plugin {
         // Nothing runs: nothing to send to the background.
         service.setRunsInBackground(true)
         #expect(!service.runsInBackground && service.queueLength == 0)
-        let first = Reporter(), second = Reporter()
+        let first = Reporter()
+        let second = Reporter()
         var results: [String] = []
         service.run(title: "First", work: first.work, completion: { results.append($0) })
         service.run(title: "Second", work: second.work, completion: { results.append($0) })
@@ -664,7 +760,9 @@ private final class WindowTestPlugin: Plugin {
         #expect(service.runsInBackground && service.isBusy)
         // The main window is free, but only for what may run beside a job.
         #expect(!app.commands.isEnabled(.copy) && !app.commands.isEnabled(.goToParent))
-        #expect(app.commands.isEnabled(.cursorToLastEntry) && app.commands.isEnabled(.showCommandLine) && app.commands.isEnabled(.focusTarget))
+        #expect(
+            app.commands.isEnabled(.cursorToLastEntry) && app.commands.isEnabled(.showCommandLine)
+                && app.commands.isEnabled(.focusTarget))
         // The window is not shown in a test; the queue goes on behind it all the same.
         #expect(!service.display.isShown)
         first.end()
@@ -678,10 +776,17 @@ private final class WindowTestPlugin: Plugin {
     }
 
     @Test func progressTexts() {
-        let copying = JobProgress(lines: ["From: a", "To: b"], itemsDone: 7, itemsTotal: 14, bytesDone: 2 << 20, bytesTotal: 8 << 20)
-        #expect(ProgressSheet.countLine(for: copying) == "7 / 14     \(Format.shortSize(2 << 20)) of \(Format.shortSize(8 << 20))")
-        #expect(ProgressSheet.countLine(for: copying, remaining: true) == "-7 / 14     -\(Format.shortSize(6 << 20)) of \(Format.shortSize(8 << 20))")
-        #expect(ProgressSheet.countLine(for: JobProgress(lines: [], itemsDone: 3, itemsTotal: 4), remaining: true) == "-1 / 4")
+        let copying = JobProgress(
+            lines: ["From: a", "To: b"], itemsDone: 7, itemsTotal: 14, bytesDone: 2 << 20, bytesTotal: 8 << 20)
+        #expect(
+            ProgressSheet.countLine(for: copying)
+                == "7 / 14     \(Format.shortSize(2 << 20)) of \(Format.shortSize(8 << 20))")
+        #expect(
+            ProgressSheet.countLine(for: copying, remaining: true)
+                == "-7 / 14     -\(Format.shortSize(6 << 20)) of \(Format.shortSize(8 << 20))")
+        #expect(
+            ProgressSheet.countLine(for: JobProgress(lines: [], itemsDone: 3, itemsTotal: 4), remaining: true)
+                == "-1 / 4")
         #expect(ProgressSheet.queueLine(0).isEmpty && ProgressSheet.queueLine(1) == "1 more job waiting")
         #expect(ProgressSheet.queueLine(3) == "3 more jobs waiting")
     }
@@ -689,17 +794,22 @@ private final class WindowTestPlugin: Plugin {
     @Test func theProgressWindowShowsStateAndOffersItsButtons() {
         let view = ProgressContentView()
         let progress = JobProgress(lines: ["From: a"], itemsDone: 1, itemsTotal: 4)
-        var state = ProgressContentView.State(title: "Copy:", progress: progress, speed: "about 6 s left", showsRemaining: false,
-                                              queue: "1 more job waiting", isPaused: false, isCancelled: false, inBackground: false)
+        var state = ProgressContentView.State(
+            title: "Copy:", progress: progress, speed: "about 6 s left", showsRemaining: false,
+            queue: "1 more job waiting", isPaused: false, isCancelled: false, inBackground: false)
         view.arrange(compact: false)
         view.show(state)
-        #expect(view.pauseButton.title == "Pause" && view.backgroundButton.title == "Background" && view.cancelButton.keyEquivalent == "\u{1b}")
+        #expect(
+            view.pauseButton.title == "Pause" && view.backgroundButton.title == "Background"
+                && view.cancelButton.keyEquivalent == "\u{1b}")
         state.isPaused = true
         state.inBackground = true
         view.arrange(compact: true)
         view.show(state)
         // In its own window Esc no longer stops the job.
-        #expect(view.pauseButton.title == "Resume" && view.backgroundButton.title == "Foreground" && view.cancelButton.keyEquivalent.isEmpty)
+        #expect(
+            view.pauseButton.title == "Resume" && view.backgroundButton.title == "Foreground"
+                && view.cancelButton.keyEquivalent.isEmpty)
         state.isCancelled = true
         view.show(state)
         #expect(!view.pauseButton.isEnabled && !view.cancelButton.isEnabled)
@@ -709,18 +819,22 @@ private final class WindowTestPlugin: Plugin {
 
     @Test func aFormReadsItsFieldsAndPutsTheKeyboardInTheFirstInput() {
         let fields: [FormField] = [
-            .note("Fill this in."), .checkbox("flag", "Recursive", true), .text("name", "Name:", "report.txt"), .password("secret", "Password:"),
+            .note("Fill this in."), .checkbox("flag", "Recursive", true), .text("name", "Name:", "report.txt"),
+            .password("secret", "Password:"),
             .lines("notes", "Notes:", "a\nb"), .choice("kind", "Kind:", ["One", "Two", "Two"], selected: 2),
-            .list("row", "Pick:", ["x", "y", "z"], selected: 1),
+            .list("row", "Pick:", ["x", "y", "z"], selected: 1)
         ]
         let dialog = FormDialog(fields: fields)
         let alert = dialog.makeAlert(title: "Form", detail: "Detail", buttons: ["OK", "Apply"])
-        #expect(alert.buttons.map(\.title) == ["OK", "Apply", "Cancel"] && alert.buttons.last?.keyEquivalent == "\u{1b}")
+        #expect(
+            alert.buttons.map(\.title) == ["OK", "Apply", "Cancel"] && alert.buttons.last?.keyEquivalent == "\u{1b}")
         #expect(alert.buttons.first?.keyEquivalent == "\r")
         // Unchanged, the form answers with what the fields were given.
         let answer = dialog.values(button: 1)
         #expect(answer.button == 1 && answer.values == FormValues(defaultsOf: fields).values)
-        #expect((dialog.firstInput as? NSTextField)?.stringValue == "report.txt" && alert.window.initialFirstResponder === dialog.firstInput)
+        #expect(
+            (dialog.firstInput as? NSTextField)?.stringValue == "report.txt"
+                && alert.window.initialFirstResponder === dialog.firstInput)
         #expect(dialog.scrollView == nil && dialog.lists.count == 1 && dialog.lists[0].searchField == nil)
     }
 
@@ -742,7 +856,8 @@ private final class WindowTestPlugin: Plugin {
         let list = dialog.lists[0]
         #expect(list.searchField != nil && dialog.firstInput === list.searchField && list.selectedRow == 4)
         list.filter("entry 2")
-        #expect(list.shown.map { rows[$0] }.starts(with: ["Entry 2", "Entry 20", "Entry 21"]) && list.shown.count == 11)
+        #expect(
+            list.shown.map { rows[$0] }.starts(with: ["Entry 2", "Entry 20", "Entry 21"]) && list.shown.count == 11)
         // The chosen row is gone from the list: the first one that is left is chosen.
         #expect(list.selectedRow == 1 && dialog.values(button: 0).index("row") == 1)
         list.moveSelection(by: 2)

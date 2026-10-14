@@ -35,12 +35,32 @@ final class ScriptedFileSystem: FileSystemProvider {
         FileItem(url: url(folder + "/" + name), name: name, isDirectory: isDirectory)
     }
 
-    var listingsBegun: Int { condition.lock(); defer { condition.unlock() }; return began }
-    var listingsEnded: Int { condition.lock(); defer { condition.unlock() }; return finished }
-    var volumeQuestions: Int { condition.lock(); defer { condition.unlock() }; return asks }
+    var listingsBegun: Int {
+        condition.lock()
+        defer { condition.unlock() }
+        return began
+    }
+    var listingsEnded: Int {
+        condition.lock()
+        defer { condition.unlock() }
+        return finished
+    }
+    var volumeQuestions: Int {
+        condition.lock()
+        defer { condition.unlock() }
+        return asks
+    }
     var volumeFigure: VolumeInfo? {
-        get { condition.lock(); defer { condition.unlock() }; return figure }
-        set { condition.lock(); figure = newValue; condition.unlock() }
+        get {
+            condition.lock()
+            defer { condition.unlock() }
+            return figure
+        }
+        set {
+            condition.lock()
+            figure = newValue
+            condition.unlock()
+        }
     }
 
     func open() {
@@ -55,13 +75,24 @@ final class ScriptedFileSystem: FileSystemProvider {
 
     func list(_ directory: URL, showHidden: Bool) throws -> [FileItem] { batches.flatMap { $0 } }
 
-    func list(_ directory: URL, showHidden: Bool, cancellation: CancellationFlag, receive: ([FileItem]) -> Bool) throws {
+    func list(_ directory: URL, showHidden: Bool, cancellation: CancellationFlag, receive: ([FileItem]) -> Bool) throws
+    {
         let started = Date()
         let holds = batchesAt[directory.path] == nil ? holdBefore : nil
         let batches = batchesAt[directory.path] ?? self.batches
-        condition.lock(); began += 1; condition.unlock()
-        defer { condition.lock(); finished += 1; condition.unlock() }
-        let waiting = cancellation.onCancel { [condition] in condition.lock(); condition.broadcast(); condition.unlock() }
+        condition.lock()
+        began += 1
+        condition.unlock()
+        defer {
+            condition.lock()
+            finished += 1
+            condition.unlock()
+        }
+        let waiting = cancellation.onCancel { [condition] in
+            condition.lock()
+            condition.broadcast()
+            condition.unlock()
+        }
         defer { _ = waiting }
         for index in 0...batches.count {
             if index == holds {
@@ -81,7 +112,8 @@ final class ScriptedFileSystem: FileSystemProvider {
     }
 
     func volume(of url: URL) -> VolumeInfo? {
-        condition.lock(); defer { condition.unlock() }
+        condition.lock()
+        defer { condition.unlock() }
         asks += 1
         return figure
     }
@@ -92,6 +124,10 @@ final class ScriptedFileSystem: FileSystemProvider {
     func createDirectory(at url: URL) throws { try inner.createDirectory(at: url) }
     func write(_ url: URL) throws -> FileWriter { try inner.write(url) }
     func remove(_ url: URL) throws { try inner.remove(url) }
-    func move(_ source: URL, to destination: URL, replacing: Bool) throws { try inner.move(source, to: destination, replacing: replacing) }
-    func copy(_ source: URL, to destination: URL, progress: (Int64) -> Bool) throws { try inner.copy(source, to: destination, progress: progress) }
+    func move(_ source: URL, to destination: URL, replacing: Bool) throws {
+        try inner.move(source, to: destination, replacing: replacing)
+    }
+    func copy(_ source: URL, to destination: URL, progress: (Int64) -> Bool) throws {
+        try inner.copy(source, to: destination, progress: progress)
+    }
 }

@@ -2,13 +2,18 @@ import AFMKernel
 import Foundation
 import TestSupport
 import Testing
+
 @testable import ViewerPlugin
 
 /// Review round 2, the row index: lines longer than a segment, files that become shorter or
 /// unreadable while they are indexed, and rows that are never cut in front of a mark.
 @Suite struct Review2ViewerRows {
-    private func document(_ data: Data, columns: Int, segment: Int, chunk: Int, wrap: Bool = true, parallel: Bool = false) -> TextDocument {
-        let document = TextDocument(source: DataByteSource(data), encoding: .utf8, layout: .text(TextLayoutOptions(columns: columns, wordWrap: wrap)))
+    private func document(
+        _ data: Data, columns: Int, segment: Int, chunk: Int, wrap: Bool = true, parallel: Bool = false
+    ) -> TextDocument {
+        let document = TextDocument(
+            source: DataByteSource(data), encoding: .utf8,
+            layout: .text(TextLayoutOptions(columns: columns, wordWrap: wrap)))
         document.buildIndex(parallel: parallel, segmentSize: segment, chunkSize: chunk)
         return document
     }
@@ -52,7 +57,9 @@ import Testing
         for index in 0..<size { bytes[index] = UInt8(ascii: "a") + UInt8(index % 26) }
         let columns = 20
         let index = document(bytes, columns: columns, segment: 16 << 10, chunk: 1 << 16, parallel: true)
-        #expect(index.isIndexComplete && index.rowCount == size / columns + (size % columns == 0 ? 0 : 1) && index.lineCount == 1)
+        #expect(
+            index.isIndexComplete && index.rowCount == size / columns + (size % columns == 0 ? 0 : 1)
+                && index.lineCount == 1)
         // About one checkpoint per 4 KB of the line, not one per 64 rows (1,280 bytes).
         let bound = size / TextRowIndex.minimumCheckpointDistance * 2 + 8
         #expect(index.checkpointCount <= bound, "checkpoints \(index.checkpointCount)")
@@ -79,12 +86,18 @@ import Testing
 
     @Test func aChunkedCheckpointListKeepsACopyUnchangedWhileTheOriginalGrows() {
         var list = TextRowIndex.CheckpointList()
-        for number in 0..<9000 { list.append(.init(offset: Int64(number) * 3, linesBefore: number, startsLine: number % 2 == 0)) }
+        for number in 0..<9000 {
+            list.append(.init(offset: Int64(number) * 3, linesBefore: number, startsLine: number % 2 == 0))
+        }
         let copy = list
-        for number in 9000..<20_000 { list.append(.init(offset: Int64(number) * 3, linesBefore: number, startsLine: number % 2 == 0)) }
+        for number in 9000..<20_000 {
+            list.append(.init(offset: Int64(number) * 3, linesBefore: number, startsLine: number % 2 == 0))
+        }
         #expect(copy.count == 9000 && list.count == 20_000)
         for number in [0, 1, 4095, 4096, 4097, 8191, 8999] {
-            #expect(copy[number].offset == Int64(number) * 3 && copy[number].linesBefore == number && copy[number].startsLine == (number % 2 == 0))
+            #expect(
+                copy[number].offset == Int64(number) * 3 && copy[number].linesBefore == number
+                    && copy[number].startsLine == (number % 2 == 0))
         }
         #expect(list[19_999].linesBefore == 19_999 && list[9000].offset == 27_000)
         let thinned = list.thinned(every: 7)
@@ -100,10 +113,13 @@ import Testing
         let reference = document(data, columns: 80, segment: 1 << 30, chunk: 1 << 20)
         for (segment, chunk) in [(1 << 16, 1 << 12), (777, 100), (1 << 20, 99)] {
             let other = document(data, columns: 80, segment: segment, chunk: chunk, parallel: true)
-            #expect(other.rowCount == reference.rowCount && other.lineCount == reference.lineCount, "\(segment)/\(chunk)")
+            #expect(
+                other.rowCount == reference.rowCount && other.lineCount == reference.lineCount, "\(segment)/\(chunk)")
             for row in stride(from: 0, to: reference.rowCount, by: 997) {
                 let expected = try reference.rows(from: row, count: 3).map { "\($0.range) \($0.line) \($0.startsLine)" }
-                #expect(try other.rows(from: row, count: 3).map { "\($0.range) \($0.line) \($0.startsLine)" } == expected, "row \(row) \(segment)/\(chunk)")
+                #expect(
+                    try other.rows(from: row, count: 3).map { "\($0.range) \($0.line) \($0.startsLine)" } == expected,
+                    "row \(row) \(segment)/\(chunk)")
             }
             #expect(try other.row(ofLine: 20_000) == reference.row(ofLine: 20_000))
         }
@@ -128,13 +144,15 @@ import Testing
 
     @Test func aFileThatBecameShorterIsReportedNotShownAsComplete() throws {
         let source = Shrunk(length: 100_000, available: 30_000)
-        let document = TextDocument(source: source, encoding: .utf8, layout: .text(TextLayoutOptions(columns: 50, wordWrap: true)))
+        let document = TextDocument(
+            source: source, encoding: .utf8, layout: .text(TextLayoutOptions(columns: 50, wordWrap: true)))
         document.buildIndex(parallel: false, segmentSize: 8192, chunkSize: 1024)
         #expect(document.readError as? ViewerError == .fileChanged)
         // What was there is shown.
         #expect(document.rowCount > 0)
         // The same in the parallel build.
-        let other = TextDocument(source: source, encoding: .utf8, layout: .text(TextLayoutOptions(columns: 50, wordWrap: true)))
+        let other = TextDocument(
+            source: source, encoding: .utf8, layout: .text(TextLayoutOptions(columns: 50, wordWrap: true)))
         other.buildIndex(parallel: true, segmentSize: 8192, chunkSize: 1024)
         #expect(other.readError as? ViewerError == .fileChanged)
     }
@@ -142,11 +160,14 @@ import Testing
     @Test func rowsOfAFileThatBecameShorterAreReportedAndDoNotTrap() throws {
         let data = Data(repeating: UInt8(ascii: "z"), count: 5000)
         let full = DataByteSource(data)
-        let document = TextDocument(source: full, encoding: .utf8, layout: .text(TextLayoutOptions(columns: 50, wordWrap: true)))
+        let document = TextDocument(
+            source: full, encoding: .utf8, layout: .text(TextLayoutOptions(columns: 50, wordWrap: true)))
         document.buildIndex(parallel: false)
         #expect(document.readError == nil)
         // Reading with a source that now has less.
-        let shorter = TextDocument(source: Shrunk(length: 5000, available: 1000), encoding: .utf8, layout: .text(TextLayoutOptions(columns: 50, wordWrap: true)))
+        let shorter = TextDocument(
+            source: Shrunk(length: 5000, available: 1000), encoding: .utf8,
+            layout: .text(TextLayoutOptions(columns: 50, wordWrap: true)))
         shorter.buildIndex(parallel: false)
         _ = try shorter.rows(from: 0, count: 200)
         #expect(shorter.readError != nil)
@@ -168,7 +189,8 @@ import Testing
 
         func read(at offset: Int64, count: Int) throws -> Data {
             if unreadable.contains(offset) { throw CocoaError(.fileReadUnknown) }
-            let lower = Int(min(offset, length)), upper = min(data.count, lower + count)
+            let lower = Int(min(offset, length))
+            let upper = min(data.count, lower + count)
             return data.subdata(in: lower..<upper)
         }
     }
@@ -179,7 +201,8 @@ import Testing
         for number in 0..<200 { text += String(format: "line %04d  xxxxxxxx\n", number) }
         let data = Data(text.utf8)
         let source = Gappy(data, unreadable: 800..<1200)
-        let document = TextDocument(source: source, encoding: .utf8, layout: .text(TextLayoutOptions(columns: 80, wordWrap: true)))
+        let document = TextDocument(
+            source: source, encoding: .utf8, layout: .text(TextLayoutOptions(columns: 80, wordWrap: true)))
         document.buildIndex(parallel: false, segmentSize: 400, chunkSize: 100)
         #expect(document.readError != nil)
         let rows = try document.rows(from: 0, count: document.rowCount)

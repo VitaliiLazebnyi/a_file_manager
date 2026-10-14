@@ -88,7 +88,8 @@ public final class TreeCache {
         // A readable name, plus a checksum of the whole key so two roots never share a file.
         let readable = String(root.locationKey.map { $0.isLetter || $0.isNumber ? $0 : "_" }.suffix(60))
         let checksum = key.utf8.reduce(UInt64(14_695_981_039_346_656_037)) { ($0 ^ UInt64($1)) &* 1_099_511_628_211 }
-        return directory?.appendingPathComponent("treeinfo-\(readable)-\(String(checksum, radix: 16)).txt", isDirectory: false)
+        return directory?.appendingPathComponent(
+            "treeinfo-\(readable)-\(String(checksum, radix: 16)).txt", isDirectory: false)
     }
 
     /// What is known of the tree below `root`, from memory or from the file; nil when the
@@ -100,7 +101,8 @@ public final class TreeCache {
         lock.unlock()
         if let remembered { return remembered }
         guard let file = fileURL(for: root, showHidden: showHidden), let data = TreeCache.read(file),
-              let text = String(data: data, encoding: .utf8), let entry = TreeCache.parseEntry(text, root: root) else { return nil }
+            let text = String(data: data, encoding: .utf8), let entry = TreeCache.parseEntry(text, root: root)
+        else { return nil }
         lock.lock()
         defer { lock.unlock() }
         // Another thread may have been quicker, or stored something newer. The entry is copied
@@ -116,7 +118,8 @@ public final class TreeCache {
     private func trimMemory(keeping key: String) {
         var total = memory.values.reduce(0) { $0 + $1.entry.paths.count }
         while memory.count > TreeCache.memoryLimit || total > TreeCache.memoryPathLimit,
-              let other = memory.first(where: { $0.key != key && !$0.value.isDirty }) {
+            let other = memory.first(where: { $0.key != key && !$0.value.isDirty })
+        {
             total -= other.value.entry.paths.count
             memory[other.key] = nil
         }
@@ -136,7 +139,9 @@ public final class TreeCache {
     }
 
     /// Keeps the tree of `root` and writes its file.
-    public func store(_ paths: [String], unscanned: [String] = [], isComplete: Bool = true, for root: URL, showHidden: Bool = false) {
+    public func store(
+        _ paths: [String], unscanned: [String] = [], isComplete: Bool = true, for root: URL, showHidden: Bool = false
+    ) {
         let entry = Entry(paths: paths, unscanned: unscanned, isComplete: isComplete)
         let key = TreeCache.key(root, showHidden)
         lock.lock()
@@ -158,7 +163,8 @@ public final class TreeCache {
             if let file = fileURL(for: root, showHidden: hidden) { removals.append((file, newTicket(for: key), key)) }
         }
         lock.unlock()
-        writeLock.lock(); defer { writeLock.unlock() }
+        writeLock.lock()
+        defer { writeLock.unlock() }
         for removal in removals { try? FileManager.default.removeItem(at: removal.file) }
     }
 
@@ -220,7 +226,9 @@ public final class TreeCache {
         // tree gets it made again when the next folder is noted.
         for slot in memory.values where slot.entry.paths.count > 100_000 { slot.known = nil }
         lock.unlock()
-        for (item, ticket) in zip(pending, tickets) { write(item.entry, for: item.root, showHidden: item.hidden, ticket: ticket) }
+        for (item, ticket) in zip(pending, tickets) {
+            write(item.entry, for: item.root, showHidden: item.hidden, ticket: ticket)
+        }
     }
 
     /// Writes what is waiting and waits until the updates handed to `noteFolder` are done; for tests.
@@ -239,13 +247,15 @@ public final class TreeCache {
     private func write(_ entry: Entry, for root: URL, showHidden: Bool, ticket: Int) {
         guard let directory, let file = fileURL(for: root, showHidden: showHidden) else { return }
         let key = TreeCache.key(root, showHidden)
-        writeLock.lock(); defer { writeLock.unlock() }
+        writeLock.lock()
+        defer { writeLock.unlock() }
         lock.lock()
         let isLatest = tickets[key] == ticket
         lock.unlock()
         guard isLatest else { return }
         // Private to the user: the folder and the file are made so from the start.
-        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+        try? FileManager.default.createDirectory(
+            at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
         chmod(directory.path, 0o700)
         // Too big for a file: what is there would be out of date, so it goes.
         if !TreeCache.writePrivately(entry, root: root, to: file) { try? FileManager.default.removeItem(at: file) }
@@ -358,7 +368,9 @@ public final class TreeCache {
                     isFirst = false
                     let prefix = Array("root=".utf8)
                     guard line.count >= prefix.count, Array(line.prefix(prefix.count)) == prefix,
-                          URL(string: String(decoding: line.dropFirst(prefix.count), as: UTF8.self))?.locationKey == root.locationKey else { return nil }
+                        URL(string: String(decoding: line.dropFirst(prefix.count), as: UTF8.self))?.locationKey
+                            == root.locationKey
+                    else { return nil }
                     continue
                 }
                 let (first, last) = (line[0], line[line.count - 1])

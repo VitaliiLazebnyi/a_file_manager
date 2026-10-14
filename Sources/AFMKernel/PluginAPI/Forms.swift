@@ -31,10 +31,16 @@ public struct FormField {
         self.kind = kind
     }
 
-    public static func text(_ key: String, _ label: String, _ value: String = "") -> FormField { FormField(key, label, .text(value)) }
+    public static func text(_ key: String, _ label: String, _ value: String = "") -> FormField {
+        FormField(key, label, .text(value))
+    }
     public static func password(_ key: String, _ label: String) -> FormField { FormField(key, label, .secureText) }
-    public static func lines(_ key: String, _ label: String, _ value: String = "") -> FormField { FormField(key, label, .multilineText(value)) }
-    public static func checkbox(_ key: String, _ label: String, _ isOn: Bool = false) -> FormField { FormField(key, label, .checkbox(isOn)) }
+    public static func lines(_ key: String, _ label: String, _ value: String = "") -> FormField {
+        FormField(key, label, .multilineText(value))
+    }
+    public static func checkbox(_ key: String, _ label: String, _ isOn: Bool = false) -> FormField {
+        FormField(key, label, .checkbox(isOn))
+    }
     public static func choice(_ key: String, _ label: String, _ options: [String], selected: Int = 0) -> FormField {
         FormField(key, label, .choice(options, selected: selected))
     }

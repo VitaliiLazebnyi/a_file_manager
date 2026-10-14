@@ -1,9 +1,10 @@
 import AFMContracts
 import AFMKernel
-@testable import AFMShell
 import AppKit
 import TestSupport
 import Testing
+
+@testable import AFMShell
 
 /// The parts of the file panel that can be checked without a window: where the cells of the
 /// Brief and Thumbnails views are, finding by typing, the quick filter's matching, colours,
@@ -16,7 +17,9 @@ import Testing
     // MARK: Grid
 
     @Test func briefFillsColumnsFromTopToBottom() {
-        let grid = GridGeometry(flow: .columns, count: 23, cell: CGSize(width: 100, height: 20), viewport: CGSize(width: 250, height: 105))
+        let grid = GridGeometry(
+            flow: .columns, count: 23, cell: CGSize(width: 100, height: 20), viewport: CGSize(width: 250, height: 105)
+        )
         #expect(grid.perLine == 5 && grid.lines == 5)
         #expect(grid.contentSize == CGSize(width: 500, height: 105))
         #expect(grid.frame(of: 0) == CGRect(x: 0, y: 0, width: 100, height: 20))
@@ -31,7 +34,9 @@ import Testing
     }
 
     @Test func arrowKeysInBrief() {
-        let grid = GridGeometry(flow: .columns, count: 23, cell: CGSize(width: 100, height: 20), viewport: CGSize(width: 250, height: 100))
+        let grid = GridGeometry(
+            flow: .columns, count: 23, cell: CGSize(width: 100, height: 20), viewport: CGSize(width: 250, height: 100)
+        )
         #expect(grid.index(from: 7, moving: .down) == 8 && grid.index(from: 7, moving: .up) == 6)
         #expect(grid.index(from: 7, moving: .right) == 12 && grid.index(from: 7, moving: .left) == 2)
         // ← in the first column and → in the last go to the first and the last entry.
@@ -40,21 +45,28 @@ import Testing
     }
 
     @Test func thumbnailsFillRowsAndScrollVertically() {
-        let grid = GridGeometry(flow: .rows, count: 10, cell: CGSize(width: 100, height: 120), viewport: CGSize(width: 450, height: 200))
+        let grid = GridGeometry(
+            flow: .rows, count: 10, cell: CGSize(width: 100, height: 120), viewport: CGSize(width: 450, height: 200))
         #expect(grid.perLine == 4 && grid.lines == 3 && grid.contentSize == CGSize(width: 450, height: 360))
         #expect(grid.frame(of: 5) == CGRect(x: 100, y: 120, width: 100, height: 120))
         #expect(grid.index(at: CGPoint(x: 150, y: 130)) == 5 && grid.index(at: CGPoint(x: 420, y: 10)) == nil)
         #expect(grid.index(at: CGPoint(x: 250, y: 250)) == nil)
         #expect(grid.indexes(in: CGRect(x: 0, y: 100, width: 450, height: 50)) == 0..<8)
-        #expect(grid.index(from: 5, moving: .right) == 6 && grid.index(from: 5, moving: .up) == 1 && grid.index(from: 5, moving: .down) == 9)
+        #expect(
+            grid.index(from: 5, moving: .right) == 6 && grid.index(from: 5, moving: .up) == 1
+                && grid.index(from: 5, moving: .down) == 9)
         // No tile straight below in the shorter last row: the last tile; none above the first row: stay.
-        #expect(grid.index(from: 7, moving: .down) == 9 && grid.index(from: 9, moving: .down) == 9 && grid.index(from: 2, moving: .up) == 2)
+        #expect(
+            grid.index(from: 7, moving: .down) == 9 && grid.index(from: 9, moving: .down) == 9
+                && grid.index(from: 2, moving: .up) == 2)
         #expect(grid.pageSize == 4)
     }
 
     @Test func anEmptyOrTinyGridDoesNotBreak() {
         let empty = GridGeometry(flow: .columns, count: 0, cell: CGSize(width: 100, height: 20), viewport: .zero)
-        #expect(empty.perLine == 1 && empty.lines == 0 && empty.indexes(in: CGRect(x: 0, y: 0, width: 50, height: 50)).isEmpty)
+        #expect(
+            empty.perLine == 1 && empty.lines == 0
+                && empty.indexes(in: CGRect(x: 0, y: 0, width: 50, height: 50)).isEmpty)
         #expect(empty.index(from: 0, moving: .right) == 0 && empty.index(at: .zero) == nil && empty.pageSize == 1)
     }
 
@@ -66,7 +78,8 @@ import Testing
         #expect(FileGridView.briefColumnWidth(for: long, limit: 200, viewport: 600) == 200)
         // Without a limit the panel's width is the limit.
         #expect(FileGridView.briefColumnWidth(for: long, limit: nil, viewport: 600) == 600)
-        let medium = FileGridView.briefColumnWidth(for: short + [item("a-name-of-middling-length.txt")], limit: 400, viewport: 600)
+        let medium = FileGridView.briefColumnWidth(
+            for: short + [item("a-name-of-middling-length.txt")], limit: 400, viewport: 600)
         #expect(medium > 150 && medium < 300)
         #expect(FileGridView.briefColumnWidth(for: [], limit: 200, viewport: 600) == 80)
     }
@@ -77,9 +90,15 @@ import Testing
         let names = ["alpha", "beta", "Bravo", "report_01", "report_02"]
         #expect(TypeSelect.row(matching: "b", in: names, from: 0) == 1)
         // The same letter again moves on; a longer prefix may stay where it is.
-        #expect(TypeSelect.row(matching: "b", in: names, from: 1) == 2 && TypeSelect.row(matching: "b", in: names, from: 2) == 1)
-        #expect(TypeSelect.row(matching: "rep", in: names, from: 3) == 3 && TypeSelect.row(matching: "report_02", in: names, from: 3) == 4)
-        #expect(TypeSelect.row(matching: "x", in: names, from: 0) == nil && TypeSelect.row(matching: "a", in: [], from: 0) == nil)
+        #expect(
+            TypeSelect.row(matching: "b", in: names, from: 1) == 2
+                && TypeSelect.row(matching: "b", in: names, from: 2) == 1)
+        #expect(
+            TypeSelect.row(matching: "rep", in: names, from: 3) == 3
+                && TypeSelect.row(matching: "report_02", in: names, from: 3) == 4)
+        #expect(
+            TypeSelect.row(matching: "x", in: names, from: 0) == nil
+                && TypeSelect.row(matching: "a", in: [], from: 0) == nil)
         // From the `[..]` row, which is before the first name.
         #expect(TypeSelect.row(matching: "a", in: names, from: -1) == 0)
     }
@@ -102,20 +121,31 @@ import Testing
     }
 
     @Test func theQuickFilterOfPlainTextAgreesWithFoundationForEveryKindOfName() {
-        let names = ["report.txt", "REPORT.TXT", "Übung.txt", "ÜBUNG", "naïve cafe", "café", "K.txt", "\u{212A}elvin", "日本語.md", "a", "", "ab", "tx"]
+        let names = [
+            "report.txt", "REPORT.TXT", "Übung.txt", "ÜBUNG", "naïve cafe", "café", "K.txt", "\u{212A}elvin", "日本語.md",
+            "a", "", "ab", "tx"
+        ]
         for text in ["Port", "t", "txt", "ung", "ÜB", "café", "k", "日本", "xt", "ab", "TX"] {
             let matches = QuickFilter.matcher(for: text)
             for name in names {
-                #expect(matches(name) == (name.range(of: text.lowercased(), options: .caseInsensitive) != nil), "\(text) in \(name)")
+                #expect(
+                    matches(name) == (name.range(of: text.lowercased(), options: .caseInsensitive) != nil),
+                    "\(text) in \(name)")
             }
         }
     }
 
     @Test func onlyTextTypedOnIsTakenToNarrowTheList() {
-        #expect(QuickFilter.narrows(from: "re", to: "rep") && QuickFilter.narrows(from: "re", to: "xre") && QuickFilter.narrows(from: "Re", to: "rEp"))
+        #expect(
+            QuickFilter.narrows(from: "re", to: "rep") && QuickFilter.narrows(from: "re", to: "xre")
+                && QuickFilter.narrows(from: "Re", to: "rEp"))
         // Fewer letters, other letters, a mask, or no text before: the whole list is filtered again.
-        #expect(!QuickFilter.narrows(from: "rep", to: "re") && !QuickFilter.narrows(from: "re", to: "ro") && !QuickFilter.narrows(from: "", to: "a"))
-        #expect(!QuickFilter.narrows(from: "re", to: "re*") && !QuickFilter.narrows(from: "r?", to: "r?a") && !QuickFilter.narrows(from: "*", to: "*a"))
+        #expect(
+            !QuickFilter.narrows(from: "rep", to: "re") && !QuickFilter.narrows(from: "re", to: "ro")
+                && !QuickFilter.narrows(from: "", to: "a"))
+        #expect(
+            !QuickFilter.narrows(from: "re", to: "re*") && !QuickFilter.narrows(from: "r?", to: "r?a")
+                && !QuickFilter.narrows(from: "*", to: "*a"))
         #expect(!QuickFilter.narrows(from: "ü", to: "üb") && !QuickFilter.narrows(from: "u", to: "uü"))
         // The narrowed list is the one the full filter gives, over the names that make a trap of "contains".
         let names = ["report.txt", "Reprint", "bare", "a.rep", "REP", "", "r", "xrex", "Übung", "ré"]
@@ -133,7 +163,9 @@ import Testing
         filter.text = "re"
         #expect(filter.title.hasPrefix("*.txt") && filter.title.hasSuffix("re"))
         let combined = filter.combined!
-        #expect(combined.matches(item("report.txt")) && !combined.matches(item("report.pdf")) && !combined.matches(item("notes.txt")))
+        #expect(
+            combined.matches(item("report.txt")) && !combined.matches(item("report.pdf"))
+                && !combined.matches(item("notes.txt")))
         // Folders are filtered by name too; the display filter below lets them all through.
         #expect(combined.matches(item("recent", folder: true)) && !combined.matches(item("docs", folder: true)))
         #expect(QuickFilter(text: "", base: nil, directory: URL(fileURLWithPath: "/x")).combined == nil)
@@ -155,7 +187,9 @@ import Testing
         let before = stack?.arrangedSubviews ?? []
         bar.update(titles: ["a", "c"], paths: ["/a", "/c"], active: 1)
         #expect(before.count == 2 && stack?.arrangedSubviews.elementsEqual(before, by: ===) == true)
-        #expect(bar.titles == ["a", "c"] && (before[1] as? NSButton)?.state == .on && (before[0] as? NSButton)?.state == .off)
+        #expect(
+            bar.titles == ["a", "c"] && (before[1] as? NSButton)?.state == .on
+                && (before[0] as? NSButton)?.state == .off)
         // Another number of tabs builds the strip anew.
         bar.update(titles: ["a", "c", "d"], paths: ["/a", "/c", "/d"], active: 1)
         #expect(bar.titles == ["a", "c", "d"] && bar.isHidden == false)
@@ -167,20 +201,29 @@ import Testing
         let sources = (0..<1000).map { URL(fileURLWithPath: "/x/f\($0).txt") }
         let session = DropSession(sequence: 7, sources: sources)
         let (inside, elsewhere) = (URL(fileURLWithPath: "/x"), URL(fileURLWithPath: "/y"))
-        #expect(session.isPointless(.move, into: inside) && !session.isPointless(.copy, into: inside) && !session.isPointless(.move, into: elsewhere))
-        #expect(session.isPointless(.move, into: inside) && session.mountPoints.contains("/") && session.mountPoints == session.mountPoints)
+        #expect(
+            session.isPointless(.move, into: inside) && !session.isPointless(.copy, into: inside)
+                && !session.isPointless(.move, into: elsewhere))
+        #expect(
+            session.isPointless(.move, into: inside) && session.mountPoints.contains("/")
+                && session.mountPoints == session.mountPoints)
         #expect(DropSession(sequence: 8, sources: []).isPointless(.copy, into: elsewhere))
     }
 
     // MARK: Colours
 
     @Test func colourEntriesAreReadFromText() {
-        let rules = ColorRule.parse("*.zip *.gz = purple\n-.tmp = red\nnonsense\n*.swift=#FF8000;;*.md = nocolour;;* = gray")
+        let rules = ColorRule.parse(
+            "*.zip *.gz = purple\n-.tmp = red\nnonsense\n*.swift=#FF8000;;*.md = nocolour;;* = gray")
         #expect(rules.map(\.maskText) == ["*.zip *.gz", "*.swift", "*"])
         #expect(ColorRule.color(for: "a.GZ", in: rules) == .systemPurple)
-        #expect(ColorRule.color(for: "a.swift", in: rules) == NSColor(srgbRed: 1, green: CGFloat(0x80) / 255, blue: 0, alpha: 1))
+        #expect(
+            ColorRule.color(for: "a.swift", in: rules)
+                == NSColor(srgbRed: 1, green: CGFloat(0x80) / 255, blue: 0, alpha: 1))
         // The first entry that matches decides.
-        #expect(ColorRule.color(for: "a.txt", in: rules) == .systemGray && ColorRule.color(for: "a.txt", in: Array(rules.prefix(2))) == nil)
+        #expect(
+            ColorRule.color(for: "a.txt", in: rules) == .systemGray
+                && ColorRule.color(for: "a.txt", in: Array(rules.prefix(2))) == nil)
         #expect(ColorRule.color(named: "#12345") == nil && ColorRule.color(named: " Red ") == .systemRed)
         #expect(!ColorRule.parse(PanelSettings.defaultColorRules).isEmpty)
     }
@@ -188,13 +231,17 @@ import Testing
     @Test func theOptionsOfTheListsComeFromTheSettings() {
         let store = MemorySettings()
         var settings = PanelSettings(from: store)
-        #expect(settings.briefWidthLimit == 200 && settings.thumbnailSide == 96 && settings.confirmsDrops && settings.colorRules.isEmpty)
+        #expect(
+            settings.briefWidthLimit == 200 && settings.thumbnailSide == 96 && settings.confirmsDrops
+                && settings.colorRules.isEmpty)
         store.set(false, forKey: PanelSettings.limitsBriefWidthKey)
         store.set(3, forKey: PanelSettings.thumbnailSizeKey)
         store.set(false, forKey: PanelSettings.confirmsDropsKey)
         store.set(true, forKey: PanelSettings.colorsByTypeKey)
         settings = PanelSettings(from: store)
-        #expect(settings.briefWidthLimit == nil && settings.thumbnailSide == 192 && !settings.confirmsDrops && settings.colorRules.count == 2)
+        #expect(
+            settings.briefWidthLimit == nil && settings.thumbnailSide == 192 && !settings.confirmsDrops
+                && settings.colorRules.count == 2)
         store.set(99, forKey: PanelSettings.thumbnailSizeKey)
         #expect(PanelSettings(from: store).thumbnailSide == 256)
         #expect(PanelSettings.page(onChange: {}).preferences.count == 6)
@@ -203,25 +250,41 @@ import Testing
     // MARK: Path bar and tabs
 
     @Test func thePathIsCutIntoItsFolders() {
-        func ancestors(_ paths: [String]) -> [(location: URL, path: String)] { paths.map { (URL(fileURLWithPath: $0), $0) } }
-        let segments = PathBarView.segments(of: "/Users/me/docs", ancestors: ancestors(["/", "/Users", "/Users/me", "/Users/me/docs"]))
-        #expect(segments.map(\.range) == [NSRange(location: 0, length: 1), NSRange(location: 1, length: 5), NSRange(location: 7, length: 2),
-                                         NSRange(location: 10, length: 4)])
+        func ancestors(_ paths: [String]) -> [(location: URL, path: String)] {
+            paths.map { (URL(fileURLWithPath: $0), $0) }
+        }
+        let segments = PathBarView.segments(
+            of: "/Users/me/docs", ancestors: ancestors(["/", "/Users", "/Users/me", "/Users/me/docs"]))
+        #expect(
+            segments.map(\.range) == [
+                NSRange(location: 0, length: 1), NSRange(location: 1, length: 5), NSRange(location: 7, length: 2),
+                NSRange(location: 10, length: 4)
+            ])
         #expect(segments.map(\.location.path) == ["/", "/Users", "/Users/me", "/Users/me/docs"])
         // A file system with a notation of its own, whose writings do not build on each other.
         #expect(PathBarView.segments(of: "archive: sub", ancestors: ancestors(["/a.zip", "/a.zip/sub"])).isEmpty)
-        let memory = PathBarView.segments(of: "mem:/A/b", ancestors: [(URL(string: "mem:///")!, "mem:/"), (URL(string: "mem:///A")!, "mem:/A"),
-                                                                    (URL(string: "mem:///A/b")!, "mem:/A/b")])
-        #expect(memory.map(\.range) == [NSRange(location: 0, length: 5), NSRange(location: 5, length: 1), NSRange(location: 7, length: 1)])
+        let memory = PathBarView.segments(
+            of: "mem:/A/b",
+            ancestors: [
+                (URL(string: "mem:///")!, "mem:/"), (URL(string: "mem:///A")!, "mem:/A"),
+                (URL(string: "mem:///A/b")!, "mem:/A/b")
+            ])
+        #expect(
+            memory.map(\.range) == [
+                NSRange(location: 0, length: 5), NSRange(location: 5, length: 1), NSRange(location: 7, length: 1)
+            ])
     }
 
     @MainActor @Test func aClickOnAPartOfThePathGoesThere() {
         let bar = PathBarView(frame: NSRect(x: 0, y: 0, width: 400, height: 22))
-        var visited: [String] = [], clicks: [Int] = []
+        var visited: [String] = []
+        var clicks: [Int] = []
         bar.onNavigate = { visited.append($0.path) }
         bar.onClick = { clicks.append($0) }
         let paths = ["/", "/Users", "/Users/me"]
-        bar.update(text: "/Users/me/*.*", segments: PathBarView.segments(of: "/Users/me", ancestors: paths.map { (URL(fileURLWithPath: $0), $0) }))
+        bar.update(
+            text: "/Users/me/*.*",
+            segments: PathBarView.segments(of: "/Users/me", ancestors: paths.map { (URL(fileURLWithPath: $0), $0) }))
         bar.click(at: bar.center(ofSegment: 1), count: 1)
         #expect(visited == ["/Users"] && clicks.isEmpty)
         // The folder that is shown, and the space behind the text, are the bar itself.
@@ -262,11 +325,14 @@ import Testing
     }
 
     @Test func pointlessDropsAreRefused() {
-        let a = URL(fileURLWithPath: "/x/a"), file = URL(fileURLWithPath: "/x/a/f.txt")
+        let a = URL(fileURLWithPath: "/x/a")
+        let file = URL(fileURLWithPath: "/x/a/f.txt")
         #expect(PanelDrop.isPointless(.copy, [], into: a))
         #expect(PanelDrop.isPointless(.move, [file], into: a) && !PanelDrop.isPointless(.copy, [file], into: a))
         // A folder into itself or into one of its subfolders.
-        #expect(PanelDrop.isPointless(.copy, [a], into: a) && PanelDrop.isPointless(.move, [a], into: URL(fileURLWithPath: "/x/a/sub/deep")))
+        #expect(
+            PanelDrop.isPointless(.copy, [a], into: a)
+                && PanelDrop.isPointless(.move, [a], into: URL(fileURLWithPath: "/x/a/sub/deep")))
         #expect(!PanelDrop.isPointless(.move, [file], into: URL(fileURLWithPath: "/x/b")))
         #expect(!PanelDrop.isPointless(.move, [URL(fileURLWithPath: "/x/ab")], into: URL(fileURLWithPath: "/x/a")))
     }
@@ -275,12 +341,18 @@ import Testing
         let mounts = ["/", "/Volumes/Stick", "/Volumes/Stick 2", "/System/Volumes/Data"]
         #expect(PanelDrop.mountPoint(of: "/Volumes/Stick/a/b", among: mounts) == "/Volumes/Stick")
         #expect(PanelDrop.mountPoint(of: "/Volumes/Stick 2/a", among: mounts) == "/Volumes/Stick 2")
-        #expect(PanelDrop.mountPoint(of: "/Volumes/Sticky/a", among: mounts) == "/" && PanelDrop.mountPoint(of: "/Users/me", among: mounts) == "/")
+        #expect(
+            PanelDrop.mountPoint(of: "/Volumes/Sticky/a", among: mounts) == "/"
+                && PanelDrop.mountPoint(of: "/Users/me", among: mounts) == "/")
         func file(_ path: String) -> URL { URL(fileURLWithPath: path) }
         #expect(PanelDrop.areOnSameVolume(file("/Users/a"), file("/tmp/b"), mountPoints: mounts))
         #expect(!PanelDrop.areOnSameVolume(file("/Users/a"), file("/Volumes/Stick/b"), mountPoints: mounts))
-        #expect(PanelDrop.areOnSameVolume(URL(string: "ftp://host/a")!, URL(string: "ftp://host/b/c")!, mountPoints: mounts))
-        #expect(!PanelDrop.areOnSameVolume(URL(string: "ftp://host/a")!, URL(string: "ftp://other/a")!, mountPoints: mounts))
+        #expect(
+            PanelDrop.areOnSameVolume(
+                URL(string: "ftp://host/a")!, URL(string: "ftp://host/b/c")!, mountPoints: mounts))
+        #expect(
+            !PanelDrop.areOnSameVolume(
+                URL(string: "ftp://host/a")!, URL(string: "ftp://other/a")!, mountPoints: mounts))
         #expect(!PanelDrop.areOnSameVolume(URL(string: "mem:///a")!, file("/a"), mountPoints: mounts))
         #expect(PanelDrop.mountPoints().contains("/"))
     }
@@ -288,27 +360,32 @@ import Testing
     @MainActor @Test func draggedItemsTravelOnThePasteboard() {
         let pasteboard = NSPasteboard.withUniqueName()
         defer { pasteboard.releaseGlobally() }
-        let local = item("a.txt"), remote = FileItem(url: URL(string: "mem:///A/one.txt")!, name: "one.txt", isDirectory: false)
+        let local = item("a.txt")
+        let remote = FileItem(url: URL(string: "mem:///A/one.txt")!, name: "one.txt", isDirectory: false)
         pasteboard.clearContents()
         // The drag carries a ticket; what is dragged stays in the program for as long as the drag lasts.
         pasteboard.writeObjects(PanelDrop.beginDrag(of: [local, remote]))
         defer { PanelDrop.endDrag() }
         #expect(PanelDrop.locations(on: pasteboard).map(\.absoluteString) == ["file:///x/a.txt", "mem:///A/one.txt"])
         // Only the item of the local disk is there for other programs.
-        let files = pasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL]
+        let files =
+            pasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL]
         #expect(files?.map(\.path) == ["/x/a.txt"])
         // Files dragged in from Finder carry file URLs only.
         pasteboard.clearContents()
         pasteboard.writeObjects([URL(fileURLWithPath: "/x/from-finder.txt") as NSURL])
         #expect(PanelDrop.locations(on: pasteboard).map(\.path) == ["/x/from-finder.txt"])
-        #expect(PanelDrop.question(.move, count: 1) == "Move 1 item to" && PanelDrop.question(.copy, count: 3) == "Copy 3 items to")
+        #expect(
+            PanelDrop.question(.move, count: 1) == "Move 1 item to"
+                && PanelDrop.question(.copy, count: 3) == "Copy 3 items to")
     }
 
     // MARK: Status line
 
     @Test func theBriefViewsStatusLineDescribesTheItemUnderTheCursor() {
-        let file = FileItem(url: URL(fileURLWithPath: "/x/win.ini"), name: "win.ini", isDirectory: false, size: 1234,
-                            modified: Date(timeIntervalSince1970: 0), permissions: 0o644)
+        let file = FileItem(
+            url: URL(fileURLWithPath: "/x/win.ini"), name: "win.ini", isDirectory: false, size: 1234,
+            modified: Date(timeIntervalSince1970: 0), permissions: 0o644)
         let text = PanelViewController.detailText(for: file)
         #expect(text.hasPrefix("win  ini  1,234  ") && text.hasSuffix("  rw-r--r--"))
         #expect(PanelViewController.detailText(for: item("docs", folder: true)).hasPrefix("[docs]  <DIR>  "))
@@ -357,11 +434,14 @@ import Testing
         }
 
         func leave() {
-            lock.lock(); running -= 1; lock.unlock()
+            lock.lock()
+            running -= 1
+            lock.unlock()
         }
 
         var counts: (calls: Int, onMain: Int, mostAtOnce: Int) {
-            lock.lock(); defer { lock.unlock() }
+            lock.lock()
+            defer { lock.unlock() }
             return (calls, onMain, mostAtOnce)
         }
     }
@@ -435,7 +515,8 @@ import Testing
         #expect(arrivals == 2 && (2...3).contains(callsForTheFolderLeft))
         #expect(store.text(of: column, for: item("b", size: 5)) == nil)
         _ = await wait { !store.isBusy }
-        #expect(store.text(of: column, for: item("b", size: 5)) == "5" && probe.counts.calls == callsForTheFolderLeft + 1)
+        #expect(
+            store.text(of: column, for: item("b", size: 5)) == "5" && probe.counts.calls == callsForTheFolderLeft + 1)
     }
 
     /// A thumbnail source that answers when the test says so.
@@ -444,7 +525,9 @@ import Testing
         var requested: [String] = []
         var cancelled: [String] = []
 
-        func thumbnail(for url: URL, side: CGFloat, scale: CGFloat, completion: @escaping (NSImage?) -> Void) -> () -> Void {
+        func thumbnail(for url: URL, side: CGFloat, scale: CGFloat, completion: @escaping (NSImage?) -> Void) -> () ->
+            Void
+        {
             let name = url.lastPathComponent
             requested.append(name)
             pending[name] = completion
@@ -469,7 +552,9 @@ import Testing
         let (a, b, c) = (item("a.png"), item("b.png"), item("c.txt"))
         #expect(store.image(for: a, side: 96, scale: 2) == nil && store.image(for: b, side: 96, scale: 2) == nil)
         // Asking again while the picture is being made does not ask the source again.
-        #expect(store.image(for: a, side: 96, scale: 2) == nil && source.requested == ["a.png", "b.png"] && store.runningCount == 2)
+        #expect(
+            store.image(for: a, side: 96, scale: 2) == nil && source.requested == ["a.png", "b.png"]
+                && store.runningCount == 2)
         let picture = NSImage(size: NSSize(width: 10, height: 10))
         source.answer("a.png", with: picture)
         let came = await wait { arrived == ["a.png"] }
@@ -487,7 +572,9 @@ import Testing
         _ = await wait { store.runningCount == 1 }
         #expect(store.image(for: c, side: 96, scale: 2) == nil && source.requested.filter { $0 == "c.txt" }.count == 1)
         store.reset()
-        #expect(store.runningCount == 0 && store.image(for: c, side: 96, scale: 2) == nil && source.requested.filter { $0 == "c.txt" }.count == 2)
+        #expect(
+            store.runningCount == 0 && store.image(for: c, side: 96, scale: 2) == nil
+                && source.requested.filter { $0 == "c.txt" }.count == 2)
         // Another size, or a changed file, is another picture.
         #expect(ThumbnailStore.key(for: a, side: 96) != ThumbnailStore.key(for: a, side: 128))
         #expect(ThumbnailStore.key(for: a, side: 96) != ThumbnailStore.key(for: item("a.png", size: 2), side: 96))
@@ -529,7 +616,9 @@ extension PanelStores {
         let late = source.pending["a.png"]
         // Scrolled away and back: a second request for the same picture is under way.
         store.keepOnly([])
-        #expect(store.image(for: a, side: 96, scale: 2) == nil && source.requested == ["a.png", "a.png"] && store.runningCount == 1)
+        #expect(
+            store.image(for: a, side: 96, scale: 2) == nil && source.requested == ["a.png", "a.png"]
+                && store.runningCount == 1)
         // The first request answers late, with nothing: that must not end the second request or
         // mark the file as one without a picture.
         late?(nil)
@@ -544,8 +633,9 @@ extension PanelStores {
     @Test func picturesAreCountedByTheirPixels() {
         let small = NSImage(size: NSSize(width: 10, height: 10))
         #expect(ThumbnailStore.cost(of: small) == 400)
-        let representation = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 512, pixelsHigh: 512, bitsPerSample: 8, samplesPerPixel: 4,
-                                              hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
+        let representation = NSBitmapImageRep(
+            bitmapDataPlanes: nil, pixelsWide: 512, pixelsHigh: 512, bitsPerSample: 8, samplesPerPixel: 4,
+            hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
         let retina = NSImage(size: NSSize(width: 256, height: 256))
         retina.addRepresentation(representation)
         #expect(ThumbnailStore.cost(of: retina) == 512 * 512 * 4)
@@ -559,11 +649,14 @@ extension PanelStores.Probe {
         private var noted: [String] = []
 
         func note(_ name: String) {
-            lock.lock(); noted.append(name); lock.unlock()
+            lock.lock()
+            noted.append(name)
+            lock.unlock()
         }
 
         var names: [String] {
-            lock.lock(); defer { lock.unlock() }
+            lock.lock()
+            defer { lock.unlock() }
             return noted
         }
     }

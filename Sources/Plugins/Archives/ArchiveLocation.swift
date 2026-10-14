@@ -64,7 +64,9 @@ enum ArchiveURL {
     static func parse(_ url: URL) -> Place? {
         guard isArchiveURL(url), let host = url.host else { return nil }
         let parts = host.split(separator: "-", omittingEmptySubsequences: false).map(String.init)
-        guard parts.count == 2 || parts.count == 3, parts[0].hasPrefix("d"), let depth = Int(parts[0].dropFirst()), depth > 0 else { return nil }
+        guard parts.count == 2 || parts.count == 3, parts[0].hasPrefix("d"), let depth = Int(parts[0].dropFirst()),
+            depth > 0
+        else { return nil }
         let prefix: String
         if parts.count == 3 {
             guard let text = unhex(parts[2]) else { return nil }
@@ -112,7 +114,9 @@ enum ArchiveURL {
 
     /// Scheme and authority, e.g. `file://` or `ftp://user@server:21`.
     private static func authority(of url: URL) -> String {
-        guard var components = URLComponents(url: url, resolvingAgainstBaseURL: true) else { return (url.scheme ?? "file") + "://" }
+        guard var components = URLComponents(url: url, resolvingAgainstBaseURL: true) else {
+            return (url.scheme ?? "file") + "://"
+        }
         components.path = ""
         components.query = nil
         components.fragment = nil
@@ -191,8 +195,10 @@ enum ArchiveFormat: Equatable {
     }
 
     /// The formats Pack can create, in the order of the dialog.
-    static let writable: [ArchiveFormat] = [.zip, .tar, .compressedTar(.gzip), .compressedTar(.bzip2), .compressedTar(.xz),
-                                            .compressedFile(.gzip), .compressedFile(.bzip2), .compressedFile(.xz)]
+    static let writable: [ArchiveFormat] = [
+        .zip, .tar, .compressedTar(.gzip), .compressedTar(.bzip2), .compressedTar(.xz),
+        .compressedFile(.gzip), .compressedFile(.bzip2), .compressedFile(.xz)
+    ]
 
     /// The extension a new archive of this format gets.
     var defaultExtension: String {
@@ -244,11 +250,19 @@ enum ArchiveFormat: Equatable {
     /// whether what they hold starts like a TAR archive.
     static func detect(head: Data, name: String, tarInside: (Codec) -> Bool) -> ArchiveFormat {
         let bytes = [UInt8](head.prefix(512))
-        func starts(_ signature: [UInt8]) -> Bool { bytes.count >= signature.count && Array(bytes[..<signature.count]) == signature }
+        func starts(_ signature: [UInt8]) -> Bool {
+            bytes.count >= signature.count && Array(bytes[..<signature.count]) == signature
+        }
         let lower = name.lowercased()
-        if starts([0x50, 0x4B, 0x03, 0x04]) || starts([0x50, 0x4B, 0x05, 0x06]) || starts([0x50, 0x4B, 0x07, 0x08]) { return .zip }
-        let codec: Codec? = starts([0x1F, 0x8B]) ? .gzip : starts([0x42, 0x5A, 0x68]) ? .bzip2
-            : starts([0xFD, 0x37, 0x7A, 0x58, 0x5A, 0x00]) ? .xz : nil
+        if starts([0x50, 0x4B, 0x03, 0x04]) || starts([0x50, 0x4B, 0x05, 0x06]) || starts([0x50, 0x4B, 0x07, 0x08]) {
+            return .zip
+        }
+        let codec: Codec? =
+            starts([0x1F, 0x8B])
+            ? .gzip
+            : starts([0x42, 0x5A, 0x68])
+                ? .bzip2
+                : starts([0xFD, 0x37, 0x7A, 0x58, 0x5A, 0x00]) ? .xz : nil
         if let codec { return tarInside(codec) ? .compressedTar(codec) : .compressedFile(codec) }
         if TarHeader.looksLikeHeader(head) { return .tar }
         // A ZIP with something in front of it (a self-extracting program) has its directory at the end as usual.
@@ -281,14 +295,19 @@ enum ForeignArchive {
             bytes.count >= offset + signature.count && Array(bytes[offset..<(offset + signature.count)]) == signature
         }
         if starts([0x1F, 0x9D]) { return .compressedTar }
-        var known = starts([0x37, 0x7A, 0xBC, 0xAF, 0x27, 0x1C])                    // 7z
-            || starts([0x52, 0x61, 0x72, 0x21, 0x1A, 0x07])                         // RAR 4 and 5
-            || starts([0x4D, 0x53, 0x43, 0x46, 0, 0, 0, 0])                         // CAB
-            || starts([0x78, 0x61, 0x72, 0x21])                                     // XAR
-            || starts(Array("070707".utf8)) || starts(Array("070701".utf8)) || starts(Array("070702".utf8))   // cpio, text headers
-            || starts([0xC7, 0x71]) || starts([0x71, 0xC7])                         // cpio, binary headers
+        var known =
+            starts([0x37, 0x7A, 0xBC, 0xAF, 0x27, 0x1C])  // 7z
+            || starts([0x52, 0x61, 0x72, 0x21, 0x1A, 0x07])  // RAR 4 and 5
+            || starts([0x4D, 0x53, 0x43, 0x46, 0, 0, 0, 0])  // CAB
+            || starts([0x78, 0x61, 0x72, 0x21])  // XAR
+            || starts(Array("070707".utf8)) || starts(Array("070701".utf8)) || starts(Array("070702".utf8))  // cpio, text headers
+            || starts([0xC7, 0x71]) || starts([0x71, 0xC7])  // cpio, binary headers
         // LHA: "-lh5-", "-lzs-", "-pm0-" behind two bytes.
-        if !known, bytes[2] == 0x2D, bytes[6] == 0x2D, [[0x6C, 0x68], [0x6C, 0x7A], [0x70, 0x6D]].contains(Array(bytes[3..<5])) { known = true }
+        if !known, bytes[2] == 0x2D, bytes[6] == 0x2D,
+            [[0x6C, 0x68], [0x6C, 0x7A], [0x70, 0x6D]].contains(Array(bytes[3..<5]))
+        {
+            known = true
+        }
         if !known {
             // ISO 9660: "CD001" at the start of a volume descriptor, 32 KB into the image.
             for sector in [16, 17, 18] where !known {
@@ -335,10 +354,14 @@ enum ArchiveError: LocalizedError {
         case .notFound(let path): return "\(path) does not exist in the archive."
         case .notADirectory(let path): return "\(path) is not a folder."
         case .readOnly(let name): return "Archives of this type cannot be changed (\(name))."
-        case .changedOutside(let name): return "\(name) was changed by another program; the changes made here were not written."
+        case .changedOutside(let name):
+            return "\(name) was changed by another program; the changes made here were not written."
         case .noRoom(let name): return "There is not enough room on the disk to write the changes into \(name)."
-        case .noScratchRoom(let name): return "There is not enough room on the startup disk to open \(name): it has to be copied there first."
-        case .nameCollision(let name): return "Several files would be stored under the name \(name). Pack with path names, or pack them one by one."
+        case .noScratchRoom(let name):
+            return "There is not enough room on the startup disk to open \(name): it has to be copied there first."
+        case .nameCollision(let name):
+            return
+                "Several files would be stored under the name \(name). Pack with path names, or pack them one by one."
         case .unsaved(let what): return what
         case .toolFailed(let message): return message
         case .cancelled: return "The operation was cancelled."

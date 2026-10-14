@@ -4,6 +4,7 @@ import AFMShell
 import AppKit
 import TestSupport
 import Testing
+
 @testable import ViewerPlugin
 
 /// The pane over a file system that is slow: closing it, switching files and laying a big text
@@ -54,7 +55,9 @@ import Testing
         memory.addFile("/A/slow.txt", String(repeating: "a slow line\n", count: 20_000))
         memory.stallsReads = true
         defer { memory.releaseStalls() }
-        let pane = ViewerPane(kernel: bench.kernel, settings: ListerSettings(bench.kernel.settings), temporaryCopies: TemporaryCopies(), isEmbedded: true)
+        let pane = ViewerPane(
+            kernel: bench.kernel, settings: ListerSettings(bench.kernel.settings), temporaryCopies: TemporaryCopies(),
+            isEmbedded: true)
         pane.load(ViewerItem(source: .file(memory.url("/A/slow.txt")), title: "slow"))
         // The cursor moves on: the next file is read, from a server that answers.
         memory.stallsReads = false
@@ -81,14 +84,18 @@ import Testing
         try writer.write(big)
         try writer.close(attributes: FileAttributes())
         memory.isLocal = false
-        let pane = ViewerPane(kernel: bench.kernel, settings: ListerSettings(bench.kernel.settings), temporaryCopies: TemporaryCopies(), isEmbedded: true)
+        let pane = ViewerPane(
+            kernel: bench.kernel, settings: ListerSettings(bench.kernel.settings), temporaryCopies: TemporaryCopies(),
+            isEmbedded: true)
         defer { pane.stopWork() }
         pane.frame = NSRect(x: 0, y: 0, width: 700, height: 400)
         pane.load(ViewerItem(source: .file(url), title: "big"))
         #expect(await wait(upTo: 120) { pane.loaded != nil && pane.pager.document?.isIndexComplete == true })
         let source = try #require(pane.loaded?.source as? CachedByteSource)
         let first = try #require(pane.pager.document)
-        #expect(source.diskCacheIsOpen && source.diskBytes >= source.length - 1 << 20, "\(source.diskBytes) of \(source.length) bytes on disk")
+        #expect(
+            source.diskCacheIsOpen && source.diskBytes >= source.length - 1 << 20,
+            "\(source.diskBytes) of \(source.length) bytes on disk")
         // Another width: the lines are short, so every segment of the first layout is taken over.
         bench.kernel.settings.set("100", forKey: "viewer.textWidth")
         pane.relayout()

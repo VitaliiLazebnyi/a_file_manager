@@ -2,9 +2,10 @@ import AFMContracts
 import AFMKernel
 import Foundation
 import LocalFileSystemPlugin
-@testable import SystemToolsPlugin
 import TestSupport
 import Testing
+
+@testable import SystemToolsPlugin
 
 /// A drive that is a folder of the sandbox: what it answers and how its ejects go is up to the test.
 private final class StandInDrive: VolumeAccess {
@@ -56,7 +57,10 @@ private final class StandInDrive: VolumeAccess {
 
     private func bench(_ drive: StandInDrive) -> (TestBench, SystemToolsPlugin) {
         let tools = SystemToolsPlugin(launchesApplications: false, volumes: drive)
-        return (TestBench(plugins: [tools], fileSystems: [LocalFileSystem()], left: box.url("A"), right: box.url("B")), tools)
+        return (
+            TestBench(plugins: [tools], fileSystems: [LocalFileSystem()], left: box.url("A"), right: box.url("B")),
+            tools
+        )
     }
 
     @Test func thePanelsGoBackToWhereTheyCameFromAndTheUserIsTold() {
@@ -69,9 +73,13 @@ private final class StandInDrive: VolumeAccess {
         let background = bench.right.tabs.openTab(showing: stick, activate: false)
         bench.commands.perform(SystemToolsCommands.ejectVolume)
         #expect(bench.left.model.directory.isSameLocation(as: box.url("A")))
-        #expect(background.directory.isSameLocation(as: home) && bench.right.model.directory.isSameLocation(as: box.url("B")))
+        #expect(
+            background.directory.isSameLocation(as: home)
+                && bench.right.model.directory.isSameLocation(as: box.url("B")))
         #expect(released.count == 1 && released.first?.isSameLocation(as: stick) == true && drive.ejects == 1)
-        #expect(bench.ui.log.last == "notice: “STICK” can now be removed safely." && tools.log.last == "eject: \(stick.path)")
+        #expect(
+            bench.ui.log.last == "notice: “STICK” can now be removed safely."
+                && tools.log.last == "eject: \(stick.path)")
     }
 
     @Test func theDriveOfAGivenLocationIsEjectedWhicheverPanelIsActive() {
@@ -92,7 +100,8 @@ private final class StandInDrive: VolumeAccess {
     }
 
     @Test func whatThisProgramLetGoOfIsGivenAMoment() {
-        let drive = StandInDrive(stick, refusals: [EjectRefusal(program: "AFileManager", isThisProgram: true, reason: "busy")])
+        let drive = StandInDrive(
+            stick, refusals: [EjectRefusal(program: "AFileManager", isThisProgram: true, reason: "busy")])
         let (bench, _) = bench(drive)
         bench.left.show(stick)
         bench.commands.perform(SystemToolsCommands.ejectVolume)
@@ -120,8 +129,13 @@ private final class StandInDrive: VolumeAccess {
     }
 
     @Test func onlyDrivesThatLeaveTheMacCanBeEjected() {
-        func ejectable(_ path: String, root: Bool? = false, internal inside: Bool?, local: Bool? = true, removable: Bool? = false, ejectable: Bool? = false) -> Bool {
-            Place.isEjectable(path: path, isRootFileSystem: root, isInternal: inside, isLocal: local, isRemovable: removable, isEjectable: ejectable)
+        func ejectable(
+            _ path: String, root: Bool? = false, internal inside: Bool?, local: Bool? = true, removable: Bool? = false,
+            ejectable: Bool? = false
+        ) -> Bool {
+            Place.isEjectable(
+                path: path, isRootFileSystem: root, isInternal: inside, isLocal: local, isRemovable: removable,
+                isEjectable: ejectable)
         }
         // Never: the start-up disk, a system volume, a second disk or partition inside the Mac,
         // or a disk the system says nothing about.

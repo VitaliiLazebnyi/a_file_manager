@@ -291,8 +291,9 @@ struct Tally {
     /// The sum of two parts counted apart; right when both are plain.
     func joined(with other: Tally) -> Tally {
         let (sum, overflow) = bytes.addingReportingOverflow(other.bytes)
-        return Tally(bytes: overflow ? .max : sum, files: files + other.files, folders: folders + other.folders,
-                     isPlain: isPlain && other.isPlain && !overflow)
+        return Tally(
+            bytes: overflow ? .max : sum, files: files + other.files, folders: folders + other.folders,
+            isPlain: isPlain && other.isPlain && !overflow)
     }
 }
 
@@ -358,7 +359,9 @@ enum ListWork {
 
     /// The same for a filter that lets through only what is shown already: those entries
     /// alone are looked at.
-    static func narrow(_ shown: [FileItem], at places: [UInt32]?, by filter: PanelFilter) -> (shown: [FileItem], places: [UInt32]?) {
+    static func narrow(_ shown: [FileItem], at places: [UInt32]?, by filter: PanelFilter) -> (
+        shown: [FileItem], places: [UInt32]?
+    ) {
         let (kept, among) = arrange(shown, by: filter)
         guard let among else { return (shown, places) }
         return (kept, places.map { places in among.map { places[Int($0)] } } ?? among)
@@ -371,10 +374,16 @@ enum ListWork {
     static func places(of shown: [FileItem], in listed: [FileItem]) -> [UInt32]? {
         guard shown.count <= listed.count else { return nil }
         func isSame(_ a: FileItem, _ b: FileItem) -> Bool {
-            guard ExactName.areSame(a.name, b.name), a.size == b.size, a.isDirectory == b.isDirectory, a.isSymlink == b.isSymlink,
-                  a.modified == b.modified || (a.modified.timeIntervalSinceReferenceDate.isNaN && b.modified.timeIntervalSinceReferenceDate.isNaN) else { return false }
+            guard ExactName.areSame(a.name, b.name), a.size == b.size, a.isDirectory == b.isDirectory,
+                a.isSymlink == b.isSymlink,
+                a.modified == b.modified
+                    || (a.modified.timeIntervalSinceReferenceDate.isNaN
+                        && b.modified.timeIntervalSinceReferenceDate.isNaN)
+            else { return false }
             // A copy of an entry holds the very same location; only otherwise are the two compared.
-            let isSameObject = withUnsafeBytes(of: a.url) { first in withUnsafeBytes(of: b.url) { first.elementsEqual($0) } }
+            let isSameObject = withUnsafeBytes(of: a.url) { first in
+                withUnsafeBytes(of: b.url) { first.elementsEqual($0) }
+            }
             return isSameObject || a.url == b.url
         }
         var places: [UInt32] = []
@@ -400,7 +409,8 @@ enum ListWork {
     static func areSameEntries(_ items: [FileItem], _ others: [FileItem]) -> Bool {
         guard items.count == others.count else { return false }
         func isSame(_ a: FileItem, _ b: FileItem) -> Bool {
-            ExactName.areSame(a.name, b.name) && a.size == b.size && a.modified == b.modified && a.isDirectory == b.isDirectory
+            ExactName.areSame(a.name, b.name) && a.size == b.size && a.modified == b.modified
+                && a.isDirectory == b.isDirectory
                 && a.isSymlink == b.isSymlink && a.isPackage == b.isPackage && a.isHidden == b.isHidden
                 && a.permissions == b.permissions && a.isSpecial == b.isSpecial
         }
@@ -427,7 +437,9 @@ enum ListWork {
         func words(_ range: Range<Int>) -> [UInt64] {
             range.map { word in
                 var bits: UInt64 = 0
-                for place in (word * 64)..<min(word * 64 + 64, items.count) where items[place].computedSize != nil { bits |= 1 << UInt64(place & 63) }
+                for place in (word * 64)..<min(word * 64 + 64, items.count) where items[place].computedSize != nil {
+                    bits |= 1 << UInt64(place & 63)
+                }
                 return bits
             }
         }
@@ -446,7 +458,8 @@ enum ListWork {
                     if matches(items[place]) { result[place >> 6 - range.lowerBound] |= 1 << UInt64(place & 63) }
                 }
             } else {
-                for place in (range.lowerBound * 64)..<min(range.upperBound * 64, items.count) where matches(items[place]) {
+                for place in (range.lowerBound * 64)..<min(range.upperBound * 64, items.count)
+                where matches(items[place]) {
                     result[place >> 6 - range.lowerBound] |= 1 << UInt64(place & 63)
                 }
             }
@@ -482,7 +495,9 @@ enum ListWork {
     /// else the first.
     static func twin(of item: FileItem, among found: [Int], in items: [FileItem]) -> Int? {
         guard found.count > 1 else { return found.first }
-        return found.first { items[$0].url == item.url && items[$0].size == item.size && items[$0].modified == item.modified }
+        return found.first {
+            items[$0].url == item.url && items[$0].size == item.size && items[$0].modified == item.modified
+        }
             ?? found.first { items[$0].url == item.url } ?? found.first
     }
 
@@ -502,12 +517,13 @@ enum ListWork {
         // The index is made first, so that the pieces only read it.
         let index = finder.prepare()
         let items = finder.items
-        return joined(Parallel.map(pieces(old.count)) { piece in
-            walk(piece) { item, hint in
-                if items.indices.contains(hint), ExactName.areSame(items[hint].name, item.name) { return hint }
-                return twin(of: item, among: index.places(of: item.name, in: items), in: items)
-            }
-        })
+        return joined(
+            Parallel.map(pieces(old.count)) { piece in
+                walk(piece) { item, hint in
+                    if items.indices.contains(hint), ExactName.areSame(items[hint].name, item.name) { return hint }
+                    return twin(of: item, among: index.places(of: item.name, in: items), in: items)
+                }
+            })
     }
 }
 

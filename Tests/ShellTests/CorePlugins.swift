@@ -7,8 +7,9 @@ import StandardPlugins
 /// whenever a feature plugin adds an entry; `Application` runs the whole program.
 enum CorePlugins {
     private static let names: Set<String> = [
-        "LocalFileSystemPlugin", "NavigationPlugin", "ViewerPlugin", "MacIntegrationPlugin", "FileOperationsPlugin", "FindFilesPlugin",
-        "ClipboardPlugin", "SelectionPlugin", "ViewOptionsPlugin", "FolderTabsPlugin",
+        "LocalFileSystemPlugin", "NavigationPlugin", "ViewerPlugin", "MacIntegrationPlugin", "FileOperationsPlugin",
+        "FindFilesPlugin",
+        "ClipboardPlugin", "SelectionPlugin", "ViewOptionsPlugin", "FolderTabsPlugin"
     ]
 
     static func make() -> [Plugin] {

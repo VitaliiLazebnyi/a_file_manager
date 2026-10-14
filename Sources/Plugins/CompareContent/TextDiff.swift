@@ -43,7 +43,7 @@ public struct DiffOptions: Equatable, Codable {
     /// A 64-bit hash of a line's key, made without building the key as a string. Equal keys
     /// have equal hashes; equal hashes are checked again with `isSameKey` where it matters.
     func hash(_ line: TextLine) -> UInt64 {
-        var hash: UInt64 = 0xcbf29ce484222325
+        var hash: UInt64 = 0xcbf2_9ce4_8422_2325
         var text = line.text
         let hashed: Bool = text.withUTF8 { bytes in
             // Only ASCII is hashed as it is. Other text takes the slow path through `key`: it folds
@@ -58,21 +58,23 @@ public struct DiffOptions: Equatable, Codable {
                         continue
                     }
                     if gap, started {
-                        hash = (hash ^ 0x20) &* 0x100000001b3
+                        hash = (hash ^ 0x20) &* 0x100_0000_01b3
                     }
                     gap = false
                     started = true
                 }
                 if ignoreCase, byte >= 0x41, byte <= 0x5A { byte += 0x20 }
-                hash = (hash ^ UInt64(byte)) &* 0x100000001b3
+                hash = (hash ^ UInt64(byte)) &* 0x100_0000_01b3
             }
             return true
         }
         if !hashed {
-            hash = 0xcbf29ce484222325
-            for byte in key(line).precomposedStringWithCanonicalMapping.utf8 { hash = (hash ^ UInt64(byte)) &* 0x100000001b3 }
+            hash = 0xcbf2_9ce4_8422_2325
+            for byte in key(line).precomposedStringWithCanonicalMapping.utf8 {
+                hash = (hash ^ UInt64(byte)) &* 0x100_0000_01b3
+            }
         } else if !ignoreLineEndings {
-            for byte in line.ending.rawValue.utf8 { hash = (hash ^ UInt64(byte)) &* 0x100000001b3 }
+            for byte in line.ending.rawValue.utf8 { hash = (hash ^ UInt64(byte)) &* 0x100_0000_01b3 }
         }
         return hash
     }
@@ -122,36 +124,53 @@ public struct TextDiff: Equatable {
 
     /// `anchors` are pairs of lines the user said belong together ("Resync comparison from
     /// here"): the texts before and after each are compared on their own.
-    public static func compute(left: [TextLine], right: [TextLine], options: DiffOptions = DiffOptions(),
-                               anchors: [(left: Int, right: Int)] = [], costLimit: Int? = nil,
-                               cancellation: CancellationFlag? = nil) -> TextDiff {
+    public static func compute(
+        left: [TextLine], right: [TextLine], options: DiffOptions = DiffOptions(),
+        anchors: [(left: Int, right: Int)] = [], costLimit: Int? = nil,
+        cancellation: CancellationFlag? = nil
+    ) -> TextDiff {
         let keys = Parallel.map([left, right]) { options.hashes($0) }
         let (leftKeys, rightKeys) = (keys[0], keys[1])
         var rows: [DiffRow] = []
         rows.reserveCapacity(max(left.count, right.count))
 
         func compare(_ a: Range<Int>, _ b: Range<Int>) {
-            for segment in Myers.diff(Array(leftKeys[a]), Array(rightKeys[b]), costLimit: costLimit, cancellation: cancellation) {
+            for segment in Myers.diff(
+                Array(leftKeys[a]), Array(rightKeys[b]), costLimit: costLimit, cancellation: cancellation)
+            {
                 let (first, second) = (segment.a.lowerBound + a.lowerBound, segment.b.lowerBound + b.lowerBound)
                 if segment.isEqual {
-                    for offset in 0..<segment.a.count { rows.append(DiffRow(left: first + offset, right: second + offset, kind: .equal)) }
+                    for offset in 0..<segment.a.count {
+                        rows.append(DiffRow(left: first + offset, right: second + offset, kind: .equal))
+                    }
                     continue
                 }
                 // Replaced lines face each other as far as they go; the rest stands alone.
                 let paired = min(segment.a.count, segment.b.count)
-                for offset in 0..<paired { rows.append(DiffRow(left: first + offset, right: second + offset, kind: .changed)) }
-                for offset in paired..<segment.a.count { rows.append(DiffRow(left: first + offset, right: nil, kind: .removed)) }
-                for offset in paired..<segment.b.count { rows.append(DiffRow(left: nil, right: second + offset, kind: .added)) }
+                for offset in 0..<paired {
+                    rows.append(DiffRow(left: first + offset, right: second + offset, kind: .changed))
+                }
+                for offset in paired..<segment.a.count {
+                    rows.append(DiffRow(left: first + offset, right: nil, kind: .removed))
+                }
+                for offset in paired..<segment.b.count {
+                    rows.append(DiffRow(left: nil, right: second + offset, kind: .added))
+                }
             }
         }
 
         var (nextLeft, nextRight) = (0, 0)
         for anchor in anchors.sorted(by: { $0.left < $1.left })
-        where anchor.left >= nextLeft && anchor.right >= nextRight && anchor.left < left.count && anchor.right < right.count {
+        where anchor.left >= nextLeft && anchor.right >= nextRight && anchor.left < left.count
+            && anchor.right < right.count
+        {
             compare(nextLeft..<anchor.left, nextRight..<anchor.right)
-            rows.append(DiffRow(left: anchor.left, right: anchor.right,
-                                kind: leftKeys[anchor.left] == rightKeys[anchor.right] && options.isSameKey(left[anchor.left], right[anchor.right])
-                                    ? .equal : .changed))
+            rows.append(
+                DiffRow(
+                    left: anchor.left, right: anchor.right,
+                    kind: leftKeys[anchor.left] == rightKeys[anchor.right]
+                        && options.isSameKey(left[anchor.left], right[anchor.right])
+                        ? .equal : .changed))
             (nextLeft, nextRight) = (anchor.left + 1, anchor.right + 1)
         }
         compare(nextLeft..<left.count, nextRight..<right.count)
@@ -199,29 +218,43 @@ public struct TextDiff: Equatable {
     /// The parts of two differing lines that differ, as ranges of UTF-16 units. After a
     /// difference the comparison only picks up again where at least `minimumMatch` characters
     /// agree, so a stray common letter does not chop a changed word into pieces.
-    public static func inline(_ left: String, _ right: String, minimumMatch: Int = 3) -> (left: [Range<Int>], right: [Range<Int>]) {
+    public static func inline(_ left: String, _ right: String, minimumMatch: Int = 3) -> (
+        left: [Range<Int>], right: [Range<Int>]
+    ) {
         // Only the part that is compared is turned into UTF-16: a line of megabytes costs no more than one of 4,096.
         let (headA, headB) = (Array(left.utf16.prefix(inlineLimit)), Array(right.utf16.prefix(inlineLimit)))
         // The whole of a longer line is counted (cheap: the length of a string is not walked unit by unit) but not copied.
-        let (countA, countB) = (headA.count == inlineLimit ? left.utf16.count : headA.count, headB.count == inlineLimit ? right.utf16.count : headB.count)
+        let (countA, countB) = (
+            headA.count == inlineLimit ? left.utf16.count : headA.count,
+            headB.count == inlineLimit ? right.utf16.count : headB.count
+        )
         // A long stretch that the two share at the start or at the end needs no search. Short
         // ones are left to it, because a stray match next to a difference is judged there.
         var prefix = 0
         while prefix < headA.count, prefix < headB.count, headA[prefix] == headB[prefix] { prefix += 1 }
         if prefix < 32 { prefix = 0 }
         var suffix = 0
-        while suffix < headA.count - prefix, suffix < headB.count - prefix, headA[headA.count - 1 - suffix] == headB[headB.count - 1 - suffix] { suffix += 1 }
+        while suffix < headA.count - prefix, suffix < headB.count - prefix,
+            headA[headA.count - 1 - suffix] == headB[headB.count - 1 - suffix]
+        { suffix += 1 }
         if suffix < 32 { suffix = 0 }
         var segments: [DiffSegment] = []
         if prefix > 0 { segments.append(DiffSegment(a: 0..<prefix, b: 0..<prefix, isEqual: true)) }
         // The effort is bounded: two long lines with little in common would take tens of milliseconds
         // each, and a screenful of them is drawn at once. A coarser result is only less exact highlighting.
-        segments += Myers.diff(Array(headA[prefix..<(headA.count - suffix)]), Array(headB[prefix..<(headB.count - suffix)]), costLimit: 300).map {
-            DiffSegment(a: ($0.a.lowerBound + prefix)..<($0.a.upperBound + prefix), b: ($0.b.lowerBound + prefix)..<($0.b.upperBound + prefix),
-                        isEqual: $0.isEqual)
+        segments += Myers.diff(
+            Array(headA[prefix..<(headA.count - suffix)]), Array(headB[prefix..<(headB.count - suffix)]),
+            costLimit: 300
+        ).map {
+            DiffSegment(
+                a: ($0.a.lowerBound + prefix)..<($0.a.upperBound + prefix),
+                b: ($0.b.lowerBound + prefix)..<($0.b.upperBound + prefix),
+                isEqual: $0.isEqual)
         }
         if suffix > 0 {
-            segments.append(DiffSegment(a: (headA.count - suffix)..<headA.count, b: (headB.count - suffix)..<headB.count, isEqual: true))
+            segments.append(
+                DiffSegment(
+                    a: (headA.count - suffix)..<headA.count, b: (headB.count - suffix)..<headB.count, isEqual: true))
         }
         if countA > inlineLimit || countB > inlineLimit {
             segments.append(DiffSegment(a: headA.count..<countA, b: headB.count..<countB, isEqual: false))
@@ -237,7 +270,8 @@ public struct TextDiff: Equatable {
             }
         }
         for (index, segment) in segments.enumerated() {
-            let isShortMatch = segment.isEqual && segment.a.count < minimumMatch && index > 0 && index < segments.count - 1
+            let isShortMatch =
+                segment.isEqual && segment.a.count < minimumMatch && index > 0 && index < segments.count - 1
             guard !segment.isEqual || isShortMatch else { continue }
             mark(segment.a, in: &leftRanges)
             mark(segment.b, in: &rightRanges)
@@ -255,7 +289,8 @@ public struct TextDiff: Equatable {
         for range in ranges {
             var range = range
             if range.lowerBound < text.length {
-                let whole = text.rangeOfComposedCharacterSequences(for: NSRange(location: range.lowerBound, length: min(range.count, text.length - range.lowerBound)))
+                let whole = text.rangeOfComposedCharacterSequences(
+                    for: NSRange(location: range.lowerBound, length: min(range.count, text.length - range.lowerBound)))
                 range = min(range.lowerBound, whole.location)..<max(range.upperBound, whole.location + whole.length)
             }
             if let last = result.last, last.upperBound >= range.lowerBound {
@@ -284,7 +319,9 @@ public struct BinaryDiff: Equatable {
 
     /// Compares on all cores: the lines are dealt out in large pieces, and each piece reports
     /// its differing stretches.
-    public static func compute(left: Data, right: Data, bytesPerLine: Int = 16, cancellation: CancellationFlag? = nil) -> BinaryDiff {
+    public static func compute(left: Data, right: Data, bytesPerLine: Int = 16, cancellation: CancellationFlag? = nil)
+        -> BinaryDiff
+    {
         let width = max(1, bytesPerLine)
         let rowCount = (max(left.count, right.count) + width - 1) / width
         let common = min(left.count, right.count)
@@ -303,7 +340,9 @@ public struct BinaryDiff: Equatable {
                         let shared = max(0, min(to, common) - from)
                         var differing = to - from - shared
                         if shared > 0, memcmp(first.baseAddress! + from, second.baseAddress! + from, shared) != 0 {
-                            for offset in from..<(from + shared) where first[offset] != second[offset] { differing += 1 }
+                            for offset in from..<(from + shared) where first[offset] != second[offset] {
+                                differing += 1
+                            }
                         }
                         bytes += differing
                         if differing > 0 {
@@ -327,8 +366,9 @@ public struct BinaryDiff: Equatable {
                 blocks.append(block)
             }
         }
-        return BinaryDiff(bytesPerLine: width, leftCount: left.count, rightCount: right.count, blocks: blocks,
-                          differingBytes: found.reduce(0) { $0 + $1.bytes })
+        return BinaryDiff(
+            bytesPerLine: width, leftCount: left.count, rightCount: right.count, blocks: blocks,
+            differingBytes: found.reduce(0) { $0 + $1.bytes })
     }
 
     /// The offset of a line's first byte, as shown in front of it.
@@ -342,7 +382,7 @@ public struct BinaryDiff: Equatable {
         guard from < data.count else { return "" }
         let bytes = data[(data.startIndex + from)..<(data.startIndex + min(from + bytesPerLine, data.count))]
         let digits = Array("0123456789ABCDEF".utf8)
-        var text = [UInt8]()
+        var text: [UInt8] = []
         text.reserveCapacity(bytesPerLine * 4 + 1)
         for (index, byte) in bytes.enumerated() {
             if index > 0 { text.append(0x20) }

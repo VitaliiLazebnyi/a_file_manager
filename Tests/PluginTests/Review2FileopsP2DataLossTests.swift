@@ -1,11 +1,12 @@
 import AFMContracts
 import AFMKernel
-@testable import FileOperationsPlugin
 import Foundation
 import LocalFileSystemPlugin
 import TestSupport
 import Testing
 import VirtualFoldersPlugin
+
+@testable import FileOperationsPlugin
 
 // The data-loss defects of review round 2 (F001/F018, F006/F013, F022/F033, F012/F020), each as
 // the smallest scenario that lost data. This file uses nothing that the program did not have
@@ -53,7 +54,9 @@ private func names(in folder: URL) -> [String] {
     // the file was copied onto itself and then removed as the source of the move.
     @Test func aMoveWithinABranchViewNeverRemovesTheFile() throws {
         let file = try box.file("d/a.txt", "precious")
-        let job = FileJob(kind: .move, sources: [file], target: TargetSpec(directory: virtual.branch(of: box.url("d"))), fileSystems: fileSystems)
+        let job = FileJob(
+            kind: .move, sources: [file], target: TargetSpec(directory: virtual.branch(of: box.url("d"))),
+            fileSystems: fileSystems)
         let answers = OldAnswers()
         job.delegate = answers
         _ = job.run()
@@ -66,7 +69,8 @@ private func names(in folder: URL) -> [String] {
     @Test func twoSourcesOfOneNameBothSurviveAMoveUnderOverwriteAll() throws {
         let sources = [try box.file("s/a/x.txt", "from-a"), try box.file("s/b/x.txt", "from-b")]
         try box.folder("t")
-        let job = FileJob(kind: .move, sources: sources, target: TargetSpec(directory: box.url("t")), fileSystems: fileSystems)
+        let job = FileJob(
+            kind: .move, sources: sources, target: TargetSpec(directory: box.url("t")), fileSystems: fileSystems)
         job.options.overwrite = .overwriteAll
         let answers = OldAnswers()
         job.delegate = answers
@@ -74,23 +78,31 @@ private func names(in folder: URL) -> [String] {
         // Wherever they are now, both contents still exist.
         var contents: Set<String> = []
         for folder in ["t", "s/a", "s/b"] {
-            for name in names(in: box.url(folder)) { if let text = box.read("\(folder)/\(name)") { contents.insert(text) } }
+            for name in names(in: box.url(folder)) {
+                if let text = box.read("\(folder)/\(name)") { contents.insert(text) }
+            }
         }
         #expect(contents == ["from-a", "from-b"])
     }
 
     // The same through a mask that gives three sources one name.
     @Test func aMaskThatGivesThreeSourcesOneNameLosesNone() throws {
-        let sources = [try box.file("s/a.doc", "doc"), try box.file("s/a.pdf", "pdf"), try box.file("s/a.rtf", "rtf")]
+        let sources = [
+            try box.file("s/a.doc", "doc"), try box.file("s/a.pdf", "pdf"), try box.file("s/a.rtf", "rtf")
+        ]
         try box.folder("t")
-        let job = FileJob(kind: .move, sources: sources, target: TargetSpec(directory: box.url("t"), mask: "*.txt"), fileSystems: fileSystems)
+        let job = FileJob(
+            kind: .move, sources: sources, target: TargetSpec(directory: box.url("t"), mask: "*.txt"),
+            fileSystems: fileSystems)
         job.options.overwrite = .overwriteAll
         let answers = OldAnswers()
         job.delegate = answers
         _ = job.run()
         var contents: Set<String> = []
         for folder in ["t", "s"] {
-            for name in names(in: box.url(folder)) { if let text = box.read("\(folder)/\(name)") { contents.insert(text) } }
+            for name in names(in: box.url(folder)) {
+                if let text = box.read("\(folder)/\(name)") { contents.insert(text) }
+            }
         }
         #expect(contents == ["doc", "pdf", "rtf"])
     }
@@ -103,7 +115,8 @@ private func names(in folder: URL) -> [String] {
         let source = try box.file("s/f.txt", String(repeating: "source-bytes ", count: 20))
         try box.folder("t")
         try FileManager.default.createSymbolicLink(at: box.url("t/f.txt"), withDestinationURL: victim)
-        let job = FileJob(kind: .copy, sources: [source], target: TargetSpec(directory: box.url("t")), fileSystems: fileSystems)
+        let job = FileJob(
+            kind: .copy, sources: [source], target: TargetSpec(directory: box.url("t")), fileSystems: fileSystems)
         let answers = OldAnswers(conflict: .resume)
         job.delegate = answers
         _ = job.run()
@@ -128,7 +141,8 @@ private func names(in folder: URL) -> [String] {
         }
         // Where images cannot be attached there is nothing to check.
         guard hdiutil(["create", "-size", "4m", "-fs", "HFS+", "-volname", "afmp2", box.url("disk.dmg").path]),
-              hdiutil(["attach", box.url("disk.dmg").path, "-mountpoint", mount.path, "-nobrowse", "-noautoopen"]) else { return }
+            hdiutil(["attach", box.url("disk.dmg").path, "-mountpoint", mount.path, "-nobrowse", "-noautoopen"])
+        else { return }
         defer { _ = hdiutil(["detach", mount.path, "-force"]) }
         let precious = mount.appendingPathComponent("precious.txt")
         try "on the volume".write(to: precious, atomically: true, encoding: .utf8)

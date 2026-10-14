@@ -26,7 +26,8 @@ struct SplitInfo: Equatable {
             values[line[..<equals].lowercased()] = String(line[line.index(after: equals)...])
         }
         guard let name = values["filename"], !name.isEmpty, let size = values["size"].flatMap({ Int64($0) }),
-              let crc = values["crc32"].flatMap({ UInt32($0, radix: 16) }) else { return nil }
+            let crc = values["crc32"].flatMap({ UInt32($0, radix: 16) })
+        else { return nil }
         self.init(name: name, size: size, crc: crc)
     }
 }
@@ -37,9 +38,11 @@ enum Splitter {
     /// the spec records it; the other floppy sizes follow the same rule, the larger media
     /// are taken at their nominal size.
     static let presets: [(title: String, bytes: Int64)] = [
-        ("Automatic", 1_457_664), ("1.44 MB (3.5\")", 1_457_664), ("1.2 MB (5.25\")", 1_213_952), ("720 k (3.5\")", 730_112),
-        ("360 k (5.25\")", 362_496), ("100 MB (ZIP)", 100 << 20), ("250 MB (ZIP)", 250 << 20), ("650 MB (CD-R)", 650 << 20),
-        ("700 MB (CD-R)", 700 << 20),
+        ("Automatic", 1_457_664), ("1.44 MB (3.5\")", 1_457_664), ("1.2 MB (5.25\")", 1_213_952),
+        ("720 k (3.5\")", 730_112),
+        ("360 k (5.25\")", 362_496), ("100 MB (ZIP)", 100 << 20), ("250 MB (ZIP)", 250 << 20),
+        ("650 MB (CD-R)", 650 << 20),
+        ("700 MB (CD-R)", 700 << 20)
     ]
     static let maximumParts = 999
 
@@ -47,7 +50,9 @@ enum Splitter {
     /// caption of a preset.
     static func size(from text: String) -> Int64? {
         let text = text.trimmingCharacters(in: .whitespaces)
-        if let preset = presets.first(where: { $0.title.caseInsensitiveCompare(text) == .orderedSame }) { return preset.bytes }
+        if let preset = presets.first(where: { $0.title.caseInsensitiveCompare(text) == .orderedSame }) {
+            return preset.bytes
+        }
         var digits = text.replacingOccurrences(of: ",", with: "").lowercased()
         if digits.hasSuffix("b"), digits.count > 1, !(digits.dropLast().last?.isNumber ?? false) { digits.removeLast() }
         var factor = 1.0
@@ -55,7 +60,8 @@ enum Splitter {
             factor = pow(2, shift)
             digits.removeLast()
         }
-        guard let number = Double(digits.trimmingCharacters(in: .whitespaces)), number > 0, number * factor < 9e18 else { return nil }
+        guard let number = Double(digits.trimmingCharacters(in: .whitespaces)), number > 0, number * factor < 9e18
+        else { return nil }
         let bytes = Int64((number * factor).rounded())
         return bytes > 0 ? bytes : nil
     }
@@ -79,7 +85,10 @@ enum Splitter {
         let base = FileItem.split(source.name).base
         // No output may be the source itself (splitting `data.001` in place): it would be replaced.
         let parts = max(1, Int(source.size.addingSaturated(partSize - 1) / partSize))
-        let outputs = (1...parts).map { directory.appending(name: partName(base, $0)) } + [directory.appending(name: base + ".crc")]
+        let outputs =
+            (1...parts).map { directory.appending(name: partName(base, $0)) } + [
+                directory.appending(name: base + ".crc")
+            ]
         guard !outputs.contains(where: { ToolRun.isSameFile($0, source.url) }) else {
             throw ToolError.failed("A part of \(source.name) would replace the file itself.")
         }
@@ -96,7 +105,9 @@ enum Splitter {
             func nextPart() throws -> ToolOutput {
                 let url = directory.appending(name: partName(base, written.count + 1))
                 guard written.count < maximumParts else { throw ToolError.failed("More than \(maximumParts) parts.") }
-                run.show(["From: " + run.fileSystems.displayPath(source.url), "To: " + run.fileSystems.displayPath(url)])
+                run.show([
+                    "From: " + run.fileSystems.displayPath(source.url), "To: " + run.fileSystems.displayPath(url)
+                ])
                 guard let part = try run.create(url, deferred: true) else { throw ToolError.cancelled }
                 written.append(part.url)
                 return part
@@ -113,13 +124,17 @@ enum Splitter {
                         output = try nextPart()
                     }
                     let room = Int(min(partSize - (output?.bytesWritten ?? 0), Int64(block.count - offset)))
-                    try output?.write(block.subdata(in: (block.startIndex + offset)..<(block.startIndex + offset + room)))
+                    try output?.write(
+                        block.subdata(in: (block.startIndex + offset)..<(block.startIndex + offset + room)))
                     offset += room
                 }
             }
             try output?.finish()
             let info = SplitInfo(name: source.name, size: total, crc: crc.checksum)
-            guard let crcFile = try run.write(Data(info.text.utf8), to: directory.appending(name: base + ".crc"), deferred: true) else {
+            guard
+                let crcFile = try run.write(
+                    Data(info.text.utf8), to: directory.appending(name: base + ".crc"), deferred: true)
+            else {
                 throw ToolError.cancelled
             }
             written.append(crcFile)
@@ -142,11 +157,15 @@ enum PartSeries {
         // An extension of digits is the counter; otherwise the last run of digits in front of
         // the extension is (the digits of `.b64` or `.mp3` count nothing).
         let dot = name.lastIndex(of: ".")
-        let numericExtension = dot.map { name.index(after: $0) < name.endIndex && name[name.index(after: $0)...].allSatisfy(isDigit) } ?? false
+        let numericExtension =
+            dot.map { name.index(after: $0) < name.endIndex && name[name.index(after: $0)...].allSatisfy(isDigit) }
+            ?? false
         let searched = numericExtension ? name[...] : name[..<(dot ?? name.endIndex)]
         if let last = searched.lastIndex(where: isDigit) {
             var first = last
-            while first > name.startIndex, case let before = name.index(before: first), isDigit(name[before]) { first = before }
+            while first > name.startIndex, case let before = name.index(before: first), isDigit(name[before]) {
+                first = before
+            }
             return .digits(first..<name.index(after: last))
         }
         // A name without digits and without an extension counts in its last two letters.
@@ -164,7 +183,8 @@ enum PartSeries {
             guard digits.count <= 18, let value = Int(digits) else { return nil }
             let next = String(value + 1)
             guard next.count <= digits.count else { return nil }
-            return name.replacingCharacters(in: range, with: String(repeating: "0", count: digits.count - next.count) + next)
+            return name.replacingCharacters(
+                in: range, with: String(repeating: "0", count: digits.count - next.count) + next)
         case .letters(let range)?:
             var letters = Array(name[range].utf8)
             var index = letters.count - 1
@@ -198,11 +218,15 @@ enum PartSeries {
     }
 
     /// `first` and the files that follow it in its folder, until a name is missing.
-    static func parts(startingAt first: FileItem, provider: FileSystemProvider, cancellation: CancellationFlag = CancellationFlag()) -> [FileItem] {
+    static func parts(
+        startingAt first: FileItem, provider: FileSystemProvider, cancellation: CancellationFlag = CancellationFlag()
+    ) -> [FileItem] {
         var parts = [first]
         let directory = first.url.deletingLastPathComponent()
         var name = first.name
-        while let next = next(after: name), let item = provider.item(at: directory.appending(name: next), cancellation: cancellation), !item.isDirectory {
+        while let next = next(after: name),
+            let item = provider.item(at: directory.appending(name: next), cancellation: cancellation), !item.isDirectory
+        {
             parts.append(item)
             name = next
         }
@@ -226,14 +250,20 @@ enum Combiner {
         let directory = item.url.deletingLastPathComponent()
         var first = item
         if item.ext.lowercased() == "crc" {
-            guard let part = provider.item(at: directory.appending(name: Splitter.partName(item.baseName, 1)), cancellation: run.cancellation) else {
+            guard
+                let part = provider.item(
+                    at: directory.appending(name: Splitter.partName(item.baseName, 1)), cancellation: run.cancellation
+                )
+            else {
                 throw ToolError.failed("\(Splitter.partName(item.baseName, 1)) not found!")
             }
             first = part
         }
         let crcFile = directory.appending(name: FileItem.split(first.name).base + ".crc")
         var info: SplitInfo?
-        if provider.item(at: crcFile, cancellation: run.cancellation) != nil, let data = try? run.contents(of: crcFile, limit: 1 << 16) {
+        if provider.item(at: crcFile, cancellation: run.cancellation) != nil,
+            let data = try? run.contents(of: crcFile, limit: 1 << 16)
+        {
             info = SplitInfo(text: String(decoding: data, as: UTF8.self))
         }
         return (PartSeries.parts(startingAt: first, provider: provider, cancellation: run.cancellation), info)
@@ -252,7 +282,9 @@ enum Combiner {
         run.carriesOrigin = true
         // A stored name is only a name: it never leads out of the target folder.
         let name = info.flatMap { storedName($0.name) } ?? PartSeries.combinedName(forPart: first.name)
-        guard let target = directory.appending(safeName: name) else { throw ToolError.failed("The name of the combined file is not a file name.") }
+        guard let target = directory.appending(safeName: name) else {
+            throw ToolError.failed("The name of the combined file is not a file name.")
+        }
         guard !parts.contains(where: { ToolRun.isSameFile($0.url, target) }) else {
             throw ToolError.failed("The combined file would replace one of its parts.")
         }
@@ -261,7 +293,9 @@ enum Combiner {
             guard let output = try run.create(target, deferred: true) else { throw ToolError.cancelled }
             let crc = CRC32Hasher()
             for part in parts {
-                run.show(["From: " + run.fileSystems.displayPath(part.url), "To: " + run.fileSystems.displayPath(output.url)])
+                run.show([
+                    "From: " + run.fileSystems.displayPath(part.url), "To: " + run.fileSystems.displayPath(output.url)
+                ])
                 try run.read(part.url) { block in
                     crc.update(block)
                     try output.write(block)
@@ -269,7 +303,9 @@ enum Combiner {
                 run.advance(0, items: 1)
             }
             try output.finish()
-            return Outcome(output: output.url, parts: parts.count, verified: info.map { $0.size == output.bytesWritten && $0.crc == crc.checksum })
+            return Outcome(
+                output: output.url, parts: parts.count,
+                verified: info.map { $0.size == output.bytesWritten && $0.crc == crc.checksum })
         }
     }
 }

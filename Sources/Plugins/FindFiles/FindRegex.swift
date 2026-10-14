@@ -22,13 +22,15 @@ final class RegexTrip {
 
     /// Whether any regular expression of the search ran out of time.
     var hasTimedOut: Bool {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         return timeouts > 0
     }
 
     /// Whether enough of them did for the pattern to be given up.
     var isTripped: Bool {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         return timeouts >= limit
     }
 }
@@ -48,14 +50,20 @@ enum FindRegex {
 
     /// Whether `text` holds a match, within `budget` seconds of work. A cancelled run reports
     /// `timedOut`; whoever cancelled does not use the answer.
-    static func firstMatch(_ regex: NSRegularExpression, in text: String, budget: TimeInterval = defaultBudget,
-                           cancelled: () -> Bool = { false }) -> Outcome {
-        guard !text.isEmpty else { return regex.firstMatch(in: text, range: NSRange(location: 0, length: 0)) != nil ? .matched : .unmatched }
+    static func firstMatch(
+        _ regex: NSRegularExpression, in text: String, budget: TimeInterval = defaultBudget,
+        cancelled: () -> Bool = { false }
+    ) -> Outcome {
+        guard !text.isEmpty else {
+            return regex.firstMatch(in: text, range: NSRange(location: 0, length: 0)) != nil ? .matched : .unmatched
+        }
         // The budget is the thread's own processor time, not the clock: a thread that is kept
         // waiting by a busy machine has not used its budget (see `ThreadTime`).
         let deadline = ThreadTime.used + budget
         var outcome = Outcome.unmatched
-        regex.enumerateMatches(in: text, options: [.reportProgress], range: NSRange(location: 0, length: text.utf16.count)) { result, _, stop in
+        regex.enumerateMatches(
+            in: text, options: [.reportProgress], range: NSRange(location: 0, length: text.utf16.count)
+        ) { result, _, stop in
             if result != nil {
                 outcome = .matched
                 stop.pointee = true
@@ -68,8 +76,10 @@ enum FindRegex {
     }
 
     /// `firstMatch` that also counts a timeout in `trip` and gives up at once on a tripped pattern.
-    static func matches(_ regex: NSRegularExpression, in text: String, trip: RegexTrip?, budget: TimeInterval = defaultBudget,
-                        cancelled: () -> Bool = { false }) -> Bool {
+    static func matches(
+        _ regex: NSRegularExpression, in text: String, trip: RegexTrip?, budget: TimeInterval = defaultBudget,
+        cancelled: () -> Bool = { false }
+    ) -> Bool {
         if trip?.isTripped == true { return false }
         switch firstMatch(regex, in: text, budget: budget, cancelled: cancelled) {
         case .matched: return true

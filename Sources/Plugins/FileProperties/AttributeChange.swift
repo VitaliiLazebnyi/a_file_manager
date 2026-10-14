@@ -28,12 +28,16 @@ enum PermissionChange: Equatable {
         let text = text.trimmingCharacters(in: .whitespaces)
         if text.isEmpty {
             self = .unchanged
-        } else if (3...4).contains(text.count), text.allSatisfy({ ("0"..."7").contains($0) }), let mode = UInt16(text, radix: 8) {
+        } else if (3...4).contains(text.count), text.allSatisfy({ ("0"..."7").contains($0) }),
+            let mode = UInt16(text, radix: 8)
+        {
             self = .absolute(mode, keepingSpecialBits: false)
         } else if let mode = PermissionChange.mode(fromLetters: text) {
             self = .absolute(mode, keepingSpecialBits: true)
         } else {
-            let clauses = text.split(separator: ",", omittingEmptySubsequences: false).map { PermissionChange.clause(String($0)) }
+            let clauses = text.split(separator: ",", omittingEmptySubsequences: false).map {
+                PermissionChange.clause(String($0))
+            }
             guard !clauses.contains(nil) else { return nil }
             self = .symbolic(clauses.compactMap { $0 })
         }
@@ -67,7 +71,9 @@ enum PermissionChange: Equatable {
             default: return nil
             }
         }
-        var clause = Clause(shifts: shifts.isEmpty ? [6, 3, 0] : shifts, operation: text[operatorIndex], bits: 0, conditionalExecute: false)
+        var clause = Clause(
+            shifts: shifts.isEmpty ? [6, 3, 0] : shifts, operation: text[operatorIndex], bits: 0,
+            conditionalExecute: false)
         for permission in text[text.index(after: operatorIndex)...] {
             switch permission {
             case "r": clause.bits |= 4
@@ -96,11 +102,16 @@ enum PermissionChange: Equatable {
             return ""
         case .absolute(let mode, let keepingSpecialBits):
             if !keepingSpecialBits { return PropertyText.octal(mode) }
-            return (0..<9).map { index in mode & (0o400 >> UInt16(index)) != 0 ? ["r", "w", "x"][index % 3] : "-" }.joined()
+            return (0..<9).map { index in mode & (0o400 >> UInt16(index)) != 0 ? ["r", "w", "x"][index % 3] : "-" }
+                .joined()
         case .symbolic(let clauses):
             return clauses.map { clause in
-                let who = clause.shifts == [6, 3, 0] ? "a" : clause.shifts.map { $0 == 6 ? "u" : ($0 == 3 ? "g" : "o") }.joined()
-                let what = (clause.bits & 4 != 0 ? "r" : "") + (clause.bits & 2 != 0 ? "w" : "") + (clause.bits & 1 != 0 ? "x" : "")
+                let who =
+                    clause.shifts == [6, 3, 0]
+                    ? "a" : clause.shifts.map { $0 == 6 ? "u" : ($0 == 3 ? "g" : "o") }.joined()
+                let what =
+                    (clause.bits & 4 != 0 ? "r" : "") + (clause.bits & 2 != 0 ? "w" : "")
+                    + (clause.bits & 1 != 0 ? "x" : "")
                 return who + String(clause.operation) + what + (clause.conditionalExecute ? "X" : "")
             }.joined(separator: ",")
         }
@@ -149,7 +160,8 @@ struct TimestampChange: Equatable {
     /// Nil when a field is neither empty nor a date or time in the form above.
     init?(date: String, time: String) {
         guard let day = TimestampChange.fields(date, count: 3...3, limits: [1...9999, 1...12, 1...31]),
-              var clock = TimestampChange.fields(time, count: 2...4, limits: [0...23, 0...59, 0...59, 0...999]) else { return nil }
+            var clock = TimestampChange.fields(time, count: 2...4, limits: [0...23, 0...59, 0...59, 0...999])
+        else { return nil }
         // Seconds that are left out become 0; fractions of a second are not kept.
         if clock.count == 2 { clock.append(0) }
         parts = day + clock.prefix(3)
@@ -178,7 +190,8 @@ struct TimestampChange: Equatable {
     /// date (the 31st of a month with 30 days).
     func applied(to original: Date, now: Date, calendar: Calendar = .current) -> Date? {
         if usesCurrentTime { return now }
-        var components = calendar.dateComponents([.year, .month, .day, .hour, .minute, .second, .nanosecond], from: original)
+        var components = calendar.dateComponents(
+            [.year, .month, .day, .hour, .minute, .second, .nanosecond], from: original)
         if let year = parts[0] { components.year = year }
         if let month = parts[1] { components.month = month }
         if let day = parts[2] { components.day = day }
@@ -195,8 +208,10 @@ struct TimestampChange: Equatable {
     /// A date as the fields of the dialog show it.
     static func fieldTexts(for date: Date, calendar: Calendar = .current) -> (date: String, time: String) {
         let parts = calendar.dateComponents([.year, .month, .day, .hour, .minute, .second], from: date)
-        return (String(format: "%04d-%02d-%02d", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0),
-                String(format: "%02d:%02d:%02d", parts.hour ?? 0, parts.minute ?? 0, parts.second ?? 0))
+        return (
+            String(format: "%04d-%02d-%02d", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0),
+            String(format: "%02d:%02d:%02d", parts.hour ?? 0, parts.minute ?? 0, parts.second ?? 0)
+        )
     }
 }
 
@@ -215,7 +230,8 @@ struct AttributeChange: Equatable {
     var recurse = false
 
     var isEmpty: Bool {
-        permissions == .unchanged && hidden == nil && locked == nil && (timestamp?.changesNothing ?? true) && owner == nil && group == nil
+        permissions == .unchanged && hidden == nil && locked == nil && (timestamp?.changesNothing ?? true)
+            && owner == nil && group == nil
     }
 
     var needsLocalFileSystem: Bool { hidden != nil || locked != nil || owner != nil || group != nil }
@@ -235,7 +251,9 @@ struct AttributeChange: Equatable {
                 if token.count == 1 { continue }
             }
             let token = token.hasPrefix("=") ? token.dropFirst() : token
-            guard let sign = token.first, sign == "+" || sign == "-", let letter = token.dropFirst().first else { return nil }
+            guard let sign = token.first, sign == "+" || sign == "-", let letter = token.dropFirst().first else {
+                return nil
+            }
             let value = String(token.dropFirst(2))
             switch letter {
             case "h" where value.isEmpty: change.hidden = sign == "+"
@@ -292,7 +310,10 @@ final class AttributeJob {
     private var ownerID: uid_t?
     private var groupID: gid_t?
 
-    init(change: AttributeChange, fileSystems: FileSystemRegistry, cancellation: CancellationFlag = CancellationFlag(), meter: ProgressMeter? = nil) {
+    init(
+        change: AttributeChange, fileSystems: FileSystemRegistry, cancellation: CancellationFlag = CancellationFlag(),
+        meter: ProgressMeter? = nil
+    ) {
         self.change = change
         self.fileSystems = fileSystems
         self.cancellation = cancellation
@@ -301,11 +322,15 @@ final class AttributeJob {
 
     func run(_ items: [FileItem]) -> Outcome {
         if let owner = change.owner {
-            guard let id = LocalInfo.userID(owner) else { return Outcome(failed: items.count, failures: ["There is no user called \(owner)."]) }
+            guard let id = LocalInfo.userID(owner) else {
+                return Outcome(failed: items.count, failures: ["There is no user called \(owner)."])
+            }
             ownerID = id
         }
         if let group = change.group {
-            guard let id = LocalInfo.groupID(group) else { return Outcome(failed: items.count, failures: ["There is no group called \(group)."]) }
+            guard let id = LocalInfo.groupID(group) else {
+                return Outcome(failed: items.count, failures: ["There is no group called \(group)."])
+            }
             groupID = id
         }
         each(items, process)
@@ -326,7 +351,10 @@ final class AttributeJob {
         // yet is changed first: the change may be what opens it.
         // Listed with the job's flag, so that a server that has stopped answering does not
         // hold the job (and a thread of the pool) after Cancel.
-        let list = { try? self.fileSystems.provider(for: item.url).list(item.url, showHidden: true, cancellation: self.cancellation) }
+        let list = {
+            try? self.fileSystems.provider(for: item.url).list(
+                item.url, showHidden: true, cancellation: self.cancellation)
+        }
         var children = list()
         // A listing that ended because of the cancel says nothing about the folder.
         guard !cancellation.isCancelled else { return }
@@ -354,7 +382,9 @@ final class AttributeJob {
             guard !cancellation.isCancelled else { return }
             lock.lock()
             outcome.failed += 1
-            if outcome.failures.count < 20 { outcome.failures.append("\(fileSystems.displayPath(item.url)): \(error.localizedDescription)") }
+            if outcome.failures.count < 20 {
+                outcome.failures.append("\(fileSystems.displayPath(item.url)): \(error.localizedDescription)")
+            }
             lock.unlock()
         }
         meter?.add(1, at: fileSystems.displayPath(item.url))
@@ -363,7 +393,9 @@ final class AttributeJob {
     private func change(_ listed: FileItem) throws {
         let url = listed.url
         let provider = try fileSystems.provider(for: url)
-        if change.needsLocalFileSystem, !url.isFileURL { throw FileSystemError.notSupported("Changing flags and owners") }
+        if change.needsLocalFileSystem, !url.isFileURL {
+            throw FileSystemError.notSupported("Changing flags and owners")
+        }
         // A locked item takes no other change, so the lock comes off first and goes on last.
         if change.locked == false { try LocalInfo.setFlag(UInt32(UF_IMMUTABLE), false, of: url) }
         // A change that starts from what the item has (`u+x`, a date with parts left as they
@@ -377,7 +409,8 @@ final class AttributeJob {
         if !item.isSymlink, !LocalInfo.isSymlink(url) {
             var attributes = FileAttributes()
             if change.permissions != .unchanged {
-                attributes.permissions = change.permissions.applied(to: item.permissions, isDirectory: item.isDirectory)
+                attributes.permissions = change.permissions.applied(
+                    to: item.permissions, isDirectory: item.isDirectory)
             }
             if let timestamp {
                 guard let date = timestamp.applied(to: item.modified, now: now) else { throw InvalidDate() }
@@ -385,8 +418,12 @@ final class AttributeJob {
             }
             // The file system unlocks an item that is made writable. With the lock left
             // "unchanged" that would be a change nobody asked for: a locked item is reported.
-            if attributes.permissions != nil, change.locked == nil, LocalInfo.details(url)?.isLocked == true { throw LockedItem() }
-            if attributes.permissions != nil || attributes.modified != nil { try provider.setAttributes(attributes, of: url, cancellation: cancellation) }
+            if attributes.permissions != nil, change.locked == nil, LocalInfo.details(url)?.isLocked == true {
+                throw LockedItem()
+            }
+            if attributes.permissions != nil || attributes.modified != nil {
+                try provider.setAttributes(attributes, of: url, cancellation: cancellation)
+            }
         }
         if ownerID != nil || groupID != nil { try LocalInfo.setOwner(ownerID, group: groupID, of: url) }
         if let hidden = change.hidden { try LocalInfo.setFlag(UInt32(UF_HIDDEN), hidden, of: url) }
@@ -394,7 +431,9 @@ final class AttributeJob {
     }
 
     private struct LockedItem: LocalizedError {
-        var errorDescription: String? { "The item is locked. Its permissions were not changed; choose Locked: Clear to unlock it." }
+        var errorDescription: String? {
+            "The item is locked. Its permissions were not changed; choose Locked: Clear to unlock it."
+        }
     }
 
     private struct InvalidDate: LocalizedError {

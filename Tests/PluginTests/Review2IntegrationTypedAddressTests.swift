@@ -25,7 +25,9 @@ final class IntegrationConsent: ServerConsentService {
         memory.addFile("/A/one.txt", "one")
         memory.addDirectory("/B")
         server.addDirectory("/in")
-        bench = TestBench(plugins: [FileOperationsPlugin()], fileSystems: [memory, server], left: memory.url("/A"), right: memory.url("/B"))
+        bench = TestBench(
+            plugins: [FileOperationsPlugin()], fileSystems: [memory, server], left: memory.url("/A"),
+            right: memory.url("/B"))
         bench.kernel.services.register(ServerConsentService.self, consent)
     }
 
@@ -73,7 +75,9 @@ final class IntegrationConsent: ServerConsentService {
         let lists = MemoryFileSystem(scheme: "listed")
         lists.addFile("/found/one.txt", "one")
         lists.capabilitiesAt = { _ in [.write, .removeOnly] }
-        let bench = TestBench(plugins: [FileOperationsPlugin()], fileSystems: [memory, lists], left: memory.url("/A"), right: memory.url("/B"))
+        let bench = TestBench(
+            plugins: [FileOperationsPlugin()], fileSystems: [memory, lists], left: memory.url("/A"),
+            right: memory.url("/B"))
         #expect(bench.commands.isEnabled(.makeDirectory) && bench.commands.isEnabled(.newTextFile))
         bench.left.show(lists.url("/found"))
         bench.left.moveCursor(toName: "one.txt")

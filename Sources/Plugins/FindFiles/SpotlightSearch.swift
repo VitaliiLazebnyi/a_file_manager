@@ -48,7 +48,9 @@ public enum SpotlightQuery {
         if handlesText(of: query) {
             let text = escape(TextPattern.unescape(query.text), keepingStars: false)
             let flags = query.caseSensitive ? "" : "cd"
-            parts.append(query.textOptions.wholeWords ? "kMDItemTextContent == \"\(text)\"\(flags)w" : "kMDItemTextContent == \"*\(text)*\"\(flags)")
+            parts.append(
+                query.textOptions.wholeWords
+                    ? "kMDItemTextContent == \"\(text)\"\(flags)w" : "kMDItemTextContent == \"*\(text)*\"\(flags)")
         }
         if let size = query.criteria.size {
             let bytes = size.bytes
@@ -85,27 +87,33 @@ public enum SpotlightQuery {
     ///
     /// **Threading.** Blocks on the file system and examines the files on all cores; meant for
     /// a background thread.
-    public static func verify(_ paths: [String], with search: FileSearch, fileSystems: FileSystemRegistry) -> [FileItem] {
+    public static func verify(_ paths: [String], with search: FileSearch, fileSystems: FileSystemRegistry) -> [FileItem]
+    {
         let query = search.query
         let checkingText = !handlesText(of: query) || recheckingText(of: query)
         // Spotlight answers with real paths and the volume may not tell upper from lower case:
         // a start directory typed in another case, or through a link, is still the same place.
         var roots: [String] = []
         for directory in query.directories {
-            for path in [directory.standardizedFileURL.path, directory.resolvingSymlinksInPath().path] where !roots.contains(path) {
+            for path in [directory.standardizedFileURL.path, directory.resolvingSymlinksInPath().path]
+            where !roots.contains(path) {
                 roots.append(path)
             }
         }
         let prefixes = roots.map { ($0.hasSuffix("/") ? $0 : $0 + "/").lowercased() }
         let hits = Parallel.map(paths) { path -> FileItem? in
-            guard !search.cancellation.isCancelled, let match = prefixes.firstIndex(where: { path.lowercased().hasPrefix($0) }) else { return nil }
+            guard !search.cancellation.isCancelled,
+                let match = prefixes.firstIndex(where: { path.lowercased().hasPrefix($0) })
+            else { return nil }
             // Cut at the `/` bytes, as the file system reads the path (a `/` with a combining
             // mark after it is one character that is not `/`).
             let below = Array(path.dropFirst(prefixes[match].count).utf8).split(separator: 0x2F)
             if let depth = query.maxDepth, below.count - 1 > depth { return nil }
             if !query.includeHidden, below.contains(where: { $0.first == 0x2E }) { return nil }
-            guard let item = fileSystems.item(at: URL(fileURLWithPath: path, isDirectory: false)), query.includeHidden || !item.isHidden,
-                  search.accepts(item, checkingText: checkingText) else { return nil }
+            guard let item = fileSystems.item(at: URL(fileURLWithPath: path, isDirectory: false)),
+                query.includeHidden || !item.isHidden,
+                search.accepts(item, checkingText: checkingText)
+            else { return nil }
             return item
         }
         guard !search.cancellation.isCancelled else { return [] }
@@ -145,7 +153,8 @@ final class SpotlightSearch: NSObject {
         lock.lock()
         self.completion = completion
         lock.unlock()
-        NotificationCenter.default.addObserver(self, selector: #selector(finished), name: .NSMetadataQueryDidFinishGathering, object: metadataQuery)
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(finished), name: .NSMetadataQueryDidFinishGathering, object: metadataQuery)
         if !metadataQuery.start() { queue.addOperation { [weak self] in self?.finished() } }
     }
 
@@ -162,7 +171,8 @@ final class SpotlightSearch: NSObject {
     }
 
     private var stopped: Bool {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         return isStopped
     }
 
@@ -178,7 +188,9 @@ final class SpotlightSearch: NSObject {
             // The attribute values are autoreleased objects: a piece at a time.
             autoreleasepool {
                 for item in index..<min(index + 5_000, count) {
-                    if let path = (metadataQuery.result(at: item) as? NSMetadataItem)?.value(forAttribute: NSMetadataItemPathKey) as? String {
+                    if let path = (metadataQuery.result(at: item) as? NSMetadataItem)?.value(
+                        forAttribute: NSMetadataItemPathKey) as? String
+                    {
                         paths.append(path)
                     }
                 }

@@ -48,15 +48,18 @@ final class KeyBindingEditor {
     }
 
     convenience init(kernel: Kernel) {
-        self.init(commands: kernel.commands.all,
-                  overrides: KeyBindingEditor.storedOverrides(in: kernel))
+        self.init(
+            commands: kernel.commands.all,
+            overrides: KeyBindingEditor.storedOverrides(in: kernel))
     }
 
     /// Takes bindings that were stored elsewhere since this editor was made (the Start menu's
     /// keys, a command's shortcut field) as the base, and keeps what was edited here on top.
     func rebase(commands: [Command], overrides fresh: [String: [String]]) {
         var merged = fresh
-        for name in Set(overrides.keys).union(stored.keys) where overrides[name] != stored[name] { merged[name] = overrides[name] }
+        for name in Set(overrides.keys).union(stored.keys) where overrides[name] != stored[name] {
+            merged[name] = overrides[name]
+        }
         self.commands = commands
         stored = fresh
         overrides = merged
@@ -117,9 +120,10 @@ final class KeyBindingEditor {
     func assign(_ shortcut: Shortcut, to command: CommandID, adding: Bool, asking ui: UserInteraction) -> Bool {
         if let owner = owner(of: shortcut), owner != command {
             let title = commands.first { $0.id == owner }?.title ?? owner.rawValue
-            let answer = ui.choose("\(ShortcutText.display(shortcut)) is already in use",
-                                   detail: "It runs “\(title)” (\(owner.rawValue)). Give it to this command instead?",
-                                   buttons: ["Reassign", "Cancel"], style: .warning)
+            let answer = ui.choose(
+                "\(ShortcutText.display(shortcut)) is already in use",
+                detail: "It runs “\(title)” (\(owner.rawValue)). Give it to this command instead?",
+                buttons: ["Reassign", "Cancel"], style: .warning)
             guard answer == 0 else { return false }
         }
         if adding {
@@ -163,16 +167,19 @@ final class KeyBindingEditor {
     /// as a whole (import, reset).
     static func reapply(in kernel: Kernel) {
         let overrides = kernel.settings.value([String: [String]].self, forKey: KeyBindings.settingsKey) ?? [:]
-        apply(KeyMap.resolve(kernel.commands.all, overrides: overrides), of: kernel.commands.all, to: kernel.keyBindings)
+        apply(
+            KeyMap.resolve(kernel.commands.all, overrides: overrides), of: kernel.commands.all, to: kernel.keyBindings
+        )
     }
 }
 
 /// Shortcuts as the user reads and presses them.
 enum ShortcutText {
     private static let keyNames: [Key: String] = [
-        .returnKey: "↩", .enter: "⌤", .tab: "⇥", .space: "Space", .backspace: "⌫", .forwardDelete: "⌦", .insert: "Insert",
+        .returnKey: "↩", .enter: "⌤", .tab: "⇥", .space: "Space", .backspace: "⌫", .forwardDelete: "⌦",
+        .insert: "Insert",
         .home: "↖", .end: "↘", .pageUp: "⇞", .pageDown: "⇟", .left: "←", .right: "→", .up: "↑", .down: "↓",
-        .keypadPlus: "Num +", .keypadMinus: "Num −", .keypadMultiply: "Num *", .keypadDivide: "Num /",
+        .keypadPlus: "Num +", .keypadMinus: "Num −", .keypadMultiply: "Num *", .keypadDivide: "Num /"
     ]
 
     /// The Mac's way of writing a shortcut: `⌃⌥⇧⌘C`, `⇧F5`.
@@ -204,7 +211,9 @@ enum ShortcutText {
             modifiers.insert(modifier)
             rest.removeFirst()
         }
-        if let named = keyNames.first(where: { $0.value.lowercased() == rest.lowercased() })?.key { return Shortcut(named, modifiers) }
+        if let named = keyNames.first(where: { $0.value.lowercased() == rest.lowercased() })?.key {
+            return Shortcut(named, modifiers)
+        }
         guard let shortcut = Shortcut(notation: rest) else { return nil }
         return Shortcut(shortcut.key, shortcut.modifiers.union(modifiers))
     }
@@ -213,9 +222,11 @@ enum ShortcutText {
         var keys: [UInt16: Key] = [
             36: .returnKey, 76: .enter, 48: .tab, 49: .space, 51: .backspace, 117: .forwardDelete, 114: .insert,
             115: .home, 119: .end, 116: .pageUp, 121: .pageDown, 123: .left, 124: .right, 125: .down, 126: .up,
-            69: .keypadPlus, 78: .keypadMinus, 67: .keypadMultiply, 75: .keypadDivide,
+            69: .keypadPlus, 78: .keypadMinus, 67: .keypadMultiply, 75: .keypadDivide
         ]
-        for (index, code) in [122, 120, 99, 118, 96, 97, 98, 100, 101, 109, 103, 111].enumerated() { keys[UInt16(code)] = .function(index + 1) }
+        for (index, code) in [122, 120, 99, 118, 96, 97, 98, 100, 101, 109, 103, 111].enumerated() {
+            keys[UInt16(code)] = .function(index + 1)
+        }
         return keys
     }()
 
@@ -246,15 +257,18 @@ struct CommandRow: Equatable {
 /// (spec 14 › The Choose command dialog). The categories are the menus the commands are in,
 /// since that is where the user knows them from.
 enum CommandCatalog {
-    static func rows(commands: [Command], menus: [MenuRegistry.Menu], shortcuts: (CommandID) -> [Shortcut]) -> [CommandRow] {
+    static func rows(commands: [Command], menus: [MenuRegistry.Menu], shortcuts: (CommandID) -> [Shortcut])
+        -> [CommandRow]
+    {
         var menuOf: [CommandID: String] = [:]
         for menu in menus {
             for case let id? in menu.items where menuOf[id] == nil { menuOf[id] = menu.title }
         }
         return commands.map { command in
             let isUser = command.id.rawValue.hasPrefix(UserCommand.prefix)
-            return CommandRow(id: command.id, title: command.title, keys: ShortcutText.display(shortcuts(command.id)),
-                              category: isUser ? CommandRow.userCategory : menuOf[command.id] ?? CommandRow.otherCategory)
+            return CommandRow(
+                id: command.id, title: command.title, keys: ShortcutText.display(shortcuts(command.id)),
+                category: isUser ? CommandRow.userCategory : menuOf[command.id] ?? CommandRow.otherCategory)
         }
     }
 
@@ -284,7 +298,9 @@ enum CommandCatalog {
             guard !bound.isEmpty else { continue }
             text += category + "\n"
             for row in bound {
-                text += "    " + row.keys.padding(toLength: max(22, row.keys.count + 2), withPad: " ", startingAt: 0) + row.title.replacingOccurrences(of: "…", with: "") + "\n"
+                text +=
+                    "    " + row.keys.padding(toLength: max(22, row.keys.count + 2), withPad: " ", startingAt: 0)
+                    + row.title.replacingOccurrences(of: "…", with: "") + "\n"
             }
             text += "\n"
         }

@@ -54,8 +54,15 @@ public enum MergeChoice { case merge, mergeAll, skip, cancel }
 /// What a job did to one item, for the operation log (13 › Operation › Log file).
 public struct OperationRecord {
     public enum Verb: String {
-        case copy = "Copy", move = "Move", append = "Append", delete = "Delete", trash = "Move to Trash"
-        case makeFolder = "New folder", removeFolder = "Delete folder", newFile = "New file", rename = "Rename"
+        case copy = "Copy"
+        case move = "Move"
+        case append = "Append"
+        case delete = "Delete"
+        case trash = "Move to Trash"
+        case makeFolder = "New folder"
+        case removeFolder = "Delete folder"
+        case newFile = "New file"
+        case rename = "Rename"
     }
 
     public enum Status: Equatable {
@@ -99,7 +106,9 @@ extension FileJobDelegate {
     public func job(_ job: FileJob, confirm question: ProtectionQuestion) -> ProtectionChoice { .proceed }
     public func job(_ job: FileJob, mergeInto existing: FileItem, source: FileItem) -> MergeChoice { .merge }
     /// Another volume is never entered without somebody saying so.
-    public func job(_ job: FileJob, crossVolumeAt folder: FileItem, purpose: ProtectionQuestion.Purpose) -> ProtectionChoice { .skip }
+    public func job(_ job: FileJob, crossVolumeAt folder: FileItem, purpose: ProtectionQuestion.Purpose)
+        -> ProtectionChoice
+    { .skip }
 }
 
 public struct JobResult {
@@ -142,11 +151,15 @@ public enum FileJobError: LocalizedError {
         case .targetIsFile(let path): return "A file with the name \(path) already exists!"
         case .sourceMissing(let path): return "\(path) does not exist any more!"
         case .folderNotEmpty(let path): return "\(path) still contains items that could not be processed."
-        case .verifyFailed(let path): return "Verify failed: the copy of \(path) differs from the original. It was removed."
+        case .verifyFailed(let path):
+            return "Verify failed: the copy of \(path) differs from the original. It was removed."
         case .cannotResume(let path): return "\(path) is not a shorter, partial copy of the file; it cannot be resumed."
-        case .unsafeName(let name): return "\"\(DisplayName.escaped(name))\" is not a valid file name here. It was not processed."
-        case .specialFile(let path): return "\(path) is a pipe, a device or a socket, not a file with contents. It was not copied."
-        case .notPlainFile(let path): return "\(path) is a link or not a plain file; it cannot be appended to or resumed."
+        case .unsafeName(let name):
+            return "\"\(DisplayName.escaped(name))\" is not a valid file name here. It was not processed."
+        case .specialFile(let path):
+            return "\(path) is a pipe, a device or a socket, not a file with contents. It was not copied."
+        case .notPlainFile(let path):
+            return "\(path) is a link or not a plain file; it cannot be appended to or resumed."
         case .otherVolume(let path): return "\(path) is another volume (a mounted disk or share). It was left as it is."
         case .nestedTooDeep(let path): return "\(path) is nested too deep to be processed."
         }
@@ -303,7 +316,9 @@ public final class FileJob {
         var items = 0
         var bytes: Int64 = 0
 
-        static func + (a: Measure, b: Measure) -> Measure { Measure(items: a.items + b.items, bytes: a.bytes.addingSaturated(b.bytes)) }
+        static func + (a: Measure, b: Measure) -> Measure {
+            Measure(items: a.items + b.items, bytes: a.bytes.addingSaturated(b.bytes))
+        }
         static func += (a: inout Measure, b: Measure) { a = a + b }
     }
 
@@ -403,23 +418,30 @@ public final class FileJob {
         init(count: Int) { outcomes = Array(repeating: nil, count: count) }
 
         func set(_ slot: Int, _ outcome: Outcome) {
-            lock.lock(); outcomes[slot] = outcome; lock.unlock()
+            lock.lock()
+            outcomes[slot] = outcome
+            lock.unlock()
         }
 
         func setCancelled() {
-            lock.lock(); cancelled = true; lock.unlock()
+            lock.lock()
+            cancelled = true
+            lock.unlock()
         }
 
         /// Waits for the workers and returns what is known; an item without an outcome was not reached.
         func settled() -> (outcomes: [Outcome?], cancelled: Bool) {
             group.wait()
-            lock.lock(); defer { lock.unlock() }
+            lock.lock()
+            defer { lock.unlock() }
             return (outcomes, cancelled)
         }
     }
 
-    public init(kind: JobKind, sources: [URL], target: TargetSpec? = nil, fileSystems: FileSystemRegistry,
-                cancellation: CancellationFlag = CancellationFlag()) {
+    public init(
+        kind: JobKind, sources: [URL], target: TargetSpec? = nil, fileSystems: FileSystemRegistry,
+        cancellation: CancellationFlag = CancellationFlag()
+    ) {
         self.kind = kind
         // Items are processed in case-insensitive name order (07 › Processing order).
         self.sources = FileJob.inProcessingOrder(sources)
@@ -516,7 +538,8 @@ public final class FileJob {
         // path typed inside an archive): asked, it answers with the real folder, and that is
         // where the job then goes.
         if var spec = target, !spec.directory.isFileURL, let found = (try? entry(at: spec.directory)) ?? nil,
-           (found.url.scheme ?? "file") != (spec.directory.scheme ?? "file") {
+            (found.url.scheme ?? "file") != (spec.directory.scheme ?? "file")
+        {
             spec.directory = found.url
             target = spec
         }
@@ -544,7 +567,9 @@ public final class FileJob {
                     try checkCancelled()
                     let deleted = try autoreleasepool { () throws -> Bool in
                         guard try hasSafeName(source, verb: toTrash ? .trash : .delete) else { return false }
-                        return try toTrash ? trash(source) : deleteTree(source, item: topItem(slot, source), isTopLevel: true, tree: nil, depth: 0)
+                        return try toTrash
+                            ? trash(source)
+                            : deleteTree(source, item: topItem(slot, source), isTopLevel: true, tree: nil, depth: 0)
                     }
                     if deleted { result.completed.append(source) }
                 }
@@ -600,11 +625,15 @@ public final class FileJob {
                 let source = sources[slot]
                 try checkCancelled()
                 try autoreleasepool {
-                    guard try hasSafeName(source, verb: isMove ? .move : .copy), var destination = destination(for: source) else {
+                    guard try hasSafeName(source, verb: isMove ? .move : .copy),
+                        var destination = destination(for: source)
+                    else {
                         return batch.set(slot, .skipped)
                     }
                     if renamesSelfCopies, destination.isSameLocation(as: source) {
-                        destination = UniqueName.available(for: destination, in: fileSystems, cancellation: cancellation) {
+                        destination = UniqueName.available(
+                            for: destination, in: fileSystems, cancellation: cancellation
+                        ) {
                             taken.contains(FileJob.claimKey($0))
                         }
                         try checkCancelled()
@@ -617,7 +646,9 @@ public final class FileJob {
                         _ = try attempt(.copy, at: source) { throw FileJobError.sourceMissing(self.display(source)) }
                         return batch.set(slot, .skipped)
                     }
-                    try transfer(item, to: destination, from: options.filter.base, batch: batch, slot: slot, isTopLevel: true, depth: 0)
+                    try transfer(
+                        item, to: destination, from: options.filter.base, batch: batch, slot: slot, isTopLevel: true,
+                        depth: 0)
                 }
             }
         } catch {
@@ -650,8 +681,10 @@ public final class FileJob {
     private func slotsInReadOrder() -> [Int] {
         let slots = Array(sources.indices)
         guard sources.count > 1, let first = sources.first, !first.isFileURL, let target,
-              let from = try? fileSystems.provider(for: first), let to = try? fileSystems.provider(for: target.directory), from !== to,
-              !sources.contains(where: { ($0.scheme ?? "file") != (first.scheme ?? "file") }) else { return slots }
+            let from = try? fileSystems.provider(for: first), let to = try? fileSystems.provider(for: target.directory),
+            from !== to,
+            !sources.contains(where: { ($0.scheme ?? "file") != (first.scheme ?? "file") })
+        else { return slots }
         let ordered = from.readOrder(of: sources)
         guard ordered.count == sources.count, ordered != sources else { return slots }
         var places: [String: [Int]] = [:]
@@ -688,7 +721,8 @@ public final class FileJob {
     /// spinning disks. Everything else gets a single stream.
     private func makePool() -> Pool? {
         guard options.copiesSmallFilesInParallel, parallelWidth > 1, let target, !sources.isEmpty,
-              areFastAndLocal([target.directory] + sourceFolders()) else { return nil }
+            areFastAndLocal([target.directory] + sourceFolders())
+        else { return nil }
         return Pool(width: parallelWidth)
     }
 
@@ -699,7 +733,8 @@ public final class FileJob {
         var seen = Set<String>()
         var last = ""
         for index in stride(from: 0, to: sources.count, by: max(1, sources.count / 4096)) {
-            let folder = (sources[index].path as NSString).deletingLastPathComponent + "|" + (sources[index].scheme ?? "file")
+            let folder =
+                (sources[index].path as NSString).deletingLastPathComponent + "|" + (sources[index].scheme ?? "file")
             if folder == last { continue }
             last = folder
             if seen.insert(folder).inserted { folders.append(sources[index].deletingLastPathComponent()) }
@@ -711,7 +746,8 @@ public final class FileJob {
     /// workers delete three times as fast as one, more cores gain almost nothing.
     private func makeDeletePool() -> Pool? {
         guard kind == .delete(toTrash: false), options.copiesSmallFilesInParallel, parallelWidth > 1,
-              areFastAndLocal(sourceFolders()) else { return nil }
+            areFastAndLocal(sourceFolders())
+        else { return nil }
         return Pool(width: min(4, parallelWidth))
     }
 
@@ -720,8 +756,10 @@ public final class FileJob {
         var devices = Set<dev_t>()
         for url in urls {
             if let device = FileIdentity.device(ofNearest: url), !devices.insert(device).inserted { continue }
-            guard let provider = try? fileSystems.provider(for: url), let volume = provider.volume(of: url, cancellation: cancellation), volume.isLocal,
-                  !StorageMedium.isRotational(url) else { return false }
+            guard let provider = try? fileSystems.provider(for: url),
+                let volume = provider.volume(of: url, cancellation: cancellation), volume.isLocal,
+                !StorageMedium.isRotational(url)
+            else { return false }
         }
         return true
     }
@@ -733,8 +771,10 @@ public final class FileJob {
     /// `isTopLevel` is true for the job's own sources, whose targets are checked against them.
     /// `tree` is the job's own source that the item lies below (nil for such a source itself): a
     /// move that takes the item away afterwards walks down from there (`remove(_:below:)`).
-    private func transfer(_ listed: FileItem, to destination: URL, from position: CopyFilter.Position, batch: Batch, slot: Int,
-                          isTopLevel: Bool = false, tree: URL? = nil, depth: Int) throws {
+    private func transfer(
+        _ listed: FileItem, to destination: URL, from position: CopyFilter.Position, batch: Batch, slot: Int,
+        isTopLevel: Bool = false, tree: URL? = nil, depth: Int
+    ) throws {
         try checkCancelled()
         let item = followsLinks ? resolvingLink(listed) : listed
         if item.isRealDirectory {
@@ -744,10 +784,15 @@ public final class FileJob {
             }
             guard depth < depthLimit else {
                 add(measuredBefore(item))
-                _ = try attempt(isMove ? .move : .copy, at: item.url) { throw FileJobError.nestedTooDeep(self.display(item.url)) }
+                _ = try attempt(isMove ? .move : .copy, at: item.url) {
+                    throw FileJobError.nestedTooDeep(self.display(item.url))
+                }
                 return batch.set(slot, .skipped)
             }
-            return batch.set(slot, try transferFolder(item, to: destination, position: inside, isTopLevel: isTopLevel, tree: tree, depth: depth))
+            return batch.set(
+                slot,
+                try transferFolder(
+                    item, to: destination, position: inside, isTopLevel: isTopLevel, tree: tree, depth: depth))
         }
         guard options.filter.admitsFile(item.name, at: position) else {
             add(Measure(items: 1, bytes: item.size))
@@ -823,7 +868,9 @@ public final class FileJob {
             }
             return Outcome(finished: true, emptied: self.isMove, target: target)
         }
-        guard let pool, !batch.isSerial, item.size <= FileJob.smallFileLimit, !decided.isRename, !renamesInPlace(item.url, target, batch) else {
+        guard let pool, !batch.isSerial, item.size <= FileJob.smallFileLimit, !decided.isRename,
+            !renamesInPlace(item.url, target, batch)
+        else {
             return batch.set(slot, try work())
         }
         pool.slots.wait()
@@ -843,11 +890,16 @@ public final class FileJob {
     /// volumes a move is a copy and a removal, which the pool takes. The items of a batch share
     /// their two folders, so the volumes are looked at once per batch.
     private func renamesInPlace(_ source: URL, _ destination: URL, _ batch: Batch) -> Bool {
-        guard isMove, let from = try? fileSystems.provider(for: source), let to = try? fileSystems.provider(for: destination),
-              from === to else { return false }
+        guard isMove, let from = try? fileSystems.provider(for: source),
+            let to = try? fileSystems.provider(for: destination),
+            from === to
+        else { return false }
         if let known = batch.staysOnVolume { return known }
         guard source.isFileURL, destination.isFileURL else { return true }
-        let (here, there) = (FileIdentity.device(of: source.deletingLastPathComponent()), FileIdentity.device(ofNearest: destination.deletingLastPathComponent()))
+        let (here, there) = (
+            FileIdentity.device(of: source.deletingLastPathComponent()),
+            FileIdentity.device(ofNearest: destination.deletingLastPathComponent())
+        )
         // Unknown counts as one volume, the way it always was.
         let stays = here == nil || there == nil || here == there
         batch.staysOnVolume = stays
@@ -890,17 +942,21 @@ public final class FileJob {
             case .rename(let name):
                 destination = folder.appending(name: name)
             case .autoRenameCopied:
-                let free = UniqueName.available(for: destination, in: fileSystems, cancellation: cancellation, isTaken: isTaken)
+                let free = UniqueName.available(
+                    for: destination, in: fileSystems, cancellation: cancellation, isTaken: isTaken)
                 // A name found while the job was being stopped is not known to be free.
                 try checkCancelled()
                 return .write(free, replacing: false)
             case .renameExisting(let name):
-                try fileSystems.provider(for: destination).move(destination, to: folder.appending(name: name), replacing: false, cancellation: cancellation)
+                try fileSystems.provider(for: destination).move(
+                    destination, to: folder.appending(name: name), replacing: false, cancellation: cancellation)
                 record(.rename, destination, folder.appending(name: name), .done)
             case .autoRenameExisting:
-                let free = UniqueName.available(for: destination, in: fileSystems, cancellation: cancellation, isTaken: isTaken)
+                let free = UniqueName.available(
+                    for: destination, in: fileSystems, cancellation: cancellation, isTaken: isTaken)
                 try checkCancelled()
-                try fileSystems.provider(for: destination).move(destination, to: free, replacing: false, cancellation: cancellation)
+                try fileSystems.provider(for: destination).move(
+                    destination, to: free, replacing: false, cancellation: cancellation)
                 record(.rename, destination, free, .done)
             case .append:
                 guard isPlainFile(existing) else { throw FileJobError.notPlainFile(display(destination)) }
@@ -977,7 +1033,8 @@ public final class FileJob {
     /// that keep the time exactly (APFS) the times are compared as they are. Called with
     /// `decisions` held.
     private func isNewer(_ file: FileItem, than other: FileItem) -> Bool {
-        file.modified.timeIntervalSince(other.modified) > max(FileJob.timestampNoise, grain(at: file.url), grain(at: other.url))
+        file.modified.timeIntervalSince(other.modified)
+            > max(FileJob.timestampNoise, grain(at: file.url), grain(at: other.url))
     }
 
     private func grain(at url: URL) -> TimeInterval {
@@ -992,18 +1049,26 @@ public final class FileJob {
     /// The second question for an item nobody may write to, or a hidden one. False: leave it.
     private func mayTouch(_ item: FileItem, for purpose: ProtectionQuestion.Purpose) throws -> Bool {
         if options.ignoresProtection || item.isSymlink { return true }
-        if options.asksAboutReadOnly, item.permissions & 0o222 == 0, try !confirm(.readOnly, purpose, item) { return false }
+        if options.asksAboutReadOnly, item.permissions & 0o222 == 0, try !confirm(.readOnly, purpose, item) {
+            return false
+        }
         if options.asksAboutHidden, item.isHidden, try !confirm(.hidden, purpose, item) { return false }
         return true
     }
 
-    private func confirm(_ reason: ProtectionQuestion.Reason, _ purpose: ProtectionQuestion.Purpose, _ item: FileItem) throws -> Bool {
+    private func confirm(_ reason: ProtectionQuestion.Reason, _ purpose: ProtectionQuestion.Purpose, _ item: FileItem)
+        throws -> Bool
+    {
         try decisions.withLock {
             let key = "\(reason)-\(purpose)"
             if confirmedForAll.contains(key) { return true }
-            switch try delegateOrStop().job(self, confirm: ProtectionQuestion(reason: reason, purpose: purpose, item: item)) {
+            switch try delegateOrStop().job(
+                self, confirm: ProtectionQuestion(reason: reason, purpose: purpose, item: item))
+            {
             case .proceed: return true
-            case .all: confirmedForAll.append(key); return true
+            case .all:
+                confirmedForAll.append(key)
+                return true
             case .skip: return false
             case .cancel: throw Cancelled()
             }
@@ -1072,8 +1137,11 @@ public final class FileJob {
         } catch {
             // What arrived of a stream can be kept for Resume, when that was asked for.
             let tidying = patience(with: to)
-            if options.keepsPartialFiles, !replacing, !(error is FileJobError), let left = to.item(at: temporary, cancellation: tidying),
-               left.size > 0, !left.isSymlink, (try? to.move(temporary, to: destination, replacing: false, cancellation: tidying)) != nil {
+            if options.keepsPartialFiles, !replacing, !(error is FileJobError),
+                let left = to.item(at: temporary, cancellation: tidying),
+                left.size > 0, !left.isSymlink,
+                (try? to.move(temporary, to: destination, replacing: false, cancellation: tidying)) != nil
+            {
                 flight.partial = (destination, left.size)
                 throw error
             }
@@ -1087,7 +1155,9 @@ public final class FileJob {
     /// place once every view is seen through, or the same file on a local disk. What was
     /// written there is then not a second copy, and the source must stay.
     private func isStillTheSource(_ target: URL, of source: URL) -> Bool {
-        let (there, here) = (RealLocation.resolve(target, in: fileSystems), RealLocation.resolve(source, in: fileSystems))
+        let (there, here) = (
+            RealLocation.resolve(target, in: fileSystems), RealLocation.resolve(source, in: fileSystems)
+        )
         return there.isSameLocation(as: here) || FileIdentity.sameFile(there, here)
     }
 
@@ -1096,8 +1166,10 @@ public final class FileJob {
     private func removePartial(of flight: Flight) {
         guard let partial = flight.partial else { return }
         flight.partial = nil
-        guard let provider = try? fileSystems.provider(for: partial.url), let left = provider.item(at: partial.url, cancellation: cancellation),
-              !left.isDirectory, !left.isSymlink, left.size == partial.size else { return }
+        guard let provider = try? fileSystems.provider(for: partial.url),
+            let left = provider.item(at: partial.url, cancellation: cancellation),
+            !left.isDirectory, !left.isSymlink, left.size == partial.size
+        else { return }
         try? provider.remove(partial.url, cancellation: cancellation)
     }
 
@@ -1110,10 +1182,11 @@ public final class FileJob {
         do {
             try provider.remove(temporary, cancellation: tidying)
             return
-        } catch where FileJob.isRefusedAsLocked(error) {
+        } catch  where FileJob.isRefusedAsLocked(error) {
             // Never a link: the change of permissions would land on what it points to.
             if let left = provider.item(at: temporary, cancellation: tidying), !left.isSymlink {
-                try? provider.setAttributes(FileAttributes(permissions: left.permissions | 0o200), of: temporary, cancellation: tidying)
+                try? provider.setAttributes(
+                    FileAttributes(permissions: left.permissions | 0o200), of: temporary, cancellation: tidying)
                 if (try? provider.remove(temporary, cancellation: tidying)) != nil { return }
             }
         } catch {}
@@ -1125,7 +1198,8 @@ public final class FileJob {
 
     /// `.afm-<UUID>.tmp`, the name every unfinished copy carries.
     static func isTemporaryName(_ name: String) -> Bool {
-        name.utf8.count == 45 && name.hasPrefix(".afm-") && name.hasSuffix(".tmp") && UUID(uuidString: String(name.dropFirst(5).dropLast(4))) != nil
+        name.utf8.count == 45 && name.hasPrefix(".afm-") && name.hasSuffix(".tmp")
+            && UUID(uuidString: String(name.dropFirst(5).dropLast(4))) != nil
     }
 
     /// The target folders that were looked through for old temporary files already.
@@ -1137,7 +1211,8 @@ public final class FileJob {
         private var value: Value
         init(_ value: Value) { self.value = value }
         func withLock<Result>(_ body: (inout Value) -> Result) -> Result {
-            lock.lock(); defer { lock.unlock() }
+            lock.lock()
+            defer { lock.unlock() }
             return body(&value)
         }
     }
@@ -1160,7 +1235,9 @@ public final class FileJob {
             guard isTemporaryName(name) else { continue }
             let path = directory.path + "/" + name
             var info = stat()
-            guard lstat(path, &info) == 0, (info.st_mode & S_IFMT) == S_IFREG, info.st_mtimespec.tv_sec < limit, info.st_ctimespec.tv_sec < limit else { continue }
+            guard lstat(path, &info) == 0, (info.st_mode & S_IFMT) == S_IFREG, info.st_mtimespec.tv_sec < limit,
+                info.st_ctimespec.tv_sec < limit
+            else { continue }
             unlink(path)
         }
     }
@@ -1171,7 +1248,9 @@ public final class FileJob {
 
     /// Copies to a free name. A cancelled or failed copy within one file system leaves nothing
     /// behind; of a stream the caller removes what arrived.
-    private func copyContents(of item: FileItem, to destination: URL, from: FileSystemProvider, to: FileSystemProvider, _ flight: Flight) throws {
+    private func copyContents(
+        of item: FileItem, to destination: URL, from: FileSystemProvider, to: FileSystemProvider, _ flight: Flight
+    ) throws {
         // A link that is followed is read through, which only a stream does.
         // (A link that was not followed, because it leads back into its own folder, comes
         // here as the link it is and is copied as one.)
@@ -1185,7 +1264,9 @@ public final class FileJob {
                     return !self.isStopping
                 }
                 if !options.preservesAttributes, !item.isSymlink {
-                    try? to.setAttributes(FileAttributes(modified: Date(), permissions: 0o644), of: destination, cancellation: cancellation)
+                    try? to.setAttributes(
+                        FileAttributes(modified: Date(), permissions: 0o644), of: destination,
+                        cancellation: cancellation)
                 }
                 return
             } catch FileSystemError.crossesVolumes {
@@ -1253,7 +1334,11 @@ public final class FileJob {
         do {
             try provider.setQuarantine(origin, of: url, cancellation: cancellation)
         } catch {
-            if !isStopping { note(.copy, at: shown, "The copy could not be marked as coming from elsewhere: \(error.localizedDescription)") }
+            if !isStopping {
+                note(
+                    .copy, at: shown,
+                    "The copy could not be marked as coming from elsewhere: \(error.localizedDescription)")
+            }
         }
     }
 
@@ -1284,7 +1369,9 @@ public final class FileJob {
         // pipe on either side would never answer.
         guard let existing = try entry(at: destination) else { throw FileJobError.sourceMissing(display(destination)) }
         guard isPlainFile(existing) else { throw FileJobError.notPlainFile(display(destination)) }
-        if item.isSpecial || FileIdentity.isSpecialNode(item.url, followingLinks: true) { throw FileJobError.specialFile(display(item.url)) }
+        if item.isSpecial || FileIdentity.isSpecialNode(item.url, followingLinks: true) {
+            throw FileJobError.specialFile(display(item.url))
+        }
         if isStillTheSource(destination, of: item.url) { throw FileJobError.copyToItself }
         if resuming, to.capabilities(for: destination).contains(.append) {
             do {
@@ -1317,14 +1404,18 @@ public final class FileJob {
             if resuming {
                 // The same check as when the file is continued in place: its end (all of it
                 // when the job verifies) must be the source's, or the two do not belong together.
-                guard kept < item.size, try startsWithPartial(reader, destination, in: to, length: kept, fully: options.verifies, flight) else {
+                guard kept < item.size,
+                    try startsWithPartial(reader, destination, in: to, length: kept, fully: options.verifies, flight)
+                else {
                     throw FileJobError.cannotResume(display(destination))
                 }
                 try reader.seek(to: UInt64(kept))
             }
             try stream(reader, into: writer, flight, alreadyCopied: resuming ? kept : 0)
             // A resumed file is the source and gets its date; an appended one is new now.
-            try writer.close(attributes: resuming ? attributes(for: item, from: from, to: to) : FileAttributes(permissions: existing.permissions))
+            try writer.close(
+                attributes: resuming
+                    ? attributes(for: item, from: from, to: to) : FileAttributes(permissions: existing.permissions))
             if let origin = flight.origin { mark(temporary, with: origin, in: to, shownAs: item.url) }
             if resuming, options.verifies { try verify(temporary, against: item.url) }
             // The longer file is a new one: tags, comments, access rules and the date of
@@ -1332,7 +1423,9 @@ public final class FileJob {
             try? to.copyMetadata(from: destination, to: temporary, cancellation: cancellation)
             // Tags and flags of the old file have come along; the mark of where the added
             // part came from must still be on the new one.
-            if let origin = flight.origin, to.quarantine(of: temporary) == nil { mark(temporary, with: origin, in: to, shownAs: item.url) }
+            if let origin = flight.origin, to.quarantine(of: temporary) == nil {
+                mark(temporary, with: origin, in: to, shownAs: item.url)
+            }
             try to.move(temporary, to: destination, replacing: true, cancellation: cancellation)
         } catch {
             try? writer.close(attributes: FileAttributes())
@@ -1347,8 +1440,10 @@ public final class FileJob {
     /// verifies, since a file that is not the start of the source would be joined to the wrong
     /// rest. A failed or cancelled continuation leaves the file as long as it got, as any
     /// partial file is.
-    private func resumeInPlace(_ destination: URL, partial: FileItem, with item: FileItem, from: FileSystemProvider, to: FileSystemProvider,
-                               _ flight: Flight) throws -> Bool {
+    private func resumeInPlace(
+        _ destination: URL, partial: FileItem, with item: FileItem, from: FileSystemProvider, to: FileSystemProvider,
+        _ flight: Flight
+    ) throws -> Bool {
         let kept = partial.size
         let reader = try from.read(item.url, cancellation: cancellation)
         defer { reader.close() }
@@ -1374,7 +1469,9 @@ public final class FileJob {
                 try verify(destination, against: item.url)
             } catch {
                 // What was added is taken off again, so that the file is the partial one it was.
-                if let undo = try? to.append(to: destination, at: kept, cancellation: patience(with: to)) { try? undo.close(attributes: FileAttributes()) }
+                if let undo = try? to.append(to: destination, at: kept, cancellation: patience(with: to)) {
+                    try? undo.close(attributes: FileAttributes())
+                }
                 throw error
             }
         }
@@ -1383,8 +1480,10 @@ public final class FileJob {
 
     /// Whether the first `length` bytes of `partial` are the first bytes of the source, which
     /// `reader` is then left at the end of. Without `fully` only the last block is compared.
-    private func startsWithPartial(_ reader: FileReader, _ partial: URL, in provider: FileSystemProvider, length: Int64, fully: Bool,
-                                   _ flight: Flight) throws -> Bool {
+    private func startsWithPartial(
+        _ reader: FileReader, _ partial: URL, in provider: FileSystemProvider, length: Int64, fully: Bool,
+        _ flight: Flight
+    ) throws -> Bool {
         let head = try provider.read(partial, cancellation: cancellation)
         defer { head.close() }
         let headTokens = interrupting(head)
@@ -1397,7 +1496,9 @@ public final class FileJob {
             try checkCancelled()
             let count = Int(min(block, length - position))
             let same = try autoreleasepool { () throws -> Bool in
-                guard let mine = try FileJob.read(count, from: head), let theirs = try FileJob.read(count, from: reader) else { return false }
+                guard let mine = try FileJob.read(count, from: head),
+                    let theirs = try FileJob.read(count, from: reader)
+                else { return false }
                 return mine == theirs
             }
             guard same else { return false }
@@ -1423,10 +1524,12 @@ public final class FileJob {
         report(["Verifying: \(display(source))"])
         let digests = Parallel.map([source, copy]) { url in
             Result {
-                try Checksum.sha256(of: url, in: self.fileSystems, flags: [self.cancellation, self.stop], isCancelled: {
-                    self.emit(force: false)
-                    return self.isStopping
-                })
+                try Checksum.sha256(
+                    of: url, in: self.fileSystems, flags: [self.cancellation, self.stop],
+                    isCancelled: {
+                        self.emit(force: false)
+                        return self.isStopping
+                    })
             }
         }
         let (original, written) = (try digests[0].get(), try digests[1].get())
@@ -1434,8 +1537,10 @@ public final class FileJob {
         if original != written { throw FileJobError.verifyFailed(display(source)) }
     }
 
-    private func transferFolder(_ folder: FileItem, to destination: URL, position: CopyFilter.Position, isTopLevel: Bool,
-                                tree: URL?, depth: Int) throws -> Outcome {
+    private func transferFolder(
+        _ folder: FileItem, to destination: URL, position: CopyFilter.Position, isTopLevel: Bool,
+        tree: URL?, depth: Int
+    ) throws -> Outcome {
         let source = folder.url
         let verb: OperationRecord.Verb = isMove ? .move : .copy
         // A folder that is another volume is not emptied by a move without somebody saying so.
@@ -1449,7 +1554,8 @@ public final class FileJob {
         let createsLater = !options.filter.isEmpty && (options.filter.skipsEmptyFolders || !position.admitted)
         // The first count took this folder for one rename and counted it as one item.
         let predicted = isMove && predictedRenames.contains(source.locationKey)
-        var movedWhole = false, createdHere = false
+        var movedWhole = false
+        var createdHere = false
         let ready = try attempt(verb, at: source, target: destination) {
             if destination.isSameLocation(as: source) { throw FileJobError.copyToItself }
             if destination.isInside(source) || (isTopLevel && FileIdentity.isInside(destination, folder: source)) {
@@ -1460,7 +1566,8 @@ public final class FileJob {
                     // The folder under another spelling (letter case): a move renames it, a copy
                     // would merge it into itself.
                     guard self.isMove else { throw FileJobError.copyToItself }
-                    try self.fileSystems.provider(for: source).move(source, to: destination, replacing: true, cancellation: self.cancellation)
+                    try self.fileSystems.provider(for: source).move(
+                        source, to: destination, replacing: true, cancellation: self.cancellation)
                     self.add(predicted ? Measure(items: 1) : self.measuredBefore(folder))
                     movedWhole = true
                     self.record(.move, source, destination, .done)
@@ -1470,7 +1577,9 @@ public final class FileJob {
                 guard existing.isRealDirectory else { throw FileJobError.targetIsFile(self.display(destination)) }
                 return try self.mayMerge(into: existing, folder)
             }
-            let (from, to) = (try self.fileSystems.provider(for: source), try self.fileSystems.provider(for: destination))
+            let (from, to) = (
+                try self.fileSystems.provider(for: source), try self.fileSystems.provider(for: destination)
+            )
             if self.isMove, from === to, self.options.filter.isEmpty {
                 // A folder that does not exist at the target moves as a whole, when renaming can do it.
                 // The size of what moves is known from the first count; only a folder that no one
@@ -1506,11 +1615,14 @@ public final class FileJob {
         guard let listed = try listing(of: source) else { return .skipped }
         // Between two file systems the files are read in the order the source reads them best.
         var children = listed.items
-        if !source.isFileURL, let from = try? fileSystems.provider(for: source), let to = try? fileSystems.provider(for: destination), from !== to {
+        if !source.isFileURL, let from = try? fileSystems.provider(for: source),
+            let to = try? fileSystems.provider(for: destination), from !== to
+        {
             children = inReadOrder(children, from: from)
         }
         let batch = Batch(count: children.count)
-        batch.isSerial = children.count == listed.items.count && zip(children, listed.items).contains { $0.url != $1.url }
+        batch.isSerial =
+            children.count == listed.items.count && zip(children, listed.items).contains { $0.url != $1.url }
         // A second source folder that lands in this target folder meets what the first one
         // brought; that is this job's own work and no rule "for all" overwrites it.
         batch.isShared = !enteredTargets.insert(FileJob.claimHash(destination)).inserted
@@ -1520,14 +1632,17 @@ public final class FileJob {
             try autoreleasepool {
                 let childTarget = destination.appending(name: child.name)
                 report { ["From: \(self.display(child.url))", "To: \(self.display(childTarget))"] }
-                try transfer(child, to: childTarget, from: position, batch: batch, slot: slot, tree: tree ?? source, depth: depth + 1)
+                try transfer(
+                    child, to: childTarget, from: position, batch: batch, slot: slot, tree: tree ?? source,
+                    depth: depth + 1)
             }
         }
         let settled = batch.settled()
         if settled.cancelled { throw Cancelled() }
         // What was refused for its name stays where it is.
-        var outcome = Outcome(finished: listed.rejected == 0 && settled.outcomes.allSatisfy { $0?.finished == true },
-                              emptied: listed.rejected == 0 && settled.outcomes.allSatisfy { $0?.emptied == true }, target: destination)
+        var outcome = Outcome(
+            finished: listed.rejected == 0 && settled.outcomes.allSatisfy { $0?.finished == true },
+            emptied: listed.rejected == 0 && settled.outcomes.allSatisfy { $0?.emptied == true }, target: destination)
         // A folder that waited for its first file (a filter was in the way) is the job's too, if one came.
         let madeLate = createsLater && !createdHere && (try? entry(at: destination)) != nil
         finishFolder(folder, at: destination, createdHere: createdHere || madeLate)
@@ -1549,16 +1664,23 @@ public final class FileJob {
     /// A folder gets its attributes when everything is inside: before, a folder without write
     /// permission could not be filled, and filling it would change its date.
     private func finishFolder(_ folder: FileItem, at destination: URL, createdHere: Bool) {
-        let attributes = FileAttributes(modified: options.preservesFolderDates ? folder.modified : nil,
-                                        permissions: createdHere && options.preservesAttributes ? folder.permissions : nil)
+        let attributes = FileAttributes(
+            modified: options.preservesFolderDates ? folder.modified : nil,
+            permissions: createdHere && options.preservesAttributes ? folder.permissions : nil)
         guard let to = try? fileSystems.provider(for: destination) else { return }
-        if attributes.modified != nil || attributes.permissions != nil { try? to.setAttributes(attributes, of: destination, cancellation: cancellation) }
+        if attributes.modified != nil || attributes.permissions != nil {
+            try? to.setAttributes(attributes, of: destination, cancellation: cancellation)
+        }
         guard createdHere else { return }
         // Last of all: tags, flags and the date of creation come along, and a lock that does
         // would forbid the changes above. A file system that cannot do it does without.
         // The origin mark goes on before them: a lock among the flags would refuse it.
-        if let origin = originMark(of: folder.url, copiedTo: destination) { mark(destination, with: origin, in: to, shownAs: folder.url) }
-        if options.preservesAttributes { try? to.copyMetadata(from: folder.url, to: destination, cancellation: cancellation) }
+        if let origin = originMark(of: folder.url, copiedTo: destination) {
+            mark(destination, with: origin, in: to, shownAs: folder.url)
+        }
+        if options.preservesAttributes {
+            try? to.copyMetadata(from: folder.url, to: destination, cancellation: cancellation)
+        }
     }
 
     /// Whether the job goes into `folder`. A folder that lies on another volume than the
@@ -1572,12 +1694,18 @@ public final class FileJob {
             if isStopping { throw Cancelled() }
             switch try delegateOrStop().job(self, crossVolumeAt: folder, purpose: purpose) {
             case .proceed: return true
-            case .all: entersVolumes = true; return true
+            case .all:
+                entersVolumes = true
+                return true
             case .skip: return false
             case .cancel: throw Cancelled()
             }
         }
-        if !allowed { note(purpose == .move ? .move : .removeFolder, at: folder.url, FileJobError.otherVolume(display(folder.url)).localizedDescription) }
+        if !allowed {
+            note(
+                purpose == .move ? .move : .removeFolder, at: folder.url,
+                FileJobError.otherVolume(display(folder.url)).localizedDescription)
+        }
         return allowed
     }
 
@@ -1586,7 +1714,9 @@ public final class FileJob {
     /// per folder). Nil inside one file system, which does its own copying. Job thread only,
     /// where asking the file system is allowed to take long.
     private func originMark(of folder: URL, copiedTo destination: URL) -> Data? {
-        guard let from = try? fileSystems.provider(for: folder), let to = try? fileSystems.provider(for: destination), from !== to else { return nil }
+        guard let from = try? fileSystems.provider(for: folder), let to = try? fileSystems.provider(for: destination),
+            from !== to
+        else { return nil }
         let key = folder.locationKey
         if let known = origins[key] { return known }
         let mark = from.quarantine(of: folder)
@@ -1600,7 +1730,9 @@ public final class FileJob {
             if mergeAll { return true }
             switch try delegateOrStop().job(self, mergeInto: existing, source: folder) {
             case .merge: return true
-            case .mergeAll: mergeAll = true; return true
+            case .mergeAll:
+                mergeAll = true
+                return true
             case .skip: return false
             case .cancel: throw Cancelled()
             }
@@ -1636,16 +1768,20 @@ public final class FileJob {
         var target = item
         if item.url.isFileURL {
             let resolved = item.url.resolvingSymlinksInPath()
-            guard let found = fileSystems.item(at: resolved), !item.url.isInside(resolved), !item.url.isSameLocation(as: resolved) else { return item }
+            guard let found = fileSystems.item(at: resolved), !item.url.isInside(resolved),
+                !item.url.isSameLocation(as: resolved)
+            else { return item }
             // "A folder it lies in" as the disk identifies folders (device and inode), not as
             // the paths read: the way to the link may itself lead through links, and then no
             // path of the link starts with the path of where it points.
             if found.isDirectory, FileIdentity.isInside(item.url, folder: resolved) { return item }
             target = found
         }
-        return FileItem(url: item.url, name: item.name, isDirectory: item.isDirectory, isSymlink: false, isPackage: target.isPackage,
-                        isHidden: item.isHidden, size: target.size, modified: target.modified, permissions: target.permissions,
-                        isSpecial: target.isSpecial)
+        return FileItem(
+            url: item.url, name: item.name, isDirectory: item.isDirectory, isSymlink: false,
+            isPackage: target.isPackage,
+            isHidden: item.isHidden, size: target.size, modified: target.modified, permissions: target.permissions,
+            isSpecial: target.isSpecial)
     }
 
     // MARK: Removing sources after a commit
@@ -1757,7 +1893,9 @@ public final class FileJob {
         let trashed = try attempt(.trash, at: source) {
             do {
                 try self.flushBeforeRemoving(source, item)
-                let removed = try self.removing(item, at: source) { try self.fileSystems.provider(for: source).trash(source) }
+                let removed = try self.removing(item, at: source) {
+                    try self.fileSystems.provider(for: source).trash(source)
+                }
                 self.record(.trash, source, nil, removed ? .done : .skipped)
                 return removed
             } catch let error where FileJob.isNoTrash(error) {
@@ -1782,7 +1920,9 @@ public final class FileJob {
         if case .notSupported? = error as? FileSystemError { return true }
         let error = error as NSError
         if error.domain == NSCocoaErrorDomain, error.code == CocoaError.featureUnsupported.rawValue { return true }
-        if error.domain == NSPOSIXErrorDomain, error.code == Int(ENOTSUP) || error.code == Int(EOPNOTSUPP) { return true }
+        if error.domain == NSPOSIXErrorDomain, error.code == Int(ENOTSUP) || error.code == Int(EOPNOTSUPP) {
+            return true
+        }
         return (error.userInfo[NSUnderlyingErrorKey] as? Error).map(isNoTrash) ?? false
     }
 
@@ -1873,12 +2013,15 @@ public final class FileJob {
         if let deletePool, quiet.count >= FileJob.parallelDeleteThreshold {
             if try !deleteLeaves(asking: asking, quiet: quiet, tree: tree, with: deletePool) { complete = false }
         } else {
-            for leaf in asking + quiet {
-                if try autoreleasepool(invoking: { try !deleteLeaf(leaf, tree: tree) }) { complete = false }
+            for leaf in asking + quiet where try autoreleasepool(invoking: { try !deleteLeaf(leaf, tree: tree) }) {
+                complete = false
             }
         }
-        for folder in folders {
-            if try autoreleasepool(invoking: { try !deleteTree(folder.url, item: folder, isTopLevel: false, tree: tree, depth: depth) }) { complete = false }
+        for folder in folders
+        where try autoreleasepool(invoking: {
+            try !deleteTree(folder.url, item: folder, isTopLevel: false, tree: tree, depth: depth)
+        }) {
+            complete = false
         }
         return complete
     }
@@ -1915,8 +2058,8 @@ public final class FileJob {
         // The workers are busy meanwhile with the files that ask nothing.
         var keptAsked = false
         do {
-            for leaf in asking {
-                if try !deleteLeaf(leaf, tree: tree) { keptAsked = true }
+            for leaf in asking where try !deleteLeaf(leaf, tree: tree) {
+                keptAsked = true
             }
         } catch {
             halt()
@@ -1933,7 +2076,8 @@ public final class FileJob {
     /// Whether the questions about protected items may come up for this file.
     private func mayAsk(_ item: FileItem) -> Bool {
         if options.ignoresProtection || item.isSymlink { return false }
-        return (options.asksAboutReadOnly && item.permissions & 0o222 == 0) || (options.asksAboutHidden && item.isHidden)
+        return (options.asksAboutReadOnly && item.permissions & 0o222 == 0)
+            || (options.asksAboutHidden && item.isHidden)
     }
 
     private func mayDeleteNonEmpty(_ url: URL) throws -> Bool {
@@ -1942,7 +2086,9 @@ public final class FileJob {
             if deleteAllNonEmpty { return true }
             switch try delegateOrStop().job(self, confirmDeleteNonEmpty: url) {
             case .delete: return true
-            case .all: deleteAllNonEmpty = true; return true
+            case .all:
+                deleteAllNonEmpty = true
+                return true
             case .skip: return false
             case .cancel: throw Cancelled()
             }
@@ -1963,17 +2109,22 @@ public final class FileJob {
             try remove()
             return true
         } catch let error where FileJob.isRefusedAsLocked(error) {
-            guard let item, !item.isSymlink, !FileIdentity.isSymlink(url), FileIdentity.isLocked(url) != false else { throw error }
+            guard let item, !item.isSymlink, !FileIdentity.isSymlink(url), FileIdentity.isLocked(url) != false else {
+                throw error
+            }
             if !options.ignoresProtection, try !confirm(.locked, .delete, item) { return false }
             let provider = try fileSystems.provider(for: url)
             let flags = FileIdentity.flags(of: url)
-            try? provider.setAttributes(FileAttributes(permissions: item.permissions | 0o200), of: url, cancellation: cancellation)
+            try? provider.setAttributes(
+                FileAttributes(permissions: item.permissions | 0o200), of: url, cancellation: cancellation)
             do {
                 try remove()
                 return true
             } catch {
                 if item.permissions & 0o200 == 0 {
-                    try? provider.setAttributes(FileAttributes(permissions: item.permissions), of: url, cancellation: patience(with: provider))
+                    try? provider.setAttributes(
+                        FileAttributes(permissions: item.permissions), of: url, cancellation: patience(with: provider)
+                    )
                 }
                 if let flags { FileIdentity.restoreFlags(flags, of: url) }
                 throw error
@@ -2014,7 +2165,9 @@ public final class FileJob {
     }
 
     /// Runs one step; on failure asks Skip / Skip all / Retry / Abort. Used on every thread of the job.
-    private func attempt(_ verb: OperationRecord.Verb, at url: URL, target: URL? = nil, _ step: () throws -> Bool) throws -> Bool {
+    private func attempt(_ verb: OperationRecord.Verb, at url: URL, target: URL? = nil, _ step: () throws -> Bool)
+        throws -> Bool
+    {
         while true {
             do {
                 return try step()
@@ -2128,8 +2281,9 @@ public final class FileJob {
                 currentLines = pendingLines()
                 self.pendingLines = nil
             }
-            return JobProgress(lines: currentLines, itemsDone: done.items, itemsTotal: total.items,
-                               bytesDone: done.bytes.addingSaturated(inFlightBytes), bytesTotal: total.bytes)
+            return JobProgress(
+                lines: currentLines, itemsDone: done.items, itemsTotal: total.items,
+                bytesDone: done.bytes.addingSaturated(inFlightBytes), bytesTotal: total.bytes)
         }
         if let progress { delegate.job(self, progress: progress) }
     }
@@ -2143,7 +2297,8 @@ public final class FileJob {
         var items: [FileItem] = []
         let verb: OperationRecord.Verb = kind == .copy ? .copy : (isMove ? .move : .delete)
         let readable = try attempt(verb, at: directory) {
-            items = try self.fileSystems.provider(for: directory).list(directory, showHidden: true, cancellation: self.cancellation)
+            items = try self.fileSystems.provider(for: directory).list(
+                directory, showHidden: true, cancellation: self.cancellation)
             // A listing that ended because of the cancel is not the whole folder.
             try self.checkCancelled()
             return true
@@ -2202,9 +2357,11 @@ public final class FileJob {
     /// nothing there under that name. A wrong guess costs a count later, nothing else.
     private func willRename(_ folder: FileItem) -> Bool {
         guard folder.url.isFileURL, let destination = destination(for: folder.url) else { return false }
-        guard destination.isFileURL, !destination.isSameLocation(as: folder.url), fileSystems.item(at: destination) == nil,
-              let here = FileIdentity.device(of: folder.url.deletingLastPathComponent()),
-              let there = FileIdentity.device(ofNearest: destination.deletingLastPathComponent()) else { return false }
+        guard destination.isFileURL, !destination.isSameLocation(as: folder.url),
+            fileSystems.item(at: destination) == nil,
+            let here = FileIdentity.device(of: folder.url.deletingLastPathComponent()),
+            let there = FileIdentity.device(ofNearest: destination.deletingLastPathComponent())
+        else { return false }
         return here == there
     }
 
@@ -2241,7 +2398,8 @@ public final class FileJob {
                 let chunk = Array(level[start..<min(start + FileJob.measuredAtOnce, level.count)])
                 autoreleasepool {
                     let listings = Parallel.map(chunk, serialBelow: 2) { folder -> [FileItem]? in
-                        try? self.fileSystems.provider(for: folder.url).list(folder.url, showHidden: true, cancellation: self.cancellation)
+                        try? self.fileSystems.provider(for: folder.url).list(
+                            folder.url, showHidden: true, cancellation: self.cancellation)
                     }
                     for (folder, children) in zip(chunk, listings) {
                         var own = Measure()
@@ -2258,7 +2416,10 @@ public final class FileJob {
                             }
                             let item = followsLinks ? resolvingLink(child) : child
                             if item.isRealDirectory {
-                                nodes.append(Node(parent: folder.index, measure: Measure(items: 1), key: item.url.locationKey.hashValue))
+                                nodes.append(
+                                    Node(
+                                        parent: folder.index, measure: Measure(items: 1),
+                                        key: item.url.locationKey.hashValue))
                                 next.append((nodes.count - 1, item.url))
                             } else {
                                 own += Measure(items: 1, bytes: item.size)
@@ -2279,7 +2440,8 @@ public final class FileJob {
         if !cancellation.isCancelled {
             remembered.withLock {
                 for node in nodes {
-                    let room = measures.count < rememberedLimit
+                    let room =
+                        measures.count < rememberedLimit
                         || (node.measure.items >= FileJob.worthKeepingPastLimit && measures.count < 2 * rememberedLimit)
                     if room { measures[node.key] = node.measure }
                 }
@@ -2344,11 +2506,13 @@ enum FileIdentity {
     /// hard links to one file are not.
     static func sameEntry(_ a: URL, _ b: URL) -> Bool {
         guard a.isFileURL, b.isFileURL,
-              a.lastPathComponent.precomposedStringWithCanonicalMapping.lowercased() == b.lastPathComponent.precomposedStringWithCanonicalMapping.lowercased(),
-              let first = status(a, followingLinks: false), let second = status(b, followingLinks: false),
-              first.st_dev == second.st_dev, first.st_ino == second.st_ino,
-              let folderA = status(a.deletingLastPathComponent(), followingLinks: true),
-              let folderB = status(b.deletingLastPathComponent(), followingLinks: true) else { return false }
+            a.lastPathComponent.precomposedStringWithCanonicalMapping.lowercased()
+                == b.lastPathComponent.precomposedStringWithCanonicalMapping.lowercased(),
+            let first = status(a, followingLinks: false), let second = status(b, followingLinks: false),
+            first.st_dev == second.st_dev, first.st_ino == second.st_ino,
+            let folderA = status(a.deletingLastPathComponent(), followingLinks: true),
+            let folderB = status(b.deletingLastPathComponent(), followingLinks: true)
+        else { return false }
         return folderA.st_dev == folderB.st_dev && folderA.st_ino == folderB.st_ino
     }
 
@@ -2359,7 +2523,10 @@ enum FileIdentity {
         guard destination.isFileURL, let own = status(folder, followingLinks: false) else { return false }
         var path = parent(of: destination.path)
         while let current = path {
-            if let found = status(current, followingLinks: true), found.st_dev == own.st_dev, found.st_ino == own.st_ino { return true }
+            if let found = status(current, followingLinks: true), found.st_dev == own.st_dev, found.st_ino == own.st_ino
+            {
+                return true
+            }
             path = parent(of: current)
         }
         return false
