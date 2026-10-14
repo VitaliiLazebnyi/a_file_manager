@@ -12,6 +12,9 @@ import sys
 
 REQUIRED = 100.0
 ROOT = pathlib.Path(__file__).resolve().parent.parent
+# Written by UITests/run.sh: the counts of the program the UI tests drove, and the program.
+UI_PROFILE = ROOT / ".build" / "uitest" / "codecov" / "ui.profdata"
+UI_PROGRAM = ROOT / ".build" / "uitest" / "app" / "A File Manager.app" / "Contents" / "MacOS" / "AFileManager"
 
 
 def run(*args: str) -> str:
@@ -24,11 +27,15 @@ def main() -> int:
     if not profiles:
         print("no coverage profiles: run `swift test --enable-code-coverage` first", file=sys.stderr)
         return 2
+    # The UI tests count too, when they ran on the sources the unit tests were built from.
+    with_ui = UI_PROFILE.exists() and UI_PROGRAM.exists()
+    if with_ui:
+        profiles.append(UI_PROFILE)
     merged = bin_dir / "codecov" / "all.profdata"
     run("xcrun", "llvm-profdata", "merge", "-sparse", *map(str, profiles), "-o", str(merged))
 
     bundles = sorted(bin_dir.glob("*Tests.xctest"))
-    binaries = [str(b / "Contents" / "MacOS" / b.stem) for b in bundles]
+    binaries = [str(b / "Contents" / "MacOS" / b.stem) for b in bundles] + ([str(UI_PROGRAM)] if with_ui else [])
     objects = [arg for binary in binaries[1:] for arg in ("-object", binary)]
     report = json.loads(
         run(
