@@ -1,0 +1,130 @@
+# Viewer — fix round 2 status
+
+Area `viewer`: `Sources/Plugins/Viewer` and its tests in `Tests/PluginTests` (existing `Viewer*Tests.swift` updated where behaviour changed on purpose, new `Review2Viewer*Tests.swift`).
+
+Where a row says "partly", the part that is done is named and the rest is under "Not done".
+
+| ID | Status | Note |
+|---|---|---|
+| V001 | fixed | `Model/ByteSource.swift`: `ProviderByteSource.close()` hands the idle readers to a background queue (`ViewerCleanup`); `UI/ViewerPane.swift`: `stopWork` and the stale-load path close the source through `ViewerCleanup.close`. A reader in use when `close` came is closed when it is checked back in (epoch). |
+| V002 | fixed | `Model/TextRows.swift`: `Segment.thin` rewritten (span of the rows, not the nominal segment; step clamped by the count; no overflow); checkpoints are thinned while a segment is scanned (every time 2,048 are reached), capped at 262,144 per segment, so a line of any length keeps a bounded list. |
+| V003 | fixed | Same change as V002 (`thin(spanning:)`, `Review2ViewerRows.aSegmentWithMoreCheckpointsThanBytes…`, `theReproducerOfTheFuzzerIndexes`). |
+| V004 | duplicate of V001 | |
+| V005 | fixed | `ByteSource.swift` `ProviderByteSource.open`: entries with `isSpecial` are refused; a local link is measured by `stat` of its target (no read); the remaining measuring loop checks the flag every block and stops at 1 TiB (`ViewerError.endless`). Pipes/devices/FIFO never opened. |
+| V006 | duplicate of V003 | |
+| V007 | fixed | `Model/ViewerSearch.swift`: the text search of decoded units is a matcher of its own (`TextMatcher`): folded character by character, a match begins before `end` only, so a backwards search never returns the match at the start; overlap grown for folding. |
+| V008 | duplicate of V007 | |
+| V009 | fixed | `UI/RichViews.swift` `WebContentView.decide`: the page is allowed once, from the string; every later navigation (meta refresh, redirect, frame) is cancelled; clicks go to `onLink`; `#fragment` jumps stay. |
+| V010 | fixed | Verdict. `Model/ViewerSave.swift` (new) + `ViewerPane+Actions.swift` `saveAs`: refuses a target that is the viewed file (stat dev/ino, links, hard links), writes a temporary file beside the target and renames it into place; the empty-block `break` is now an error. |
+| V011 | duplicate of V001 | |
+| V012 | duplicate of V001 | `ProviderByteSource.deinit` closes the readers on the cleanup queue. |
+| V013 | fixed | V009 plus `LinkPolicy.target` (see V029). |
+| V014 | fixed | Verdict. See V005. |
+| V015 | fixed | `Model/CharacterBoundaries.swift`: every read is checked to give at least the bytes inside the text, else `ViewerError.fileChanged` is thrown; `walk` is bounded by `data.count`. |
+| V016 | fixed | Verdict. See V015 (`Review2ViewerSearch.aFileThatBecameShorterDoesNotTrap…`). |
+| V017 | fixed | Sparse checkpoints: span fixed (V002). Quadratic partial publishing: `CheckpointList` is now chunked (4,096 per chunk), a published partial shares the full chunks, so appending copies one chunk. |
+| V018 | fixed | Verdict. See V002. |
+| V019 | duplicate of V007 | |
+| V020 | fixed | `UI/ImageCanvasView.swift` `ScaledFrameCache`: one serial queue, 0.1 s settle, a job that is overtaken (`Latest` counter) does not run, resample inside an `autoreleasepool`; the interim main-thread draw uses `.low` quality. |
+| V021 | fixed | `RichViews.swift` `LinkGate` (delegate of the RTF text view and of the PDF view): only http/https/mailto are opened, after the click; others do nothing. The PDF delegate method is not exercised by a test (no GUI run); see Not done. |
+| V022 | fixed | `TemporaryCopies.safeName` (one component: no `/`, `:`, `\`, controls, never `.`/`..`, at most 200 bytes, keeps the extension); the file is created `O_EXCL` in a fresh 0700 folder and its parent is checked. |
+| V023 | duplicate of V022 | Verdict. |
+| V024 | fixed | Partly. `UI/TextPagerView.swift`: the work of a document runs on queues of its own (`DocumentQueues`: rows and look-ups apart) replaced when another document is adopted, so a read that never returns holds up only its document. In-flight builds/loads are not capped (see Not done). |
+| V025 | duplicate of V010 | |
+| V026 | fixed | `ViewerSave.save` throws `ViewerError.fileChanged` on a short read and leaves the target untouched. |
+| V027 | duplicate of V001 | Verdict. |
+| V028 | fixed | `ViewerPane.htmlPageLimit` (8 MB) and `rtfLimit` (4 MB): larger files fall back to the text modes before anything is read for layout. |
+| V029 | fixed | `LinkPolicy.target(of:relativeTo:)` + `ViewerPane.followLink`: only a relative link resolving to a file in the folder of the shown file or below it, same scheme/host/port/user, no `..` or separators in decoded components. http/https/mailto go to the browser. |
+| V030 | fixed | Caps for HTML/RTF (V028); copy limit 16 MB text / 8 MB hex; print limit 512 KB; interim image draw at low quality. The pasteboard string is still set on the main thread (smaller). |
+| V031 | fixed | Readers closed in the background (V001); `TemporaryCopies` deletes released copies on `ViewerCleanup`; `removeAll` deletes in the background and waits at most 2 s (plugin stop). |
+| V032 | not a defect | One 12-byte checkpoint per 4 KB is the documented trade-off; the new per-segment cap bounds giant lines. |
+| V033 | fixed | `CharacterBoundaries.keptLimit` (65,536 blocks); beyond it the map restarts from block 0. |
+| V034 | fixed | `ImageDecoder.pixelLimit` (400 megapixels) checked against the size the file claims before any thumbnail is made. Not unit tested (no small file claims that many pixels). |
+| V035 | fixed | Partly: combining marks, variation selectors, zero-width spaces and joiners (and what a joiner joins) take no column, so a row is not cut in front of them; a run of them is still cut after `4 × columns + 16` units. East Asian width is not done (see Not done). |
+| V036 | fixed | `Segment.endsAtGap` / `Position.endRow`: rows are never walked through a segment that failed; `rows(from:)` continues at the checkpoint of the next known row. |
+| V037 | not a defect | Documented limit (64 KB overlap). |
+| V038 | fixed | Partly. Viewer part: V055/V078. `Splitter` double close and `createChecksums` belong to FileTools: cross-request. |
+| V039 | duplicate of V021 | |
+| V040 | fixed | `TextPagerView`: indexing threads hold a `ProgressCoalescer` (and the document), never the view; the view is taken only inside the main-thread block. |
+| V041 | duplicate of V042 | |
+| V042 | fixed | `TextRows.scan(changed:)`, `TextDocument.walk/fixedRows`: a read that is short inside the length records `ViewerError.fileChanged` (status line "Read error"). Also in `ViewerPane.stripHTML` and `ViewerSave`. |
+| V043 | fixed | `CachedByteSource.block` keeps only whole blocks (or the short last); `DiskBlockCache.read` gives `held` and the global budget back when the block is lost; spill file opened `O_CLOEXEC`; reads of 4 blocks or more go the long path. |
+| V044 | fixed | `FolderSummary.measure` uses the cancellable listing and takes `limit:`; the quick view counts at most 20,000 entries on a non-local volume (`isPartial`, text "At least …"). |
+| V045 | fixed | `Model/HTMLText.swift`: `<` is markup only before a letter, `/`, `!`, `?`; the end of a tag honours quotes after `=` (bounded to 512 units); `attributeRange` walks the attributes (no `data-href`, no `href=` inside a value). Reference in `ViewerAdoptHTMLReference.swift` updated. |
+| V046 | fixed | `TextDocument` makes the byte-layout code table on first row read (background); `search()` takes `characterBoundaries` on the work queue. |
+| V047 | refuted | Verdict: it traps (fixed under V002), it does not loop. |
+| V048 | fixed | `TextRowIndex.Overview` (small `os_unfair_lock` copy of rows, lines, covered end, complete, failure, reused): the main thread never waits for the index lock. |
+| V049 | fixed | `segmentsReused` read from the same `Overview`. |
+| V050 | fixed | `ViewerEncoding.isAvailable` refuses multi-byte code pages other than 932/936/949/950 (51932, 54936 …). |
+| V051 | duplicate of V007 | And V052. |
+| V052 | fixed | `TextMatcher` compares folded characters exactly; no ignorable characters are skipped, so the raw and decoded paths and every chunk size agree (`Review2ViewerSearch.theAnswerDoesNotDependOnTheChunkSizeOrThePath`, 300 random cases). |
+| V053 | duplicate of V052 | |
+| V054 | fixed | `ImageDecoder`: more than one frame plays only when the file carries GIF/APNG/WebP/HEICS animation data; otherwise the largest image is shown alone. |
+| V055 | fixed | `TemporaryCopies`: an epoch (`removeAll`) and a per-owner release count; a copy begun before either is dropped or registered as idle. |
+| V056 | duplicate of V021 | Verdict. |
+| V057 | duplicate of V009 | Verdict. |
+| V058 | fixed | Copies refused above 1 GiB (also while reading when the size was unknown), refused when the disk would be left with less than 256 MB; idle copies limited to 2 and 512 MB together; the reason is shown. |
+| V059 | fixed | Index progress reaches the main thread at most every 50 ms (`ProgressCoalescer`). |
+| V060 | duplicate of V048 | |
+| V061 | fixed | `afterLoad` is dropped when another document is adopted or the pager is cleared. |
+| V062 | fixed | `knownTopOffset`: `topOffset` falls back to the last top row seen, not to the start of the file. |
+| V063 | fixed | CTLines of rows that are still loaded survive a fetch. |
+| V064 | fixed | Selection rectangle uses `min`/`abs`. |
+| V065 | fixed | See V030. |
+| V066 | fixed | See V030. |
+| V067 | fixed | `redecodeHTML()` on encoding/font-slot change in HTML mode; a read error of the HTML text is shown. |
+| V068 | fixed | `QLPreviewView` kept and `close()`d in `dropRichViews`. |
+| V069 | fixed | Partly. The layout is compared with the pending document's (`shownLayout`); zoom steps are debounced through `pagerResized`; a shown document that is still indexing stops when a new layout takes over (`TextDocument.stopIndexing`). Reading a giant line twice in a sequential scan is not changed. |
+| V070 | fixed | Partly. `FolderSummary` (viewer) done; `SpaceCalculator`, `AttributeJob`, `CommentStore` are other areas: cross-request. |
+| V071 | duplicate of V020 | |
+| V072 | duplicate of V040 | |
+| V073 | fixed | A stopped document keeps its rows (no fetch, a cancelled fetch's result is dropped); `isIndexing` is false for it. |
+| V074 | duplicate of V061 | |
+| V075 | duplicate of V024 | Look-ups and row fetches have separate queues. |
+| V076 | not a defect | By design, as the entry says. |
+| V077 | not a defect | One modal per user operation. |
+| V078 | duplicate of V055 | |
+| V079 | fixed | Partly: a load or folder count that was superseded before it got a thread returns at once. A provider that ignores cancellation is still not bounded. |
+| V080 | not a defect | Contract of `interrupt()`. |
+| V081 | fixed | Readers in use at `close` are closed when checked in (V001). |
+| V082 | duplicate of V046 | |
+| V083 | fixed | `TextPagerView.isIndexing` is false for a document whose reading was stopped. |
+| V084 | fixed | `TemporaryCopies.newFolder` creates directories outside the lock. `DiskBlockCache.lock` is not taken by the main thread. |
+| V085 | duplicate of V043 | |
+| V086 | fixed | A thread waiting for `CharacterBoundaries.computing` polls and honours its flag. |
+| V087 | duplicate of V049 | |
+| V088 | duplicate of V046 | |
+| V089 | fixed | `isFetching` removed. |
+| V090 | not a defect | As the entry says. |
+| V091 | not a defect | Allowed by the contract. |
+
+## Decisions
+
+- Giant lines: at most 262,144 checkpoints per 4 MB segment (3 MB); a lookup in a line of 50 GB decodes about 200 KB. The distance rule (average 4 KB) still applies below that.
+- Short read inside a file's length = the file changed: it ends the scan/walk, keeps what was found and sets a read error ("The file changed while it was being read…") shown in the status line.
+- Files that do not report a size and cannot be statted (servers) are read to measure only up to 1 TiB and with a cancel check each megabyte.
+- Special files (pipes, devices, sockets, also behind links) are refused, not opened.
+- Page mode / RTF: HTML over 8 MB and RTF over 4 MB fall back to the text modes. Copies of remote media for the players: refused above 1 GiB or when less than 256 MB would be left; idle copies at most 2 and 512 MB.
+- Links in a viewed page: relative links inside the folder of the shown file (and below) are followed in the viewer; http/https/mailto after a click in the default program; everything else is ignored. Same rule for RTF/PDF (web/mail only).
+- Copy to the clipboard: 16 MB text, 8 MB hex. Print: first 512 KB.
+- Image files with several images that are not an animation show the largest; images claiming more than 400 megapixels are not decoded.
+- Case-insensitive text search compares characters folded as `String.folding(.caseInsensitive)` does (ß = ss, ligatures, Kelvin sign), whole characters only; control characters are never skipped.
+- Cleanup queue work (closing readers, deleting copies) is concurrent and `userInitiated`; `TemporaryCopies.removeAll` waits at most 2 s (plugin stop).
+
+## Tests
+
+New: `Tests/PluginTests/Review2ViewerRowsTests.swift`, `Review2ViewerSearchTests.swift`, `Review2ViewerSourceTests.swift` (with `Review2HookProvider`), `Review2ViewerPaneTests.swift`.
+Updated for deliberate behaviour changes: `ViewerFixTests` (temporary copies are deleted in the background: `waitForCleanup()`), `ViewerAdoptPaneTests` (`ViewerCleanup.drain()`), `ViewerAdoptRichTests` (links: no `data-href` decoy, no `href` inside a title), `ViewerAdoptHTMLReference.swift`.
+
+The `PluginTests` target did not build in the project tree at the end because of other areas' files (`NetworkPluginTests.swift`: `boundAccount` is internal), so the Viewer tests were built and run in an isolated copy of the tree: the sources and tests of the state before the round (`build/backups/before-round2-fixes.tgz`) with the viewer area's files copied over. The viewer module also builds on its own in the project tree against the current kernel (`swift build --scratch-path .build-viewer --target ViewerPlugin`).
+
+Result of the final run (`swift test --filter Viewer` in the isolated tree): 146 tests in 15 suites passed (50 s), 0 failures. That is the 109 tests that existed plus the 37 new ones in the four `Review2Viewer*` files.
+
+## Not done
+
+- V035: East Asian wide characters still take one column (a width of 2 would need the fast paths that cut short lines unseen to know about it); only combining marks and joiners were done.
+- V069: a sequential (remote) scan still reads a giant line twice; V024: the number of index builds/loads in flight is not capped (a stuck read on a share that cannot be interrupted still holds one thread); V079: same, for loads.
+- V021/V039/V056: the PDF link delegate (`pdfViewWillClick(onLink:with:)`) and the RTF `clickedOnLink` return value were not run in a window; the pure rules (`LinkPolicy`) and the web view decision are tested. I rely on PDFKit not opening the URL itself when the delegate method exists.
+- V070, V038: the parts in FileProperties/FileTools (see `cross-requests/viewer.md`).
+- V034: no test for the pixel limit.
+- A FIFO that replaces a regular file between the `stat` and the `open` would still block that one load thread (the local provider's reader opens by path; `LocalFileSystem` is not mine).

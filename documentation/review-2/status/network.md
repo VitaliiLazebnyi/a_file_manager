@@ -1,0 +1,220 @@
+# Review 2 — network: status of the fix round
+
+Area: `Sources/Plugins/Network` and its tests in `Tests/PluginTests`.
+Work list: `documentation/review-2/findings/network.md` (N001–N108 are findings and verdicts; N109–N162 are
+"sound" and "gap" entries that need no fix).
+
+Short names used in the notes: `FTPList` = FTPListParser.swift, `FTPConn` = FTPConnection.swift,
+`FTPSess` = FTPSession.swift, `SFTPSess` = SFTPSession.swift, `SFTPChan` = SFTPChannel.swift,
+`RFS` = RemoteFileSystem.swift, `Cmds` = NetworkCommands.swift, `Saved` = SavedConnections.swift,
+`Addr` = ServerAddress.swift, `RSess` = RemoteSession.swift.
+
+## 1. Findings and verdicts
+
+| ID | Status | Note |
+|----|--------|------|
+| N001 | fixed | `FTPList`: the three Unix patterns and the DOS pattern are gone; a hand-written one-pass reader per format. Lines over 4096 bytes are no entry. Tested with the reproducer. |
+| N002 | fixed | `Addr`: `RemotePath` cuts at the bytes of `/`. In the result every slash is a character of its own; a name that would melt into a slash gets U+FFFD next to it, is refused by `RFS.resolve`, and is left out of listings (`isSafeName`). Tested with the reproducer and 20 000 generated texts. |
+| N003 | fixed | `Cmds.addToDownloadList`: the lines are made inside the job, not on the main thread. |
+| N004 | fixed | With N001; `FTPConn.list` reads through `LineSplitter` (FTPReply.swift): every byte looked at once, a part without a line end never grows beyond 4096 bytes. |
+| N005 | fixed | `RFS.move`, `RemoteSession.rename(_:to:replacing:)`: nothing is deleted to make room. Plain rename first (SFTP: `posix-rename` when replacing); on a refusal the server is asked whether the source exists and a file is in the way; only then that file is renamed aside, the source renamed in, the aside one deleted last, and renamed back on failure. SFTP errors are no longer turned into a 550. |
+| N006 | refuted | Verdict: refuted as worded. The defect underneath is N007. |
+| N007 | fixed | As N005. The verifier's case (`missing.txt -> keep.txt`) is a test: no DELE is sent, `keep.txt` stays. |
+| N008 | fixed | `Addr`: `ServerKey` takes only ports 1…65535 (else the usual one); `Saved`: `SavedConnection` decodes tolerantly and drops such a port. Tested with the reproducer. |
+| N009 | fixed | `RFS.quarantine(of:)` returns `0083;<hex time>;<program name>;` for every location on a server. Putting it on the local copy is the copying side's part: cross-request 2. |
+| N010 | fixed | `FTPSess`/`SFTPSess`/`RSess.lockPatiently`: `loginLock` and `connectLock` are waited for in turns that end on the caller's flag, on Disconnect, and when nothing moves. The four changing calls have no flag in the provider interface (cross-request 1); their waits end on Disconnect and on the limits. |
+| N011 | fixed | `FTPSess`: one resolver per session, newest listing first, at most 512 links; takes only a connection that is free now, asks 8 links, gives it back, stands aside while a command waits; never raises a dialog. |
+| N012 | fixed | `FTPSess.FTPReader.close`: the decision and the interrupt are made under `stateLock`, like `interrupt()`. A race test runs 60 rounds. |
+| N013 | duplicate of N012 | |
+| N014 | fixed | `disconnect()` of both sessions returns at once; goodbyes (QUIT, closing the pipe) run on `Background` threads. `Cmds` no longer uses a global queue for it. |
+| N015 | duplicate of N014 | |
+| N016 | fixed | `Cmds`/`DownloadList.swift`: the list is read with a size limit, turned into a plan, shown (what each line does, counts, a warning when it sends, copies or moves local files) and runs only on "Run the List". A plain line may only download from a server to this Mac. The final rename no longer replaces: an existing file is asked about. |
+| N017 | fixed | `Cmds.ListRun`/`ListPlan`: lines that are not carried out are sorted out before the run (no call per line), messages show 20 lines and "… and N more". |
+| N018 | fixed | `Saved.PasswordVault`: every Keychain call runs on its own serial queue; the main thread only queues. The editor no longer reads the Keychain, the password dialog no longer writes it. |
+| N019 | duplicate of N009 | Verdict on the same defect. |
+| N020 | fixed | `DownloadList.canHold`: a source or target with any line break or control character, a source holding the separator, or a line that would read back as a command is not written; the user is told how many were left out. |
+| N021 | fixed | `FTPConn.beginTransfer`: after the 1xx reply every failure reads the final reply or marks the connection broken. Tested in active mode with a server that never connects. |
+| N022 | fixed | `FTPConn.NameMemory`, `SFTPChan`: names the server spelled decomposed, or in another encoding (CP1252 in automatic mode; any bytes over SFTP, read as Latin 1), are remembered and sent back as the bytes they came as. A character the encoding lacks is an error, not `?`. Limit: a name that is no valid text in the forced encoding of an FTP connection still cannot be addressed. |
+| N023 | fixed | With N004 (`LineSplitter`). |
+| N024 | fixed | Verdict on N001/N004; also `NetStream.readLine` has a limit and replies are bounded (N025). |
+| N025 | fixed | `FTPReply.swift` (`FTPLimits`, parser keeps 1000 lines/64 KB), `NetStream.readLine` (4096 bytes per line), `FTPConn.readReply` (one deadline per reply, at most 20 000 lines read), `abortTransfer` (at most 3 extra replies). |
+| N026 | fixed | As N010, plus `FTPSess.acquire`: a wait for a connection or a transfer slot ends with a clear error when nothing moved on the session for 60 s (or twice the timeout). |
+| N027 | fixed | `FTPSess`, `SFTPSess`: "declined" is recorded only when the user said no to a question; a login that was merely cancelled is tried again. |
+| N028 | fixed | As N011; `RFS`: the observer uses `EntryCache.updateIfKnown`, which changes a known entry and does nothing else. |
+| N029 | fixed | `FTPSess.FTPWriter.close`: after every binary upload the server's length (SIZE, else MLST) is compared with start + written. A server with neither cannot be checked. |
+| N030 | fixed | `Cmds`, `RSess.askToTrustChanged`, `CertificateTrust.fingerprints/replace`: a dialog of its own with both fingerprints; consent needs a ticked box; the new fingerprint replaces the old in memory and in the store. |
+| N031 | duplicate of N030 | Verdict on the same defect. |
+| N032 | fixed | `NetStream.DataListener`: bound to the control connection's local address; a connection from any address but the control connection's peer is closed and the wait goes on. |
+| N033 | duplicate of N016 | Verdict on the same defect. |
+| N034 | fixed | `RFS.entry(beforeOverwriting:)`: before an upload or a non-replacing rename, a cached "absent" is checked with the server where one question is cheap, and always when the listing holds a name alike in case or composition. SFTP renames that must not replace use the plain rename, which the server refuses. Left: an FTP server without MLST still relies on a listing up to 10 s old when no alike name exists. |
+| N035 | fixed | `RSess.Background`: at most 6 threads of its own, the rest waits in line; no dispatch queue is blocked. SFTP handles are closed without waiting (N094). |
+| N036 | fixed | `SFTPChan.writeAll`: a packet that was begun is finished while the pipe keeps taking bytes; the cancelled writer is let go only when the pipe takes nothing for 2 s. |
+| N037 | fixed | `SFTPChan.wait`: a timeout during which nothing at all arrived closes the channel; `SFTPSess.sshArguments` always passes `ServerAliveInterval`. |
+| N038 | fixed | `SFTPSess.SFTPFileWriter.close` sends CLOSE itself and throws on a bad status or a timeout. |
+| N039 | fixed | `SFTPSess.TransferWindow`: the window follows the measured throughput (about 1.5 s of data, 2…64 requests); nothing is read ahead for the first read after opening or a jump. Not measured on a slow line; the logic is covered by the transfer tests. |
+| N040 | fixed | `SFTPFileWriter.fail`: on the first failure the file is cut back to the first unconfirmed byte (`fsetstat`, put in line behind the writes); `close` also compares the server's length (`fstat`). |
+| N041 | fixed | `Addr`: `ServerAddress` refuses a host that has no URL; `ServerKey.url` never falls back to a file URL (`host.invalid` instead); hosts beyond ASCII are brought to the form a URL gives back, so both keys are equal. |
+| N042 | fixed | The hazard was not proven. A cross-wait now ends with an error after the stall limit instead of hanging (N026). |
+| N043 | not a defect | Latency after `interrupt`, as the finding says. It is bounded tighter now (N025), and no longer on a dispatch queue. |
+| N044 | fixed | `FTPSess.openConnection` reads `hasConnected` again after taking `loginLock`; the 421 handling moved to `acquire` and applies whenever a login exists. |
+| N045 | duplicate of N044 | |
+| N046 | duplicate of N010 | |
+| N047 | fixed | `lockPatiently`: the main thread never waits for `loginLock`/`connectLock`; it gets an error at once. |
+| N048 | fixed | `FTPSess.ask`: every question is asked with `loginLock` held; a thread that waited uses the answer the first one got. |
+| N049 | fixed | `FTPSess.acquire`: after a 421 the slot is given back and the thread waits for a connection that comes free or for the next attempt. |
+| N050 | duplicate of N051 | |
+| N051 | fixed | `FTPSess.keepIdleConnectionsAlive`: one connection at a time, not counted against the limit while it is tested, on a `Background` thread. |
+| N052 | fixed | The hazard was not proven. Such a wait now ends with an error after the stall limit (N026). |
+| N053 | duplicate of N011 | |
+| N054 | duplicate of N035 | |
+| N055 | duplicate of N056 | |
+| N056 | fixed | `FTPReader.seek` is bracketed like a read; `close` no longer touches `atEnd` or `position`. |
+| N057 | fixed | `NetStream.TLSSettings`: certificates are checked on a queue of their own, not on the stream's. Built; no test can make a revocation check slow. |
+| N058 | duplicate of N014 | |
+| N059 | duplicate of N014 | |
+| N060 | fixed | `SFTPChan`: the reading thread closes the channel (and ssh) when the stream ends or is not SFTP. |
+| N061 | duplicate of N036 | |
+| N062 | not a defect | By design: one login is shared, so the lock is held while ssh asks. The main thread no longer waits for it (N047). |
+| N063 | duplicate of N064 | |
+| N064 | fixed | `SFTPSess`: `disconnect` closes the channel of a login under way; a login that ends on a closed session closes its channel and throws. |
+| N065 | fixed | `SFTPSess.open`: a connected session takes no `connectLock`; the wait for it ends on the flag, on Disconnect and on a time limit. |
+| N066 | fixed | `VolumeMounting.swift`: the wait for ejecting ends after 60 s with an error. Built; not tested (no real volume in tests). |
+| N067 | duplicate of N009 | |
+| N068 | fixed | `FTPSess`, `Cmds`: before a password goes over plain FTP the user is asked once per server ("Do not ask again for this server" is kept in the settings). Servers on this machine are not asked about. |
+| N069 | duplicate of N032 | |
+| N070 | fixed | `Cmds.readList`: 4 MB at most, plain files only; at most 100 000 lines are carried out. |
+| N071 | fixed | `RFS.ConnectionCenter` (`chosen`), `ConnectionProfile.asksBeforeConnecting`, both sessions: a server that is not saved and was not chosen in a dialog of the plugin is asked about before the first login. |
+| N072 | duplicate of N018 | |
+| N073 | fixed | `FTPConn.finishTransfer` reads on past further 1xx replies (at most 4). |
+| N074 | fixed | `FTPConn.list`: at most 4 000 000 entries and 1 GB per listing. |
+| N075 | duplicate of N020 | Verdict on the same defect. |
+| N076 | fixed | `FTPSess.acquire` reads the profile under the lock. |
+| N077 | fixed | Different remedy than proposed: the number of logins the program may make is unchanged, but a 421 no longer fails the transfer after the back-off (N049). See Decisions. |
+| N078 | duplicate of N056 | |
+| N079 | duplicate of N012 | Verdict on the same defect. |
+| N080 | fixed | `NetStream`: the queue is only asked to receive again when receiving had stopped. |
+| N081 | duplicate of N032 | Verdict on the same defect. |
+| N082 | duplicate of N014 | |
+| N083 | fixed | `Cmds.edit(offered:)`: the quick-connect password is stored only when the box in the dialog stays ticked. |
+| N084 | duplicate of N083 | |
+| N085 | fixed | `Credentials.remember`, `SessionEnvironment.rememberPassword`: stored after the server accepted it. |
+| N086 | fixed | `Saved.PasswordVault`: a password is kept under identifier + scheme + host + port + user; a connection with a known identifier and another host or user finds none. |
+| N087 | fixed | `ConnectionCenter.announce` leaves a session alone that is logging in, and does nothing when nothing changed. |
+| N088 | fixed | `SFTPChan.AskpassHelper`: `SSH_ASKPASS_PROMPT` is read (a confirmation is answered by the exit status, a notice goes to the log), and each answer carries the number of its question, so one left behind answers nothing. |
+| N089 | fixed | `sshArguments`: `LogLevel=ERROR`, under which ssh does not print the server's banner. Tested with the real ssh and sshd on 127.0.0.1. |
+| N090 | fixed | `SFTPChan.largestPacket` = 1 MB. |
+| N091 | fixed | `SFTPSess.SSHQuestion`: a question is ssh's own only in ssh's exact shape; a server's text is shown marked as the server's; only ssh's host-key question is a confirmation. |
+| N092 | fixed | `SFTPSess.open`: when the stored password is refused the login is made once more and the user is asked; what works replaces the stored one. Tested with a stand-in for ssh that asks through the same helper. |
+| N093 | duplicate of N064 | |
+| N094 | fixed | `SFTPChan.sendWithoutAnswer`: the CLOSE is put in line and written before the next request by whoever writes next. |
+| N095 | fixed | `SFTPSess.list`: one time limit for all link answers of a batch; requests already sent are given up when a send throws. |
+| N096 | fixed | `SFTPFileReader`: the request size follows a server limit once it showed three times in a row; after a jump only what the caller asked for is requested. |
+| N097 | fixed | `sshArguments`: `RemoteCommand=none`, `PermitLocalCommand=no`, `ControlMaster=no`, `ControlPath=none`, `RequestTTY=no`, `-T`. The real ssh accepts them (tested). |
+| N098 | refuted | Verdict: the system's ssh handles a changed host key. |
+| N099 | fixed | `SSHQuestion`: the login is cut at the last `@`; a question that names nobody is passed to the user. |
+| N100 | fixed | `Saved.KeychainPasswords.setPassword`: update in place, add when missing, delete only when asked. Built; not tested (tests never touch the Keychain). |
+| N101 | fixed | `Addr.removingPassword`: also without `://` and with `/`, `?`, `#` in the password. |
+| N102 | refuted | Verdict: refuted as stated. |
+| N103 | fixed | `VolumeMounting.swift`: `NetFSMountURLAsync` with `NetFSMountURLCancel` on Cancel. Built; not tested (no real mount in tests). |
+| N104 | fixed | `VolumeMounting.swift`, `Cmds`: every message shows the address without its password. |
+| N105 | duplicate of N104 | Verdict on the same defect. |
+| N106 | not a defect | A list of lock-order edges, for information. The edge loginLock/connectLock → main is guarded now (N047). |
+| N107 | duplicate of N047 | |
+| N108 | not a defect | The closures are set once, before any session exists; the finding itself calls it benign. |
+
+Counts: fixed 74, duplicate 27, refuted 3, not a defect 4, needs other area 0, not fixed 0 (108 entries).
+
+## 2. Decisions
+
+1. **A server nobody chose is asked about.** A location on a server that is neither a saved connection nor
+   one the user opened in a dialog of the plugin leads to "Connect to X?" before the first login. This also
+   happens once for an address typed into the command line, because typed text and text from a tab file
+   reach the plugin the same way (cross-request 4).
+2. **Passwords are bound to the server and login.** They are kept under identifier + scheme + host + port +
+   user. Passwords an earlier version kept under the identifier alone are moved once, the first time the
+   new version sees the saved connections; a marker in the Keychain prevents a second move.
+3. **Trusted certificates left the settings.** They are kept in the Keychain. What an earlier version kept in
+   `network.trustedCertificates` is ignored and emptied, so each such server asks once more.
+4. **A changed certificate needs a ticked box**, not only a button, and the new fingerprint replaces the
+   old ones. There is no "this once" for a changed certificate.
+5. **Plain FTP with a password asks first**, once per server, with "Do not ask again for this server".
+   Servers on this machine (`localhost`, `127.*`, `::1`) are not asked about.
+6. **A password question that names nobody is not answered with the stored password.** The user is asked.
+7. **Download lists.** A plain line may only download from a server to this Mac; anything else must start
+   with `put:`, `copy:` or `move:`. Limits: 4 MB per list file, 100 000 lines, 60 s per `sleep:`. A name
+   with a line break is refused, not escaped (the file format has no escape). When the target name exists
+   the choice is "Replace" or "Keep Both" (the new file keeps the name it arrived with).
+8. **Limits for what a server sends.** Line 4096 bytes; reply 1000 lines/64 KB kept, 20 000 lines read,
+   one timeout for the whole reply; listing 4 000 000 entries and 1 GB; SFTP packet 1 MB. A size too large
+   for a number is the largest number; a size below zero or not a number is 0; a date outside the years
+   1…9999 is no date.
+9. **Waits.** A wait for a connection, a transfer slot or another thread's login ends when nothing moved
+   on the session for 60 s (or twice the timeout, whichever is longer). The time a question to the user is
+   open does not count. The main thread never waits for a login lock.
+10. **Logins per server (N077).** The limits are unchanged (up to 3 for commands and 4 each for downloads
+    and uploads at the default setting). A shared lower cap would make a listing wait for a running
+    transfer. Instead a 421 makes the thread wait for a connection that comes free.
+11. **Closing a reader returns at once.** The server is told in the background. A thread that needs a
+    connection waits up to 0.5 s for one that is on its way back before it logs in again.
+12. **A name that cannot be told apart from the slash next to it** (it begins with a combining mark, or ends
+    with a character that joins what follows) is left out of listings and refused in paths.
+13. **FTPS servers that insist on TLS session reuse** stay unsupported; the clear error is kept.
+    `Network.framework` gives no way to resume the control connection's session on a data connection.
+14. **A notice of ssh that wants no answer** (touch the security key) goes to the connection log; there is
+    no window for it.
+15. **`ServerKey.url` for a host that has no URL** gives a location on `host.invalid`, never on the local
+    disk. `ServerAddress` refuses such hosts, so this is only reached by a key made by hand.
+
+## 3. Tests
+
+New files (81 tests):
+
+- `Tests/PluginTests/Review2NetworkParserTests.swift` (21): hostile LIST lines and the reproducer, the
+  formats, clamped sizes and dates, `LineSplitter`, the reply limit, paths cut at bytes (reproducer and
+  20 000 generated texts), the saved connection with a bad port (reproducer), hosts without a URL, download
+  list rules, ssh question shapes, the askpass helper, addresses without passwords, the download mark,
+  names that go back as they came.
+- `Tests/PluginTests/Review2NetworkFTPTests.swift` (32): replacing moves on five kinds of server, the cached
+  "absent", upload lengths, endless listings and replies, a transfer announced twice, active mode that
+  fails, the listener's peer check, decomposed names, cancellable and bounded waits, closing readers
+  (also the race), dropped transfers, keep-alive, the link resolver, consent, a login under way, plain FTP
+  passwords, the trust store, a changed certificate with two TLS servers.
+- `Tests/PluginTests/Review2NetworkSFTPTests.swift` (17): confirmed and measured uploads, a failing close, a
+  refused write and the cut, a silent server, the order of CLOSE, Disconnect during a login, a packet that
+  is not SFTP, cancelled writers on the shared channel, renames, one page for a viewer, a wrong stored
+  password, questions from a server or jump host, the real ssh with the program's options and a banner.
+- `Tests/PluginTests/Review2NetworkCommandTests.swift` (11): the list preview and Cancel, no replacing
+  without asking, plain lines only download, many lines, names with line breaks, the quick-connect password,
+  passwords bound to server and user, the one-time move, certificates in the settings, the dialog for a
+  changed certificate, no password in any message.
+
+Existing files updated because behaviour changed on purpose: `NetworkServerForTests.swift` and
+`NetworkFixSFTPTests.swift` (the two fake servers learned more ways to misbehave), `NetworkFixTests.swift`,
+`NetworkParserTests.swift`, `NetworkSFTPTests.swift`, `NetworkPluginTests.swift` (one test added),
+`NetworkFTPTests.swift`.
+
+Final run, in the project with `--scratch-path .build-network --filter Network`, twice in a row:
+**185 tests in 32 suites passed, 0 failed.** 184 of them are the network tests (103 existing, 81 new); the
+filter also matches one test of another area. Before that the same tests passed five times in a row in a
+copy of the package that held only the network plugin and what it needs. Only local servers were used: the
+FTP test server, a Python FTPS server, a Python SFTP server, the system's `sftp-server`, and the system's
+`sshd` on 127.0.0.1. The whole program builds (`swift build`).
+
+## 4. Not done
+
+- **Built but not tested**, because the tests cannot reach the real thing: the Keychain update order
+  (N100), cancelling and timing out a system mount (N066, N103), the certificate check on its own queue
+  (N057), the window on a really slow line (N039). The code compiles and was read through.
+- **Left to other areas** (see `cross-requests/network.md`): putting the download mark on local copies
+  (N009: the provider returns it, the copying side must apply it), a cancellation flag for the four
+  changing provider calls (N010/N026: their waits are bounded, not cancellable from the progress window),
+  a dialog with a safe default button, and a way to tell a typed address from one read from a file.
+- **Known limits that remain:** an FTP server with neither SIZE nor MLST cannot have its uploads measured
+  (N029); an FTP server without MLST is still believed for up to 10 s that a name is free when no alike
+  name is listed (N034); a name that is not valid text in the encoding forced for an FTP connection cannot
+  be addressed (N022); FTPS with required TLS session reuse is not supported (decision 13).
+- **A deadlock in the test harness, not in the program:** a question asked while `FakePanel` reads a
+  folder on the main thread cannot be answered, because the kernel now lists on its own thread while the
+  fake waits on the main thread. The test for a typed address therefore answers the "Connect?" question
+  without the dialog, and the dialog is tested by itself. The real panels do not read on the main thread.
+- The fuzzers were not run again (the fuzz package builds every plugin); the three reproducers are tests.

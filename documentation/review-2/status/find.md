@@ -1,0 +1,106 @@
+# Status — find (FindFiles, Selection, MultiRename)
+
+Files are under `Sources/Plugins/{FindFiles,Selection,MultiRename}`. "Fixed" means built and covered by the tests listed below; where a fix is
+partial the note says what is left (and the same is repeated under "Not done").
+
+| ID | Status | Note |
+|---|---|---|
+| R001 | fixed | Selection/SelectionPlugin.swift: `foldsCase` (resourceValues) now runs inside the background comparison, never on main. |
+| R002 | fixed | FindFiles/FindFilesWindowController.swift: Cmd+C builds the text on a background queue for lists above 20,000 rows and puts it on the pasteboard when ready (older request dropped). |
+| R003 | fixed | FindFiles/SpotlightSearch.swift: `NSMetadataQuery.operationQueue` is a queue of ours; paths are read there in autoreleased pieces of 5,000, capped at 1,000,000 (the window says when it was cut); `stop()` is safe while reading. Not run against a real Spotlight index. |
+| R004 | duplicate of R003 | |
+| R005 | fixed | MultiRename/MultiRenameSession.swift: the job computes the "renamed" flags, folders, attempted/left lists; `finish` removes rows by flag (list edits are refused while a job runs). |
+| R006 | fixed | MultiRenameSession.swift (`ClipboardSource`), RenameMask.swift (`clipboardLoader`), MultiRenamePlugin.swift: the clipboard is read only when a mask uses `[X]`, on a background queue, cached by `changeCount`, capped at 64 KB of text, with a 2 s patience; environment and title rule are cached per session. |
+| R007 | duplicate of R003 | |
+| R008 | duplicate of R005 | |
+| R009 | duplicate of R006 | Debounce (0.1 s) added too, see R028. |
+| R010 | fixed | Selection/SelectionPlugin.swift: select by mask, similar, all-by-scope, invert and restore (long lists), Compare Directories, Mark Newer, Load from clipboard / file work off main with a `listVersion` guard and are applied in pieces of 20,000 names. Applying still costs the model's name lookups on main (kernel bulk API requested, cross-requests/find.md item 1); `selectAll`/`clearSelection` of everything and `invertSelection`/`restoreSelection` on lists up to 20,000 stay the kernel's own calls. |
+| R011 | needs other area | VirtualFolders owns `VirtualFileSystem.register(files:)`/`unique()`. Find Files now keeps its result URLs unique and in order and requests a `isUnique:` flag on `FileListService.show` (cross-requests/find.md item 2). |
+| R012 | fixed | Every user regex goes through `enumerateMatches(.reportProgress)` and stops from the block on a 0.1-0.25 s per-item budget (2 s per 1-5 MB piece of file text) or on cancel, after three timeouts the pattern is given up: FindFiles/FindRegex.swift (name regex, content regex, field-rule regex), Selection/SelectionRegex.swift, MultiRename/RenameRegex.swift. Selection masks run off main; Multi-Rename preview and Start are cancelled inside a match; a timeout is `<Error!>` / "takes too long" / a note in the Find summary. Plain wildcard Search & Replace is a hand-written matcher (see R014). |
+| R013 | fixed | FindFiles/TextPattern.swift `Needle.match` is iterative (two arrays, no recursion); 20,000 characters on a 512 KB thread. |
+| R014 | fixed | MultiRename/RenameRegex.swift `WildcardMatcher` replaces the regex built from `*`/`?` (no backtracking; compared in a test against the old regex definition on 800 random cases); `(a*)*b` is bounded (R012). |
+| R015 | duplicate of R014 | |
+| R016 | fixed | Selection/SelectionFile.swift `windows1252`: per-scalar conversion, base letter or `?`; no `allowLossyConversion` call. |
+| R017 | duplicate of R016 | |
+| R018 | fixed | FindFiles/DuplicateFinder.swift + FileSearch.locationKey(of:): non-file URLs are de-duplicated by scheme/lower-cased host/path before grouping and in overlapping roots. One share mounted twice locally (different `st_dev`) is still not recognised. |
+| R019 | fixed | FileSearch.run: folder keys in a set, ancestors walked per item, name test first, cancellation polled. |
+| R020 | fixed | FileIdentity.swift: `SF_DATALESS` files are not read (text search and duplicate hashing). No option to read them anyway (see Decisions). |
+| R021 | fixed | FileSearch: a budget of 200,000 listed-not-reported entries holds back further folder listings (the front job always proceeds); listings are filtered per batch; `SearchQuery.resultLimit` (window: 2,000,000) and 3,000,000 files for duplicate runs, with a note in the summary. |
+| R022 | fixed | FileSearch.Walk.publish: candidates, children, state, pending and `isListed` are set in one locked section; the check jobs capture the candidates by value. |
+| R023 | fixed | `JobStack.push` ignores jobs after `close()`; the dropped tree is released on a background queue. |
+| R024 | fixed | Find Files part: `selectionCount > 0` instead of walking the panel (prepare, windowDidBecomeKey); the list of selected items is built only for "only selected". SyncSession.adopt (DirectorySync) and CompareOperands.choose (CompareContent): needs other area (cross-requests/find.md item 5). |
+| R025 | fixed | FindFilesWindowController: counts and the URL list are kept as rows arrive, finish updates the summary row only, goToFile/feed read the URL array, batches are cut at 2,000 rows or 0.1 s. |
+| R026 | fixed | Sorts and "next step" have their own queue; previews no longer block on a regex (R012). |
+| R027 | fixed | ContentDate: regular, non-dataless files of an image type only; dates kept across reorders (`ContentDateStore`). A file swapped for a FIFO between the check and ImageIO's open is not excluded. |
+| R028 | fixed | MultiRenameSession: entries/new names/statuses in parallel arrays, counts come with the preview, 0.1 s debounce, list edits reuse folder caches, sorting/next-step/edit-names/name-list parsing off main for long lists. |
+| R029 | fixed | `isBusy` set for Start and Undo until the job ends; Undo/Start/list edits refused meanwhile; the history is replaced only if its length is unchanged. |
+| R030 | fixed | RenameRun.swift `diskName(of:)` takes the URL's last component for any scheme when the name holds a slash. |
+| R031 | fixed | RenameStore: `undoCount` stored beside the history, history decoded in the background (`loadUndo`), no decode at window open. |
+| R032 | fixed | Hard cap: runs are saved only while the newest ones together stay within 50,000 items; a bigger newest run is kept in memory for the session only. Still in the settings, not a file of its own (cross-requests/find.md item 6). |
+| R033 | duplicate of R022 | |
+| R034 | duplicate of R025 | |
+| R035 | fixed | See R010; `similar`, `all`, masks with paths are computed off main; the `**` chain is iterative (R065). |
+| R036 | fixed | Walk.deliver reports the tested prefix of a folder while the rest is still tested (test with gated checks). The listing of one folder is still read whole and sorted before the first hit of that folder. |
+| R037 | duplicate of R025 | |
+| R038 | duplicate of R022 | |
+| R039 | duplicate of R025 | |
+| R040 | duplicate of R025 | |
+| R041 | duplicate of R003 | |
+| R042 | duplicate of R012 | Content regex: budget per piece, cancel checked inside the match. |
+| R043 | duplicate of R006 | Rows are no longer mapped per keystroke either (R028). |
+| R044 | duplicate of R012 | Start's job cancels inside a regex and lists folders with the job's cancellation flag. |
+| R045 | duplicate of R012 | |
+| R046 | fixed | Overlapping roots/items are de-duplicated by (parent folder identity, name) for local files: hard links stay, one folder reached twice (firmlink) is one. |
+| R047 | fixed | Start directories claim their folder identities in order before the threads start, so the first one is searched whatever the timing. |
+| R048 | duplicate of R025 | |
+| R049 | fixed | `FieldRules.unusableRule` makes `FileSearch.problem` a bad-regex error; expressions are compiled once (`PreparedFieldRules`). |
+| R050 | fixed | `Age.cutoff` clamps (1,000,000 units, nil date = earliest), SearchForm size text, depth +1 overflow, `SearchSettings` negative depth, Selection `step`/`all` counts clamped. |
+| R051 | fixed | `verify`: roots compared case-insensitively and also resolved through symlinks; the text is re-checked in the files when the index cannot judge it (case sensitive, other encodings, more than a word: `SpotlightQuery.recheckingText`); cancellation checked before the final sort (the sort itself cannot be interrupted). |
+| R052 | duplicate of R013 | |
+| R053 | fixed | `LineDecoder` sniffs UTF-16 byte order without a mark (zero bytes in the first 256). |
+| R054 | fixed | A forced cut of a long line is made between characters (UTF-8 boundary, incomplete tail waits) and the last 4 KB are repeated at the start of the next piece. |
+| R055 | fixed | MultiRenamePlugin.open: the old window is detached before it is closed. |
+| R056 | fixed | `sortRequest`: of two sorts under way the last wins; sorts no longer drop each other. |
+| R057 | fixed | Preview: planner keys on all cores, target folders listed with the cancellation flag, folder caches and dates kept across reorders/removals. Not done: `steps` is still serial and not cancellable, `foldsCase` lists a folder a second time. |
+| R058 | fixed | `session.close()` from `windowWillClose` cancels the preview and a pending one; Undo ends with a new preview. |
+| R059 | fixed | A run with names from a list/typed that put files in other folders (slash in a name) asks first (job-side `monitor.ask`). |
+| R060 | fixed | Names compared byte for byte (preview, planner); target URL keeps the typed form of the name; the rename of a pure normalization change goes through a temporary name (see cross-requests/find.md item 3 for the LocalFileSystem hazard this uncovered). Test now compares scalars and renames on the real disk, including Undo. |
+| R061 | fixed | `isSameFile` false for a missing target (plain exclusive rename instead of a replacing one); target folders away from every source folder ask their volume for case sensitivity; auto-numbered names are cut to 255 bytes; folders and what is inside them are renamed inside out. Undo still identifies files by path only (unchanged, by design). |
+| R062 | fixed | `LocalFileReader`: `open(O_NONBLOCK)` + `fstat` on the descriptor (regular, not dataless), then blocking reads, used by text search and duplicate hashing for local files. Open on a dead network mount still blocks (cannot be interrupted). |
+| R063 | fixed | askSpotlight: weak self in both closures. |
+| R064 | fixed | The log goes to `~/Library/Logs/<product>/` (folder 0700, file 0600) instead of the temp directory. |
+| R065 | fixed | `Token.chain` is a two-pointer match (linear in patterns × folders). |
+| R066 | fixed | Selection files and the clipboard are read, parsed and matched in the job/background; the read job honours cancellation; saving writes a temporary file beside the target and moves it into place, so a failed write keeps the old file. Clipboard text above 64 MB is refused. |
+| R067 | fixed | The walk tree and the dropped jobs are released on a utility queue. |
+| R068 | duplicate of R050 | |
+| R069 | duplicate of R050 | |
+| R070 | duplicate of R030 | |
+| R071 | not a defect | `count - 1` can only trap for `Int.min`, which the app never passes. |
+| R072 | refuted | Verdict: the 20-run history is deliberate; kept (and Undo is now also disabled while a job runs). |
+
+## Decisions
+- Dataless (iCloud stub) files are never read by a content search or by duplicate hashing; there is no switch to read them.
+- Find Files stops at 2,000,000 hits (and duplicate runs at 3,000,000 files) and says so in the summary line; Spotlight answers are read up to 1,000,000 paths.
+- Regex budgets: 0.25 s per name for Find/Selection, 0.1 s per name for Multi-Rename, 2 s per piece of file text; after three timeouts of one pattern the rest of its items are answered "no match" / `<Error!>` at once. Any timeout is shown (Find summary note, Selection message, Multi-Rename preview message).
+- Multi-Rename undo history: at most 50,000 renamed files are saved in all; the saved runs are always the newest ones without a gap, so a bigger newest run means nothing is saved (it still works in this session).
+- Multi-Rename refuses list edits (move, remove, sort, next step, load names) while a run or Undo is under way.
+- A run that gets its names from a list or typed text and would move files into other folders asks for confirmation (default behaviour in tests: the scripted answer).
+- `SelectionPlugin(pasteboard:background:)`: `background: false` keeps everything synchronous (used by the Selection tests); the default (the app) works long lists, regex masks, Compare Directories and the clipboard in the background. Lists up to 20,000 items without a regex stay synchronous.
+- Invert/restore on lists over 20,000 items use the marks as a set of names (two names that read the same count as one); below that the exact kernel calls are used.
+- The Multi-Rename log is written to `~/Library/Logs/<product>/`.
+
+## Tests
+New: `Tests/PluginTests/Review2FindFilesTests.swift` (16 tests), `Review2FindSelectionTests.swift` (11), `Review2FindRenameTests.swift` (19).
+Changed existing tests: `SelectionMoreTests.swift` and `ToolsAdoptTests.swift` (Selection bench built with `background: false`), `FindRenameFixRenameTests.swift` (`isSameFile` of a missing target is now false),
+`MultiRenamePluginTests.swift` (answers the new confirmation of names that move files), `MultiRenameEngineTests.swift` (the `[u]` check compares scalars).
+Final run in the project tree (`swift test --scratch-path .build-find --filter "Review2Find|FindFiles|MultiRename|SelectionMore|ToolsAdopt"`): **238 tests in 29 suites, all passed** (FindFiles, Selection, Multi-Rename test classes, the three new Review2Find files, ToolsAdopt). A second run of the plugin-command / remembered-listing / config / system-tools / Mac-integration / file-ops-fix classes that use `SelectionPlugin()` with its default (background) mode: 17 tests, all passed. The same area tests also passed repeatedly (5 runs of the new files) in a private package built from a snapshot of the pre-round kernel/shell.
+Not run: ShellTests, the whole PluginTests target, TSan/ASan builds; the Spotlight query itself (needs a live index).
+
+## Not done
+- A kernel bulk-marking API (cross-requests/find.md item 1): applying a long selection still costs the model's per-name lookups on the main thread, in pieces of 20,000; `selectAll`/`clearSelection` of everything and the kernel `invertSelection`/`restoreSelection` stay O(n) kernel calls on main for lists up to 20,000 (invert/restore above that are done off main).
+- R011 (VirtualFolders), the SyncSession / CompareOperands part of R024 (DirectorySync, CompareContent).
+- The first hit of a very large single folder still waits for that folder's listing and sort (providers list in batches but the results must come out in name order).
+- Spotlight with a real index was not run (no test can rely on the index); the NSMetadataQuery operation-queue path is code-reviewed only.
+- Multi-Rename: `RenamePlanner.steps` is serial and not cancellable; `foldsCase` still lists a folder a second time; the undo history stays in the settings (a file of its own needs a kernel settings API); "Undo identifies files by path only" is unchanged.
+- One share mounted twice at different local mount points is not recognised as the same files by the duplicate finder.
+- A FIFO that replaces a picture between the regular-file check and ImageIO's own open (`[T4]`) is not excluded.

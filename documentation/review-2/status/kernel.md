@@ -1,0 +1,227 @@
+# Review 2 — status of the kernel area
+
+Scope: `Sources/AFMKernel`, `Sources/AFMContracts`, `Tests/KernelTests`, `Tests/TestSupport`.
+Every public API change is additive: all existing signatures still compile and behave as documented, except where
+a finding asked for the behaviour to change (listed under "Decisions").
+
+## 1. Findings and verdicts
+
+| ID | Status | Note |
+| --- | --- | --- |
+| K001 | fixed | `Panels/Sorting.swift`: names are never handed to `localizedCaseInsensitiveCompare`; the order is the collation key bytes, then the name bytes. The pair of the reproducer is sorted in `Review2KernelSorting.theNamesThatStoppedTheProgramAreSortedLikeAnyOthers`. |
+| K002 | duplicate of K001 | |
+| K003 | fixed | `FileSystem/FileSystemProvider.swift`: `totalSizeByListing` nests at most 32 calls per thread (`TreeWalk`), then walks level by level to at most 1000 further levels, never lists a location twice, checks the flag at every level. Pool threads have a 2 MiB stack (`Support/Parallel.swift`). Tested with 20,000 levels on a 512 KB stack. |
+| K004 | fixed | `Panels/Listing.swift`, new `Support/BlockingCalls.swift`: `volume(of:cancellation:)` (new requirement with default), the listing and `item(at:)` run on kernel threads; the same question is asked once per location, a given-up listing is not started again until it has come back, at most 64 questions per file system are under way. 100 refreshes of a dead folder: 1 stuck thread, the caller returns at once on cancel, a healthy folder of the same file system loads. The local file system still has to make its `volume(of:cancellation:)` give up (cross-request 12), and the shell to start readers off the dispatch queues (cross-request 1). |
+| K005 | fixed | `Panels/PanelModel.swift`, `Panels/PanelLists.swift`: names are found through one index over `listedItems` (`NameIndex`), shown rows by binary search. 10,000 sizes with a filter at 1M: 51 ms the first time (makes the index), 2.6 ms after. |
+| K006 | fixed | `Support/Parallel.swift`: threads are shared out between trees of jobs (fewest threads first), a tree gets at most `width` threads unless its pieces wait *and* get done. A stalled 600-piece job keeps `width` threads; a later job gets helpers at once. |
+| K007 | fixed | As K004: the blocked calls no longer sit on global-queue threads. What remains on a global queue is the shell's reader thread while it waits, and that ends with the load's flag (cross-request 1). |
+| K008 | fixed | `Support/Parallel.swift` `perform`: every piece runs in an `autoreleasepool` (per index for small grains, per piece for large), on pool threads and on the caller. The other two sites named in the finding (`FileSearch.JobStack.work`, `TextRows`) are not kernel code. |
+| K009 | duplicate of K008 | |
+| K010 | fixed | Marks are a bit per entry (`Bitset`). At 1M, release build: select all 0.0 ms, totals after 0.0 ms, invert 0.0 ms, `select(mask:)` 14 ms, save + restore 0.0 ms, `operands()` 48 ms (0 when everything is marked). |
+| K011 | fixed | As K010 and K005; a no-op `update(with:)` at 1M is one parallel comparison (24 ms sync, or in the background with `prepare`). The name index is made with parallel hashing (12 ms at 1M) or handed in by `prepare`. |
+| K012 | fixed | `listVersion` moves only when `listedItems` changed. New `basis` / `prepare` / `apply`: a stale result is refused (`.stale`) with no work done. `setSort(_:presorted:listVersion:)` added, returns false when stale. The old `setFilter(_:prefiltered:listVersion:)` keeps its documented fall-back (now on all cores); callers switch to `prepare` (cross-requests 2, 8). Direction flip no longer calls `NSString.compare`. |
+| K013 | fixed | `Snapshot` holds filter and order; `restore` puts the filter back and puts the list into the panel's present order if that changed. |
+| K014 | fixed | Kernel side as K013; `Snapshot.filter` is public so the controller can restore its own quick-filter entry (cross-request 3). |
+| K015 | fixed | Lists that the model lets go of (leaving a folder, a refresh, a closed tab, a dropped snapshot, basis or prepared change) are released on a kernel thread (`Discard`, `Remains`). At 1M: open 0.0 ms, dropping the snapshot 0.0 ms on the caller. |
+| K016 | fixed | `PanelModel.prepare(_:update:…)` does sorting, comparing, size carry-over, filtering and the old-to-new table in the background; `apply` took 3.8 ms at 1M with a filter and 990k marks. The direct `update(with:)`: 24 ms unchanged, 80 ms with two entries gone (was 0.4-1.1 s). |
+| K017 | fixed | No bump for a no-op refresh, `setComputedSizes`, or any filter change (`onlyAChangedListMovesTheVersion`). |
+| K018 | fixed | With `prepare(_:sort:)` the filter is not asked again at all (what was shown stays shown); `apply` 3.3 ms at 1M. The old `setSort(_:presorted:)` filters on all cores (49 ms at 1M with 1M marks, was 378 ms + marks). |
+| K019 | fixed | As K010. New: `select(where:)`, `rows(of:where:)` + `setSelection(_:_:)`, `setSelected(_:indices:shownVersion:)`. The Selection plugin has to call them (cross-request 11). |
+| K020 | duplicate of K019 | |
+| K021 | fixed | The order is defined by ICU sort-key bytes, then name bytes: a strict total order by construction. Checked for all pairs of the Cyrillic set and for da/nb/cy/es-traditional/hu/hr. |
+| K022 | fixed | No fallback exists any more. 1M names, release: ASCII 94-150 ms, Cyrillic 116-143 ms, Hungarian 211 ms (was 2.0 s), streamed load 0.4-0.8 s (was 2.3-6.1 s). |
+| K023 | fixed | As K021; the gate, the check pass and the exact re-sort are removed; sort, merge, reverse and `SortedFileList` give the same list whatever the path. |
+| K024 | fixed | `keysOrderPlainNames` and the plain flags are gone. |
+| K025 | fixed | The watcher tells threads beyond the cores that are ready to run to leave at their next piece, and idle ones at once (`aJobWhosePiecesStopDoesNotTakeTheThreadsOfTheNext` waits for `threads <= width`). |
+| K026 | fixed | Idle threads are called by a counted `summons`, not by counting signals; the watcher is armed by every job and looks at all open work. (A first version with wake credits lost calls after idle time-outs; found by the 1M benchmark, covered by `helpersStillComeAfterManyCallsWithIdleTimesBetween`.) |
+| K027 | fixed | The watcher is a thread of the pool's own (`AFM.Parallel.watch`); no dispatch queue is used by the pool. |
+| K028 | duplicate of K008 | |
+| K029 | duplicate of K006 | |
+| K030 | fixed | A mark is a place in the list, so totals, `selectionCount` and `operands()` count the same entries, also for two entries of one name (`theSameNameTwiceIsTwoEntriesEverywhere`). |
+| K031 | not a defect | No hang then or now. The matcher is the kernel's own (`Support/FileMask.swift`), bounded by mask length times name length; 4 KB against 4 KB took 208 ms under the address sanitizer in 1.35M fuzz executions. |
+| K032 | fixed | `Panels/ListingCache.swift`: slots are taken out under the lock and released outside it, on a kernel thread. |
+| K033 | fixed | Second half (one linear search per name with a filter): fixed as K005. First half (the whole list is copied when somebody else holds it): not fixed, see "Not done". |
+| K034 | fixed | Jobs opened on the main thread get free threads first and are started threads at once; pool threads take on the caller's QoS for a tree's pieces. |
+| K035 | fixed | `AFMContracts/Format.swift`: `kilobytes` rounds without a sum; `speed` and `duration` take NaN, infinity and any magnitude. `Support/Saturating.swift`: `subtractingSaturated`, `multipliedSaturated`, `Int64(saturating:)`, the same for `Int`. |
+| K036 | fixed | The shared `NumberFormatter` is gone; digits are grouped by hand (`Format.bytes`). |
+| K037 | fixed | `URL.appending(safeName:)` and `PathSafety` (byte-based). `appending(name:)` keeps taking paths (the registry uses it for typed relative paths) and says so. |
+| K038 | duplicate of K003 | |
+| K039 | fixed | `Panels/Listing.swift` `RootCache`: the top of the tree is remembered per directory for 30 s, so going down or along a deep path climbs once. The first load at such a depth still climbs (background CPU). |
+| K040 | fixed | As K004; the comment of `stream` now says that an error after batches is thrown. |
+| K041 | fixed | No reproducer was kept. With marks as places that are always intersected with what is shown, a mark without a shown row cannot be represented; the fuzz target `panel` ran 39k executions clean. |
+| K042 | fixed | As K030: nothing depends on whether the index exists. |
+| K043 | fixed | `duplicate()` copies `isComplete` and `isRefreshing`. |
+| K044 | fixed | Rule documented on `Parallel.map`; `Parallel.isHoldingUpMainThread` and `assertMayWaitForMainThread()`, asserted in `Kernel.askUser`. |
+| K045 | fixed | Sizes are set at one place of `listedItems` and at its shown row. `Tests/Fuzz/repro/kernel/panel-computed-size-shown-vs-listed.bin` passes with the unchanged harness; `sizesGoToTheSameEntryInBothListsWhateverTheFilter`. |
+| K046 | not a defect | `selection` is a `Set<String>`, documented as merging names that read the same. New `selectedNames` (one per marked entry, as written), `hasSelection`. |
+| K047 | needs other area | The model keeps its list sorted and is never told the order of arrival; documented on `Sorter.resort`. ViewOptions reloads the panel when Unsorted is chosen after another key (cross-request 9). |
+| K048 | refuted | |
+| K049 | fixed | `Support/FileMask.swift`: mask and name are case-folded and composed (NFC); `?` is one Unicode scalar; `[` and `\` are ordinary characters; `STRASSE*` matches `straße`. No shared reference counts in the hot path (1M names on 16 cores: 14-20 ms). |
+| K050 | fixed | The watcher's pause doubles up to 1 s while looking changes nothing, and it stops when no job is open and no thread is beyond the cores. |
+| K051 | fixed | A tree whose pieces wait and get done is given up to 4 x `width` threads (`piecesThatWaitAndComeBackGetMoreThreadsThanCores`). |
+| K052 | fixed | Pool threads take the QoS of the tree's caller (the main thread's for its calls, never below utility), so the main thread no longer waits on threads of a lower class and utility callers are not raised. |
+| K053 | duplicate of K028 | A verdict on a figure; no code of its own. |
+| K054 | fixed | As K034. |
+| K055 | not a defect | Kernel part: `NameCollator.lock` is held while a language's collator is made, once per language, CPU only. The other locks in the table are other areas'. `JobMonitor.report` now says that it may block. |
+| K056 | duplicate of K007 | |
+
+Counts: fixed 43, duplicate 8, refuted 1, not a defect 3, needs other area 1, not fixed 0 (one half of K033 is
+not fixed, see "Not done").
+
+## 2. New kernel API (all additive)
+
+### Blocking work off the dispatch queues — `BlockingCalls` (`Support/BlockingCalls.swift`)
+- `BlockingCalls.run { }`: runs work on a thread of the kernel's own (named `AFM.Blocking`, made on demand, kept 5 s
+  when idle, inside an autorelease pool). For anything that may wait on something outside the program.
+- `BlockingCalls.answer(from: provider, to: "volume " + key, sharing: true, cancellation: flag) { flag in … } -> Answer?`:
+  asks on a kernel thread and waits on the calling thread (not the main thread). Equal questions to one owner are
+  asked once; with `sharing: false` each asker gets its own answer, one after the other once an earlier one was
+  given up. At most `BlockingCalls.limit` (64) per owner under way; further ones wait without a thread. Returns
+  nil as soon as `cancellation` is set; the work is told through the flag it was handed.
+- The same with `then:`: returns at once and delivers on the main thread (nil when cancelled first).
+- `BlockingCalls.unanswered(for:)`: how many questions to an owner have not come back.
+- `Discard.later(&array)` / `Discard.later(&optional)`: releases a long list on a kernel thread.
+
+### Paths from outside — `PathSafety` (`FileSystem/FileItem.swift`)
+Byte-based: `isSafeName(_:)` (not empty, not `.`/`..`, no `/` byte, no NUL), `components(ofRelativePath:
+allowingTrailingSeparator:)` (cut at the `/` byte; nil unless every part is safe), `location(ofRelativePath:below:)`,
+`isContained(_:in:resolvingLinks:)` (paths written out in full and compared byte by byte; with links resolved also
+for a file that does not exist yet), and `URL.appending(safeName:) -> URL?`. `URL.isInside` compares bytes now.
+
+### Panel model (`Panels/PanelModel.swift`)
+- `basis` (O(1), main thread) → `PanelModel.prepare(basis, sort:)`, `prepare(basis, filter:)`,
+  `prepare(basis, update:focus:presorted:)`, `prepare(basis, extendingTo:sortedBy:)` (any thread) →
+  `apply(prepared) -> Outcome` (`.stale` / `.unchanged` / `.changed`; main thread). Marks, the cursor and calculated
+  sizes that change in between are kept; a change of the list, the filter or the order makes the result stale.
+- `listVersion` moves only with `listedItems`; `shownVersion` moves with list, filter and order (guard for indexes
+  of `items`).
+- Marks: `hasSelection`, `selectedNames`, `select(where:select:)`, `PanelModel.rows(of:where:)` +
+  `setSelection(_:_:)`, `setSelected(_:indices:shownVersion:)`, `setSelection(indices:shownVersion:)`,
+  `operandsSnapshot()` (`items()`, `markedItems()`, `markedIndices()`, `isMarked(at:)` on any thread).
+- `setSort(_:presorted:listVersion:) -> Bool`; `Snapshot.filter`, `Snapshot.sort`.
+
+### Other
+- `Parallel.isHoldingUpMainThread`, `Parallel.assertMayWaitForMainThread()`.
+- `FileSystemProvider.volume(of:cancellation:)`; `TreeWalk.nesting`.
+- `Int64.subtractingSaturated`, `multipliedSaturated(by:)`, `Int64(saturating:)`, `Int.addingSaturated`,
+  `Int.multipliedSaturated(by:)`.
+- `Kernel.init` installs an empty handler for `SIGPIPE` (unless one is installed): a write to a broken pipe is
+  `EPIPE` in this program, and programs it starts keep the system's default.
+
+## 3. Requests from other areas that were implemented
+
+| From | What | Where |
+| --- | --- | --- |
+| archives 1, shell 6, fileops 6 | `Plugin.prepareToQuit(cancellation:completion:)` (default: done at once), `Kernel.prepareToQuit` | `PluginAPI/Kernel.swift` |
+| tools 1 | `Plugin.shouldTerminate()` (default true), `Kernel.shouldTerminate()` | `PluginAPI/Kernel.swift` |
+| tools 2 | `URL.isSameFile(as:followingLinks:)` (device and inode for local files) | `FileSystem/FileItem.swift` |
+| find 1, shell 1, config-a 2, fileops 4 | `operandsSnapshot()`, index-based marking, `selectedNames`; `deselect` and `operands()` no longer search per name | `Panels/PanelModel.swift` |
+| shell 2, config-a 3, 4 | `listVersion` unmoved by no-op refreshes; `prepare(_:extendingTo:sortedBy:)` and `prepare(_:update:…)` in place of `…prefiltered:` variants | `Panels/PanelModel.swift` |
+| shell 3 | `ContentColumn.init(…cancellableValue:)`, `cancellableValue` on every column | `PluginAPI/ContentColumns.swift` |
+| shell 4 | `JobMonitor.report` says it may block | `PluginAPI/JobService.swift` |
+| shell 9 | `Kernel.askUser` goes through the main run loop (common modes); the main queue only where no run loop turns within 200 ms | `PluginAPI/Kernel.swift` |
+| localfs 1 | `FileItem.linkTargetSize`, `FileItem.device` (16 bytes per item, not in `isSameEntry`) | `FileSystem/FileItem.swift` |
+| localfs 2 | `FileSystemRegistry.placesDidChange` (`AFMPlacesDidChange`) | `FileSystem/FileSystemProvider.swift` |
+| localfs 5 | `createDirectory(at:exclusive:)` (default looks with `item(at:)` first) | same |
+| network 1, fileops 2 | cancellable `createDirectory`, `remove`, `move`, `setAttributes`, `copyMetadata`, `setQuarantine` (defaults call the plain ones) | same |
+| network 3, fileops 5 | `UserInteraction.choose(…defaultButton:)` (default ignores it; the shell implements) | `PluginAPI/UserInteraction.swift` |
+| network 4 | `ServerConsentService` | `AFMContracts/Services.swift` |
+| fileops 1, config-b | `FileSystemProvider.realLocation(of:)` (default nil), `FileSystemRegistry.realLocation(of:)` | `FileSystem/FileSystemProvider.swift` |
+| fileops 3, config-a 5 | `Format.displayName(_:)`, `Format.displayName(_:limit:)` | `AFMContracts/Format.swift` |
+| archives 3 | `FileSystemRegistry.addFlusher`, `flushPendingWrites(to:cancellation:)` | `FileSystem/FileSystemProvider.swift` |
+| archives 4 | `FileSystemProvider.readOrder(of:)` (default: as given) | same |
+| config-a 1 | `Kernel.settingsKeys` (`SettingsKeyRegistry`, `SettingsKeyKind`) | `PluginAPI/Kernel.swift` |
+| config-b | `PanelTabs.performBatch`, `FileSystemProvider.connectsToServer` | `Panels/PanelTabs.swift`, provider |
+| find 2 | `FileListService.show(_:title:in:isUnique:)` (default ignores `isUnique`) | `AFMContracts/Services.swift` |
+| find 6 | `SettingsStore.largeData(forKey:)` / `setLarge(_:forKey:)` (defaults keep them with the rest) | `PluginAPI/Kernel.swift` |
+
+Not implemented, with the reason:
+- shell 6, the variant "`Kernel.shutdown` runs the stops off the main thread": every plugin's `stop()` is written
+  for the main thread. `prepareToQuit` is the place for long work.
+- config-a 5, `LoginShell` in AFMContracts: it starts processes; the contracts module holds names and formats.
+- config-b, a kernel-owned pasteboard queue: the kernel has no AppKit, and a queue cannot order background reads
+  against main-thread writes unless the main thread waits on it.
+- config-b, `PanelTabs.init(restoring:)` not connecting at start: the shell decides what is shown first;
+  `connectsToServer` is there for it.
+
+My own requests to other areas are in `documentation/review-2/cross-requests/kernel.md`.
+
+## 4. Decisions
+
+- **The order of names is the collator's, not the localized comparison's.** Names are ordered by ICU sort key at
+  secondary strength (letters and accents count, case does not, punctuation is not ignored), then by their UTF-8
+  bytes. Lists can come out in a slightly different order than before where the old comparison was inconsistent,
+  and names that differ only in case or in how an accent is written are now in byte order. Without the system's
+  collator the key is the lowercase form.
+- **A mark belongs to one entry.** Two entries of the very same name (a list gathered from several folders) can be
+  marked one without the other; marking by *name* marks every entry written like it. `selectionCount` counts
+  entries.
+- **`listVersion` no longer moves with a filter, a calculated size or a no-op refresh.** Whoever guarded indexes
+  of `items` with it uses `shownVersion`.
+- **`restore(snapshot)` keeps the panel's present order** and re-sorts the restored list if the order changed since
+  the snapshot (rare; on the calling thread). The filter is the snapshot's.
+- **File masks:** `[` `]` `\` are ordinary characters; `?` is one Unicode scalar; matching ignores case by full
+  case folding and the way accents are written.
+- **Limits:** 64 unanswered questions per file system (`BlockingCalls.limit`); a size walk nests 32 calls per thread
+  and gives up 1000 levels below that; a tree of pool jobs gets `width` threads, up to 4 x `width` when its pieces
+  wait and finish; the pool never has more than max(64, 16 x `width`) threads; root answers are remembered 30 s.
+- **A listing waits behind a given-up listing of the same location** instead of starting a second one; two live
+  listings of one location (two panels) still run side by side.
+- **`PanelLoader.stream` called on the main thread** (tests, small tools) asks the file system directly, as before.
+- **`SIGPIPE`** is caught by an empty handler, not ignored: "ignored" is inherited by programs started with a plain
+  `posix_spawn` (measured: such a child survives `kill -PIPE` under `SIG_IGN` and ends as usual under the
+  handler; Foundation's `Process` resets it either way), so `ssh` and the user's shell commands keep the default.
+- **`Format.kilobytes`** rounds negative numbers to the nearest too (it truncated toward zero before).
+- **`duplicate()`** of a tab that is still loading is not complete either, until the shell reads it.
+
+## 5. Tests
+
+New files:
+- `Tests/KernelTests/Review2KernelSortingTests.swift` (6 tests)
+- `Tests/KernelTests/Review2KernelParallelTests.swift` (11 tests: pool, blocking calls, discard)
+- `Tests/KernelTests/Review2KernelModelTests.swift` (14 tests)
+- `Tests/KernelTests/Review2KernelLoaderTests.swift` (13 tests: loader on a stalled file system, deep trees, path
+  safety, file masks)
+- `Tests/KernelTests/Review2KernelRequestsTests.swift` (11 tests: the APIs other areas asked for, `SIGPIPE`)
+- `Tests/PluginTests/Review2KernelFormatTests.swift` (5 tests; `KernelTests` does not link `AFMContracts`)
+
+Existing tests changed because the behaviour changed by design (`Tests/KernelTests/KernelFixTests.swift`,
+`KernelApiTests.swift`): the mask reference (was `fnmatch`), the "keys of another language" test (the order is
+the language's now), and two expectations that a filter moves `listVersion`.
+
+Final run, `swift test --scratch-path .build-kernel --filter KernelTests`: **170 tests in 31 suites passed**, four
+runs in a row. `--filter Review2KernelFormat`: 5 passed.
+
+All targets (`swift test`, and `--filter PluginTests`), seven runs in all while other agents were building and
+testing on the same machine: KernelTests 170 passed and ShellTests 154 passed every time they ran; PluginTests
+(1568 tests) passed in 4 runs and failed in 3 with tests of other areas that pass when run by themselves:
+`theRealShellTakesTheOptionsAndTheBannerIsNotShownAsTheError` (Review2NetworkSFTPTests, twice: the message of a
+real `ssh` had not arrived when the connection was seen to end) and `aLargeImageIsResampledOnceWhileItIsScrolledAndDrawnAgain`
+/ `aFrameIsScaledOnceForTheSizeItIsShownAt` (ViewerAdoptRichTests, once: waits that ran out). I first took the
+SFTP failure for an effect of my `SIGPIPE` change; runs with the handler switched off and on did not bear that out
+(1 of 1 clean without it, 2 of 3 clean with it), so I count all three as dependent on load, not as kernel
+regressions, and that is a judgement from seven runs, not a proof.
+
+Also run, not part of the test targets: the kernel fuzz driver under the address sanitizer (see cross-request 15
+for the three harness checks that state old behaviour): filemask 1.35M, panel 39k, paneldup 20k, sorter 1.6k
+executions without a finding after two bugs it found were fixed (a range of rows wholly outside the list trapped
+in `setSelected(_:rows:)`; a prefiltered list with two entries of one name was matched to the wrong one).
+A release benchmark at 1M entries gave the figures quoted in the table.
+
+## 6. Not done
+
+- **K033, first half:** `setComputedSizes` still copies the whole list once when somebody else holds it (the
+  listing cache, a snapshot, a basis): about 30-50 ms at 1M, once per shared list. That is copy-on-write of a
+  public array; avoiding it means not keeping sizes in `items`, which is an API change.
+- **Still on the calling thread for the old calls** (the `prepare` / `apply` route has none of it): `setSort(_:)`
+  148 ms at 1M (the sort itself), `setFilter(_:)` 52 ms, `update(with:)` 24-80 ms, `selection` (the `Set<String>`)
+  105 ms with 1M marks, `operands()` 48 ms for nearly-all-marked. Until the shell and the plugins call the new API
+  (cross-requests 2, 8, 11), these remain what the main thread pays.
+- **K004/K007 end to end:** the kernel side is done and tested with a stalled fake file system; not tested with a
+  real dead mount, and the shell's reader thread still comes from a global queue until cross-request 1.
+- **K047:** needs the ViewOptions plugin (cross-request 9).
+- **K039:** the first load at the bottom of a very deep path still climbs it once.
+- **Pool growth for waiting pieces** relies on what the system says a thread is doing (`thread_info`), as before;
+  a tree whose pieces wait and never finish stays at `width` threads by design.
+- `Tests/Fuzz` was not edited (not mine); three of its checks fail by design now (cross-request 15).
+- The `.build-kernel` folder is deleted.

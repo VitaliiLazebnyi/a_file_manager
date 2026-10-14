@@ -1,0 +1,189 @@
+# Fix round 2 — fileops
+
+Scope: `Sources/Plugins/FileOperations`, `Sources/Plugins/Clipboard`, `Sources/Plugins/FileProperties`
+and their tests. Work list: `findings/fileops.md`. Requests to other areas: `cross-requests/fileops.md`.
+
+"fixed" means built and covered by a test that passes, unless the note says "no test of its own".
+Where a finding reaches into another area, the note says which part is done here and which is asked for.
+
+## Findings and verdicts
+
+| ID | Status | Note |
+|----|--------|------|
+| F001 | fixed | `FileJob.swift`, new `JobSafety.swift` (`RealLocation`), `FileOperationsPlugin.swift`, `ClipboardPlugin.swift`. A target in a branch view is resolved to the real folder when the job is made; a file system that answers `item(at:)` with a file of another scheme (branch view, archive "outside" locations) has the real place planned; "same entry" is a `.rename` plan that only ever renames; `put`/`extend` refuse when target is the source; a source is removed only if the written target is another file (`isStillTheSource`); hard links of the source are refused. Tests: `Review2FileopsBranchView`, `Review2FileopsCommands`. |
+| F002 | needs other area | Clipboard part fixed here (see F004). Drag start, grid dragging items and drag-enter are in AFMShell: cross-request 7. |
+| F003 | fixed | `ClipboardPlugin.putText`: name lists of more than 2000 items are built on a background queue, the latest request wins. No test of its own for the background path (small selections stay synchronous and are covered by `ClipboardMore`). `operands()` itself is kernel (cross-request 4). |
+| F004 | fixed | `ClipboardPlugin.place`: up to 1000 files as before; above that the selection is remembered in memory (Paste in this program is instant) and the user is asked whether to write the files for other programs too. See Decisions. Test: `aLargeSelectionIsRememberedAndOnlyWrittenOutWhenAskedFor`. |
+| F005 | fixed | Own selections are pasted from memory; foreign ones are read as one list (`NSFilenamesPboardType`) when offered, `readObjects` only as a fallback. The same-folder filter and the folders to refresh are computed on the job thread (`FileOperations.transfer` service). |
+| F006 | fixed | `FileJob.swift`: every batch remembers the targets it gave out (`Batch.produced`, hashes of the folded names), a target folder entered twice by one job is `isShared`; a collision with the job's own output is never resolved by a rule "for all" (kept under an auto-renamed name; only an answer for that one file overwrites). Multi-rename is now one job (`newNames`). Tests: `equallyNamedSources…`, `aMaskThatGivesSeveralSourcesOneName…`, `anAnswerForAll…`, `twoSourceFolders…`, `severalItemsRenamedToOneName…`. |
+| F007 | fixed | `FileJob.put/extend`, `Checksum.swift`: `FileItem.isSpecial` and an own `stat` are consulted; a pipe, device or socket is reported (`FileJobError.specialFile`) and never opened; a link to one is still copied as a link where links are copied. Tests: `aPipeInAStreamedCopy…`, `aPipeIsNotReadForAChecksum…`. The window between check and open needs LocalFileSystem (cross-request 9). |
+| F008 | fixed | `FileOperations.run(summary:)`: the names to deselect are computed on the job thread. `PanelModel.deselect` itself (97 ms) is kernel: cross-request 4. No test of its own. |
+| F009 | fixed | Delete asks `capabilities(for: directory)` once instead of per item. `operands()` is kernel: cross-request 4. No test of its own. |
+| F010 | fixed | `FilePropertiesPlugin.swift`: folders to refresh and the link results are computed in the job. No test of its own. |
+| F011 | needs other area | Same as F002/F004: the clipboard side is fixed, the drag side is AFMShell (cross-request 7, with what was measured about lazy providers). |
+| F012 | fixed | `FileJob.mayEnter` + new delegate question `job(_:crossVolumeAt:purpose:)` (default: skip): Delete and Move stop at a folder on another device, note it in the result and the log, and go on only after an explicit yes (`JobBridge` dialog, Skip is the default button). Tests with a real disk image: `Review2FileopsMounts` (3 tests). |
+| F013 | duplicate of F006 | |
+| F014 | fixed | `NameTemplate.slice`: digits limited to 18, positions cut to 2^20, lengths non-negative and ≤ 255, counter width clamped to 0…255. Test: `rangesNearTheEndsOfIntDoNotCrash` (also feeds the fuzz reproducers). |
+| F015 | fixed | Same change as F014. |
+| F016 | duplicate of F014 | and F015. |
+| F017 | duplicate of F007 | LocalFileSystem reader and the quit path are other areas (cross-request 9). |
+| F018 | duplicate of F001 | |
+| F019 | fixed | `FileJob.resolvingLink`: a link whose target is a folder the link lies in, by device+inode of the folders on the way (`FileIdentity.isInside`), stays a link and is copied as one. Test: `aLinkBackToAFolderItLiesInIsSeenThroughAnotherLink`. Recursion: the count is iterative (level by level), the walk runs on a thread of the job's own with a 64 MB stack and a depth limit of 1024 (`depthLimit`). Tests: `aTreeAsDeepAsPathsAllow…`, `aTreeDeeperThanTheLimit…`. |
+| F020 | duplicate of F012 | |
+| F021 | needs other area | `makePool` now looks at every source folder (a spread sample of 4096 for longer lists), each device once: fixed, test `aListOfSourcesFromManyFolders…`. Cancellable `remove`/`move`/`createDirectory`/`setAttributes`/`copyMetadata`/`setQuarantine` do not exist in the kernel: cross-request 2. |
+| F022 | fixed | `FileJob.plan/extend`, `JobBridge`: no Append/Resume when the target is a link or not a plain file (asked of the disk again right before opening); the rewrite path now does the same prefix check as resume-in-place. Tests: `resumeAndAppendNeverWriteThroughALinkAtTheTarget`, `resumeByWritingAnew…`. `O_NOFOLLOW` in `LocalFileSystem.append`: cross-request 10. |
+| F023 | fixed | `FileJob.isNewer` + `FileIdentity.timestampGrain`: tolerance 0 on APFS (1 ms for `Date` rounding), 1 s on HFS+, 2 s on everything else local, on shares and on non-`file:` file systems; the larger of the two sides. Tests: `agesAreComparedExactly…`, `theGrainOfAVolume…`; the round-1 tests on a 2-second file system still pass. |
+| F024 | fixed | `FileJob`: a flight remembers the partial file it left under the real name and removes exactly that file before a Retry. Tests: `aRetryAfterAKeptPartialFile…`, `aSkipAfterAFailedCopyKeepsThePartialFile…`, `aCancelledOrFailedOverwriteLeavesTheFileThatWasThere`. |
+| F025 | needs other area | Completion work moved to the job thread (F008). `operands()` is kernel (cross-request 4); the Verify Checksums part is `Plugins/FileTools` (tools area). |
+| F026 | fixed | `FileOperationsPlugin.transfer`: the proposal names the real folder of a branch-view target; a list of files is not proposed as a folder (name only) and is refused as a paste target. Tests: `copyingTowardsABranchViewGoesIntoTheRealFolder`, `aListOfFilesIsNotOfferedAsATarget`, `nothingCanBePastedIntoAListOfFiles`. |
+| F027 | fixed | `OperationLog.flush(timeout:)`, used by `FileOperationsPlugin.stop()` with 2 s. Only the success path is tested. The proper place is the shell's quit: cross-request 6. |
+| F028 | fixed | `AttributeChange.swift`: an octal mode is the whole mode, as for `chmod` (see Decisions); the dialog says so; Recurse with untouched permissions asks instead of returning silently. Tests: `anOctalModeIsTheWholeModeAsForChmod`, `recurseWithUntouchedPermissions…`; two round-1 expectations updated in `FilePropertiesTests.swift`. |
+| F029 | fixed | `PropertyActions.summary`: 20 lines plus "… and N more"; the job keeps only the first 20 failures. Test: `aLongListOfFailuresIsCutForTheMessage`. |
+| F030 | duplicate of F029 | |
+| F031 | duplicate of F019 | |
+| F032 | fixed | `FileJob.removing/discard`: a link is never made writable; on a local disk only an item that carries a lock flag is unlocked. Test: `aRefusedDeleteNeverChangesTheTargetOfALinkOrAFileThatIsNotLocked`. |
+| F033 | duplicate of F022 | |
+| F034 | fixed | `autoreleasepool` per block in `FileJob.stream`, `extend`, `startsWithPartial`, `Checksum.sha256`, `CommentStore.load`, and per item in the walks. No memory measurement. The other files named (FindFiles, DirectorySync, FileTools) are other areas: cross-request 15. |
+| F035 | duplicate of F074 | and F075. |
+| F036 | fixed | `CommentStore`: a per-folder generation, bumped by `forget`; a reading that began before a change is returned but not remembered. Test: `aReadingThatBeganBeforeAChangeIsNotRemembered`. |
+| F037 | fixed | `FilePropertiesPlugin`: the attributes dialog, the comment dialog and Show Link Target are dropped when the panel shows another folder by then. No test of its own. |
+| F038 | fixed | Owner and group names are resolved in the "Reading attributes" job (the dialog then finds them in the cache). No test of its own. |
+| F039 | fixed | Paste reads the text or picture in the job; `[X]` reads the clipboard in the job. A foreign file list without the list type is still read with `readObjects` on main. |
+| F040 | fixed | `ClipboardPlugin.pasteContent`: written under a temporary name, moved into place, removed on failure. Test: `aTextIsPastedAsAFileWithoutLeavingADraft` (success path). |
+| F041 | fixed | `FileJob.report` takes a closure; the lines are built only when a report goes out. No test of its own. |
+| F042 | fixed | `kept` is a set of keys (the item and every folder above). Covered by the round-1 deferred-removal tests. |
+| F043 | needs other area | Local guards added: `lstat` again before a folder is walked into for delete, before permissions/dates are changed (`AttributeJob`), before an item is unlocked. Test: `changesStartFromWhatTheItemHasNowAndNeverUnlockOrFollowALink`. Closing the race needs `openat`/`unlinkat`/no-follow calls in LocalFileSystem: cross-request 11. |
+| F044 | fixed | With F032: no chmod unless the item is really locked; permissions and lock flag are restored when the retry fails. |
+| F045 | fixed | `FileJob.wantsRecord`, `OperationLog.Configuration.wants(_:_:)`. Test: `recordsNobodyWantsAreNotMade`. |
+| F046 | fixed | (1) Progress is delivered under its own lock (`delivery`), no longer under `counters`: a paused report keeps no counter. (2) Removing deferred sources reports each step, so Pause takes hold there. (3) Abort/Cancel in a question also sets the job's own flag (`halt`), which opens the pause gate. Test: `abortAlsoSetsTheJobsOwnFlag…`, `manySmallFiles…OrderedProgress`. Not changed: a commit in progress cannot be paused; the gate itself is AFMShell (cross-request 8). |
+| F047 | fixed | The measure cache is keyed by the hash of the location, not the string. No test of its own. |
+| F048 | fixed | Top-level sources that are not on the local disk are looked up once (kept from the count, up to 4096 sources). Test: `aSourceOnAServerIsAskedAboutOnceNotThreeTimes`. |
+| F049 | fixed | `FileJob.hasSafeName` for every top-level source. Test: `aSourceWhoseNameLeadsOutOfItsFolderIsRefused`. |
+| F050 | fixed | Source removal of a move goes through `removing`. Test: `aLockedSourceOfAMove…`. |
+| F051 | fixed | A temporary file that cannot be removed is counted and logged; stale `.afm-<uuid>.tmp` files (plain files, untouched for 24 h) are swept from a target folder once per run. Test: `oldTemporaryFilesAreSweptAndNothingElse`. See Decisions. |
+| F052 | fixed | `FileJob.mark`: a quarantine failure is counted and logged (not a question); for folders the mark is set before `copyMetadata`. No test of its own. |
+| F053 | fixed | `FileJob.attributes(for:from:to:)`: across file systems set-user-ID, set-group-ID and sticky never come along; on the local disk the rest is cut by the umask. Test: `rightsFromAnotherFileSystem…`. See Decisions. |
+| F054 | fixed | Append/Resume by rewriting carries the old file's metadata to the new one (`copyMetadata`). Test: `anAppendedFileKeeps…`. |
+| F055 | needs other area | Done here: names are escaped in the file-operation dialogs and messages (`DisplayName.escaped`), in the log, in FileProperties messages. Test: `namesThatCouldMisleadAreWrittenOutInQuestions`. Not here: the default button of critical questions (AFMShell, cross-request 5), `%L`/`%F` list files (Configuration, cross-request 14), a shared helper (cross-request 3). |
+| F056 | fixed | Multi-rename is one job, so "Overwrite all" holds for all of it. Test: `aRenameOfSeveralItemsToOneNameKeepsThemAllAndAsksOnce`. |
+| F057 | fixed | With F039. |
+| F058 | fixed | `selectionCount` in FileOperations and FileProperties. `ArchiveCommands.swift:320` is the archives area (cross-request 13). |
+| F059 | fixed | `NameTemplate.clipboardText`. Test: `theClipboardCannotBringPathsIntoAName`. |
+| F060 | fixed | `OperationLog.line`. Test: `aNameWithALineBreakIsOneLineInTheLog`. |
+| F061 | fixed | `OperationLog.drain`. Test: `aBurstThatFillsTheLogSeveralTimesRotatesEachTime`. |
+| F062 | fixed | The log file is opened with `O_APPEND`. Test: `theLogAppendsAlsoAfterSomebodyElseEmptiedOrExtendedIt`. |
+| F063 | fixed | `AttributeJob.change` reads the item again when the change depends on what it has. Test: `changesStartFromWhatTheItemHasNow…`. |
+| F064 | fixed | A locked item with "Locked: unchanged" is reported, not unlocked. Same test. |
+| F065 | duplicate of F036 | |
+| F066 | fixed | `CommentStore` does not read a `descript.ion` that is, or leads to, a pipe/device (`LocalInfo.canBeRead`). Test: `aPipeCalledLikeTheCommentFileIsNotRead`. |
+| F067 | fixed | A linked comment file is written through the link; flags and metadata of the old file are carried over; a hidden file stays hidden. Test: `aLinkedOrHiddenCommentFileStaysLinkedAndHidden`. |
+| F068 | fixed | A name the format cannot hold is refused (`DescriptIon.canName`). Test: `aNameTheFileCannotHold…`. |
+| F069 | fixed | `PermissionChange.text`, `AttributeDraft.take`. Test: `everyChangeCanBeWrittenAndReadBack`. |
+| F070 | fixed | The enabled closure uses the model's cached totals. No test of its own. |
+| F071 | fixed | A "yes, files" is remembered per pasteboard change count; own selections answer from memory. A "no" is asked again (cheap, and files may still arrive in the same state). |
+| F072 | duplicate of F023 | |
+| F073 | duplicate of F024 | |
+| F074 | fixed | One set of date formatters per text. Test: `theDateFormattersAreMadeOncePerText` (20,000 names; no timing assertion). |
+| F075 | fixed | Empty names are filtered in the list branch. Test: `aMaskThatComesToNothingNamesNothing`. |
+| F076 | duplicate of F028 | Decision recorded below. |
+| F077 | fixed | `DescriptIon.data()`: a file without a mark never starts with the bytes of one. Test: `aFirstNameThatLooksLikeAByteOrderMarkStaysAName`. |
+| F078 | fixed | `DescriptIon` parses and writes by Unicode scalars. Test: `separatorsAreFoundNextToCombiningMarks`. |
+| F079 | not a defect | One short background task per user action (Finder Info); bounded by the user. |
+| F080 | fixed | With F071: the first question after files land still costs what the system takes; later ones do not. |
+| F081 | needs other area | The lock is in `OpenArchive.capabilities` (archives): cross-request 13. |
+
+## Decisions
+
+1. **Several sources onto one target name** (F006): the job's own output is never overwritten by
+   a rule ("Overwrite all", "older", "larger", …, whether preset or answered "for all" in this very
+   question). The later file arrives as `name (2).ext`. With "Skip all" it is skipped, with the
+   auto-rename rules it is handled as usual. In "Ask" mode the Overwrite question still comes,
+   and "Overwrite" for that one file is honoured.
+2. **Special files** (F007): pipes, devices and sockets are skipped with a reported error
+   everywhere, also local-to-local; nodes are not recreated (the provider interface has no call
+   for it). A link to one is copied as a link where links are copied. A move within one file
+   system still renames them.
+3. **Mount points** (F012): Delete and Move ask at every folder that lies on another device
+   than its parent, also at a top-level source. Buttons: Skip (default), Delete/Move its
+   contents, All Volumes, Cancel. Without a delegate answer the default is Skip. A skipped
+   volume counts as a failure of the job (the folder above stays). Copy still descends.
+4. **Timestamp tolerance** (F023): 1 ms on APFS (rounding of `Date`), 1 s on HFS+, 2 s on any other
+   local file system, on shares and on servers/archives; unknown counts as 2 s.
+5. **`755` vs `4755`** (F028/F076): behaviour now matches `chmod`. Any octal mode is absolute:
+   `755` clears set-user-ID, set-group-ID and sticky. Letters (`rwxr-xr-x`) and clauses keep
+   them. The dialog's note says so.
+6. **Recurse with untouched permissions** (F028): a question "give the permissions NNN to
+   everything inside as well?" (Apply / Back) instead of a silent return.
+7. **Locked item with "Locked: unchanged"** (F064): reported as a failure and left as it is.
+8. **Huge selections on the clipboard** (F002/F004): no lazy scheme works for files (measured;
+   details in cross-request 7). Above 1000 files the user chooses: "For This Program" (default,
+   instant; other programs get the paths as text) or "Also for Other Programs" (blocks for the
+   time the system takes) or Cancel.
+9. **Cut, then Paste into the same folder**: nothing happens and the files stay cut (before,
+   the cut was forgotten).
+10. **Streamed permissions** (F053): special bits are always dropped across file systems; the
+    umask is applied only when the destination is the local disk (packing into an archive or
+    uploading keeps group/other bits).
+11. **Stale temporary files** (F051): only names of the exact form `.afm-<UUID>.tmp`, plain files,
+    with both modification and status-change time older than 24 hours, in the job's top-level
+    target folder, local disks only, once per folder and run.
+12. **Hard link of the source as target**: refused with "You cannot copy a file to itself!", as
+    `cp` and `mv` do.
+13. **Depth** (F019): folders nested deeper than 1024 levels are reported and not entered.
+14. **Abort** also sets the job's cancellation flag (F046), so in-flight parallel copies stop
+    instead of finishing their current file.
+15. **Names the comment file cannot hold** (F068): refused with a message rather than written in a
+    form that reads back as another name.
+16. **Log flush at quit** (F027): waits at most 2 seconds on the main thread.
+17. **A list of files as target** (F026): F5/F6 propose the name alone (as Shift+F5 does); Paste
+    into a list is refused with a message.
+
+## Tests
+
+Added:
+- `Tests/PluginTests/Review2FileopsJobTests.swift` — suites `Review2FileopsBranchView` (8),
+  `Review2FileopsJob` (29), `Review2FileopsMounts` (3; attach a 4 MB disk image with `hdiutil`
+  and detach it; they pass without checking anything where images cannot be attached — here
+  they could, and ran for real).
+- `Tests/PluginTests/Review2FileopsPluginTests.swift` — suites `Review2FileopsCommands` (12),
+  `Review2FileopsNames` (4), `Review2FileopsLog` (4), `Review2FileopsComments` (6),
+  `Review2FileopsAttributes` (5).
+
+Changed: `Tests/PluginTests/FilePropertiesTests.swift` (two expectations, decision 5).
+
+The new tests were not run against the code as it was before this round (they use the new
+API); the defects they cover were reproduced by the reviewers and verifiers.
+
+Final runs (2026-10-14, machine under load from the other agents):
+
+1. Project tree as it stands now, `swift test --scratch-path .build-fileops --filter PluginTests
+   --skip Network`: **1382 tests in 167 suites passed, 0 failures.** This includes all 71 new
+   tests, every FileJob, FileOperations, Clipboard and FileProperties suite, and the
+   VirtualFolders, Archives and Integration suites that drive file jobs.
+2. The same run without `--skip Network` did not end: it hung inside the network area's test
+   FTP server (`NetworkServerForTests.swift`, sampled: no file-operation frames on any thread),
+   after `NetworkAdoptTests.aSendThatIsCancelledOnAFullPipeEnds` and
+   `NetworkFTPTests.seeksWhileReading` had failed. That area was being edited at the time. I
+   stopped my own test process.
+3. Because the kernel did not compile for a long stretch while other agents were editing, the
+   work was also built and tested in a private copy (the pre-round backup plus this area's
+   sources and tests): all 1197 plugin tests of that copy passed, the network suites included.
+   One run there had two unrelated timing failures that passed when run again
+   (`ArchivesFixTests.pendingChangesKeepAnArchiveAliveUntilTheyAreWritten`, a 60 s wait, and
+   `ConfigPlacesFixConfigurationTests.aChainWaitsForTheProgramBeforeItsNextStep`).
+
+KernelTests and ShellTests were not run by this area.
+
+## Not done
+
+- F002/F011 drag side, F017/F007 window between check and open, F021 cancellable changing
+  calls, F043 race-free tree operations, F055 default button and list files, F081: need other
+  areas; see `cross-requests/fileops.md`.
+- F025: `operands()` and the Verify Checksums start are outside this area.
+- F039: a file list from another program that does not offer the list type is still read
+  item by item on the main thread.
+- F046: a commit that is under way cannot be paused.
+- Cut and Copy are still not offered in a branch view (`hasLocalOperands` asks for a `file:`
+  panel folder); not a finding, left as it was.
+- No test of its own for: F003 (background path), F008, F009, F010, F037, F038, F041, F047,
+  F052, F070; F027 and F040 only on the success path; F034 without a memory measurement.
