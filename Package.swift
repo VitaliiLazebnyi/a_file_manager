@@ -92,7 +92,12 @@ let testTargets: [Target] = [
     .testTarget(
         name: "ShellTests",
         dependencies: ["AFMKernel", "AFMContracts", "AFMShell", "StandardPlugins", "TestSupport"],
-        swiftSettings: testSettings)
+        swiftSettings: testSettings),
+    // The benchmarks of the hot paths with their limits; run by Scripts/benchmarks.sh, in release.
+    .executableTarget(
+        name: "Benchmarks",
+        dependencies: ["AFMKernel", "TestSupport", "LocalFileSystemPlugin", "FileOperationsPlugin", "ArchivesPlugin"],
+        path: "Tests/Benchmarks", swiftSettings: strict)
 ]
 
 let package = Package(
