@@ -15,21 +15,25 @@ struct ArchiveOptions {
 /// What archives need from their surroundings. One object is shared by everything the plugin
 /// owns; its closures are set once, before any archive is opened, and may be called from any
 /// thread.
-final class ArchiveEnvironment {
+///
+/// Unchecked: the settings and closures are set while the plugin starts (tests: before any
+/// archive is opened) and only read afterwards; `options` and `isStopping` are guarded by
+/// `lock`.
+final class ArchiveEnvironment: @unchecked Sendable {
     let scratch = ScratchFolder()
     private let lock = NSLock()
     private var current = ArchiveOptions()
     private var stopping = false
 
     /// The file systems of the program, for archives that lie on something other than the disk.
-    var fileSystems: () -> FileSystemRegistry? = { nil }
+    var fileSystems: @Sendable () -> FileSystemRegistry? = { nil }
     /// Asks for the password of an archive; `retry` after a wrong one. Nil gives up.
-    var askPassword: (_ archiveName: String, _ retry: Bool) -> String? = { _, _ in nil }
+    var askPassword: @Sendable (_ archiveName: String, _ retry: Bool) -> String? = { _, _ in nil }
     /// Tells the user that changes could not be written into an archive. Must not wait for
     /// the user: it is called on the thread that writes.
-    var reportFailure: (_ error: any Error, _ archiveName: String) -> Void = { _, _ in }
+    var reportFailure: @Sendable (_ error: any Error, _ archiveName: String) -> Void = { _, _ in }
     /// The directories whose contents changed behind the panels' backs.
-    var contentsChanged: (_ archive: URL) -> Void = { _ in }
+    var contentsChanged: @Sendable (_ archive: URL) -> Void = { _ in }
 
     /// Archives up to this size that cannot be read at any position (compressed TAR, 7z, …)
     /// are unpacked once into a temporary TAR, so that reading single members is fast.
@@ -65,14 +69,17 @@ final class ArchiveEnvironment {
     /// due would wait behind them for as long as that lasts. The clock itself is a queue of
     /// the plugin's own, on which nothing ever runs but the starting of these threads.
     /// (Tests put a clock of their own here.)
-    var schedule: (_ delay: TimeInterval, _ priority: QualityOfService, _ work: @escaping () -> Void) -> Void = {
-        delay, priority, work in
+    var schedule: Scheduler = { delay, priority, work in
         ArchiveEnvironment.later(delay, priority, name: "Archive write", work)
     }
+    typealias Scheduler =
+        @Sendable (_ delay: TimeInterval, _ priority: QualityOfService, _ work: @escaping @Sendable () -> Void) -> Void
 
     /// The same clock for the plugin's housekeeping (closing readers nobody came back for),
     /// which is not the delayed writes' business and not a test clock's either.
-    static func later(_ delay: TimeInterval, _ priority: QualityOfService, name: String, _ work: @escaping () -> Void) {
+    static func later(
+        _ delay: TimeInterval, _ priority: QualityOfService, name: String, _ work: @escaping @Sendable () -> Void
+    ) {
         clock.asyncAfter(deadline: .now() + delay) {
             let thread = Thread(block: work)
             thread.qualityOfService = priority
@@ -90,9 +97,9 @@ final class ArchiveEnvironment {
     /// a file system that cannot clone (tests).
     var clonesArchives = true
     /// Whether `needed` bytes can be written into `folder`.
-    var hasRoom: (_ needed: UInt64, _ folder: URL) -> Bool = Volume.hasRoom
+    var hasRoom: @Sendable (_ needed: UInt64, _ folder: URL) -> Bool = { Volume.hasRoom(for: $0, at: $1) }
     /// The volume a path lies on, as a number (tests: an archive "on another disk").
-    var volume: (_ path: String) -> dev_t? = Volume.device
+    var volume: @Sendable (_ path: String) -> dev_t? = { Volume.device(of: $0) }
     /// Where new members are saved when they can be written neither into their archive nor
     /// next to it; nil keeps them in the temporary folder.
     var recoveryFolder: URL?
@@ -108,7 +115,7 @@ final class ArchiveEnvironment {
     let quitting = CancellationFlag()
     /// Called by a write when the new archive file is complete and before it takes the old
     /// one's place, on the writing thread (tests: what changes while a write is under way).
-    var whileWriting: (() -> Void)?
+    var whileWriting: (@Sendable () -> Void)?
 
     var options: ArchiveOptions {
         get {
@@ -165,7 +172,8 @@ enum Volume {
     // MARK: Asking only disks that answer
 
     private static let mountLock = NSLock()
-    private static var mounts: (read: DispatchTime, points: [(path: [UInt8], isLocal: Bool)])?
+    /// Guarded by `mountLock`.
+    nonisolated(unsafe) private static var mounts: (read: DispatchTime, points: [(path: [UInt8], isLocal: Bool)])?
 
     /// The mounted volumes as the system has them in memory (`MNT_NOWAIT`): no volume is asked.
     private static func mountPoints() -> [(path: [UInt8], isLocal: Bool)] {
@@ -400,7 +408,10 @@ enum RescueOutcome {
 /// retired one takes no change any more (`ArchiveError.retired`; the file system then asks
 /// the store again and gets the archive that took its place). So no change can land in an
 /// archive that nobody will write.
-final class OpenArchive {
+///
+/// Unchecked: what changes is guarded by `lock`, the gate, `stateLock` and `passwordGate`, as
+/// said above; the rest is fixed in `init`.
+final class OpenArchive: @unchecked Sendable {
     /// The archive file as its own file system names it.
     let archiveURL: URL
     let name: String
@@ -2441,7 +2452,10 @@ extension ZipWriter {
 /// compressed on all cores at once (see `ZipPacker` for why that gives one valid stream).
 /// With a password the compressed bytes are encrypted (AES-256) as they are written.
 /// Used by the one thread that copies the file.
-private final class ZipMemberWriter: FileWriter {
+///
+/// Unchecked: used by one thread at a time, as `FileWriter` allows; `interrupt` touches only
+/// `interruption`, which is safe from any thread.
+private final class ZipMemberWriter: FileWriter, @unchecked Sendable {
     private let archive: OpenArchive
     private let path: String
     private let temporary: TemporaryFile

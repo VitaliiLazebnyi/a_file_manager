@@ -1,8 +1,8 @@
 import AFMKernel
 import Foundation
 
-/// A number several threads add to.
-final class SharedCounter {
+/// A number several threads add to. All state is guarded by `lock`.
+final class SharedCounter: @unchecked Sendable {
     private let lock = NSLock()
     private var total: Int64 = 0
 
@@ -25,9 +25,10 @@ enum Background {
     /// The other thread is one of the kernel's own, not one of the system's shared pool:
     /// the work reads an archive and writes files, and where that waits (a share, a server)
     /// it must not keep a thread everybody else's work needs.
-    static func run<Result>(_ work: @escaping () -> Result, tick: () -> Void) -> Result {
+    static func run<Result: Sendable>(_ work: @escaping @Sendable () -> Result, tick: () -> Void) -> Result {
         let group = DispatchGroup()
-        var result: Result?
+        // Written by the work before it leaves the group, read here only after the wait.
+        nonisolated(unsafe) var result: Result?
         group.enter()
         BlockingCalls.run {
             result = work()
@@ -73,7 +74,7 @@ enum Quarantine {
 /// Here the write goes on into the folder that was opened, wherever that has been moved to.
 ///
 /// **Threading.** Any number of threads at once; each call opens and closes what it needs.
-final class UnpackFolder {
+final class UnpackFolder: Sendable {
     let url: URL
     private let descriptor: Int32
 
@@ -266,7 +267,7 @@ enum ArchiveTester {
     ) -> [String] {
         do { try unlock(archive, only: only) } catch { return [error.localizedDescription] }
         let members = archive.entries.filter { !$0.isDirectory && only?.contains($0.path) != false }
-        func check(_ entry: ArchiveEntry, _ stream: any ByteStream) -> String? {
+        @Sendable func check(_ entry: ArchiveEntry, _ stream: any ByteStream) -> String? {
             do {
                 try readThrough(
                     stream, expecting: entry.sizeIsExact ? entry.size : nil, cancellation: cancellation,
@@ -341,7 +342,11 @@ enum UnpackConflictChoice {
 /// on that thread; then the members of an archive that can be read at any position are
 /// unpacked on all cores at once, while archives that are one compressed stream are unpacked
 /// in a single pass.
-final class Unpacker {
+///
+/// Unchecked: what changes (the answers to questions, the result, the counts) is touched only
+/// by the job's thread; the members that are written on all cores use only what is fixed in
+/// `init`, `bytesDone` (which guards itself) and `whileUnpacking` (set before `run`).
+final class Unpacker: @unchecked Sendable {
     /// What to take out of one archive: all of it, or what was selected in a panel.
     struct Source {
         let archive: OpenArchive
@@ -374,7 +379,7 @@ final class Unpacker {
     private var lines: [String] = []
     /// Called on the writing thread when the folder a member goes into is open and before
     /// the member's file is made (tests: what is done to the target folder meanwhile).
-    var whileUnpacking: ((ArchiveEntry) -> Void)?
+    var whileUnpacking: (@Sendable (ArchiveEntry) -> Void)?
 
     init(
         fileSystems: FileSystemRegistry, monitor: any JobMonitor, options: UnpackOptions,
@@ -656,7 +661,7 @@ final class Unpacker {
             )
             let outcomes = Background.run(
                 { [self] in
-                    let one: ((task: Task, root: UnpackFolder?)) -> String? = { file in
+                    let one: @Sendable ((task: Task, root: UnpackFolder?)) -> String? = { file in
                         let (task, root) = file
                         guard !cancellation.isCancelled else { return "" }
                         do {

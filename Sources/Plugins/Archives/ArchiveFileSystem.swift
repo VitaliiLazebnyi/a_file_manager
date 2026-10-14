@@ -17,7 +17,10 @@ import Foundation
 /// yes, which it does under the archive's own lock and never while changes wait or a member
 /// is being written; a retired archive refuses every change. So every archive that holds
 /// something unwritten is in the table, where `commit`, `flushAll` and the stop find it.
-final class ArchiveStore {
+///
+/// Unchecked: the table is guarded by `lock`, what a slot holds by the slot's own lock (see
+/// Threading above).
+final class ArchiveStore: @unchecked Sendable {
     let environment: ArchiveEnvironment
     private let lock = NSLock()
     private var slots: [String: Slot] = [:]

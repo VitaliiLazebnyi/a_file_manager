@@ -38,7 +38,8 @@ public final class ArchivesPlugin: Plugin {
             .appendingPathComponent(kernel.productName, isDirectory: true).appendingPathComponent(
                 "Unsaved archive changes", isDirectory: true)
         environment.askPassword = { [weak kernel] archive, retry in
-            kernel?.askUser { ui in
+            // `@Sendable`, so that it may be sent from this thread to the main thread.
+            kernel?.askUser { @Sendable ui in
                 let answer = ui.form(
                     retry ? "Wrong password" : "Password", detail: "\(archive) is encrypted.",
                     fields: [.password("password", "Password:")], buttons: ["OK"])
@@ -48,10 +49,10 @@ public final class ArchivesPlugin: Plugin {
         // Not waited for: the thread that writes archives goes on (and is not kept from the
         // shared pool) while the message is on the screen.
         environment.reportFailure = { [weak kernel] error, archive in
-            let show: () -> Void = {
+            let show: @MainActor @Sendable () -> Void = { [weak kernel] in
                 kernel?.ui.report(error, title: "The changes to \(archive) could not be written!")
             }
-            if Thread.isMainThread { show() } else { DispatchQueue.main.async(execute: show) }
+            if Thread.isMainThread { MainActor.assumeIsolated(show) } else { DispatchQueue.main.async(execute: show) }
         }
         // A copy job that reads a thousand encrypted members asks for the password once.
         environment.passwordRefusalMemory = 5
@@ -60,7 +61,7 @@ public final class ArchivesPlugin: Plugin {
         // After a delayed write the archive file has a new size and date: the panels that
         // show its folder follow.
         environment.contentsChanged = { [weak kernel] archive in
-            DispatchQueue.main.async { kernel?.panels.refresh([archive.deletingLastPathComponent()]) }
+            DispatchQueue.main.async { [weak kernel] in kernel?.panels.refresh([archive.deletingLastPathComponent()]) }
         }
 
         for scheme in ArchiveURL.schemes {
@@ -134,7 +135,7 @@ public final class ArchivesPlugin: Plugin {
                     Preference(
                         ArchiveSettings.unpackOverwrite, "Overwrite existing files when unpacking",
                         .flag(default: false))
-                ], onChange: actions.refreshOptions))
+                ], onChange: { actions.refreshOptions() }))
     }
 
     /// The kernel's hook for work before quitting: the changes that still wait are written
@@ -230,8 +231,8 @@ public final class ArchivesPlugin: Plugin {
         store.close()
     }
 
-    /// What the stop's background thread hands back.
-    private final class StopState {
+    /// What the stop's background thread hands back. All state is guarded by `lock`.
+    private final class StopState: @unchecked Sendable {
         private let lock = NSLock()
         private var result: [(error: any Error, name: String)]?
 
@@ -272,7 +273,9 @@ public final class ArchivesPlugin: Plugin {
     /// archive. For a shell that wants to show "Saving archives…" before it lets the program
     /// quit; `cancellation` ends the writes early, and nothing is lost by that: what was not
     /// written keeps waiting (and `stop()` deals with it).
-    public func writePendingChanges(cancellation: CancellationFlag, completion: @escaping ([String]) -> Void) {
+    public func writePendingChanges(
+        cancellation: CancellationFlag, completion: @escaping @MainActor @Sendable ([String]) -> Void
+    ) {
         let store = self.store
         Thread.detachNewThread {
             let failed = store.flushAll(cancellation: cancellation).map {
