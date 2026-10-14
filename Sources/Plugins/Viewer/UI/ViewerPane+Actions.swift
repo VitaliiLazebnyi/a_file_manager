@@ -590,13 +590,13 @@ extension ViewerPane {
                 ) { fraction in
                     guard Date().timeIntervalSince(lastReport) > 0.1 else { return }
                     lastReport = Date()
-                    DispatchQueue.main.async { [weak self] in
+                    DispatchQueue.main.async {
                         guard let self, self.activity?.cancel === cancel else { return }
                         self.activity?.progress = fraction
                     }
                 }
             }
-            DispatchQueue.main.async { [weak self] in
+            DispatchQueue.main.async {
                 guard let self else { return }
                 if self.activity?.cancel === cancel { self.activity = nil }
                 guard self.loadGeneration == generation, self.pager.document?.source === document.source,
@@ -797,7 +797,10 @@ extension ViewerPane {
     /// as themselves.
     func printContent() {
         let info = printInfo()
-        let run: @MainActor @Sendable (NSPrintOperation) -> Void = { operation in
+        // Weakly: the block that prepares a text holds this, and must not be the pane's last
+        // owner on its thread (a view goes away on the main thread).
+        let run: @MainActor @Sendable (NSPrintOperation) -> Void = { [weak self] operation in
+            guard let self else { return }
             if let window = self.window {
                 operation.runModal(for: window, delegate: nil, didRun: nil, contextInfo: nil)
             } else {
@@ -843,7 +846,7 @@ extension ViewerPane {
                 let text = Self.printableText(
                     of: document, in: range, maxRows: Self.printPageLimit * linesPerPage,
                     cancellation: cancel ?? CancellationFlag())
-                DispatchQueue.main.async { [weak self] in
+                DispatchQueue.main.async {
                     guard let self else { return }
                     if self.activity?.cancel === cancel { self.activity = nil }
                     guard self.loadGeneration == generation, cancel?.isCancelled != true else { return }

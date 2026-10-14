@@ -531,8 +531,8 @@ final class TextRowIndex: @unchecked Sendable {
             for number in bounds.indices {
                 work(number, lineStart: lineStart)
                 // What this segment found out about where its last line ends is the next one's start.
-                let known = synchronized { scanned[number]?.nextStart }
-                if let known { lineStart = known } else if scanned[number] != nil { lineStart = nil }
+                let entry = synchronized { scanned[number] }
+                if let known = entry?.nextStart { lineStart = known } else if entry != nil { lineStart = nil }
             }
         }
         guard !cancellation.isCancelled else { return }

@@ -35,7 +35,7 @@ struct FolderSummary: Equatable {
     ) -> Self {
         let budget = limit.map { Budget($0) }
         var result = measure(directory, provider: provider, cancellation: cancellation, budget: budget)
-        result.isPartial = budget?.isExhausted == true
+        result.isPartial = budget?.exhausted == true
         return result
     }
 
@@ -44,7 +44,7 @@ struct FolderSummary: Equatable {
     private final class Budget: @unchecked Sendable {
         private let lock = NSLock()
         private var left: Int
-        private(set) var isExhausted = false
+        private var isExhausted = false
 
         init(_ limit: Int) { left = max(0, limit) }
 
