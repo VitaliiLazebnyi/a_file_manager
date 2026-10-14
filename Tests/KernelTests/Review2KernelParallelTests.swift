@@ -272,7 +272,8 @@ private func waitUntil(seconds: TimeInterval = 60, _ condition: () -> Bool) -> B
             BlockingCalls.answer(from: owner, to: "volume /dead") { _ -> Int in
                 release.wait()
                 return 4
-            } == 4)
+            } == 4
+        )
         #expect(asked.count == 1)
     }
 

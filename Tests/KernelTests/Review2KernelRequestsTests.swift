@@ -14,8 +14,12 @@ private func file(_ name: String, size: Int64 = 1, in directory: URL = folder) -
     let model = PanelModel(directory: folder)
     model.show(
         Listing(
-            directory: folder, items: items, parent: folder.deletingLastPathComponent(),
-            root: URL(fileURLWithPath: "/")))
+            directory: folder,
+            items: items,
+            parent: folder.deletingLastPathComponent(),
+            root: URL(fileURLWithPath: "/")
+        )
+    )
     return model
 }
 
@@ -85,7 +89,12 @@ private final class PlainPlugin: Plugin {
                 let chosen = kernel.askUser { @Sendable ui -> Int in
                     onMain = Thread.isMainThread
                     return ui.choose(
-                        "Go on?", detail: "", buttons: ["Yes", "No"], style: .warning, defaultButton: nil)
+                        "Go on?",
+                        detail: "",
+                        buttons: ["Yes", "No"],
+                        style: .warning,
+                        defaultButton: nil
+                    )
                 }
                 continuation.resume(returning: (chosen, onMain))
             }
@@ -100,11 +109,14 @@ private final class PlainPlugin: Plugin {
         var onMain = false
         let value: Int? = await withCheckedContinuation { continuation in
             BlockingCalls.answer(
-                from: owner, to: "quick", { _ in 5 },
+                from: owner,
+                to: "quick",
+                { _ in 5 },
                 then: { (answer: Int?) in
                     onMain = Thread.isMainThread
                     continuation.resume(returning: answer)
-                })
+                }
+            )
         }
         #expect(value == 5 && onMain)
         // Given up before the answer: nil is delivered, once, and the answer that comes later is dropped.
@@ -112,7 +124,9 @@ private final class PlainPlugin: Plugin {
         var delivered = 0
         let none: Int? = await withCheckedContinuation { continuation in
             BlockingCalls.answer(
-                from: owner, to: "slow", cancellation: flag,
+                from: owner,
+                to: "slow",
+                cancellation: flag,
                 { _ -> Int in
                     release.wait()
                     return 1
@@ -120,7 +134,8 @@ private final class PlainPlugin: Plugin {
                 then: { (answer: Int?) in
                     delivered += 1
                     continuation.resume(returning: answer)
-                })
+                }
+            )
             flag.cancel()
         }
         release.signal()
@@ -160,14 +175,16 @@ private final class PlainPlugin: Plugin {
         #expect(names == model.operands().map(\.name) && indices == Array(wanted.dropFirst(2)) && marked)
         #expect(
             snapshot.markedCount == wanted.count - 2 && snapshot.cursorItem?.name == model.cursorItem?.name
-                && snapshot.shownVersion == version)
+                && snapshot.shownVersion == version
+        )
         // A filter moves what is shown, not the list: indexes worked out before are refused.
         let listVersion = model.listVersion
         model.setFilter(nil)
         #expect(model.listVersion == listVersion && model.shownVersion != version)
         #expect(
             !model.setSelection(indices: [1, 2], shownVersion: version)
-                && !model.setSelected(true, indices: [1], shownVersion: version))
+                && !model.setSelected(true, indices: [1], shownVersion: version)
+        )
         model.clearSelection()
         #expect(model.operandsSnapshot().items().map(\.name) == [model.cursorItem!.name])
     }
@@ -184,10 +201,14 @@ private final class PlainPlugin: Plugin {
         let filter = PanelFilter(title: "big") { $0.size > 1 }
         #expect(
             model.setFilter(
-                filter, prefiltered: PanelModel.filtered(model.listedItems, by: filter), listVersion: model.listVersion
-            ))
+                filter,
+                prefiltered: PanelModel.filtered(model.listedItems, by: filter),
+                listVersion: model.listVersion
+            )
+        )
         #expect(
-            model.items.map(\.size) == model.listedItems.filter(filter.matches).map(\.size) && model.items.count == 3)
+            model.items.map(\.size) == model.listedItems.filter(filter.matches).map(\.size) && model.items.count == 3
+        )
         model.selectAll()
         #expect(
             model.selectionCount == 3 && model.totals.selectedBytes == 13 && model.operands().allSatisfy { $0.size > 1 }
@@ -251,7 +272,8 @@ private final class PlainPlugin: Plugin {
         let made = FileItem(url: folder, name: "x", isDirectory: false, linkTargetSize: 77, device: -3)
         #expect(
             made.linkTargetSize == 77 && made.device == -3
-                && made.isSameEntry(as: FileItem(url: folder, name: "x", isDirectory: false)))
+                && made.isSameEntry(as: FileItem(url: folder, name: "x", isDirectory: false))
+        )
         // The same file under two names.
         let sandbox = try Sandbox()
         let original = try sandbox.file("a/original.txt")
@@ -260,11 +282,13 @@ private final class PlainPlugin: Plugin {
         try FileManager.default.createSymbolicLink(at: sandbox.url("a/soft.txt"), withDestinationURL: original)
         #expect(
             original.isSameFile(as: sandbox.url("a/hard.txt"))
-                && original.isSameFile(as: sandbox.url("a/../a/original.txt")))
+                && original.isSameFile(as: sandbox.url("a/../a/original.txt"))
+        )
         #expect(!original.isSameFile(as: other) && !original.isSameFile(as: sandbox.url("a/none.txt")))
         #expect(
             !original.isSameFile(as: sandbox.url("a/soft.txt"))
-                && original.isSameFile(as: sandbox.url("a/soft.txt"), followingLinks: true))
+                && original.isSameFile(as: sandbox.url("a/soft.txt"), followingLinks: true)
+        )
         #expect(URL(string: "ftp://h/a")!.isSameFile(as: URL(string: "ftp://h/a/")!))
     }
 
@@ -277,17 +301,20 @@ private final class PlainPlugin: Plugin {
         #expect(keys.kind(of: "commands.user") == .runsCode && keys.kind(of: "findFiles.history.text") == .history)
         #expect(
             keys.kind(of: "findFiles.size") == .ordinary && keys.kind(of: "unknown") == nil
-                && keys.kind(of: "commands.user2") == nil)
+                && keys.kind(of: "commands.user2") == nil
+        )
         #expect(
             keys.accepts(Data([1, 2]), forKey: "findFiles.size")
-                && !keys.accepts(Data([1, 2, 3, 4, 5]), forKey: "findFiles.size"))
+                && !keys.accepts(Data([1, 2, 3, 4, 5]), forKey: "findFiles.size")
+        )
         #expect(!keys.accepts(Data(), forKey: "unknown") && keys.all.count == 3)
         // Large values go where the store keeps them; by default, with the rest.
         let settings = MemorySettings()
         settings.scoped(to: "rename").setLarge(Data([9]), forKey: "undo")
         #expect(
             settings.largeData(forKey: "rename.undo") == Data([9])
-                && settings.scoped(to: "rename").largeData(forKey: "undo") == Data([9]))
+                && settings.scoped(to: "rename").largeData(forKey: "undo") == Data([9])
+        )
     }
 
     @Test func aBrokenPipeIsAnErrorHereAndStillEndsTheProgramsWeStart() {
@@ -333,13 +360,16 @@ private final class PlainPlugin: Plugin {
     @Test func aColumnCanBeToldThatItsAnswerIsNoLongerWanted() {
         let plain = ContentColumn(id: "plain", title: "Plain") { $0.name.uppercased() }
         let patient = ContentColumn(
-            id: "patient", title: "Patient",
-            cancellableValue: { item, flag in flag.isCancelled ? "given up" : item.name })
+            id: "patient",
+            title: "Patient",
+            cancellableValue: { item, flag in flag.isCancelled ? "given up" : item.name }
+        )
         let cancelled = CancellationFlag()
         cancelled.cancel()
         #expect(
             plain.value(file("a")) == "A" && plain.cancellableValue(file("a"), CancellationFlag()) == "A"
-                && plain.cancellableValue(file("a"), cancelled) == "")
+                && plain.cancellableValue(file("a"), cancelled) == ""
+        )
         #expect(patient.value(file("a")) == "a" && patient.cancellableValue(file("a"), cancelled) == "given up")
     }
 }
