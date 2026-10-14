@@ -26,7 +26,7 @@ import ViewerPlugin
     var commands: CommandRegistry { bench.commands }
     var left: FakePanel { bench.left }
     var right: FakePanel { bench.right }
-    var ui: ScriptedInteraction { bench.ui }
+    var ui: ScriptedInteraction { bench.interaction }
 
     init() {
         memory.addFile("/A/one.txt", "new")

@@ -111,9 +111,9 @@ import Testing
         let bench = makeBench(background: true)
         bench.left.show(memory.url("/A"), focus: nil, history: .keep, completion: nil)
         bench.commands.perform(.selectGroup, .text("<(a+)+$"))
-        await settle { bench.ui.log.contains { $0.hasPrefix("inform:") } }
+        await settle { bench.interaction.log.contains { $0.hasPrefix("inform:") } }
         #expect(
-            bench.ui.log.last == "inform: The regular expression takes too long."
+            bench.interaction.log.last == "inform: The regular expression takes too long."
                 && bench.left.model.selectionCount == 0)
     }
 
@@ -189,7 +189,7 @@ import Testing
         memory.addFile("/B/list.txt", "old")
         let bench = makeBench(background: false)
         bench.left.moveCursor(toName: "one.txt")
-        bench.ui.choiceAnswers = [0]
+        bench.interaction.choiceAnswers = [0]
         bench.commands.perform(Ids.saveSelectionToFileANSI, .location(memory.url("/B/list.txt")))
         #expect(memory.contents("/B/list.txt") == "one.txt")
         #expect(memory.allPaths.filter { $0.hasPrefix("/B/") } == ["/B/list.txt"])

@@ -278,7 +278,7 @@ import Testing
         #expect(RenameStore(settings: settings).undoCount == 2)
         // The file of the newer run is deleted by somebody else: that run cannot be taken back.
         try? memory.remove(memory.url("/d/second.txt"))
-        bench.ui.choiceAnswers = [0, 0]
+        bench.interaction.choiceAnswers = [0, 0]
         session = open("*")
         var left: [RenamedItem]?
         session.undo { left = $0 }

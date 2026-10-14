@@ -115,7 +115,7 @@ private func sourceLike(_ count: Int, seed: UInt64) -> [Int] {
     let plugin = CompareContentPlugin(opensWindows: false)
     let settings = MemorySettings()
     let bench: TestBench
-    var ui: ScriptedInteraction { bench.ui }
+    var ui: ScriptedInteraction { bench.interaction }
     var session: CompareSession { plugin.sessions[0] }
 
     init() throws {
