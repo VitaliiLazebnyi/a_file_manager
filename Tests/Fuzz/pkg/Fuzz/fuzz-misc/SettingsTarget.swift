@@ -67,17 +67,17 @@ internal enum SettingsTarget {
     private static func importTwice(_ url: URL, bench: SettingsBench, center: ConfigurationCenter, answer: Int) {
         switch answer {
         case 0:
-            bench.bench.ui.formAnswers = [.accept]
+            bench.bench.interaction.formAnswers = [.accept]
 
         case 1:
-            bench.bench.ui.formAnswers = []
+            bench.bench.interaction.formAnswers = []
 
         default:
-            bench.bench.ui.formAnswers = [.values(ticked)]
+            bench.bench.interaction.formAnswers = [.values(ticked)]
         }
         center.importSettings(from: url)
         // A second import of the same file, everything ticked: nothing may be left half done by the first.
-        bench.bench.ui.formAnswers = [.values(ticked)]
+        bench.bench.interaction.formAnswers = [.values(ticked)]
         center.importSettings(from: url)
     }
 
@@ -91,7 +91,7 @@ internal enum SettingsTarget {
         let keysStored = bench.settings.data(forKey: KeyBindings.settingsKey) != nil
         let frequentStored = bench.settings.data(forKey: "places.history.frequent") != nil
         print(
-            "ui: \(bench.bench.ui.log)\nforms shown: \(bench.bench.ui.forms.count); "
+            "ui: \(bench.bench.interaction.log)\nforms shown: \(bench.bench.interaction.forms.count); "
                 + "user commands \(center.store.userCommands.count), start menu \(center.store.startMenu.count), "
                 + "key bindings stored \(keysStored), frequent \(frequentStored)"
         )
