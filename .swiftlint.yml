@@ -1,6 +1,7 @@
 # SwiftLint: every rule is on, and `swiftlint lint --strict` turns every warning into an error.
 # Layout is swift-format's job (.swift-format); the rules below are off only because they contradict
-# another enabled rule or swift-format, so no code can satisfy both. Each says what it conflicts with.
+# another enabled rule or swift-format, so no code can satisfy both. Each says what it conflicts with;
+# documentation/quality-gates-handover.md has an example of each.
 
 opt_in_rules:
   - all
@@ -14,22 +15,43 @@ disabled_rules:
   - explicit_type_interface
   # Requires `self.` everywhere; contradicts `redundant_self`.
   - explicit_self
-  # Requires `public extension`; contradicts swift-format's NoAccessLevelOnExtensionDeclaration.
+  # Requires `public extension`; contradicts `no_extension_access_modifier` and swift-format's
+  # NoAccessLevelOnExtensionDeclaration.
   - extension_access_modifier
-  # Requires a deinit in every class, which is empty in most; contradicts `no_empty_block`.
-  - required_deinit
-  # Import order is swift-format's OrderedImports, which groups @testable imports differently.
+  # Requires `case let .pair(a, b)`; swift-format's UseLetInEveryBoundCaseVariable rewrites it to
+  # `case .pair(let a, let b)`.
+  - pattern_matching_keywords
+  # Requires `#imageLiteral`/`#colorLiteral`; contradicts `discouraged_object_literal` and swift-format's
+  # NoPlaygroundLiterals.
+  - object_literal
+  # Forbids `case red = "red"`, which `explicit_enum_raw_value` requires.
+  - redundant_string_enum_value
+  # Sorts imports ignoring case (`Testing` before `TestSupport`); swift-format's OrderedImports, which
+  # `swift format format` applies, sorts by character code (`TestSupport` before `Testing`).
   - sorted_imports
   # Flags every literal but 0 and 1 (sizes, offsets, test data); agreed to leave off.
   - no_magic_numbers
 
+# Everything git tracks is linted. Left out: build output, and the `Sources`/`TestSupport` links of the
+# fuzz and stress packages, which point at code that is linted where it lives (the analyzer follows
+# links and would report it twice). `.claude` holds agent worktrees, each a copy of the whole project.
 excluded:
   - .build
-  - .build-native
+  - .build-*
+  - .swiftpm
+  - .claude
   - build
   - scratchpad
   - Tests/Fuzz/out
   - Tests/Fuzz/pkg/.build
+  - Tests/Fuzz/pkg/.swiftpm
+  - Tests/Fuzz/pkg/Sources
+  - Tests/Fuzz/pkg/TestSupport
+  - Tests/Stress/out
+  - Tests/Stress/harness/.build
+  - Tests/Stress/harness/.swiftpm
+  - Tests/Stress/harness/Sources
+  - Tests/Stress/harness/TestSupport
 
 line_length:
   warning: 120
@@ -43,3 +65,15 @@ missing_docs:
   excludes_extensions: false
   excludes_inherited_types: false
   excludes_trivial_init: false
+
+# swift-format puts the `{` on a line of its own after a condition list, type header or signature that
+# it had to wrap (`if a,\n    b\n{`); everywhere else the brace stays on the line, as this rule wants.
+opening_brace:
+  ignore_multiline_statement_conditions: true
+  ignore_multiline_type_headers: true
+  ignore_multiline_function_signatures: true
+
+# The lines of a multi-line string literal are text, not code: re-indenting them changes the string.
+indentation_width:
+  indentation_width: 4
+  include_multiline_strings: false

@@ -8,9 +8,9 @@
   "indentation": {
     "spaces": 4
   },
-  "lineBreakAroundMultilineExpressionChainComponents": false,
+  "lineBreakAroundMultilineExpressionChainComponents": true,
   "lineBreakBeforeControlFlowKeywords": false,
-  "lineBreakBeforeEachArgument": false,
+  "lineBreakBeforeEachArgument": true,
   "lineBreakBeforeEachGenericRequirement": false,
   "lineBreakBetweenDeclarationAttributes": false,
   "lineLength": 120,

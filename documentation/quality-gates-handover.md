@@ -56,13 +56,79 @@ from the host Mac into the test VM. Branch: `quality-gates`.
      Lock-guarded classes are `@unchecked Sendable` with a doc line naming the lock or the rule that makes them safe.
    - Closures that cross threads are `@Sendable`; those run on the main thread `@MainActor`. `JobMonitor.ask` and
      `Kernel.askUser` take `@MainActor @Sendable` questions; `Plugin.prepareToQuit` a `@Sendable` completion.
-   - Kernel `Handover<Value>`: a documented box for values that are safe to hand over but not marked `Sendable`
-     (values built on one thread and handed over whole, values one thread at a time uses). Deployment target:
-     macOS 14. The pasteboard is read on the main thread only.
-   - Every `@unchecked Sendable` and `nonisolated(unsafe)` was audited on 2026-10-15; the races found were fixed
-     (lock or `let` via `init`), and each remaining one names the lock or the rule that makes it safe.
-   - Shell `MainLoop.queue`: a main-thread block run later from the run loop; `MainLoop`/`MainOwned` are internal
-     to the shell (Places and Selection keep a small `performOnMainLoop` of their own).
+   - Kernel `Handover<Value>`: a documented box for values that are safe to hand over but not marked `Sendable` (values
+     built on one thread and handed over whole, values one thread at a time uses). Deployment target: macOS 14. The
+     pasteboard is read on the main thread only.
+   - Every `@unchecked Sendable` and `nonisolated(unsafe)` was audited on 2026-10-15; the races found were fixed (lock
+     or `let` via `init`), and each remaining one names the lock or the rule that makes it safe.
+   - Shell `MainLoop.queue`: a main-thread block run later from the run loop; `MainLoop`/`MainOwned` are internal to the
+     shell (Places and Selection keep a small `performOnMainLoop` of their own).
+
+## Lint configuration (checked rule by rule, 2026-10-15)
+
+Every SwiftLint rule with findings was tried: real violations rewritten the way the rule wants, run through
+`swift format format`, linted again. Pairs that pull in opposite directions were tried the same way.
+
+**Off: no code satisfies both.** Each line shows what one side wants and what the other does to it.
+
+```swift
+// contrasted_opening_brace: `{` on the next line. opening_brace and swift-format: `func f() {`.
+// explicit_type_interface: `let tint: NSColor = NSColor.red`. redundant_type_annotation flags exactly that.
+// explicit_self (analyzer): `self.value`. redundant_self flags it.
+// extension_access_modifier: `public extension A { static let b = 1 }`. no_extension_access_modifier flags
+//   it; swift-format (NoAccessLevelOnExtensionDeclaration) moves `public` onto the members.
+// pattern_matching_keywords: `case let .pair(a, b):`. `swift format format` (UseLetInEveryBoundCaseVariable)
+//   rewrites it to `case .pair(let a, let b):`.
+// object_literal: `#colorLiteral(red: 1, green: 0, blue: 0, alpha: 1)` instead of `NSColor(red:...)`.
+//   discouraged_object_literal and swift-format (NoPlaygroundLiterals) forbid the literal.
+// redundant_string_enum_value: `enum Color: String { case red }`. explicit_enum_raw_value wants
+//   `case red = "red"`.
+// sorted_imports: `import Testing` before `import TestSupport` (case ignored). `swift format format`
+//   (OrderedImports) sorts by character code: `TestSupport` first (127 files).
+// no_magic_numbers: off by agreement, not by contradiction.
+```
+
+`required_deinit` is now on (it was off for "contradicting `no_empty_block`"): a block holding only a comment satisfies
+`no_empty_block`, so `deinit {` + `// Nothing to release.` + `}` satisfies both.
+
+**Configured so SwiftLint and swift-format agree** (`.swiftlint.yml`, `.swift-format`):
+
+- `.swift-format` `lineBreakBeforeEachArgument: true`: when swift-format wraps a call or a declaration it now puts each
+  argument on its own line and the `)` on a line of its own, which is what `multiline_arguments`,
+  `multiline_arguments_brackets`, `multiline_call_arguments` and `multiline_parameters(_brackets)` want. Formatting the
+  tree once removes about 6,600 of their findings; no finding of these rules is left that the formatter makes.
+- `.swift-format` `lineBreakAroundMultilineExpressionChainComponents: true`: a chain that wraps gets one call per line
+  (`multiline_function_chains` 92 → 58; the rest is layout written by hand and is fixed by hand).
+- `opening_brace` ignores the brace after a wrapped condition list, type header or signature: swift-format always puts
+  it on a line of its own there (`if a,\n    b\n{`). Elsewhere the rule applies; when a line is too long for its `{`,
+  wrap the signature or condition by hand and the brace moves down with it.
+- `indentation_width` leaves the lines of multi-line string literals alone: they are text, re-indenting changes it.
+
+**On, but swift-format's own output can violate them; fix by hand, the formatter keeps the fix:**
+
+- `closure_parameter_position`: for a long `call(a, b) { [weak self] x in`, swift-format moves `[weak self] x in` to the
+  next line. Break the arguments instead (`call(\n    a,\n    b\n) { [weak self] x in`).
+- `strict_fileprivate`: swift-format turns `private extension A { func f() }` into `extension A` with a
+  `fileprivate func f()`. Write `private func f()` inside a plain `extension`.
+- Together, `explicit_acl`, `lower_acl_than_parent` and `strict_fileprivate` leave no access level for a member of a
+  private type that other code in the file uses (`internal` is higher than the type, `fileprivate` is banned, `private`
+  hides it). Make such a helper type internal (then `one_declaration_per_file` puts it in a file of its own).
+- `prefixed_toplevel_constant` covers `let package = Package(...)` in the three manifests; SwiftPM does not need the
+  name (`let kPackage = Package(...)` passes `swift package dump-package`).
+- `trailing_closure` on calls that pick an overload by the closure's label (`register(_:parameterized:)` next to
+  `register(_:handler:)`): swift-format's AmbiguousTrailingClosureOverload also objects to such overloads; give them
+  different base names.
+
+**What the gates look at.** Every Swift file git knows of: swift-format via `git ls-files` (this adds the three
+`Package.swift`), SwiftLint by walking the tree. Excluded everywhere: build output, `.claude/` (agent worktrees, now in
+`.gitignore`, which also keeps Prettier, jscpd and typos out; markdownlint has its own ignore), and the
+`Sources`/`TestSupport` links inside `Tests/Fuzz/pkg` and `Tests/Stress/harness` (`swiftlint analyze` follows links and
+reported every `Sources` finding a second time). The fuzz and stress drivers themselves are linted.
+
+**`swiftlint analyze` covers `Sources` and `Tests/TestSupport` only.** On the test targets SourceKit crashes while
+expanding Swift Testing's `@Suite` macro (Xcode 27, SwiftLint 0.65.1, with or without the sourcekitd link); the whole
+run then dies. The fuzz and stress packages do not build at the moment (`CommandRegistry.swift:56`, main-actor
+initializer called from a nonisolated context under their Swift 5 settings), so they have no compile log to analyse.
 
 ## Next steps, in order
 
@@ -75,8 +141,9 @@ from the host Mac into the test VM. Branch: `quality-gates`.
 4. **Leaks** found by `leaks` on the test suites: Kernel ↔ CommandRegistry retain cycle (command closures capture the
    kernel strongly), FileJob cycle, Places `TreeScanner` subfolder arrays, QuitProgress, FileSystemRegistry, ToolRun,
    VirtualFileSystem, ViewerPlugin cycles; NSPasteboard, SyncComparison, SessionEnvironment leaks.
-5. **Coverage to 100%** (89.4% lines at the start; lowest: Places 62%, MacIntegration 78%, DirectorySync 82%, SystemTools
-   82%, AFMShell 84%). UI tests for the AppKit code need an Xcode project (SwiftPM cannot host UI tests); generate it.
+5. **Coverage to 100%** (89.4% lines at the start; lowest: Places 62%, MacIntegration 78%, DirectorySync 82%,
+   SystemTools 82%, AFMShell 84%). UI tests for the AppKit code need an Xcode project (SwiftPM cannot host UI tests);
+   generate it.
 6. **Mutation testing.** `Scripts/mutation-gate.py` is still to be written (parse Muter's JSON report, fail on survivors
    not listed as equivalent). A first run on `KeyBindings.swift` scored 50% (survivors at lines 33 and 52). A full run
    takes days: split the files over VM clones.
@@ -111,8 +178,8 @@ from the host Mac into the test VM. Branch: `quality-gates`.
 ## Gotchas met so far
 
 - Changing a protocol requirement that has a default implementation (`watch`, `prepareToQuit`) silently leaves
-  implementations with the old signature behind: they stop implementing it and the default takes over. Grep for the
-  old signature after such a change.
+  implementations with the old signature behind: they stop implementing it and the default takes over. Grep for the old
+  signature after such a change.
 - The build cache goes by file content: `touch` does not force a recompile. Use `swift package clean` (or delete the
   target's folder under `.build/out/Intermediates.noindex`) to see every diagnostic; an incremental build reports only
   the files it compiled, and errors stop the build at the first module.
