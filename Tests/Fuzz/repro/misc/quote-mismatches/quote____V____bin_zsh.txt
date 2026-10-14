@@ -1,0 +1,8 @@
+size 4
+key quote "%|V|" /bin/zsh
+template: "%|V|"
+shell: /bin/zsh
+name=" \t" dir="\t\'\t$\t" value="\n\"\u{0301}" selection=["\"-a \"", "\" \"", "\" \""]
+line after printf: "\"\n\"\u{0301}\""
+expected: [["\n\"\u{0301}"]]
+got: []

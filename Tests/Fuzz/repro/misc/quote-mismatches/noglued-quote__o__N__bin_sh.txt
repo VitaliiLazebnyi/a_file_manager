@@ -1,0 +1,8 @@
+size 2
+key quote -o %N /bin/sh
+template: -o %N
+shell: /bin/sh
+name=" " dir="　|?${HOME}:" value="\"+3\\" selection=["\"=,\"", "\"񜁛򋥔\"", "\"\\\"+~\\u{1B}󪭆\""]
+line after printf: "-o"
+expected: [["-o"], [" "]]
+got: ["-o"]

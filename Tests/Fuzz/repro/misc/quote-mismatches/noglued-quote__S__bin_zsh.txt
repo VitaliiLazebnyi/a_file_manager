@@ -1,0 +1,8 @@
+size 11
+key quote %S /bin/zsh
+template: %S
+shell: /bin/zsh
+name="^,:@+" dir="abx$(id)`id`" value="$HOMÉ‍️😀" selection=["\"  \\u{01}\\u{7F}\"", "\" \"", "\" \""]
+line after printf: " \u{01}\u{7F} \" \" \" \""
+expected: [["  \u{01}\u{7F}"], [" "], [" "]]
+got: [" \u{01}\u{7F}", " ", " "]

@@ -1,0 +1,13 @@
+No product patch is applied or needed.
+
+History: during the first campaign (report 30) the fuzzing copy of the sources carried one
+same-line change, to get past finding 13 (rows-thin-overflow):
+
+  Sources/Plugins/Viewer/Model/TextRows.swift line 225
+  original: while bytes / Int64(count) * Int64(step) < Int64(TextRowIndex.minimumCheckpointDistance) { step *= 2 }
+  patched:  while step < 1 << 40, bytes / Int64(count) * Int64(step) < Int64(TextRowIndex.minimumCheckpointDistance) { step *= 2 }
+
+The product was fixed in the review-2 fix round (V002/V003, `thin(spanning:)`), the drivers build
+against the project's own Sources/ through the symbolic links in pkg/, and
+repro/viewer/rows-thin-overflow.bin passes on the unpatched product (see
+documentation/review-2/status/harnesses.md).

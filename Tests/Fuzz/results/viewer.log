@@ -1,0 +1,61 @@
+TARGET GROUP 6 - VIEWER MODEL          driver: pkg/Fuzz/fuzz-viewer/main.swift (+ HTMLReference.swift, the tests' reference copy)
+Binaries: build-asan/release/fuzz-viewer (ASan + inline-8bit-counter coverage, -O), build-rel/release/fuzz-viewer (plain -O)
+Commands:  fuzz-viewer fuzz <target> --out DIR --time N | run <target> FILE | min <target> FILE OUT | scale FILE (HTML scaling)
+
+target      asan execs   release execs   crashes  hangs  over-memory  property mismatches
+detect         106,109        640,318        0       0        0        0
+boundaries     435,117      1,032,918        0       0        0        0
+rows            37,747        300,541        1       0        0        0   (crash: thin overflow; copy patched afterwards)
+search          25,172        574,186        0       0        0        3 signatures, 2 root causes
+html           118,416      1,044,758        0       0        0        0   (fast == tests' reference on every input)
+
+FINDING 1  rows-thin-overflow  (trap: arithmetic overflow)
+  site    Sources/Plugins/Viewer/Model/TextRows.swift:225  TextRowIndex.Segment.thin(spanning:)
+          `while bytes / Int64(count) * Int64(step) < 4096 { step *= 2 }`
+  reason  A segment owns every row of the lines that begin in it, wherever they end. When it has more checkpoints
+          (one per 64 rows) than it is bytes long, bytes / count == 0, the loop never ends and step *= 2 overflows Int.
+          Repro: columns 1, segmentSize 1, one 66-byte line -> 2 checkpoints for a 1-byte segment.
+          With the app's sizes (segment 4 MiB) this needs one line of more than 64 * 4 MiB = 268,435,456 rows:
+          a single line (no CR/LF) of > 268M * columns characters, e.g. ~27 GB at 100 columns, ~2.7 GB in a 10-column window.
+  repro   repro/viewer/rows-thin-overflow.bin     fuzz-viewer run rows repro/viewer/rows-thin-overflow.bin
+          (needs the unpatched line 225; the fuzzing copy is patched, see results/PATCHES.txt)
+  fix     guard the quotient: let perCheckpoint = max(1, bytes / Int64(count)), or compute
+          step from (minimumCheckpointDistance * count + bytes - 1) / max(1, bytes) rounded up to a power of two.
+
+FINDING 2  search-backwards-returns-match-at-start  (wrong result, no crash)
+  site    Sources/Plugins/Viewer/Model/ViewerSearch.swift:225 (range = first ..< end + length - 1) in search(), .text case
+  reason  The range handed to NSString.range(of:) assumes a match is as long as the needle. Without case, "ss" matches the
+          one unit "ß" (also "ſs" etc.), so a match that begins AT `end` (the first unit not accepted) fits into the range
+          and is returned. Backwards, `end` is the start position: find(from: 4, backwards) in "Straße" returns 4..<6.
+          The pane starts a backwards search at selection.lowerBound (TextPagerView.swift:508), so Find Previous
+          returns the same match again and never moves on. Variant with `start` inside a character returns a match
+          beginning after start (repro ...-midcharacter.bin).
+  repro   FZ_STRICT=1 fuzz-viewer run search repro/viewer/search-backwards-returns-match-at-start.bin
+          FZ_STRICT=1 fuzz-viewer run search repro/viewer/search-backwards-returns-match-after-start-midcharacter.bin
+          (without FZ_STRICT the driver tolerates this known case so fuzzing can go on)
+  fix     after range(of:), reject a match with found.location >= end (and go on searching before it when `last`);
+          or search first..<end + maxMatchLength and filter on the match's location.
+
+FINDING 3  search-raw-vs-decoded / chunked-vs-whole with ignorable characters  (inconsistent result, no crash)
+  site    Sources/Plugins/Viewer/Model/ViewerSearch.swift:227 text.range(of: needle, options: [.literal, .caseInsensitive])
+  reason  Foundation's case-insensitive search, once the text is not plain ASCII, ignores control and other ignorable
+          characters (U+0000-U+0008, U+001B, U+200B ...; not tab) on both sides: "\u{1B}9" is found in "9\u{FFFD}" as "9",
+          and "99" is found in "é 9\u{1}9" with length 3. The raw byte path (rawASCII) compares bytes exactly, so the
+          answer depends on which path a chunk takes, and since such a match is shorter/longer than the needle the
+          `while range.length >= length` / `end + length - 1` arithmetic makes it depend on the chunk size as well.
+  repro   fuzz-viewer run search repro/viewer/search-raw-vs-decoded-ignorable-characters.bin     (raw nil, decoded 0..<1)
+          fuzz-viewer run search repro/viewer/search-chunked-vs-whole-ignorable-characters.bin  (chunked nil, whole 59..<60)
+  fix     compare case-folded UTF-16 units yourself (as rawASCII does for bytes) or verify each NSString hit by
+          comparing found.length and the folded units against the needle; do not size ranges by the needle's length.
+
+HTML time: linear. Slowest shapes (release, per 1024 UTF-16 units): `<a href="x">` repeated 20-27 us, `&` repeated 19 us,
+`<li>x` 6-12 us, `&#x41` 7 us; all others < 3 us. Each stays flat from 2 KB to 64 KB (x1..x32), so no quadratic shape found
+among: < & <script> <style <a href=" <a href=' <!-- <pre> <svg><a> <title> </ <a<a <script></scrip.
+(ASan run noted 200 ms/KB once: first-call set-up under ASan, not reproducible: the same input takes 0.002 ms.)
+
+Slow executions seen (rows 150-250 ms, search 160-240 ms for 3.7 KB) come from the driver's 1-byte segments/chunks
+(thousands of Parallel waves); not reachable with the app's 4 MiB / 1 MiB sizes.
+
+Not fuzzed: ProviderByteSource / CachedByteSource / DiskBlockCache (need a file system provider and disk; only DataByteSource
+was used), cancellation mid-build, regular expressions typed by the user (only a fixed list of harmless expressions,
+so that time is the search's own), the UI layer (TextPagerView, ViewerPane), RTF/PDF/image paths.

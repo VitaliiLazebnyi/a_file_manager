@@ -1,0 +1,8 @@
+size 11
+key quote "%P%N" /bin/zsh
+template: "%P%N"
+shell: /bin/zsh
+name="-n" dir="\'\\\'\'\"\"\u{20D2}" value=".txt" selection=["\"..  \"", "\" \"", "\" \""]
+line after printf: "\"/tmp/\'\\\\\'\'\\\"\"\u{20D2}/-n\""
+expected: [["/tmp/\'\\\'\'\"\"\u{20D2}/-n"]]
+got: []

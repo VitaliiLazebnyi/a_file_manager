@@ -1,0 +1,8 @@
+size 4
+key quote command-field %V% (bare) /bin/zsh
+template: command-field %V% (bare)
+shell: /bin/zsh
+value="\n\"\u{0301}"
+line after printf: "\"\n\"\u{0301}\""
+expected: [["\n\"\u{0301}"]]
+got: []

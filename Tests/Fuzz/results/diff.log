@@ -1,0 +1,34 @@
+GROUP 7 - CompareContent / MultiRename / NameTemplate          driver: pkg/Fuzz/fuzz-diff/main.swift
+Fuzzer: own coverage-guided mutation fuzzer (FuzzCore). "asan" = -O + AddressSanitizer + inline 8-bit edge counters; "rel" = plain -O.
+Reproduce: $F/build-rel/release/fuzz-diff run <target> <file> [--timeout S]
+
+target        asan execs  rel execs   crashes  hangs  property failures
+myers              9790      26748       0       0     0   (cover, equal-really-equal, apply==B, with limits 0..23; shortest vs LCS when no limit; [Int] and [UInt16] overloads; sizes up to ~30k elements, i.e. also the automatic limit)
+textdiff          74049     132924       0       0     0   (rows cover both files in order, equal rows isSameKey, rebuiltRight, blocks, shortest vs LCS on keys, anchors -2..253, cost limit, CompareLoader.text width)
+inline            12290      24061       0       0     0   (ranges sorted/non-empty/in bounds; unhighlighted rest of both lines equal; decoded and NSString-bridged strings with lone surrogates; lines > 4096 units; minimumMatch 0..5)
+loader            26810      31535       0       0     0   (TextDocument(data:) detect/decode/split, data() round trip for bytes valid in the detected encoding, forced encodings, looksBinary; BinaryDiff count/blocks/rows/text, bytesPerLine -128..127)
+renamemask        80611     106430       0       1     0   (RenameEngine: masks, wildcard search, case, counters with Int.min/Int.max; RenameMask.evaluate, CharacterRange, LetterCase, TitleCaseRule, alphabetic)
+renameregex       84459      74841       0       1     0   (same with regular expressions and $n / \U templates)
+planner          190768     190955       0       0     0   (conflicts empty after autoRenamed / skippingConflicts; steps executed on a name set: source present, target free, every item ends at its target; case-folding on/off/per-folder; NFC/NFD twins)
+nametemplate       9986      52305       2       0     1   (2 crashes found by reading the code and confirmed by hand-made inputs; the guided run was slowed by <0-99999> ranges)
+
+FINDINGS
+1. CRASH (overflow trap)  Sources/Plugins/FileOperations/NameTemplate.swift:352  `width = last - start + 1`
+   typed text "<[N9223372036854775807--9223372036854775807]": start = Int.max-1, last = count - Int.max -> subtraction overflows.
+   repro: repro/diff/nametemplate-slice-overflow.bin       cmd: fuzz-diff run nametemplate repro/diff/nametemplate-slice-overflow.bin
+2. CRASH (overflow trap)  Sources/Plugins/FileOperations/NameTemplate.swift:343  `end = start + length - 1`
+   typed text "<[N1,-9223372036854775808]": length = Int.min (min($0, 255) keeps negatives) -> 0 + Int.min - 1 overflows.
+   repro: repro/diff/nametemplate-slice-length-overflow.bin
+   Both: New folder (F7) / New file (Shift+F4) with a text starting with "<"; NameTemplate.names runs inside the job -> trap kills the app.
+   Fix: parse positions with a digit limit (as RenameMask.Scanner.number does: at most 9 digits) or clamp to 0...maxWidth / use &+ or addingReportingOverflow; reject negative lengths.
+3. HANG  Sources/Plugins/MultiRename/RenameRules.swift:166 (matches(in:)) / :163 (firstMatch), pattern built at :187-196 (wildcardPattern)
+   Plain (non-regex) Search "*a*a*a*a*a*a*a*a*a*a*a*a*a*a*b" against a 250-letter name "aaa...a.a": becomes ^.*?a.*?a...b, which backtracks exponentially; > 60 s per name (never finished), not cancellable (isCancelled is only asked between names).
+   repro: repro/diff/renamemask-wildcard-backtracking.bin   cmd: fuzz-diff run renamemask <file> --timeout 60
+   Same with a user regular expression "(a*)*b" on 32 a's: repro/diff/renameregex-catastrophic.bin (fuzz-diff run renameregex ...).
+   Fix: match wildcards with a linear two-pointer matcher instead of a regex (or collapse to possessive/atomic groups), and run NSRegularExpression through enumerateMatches with a deadline / the cancel flag (stop.pointee = true), reporting <Error!> on timeout.
+4. SLOW (bounded)  NameTemplate.swift:284-289: a DateFormatter is built for every [d]/[t] of every name. "<0-99999>[d]" takes 13 s per call of names() (release build) on the job thread. repro/diff/nametemplate-slow-range.bin (--timeout 100). Fix: one formatter per expansion run.
+5. PROPERTY (low)  NameTemplate.names: a list part that expands to nothing is returned as an empty name ("<[T2+1D]" -> [""], "<a|[U]" -> ["a", ""]); the range branch (line 65) filters empty names, the list branch (66-78) does not. repro/diff/nametemplate-empty-name.bin with FZ_EMPTY_NAMES=1.
+NOT A PRODUCT BUG: RenameMask.swift:499 `context.count - 1` traps for count == Int.min; count is entries.count in the app (repro/diff/note-unrealistic-count.bin is the driver's first, unrealistic input; the driver now keeps count in 0..<3,000,000).
+
+NOT FUZZED: CompareSession (needs a Kernel and the main queue: resync/edit/undo/find on top of the functions above); CompareLoader.load/identical/replace (file-system readers, no parsing of their own beyond TextDocument/BinaryDiff); RenameStore/RenameRun file-system parts; locale- and time-zone-dependent output was run with en_US_POSIX/UTC only.
+No patches to the source copy were needed.

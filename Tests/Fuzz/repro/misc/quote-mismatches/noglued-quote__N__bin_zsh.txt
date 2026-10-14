@@ -1,0 +1,8 @@
+size 2
+key quote %N /bin/zsh
+template: %N
+shell: /bin/zsh
+name=" " dir="　|?${HOME}:" value="\"+3\\" selection=["\"=,\"", "\"񜁛򋥔\"", "\"\\\"+~\\u{1B}󪭆\""]
+line after printf: ""
+expected: [[" "]]
+got: [""]

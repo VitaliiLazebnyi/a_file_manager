@@ -1,0 +1,6 @@
+size 4
+key argument arrives decomposed (Process)
+template: %N
+name="è]\u{7F}" dir="\u{1B})ë{" value="}--<î>-e" selection=["\"\\\'\\\\\\\'\\\'&ñ;\"", "\"~̸#ô=a.\"", "\"..%÷^\""]
+expected bytes: [[[195, 168, 93, 127]]]
+got bytes: [[101, 204, 128, 93, 127]]

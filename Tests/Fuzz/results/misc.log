@@ -1,0 +1,88 @@
+FUZZ RESULTS - target group 5 (misc): descript.ion, tab files, selection files, settings import /
+lenient decoders, parameter expansion, shell quoting.
+Driver: pkg/Fuzz/fuzz-misc/main.swift   Reproducers: repro/misc/   No patches were made to the source copy.
+Reproduce: build-rel/release/fuzz-misc run <target> <file>   (build: ./build.sh rel fuzz-misc)
+
+EXECUTIONS (coverage-guided ASan build, -O, 60 s each  +  plain release build, 25 s each)
+  descript        92,623 asan + 36,508 rel   0 crashes; 1 property class (rewrite changes entries, 2 causes)
+  descript-line   34,836 asan + 25,553 rel   0 crashes; 2 property classes (line misread)
+  descript-store  92,752 asan + 35,735 rel   0 crashes; 2 property classes seen in the first run (same causes as descript)
+  tabfile         67,570 asan + 65,156 rel   0 crashes, 0 hangs (slowest 249 ms incl. first-use start-up; 85 ms for 3.4 KB on rerun)
+  selection      112,826 asan + 69,181 rel   2 crashes (NSException in ANSI save; abort inside Foundation compare via Sorter)
+  settings        93,893 asan + 84,059 rel   1 crash (FrequentFolders count overflow); 1 "rss" stop = harness leak (a bench per input), not a finding
+  lenient        276,848 asan + 361,089 rel  1 crash (same FrequentFolders overflow)
+  pexpand        111,425 asan + 49,579 rel   1 crash (substring length overflow)
+  quote (release build, real /bin/zsh -c and /bin/sh -c): 1,268 launches-pairs = 150,800 expansions checked
+        (44,050 with all names, 106,750 with the combining-mark hole filtered out); 4 mismatch classes
+  No hang and no over-memory case in the code under test.
+
+CRASHES
+ C1 critical  Sorting.swift:54  Sorter.compareNames -> String.localizedCaseInsensitiveCompare aborts inside
+    CoreFoundation (_CFCompareStringsWithLocale frees/reallocs a stack buffer; macOS 27.0.1 26A434) for a
+    pair of names such as (128 x U+0015 + U+FFFD + "a" + 66 x "0") vs "U+FFFD". Listing a folder holding
+    such names sorts them -> the program aborts. ASan: bad-free; plain build: "pointer being freed was not allocated".
+    repro: repro/misc/sorter-cfcompare-abort.bin   cmd: fuzz-misc run selection repro/misc/sorter-cfcompare-abort.bin
+    standalone (no project code): repro/misc/cf/cfcompare.swift, cf2.swift (./cf2 128x15,1xFFFD,1x61,66x30 1xFFFD)
+    fix: do not hand raw names to the localized compare: strip/replace control characters (Cc) for the
+    collation key, or compare precomputed sort keys; keep the exact-bytes tie-break.
+ C2 high  ParameterExpansion.swift:364  `from + length` overflows: `%N:~6,9223372036854775807`
+    (from = 6, length = Int.max). Parameters come from a user command / Start-menu entry, also from an
+    imported settings file; the trap is hit when the command is run.
+    repro: repro/misc/pexpand-substring-length-overflow.bin   cmd: fuzz-misc run pexpand <file>
+    fix: `from.addingReportingOverflow(length)` / `length >= all.count - from ? all.count : from + length`.
+ C3 high  DirectoryHistory.swift:98  `counts[..., default: 0] += 1` overflows when the stored count is
+    Int.max: {"counts":{"<folder url>":9223372036854775807}} under places.history.frequent. After importing
+    such a settings file (or with such stored data) the program traps whenever that folder is visited -
+    at every start if it is the start folder.
+    repro: repro/misc/settings-import-frequent-count-overflow.json (through ConfigurationCenter.importSettings,
+           cmd: fuzz-misc run settings <file>) and repro/misc/frequentfolders-count-overflow.bin (fuzz-misc run lenient <file>)
+    fix: `&+=` with a cap, or clamp counts when decoding (max(0, min(count, 1 << 40))).
+ C4 high  SelectionFile.swift:19  `text.data(using: .windowsCP1252, allowLossyConversion: true)` raises
+    NSInternalInconsistencyException "didn't convert all characters" (uncaught -> abort) for a selected
+    name such as U+3000 U+0300. Needs "Save Selection To File (ANSI)" with such a name marked.
+    repro: repro/misc/selection-save-ansi-nsexception.bin   cmd: fuzz-misc run selection <file>
+    fix: convert per character with a "?" fallback (or precompose and map scalars), never the lossy NSString call.
+
+SHELL-QUOTING PROPERTY (printf '%s\0' <expansion> through /bin/zsh -c and /bin/sh -c; same results in both)
+ Q1 SECURITY (high)  ParameterExpansion.swift:63-70 ShellWords.escaped compares whole Characters, so a
+    `"`, `\`, `$` or backtick that carries a combining mark is not escaped. Contexts: bare %N/%P%N/%S/%T%N,
+    inside the user's double quotes, %|VAR|, and the Command field's %VAR% (CommandLanguage.swift:106-107).
+    Minimal: name  a"<U+0301>;touch PWNED;"<U+0301>  with parameters  %N  gives  "a"́;touch PWNED;"́"  and
+    zsh runs `touch PWNED`.  Shortest mismatch: value LF " U+0301.
+    repro: repro/misc/quote-injection-combining-mark.bin   cmd: fuzz-misc run quote-demo <file>
+    The single-quote context ('%N') held in every case.
+    fix: escape by unicode scalar (or UTF-8 byte), or always emit single-quoted words with ' -> '\''.
+    Same cause, not counted by the property: `name.hasPrefix("-")` (line 263) misses "-" + combining mark,
+    so such a name gets no "./" in front.
+ Q2 (medium)  ParameterExpansion.swift:139 trims `.whitespaces` from the finished text: a name that begins
+    or ends the text with U+00A0, U+3000 or another Unicode space (not quoted, the shell does not split
+    on them) loses it. Minimal: name "a<U+00A0>", parameters %N -> argument "a". Another file may be meant.
+    repro: repro/misc/quote-trailing-nbsp-trimmed.bin, quote-trailing-ideographic-space-trimmed.bin (run quote-demo)
+    fix: trim only ASCII space/tab, or add Unicode White_Space to the characters that force quoting.
+ Q3 (low)  Process (CommandRunner.swift:247, and the test's own launch) passes arguments in decomposed
+    form: name "ò" (C3 B2) arrives as 6F CC 80. Harmless on APFS, a different name on volumes that
+    tell the two apart. See repro/misc/quote-mismatch-argument-decomposed.txt.
+    fix: launch with posix_spawn / pass the line as bytes, or accept.
+ Q4 (low, accepted by the test)  ParameterExpansion.swift:258 atWordStart is true after any space, also
+    inside the user's quotes: `"pre %N post"` with name -x gives "pre ./-x post".
+ All recorded shortest mismatches per context and shell: repro/misc/quote-mismatches/.
+
+OTHER PROPERTY MISMATCHES (descript.ion; low: comments misread or lost, no crash)
+ D1 Descript.swift:55-57 + data(): leading empty lines are dropped on rewrite, so a first name that begins
+    with the bytes FF FE / FE FF / EF BB BF (CP1252 "ÿþ", "þÿ", "ï»¿", or U+FEFF) turns into a byte-order
+    mark: after changing any comment the file reads differently or not at all (all comments gone,
+    later edits refused as "unreadable"). Minimal: 0A FF FE.
+    repro: descript-rewrite-bom-collision.bin (run descript, FZ_DESCRIPT_ALL=1), descript-store-bom-name-lost.bin,
+           descript-store-file-unreadable-after-edit.bin (run descript-store, FZ_DESCRIPT_ALL=1)
+ D2 Descript.swift:71-76 parse by Character: a space or quote that forms one character with its neighbour
+    is not seen. `<name ending in U+0600> b` and `file.txt <U+0301>comment` read as one long name without
+    comment; `"<U+0301>" text` keeps its quotes. Minimal: E3 83 D8 80 62 (descript-line), "\u{301}" (quoted).
+    repro: descript-line-misread-prepend-char.bin, descript-quoted-line-misread-combining-mark.bin (run descript-line),
+           descript-rewrite-prepend-char.bin (run descript, FZ_DESCRIPT_ALL=1)
+    fix for both: parse and write on unicode scalars/bytes; write a mark-free first line (or keep the BOM-less
+    encodings from starting with those bytes).
+
+NOT FUZZED
+  Imported commands of the program itself (cm_/em_/afm_ steps, cd) were parsed (CommandLanguage.steps) but not
+  performed: several open windows. cm_wait's timer was not run. Bytes that are not valid UTF-8 cannot occur in
+  a Swift String, so names were arbitrary Unicode scalars (incl. every U+0001-U+00FF) instead of raw bytes.

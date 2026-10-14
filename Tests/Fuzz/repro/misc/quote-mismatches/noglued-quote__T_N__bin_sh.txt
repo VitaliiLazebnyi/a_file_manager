@@ -1,0 +1,8 @@
+size 2
+key quote %T%N /bin/sh
+template: %T%N
+shell: /bin/sh
+name=" " dir="　|?${HOME}:" value="\"+3\\" selection=["\"=,\"", "\"񜁛򋥔\"", "\"\\\"+~\\u{1B}󪭆\""]
+line after printf: "/other/"
+expected: [["/other/ "]]
+got: ["/other/"]

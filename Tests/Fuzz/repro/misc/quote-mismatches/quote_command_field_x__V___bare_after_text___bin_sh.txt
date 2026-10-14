@@ -1,0 +1,8 @@
+size 4
+key quote command-field x=%V% (bare-after-text) /bin/sh
+template: command-field x=%V% (bare-after-text)
+shell: /bin/sh
+value="\n\"\u{0301}"
+line after printf: "x=\"\n\"\u{0301}\""
+expected: [["x=\n\"\u{0301}"]]
+got: []

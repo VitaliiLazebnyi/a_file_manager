@@ -1,0 +1,8 @@
+size 4
+key quote command-field "%V%" (double) /bin/sh
+template: command-field "%V%" (double)
+shell: /bin/sh
+value="\n\"\u{0301}"
+line after printf: "\"\n\"\u{0301}\""
+expected: [["\n\"\u{0301}"]]
+got: []

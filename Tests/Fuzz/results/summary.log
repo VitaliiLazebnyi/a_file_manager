@@ -1,0 +1,45 @@
+A File Manager fuzzing: groups 1-4 (archives, network, FileTools, kernel). Groups 5-7: misc.log, viewer.log, diff.log.
+asan = -O + AddressSanitizer + edge-coverage feedback (own fuzzer, libFuzzer not in the Command Line Tools); rel = plain -O seeded with the asan corpus.
+
+target                 asan-execs  rel-execs  findings
+arch-bz                      1103          -  
+arch-tar                    74275      98725  
+arch-tarlist               257173     381677  
+arch-tgz                    69551      40630  
+arch-tgzlist               214057     113940  
+arch-txz                    64366          -  
+arch-txzlist               166851     117350  
+arch-zip                    83079      60266  
+arch-ziplist               178108     259102  
+arch-zipmod                105982      70586  
+net-address                238722      92942  18x property remotepath-normalized;
+net-ftplist                 59378          -  10x timeout $s8fuzz_netySays5UInt8VGcfU0_;
+net-ftpreply               344371     211555  
+net-saved                  976153    1191647  1x signal5 $s13NetworkPlugin9ServerKeyV3url4path10Foundation3URLVSS_tF + 1260;1x signal5 $s13NetworkPlugin9ServerKeyV3url4path10Foundation3URLVSS_tF + 408;
+net-sftpdec               1724398    1551337  
+net-sftpsession            172155          -  
+tools-checksum              57661      18636  1x property checksum-empty-name;2x property checksum-empty-name;
+tools-combine               28170      12556  
+tools-decode                25828       9309  
+tools-decodemem            384259     356137  
+tools-parts                 37653       6400  
+tools-verify                23207      13617  
+kernel-filemask            756041    1000131  
+kernel-panel               112417      52308  2x property panel-items-not-filtered-list;2x property panel-selectioncount-vs-marked-names;87x property panel-selection-set-size;
+kernel-paneldup             47554          -  1x property panel-items-not-filtered-list-identical-names;3x property panel-selectioncount-vs-marked-names;43x property panel-totals-identical-names;7x property panel-selection-set-size;
+kernel-sorter                1247       1140  
+
+Findings (reproduce: build-rel/release/fuzz-<bin> run <target> <file>; build with ./build.sh rel fuzz-<bin>)
+1 containment: a "/" followed by a combining mark is one Character, so Character-based splitting does not see the separator and a leading ".." survives.
+  Archives/ArchiveTree.swift:82 (normalized), FileTools/Transcoding.swift:520 (safeName), FileTools/SplitCombine.swift:242 (stored name).
+  repro/arch/containment-slash-combining-mark.zip|.tar (fuzz-arch zip|tar), repro/tools/decode-containment-slash-combining-mark.bin (fuzz-tools decode),
+  repro/tools/combine-containment-slash-combining-mark.crc (fuzz-tools combine). Result: one file written into the parent of the target folder.
+  Fix: split and compare on utf8 bytes (as RemoteEntry.isSafeName does), and check the final URL stays below the target.
+  Same class, no write: Network/ServerAddress.swift:65 RemotePath.normalized (repro/net/remotepath-slash-joins-combining-mark.bin, fuzz-net address).
+2 crash: Network/ServerAddress.swift:48 components.port = port with a negative saved port (URLComponents traps). repro/net/saved-connection-port-trap.json (fuzz-net saved).
+3 hang: Network/FTPListParser.swift:126-130 regexes used by unix() (~:153); a LIST line with a long digit run backtracks: 250/500/1000/2000 digits = 15/56/217/991 ms.
+  repro/net/ftplist-regex-backtracking.txt (fuzz-net ftplist, add --timeout 0.5).
+4 low: FileTools/ChecksumFiles.swift:133-136 yields an entry with an empty name for "<digest> *". repro/tools/checksum-empty-name.md5 (fuzz-tools checksum).
+5 low, PanelModel (fuzz-kernel panel): repro/kernel/panel-selection-set-loses-twin-names.bin (selection: Set<String> merges NFC/NFD twins, PanelModel.swift:97-102);
+  panel-selectioncount-vs-marked.bin (a mark without a shown row after setSort); panel-computed-size-shown-vs-listed.bin (setComputedSizes, :712-720). Root cause of the last two not analysed.
+Not a product bug: runs/net-address-driver-artifact (driver passed an empty default scheme).

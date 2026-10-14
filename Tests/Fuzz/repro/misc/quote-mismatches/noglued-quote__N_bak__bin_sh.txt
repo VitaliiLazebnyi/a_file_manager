@@ -1,0 +1,8 @@
+size 2
+key quote %N.bak /bin/sh
+template: %N.bak
+shell: /bin/sh
+name=" " dir="　|?${HOME}:" value="\"+3\\" selection=["\"=,\"", "\"񜁛򋥔\"", "\"\\\"+~\\u{1B}󪭆\""]
+line after printf: ".bak"
+expected: [[" .bak"]]
+got: [".bak"]

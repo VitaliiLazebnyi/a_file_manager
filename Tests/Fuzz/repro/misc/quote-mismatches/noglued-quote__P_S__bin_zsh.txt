@@ -1,0 +1,8 @@
+size 30
+key quote %P%S /bin/zsh
+template: %P%S
+shell: /bin/zsh
+name=":" dir="+.a" value="x" selection=["\"`id`${HOME}$HOME\"", "\"\\u{200D}\"", "\"😀é \""]
+line after printf: "\"/tmp/+.a/\\`id\\`\\${HOME}\\$HOME\" /tmp/+.a/‍ /tmp/+.a/😀é"
+expected: [["/tmp/+.a/`id`${HOME}$HOME"], ["/tmp/+.a/‍"], ["/tmp/+.a/😀é "]]
+got: ["/tmp/+.a/`id`${HOME}$HOME", "/tmp/+.a/‍", "/tmp/+.a/😀é"]

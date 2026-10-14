@@ -1,0 +1,38 @@
+# file	group	target	env (or -)	extra run arguments (or -)	finding of report 30 (or 20/21/22)
+arch/containment-slash-combining-mark.zip	arch	zip	-	-	30#1 write outside the target folder (ZIP)
+arch/containment-slash-combining-mark.tar	arch	tar	-	-	30#1 write outside the target folder (TAR)
+tools/decode-containment-slash-combining-mark.bin	tools	decode	-	-	30#1 write outside the target folder (decode)
+tools/combine-containment-slash-combining-mark.crc	tools	combine	-	-	30#1 write outside the target folder (combine)
+tools/checksum-empty-name.md5	tools	checksum	-	-	30 low: checksum line gives an entry without a name
+net/remotepath-slash-joins-combining-mark.bin	net	address	-	-	30#1 RemotePath.normalized keeps ".." behind a slash with a combining mark
+net/ftplist-regex-backtracking.txt	net	ftplist	-	--timeout 0.5	30#3 hang listing an FTP folder (regex backtracking)
+net/saved-connection-port-trap.json	net	saved	-	-	30#6 crash on a saved connection with a negative port
+misc/sorter-cfcompare-abort.bin	misc	selection	-	-	30#2 process abort when sorting a listing (CoreFoundation compare)
+misc/quote-injection-combining-mark.bin	misc	quote-demo	-	-	30#4 shell-quoting command injection
+misc/quote-trailing-nbsp-trimmed.bin	misc	quote-demo	-	-	30#5 trailing U+00A0 trimmed from an expanded name
+misc/quote-trailing-ideographic-space-trimmed.bin	misc	quote-demo	-	-	30#5 trailing U+3000 trimmed from an expanded name
+misc/pexpand-substring-length-overflow.bin	misc	pexpand	-	-	30#7 crash in parameter expansion (substring length overflow)
+misc/settings-import-frequent-count-overflow.json	misc	settings	-	-	30#8 crash after settings import (visit counter overflow)
+misc/frequentfolders-count-overflow.bin	misc	lenient	-	-	30#8 same counter, through the stored value
+misc/selection-save-ansi-nsexception.bin	misc	selection	-	-	30#9 abort saving a selection as ANSI
+misc/descript-rewrite-bom-collision.bin	misc	descript	-	-	22 descript.ion: first name reads like a byte-order mark
+misc/descript-rewrite-prepend-char.bin	misc	descript	-	-	22 descript.ion: Character-based parsing, rewrite
+misc/descript-line-misread-prepend-char.bin	misc	descript-line	-	-	22 descript.ion: line misread
+misc/descript-quoted-line-misread-combining-mark.bin	misc	descript-line	-	-	22 descript.ion: quoted line misread
+misc/descript-store-bom-name-lost.bin	misc	descript-store	-	-	22 descript.ion: comment lost after an edit
+misc/descript-store-file-unreadable-after-edit.bin	misc	descript-store	-	-	22 descript.ion: file unreadable after an edit
+diff/nametemplate-slice-overflow.bin	diff	nametemplate	-	-	30#10 crash in name templates (last - start + 1)
+diff/nametemplate-slice-length-overflow.bin	diff	nametemplate	-	-	30#10 crash in name templates (start + length - 1)
+diff/nametemplate-slow-range.bin	diff	nametemplate	-	--timeout 5	20 low: a DateFormatter per name, about 13 s
+diff/nametemplate-empty-name.bin	diff	nametemplate	-	-	20 low: empty names from the list branch
+diff/renamemask-wildcard-backtracking.bin	diff	renamemask	-	--timeout 5	30#11 hang in Multi-Rename (wildcards become a backtracking regex)
+diff/renameregex-catastrophic.bin	diff	renameregex	-	--timeout 5	30#11 hang in Multi-Rename (user regex (a*)*b)
+diff/note-unrealistic-count.bin	diff	renamemask	-	-	20 note only: trap for count = Int.min, which the program never passes
+viewer/rows-thin-overflow.bin	viewer	rows	-	-	30#13 viewer row-index overflow
+viewer/search-backwards-returns-match-at-start.bin	viewer	search	-	-	30#12 backwards search returns the match at the start
+viewer/search-backwards-returns-match-after-start-midcharacter.bin	viewer	search	-	-	30#12 variant, start inside a character
+viewer/search-raw-vs-decoded-ignorable-characters.bin	viewer	search	-	-	21 low: raw and decoded search paths disagree
+viewer/search-chunked-vs-whole-ignorable-characters.bin	viewer	search	-	-	21 low: chunked and whole search disagree
+kernel/panel-selection-set-loses-twin-names.bin	kernel	panel	-	-	30 low: NFC/NFD twin names merge in the selection
+kernel/panel-selectioncount-vs-marked.bin	kernel	panel	-	-	30 low: a mark without a shown row after setSort
+kernel/panel-computed-size-shown-vs-listed.bin	kernel	panel	-	-	30 low: shown and listed computed size differ

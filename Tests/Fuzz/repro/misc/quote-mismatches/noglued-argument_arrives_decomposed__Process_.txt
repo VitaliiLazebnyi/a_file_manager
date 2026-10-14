@@ -1,0 +1,6 @@
+size 2
+key argument arrives decomposed (Process)
+template: %|V|
+name="\"\";⃒~" dir="\'\\\'\'&\"\"" value="ò" selection=["\"\\u{0338}#.txt=õx\"", "\"x\"", "\"x\""]
+expected bytes: [[[195, 178]]]
+got bytes: [[111, 204, 128]]
