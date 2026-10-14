@@ -97,7 +97,7 @@ let testTargets: [Target] = [
     .executableTarget(
         name: "Benchmarks",
         dependencies: ["AFMKernel", "TestSupport", "LocalFileSystemPlugin", "FileOperationsPlugin", "ArchivesPlugin"],
-        path: "Tests/Benchmarks", swiftSettings: strict)
+        path: "Tests/Benchmarks", exclude: ["limits.json"], swiftSettings: strict)
 ]
 
 let package = Package(
