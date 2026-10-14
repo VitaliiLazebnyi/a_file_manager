@@ -1,5 +1,3 @@
-import Foundation
-
 /// Spreads independent work over the processor's cores.
 public enum Parallel: Sendable {
     /// True while the calling code runs as part of a `map` that the main thread is waiting

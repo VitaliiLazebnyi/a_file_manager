@@ -1,5 +1,3 @@
-import Foundation
-
 /// The keys held down with the key of a shortcut.
 public struct KeyModifiers: OptionSet, Hashable, Sendable {
     /// Shift.

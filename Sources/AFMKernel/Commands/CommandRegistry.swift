@@ -1,5 +1,3 @@
-import Foundation
-
 /// The one place every command is registered and passes through, whatever triggered it: menu, key, button, context menu
 /// or another plugin (spec 20 › Command dispatch contract).
 ///

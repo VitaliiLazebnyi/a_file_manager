@@ -1,5 +1,3 @@
-import Foundation
-
 /// A key with the modifiers held down with it, as commands are bound to them.
 public struct Shortcut: Hashable, Sendable {
     /// The modifiers in the order the text form writes them, with their names there.

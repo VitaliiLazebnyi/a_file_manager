@@ -1,5 +1,3 @@
-import Foundation
-
 /// A key of a shortcut: a character (as it is on the user's keyboard layout) or a named key.
 public enum Key: Hashable, Sendable {
     /// Backspace, which deletes to the left.

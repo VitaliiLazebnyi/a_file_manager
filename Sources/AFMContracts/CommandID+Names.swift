@@ -1,5 +1,4 @@
 public import AFMKernel
-import Foundation
 
 /// The command vocabulary shared by the plugins and the shell: the internal command names of
 /// the specification (17 › Command catalogue), with what each expects as its argument.

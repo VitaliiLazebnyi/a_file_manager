@@ -145,7 +145,7 @@ private final class StandInDrive: VolumeAccess, @unchecked Sendable {
             ejectable: Bool? = false
         ) -> Bool {
             func fact(_ value: Bool?) -> Place.Fact { value.map(Place.Fact.known) ?? .unknown }
-            var traits = Place.VolumeTraits(path: path)
+            var traits = Place.VolumeTraits(path: path, values: nil)
             (traits.isRootFileSystem, traits.isInternal, traits.isLocal) = (fact(root), fact(inside), fact(local))
             (traits.isRemovable, traits.isEjectable) = (fact(removable), fact(ejectable))
             return traits.mayBeEjected

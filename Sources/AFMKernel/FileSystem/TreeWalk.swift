@@ -1,4 +1,4 @@
-import Foundation
+import Darwin
 
 /// How deep the calls of a walk through a tree of folders are nested on the current thread.
 ///

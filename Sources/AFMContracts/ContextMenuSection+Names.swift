@@ -1,5 +1,4 @@
 public import AFMKernel
-import Foundation
 
 /// The sections of the file list's context menu, shared by every plugin that adds entries.
 extension ContextMenuSection {

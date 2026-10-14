@@ -1,4 +1,4 @@
-import Foundation
+import Dispatch
 
 /// The jobs: what one call of `run` hands out.
 extension ParallelPool {

@@ -1,5 +1,3 @@
-import Foundation
-
 /// Ties a flag to the reader or writer of a transfer, so that a Cancel ends a read or write
 /// that waits.
 extension CancellationFlag {

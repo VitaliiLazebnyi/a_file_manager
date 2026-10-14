@@ -56,11 +56,6 @@ public struct Place: Sendable {
             return isInternal == .known(false)
         }
 
-        /// A volume the system has said nothing about yet.
-        public init(path: String) {
-            self.path = path
-        }
-
         /// What the system said, in the values of a location on the volume (nil: nothing).
         public init(path: String, values: URLResourceValues?) {
             self.path = path

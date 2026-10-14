@@ -1,5 +1,3 @@
-import Foundation
-
 /// What the status line shows of the volume a panel is on: its name and space.
 public struct VolumeInfo: Equatable, Sendable {
     /// The volume's name, as the Finder shows it.

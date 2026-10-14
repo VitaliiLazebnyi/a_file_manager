@@ -1,5 +1,3 @@
-import Foundation
-
 /// What the user sees of a command.
 public struct Command: Sendable {
     /// The name the command is registered and run under.

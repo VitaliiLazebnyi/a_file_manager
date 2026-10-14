@@ -1,5 +1,3 @@
-import Foundation
-
 /// Where plugins say in which menus their commands appear.
 ///
 /// The shell builds the menu bar and the context menu from this; it has no menu layout of its own.

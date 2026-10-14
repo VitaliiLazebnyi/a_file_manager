@@ -1,5 +1,4 @@
 public import AFMKernel
-import Foundation
 
 /// The menus of the menu bar and the sections inside them, shared by every plugin that adds
 /// entries (spec 04 › Main menu, in the Mac's menu order). A plugin with a menu of its own

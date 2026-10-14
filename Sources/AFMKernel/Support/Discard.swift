@@ -1,5 +1,3 @@
-import Foundation
-
 /// Lets go of large lists away from the thread that used them: freeing a million entries
 /// takes a tenth of a second and more, which the main thread does not have.
 internal enum Discard: Sendable {

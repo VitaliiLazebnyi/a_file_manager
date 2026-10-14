@@ -1,5 +1,3 @@
-import Foundation
-
 /// What a file system can do, so commands can be offered or withheld before they fail.
 public struct FileSystemCapabilities: OptionSet, Sendable {
     /// Files and folders can be created, changed and deleted.

@@ -1,5 +1,3 @@
-import Foundation
-
 /// A group of entries inside a menu; groups are shown in the order of their `order` values, with a separator between
 /// them.
 ///

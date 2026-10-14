@@ -1,5 +1,3 @@
-import Foundation
-
 /// A menu of the menu bar.
 ///
 /// Menus are shown in the order of their `order` values.

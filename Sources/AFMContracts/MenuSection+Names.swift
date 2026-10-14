@@ -1,5 +1,4 @@
 public import AFMKernel
-import Foundation
 
 /// The sections of the shared menus, each a group of entries between separators.
 extension MenuSection {

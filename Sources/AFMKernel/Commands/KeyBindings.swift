@@ -1,4 +1,3 @@
-import Foundation
 import os
 
 /// Which key runs which command.
