@@ -1,4 +1,5 @@
-// swift-tools-version:5.10
+// swift-tools-version:6.2
+import Foundation
 import PackageDescription
 
 // A small kernel, a window shell, and plugins that provide every feature.
@@ -14,19 +15,33 @@ import PackageDescription
 //   StandardPlugins  the list of plugins that make up the program.
 //   AFileManager  the program: starts the shell with the standard plugins.
 
-import Foundation
+/// Every target is compiled in the Swift 6 language mode (data races are errors), with every
+/// warning an error and the upcoming features that make code more explicit.
+let strict: [SwiftSetting] = [
+    .treatAllWarnings(as: .error),
+    .enableUpcomingFeature("ExistentialAny"),
+    .enableUpcomingFeature("MemberImportVisibility"),
+    .enableUpcomingFeature("InternalImportsByDefault"),
+]
 
 /// With the Command Line Tools alone (no Xcode), incremental test builds lose the path to the
-/// Swift Testing macro plugin; it is passed explicitly where that toolchain is installed.
-let commandLineToolsTesting = "/Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/testing"
-let testingPlugin: [SwiftSetting] = FileManager.default.fileExists(atPath: commandLineToolsTesting)
-    ? [.unsafeFlags(["-plugin-path", commandLineToolsTesting])] : []
+/// Swift Testing macro plugin; it is passed explicitly where that toolchain is the active one.
+let commandLineToolsTesting: String = "/Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/testing"
+let usesCommandLineTools: Bool = ProcessInfo.processInfo.environment["DEVELOPER_DIR"] == nil
+    && FileManager.default.fileExists(atPath: commandLineToolsTesting)
+let testSettings: [SwiftSetting] = strict + (usesCommandLineTools
+    ? [.unsafeFlags(["-plugin-path", commandLineToolsTesting])] : [])
 
 func plugin(_ name: String, needsShell: Bool = false) -> Target {
-    .target(name: name + "Plugin", dependencies: ["AFMKernel", "AFMContracts"] + (needsShell ? ["AFMShell"] : []), path: "Sources/Plugins/" + name)
+    var dependencies: [Target.Dependency] = ["AFMKernel", "AFMContracts"]
+    if needsShell {
+        dependencies.append("AFMShell")
+    }
+    return .target(name: name + "Plugin", dependencies: dependencies, path: "Sources/Plugins/" + name,
+                   swiftSettings: strict)
 }
 
-let plugins = [
+let plugins: [Target] = [
     plugin("LocalFileSystem"),
     plugin("FileOperations"),
     plugin("Navigation"),
@@ -49,23 +64,36 @@ let plugins = [
     plugin("SystemTools", needsShell: true),
     plugin("Configuration", needsShell: true),
 ]
-let pluginDependencies = plugins.map { Target.Dependency(stringLiteral: $0.name) }
+let pluginDependencies: [Target.Dependency] = plugins.map { Target.Dependency(stringLiteral: $0.name) }
+
+let kernel: [Target.Dependency] = ["AFMKernel"]
+let kernelAndContracts: [Target.Dependency] = ["AFMKernel", "AFMContracts"]
+
+let coreTargets: [Target] = [
+    .target(name: "AFMKernel", swiftSettings: strict),
+    .target(name: "AFMContracts", dependencies: kernel, swiftSettings: strict),
+    .target(name: "AFMShell", dependencies: kernelAndContracts, swiftSettings: strict),
+    .target(name: "StandardPlugins", dependencies: kernel + pluginDependencies, swiftSettings: strict),
+    .executableTarget(name: "AFileManager", dependencies: ["AFMKernel", "AFMShell", "StandardPlugins"],
+                      swiftSettings: strict),
+]
+
+let testTargets: [Target] = [
+    .target(name: "TestSupport", dependencies: kernel, path: "Tests/TestSupport", swiftSettings: strict),
+    .testTarget(name: "KernelTests", dependencies: ["AFMKernel", "TestSupport"], swiftSettings: testSettings),
+    .testTarget(name: "PluginTests", dependencies: kernelAndContracts + ["TestSupport"] + pluginDependencies,
+                swiftSettings: testSettings),
+    .testTarget(name: "ShellTests",
+                dependencies: ["AFMKernel", "AFMContracts", "AFMShell", "StandardPlugins", "TestSupport"],
+                swiftSettings: testSettings),
+]
 
 let package = Package(
     name: "AFileManager",
     platforms: [.macOS(.v13)],
-    targets: [
-        .target(name: "AFMKernel"),
-        .target(name: "AFMContracts", dependencies: ["AFMKernel"]),
-        .target(name: "AFMShell", dependencies: ["AFMKernel", "AFMContracts"]),
-        .target(name: "StandardPlugins", dependencies: ["AFMKernel"] + pluginDependencies),
-        .executableTarget(name: "AFileManager", dependencies: ["AFMKernel", "AFMShell", "StandardPlugins"]),
-
-        .target(name: "TestSupport", dependencies: ["AFMKernel"], path: "Tests/TestSupport"),
-        .testTarget(name: "KernelTests", dependencies: ["AFMKernel", "TestSupport"], swiftSettings: testingPlugin),
-        .testTarget(name: "PluginTests", dependencies: ["AFMKernel", "AFMContracts", "TestSupport"] + pluginDependencies,
-                    swiftSettings: testingPlugin),
-        .testTarget(name: "ShellTests", dependencies: ["AFMKernel", "AFMContracts", "AFMShell", "StandardPlugins", "TestSupport"],
-                    swiftSettings: testingPlugin),
-    ] + plugins
+    dependencies: [
+        // `swift package generate-documentation`, used by the docs gate of Scripts/check.sh.
+        .package(url: "https://github.com/swiftlang/swift-docc-plugin", from: "1.4.0"),
+    ],
+    targets: coreTargets + testTargets + plugins
 )
