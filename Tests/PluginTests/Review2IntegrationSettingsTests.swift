@@ -78,4 +78,32 @@ import Testing
         schema.declaredKind = { _ in nil }
         #expect(schema.group(of: "network.unprotectedPasswordHosts", value: ["a"]) == nil)
     }
+
+    /// The schema's copy of the declarations answers on any thread exactly as the registry
+    /// does on the main thread: the key itself first, else the longest family it belongs to.
+    @Test func theSchemaAnswersAsTheRegistryDoesOnAnyThread() async {
+        let keys = bench.kernel.settingsKeys
+        keys.declare(prefix: "findFiles.", kind: .ordinary)
+        keys.declare(prefix: "findFiles.history.", kind: .history)
+        keys.declare(prefix: "findFiles.history.deep.", kind: .runsCode)
+        keys.declare("findFiles.history", kind: .trust)
+        keys.declare("findFiles.history.deep.", kind: .connection)
+        // A later word wins, for a key and for a family.
+        keys.declare("viewer.helper", kind: .history)
+        keys.declare(prefix: "findFiles.", kind: .connection)
+        let probes = [
+            "findFiles.", "findFiles.x", "findFiles.history", "findFiles.history.", "findFiles.history.a",
+            "findFiles.history.deep", "findFiles.history.deep.", "findFiles.history.deep.b", "findFilesX",
+            "findfiles.x",
+            "network.unprotectedPasswordHosts", "network.passiveMode", "network.", "network", "viewer.helper",
+            "viewer.helperX", "", "é.findFiles.x"
+        ]
+        let expected = probes.map { keys.kind(of: $0) }
+        let schema = plugin.center!.settingsSchema()
+        // Declared after the copy: the schema does not see it.
+        keys.declare(prefix: "viewer.", kind: .trust)
+        let answered = await Task.detached { probes.map { schema.declaredKind($0) } }.value
+        #expect(answered == expected)
+        #expect(schema.declaredKind("viewer.other") == nil && keys.kind(of: "viewer.other") == .trust)
+    }
 }
