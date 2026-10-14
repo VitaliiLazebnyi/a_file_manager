@@ -210,6 +210,114 @@ initializer called from a nonisolated context under their Swift 5 settings), so 
   allows two macOS VMs running at once on one Mac, so on this host a full run is two shards of about 250 hours each;
   more shards need more Macs.
 
+## Extras (2026-10-15)
+
+New gates in `Scripts/check.sh` (times in the test VM, 8 cores, with other agents' builds running beside):
+
+| Gate           | What                                                                     | Time                                |
+| -------------- | ------------------------------------------------------------------------ | ----------------------------------- |
+| `architecture` | `Scripts/architecture.py`: module rules on the manifest and every import | 20 s (2 min on a cold module cache) |
+| `api`          | `Scripts/api-check.sh`: plugin API against `origin/main`                 | 30 s (2.5 min with a new baseline)  |
+| `memory`       | `Tests/PluginTests/MemoryGrowth`, with `AFM_MEMORY_GROWTH=1`             | 40 s after the test build           |
+| `benchmarks`   | `Scripts/benchmarks.sh`: hot paths within recorded limits (not in CI)    | 2.5 to 6 min                        |
+| `codeql`       | fixed: runs under Rosetta with the native build system                   | 21 min                              |
+| `sbom`         | fixed: no build output or worktrees in it; checks every resolved package | 2 s                                 |
+
+- **Architecture.** A script, not a test target: it needs the manifest (`swift package dump-package`) and the compiler's
+  symbol graphs, which a test cannot get without building twice. Every `import` line of every file of every target is
+  read (comments and string literals blanked out first), `@testable` included; a package module a file imports must be a
+  direct dependency (SwiftPM's build finds undeclared ones anyway, checked: a plugin importing another plugin builds).
+  "Names only" for AFMContracts is checked on its symbol graph: protocols and their requirements, enums and cases,
+  structs, type aliases, `static let` names, stored constants, the `Format` enum (which the header names among the
+  contracts), and defaults of its own protocols' requirements. Anything else is behaviour. A plugin that declares the
+  shell must import it; a test target must import every module it depends on.
+- **API breaks.** `swift package diagnose-api-breaking-changes` cannot be used: it only compares modules of library
+  products (this package has none: "Skipping AFMKernel because it does not exist in the baseline") and fails with the
+  default build system. The script checks the baseline out into `.build-tools/api/<commit>`, builds it once, dumps both
+  APIs with `swift-api-digester -dump-sdk` and diagnoses them. **An intended break** is acknowledged in
+  `Scripts/api-breaks.txt`: the line exactly as printed, under a `# reason:` line; a line without a reason, and a line
+  that matches no break (stale once the change is on main), fail the gate. On `origin/main` itself the baseline is the
+  commit before. Verified on a scratch copy: a renamed function and a defaulted parameter added were reported, a new
+  name was not, acknowledged ones passed, a stale one and one without a reason failed.
+- **Benchmarks.** `Tests/Benchmarks` (executable target `Benchmarks`, release with `-enable-testing` for the archive
+  file system). Each run is a process of its own, so the peak footprint is the benchmark's; 5 runs, medians of clock
+  time, processor time (all threads) and peak memory. Limits in `Tests/Benchmarks/limits.json` per kind of machine:
+  median × 1.5 + 0.05 s (clock), × 1.3 + 0.05 s (processor), × 1.15 + 32 MB (memory). Over a limit, the benchmark is
+  measured again and the lower median counts. A machine whose load is above half its cores is not judged (exit 3).
+  **Updating limits:** `Scripts/benchmarks.sh --record` on a quiet machine, look at the diff, commit it with the change
+  that caused it. The first run makes a folder of 100,000 files and a ZIP of it in `.build-tools/bench`.
+- **Memory growth.** One serialized suite in PluginTests (it reuses the test FTP server and `TestBench`); skipped unless
+  `AFM_MEMORY_GROWTH=1`, because the footprint (`Footprint`, `phys_footprint` from `task_info`) is the whole process's.
+  One warm-up round, five measured rounds, freed memory handed back (`malloc_zone_pressure_relief`) before each reading;
+  the last round may be at most 4 MB above the first. A self-test shows that keeping 256 KB per run is caught.
+- **Property tests.** A generator and shrinker of our own in `Tests/TestSupport/Property` (about 200 lines): generators
+  draw numbers from a recorded source, and shrinking replays fewer and smaller numbers, so every generator built with
+  `map`/`flatMap` shrinks without code of its own. No package: the candidates (SwiftCheck) are unmaintained or would
+  bring a dependency into the manifest for a few hundred lines. Seeds come from the test's name (the same on every
+  machine); `AFM_PROPERTY_SEED=<n>` and `AFM_PROPERTY_RUNS=<factor>` widen the search. Properties in
+  `Tests/KernelTests/Properties`: sorting (permutation, strict and transitive order, stable, independent of input order,
+  long lists on all cores, resort, merge, batches), name order and keys, filter then sort equals sort then filter (and
+  narrowing, and the reported places), the name index (and after moves, and long lists), `Bitset` against `Set`,
+  counting long lists, `Parallel.map`, `FileItem.split`, `FileMask` against a literal reference of the specification,
+  saturating arithmetic against 128-bit results, path safety.
+- **Settings migration.** Fixtures (raw JSON as written) for every stored key, in `Tests/PluginTests/SettingsMigration`
+  and `Tests/ShellTests/SettingsMigration*`; each is loaded by its owner, checked field by field, and written back in
+  the same shape (compared as canonical JSON), so a format change fails a test and needs a fixture of its own.
+- **CodeQL** needs Rosetta (its Swift extractor is Intel only; `Scripts/install-tools.sh` installs it now), the native
+  build system (the tracer does not follow the default build system's build service) and `--disable-sandbox`
+  (`sandbox-exec` has no Intel slice). `codeql.yml` builds the same way.
+
+### Logging and diagnostics (proposal, not implemented)
+
+For the module agents to implement in one way everywhere:
+
+- **One subsystem, one category per module.** The kernel offers `public enum Log` with
+  `static func logger(_ category: String) -> Logger` (it imports `os`, no UI) and the subsystem, the bundle identifier
+  (`local.a-file-manager`). Categories: `Kernel`, `Kernel.Panels`, `Kernel.Jobs`, `Shell`, and the plugin's name for
+  each plugin (`Archives`, `Network`, ...). Each module keeps one `private let log = Log.logger("Archives")` per file
+  that logs; no `print`, no `NSLog`. An architecture rule can then check that `os.Logger` is made only through `Log`.
+- **Levels.** `debug`: traces for development (not kept). `info`: state changes (folder read, job started and ended,
+  archive opened). `notice`: what the user would recognise (connected to a server, settings imported). `error`: an
+  operation failed (with the error). `fault`: a broken invariant (a bug).
+- **Privacy.** Every name, path, URL, host, user name and message from outside is interpolated `privacy: .private` (the
+  default for dynamic text; write it out anyway); counts, sizes, durations and error codes `.public`. Passwords,
+  keychain items, certificate data and file contents are never logged.
+- **Signposts.** An `OSSignposter` per category for the hot paths, with interval names that match the benchmarks
+  (`sort`, `filter`, `mark`, `list`, `copy`, `archive-open`), so Instruments shows where the time goes in the real
+  program.
+- **Threads.** `Logger` is `Sendable`; logging never hops to the main thread and never waits.
+- **Diagnostics export.** Help › Export Diagnostics… (in the SystemTools plugin): reads this run's entries of the
+  subsystem through `OSLogStore(scope: .currentProcessIdentifier)` (private values stay `<private>`), adds the program
+  and macOS versions, the machine model, the plugins, the running jobs and the settings keys with their sizes (no
+  values), and writes one text file where the user chooses. Nothing is sent anywhere.
+- **Tests.** Key events can be checked by reading `OSLogStore(scope: .currentProcessIdentifier)` filtered by subsystem
+  and category; no logging test double is needed.
+
+### Open findings in today's code (for the module agents)
+
+- **Architecture gate, 8 findings.** `FilePropertiesPlugin`, `NetworkPlugin`, `SystemToolsPlugin` declare the shell
+  (`needsShell: true`) but none of their files imports it; `AFileManager` declares `AFMKernel` without importing it;
+  three PluginTests files (`Review2ViewerPaneTests`, `ViewerAdoptPaneTests`, `ViewerPluginTests`) import `AFMShell`,
+  which PluginTests does not depend on; `Kernel.userTyped(location:proposal:relativeTo:)` in
+  `AFMContracts/Services.swift:65` is behaviour in the contracts (it belongs to the kernel or the network plugin).
+- **API gate, 47 breaks against `origin/main`** (7d0f18e, before the Swift 6 migration): `Sendable` added to the
+  protocols `FileReader`, `FileWriter`, `FileSystemProvider`, `JobMonitor`, `SettingsStore`, `UserInteraction` and to
+  generic parameters (`Parallel.map`, `JobService.run`, `JobMonitor.ask`, `Kernel.askUser`, `BlockingCalls.answer`);
+  `nonisolated` on `Kernel` properties, `PanelModel.prepare`/`rows`/`filtered`, `PanelFilter.mask` and some constants;
+  `FileSystemProvider.watch` returns `(any WatchToken)?` instead of `AnyObject?`. All are the migration; they need
+  acknowledging with reasons (or vanish once the migration is on main).
+- **`PathSafety.isContained`** (kernel): `root//../a` and `root/a//..` count as inside `root`, because
+  `URL.standardized` takes the empty name for a folder that `..` leaves; the file system reads `//` as `/`. Recorded as
+  a known issue in `PathSafetyProperties`. `location(ofRelativePath:)` refuses empty names first, so archives and
+  servers do not reach it there; `Unpacker.lies(_:below:)` and `ArchiveFileSystem` call it directly, and
+  `Unpacker.refuseLinks` uses `standardized.pathComponents` the same way.
+- **`SortedFileList` (kernel)**: collecting a million entries in batches of 10,000 takes 8 s and 3.5 GB at peak
+  (`batches-1m`); every batch merges the whole list and its keys again, and the merged keys keep every block of earlier
+  keys. Sorting the same million at once takes 0.2 s and 680 MB.
+- **`Package.swift`** is not formatted the way `.swift-format` now wants (`lineBreakBeforeEachArgument`), and has
+  SwiftLint findings of its own (`explicit_acl`, `missing_docs`, `prefixed_toplevel_constant` for the helpers); the new
+  `Benchmarks` target follows the file's present style.
+
 ## Gotchas met so far
 
 - Changing a protocol requirement that has a default implementation (`watch`, `prepareToQuit`) silently leaves
