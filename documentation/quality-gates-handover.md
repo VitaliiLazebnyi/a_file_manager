@@ -82,6 +82,32 @@ from the host Mac into the test VM. Branch: `quality-gates`.
    takes days: split the files over VM clones.
 7. **Extras** listed above; then switch every gate on (CI, `git config core.hooksPath .githooks`).
 
+## UI tests, accessibility audit, snapshot tests
+
+- **Project:** `UITests/project.yml` (XcodeGen) generates a project with one target, the UI test bundle; the generated
+  `.xcodeproj` is not in git. The program is not built by Xcode: `Scripts/build-app.sh` builds it from the package
+  (debug, coverage counting, bundle identifier `local.a-file-manager.uitests`), and the tests start that bundle with
+  `XCUIApplication(url:)`. The package stays the one description of the program.
+- **Running:** `Scripts/check.sh uitest` (or `UITests/run.sh [xcodebuild options]`), about 1 minute. Only in the
+  logged-in session, not over SSH. Not in the default list: it needs the window server and takes over keyboard and
+  mouse.
+- **Isolation:** the bundle identifier of its own gives the program other preferences and another Application Support
+  folder; `run.sh` empties both before and after. Each test makes its folders in the runner's temporary folder and
+  passes them on the command line (`-left.tabs <data>`, the argument domain). Xcode always runs the test runner in an
+  App Sandbox: the tests can write only in their container and cannot remove preferences themselves.
+- **Waits:** condition-based only (`Wait`), at most 30 s; no fixed pauses.
+- **Coverage:** the program writes `.build/uitest/codecov/ui-*.profraw` (`LLVM_PROFILE_FILE`), merged into
+  `ui.profdata`. The counts merge with those of `swift test --enable-code-coverage` (same compiler flags, same function
+  hashes; checked: no mismatch warnings, +142 lines). `Scripts/coverage-gate.py` does not read them yet: it needs to
+  merge `ui.profdata` with the other profiles and pass the program's binary as one more `-object`.
+- **Audit findings (open):** the file lists have no accessibility label; the empty cells of the `[..]` row are static
+  texts without a value; the Attr column, partly outside the visible panel, fails the contrast check; one element in the
+  menu bar area (type 81) has no description. The audit test fails until they are fixed in `AFMShell`.
+- **Snapshot tests:** `Tests/ShellTests/Snapshot.swift` draws a view offscreen (light appearance, 2× pixels) and
+  compares it with `Tests/Snapshots/<name>.png` (a channel may be 24 of 255 off, 0.2% of the pixels may differ).
+  `AFM_RECORD_SNAPSHOTS=1 swift test --filter Snapshots` records; a recording counts as a failure. A mismatch writes
+  what was drawn to `.build/snapshots/`. Views in the user's accent colour make poor references.
+
 ## Gotchas met so far
 
 - Changing a protocol requirement that has a default implementation (`watch`, `prepareToQuit`) silently leaves
