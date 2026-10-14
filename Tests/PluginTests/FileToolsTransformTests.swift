@@ -17,7 +17,7 @@ import Testing
     static let megabyteOfPattern = patternData(1_048_576)
     var megabyte: Data { Self.megabyteOfPattern }
 
-    var ui: ScriptedInteraction { bench.ui }
+    var ui: ScriptedInteraction { bench.interaction }
     var run: ToolRun { ToolRun(fileSystems: bench.kernel.fileSystems) }
 
     private let scratch = ScratchPasteboard()

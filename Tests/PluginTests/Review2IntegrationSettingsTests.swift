@@ -44,9 +44,9 @@ import Testing
         try Data("{\"format\":\"A File Manager settings\",\"version\":1,\"settings\":{\(entries)}}".utf8).write(to: url)
 
         // Accepted as proposed: the ordinary setting comes in, the trusted servers and what is run do not.
-        bench.ui.formAnswers = [.accept]
+        bench.interaction.formAnswers = [.accept]
         bench.commands.perform("afm_ImportSettings", .location(url))
-        let fields = try #require(bench.ui.forms.last)
+        let fields = try #require(bench.interaction.forms.last)
         let parts = fields.filter {
             guard case .checkbox = $0.kind else { return false }
             return true
@@ -63,7 +63,7 @@ import Testing
                 && settings.data(forKey: "viewer.helper") == nil)
 
         // Ticked, it comes in.
-        bench.ui.formAnswers = [.values(["trust": .flag(true)])]
+        bench.interaction.formAnswers = [.values(["trust": .flag(true)])]
         bench.commands.perform("afm_ImportSettings", .location(url))
         #expect(stored("network.unprotectedPasswordHosts") == #"["evil.example"]"#)
         #expect(settings.data(forKey: "viewer.helper") == nil)

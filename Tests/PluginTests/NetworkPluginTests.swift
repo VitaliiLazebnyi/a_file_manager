@@ -55,7 +55,7 @@ private final class FakeMounter: VolumeMounter, @unchecked Sendable {
     var commands: CommandRegistry { bench.commands }
     var left: FakePanel { bench.left }
     var right: FakePanel { bench.right }
-    var ui: ScriptedInteraction { bench.ui }
+    var ui: ScriptedInteraction { bench.interaction }
     var key: ServerKey { ServerKey(scheme: "ftp", host: "127.0.0.1", port: server.port) }
     var address: String { "127.0.0.1:\(server.port)" }
 

@@ -197,7 +197,7 @@ import Testing
     private var shell: (lines: [String], count: Int) { (plugin.launched, plugin.launched.count) }
 
     var commands: CommandRegistry { bench.commands }
-    var ui: ScriptedInteraction { bench.ui }
+    var ui: ScriptedInteraction { bench.interaction }
     var center: ConfigurationCenter { plugin.center! }
 
     init() throws {

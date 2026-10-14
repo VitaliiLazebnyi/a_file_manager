@@ -22,7 +22,7 @@ import VirtualFoldersPlugin
     let virtual = VirtualFoldersPlugin()
     let bench: TestBench
 
-    var ui: ScriptedInteraction { bench.ui }
+    var ui: ScriptedInteraction { bench.interaction }
     var commands: CommandRegistry { bench.commands }
 
     init() throws {

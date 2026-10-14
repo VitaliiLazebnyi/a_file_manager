@@ -850,7 +850,7 @@ private final class ArchiveFake: FileSystemProvider {
 
     @Test func aFormThatCannotBeSearchedWithIsReported() async {
         await search { ($0.findText, $0.text, $0.textOptions.hex) = (true, "xyz", true) }
-        #expect(bench.ui.log == ["inform: The search cannot start"] && !window.isSearching && window.lines.isEmpty)
+        #expect(bench.interaction.log == ["inform: The search cannot start"] && !window.isSearching && window.lines.isEmpty)
     }
 
     @Test func onlySelectedItemsOfThePanel() async {

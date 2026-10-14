@@ -16,7 +16,7 @@ import Testing
     let settings = MemorySettings()
     let bench: TestBench
 
-    var ui: ScriptedInteraction { bench.ui }
+    var ui: ScriptedInteraction { bench.interaction }
     var session: CompareSession { plugin.sessions[0] }
 
     init() {
@@ -346,7 +346,7 @@ import Testing
         bench.left.moveCursor(toName: "same.txt")
         bench.commands.perform(.compareByContent)
         await spin { plugin.sessions.isEmpty }
-        #expect(windows().isEmpty && bench.ui.log == ["inform: Compare contents"])
+        #expect(windows().isEmpty && bench.interaction.log == ["inform: Compare contents"])
 
         bench.left.moveCursor(toName: "a.txt")
         bench.commands.perform(.compareByContent)

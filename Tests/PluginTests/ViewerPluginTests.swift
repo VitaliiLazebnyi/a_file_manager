@@ -24,7 +24,7 @@ private final class FakeOverlayHost: PanelOverlayHost {
     var pasteboard: NSPasteboard { scratch.pasteboard }
 
     var commands: CommandRegistry { bench.commands }
-    var ui: ScriptedInteraction { bench.ui }
+    var ui: ScriptedInteraction { bench.interaction }
 
     init() throws {
         _ = NSApplication.shared
