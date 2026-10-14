@@ -2,7 +2,7 @@ public import AFMContracts
 public import AFMKernel
 public import Foundation
 
-public enum JobKind: Equatable {
+public enum JobKind: Equatable, Sendable {
     case transfer(TransferKind)
     case delete(toTrash: Bool)
 
@@ -11,7 +11,7 @@ public enum JobKind: Equatable {
 }
 
 /// Answers of the Overwrite dialog (07 › Choices). The "all" answers hold for the rest of the job.
-public enum ConflictChoice: Equatable {
+public enum ConflictChoice: Equatable, Sendable {
     case overwrite, overwriteAll, skip, skipAll, overwriteAllOlder, cancel
     /// The copied file gets this name instead; if it is taken too, the question comes again.
     case rename(String)
@@ -25,21 +25,21 @@ public enum ConflictChoice: Equatable {
     case overwriteAllOlderOrSame, copyAllLarger, copyAllSmaller, renameOlderSkipNewer
 }
 
-public enum ErrorChoice { case skip, skipAll, retry, abort }
+public enum ErrorChoice: Sendable { case skip, skipAll, retry, abort }
 /// Answers to "The directory … is not empty!" (07 › Delete › Questions).
-public enum FolderDeleteChoice { case delete, all, skip, cancel }
+public enum FolderDeleteChoice: Sendable { case delete, all, skip, cancel }
 
 /// The second question about an item that is protected (07 › Read-only, hidden and system
 /// targets; 07 › Delete › Questions). On the Mac "read only" is a file nobody may write to, and
 /// "locked" a file with the Finder's Locked flag, which only shows when the change is refused.
-public struct ProtectionQuestion {
-    public enum Reason {
+public struct ProtectionQuestion: Sendable {
+    public enum Reason: Sendable {
         case readOnly, hidden, locked
         /// The item cannot go to the Trash (a network share or a disk without one); the
         /// question is whether to delete it for good instead.
         case noTrash
     }
-    public enum Purpose { case overwrite, delete, move }
+    public enum Purpose: Sendable { case overwrite, delete, move }
 
     public let reason: Reason
     public let purpose: Purpose
@@ -47,13 +47,13 @@ public struct ProtectionQuestion {
 }
 
 /// `all` answers the same question for the rest of the job.
-public enum ProtectionChoice { case proceed, all, skip, cancel }
+public enum ProtectionChoice: Sendable { case proceed, all, skip, cancel }
 /// Answers to "the folder already exists at the target".
-public enum MergeChoice { case merge, mergeAll, skip, cancel }
+public enum MergeChoice: Sendable { case merge, mergeAll, skip, cancel }
 
 /// What a job did to one item, for the operation log (13 › Operation › Log file).
-public struct OperationRecord {
-    public enum Verb: String {
+public struct OperationRecord: Sendable {
+    public enum Verb: String, Sendable {
         case copy = "Copy"
         case move = "Move"
         case append = "Append"
@@ -65,7 +65,7 @@ public struct OperationRecord {
         case rename = "Rename"
     }
 
-    public enum Status: Equatable {
+    public enum Status: Equatable, Sendable {
         case done
         case failed(String)
         case skipped
@@ -111,7 +111,7 @@ extension FileJobDelegate {
     { .skip }
 }
 
-public struct JobResult {
+public struct JobResult: Sendable {
     /// Top-level sources that were processed completely; the panel deselects these.
     public var completed: [URL] = []
     public var cancelled = false
@@ -193,7 +193,12 @@ public enum FileJobError: LocalizedError {
 /// The answers that hold "for all" are guarded by `decisions`, which also lets only one
 /// question be open at a time; the counters are guarded by `counters`. Set `options`,
 /// `delegate` and `onRecord` before `run()`; only `cancel()` may be called from elsewhere.
-public final class FileJob {
+///
+/// Unchecked `Sendable`: the job goes to its own thread and to the workers of the pool, and
+/// its state is guarded as said above (by `decisions`, `counters`, `delivery`, `remembered` and
+/// `pendingRemovals`, or used by the job thread only); the settings do not change once `run()`
+/// has started.
+public final class FileJob: @unchecked Sendable {
     public let kind: JobKind
     public let sources: [URL]
     /// Where the job goes. Always a real place: a folder of a branch view is replaced by the
@@ -212,10 +217,10 @@ public final class FileJob {
     public weak var delegate: any FileJobDelegate?
     /// Receives what was done to every item, for the operation log. Called on the job's
     /// threads, several at once during a parallel copy, so it must be safe for that.
-    public var onRecord: ((OperationRecord) -> Void)?
+    public var onRecord: (@Sendable (OperationRecord) -> Void)?
     /// Asked before a record is put together (two displayed paths each): false for the kinds
     /// nobody is going to write down. Nil: every record is made. Called like `onRecord`.
-    public var wantsRecord: ((OperationRecord.Verb, OperationRecord.Status) -> Bool)?
+    public var wantsRecord: (@Sendable (OperationRecord.Verb, OperationRecord.Status) -> Bool)?
     /// The least time between two progress reports; the first always goes out. Zero reports
     /// every change, which a window does not need and a test wants.
     public var progressInterval: TimeInterval = 0
@@ -376,7 +381,7 @@ public final class FileJob {
     /// work that blocks (`BlockingCalls.run`), not on a dispatch queue: a worker waits for a
     /// disk, and a disk that has stopped answering must not take threads from the queues the
     /// rest of the program shares.
-    private final class Pool {
+    private final class Pool: Sendable {
         let slots: DispatchSemaphore
         private let width: Int
 
@@ -387,7 +392,7 @@ public final class FileJob {
 
         /// Starts `work` on a thread of its own; `group` is left when it has returned, and
         /// the worker's slot (taken by the caller beforehand) is given back.
-        func start(in group: DispatchGroup, _ work: @escaping () -> Void) {
+        func start(in group: DispatchGroup, _ work: @escaping @Sendable () -> Void) {
             group.enter()
             BlockingCalls.run { [slots] in
                 work()
@@ -405,7 +410,10 @@ public final class FileJob {
 
     /// The items of one folder (or the job's sources): where their outcomes are collected
     /// while some of them are still being copied by the pool.
-    private final class Batch {
+    ///
+    /// Unchecked `Sendable`: the outcomes and `cancelled` are guarded by `lock`; the other
+    /// properties are used by the job thread only.
+    private final class Batch: @unchecked Sendable {
         let group = DispatchGroup()
         private let lock = NSLock()
         private var outcomes: [Outcome?]
@@ -518,7 +526,9 @@ public final class FileJob {
     /// job's own, whose stack has room for the deepest tree the job enters (`depthLimit`); the
     /// calling thread waits for it.
     public func run() -> JobResult {
-        final class Box { var result = JobResult() }
+        /// Unchecked `Sendable`: written by the job's thread before it signals `finished`, read
+        /// here only after the wait.
+        final class Box: @unchecked Sendable { var result = JobResult() }
         let box = Box()
         let finished = DispatchSemaphore(value: 0)
         let thread = Thread {
@@ -841,7 +851,7 @@ public final class FileJob {
         batch.produced.insert(Self.claimHash(target))
         // Asked here, on the job thread, once per source folder; the workers only use the answer.
         let origin = originMark(of: item.url.deletingLastPathComponent(), copiedTo: target)
-        let work = { () throws -> Outcome in
+        let work = { @Sendable () throws -> Outcome in
             let flight = Flight()
             flight.origin = origin
             defer { self.land(flight, Measure(items: 1, bytes: item.size)) }
@@ -1228,18 +1238,6 @@ public final class FileJob {
 
     /// The target folders that were looked through for old temporary files already.
     private static let swept = Guarded(Set<String>())
-
-    /// A value behind a lock.
-    private final class Guarded<Value> {
-        private let lock = NSLock()
-        private var value: Value
-        init(_ value: Value) { self.value = value }
-        func withLock<Result>(_ body: (inout Value) -> Result) -> Result {
-            lock.lock()
-            defer { lock.unlock() }
-            return body(&value)
-        }
-    }
 
     /// How old an unfinished copy must be before it counts as left behind.
     static let staleTemporaryAge: TimeInterval = 24 * 60 * 60
@@ -2068,8 +2066,9 @@ public final class FileJob {
     /// meets later (a locked file) is asked under the same lock as any other. An Abort or Cancel
     /// in any of them stops the others, and the function returns only when the workers are done.
     private func deleteLeaves(asking: [FileItem], quiet: [FileItem], tree: URL, with pool: Pool) throws -> Bool {
-        /// What the workers found out, under a lock of its own.
-        final class Tally {
+        /// What the workers found out, under a lock of its own. Unchecked `Sendable`: all state
+        /// is guarded by `lock`.
+        final class Tally: @unchecked Sendable {
             let lock = NSLock()
             var kept = false
             var failure: any Error?
@@ -2567,5 +2566,17 @@ enum FileIdentity {
             path = parent(of: current)
         }
         return false
+    }
+}
+
+/// A value behind a lock. Unchecked `Sendable`: `value` is guarded by `lock`.
+final class Guarded<Value: Sendable>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value: Value
+    init(_ value: Value) { self.value = value }
+    func withLock<Result>(_ body: (inout Value) -> Result) -> Result {
+        lock.lock()
+        defer { lock.unlock() }
+        return body(&value)
     }
 }

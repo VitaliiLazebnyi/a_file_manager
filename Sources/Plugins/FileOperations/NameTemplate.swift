@@ -21,7 +21,7 @@ public import Foundation
 ///
 /// Pure: everything it needs to know comes in through `Context`. Usable on any thread.
 public enum NameTemplate {
-    public struct Context {
+    public struct Context: Sendable {
         /// The item under the cursor: its name with extension; empty on `[..]`.
         public var cursorName = ""
         public var cursorIsFolder = false
@@ -35,7 +35,7 @@ public enum NameTemplate {
         public var clipboard: String?
         public var environment: [String: String] = ProcessInfo.processInfo.environment
         /// Whether a name is taken already, for the optional digit `[C]`. May touch a file system.
-        public var exists: (String) -> Bool = { _ in false }
+        public var exists: @Sendable (String) -> Bool = { _ in false }
 
         public init() {}
     }

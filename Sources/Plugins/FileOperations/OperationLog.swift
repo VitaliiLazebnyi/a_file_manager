@@ -12,8 +12,11 @@ public import Foundation
 /// The lines of a burst go to the file together, through a handle that stays open, after the
 /// file has been checked for rotation once. `flush` (a job's end, the program's end) writes at
 /// once. Nothing here runs on the main thread except the cheap hand-over.
-public final class OperationLog {
-    public enum Rotation: Equatable {
+///
+/// Unchecked `Sendable`: the mutable state is used on the log's queue only; the rest does not
+/// change after `init`.
+public final class OperationLog: @unchecked Sendable {
+    public enum Rotation: Equatable, Sendable {
         case never
         /// A new file with the first line written after midnight.
         case daily
@@ -22,7 +25,7 @@ public final class OperationLog {
     }
 
     /// What the Log file page of the configuration holds.
-    public struct Configuration: Equatable {
+    public struct Configuration: Equatable, Sendable {
         public var isEnabled = false
         public var file = URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent(
             "Library/Logs/A File Manager/operations.log")
@@ -61,7 +64,7 @@ public final class OperationLog {
 
     public let configuration: Configuration
     private let queue = DispatchQueue(label: "afm.fileoperations.log", qos: .utility)
-    private let now: () -> Date
+    private let now: @Sendable () -> Date
     private let fm = FileManager.default
     private let stamp: DateFormatter
     private let day: DateFormatter
@@ -76,7 +79,7 @@ public final class OperationLog {
     private static let delay: TimeInterval = 0.25
 
     /// `now` is the clock; tests bring their own.
-    public init(_ configuration: Configuration, now: @escaping () -> Date = Date.init) {
+    public init(_ configuration: Configuration, now: @escaping @Sendable () -> Date = { Date() }) {
         self.configuration = configuration
         self.now = now
         stamp = DateFormatter()
@@ -131,12 +134,18 @@ public final class OperationLog {
     /// some thread, when everything handed in so far is in the file, or as soon as
     /// `cancellation` is set (the user does not want to wait for a disk that is not
     /// answering). The writing itself goes on on the log's queue either way. Any thread.
-    public func flush(cancellation: CancellationFlag, completion: @escaping () -> Void) {
-        final class Once {
+    public func flush(cancellation: CancellationFlag, completion: @escaping @Sendable () -> Void) {
+        /// Unchecked `Sendable`: all state is guarded by `lock`.
+        final class Once: @unchecked Sendable {
             private let lock = NSLock()
-            private var completion: (() -> Void)?
-            var token: AnyObject?
-            init(_ completion: @escaping () -> Void) { self.completion = completion }
+            private var completion: (@Sendable () -> Void)?
+            private var token: AnyObject?
+            init(_ completion: @escaping @Sendable () -> Void) { self.completion = completion }
+            func keep(_ token: AnyObject) {
+                lock.lock()
+                self.token = token
+                lock.unlock()
+            }
             func fire() {
                 lock.lock()
                 let call = completion
@@ -146,7 +155,7 @@ public final class OperationLog {
             }
         }
         let once = Once(completion)
-        once.token = cancellation.onCancel { once.fire() }
+        once.keep(cancellation.onCancel { once.fire() })
         queue.async {
             self.drain()
             self.closeHandle()
@@ -157,7 +166,7 @@ public final class OperationLog {
 
     /// Runs `work` on the log's queue, in its turn. For tests, which hold the queue up with
     /// it the way a disk that has stopped answering does.
-    func onQueue(_ work: @escaping () -> Void) {
+    func onQueue(_ work: @escaping @Sendable () -> Void) {
         queue.async(execute: work)
     }
 
