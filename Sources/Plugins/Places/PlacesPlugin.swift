@@ -152,7 +152,7 @@ public final class PlacesPlugin: Plugin {
 
     /// Writes the tree cache before the program quits, away from the main thread (a tree of
     /// millions of folders is a file of many megabytes). `stop` then finds nothing left to write.
-    public func prepareToQuit(cancellation _: CancellationFlag, completion: @escaping () -> Void) {
+    public func prepareToQuit(cancellation _: CancellationFlag, completion: @escaping @Sendable () -> Void) {
         let cache = treeCache
         BlockingCalls.run {
             cache.flush()
