@@ -69,17 +69,16 @@ final class ReadAhead {
         let leave: @MainActor () -> Void
     }
 
-    /// Unchecked: what is marked "main thread only" is touched there alone, and what is
-    /// shared with the reading thread is guarded by `lock`.
+    /// Unchecked: the main thread's part is isolated to it, and what is shared with the
+    /// reading thread is guarded by `lock`.
     private final class Reading: @unchecked Sendable {
         let target: Target
         let cancellation = CancellationFlag()
-        // Main thread only.
-        var waiting: [@MainActor (Outcome) -> Void] = []
+        @MainActor var waiting: [@MainActor (Outcome) -> Void] = []
         /// How many panels wait for the result.
-        var waiters = 0
+        @MainActor var waiters = 0
         /// When the reading was told to stop.
-        var cancelledAt: TimeInterval?
+        @MainActor var cancelledAt: TimeInterval?
 
         // Shared with the reading thread, behind the lock.
         private let lock = NSLock()
