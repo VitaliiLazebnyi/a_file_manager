@@ -1,0 +1,16 @@
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# App bundle and backups written by Scripts/build-app.sh
+build/
+
+# Fuzz and stress build output (their READMEs: out/ can be deleted at any time)
+Tests/Fuzz/out/
+Tests/Stress/out/
+
+# Temporary working files
+scratchpad/
+
+# macOS
+.DS_Store
