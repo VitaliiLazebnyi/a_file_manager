@@ -11,8 +11,9 @@ import Foundation
 /// lead byte begins right after it, and from a known boundary the characters are counted off
 /// forward, exactly as the decoder counts them. The boundary at the start of every block of
 /// `spacing` bytes is kept once found, so a search through a long run reads each part of it
-/// once. Safe to use from several threads.
-final class CharacterBoundaries {
+/// once. Safe to use from several threads: `known` is guarded by `lock`, and the rest is
+/// immutable.
+final class CharacterBoundaries: @unchecked Sendable {
     private let source: any ByteSource
     private let content: Range<Int64>
     private let table: CodeTable

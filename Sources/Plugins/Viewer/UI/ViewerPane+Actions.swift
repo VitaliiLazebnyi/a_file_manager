@@ -590,13 +590,13 @@ extension ViewerPane {
                 ) { fraction in
                     guard Date().timeIntervalSince(lastReport) > 0.1 else { return }
                     lastReport = Date()
-                    DispatchQueue.main.async {
+                    DispatchQueue.main.async { [weak self] in
                         guard let self, self.activity?.cancel === cancel else { return }
                         self.activity?.progress = fraction
                     }
                 }
             }
-            DispatchQueue.main.async {
+            DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
                 if self.activity?.cancel === cancel { self.activity = nil }
                 guard self.loadGeneration == generation, self.pager.document?.source === document.source,
@@ -621,7 +621,7 @@ extension ViewerPane {
 
     /// Copies the selection as text or as hexadecimal values (spec 10 › Selection and
     /// clipboard). The bytes are read in the background.
-    func copySelection(asHex: Bool, completion: @escaping () -> Void = {}) {
+    func copySelection(asHex: Bool, completion: @escaping @MainActor @Sendable () -> Void = {}) {
         guard let document = pager.document, let selection = pager.selection else { return }
         // Hex is three characters a byte; the string is made on the main thread for the clipboard.
         let limit = asHex ? Self.copyLimit / 2 : Self.copyLimit
@@ -629,7 +629,8 @@ extension ViewerPane {
             kernel.ui.inform("The selection is too large for the clipboard (more than \(Format.shortSize(limit))).")
             return
         }
-        let pasteboard = pasteboard
+        // Carried through the background and used on the main thread only.
+        let pasteboard = Handover(pasteboard)
         let cancellation = cancellation
         workQueue.async {
             let text =
@@ -638,8 +639,8 @@ extension ViewerPane {
                 : try? document.text(in: selection, cancellation: cancellation)
             DispatchQueue.main.async {
                 if let text {
-                    pasteboard.clearContents()
-                    pasteboard.setString(text, forType: .string)
+                    pasteboard.value.clearContents()
+                    pasteboard.value.setString(text, forType: .string)
                 }
                 completion()
             }
@@ -703,7 +704,7 @@ extension ViewerPane {
         return menu
     }
 
-    private func withSelectedText(_ action: @escaping (String) -> Void) {
+    private func withSelectedText(_ action: @escaping @MainActor @Sendable (String) -> Void) {
         guard let document = pager.document, let selection = pager.selection, selection.count <= 4_096 else { return }
         workQueue.async {
             guard let text = try? document.text(in: selection) else { return }
@@ -769,7 +770,7 @@ extension ViewerPane {
     // MARK: Printing
 
     /// The most pages of text that are printed; a longer text is cut there, and the user is told.
-    static let printPageLimit = 2_000
+    nonisolated static let printPageLimit = 2_000
 
     private func printInfo() -> NSPrintInfo {
         let info = NSPrintInfo(dictionary: NSPrintInfo.shared.dictionary() as? [NSPrintInfo.AttributeKey: Any] ?? [:])
@@ -796,8 +797,8 @@ extension ViewerPane {
     /// as themselves.
     func printContent() {
         let info = printInfo()
-        func run(_ operation: NSPrintOperation) {
-            if let window {
+        let run: @MainActor @Sendable (NSPrintOperation) -> Void = { operation in
+            if let window = self.window {
                 operation.runModal(for: window, delegate: nil, didRun: nil, contextInfo: nil)
             } else {
                 operation.run()
@@ -836,11 +837,13 @@ extension ViewerPane {
             let linesPerPage = TextPrintView.linesPerPage(font: font, pageHeight: page.height)
             activity = ("Preparing to print…", nil, CancellationFlag())
             let cancel = activity?.cancel
-            workQueue.async { [weak self] in
+            // Made on the main thread and used there only, by the block that comes back.
+            let held = Handover((font: font, info: info))
+            workQueue.async { [weak self, range] in
                 let text = Self.printableText(
                     of: document, in: range, maxRows: Self.printPageLimit * linesPerPage,
                     cancellation: cancel ?? CancellationFlag())
-                DispatchQueue.main.async {
+                DispatchQueue.main.async { [weak self] in
                     guard let self else { return }
                     if self.activity?.cancel === cancel { self.activity = nil }
                     guard self.loadGeneration == generation, cancel?.isCancelled != true else { return }
@@ -851,7 +854,8 @@ extension ViewerPane {
                     }
                     run(
                         NSPrintOperation(
-                            view: TextPrintView(lines: text.lines, font: font, pageSize: page), printInfo: info))
+                            view: TextPrintView(lines: text.lines, font: held.value.font, pageSize: page),
+                            printInfo: held.value.info))
                 }
             }
         }
@@ -859,7 +863,7 @@ extension ViewerPane {
 
     /// The rows of `range` as the document's layout shows them, at most `maxRows` of them (`truncated`
     /// when there are more). Blocks.
-    static func printableText(
+    nonisolated static func printableText(
         of document: TextDocument, in range: Range<Int64>, maxRows: Int = printPageLimit * 60,
         cancellation: CancellationFlag = CancellationFlag()
     ) -> PrintableText {

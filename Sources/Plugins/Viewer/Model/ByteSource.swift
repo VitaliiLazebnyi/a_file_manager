@@ -34,7 +34,7 @@ enum ViewerError: LocalizedError, Equatable {
 enum ViewerCleanup {
     private static let queue = DispatchQueue(label: "viewer.cleanup", qos: .userInitiated, attributes: .concurrent)
 
-    static func async(_ work: @escaping () -> Void) {
+    static func async(_ work: @escaping @Sendable () -> Void) {
         queue.async(execute: work)
     }
 
@@ -59,7 +59,7 @@ enum ViewerCleanup {
 /// asks for the pieces it shows (spec 10 › Window model: the text modes stream the file).
 /// `read` blocks and is safe to call from several threads at once; never call it on the main
 /// thread.
-protocol ByteSource: AnyObject {
+protocol ByteSource: AnyObject, Sendable {
     var length: Int64 { get }
     /// The bytes from `offset` on, at most `count`; fewer only at the end of the file.
     func read(at offset: Int64, count: Int) throws -> Data
@@ -114,7 +114,9 @@ extension CancellationFlag {
 /// A flag that is set when any of its parents is, for work that has a stop of its own and also
 /// ends with the document or the pane it belongs to. Keep the value for as long as the work
 /// runs; letting go of it unhooks the flag from its parents.
-final class LinkedCancellation {
+///
+/// Immutable after `init`; the tokens are only held, never used.
+final class LinkedCancellation: @unchecked Sendable {
     let flag = CancellationFlag()
     private let tokens: [AnyObject]
 
@@ -145,7 +147,9 @@ final class DataByteSource: ByteSource {
 /// A file on any file system, read through its provider with `seek` and `read`, so the viewer
 /// works wherever a panel can show files (archives, servers). Several threads read at once,
 /// each through a reader of its own; idle readers are kept for the next request.
-final class ProviderByteSource: ByteSource {
+///
+/// `idle` and `closes` are guarded by `lock`; everything else is immutable.
+final class ProviderByteSource: ByteSource, @unchecked Sendable {
     let url: URL
     let length: Int64
     private let provider: any FileSystemProvider
@@ -303,12 +307,14 @@ final class ProviderByteSource: ByteSource {
 /// nothing is left behind whatever happens to the program. All the sources together keep at
 /// most `totalLimit` bytes and one source at most 1 GB; a source that finds the room used up
 /// goes on without caching more.
-/// Safe to use from several threads.
-final class DiskBlockCache {
+/// Safe to use from several threads: the state of a cache is guarded by `lock`, the shared
+/// budget by `budget`.
+final class DiskBlockCache: @unchecked Sendable {
     /// The most all caches together hold.
     static let totalLimit: Int64 = 2 << 30
     private static let budget = NSLock()
-    private static var held: Int64 = 0
+    /// Guarded by `budget`.
+    nonisolated(unsafe) private static var held: Int64 = 0
 
     /// Bytes all caches hold now.
     static var totalHeld: Int64 {
@@ -454,7 +460,9 @@ final class DiskBlockCache {
 /// every block of it is kept, so laying the text out again does not fetch the file again. A
 /// bigger file of such a source is kept on disk with `spillsToDisk` (`DiskBlockCache`): long
 /// reads fetch only the blocks the disk does not have, and the rest comes from the disk.
-final class CachedByteSource: ByteSource {
+///
+/// `blocks` and `order` are guarded by `lock`; everything else is immutable or safe itself.
+final class CachedByteSource: ByteSource, @unchecked Sendable {
     let base: any ByteSource
     let blockSize: Int
     private let capacity: Int

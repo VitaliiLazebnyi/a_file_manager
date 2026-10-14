@@ -155,7 +155,9 @@ public final class ViewerPlugin: Plugin, ViewerService {
         hideQuickView()
         windows.forEach { $0.close() }
         windows = []
-        temporaryCopies.removeAll(waiting: false, then: completion)
+        // `Plugin.prepareToQuit` lets `completion` be called on any thread, though its type does not say so.
+        let completion = Handover(completion)
+        temporaryCopies.removeAll(waiting: false) { completion.value() }
     }
 
     // MARK: ViewerService

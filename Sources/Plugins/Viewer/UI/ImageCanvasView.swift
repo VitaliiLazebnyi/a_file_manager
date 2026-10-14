@@ -183,6 +183,7 @@ enum ImageDecoder {
 /// and scale in use), made in the background; it is dropped when any of them changes. Only a
 /// frame that is shown smaller than it is gets one (an enlarged one is no smaller to keep), and
 /// none above `pixelLimit` pixels. Main thread only.
+@MainActor
 final class ScaledFrameCache {
     /// A scaled bitmap has at most this many pixels (160 MB).
     static let pixelLimit = 40_000_000
@@ -205,7 +206,8 @@ final class ScaledFrameCache {
     /// How long a size must stay before its bitmap is made.
     static let settle = 0.1
 
-    private final class Latest {
+    /// Guarded by `lock`.
+    private final class Latest: @unchecked Sendable {
         private let lock = NSLock()
         private var number = 0
 
@@ -246,7 +248,7 @@ final class ScaledFrameCache {
             // Overtaken while it waited: another size is wanted now.
             guard latest.value == token else { return }
             let scaled = autoreleasepool { Self.scale(frame, width: width, height: height) }
-            DispatchQueue.main.async {
+            DispatchQueue.main.async { [weak self] in
                 guard let self, self.generation == token else { return }
                 self.ready = scaled
                 self.made += 1
@@ -264,7 +266,7 @@ final class ScaledFrameCache {
     }
 
     /// `frame` resampled to `width` × `height` pixels with the best interpolation.
-    static func scale(_ frame: CGImage, width: Int, height: Int) -> CGImage? {
+    nonisolated static func scale(_ frame: CGImage, width: Int, height: Int) -> CGImage? {
         let space = frame.colorSpace.flatMap { $0.model == .rgb ? $0 : nil } ?? CGColorSpace(name: CGColorSpace.sRGB)
         guard let space,
             let context = CGContext(
@@ -322,7 +324,8 @@ final class ImageCanvasView: NSScrollView {
     private let canvas = Canvas()
     private var image: DecodedImage?
     private var frameIndex = 0
-    private var timer: Timer?
+    /// Set on the main thread, read in `deinit`.
+    nonisolated(unsafe) private var timer: Timer?
     private var manualZoom: CGFloat?
     private var quarterTurns = 0
     var fit = ImageFit.none {
@@ -472,11 +475,14 @@ final class ImageCanvasView: NSScrollView {
         guard let image, image.frames.count > 1 else { return }
         timer = Timer.scheduledTimer(withTimeInterval: image.frames[frameIndex].delay, repeats: false) {
             [weak self] _ in
-            guard let self, let image = self.image else { return }
-            frameIndex = (frameIndex + 1) % image.frames.count
-            canvas.frameImage = image.frames[frameIndex].image
-            canvas.needsDisplay = true
-            scheduleNextFrame()
+            // A scheduled timer fires on the main run loop.
+            MainActor.assumeIsolated {
+                guard let self, let image = self.image else { return }
+                self.frameIndex = (self.frameIndex + 1) % image.frames.count
+                self.canvas.frameImage = image.frames[self.frameIndex].image
+                self.canvas.needsDisplay = true
+                self.scheduleNextFrame()
+            }
         }
     }
 

@@ -2,8 +2,8 @@ import AFMKernel
 import AppKit
 
 /// A number that can be read on any thread: the newest request, so the work of an overtaken one
-/// can be skipped by the queue it waits in.
-private final class LatestNumber {
+/// can be skipped by the queue it waits in. Guarded by `lock`.
+private final class LatestNumber: @unchecked Sendable {
     private let lock = NSLock()
     private var number = 0
 
@@ -24,12 +24,14 @@ private final class LatestNumber {
 /// Brings the progress of an index that is built on other threads to the main thread, at most one
 /// at a time and not more often than every 50 ms. The threads that build hold this object and not
 /// the view, so the view is never released by one of them (it would be taken apart on that thread).
-private final class ProgressCoalescer {
+///
+/// `scheduled` and `last` are guarded by `lock`; `handler` belongs to the main thread.
+private final class ProgressCoalescer: @unchecked Sendable {
     private let lock = NSLock()
     private var scheduled = false
     private var last = DispatchTime(uptimeNanoseconds: 0)
     /// Set and called on the main thread.
-    var handler: (() -> Void)?
+    var handler: (@MainActor () -> Void)?
 
     /// Called from any thread.
     func signal() {
@@ -44,14 +46,15 @@ private final class ProgressCoalescer {
             scheduled = false
             last = DispatchTime.now()
             lock.unlock()
-            handler?()
+            // The main queue runs its blocks on the main thread.
+            MainActor.assumeIsolated { handler?() }
         }
     }
 }
 
 /// The queues the work for one document runs on, so that a read that never returns (a share that
 /// stopped answering) holds up that document only, not the next file shown.
-private final class DocumentQueues {
+private final class DocumentQueues: Sendable {
     /// Row fetches: a newer one replaces an older one that is still waiting.
     let rows = DispatchQueue(label: "viewer.rows", qos: .userInitiated)
     /// Looks for a place or a line, and for the text cursor.
@@ -274,7 +277,7 @@ final class TextPagerView: NSView {
                 if !document.cancellation.isCancelled { document.record(error) }
                 row = nil
             }
-            DispatchQueue.main.async {
+            DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
                 self.restoringCaretIn = nil
                 guard self.document === document, self.caretToRestore == offset else { return }
@@ -438,7 +441,7 @@ final class TextPagerView: NSView {
                 if !request.flag.isCancelled { document.record(error) }
                 rows = []
             }
-            DispatchQueue.main.async {
+            DispatchQueue.main.async { [weak self] in
                 guard let self, self.generation == wanted, self.document === document else { return }
                 // A fetch that was stopped brought nothing: the rows on screen stay.
                 guard !request.flag.isCancelled else { return }
@@ -612,7 +615,7 @@ final class TextPagerView: NSView {
                 if !request.flag.isCancelled { document.record(error) }
                 row = nil
             }
-            DispatchQueue.main.async {
+            DispatchQueue.main.async { [weak self] in
                 guard let self, self.revealGeneration == wanted, self.document === document else { return }
                 guard let row else {
                     // That part of the text is not indexed yet; `rowCountChanged` asks again.
@@ -655,7 +658,7 @@ final class TextPagerView: NSView {
     }
 
     /// Scrolls to a line (counted from 1); false is handed to `completion` when there is none.
-    func scroll(toLine line: Int, completion: @escaping (Bool) -> Void = { _ in }) {
+    func scroll(toLine line: Int, completion: @escaping @MainActor @Sendable (Bool) -> Void = { _ in }) {
         guard let document else { return }
         revealGeneration += 1
         let wanted = revealGeneration
@@ -669,7 +672,7 @@ final class TextPagerView: NSView {
                 if !request.flag.isCancelled { document.record(error) }
                 row = nil
             }
-            DispatchQueue.main.async {
+            DispatchQueue.main.async { [weak self] in
                 guard let self, self.revealGeneration == wanted, self.document === document else { return }
                 if let row {
                     self.topRow = row

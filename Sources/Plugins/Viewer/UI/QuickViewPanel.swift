@@ -9,6 +9,7 @@ import AppKit
 /// It goes away when the user switches to the covered panel or shows another place in it
 /// (`onDismiss`). Main thread only; the pane does its reading in the background and drops the
 /// load of the item before when the cursor moves on.
+@MainActor
 final class QuickViewPanel {
     let pane: ViewerPane
     /// The panel whose list is covered.
