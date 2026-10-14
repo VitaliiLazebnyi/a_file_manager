@@ -316,17 +316,15 @@ final class SFTPSession: RemoteSession, @unchecked Sendable {
         if let transport {
             created = SFTPChannel(
                 executable: transport.executable, arguments: transport.arguments,
-                environment: askpass?.environment ?? [:])
+                environment: askpass?.environment ?? [:], writeTimeout: max(10, options.timeout), names: names)
         } else {
             guard profile.user?.hasPrefix("-") != true else {
                 throw NetworkError.loginFailed("The user name is not valid.")
             }
             created = SFTPChannel(
                 executable: "/usr/bin/ssh", arguments: Self.sshArguments(for: profile, options: options),
-                environment: askpass?.environment ?? [:])
+                environment: askpass?.environment ?? [:], writeTimeout: max(10, options.timeout), names: names)
         }
-        created.writeTimeout = max(10, options.timeout)
-        created.names = names
         lock.lock()
         let closed = isClosed
         if !closed { opening = created }

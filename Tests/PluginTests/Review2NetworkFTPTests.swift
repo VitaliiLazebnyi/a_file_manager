@@ -660,13 +660,12 @@ private final class Notes: @unchecked Sendable {
     }
 
     @Test func certificatesAcceptedForGoodAreNotReadFromTheSettings() {
-        let trust = CertificateTrust()
         // Used by the callbacks, which run one at a time while the calls below wait for them.
         nonisolated(unsafe) var loads = 0
-        trust.load = {
+        let trust = CertificateTrust(load: {
             loads += 1
             return ["Files.Example.com": ["AA:BB"]]
-        }
+        })
         // Nothing is fetched before a connection needs it.
         #expect(!trust.isAccepted("AA:BB", for: "files.example.com") && loads == 0)
         trust.prepare()

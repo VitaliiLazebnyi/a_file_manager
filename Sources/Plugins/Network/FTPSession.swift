@@ -17,8 +17,8 @@ import Foundation
 /// limit per client allow. Downloads and uploads wait separately because a copy between two
 /// folders of one server holds a download while it waits for an upload.
 ///
-/// The pool's state is guarded by `condition` and the link observer by `observerLock`;
-/// `returnGrace` and `stallLimit` are set by tests before the session is used.
+/// The pool's state, `returnGrace` and `stallLimit` included, is guarded by `condition`, and the
+/// link observer by `observerLock`.
 final class FTPSession: RemoteSession, @unchecked Sendable {
     /// What a connection is held for while a file is open.
     fileprivate enum TransferKind { case read, write }
@@ -77,7 +77,11 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
     /// How long a thread that needs a connection waits for one of those, or for one the
     /// keep-alive is testing at that moment, before it opens another: on a server that answers,
     /// the one coming back is there sooner than a new login. Tests lengthen it.
-    var returnGrace: TimeInterval = 0.5
+    var returnGrace: TimeInterval {
+        get { condition.withLock { grace } }
+        set { condition.withLock { grace = newValue } }
+    }
+    private var grace: TimeInterval = 0.5
     /// A connection the keep-alive is testing; it is in nobody's hands and not counted against the limit.
     private var pinged: FTPConnection?
     private var isPinging = false
@@ -107,8 +111,13 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
 
     /// How long a wait for a connection, or for another thread's login, goes on while nothing
     /// moves on any connection of the session and no question is open. Tests shorten it.
-    var stallLimit: TimeInterval?
-    private var patience: TimeInterval { stallLimit ?? max(60, 2 * environment.options.values.timeout) }
+    var stallLimit: TimeInterval? {
+        get { condition.withLock { stallTime } }
+        set { condition.withLock { stallTime = newValue } }
+    }
+    private var stallTime: TimeInterval?
+    /// Called with the lock held.
+    private var patience: TimeInterval { stallTime ?? max(60, 2 * environment.options.values.timeout) }
 
     init(profile: ConnectionProfile, environment: SessionEnvironment) {
         currentProfile = profile
@@ -347,11 +356,9 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
                     mayGoUnprotected = true
                     condition.unlock()
                 }
-                let connection = FTPConnection(config: config(for: profile), trust: environment.trust)
-                connection.log = environment.log
-                connection.knownLinks = links
-                connection.knownNames = names
-                connection.onActivity = { [weak self] in self?.noteProgress() }
+                let connection = FTPConnection(
+                    config: config(for: profile), trust: environment.trust, knownLinks: links, knownNames: names,
+                    onActivity: { [weak self] in self?.noteProgress() }, log: environment.log)
                 do {
                     try connection.connect(cancellation: cancellation ?? closing)
                     condition.lock()
@@ -446,7 +453,7 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
                         busyRetries <= Self.busyDelays.count && (openNotBefore.map { Date() >= $0 } ?? true)
                     // A connection that is on its way back is waited for, for a moment.
                     let oneIsComing =
-                        (returning > 0 || pinged != nil) && !fresh && Date().timeIntervalSince(began) < returnGrace
+                        (returning > 0 || pinged != nil) && !fresh && Date().timeIntervalSince(began) < grace
                     // Connections held by open files are not coming back soon, and one the keep-alive tests is nobody's.
                     if serverHasRoom, !oneIsComing,
                         transfer != nil || total - transfers - (pinged == nil ? 0 : 1) < limit || fresh

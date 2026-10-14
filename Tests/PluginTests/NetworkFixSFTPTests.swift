@@ -333,8 +333,8 @@ final class FakeSFTPServer: @unchecked Sendable {
         let box = try Sandbox()
         let server = try FakeSFTPServer(root: box.url("."), box: box, mode: .stalled)
         let channel = SFTPChannel(
-            executable: server.transport.executable, arguments: server.transport.arguments, environment: [:])
-        channel.writeTimeout = 1
+            executable: server.transport.executable, arguments: server.transport.arguments, environment: [:],
+            writeTimeout: 1)
         try channel.start(timeout: 10, cancellation: nil) { true }
         defer { channel.close() }
         let started = Date()

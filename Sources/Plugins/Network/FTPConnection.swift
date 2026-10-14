@@ -233,12 +233,12 @@ final class FTPConnection: @unchecked Sendable {
     private var extendedPassiveFailed = false
     private var currentType: Character?
     /// Links already found to lead to a directory or not, so a listing seen again is not asked again.
-    var knownLinks = LinkMemory()
+    let knownLinks: LinkMemory
     /// The names of this server that are written back as they came (see `NameMemory`).
-    var knownNames = NameMemory()
+    let knownNames: NameMemory
     /// Called whenever the server showed a sign of life on this connection, from the thread
     /// that uses it: whoever waits for a connection of the pool waits on while this is called.
-    var onActivity: (@Sendable () -> Void)?
+    let onActivity: (@Sendable () -> Void)?
     /// The links (full paths) the last listing left unanswered for lack of time.
     private(set) var unresolvedLinks: [String] = []
     private var workingDirectory: String?
@@ -254,11 +254,20 @@ final class FTPConnection: @unchecked Sendable {
     /// When the connection was last used; the pool reads it while it holds the connection.
     var lastUsed = Date()
     /// Called with every line sent and received, for the log.
-    var log: (@Sendable (String) -> Void)?
+    let log: (@Sendable (String) -> Void)?
 
-    init(config: FTPServerConfig, trust: CertificateTrust) {
+    /// `knownLinks` and `knownNames` are the session's, shared by its connections.
+    init(
+        config: FTPServerConfig, trust: CertificateTrust, knownLinks: LinkMemory = LinkMemory(),
+        knownNames: NameMemory = NameMemory(), onActivity: (@Sendable () -> Void)? = nil,
+        log: (@Sendable (String) -> Void)? = nil
+    ) {
         self.config = config
         self.trust = trust
+        self.knownLinks = knownLinks
+        self.knownNames = knownNames
+        self.onActivity = onActivity
+        self.log = log
         encoding = config.encoding
     }
 

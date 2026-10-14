@@ -139,50 +139,108 @@ public struct Credentials: Sendable {
 /// user accepted, and a way to ask the user. The questions may be asked from any thread and
 /// block until they are answered.
 ///
-/// The questions and the other settings are set while the plugin starts (tests set them before
-/// they connect) and only read afterwards, from any thread.
+/// The questions and the other settings are set while the plugin starts (tests set them when
+/// they like) and read from any thread; they are guarded by `lock`. A question is taken under
+/// the lock and asked without it.
 public final class SessionEnvironment: @unchecked Sendable {
     public let options: NetworkOptions
     public let trust: CertificateTrust
+    private let lock = NSLock()
+    private var hooks = Hooks()
+
+    /// What can be set, in one place, for the lock.
+    private struct Hooks {
+        var askCredentials: @Sendable (_ profile: ConnectionProfile, _ message: String) -> Credentials? = { _, _ in
+            nil
+        }
+        var askToTrust: @Sendable (_ profile: ConnectionProfile, _ certificate: CertificateInfo) -> Bool = { _, _ in
+            false
+        }
+        var askToTrustChanged:
+            @Sendable (_ profile: ConnectionProfile, _ certificate: CertificateInfo, _ known: [String]) -> Bool = {
+                _, _, _ in false
+            }
+        var askToConnect: @Sendable (_ profile: ConnectionProfile) -> Bool = { _ in true }
+        var askToSendPasswordUnprotected: @Sendable (_ profile: ConnectionProfile) -> Bool = { _ in true }
+        var asksAboutUnprotectedLoopback = false
+        var rememberPassword: @Sendable (_ profile: ConnectionProfile, _ password: String) -> Void = { _, _ in }
+        var askSecret: @Sendable (_ profile: ConnectionProfile, _ question: String, _ isSecret: Bool) -> String? = {
+            _, _, _ in
+            nil
+        }
+        var declineMemory: TimeInterval = 5
+        var log: @Sendable (String) -> Void = { _ in }
+    }
+
+    private func hook<Value>(_ path: KeyPath<Hooks, Value>) -> Value {
+        lock.withLock { hooks[keyPath: path] }
+    }
+
+    private func setHook<Value>(_ path: WritableKeyPath<Hooks, Value>, _ value: Value) {
+        lock.withLock { hooks[keyPath: path] = value }
+    }
+
     /// Asks for the user name and password of a server; `message` says why (the first time, or
     /// what the server answered to the last attempt). Nil when the user gives up.
-    public var askCredentials: @Sendable (_ profile: ConnectionProfile, _ message: String) -> Credentials? = { _, _ in
-        nil
+    public var askCredentials: @Sendable (_ profile: ConnectionProfile, _ message: String) -> Credentials? {
+        get { hook(\.askCredentials) }
+        set { setHook(\.askCredentials, newValue) }
     }
     /// Shows a certificate the system does not trust; true when the user accepts it. The
     /// answer is recorded in `trust` by whoever asks.
-    public var askToTrust: @Sendable (_ profile: ConnectionProfile, _ certificate: CertificateInfo) -> Bool = { _, _ in
-        false
+    public var askToTrust: @Sendable (_ profile: ConnectionProfile, _ certificate: CertificateInfo) -> Bool {
+        get { hook(\.askToTrust) }
+        set { setHook(\.askToTrust, newValue) }
     }
     /// Shows a certificate that differs from the ones accepted for this server before
     /// (`known`, their fingerprints): the sign of somebody in the middle, or of a server that
     /// renewed its certificate. True when the user accepts the new one in place of the old;
     /// whoever asks records that with `CertificateTrust.replace`. Refused unless set.
     public var askToTrustChanged:
-        @Sendable (_ profile: ConnectionProfile, _ certificate: CertificateInfo, _ known: [String]) -> Bool = {
-            _, _, _ in false
-        }
+        @Sendable (_ profile: ConnectionProfile, _ certificate: CertificateInfo, _ known: [String]) -> Bool
+    {
+        get { hook(\.askToTrustChanged) }
+        set { setHook(\.askToTrustChanged, newValue) }
+    }
     /// Asks whether to connect to a server nobody chose (`ConnectionProfile.asksBeforeConnecting`).
-    public var askToConnect: @Sendable (_ profile: ConnectionProfile) -> Bool = { _ in true }
+    public var askToConnect: @Sendable (_ profile: ConnectionProfile) -> Bool {
+        get { hook(\.askToConnect) }
+        set { setHook(\.askToConnect, newValue) }
+    }
     /// Asks whether to send a password over a connection that is not encrypted (plain FTP).
-    public var askToSendPasswordUnprotected: @Sendable (_ profile: ConnectionProfile) -> Bool = { _ in true }
+    public var askToSendPasswordUnprotected: @Sendable (_ profile: ConnectionProfile) -> Bool {
+        get { hook(\.askToSendPasswordUnprotected) }
+        set { setHook(\.askToSendPasswordUnprotected, newValue) }
+    }
     /// A server on this machine itself (`localhost`, `127.0.0.1`) is not asked about: nothing
     /// sent there crosses a network. Tests set this to ask all the same.
-    public var asksAboutUnprotectedLoopback = false
+    public var asksAboutUnprotectedLoopback: Bool {
+        get { hook(\.asksAboutUnprotectedLoopback) }
+        set { setHook(\.asksAboutUnprotectedLoopback, newValue) }
+    }
     /// Stores the password the user asked to keep, after the server accepted it. Called on the
     /// connecting thread.
-    public var rememberPassword: @Sendable (_ profile: ConnectionProfile, _ password: String) -> Void = { _, _ in }
+    public var rememberPassword: @Sendable (_ profile: ConnectionProfile, _ password: String) -> Void {
+        get { hook(\.rememberPassword) }
+        set { setHook(\.rememberPassword, newValue) }
+    }
     /// Asks a question of the secure shell (a host key to confirm, the passphrase of a key).
-    public var askSecret: @Sendable (_ profile: ConnectionProfile, _ question: String, _ isSecret: Bool) -> String? = {
-        _, _, _ in
-        nil
+    public var askSecret: @Sendable (_ profile: ConnectionProfile, _ question: String, _ isSecret: Bool) -> String? {
+        get { hook(\.askSecret) }
+        set { setHook(\.askSecret, newValue) }
     }
     /// After the user refused a password or a certificate, further attempts to connect to that
     /// server fail for this many seconds without asking again: one click on a folder leads to
     /// several questions to the file system, and the user answered once.
-    public var declineMemory: TimeInterval = 5
+    public var declineMemory: TimeInterval {
+        get { hook(\.declineMemory) }
+        set { setHook(\.declineMemory, newValue) }
+    }
     /// Receives the dialogue with the servers, line by line, from any thread.
-    public var log: @Sendable (String) -> Void = { _ in }
+    public var log: @Sendable (String) -> Void {
+        get { hook(\.log) }
+        set { setHook(\.log, newValue) }
+    }
 
     public init(options: NetworkOptions = NetworkOptions(), trust: CertificateTrust = CertificateTrust()) {
         self.options = options
