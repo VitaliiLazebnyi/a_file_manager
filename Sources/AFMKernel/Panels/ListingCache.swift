@@ -1,4 +1,4 @@
-import Foundation
+public import Foundation
 
 /// Remembers the last complete listing of the folders that are slow to read, so a panel that
 /// returns to one can show it at once and read it afresh behind ("show old, refresh behind").

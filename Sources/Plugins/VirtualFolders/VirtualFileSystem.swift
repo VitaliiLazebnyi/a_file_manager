@@ -1,5 +1,5 @@
-import AFMKernel
-import Foundation
+public import AFMKernel
+public import Foundation
 
 /// The file system of folders that exist only in the panel: the branch view of a directory and
 /// lists of files from anywhere (spec 03 › Branch view, 09 › Feed to listbox).

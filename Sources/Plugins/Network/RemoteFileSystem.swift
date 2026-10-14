@@ -1,5 +1,5 @@
-import AFMKernel
-import Foundation
+public import AFMKernel
+public import Foundation
 
 /// The servers the program is connected to, and how to reach the ones it is not connected to
 /// yet (spec 11 › A connection is a panel location). The file-system providers find their

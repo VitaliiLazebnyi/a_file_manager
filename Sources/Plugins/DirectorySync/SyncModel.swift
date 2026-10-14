@@ -1,6 +1,6 @@
 import AFMContracts
-import AFMKernel
-import Foundation
+public import AFMKernel
+public import Foundation
 
 /// The wildcard field of Synchronize directories (spec 09 › Filter, 18 › File masks): masks
 /// separated by spaces or semicolons, masks to leave out after `|`. An excluded mask that ends

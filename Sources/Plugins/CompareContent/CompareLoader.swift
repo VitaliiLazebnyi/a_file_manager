@@ -1,6 +1,6 @@
 import AFMContracts
-import AFMKernel
-import Foundation
+public import AFMKernel
+public import Foundation
 
 /// Two files as the compare window shows them.
 public enum CompareContent {

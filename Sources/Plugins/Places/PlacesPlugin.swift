@@ -1,6 +1,6 @@
 import AFMContracts
-import AFMKernel
-import Foundation
+public import AFMKernel
+public import Foundation
 
 extension CommandID {
     /// The directory tree of the source panel's volume in a window (spec 12 › Directory Tree dialog).

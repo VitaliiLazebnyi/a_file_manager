@@ -1,5 +1,5 @@
-import AFMKernel
-import Foundation
+public import AFMKernel
+public import Foundation
 import NetFS
 
 /// Mounting and ejecting network volumes, the Mac's form of mapping and disconnecting network

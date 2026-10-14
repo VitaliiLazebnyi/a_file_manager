@@ -1,5 +1,5 @@
-import AFMKernel
-import Foundation
+public import AFMKernel
+public import Foundation
 
 /// A saved set of folder tabs (spec 03 › Tab files and storage, 19 › `.tab` files): a text
 /// file in INI form, UTF-8, with the tabs of one panel in `[activetabs]` and, when both sides

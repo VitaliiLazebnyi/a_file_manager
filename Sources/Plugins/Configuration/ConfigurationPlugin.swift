@@ -1,7 +1,7 @@
 import AFMContracts
-import AFMKernel
+public import AFMKernel
 import AFMShell
-import AppKit
+public import AppKit
 import UniformTypeIdentifiers
 
 /// The configuration dialog, hotkeys, button bar and user commands (spec 13, 14), the settings

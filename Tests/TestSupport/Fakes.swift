@@ -1,5 +1,5 @@
-import AFMKernel
-import Foundation
+public import AFMKernel
+public import Foundation
 
 /// Answers the program's questions from a script and records what was asked.
 public final class ScriptedInteraction: UserInteraction {

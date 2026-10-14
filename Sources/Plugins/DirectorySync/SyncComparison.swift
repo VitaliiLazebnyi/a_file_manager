@@ -1,5 +1,5 @@
-import AFMKernel
-import Foundation
+public import AFMKernel
+public import Foundation
 
 /// How far a comparison is (spec 09 › Status line).
 public struct SyncProgress: Equatable {

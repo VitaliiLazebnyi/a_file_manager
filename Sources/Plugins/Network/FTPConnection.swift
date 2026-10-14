@@ -1,5 +1,5 @@
 import AFMKernel
-import Foundation
+public import Foundation
 
 /// How file names travel on the control connection (spec 11 › File-name encoding).
 public enum NameEncoding: Int, Codable, CaseIterable {

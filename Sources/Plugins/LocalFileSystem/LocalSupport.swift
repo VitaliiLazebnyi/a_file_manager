@@ -1,5 +1,5 @@
 import AFMKernel
-import Foundation
+public import Foundation
 
 /// Lets another thread end a system call this thread is blocked in (an `open`, `read` or
 /// `write` on a share that has stopped answering), by a signal that does nothing except

@@ -1,5 +1,5 @@
 import AFMKernel
-import AppKit
+public import AppKit
 import Darwin
 
 /// What is known of the volume a folder is on.

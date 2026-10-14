@@ -1,5 +1,5 @@
 import AFMKernel
-import Foundation
+public import Foundation
 
 /// What a `vfolder:` URL stands for. Everything a virtual folder needs to find its way back to
 /// the real file system is written into the URL itself, so a tab that shows one can be stored

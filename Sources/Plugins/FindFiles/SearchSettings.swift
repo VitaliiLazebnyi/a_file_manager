@@ -1,5 +1,5 @@
-import AFMKernel
-import Foundation
+public import AFMKernel
+public import Foundation
 
 /// Everything the Find Files window holds in its four tabs, as the user entered it. This is
 /// what a saved search stores and what a search is made from (spec 09 › Load/Save tab).

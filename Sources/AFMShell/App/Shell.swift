@@ -1,6 +1,6 @@
 import AFMContracts
-import AFMKernel
-import AppKit
+public import AFMKernel
+public import AppKit
 
 /// The window shell: the main window with its two panels, the progress window and the menu
 /// bar. It provides no file-manager features itself; it shows what the plugins registered

@@ -1,4 +1,4 @@
-import Foundation
+public import Foundation
 
 /// The contents of one directory as read from its file system, with what a panel needs to
 /// know about its surroundings. Read in the background, then handed to the panel's model.

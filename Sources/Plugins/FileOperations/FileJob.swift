@@ -1,6 +1,6 @@
-import AFMContracts
-import AFMKernel
-import Foundation
+public import AFMContracts
+public import AFMKernel
+public import Foundation
 
 public enum JobKind: Equatable {
     case transfer(TransferKind)

@@ -1,4 +1,4 @@
-import AFMKernel
+public import AFMKernel
 import CryptoKit
 import Foundation
 

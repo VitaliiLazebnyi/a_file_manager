@@ -1,4 +1,4 @@
-import AFMKernel
+public import AFMKernel
 import Foundation
 
 /// A stretch of two sequences that is either the same in both or differs: `a` is deleted and

@@ -1,4 +1,4 @@
-import Foundation
+public import Foundation
 
 /// A file panel as plugins see it. Its state is in the models (`tabs`): a plugin changes a
 /// model and the panel on screen follows by itself. What needs the file system goes through

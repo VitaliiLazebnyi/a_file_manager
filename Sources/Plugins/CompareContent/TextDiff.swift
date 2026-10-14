@@ -1,5 +1,5 @@
-import AFMKernel
-import Foundation
+public import AFMKernel
+public import Foundation
 
 /// When two lines count as equal (spec 09 › Comparison rules). The options only decide
 /// equality; inside a line that differs, the characters are compared exactly.

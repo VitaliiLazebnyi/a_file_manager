@@ -1,6 +1,6 @@
-import AFMContracts
-import AFMKernel
-import Foundation
+public import AFMContracts
+public import AFMKernel
+public import Foundation
 
 extension CommandID {
     /// Branch view of the selected folders only (spec 03 › Selected branch).

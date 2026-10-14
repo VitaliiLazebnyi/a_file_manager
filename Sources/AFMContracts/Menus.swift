@@ -1,4 +1,4 @@
-import AFMKernel
+public import AFMKernel
 import Foundation
 
 /// The menus of the menu bar and the sections inside them, shared by every plugin that adds

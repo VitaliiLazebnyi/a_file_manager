@@ -1,6 +1,6 @@
 import AFMContracts
-import AFMKernel
-import Foundation
+public import AFMKernel
+public import Foundation
 
 /// Archives as folders; pack, unpack and test (spec 08).
 ///

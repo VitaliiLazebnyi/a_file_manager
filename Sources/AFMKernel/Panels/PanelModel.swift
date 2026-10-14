@@ -1,4 +1,4 @@
-import Foundation
+public import Foundation
 
 /// State of one folder tab: location, list, cursor, selection, sort order and history
 /// (spec 01 › Panel state, 03 › Selection, 03 › Navigation).

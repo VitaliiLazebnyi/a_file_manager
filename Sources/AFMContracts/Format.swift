@@ -1,4 +1,4 @@
-import Foundation
+public import Foundation
 
 /// How sizes, dates, speeds and attributes are written everywhere in the program
 /// (spec 03 › Data formats).

@@ -1,4 +1,4 @@
-import Foundation
+public import Foundation
 
 /// The download list (spec 11 › Download list and HTTP downloads): a text file with one
 /// transfer per line, written by *Add to download list* and worked through by *FTP Download

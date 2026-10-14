@@ -1,5 +1,5 @@
-import AFMKernel
-import Foundation
+public import AFMKernel
+public import Foundation
 
 /// The encodings "Find text" can look for a text in (spec 09 › "Find text"). The Windows
 /// pair "ANSI" and "ASCII (DOS)" is kept for files that come from there; UTF-8 is what a Mac

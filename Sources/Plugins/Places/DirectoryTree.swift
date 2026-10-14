@@ -1,5 +1,5 @@
-import AFMKernel
-import Foundation
+public import AFMKernel
+public import Foundation
 
 /// One folder of a directory tree (spec 12 › Directory Tree dialog). Nodes belong to whoever
 /// owns their `DirectoryTree`.

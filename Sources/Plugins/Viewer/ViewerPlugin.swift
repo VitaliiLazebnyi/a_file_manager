@@ -1,7 +1,7 @@
-import AFMContracts
-import AFMKernel
-import AFMShell
-import AppKit
+public import AFMContracts
+public import AFMKernel
+public import AFMShell
+public import AppKit
 
 /// Commands only the viewer uses, by their names in the specification (17 › Command catalogue).
 extension CommandID {

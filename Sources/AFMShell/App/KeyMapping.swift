@@ -1,5 +1,5 @@
-import AFMKernel
-import AppKit
+public import AFMKernel
+public import AppKit
 
 /// Translates between the kernel's shortcuts and the Mac's key events and menu keys.
 extension Key {

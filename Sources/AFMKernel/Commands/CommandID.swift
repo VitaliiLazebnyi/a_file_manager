@@ -1,4 +1,4 @@
-import Foundation
+public import Foundation
 
 /// The name of a command. Plugins register commands under names; menus, keys and other
 /// plugins refer to them by name only. The kernel defines no names itself.

@@ -1,4 +1,4 @@
-import Foundation
+public import Foundation
 
 /// An entry of the volume list: a disk, a mounted folder or a well-known place.
 public struct Place {

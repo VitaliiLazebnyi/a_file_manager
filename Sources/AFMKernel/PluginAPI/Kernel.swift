@@ -1,4 +1,4 @@
-import Foundation
+public import Foundation
 
 /// A feature of the program. A plugin registers what it provides (commands, menu entries,
 /// file systems, openers, services) with the kernel when it starts, and keeps whatever state

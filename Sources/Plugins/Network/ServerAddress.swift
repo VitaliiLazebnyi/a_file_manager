@@ -1,4 +1,4 @@
-import Foundation
+public import Foundation
 
 /// How a connection to an FTP server is secured (spec 11 › Address and URL syntax).
 public enum TLSMode: Int, Codable, Equatable {

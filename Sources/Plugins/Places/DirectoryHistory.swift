@@ -1,5 +1,5 @@
-import AFMKernel
-import Foundation
+public import AFMKernel
+public import Foundation
 
 /// The directories one panel visited, oldest first (spec 03 › Directory history list). The
 /// panel's own back/forward list forgets what lay ahead; this one keeps every place once.

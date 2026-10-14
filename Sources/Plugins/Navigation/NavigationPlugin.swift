@@ -1,6 +1,6 @@
 import AFMContracts
-import AFMKernel
-import AppKit
+public import AFMKernel
+public import AppKit
 
 extension CommandID {
     /// Ctrl+← / Ctrl+→: shows the folder under the cursor in the left / right panel

@@ -1,6 +1,6 @@
 import AFMContracts
-import AFMKernel
-import AppKit
+public import AFMKernel
+public import AppKit
 
 /// The Multi-Rename Tool (spec 09 › Multi-Rename Tool).
 public final class MultiRenamePlugin: Plugin {

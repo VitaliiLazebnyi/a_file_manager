@@ -1,4 +1,4 @@
-import Foundation
+public import Foundation
 
 /// Spreads independent work over the processor's cores.
 public enum Parallel {

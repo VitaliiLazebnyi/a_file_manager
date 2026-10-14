@@ -1,5 +1,5 @@
 import AFMKernel
-import Foundation
+public import Foundation
 
 /// The directory trees that were read, kept so the tree window opens at once (spec 12 ›
 /// Reading the tree and the tree cache). Each root (with and without hidden folders, which

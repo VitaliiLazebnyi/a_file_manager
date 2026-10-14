@@ -1,4 +1,4 @@
-import Foundation
+public import Foundation
 
 /// The ordered folder tabs of one panel. Each tab keeps its own directory, sort order,
 /// selection and history (spec 03 › Folder tabs). Like the tabs' models it only holds state:

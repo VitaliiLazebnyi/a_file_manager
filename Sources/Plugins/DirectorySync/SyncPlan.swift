@@ -1,6 +1,6 @@
 import AFMContracts
-import AFMKernel
-import Foundation
+public import AFMKernel
+public import Foundation
 
 /// What Synchronize is about to do, worked out from the rows and their actions
 /// (spec 09 › The "Synchronize" dialog and the run). A value without behaviour: the dialog

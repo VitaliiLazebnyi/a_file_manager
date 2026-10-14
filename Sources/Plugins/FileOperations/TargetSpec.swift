@@ -1,6 +1,6 @@
 import AFMContracts
-import AFMKernel
-import Foundation
+public import AFMKernel
+public import Foundation
 
 /// Target masks of Copy and Move (spec 07 › Wildcard target names).
 public enum TargetMask {

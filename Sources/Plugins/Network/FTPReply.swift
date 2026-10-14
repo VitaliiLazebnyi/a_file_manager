@@ -1,4 +1,4 @@
-import Foundation
+public import Foundation
 
 /// One answer of an FTP server: a three-digit code and the text lines that came with it.
 public struct FTPReply: Equatable {

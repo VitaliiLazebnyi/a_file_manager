@@ -1,5 +1,5 @@
 import AFMKernel
-import Foundation
+public import Foundation
 
 /// The program that carries the SFTP dialogue instead of `/usr/bin/ssh`: tests run the
 /// system's own `sftp-server` on a sandbox folder this way, without a network or a login.

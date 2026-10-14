@@ -1,5 +1,5 @@
-import AFMKernel
-import Foundation
+public import AFMKernel
+public import Foundation
 
 /// Collects every file below some directories into one flat list (spec 03 › Branch view).
 ///

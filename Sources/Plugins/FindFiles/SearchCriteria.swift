@@ -1,6 +1,6 @@
 import AFMContracts
-import AFMKernel
-import Foundation
+public import AFMKernel
+public import Foundation
 
 /// A state of the Advanced tab's attribute boxes: must be set, must not be set, or either.
 public enum TriState: Int, Codable {

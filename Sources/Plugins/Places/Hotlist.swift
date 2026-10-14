@@ -1,5 +1,5 @@
-import AFMKernel
-import Foundation
+public import AFMKernel
+public import Foundation
 
 /// One line of the directory hotlist (spec 12 › Directory hotlist editor): a place to go to,
 /// a submenu of further entries, or a separator line.

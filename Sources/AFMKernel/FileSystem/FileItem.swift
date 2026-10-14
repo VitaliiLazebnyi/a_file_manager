@@ -1,4 +1,4 @@
-import Foundation
+public import Foundation
 
 /// One entry of a directory, on whatever file system it lives (spec 03 › Rows in Full view).
 public struct FileItem: Equatable {

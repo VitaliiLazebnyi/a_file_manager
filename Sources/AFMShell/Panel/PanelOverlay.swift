@@ -1,4 +1,4 @@
-import AppKit
+public import AppKit
 
 /// What a panel on screen offers beyond `PanelHandle`, to plugins that put views of their own
 /// into the window: `kernel.panels.target as? PanelOverlayHost`.

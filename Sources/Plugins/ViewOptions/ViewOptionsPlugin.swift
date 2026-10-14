@@ -1,5 +1,5 @@
 import AFMContracts
-import AFMKernel
+public import AFMKernel
 import Foundation
 
 /// The Show menu: the view of the file list, the plugin columns, which files are listed, the

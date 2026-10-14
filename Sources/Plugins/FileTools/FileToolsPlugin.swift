@@ -1,6 +1,6 @@
 import AFMContracts
-import AFMKernel
-import AppKit
+public import AFMKernel
+public import AppKit
 
 /// The commands of this plugin, under the names of the specification (17 › Command catalogue).
 extension CommandID {

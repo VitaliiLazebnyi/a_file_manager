@@ -1,4 +1,4 @@
-import Foundation
+public import Foundation
 
 /// How the bytes of a text file become characters (spec 09 › Loading, mode and encodings).
 public enum TextEncoding: Equatable {

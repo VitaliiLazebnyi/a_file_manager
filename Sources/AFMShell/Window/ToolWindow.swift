@@ -1,5 +1,5 @@
 import AFMKernel
-import AppKit
+public import AppKit
 
 /// A secondary window for plugins (viewer, Find Files): Esc and Cmd+W close it.
 open class ToolWindow: NSWindow {

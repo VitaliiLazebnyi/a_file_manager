@@ -1,4 +1,4 @@
-import Foundation
+public import Foundation
 
 /// A scratch folder on the local disk that is removed when the test ends.
 public final class Sandbox {

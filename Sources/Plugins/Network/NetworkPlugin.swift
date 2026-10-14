@@ -1,5 +1,5 @@
 import AFMContracts
-import AFMKernel
+public import AFMKernel
 import Foundation
 
 /// The commands only this plugin uses (spec 11 › The Net menu, 17 › Command catalogue).

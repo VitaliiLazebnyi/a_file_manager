@@ -1,6 +1,6 @@
 import AFMContracts
-import AFMKernel
-import AppKit
+public import AFMKernel
+public import AppKit
 
 /// The commands only this plugin provides (spec 17 › Clipboard). The `Net` variants write
 /// URLs, which is what a UNC path is on the Mac.

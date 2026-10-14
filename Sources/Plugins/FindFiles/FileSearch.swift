@@ -1,5 +1,5 @@
-import AFMKernel
-import Foundation
+public import AFMKernel
+public import Foundation
 
 /// The "Search for" field of Find Files (spec 09 › "Search for"): masks separated by spaces,
 /// exclude masks after `|`. A word without wildcards and without a dot matches anywhere in the

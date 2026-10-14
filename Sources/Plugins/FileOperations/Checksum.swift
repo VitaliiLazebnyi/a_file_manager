@@ -1,6 +1,6 @@
-import AFMKernel
+public import AFMKernel
 import CryptoKit
-import Foundation
+public import Foundation
 
 /// Checksums of file contents, read block by block through the file-system providers, so a
 /// file of any size on any file system costs one megabyte of memory (spec 07 › Verify).

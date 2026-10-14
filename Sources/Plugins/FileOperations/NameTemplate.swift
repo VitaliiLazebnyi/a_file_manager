@@ -1,5 +1,5 @@
 import AFMKernel
-import Foundation
+public import Foundation
 
 /// The names typed into New folder (F7) and New file (Shift+F4): several at once, nested,
 /// and, when the text starts with `<`, with placeholders and counter ranges (spec 07 › New

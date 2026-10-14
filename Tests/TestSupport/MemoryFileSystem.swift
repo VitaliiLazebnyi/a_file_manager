@@ -1,5 +1,5 @@
-import AFMKernel
-import Foundation
+public import AFMKernel
+public import Foundation
 
 /// A file system that exists only in memory (`mem:` URLs). It stands in for the kinds of
 /// location the program does not have yet (archives, servers) and shows that panels, jobs and

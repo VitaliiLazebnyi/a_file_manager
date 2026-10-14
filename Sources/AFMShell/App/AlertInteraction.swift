@@ -1,5 +1,5 @@
-import AFMKernel
-import AppKit
+public import AFMKernel
+public import AppKit
 
 /// Asks the user with standard alerts.
 public final class AlertInteraction: UserInteraction {

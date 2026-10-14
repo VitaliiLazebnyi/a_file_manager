@@ -1,4 +1,4 @@
-import Foundation
+public import Foundation
 
 /// Sort keys of the Show menu; raw values match `sortorder=` in the spec (03 › Sort keys).
 public enum SortKey: Int {

@@ -1,6 +1,6 @@
 import AFMContracts
-import AFMKernel
-import AppKit
+public import AFMKernel
+public import AppKit
 
 /// The Mark menu (spec 03 › Selection, 09 › Compare directories and Mark newer). The commands
 /// change the model's selection; the panel redraws by itself.

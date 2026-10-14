@@ -1,5 +1,5 @@
-import AFMKernel
-import Foundation
+public import AFMKernel
+public import Foundation
 
 /// Turns a search into a question for Spotlight's index (in place of the spec's *Everything*,
 /// 09 › Everything integration). Spotlight answers the parts it knows (names, plain text,

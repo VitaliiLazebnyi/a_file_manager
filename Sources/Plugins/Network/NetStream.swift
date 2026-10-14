@@ -1,6 +1,6 @@
 import AFMKernel
 import CryptoKit
-import Foundation
+public import Foundation
 import Network
 import Security
 

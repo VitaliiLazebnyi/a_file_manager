@@ -1,5 +1,5 @@
-import AFMKernel
-import Foundation
+public import AFMKernel
+public import Foundation
 
 /// The log of file operations (spec 13 › Operation › Log file): one line per item,
 ///

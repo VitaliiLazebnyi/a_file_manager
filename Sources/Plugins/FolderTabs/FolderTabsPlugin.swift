@@ -1,5 +1,5 @@
 import AFMContracts
-import AFMKernel
+public import AFMKernel
 import Foundation
 
 extension CommandID {

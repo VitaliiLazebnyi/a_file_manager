@@ -1,5 +1,5 @@
-import AFMKernel
-import AppKit
+public import AFMKernel
+public import AppKit
 import ArchivesPlugin
 import ClipboardPlugin
 import CompareContentPlugin

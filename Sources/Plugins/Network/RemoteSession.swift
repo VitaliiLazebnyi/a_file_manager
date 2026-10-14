@@ -1,5 +1,5 @@
 import AFMKernel
-import Foundation
+public import Foundation
 
 /// How file contents travel (spec 11 › Transfer modes).
 public enum TransferMode: Int, CaseIterable {

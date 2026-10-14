@@ -1,5 +1,5 @@
-import AFMKernel
-import Foundation
+public import AFMKernel
+public import Foundation
 import Security
 
 /// Where the passwords of saved connections are kept. Safe from any thread.

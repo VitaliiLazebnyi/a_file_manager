@@ -1,4 +1,4 @@
-import Foundation
+public import Foundation
 
 /// Measures how fast a job advances and estimates the time left. The speed is the average over
 /// the last few seconds, so it follows changes without jumping with every block.

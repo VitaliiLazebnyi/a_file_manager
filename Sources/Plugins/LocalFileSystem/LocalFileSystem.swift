@@ -1,6 +1,6 @@
-import AFMKernel
+public import AFMKernel
 import AppKit
-import Foundation
+public import Foundation
 
 /// The file system of the Mac itself (`file:` URLs). The system calls it uses are safe to make
 /// from several threads at once; the little it remembers (the list of places, what it learned

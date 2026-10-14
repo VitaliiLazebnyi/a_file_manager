@@ -1,5 +1,5 @@
 import AFMKernel
-import Foundation
+public import Foundation
 
 /// One entry of a directory on a server, as far as the server told.
 public struct RemoteEntry: Equatable {

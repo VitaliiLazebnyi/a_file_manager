@@ -1,6 +1,6 @@
 import AFMContracts
-import AFMKernel
-import Foundation
+public import AFMKernel
+public import Foundation
 
 /// Commands only this plugin provides (spec 17 › Command catalogue).
 extension CommandID {

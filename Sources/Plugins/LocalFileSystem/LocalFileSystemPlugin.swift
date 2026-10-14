@@ -1,4 +1,4 @@
-import AFMKernel
+public import AFMKernel
 import Foundation
 
 /// Provides the local disks and mounted volumes: everything reachable through a file path.
