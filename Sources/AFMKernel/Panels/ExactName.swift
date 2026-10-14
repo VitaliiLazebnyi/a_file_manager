@@ -31,9 +31,9 @@ internal struct ExactName: Hashable, Sendable {
 
     /// Feeds the bytes of a name to a hasher.
     internal static func combine(_ name: String, into hasher: inout Hasher) {
-        if name.utf8.withContiguousStorageIfAvailable({ hasher.combine(bytes: UnsafeRawBufferPointer($0)) }) == nil {
-            Array(name.utf8).withUnsafeBytes { hasher.combine(bytes: $0) }
-        }
+        // A name whose UTF-8 is not in one piece is put in one first.
+        var bytes = name
+        bytes.withUTF8 { hasher.combine(bytes: UnsafeRawBufferPointer($0)) }
     }
 
     /// Hashes the name's bytes, as `==` compares them.

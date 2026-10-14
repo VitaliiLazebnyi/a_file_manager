@@ -42,10 +42,7 @@ extension PanelModel {
             return .changed
 
         case .sizes(let sizeStamp, let sized):
-            guard sizeStamp == self.sizeStamp else {
-                return .stale
-            }
-            return takeSizes(prepared, sized: sized)
+            return takeSizes(prepared, sizeStamp: sizeStamp, sized: sized)
         }
     }
 
@@ -145,8 +142,13 @@ extension PanelModel {
         return .changed
     }
 
-    /// Takes copies of the lists with calculated sizes written into them.
-    internal func takeSizes(_ prepared: Prepared, sized: Bitset) -> Outcome {
+    /// Takes copies of the lists with calculated sizes written into them, made when the sizes
+    /// set so far were `sizeStamp`.
+    internal func takeSizes(_ prepared: Prepared, sizeStamp: Int, sized: Bitset) -> Outcome {
+        // Another size was set since: the copies lack it.
+        guard sizeStamp == self.sizeStamp else {
+            return .stale
+        }
         // No name was found: the lists stay.
         guard prepared.lists.listed.count == listedItems.count, !listedItems.isEmpty else {
             return .unchanged
@@ -159,7 +161,7 @@ extension PanelModel {
         self.sized = sized
         counted.setList(prepared.lists.tally)
         counted.selected = nil
-        sizeStamp += 1
+        self.sizeStamp += 1
         changed(.selection)
         return .changed
     }
