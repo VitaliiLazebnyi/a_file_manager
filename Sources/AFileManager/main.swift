@@ -1,5 +1,10 @@
 import AFMShell
 import StandardPlugins
 
-let application = ShellApplication(productName: StandardPlugins.productName, plugins: StandardPlugins.make())
-application.run()
+/// The program: the window shell with the standard plugins, run until the user quits.
+private let kApplication = ShellApplication(
+    productName: StandardPlugins.productName,
+    plugins: StandardPlugins.make()
+)
+
+kApplication.run()
