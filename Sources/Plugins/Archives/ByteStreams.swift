@@ -39,7 +39,7 @@ func posixError(_ code: Int32, _ path: String) -> any Error {
 /// A file on the local disk that is read at any position, from any number of threads at once
 /// (`pread` keeps no position). The file stays readable for as long as this object lives, even
 /// when it is replaced or deleted meanwhile.
-final class RandomAccessFile {
+final class RandomAccessFile: Sendable {
     let size: UInt64
     let path: String
     /// What the open file is, taken from the descriptor: a file that has since been replaced
@@ -97,11 +97,11 @@ final class RandomAccessFile {
 
 /// A request to end a read that runs through streams (decompressing, skipping on to a member,
 /// waiting for a child process). Set from any thread; the streams that can take long look at it
-/// and throw, and a child process is stopped by it.
-final class StreamInterrupt {
+/// and throw, and a child process is stopped by it. All state is guarded by `lock`.
+final class StreamInterrupt: @unchecked Sendable {
     private let lock = NSLock()
     private var isRaised = false
-    private var handlers: [() -> Void] = []
+    private var handlers: [@Sendable () -> Void] = []
 
     var isSet: Bool {
         lock.lock()
@@ -124,7 +124,7 @@ final class StreamInterrupt {
 
     /// Runs `handler` when the request is set, at once if it is already. Holds on to what it
     /// touches weakly.
-    func onSet(_ handler: @escaping () -> Void) {
+    func onSet(_ handler: @escaping @Sendable () -> Void) {
         lock.lock()
         guard isRaised else {
             handlers.append(handler)
@@ -144,8 +144,8 @@ final class StreamInterrupt {
 /// Where the reader of a member hands the streams it reads through to its owner's request to
 /// stop, which may come at any time from another thread. A stream that is kept for the next
 /// reader (see `OpenArchive.park`) is let go of at `release()`, so that a request that comes
-/// later cannot end somebody else's read.
-final class InterruptSlot {
+/// later cannot end somebody else's read. All state is guarded by `lock`.
+final class InterruptSlot: @unchecked Sendable {
     private let lock = NSLock()
     private var interrupted = false
     private var current: StreamInterrupt?
@@ -572,13 +572,17 @@ final class SpaceWatch {
 ///
 /// Temporary files that have to lie elsewhere (next to an archive on another volume) are
 /// noted in a list beside the folder, so that they are found again and removed too.
-final class ScratchFolder {
+///
+/// Unchecked: what changes, here and in the table of all folders, is guarded by the static
+/// `lock`.
+final class ScratchFolder: @unchecked Sendable {
     let url: URL
 
     static let prefix = "afm-archives-"
     private static let keptMark = "kept-unsaved-changes"
     private static let lock = NSLock()
-    private static var folders: [String: ScratchFolder.Paths] = [:]
+    /// Guarded by `lock`.
+    nonisolated(unsafe) private static var folders: [String: ScratchFolder.Paths] = [:]
     private var isKept = false
     private var isMade = false
     private var externals: [String] = []
@@ -710,8 +714,9 @@ final class ScratchFolder {
     }
 }
 
-/// A temporary file that disappears with the last object that refers to it.
-final class TemporaryFile {
+/// A temporary file that disappears with the last object that refers to it. `kept` is
+/// guarded by `lock`.
+final class TemporaryFile: @unchecked Sendable {
     let url: URL
     private let lock = NSLock()
     private var kept = false

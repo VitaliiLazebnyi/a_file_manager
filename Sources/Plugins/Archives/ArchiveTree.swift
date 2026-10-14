@@ -375,7 +375,10 @@ struct ArchiveTree {
 /// going back means starting again from the front, and a member behind a long stretch of
 /// decompression is a long way off. Used by one thread; only `interrupt()` may be called from
 /// another, which ends the read or seek that is under way and every later one.
-final class ArchiveMemberReader: FileReader {
+///
+/// Unchecked: used by one thread at a time, as `FileReader` allows; `interrupt` touches only
+/// `slot`, which is safe from any thread.
+final class ArchiveMemberReader: FileReader, @unchecked Sendable {
     private let open: (InterruptSlot) throws -> any ByteStream
     private let slot = InterruptSlot()
     private var stream: any ByteStream?

@@ -346,7 +346,7 @@ enum Tool {
 
     /// Reads a pipe to its end on a thread of its own (not one of the shared pool's, which a
     /// child that never ends would take away for good) and keeps the first `errorLimit` bytes.
-    static func collect(_ handle: FileHandle, group: DispatchGroup, into store: @escaping (Data) -> Void) {
+    static func collect(_ handle: FileHandle, group: DispatchGroup, into store: @escaping @Sendable (Data) -> Void) {
         group.enter()
         Thread.detachNewThread {
             var kept = Data()
@@ -385,7 +385,8 @@ enum Tool {
             try? writeEnd.close()
             group.leave()
         }
-        var errors = Data()
+        // Written by the reading thread before it leaves the group, read here only after the wait.
+        nonisolated(unsafe) var errors = Data()
         collect(stderr.fileHandleForReading, group: group) { errors = $0 }
         let output = (try? stdout.fileHandleForReading.readToEnd()) ?? Data()
         group.wait()
@@ -404,7 +405,10 @@ enum Tool {
 /// The standard output of a child process as a stream. Closing it before the end stops the
 /// child, which is how a cancelled operation ends it; so does the `control`, from any thread,
 /// and the read that waits for the child then throws.
-final class ProcessStream: ByteStream {
+///
+/// Unchecked: `errors` and `isClosed` are guarded by `lock`; the rest is fixed in `init` or
+/// belongs to the thread that reads the stream. Other threads only `stop` the child.
+final class ProcessStream: ByteStream, @unchecked Sendable {
     private let process: Process
     private let executable: String
     private let output = Pipe()

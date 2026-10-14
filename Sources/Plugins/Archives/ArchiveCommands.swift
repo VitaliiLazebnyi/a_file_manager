@@ -55,6 +55,7 @@ enum ArchiveSettings {
 /// panels and ask the user. Everything that reads or writes files runs inside a job, on the
 /// job's thread, with a progress window and Cancel; the job's completion returns to the main
 /// thread to report and to refresh the panels.
+@MainActor
 final class ArchiveCommands {
     private let kernel: Kernel
     private let store: ArchiveStore
@@ -214,7 +215,7 @@ final class ArchiveCommands {
     // MARK: Pack
 
     /// Splits a prefix such as `tgz:` off a Pack target (spec 08 › Target string).
-    static func splitPrefix(_ text: String) -> (format: ArchiveFormat?, path: String) {
+    nonisolated static func splitPrefix(_ text: String) -> (format: ArchiveFormat?, path: String) {
         guard let colon = text.firstIndex(of: ":"), !text[text.index(after: colon)...].hasPrefix("//") else {
             return (nil, text)
         }
@@ -225,7 +226,7 @@ final class ArchiveCommands {
     }
 
     /// The file name a new archive gets: the typed name with the ending of the chosen format.
-    static func archiveName(_ typed: String, format: ArchiveFormat) -> String {
+    nonisolated static func archiveName(_ typed: String, format: ArchiveFormat) -> String {
         let ext = (typed as NSString).pathExtension.lowercased()
         if format == .zip, ArchiveFileSystem.zipExtensions.contains(ext) { return typed }
         if let split = ArchiveFormat.splitKnownExtension(typed) {
@@ -337,10 +338,11 @@ final class ArchiveCommands {
         let (fileSystems, store, ui) = (self.fileSystems, self.store, self.ui)
         kernel.jobs.run(
             title: "Packing:",
-            work: { monitor -> (result: PackResult, packed: [String]) in
+            work: { [options, archive, innerFolder] monitor -> (result: PackResult, packed: [String]) in
                 let packer = Packer(fileSystems: fileSystems, store: store, monitor: monitor, options: options)
                 packer.confirmReplace = { existing in
-                    monitor.ask {
+                    // `@Sendable`, so that it may be sent from this thread to the main thread.
+                    monitor.ask { @Sendable in
                         ui.choose(
                             "Overwrite:", detail: "\(fileSystems.displayPath(existing)) already exists.",
                             buttons: ["Overwrite", "Cancel"],
@@ -365,7 +367,7 @@ final class ArchiveCommands {
 
     /// The names the panel marks the operands that were packed with. A branch or list view
     /// names its items by path, which is not the last name of their locations.
-    static func names(of operands: [FileItem], packedAs completed: [URL]) -> [String] {
+    nonisolated static func names(of operands: [FileItem], packedAs completed: [URL]) -> [String] {
         let packed = Set(completed)
         return operands.filter { packed.contains($0.url) }.map(\.name)
     }
@@ -443,7 +445,7 @@ final class ArchiveCommands {
         let (fileSystems, store, ui) = (self.fileSystems, self.store, self.ui)
         kernel.jobs.run(
             title: "Unpacking:",
-            work: { monitor -> UnpackResult in
+            work: { [options] monitor -> UnpackResult in
                 var sources: [Unpacker.Source] = []
                 var unreadable: [String] = []
                 if let inside {
@@ -472,7 +474,8 @@ final class ArchiveCommands {
                 }
                 let unpacker = Unpacker(fileSystems: fileSystems, monitor: monitor, options: options) {
                     existing, entry in
-                    monitor.ask {
+                    // `@Sendable`, so that it may be sent from this thread to the main thread.
+                    monitor.ask { @Sendable in
                         ui.pick(
                             "Overwrite:",
                             detail:
@@ -522,7 +525,7 @@ final class ArchiveCommands {
         let (fileSystems, store) = (self.fileSystems, self.store)
         kernel.jobs.run(
             title: "Testing:",
-            work: { monitor -> (problems: [String], tested: Int) in
+            work: { [archives] monitor -> (problems: [String], tested: Int) in
                 var problems: [String] = []
                 var tested = 0
                 for (index, url) in archives.enumerated() where !monitor.cancellation.isCancelled {
