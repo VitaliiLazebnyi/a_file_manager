@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// Which key runs which command. Plugins supply defaults with their commands; the user's own
 /// choices, kept in the settings, replace them. Every key press and every menu key is looked
@@ -8,14 +9,23 @@ public final class KeyBindings {
     /// Settings key of the user's bindings: command name → shortcuts in text form.
     public nonisolated static let settingsKey = "keyBindings"
 
+    private static let log = Log.logger("Kernel")
     private var commands: [Shortcut: CommandID] = [:]
     private var shortcuts: [CommandID: [Shortcut]] = [:]
 
     public init() {}
 
-    /// Binds a command's default key. A key that is already taken stays with its command.
+    /// Binds a command's default key. A key that is already taken stays with its command; two
+    /// plugins that want the same key are a bug, which is logged.
     public func bindDefault(_ shortcut: Shortcut, to command: CommandID) {
-        guard commands[shortcut] == nil else { return }
+        if let owner = commands[shortcut] {
+            if owner != command {
+                Self.log.fault(
+                    "\(owner, privacy: .public) and \(command, privacy: .public) both want \(shortcut.notation, privacy: .public)"
+                )
+            }
+            return
+        }
         commands[shortcut] = command
         shortcuts[command, default: []].append(shortcut)
     }

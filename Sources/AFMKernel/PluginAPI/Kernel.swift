@@ -1,4 +1,5 @@
 public import Foundation
+import os
 
 /// A feature of the program. A plugin registers what it provides (commands, menu entries,
 /// file systems, openers, services) with the kernel when it starts, and keeps whatever state
@@ -73,6 +74,8 @@ public final class Kernel {
     public private(set) var plugins: [any Plugin] = []
     /// Weak: the shell owns the kernel.
     private weak var shell: (any ShellServices)?
+    private static let log = Log.logger("Kernel")
+    private static let signposter = Log.signposter("Kernel")
 
     public init(productName: String, settings: any SettingsStore, ui: any UserInteraction) {
         self.productName = productName
@@ -112,7 +115,11 @@ public final class Kernel {
     public func load(_ plugins: [any Plugin]) {
         for plugin in plugins {
             self.plugins.append(plugin)
+            // How long each plugin takes to start, for Instruments.
+            let interval = Self.signposter.beginInterval("start", id: .exclusive, "\(plugin.name, privacy: .public)")
             plugin.start(in: self)
+            Self.signposter.endInterval("start", interval)
+            Self.log.info("Started the plugin \(plugin.name, privacy: .public)")
         }
     }
 
@@ -127,6 +134,7 @@ public final class Kernel {
     /// Stops the plugins when the program quits.
     public func shutdown() {
         plugins.reversed().forEach { $0.stop() }
+        Self.log.info("Stopped \(self.plugins.count, privacy: .public) plugins")
     }
 
     /// Asks every plugin whether the program may quit (`Plugin.shouldTerminate`), in the
