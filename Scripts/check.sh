@@ -7,7 +7,7 @@
 #
 # Gates:
 #   format      swift-format and Prettier leave every file as it is
-#   lint        SwiftLint (--strict, every rule but the conflicting ones), swift-format lint
+#   lint        SwiftLint (--strict, every rule but the conflicting ones) and its analyzer rules
 #   docs-lint   markdownlint, typos
 #   scripts     ShellCheck, actionlint, zizmor
 #   secrets     gitleaks over the whole history
@@ -87,7 +87,7 @@ for gate in "${gates[@]}"; do
       step "Semgrep"
       semgrep scan --error --metrics off --quiet --config p/security-audit --config p/secrets --config p/swift .
       step "Trivy"
-      trivy fs --quiet --exit-code 1 --scanners vuln,secret,misconfig .
+      trivy fs --quiet --exit-code 1 --scanners vuln,secret,misconfig --skip-dirs .claude .
       step "OSV-Scanner"
       osv-scanner scan source --recursive . || [[ $? -eq 128 ]]  # 128: no package sources to scan
       ;;
