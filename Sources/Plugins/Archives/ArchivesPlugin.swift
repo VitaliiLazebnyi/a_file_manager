@@ -145,7 +145,7 @@ public final class ArchivesPlugin: Plugin {
     /// `cancellation` was set: the user did not want to wait. Nothing is lost by that: what
     /// was not written still waits, and `stop()`, which then no longer tries to write it,
     /// keeps it on the disk and says where.
-    public func prepareToQuit(cancellation: CancellationFlag, completion: @escaping () -> Void) {
+    public func prepareToQuit(cancellation: CancellationFlag, completion: @escaping @Sendable () -> Void) {
         let (store, environment) = (self.store, self.environment)
         guard store.hasPendingChanges else {
             completion()

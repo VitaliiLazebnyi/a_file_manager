@@ -29,7 +29,7 @@ private final class QuitTestPlugin: Plugin {
         return allowsQuit
     }
 
-    func prepareToQuit(cancellation: CancellationFlag, completion: @escaping () -> Void) {
+    func prepareToQuit(cancellation: CancellationFlag, completion: @escaping @Sendable () -> Void) {
         prepared += 1
         guard !hasNothingToDo else {
             completion()

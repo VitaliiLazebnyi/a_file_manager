@@ -26,14 +26,14 @@ private func sample(_ count: Int) -> [FileItem] {
     }
 }
 
-private func panel(_ items: [FileItem], sort: ListOrder = ListOrder()) -> PanelModel {
+@MainActor private func panel(_ items: [FileItem], sort: ListOrder = ListOrder()) -> PanelModel {
     let model = PanelModel(directory: folder, sort: sort)
     model.show(listing(items))
     return model
 }
 
 /// The totals counted the plain way, from what the model shows.
-private func counted(_ model: PanelModel) -> PanelModel.Totals {
+@MainActor private func counted(_ model: PanelModel) -> PanelModel.Totals {
     var totals = PanelModel.Totals()
     for (index, item) in model.items.enumerated() {
         let size = item.isFolder ? (item.computedSize ?? 0) : item.size
@@ -48,7 +48,7 @@ private func counted(_ model: PanelModel) -> PanelModel.Totals {
 }
 
 /// Everything a panel shows, to compare two models by.
-private func state(_ model: PanelModel) -> [String] {
+@MainActor private func state(_ model: PanelModel) -> [String] {
     [
         model.items.map(\.name).joined(separator: "|"), model.listedItems.map(\.name).joined(separator: "|"),
         model.selectedNames.joined(separator: "|"), "\(model.cursor)", model.cursorItem?.name ?? "-", "\(model.totals)",
@@ -59,9 +59,10 @@ private func state(_ model: PanelModel) -> [String] {
 }
 
 /// Runs work on another thread and waits for it, as a panel does with long lists.
-private func elsewhere<Value>(_ work: @escaping () -> Value) -> Value {
+private func elsewhere<Value>(_ work: @escaping @Sendable () -> Value) -> Value {
     let done = DispatchSemaphore(value: 0)
-    var value: Value?
+    // Written by the other thread before it signals, read here after the wait.
+    nonisolated(unsafe) var value: Value?
     Thread.detachNewThread {
         value = work()
         done.signal()

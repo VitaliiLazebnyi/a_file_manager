@@ -10,7 +10,7 @@ private func file(_ name: String, size: Int64 = 1, in directory: URL = folder) -
     FileItem(url: directory.appendingPathComponent(name), name: name, isDirectory: false, size: size)
 }
 
-private func panel(_ items: [FileItem]) -> PanelModel {
+@MainActor private func panel(_ items: [FileItem]) -> PanelModel {
     let model = PanelModel(directory: folder)
     model.show(
         Listing(
@@ -34,7 +34,7 @@ private final class QuittingPlugin: Plugin {
         asked += 1
         return mayQuit
     }
-    func prepareToQuit(cancellation: CancellationFlag, completion: @escaping () -> Void) {
+    func prepareToQuit(cancellation: CancellationFlag, completion: @escaping @Sendable () -> Void) {
         sawFlag = cancellation
         guard finishesLate else {
             completion()
@@ -80,8 +80,9 @@ private final class PlainPlugin: Plugin {
         let kernel = Kernel(productName: "Test", settings: MemorySettings(), ui: ui)
         let answer: (Int, Bool) = await withCheckedContinuation { continuation in
             Thread.detachNewThread {
-                var onMain = false
-                let chosen = kernel.askUser { ui -> Int in
+                // Written on the main thread while this thread waits for the answer.
+                nonisolated(unsafe) var onMain = false
+                let chosen = kernel.askUser { @Sendable ui -> Int in
                     onMain = Thread.isMainThread
                     return ui.choose(
                         "Go on?", detail: "", buttons: ["Yes", "No"], style: .warning, defaultButton: nil)
@@ -145,7 +146,8 @@ private final class PlainPlugin: Plugin {
         model.moveCursor(to: 5)
         let snapshot = model.operandsSnapshot()
         let done = DispatchSemaphore(value: 0)
-        var (names, indices, marked): ([String], [Int], Bool) = ([], [], false)
+        // Written by the other thread before it signals, read here after the wait.
+        nonisolated(unsafe) var (names, indices, marked): ([String], [Int], Bool) = ([], [], false)
         Thread.detachNewThread {
             names = snapshot.items().map(\.name)
             indices = snapshot.markedIndices()
@@ -226,7 +228,8 @@ private final class PlainPlugin: Plugin {
         // Whoever keeps changes to a file back is asked to write them before the file is used.
         let registry = FileSystemRegistry()
         registry.register(memory)
-        var flushed: [String] = []
+        // The flushers run on this thread, inside the calls below.
+        nonisolated(unsafe) var flushed: [String] = []
         registry.addFlusher { url, _ in flushed.append(url.lastPathComponent) }
         registry.addFlusher { url, flag in
             if url.lastPathComponent == "bad" || flag.isCancelled { throw FileSystemError.notSupported("Flushing") }

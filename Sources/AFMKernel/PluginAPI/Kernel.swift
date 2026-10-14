@@ -22,13 +22,15 @@ public protocol Plugin: AnyObject {
     /// yet written) starts that work in the background and calls `completion`, on any thread
     /// and exactly once, when it is done or has given up because `cancellation` was set (the
     /// user did not want to wait). The default calls `completion` at once.
-    func prepareToQuit(cancellation: CancellationFlag, completion: @escaping () -> Void)
+    func prepareToQuit(cancellation: CancellationFlag, completion: @escaping @Sendable () -> Void)
 }
 
 extension Plugin {
     public func stop() {}
     public func shouldTerminate() -> Bool { true }
-    public func prepareToQuit(cancellation _: CancellationFlag, completion: @escaping () -> Void) { completion() }
+    public func prepareToQuit(cancellation _: CancellationFlag, completion: @escaping @Sendable () -> Void) {
+        completion()
+    }
 }
 
 /// What the window shell provides to plugins once it exists.
@@ -137,13 +139,14 @@ public final class Kernel {
     /// thread when the last one is done. Called on the main thread, by the shell, after the
     /// quit is decided and before `shutdown`; setting `cancellation` tells the plugins not to
     /// keep the user waiting.
-    public func prepareToQuit(cancellation: CancellationFlag, completion: @escaping () -> Void) {
+    public func prepareToQuit(cancellation: CancellationFlag, completion: @escaping @MainActor @Sendable () -> Void) {
         let group = DispatchGroup()
         for plugin in plugins {
             group.enter()
             // A plugin that answers twice must not end the wait for the others.
             let lock = NSLock()
-            var isDone = false
+            // Guarded by `lock`.
+            nonisolated(unsafe) var isDone = false
             plugin.prepareToQuit(cancellation: cancellation) {
                 lock.lock()
                 let isFirst = !isDone
@@ -152,7 +155,8 @@ public final class Kernel {
                 if isFirst { group.leave() }
             }
         }
-        group.notify(queue: .main, execute: completion)
+        // Notified on the main queue.
+        group.notify(queue: .main) { MainActor.assumeIsolated { completion() } }
     }
 
     private var attachedShell: any ShellServices {
@@ -170,7 +174,7 @@ public final class Kernel {
     /// Asks the user something from any thread and waits for the answer: the route for a file
     /// system that needs, say, a password in the middle of a job. Inside a job prefer
     /// `JobMonitor.ask`, which also keeps the progress window correct.
-    nonisolated public func askUser<Answer: Sendable>(_ question: sending @MainActor (any UserInteraction) -> Answer)
+    nonisolated public func askUser<Answer: Sendable>(_ question: @MainActor @Sendable (any UserInteraction) -> Answer)
         -> Answer
     {
         if Thread.isMainThread { return MainActor.assumeIsolated { question(ui) } }
@@ -185,8 +189,6 @@ public final class Kernel {
         let hop = MainThreadHop()
         var answer: Answer?
         withoutActuallyEscaping(question) { question in
-            // Run on the main thread only (by its run loop or its queue), while this thread waits.
-            nonisolated(unsafe) let question = question
             hop.work = { answer = MainActor.assumeIsolated { question(ui) } }
             let block: @Sendable () -> Void = { hop.run() }
             CFRunLoopPerformBlock(CFRunLoopGetMain(), CFRunLoopMode.commonModes.rawValue, block)

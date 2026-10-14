@@ -39,7 +39,7 @@ public final class FileOperationsPlugin: Plugin {
     /// in the background, so that a log on a volume that has stopped answering holds up
     /// nothing but itself, and no longer than the user wants to wait (`cancellation`).
     /// `stop()` then finds nothing left to write.
-    public func prepareToQuit(cancellation: CancellationFlag, completion: @escaping () -> Void) {
+    public func prepareToQuit(cancellation: CancellationFlag, completion: @escaping @Sendable () -> Void) {
         guard let operations else {
             completion()
             return

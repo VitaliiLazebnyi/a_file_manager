@@ -42,7 +42,8 @@ private final class PlainFileSystem: FileSystemProvider {
 }
 
 /// Something set on one thread and waited for on another, without a clock in between.
-private final class Signal<Value> {
+/// Unchecked: the value is guarded by `condition`.
+private final class Signal<Value>: @unchecked Sendable {
     private let condition = NSCondition()
     private var value: Value?
 
@@ -72,7 +73,7 @@ private func waitUntil(seconds: TimeInterval = 60, _ condition: () -> Bool) -> B
     return true
 }
 
-private func onThread(_ work: @escaping () -> Void) {
+private func onThread(_ work: @escaping @Sendable () -> Void) {
     let thread = Thread(block: work)
     thread.stackSize = 1 << 20
     thread.start()
@@ -81,7 +82,8 @@ private func onThread(_ work: @escaping () -> Void) {
 @Suite struct CancellationHandlers {
     @Test func aHandlerIsCalledOnceWhenTheFlagIsSet() {
         let flag = CancellationFlag()
-        var calls = 0
+        // The handlers run on this thread, inside the calls below.
+        nonisolated(unsafe) var calls = 0
         let registration = flag.onCancel { calls += 1 }
         #expect(calls == 0 && !flag.isCancelled)
         flag.cancel()
@@ -89,7 +91,8 @@ private func onThread(_ work: @escaping () -> Void) {
         #expect(calls == 1 && flag.isCancelled)
         _ = registration
         // A flag that is set already calls at once.
-        var late = 0
+        // The handlers run on this thread, inside the calls below.
+        nonisolated(unsafe) var late = 0
         let second = flag.onCancel { late += 1 }
         #expect(late == 1)
         _ = second
@@ -97,7 +100,8 @@ private func onThread(_ work: @escaping () -> Void) {
 
     @Test func aReleasedRegistrationIsForgotten() {
         let flag = CancellationFlag()
-        var calls = 0
+        // The handlers run on this thread, inside the calls below.
+        nonisolated(unsafe) var calls = 0
         var registration: AnyObject? = flag.onCancel { calls += 1 }
         let kept = flag.onCancel { calls += 10 }
         #expect(registration != nil)
@@ -110,7 +114,8 @@ private func onThread(_ work: @escaping () -> Void) {
     @Test func theFlagIsSetFromOtherThreadsWhileHandlersComeAndGo() {
         let flag = CancellationFlag()
         let counter = NSLock()
-        var calls = 0
+        // Guarded by `counter`.
+        nonisolated(unsafe) var calls = 0
         let done = Signal<Bool>()
         onThread {
             Thread.sleep(forTimeInterval: 0.01)
@@ -234,7 +239,8 @@ private func onThread(_ work: @escaping () -> Void) {
         memory.stallsListings = true
         let flag = CancellationFlag()
         let ended = Signal<String>()
-        var batches = 0
+        // Written by the other thread before it signals, read here after the wait.
+        nonisolated(unsafe) var batches = 0
         onThread { [memory, fileSystems] in
             do {
                 _ = try PanelLoader.load(

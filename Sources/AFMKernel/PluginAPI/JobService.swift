@@ -38,7 +38,7 @@ public protocol JobMonitor: AnyObject, Sendable {
     /// `ask`, may take.
     func report(_ progress: JobProgress)
     /// Asks the user something in the middle of the work and waits for the answer.
-    func ask<Answer: Sendable>(_ question: sending @MainActor () -> Answer) -> Answer
+    func ask<Answer: Sendable>(_ question: @MainActor @Sendable () -> Answer) -> Answer
 }
 
 /// A job that was handed to the job service.

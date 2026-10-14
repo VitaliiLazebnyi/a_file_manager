@@ -3,7 +3,7 @@ import Foundation
 import TestSupport
 import Testing
 
-@Suite struct Commands {
+@MainActor @Suite struct Commands {
     @Test func runsRegisteredCommandsWithTheirArgument() {
         let commands = CommandRegistry()
         var log: [String] = []
@@ -61,7 +61,7 @@ import Testing
     }
 }
 
-@Suite struct Keys {
+@MainActor @Suite struct Keys {
     @Test func shortcutsAsText() {
         let samples: [(Shortcut, String)] = [
             (.cmd("c", .shift), "shift+cmd+c"), (.f(5), "f5"), (.f(6, .shift), "shift+f6"),
@@ -118,7 +118,7 @@ import Testing
     }
 }
 
-@Suite struct Menus {
+@MainActor @Suite struct Menus {
     static let files = MenuID("Files", order: 10), show = MenuID("Show", order: 50)
 
     @Test func menusAreOrderedAndGrouped() {
@@ -276,7 +276,8 @@ import Testing
 
     @Test func parallelMapUsesSeveralThreads() {
         let lock = NSLock()
-        var threads: Set<UInt64> = []
+        // Guarded by `lock`.
+        nonisolated(unsafe) var threads: Set<UInt64> = []
         // The threads are shared with whatever else runs at the time (other tests keep them
         // busy, and the oldest job is served first), so a second one is waited for.
         let deadline = Date().addingTimeInterval(30)

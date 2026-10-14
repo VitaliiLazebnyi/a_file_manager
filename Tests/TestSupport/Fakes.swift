@@ -158,7 +158,7 @@ public final class ImmediateJobService: JobService {
         let cancellation = CancellationFlag()
         var reports: [JobProgress] = []
         func report(_ progress: JobProgress) { reports.append(progress) }
-        func ask<Answer: Sendable>(_ question: sending @MainActor () -> Answer) -> Answer {
+        func ask<Answer: Sendable>(_ question: @MainActor @Sendable () -> Answer) -> Answer {
             MainActor.assumeIsolated { question() }
         }
     }

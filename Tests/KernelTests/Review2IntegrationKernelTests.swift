@@ -20,9 +20,10 @@ private func listing(_ folder: URL, _ items: [FileItem]) -> Listing {
         directory: folder, items: items, parent: folder.deletingLastPathComponent(), root: URL(fileURLWithPath: "/"))
 }
 
-private func elsewhere<Value>(_ work: @escaping () -> Value) -> Value {
+private func elsewhere<Value>(_ work: @escaping @Sendable () -> Value) -> Value {
     let done = DispatchSemaphore(value: 0)
-    var value: Value?
+    // Written by the other thread before it signals, read here after the wait.
+    nonisolated(unsafe) var value: Value?
     Thread.detachNewThread {
         value = work()
         done.signal()
@@ -38,7 +39,7 @@ private func elsewhere<Value>(_ work: @escaping () -> Value) -> Value {
         return model
     }
 
-    private var arrival: [FileItem] {
+    nonisolated private var arrival: [FileItem] {
         [
             entry("zeta.txt", in: other, size: 3), entry("Docs", in: other, folder: true),
             entry("alpha.log", in: other, size: 5),
@@ -189,7 +190,8 @@ private func elsewhere<Value>(_ work: @escaping () -> Value) -> Value {
 
     @Test func eachThreadHasItsOwn() {
         let done = DispatchSemaphore(value: 0)
-        var other = 0.0
+        // Written by the other thread before it signals, read here after the wait.
+        nonisolated(unsafe) var other = 0.0
         Thread.detachNewThread {
             var sum = 0.0
             let start = ThreadTime.used

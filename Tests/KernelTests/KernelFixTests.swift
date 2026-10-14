@@ -175,7 +175,7 @@ private let everyOrder = [SortKey.name, .ext, .size, .date, .unsorted].flatMap {
 @Suite struct ParallelWork {
     @Test func nestedMapsGiveTheSameResultsAsPlainLoops() {
         // A tree of calls three levels deep, with uneven branches.
-        func walk(_ depth: Int, _ seed: Int) -> Int {
+        @Sendable func walk(_ depth: Int, _ seed: Int) -> Int {
             guard depth > 0 else { return seed }
             return Parallel.map(Array(0..<(2 + seed % 5))) { walk(depth - 1, seed * 7 + $0) }.reduce(seed, &+)
         }
@@ -192,7 +192,8 @@ private let everyOrder = [SortKey.name, .ext, .size, .date, .unsorted].flatMap {
         let cores = ProcessInfo.processInfo.activeProcessorCount
         guard cores >= 4 else { return }
         let lock = NSLock()
-        var (running, most) = (0, 0)
+        // Guarded by `lock`.
+        nonisolated(unsafe) var (running, most) = (0, 0)
         // A piece stays until a second one runs beside it (a condition, not a length of time:
         // on a busy machine a helper thread may be long in coming), or for very long if none
         // ever does, which is the failure.
@@ -228,7 +229,8 @@ private let everyOrder = [SortKey.name, .ext, .size, .date, .unsorted].flatMap {
         // Pieces that wait, like pieces that wait for a server, take up every helper thread.
         let cores = ProcessInfo.processInfo.activeProcessorCount
         let gate = NSCondition()
-        var (isOpen, waiting) = (false, 0)
+        // Guarded by `gate`.
+        nonisolated(unsafe) var (isOpen, waiting) = (false, 0)
         let sleepers = DispatchGroup()
         sleepers.enter()
         Thread {
@@ -249,7 +251,8 @@ private let everyOrder = [SortKey.name, .ext, .size, .date, .unsorted].flatMap {
         while waiting < min(2, cores), gate.wait(until: end) {}
         gate.unlock()
         let lock = NSLock()
-        var (running, most) = (0, 0)
+        // Guarded by `lock`.
+        nonisolated(unsafe) var (running, most) = (0, 0)
         let deadline = Date().addingTimeInterval(60)
         _ = Parallel.map(Array(0..<8)) { _ in
             lock.lock()
@@ -280,7 +283,8 @@ private let everyOrder = [SortKey.name, .ext, .size, .date, .unsorted].flatMap {
         let results = DispatchQueue.global().sync { () -> [Int] in
             var sums = [Int](repeating: 0, count: 24)
             sums.withUnsafeMutableBufferPointer { sums in
-                let slots = sums.baseAddress!
+                // Each caller writes its own slot.
+                nonisolated(unsafe) let slots = sums.baseAddress!
                 DispatchQueue.concurrentPerform(iterations: 24) { caller in
                     slots[caller] = Parallel.map(Array(0..<200)) {
                         Parallel.map([$0, caller]) { $0 * 2 }.reduce(0, +)

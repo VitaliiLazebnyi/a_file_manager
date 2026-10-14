@@ -19,16 +19,17 @@ private func listing(_ items: [FileItem]) -> Listing {
         directory: folder, items: items, parent: folder.deletingLastPathComponent(), root: URL(fileURLWithPath: "/"))
 }
 
-private func panel(_ items: [FileItem], sort: ListOrder = ListOrder()) -> PanelModel {
+@MainActor private func panel(_ items: [FileItem], sort: ListOrder = ListOrder()) -> PanelModel {
     let model = PanelModel(directory: folder, sort: sort)
     model.show(listing(items))
     return model
 }
 
 /// Runs work on another thread and waits for it, as a panel does with long lists.
-private func elsewhere<Value>(_ work: @escaping () -> Value) -> Value {
+private func elsewhere<Value>(_ work: @escaping @Sendable () -> Value) -> Value {
     let done = DispatchSemaphore(value: 0)
-    var value: Value?
+    // Written by the other thread before it signals, read here after the wait.
+    nonisolated(unsafe) var value: Value?
     Thread.detachNewThread {
         value = work()
         done.signal()
@@ -38,7 +39,8 @@ private func elsewhere<Value>(_ work: @escaping () -> Value) -> Value {
 }
 
 /// A file system that knows its top and counts how often it is asked to go up.
-private final class RootedFileSystem: FileSystemProvider {
+/// Unchecked: the count is guarded by `lock`.
+private final class RootedFileSystem: FileSystemProvider, @unchecked Sendable {
     let scheme = "rooted"
     let capabilities: FileSystemCapabilities = []
     let knowsItsTop: Bool
@@ -517,7 +519,8 @@ private final class RootedFileSystem: FileSystemProvider {
         memory.stallsChanges = true
         let flag = CancellationFlag()
         let ended = DispatchSemaphore(value: 0)
-        var failure: (any Error)?
+        // Written by the other thread before it signals, read here after the wait.
+        nonisolated(unsafe) var failure: (any Error)?
         Thread.detachNewThread {
             do { try memory.remove(memory.url("/a.txt"), cancellation: flag) } catch { failure = error }
             ended.signal()
@@ -554,7 +557,8 @@ private final class RootedFileSystem: FileSystemProvider {
             ])
         let flag = CancellationFlag()
         let ended = DispatchSemaphore(value: 0)
-        var names: [String]?
+        // Written by the other thread before it signals, read here after the wait.
+        nonisolated(unsafe) var names: [String]?
         Thread.detachNewThread {
             names = try? memory.list(memory.url("/dead"), showHidden: true, cancellation: flag).map(\.name)
             ended.signal()

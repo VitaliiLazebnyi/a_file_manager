@@ -15,7 +15,9 @@ private func waitUntil(seconds: TimeInterval = 60, _ condition: () -> Bool) -> B
 
 /// A file system whose questions about one folder never come back until they are released:
 /// a share whose server is gone.
-private final class StalledFileSystem: FileSystemProvider {
+///
+/// Unchecked: the counts and flags are guarded by `lock`; the switches are set before use.
+private final class StalledFileSystem: FileSystemProvider, @unchecked Sendable {
     let inner = MemoryFileSystem(scheme: "stall")
     var scheme: String { inner.scheme }
     var capabilities: FileSystemCapabilities { [.write] }
@@ -94,7 +96,7 @@ private final class StalledFileSystem: FileSystemProvider {
     /// One try at reading a location, on a thread of its own; `ended` is signalled when it returns.
     private func load(
         _ path: String, _ stalled: StalledFileSystem, _ registry: FileSystemRegistry, cancellation: CancellationFlag,
-        ended: DispatchSemaphore, names: @escaping ([String]) -> Void = { _ in }
+        ended: DispatchSemaphore, names: @escaping @Sendable ([String]) -> Void = { _ in }
     ) {
         Thread.detachNewThread {
             var seen: [String] = []
@@ -126,7 +128,8 @@ private final class StalledFileSystem: FileSystemProvider {
         #expect(stalled.handedFlags.first?.isCancelled == true)
         // A healthy folder of the same file system still loads.
         let (ended, got) = (DispatchSemaphore(value: 0), DispatchSemaphore(value: 0))
-        var names: [String] = []
+        // Written by the other thread before it signals, read here after the wait.
+        nonisolated(unsafe) var names: [String] = []
         load("/alive", stalled, registry, cancellation: CancellationFlag(), ended: ended) {
             names = $0
             got.signal()
@@ -155,7 +158,8 @@ private final class StalledFileSystem: FileSystemProvider {
         // Whoever still wants the folder waits, without a thread of the kernel's, until the
         // old listing has come back, and then reads it afresh.
         let (ended, got) = (DispatchSemaphore(value: 0), DispatchSemaphore(value: 0))
-        var names: [String] = []
+        // Written by the other thread before it signals, read here after the wait.
+        nonisolated(unsafe) var names: [String] = []
         load("/dead", stalled, registry, cancellation: CancellationFlag(), ended: ended) {
             names = $0
             got.signal()
@@ -210,7 +214,9 @@ private final class StalledFileSystem: FileSystemProvider {
 }
 
 /// A tree of folders one inside the other, as deep as wanted, with one file at every level.
-private final class DeepFileSystem: FileSystemProvider {
+///
+/// Unchecked: the count is guarded by `lock`; `isEndless` is set before use.
+private final class DeepFileSystem: FileSystemProvider, @unchecked Sendable {
     let scheme = "deep"
     let capabilities: FileSystemCapabilities = []
     let depth: Int
@@ -254,9 +260,10 @@ private final class DeepFileSystem: FileSystemProvider {
 /// Review 2, K003/K038: the size of a tree that is deeper than any stack.
 @Suite struct Review2KernelTreeSize {
     /// On a thread with the small stack the pool's threads used to have.
-    private func onSmallStack<Value>(_ work: @escaping () -> Value) -> Value? {
+    private func onSmallStack<Value>(_ work: @escaping @Sendable () -> Value) -> Value? {
         let done = DispatchSemaphore(value: 0)
-        var value: Value?
+        // Written by the other thread before it signals, read here after the wait.
+        nonisolated(unsafe) var value: Value?
         let thread = Thread {
             value = work()
             done.signal()

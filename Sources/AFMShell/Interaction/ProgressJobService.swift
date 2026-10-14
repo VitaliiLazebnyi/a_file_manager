@@ -379,14 +379,12 @@ final class ProgressSheet: JobMonitor, @unchecked Sendable {
     /// Asks on the main thread and waits for the answer. The question is put from the run
     /// loop, not from inside a block of the main dispatch queue, where its dialog would keep
     /// everything else that was sent to the main thread waiting (`MainLoop`).
-    func ask<Answer: Sendable>(_ question: sending @MainActor () -> Answer) -> Answer {
+    func ask<Answer: Sendable>(_ question: @MainActor @Sendable () -> Answer) -> Answer {
         // A job has no business on the main thread; whoever asks from there is answered there.
         if Thread.isMainThread { return MainActor.assumeIsolated { put(question) } }
         let slot = AskSlot<Answer>()
         let answered = DispatchSemaphore(value: 0)
         withoutActuallyEscaping(question) { question in
-            // Asked on the main thread only, while this thread waits.
-            nonisolated(unsafe) let question = question
             slot.question = question
             MainLoop.perform {
                 // The question is let go of here, before the job's thread is woken: the run

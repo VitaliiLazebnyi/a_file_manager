@@ -6,7 +6,8 @@ import Testing
 /// Counts its instances that are still alive.
 private final class Tracked {
     static let lock = NSLock()
-    static var alive = 0
+    /// Guarded by `lock`.
+    nonisolated(unsafe) static var alive = 0
     init() {
         Self.lock.lock()
         Self.alive += 1
@@ -24,7 +25,8 @@ private final class Tracked {
     }
 }
 
-private final class Counter {
+/// Unchecked: all state is guarded by `lock`.
+private final class Counter: @unchecked Sendable {
     private let lock = NSLock()
     private var value = 0
     private var threads = Set<UInt64>()
@@ -119,7 +121,8 @@ private func waitUntil(seconds: TimeInterval = 60, _ condition: () -> Bool) -> B
         // Pieces that wait a moment each (as for an answer from a server). With no more
         // threads than cores, never more than `width + 1` of them are under way at once.
         let lock = NSLock()
-        var (underWay, most) = (0, 0)
+        // Guarded by `lock`.
+        nonisolated(unsafe) var (underWay, most) = (0, 0)
         _ = Parallel.map(Array(0..<(width * 40))) { _ in
             lock.lock()
             underWay += 1
@@ -156,7 +159,7 @@ private func waitUntil(seconds: TimeInterval = 60, _ condition: () -> Bool) -> B
 
     @Test func nestedWorkOfSeveralCallersAtOnceGivesTheRightSums() {
         // The same tree of calls from several threads, while others open and close jobs.
-        func tree(_ depth: Int) -> Int {
+        @Sendable func tree(_ depth: Int) -> Int {
             depth == 0 ? 1 : Parallel.map(Array(0..<6)) { _ in tree(depth - 1) }.reduce(0, +)
         }
         let results = Counter()
@@ -193,7 +196,7 @@ private func waitUntil(seconds: TimeInterval = 60, _ condition: () -> Bool) -> B
 
 /// Review 2, K004/K007/K040: blocking questions on the kernel's own threads, bounded.
 @Suite(.serialized) struct Review2KernelBlockingCalls {
-    private final class Owner {}
+    private final class Owner: Sendable {}
 
     @Test func theSameQuestionIsAskedOnceForAllWhoWait() {
         let owner = Owner()
@@ -227,7 +230,8 @@ private func waitUntil(seconds: TimeInterval = 60, _ condition: () -> Bool) -> B
         let owner = Owner()
         let asked = Counter()
         let release = DispatchSemaphore(value: 0)
-        var flags: [CancellationFlag] = []
+        // Guarded by `lock`.
+        nonisolated(unsafe) var flags: [CancellationFlag] = []
         let lock = NSLock()
         // Fifty tries at a location that does not answer, each given up.
         for _ in 0..<50 {
@@ -299,7 +303,8 @@ private func waitUntil(seconds: TimeInterval = 60, _ condition: () -> Bool) -> B
 
     @Test func workRunsOffTheDispatchQueuesAndListsAreReleasedThere() {
         let name = DispatchSemaphore(value: 0)
-        var threadName: String?
+        // Written by the other thread before it signals, read here after the wait.
+        nonisolated(unsafe) var threadName: String?
         BlockingCalls.run {
             threadName = Thread.current.name
             name.signal()
