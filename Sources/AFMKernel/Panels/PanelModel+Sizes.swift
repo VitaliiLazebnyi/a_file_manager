@@ -18,12 +18,7 @@ extension PanelModel {
     /// subtracted without counting again, and marking everything or the opposite is worked out from
     /// the list's figures.
     public var totals: Totals {
-        if counted.list == nil { counted.setList(ListWork.tally(items)) }
-        if counted.selected == nil {
-            let tally = marks.isEmpty ? Tally() : ListWork.tally(listedItems, at: marks)
-            counted.selected = Totals(selected: Counts(tally))
-        }
-        let (list, selected) = (counted.list ?? Totals(), counted.selected ?? Totals())
+        let (list, selected) = (countedList(), countedSelection())
         return Totals(
             selected: Counts(
                 bytes: selected.selectedBytes,
@@ -60,8 +55,7 @@ extension PanelModel {
                 shown: [],
                 places: basis.places,
                 index: finder.index,
-                tally: nil,
-                moves: .same
+                tally: nil
             )
             let kind = PreparedKind.sizes(sizeStamp: basis.sizeStamp, sized: known)
             return Prepared(kind, from: basis, lists: lists, sort: basis.sort, filter: basis.filter)
@@ -85,8 +79,7 @@ extension PanelModel {
             shown: shown,
             places: basis.places,
             index: finder.index,
-            tally: ListWork.tally(shown),
-            moves: .same
+            tally: ListWork.tally(shown)
         )
         let kind = PreparedKind.sizes(sizeStamp: basis.sizeStamp, sized: known)
         return Prepared(kind, from: basis, lists: lists, sort: basis.sort, filter: basis.filter)
@@ -166,5 +159,25 @@ extension PanelModel {
         if marks.contains(place) {
             counted.selected = counted.selected.flatMap { $0.adding(bytes: difference, selected: true) }
         }
+    }
+
+    /// The figures of the shown entries, counted now if they are not known.
+    internal func countedList() -> Totals {
+        if let list = counted.list {
+            return list
+        }
+        let tally = ListWork.tally(items)
+        counted.setList(tally)
+        return Totals(total: Counts(tally))
+    }
+
+    /// The figures of the marked entries, counted now if they are not known.
+    internal func countedSelection() -> Totals {
+        if let selected = counted.selected {
+            return selected
+        }
+        let selected = Totals(selected: Counts(marks.isEmpty ? Tally() : ListWork.tally(listedItems, at: marks)))
+        counted.selected = selected
+        return selected
     }
 }

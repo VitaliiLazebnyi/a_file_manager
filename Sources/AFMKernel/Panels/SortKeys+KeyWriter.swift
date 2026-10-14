@@ -159,8 +159,7 @@ extension SortKeys {
             units.withUnsafeBufferPointer { units in
                 collator.writeKey(
                     of: UnsafeBufferPointer(rebasing: units[range]),
-                    into: bytes + used,
-                    capacity: capacity - used
+                    into: UnsafeMutableBufferPointer(start: bytes + used, count: capacity - used)
                 )
             }
         }

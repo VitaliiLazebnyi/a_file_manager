@@ -149,11 +149,9 @@ public enum PanelLoader: Sendable {
             items += batch.listing.items
             return true
         }
-        if flag.isCancelled {
+        // Nothing arrives only when the reading was cancelled.
+        guard let first, !flag.isCancelled else {
             throw CocoaError(.userCancelled)
-        }
-        guard let first else {
-            throw FileSystemError.notSupported("Listing \(location.absoluteString)")
         }
         let header = first.listing
         let listing = Listing(
@@ -243,7 +241,7 @@ public enum PanelLoader: Sendable {
     }
 
     /// Lists a directory on a kernel thread and hands every batch to the calling thread, where
-    /// `receive` runs as if the file system had called it.
+    /// `receive` runs as if the file system had called it; the caller has checked `cancellation`.
     ///
     /// Returns when the listing is over, when `receive` wanted no more, or, without a word, when
     /// `cancellation` is set; the file system's thread is then left to come back in its own time.
@@ -254,9 +252,6 @@ public enum PanelLoader: Sendable {
         cancellation: CancellationFlag,
         receive: ([FileItem]) -> Bool
     ) throws {
-        if cancellation.isCancelled {
-            return
-        }
         if Thread.isMainThread {
             try provider.list(directory, showHidden: showHidden, cancellation: cancellation, receive: receive)
             return
@@ -286,24 +281,17 @@ public enum PanelLoader: Sendable {
     private static func pass(_ relay: ListingRelay, to receive: ([FileItem]) -> Bool, ticket: CallBook.Ticket)
         throws
     {
-        while true {
-            switch relay.next() {
-            case .batch(let items):
-                let wantsMore = receive(items)
-                relay.reply(wantsMore)
-                if !wantsMore {
-                    // The file system has been told; it is not waited for.
-                    ticket.cancel()
-                    return
-                }
-
-            case .finished(let result):
-                try result?.get()
-                return
-
-            case .abandoned:
+        var event = relay.next()
+        while case .batch(let items) = event {
+            let wantsMore = receive(items)
+            relay.reply(wantsMore)
+            guard wantsMore else {
+                // The file system has been told; it is not waited for.
+                ticket.cancel()
                 return
             }
+            event = relay.next()
         }
+        if case .finished(let result) = event { try result?.get() }
     }
 }

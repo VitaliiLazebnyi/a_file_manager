@@ -93,7 +93,7 @@ internal struct SortKeys: @unchecked Sendable {
         // An empty array is never made with `unsafeUninitializedCapacity`: for a capacity of zero
         // the standard library writes the count into the storage all empty arrays share, a write
         // that races with any other thread reading an empty array.
-        precondition(!items.isEmpty, "Keys are made for one item or more")
+        precondition(!items.isEmpty)
         self.order = order
         self.collator = collator
         let pieceCount = items.count > Sorter.parallelThreshold ? ProcessInfo.processInfo.activeProcessorCount * 4 : 1

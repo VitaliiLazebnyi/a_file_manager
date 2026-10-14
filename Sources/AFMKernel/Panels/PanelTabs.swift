@@ -128,9 +128,14 @@ public final class PanelTabs {
         guard tabs.indices.contains(index), tabs.indices.contains(destination), index != destination else {
             return
         }
-        let activeTab = active
         tabs.insert(tabs.remove(at: index), at: destination)
-        activeIndex = tabs.firstIndex { $0 === activeTab } ?? 0
+        if activeIndex == index {
+            activeIndex = destination
+        } else if index < activeIndex, destination >= activeIndex {
+            activeIndex -= 1
+        } else if index > activeIndex, destination <= activeIndex {
+            activeIndex += 1
+        }
         onChange?()
     }
 

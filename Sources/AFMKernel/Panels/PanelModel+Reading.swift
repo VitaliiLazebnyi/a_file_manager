@@ -6,7 +6,5 @@ extension PanelModel {
         internal let listing: Listing
         /// The item the cursor goes to; nil keeps it on its item.
         internal let focus: String?
-        /// Whether the reading holds the entries the panel has.
-        internal let isSame: Bool
     }
 }

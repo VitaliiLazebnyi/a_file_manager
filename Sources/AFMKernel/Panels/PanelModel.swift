@@ -162,7 +162,7 @@ public final class PanelModel {
 
     /// Announces a change.
     internal func changed(_ change: Change) {
-        MainThread.assert("A panel model")
+        MainActor.assertIsolated()
         onChange?(change)
     }
 

@@ -51,8 +51,8 @@ extension PanelModel {
         if let requestedSort { adoptSort(requestedSort) }
         let grown = order == sort ? listed : Sorter.sort(listed, by: sort)
         let (shown, places) = ListWork.arrange(grown, by: filter)
-        var lists = ArrangedLists(listed: grown, shown: shown, places: places, index: nil, tally: nil, moves: .byName)
-        extend(&lists)
+        var lists = ArrangedLists(listed: grown, shown: shown, places: places, index: nil, tally: nil)
+        extend(&lists, moves: .byName)
     }
 
     /// The directory has arrived completely.
@@ -115,14 +115,15 @@ extension PanelModel {
     internal func arrangement(of listed: [FileItem], presorted: ListOrder?) -> ArrangedLists {
         let sorted = presorted == sort ? listed : Sorter.sort(listed, by: sort)
         let (shown, places) = ListWork.arrange(sorted, by: filter)
-        return ArrangedLists(listed: sorted, shown: shown, places: places, index: nil, tally: nil, moves: .byName)
+        return ArrangedLists(listed: sorted, shown: shown, places: places, index: nil, tally: nil)
     }
 
-    /// Takes the grown list of a directory that is arriving piece by piece.
-    internal func extend(_ lists: inout ArrangedLists) {
+    /// Takes the grown list of a directory that is arriving piece by piece; `moves` says where
+    /// the entries it had are in it.
+    internal func extend(_ lists: inout ArrangedLists, moves: Moves) {
         let cursorName = cursorItem?.name
         let wasOnParentRow = cursorIsOnParentRow
-        replace(&lists, keepsTotals: false, isNewReading: true)
+        replace(&lists, moves: moves, keepsTotals: false, isNewReading: true)
         isInArrivalOrder = sort.key == .unsorted
         if let focus = pendingFocus, let row = row(ofName: focus) {
             // The item the panel was asked to show has arrived.

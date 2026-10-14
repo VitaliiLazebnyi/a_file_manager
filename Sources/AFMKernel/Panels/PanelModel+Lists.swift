@@ -58,9 +58,6 @@ extension PanelModel {
     /// `shift` carries the distance of the last entry found from one call to the next.
     internal func destination(of place: Int, in old: [FileItem], by moves: Moves, shift: inout Int) -> Int? {
         switch moves {
-        case .same:
-            return place
-
         case .table(let table):
             let found = table[place]
             return found == .max ? nil : Int(found)
@@ -76,9 +73,6 @@ extension PanelModel {
 
     /// The places of a set in the list `old`, moved to where their entries are now.
     internal func moved(_ bits: Bitset, from old: [FileItem], by moves: Moves) -> Bitset {
-        if case .same = moves, bits.size == listedItems.count {
-            return bits
-        }
         var result = Bitset(size: listedItems.count)
         var shift = 0
         for place in bits {
@@ -92,18 +86,18 @@ extension PanelModel {
     ///
     /// A later reading (`isNewReading`) takes the sizes for its folders only. `keepsTotals` keeps
     /// the counted totals, for a list that holds the same entries.
-    internal func replace(_ lists: inout ArrangedLists, keepsTotals: Bool, isNewReading: Bool) {
+    internal func replace(_ lists: inout ArrangedLists, moves: Moves, keepsTotals: Bool, isNewReading: Bool) {
         let (oldMarks, oldSized, oldCounted) = (marks, sizedPlaces(), counted)
         take(&lists)
         // `lists` holds the old lists from here on, for as long as their entries are looked at.
         arrangementChanged(list: true, index: lists.index)
         let old = lists.listed
-        let moves = movesFor(oldMarks.count + oldSized.count, from: old, by: lists.moves)
-        var kept = moved(oldMarks, from: old, by: moves)
+        let found = movesFor(oldMarks.count + oldSized.count, from: old, by: moves)
+        var kept = moved(oldMarks, from: old, by: found)
         if shownPlaces != nil, !kept.isEmpty { kept.formIntersection(shownBits()) }
         marks = kept
-        if case .places(let places) = saved { saved = .places(moved(places, from: old, by: moves)) }
-        let writes = carriedSizes(oldSized, from: old, by: moves, isNewReading: isNewReading)
+        if case .places(let places) = saved { saved = .places(moved(places, from: old, by: found)) }
+        let writes = carriedSizes(oldSized, from: old, by: found, isNewReading: isNewReading)
         write(writes)
         if keepsTotals, writes.isEmpty {
             counted = oldCounted

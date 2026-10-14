@@ -41,7 +41,7 @@ extension PanelModel {
             // this object goes, which is the main thread right after `apply`.
             var fresh: [FileItem] = []
             switch kind {
-            case .update(let reading):
+            case .update(let reading, _), .sameEntries(let reading):
                 fresh = reading.listing.items
 
             case .show(let visit):
@@ -50,7 +50,7 @@ extension PanelModel {
             default:
                 break
             }
-            kind = .sort
+            kind = .filter
             Discard.later(&fresh)
         }
     }

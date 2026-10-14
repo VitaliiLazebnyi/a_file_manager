@@ -41,8 +41,7 @@ extension PanelModel {
             shown: snapshot.lists.lists[1],
             places: snapshot.places,
             index: snapshot.index,
-            tally: nil,
-            moves: .same
+            tally: nil
         )
         take(&lists)
         lists.discard()
@@ -74,7 +73,7 @@ extension PanelModel {
         keepSavedMarksByName()
         self.directory = directory.standardized
         adopt(Surroundings(parent: parent, root: root, volume: nil))
-        var lists = ArrangedLists(listed: [], shown: [], places: nil, index: nil, tally: nil, moves: .same)
+        var lists = ArrangedLists(listed: [], shown: [], places: nil, index: nil, tally: nil)
         take(&lists)
         lists.discard()
         (marks, sized, cursor) = (Bitset(), nil, 0)

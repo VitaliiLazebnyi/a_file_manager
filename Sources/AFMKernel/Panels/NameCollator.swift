@@ -30,24 +30,24 @@ internal final class NameCollator: @unchecked Sendable {
     private static let cache = OSAllocatedUnfairLock(initialState: [String: NameCollator]())
 
     /// The collator of the user's language as it is now.
-    internal static var current: NameCollator { shared(Locale.current.collatorIdentifier ?? "", numeric: false) }
+    internal static var current: NameCollator { shared(Locale.current.collatorIdentifier, numeric: false) }
 
     /// The same collator with runs of digits ordered by their value (`file2` before
     /// `file10`): the order of `Sorter.compare(_:_:numeric:)`, not of the panels' lists.
     internal static var currentNumeric: NameCollator {
-        shared(Locale.current.collatorIdentifier ?? "", numeric: true)
+        shared(Locale.current.collatorIdentifier, numeric: true)
     }
 
     /// The library's collator and the library; nil when there is none, and names are ordered
     /// by their lowercase forms.
     private let collator: (handle: OpaquePointer, library: CollationLibrary)?
 
-    /// The collator of a language (an ICU identifier such as `ru`), with runs of digits ordered by
-    /// their value or not, from `library`.
+    /// The collator of a language (an ICU identifier such as `ru`; nil for ICU's default), with runs
+    /// of digits ordered by their value or not, from `library`.
     ///
     /// Without the library, or when it cannot make the collator, names are ordered by their
     /// lowercase forms.
-    internal init(identifier: String, numeric: Bool, library: CollationLibrary?) {
+    internal init(identifier: String?, numeric: Bool, library: CollationLibrary?) {
         var status: Int32 = 0
         guard let library, let handle = library.open(identifier, &status) else {
             collator = nil
@@ -66,9 +66,8 @@ internal final class NameCollator: @unchecked Sendable {
     }
 
     /// The collator of a language, made once and then shared.
-    private static func shared(_ identifier: String, numeric: Bool) -> NameCollator {
-        // ICU identifiers start with a letter: the first character tells the two kinds apart.
-        let key = (numeric ? "1" : "0") + identifier
+    private static func shared(_ identifier: String?, numeric: Bool) -> NameCollator {
+        let key = "\(numeric) \(String(describing: identifier))"
         return cache.withLock { known in
             if let found = known[key] {
                 return found
@@ -79,25 +78,19 @@ internal final class NameCollator: @unchecked Sendable {
         }
     }
 
-    /// Writes the key of a text given in UTF-16 into `buffer` and returns the key's length.
+    /// Writes the key of a text given in UTF-16 into `key` and returns the key's length.
     ///
-    /// A length above `capacity` means the key did not fit and nothing usable was written; the
+    /// A length above the buffer's means the key did not fit and nothing usable was written; the
     /// caller comes again with more room.
-    internal func writeKey(
-        of text: UnsafeBufferPointer<UInt16>,
-        into buffer: UnsafeMutablePointer<UInt8>,
-        capacity: Int
-    )
-        -> Int
-    {
+    internal func writeKey(of text: UnsafeBufferPointer<UInt16>, into key: UnsafeMutableBufferPointer<UInt8>) -> Int {
         if let (handle, library) = collator {
-            let room = Int32(min(capacity, Int(Int32.max)))
-            return Int(library.sortKey(handle, text.baseAddress, Int32(clamping: text.count), buffer, room))
+            let room = Int32(min(key.count, Int(Int32.max)))
+            return Int(library.sortKey(handle, text.baseAddress, Int32(clamping: text.count), key.baseAddress, room))
         }
         // Without the system's collator: the lowercase form, which at least ignores case.
         let lowercase = Array(String(decoding: text, as: UTF16.self).lowercased().utf8)
-        if lowercase.count <= capacity {
-            _ = UnsafeMutableBufferPointer(start: buffer, count: lowercase.count).initialize(fromContentsOf: lowercase)
+        if lowercase.count <= key.count {
+            _ = UnsafeMutableBufferPointer(rebasing: key[..<lowercase.count]).initialize(fromContentsOf: lowercase)
         }
         return lowercase.count
     }
@@ -116,24 +109,27 @@ internal final class NameCollator: @unchecked Sendable {
         }
         return withUnsafeTemporaryAllocation(of: UInt16.self, capacity: unitCount) { units in
             _ = units.initialize(from: text.utf16)
-            var capacity = unitCount * 6 + 32
-            while true {
-                let result: Result? = withUnsafeTemporaryAllocation(of: UInt8.self, capacity: capacity) { key in
-                    let length =
-                        key.baseAddress.map { writeKey(of: UnsafeBufferPointer(units), into: $0, capacity: capacity) }
-                        ?? 0
-                    guard length <= capacity else {
-                        // Too short: again, with room for the whole key.
-                        capacity = length
-                        return nil
-                    }
-                    return body(UnsafeBufferPointer(start: key.baseAddress, count: max(length, 0)))
-                }
-                if let result {
-                    return result
-                }
-            }
+            return withKey(of: UnsafeBufferPointer(units), room: unitCount * 6 + 32, body)
         }
+    }
+
+    /// Hands `body` the key of UTF-16 text, made in `room` bytes, or in as many as it needs.
+    private func withKey<Result>(
+        of units: UnsafeBufferPointer<UInt16>,
+        room: Int,
+        _ body: (UnsafeBufferPointer<UInt8>) -> Result
+    ) -> Result {
+        var needed = room
+        let result: Result? = withUnsafeTemporaryAllocation(of: UInt8.self, capacity: room) { key in
+            let length = writeKey(of: units, into: key)
+            guard length <= room else {
+                // Too short: again, with room for the whole key.
+                needed = length
+                return nil
+            }
+            return body(UnsafeBufferPointer(rebasing: key[..<length]))
+        }
+        return result ?? withKey(of: units, room: needed, body)
     }
 
     deinit {

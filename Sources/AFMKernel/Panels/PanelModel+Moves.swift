@@ -4,8 +4,6 @@ extension PanelModel {
     internal enum Moves {
         /// By their names, looked up when needed.
         case byName
-        /// Every entry is where it was.
-        case same
         /// The new place of every old one; `UInt32.max` for an entry that is gone.
         case table([UInt32])
     }

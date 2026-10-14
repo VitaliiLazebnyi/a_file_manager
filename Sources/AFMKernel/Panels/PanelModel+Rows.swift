@@ -46,7 +46,7 @@ extension PanelModel {
         }
         let found = places(ofExactly: item.name)
         guard found.count > 1 else {
-            return found.first.map(marks.contains) ?? false
+            return found.first.map(marks.contains) == true
         }
         // Several entries of this very name: the one that is this item; if none is quite
         // (the item is an older reading), the likeliest of those that are shown.
@@ -54,8 +54,8 @@ extension PanelModel {
             return marks.contains(own)
         }
         let shown = found.filter { shownIndex(ofPlace: $0) != nil }
-        return ListWork.twin(of: item, among: shown.isEmpty ? found : shown, in: listedItems).map(marks.contains)
-            ?? false
+        let twin = ListWork.twin(of: item, among: shown.isEmpty ? found : shown, in: listedItems)
+        return twin.map(marks.contains) == true
     }
 
     /// Moves the cursor from a command; the row is kept inside the list.

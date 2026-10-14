@@ -63,8 +63,7 @@ extension PanelModel {
             shown: shown,
             places: places,
             index: lookups.index,
-            tally: ListWork.tally(shown),
-            moves: .same
+            tally: ListWork.tally(shown)
         )
         _ = take(Prepared(.filter, from: basis, lists: lists, sort: sort, filter: filter))
     }

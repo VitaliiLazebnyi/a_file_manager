@@ -19,8 +19,7 @@ extension PanelModel {
             shown: shown,
             places: places,
             index: basis.index,
-            tally: ListWork.tally(shown),
-            moves: .same
+            tally: ListWork.tally(shown)
         )
         return Prepared(.filter, from: basis, lists: lists, sort: basis.sort, filter: filter)
     }
@@ -95,10 +94,9 @@ extension PanelModel {
             shown: shown,
             places: places,
             index: finder.index,
-            tally: ListWork.tally(shown),
-            moves: .table(table)
+            tally: ListWork.tally(shown)
         )
-        return Prepared(.extend, from: basis, lists: lists, sort: wanted, filter: basis.filter)
+        return Prepared(.extend(.table(table)), from: basis, lists: lists, sort: wanted, filter: basis.filter)
     }
 
     /// The list in another order; `indexing` makes the index of names of a long list along with it.
@@ -114,10 +112,9 @@ extension PanelModel {
                 shown: basis.items,
                 places: basis.places,
                 index: basis.index,
-                tally: nil,
-                moves: .same
+                tally: nil
             )
-            return Prepared(.sort, from: basis, lists: lists, sort: order, filter: basis.filter)
+            return Prepared(.sortName, from: basis, lists: lists, sort: order, filter: basis.filter)
         }
         let listed = Sorter.permute(old, by: indexes)
         let table = ListWork.inverse(of: indexes)
@@ -136,10 +133,9 @@ extension PanelModel {
             shown: shown,
             places: places,
             index: index,
-            tally: nil,
-            moves: .table(table)
+            tally: nil
         )
-        return Prepared(.sort, from: basis, lists: lists, sort: order, filter: basis.filter)
+        return Prepared(.sort(table), from: basis, lists: lists, sort: order, filter: basis.filter)
     }
 
     /// A fresh listing of the directory the panel shows; with `tabulating`, the place of every old
@@ -167,25 +163,23 @@ extension PanelModel {
                 shown: basis.items,
                 places: basis.places,
                 index: basis.index,
-                tally: nil,
-                moves: .same
+                tally: nil
             )
-            let kind = PreparedKind.update(Reading(listing: listing, focus: focus, isSame: true))
+            let kind = PreparedKind.sameEntries(Reading(listing: listing, focus: focus))
             return Prepared(kind, from: basis, lists: lists, sort: basis.sort, filter: basis.filter)
         }
         let finder = NameFinder(listed)
         carrySizes(from: basis, into: &listed, finder: finder)
-        let table = tabulating ? Moves.table(ListWork.moves(from: old, to: finder)) : .byName
+        let moves = tabulating ? Moves.table(ListWork.moves(from: old, to: finder)) : .byName
         let (shown, places) = ListWork.arrange(listed, by: basis.filter)
         let lists = ArrangedLists(
             listed: listed,
             shown: shown,
             places: places,
             index: finder.index,
-            tally: ListWork.tally(shown),
-            moves: table
+            tally: ListWork.tally(shown)
         )
-        let kind = PreparedKind.update(Reading(listing: listing, focus: focus, isSame: false))
+        let kind = PreparedKind.update(Reading(listing: listing, focus: focus), moves)
         return Prepared(kind, from: basis, lists: lists, sort: order, filter: basis.filter)
     }
 
@@ -213,8 +207,7 @@ extension PanelModel {
             shown: shown,
             places: places,
             index: indexing && listed.count > indexedAbove ? NameIndex(listed) : nil,
-            tally: ListWork.tally(shown),
-            moves: .byName
+            tally: ListWork.tally(shown)
         )
         return Prepared(.show(visit), from: basis, lists: lists, sort: order, filter: basis.filter)
     }

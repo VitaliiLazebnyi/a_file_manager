@@ -8,7 +8,7 @@ extension PanelModel {
     /// are taken as they are now. A prepared change is applied once.
     @discardableResult
     public func apply(_ prepared: Prepared) -> Outcome {
-        MainThread.assert("A panel model")
+        MainActor.assertIsolated()
         return take(prepared)
     }
 
@@ -21,18 +21,24 @@ extension PanelModel {
         case .show(let visit):
             return takeShow(prepared, visit)
 
-        case .sort:
-            return takeSort(prepared)
+        case .sort(let table):
+            return takeSort(prepared, table: table)
+
+        case .sortName:
+            return takeSortName(prepared)
 
         case .filter:
             return takeFilter(prepared)
 
-        case .update(let reading):
-            return takeUpdate(prepared, reading)
+        case .update(let reading, let moves):
+            return takeUpdate(prepared, reading, moves: moves)
 
-        case .extend:
+        case .sameEntries(let reading):
+            return takeUpdate(prepared, reading, moves: nil)
+
+        case .extend(let moves):
             adoptSort(prepared.sort)
-            extend(&prepared.lists)
+            extend(&prepared.lists, moves: moves)
             return .changed
 
         case .sizes(let sizeStamp, let sized):
@@ -51,29 +57,30 @@ extension PanelModel {
         return .changed
     }
 
-    /// Takes the list in another order.
-    internal func takeSort(_ prepared: Prepared) -> Outcome {
+    /// Takes the list in another order; `table` holds the new place of every entry.
+    internal func takeSort(_ prepared: Prepared, table: [UInt32]) -> Outcome {
         // Another order has been asked for since: this one is no longer wanted.
         if let requestedSort, requestedSort != prepared.sort {
             return .stale
         }
         let cursorPlace = cursorItem == nil ? nil : place(ofShown: cursor - offset)
         adoptSort(prepared.sort)
-        guard case .table = prepared.lists.moves else {
-            // The list is in the new order as it is; only the name of the order changes.
-            prepared.forget()
-            stamp += 1
-            changed(.contents)
-            return .changed
-        }
-        let moves = prepared.lists.moves
-        replace(&prepared.lists, keepsTotals: true, isNewReading: false)
-        var shift = 0
-        if let cursorPlace, let found = destination(of: cursorPlace, in: [], by: moves, shift: &shift),
-            let index = shownIndex(ofPlace: found)
-        {
+        replace(&prepared.lists, moves: .table(table), keepsTotals: true, isNewReading: false)
+        if let cursorPlace, let index = shownIndex(ofPlace: Int(table[cursorPlace])) {
             cursor = index + offset
         }
+        changed(.contents)
+        return .changed
+    }
+
+    /// Takes an order the list is in already: only the name of the order changes.
+    internal func takeSortName(_ prepared: Prepared) -> Outcome {
+        if let requestedSort, requestedSort != prepared.sort {
+            return .stale
+        }
+        adoptSort(prepared.sort)
+        prepared.forget()
+        stamp += 1
         changed(.contents)
         return .changed
     }
@@ -107,19 +114,20 @@ extension PanelModel {
         return .changed
     }
 
-    /// Takes a fresh reading of the directory the panel shows.
-    internal func takeUpdate(_ prepared: Prepared, _ reading: Reading) -> Outcome {
+    /// Takes a fresh reading of the directory the panel shows; without `moves` it holds the
+    /// entries the panel has.
+    internal func takeUpdate(_ prepared: Prepared, _ reading: Reading, moves: Moves?) -> Outcome {
         let focusName = reading.focus ?? cursorItem?.name
         let oldCursor = cursor
         let oldVolume = volume
         let oldState = ListState(isListed: isListed, isComplete: isComplete, isRefreshing: isRefreshing)
         adopt(reading.listing)
-        if reading.isSame {
-            prepared.forget()
-        } else {
+        if let moves {
             adoptSort(prepared.sort)
-            replace(&prepared.lists, keepsTotals: false, isNewReading: true)
+            replace(&prepared.lists, moves: moves, keepsTotals: false, isNewReading: true)
             isInArrivalOrder = sort.key == .unsorted
+        } else {
+            prepared.forget()
         }
         // A vanished cursor item leaves the cursor on the row that took its place (07 › State changes).
         // In a list that did not change, the item is where it was.
@@ -128,7 +136,7 @@ extension PanelModel {
             ?? min(oldCursor, max(rowCount - 1, 0))
         // The flags count as well: whoever shows "refreshing" has to hear that it is over.
         let isDifferent =
-            !reading.isSame || cursor != oldCursor || volume != oldVolume || !oldState.isListed
+            moves != nil || cursor != oldCursor || volume != oldVolume || !oldState.isListed
             || isComplete != oldState.isComplete || isRefreshing != oldState.isRefreshing
         guard isDifferent else {
             return .unchanged

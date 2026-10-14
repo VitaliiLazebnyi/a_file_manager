@@ -38,7 +38,8 @@ public enum Sorter: Sendable {
             if key == .ext {
                 (first, second) = (ext, base)
             } else {
-                (first, second) = (base, String(item.name.utf8.dropFirst(base.utf8.count)) ?? "")
+                let cut = item.name.utf8.index(item.name.utf8.startIndex, offsetBy: base.utf8.count)
+                (first, second) = (base, String(item.name[cut...]))
             }
         }
     }

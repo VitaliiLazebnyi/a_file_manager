@@ -13,8 +13,6 @@ internal struct ArrangedLists {
     internal let index: NameIndex?
     /// The count of `shown`, when it was made along with the work.
     internal let tally: Tally?
-    /// Where the entries of the replaced list are in this one.
-    internal let moves: PanelModel.Moves
 
     /// Lets go of whatever lists this holds, in the background.
     internal mutating func discard() {

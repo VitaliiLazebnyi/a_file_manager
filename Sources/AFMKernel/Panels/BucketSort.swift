@@ -77,7 +77,7 @@ internal enum BucketSort {
     /// Where each piece puts its share of each bucket (`starts[piece][bucket]`), and the
     /// positions of each bucket, from how many values of each bucket each piece holds.
     private static func layout(_ counts: [[Int]]) -> (starts: [[Int]], runs: [Range<Int>]) {
-        let bucketCount = counts.first?.count ?? 0
+        let bucketCount = counts[0].count
         var starts = [[Int]](repeating: [Int](repeating: 0, count: bucketCount), count: counts.count)
         var runs: [Range<Int>] = []
         var position = 0
