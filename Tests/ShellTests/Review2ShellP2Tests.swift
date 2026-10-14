@@ -375,10 +375,12 @@ extension Application {
         let due = await wait { app.shell.quitProgress?.isDue == true }
         #expect(due && reply == nil && plugin.pending?.flag.isCancelled == false)
         #expect(app.shell.quitProgress?.text == QuitProgress.waitingText)
+        weak let progress = app.shell.quitProgress
         // The plugin is done: the program quits, and the notice is gone.
         plugin.finish()
         let answered = await wait { reply != nil }
         #expect(answered && reply == true && app.shell.quitProgress == nil)
+        #expect(progress == nil)
     }
 
     @Test func quitNowTellsThePluginsNotToKeepTheUserWaiting() async {

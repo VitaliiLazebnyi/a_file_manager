@@ -46,6 +46,9 @@ final class QuitProgress: NSObject {
     /// Takes the window away, or keeps it from coming.
     func close() {
         isClosed = true
+        // The answers hold what holds this window.
+        onQuitNow = nil
+        onDontQuit = nil
         cancelTimer?()
         cancelTimer = nil
         guard panel != nil else { return }
