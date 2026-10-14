@@ -1,0 +1,6 @@
+.build/
+build/
+scratchpad/
+Tests/Fuzz/out/
+Tests/Stress/results/
+documentation/review-*/extracted/

@@ -11,20 +11,26 @@ What each other area still has to call is listed, per area, in `cross-requests/k
 ### 0.1 There since the first pass — checked against the code at the start of this pass
 
 Quit (`Sources/AFMKernel/PluginAPI/Kernel.swift`):
+
 - `protocol Plugin { func shouldTerminate() -> Bool }` — default `true`. Asked on the main thread before anything is
   stopped; a plugin with unsaved work asks its question here and returns `false` to call the quit off.
 - `Kernel.shouldTerminate() -> Bool` — asks every plugin in start order, `false` as soon as one says no. Main thread.
 - `protocol Plugin { func prepareToQuit(cancellation: CancellationFlag, completion: @escaping () -> Void) }` — default
-  calls `completion()` at once. Long work before quitting starts here in the background; `completion` on any
-  thread, once.
+  calls `completion()` at once. Long work before quitting starts here in the background; `completion` on any thread,
+  once.
 - `Kernel.prepareToQuit(cancellation: CancellationFlag, completion: @escaping () -> Void)` — all plugins at once,
   `completion` on the main thread after the last. (The shell calls both now: `Shell.swift`.)
 
 Dialogs (`PluginAPI/UserInteraction.swift`):
-- `UserInteraction.choose(_ message: String, detail: String, buttons: [String], style: QuestionStyle, defaultButton: Int?) -> Int`
-  — the index Return presses, `nil` for none. (Implemented by the shell's `AlertInteraction` now.)
+
+- ```swift
+  UserInteraction.choose(_ message: String, detail: String, buttons: [String], style: QuestionStyle, defaultButton: Int?) -> Int
+  ```
+
+  `defaultButton` is the index Return presses, `nil` for none. (Implemented by the shell's `AlertInteraction` now.)
 
 File systems (`FileSystem/FileSystemProvider.swift`, `FileSystem/FileItem.swift`):
+
 - `FileItem.linkTargetSize: Int64?`, `FileItem.device: Int64?` — filled by the local file system from this pass on.
 - `func createDirectory(at url: URL, exclusive: Bool) throws`
 - `func createDirectory(at url: URL, cancellation: CancellationFlag) throws`
@@ -34,25 +40,29 @@ File systems (`FileSystem/FileSystemProvider.swift`, `FileSystem/FileItem.swift`
 - `func copyMetadata(from source: URL, to destination: URL, cancellation: CancellationFlag) throws`
 - `func setQuarantine(_ value: Data, of url: URL, cancellation: CancellationFlag) throws`
 - `func volume(of url: URL, cancellation: CancellationFlag) -> VolumeInfo?`
-- `func realLocation(of url: URL) -> URL?`, `FileSystemRegistry.realLocation(of:) -> URL`,
-  `var connectsToServer: Bool`, `func readOrder(of urls: [URL]) -> [URL]`,
-  `FileSystemRegistry.addFlusher(_:)`, `flushPendingWrites(to:cancellation:)`, `FileSystemRegistry.placesDidChange`,
-  `URL.isSameFile(as:followingLinks:)`, `URL.appending(safeName:)`, `PathSafety`.
+- `func realLocation(of url: URL) -> URL?`, `FileSystemRegistry.realLocation(of:) -> URL`, `var connectsToServer: Bool`,
+  `func readOrder(of urls: [URL]) -> [URL]`, `FileSystemRegistry.addFlusher(_:)`,
+  `flushPendingWrites(to:cancellation:)`, `FileSystemRegistry.placesDidChange`, `URL.isSameFile(as:followingLinks:)`,
+  `URL.appending(safeName:)`, `PathSafety`.
 
 A typed address or one read from a file (`AFMContracts/Services.swift`):
-- `protocol ServerConsentService { func userChose(_ location: URL) }` — offered by the network plugin; called by
-  whoever takes a location from the keyboard, by nobody for a location read from a file.
+
+- `protocol ServerConsentService { func userChose(_ location: URL) }` — offered by the network plugin; called by whoever
+  takes a location from the keyboard, by nobody for a location read from a file.
 
 Settings (`PluginAPI/Kernel.swift`):
-- `Kernel.settingsKeys: SettingsKeyRegistry` — `declare(_ key: String, kind: SettingsKeyKind = .ordinary, check: ((Data) -> Bool)? = nil)`,
-  `declare(prefix:kind:check:)`, `declaration(for:)`, `kind(of:)`, `accepts(_:forKey:)`, `all`;
-  `SettingsKeyKind`: `.ordinary`, `.history`, `.runsCode`, `.trust`, `.connection`.
+
+- `Kernel.settingsKeys: SettingsKeyRegistry` —
+  `declare(_ key: String, kind: SettingsKeyKind = .ordinary, check: ((Data) -> Bool)? = nil)`,
+  `declare(prefix:kind:check:)`, `declaration(for:)`, `kind(of:)`, `accepts(_:forKey:)`, `all`; `SettingsKeyKind`:
+  `.ordinary`, `.history`, `.runsCode`, `.trust`, `.connection`.
 - `SettingsStore.largeData(forKey:)`, `setLarge(_:forKey:)`.
 
 Marks in bulk and heavy changes in the background (`Panels/PanelModel.swift`):
-- `select(where:select:)`, `PanelModel.rows(of: Basis, where:) -> RowSet` + `setSelection(_ rows: RowSet, _ change: SelectionChange)`,
-  `setSelected(_:indices:shownVersion:) -> Bool`, `setSelection(indices:shownVersion:) -> Bool`, `selectedNames`,
-  `hasSelection`, `operandsSnapshot() -> Operands`.
+
+- `select(where:select:)`, `PanelModel.rows(of: Basis, where:) -> RowSet` +
+  `setSelection(_ rows: RowSet, _ change: SelectionChange)`, `setSelected(_:indices:shownVersion:) -> Bool`,
+  `setSelection(indices:shownVersion:) -> Bool`, `selectedNames`, `hasSelection`, `operandsSnapshot() -> Operands`.
 - `basis` → `PanelModel.prepare(basis, sort:)` / `prepare(basis, filter:)` / `prepare(basis, update:focus:presorted:)` /
   `prepare(basis, extendingTo:sortedBy:)` → `apply(prepared) -> Outcome`.
 - `BlockingCalls.run`, `BlockingCalls.answer(from:to:sharing:cancellation:_:)` (+ `then:`).
@@ -60,11 +70,12 @@ Marks in bulk and heavy changes in the background (`Panels/PanelModel.swift`):
 ### 0.2 Added in this pass
 
 `FileSystemProvider` (each with a default, so no file system has to change):
-- `func copy(_ source: URL, to destination: URL, cancellation: CancellationFlag, progress: (Int64) -> Bool) throws`
-  — the copy inside one file system, ended early once the flag is set, also where `progress` is not asked. Default:
-  the plain `copy`, the flag looked at whenever `progress` is asked.
-- `func remove(_ url: URL, below root: URL, cancellation: CancellationFlag) throws` — removes an item of a tree only
-  if every folder on the way from `root` to it is still a folder and none a link. Default: `remove(_:cancellation:)`.
+
+- `func copy(_ source: URL, to destination: URL, cancellation: CancellationFlag, progress: (Int64) -> Bool) throws` —
+  the copy inside one file system, ended early once the flag is set, also where `progress` is not asked. Default: the
+  plain `copy`, the flag looked at whenever `progress` is asked.
+- `func remove(_ url: URL, below root: URL, cancellation: CancellationFlag) throws` — removes an item of a tree only if
+  every folder on the way from `root` to it is still a folder and none a link. Default: `remove(_:cancellation:)`.
 - `func createDirectory(at url: URL, exclusive: Bool, cancellation: CancellationFlag) throws` — default: the call
   without a flag.
 - `func commit(_ url: URL, cancellation: CancellationFlag, progress: (Int64, Int64) -> Bool) throws` — bytes done and
@@ -75,14 +86,15 @@ Marks in bulk and heavy changes in the background (`Panels/PanelModel.swift`):
 - `FileSystemCapabilities.removeOnly` — said besides `.write` where entries can be removed but nothing created.
 
 `PanelModel`:
-- `func requestSort(_ order: ListOrder)`, `var requestedSort: ListOrder?`, `var wantedSort: ListOrder` — the order
-  the user asked for is noted at no cost; every list that arrives is taken in it and makes it the panel's; a
+
+- `func requestSort(_ order: ListOrder)`, `var requestedSort: ListOrder?`, `var wantedSort: ListOrder` — the order the
+  user asked for is noted at no cost; every list that arrives is taken in it and makes it the panel's; a
   `prepare(_:sort:)` for another order is `.stale`. `Basis.requestedSort` carries it.
 - `var isInArrivalOrder: Bool` — false once the list was put into the order of a key other than `unsorted`.
-- `static func prepare(_ basis: Basis, computedSizes: [(name: String, size: Int64)]) -> Prepared` — sizes written
-  into a copy of the list in the background; `apply` is `.stale` also when another size was set meanwhile.
-- `static func rows(of basis: Basis, indices: some Sequence<Int>) -> RowSet` — a row set from indexes of
-  `basis.items`, on any thread.
+- `static func prepare(_ basis: Basis, computedSizes: [(name: String, size: Int64)]) -> Prepared` — sizes written into a
+  copy of the list in the background; `apply` is `.stale` also when another size was set meanwhile.
+- `static func rows(of basis: Basis, indices: some Sequence<Int>) -> RowSet` — a row set from indexes of `basis.items`,
+  on any thread.
 - `hasOperandFile` keeps its answer until the marks change (no new signature).
 
 `LocalFileSystem` implements all of the above that concern it, plus `volume(of:cancellation:)`, the flagged
@@ -96,48 +108,48 @@ Marks in bulk and heavy changes in the background (`Panels/PanelModel.swift`):
 
 Status words as in the instructions. "L", "K", "S", "F", "G", "X", "C" are finding IDs; "req" rows are cross-requests.
 
-| ID | Status | Note |
-| --- | --- | --- |
-| K033 (first half) | fixed | `PanelModel.prepare(_:computedSizes:)` + `apply`: the copy of a shared list is made where `prepare` runs. The plain `setComputedSizes` still copies once when somebody else holds the list (30-50 ms at 1M) and says so in its comment. Already used by the shell (`PanelViewController.swift` ~1340) and FileProperties. Tests: `calculatedSizesCanBePreparedInTheBackground`, `preparedSizesAreRefusedWhenAnythingTheyRestOnHasChanged`, `aNameWrittenInAnotherFormFindsItsFolderWhenSizesArePrepared`. |
-| K039 | needs other area | Kernel part done: `root(of:)` is a protocol requirement, `PanelLoader` asks it instead of climbing (`Panels/Listing.swift`), `LocalFileSystem.root(of:)` answers `/` at once. The measured case is a path inside an archive: `ArchiveFileSystem` has to implement `root(of:)` (cross-request 7); until then its first load at such a depth climbs once, as before. Test: `aFileSystemThatKnowsItsTopIsNotClimbed`. |
-| K047 | fixed | `PanelModel.isInArrivalOrder`, followed through `show`, `update`, `extend`, sort, `restore`, `duplicate`, `open`. ViewOptions already reloads when Unsorted follows another key (`ViewOptionsPlugin.swift` ~247-250, done by plugins-a-p2), so the user gets the arrival order; the flag lets it reload only when needed. Tests: `theModelSaysWhetherItsListIsStillInTheOrderItCameIn`, `theOrderOfArrivalIsFollowedThroughEveryWayAListChanges`. |
-| Old synchronous `PanelModel` calls | fixed | Every call whose cost grows with the list has a background route; the class comment has the table, and each plain call says "not for the main thread on long lists" with its alternative: `setSort` (both), `setFilter` (both), `update(with:)`, `extend(to:sortedBy:)`, `setComputedSizes` (shared list), `select(where:)`, `setSelected(_:names:)`, `setSelection(names:)`, `deselect`, `operands()`, `selection`, `savedSelection`, `restore` (re-sort when the order changed). `restoreSelection` of a saved selection above 20,000 names in another folder is done on all cores now (`aLongSavedSelectionIsRestoredInAnotherFolderOfTheSameNames`). |
-| S011 | fixed | `hasOperandFile`: the answer for the marks is kept until they change, so a selection of nothing but folders is walked once and not at every validation tick. Test: `whetherAFileIsMarkedIsAnsweredFromMemoryUntilTheMarksChange`. (The "third call builds an index" half went in the first pass: the cursor's item is not looked up by name.) |
-| S015, S001, F025 | fixed | Confirmed in the code, no change in this pass: `totals` is O(1) after select all / invert and one parallel pass otherwise; `listVersion` does not move on a no-op; `operandsSnapshot()` is the off-main route for operands. The shell calls `prepare` for pieces, updates and sizes now. |
-| S039 | fixed | Kernel side: with `prepare(_:extendingTo:sortedBy:)` (which the shell calls now, `PanelViewController.swift` ~849) the name index comes with the prepared list, so the cursor is found without a walk; the plain `extend` says it is not for long lists. Not re-measured at 1M in this pass. |
-| L016 | fixed | `LocalFileSystem.item(at:)` and the listings fill `FileItem.linkTargetSize` for a link to a regular file (from `LinkResolver`, which looked at the target anyway). The entry stays what `lstat` sees (`size` 0). Test: `aLinkToAFileSaysHowLargeThatFileIs`. The Viewer has to read it (cross-request 19). |
-| Device / mount points (brief) | fixed | `FileItem.device` filled in listings and `item(at:)`. A bulk read reports the *covered* folder's device for a mount point (measured: `/dev`, `/System/Volumes/*`, `/Volumes/*` all came back with the parent's number), so the listing takes one `fstat` of the folder for all entries and the mount table (`getfsstat`, no disk asked) for the volumes mounted directly in it. Tests: `everyEntrySaysWhichVolumeItIsOn`, `aFolderAnotherVolumeIsMountedOnHasThatVolumesNumber` (checks every local mount point below `/`, `/System/Volumes`, `/Volumes` against `lstat`). |
-| L023 | fixed | As far as the system allows, see "Not done" for the rest. The six changing calls with a flag are implemented (`LocalFileSystem.swift`, `LocalSupport.swift`: `LocalCall`, `RemoteChanges`). On a disk of this Mac: on the calling thread; the flag sends the blocked thread a signal (`EINTR` where the volume allows it) and keeps every further system call of the operation from being begun; a lock taken off for the change is put back. On a share or automounted folder: on a kernel thread; 2 s after the flag was set the caller leaves the call behind (`userCancelled`), at most 4 per volume, further changes there fail at once with `ETIMEDOUT` until one returns. Tests: `theChangingCallsWorkWithAFlagAsWithout`, `aFlagThatIsSetKeepsEveryChangeFromBeingBegun`, `aLockThatWasTakenOffForAChangeIsPutBackWhenTheChangeIsStopped`, and the `Review2KernelP2DeadVolume` suite. |
-| L029 | fixed | `createDirectory(at:exclusive:)` (and with a flag): one `mkdir` for the last name, `alreadyExists` for a folder, a file, a link to a folder or a dangling link; parents as usual. The plain call keeps its contract (existing folder or link to one is success) and no longer goes through `FileManager`. Tests: `aFolderThatMustBeNewIsMadeOnlyWhereNothingHasItsName`, `aFolderThatMayBeThereIsMadeAsBefore`, `manyThreadsMakeTheSameFoldersAtOnce`. |
-| L032 | fixed | `copy(_:to:cancellation:progress:)`: the blocked read/write is sent a signal, the flag is looked at at every step `copyfile` reports (start/end of data, every block, every extended attribute), and on a share the copy is left behind after 2 s; what a stopped copy wrote is removed by the call, or by its thread once the system lets it go. `fm.copyItem` is not used any more (first pass). What the API does not allow is under "Not done". Tests: `aCopyIsStoppedBetweenTheStepsTheSystemReports`, `aCopyOntoAVolumeThatDoesNotAnswerLeavesNothingAndReportsToNobodyAfterItWasLeft`. FileJob has to pass its flag (cross-request 1). |
-| L043, F043 | needs other area | Local part done: `remove(_:below:cancellation:)` walks from the root through descriptors opened with `O_NOFOLLOW` and removes with `unlinkat`; exclusive `createDirectory` for Unpack. Test: `anItemOfATreeIsRemovedOnlyWhereTheTreeReallyIs` (a folder swapped for a link to a victim folder: nothing of the victim is removed). `FileJob` and `Unpacker` have to call them (cross-requests 2, 3, 9). |
-| K004 / K007 / K040 on the local side | fixed | `LocalFileSystem.volume(of:cancellation:)`: one question per volume at a time on a kernel thread, everybody who asks meanwhile waits for the same answer (ends at once with the flag) and is answered from memory once the volume has been silent for 3 s; `volumeInfoDidChange` when it comes back. Every thread the local file system parks on a volume is a kernel thread now, not a dispatch queue's (volume, link targets, places, spare space, the watcher's `realpath`). A cancelled listing sends its blocked `open` / `getattrlistbulk` a signal. Tested with a stand-in volume only (see "Not done"): `aFolderOnADeadShareIsTriedAgainAndAgainWithoutCostingAThreadEachTime` (40 refreshes: 2 stuck threads in all, a healthy folder loads, everything recovers), `theVolumeIsAskedOnceAndAnsweredFromMemoryWhileItIsSilent`. |
-| G001 | fixed | Confirmed (first pass, `Format.kilobytes` rounds without a sum). Test added: `theLargestSizesAreWrittenAndNotTrappedOn`. |
-| G003 | fixed | Confirmed (first pass, `speed` / `duration` take NaN, infinity, any magnitude). Test added: `speedsAndTimesThatAreNoNumbersAreWrittenAndNotTrappedOn`. |
-| G004 | fixed | First half (shared `NumberFormatter`) went in the first pass. Second half fixed now: the date formatter is made for the region and time zone of the moment and replaced (never changed) when either changes (`AFMContracts/Format.swift`, `Dates`). Test: `numbersAndDatesAreWrittenFromManyThreadsWhileTheRegionChanges`. |
-| X004 | fixed | `aStaleFreeSpaceFigureIsAnsweredAtOnceAndCorrectedBehind` (`KernelApiLocalTests.swift`) no longer reads the real disk's free space: the file system is given fixed figures (`LocalProbes.freeSpace`) and the test asserts exact numbers. |
-| X007 | fixed | Confirmed: `Kernel.init` installs an empty `SIGPIPE` handler (first pass); `aBrokenPipeIsAnErrorHereAndStillEndsTheProgramsWeStart` passes. |
-| X001, X002 | fixed | For what is mine. The stress logs (`Tests/Stress/logs`) name no KernelTests failure; the failing tests were X003-X006 and X008. Three kernel tests that waited for lengths of time now wait for conditions: `workBelowTheTopLevelIsSpreadOverTheCores`, `aJobIsNotLeftAloneWhileEveryThreadWaitsForSomething` (`KernelFixTests.swift`), `addingUpSizesEndsWhenAListingWaits` (`KernelApiTests.swift`). |
-| X003, X005, X006, X008 | needs other area | Tests of Places, the shell (two) and Archives. TestSupport now offers what X006 needs (cross-request 11). X005 and X008 share a cause with what I saw in the watcher (work at utility class getting no thread on a busy machine): see Decisions. |
-| req plugins-a-p2 1 | fixed | `requestSort` / `requestedSort` / `wantedSort`. Tests: `anOrderThatWasAskedForComesWithTheNextListThatArrives`, `aSortThatIsNoLongerTheOneAskedForIsRefused`. |
-| req plugins-a-p2 2 | fixed | `PanelModel.rows(of:indices:)`. Test: `rowsWorkedOutAsIndexesBecomeASelectionInOneStep`. |
-| req plugins-a-p2 3 | fixed | `watch(_:recursively:onChange:)`, local implementation in `DirectoryWatcher`. Test: `aTreeIsWatchedAsOneAndAFolderOnlyForItself`. |
-| req plugins-a-p2 4, fileops 12 | fixed | `FileSystemCapabilities.removeOnly` exists; nobody sets or reads it yet (cross-request 17). |
-| req fileops-p2 4 | fixed | `commit(_:cancellation:progress:)` with its default. Test: `aCommitAsksItsProgressOnceWhereAFileSystemSaysNoMore`. Archives / network have to report from it. |
-| req fileops-p2 6, fileops 11 | fixed | `remove(_:below:cancellation:)`, see L043. `setAttributes` never follows a link (first pass). |
-| req fileops-p2 7 | not a defect | For information only (FileJob asks the disk for its mount-point question). |
-| req fileops 2, network 1 (local side) | fixed | See L023. |
-| req fileops 9, 10; find 3, 4 | fixed | Confirmed in the code, first pass: `read` opens with `O_NONBLOCK`, `fstat`s and refuses what is not a regular file; `append` uses `O_NOFOLLOW`; the accent-only rename no longer unlinks. |
-| req localfs 1, 5; kernel.md 12, 13 | fixed | The local file system fills the two `FileItem` fields, implements `createDirectory(at:exclusive:)` with `mkdir` alone and `volume(of:cancellation:)`. |
-| req tools 1, archives 1, shell 6, fileops 5/6, network 3/4, config-a 1, find 1 | fixed | First pass; confirmed present (section 0.1). The shell calls the quit hooks and implements the default button now. |
-| req config-b (pasteboard queue), config-a 5 (`LoginShell` in contracts), shell 6 (stops off the main thread) | not fixed | Declined in the first pass for the reasons in `status/kernel.md` section 3; nothing has changed them. |
+| ID                                                                                                           | Status           | Note                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ------------------------------------------------------------------------------------------------------------ | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| K033 (first half)                                                                                            | fixed            | `PanelModel.prepare(_:computedSizes:)` + `apply`: the copy of a shared list is made where `prepare` runs. The plain `setComputedSizes` still copies once when somebody else holds the list (30-50 ms at 1M) and says so in its comment. Already used by the shell (`PanelViewController.swift` ~1340) and FileProperties. Tests: `calculatedSizesCanBePreparedInTheBackground`, `preparedSizesAreRefusedWhenAnythingTheyRestOnHasChanged`, `aNameWrittenInAnotherFormFindsItsFolderWhenSizesArePrepared`.                                                                                                                                                                                                                                                                                                                                                                                     |
+| K039                                                                                                         | needs other area | Kernel part done: `root(of:)` is a protocol requirement, `PanelLoader` asks it instead of climbing (`Panels/Listing.swift`), `LocalFileSystem.root(of:)` answers `/` at once. The measured case is a path inside an archive: `ArchiveFileSystem` has to implement `root(of:)` (cross-request 7); until then its first load at such a depth climbs once, as before. Test: `aFileSystemThatKnowsItsTopIsNotClimbed`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| K047                                                                                                         | fixed            | `PanelModel.isInArrivalOrder`, followed through `show`, `update`, `extend`, sort, `restore`, `duplicate`, `open`. ViewOptions already reloads when Unsorted follows another key (`ViewOptionsPlugin.swift` ~247-250, done by plugins-a-p2), so the user gets the arrival order; the flag lets it reload only when needed. Tests: `theModelSaysWhetherItsListIsStillInTheOrderItCameIn`, `theOrderOfArrivalIsFollowedThroughEveryWayAListChanges`.                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| Old synchronous `PanelModel` calls                                                                           | fixed            | Every call whose cost grows with the list has a background route; the class comment has the table, and each plain call says "not for the main thread on long lists" with its alternative: `setSort` (both), `setFilter` (both), `update(with:)`, `extend(to:sortedBy:)`, `setComputedSizes` (shared list), `select(where:)`, `setSelected(_:names:)`, `setSelection(names:)`, `deselect`, `operands()`, `selection`, `savedSelection`, `restore` (re-sort when the order changed). `restoreSelection` of a saved selection above 20,000 names in another folder is done on all cores now (`aLongSavedSelectionIsRestoredInAnotherFolderOfTheSameNames`).                                                                                                                                                                                                                                      |
+| S011                                                                                                         | fixed            | `hasOperandFile`: the answer for the marks is kept until they change, so a selection of nothing but folders is walked once and not at every validation tick. Test: `whetherAFileIsMarkedIsAnsweredFromMemoryUntilTheMarksChange`. (The "third call builds an index" half went in the first pass: the cursor's item is not looked up by name.)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| S015, S001, F025                                                                                             | fixed            | Confirmed in the code, no change in this pass: `totals` is O(1) after select all / invert and one parallel pass otherwise; `listVersion` does not move on a no-op; `operandsSnapshot()` is the off-main route for operands. The shell calls `prepare` for pieces, updates and sizes now.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| S039                                                                                                         | fixed            | Kernel side: with `prepare(_:extendingTo:sortedBy:)` (which the shell calls now, `PanelViewController.swift` ~849) the name index comes with the prepared list, so the cursor is found without a walk; the plain `extend` says it is not for long lists. Not re-measured at 1M in this pass.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| L016                                                                                                         | fixed            | `LocalFileSystem.item(at:)` and the listings fill `FileItem.linkTargetSize` for a link to a regular file (from `LinkResolver`, which looked at the target anyway). The entry stays what `lstat` sees (`size` 0). Test: `aLinkToAFileSaysHowLargeThatFileIs`. The Viewer has to read it (cross-request 19).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| Device / mount points (brief)                                                                                | fixed            | `FileItem.device` filled in listings and `item(at:)`. A bulk read reports the _covered_ folder's device for a mount point (measured: `/dev`, `/System/Volumes/*`, `/Volumes/*` all came back with the parent's number), so the listing takes one `fstat` of the folder for all entries and the mount table (`getfsstat`, no disk asked) for the volumes mounted directly in it. Tests: `everyEntrySaysWhichVolumeItIsOn`, `aFolderAnotherVolumeIsMountedOnHasThatVolumesNumber` (checks every local mount point below `/`, `/System/Volumes`, `/Volumes` against `lstat`).                                                                                                                                                                                                                                                                                                                    |
+| L023                                                                                                         | fixed            | As far as the system allows, see "Not done" for the rest. The six changing calls with a flag are implemented (`LocalFileSystem.swift`, `LocalSupport.swift`: `LocalCall`, `RemoteChanges`). On a disk of this Mac: on the calling thread; the flag sends the blocked thread a signal (`EINTR` where the volume allows it) and keeps every further system call of the operation from being begun; a lock taken off for the change is put back. On a share or automounted folder: on a kernel thread; 2 s after the flag was set the caller leaves the call behind (`userCancelled`), at most 4 per volume, further changes there fail at once with `ETIMEDOUT` until one returns. Tests: `theChangingCallsWorkWithAFlagAsWithout`, `aFlagThatIsSetKeepsEveryChangeFromBeingBegun`, `aLockThatWasTakenOffForAChangeIsPutBackWhenTheChangeIsStopped`, and the `Review2KernelP2DeadVolume` suite. |
+| L029                                                                                                         | fixed            | `createDirectory(at:exclusive:)` (and with a flag): one `mkdir` for the last name, `alreadyExists` for a folder, a file, a link to a folder or a dangling link; parents as usual. The plain call keeps its contract (existing folder or link to one is success) and no longer goes through `FileManager`. Tests: `aFolderThatMustBeNewIsMadeOnlyWhereNothingHasItsName`, `aFolderThatMayBeThereIsMadeAsBefore`, `manyThreadsMakeTheSameFoldersAtOnce`.                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| L032                                                                                                         | fixed            | `copy(_:to:cancellation:progress:)`: the blocked read/write is sent a signal, the flag is looked at at every step `copyfile` reports (start/end of data, every block, every extended attribute), and on a share the copy is left behind after 2 s; what a stopped copy wrote is removed by the call, or by its thread once the system lets it go. `fm.copyItem` is not used any more (first pass). What the API does not allow is under "Not done". Tests: `aCopyIsStoppedBetweenTheStepsTheSystemReports`, `aCopyOntoAVolumeThatDoesNotAnswerLeavesNothingAndReportsToNobodyAfterItWasLeft`. FileJob has to pass its flag (cross-request 1).                                                                                                                                                                                                                                                 |
+| L043, F043                                                                                                   | needs other area | Local part done: `remove(_:below:cancellation:)` walks from the root through descriptors opened with `O_NOFOLLOW` and removes with `unlinkat`; exclusive `createDirectory` for Unpack. Test: `anItemOfATreeIsRemovedOnlyWhereTheTreeReallyIs` (a folder swapped for a link to a victim folder: nothing of the victim is removed). `FileJob` and `Unpacker` have to call them (cross-requests 2, 3, 9).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| K004 / K007 / K040 on the local side                                                                         | fixed            | `LocalFileSystem.volume(of:cancellation:)`: one question per volume at a time on a kernel thread, everybody who asks meanwhile waits for the same answer (ends at once with the flag) and is answered from memory once the volume has been silent for 3 s; `volumeInfoDidChange` when it comes back. Every thread the local file system parks on a volume is a kernel thread now, not a dispatch queue's (volume, link targets, places, spare space, the watcher's `realpath`). A cancelled listing sends its blocked `open` / `getattrlistbulk` a signal. Tested with a stand-in volume only (see "Not done"): `aFolderOnADeadShareIsTriedAgainAndAgainWithoutCostingAThreadEachTime` (40 refreshes: 2 stuck threads in all, a healthy folder loads, everything recovers), `theVolumeIsAskedOnceAndAnsweredFromMemoryWhileItIsSilent`.                                                       |
+| G001                                                                                                         | fixed            | Confirmed (first pass, `Format.kilobytes` rounds without a sum). Test added: `theLargestSizesAreWrittenAndNotTrappedOn`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| G003                                                                                                         | fixed            | Confirmed (first pass, `speed` / `duration` take NaN, infinity, any magnitude). Test added: `speedsAndTimesThatAreNoNumbersAreWrittenAndNotTrappedOn`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| G004                                                                                                         | fixed            | First half (shared `NumberFormatter`) went in the first pass. Second half fixed now: the date formatter is made for the region and time zone of the moment and replaced (never changed) when either changes (`AFMContracts/Format.swift`, `Dates`). Test: `numbersAndDatesAreWrittenFromManyThreadsWhileTheRegionChanges`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| X004                                                                                                         | fixed            | `aStaleFreeSpaceFigureIsAnsweredAtOnceAndCorrectedBehind` (`KernelApiLocalTests.swift`) no longer reads the real disk's free space: the file system is given fixed figures (`LocalProbes.freeSpace`) and the test asserts exact numbers.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| X007                                                                                                         | fixed            | Confirmed: `Kernel.init` installs an empty `SIGPIPE` handler (first pass); `aBrokenPipeIsAnErrorHereAndStillEndsTheProgramsWeStart` passes.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| X001, X002                                                                                                   | fixed            | For what is mine. The stress logs (`Tests/Stress/logs`) name no KernelTests failure; the failing tests were X003-X006 and X008. Three kernel tests that waited for lengths of time now wait for conditions: `workBelowTheTopLevelIsSpreadOverTheCores`, `aJobIsNotLeftAloneWhileEveryThreadWaitsForSomething` (`KernelFixTests.swift`), `addingUpSizesEndsWhenAListingWaits` (`KernelApiTests.swift`).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| X003, X005, X006, X008                                                                                       | needs other area | Tests of Places, the shell (two) and Archives. TestSupport now offers what X006 needs (cross-request 11). X005 and X008 share a cause with what I saw in the watcher (work at utility class getting no thread on a busy machine): see Decisions.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| req plugins-a-p2 1                                                                                           | fixed            | `requestSort` / `requestedSort` / `wantedSort`. Tests: `anOrderThatWasAskedForComesWithTheNextListThatArrives`, `aSortThatIsNoLongerTheOneAskedForIsRefused`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| req plugins-a-p2 2                                                                                           | fixed            | `PanelModel.rows(of:indices:)`. Test: `rowsWorkedOutAsIndexesBecomeASelectionInOneStep`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| req plugins-a-p2 3                                                                                           | fixed            | `watch(_:recursively:onChange:)`, local implementation in `DirectoryWatcher`. Test: `aTreeIsWatchedAsOneAndAFolderOnlyForItself`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| req plugins-a-p2 4, fileops 12                                                                               | fixed            | `FileSystemCapabilities.removeOnly` exists; nobody sets or reads it yet (cross-request 17).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| req fileops-p2 4                                                                                             | fixed            | `commit(_:cancellation:progress:)` with its default. Test: `aCommitAsksItsProgressOnceWhereAFileSystemSaysNoMore`. Archives / network have to report from it.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| req fileops-p2 6, fileops 11                                                                                 | fixed            | `remove(_:below:cancellation:)`, see L043. `setAttributes` never follows a link (first pass).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| req fileops-p2 7                                                                                             | not a defect     | For information only (FileJob asks the disk for its mount-point question).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| req fileops 2, network 1 (local side)                                                                        | fixed            | See L023.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| req fileops 9, 10; find 3, 4                                                                                 | fixed            | Confirmed in the code, first pass: `read` opens with `O_NONBLOCK`, `fstat`s and refuses what is not a regular file; `append` uses `O_NOFOLLOW`; the accent-only rename no longer unlinks.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| req localfs 1, 5; kernel.md 12, 13                                                                           | fixed            | The local file system fills the two `FileItem` fields, implements `createDirectory(at:exclusive:)` with `mkdir` alone and `volume(of:cancellation:)`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| req tools 1, archives 1, shell 6, fileops 5/6, network 3/4, config-a 1, find 1                               | fixed            | First pass; confirmed present (section 0.1). The shell calls the quit hooks and implements the default button now.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| req config-b (pasteboard queue), config-a 5 (`LoginShell` in contracts), shell 6 (stops off the main thread) | not fixed        | Declined in the first pass for the reasons in `status/kernel.md` section 3; nothing has changed them.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 
 ## 2. Decisions
 
-- **A cancelled change on a share is left behind, not waited for.** After `userCancelled` from a flagged changing
-  call on a volume that is not a disk of this Mac, the system call may still take effect when the server answers.
-  The call makes no further step once it returns. The alternative was a job that cannot be cancelled for as long
-  as the server is away. Patience after the flag: 2 s; at most 4 calls left behind per volume, then `ETIMEDOUT`.
+- **A cancelled change on a share is left behind, not waited for.** After `userCancelled` from a flagged changing call
+  on a volume that is not a disk of this Mac, the system call may still take effect when the server answers. The call
+  makes no further step once it returns. The alternative was a job that cannot be cancelled for as long as the server is
+  away. Patience after the flag: 2 s; at most 4 calls left behind per volume, then `ETIMEDOUT`.
 - **Which volumes count as "not a disk of this Mac":** what the mount table says (`MNT_LOCAL` not set, automounted,
   `autofs`), by the path's text. A disk of this Mac that stops answering (a failing USB disk) gets the signal only.
 - **`progress` of a flagged copy on a share is called on another thread** while the caller waits in the call.
@@ -147,88 +159,90 @@ Status words as in the instructions. "L", "K", "S", "F", "G", "X", "C" are findi
 - **`createDirectory` no longer uses `FileManager`.** Same results; a file in the way is still
   `CocoaError(.fileWriteFileExists)`, a failing parent is now a POSIX error naming that parent.
 - **`prepare(_:sort:)` for the order the list is in leaves the list as it is** (it used to sort it again).
-- **A requested sort wins over `presorted`:** a list that arrives sorted by the old order while another is requested
-  is sorted again where it is applied (in the background with `prepare`). The shell should sort by `wantedSort`.
+- **A requested sort wins over `presorted`:** a list that arrives sorted by the old order while another is requested is
+  sorted again where it is applied (in the background with `prepare`). The shell should sort by `wantedSort`.
 - **`isInArrivalOrder` is true for an empty or just-opened panel** and for a list only ever shown unsorted.
-- **The watcher's queues are no longer of the utility class** (control: user-initiated, sifting: default), and a
-  stream the system refuses is tried again (0.5 s, doubling to 30 s). One run of the whole plugin test target had
-  `aFolderThatIsWatchedAgainAfterAChangeOfTheSetKeepsReporting` wait 60 s for a report that never came. I could
-  not find the cause by reading; the log shows no refusal by the system, so the retry is a safeguard, not the
-  explanation. Starvation of utility-class queues on a saturated machine is the same thing X005 and X008 describe,
-  which is why I raised the class. This is a judgement, not a finding: see "Tests" for what the runs after it showed.
+- **The watcher's queues are no longer of the utility class** (control: user-initiated, sifting: default), and a stream
+  the system refuses is tried again (0.5 s, doubling to 30 s). One run of the whole plugin test target had
+  `aFolderThatIsWatchedAgainAfterAChangeOfTheSetKeepsReporting` wait 60 s for a report that never came. I could not find
+  the cause by reading; the log shows no refusal by the system, so the retry is a safeguard, not the explanation.
+  Starvation of utility-class queues on a saturated machine is the same thing X005 and X008 describe, which is why I
+  raised the class. This is a judgement, not a finding: see "Tests" for what the runs after it showed.
 - **`remove(_:below:)` refuses the root itself and anything not below it** (`EINVAL`).
-- **`FileItem.linkTargetSize` is not part of `isSameEntry`:** a refresh does not notice that only a link's target
-  grew. The figure is as of the reading; `item(at:)` gives it fresh.
+- **`FileItem.linkTargetSize` is not part of `isSameEntry`:** a refresh does not notice that only a link's target grew.
+  The figure is as of the reading; `item(at:)` gives it fresh.
 - **Test seam:** `LocalFileSystem.probes` (`LocalProbes`, internal): `willAsk`, `isLocal`, `freeSpace`, and the two
   patiences. Nil in the program; set by tests before the file system is used.
 
 ## 3. Tests
 
 New files:
+
 - `Tests/KernelTests/Review2KernelP2Tests.swift` — 17 tests (arrival order, prepared sizes, operand file, long saved
-  selection, tops of trees, flagged copy / exclusive folder defaults, requested sort, rows by index, commit
-  progress, the fake's stalls).
+  selection, tops of trees, flagged copy / exclusive folder defaults, requested sort, rows by index, commit progress,
+  the fake's stalls).
 - `Tests/PluginTests/Review2KernelP2LocalTests.swift` — 19 tests in 4 suites (`Review2KernelP2LocalItems`,
   `…LocalChanges`, `…DeadVolume`, `…Watching`).
 - `Tests/PluginTests/Review2KernelP2FormatTests.swift` — 3 tests.
 
 Changed: `KernelFixTests.swift` and `KernelApiTests.swift` (three tests wait for conditions),
-`KernelApiLocalTests.swift` (X004), `Review2LocalfsTests.swift` (the places test listens before the file system
-exists), `Tests/TestSupport/MemoryFileSystem.swift` (additions only).
+`KernelApiLocalTests.swift` (X004), `Review2LocalfsTests.swift` (the places test listens before the file system exists),
+`Tests/TestSupport/MemoryFileSystem.swift` (additions only).
 
 ### Final runs (`--scratch-path .build-kernel-p2`, the machine busy with other agents throughout)
 
-- **`--filter KernelTests`: 187 tests in 32 suites passed**, in every one of 7 runs (4 by themselves, 3 as part of
-  the wide runs below).
+- **`--filter KernelTests`: 187 tests in 32 suites passed**, in every one of 7 runs (4 by themselves, 3 as part of the
+  wide runs below).
 - **The local file system and format suites** (`Review2LocalFileSystem`, `Review2DirectoryWatcher`, `LocalDisk`,
-  `LocalDiskExtras`, `KernelApiOnLocalDisks`, `LocalDiskFixes`, `Review2KernelFormat`, `Review2KernelP2…`):
-  **86 tests in 20 suites passed**, 3 runs in a row by themselves.
+  `LocalDiskExtras`, `KernelApiOnLocalDisks`, `LocalDiskFixes`, `Review2KernelFormat`, `Review2KernelP2…`): **86 tests
+  in 20 suites passed**, 3 runs in a row by themselves.
 - **Wide runs, `swift test --skip Network`** (Network left out as instructed; it is not my area):
 
-  | Run | ShellTests | PluginTests (1541 tests, 190 suites) | KernelTests |
-  | --- | --- | --- | --- |
-  | 1 | 178 passed | **failed, 3 issues in 2 tests** | 187 passed |
-  | 2 | 179 passed | passed | 187 passed |
-  | 3 (PluginTests only) | — | **failed, 1 issue in 1 test** | — |
-  | 4 (PluginTests only) | — | passed | — |
-  | 5 | 179 passed | passed | 187 passed |
+  | Run                  | ShellTests | PluginTests (1541 tests, 190 suites) | KernelTests |
+  | -------------------- | ---------- | ------------------------------------ | ----------- |
+  | 1                    | 178 passed | **failed, 3 issues in 2 tests**      | 187 passed  |
+  | 2                    | 179 passed | passed                               | 187 passed  |
+  | 3 (PluginTests only) | —          | **failed, 1 issue in 1 test**        | —           |
+  | 4 (PluginTests only) | —          | passed                               | —           |
+  | 5                    | 179 passed | passed                               | 187 passed  |
 
   The failures, plainly:
-  - Run 1, `aFolderThatIsWatchedAgainAfterAChangeOfTheSetKeepsReporting` (`Review2LocalfsTests.swift:465`, **my
-    area**): no report from the watcher within 60 s. Cause not established. After it I raised the watcher's queues
-    above the utility class and added a retry for a refused stream (see Decisions); the test passed in the four
-    wide runs and three local runs that followed. Four clean runs do not prove the cause was found.
+  - Run 1, `aFolderThatIsWatchedAgainAfterAChangeOfTheSetKeepsReporting` (`Review2LocalfsTests.swift:465`, **my area**):
+    no report from the watcher within 60 s. Cause not established. After it I raised the watcher's queues above the
+    utility class and added a retry for a refused stream (see Decisions); the test passed in the four wide runs and
+    three local runs that followed. Four clean runs do not prove the cause was found.
   - Run 1, `aFrameIsScaledOnceForTheSizeItIsShownAt` (`ViewerAdoptRichTests.swift:131-132`, Viewer, not mine): two
-    expectations of one test, a wait that ran out after 167 s. The first-pass kernel agent saw the same test fail
-    under load. I did not look into it.
-  - Run 3, `thePlacesAreAnsweredAtOnceAndAnnouncedWhenTheyChange` (`Review2LocalfsTests.swift:385`, **my area**):
-    a race in the test, which this pass made likelier. The test made its file system and *then* began to listen
-    for `placesDidChange`; the file system reads the places the moment it is made, now on a kernel thread that
-    starts at once, so the announcement could be over before the listener was there. The test now listens first.
-    Passed in runs 4 and 5.
-- Not run: the Network suites, the fuzz drivers, any sanitizer build, any benchmark at a million entries. The
-  figures quoted from the first pass were not measured again.
+    expectations of one test, a wait that ran out after 167 s. The first-pass kernel agent saw the same test fail under
+    load. I did not look into it.
+  - Run 3, `thePlacesAreAnsweredAtOnceAndAnnouncedWhenTheyChange` (`Review2LocalfsTests.swift:385`, **my area**): a race
+    in the test, which this pass made likelier. The test made its file system and _then_ began to listen for
+    `placesDidChange`; the file system reads the places the moment it is made, now on a kernel thread that starts at
+    once, so the announcement could be over before the listener was there. The test now listens first. Passed in runs 4
+    and 5.
+
+- Not run: the Network suites, the fuzz drivers, any sanitizer build, any benchmark at a million entries. The figures
+  quoted from the first pass were not measured again.
 - `.build-kernel-p2` is deleted.
 
 ## 4. Not done
 
 - **Calls without a flag cannot be ended.** `remove`, `move`, `createDirectory`, `setAttributes`, `copyMetadata`,
-  `setQuarantine`, `copy` in their plain forms block for as long as the volume likes, as before. Callers must pass
-  their flag (cross-requests 1-4).
-- **`trash` has no flagged variant** and cannot be ended: `FileManager.trashItem` offers no way, and the protocol
-  has no such call.
-- **A signal ends a system call only where the volume allows it** (an NFS mount made with `intr`; for SMB and
-  others I do not know and could not test). Where it does not, a disk of this Mac that hangs holds the calling
-  thread; on a share the caller is freed by leaving the call behind, and the thread stays until the system returns.
+  `setQuarantine`, `copy` in their plain forms block for as long as the volume likes, as before. Callers must pass their
+  flag (cross-requests 1-4).
+- **`trash` has no flagged variant** and cannot be ended: `FileManager.trashItem` offers no way, and the protocol has no
+  such call.
+- **A signal ends a system call only where the volume allows it** (an NFS mount made with `intr`; for SMB and others I
+  do not know and could not test). Where it does not, a disk of this Mac that hangs holds the calling thread; on a share
+  the caller is freed by leaving the call behind, and the thread stays until the system returns.
 - **Nothing here was tested against a real mount that has stopped answering.** The dead volume in the tests is an
-  ordinary folder whose questions are held back by a hook (`LocalProbes.willAsk`) placed before the system calls.
-  That shows the bookkeeping (who waits, who is freed, how many threads stay, what happens on return), not what
-  macOS does inside `rename` or `getattrlistbulk` on a dead SMB or NFS mount.
-- **Inside one `copyfile` step there is no stopping point of ours:** a clone is one call; between two reported
-  steps the signal is the only means. The date of creation and the flags after the copy are set in any case.
-- **`item(at:cancellation:)` and `entries(of:…)` of the local file system** have no way of their own to leave a
-  blocked call (the panel's loader asks through `BlockingCalls`, which does); the lean `entries` listing looks at
-  the flag between buffers and entries only.
+  ordinary folder whose questions are held back by a hook (`LocalProbes.willAsk`) placed before the system calls. That
+  shows the bookkeeping (who waits, who is freed, how many threads stay, what happens on return), not what macOS does
+  inside `rename` or `getattrlistbulk` on a dead SMB or NFS mount.
+- **Inside one `copyfile` step there is no stopping point of ours:** a clone is one call; between two reported steps the
+  signal is the only means. The date of creation and the flags after the copy are set in any case.
+- **`item(at:cancellation:)` and `entries(of:…)` of the local file system** have no way of their own to leave a blocked
+  call (the panel's loader asks through `BlockingCalls`, which does); the lean `entries` listing looks at the flag
+  between buffers and entries only.
 - **`DirectoryEntry` has no device**, so the lean listing does not say which volume an entry is on.
 - **A link's locality is judged by its text** (first-pass limit, unchanged): a path that reaches a share through an
   intermediate link is asked inline.
@@ -236,5 +250,5 @@ exists), `Tests/TestSupport/MemoryFileSystem.swift` (additions only).
 - **K039 for archives** and **L043 / F043 end to end** wait for the adoptions named in the table.
 - **`removeOnly`** is defined and unused.
 - `Tests/Fuzz` not touched; the three checks named in `cross-requests/kernel.md` item 15 still state old behaviour.
-- The plain `PanelModel` calls keep their costs (figures in `status/kernel.md` section 6); they are documented, and
-  the shell and the plugins I looked at call the background routes for pieces, updates, sizes and sorting.
+- The plain `PanelModel` calls keep their costs (figures in `status/kernel.md` section 6); they are documented, and the
+  shell and the plugins I looked at call the background routes for pieces, updates, sizes and sorting.

@@ -5,10 +5,10 @@ files `Resources/` and `Scripts/`. Paths below are relative to `Sources/AFMShell
 
 The mechanisms most rows refer to:
 
-- **`PanelViewController.change(_:count:fresh:while:by:then:)`** (`Panel/PanelViewController.swift`): every change of
-  a tab's list that the model can work out from the list as it is goes `basis` → `PanelModel.prepare(…)` on a
-  compute thread → `apply` on the main thread; `.stale` starts again from a new basis, again in the background. Lists
-  under 20,000 entries are done on the spot. Used for a fresh reading (`prepare(_:update:…)`), a list that grows
+- **`PanelViewController.change(_:count:fresh:while:by:then:)`** (`Panel/PanelViewController.swift`): every change of a
+  tab's list that the model can work out from the list as it is goes `basis` → `PanelModel.prepare(…)` on a compute
+  thread → `apply` on the main thread; `.stale` starts again from a new basis, again in the background. Lists under
+  20,000 entries are done on the spot. Used for a fresh reading (`prepare(_:update:…)`), a list that grows
   (`prepare(_:extendingTo:sortedBy:)`), a filter (`prepare(_:filter:)`) and calculated sizes
   (`prepare(_:computedSizes:)`).
 - **Lanes on the kernel's threads** (`App/Background.swift`): `Background.storage` keeps its lanes (one call at a time
@@ -21,81 +21,81 @@ The mechanisms most rows refer to:
 
 IDs are those of the findings files; "X n" is item n of `cross-requests/X.md`.
 
-| ID / request | Status | Note |
-|---|---|---|
-| S001 | fixed | The shell part that was left: arriving pieces, quiet and loud re-readings and the fresh listing behind a remembered one go through `change` (`prepare`/`apply`); nothing in those paths sorts, filters, compares or carries marks on the main thread for a list of 20,000 entries or more. `PanelViewController.swift` (`load`, `showRemembered`, `reload`), tested with a filter that counts the threads it is asked on. |
-| S018 | fixed | `PanelViewController+Interaction.swift` `setFilter`: `prepare(_:filter:)` / `apply`; pieces that arrive under a filter are filtered in `prepare(_:extendingTo:)`. The old `setFilter(_:prefiltered:listVersion:)` is no longer called. |
-| S015 | fixed | The shell's own cache of the totals is gone (it was thrown away on every change); the status line asks `PanelModel.totals`, which the kernel keeps running. |
-| S039 | fixed | A piece of a long folder is taken with `apply` (index, totals and the old-to-new table come from the background); the list that goes is released by the model off the main thread. |
-| S011 | not a defect (here) | Kernel code, fixed there (`hasOperandFile` keeps its answer). Nothing in the shell calls it. |
-| S055 | fixed | `Panel/PanelDragAndDrop.swift`, `PanelViewController+Interaction.swift` `dragPayload`: a drag that starts on a marked row takes `operandsSnapshot()`; up to 2,000 marks are listed at once, more are listed and their locations made on a compute thread while the drag is under way (`Payload(marked:)`). `DropSession` takes the sources when they are there; a drop that comes first has them made on the spot (`finishNow`). |
-| F002, F011 (shell part) | fixed | As S055; the grid's drag uses the same payload. The cost that remains for other programs is theirs to ask for (lazy `NSFilenamesPboardType`). Reading a long drag *from* another program is unchanged (see Not done). |
-| S013, S014 (shell part) | fixed | The shell calls `Kernel.prepareToQuit` before `shutdown` (below). What plugins still do in `stop()` is theirs. |
-| S004, S033, S034, S072 | not fixed (nothing left in the shell) | The remainder was the plugins' `enabled:` closures. Measured in this pass at 1M entries with 500k marks: `validateBars()` and the panel events cost the main thread 0 ms, so nothing slow is reached from the shell any more. |
-| S023, S024 | fixed | The shell's remaining hops through the main dispatch queue that could lead into a command are run-loop timers now (`MainLoop.after`): the in-place rename after a click, the quick filter's delay, the empty-folder delay, bar validation, read-ahead dwell, the progress window's delay, thumbnails. `Kernel.askUser` itself was fixed by the kernel. |
-| S041 | fixed | `Resources/Info.plist`: `NSAppleEventsUsageDescription`; also `CFBundleInfoDictionaryVersion`, `CFBundleDevelopmentRegion`, and `NSSupportsSuddenTermination` / `NSSupportsAutomaticTermination` false (the program has work to finish when it quits). |
-| S042 | fixed | `Scripts/build-app.sh`: `codesign --options runtime` with `Resources/AFileManager.entitlements` (Apple events only; the file says which entitlements are left out and why), `CODESIGN_IDENTITY` (default ad hoc), no timestamp server unless asked, bundle cleaned of extended attributes, and the script fails unless the result verifies, carries the `runtime` flag and none of the entitlements that would undo it. Run: `flags=0x10002(adhoc,runtime)`. No sandbox (decision 9). |
-| S043 | not a defect | Nothing changed; the kernel documents that `report` may block. |
-| S048 | fixed | `Panel/ColumnValueStore.swift` calls `ContentColumn.cancellableValue` with a flag that is set when the panel leaves the folder. |
-| new (found by the tests under load) | fixed | `Interaction/ProgressJobService.swift` `ProgressSheet.ask`: the run loop kept the block (and with it the non-escaping question) a moment longer than the job's thread waited, and the program trapped with "closure argument was escaped in withoutActuallyEscaping block" (seen once in `aFileThatVanishedMeanwhileGivesTheUsualError`). The question is handed over in a slot that is emptied before the job's thread is woken. |
-| new (measured) | fixed | `PanelViewController+Lists.swift` `reloadList`: the table keeps its rows across folders as well (making the visible rows anew costs about 50 ms a time, measured), and takes the list anew only for another view, other columns, or when more than 400,000 rows go at once (the table gives rows up at about 0.1 µs each). |
-| kernel 1 | fixed | Readers run on `BlockingCalls.run` threads through the lanes; a new reading cancels the one before (as before). `volume(of:cancellation:)` through `BlockingCalls.answer`, shared with the reader's own question and given up when the tab closes; `places()` through `BlockingCalls.answer`. The shell asks no provider for `item(at:)`. |
-| kernel 2 | fixed | See S001, S018. Sorting is ViewOptions' command; the shell's own re-sorting of arriving pieces was already in the background. |
-| kernel 3 (K013, K014) | fixed | `PanelViewController.restore(_:to:quickFilter:)`: the quick filter a tab had when its snapshot was taken comes back with `PanelModel.restore` (three call sites). |
-| kernel 4, fileops 5, fileops-p2 1, network 3 (F055, N030) | fixed | `App/AlertInteraction.swift`: `choose(…defaultButton:)`; Return for that button and no other, Esc for the last (by key equivalent, or by a key monitor when the last button is also Return's), `nil` = no default and the keyboard starts on the last button. Without a say, a `.critical` question with a choice gets its last button as default (decision 1). |
-| kernel 5, find 6 | fixed | `UserDefaultsSettings.largeData` / `setLarge`: a file per key in Application Support, written in the background, newest value last; the copy in the preferences is removed; waited for at quit (5 s at most). |
-| kernel 6, tools 1, archives 1, fileops 6, fileops-p2 2, plugins-b-p2 2, shell 6 | fixed | `ShellApplication.applicationShouldTerminate`: `Shell.mayQuit()` (`Kernel.shouldTerminate`; false → `.terminateCancel`), then `Shell.finishToQuit`: jobs stopped, then `Kernel.prepareToQuit`, reply from the run loop. |
-| kernel 7, shell 1 | fixed | See S055 and S015. |
-| kernel-p2 10 | fixed | The order the readers sort by, the order pieces are compared with, the read-ahead's order, the header's arrow and "click the same column again" all use `PanelModel.wantedSort`. |
-| kernel-p2 11 (X006) | fixed | `aFolderThatFailsWhileAnotherReadingOvertook…` stalls the folder and waits for conditions (`stalledListings(of:)`, `releaseStalls()`); no length of time is left in it. |
-| kernel-p2 0.2 `prepare(_:computedSizes:)` | fixed | Sizes that arrive for a long list are written into its copy in the background. |
-| shell 2, 3, 4, 9 | fixed | Adopted what the kernel made of them (above). |
-| shell 5 | needs other area | The plugins' closures; see S004. |
-| shell 7 | fixed | S041, S042. |
-| config-a (C053), plugins-a-p2 5 | fixed | `Window/CommandLine.swift`, `CommandLineView.swift`: a line that begins with a blank is not remembered, and nothing is while `systemTools.recordHistory` is off (what was remembered goes then). The line is handed on with its blank, so the plugin that runs it can keep its own rule (it never saw the blank before). |
-| config-a (C048) | not a defect | The shell does not decide "program or application"; it hands the line over. |
-| config-b / plugins-a-p2 5 (C072, C111, start-up) | fixed | `Window/PanelCoordinator.swift` `keepFromConnectingAtStart`: a restored tab whose file system `connectsToServer` is not the one in front at start (decision 5). |
-| fileops 7, fileops-p2 3 | fixed in part | Drag start: fixed (S055). Drag-enter of the program's own drag: nothing is read back. A long drag from *another* program is still read in one call (Not done). |
-| fileops 8 (F046) | not implemented | Judged unsound for the shell: the gate cannot know that an answer means "end the job"; only the job does, and it says so through its flag, which the gate already watches. A gate that watched "the work has returned" would open when the job's thread is no longer there to pass it. |
-| localfs 3 | fixed (first pass) | Checked: `PlacesStore` still observes `AFMPlacesDidChange` and the mount notifications. |
-| network 4, archnet-p2 1 (N071) | fixed | `CommandLineView.noteTypedLocation`: `cd <path>` on the command line reports the location to `ServerConsentService` when its file system connects to a server. |
-| X005 | fixed | `columnValuesAreComputedInTheBackgroundOnSeveralCores`: no wall-clock margin; the first call waits for a second one beside it, so "several at once" does not depend on how fast a busy machine starts a thread. |
-| X006 | fixed | See kernel-p2 11. |
-| X001, X002 (shell tests) | fixed in part | The other wall-clock margins of ShellTests are gone or widened by conditions: `pluginColumnsAreFilledIn…` (18 ms margin removed), `aLargeFolderStaysFastInEveryView` (thread CPU time instead of wall time), `aRememberedFolderIsShownAtOnce…`, `aRememberedFolderInAnotherOrder…`, `movingTheCursorCancelsAReadAhead…` (the simulated server is slow enough for the test's turn to come). Not run under the sanitizers in this pass. |
+| ID / request                                                                    | Status                                | Note                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ------------------------------------------------------------------------------- | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| S001                                                                            | fixed                                 | The shell part that was left: arriving pieces, quiet and loud re-readings and the fresh listing behind a remembered one go through `change` (`prepare`/`apply`); nothing in those paths sorts, filters, compares or carries marks on the main thread for a list of 20,000 entries or more. `PanelViewController.swift` (`load`, `showRemembered`, `reload`), tested with a filter that counts the threads it is asked on.                                                             |
+| S018                                                                            | fixed                                 | `PanelViewController+Interaction.swift` `setFilter`: `prepare(_:filter:)` / `apply`; pieces that arrive under a filter are filtered in `prepare(_:extendingTo:)`. The old `setFilter(_:prefiltered:listVersion:)` is no longer called.                                                                                                                                                                                                                                                |
+| S015                                                                            | fixed                                 | The shell's own cache of the totals is gone (it was thrown away on every change); the status line asks `PanelModel.totals`, which the kernel keeps running.                                                                                                                                                                                                                                                                                                                           |
+| S039                                                                            | fixed                                 | A piece of a long folder is taken with `apply` (index, totals and the old-to-new table come from the background); the list that goes is released by the model off the main thread.                                                                                                                                                                                                                                                                                                    |
+| S011                                                                            | not a defect (here)                   | Kernel code, fixed there (`hasOperandFile` keeps its answer). Nothing in the shell calls it.                                                                                                                                                                                                                                                                                                                                                                                          |
+| S055                                                                            | fixed                                 | `Panel/PanelDragAndDrop.swift`, `PanelViewController+Interaction.swift` `dragPayload`: a drag that starts on a marked row takes `operandsSnapshot()`; up to 2,000 marks are listed at once, more are listed and their locations made on a compute thread while the drag is under way (`Payload(marked:)`). `DropSession` takes the sources when they are there; a drop that comes first has them made on the spot (`finishNow`).                                                      |
+| F002, F011 (shell part)                                                         | fixed                                 | As S055; the grid's drag uses the same payload. The cost that remains for other programs is theirs to ask for (lazy `NSFilenamesPboardType`). Reading a long drag _from_ another program is unchanged (see Not done).                                                                                                                                                                                                                                                                 |
+| S013, S014 (shell part)                                                         | fixed                                 | The shell calls `Kernel.prepareToQuit` before `shutdown` (below). What plugins still do in `stop()` is theirs.                                                                                                                                                                                                                                                                                                                                                                        |
+| S004, S033, S034, S072                                                          | not fixed (nothing left in the shell) | The remainder was the plugins' `enabled:` closures. Measured in this pass at 1M entries with 500k marks: `validateBars()` and the panel events cost the main thread 0 ms, so nothing slow is reached from the shell any more.                                                                                                                                                                                                                                                         |
+| S023, S024                                                                      | fixed                                 | The shell's remaining hops through the main dispatch queue that could lead into a command are run-loop timers now (`MainLoop.after`): the in-place rename after a click, the quick filter's delay, the empty-folder delay, bar validation, read-ahead dwell, the progress window's delay, thumbnails. `Kernel.askUser` itself was fixed by the kernel.                                                                                                                                |
+| S041                                                                            | fixed                                 | `Resources/Info.plist`: `NSAppleEventsUsageDescription`; also `CFBundleInfoDictionaryVersion`, `CFBundleDevelopmentRegion`, and `NSSupportsSuddenTermination` / `NSSupportsAutomaticTermination` false (the program has work to finish when it quits).                                                                                                                                                                                                                                |
+| S042                                                                            | fixed                                 | `Scripts/build-app.sh`: `codesign --options runtime` with `Resources/AFileManager.entitlements` (Apple events only; the file says which entitlements are left out and why), `CODESIGN_IDENTITY` (default ad hoc), no timestamp server unless asked, bundle cleaned of extended attributes, and the script fails unless the result verifies, carries the `runtime` flag and none of the entitlements that would undo it. Run: `flags=0x10002(adhoc,runtime)`. No sandbox (decision 9). |
+| S043                                                                            | not a defect                          | Nothing changed; the kernel documents that `report` may block.                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| S048                                                                            | fixed                                 | `Panel/ColumnValueStore.swift` calls `ContentColumn.cancellableValue` with a flag that is set when the panel leaves the folder.                                                                                                                                                                                                                                                                                                                                                       |
+| new (found by the tests under load)                                             | fixed                                 | `Interaction/ProgressJobService.swift` `ProgressSheet.ask`: the run loop kept the block (and with it the non-escaping question) a moment longer than the job's thread waited, and the program trapped with "closure argument was escaped in withoutActuallyEscaping block" (seen once in `aFileThatVanishedMeanwhileGivesTheUsualError`). The question is handed over in a slot that is emptied before the job's thread is woken.                                                     |
+| new (measured)                                                                  | fixed                                 | `PanelViewController+Lists.swift` `reloadList`: the table keeps its rows across folders as well (making the visible rows anew costs about 50 ms a time, measured), and takes the list anew only for another view, other columns, or when more than 400,000 rows go at once (the table gives rows up at about 0.1 µs each).                                                                                                                                                            |
+| kernel 1                                                                        | fixed                                 | Readers run on `BlockingCalls.run` threads through the lanes; a new reading cancels the one before (as before). `volume(of:cancellation:)` through `BlockingCalls.answer`, shared with the reader's own question and given up when the tab closes; `places()` through `BlockingCalls.answer`. The shell asks no provider for `item(at:)`.                                                                                                                                             |
+| kernel 2                                                                        | fixed                                 | See S001, S018. Sorting is ViewOptions' command; the shell's own re-sorting of arriving pieces was already in the background.                                                                                                                                                                                                                                                                                                                                                         |
+| kernel 3 (K013, K014)                                                           | fixed                                 | `PanelViewController.restore(_:to:quickFilter:)`: the quick filter a tab had when its snapshot was taken comes back with `PanelModel.restore` (three call sites).                                                                                                                                                                                                                                                                                                                     |
+| kernel 4, fileops 5, fileops-p2 1, network 3 (F055, N030)                       | fixed                                 | `App/AlertInteraction.swift`: `choose(…defaultButton:)`; Return for that button and no other, Esc for the last (by key equivalent, or by a key monitor when the last button is also Return's), `nil` = no default and the keyboard starts on the last button. Without a say, a `.critical` question with a choice gets its last button as default (decision 1).                                                                                                                       |
+| kernel 5, find 6                                                                | fixed                                 | `UserDefaultsSettings.largeData` / `setLarge`: a file per key in Application Support, written in the background, newest value last; the copy in the preferences is removed; waited for at quit (5 s at most).                                                                                                                                                                                                                                                                         |
+| kernel 6, tools 1, archives 1, fileops 6, fileops-p2 2, plugins-b-p2 2, shell 6 | fixed                                 | `ShellApplication.applicationShouldTerminate`: `Shell.mayQuit()` (`Kernel.shouldTerminate`; false → `.terminateCancel`), then `Shell.finishToQuit`: jobs stopped, then `Kernel.prepareToQuit`, reply from the run loop.                                                                                                                                                                                                                                                               |
+| kernel 7, shell 1                                                               | fixed                                 | See S055 and S015.                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| kernel-p2 10                                                                    | fixed                                 | The order the readers sort by, the order pieces are compared with, the read-ahead's order, the header's arrow and "click the same column again" all use `PanelModel.wantedSort`.                                                                                                                                                                                                                                                                                                      |
+| kernel-p2 11 (X006)                                                             | fixed                                 | `aFolderThatFailsWhileAnotherReadingOvertook…` stalls the folder and waits for conditions (`stalledListings(of:)`, `releaseStalls()`); no length of time is left in it.                                                                                                                                                                                                                                                                                                               |
+| kernel-p2 0.2 `prepare(_:computedSizes:)`                                       | fixed                                 | Sizes that arrive for a long list are written into its copy in the background.                                                                                                                                                                                                                                                                                                                                                                                                        |
+| shell 2, 3, 4, 9                                                                | fixed                                 | Adopted what the kernel made of them (above).                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| shell 5                                                                         | needs other area                      | The plugins' closures; see S004.                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| shell 7                                                                         | fixed                                 | S041, S042.                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| config-a (C053), plugins-a-p2 5                                                 | fixed                                 | `Window/CommandLine.swift`, `CommandLineView.swift`: a line that begins with a blank is not remembered, and nothing is while `systemTools.recordHistory` is off (what was remembered goes then). The line is handed on with its blank, so the plugin that runs it can keep its own rule (it never saw the blank before).                                                                                                                                                              |
+| config-a (C048)                                                                 | not a defect                          | The shell does not decide "program or application"; it hands the line over.                                                                                                                                                                                                                                                                                                                                                                                                           |
+| config-b / plugins-a-p2 5 (C072, C111, start-up)                                | fixed                                 | `Window/PanelCoordinator.swift` `keepFromConnectingAtStart`: a restored tab whose file system `connectsToServer` is not the one in front at start (decision 5).                                                                                                                                                                                                                                                                                                                       |
+| fileops 7, fileops-p2 3                                                         | fixed in part                         | Drag start: fixed (S055). Drag-enter of the program's own drag: nothing is read back. A long drag from _another_ program is still read in one call (Not done).                                                                                                                                                                                                                                                                                                                        |
+| fileops 8 (F046)                                                                | not implemented                       | Judged unsound for the shell: the gate cannot know that an answer means "end the job"; only the job does, and it says so through its flag, which the gate already watches. A gate that watched "the work has returned" would open when the job's thread is no longer there to pass it.                                                                                                                                                                                                |
+| localfs 3                                                                       | fixed (first pass)                    | Checked: `PlacesStore` still observes `AFMPlacesDidChange` and the mount notifications.                                                                                                                                                                                                                                                                                                                                                                                               |
+| network 4, archnet-p2 1 (N071)                                                  | fixed                                 | `CommandLineView.noteTypedLocation`: `cd <path>` on the command line reports the location to `ServerConsentService` when its file system connects to a server.                                                                                                                                                                                                                                                                                                                        |
+| X005                                                                            | fixed                                 | `columnValuesAreComputedInTheBackgroundOnSeveralCores`: no wall-clock margin; the first call waits for a second one beside it, so "several at once" does not depend on how fast a busy machine starts a thread.                                                                                                                                                                                                                                                                       |
+| X006                                                                            | fixed                                 | See kernel-p2 11.                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| X001, X002 (shell tests)                                                        | fixed in part                         | The other wall-clock margins of ShellTests are gone or widened by conditions: `pluginColumnsAreFilledIn…` (18 ms margin removed), `aLargeFolderStaysFastInEveryView` (thread CPU time instead of wall time), `aRememberedFolderIsShownAtOnce…`, `aRememberedFolderInAnotherOrder…`, `movingTheCursorCancelsAReadAhead…` (the simulated server is slow enough for the test's turn to come). Not run under the sanitizers in this pass.                                                 |
 
-Counts over the 39 rows: fixed 30, not a defect 2, fixed in part 2, not a defect (here) 1, not fixed (nothing left in the shell) 1, needs other area 1, not implemented 1, fixed (first pass) 1.
+Counts over the 39 rows: fixed 30, not a defect 2, fixed in part 2, not a defect (here) 1, not fixed (nothing left in
+the shell) 1, needs other area 1, not implemented 1, fixed (first pass) 1.
 
 ## 2. Decisions
 
-1. **Return in a critical question presses the last button**, the one that changes nothing, when the caller does
-   not name a default; in every other question the first, as before. A caller's `defaultButton` always wins.
-   The two questions of the shell itself ("does not stop": Stop Waiting / Keep Waiting, Quit Anyway / Keep
-   Waiting) have Keep Waiting as default.
-2. **Quit, while plugins are finishing:** nothing is shown for half a second. Then a small modal window
-   "Finishing before quitting…" with **Quit Now** (sets the cancellation flag; the program quits when the plugins
-   have given up, and after 5 s whether or not they have) and **Don't Quit** (the default, Return; the quit is
-   called off, the flag is not set and the plugins go on writing). The brief asked for "progress with Cancel";
-   one button called Cancel could mean either, so there are two with their meanings written on them.
+1. **Return in a critical question presses the last button**, the one that changes nothing, when the caller does not
+   name a default; in every other question the first, as before. A caller's `defaultButton` always wins. The two
+   questions of the shell itself ("does not stop": Stop Waiting / Keep Waiting, Quit Anyway / Keep Waiting) have Keep
+   Waiting as default.
+2. **Quit, while plugins are finishing:** nothing is shown for half a second. Then a small modal window "Finishing
+   before quitting…" with **Quit Now** (sets the cancellation flag; the program quits when the plugins have given up,
+   and after 5 s whether or not they have) and **Don't Quit** (the default, Return; the quit is called off, the flag is
+   not set and the plugins go on writing). The brief asked for "progress with Cancel"; one button called Cancel could
+   mean either, so there are two with their meanings written on them.
 3. **A plugin's veto** (`shouldTerminate`) is asked before any job is stopped, so a quit that is called off has
    disturbed nothing. A second quit request while one is being carried out is refused.
 4. **Command-line history:** the window's history follows the command-line plugin's switch
    (`systemTools.recordHistory`), not a switch of its own: one preference, two histories.
-5. **Start-up:** a restored tab on a file system that connects to servers is kept, with its place, but is not in
-   front: another tab of the panel is, or a new one at the home folder when all would connect. Going to the tab
-   connects. (Stored tabs can come out of an imported settings file; and a start that waits for a dead server
-   helps nobody.)
-6. **Typed addresses:** only `cd <path>` on the command line is reported as the user's own choice by the shell,
-   and only for file systems that connect to servers. Places, drive buttons, path-bar clicks and restored tabs
-   are not typed and are not reported.
-7. **Large settings** live in `~/Library/Application Support/<bundle id>/Settings/<key>.data`, mode 0600 in a
-   0700 folder, the key written with letters, digits, `-`, `_`, `.` and `%XX` for everything else. A store that is
-   not the standard preferences keeps large values with the rest unless it is given a folder (tests).
-8. **Long lists on entering a folder:** a first piece of 20,000 entries or more is shown as its first 5,000 at
-   once and whole a moment later, from the background, also when the folder was read in one go.
-9. **Packaging:** hardened runtime, Apple events as the only entitlement, no App Sandbox (a file manager works on
-   every folder the user can reach), no `LSFileQuarantineEnabled` (it would put a download mark on every file the
-   program copies; the program carries the mark of real downloads itself), no secure timestamp unless
-   `AFM_SECURE_TIMESTAMP=1` with a real identity (the one step that would ask a server).
+5. **Start-up:** a restored tab on a file system that connects to servers is kept, with its place, but is not in front:
+   another tab of the panel is, or a new one at the home folder when all would connect. Going to the tab connects.
+   (Stored tabs can come out of an imported settings file; and a start that waits for a dead server helps nobody.)
+6. **Typed addresses:** only `cd <path>` on the command line is reported as the user's own choice by the shell, and only
+   for file systems that connect to servers. Places, drive buttons, path-bar clicks and restored tabs are not typed and
+   are not reported.
+7. **Large settings** live in `~/Library/Application Support/<bundle id>/Settings/<key>.data`, mode 0600 in a 0700
+   folder, the key written with letters, digits, `-`, `_`, `.` and `%XX` for everything else. A store that is not the
+   standard preferences keeps large values with the rest unless it is given a folder (tests).
+8. **Long lists on entering a folder:** a first piece of 20,000 entries or more is shown as its first 5,000 at once and
+   whole a moment later, from the background, also when the folder was read in one go.
+9. **Packaging:** hardened runtime, Apple events as the only entitlement, no App Sandbox (a file manager works on every
+   folder the user can reach), no `LSFileQuarantineEnabled` (it would put a download mark on every file the program
+   copies; the program carries the mark of real downloads itself), no secure timestamp unless `AFM_SECURE_TIMESTAMP=1`
+   with a real identity (the one step that would ask a server).
 10. **A column value for a folder that was left** is no longer worked out if its batch had not started; it is told
     through its flag.
 11. **The table keeps its rows across folders** and is told the new number of rows; see the row "new (measured)".
@@ -103,57 +103,56 @@ Counts over the 39 rows: fixed 30, not a defect 2, fixed in part 2, not a defect
 ## 3. Tests
 
 Added: `Tests/ShellTests/Review2ShellP2Tests.swift` — 24 tests: 16 in `extension Application` (long lists through
-`prepare`/`apply` with a thread-counting filter, pieces under a filter, a filter overtaken by a sort, the quick
-filter after a failed navigation, the drag of very many marks, calculated sizes in a long list, six tests of
-quitting, start-up with a server tab, the command line's history and typed addresses) and 8 in
-`Review2ShellP2Parts` (default buttons, large settings, history rules, lanes on kernel threads, column
-cancellation).
+`prepare`/`apply` with a thread-counting filter, pieces under a filter, a filter overtaken by a sort, the quick filter
+after a failed navigation, the drag of very many marks, calculated sizes in a long list, six tests of quitting, start-up
+with a server tab, the command line's history and typed addresses) and 8 in `Review2ShellP2Parts` (default buttons,
+large settings, history rules, lanes on kernel threads, column cancellation).
 
-Changed because behaviour changed by design: `WindowTests.swift` (a line with a leading blank is private now; the
-test's line has trailing blanks only), `PanelPartsTests.swift` (a value for a folder that was left may not be
-computed at all). Changed to be independent of time: see X005, X006, X001/X002.
+Changed because behaviour changed by design: `WindowTests.swift` (a line with a leading blank is private now; the test's
+line has trailing blanks only), `PanelPartsTests.swift` (a value for a folder that was left may not be computed at all).
+Changed to be independent of time: see X005, X006, X001/X002.
 
 Final runs, from the project root, after the last source change:
-`swift test --scratch-path .build-shell-p2 --filter ShellTests` — **178 tests in 9 suites passed, 0 failures, four
-runs in a row** (load average 9 to 15). The same filter also runs `PluginTests.Review2ConfigAShell` (12 tests,
-passed). Earlier in the pass, while other areas' test targets did not compile, the ShellTests target was run alone
-from a scratch package linking the same sources, at load averages of 60 to 160: the last two of those runs (176 and
-178 tests) passed; the ones before them are what found the failures fixed above (the probe I had broken, the
-`withoutActuallyEscaping` trap, the server-listing count).
+`swift test --scratch-path .build-shell-p2 --filter ShellTests` — **178 tests in 9 suites passed, 0 failures, four runs
+in a row** (load average 9 to 15). The same filter also runs `PluginTests.Review2ConfigAShell` (12 tests, passed).
+Earlier in the pass, while other areas' test targets did not compile, the ShellTests target was run alone from a scratch
+package linking the same sources, at load averages of 60 to 160: the last two of those runs (176 and 178 tests) passed;
+the ones before them are what found the failures fixed above (the probe I had broken, the `withoutActuallyEscaping`
+trap, the server-listing count).
 
-`Scripts/build-app.sh` was run twice into the scratch folder (`AFM_BUILD_DIR`, `AFM_APP_DIR`): builds, signs,
-verifies; `flags=0x10002(adhoc,runtime)`, entitlements = Apple events only. The application was never started.
+`Scripts/build-app.sh` was run twice into the scratch folder (`AFM_BUILD_DIR`, `AFM_APP_DIR`): builds, signs, verifies;
+`flags=0x10002(adhoc,runtime)`, entitlements = Apple events only. The application was never started.
 
-Measured once, not kept as a test (release build with `-enable-testing`, a scripted file system, 1,000,000 entries,
-load average 8 to 15, main-thread CPU time; the test's own polling costs about 40 ms per second and is in the figures):
+Measured once, not kept as a test (release build with `-enable-testing`, a scripted file system, 1,000,000 entries, load
+average 8 to 15, main-thread CPU time; the test's own polling costs about 40 ms per second and is in the figures):
 
-| What | Main thread | Longest gap between two 1 ms timer turns |
-|---|---|---|
-| entering the folder (read in one go) | 34 to 53 ms over 110 to 134 ms | 6 to 39 ms |
-| select all, with the status line | 0 ms | 0 ms |
-| filter `*.txt` with all 1M marked (500k rows go) | 25 ms | 12 ms |
-| reading again, nothing changed | 1 ms | 5 ms |
-| reading again, two entries gone | 13 ms | 10 to 15 ms |
-| drag start on a marked row (500k marked) | 4 ms | 2 to 3 ms |
-| filter off (500k rows come) | 12 to 14 ms | 0 ms |
+| What                                             | Main thread                    | Longest gap between two 1 ms timer turns |
+| ------------------------------------------------ | ------------------------------ | ---------------------------------------- |
+| entering the folder (read in one go)             | 34 to 53 ms over 110 to 134 ms | 6 to 39 ms                               |
+| select all, with the status line                 | 0 ms                           | 0 ms                                     |
+| filter `*.txt` with all 1M marked (500k rows go) | 25 ms                          | 12 ms                                    |
+| reading again, nothing changed                   | 1 ms                           | 5 ms                                     |
+| reading again, two entries gone                  | 13 ms                          | 10 to 15 ms                              |
+| drag start on a marked row (500k marked)         | 4 ms                           | 2 to 3 ms                                |
+| filter off (500k rows come)                      | 12 to 14 ms                    | 0 ms                                     |
 
 ## 4. Not done
 
-- **Nothing was run in the real program.** The quit window (`QuitProgress`, a modal panel run from a run-loop
-  timer while the application waits in `.terminateLater`) is built and its logic tested without a running
-  application; that its buttons work on screen in that state is not verified. The same holds for Esc on an alert
-  whose last button is also Return's (a local key monitor), and for the table keeping its rows across folders.
+- **Nothing was run in the real program.** The quit window (`QuitProgress`, a modal panel run from a run-loop timer
+  while the application waits in `.terminateLater`) is built and its logic tested without a running application; that
+  its buttons work on screen in that state is not verified. The same holds for Esc on an alert whose last button is also
+  Return's (a local key monitor), and for the table keeping its rows across folders.
 - **Entering a remembered long folder** (`PanelModel.showRemembered`) and the rare `show` of a fresh listing whose
-  remembered copy was still being sorted are one model call on the main thread: no kernel `prepare` exists for
-  entering another folder (cross-request shell-p2 2). With a display filter on, that call filters on all cores
-  while the main thread waits.
+  remembered copy was still being sorted are one model call on the main thread: no kernel `prepare` exists for entering
+  another folder (cross-request shell-p2 2). With a display filter on, that call filters on all cores while the main
+  thread waits.
 - **The first 5,000 entries of a folder under a display filter** are filtered on the main thread (bounded).
-- **When 400,000 rows or fewer go at once** the table is told so in place, which costs AppKit about 0.1 µs a row
-  (25 to 46 ms at 500k, measured); above that the list is taken anew (about 50 ms). Both are AppKit's.
-- **A long drag from another program** is read with one `readObjects` call at drag-enter (fileops-p2 3 suggests
-  reading the items a few per turn); not done.
-- **Kernel: the fresh listing kept by a prepared change** is worked around in the shell, not fixed
-  (cross-request shell-p2 1).
+- **When 400,000 rows or fewer go at once** the table is told so in place, which costs AppKit about 0.1 µs a row (25 to
+  46 ms at 500k, measured); above that the list is taken anew (about 50 ms). Both are AppKit's.
+- **A long drag from another program** is read with one `readObjects` call at drag-enter (fileops-p2 3 suggests reading
+  the items a few per turn); not done.
+- **Kernel: the fresh listing kept by a prepared change** is worked around in the shell, not fixed (cross-request
+  shell-p2 1).
 - **Sanitizer runs** (X001, X002) were not repeated.
 - `Sources/AFileManager` and `Sources/StandardPlugins` needed no change.
 - The `.build-shell-p2` folder and the scratch copies are deleted.

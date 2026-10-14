@@ -1,63 +1,63 @@
 # Status: config-b (Places, VirtualFolders, FolderTabs, Navigation)
 
-| ID | Status | Note |
-|---|---|---|
-| C004 | fixed | Places/DirectoryTreeWindowController.swift: reloads are queued, deduplicated, limited to expanded nodes and time-budgeted per turn. |
-| C005 | duplicate of C004 | Same change. |
-| C006 | fixed | VirtualFolders/VirtualFileSystem.swift: register/registerPicked take no per-file work; dedupe, schemes, parents and locality are prepared once off main (inline only up to 2048 files); watch() reads the prepared parents. |
-| C007 | fixed | watch() uses the parents prepared with the list (at most watchLimit); an unprepared list is scanned in its first 4096 files only. |
-| C008 | fixed | Coalescer delivers on the main thread (direct when already on main, else main.async), settle runs on main, a cancelled flag is set from Watchers.deinit. |
-| C009 | duplicate of C008 | Same change. |
-| C010 | fixed | VirtualFoldersPlugin.leave(): the names of a picked branch are taken in a job, not on main. |
-| C024 | fixed | Places/DirectoryHistory.swift: FrequentFolders.record saturates at Int.max; decode clamps negatives and keeps at most storedLimit. |
-| C025 | duplicate of C024 | Same change; reproducer shape covered by Review2ConfigBPlaces. |
-| C029 | fixed | FolderTabs: TabFile.tabLimit (256 tabs per side), FolderTabsPlugin.tabsPerPanelLimit per panel, parsing moved into the load job, onChange fired once per batch. |
-| C034 | fixed | Places/DirectoryTree.swift search(...timeBudget:) and the window continue the quick search in 8 ms slices, cancelled by the next key press. |
-| C037 | duplicate of C034 | Same change. |
-| C039 | duplicate of C008 | Same change. |
-| C040 | fixed | Tree scan runs on a utility queue; local reads use concurrentPerform at that priority; per-thread disk throttle and no-materialise policies where the thread accepts them; protected/TCC/cloud (SF_DATALESS) folders and automounts are listed but not read; folderLimit 5M and timeLimit 10 min. The branch-walk part and Parallel.swift are not in this area. |
-| C052 | duplicate of C004 | Same change (time budget instead of node count, no per-node row(forItem:)). |
-| C057 | fixed | Partly: walker keeps only watchLimit visited directories; re-walks back off (0.5 s doubling to 8 s); no report after the watcher is released. Not done: one recursive watch for local branches; receive() is still consulted only for non-empty batches when no cancellation flag is given (panels always pass one). |
-| C058 | duplicate of C006 | Same change (volume(of:) no longer scans the list either). |
-| C059 | duplicate of C006 | Same change. |
-| C060 | duplicate of C008 | Same change. |
-| C061 | fixed | VirtualLocation.prefix(of:) and DirectoryHistory/FrequentFolders/TreeCache.format drop the password from stored locations. |
-| C071 | fixed | FolderTabs restore/replace batch the tabs.onChange notification (saved, silenced, fired once). |
-| C072 | fixed | A tab loaded from a file that would connect (ftp, ftps, sftp, http(s), ssh, smb, cifs, afp, nfs, webdav, dav(s), vfolder) is opened but never made the shown tab; if none else exists the shown tab stays. Start-up restore is the shell's (cross-request). |
-| C073 | fixed | TabFile writes paths/captions with control characters, edge spaces or a leading quote in quotes with backslash escapes; reading restores them; unquoted old values are read as they stand. |
-| C074 | fixed | BOM stripped in TabFile(text:); TabFile.text(decoding:) detects UTF-16 BOMs; the plugin uses it. |
-| C075 | fixed | NavigationPlugin: next/previous volume asks places() in a job. |
-| C076 | not fixed | NSPasteboard is not safe against concurrent use: a background read crashed against main-thread clearContents/setString in tests. Clipboard text is still read on the main thread (cached availableType by changeCount for the menu); see cross-requests/config-b.md. |
-| C077 | duplicate of C076 | Same reason. |
-| C078 | not fixed | One-off 53 ms index build at 1M subfolders in one folder; would need a changed tree structure. |
-| C079 | not fixed | NSOutlineView reloadData/expand cost for 1M visible rows is inherent; the scan-time reloads are now time-sliced. |
-| C080 | fixed | The tree is released on a background queue (releaseTree) on replacement and when the window closes. |
-| C081 | not a defect | Each modal is user-triggered and not raised from a timer or event flood. |
-| C082 | not a defect | Quit must write the history and the dirty cache files; the amount is bounded (updateLimit 2 MB per file, small history). |
-| C092 | fixed | Window controller: per-tree store tickets; an older scan's late store is skipped. |
-| C093 | fixed | TreeCache: directory 0700, files 0600 written via temp file + rename, files limited to 64 MiB, newline paths left out. |
-| C094 | fixed | TreeCache.entry(for:) copies the entry while the lock is held. |
-| C096 | fixed | FileListFile.read stops at 16 MiB and 1,000,000 lines. |
-| C110 | fixed | Entry count capped (TabFile.tabLimit, tabsPerPanelLimit). |
-| C111 | fixed | Escaping on write (C073) and no connecting tab becomes the shown one (C072). |
-| C112 | fixed | DirectoryHistory.Visit caches its location key; recording no longer parses 200 URLs. |
-| C113 | needs other area | The code is Sources/Plugins/SystemTools/DirectoryList.swift (PagePrintView), not in Navigation. |
-| C114 | fixed | TreeCache: write tickets per file; an older snapshot written late is dropped; remove() invalidates pending writes. |
-| C115 | fixed | HotlistAction.changeDirectoryCommand quotes paths with edge spaces or a final colon or quotes; the parser reads quoted paths as they stand. |
-| C116 | fixed | Lists are forgotten least-recently-used first (every use counts), watched lists stay, total file count is bounded (3M). |
-| C117 | fixed | Partly: a typed "(list N)" / "(selected branch N)" note must match the list's own title/path. A real folder named like "x (branch)" is reached with a trailing slash ("x (branch)/"); the text-only location(from:) cannot stat. |
-| C118 | fixed | capabilities without a location is the intersection over every virtual folder read, not the last one. |
-| C119 | fixed | Size/line caps (C096) and list-file lines are taken only when local or on the very server the list file is on. |
-| C120 | fixed | VirtualLocation decoding makes the path plain (no . / .. / empty parts, scalar-wise) and rejects prefixes with a path, query, fragment or password. |
-| C129 | fixed | TreeCache reads a cache file only up to fileLimit (64 MiB). |
+| ID   | Status            | Note                                                                                                                                                                                                                                                                                                                                                            |
+| ---- | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C004 | fixed             | Places/DirectoryTreeWindowController.swift: reloads are queued, deduplicated, limited to expanded nodes and time-budgeted per turn.                                                                                                                                                                                                                             |
+| C005 | duplicate of C004 | Same change.                                                                                                                                                                                                                                                                                                                                                    |
+| C006 | fixed             | VirtualFolders/VirtualFileSystem.swift: register/registerPicked take no per-file work; dedupe, schemes, parents and locality are prepared once off main (inline only up to 2048 files); watch() reads the prepared parents.                                                                                                                                     |
+| C007 | fixed             | watch() uses the parents prepared with the list (at most watchLimit); an unprepared list is scanned in its first 4096 files only.                                                                                                                                                                                                                               |
+| C008 | fixed             | Coalescer delivers on the main thread (direct when already on main, else main.async), settle runs on main, a cancelled flag is set from Watchers.deinit.                                                                                                                                                                                                        |
+| C009 | duplicate of C008 | Same change.                                                                                                                                                                                                                                                                                                                                                    |
+| C010 | fixed             | VirtualFoldersPlugin.leave(): the names of a picked branch are taken in a job, not on main.                                                                                                                                                                                                                                                                     |
+| C024 | fixed             | Places/DirectoryHistory.swift: FrequentFolders.record saturates at Int.max; decode clamps negatives and keeps at most storedLimit.                                                                                                                                                                                                                              |
+| C025 | duplicate of C024 | Same change; reproducer shape covered by Review2ConfigBPlaces.                                                                                                                                                                                                                                                                                                  |
+| C029 | fixed             | FolderTabs: TabFile.tabLimit (256 tabs per side), FolderTabsPlugin.tabsPerPanelLimit per panel, parsing moved into the load job, onChange fired once per batch.                                                                                                                                                                                                 |
+| C034 | fixed             | Places/DirectoryTree.swift search(...timeBudget:) and the window continue the quick search in 8 ms slices, cancelled by the next key press.                                                                                                                                                                                                                     |
+| C037 | duplicate of C034 | Same change.                                                                                                                                                                                                                                                                                                                                                    |
+| C039 | duplicate of C008 | Same change.                                                                                                                                                                                                                                                                                                                                                    |
+| C040 | fixed             | Tree scan runs on a utility queue; local reads use concurrentPerform at that priority; per-thread disk throttle and no-materialise policies where the thread accepts them; protected/TCC/cloud (SF_DATALESS) folders and automounts are listed but not read; folderLimit 5M and timeLimit 10 min. The branch-walk part and Parallel.swift are not in this area. |
+| C052 | duplicate of C004 | Same change (time budget instead of node count, no per-node row(forItem:)).                                                                                                                                                                                                                                                                                     |
+| C057 | fixed             | Partly: walker keeps only watchLimit visited directories; re-walks back off (0.5 s doubling to 8 s); no report after the watcher is released. Not done: one recursive watch for local branches; receive() is still consulted only for non-empty batches when no cancellation flag is given (panels always pass one).                                            |
+| C058 | duplicate of C006 | Same change (volume(of:) no longer scans the list either).                                                                                                                                                                                                                                                                                                      |
+| C059 | duplicate of C006 | Same change.                                                                                                                                                                                                                                                                                                                                                    |
+| C060 | duplicate of C008 | Same change.                                                                                                                                                                                                                                                                                                                                                    |
+| C061 | fixed             | VirtualLocation.prefix(of:) and DirectoryHistory/FrequentFolders/TreeCache.format drop the password from stored locations.                                                                                                                                                                                                                                      |
+| C071 | fixed             | FolderTabs restore/replace batch the tabs.onChange notification (saved, silenced, fired once).                                                                                                                                                                                                                                                                  |
+| C072 | fixed             | A tab loaded from a file that would connect (ftp, ftps, sftp, http(s), ssh, smb, cifs, afp, nfs, webdav, dav(s), vfolder) is opened but never made the shown tab; if none else exists the shown tab stays. Start-up restore is the shell's (cross-request).                                                                                                     |
+| C073 | fixed             | TabFile writes paths/captions with control characters, edge spaces or a leading quote in quotes with backslash escapes; reading restores them; unquoted old values are read as they stand.                                                                                                                                                                      |
+| C074 | fixed             | BOM stripped in TabFile(text:); TabFile.text(decoding:) detects UTF-16 BOMs; the plugin uses it.                                                                                                                                                                                                                                                                |
+| C075 | fixed             | NavigationPlugin: next/previous volume asks places() in a job.                                                                                                                                                                                                                                                                                                  |
+| C076 | not fixed         | NSPasteboard is not safe against concurrent use: a background read crashed against main-thread clearContents/setString in tests. Clipboard text is still read on the main thread (cached availableType by changeCount for the menu); see cross-requests/config-b.md.                                                                                            |
+| C077 | duplicate of C076 | Same reason.                                                                                                                                                                                                                                                                                                                                                    |
+| C078 | not fixed         | One-off 53 ms index build at 1M subfolders in one folder; would need a changed tree structure.                                                                                                                                                                                                                                                                  |
+| C079 | not fixed         | NSOutlineView reloadData/expand cost for 1M visible rows is inherent; the scan-time reloads are now time-sliced.                                                                                                                                                                                                                                                |
+| C080 | fixed             | The tree is released on a background queue (releaseTree) on replacement and when the window closes.                                                                                                                                                                                                                                                             |
+| C081 | not a defect      | Each modal is user-triggered and not raised from a timer or event flood.                                                                                                                                                                                                                                                                                        |
+| C082 | not a defect      | Quit must write the history and the dirty cache files; the amount is bounded (updateLimit 2 MB per file, small history).                                                                                                                                                                                                                                        |
+| C092 | fixed             | Window controller: per-tree store tickets; an older scan's late store is skipped.                                                                                                                                                                                                                                                                               |
+| C093 | fixed             | TreeCache: directory 0700, files 0600 written via temp file + rename, files limited to 64 MiB, newline paths left out.                                                                                                                                                                                                                                          |
+| C094 | fixed             | TreeCache.entry(for:) copies the entry while the lock is held.                                                                                                                                                                                                                                                                                                  |
+| C096 | fixed             | FileListFile.read stops at 16 MiB and 1,000,000 lines.                                                                                                                                                                                                                                                                                                          |
+| C110 | fixed             | Entry count capped (TabFile.tabLimit, tabsPerPanelLimit).                                                                                                                                                                                                                                                                                                       |
+| C111 | fixed             | Escaping on write (C073) and no connecting tab becomes the shown one (C072).                                                                                                                                                                                                                                                                                    |
+| C112 | fixed             | DirectoryHistory.Visit caches its location key; recording no longer parses 200 URLs.                                                                                                                                                                                                                                                                            |
+| C113 | needs other area  | The code is Sources/Plugins/SystemTools/DirectoryList.swift (PagePrintView), not in Navigation.                                                                                                                                                                                                                                                                 |
+| C114 | fixed             | TreeCache: write tickets per file; an older snapshot written late is dropped; remove() invalidates pending writes.                                                                                                                                                                                                                                              |
+| C115 | fixed             | HotlistAction.changeDirectoryCommand quotes paths with edge spaces or a final colon or quotes; the parser reads quoted paths as they stand.                                                                                                                                                                                                                     |
+| C116 | fixed             | Lists are forgotten least-recently-used first (every use counts), watched lists stay, total file count is bounded (3M).                                                                                                                                                                                                                                         |
+| C117 | fixed             | Partly: a typed "(list N)" / "(selected branch N)" note must match the list's own title/path. A real folder named like "x (branch)" is reached with a trailing slash ("x (branch)/"); the text-only location(from:) cannot stat.                                                                                                                                |
+| C118 | fixed             | capabilities without a location is the intersection over every virtual folder read, not the last one.                                                                                                                                                                                                                                                           |
+| C119 | fixed             | Size/line caps (C096) and list-file lines are taken only when local or on the very server the list file is on.                                                                                                                                                                                                                                                  |
+| C120 | fixed             | VirtualLocation decoding makes the path plain (no . / .. / empty parts, scalar-wise) and rejects prefixes with a path, query, fragment or password.                                                                                                                                                                                                             |
+| C129 | fixed             | TreeCache reads a cache file only up to fileLimit (64 MiB).                                                                                                                                                                                                                                                                                                     |
 
 ## Decisions
 
-- Tabs from a tab file that would connect to a server (fixed scheme list) are opened but never made the shown tab.
-  If nothing else can be shown, the tab that was shown stays (replace keeps it). Limit 256 tabs per side/panel,
-  paths 4096 and captions 256 characters.
-- Tab files and list files escape awkward values by quoting them with backslash escapes (quote at both ends of
-  the value/line); a value not wrapped in quotes, or with an unknown escape, is read literally, so old files read as before.
+- Tabs from a tab file that would connect to a server (fixed scheme list) are opened but never made the shown tab. If
+  nothing else can be shown, the tab that was shown stays (replace keeps it). Limit 256 tabs per side/panel, paths 4096
+  and captions 256 characters.
+- Tab files and list files escape awkward values by quoting them with backslash escapes (quote at both ends of the
+  value/line); a value not wrapped in quotes, or with an unknown escape, is read literally, so old files read as before.
 - List files: only local files and files on the same server as the list file are taken; limit 16 MiB / 1,000,000 lines.
 - Passwords are dropped from stored/virtual locations (history, frequent folders, tree cache root, vfolder URLs).
 - Tree scan: 5,000,000 folders or 10 minutes, then it ends as incomplete. Protected folders (Desktop, Documents,
@@ -65,8 +65,8 @@
   Containers, Group Containers, etc.), dataless folders, automounts are listed but read only when the user opens them.
 - TreeCache: 64 MiB per file; a tree too big for that is kept in memory (file removed); at most 8 trees in memory.
 - Virtual lists: 64 lists and 3M files in total; the least recently used unwatched list goes first.
-- Clipboard: read on the main thread only (NSPasteboard crashed under concurrent use); a "has text" yes is cached
-  by changeCount, a no is asked again each time.
+- Clipboard: read on the main thread only (NSPasteboard crashed under concurrent use); a "has text" yes is cached by
+  changeCount, a no is asked again each time.
 - Added `VirtualFileSystem.realLocation(of:)` for the file-operations agent (see cross-requests/config-b.md).
 - C105 (TreeCache part): cache files are now 0600 in a 0700 folder; the Configuration export part is config-a's.
 
@@ -79,13 +79,15 @@
   PlacesNavigationTests (clipboard answer).
 - Final run (live tree, own build folder .build-config-b): Places, VirtualFolders, FolderTabs and Navigation suites
   (NavigationPlaces, VirtualLocations, BranchWalking, VirtualFolderCommands, Places*, TabFiles, FolderTabCommands,
-  ConfigPlacesFix*, VirtualFoldersAdoption, PlacesAdoption, Review2ConfigB*): 172 tests in 31 suites, all passed
-  (run twice). Integration suites that go through these plugins (LocalDiskFixes, PluginFixes, PluginCommands,
-  ArchiveJobsEndToEnd, JobsThroughVirtualFolders, NamesInBranchViews, ViewerThroughVirtualFolders): 56 tests, all passed.
+  ConfigPlacesFix*, VirtualFoldersAdoption, PlacesAdoption, Review2ConfigB*): 172 tests in 31 suites, all passed (run
+  twice). Integration suites that go through these plugins (LocalDiskFixes, PluginFixes, PluginCommands,
+  ArchiveJobsEndToEnd, JobsThroughVirtualFolders, NamesInBranchViews, ViewerThroughVirtualFolders): 56 tests, all
+  passed.
 - A full PluginTests run was attempted and stopped (the machine is loaded; it stalled). In the part that ran, the
   failures were outside this area: NetworkFTP.seeksWhileReading, NetworkAdoptSFTP.aSendThatIsCancelledOnAFullPipeEnds,
   SystemTools.aTypedLineRunsInTheSourceFolderAndItsOutputIsShown (not mine).
-- During development NSPasteboard crashed (SIGSEGV) in a test when read from a background queue; that design was removed.
+- During development NSPasteboard crashed (SIGSEGV) in a test when read from a background queue; that design was
+  removed.
 
 ## Not done
 
@@ -93,5 +95,5 @@
 - C078, C079: inherent / needs a changed structure.
 - C057: no recursive local watch; receive() without a cancellation flag.
 - C113: not in this area.
-- Window controller (DirectoryTreeWindowController) has no unit test: it needs a window; the scanner, tree search,
-  cache and store-ticket logic are tested through their models.
+- Window controller (DirectoryTreeWindowController) has no unit test: it needs a window; the scanner, tree search, cache
+  and store-ticket logic are tested through their models.

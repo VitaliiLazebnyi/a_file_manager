@@ -1,0 +1,11 @@
+// Markdown lint: every rule on. Layout is Prettier's job (.prettierrc.json, 120 columns);
+// the line-length rule matches it and skips tables and code, which cannot be wrapped.
+{
+  "config": {
+    "default": true,
+    "MD013": { "line_length": 120, "tables": false, "code_blocks": false, "headings": false }
+  },
+  "globs": ["**/*.md"],
+  "ignores": [".build/**", "build/**", "scratchpad/**", "Tests/Fuzz/out/**", "Tests/Stress/results/**",
+              "documentation/review-*/extracted/**"]
+}

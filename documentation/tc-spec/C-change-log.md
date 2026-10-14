@@ -1,273 +1,286 @@
 # Appendix C: Change log
 
-This appendix records the corrections made between the editions of this specification, condensed from the correction lists of the first edition and grouped by topic. Each row gives what the first edition said, what is correct, and the basis of the correction; where the same correction was reported several times it appears once. The current description of each topic is in the chapter named in the section heading.
+This appendix records the corrections made between the editions of this specification, condensed from the correction
+lists of the first edition and grouped by topic. Each row gives what the first edition said, what is correct, and the
+basis of the correction; where the same correction was reported several times it appears once. The current description
+of each topic is in the chapter named in the section heading.
 
-**Related:** [Appendix A](A-host-differences.md) (host artefacts), [Appendix B](B-investigation-and-test-setup.md) (phases and provenance conventions).
+**Related:** [Appendix A](A-host-differences.md) (host artefacts), [Appendix B](B-investigation-and-test-setup.md)
+(phases and provenance conventions).
 
 ## 1. Editions
 
-The first edition grew in layers. A user-interface reference (first-edition chapters 01–14) was written from on-screen exploration under Wine, with every dialog opened and cancelled. Logic chapters (15–20) were then written from the program's help, plus a localisation chapter (21); they corrected the UI chapters where the help disagreed. Hands-on sandbox tests under Wine (22) confirmed operations for real, and tests on real Windows 11 (23) repeated the host-dependent checks and added FTP, plugins, network and printing. Each layer kept a "Corrections to existing chapters" list and patched the earlier chapters with inline notes. This consolidated edition describes each topic once with the final behaviour, removes the patch notes, and moves host-specific findings to Appendix A.
+The first edition grew in layers. A user-interface reference (first-edition chapters 01–14) was written from on-screen
+exploration under Wine, with every dialog opened and cancelled. Logic chapters (15–20) were then written from the
+program's help, plus a localisation chapter (21); they corrected the UI chapters where the help disagreed. Hands-on
+sandbox tests under Wine (22) confirmed operations for real, and tests on real Windows 11 (23) repeated the
+host-dependent checks and added FTP, plugins, network and printing. Each layer kept a "Corrections to existing chapters"
+list and patched the earlier chapters with inline notes. This consolidated edition describes each topic once with the
+final behaviour, removes the patch notes, and moves host-specific findings to Appendix A.
 
-In the tables, **Basis** names the help topic (*help: …*), **Wine** (observed in the sandbox tests under Wine) or **Windows** (observed on Windows 11).
+In the tables, **Basis** names the help topic (_help: …_), **Wine** (observed in the sandbox tests under Wine) or
+**Windows** (observed on Windows 11).
 
-*Basis: first-edition structure.*
+_Basis: first-edition structure._
 
 ## 2. Window, title and start-up (now 01, 02)
 
-| First edition said | Correct | Basis |
-|---|---|---|
-| Title `<user>^ - Total Commander (x64) 11.58 - NOT REGISTERED`; the `^` "most likely an elevation/instance marker" | `Total Commander (x64) 11.58 - NOT REGISTERED`; the prefix was a Wine artefact | Windows |
-| Nag screen not captured; Configuration opening at first start only inferred | Nag captions recorded; the first start opens Configuration on the Layout page, then the icon-library chooser | Windows |
-| Default window 1092 × 794 logical points; rendering metrics from Wine screenshots only | ≈ 863 × 628 logical px at 200 %, centred; Windows 11 metrics added; all DPI-dependent (Appendix A) | Windows |
-| Drive list: letters plus `+ Computer`, `* My Documents` | Also real drives (`d  DVD Drive`) and `\  Network Neighborhood`; mapped drives as `z  \\localhost\c$\tc-sandbox`; an FTP connection as `0` with a globe icon | Windows |
-| Path bar: active blue with white text, inactive grey | Default colours follow the Windows caption colours (steel blue / lighter grey-blue on Windows 11); a long path shows its end with ◀ ▶ scroll arrows | Windows |
-| Path bar: double click or "F9-path focus" edits the path | Double click opens the hotlist; a single click outside the path text or `cm_EditPath` edits; a slow right click (~1 s) opens the history; the keyboard reaches the bar with Alt+F11 / Alt+F12; F9 opens the menu above the source panel | help: add_curdir, keyboard |
-| Function-key bar: right click does nothing | Right click on F8 opens the Recycle Bin; F3, F4 and F8 accept dropped files | help: add_buttons |
-| No FTP toolbar; drive button bar only described | A full-width FTP toolbar appears above the panels while connected; the drive button bar shows `[c] [d] [\]` at once after Apply | Windows |
-| Dark mode "observed briefly" | Full Windows 11 palette recorded; `DarkMode=0` stays in the ini until settings are saved | Windows |
-| About box: `totalcmd64.exe` | Program file shown as `TOTALCMD64.EXE` | Windows |
+| First edition said                                                                                                 | Correct                                                                                                                                                                                                                                 | Basis                      |
+| ------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- |
+| Title `<user>^ - Total Commander (x64) 11.58 - NOT REGISTERED`; the `^` "most likely an elevation/instance marker" | `Total Commander (x64) 11.58 - NOT REGISTERED`; the prefix was a Wine artefact                                                                                                                                                          | Windows                    |
+| Nag screen not captured; Configuration opening at first start only inferred                                        | Nag captions recorded; the first start opens Configuration on the Layout page, then the icon-library chooser                                                                                                                            | Windows                    |
+| Default window 1092 × 794 logical points; rendering metrics from Wine screenshots only                             | ≈ 863 × 628 logical px at 200 %, centred; Windows 11 metrics added; all DPI-dependent (Appendix A)                                                                                                                                      | Windows                    |
+| Drive list: letters plus `+ Computer`, `* My Documents`                                                            | Also real drives (`d  DVD Drive`) and `\  Network Neighborhood`; mapped drives as `z  \\localhost\c$\tc-sandbox`; an FTP connection as `0` with a globe icon                                                                            | Windows                    |
+| Path bar: active blue with white text, inactive grey                                                               | Default colours follow the Windows caption colours (steel blue / lighter grey-blue on Windows 11); a long path shows its end with ◀ ▶ scroll arrows                                                                                     | Windows                    |
+| Path bar: double click or "F9-path focus" edits the path                                                           | Double click opens the hotlist; a single click outside the path text or `cm_EditPath` edits; a slow right click (~1 s) opens the history; the keyboard reaches the bar with Alt+F11 / Alt+F12; F9 opens the menu above the source panel | help: add_curdir, keyboard |
+| Function-key bar: right click does nothing                                                                         | Right click on F8 opens the Recycle Bin; F3, F4 and F8 accept dropped files                                                                                                                                                             | help: add_buttons          |
+| No FTP toolbar; drive button bar only described                                                                    | A full-width FTP toolbar appears above the panels while connected; the drive button bar shows `[c] [d] [\]` at once after Apply                                                                                                         | Windows                    |
+| Dark mode "observed briefly"                                                                                       | Full Windows 11 palette recorded; `DarkMode=0` stays in the ini until settings are saved                                                                                                                                                | Windows                    |
+| About box: `totalcmd64.exe`                                                                                        | Program file shown as `TOTALCMD64.EXE`                                                                                                                                                                                                  | Windows                    |
 
-*Basis: per row.*
+_Basis: per row._
 
 ## 3. Display defaults (now 02, 03, 13)
 
-| First edition said | Correct | Basis |
-|---|---|---|
+| First edition said                                                                                               | Correct                                                                                                                                                                     | Basis                                     |
+| ---------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
 | File list font "Microsoft Sans Serif, 8, bold"; then, from the help, Segoe UI Semibold 9 on a fresh installation | Fresh Windows 11 installation: Segoe UI 9 regular for file list and main window; MS Sans Serif 8 bold is the fallback that Wine showed; dialog font MS Sans Serif 8 in both | help: inisettings2, inisettings3; Windows |
-| Icon size 16×16 (`Iconsize32=16`) | Depends on DPI: 16×16 at 96 DPI, 32×32 at 200 % | Windows |
-| Tabstops 147 / 209 / 213 / 273 / 90; DPI box 96 | 176 / 234 / 238 / 299 / 91 and DPI 192 at 200 %; both sets DPI/font-dependent | Windows |
-| All Options values are fresh-installation defaults | Confirmed on Windows for every page checked, except the DPI/font values | Windows |
-| Refresh: "unchecked under Wine; on Windows the default is on" | `WatchDirs=0`, off by default, also on Windows; panels are re-read on activation | help: inisettings2; Windows |
-| View Mode *Priority*: "probably colours override colours by file type" | Gives the view mode's icon priority over icons from `desktop.ini` or the drive icon; unrelated to colours | help: dlg_configviewmode |
-| *Cursor font* disabled while the Windows-theme cursor is on | Available only when *Use inverted cursor* is ticked | help: dlg_configcolor |
+| Icon size 16×16 (`Iconsize32=16`)                                                                                | Depends on DPI: 16×16 at 96 DPI, 32×32 at 200 %                                                                                                                             | Windows                                   |
+| Tabstops 147 / 209 / 213 / 273 / 90; DPI box 96                                                                  | 176 / 234 / 238 / 299 / 91 and DPI 192 at 200 %; both sets DPI/font-dependent                                                                                               | Windows                                   |
+| All Options values are fresh-installation defaults                                                               | Confirmed on Windows for every page checked, except the DPI/font values                                                                                                     | Windows                                   |
+| Refresh: "unchecked under Wine; on Windows the default is on"                                                    | `WatchDirs=0`, off by default, also on Windows; panels are re-read on activation                                                                                            | help: inisettings2; Windows               |
+| View Mode _Priority_: "probably colours override colours by file type"                                           | Gives the view mode's icon priority over icons from `desktop.ini` or the drive icon; unrelated to colours                                                                   | help: dlg_configviewmode                  |
+| _Cursor font_ disabled while the Windows-theme cursor is on                                                      | Available only when _Use inverted cursor_ is ticked                                                                                                                         | help: dlg_configcolor                     |
 
-*Basis: per row.*
+_Basis: per row._
 
 ## 4. File panels, views and context menus (now 03, 05)
 
-| First edition said | Correct | Basis |
-|---|---|---|
-| Attr: four flags `r a h s`; `----` for most folders | Also `c` (compressed) and `e` (encrypted); Windows system folders show `r---`; hidden/system items get a red `!` overlay | help: add_filelist; Windows |
-| Folders show `<DIR>` | NTFS symbolic links and junctions show `<LNK>` | help: add_filelist; Windows |
-| Cursor: light-blue bar | Plus a darker blue 1 px border (Windows theme) | Windows |
-| Comments view: Name plus a comment column | Header stays Name/Ext/Size/Date/Attr; the comment starts at the Size column; multi-line comments on one line | Wine |
-| Thumbnails: square frames 96×96; images show previews | Header row stays; `[..]` is a large up-arrow tile; real PNG and JPG thumbnails; captions shortened as `gree..png`; `cm_ZoomIn 200` doubles the tiles at once | Wine; Windows |
-| Quick View | The viewer panel has no column header | Wine |
-| Branch view: the status line shows the name | It shows the relative path; rows are bare names sorted by name; path bar unchanged; leaving the view opens the cursor file's folder | Wine |
-| Name: optional trailing `\` | Brackets off + *Append \\* shows `bin\`, `..\`, applied at once; *Sorting directories: Like files* also applied live | Windows |
-| Footer always ends with `, … dir(s)` | Also seen without that part; the comparison view counts only visible files; after Feed to listbox it shows the cursor item | Wine |
-| Choosing a drive opens its root | Choosing the drive the other panel is on opens that panel's folder | Wine |
-| Quick search jumps to the first match | To the next match from the cursor; ↓ / ↑ go to the next / previous match | help: dlg_quicksearch |
-| Quick filter is a substring filter | Follows *Exact name match*: names must start with the text by default (`QuickSearchMatchBeginning=1`); substring only when that is off or the text starts with `*` | help: dlg_configquicksearch, inisettings2 |
-| Shift+F2 changes both captions to `Comparison: …` | Captions stay unchanged and the previous selection is replaced; only *Mark Newer, Hide Same Files* shows `Comparison: <path>\*.*` and hides identical files; Ctrl+R twice or any reread ends it | Wine |
-| Compare Directories selects differing files | Only newer files and files missing on the other side; an older differing file stays unmarked | help: options_compare; Wine |
-| Search results shown as `Search results: …` | Drive line `Search result:` (combo empty), empty path bar, full paths in Name, other columns empty; Backspace returns | Wine |
-| Archive path `c:\x\a.zip\sub\*.*` for nested archives | An archive inside an archive is extracted to `%TEMP%\_tc\`, and path bar and drive switch to that temp path | Wine |
-| Inside archives: header right-click opens the view menu | The header reads `[Auto] Name`; right-clicking `[Auto]` opens the file-name encoding menu | Wine |
-| File context menu "on Windows also carries every shell extension" | Windows 11 classic shell menus for files and folders recorded; TC's item reads "View (Lister)" | Windows |
-| Long paths not covered | Paths over 260 characters are entered, viewed and copied normally | Windows |
+| First edition said                                                | Correct                                                                                                                                                                                         | Basis                                     |
+| ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| Attr: four flags `r a h s`; `----` for most folders               | Also `c` (compressed) and `e` (encrypted); Windows system folders show `r---`; hidden/system items get a red `!` overlay                                                                        | help: add_filelist; Windows               |
+| Folders show `<DIR>`                                              | NTFS symbolic links and junctions show `<LNK>`                                                                                                                                                  | help: add_filelist; Windows               |
+| Cursor: light-blue bar                                            | Plus a darker blue 1 px border (Windows theme)                                                                                                                                                  | Windows                                   |
+| Comments view: Name plus a comment column                         | Header stays Name/Ext/Size/Date/Attr; the comment starts at the Size column; multi-line comments on one line                                                                                    | Wine                                      |
+| Thumbnails: square frames 96×96; images show previews             | Header row stays; `[..]` is a large up-arrow tile; real PNG and JPG thumbnails; captions shortened as `gree..png`; `cm_ZoomIn 200` doubles the tiles at once                                    | Wine; Windows                             |
+| Quick View                                                        | The viewer panel has no column header                                                                                                                                                           | Wine                                      |
+| Branch view: the status line shows the name                       | It shows the relative path; rows are bare names sorted by name; path bar unchanged; leaving the view opens the cursor file's folder                                                             | Wine                                      |
+| Name: optional trailing `\`                                       | Brackets off + _Append \\_ shows `bin\`, `..\`, applied at once; _Sorting directories: Like files_ also applied live                                                                            | Windows                                   |
+| Footer always ends with `, … dir(s)`                              | Also seen without that part; the comparison view counts only visible files; after Feed to listbox it shows the cursor item                                                                      | Wine                                      |
+| Choosing a drive opens its root                                   | Choosing the drive the other panel is on opens that panel's folder                                                                                                                              | Wine                                      |
+| Quick search jumps to the first match                             | To the next match from the cursor; ↓ / ↑ go to the next / previous match                                                                                                                        | help: dlg_quicksearch                     |
+| Quick filter is a substring filter                                | Follows _Exact name match_: names must start with the text by default (`QuickSearchMatchBeginning=1`); substring only when that is off or the text starts with `*`                              | help: dlg_configquicksearch, inisettings2 |
+| Shift+F2 changes both captions to `Comparison: …`                 | Captions stay unchanged and the previous selection is replaced; only _Mark Newer, Hide Same Files_ shows `Comparison: <path>\*.*` and hides identical files; Ctrl+R twice or any reread ends it | Wine                                      |
+| Compare Directories selects differing files                       | Only newer files and files missing on the other side; an older differing file stays unmarked                                                                                                    | help: options_compare; Wine               |
+| Search results shown as `Search results: …`                       | Drive line `Search result:` (combo empty), empty path bar, full paths in Name, other columns empty; Backspace returns                                                                           | Wine                                      |
+| Archive path `c:\x\a.zip\sub\*.*` for nested archives             | An archive inside an archive is extracted to `%TEMP%\_tc\`, and path bar and drive switch to that temp path                                                                                     | Wine                                      |
+| Inside archives: header right-click opens the view menu           | The header reads `[Auto] Name`; right-clicking `[Auto]` opens the file-name encoding menu                                                                                                       | Wine                                      |
+| File context menu "on Windows also carries every shell extension" | Windows 11 classic shell menus for files and folders recorded; TC's item reads "View (Lister)"                                                                                                  | Windows                                   |
+| Long paths not covered                                            | Paths over 260 characters are entered, viewed and copied normally                                                                                                                               | Windows                                   |
 
-*Basis: per row.*
+_Basis: per row._
 
 ## 5. Keyboard (now 06)
 
-| First edition said | Correct | Basis |
-|---|---|---|
-| Key tables reconstructed from help pages whose key column was blank under Wine; † marks for unconfirmed keys | Rebuilt from `KEYBOARD.TXT`, the help, `WCMD_ENG.MNU` and `TOTALCMD.INC`, with a `cm_` column, per-tool tables, mouse+key gestures, context rules and redefinition rules; an F-key overview including free combinations; all † marks resolved (F2 = reread, Shift+F7 = new folder in the target, Ctrl+Enter / Ctrl+Shift+Enter, Esc in the command line) | KEYBOARD.TXT; help: keyboard |
-| Ctrl+E / Ctrl+X = previous / next command | Ctrl+X cuts text; only Ctrl+E is a history key; `cm_NextCommand` has no default key | help: cmdline |
-| Shift+F3 views the file under the cursor | It uses the other of the two internal viewer methods, as configured | help: keyboard |
-| Space moves the cursor and computes folder sizes | No move unless `SpaceMovesDown=1`; the size is computed only for an unselected folder and only while *…when selecting with the space bar* is on; Insert moves down | KEYBOARD.TXT; help: dlg_config2 |
-| Alt+F4 exits | Exits or minimises (`MinimizeOnClose`) | help: keyboard |
-| Typing goes to the command line unless quick search is letters-only | Letters stay in the panel in mode 2 (*Letter only*) and mode 3 (*Letters - with search dialog*); → (Shift+→ in Brief view) reaches the command line; *Letter only* jumps without a box and Enter opens the file | help: dlg_configquicksearch; Windows |
-| No Alt shortcut tested | Alt+F7, Alt+F1, Alt+Enter, Alt+F, Alt+→ in Lister and Ctrl+Shift+F5 confirmed; no result for the others | Windows |
-| Home/End unconfirmed; selection keys incomplete | End confirmed; Shift+↓ toggles and moves down; Ctrl+A never selects `[..]` | Wine |
-| Hotkey notation `C`, `A`, `S`, `W` (Win); `<mods>+<key>=<command> [params]` | `[Shortcuts]` uses only C, A, S; Win combinations go into `[ShortcutsWin]`; parameters go into a separate `<mods>+<key>_params=` key; keypad names `ADD`, `SUB`, `NUM0` … unverified | help: inisettings3 |
-| Missing keys | Added, among others: Shift+Del, Ctrl+↓ history, command-line editing keys, Ctrl+Shift+A / S, Ctrl+Tab options, `CtrlArrowOpenArchive`, media keys, `KeyboardID`, full Lister keys (C = centre for images, cover in media mode), and HISTORY.TXT items (F13–F24, where redefined keys do not work) | KEYBOARD.TXT; help; HISTORY.TXT |
+| First edition said                                                                                           | Correct                                                                                                                                                                                                                                                                                                                                                  | Basis                                |
+| ------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| Key tables reconstructed from help pages whose key column was blank under Wine; † marks for unconfirmed keys | Rebuilt from `KEYBOARD.TXT`, the help, `WCMD_ENG.MNU` and `TOTALCMD.INC`, with a `cm_` column, per-tool tables, mouse+key gestures, context rules and redefinition rules; an F-key overview including free combinations; all † marks resolved (F2 = reread, Shift+F7 = new folder in the target, Ctrl+Enter / Ctrl+Shift+Enter, Esc in the command line) | KEYBOARD.TXT; help: keyboard         |
+| Ctrl+E / Ctrl+X = previous / next command                                                                    | Ctrl+X cuts text; only Ctrl+E is a history key; `cm_NextCommand` has no default key                                                                                                                                                                                                                                                                      | help: cmdline                        |
+| Shift+F3 views the file under the cursor                                                                     | It uses the other of the two internal viewer methods, as configured                                                                                                                                                                                                                                                                                      | help: keyboard                       |
+| Space moves the cursor and computes folder sizes                                                             | No move unless `SpaceMovesDown=1`; the size is computed only for an unselected folder and only while _…when selecting with the space bar_ is on; Insert moves down                                                                                                                                                                                       | KEYBOARD.TXT; help: dlg_config2      |
+| Alt+F4 exits                                                                                                 | Exits or minimises (`MinimizeOnClose`)                                                                                                                                                                                                                                                                                                                   | help: keyboard                       |
+| Typing goes to the command line unless quick search is letters-only                                          | Letters stay in the panel in mode 2 (_Letter only_) and mode 3 (_Letters - with search dialog_); → (Shift+→ in Brief view) reaches the command line; _Letter only_ jumps without a box and Enter opens the file                                                                                                                                          | help: dlg_configquicksearch; Windows |
+| No Alt shortcut tested                                                                                       | Alt+F7, Alt+F1, Alt+Enter, Alt+F, Alt+→ in Lister and Ctrl+Shift+F5 confirmed; no result for the others                                                                                                                                                                                                                                                  | Windows                              |
+| Home/End unconfirmed; selection keys incomplete                                                              | End confirmed; Shift+↓ toggles and moves down; Ctrl+A never selects `[..]`                                                                                                                                                                                                                                                                               | Wine                                 |
+| Hotkey notation `C`, `A`, `S`, `W` (Win); `<mods>+<key>=<command> [params]`                                  | `[Shortcuts]` uses only C, A, S; Win combinations go into `[ShortcutsWin]`; parameters go into a separate `<mods>+<key>_params=` key; keypad names `ADD`, `SUB`, `NUM0` … unverified                                                                                                                                                                     | help: inisettings3                   |
+| Missing keys                                                                                                 | Added, among others: Shift+Del, Ctrl+↓ history, command-line editing keys, Ctrl+Shift+A / S, Ctrl+Tab options, `CtrlArrowOpenArchive`, media keys, `KeyboardID`, full Lister keys (C = centre for images, cover in media mode), and HISTORY.TXT items (F13–F24, where redefined keys do not work)                                                        | KEYBOARD.TXT; help; HISTORY.TXT      |
 
-*Basis: per row.*
+_Basis: per row._
 
 ## 6. Copy, move and rename (now 07)
 
-| First edition said | Correct | Basis |
-|---|---|---|
-| Selected folders are measured before the dialog opens | Measured in the background while the dialog is open | Wine |
-| One item gives `Copy "name" to` | Only a single file does; a single folder gives `Copy 1 file(s) to` | Wine |
-| Info strip: total size, files, folders | The folder count includes the selected folders and their subfolders; a single file shows bytes as `15 b` | Wine |
-| Target combo with history | Also path auto-complete; missing target folders are created silently, several levels deep | Wine |
-| F2 Queue adds the job to the queue | Opens the Background Transfer Manager and starts at once (title `<first item> (Copy)`, job lines `copy:<src> -> <dst>` / `copyflags:0`); jobs queued while paused are appended and run one after another; when done the window stays open with "(READY)" (a single Wine job's window closed itself; cause not established) | Wine; Windows |
-| No Overwrite dialog | Full dialog: button grid and accelerators, default Overwrite, *More Options >>* menu, Compare box, thumbnails, custom fields; read-only follow-up prompt; no Append for rename conflicts | Wine |
-| Shift+F5 not described | Compact dialog without Queue, Options, `+ F7` / `+ F8` or counter | Wine |
-| Move identical to Copy | Counter includes subfolders; cursor moves to the next item | Wine |
-| Shift+F6 edits inline | 1st press selects name+ext, 2nd only the name; a ✓ button confirms; auto-rename gives `name (2).ext` | Wine |
-| Copy job: Esc check, end state not described | Name order (case-insensitive); "You cannot copy a file to itself!"; Esc guard fires only while Esc is really held; source selection removed; file times kept | Wine; Windows |
-| No statement on access errors | "Access denied on file …!" with [As Administrator] buttons; a denied target gives "The given target path … is invalid!" and closes the dialog | Windows |
-| Create shortcut not described | Dialog `Create shortcut of "<name>" as`; the extension is replaced by `.lnk` | Windows |
-| Copy NTFS permissions copies ACLs, owner and auditing | Explicit ACEs plus the target's inherited ACEs; without the option only inherited ones; alternate data streams are copied either way | Windows |
-| Left-drag: *Drag&Drop* confirmation if enabled; Explorer: normal OLE drop | Between panels: the normal Copy dialog; Explorer → TC: TC's Yes/No box "Copy 1 file(s) to"; TC → Explorer on the same drive: moved by Explorer, no prompt | Wine; Windows |
-| Ctrl+V not described | Pastes at once through the shell copy engine; conflicts show the shell's dialog | Wine |
+| First edition said                                                        | Correct                                                                                                                                                                                                                                                                                                                    | Basis         |
+| ------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- |
+| Selected folders are measured before the dialog opens                     | Measured in the background while the dialog is open                                                                                                                                                                                                                                                                        | Wine          |
+| One item gives `Copy "name" to`                                           | Only a single file does; a single folder gives `Copy 1 file(s) to`                                                                                                                                                                                                                                                         | Wine          |
+| Info strip: total size, files, folders                                    | The folder count includes the selected folders and their subfolders; a single file shows bytes as `15 b`                                                                                                                                                                                                                   | Wine          |
+| Target combo with history                                                 | Also path auto-complete; missing target folders are created silently, several levels deep                                                                                                                                                                                                                                  | Wine          |
+| F2 Queue adds the job to the queue                                        | Opens the Background Transfer Manager and starts at once (title `<first item> (Copy)`, job lines `copy:<src> -> <dst>` / `copyflags:0`); jobs queued while paused are appended and run one after another; when done the window stays open with "(READY)" (a single Wine job's window closed itself; cause not established) | Wine; Windows |
+| No Overwrite dialog                                                       | Full dialog: button grid and accelerators, default Overwrite, _More Options >>_ menu, Compare box, thumbnails, custom fields; read-only follow-up prompt; no Append for rename conflicts                                                                                                                                   | Wine          |
+| Shift+F5 not described                                                    | Compact dialog without Queue, Options, `+ F7` / `+ F8` or counter                                                                                                                                                                                                                                                          | Wine          |
+| Move identical to Copy                                                    | Counter includes subfolders; cursor moves to the next item                                                                                                                                                                                                                                                                 | Wine          |
+| Shift+F6 edits inline                                                     | 1st press selects name+ext, 2nd only the name; a ✓ button confirms; auto-rename gives `name (2).ext`                                                                                                                                                                                                                       | Wine          |
+| Copy job: Esc check, end state not described                              | Name order (case-insensitive); "You cannot copy a file to itself!"; Esc guard fires only while Esc is really held; source selection removed; file times kept                                                                                                                                                               | Wine; Windows |
+| No statement on access errors                                             | "Access denied on file …!" with [As Administrator] buttons; a denied target gives "The given target path … is invalid!" and closes the dialog                                                                                                                                                                              | Windows       |
+| Create shortcut not described                                             | Dialog `Create shortcut of "<name>" as`; the extension is replaced by `.lnk`                                                                                                                                                                                                                                               | Windows       |
+| Copy NTFS permissions copies ACLs, owner and auditing                     | Explicit ACEs plus the target's inherited ACEs; without the option only inherited ones; alternate data streams are copied either way                                                                                                                                                                                       | Windows       |
+| Left-drag: _Drag&Drop_ confirmation if enabled; Explorer: normal OLE drop | Between panels: the normal Copy dialog; Explorer → TC: TC's Yes/No box "Copy 1 file(s) to"; TC → Explorer on the same drive: moved by Explorer, no prompt                                                                                                                                                                  | Wine; Windows |
+| Ctrl+V not described                                                      | Pastes at once through the shell copy engine; conflicts show the shell's dialog                                                                                                                                                                                                                                            | Wine          |
 
-*Basis: per row.*
+_Basis: per row._
 
 ## 7. New folder, delete, attributes, properties (now 07)
 
-| First edition said | Correct | Basis |
-|---|---|---|
-| New folder pre-filled with the cursor name | Empty when the cursor is on `[..]` | Wine |
-| `[X]` (clipboard) in the `±` menu | Absent while the clipboard holds no text | Wine |
-| Counter `<1-10>[C]` only listed | The range must start the field; live two-line preview; zero-padded to the end value's width; cursor on the last folder; `\|` separates several folders, `\` nests | Wine |
-| Generic delete question | Shift+F8 title "Permanently delete"; separate file and folder wording; item red while asking; cursor to the next item (previous after the last) | Wine |
-| Non-empty folder: "a second confirmation" | "The directory <path> is not empty!" … [Delete] [All] [Skip] [Cancel], over a "Deleting:" progress window | Wine |
-| Read-only, hidden and system files ask separately | READ ONLY prompt (Skip clears the selection) and "has either the attribute HIDDEN or SYSTEM!" prompt for direct deletion; to the recycle bin: "…move the selected file <name> to the recycle bin?", no attribute prompt, no progress window for one small file | Wine; Windows; help: inisettings2 (`VistaDelete`) |
-| Change attributes: title `<name>`; boxes grey | `Change attributes: <count>` for several items; grey third state and date hints only then; a single item shows its real values | Wine |
-| Properties: tab *General* | Windows sheet: General / Digital Signatures / Security / Details / Previous Versions | Windows |
-| Calculate space: example on a folder | NTFS box with cluster-based space; a selection is used instead of the cursor item; streams not mentioned | Windows |
+| First edition said                                | Correct                                                                                                                                                                                                                                                          | Basis                                             |
+| ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| New folder pre-filled with the cursor name        | Empty when the cursor is on `[..]`                                                                                                                                                                                                                               | Wine                                              |
+| `[X]` (clipboard) in the `±` menu                 | Absent while the clipboard holds no text                                                                                                                                                                                                                         | Wine                                              |
+| Counter `<1-10>[C]` only listed                   | The range must start the field; live two-line preview; zero-padded to the end value's width; cursor on the last folder; `\|` separates several folders, `\` nests                                                                                                | Wine                                              |
+| Generic delete question                           | Shift+F8 title "Permanently delete"; separate file and folder wording; item red while asking; cursor to the next item (previous after the last)                                                                                                                  | Wine                                              |
+| Non-empty folder: "a second confirmation"         | "The directory `<path>` is not empty!" … [Delete] [All] [Skip] [Cancel], over a "Deleting:" progress window                                                                                                                                                      | Wine                                              |
+| Read-only, hidden and system files ask separately | READ ONLY prompt (Skip clears the selection) and "has either the attribute HIDDEN or SYSTEM!" prompt for direct deletion; to the recycle bin: "…move the selected file `<name>` to the recycle bin?", no attribute prompt, no progress window for one small file | Wine; Windows; help: inisettings2 (`VistaDelete`) |
+| Change attributes: title `<name>`; boxes grey     | `Change attributes: <count>` for several items; grey third state and date hints only then; a single item shows its real values                                                                                                                                   | Wine                                              |
+| Properties: tab _General_                         | Windows sheet: General / Digital Signatures / Security / Details / Previous Versions                                                                                                                                                                             | Windows                                           |
+| Calculate space: example on a folder              | NTFS box with cluster-based space; a selection is used instead of the cursor item; streams not mentioned                                                                                                                                                         | Windows                                           |
 
-*Basis: per row.*
+_Basis: per row._
 
 ## 8. Clipboard formats, selection files, comments (now 03, 07)
 
-| First edition said | Correct | Basis |
-|---|---|---|
-| Mark-menu clipboard items without format | Exact line formats: folders with trailing `\`, details TAB-separated, no final line break | Wine |
-| Save Selection: ANSI/Unicode variants | The menu item writes UTF-16LE with BOM, CRLF, no final CRLF | Wine |
-| Comment dialog: live character count; storage only named | A line break counts 2; `descript.ion` line format, ANSI, multi-line as `\n` plus `0x04 0xC2`, file Hidden; comments not copied with files by default | Wine |
+| First edition said                                       | Correct                                                                                                                                              | Basis |
+| -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
+| Mark-menu clipboard items without format                 | Exact line formats: folders with trailing `\`, details TAB-separated, no final line break                                                            | Wine  |
+| Save Selection: ANSI/Unicode variants                    | The menu item writes UTF-16LE with BOM, CRLF, no final CRLF                                                                                          | Wine  |
+| Comment dialog: live character count; storage only named | A line break counts 2; `descript.ion` line format, ANSI, multi-line as `\n` plus `0x04 0xC2`, file Hidden; comments not copied with files by default | Wine  |
 
-*Basis: per row.*
+_Basis: per row._
 
 ## 9. Archives and file tools (now 08)
 
-| First edition said | Correct | Basis |
-|---|---|---|
-| Compression rate 0–9 for ZIP/7Z | ZIP 0–9 (0 = store; 10 = LZMA with `LzmaAllowed=1`); 7-Zip, GZ and TGZ accept 1–9 | help: dlg_pack |
-| Pack name = item under the cursor | One item: its name; several: target path plus source-directory name; Ctrl + Files › Pack proposes the source directory | help: dlg_pack; Wine |
-| Encrypt disabled for some formats; result not described | TGZ greys Encrypt; `tgz:` prefix; no success message; ZIP and TGZ member layout recorded | Wine |
-| Unpack: layout only | *separate subdir* creates `<target>\<archive name without extension>\` (target created too), silently | Wine |
-| Test Archive(s) not described | Silent on success; "Verify (CRC check):" progress; "Error in packed file <path>" [OK] [Cancel] | Wine |
-| `.crc` format "(documented)"; Combine dialog only | `filename=` / `size=` / `crc32=` (upper-case hex), CRLF; `360 k` = 362,496 bytes; success boxes for Split and "Combine - <parts>" | Wine |
-| Decode decodes into the target | A dialog first; a missing target is rejected ("…is invalid!") and the dialog closes; MIME name from the header; UUE output format | Wine |
-| Verify Checksums needs checksum files | Also with a hash on the clipboard, or CRC32 in brackets in file names; `.bk3` and `ChecksumExtraTypes` recognised | help: dlg_verifysfv, inisettings1 |
-| Checksum file extensions "expected" | Live `.sfv` / `.md5` / `.sha256`; several files → `<dir name>.<ext>`; last method remembered; selection cleared; file format and verify window | Wine |
+| First edition said                                      | Correct                                                                                                                                        | Basis                             |
+| ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
+| Compression rate 0–9 for ZIP/7Z                         | ZIP 0–9 (0 = store; 10 = LZMA with `LzmaAllowed=1`); 7-Zip, GZ and TGZ accept 1–9                                                              | help: dlg_pack                    |
+| Pack name = item under the cursor                       | One item: its name; several: target path plus source-directory name; Ctrl + Files › Pack proposes the source directory                         | help: dlg_pack; Wine              |
+| Encrypt disabled for some formats; result not described | TGZ greys Encrypt; `tgz:` prefix; no success message; ZIP and TGZ member layout recorded                                                       | Wine                              |
+| Unpack: layout only                                     | _separate subdir_ creates `<target>\<archive name without extension>\` (target created too), silently                                          | Wine                              |
+| Test Archive(s) not described                           | Silent on success; "Verify (CRC check):" progress; "Error in packed file `<path>`" [OK] [Cancel]                                               | Wine                              |
+| `.crc` format "(documented)"; Combine dialog only       | `filename=` / `size=` / `crc32=` (upper-case hex), CRLF; `360 k` = 362,496 bytes; success boxes for Split and "Combine - `<parts>`"            | Wine                              |
+| Decode decodes into the target                          | A dialog first; a missing target is rejected ("…is invalid!") and the dialog closes; MIME name from the header; UUE output format              | Wine                              |
+| Verify Checksums needs checksum files                   | Also with a hash on the clipboard, or CRC32 in brackets in file names; `.bk3` and `ChecksumExtraTypes` recognised                              | help: dlg_verifysfv, inisettings1 |
+| Checksum file extensions "expected"                     | Live `.sfv` / `.md5` / `.sha256`; several files → `<dir name>.<ext>`; last method remembered; selection cleared; file format and verify window | Wine                              |
 
-Left open, not corrected: the Packer page label "ACE (>= 2.04)" is kept although the help says ACE ≥ 1.2b; the *Pack Unicode names* combo shows 6 entries while the help documents a 7th, "Store Unicode characters as '?'" (`ZipUnicode=6`), which a clone should accept in the ini.
+Left open, not corrected: the Packer page label "ACE (>= 2.04)" is kept although the help says ACE ≥ 1.2b; the _Pack
+Unicode names_ combo shows 6 entries while the help documents a 7th, "Store Unicode characters as '?'" (`ZipUnicode=6`),
+which a clone should accept in the ini.
 
-*Basis: per row.*
+_Basis: per row._
 
 ## 10. Search, rename, synchronize, compare (now 09)
 
-| First edition said | Correct | Basis |
-|---|---|---|
-| A name without wildcards means "contains" | Only a token without a dot; with a dot it is an exact name (`.ini` finds only a file named `.ini`) | help: dlg_search |
-| Results: `[No files found]` or one path per line | First line `[N files and M directories found]` (selected), paths sorted, status line repeats it; duplicates as `<name>  -  <folder>\` with dashed group separators | Wine |
-| Reopening Find not described | *Search for*, *Search in* and *Find text* remembered; Advanced page reset | Wine |
-| Plugins tab: `tc` examples | Exif fields listed; numeric fields default to `>`; a *Make contains* rule found exactly the matching file | Windows |
-| RegEx: Perl style, `$0…$9` | TRegExpr, up to 89 subexpressions; look-ahead only at the end, look-behind only at the start; `\U` `\L` `\F` before `$n` | help: reg_ex |
-| Multi-Rename `±` menu | Runs `[P]` … `[X]` and adds `[I]` Folders only | Wine |
-| `<default>` only listed | Resets mask `[N]`, ext `[E]`, search/replace, counter 1/1/1, case | Wine |
-| Case conversion applied last | Also converts the extension | Wine |
-| Start! renames; Undo is persistent | No message; list emptied; Undo and Result list enabled; log `%TEMP%\_tc\renlog.txt`; Undo asks first with the list; panel not refreshed; last values kept | Wine |
-| Synchronize *by content*: binary compare of equal names | Only for pairs with the same size and date (or size with *ignore date*); FTP uses server checksums, archives and plugins checksums; content plugins can replace the byte compare | help: dlg_synchronize_dirs |
-| Synchronize: status `Files found: 0`; rows with red `≠`; menu and Synchronize… dialog from the help | Full status counts and `N/9` counter; grey folder headers; green → / blue ← by the newer side, black `=`; observed menu and dialog; Right → Left runs first; Confirm overwrites shows the Overwrite dialog; automatic re-compare | Wine |
-| No FTP-specific Synchronize UI | First-use warning plus help topic; *FTP time offset* `dT= [0] h` [x] mdtm [x] utc; *by content* greyed | Windows |
-| Saved sync sets in `[Sync]` | `[SyncOptions]` with `<name>_L`, `_R`, `_Wcs`, `_Flags` | help: inisettings3 |
-| Compare by content pre-fills the cursor files or two selected files | Two or more selected → first two; one selected → first selected in the target panel, else the same-named file; none → cursor file against the same-named file; the target's cursor file is never used | help: compare_by_content |
-| Compare window ends with a status line | Two-line bottom pane; opens at the first difference; colouring, hunks and defaults recorded | Wine |
+| First edition said                                                                                  | Correct                                                                                                                                                                                                                          | Basis                      |
+| --------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- |
+| A name without wildcards means "contains"                                                           | Only a token without a dot; with a dot it is an exact name (`.ini` finds only a file named `.ini`)                                                                                                                               | help: dlg_search           |
+| Results: `[No files found]` or one path per line                                                    | First line `[N files and M directories found]` (selected), paths sorted, status line repeats it; duplicates as `<name>  -  <folder>\` with dashed group separators                                                               | Wine                       |
+| Reopening Find not described                                                                        | _Search for_, _Search in_ and _Find text_ remembered; Advanced page reset                                                                                                                                                        | Wine                       |
+| Plugins tab: `tc` examples                                                                          | Exif fields listed; numeric fields default to `>`; a _Make contains_ rule found exactly the matching file                                                                                                                        | Windows                    |
+| RegEx: Perl style, `$0…$9`                                                                          | TRegExpr, up to 89 subexpressions; look-ahead only at the end, look-behind only at the start; `\U` `\L` `\F` before `$n`                                                                                                         | help: reg_ex               |
+| Multi-Rename `±` menu                                                                               | Runs `[P]` … `[X]` and adds `[I]` Folders only                                                                                                                                                                                   | Wine                       |
+| `<default>` only listed                                                                             | Resets mask `[N]`, ext `[E]`, search/replace, counter 1/1/1, case                                                                                                                                                                | Wine                       |
+| Case conversion applied last                                                                        | Also converts the extension                                                                                                                                                                                                      | Wine                       |
+| Start! renames; Undo is persistent                                                                  | No message; list emptied; Undo and Result list enabled; log `%TEMP%\_tc\renlog.txt`; Undo asks first with the list; panel not refreshed; last values kept                                                                        | Wine                       |
+| Synchronize _by content_: binary compare of equal names                                             | Only for pairs with the same size and date (or size with _ignore date_); FTP uses server checksums, archives and plugins checksums; content plugins can replace the byte compare                                                 | help: dlg_synchronize_dirs |
+| Synchronize: status `Files found: 0`; rows with red `≠`; menu and Synchronize… dialog from the help | Full status counts and `N/9` counter; grey folder headers; green → / blue ← by the newer side, black `=`; observed menu and dialog; Right → Left runs first; Confirm overwrites shows the Overwrite dialog; automatic re-compare | Wine                       |
+| No FTP-specific Synchronize UI                                                                      | First-use warning plus help topic; _FTP time offset_ `dT= [0] h` [x] mdtm [x] utc; _by content_ greyed                                                                                                                           | Windows                    |
+| Saved sync sets in `[Sync]`                                                                         | `[SyncOptions]` with `<name>_L`, `_R`, `_Wcs`, `_Flags`                                                                                                                                                                          | help: inisettings3         |
+| Compare by content pre-fills the cursor files or two selected files                                 | Two or more selected → first two; one selected → first selected in the target panel, else the same-named file; none → cursor file against the same-named file; the target's cursor file is never used                            | help: compare_by_content   |
+| Compare window ends with a status line                                                              | Two-line bottom pane; opens at the first difference; colouring, hunks and defaults recorded                                                                                                                                      | Wine                       |
 
-*Basis: per row.*
+_Basis: per row._
 
 ## 11. Lister and associations (now 10)
 
-| First edition said | Correct | Basis |
-|---|---|---|
-| `100 %` shows the position | For images it is the zoom; Encoding greyed; files from archives are viewed from `%TEMP%\_tc\` | Wine |
-| Hex and Binary show placeholder glyphs; search caption "Enter search text" | `.` for control characters in Hex; Binary shows CR/LF as dots and wraps at 75 characters; caption "Enter search text:" | Windows |
-| `<<` and `>>` at the right of the menu bar | Shown as `<< 1/3 >>`; with one file N and Alt+→ do nothing | Windows |
-| Plugins menu: Internal plus installed plugins | `Internal (no plugins)` · `✓ Imagine`; title `Lister (imagine) - [<path>]` | Windows |
-| Internal associations take precedence | Not for exe, com, bat, cmd and lnk; an archive's *Open* can be redefined only with `***command` and the extension listed explicitly | help: internal_associations |
+| First edition said                                                         | Correct                                                                                                                             | Basis                       |
+| -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | --------------------------- |
+| `100 %` shows the position                                                 | For images it is the zoom; Encoding greyed; files from archives are viewed from `%TEMP%\_tc\`                                       | Wine                        |
+| Hex and Binary show placeholder glyphs; search caption "Enter search text" | `.` for control characters in Hex; Binary shows CR/LF as dots and wraps at 75 characters; caption "Enter search text:"              | Windows                     |
+| `<<` and `>>` at the right of the menu bar                                 | Shown as `<< 1/3 >>`; with one file N and Alt+→ do nothing                                                                          | Windows                     |
+| Plugins menu: Internal plus installed plugins                              | `Internal (no plugins)` · `✓ Imagine`; title `Lister (imagine) - [<path>]`                                                          | Windows                     |
+| Internal associations take precedence                                      | Not for exe, com, bat, cmd and lnk; an archive's _Open_ can be redefined only with `***command` and the extension listed explicitly | help: internal_associations |
 
-*Basis: per row.*
+_Basis: per row._
 
 ## 12. Background Transfer Manager (now 07)
 
-| First edition said | Correct | Basis |
-|---|---|---|
-| `+` / `-` add or remove a parallel transfer | One job at a time; `+` opens a menu to add jobs; `-` removes selected queued jobs (on the active one it offers to abort it and continue); order changed by dragging while paused | help: options_background_transfer_manager |
-| Idle window titled "Total Commander"; closes itself | See §6; the observed `[+]` menu had three items; the Overwrite dialog docks under the window | Wine; Windows |
+| First edition said                                  | Correct                                                                                                                                                                          | Basis                                     |
+| --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| `+` / `-` add or remove a parallel transfer         | One job at a time; `+` opens a menu to add jobs; `-` removes selected queued jobs (on the active one it offers to abort it and continue); order changed by dragging while paused | help: options_background_transfer_manager |
+| Idle window titled "Total Commander"; closes itself | See §6; the observed `[+]` menu had three items; the Overwrite dialog docks under the window                                                                                     | Wine; Windows                             |
 
-*Basis: per row.*
+_Basis: per row._
 
 ## 13. FTP and network (now 11)
 
-| First edition said | Correct | Basis |
-|---|---|---|
-| No connection opened; network dialogs not opened | A full FTP and FTPS session ran against 127.0.0.1, and the network dialogs were opened (Appendix B) | Windows |
-| *FTP Show Hidden Files* uses `LIST -a` | `LIST -la`; `SpecialFlags` 512 adds `MLSD -la` | help: ftp_menu, wcx_ftp_ini_settings |
-| `wincmd.ini` holds everything except the FTP sessions | `wcx_ftp.ini` holds all FTP client settings, firewall, server types, time-zone offsets, master-password verifier and plugin passwords; redirection keys inside it are ignored | help: wcx_ftp_ini_settings, inisettings |
-| FTP path `ftp://host/dir` under `\ftp` | Drive combo `0`, drive line `ftp://host:port`, path bar `0:/pub/*.*`, prompt `0:/pub/>` | Windows |
-| Ctrl+Shift+M switches Binary / ASCII / Auto | Toolbar *Transfer mode* combo: Automatic · Binary (archives, doc etc.) · Text (plain text, html, etc.); two-line log box; "BG:" prefix for background transfers | Windows |
-| Small FTP log window | "Connect" window with header block, server dialogue and [Abort] | Windows |
-| Sessions in alphabetical order | Shown in creation order (names not recorded) | Windows |
-| SSL/TLS "probably" the `ftps://` prefix | Ticking it writes `ftps://` into Host and ticks passive mode; anonymous logins ask "Your e-mail address as password:" | Windows |
-| A second dialog offers Resume or Overwrite | "Target already exists" box with eight buttons including Resume and Resume all | Windows |
-| Invalid certificate: warning and red lock | "SSL" box with fingerprint, validity, subject, issuer and *Always trust this server*; sChannel log line | Windows |
-| Disconnect save question (documented) | "Current session not saved, save?" only for quick-connect sessions; the panel returns to the last local directory | Windows |
-| MLSD and temporary F3 copy (documented) | Alt+Enter shows the raw MLSD listing (UTC) from `%TEMP%\FTP….tmp`; F3 copies to `%TEMP%\_tc\` | Windows |
-| Download list `ftplist.txt`, format documented | Proposed in the program folder; line `<url> -> <local path>`, ANSI, CRLF; Download From List reconnects silently and rewrites the list | Windows |
-| Live-session dialogs missing; connection details from cancelled dialogs | Download, Upload and delete dialogs with background options, F7 and Shift+F6 on the server recorded; Advanced-tab defaults confirmed; *FTP Disconnect* enabled and *Show Hidden Files* checkable while connected | Windows |
-| Network items "(not run)"; Share/Unshare legacy | Map Network Drive wizard; Disconnect list; a server root `\\localhost\*.*` lists only `[..]`; Share Current Directory opens the folder Properties sheet; admin shares; PORT Test → "USB" window, "Connect failed!" | Windows |
-| X32 submenu in shell menus | Not present in the Windows 11 menus (32-bit extensions not tested) | Windows |
+| First edition said                                                      | Correct                                                                                                                                                                                                            | Basis                                   |
+| ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------- |
+| No connection opened; network dialogs not opened                        | A full FTP and FTPS session ran against 127.0.0.1, and the network dialogs were opened (Appendix B)                                                                                                                | Windows                                 |
+| _FTP Show Hidden Files_ uses `LIST -a`                                  | `LIST -la`; `SpecialFlags` 512 adds `MLSD -la`                                                                                                                                                                     | help: ftp_menu, wcx_ftp_ini_settings    |
+| `wincmd.ini` holds everything except the FTP sessions                   | `wcx_ftp.ini` holds all FTP client settings, firewall, server types, time-zone offsets, master-password verifier and plugin passwords; redirection keys inside it are ignored                                      | help: wcx_ftp_ini_settings, inisettings |
+| FTP path `ftp://host/dir` under `\ftp`                                  | Drive combo `0`, drive line `ftp://host:port`, path bar `0:/pub/*.*`, prompt `0:/pub/>`                                                                                                                            | Windows                                 |
+| Ctrl+Shift+M switches Binary / ASCII / Auto                             | Toolbar _Transfer mode_ combo: Automatic · Binary (archives, doc etc.) · Text (plain text, html, etc.); two-line log box; "BG:" prefix for background transfers                                                    | Windows                                 |
+| Small FTP log window                                                    | "Connect" window with header block, server dialogue and [Abort]                                                                                                                                                    | Windows                                 |
+| Sessions in alphabetical order                                          | Shown in creation order (names not recorded)                                                                                                                                                                       | Windows                                 |
+| SSL/TLS "probably" the `ftps://` prefix                                 | Ticking it writes `ftps://` into Host and ticks passive mode; anonymous logins ask "Your e-mail address as password:"                                                                                              | Windows                                 |
+| A second dialog offers Resume or Overwrite                              | "Target already exists" box with eight buttons including Resume and Resume all                                                                                                                                     | Windows                                 |
+| Invalid certificate: warning and red lock                               | "SSL" box with fingerprint, validity, subject, issuer and _Always trust this server_; sChannel log line                                                                                                            | Windows                                 |
+| Disconnect save question (documented)                                   | "Current session not saved, save?" only for quick-connect sessions; the panel returns to the last local directory                                                                                                  | Windows                                 |
+| MLSD and temporary F3 copy (documented)                                 | Alt+Enter shows the raw MLSD listing (UTC) from `%TEMP%\FTP….tmp`; F3 copies to `%TEMP%\_tc\`                                                                                                                      | Windows                                 |
+| Download list `ftplist.txt`, format documented                          | Proposed in the program folder; line `<url> -> <local path>`, ANSI, CRLF; Download From List reconnects silently and rewrites the list                                                                             | Windows                                 |
+| Live-session dialogs missing; connection details from cancelled dialogs | Download, Upload and delete dialogs with background options, F7 and Shift+F6 on the server recorded; Advanced-tab defaults confirmed; _FTP Disconnect_ enabled and _Show Hidden Files_ checkable while connected   | Windows                                 |
+| Network items "(not run)"; Share/Unshare legacy                         | Map Network Drive wizard; Disconnect list; a server root `\\localhost\*.*` lists only `[..]`; Share Current Directory opens the folder Properties sheet; admin shares; PORT Test → "USB" window, "Connect failed!" | Windows                                 |
+| X32 submenu in shell menus                                              | Not present in the Windows 11 menus (32-bit extensions not tested)                                                                                                                                                 | Windows                                 |
 
-*Basis: per row.*
+_Basis: per row._
 
 ## 14. Plugins (now 15)
 
-| First edition said | Correct | Basis |
-|---|---|---|
+| First edition said                                                        | Correct                                                                                                                                                                                                                                                                                                                                                                                                       | Basis   |
+| ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
 | Plugin types only; auto-install proposes `PluginBaseDir\<type>\<plugin>\` | Enter on a ZIP with `pluginst.inf` asks to install; default `%COMMANDER_PATH%\plugins\<type>\<name>`; a non-writable folder gives "Directory … not created!" [OK] [As Administrator]; later proposals use `%APPDATA%\GHISLER\plugins\…`; packers open Associate once per extension; each type opens its registration dialog (file-system lines `<name>  -  <path>`); paths stored with `%APPDATA%` unexpanded | Windows |
-| A plugin path passes the command line to the plugin first | With the Registry plugin `cd c:\…` was not executed; the drive had to be changed with Alt+F1 | Windows |
-| Plugin paths shown as the plugin name | `\\\Registry\*.*`; Network Neighborhood `\\Network\*.*` | Windows |
+| A plugin path passes the command line to the plugin first                 | With the Registry plugin `cd c:\…` was not executed; the drive had to be changed with Alt+F1                                                                                                                                                                                                                                                                                                                  | Windows |
+| Plugin paths shown as the plugin name                                     | `\\\Registry\*.*`; Network Neighborhood `\\Network\*.*`                                                                                                                                                                                                                                                                                                                                                       | Windows |
 
-*Basis: per row.*
+_Basis: per row._
 
 ## 15. Configuration and customisation (now 13, 14)
 
-| First edition said | Correct | Basis |
-|---|---|---|
-| Apply applies settings to the panels | Confirmed live (drive buttons, brackets, *Append \\*) | Windows |
-| `SoundDelay=10` | `-10`: negative means *Only play for long operations* is off; the absolute value is the threshold in seconds | help: inisettings2 |
-| A subbar button opens another bar as a drop-down | It switches the bar; drop-down only with *Show as menu* or Shift held | help: dlg_configbuttonbar |
-| `%p`, `%t`, `%n` = source path, target path, name | Lower case inserts the short 8.3 forms; long forms are `%P`, `%T`, `%N` | help: dlg_configbuttonbar, dlg_usermenu |
-| Dragging a file onto the bar adds a button | Onto a button it runs that program with the file; a new button only on empty bar space or with Shift | help: drag_drop, add_btnbar |
+| First edition said                                | Correct                                                                                                      | Basis                                   |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | --------------------------------------- |
+| Apply applies settings to the panels              | Confirmed live (drive buttons, brackets, _Append \\_)                                                        | Windows                                 |
+| `SoundDelay=10`                                   | `-10`: negative means _Only play for long operations_ is off; the absolute value is the threshold in seconds | help: inisettings2                      |
+| A subbar button opens another bar as a drop-down  | It switches the bar; drop-down only with _Show as menu_ or Shift held                                        | help: dlg_configbuttonbar               |
+| `%p`, `%t`, `%n` = source path, target path, name | Lower case inserts the short 8.3 forms; long forms are `%P`, `%T`, `%N`                                      | help: dlg_configbuttonbar, dlg_usermenu |
+| Dragging a file onto the bar adds a button        | Onto a button it runs that program with the file; a new button only on empty bar space or with Shift         | help: drag_drop, add_btnbar             |
 
-*Basis: per row.*
+_Basis: per row._
 
 ## 16. Settings files (now 19)
 
-| First edition said | Correct | Basis |
-|---|---|---|
-| Save Settings / Save Position write directories and histories | Save Position: window position, size and tabstops only; Save Settings: display settings, directories and position, not the histories | help: options_configsaveposition, save_settings |
-| All settings in `wincmd.ini` | Sections can move with `AlternateUserIni` / `RedirectSection`; bars in `.bar`, user commands in `usercmd.ini`, frequent folders in `tcDirFrq.txt`, tabs in `.tab` | help: inisettings |
-| `[Tabstops]` `0`=ext … `5`=width | `0` Size, `1` Date/Time, `2` unused, `3` Attributes, `4` Extension, `5` Comment, `6` window width, `AdjustWidth=1`; only a fallback for `Tabstops=` in the resolution section | help: inisettings3 |
-| `SpecialView` = custom-columns number | `1` Comments, `2` Thumbnails, `n + 2` custom view; only with `ShowAllDetails=1` | help: inisettings3 |
-| `[CustomFields]` / `[CustomColumns]` | Only `[CustomFields]` (plus `[CustomFields_<PluginName>]`) | help: inisettings3 |
-| `[ViewModes]` holds the auto-switch rules | Rules in `[ViewModeSwitch]`; `[ViewModes]` holds names, icons, options, commands | help: inisettings3 |
-| `ButtonBar2=1`; vertical bar keys with suffix `2` | `ButtonBarVertical=1`; own section `[ButtonbarVertical]`; `[Layout]` also has `TabHeaderThemed`, `TabHeaderBoldArrow`, `DarkListBorders` | help: inisettings3 |
-| `.bar` tooltip key `hintN` | `menuN` | DEFAULT.BAR |
-| `[left history]` / `[right history]` | `[LeftHistory]` / `[RightHistory]` | help: inisettings3; wincmd.ini |
-| `ShowEXEandLNKicons=1` | `2` | help: inisettings2 |
-| `[Colors]` defaults white / grey | `-1` (system) for back, fore and cursor colours; `MarkColor=255`; `ThemedCursor=-100` | help: inisettings3 |
-| `ShowHiddenSystem=0` for one checkbox | Two checkboxes in one key: 0 none, 1 both, 2 hidden, 3 system | help: dlg_display, inisettings2 |
-| `firstmnu=3002`; resolution section `[1728x1117 (8x16)]` only | `2810` on Windows (no meaning); `[3456x1896 (10x20)]` at 192 DPI; Windows first-start ini summarised | Windows |
-| No `.br2` files; `treeinfo.wc` "internal", in the drive root or `%LOCALAPPDATA%\GHISLER` | `default.br2` / `vertical.br2` icon caches at start-up; `treeinfo<drive>.wc`, Hidden, plain text `[relative\path]` lines in depth-first order | Windows |
-| Installer "writes the location to the registry" | Installer pages and the ini-location choices recorded | Windows |
-| Plugin and download-list files | See §13 and §14 | Windows |
+| First edition said                                                                       | Correct                                                                                                                                                                       | Basis                                           |
+| ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| Save Settings / Save Position write directories and histories                            | Save Position: window position, size and tabstops only; Save Settings: display settings, directories and position, not the histories                                          | help: options_configsaveposition, save_settings |
+| All settings in `wincmd.ini`                                                             | Sections can move with `AlternateUserIni` / `RedirectSection`; bars in `.bar`, user commands in `usercmd.ini`, frequent folders in `tcDirFrq.txt`, tabs in `.tab`             | help: inisettings                               |
+| `[Tabstops]` `0`=ext … `5`=width                                                         | `0` Size, `1` Date/Time, `2` unused, `3` Attributes, `4` Extension, `5` Comment, `6` window width, `AdjustWidth=1`; only a fallback for `Tabstops=` in the resolution section | help: inisettings3                              |
+| `SpecialView` = custom-columns number                                                    | `1` Comments, `2` Thumbnails, `n + 2` custom view; only with `ShowAllDetails=1`                                                                                               | help: inisettings3                              |
+| `[CustomFields]` / `[CustomColumns]`                                                     | Only `[CustomFields]` (plus `[CustomFields_<PluginName>]`)                                                                                                                    | help: inisettings3                              |
+| `[ViewModes]` holds the auto-switch rules                                                | Rules in `[ViewModeSwitch]`; `[ViewModes]` holds names, icons, options, commands                                                                                              | help: inisettings3                              |
+| `ButtonBar2=1`; vertical bar keys with suffix `2`                                        | `ButtonBarVertical=1`; own section `[ButtonbarVertical]`; `[Layout]` also has `TabHeaderThemed`, `TabHeaderBoldArrow`, `DarkListBorders`                                      | help: inisettings3                              |
+| `.bar` tooltip key `hintN`                                                               | `menuN`                                                                                                                                                                       | DEFAULT.BAR                                     |
+| `[left history]` / `[right history]`                                                     | `[LeftHistory]` / `[RightHistory]`                                                                                                                                            | help: inisettings3; wincmd.ini                  |
+| `ShowEXEandLNKicons=1`                                                                   | `2`                                                                                                                                                                           | help: inisettings2                              |
+| `[Colors]` defaults white / grey                                                         | `-1` (system) for back, fore and cursor colours; `MarkColor=255`; `ThemedCursor=-100`                                                                                         | help: inisettings3                              |
+| `ShowHiddenSystem=0` for one checkbox                                                    | Two checkboxes in one key: 0 none, 1 both, 2 hidden, 3 system                                                                                                                 | help: dlg_display, inisettings2                 |
+| `firstmnu=3002`; resolution section `[1728x1117 (8x16)]` only                            | `2810` on Windows (no meaning); `[3456x1896 (10x20)]` at 192 DPI; Windows first-start ini summarised                                                                          | Windows                                         |
+| No `.br2` files; `treeinfo.wc` "internal", in the drive root or `%LOCALAPPDATA%\GHISLER` | `default.br2` / `vertical.br2` icon caches at start-up; `treeinfo<drive>.wc`, Hidden, plain text `[relative\path]` lines in depth-first order                                 | Windows                                         |
+| Installer "writes the location to the registry"                                          | Installer pages and the ini-location choices recorded                                                                                                                         | Windows                                         |
+| Plugin and download-list files                                                           | See §13 and §14                                                                                                                                                               | Windows                                         |
 
-*Basis: per row.*
+_Basis: per row._
 
 ## 17. Other tools (now 12)
 
-| First edition said | Correct | Basis |
-|---|---|---|
-| Directory Tree opens on the current folder; F2 rebuilds the cache | First "Reading directories: N (Esc to abort)"; cache in `%LOCALAPPDATA%\GHISLER` when the root is not writable | Windows |
+| First edition said                                                     | Correct                                                                                                                                                  | Basis   |
+| ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| Directory Tree opens on the current folder; F2 rebuilds the cache      | First "Reading directories: N (Esc to abort)"; cache in `%LOCALAPPDATA%\GHISLER` when the root is not writable                                           | Windows |
 | Print file list "with preview"; nothing selected "inferred: all files" | "Print directory" window, scaling list, margins 0.79 in, header 0.20 in with `%d - Page %p/%t`; the preview listed only the cursor item or the selection | Windows |
 
-*Basis: per row.*
+_Basis: per row._
