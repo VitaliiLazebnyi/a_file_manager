@@ -179,10 +179,26 @@ import Testing
         let kernel = Kernel(productName: "Test", settings: MemorySettings(), ui: ScriptedInteraction())
         var runs = 0
         // The enabled check would crash on kernel.panels; a blocked registry never asks it.
-        kernel.commands.register(Command("copy", "Copy"), enabled: { kernel.panels.source.model.hasOperands }) {
+        kernel.commands.register(
+            Command("copy", "Copy"), enabled: { [weak kernel] in kernel?.panels.source.model.hasOperands == true }
+        ) {
             runs += 1
         }
         #expect(!kernel.commands.isEnabled("copy") && !kernel.commands.perform("copy") && runs == 0)
+    }
+
+    @Test func theKernelGoesWithTheShell() {
+        // The shell owns the kernel; the kernel must not keep its shell alive.
+        weak var kernel: Kernel?
+        weak var shell: TestBench?
+        do {
+            let memory = MemoryFileSystem()
+            let bench = TestBench(
+                plugins: [MemoryPlugin()], fileSystems: [], left: memory.url("/"), right: memory.url("/"))
+            (kernel, shell) = (bench.kernel, bench)
+            #expect(bench.commands.isEnabled("mem_Hello"))
+        }
+        #expect(kernel == nil && shell == nil)
     }
 
     @Test func theUsersKeysAreAppliedWhenTheShellAttaches() {
