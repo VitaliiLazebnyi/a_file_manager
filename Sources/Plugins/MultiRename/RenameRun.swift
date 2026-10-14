@@ -62,7 +62,9 @@ struct RenamePreview {
 
 /// The dates inside pictures (`[T4]`), kept for as long as a session lives: a list that is
 /// only put in another order does not read its files again. Safe to use from several threads.
-final class ContentDateStore {
+///
+/// Unchecked `Sendable`: `dates` is guarded by `lock`.
+final class ContentDateStore: @unchecked Sendable {
     private let lock = NSLock()
     private var dates: [URL: Date?] = [:]
 
@@ -85,7 +87,9 @@ final class ContentDateStore {
 /// list changes and after a run, so nothing in it outlives the list it was made for. Folder
 /// contents are as they were when first looked at; a run lists them afresh. Safe to use from
 /// several threads.
-final class RenameCache {
+///
+/// Unchecked `Sendable`: all mutable state is guarded by `lock`; `dates` does not change.
+final class RenameCache: @unchecked Sendable {
     struct Rows {
         var subjects: [RenameSubject]
         var folders: [URL]
@@ -215,7 +219,7 @@ enum RenameComputation {
     static func names(
         _ entries: [RenameEntry], settings: RenameSettings, context: RenameContext, given: [String]?,
         fileSystems: FileSystemRegistry, subjects: [RenameSubject]? = nil,
-        isCancelled: () -> Bool = { false }
+        isCancelled: @Sendable () -> Bool = { false }
     ) -> (names: [String?], problem: any Error?) {
         var context = context
         context.count = entries.count
@@ -240,7 +244,7 @@ enum RenameComputation {
     static func preview(
         _ entries: [RenameEntry], settings: RenameSettings, context: RenameContext, given: [String]? = nil,
         fileSystems: FileSystemRegistry, cache: RenameCache = RenameCache(),
-        cancellation: CancellationFlag? = nil, isCancelled: () -> Bool = { false }
+        cancellation: CancellationFlag? = nil, isCancelled: @Sendable () -> Bool = { false }
     ) -> RenamePreview {
         let rows = cache.rows(for: entries, fileSystems: fileSystems)
         let (names, problem) = names(
@@ -303,9 +307,9 @@ struct RenameSurvey {
 
     /// The keys of every entry of the given folders (by `locationKey`). A folder that does not
     /// exist yet has none.
-    func existingKeys(in folders: [String: URL], planner: RenamePlanner, isCancelled: () -> Bool = { false }) -> Set<
-        String
-    > {
+    func existingKeys(
+        in folders: [String: URL], planner: RenamePlanner, isCancelled: @Sendable () -> Bool = { false }
+    ) -> Set<String> {
         let listed = Parallel.map(Array(folders)) { folderKey, folder -> Set<String> in
             if let known = cache?.existingKeys(folderKey: folderKey) { return known }
             guard !isCancelled(), let provider = try? fileSystems.provider(for: folder),

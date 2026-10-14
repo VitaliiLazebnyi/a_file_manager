@@ -4,7 +4,9 @@ import Foundation
 /// Counts the names a regular expression of Search & Replace ran out of time on. Shared by the
 /// threads of one preview or run. After a few timeouts the expression is given up: the rest of
 /// the names answer at once (`<Error!>`) instead of costing the budget each.
-final class RenameRegexGuard {
+///
+/// Unchecked `Sendable`: `timeouts` is guarded by `lock`.
+final class RenameRegexGuard: @unchecked Sendable {
     private let lock = NSLock()
     private var timeouts = 0
     private let limit = 3
