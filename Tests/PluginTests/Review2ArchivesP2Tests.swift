@@ -256,9 +256,6 @@ private final class Collected<Value>: @unchecked Sendable {
         let archive = try writeZip(
             "race.zip",
             members: [("dir/sub/planted.txt", 0o644), ("dir/sub/second.txt", 0o644), ("plain.txt", 0o644)])
-        let unpacker = Unpacker(fileSystems: bench.fileSystems, monitor: bench.monitor, options: UnpackOptions()) {
-            _, _ in .overwrite
-        }
         let swapped = Collected<String>()
         let fm = FileManager.default
         // The folder was looked at and opened; now somebody takes it away and puts a link
@@ -270,13 +267,16 @@ private final class Collected<Value>: @unchecked Sendable {
         try fm.createDirectory(at: outside.appendingPathComponent("sub"), withIntermediateDirectories: true)
         let link = target.appendingPathComponent("dir.link")
         try fm.createSymbolicLink(at: link, withDestinationURL: outside)
-        unpacker.whileUnpacking = { entry in
-            guard entry.path == "dir/sub/planted.txt", swapped.all.isEmpty else { return }
-            swapped.add(entry.path)
-            if renamex_np(target.appendingPathComponent("dir").path, link.path, UInt32(RENAME_SWAP)) == 0 {
-                try? FileManager.default.moveItem(at: link, to: target.appendingPathComponent("taken"))
+        let unpacker = Unpacker(
+            fileSystems: bench.fileSystems, monitor: bench.monitor, options: UnpackOptions(),
+            whileUnpacking: { entry in
+                guard entry.path == "dir/sub/planted.txt", swapped.all.isEmpty else { return }
+                swapped.add(entry.path)
+                if renamex_np(target.appendingPathComponent("dir").path, link.path, UInt32(RENAME_SWAP)) == 0 {
+                    try? FileManager.default.moveItem(at: link, to: target.appendingPathComponent("taken"))
+                }
             }
-        }
+        ) { _, _ in .overwrite }
         let result = unpacker.run([Unpacker.Source(archive: try bench.store.archive(at: archive))], into: target)
         #expect(swapped.all == ["dir/sub/planted.txt"])
         // Nothing arrived at the place the link points to.

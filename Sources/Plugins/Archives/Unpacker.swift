@@ -343,9 +343,9 @@ enum UnpackConflictChoice {
 /// unpacked on all cores at once, while archives that are one compressed stream are unpacked
 /// in a single pass.
 ///
-/// Unchecked: what changes (the answers to questions, the result, the counts) is touched only
-/// by the job's thread; the members that are written on all cores use only what is fixed in
-/// `init`, `bytesDone` (which guards itself) and `whileUnpacking` (set before `run`).
+/// Unchecked: what changes (the answers to questions, the result, the counts, the open
+/// folders) is touched only by the thread that calls `run`; the members that are written on
+/// all cores use only what is fixed in `init` and `bytesDone` (which guards itself).
 final class Unpacker: @unchecked Sendable {
     /// What to take out of one archive: all of it, or what was selected in a panel.
     struct Source {
@@ -379,15 +379,17 @@ final class Unpacker: @unchecked Sendable {
     private var lines: [String] = []
     /// Called on the writing thread when the folder a member goes into is open and before
     /// the member's file is made (tests: what is done to the target folder meanwhile).
-    var whileUnpacking: (@Sendable (ArchiveEntry) -> Void)?
+    private let whileUnpacking: (@Sendable (ArchiveEntry) -> Void)?
 
     init(
         fileSystems: FileSystemRegistry, monitor: any JobMonitor, options: UnpackOptions,
+        whileUnpacking: (@Sendable (ArchiveEntry) -> Void)? = nil,
         askConflict: @escaping (_ existing: FileItem, _ entry: ArchiveEntry) -> UnpackConflictChoice
     ) {
         self.fileSystems = fileSystems
         self.monitor = monitor
         self.options = options
+        self.whileUnpacking = whileUnpacking
         self.askConflict = askConflict
         overwriteAll = options.overwrites
     }

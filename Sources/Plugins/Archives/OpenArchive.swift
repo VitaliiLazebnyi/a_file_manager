@@ -13,70 +13,32 @@ struct ArchiveOptions {
 }
 
 /// What archives need from their surroundings. One object is shared by everything the plugin
-/// owns; its closures are set once, before any archive is opened, and may be called from any
-/// thread.
+/// owns; its closures are set while the plugin starts, and may be called from any thread.
+/// The settings are read and written as properties of the environment (`environment.flushDelay`).
 ///
-/// Unchecked: the settings and closures are set while the plugin starts (tests: before any
-/// archive is opened) and only read afterwards; `options` and `isStopping` are guarded by
-/// `lock`.
+/// Unchecked: the settings, `options` and `isStopping` are guarded by `lock` (tests change
+/// settings while archives are open); the rest is fixed in `init`.
+@dynamicMemberLookup
 final class ArchiveEnvironment: @unchecked Sendable {
     let scratch = ScratchFolder()
+    /// Set when quitting has waited long enough: ends the writes that are still under way.
+    let quitting = CancellationFlag()
     private let lock = NSLock()
+    private var settings = Settings()
     private var current = ArchiveOptions()
     private var stopping = false
 
-    /// The file systems of the program, for archives that lie on something other than the disk.
-    var fileSystems: @Sendable () -> FileSystemRegistry? = { nil }
-    /// Asks for the password of an archive; `retry` after a wrong one. Nil gives up.
-    var askPassword: @Sendable (_ archiveName: String, _ retry: Bool) -> String? = { _, _ in nil }
-    /// Tells the user that changes could not be written into an archive. Must not wait for
-    /// the user: it is called on the thread that writes.
-    var reportFailure: @Sendable (_ error: any Error, _ archiveName: String) -> Void = { _, _ in }
-    /// The directories whose contents changed behind the panels' backs.
-    var contentsChanged: @Sendable (_ archive: URL) -> Void = { _ in }
-
-    /// Archives up to this size that cannot be read at any position (compressed TAR, 7z, …)
-    /// are unpacked once into a temporary TAR, so that reading single members is fast.
-    var materializeLimit: UInt64 = 256 << 20
-    /// The temporary copy may not grow beyond this.
-    var unpackedLimit: UInt64 = 4 << 30
-    /// This much stays free on the volume of the temporary folder, whatever is unpacked or
-    /// fetched into it: a copy that would eat into it is not made (or given up half-way).
-    var scratchReserve: UInt64 = 2 << 30
-    /// The temporary copies of the archives that are open but not in use may take this much
-    /// together; beyond it the least recently used are let go.
-    var scratchBudget: UInt64 = 8 << 30
-    /// An archive may hold this many entries; one that lists more is refused with a clear
-    /// message instead of filling the memory. An entry of a ZIP costs about 400 bytes
-    /// (measured: 396 with a 45-byte path and the extra fields the `zip` program writes), so
-    /// the directory of the largest archive that is opened takes about 800 MB.
-    var maxEntries = 2_000_000
-    /// Archives may lie inside archives this deep.
-    var maxNesting = 6
-    /// How long after the last change pending changes are written into a ZIP; nil never
-    /// writes by itself.
-    var flushDelay: TimeInterval? = 1
-    /// How long after a failed write the next attempt is made; doubled with every further
-    /// failure, up to `maxRetryDelay`. A change to the archive brings the next attempt at once.
-    var retryDelay: TimeInterval = 30
-    var maxRetryDelay: TimeInterval = 3_600
-    /// The delayed write runs with low priority. When all cores are busy that may not run for
-    /// minutes; this long after it was due it runs with the priority of the user's own work.
-    var escalationDelay: TimeInterval = 5
-    /// Runs `work` after `delay` on a thread of its own with the given priority. The delayed
-    /// writes are started this way and not on the system's shared queues: those have a
-    /// limited number of threads, and when all of them are busy (or blocked) a write that is
-    /// due would wait behind them for as long as that lasts. The clock itself is a queue of
-    /// the plugin's own, on which nothing ever runs but the starting of these threads.
-    /// (Tests put a clock of their own here.)
-    var schedule: Scheduler = { delay, priority, work in
-        ArchiveEnvironment.later(delay, priority, name: "Archive write", work)
+    subscript<Value>(dynamicMember keyPath: WritableKeyPath<Settings, Value>) -> Value {
+        get { lock.withLock { settings[keyPath: keyPath] } }
+        set { lock.withLock { settings[keyPath: keyPath] = newValue } }
     }
+
     typealias Scheduler =
         @Sendable (_ delay: TimeInterval, _ priority: QualityOfService, _ work: @escaping @Sendable () -> Void) -> Void
 
-    /// The same clock for the plugin's housekeeping (closing readers nobody came back for),
-    /// which is not the delayed writes' business and not a test clock's either.
+    /// The same clock as the delayed writes' (see `Settings.schedule`) for the plugin's
+    /// housekeeping (closing readers nobody came back for), which is not the delayed writes'
+    /// business and not a test clock's either.
     static func later(
         _ delay: TimeInterval, _ priority: QualityOfService, name: String, _ work: @escaping @Sendable () -> Void
     ) {
@@ -88,34 +50,82 @@ final class ArchiveEnvironment: @unchecked Sendable {
         }
     }
     private static let clock = DispatchQueue(label: "afm.archives.clock", qos: .userInitiated)
-    /// A file that a job has just given its final name inside a ZIP is written into the
-    /// archive file before the rename returns, when that means writing no more than this
-    /// many bytes besides the file itself (or no more than is waiting anyway). Zero leaves
-    /// every write to the delay.
-    var immediateWriteLimit: UInt64 = 256 << 10
-    /// Off, archives are never cloned and every change writes the whole archive anew, as on
-    /// a file system that cannot clone (tests).
-    var clonesArchives = true
-    /// Whether `needed` bytes can be written into `folder`.
-    var hasRoom: @Sendable (_ needed: UInt64, _ folder: URL) -> Bool = { Volume.hasRoom(for: $0, at: $1) }
-    /// The volume a path lies on, as a number (tests: an archive "on another disk").
-    var volume: @Sendable (_ path: String) -> dev_t? = { Volume.device(of: $0) }
-    /// Where new members are saved when they can be written neither into their archive nor
-    /// next to it; nil keeps them in the temporary folder.
-    var recoveryFolder: URL?
-    /// After the user declined to give a password (or gave three wrong ones), members of that
-    /// archive fail without a question for this long: a job that reads a thousand encrypted
-    /// members asks once, not a thousand times.
-    var passwordRefusalMemory: TimeInterval = 0
-    /// How long quitting waits for the changes to be written before it gives up, keeps the
-    /// new members in the temporary folder and says so.
-    var quitTimeout: TimeInterval = 120
-    var limits = ZipLimits.standard
-    /// Set when quitting has waited long enough: ends the writes that are still under way.
-    let quitting = CancellationFlag()
-    /// Called by a write when the new archive file is complete and before it takes the old
-    /// one's place, on the writing thread (tests: what changes while a write is under way).
-    var whileWriting: (@Sendable () -> Void)?
+
+    struct Settings {
+        /// The file systems of the program, for archives that lie on something other than the disk.
+        var fileSystems: @Sendable () -> FileSystemRegistry? = { nil }
+        /// Asks for the password of an archive; `retry` after a wrong one. Nil gives up.
+        var askPassword: @Sendable (_ archiveName: String, _ retry: Bool) -> String? = { _, _ in nil }
+        /// Tells the user that changes could not be written into an archive. Must not wait for
+        /// the user: it is called on the thread that writes.
+        var reportFailure: @Sendable (_ error: any Error, _ archiveName: String) -> Void = { _, _ in }
+        /// The directories whose contents changed behind the panels' backs.
+        var contentsChanged: @Sendable (_ archive: URL) -> Void = { _ in }
+
+        /// Archives up to this size that cannot be read at any position (compressed TAR, 7z, …)
+        /// are unpacked once into a temporary TAR, so that reading single members is fast.
+        var materializeLimit: UInt64 = 256 << 20
+        /// The temporary copy may not grow beyond this.
+        var unpackedLimit: UInt64 = 4 << 30
+        /// This much stays free on the volume of the temporary folder, whatever is unpacked or
+        /// fetched into it: a copy that would eat into it is not made (or given up half-way).
+        var scratchReserve: UInt64 = 2 << 30
+        /// The temporary copies of the archives that are open but not in use may take this much
+        /// together; beyond it the least recently used are let go.
+        var scratchBudget: UInt64 = 8 << 30
+        /// An archive may hold this many entries; one that lists more is refused with a clear
+        /// message instead of filling the memory. An entry of a ZIP costs about 400 bytes
+        /// (measured: 396 with a 45-byte path and the extra fields the `zip` program writes), so
+        /// the directory of the largest archive that is opened takes about 800 MB.
+        var maxEntries = 2_000_000
+        /// Archives may lie inside archives this deep.
+        var maxNesting = 6
+        /// How long after the last change pending changes are written into a ZIP; nil never
+        /// writes by itself.
+        var flushDelay: TimeInterval? = 1
+        /// How long after a failed write the next attempt is made; doubled with every further
+        /// failure, up to `maxRetryDelay`. A change to the archive brings the next attempt at once.
+        var retryDelay: TimeInterval = 30
+        var maxRetryDelay: TimeInterval = 3_600
+        /// The delayed write runs with low priority. When all cores are busy that may not run for
+        /// minutes; this long after it was due it runs with the priority of the user's own work.
+        var escalationDelay: TimeInterval = 5
+        /// Runs `work` after `delay` on a thread of its own with the given priority. The delayed
+        /// writes are started this way and not on the system's shared queues: those have a
+        /// limited number of threads, and when all of them are busy (or blocked) a write that is
+        /// due would wait behind them for as long as that lasts. The clock itself is a queue of
+        /// the plugin's own, on which nothing ever runs but the starting of these threads.
+        /// (Tests put a clock of their own here.)
+        var schedule: Scheduler = { delay, priority, work in
+            ArchiveEnvironment.later(delay, priority, name: "Archive write", work)
+        }
+        /// A file that a job has just given its final name inside a ZIP is written into the
+        /// archive file before the rename returns, when that means writing no more than this
+        /// many bytes besides the file itself (or no more than is waiting anyway). Zero leaves
+        /// every write to the delay.
+        var immediateWriteLimit: UInt64 = 256 << 10
+        /// Off, archives are never cloned and every change writes the whole archive anew, as on
+        /// a file system that cannot clone (tests).
+        var clonesArchives = true
+        /// Whether `needed` bytes can be written into `folder`.
+        var hasRoom: @Sendable (_ needed: UInt64, _ folder: URL) -> Bool = { Volume.hasRoom(for: $0, at: $1) }
+        /// The volume a path lies on, as a number (tests: an archive "on another disk").
+        var volume: @Sendable (_ path: String) -> dev_t? = { Volume.device(of: $0) }
+        /// Where new members are saved when they can be written neither into their archive nor
+        /// next to it; nil keeps them in the temporary folder.
+        var recoveryFolder: URL?
+        /// After the user declined to give a password (or gave three wrong ones), members of that
+        /// archive fail without a question for this long: a job that reads a thousand encrypted
+        /// members asks once, not a thousand times.
+        var passwordRefusalMemory: TimeInterval = 0
+        /// How long quitting waits for the changes to be written before it gives up, keeps the
+        /// new members in the temporary folder and says so.
+        var quitTimeout: TimeInterval = 120
+        var limits = ZipLimits.standard
+        /// Called by a write when the new archive file is complete and before it takes the old
+        /// one's place, on the writing thread (tests: what changes while a write is under way).
+        var whileWriting: (@Sendable () -> Void)?
+    }
 
     var options: ArchiveOptions {
         get {
@@ -409,8 +419,10 @@ enum RescueOutcome {
 /// the store again and gets the archive that took its place). So no change can land in an
 /// archive that nobody will write.
 ///
-/// Unchecked: what changes is guarded by `lock`, the gate, `stateLock` and `passwordGate`, as
-/// said above; the rest is fixed in `init`.
+/// Unchecked: what changes is guarded by `lock` (the passwords too: `passwordGate` only lets
+/// one question run at a time), except `publishedEditable` (`stateLock`); `file` and
+/// `signature` are replaced only by the holder of the gate, under `lock`. The rest is fixed
+/// in `init`, or touched in `init` and `deinit` only.
 final class OpenArchive: @unchecked Sendable {
     /// The archive file as its own file system names it.
     let archiveURL: URL
@@ -433,7 +445,7 @@ final class OpenArchive: @unchecked Sendable {
     private let instance = UUID().uuidString
 
     private var file: RandomAccessFile
-    private(set) var format: ArchiveFormat
+    let format: ArchiveFormat
     private var tree = ArchiveTree()
     /// A stream archive unpacked into a temporary TAR (or a compressed file into its content).
     private var unpacked: (file: RandomAccessFile, temporary: TemporaryFile)?
@@ -552,7 +564,7 @@ final class OpenArchive: @unchecked Sendable {
 
     // MARK: Reading the directory
 
-    /// Called while nobody else can see the archive (opening) or with the lock held (rebase).
+    /// Called while nobody else can see the archive (opening).
     private func load(control: StreamInterrupt? = nil) throws {
         tree = ArchiveTree()
         unpacked = nil
@@ -2289,7 +2301,7 @@ final class OpenArchive: @unchecked Sendable {
         let reopened: RandomAccessFile
         let listing: ZipListing
         do {
-            guard case .zip = locked({ format }) else { throw ArchiveError.changedOutside(name) }
+            guard case .zip = format else { throw ArchiveError.changedOutside(name) }
             reopened = try RandomAccessFile(localURL)
             listing = try Self.readZip(reopened, environment: environment, control: nil)
             guard !listing.hasDuplicates else { throw ArchiveError.changedOutside(name) }
