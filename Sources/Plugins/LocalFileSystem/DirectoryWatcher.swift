@@ -14,7 +14,7 @@ import Foundation
 /// folders are resolved (`realpath` asks the disk, and a stalled share does not answer) and
 /// the stream is made and started on queues of the watcher's own, so the caller may be the
 /// main thread.
-final class DirectoryWatcher {
+final class DirectoryWatcher: Sendable {
     /// The streams this process holds. The system gives one process 512 of them and refuses
     /// the next one without a word (`FSEventStreamStart` answers false and nothing is
     /// logged), so a program that lets streams pile up ends with folders nobody watches.
@@ -22,7 +22,8 @@ final class DirectoryWatcher {
     /// `AFM_WATCHER_CENSUS` set, which prints the figures when the process ends.
     enum Census {
         private static let lock = NSLock()
-        private static var (now, most, refused) = (0, 0, 0)
+        /// Guarded by `lock`.
+        nonisolated(unsafe) private static var (now, most, refused) = (0, 0, 0)
         private static let printsAtExit: Void = {
             guard getenv("AFM_WATCHER_CENSUS") != nil else { return }
             atexit {
@@ -63,7 +64,8 @@ final class DirectoryWatcher {
     }
 
     /// Set once the watcher is stopped or has gone: reports still under way are dropped.
-    private final class Gate {
+    /// All state is guarded by `lock`.
+    private final class Gate: @unchecked Sendable {
         private let lock = NSLock()
         private var stopped = false
 
@@ -83,7 +85,9 @@ final class DirectoryWatcher {
     /// What a running stream needs, apart from the watcher: the stream keeps it alive itself,
     /// so a report that is under way when the watcher stops or goes away finds everything
     /// it touches still there.
-    private final class Watch {
+    ///
+    /// Unchecked: what changes is guarded by `lock`; the rest is fixed in `init`.
+    private final class Watch: @unchecked Sendable {
         /// Resolved path as reported by the system → the directory the caller asked for.
         let watched: [String: URL]
         /// The lengths of the resolved paths: most reports are rejected on length alone,
@@ -91,7 +95,7 @@ final class DirectoryWatcher {
         private let lengths: Set<Int>
         let queue: DispatchQueue
         let streamQueue: DispatchQueue
-        let onChange: ([URL]) -> Void
+        let onChange: @Sendable ([URL]) -> Void
         private let gate: Gate
         private let lock = NSLock()
         private var stopped = false
@@ -113,7 +117,7 @@ final class DirectoryWatcher {
 
         init(
             watched: [String: URL], recursive: Bool, queue: DispatchQueue, streamQueue: DispatchQueue, gate: Gate,
-            onChange: @escaping ([URL]) -> Void
+            onChange: @escaping @Sendable ([URL]) -> Void
         ) {
             (self.watched, self.queue, self.streamQueue, self.gate, self.onChange) = (
                 watched, queue, streamQueue, gate, onChange
@@ -203,9 +207,12 @@ final class DirectoryWatcher {
 
     /// Everything that is done to streams, on `control`. Held by the closures that are
     /// still to run, so the watcher itself may go away at any moment.
-    private final class Core {
+    ///
+    /// Unchecked: what changes is only touched on `control`, one block at a time; the rest is
+    /// fixed in `init`.
+    private final class Core: @unchecked Sendable {
         let queue: DispatchQueue
-        let onChange: ([URL]) -> Void
+        let onChange: @Sendable ([URL]) -> Void
         let isRecursive: Bool
         // Not at the lowest classes: while the program (or the machine) keeps every core busy
         // with work of a higher class, queues of the utility class may get no thread for a
@@ -232,7 +239,7 @@ final class DirectoryWatcher {
         private static let failureLifetime: UInt64 = 5_000_000_000
         private static let resolutionPatience = 2.0
 
-        init(queue: DispatchQueue, recursive: Bool, onChange: @escaping ([URL]) -> Void) {
+        init(queue: DispatchQueue, recursive: Bool, onChange: @escaping @Sendable ([URL]) -> Void) {
             (self.queue, self.onChange, isRecursive) = (queue, onChange, recursive)
         }
 
@@ -374,7 +381,7 @@ final class DirectoryWatcher {
 
     /// `onChange` receives the watched folders whose contents changed, on `queue`. With
     /// `recursive`, a watched folder is reported for a change anywhere below it as well.
-    init(queue: DispatchQueue = .main, recursive: Bool = false, onChange: @escaping ([URL]) -> Void) {
+    init(queue: DispatchQueue = .main, recursive: Bool = false, onChange: @escaping @Sendable ([URL]) -> Void) {
         core = Core(queue: queue, recursive: recursive, onChange: onChange)
     }
 

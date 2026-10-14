@@ -5,7 +5,12 @@ public import Foundation
 /// The file system of the Mac itself (`file:` URLs). The system calls it uses are safe to make
 /// from several threads at once; the little it remembers (the list of places, what it learned
 /// about volumes and kinds of folders, the locked copies it made) is guarded by locks.
-public final class LocalFileSystem: FileSystemProvider {
+///
+/// Unchecked: every table is guarded by the lock named beside it (`packageLock`,
+/// `lockedLock`, `placesLock`, `volumeLock`, `spareLock`); `probes` is set by tests before the
+/// file system is used and only read afterwards; `mountObservers` is set in `init` and read in
+/// `deinit`; the default file manager may be used from any thread.
+public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
     public let scheme = "file"
     public let capabilities: FileSystemCapabilities = [.write, .trash, .append]
     private let fm = FileManager.default
@@ -305,7 +310,9 @@ public final class LocalFileSystem: FileSystemProvider {
         let pieces = stride(from: 0, to: entries.count, by: pieceSize).map { $0..<min($0 + pieceSize, entries.count) }
         let text = directory.absoluteString
         return entries.withUnsafeBufferPointer { entries in
-            Parallel.map(pieces) { piece -> [FileItem] in
+            // Only read, and only while the call lasts.
+            nonisolated(unsafe) let entries = entries
+            return Parallel.map(pieces) { piece -> [FileItem] in
                 let directory = URL(string: text) ?? directory
                 return piece.compactMap {
                     self.item(of: entries[$0], in: directory, showHidden: showHidden, devices: devices)
@@ -504,7 +511,10 @@ public final class LocalFileSystem: FileSystemProvider {
 
     /// Reads through the descriptor with `read(2)`, into a block that is the caller's own: no
     /// object of the system's is made per read, so nothing piles up on a long-lived thread.
-    private final class Reader: FileReader {
+    ///
+    /// Unchecked: used by one thread at a time, as `FileReader` allows; `interrupt` touches
+    /// only `interruption`, which is safe from any thread.
+    private final class Reader: FileReader, @unchecked Sendable {
         private var descriptor: Int32
         private let url: URL
         private let interruption = Interruption()
@@ -558,8 +568,8 @@ public final class LocalFileSystem: FileSystemProvider {
     /// a signal) and keeps the next one from being begun. On a share or an automounted
     /// folder, where a call can wait for as long as the server is away, it is made on a
     /// thread of its own so that the caller can leave it behind (`RemoteChanges`).
-    private func change<Value>(
-        at url: URL, _ cancellation: CancellationFlag, _ body: @escaping (LocalCall) throws -> Value
+    private func change<Value: Sendable>(
+        at url: URL, _ cancellation: CancellationFlag, _ body: @escaping @Sendable (LocalCall) throws -> Value
     ) throws -> Value {
         if cancellation.isCancelled { throw CocoaError(.userCancelled) }
         let call = LocalCall(probes)
@@ -710,7 +720,10 @@ public final class LocalFileSystem: FileSystemProvider {
     /// Writes through the descriptor it was made with, and gives the file its date and its
     /// rights through the same descriptor before closing it: nothing that happens to the name
     /// meanwhile (a link put in its place) can redirect that.
-    private final class Writer: FileWriter {
+    ///
+    /// Unchecked: used by one thread at a time, as `FileWriter` allows; `interrupt` touches
+    /// only `interruption`, which is safe from any thread.
+    private final class Writer: FileWriter, @unchecked Sendable {
         private var descriptor: Int32
         private let url: URL
         /// What a new file is given when the caller names no rights; nil for a file that was
@@ -1066,7 +1079,10 @@ public final class LocalFileSystem: FileSystemProvider {
 
     /// Hands the progress of a copy to the caller's closure for as long as the caller is
     /// there: a copy that was left behind finds nobody to report to, and stops.
-    private final class CopyReport {
+    ///
+    /// Unchecked: `report` is guarded by `lock`. The caller's closure is called on another
+    /// thread only while the caller waits for the copy, and never once `detach` has returned.
+    private final class CopyReport: @unchecked Sendable {
         private let lock = NSLock()
         private var report: ((Int64) -> Bool)?
 
@@ -1514,7 +1530,8 @@ public final class LocalFileSystem: FileSystemProvider {
             .volumeIsRootFileSystemKey
         ]
         let volumes = fm.mountedVolumeURLs(includingResourceValuesForKeys: nil, options: [.skipHiddenVolumes]) ?? []
-        final class Slot {
+        /// All state is guarded by `lock`.
+        final class Slot: @unchecked Sendable {
             let lock = NSLock()
             var place: Place?
         }
@@ -1662,7 +1679,10 @@ public final class LocalFileSystem: FileSystemProvider {
     }
 
     /// One question to a volume that is under way, and everybody who waits for its answer.
-    private final class VolumeQuestion {
+    ///
+    /// Unchecked: `info` and `isOver` are guarded by `condition`, `wasAnsweredFromMemory` by
+    /// the file system's `volumeLock`.
+    private final class VolumeQuestion: @unchecked Sendable {
         enum Outcome {
             case answered(VolumeInfo?)
             case cancelled
@@ -1841,7 +1861,7 @@ public final class LocalFileSystem: FileSystemProvider {
         }
         spareLock.unlock()
         guard after != before else { return }
-        DispatchQueue.main.async {
+        DispatchQueue.main.async { [volume] in
             NotificationCenter.default.post(
                 name: FileSystemRegistry.volumeInfoDidChange, object: self,
                 userInfo: [FileSystemRegistry.volumeRootKey: volume])
@@ -1852,8 +1872,11 @@ public final class LocalFileSystem: FileSystemProvider {
     /// thread, and only for the directories that were asked for. Returns at once: the folders
     /// are resolved and the stream is made in the background (a share that does not answer
     /// must not hold up the caller).
-    public func watch(_ directories: [URL], onChange: @escaping ([URL]) -> Void) -> AnyObject? {
-        let watcher = DirectoryWatcher(onChange: onChange)
+    public func watch(_ directories: [URL], onChange: @escaping @MainActor @Sendable ([URL]) -> Void) -> (
+        any WatchToken
+    )? {
+        // The watcher delivers on the main queue.
+        let watcher = DirectoryWatcher { changed in MainActor.assumeIsolated { onChange(changed) } }
         watcher.watch(directories)
         return watcher
     }
@@ -1861,8 +1884,13 @@ public final class LocalFileSystem: FileSystemProvider {
     /// One stream of the system's covers a folder and everything below it, so a whole tree
     /// costs what one folder costs: `onChange` names the watched folder below which
     /// something changed, lumped together as for single folders.
-    public func watch(_ directories: [URL], recursively: Bool, onChange: @escaping ([URL]) -> Void) -> AnyObject? {
-        let watcher = DirectoryWatcher(recursive: recursively, onChange: onChange)
+    public func watch(
+        _ directories: [URL], recursively: Bool, onChange: @escaping @MainActor @Sendable ([URL]) -> Void
+    ) -> (any WatchToken)? {
+        // The watcher delivers on the main queue.
+        let watcher = DirectoryWatcher(recursive: recursively) { changed in
+            MainActor.assumeIsolated { onChange(changed) }
+        }
         watcher.watch(directories)
         return watcher
     }
