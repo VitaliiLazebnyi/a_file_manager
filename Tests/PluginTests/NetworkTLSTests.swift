@@ -31,9 +31,9 @@ import Testing
         // The certificate is signed by nobody the system knows: the user is asked, and No ends it.
         nonisolated(unsafe) var shown: [CertificateInfo] = []
         let accepts = Shared(false)
-        environment.askToTrust = { profile, certificate in
+        environment.askToTrust = { [trust = environment.trust] profile, certificate in
             shown.append(certificate)
-            if accepts.value { environment.trust.accept(certificate.fingerprint, for: profile.key.host) }
+            if accepts.value { trust.accept(certificate.fingerprint, for: profile.key.host) }
             return accepts.value
         }
         #expect(throws: NetworkError.self) { try fileSystem.list(key.url(), showHidden: true) }

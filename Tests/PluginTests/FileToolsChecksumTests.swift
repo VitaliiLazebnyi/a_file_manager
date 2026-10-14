@@ -13,7 +13,8 @@ import Testing
     let memory = MemoryFileSystem()
     let box: Sandbox
     let settings = MemorySettings()
-    let pasteboard = NSPasteboard.withUniqueName()
+    private let scratch = ScratchPasteboard()
+    var pasteboard: NSPasteboard { scratch.pasteboard }
     let bench: TestBench
 
     var ui: ScriptedInteraction { bench.ui }
@@ -27,7 +28,7 @@ import Testing
         try box.file("work/sub/deep/d.txt", "delta")
         try box.folder("other")
         bench = TestBench(
-            plugins: [FileToolsPlugin(pasteboard: pasteboard)], fileSystems: [LocalFileSystem(), memory],
+            plugins: [FileToolsPlugin(pasteboard: scratch.pasteboard)], fileSystems: [LocalFileSystem(), memory],
             left: box.url("work"), right: box.url("other"), settings: settings)
     }
 

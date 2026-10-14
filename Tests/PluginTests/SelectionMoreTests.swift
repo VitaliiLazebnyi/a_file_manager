@@ -212,7 +212,8 @@ import Testing
     typealias Ids = SelectionCommands
 
     let memory = MemoryFileSystem()
-    let pasteboard = NSPasteboard.withUniqueName()
+    private let scratch = ScratchPasteboard()
+    var pasteboard: NSPasteboard { scratch.pasteboard }
     let settings = MemorySettings()
 
     init() {

@@ -158,7 +158,7 @@ extension Application {
         let kernel = Kernel(productName: StandardPlugins.productName, settings: settings, ui: ui)
         kernel.fileSystems.register(memory)
         kernel.fileSystems.register(extra)
-        kernel.load(StandardPlugins.make(pasteboard: .withUniqueName(), launchesApplications: false))
+        kernel.load(StandardPlugins.make(pasteboard: scratch.pasteboard, launchesApplications: false))
         let running = Running(kernel: kernel, shell: Shell(kernel: kernel, home: box.url("home")))
         await settle(running)
         return running

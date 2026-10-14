@@ -731,11 +731,12 @@ private final class Collected<Value>: @unchecked Sendable {
         // "Another volume": everything outside the temporary folder's own.
         let opened = try bench.store.archive(at: archive)
         let asked = Collected<String>()
-        bench.environment.volume = { path in
+        // (Weak: the archive holds the environment, which holds this.)
+        bench.environment.volume = { [weak opened] path in
             asked.add(path)
             // Asked without the directory's lock: looking into the archive from here would
             // otherwise never return.
-            _ = opened.isBusy
+            _ = opened?.isBusy
             return path == scratch.deletingLastPathComponent().path ? 1 : 2
         }
         // (Not kept beyond its closing: a writer holds on to its temporary file.)

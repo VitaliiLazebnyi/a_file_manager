@@ -187,7 +187,8 @@ extension Int {
 
 @MainActor @Suite struct PluginFixes {
     let memory = MemoryFileSystem()
-    let pasteboard = NSPasteboard.withUniqueName()
+    private let scratch = ScratchPasteboard()
+    var pasteboard: NSPasteboard { scratch.pasteboard }
     let bench: TestBench
 
     init() {
@@ -195,7 +196,7 @@ extension Int {
         memory.addFile("/A/docs/in.txt", "inside")
         memory.addFile("/B/other.txt", "o")
         bench = TestBench(
-            plugins: [FolderTabsPlugin(), NavigationPlugin(pasteboard: pasteboard), ViewOptionsPlugin()],
+            plugins: [FolderTabsPlugin(), NavigationPlugin(pasteboard: scratch.pasteboard), ViewOptionsPlugin()],
             fileSystems: [memory],
             left: memory.url("/A"), right: memory.url("/B"))
     }

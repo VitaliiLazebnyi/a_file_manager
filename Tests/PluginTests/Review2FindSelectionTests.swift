@@ -78,7 +78,8 @@ import Testing
     typealias Ids = SelectionCommands
 
     let memory = MemoryFileSystem()
-    let pasteboard = NSPasteboard.withUniqueName()
+    private let scratch = ScratchPasteboard()
+    var pasteboard: NSPasteboard { scratch.pasteboard }
 
     func makeBench(background: Bool) -> TestBench {
         TestBench(

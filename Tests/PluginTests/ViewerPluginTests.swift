@@ -20,7 +20,8 @@ private final class FakeOverlayHost: PanelOverlayHost {
     let bench: TestBench
     let plugin: ViewerPlugin
     fileprivate let hosts: [ObjectIdentifier: FakeOverlayHost]
-    let pasteboard = NSPasteboard.withUniqueName()
+    private let scratch = ScratchPasteboard()
+    var pasteboard: NSPasteboard { scratch.pasteboard }
 
     var commands: CommandRegistry { bench.commands }
     var ui: ScriptedInteraction { bench.ui }

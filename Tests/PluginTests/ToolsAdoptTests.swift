@@ -122,7 +122,8 @@ private func isExactly(_ name: String, _ other: String) -> Bool { name.utf8.elem
         memory.addDirectory("/B")
     }
 
-    let pasteboard = NSPasteboard.withUniqueName()
+    private let scratch = ScratchPasteboard()
+    var pasteboard: NSPasteboard { scratch.pasteboard }
 
     func makeBench() -> TestBench {
         TestBench(

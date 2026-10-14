@@ -128,7 +128,7 @@ extension Application {
         // Without the plugins that run command lines and hear of typed addresses where a
         // test brings its own.
         let replaced = extra.contains { $0 is ConsentPlugin } ? ["SystemToolsPlugin", "NetworkPlugin"] : []
-        let standard = StandardPlugins.make(pasteboard: .withUniqueName(), launchesApplications: false)
+        let standard = StandardPlugins.make(pasteboard: scratch.pasteboard, launchesApplications: false)
             .filter { !replaced.contains(String(describing: type(of: $0))) }
         kernel.load(standard + extra)
         let running = Running(kernel: kernel, shell: Shell(kernel: kernel, home: box.url("home")))

@@ -46,6 +46,7 @@ private final class WindowTestPlugin: Plugin {
     let box: Sandbox
     let ui = ScriptedInteraction()
     let settings = MemorySettings()
+    let scratch = ScratchPasteboard()
     fileprivate let extra = WindowTestPlugin()
 
     init() throws {
@@ -94,7 +95,7 @@ private final class WindowTestPlugin: Plugin {
 
     fileprivate func start(with plugin: WindowTestPlugin? = nil) async -> Running {
         let kernel = Kernel(productName: StandardPlugins.productName, settings: settings, ui: ui)
-        kernel.load(CorePlugins.make() + [plugin ?? extra])
+        kernel.load(CorePlugins.make(pasteboard: scratch.pasteboard) + [plugin ?? extra])
         let running = Running(kernel: kernel, shell: Shell(kernel: kernel, home: box.url("home")))
         await settle(running)
         return running

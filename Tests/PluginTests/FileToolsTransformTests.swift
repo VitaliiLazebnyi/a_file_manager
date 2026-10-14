@@ -20,6 +20,8 @@ import Testing
     var ui: ScriptedInteraction { bench.ui }
     var run: ToolRun { ToolRun(fileSystems: bench.kernel.fileSystems) }
 
+    private let scratch = ScratchPasteboard()
+
     init() throws {
         box = try Sandbox()
         try box.folder("A")
@@ -27,7 +29,7 @@ import Testing
         memory.addDirectory("/in")
         memory.addDirectory("/out")
         bench = TestBench(
-            plugins: [FileToolsPlugin(pasteboard: NSPasteboard.withUniqueName())],
+            plugins: [FileToolsPlugin(pasteboard: scratch.pasteboard)],
             fileSystems: [LocalFileSystem(), memory],
             left: box.url("A"), right: box.url("B"), settings: settings)
     }
@@ -467,17 +469,15 @@ import Testing
         }
         #expect(namesOnDisk(box.url("B")).isEmpty)
         // Cancelled in the middle: the cancel flag is set when half of the bytes are through.
-        nonisolated(unsafe) var half: ToolRun?
-        half = ToolRun(
-            fileSystems: bench.kernel.fileSystems,
+        let flag = CancellationFlag()
+        let half = ToolRun(
+            fileSystems: bench.kernel.fileSystems, cancellation: flag,
             report: { progress in
-                if progress.bytesDone >= 500_000 { half?.cancellation.cancel() }
+                if progress.bytesDone >= 500_000 { flag.cancel() }
             })
-        if let half {
-            try Data(count: 3 << 20).write(to: box.url("A/large.bin"))
-            #expect(throws: ToolError.cancelled) {
-                try Splitter.split(item("A/large.bin"), into: box.url("B"), partSize: 300_000, run: half)
-            }
+        try Data(count: 3 << 20).write(to: box.url("A/large.bin"))
+        #expect(throws: ToolError.cancelled) {
+            try Splitter.split(item("A/large.bin"), into: box.url("B"), partSize: 300_000, run: half)
         }
         #expect(namesOnDisk(box.url("B")).isEmpty)
     }

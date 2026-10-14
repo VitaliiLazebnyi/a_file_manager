@@ -15,7 +15,8 @@ import Testing
 /// keeps short lines.
 @MainActor @Suite struct Review2ConfigAMac {
     let box: Sandbox
-    let pasteboard = NSPasteboard.withUniqueName()
+    private let scratch = ScratchPasteboard()
+    var pasteboard: NSPasteboard { scratch.pasteboard }
     let mac: MacIntegrationPlugin
     let bench: TestBench
     let count: Int
@@ -32,7 +33,7 @@ import Testing
         }
         try box.file("S/line\nbreak.txt")
         try box.folder("B")
-        mac = MacIntegrationPlugin(launchesApplications: false, pasteboard: pasteboard) { _ in
+        mac = MacIntegrationPlugin(launchesApplications: false, pasteboard: scratch.pasteboard) { _ in
             [URL(fileURLWithPath: "/Applications/First.app")]
         }
         bench = TestBench(

@@ -12,8 +12,8 @@ import StandardPlugins
         "ClipboardPlugin", "SelectionPlugin", "ViewOptionsPlugin", "FolderTabsPlugin"
     ]
 
-    static func make() -> [any Plugin] {
-        StandardPlugins.make(pasteboard: .withUniqueName(), launchesApplications: false)
+    static func make(pasteboard: NSPasteboard) -> [any Plugin] {
+        StandardPlugins.make(pasteboard: pasteboard, launchesApplications: false)
             .filter { names.contains(String(describing: type(of: $0))) }
     }
 }
