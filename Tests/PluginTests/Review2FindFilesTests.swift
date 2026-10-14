@@ -174,8 +174,7 @@ import Testing
             })
         var query = SearchQuery(directory: memory.url("/wide"))
         query.fieldRules = FieldRules(isEnabled: true, rules: [FieldRule("gate", .equals, "open")])
-        let search = FileSearch(query, fileSystems: fileSystems, columns: columns)
-        search.budget = 30
+        let search = FileSearch(query, fileSystems: fileSystems, columns: columns, tuning: .init(budget: 30))
         // Written by the other thread before it signals, read here after the wait.
         nonisolated(unsafe) var count = 0
         let done = DispatchSemaphore(value: 0)

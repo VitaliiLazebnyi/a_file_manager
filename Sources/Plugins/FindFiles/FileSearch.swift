@@ -197,8 +197,8 @@ public struct SearchQuery: Sendable {
 /// budget of listed but not yet reported entries is used up, so that a slow front job (a huge
 /// file, a stalled share) does not let the other threads read the whole tree into memory.
 ///
-/// Safe to share as said above: `limitReached` is guarded by `limitLock`, and the test settings
-/// `budget` and `partialListingAfter` are set before `run` only.
+/// Safe to share as said above: `limitReached` is guarded by `limitLock`; the rest is fixed in
+/// `init`.
 public final class FileSearch: @unchecked Sendable {
     public let query: SearchQuery
     public let cancellation = CancellationFlag()
@@ -226,13 +226,27 @@ public final class FileSearch: @unchecked Sendable {
     /// The listed but not yet reported entries that hold back the listing of further folders.
     static let candidateBudget = 200_000
     /// The budget this search works to; tests make it small.
-    var budget = FileSearch.candidateBudget
+    let budget: Int
     /// The files a duplicate search collects before it stops and says so.
     static let duplicateCandidateLimit = 3_000_000
 
-    public init(
+    public convenience init(
         _ query: SearchQuery, fileSystems: FileSystemRegistry, columns: ColumnRegistry? = nil, now: Date = Date()
     ) {
+        self.init(query, fileSystems: fileSystems, columns: columns, now: now, tuning: Tuning())
+    }
+
+    /// What tests make small.
+    struct Tuning {
+        var budget = FileSearch.candidateBudget
+        var partialListingAfter = FileSearch.defaultPartialListingAfter
+    }
+
+    init(
+        _ query: SearchQuery, fileSystems: FileSystemRegistry, columns: ColumnRegistry? = nil, now: Date = Date(),
+        tuning: Tuning
+    ) {
+        (budget, partialListingAfter) = (tuning.budget, tuning.partialListingAfter)
         self.query = query
         self.fileSystems = fileSystems
         self.now = now
@@ -376,7 +390,7 @@ public final class FileSearch: @unchecked Sendable {
     /// reported in parts while the listing goes on (each part in name order).
     static let defaultPartialListingAfter = 100_000
     /// Tests make it small.
-    var partialListingAfter = FileSearch.defaultPartialListingAfter
+    let partialListingAfter: Int
 
     /// Runs the search and returns the files that are duplicates of each other, in groups
     /// (spec 09 › Duplicate finder); empty when the search was cancelled. The files are all
@@ -465,7 +479,8 @@ public final class FileSearch: @unchecked Sendable {
         private var visited: [FileIdentity: Int] = [:]
         private let visitedLock = NSLock()
         /// Counts what is listed and not yet reported, and what the reporting thread waits for.
-        /// Its own lock, never held with another: the job stack asks it from inside its own.
+        /// A leaf lock: nothing else is taken while it is held (the job stack and `deliver` ask
+        /// it from inside their own).
         private let budgetLock = NSLock()
         private var undelivered = 0
         private var needed: Node?
