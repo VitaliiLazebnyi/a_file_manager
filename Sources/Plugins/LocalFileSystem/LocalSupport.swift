@@ -8,8 +8,8 @@ public import Foundation
 ///
 /// The signal is only ever sent to a thread that has announced, with `begin()`, that it is
 /// inside one call; a signal that comes a moment too early is sent again until the call is
-/// over. **Thread-safe**; `interrupt()` returns at once.
-final class Interruption {
+/// over. **Thread-safe**; `interrupt()` returns at once. All state is guarded by `lock`.
+final class Interruption: @unchecked Sendable {
     private let lock = NSLock()
     private var thread: pthread_t?
     private var interrupted = false
@@ -99,8 +99,9 @@ final class Interruption {
 
 /// The mounted file systems, as the kernel lists them. Reading the list never touches a
 /// mounted disk (`MNT_NOWAIT`), so it is safe to ask on any thread about a path on a share
-/// that has stopped answering. Kept for a moment and then read again.
-final class MountTable {
+/// that has stopped answering. Kept for a moment and then read again. All state is guarded
+/// by `lock`.
+final class MountTable: @unchecked Sendable {
     static let shared = MountTable()
 
     struct Mount {
@@ -194,8 +195,8 @@ struct LinkTarget {
 /// up a listing. A target on a disk of this Mac is asked for at once; one anywhere else is
 /// asked for on a thread of its own and waited for for a moment only. A few such questions
 /// may be stuck for good (each holds a thread until the share answers); past that limit links
-/// into places that are not local are no longer followed.
-final class LinkResolver {
+/// into places that are not local are no longer followed. All state is guarded by `lock`.
+final class LinkResolver: @unchecked Sendable {
     static let shared = LinkResolver()
 
     private let lock = NSLock()
@@ -215,7 +216,8 @@ final class LinkResolver {
         }
         inFlight += 1
         lock.unlock()
-        final class Answer {
+        /// All state is guarded by `lock`.
+        final class Answer: @unchecked Sendable {
             let lock = NSLock()
             var target: LinkTarget?
         }
@@ -313,13 +315,13 @@ extension LocalFileSystem {
 struct LocalProbes {
     /// Called with a path just before the system is asked about it in a way that can wait on
     /// the volume: a test blocks here for the paths of its "dead" volume.
-    var willAsk: ((String) -> Void)?
+    var willAsk: (@Sendable (String) -> Void)?
     /// Whether a path is on a disk of this Mac; nil (the closure or its answer) asks the
     /// mount table.
-    var isLocal: ((String) -> Bool?)?
+    var isLocal: (@Sendable (String) -> Bool?)?
     /// The free space of the volume at a path, plainly free and free for important uses;
     /// nil asks the system.
-    var freeSpace: ((String) -> (available: Int64?, important: Int64?))?
+    var freeSpace: (@Sendable (String) -> (available: Int64?, important: Int64?))?
     /// How long a change on a volume that is not a disk of this Mac is waited for after it
     /// was cancelled, in seconds, before the caller goes on without it.
     var patienceAfterCancel: TimeInterval = 2
@@ -333,9 +335,9 @@ struct LocalProbes {
 /// `interruption` (from another thread, when the caller's flag is set), and none is begun
 /// once that has happened. What must be done whatever happens (putting a lock back) is
 /// called directly instead.
-final class LocalCall {
+final class LocalCall: Sendable {
     let interruption = Interruption()
-    private let willAsk: ((String) -> Void)?
+    private let willAsk: (@Sendable (String) -> Void)?
 
     init(_ probes: LocalProbes) {
         willAsk = probes.willAsk
@@ -379,7 +381,8 @@ final class LocalCall {
 ///
 /// A volume with several calls left behind is not asked again until one of them returns:
 /// further changes there fail at once (`ETIMEDOUT`), instead of costing a thread each.
-final class RemoteChanges {
+/// All state is guarded by `lock`.
+final class RemoteChanges: @unchecked Sendable {
     static let shared = RemoteChanges()
 
     /// The most calls on one volume that may be left behind at a time.
@@ -396,15 +399,16 @@ final class RemoteChanges {
     }
 
     /// Where the call's thread leaves its result, and learns that nobody waits for it.
-    private final class Outcome<Value> {
+    /// All state is guarded by `lock`.
+    private final class Outcome<Value: Sendable>: @unchecked Sendable {
         let lock = NSLock()
         var result: Result<Value, any Error>?
         var isLeftBehind = false
     }
 
-    func run<Value>(
+    func run<Value: Sendable>(
         on volume: String, patience: TimeInterval, cancellation: CancellationFlag, _ call: LocalCall,
-        _ body: @escaping (LocalCall) throws -> Value
+        _ body: @escaping @Sendable (LocalCall) throws -> Value
     ) throws -> Value {
         lock.lock()
         let isDead = (stranded[volume] ?? 0) >= Self.limit
@@ -458,8 +462,8 @@ final class RemoteChanges {
     }
 }
 
-/// A value that several threads share, behind a lock.
-final class Locked<Value> {
+/// A value that several threads share, behind a lock. All state is guarded by `lock`.
+final class Locked<Value: Sendable>: @unchecked Sendable {
     private let lock = NSLock()
     private var value: Value
 
