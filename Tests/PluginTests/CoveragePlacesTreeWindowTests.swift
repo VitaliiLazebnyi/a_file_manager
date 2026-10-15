@@ -17,6 +17,8 @@ import Testing
     let bench: TestBench
     /// How often a search found nothing: the window's sound, counted instead of played.
     let beeps = Shared(0)
+    /// The windows the tree was asked to show: none is put on screen.
+    let presenter = StabilityPresenter()
 
     init() {
         _ = NSApplication.shared
@@ -27,14 +29,14 @@ import Testing
     func window(cache: TreeCache = TreeCache(directory: nil), hiddenScanLimit: TimeInterval = 900)
         -> CoveragePlacesTreeParts
     {
-        CoveragePlacesTreeParts(
-            controller: DirectoryTreeWindowController(
-                kernel: bench.kernel,
-                cache: cache,
-                hiddenScanLimit: hiddenScanLimit,
-                beep: { [beeps] in beeps.modify { $0 += 1 } }
-            )
+        let controller = DirectoryTreeWindowController(
+            kernel: bench.kernel,
+            cache: cache,
+            hiddenScanLimit: hiddenScanLimit,
+            beep: { [beeps] in beeps.modify { $0 += 1 } }
         )
+        controller.present = presenter.present
+        return CoveragePlacesTreeParts(controller: controller)
     }
 
     func spin(_ condition: () -> Bool) async -> Bool {
@@ -47,6 +49,7 @@ import Testing
     {
         let tree = window(cache: cache)
         tree.controller.show(for: folders.url(path), showHidden: showHidden)
+        #expect(presenter.isOpen(tree.window))
         #expect(await spin { tree.isIdle })
         return tree
     }
@@ -109,7 +112,7 @@ import Testing
         let other = window()
         defer { other.controller.close() }
         other.controller.show(for: try #require(URL(string: "nowhere:///x")), showHidden: false)
-        #expect(other.window?.isVisible == false)
+        #expect(!presenter.isOpen(other.window))
         tree.controller.close()
     }
 
@@ -258,7 +261,7 @@ import Testing
         tree.controller.show(for: folders.url("/A"), showHidden: false)
         #expect(await spin { folders.isWaiting("/B") })
         tree.controller.shutDown()
-        #expect(tree.window?.isVisible == false)
+        #expect(!presenter.isOpen(tree.window))
         folders.release("/B")
         #expect(await spin { cache.entry(for: root)?.isComplete == false })
         // The tree stays: what it showed was not stored as it is.
@@ -395,7 +398,7 @@ import Testing
         #expect(tree.searchField?.stringValue == "a" && tree.selected == "A")
         tree.press("\u{F701}", code: 125, .control)
         tree.press("\r", code: 36)
-        #expect(tree.window?.isVisible == false && bench.left.model.directory == folders.url("/A/a1"))
+        #expect(!presenter.isOpen(tree.window) && bench.left.model.directory == folders.url("/A/a1"))
     }
 
     @Test func keysInTheSearchFieldStepAndGo() async {
@@ -427,7 +430,7 @@ import Testing
         #expect(tree.controller.handleFieldKey(key("\u{F701}", 125, .control)) && tree.selected == "a2")
         #expect(tree.controller.handleFieldKey(key("\u{F700}", 126)) && tree.selected == "a1")
         #expect(tree.controller.handleFieldKey(key("\u{3}", 76)))
-        #expect(tree.window?.isVisible == false && bench.left.model.directory == folders.url("/A/a1"))
+        #expect(!presenter.isOpen(tree.window) && bench.left.model.directory == folders.url("/A/a1"))
     }
 
     @Test func theButtonsGoOrCancelAndAJobKeepsThePanelWhereItIs() async {
@@ -435,9 +438,9 @@ import Testing
         defer { tree.controller.close() }
         tree.outline?.deselectAll(nil)
         tree.click("Go")
-        #expect(tree.window?.isVisible == true)
+        #expect(presenter.isOpen(tree.window))
         tree.click("Cancel")
-        #expect(tree.window?.isVisible == false && bench.left.model.directory == folders.url("/A"))
+        #expect(!presenter.isOpen(tree.window) && bench.left.model.directory == folders.url("/A"))
         tree.controller.show(for: folders.url("/A/a2"), showHidden: false)
         #expect(await spin { tree.selected == "a2" })
         var rejected = 0
@@ -448,7 +451,8 @@ import Testing
             work: { monitor in monitor.ask { parts.value.click("Go") } },
             completion: { _ in }
         )
-        #expect(rejected == 1 && tree.window?.isVisible == false && bench.left.model.directory == folders.url("/A"))
+        // (A window that was closed and is not put on screen again tells of no second close.)
+        #expect(rejected == 1 && presenter.presented.count == 2 && bench.left.model.directory == folders.url("/A"))
     }
 
     @Test func aSearchOfAHugeTreeGoesOnInTurnsAndANewOneEndsIt() async {
@@ -497,9 +501,9 @@ import Testing
     @Test func theStartUpDiskLeavesOutTheVolumesMountedInIt() async throws {
         let box = try Sandbox()
         let local = TestBench(plugins: [], fileSystems: [LocalFileSystem()], left: box.root, right: box.root)
-        let tree = CoveragePlacesTreeParts(
-            controller: DirectoryTreeWindowController(kernel: local.kernel, cache: TreeCache(directory: nil)) {}
-        )
+        let controller = DirectoryTreeWindowController(kernel: local.kernel, cache: TreeCache(directory: nil)) {}
+        controller.present = presenter.present
+        let tree = CoveragePlacesTreeParts(controller: controller)
         defer { tree.controller.close() }
         tree.controller.show(for: box.root, showHidden: false)
         // The first levels are read (and the folders mounted inside left out) before Esc.
