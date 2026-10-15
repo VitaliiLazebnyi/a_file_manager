@@ -62,7 +62,10 @@ final class BarCommandButton: NSButton {
         super.updateTrackingAreas()
         if let hoverArea { removeTrackingArea(hoverArea) }
         let area = NSTrackingArea(
-            rect: .zero, options: [.mouseEnteredAndExited, .activeInActiveApp, .inVisibleRect], owner: self)
+            rect: .zero,
+            options: [.mouseEnteredAndExited, .activeInActiveApp, .inVisibleRect],
+            owner: self
+        )
         addTrackingArea(area)
         hoverArea = area
         if let window {
@@ -199,10 +202,12 @@ final class ButtonBarView: NSView, NSDraggingSource {
             $0.map { $0.command == ToolbarRegistry.lineBreak || commands[$0.command] != nil } ?? true
         }
         var buttons = shown.compactMap { $0 }.filter { $0.command != ToolbarRegistry.lineBreak }.makeIterator()
-        return ButtonBarArrangement(entries: shown.map { $0?.command }).entries.map { id in
-            guard let id else { return nil }
-            return id == ToolbarRegistry.lineBreak ? ToolbarRegistry.Button(command: id, symbol: "") : buttons.next()
-        }
+        return ButtonBarArrangement(entries: shown.map { $0?.command }).entries
+            .map { id in
+                guard let id else { return nil }
+                return id == ToolbarRegistry.lineBreak
+                    ? ToolbarRegistry.Button(command: id, symbol: "") : buttons.next()
+            }
     }
 
     /// The command's title and its main key, `Find Files… (⌥F7)`, and below them what the
@@ -250,7 +255,8 @@ final class ButtonBarView: NSView, NSDraggingSource {
             }
             guard let command = kernel.commands[entry.command] else { continue }
             let button = BarButton.style(
-                BarCommandButton(title: "", target: self, action: #selector(buttonPressed(_:))))
+                BarCommandButton(title: "", target: self, action: #selector(buttonPressed(_:)))
+            )
             button.isBordered = false
             let dragged = Dragged.button(line: line, group: group, index: index)
             button.onCommandMouseDown = { [weak self, weak button] event in
@@ -273,7 +279,10 @@ final class ButtonBarView: NSView, NSDraggingSource {
             }
             button.identifier = NSUserInterfaceItemIdentifier(command.id.rawValue)
             button.toolTip = Self.toolTip(
-                for: command, keys: kernel.keyBindings, hint: kernel.toolbar.hint(for: command.id))
+                for: command,
+                keys: kernel.keyBindings,
+                hint: kernel.toolbar.hint(for: command.id)
+            )
             button.setAccessibilityLabel(command.title)
             buttons.append(button)
             items.append(button)
@@ -345,18 +354,19 @@ final class ButtonBarView: NSView, NSDraggingSource {
 
     /// The views a drag of `item` takes along: the button, or the handle and its group.
     private func views(of item: Dragged) -> [NSView] {
-        zip(flow.items, slots).compactMap { view, slot in
-            switch (item, slot) {
-            case (.button(let l, let g, let i), .button(let line, let group, let index)):
-                return (l, g, i) == (line, group, index) ? view : nil
+        zip(flow.items, slots)
+            .compactMap { view, slot in
+                switch (item, slot) {
+                case (.button(let l, let g, let i), .button(let line, let group, let index)):
+                    return (l, g, i) == (line, group, index) ? view : nil
 
-            case (.group(let l, let g), .handle(let line, let group)),
-                (.group(let l, let g), .button(let line, let group, _)):
-                return (l, g) == (line, group) ? view : nil
+                case (.group(let l, let g), .handle(let line, let group)),
+                    (.group(let l, let g), .button(let line, let group, _)):
+                    return (l, g) == (line, group) ? view : nil
 
-            default: return nil
+                default: return nil
+                }
             }
-        }
     }
 
     private func beginDrag(_ item: Dragged, from event: NSEvent) {
@@ -367,7 +377,9 @@ final class ButtonBarView: NSView, NSDraggingSource {
         pasteboardItem.setString("", forType: Self.pasteboardType)
         let draggingItem = NSDraggingItem(pasteboardWriter: pasteboardItem)
         draggingItem.setDraggingFrame(
-            NSRect(origin: convert(first.frame, from: flow).origin, size: image.size), contents: image)
+            NSRect(origin: convert(first.frame, from: flow).origin, size: image.size),
+            contents: image
+        )
         dragged = item
         views.forEach { $0.alphaValue = 0.3 }
         // Room for a new line below the bar while the drag lasts.
@@ -422,7 +434,8 @@ final class ButtonBarView: NSView, NSDraggingSource {
                 }
                 if endsLine(index) {
                     anchors.append(
-                        (.line(slot.line, at: lines[slot.line].count), NSPoint(x: frame.maxX, y: frame.midY)))
+                        (.line(slot.line, at: lines[slot.line].count), NSPoint(x: frame.maxX, y: frame.midY))
+                    )
                 }
             }
             func distance(_ anchor: NSPoint) -> CGFloat { hypot(anchor.x - point.x, 3 * (anchor.y - point.y)) }
@@ -481,8 +494,11 @@ final class ButtonBarView: NSView, NSDraggingSource {
             case .newLine:
                 guard let first = frames.first, let bottom = frames.map(\.maxY).max() else { return nil }
                 return NSRect(
-                    x: first.minX, y: bottom + 4, width: max(flow.bounds.width - 2 * first.minX, 0),
-                    height: first.height - 4)
+                    x: first.minX,
+                    y: bottom + 4,
+                    width: max(flow.bounds.width - 2 * first.minX, 0),
+                    height: first.height - 4
+                )
             }
         }
         switch target {
@@ -605,18 +621,21 @@ final class DriveBarView: NSView {
     func rebuild() {
         places = store.all
         ejectButtons = [:]
-        buttons = places.enumerated().map { index, place in
-            let button = BarButton.make(target: self, action: #selector(buttonPressed(_:)))
-            button.title = DisplayText.clean(place.name)
-            button.image = NSImage(
-                systemSymbolName: Self.symbol(for: place.kind), accessibilityDescription: nil)
-            button.imagePosition = .imageLeading
-            button.tag = index
-            button.toolTip = DisplayText.clean(kernel.fileSystems.displayPath(place.url))
-            button.sizeToFit()
-            button.frame.size.height = BarButton.height
-            return button
-        }
+        buttons = places.enumerated()
+            .map { index, place in
+                let button = BarButton.make(target: self, action: #selector(buttonPressed(_:)))
+                button.title = DisplayText.clean(place.name)
+                button.image = NSImage(
+                    systemSymbolName: Self.symbol(for: place.kind),
+                    accessibilityDescription: nil
+                )
+                button.imagePosition = .imageLeading
+                button.tag = index
+                button.toolTip = DisplayText.clean(kernel.fileSystems.displayPath(place.url))
+                button.sizeToFit()
+                button.frame.size.height = BarButton.height
+                return button
+            }
         var items: [NSView] = []
         for (index, button) in buttons.enumerated() {
             items.append(button)
@@ -647,11 +666,12 @@ final class DriveBarView: NSView {
     /// The place the source panel is in: the one with the longest path that contains its folder.
     static func currentPlace(among places: [Place], for directory: URL) -> Int? {
         let path = directory.standardized.path
-        let candidates = places.enumerated().filter { _, place in
-            guard place.url.scheme == directory.scheme, place.url.host == directory.host else { return false }
-            let root = place.url.standardized.path
-            return path == root || path.hasPrefix(root.hasSuffix("/") ? root : root + "/")
-        }
+        let candidates = places.enumerated()
+            .filter { _, place in
+                guard place.url.scheme == directory.scheme, place.url.host == directory.host else { return false }
+                let root = place.url.standardized.path
+                return path == root || path.hasPrefix(root.hasSuffix("/") ? root : root + "/")
+            }
         return candidates.max { $0.element.url.path.count < $1.element.url.path.count }?.offset
     }
 

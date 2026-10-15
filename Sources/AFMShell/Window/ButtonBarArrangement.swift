@@ -38,12 +38,14 @@ struct ButtonBarArrangement: Equatable {
 
     /// The bar in the form the toolbar registry keeps: nil is a separator.
     var entries: [CommandID?] {
-        lines.enumerated().flatMap { number, line -> [CommandID?] in
-            let groups = line.enumerated().flatMap { index, group in
-                (index == 0 ? [] : [nil]) + group.map(Optional.init)
+        lines.enumerated()
+            .flatMap { number, line -> [CommandID?] in
+                let groups = line.enumerated()
+                    .flatMap { index, group in
+                        (index == 0 ? [] : [nil]) + group.map(Optional.init)
+                    }
+                return (number == 0 ? [] : [ToolbarRegistry.lineBreak]) + groups
             }
-            return (number == 0 ? [] : [ToolbarRegistry.lineBreak]) + groups
-        }
     }
 
     // Each change marks what it takes away (an empty group stands for a moved one), puts it

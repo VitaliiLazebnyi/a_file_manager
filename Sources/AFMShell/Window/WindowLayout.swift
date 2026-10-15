@@ -132,11 +132,18 @@ final class WindowLayout {
         preferences.append(Preference(Self.stackedKey, "Panels one above the other", .flag(default: false)))
         preferences.append(
             Preference(
-                BarButton.iconSizeKey, "Size of the button bar's pictures",
-                .choice(BarButton.iconSizeNames, default: BarButton.defaultIconSize)))
+                BarButton.iconSizeKey,
+                "Size of the button bar's pictures",
+                .choice(BarButton.iconSizeNames, default: BarButton.defaultIconSize)
+            )
+        )
         preferences.append(
             Preference(
-                Self.titleExtraKey, "Extra text in the window title (*text or $text)", .text(default: "")))
+                Self.titleExtraKey,
+                "Extra text in the window title (*text or $text)",
+                .text(default: "")
+            )
+        )
         return PreferencePage(title: "Layout", preferences: preferences) { [weak self] in self?.onChange?() }
     }
 }

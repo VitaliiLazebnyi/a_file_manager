@@ -28,7 +28,10 @@ enum MenuBuilder {
 
     static func item(_ command: Command, keys: KeyBindings?) -> NSMenuItem {
         let item = NSMenuItem(
-            title: command.title, action: command.editingRole.map(selector(for:)) ?? action, keyEquivalent: "")
+            title: command.title,
+            action: command.editingRole.map(selector(for:)) ?? action,
+            keyEquivalent: ""
+        )
         item.representedObject = command.id.rawValue
         if let shortcut = keys?.menuShortcut(for: command.id), let key = shortcut.key.menuEquivalent {
             item.keyEquivalent = key
@@ -98,7 +101,10 @@ enum MenuBuilder {
     /// An entry of the shell's own menus. Its key is left out when the user or a plugin gave
     /// that key to a command: every key is bound in one place.
     private static func standardItem(
-        _ title: String, _ action: Selector, _ key: String = "", _ modifiers: KeyModifiers = .command,
+        _ title: String,
+        _ action: Selector,
+        _ key: String = "",
+        _ modifiers: KeyModifiers = .command,
         keys: KeyBindings
     ) -> NSMenuItem {
         let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
@@ -161,7 +167,8 @@ enum MenuBuilder {
 
         let appMenu = NSMenu(title: appName)
         appMenu.addItem(
-            standardItem("About \(appName)", #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keys: keys))
+            standardItem("About \(appName)", #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keys: keys)
+        )
         if kernel.commands[.configuration] != nil {
             appMenu.addItem(.separator())
             appMenu.addItem(standardItem("Settings…", #selector(ShellApplication.showSettings(_:)), ",", keys: keys))
@@ -173,7 +180,11 @@ enum MenuBuilder {
             .separator(), services, .separator(),
             standardItem("Hide \(appName)", #selector(NSApplication.hide(_:)), "h", keys: keys),
             standardItem(
-                "Hide Others", #selector(NSApplication.hideOtherApplications(_:)), "h", [.command, .option], keys: keys
+                "Hide Others",
+                #selector(NSApplication.hideOtherApplications(_:)),
+                "h",
+                [.command, .option],
+                keys: keys
             ),
             standardItem("Show All", #selector(NSApplication.unhideAllApplications(_:)), keys: keys),
             .separator(),
@@ -210,7 +221,12 @@ enum MenuBuilder {
             standardItem("Minimize", #selector(NSWindow.performMiniaturize(_:)), "m", keys: keys),
             standardItem("Zoom", #selector(NSWindow.performZoom(_:)), keys: keys),
             standardItem(
-                "Enter Full Screen", #selector(NSWindow.toggleFullScreen(_:)), "f", [.command, .control], keys: keys),
+                "Enter Full Screen",
+                #selector(NSWindow.toggleFullScreen(_:)),
+                "f",
+                [.command, .control],
+                keys: keys
+            ),
             .separator(),
             standardItem(appName, #selector(ShellApplication.showMainWindow(_:)), "0", keys: keys),
             .separator(),
@@ -293,7 +309,9 @@ final class MenuKeys: NSObject, NSMenuDelegate {
     }
 
     func menuHasKeyEquivalent(
-        _ menu: NSMenu, for event: NSEvent, target: AutoreleasingUnsafeMutablePointer<AnyObject?>,
+        _ menu: NSMenu,
+        for event: NSEvent,
+        target: AutoreleasingUnsafeMutablePointer<AnyObject?>,
         action: UnsafeMutablePointer<Selector?>
     ) -> Bool {
         lookups += 1
@@ -350,7 +368,9 @@ final class MenuKeys: NSObject, NSMenuDelegate {
         for shortcut in shortcuts {
             if let id = kernel.keyBindings.command(for: shortcut), kernel.keyBindings.menuShortcut(for: id) == shortcut,
                 let item = Self.find(
-                    in: menu, where: { MenuBuilder.command(of: $0) == id && !$0.keyEquivalent.isEmpty })
+                    in: menu,
+                    where: { MenuBuilder.command(of: $0) == id && !$0.keyEquivalent.isEmpty }
+                )
             {
                 return item
             }

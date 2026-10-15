@@ -77,7 +77,8 @@ final class FormDialog: NSObject, NSTextViewDelegate {
         for (index, row) in rows.enumerated() where row.count == 1 {
             grid.mergeCells(
                 inHorizontalRange: NSRange(location: 0, length: grid.numberOfColumns),
-                verticalRange: NSRange(location: index, length: 1))
+                verticalRange: NSRange(location: index, length: 1)
+            )
         }
         if grid.numberOfColumns > 1 { grid.column(at: 0).xPlacement = .trailing }
         grid.rowAlignment = .firstBaseline

@@ -53,9 +53,16 @@ final class QuitProgress: NSObject {
         // loop, which the loop does not look at by itself until an event wakes it.
         NSApp.stopModal()
         if let wake = NSEvent.otherEvent(
-            with: .applicationDefined, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0,
-            context: nil, subtype: 0, data1: 0, data2: 0)
-        {
+            with: .applicationDefined,
+            location: .zero,
+            modifierFlags: [],
+            timestamp: 0,
+            windowNumber: 0,
+            context: nil,
+            subtype: 0,
+            data1: 0,
+            data2: 0
+        ) {
             NSApp.postEvent(wake, atStart: true)
         }
     }

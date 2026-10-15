@@ -43,7 +43,10 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation, NSSp
         functionKeyBar = FunctionKeyBar(kernel: kernel)
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 1_180, height: 700),
-            styleMask: [.titled, .closable, .resizable, .miniaturizable], backing: .buffered, defer: false)
+            styleMask: [.titled, .closable, .resizable, .miniaturizable],
+            backing: .buffered,
+            defer: false
+        )
         window.minSize = NSSize(width: 640, height: 360)
         window.isReleasedWhenClosed = false
         window.collectionBehavior.insert(.fullScreenPrimary)
@@ -92,7 +95,11 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation, NSSp
     private func observe() {
         let center = NotificationCenter.default
         center.addObserver(
-            self, selector: #selector(appBecameActive), name: NSApplication.didBecomeActiveNotification, object: nil)
+            self,
+            selector: #selector(appBecameActive),
+            name: NSApplication.didBecomeActiveNotification,
+            object: nil
+        )
         // Reading ahead follows whether this window is the one in use.
         for name in [NSApplication.didBecomeActiveNotification, NSApplication.didResignActiveNotification] {
             center.addObserver(self, selector: #selector(activityChanged), name: name, object: nil)
@@ -113,7 +120,11 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation, NSSp
         // once (`scheduleValidation`). For the rest (a plugin's own state, the pasteboard) they
         // are looked at now and then while events arrive, not after every single event.
         center.addObserver(
-            self, selector: #selector(windowUpdated), name: NSWindow.didUpdateNotification, object: window)
+            self,
+            selector: #selector(windowUpdated),
+            name: NSWindow.didUpdateNotification,
+            object: window
+        )
     }
 
     // MARK: Layout
@@ -159,7 +170,9 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation, NSSp
     }
 
     func splitView(
-        _: NSSplitView, constrainSplitPosition proposedPosition: CGFloat, ofSubviewAt _: Int
+        _: NSSplitView,
+        constrainSplitPosition proposedPosition: CGFloat,
+        ofSubviewAt _: Int
     ) -> CGFloat {
         guard splitExtent > 0 else { return proposedPosition }
         return min(splitExtent * 0.9, max(splitExtent * 0.1, proposedPosition))

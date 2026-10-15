@@ -36,7 +36,11 @@ enum Notice {
         background.addSubview(label)
 
         let panel = NSPanel(
-            contentRect: frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+            contentRect: frame,
+            styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered,
+            defer: false
+        )
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = true
@@ -52,8 +56,10 @@ enum Notice {
         if let window { window.addChildWindow(panel, ordered: .above) } else { panel.orderFrontRegardless() }
         shown = panel
         NSAccessibility.post(
-            element: panel, notification: .announcementRequested,
-            userInfo: [.announcement: message, .priority: NSAccessibilityPriorityLevel.high.rawValue])
+            element: panel,
+            notification: .announcementRequested,
+            userInfo: [.announcement: message, .priority: NSAccessibilityPriorityLevel.high.rawValue]
+        )
         NSAnimationContext.runAnimationGroup {
             $0.duration = 0.15
             panel.animator().alphaValue = 1
@@ -75,7 +81,8 @@ enum Notice {
                             panel.orderOut(nil)
                             shown = nil
                         }
-                    })
+                    }
+                )
             }
         }
     }

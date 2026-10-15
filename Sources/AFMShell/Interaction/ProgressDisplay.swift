@@ -61,7 +61,11 @@ final class ProgressDisplay {
         }
         observers = [
             center.addObserver(
-                forName: NSWindow.didDeminiaturizeNotification, object: window, queue: .main, using: retry),
+                forName: NSWindow.didDeminiaturizeNotification,
+                object: window,
+                queue: .main,
+                using: retry
+            ),
             center.addObserver(forName: NSWindow.didBecomeKeyNotification, object: window, queue: .main, using: retry),
             center.addObserver(forName: NSApplication.didUnhideNotification, object: nil, queue: .main, using: retry)
         ]
@@ -91,8 +95,11 @@ final class ProgressDisplay {
         guard panel == nil, let monitor, let window, window.isVisible else { return }
         let inBackground = service?.runsInBackground ?? false
         let panel = NSPanel(
-            contentRect: .zero, styleMask: inBackground ? [.titled, .miniaturizable] : [.titled],
-            backing: .buffered, defer: false)
+            contentRect: .zero,
+            styleMask: inBackground ? [.titled, .miniaturizable] : [.titled],
+            backing: .buffered,
+            defer: false
+        )
         panel.isReleasedWhenClosed = false
         content.arrange(compact: inBackground)
         panel.contentView = content
@@ -140,7 +147,8 @@ final class ProgressDisplay {
             queue: ProgressSheet.queueLine(service.queueLength),
             isPaused: service.isPaused,
             isCancelled: monitor?.cancellation.isCancelled ?? false,
-            inBackground: !panelIsSheet)
+            inBackground: !panelIsSheet
+        )
         content.show(state)
         if !panelIsSheet, let title = monitor?.title { panel?.title = title }
     }

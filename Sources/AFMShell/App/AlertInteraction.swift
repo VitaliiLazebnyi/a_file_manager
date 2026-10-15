@@ -37,8 +37,12 @@ final class AlertInteraction: UserInteraction {
     /// button in every question.
     func choose(_ message: String, detail: String, buttons: [String], style: QuestionStyle) -> Int {
         choose(
-            message, detail: detail, buttons: buttons, style: style,
-            defaultButton: Self.defaultButton(for: style, of: buttons))
+            message,
+            detail: detail,
+            buttons: buttons,
+            style: style,
+            defaultButton: Self.defaultButton(for: style, of: buttons)
+        )
     }
 
     /// The same with the caller's say in which button Return presses; nil for none, where the
@@ -198,8 +202,10 @@ public final class UserDefaultsSettings: SettingsStore, @unchecked Sendable {
             if let file = largeFile(forKey: key) {
                 if let value {
                     try? FileManager.default.createDirectory(
-                        at: file.deletingLastPathComponent(), withIntermediateDirectories: true,
-                        attributes: [.posixPermissions: 0o700])
+                        at: file.deletingLastPathComponent(),
+                        withIntermediateDirectories: true,
+                        attributes: [.posixPermissions: 0o700]
+                    )
                     // A history may hold what nobody else should read.
                     if (try? value.write(to: file, options: .atomic)) != nil {
                         try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: file.path)

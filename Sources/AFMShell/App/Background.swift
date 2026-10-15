@@ -119,7 +119,9 @@ enum Background {
     /// one of the kernel's threads for calls that block (`BlockingCalls.run`), which are kept
     /// for the next lane when this one is done, so a run of short calls starts no thread each.
     static func storage(
-        _ purpose: String, at location: URL, qos: QualityOfService = .userInitiated,
+        _ purpose: String,
+        at location: URL,
+        qos: QualityOfService = .userInitiated,
         _ work: @escaping @Sendable () -> Void
     ) {
         let key = laneKey(purpose, location)
@@ -161,8 +163,11 @@ enum Background {
     /// belongs to the main thread; `then` receives what it returned on the main thread, from
     /// the run loop (`MainLoop`), and is let go of there.
     static func storage<Value: Sendable>(
-        _ purpose: String, at location: URL, qos: QualityOfService = .userInitiated,
-        work: @escaping @Sendable () -> Value, then: @escaping @MainActor (Value) -> Void
+        _ purpose: String,
+        at location: URL,
+        qos: QualityOfService = .userInitiated,
+        work: @escaping @Sendable () -> Value,
+        then: @escaping @MainActor (Value) -> Void
     ) {
         let receiver = MainOwned(then)
         storage(purpose, at: location, qos: qos) {
@@ -196,7 +201,8 @@ enum Background {
 
     /// The same with a result for the main thread (see `storage(_:at:qos:work:then:)`).
     static func compute<Value: Sendable>(
-        work: @escaping @Sendable () -> Value, then: @escaping @MainActor (Value) -> Void
+        work: @escaping @Sendable () -> Value,
+        then: @escaping @MainActor (Value) -> Void
     ) {
         let receiver = MainOwned(then)
         compute {
@@ -259,12 +265,13 @@ enum Mounts {
         let count = getmntinfo(&buffer, MNT_NOWAIT)
         var volumes: [Volume] = []
         if count > 0, let buffer {
-            volumes = (0..<Int(count)).map { index in
-                let path = withUnsafePointer(to: &buffer[index].f_mntonname) { pointer in
-                    pointer.withMemoryRebound(to: CChar.self, capacity: Int(MAXPATHLEN)) { String(cString: $0) }
+            volumes = (0..<Int(count))
+                .map { index in
+                    let path = withUnsafePointer(to: &buffer[index].f_mntonname) { pointer in
+                        pointer.withMemoryRebound(to: CChar.self, capacity: Int(MAXPATHLEN)) { String(cString: $0) }
+                    }
+                    return Volume(path: path, isLocal: buffer[index].f_flags & UInt32(MNT_LOCAL) != 0)
                 }
-                return Volume(path: path, isLocal: buffer[index].f_flags & UInt32(MNT_LOCAL) != 0)
-            }
         }
         if volumes.isEmpty { volumes = [Volume(path: "/", isLocal: true)] }
         cached = (now, volumes)

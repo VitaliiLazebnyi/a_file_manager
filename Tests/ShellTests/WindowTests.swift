@@ -402,7 +402,8 @@ private final class WindowTestPlugin: Plugin {
                 && window.functionKeyBar.isHidden
         )
         #expect(
-            !window.splitView.isVertical && app.commands.isChecked(.panelsStacked) && !app.commands.isChecked(.showButtonBar)
+            !window.splitView.isVertical && app.commands.isChecked(.panelsStacked)
+                && !app.commands.isChecked(.showButtonBar)
         )
         app.shell.layout.divider = 300
         #expect(!app.commands.isChecked(.panelsEqualWidth))
