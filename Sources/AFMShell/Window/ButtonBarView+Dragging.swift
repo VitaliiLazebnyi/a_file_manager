@@ -81,7 +81,7 @@ extension ButtonBarView {
             return false
         }
         let start = event.locationInWindow
-        while let next = window.nextEvent(matching: [.leftMouseDragged, .leftMouseUp]) {
+        while let next = nextMouseEvent(window) {
             if next.type == .leftMouseUp {
                 return false
             }
@@ -136,8 +136,7 @@ extension ButtonBarView {
             return
         }
         dragged = nil
-        let cancelled = NSApp.currentEvent?.type == .keyDown
-        guard case .button = item, operation.isEmpty, !cancelled, let bar else {
+        guard case .button = item, operation.isEmpty, !dragWasCancelled(), let bar else {
             return
         }
         if !bar.insetBy(dx: -4, dy: -4).contains(screenPoint) {
@@ -259,11 +258,8 @@ extension ButtonBarView {
         }
         // Room for a new line below the bar while the drag lasts.
         flow.extraHeight = (flow.items.first?.frame.height ?? BarButton.height) + 2
-        let session = beginDraggingSession(with: [draggingItem], event: event, source: self)
         // A button dropped off the bar is removed: it does not fly back.
-        if case .button = item {
-            session.animatesToStartingPositionsOnCancelOrFail = false
-        }
+        startDragging(self, [draggingItem], event, item.isGroup)
     }
 
     /// Where the bar shows that a drop would go, in the flow's coordinates.

@@ -35,6 +35,14 @@ internal final class ButtonBarView: NSView, NSDraggingSource {
         case button(line: Int, group: Int, index: Int)
         /// A group with its handle.
         case group(line: Int, group: Int)
+
+        /// True for a whole group.
+        internal var isGroup: Bool {
+            if case .group = self {
+                return true
+            }
+            return false
+        }
     }
 
     /// Where a drop would put what is dragged.
@@ -69,6 +77,20 @@ internal final class ButtonBarView: NSView, NSDraggingSource {
     internal private(set) var slots: [Slot] = []
     /// What is being dragged, while a drag of the bar's lasts.
     internal var dragged: Dragged?
+    /// The next move or release of the mouse while a press may become a drag; taken from the
+    /// window's queue of events unless told otherwise.
+    internal var nextMouseEvent: (NSWindow) -> NSEvent? = { window in
+        window.nextEvent(matching: [.leftMouseDragged, .leftMouseUp])
+    }
+    /// Whether the drag that just ended was called off with Escape: the event that ended it is
+    /// a key press.
+    internal var dragWasCancelled: () -> Bool = { NSApp.currentEvent?.type == .keyDown }
+    /// Starts the system's drag of the items from the event; the last argument says whether
+    /// they fly back when the drag fails.
+    internal var startDragging: (ButtonBarView, [NSDraggingItem], NSEvent, Bool) -> Void = { bar, items, event, back in
+        bar.beginDraggingSession(with: items, event: event, source: bar).animatesToStartingPositionsOnCancelOrFail =
+            back
+    }
     /// The kernel whose commands the buttons run.
     private let kernel: Kernel
 
