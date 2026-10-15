@@ -318,8 +318,4 @@ internal final class MainWindowController: NSWindowController, NSMenuItemValidat
         // What another program did meanwhile (the pasteboard) may have changed what the buttons offer.
         scheduleValidation()
     }
-
-    deinit {
-        // Nothing to release: notification observers that are objects are removed by the system.
-    }
 }

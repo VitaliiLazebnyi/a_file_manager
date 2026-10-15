@@ -26,10 +26,6 @@ internal final class ThumbnailStore {
         override func isEqual(_ object: Any?) -> Bool {
             (object as? CacheKey)?.key == key
         }
-
-        deinit {
-            // Nothing to release.
-        }
     }
 
     /// The memory the pictures may take, counted in pixels of 4 bytes.

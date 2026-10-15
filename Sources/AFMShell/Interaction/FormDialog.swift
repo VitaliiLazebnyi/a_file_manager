@@ -11,10 +11,6 @@ internal final class FormDialog: NSObject, NSTextViewDelegate {
     /// A clip view that starts at the top, so a scrolled form starts at its first row.
     private final class FlippedClipView: NSClipView {
         override var isFlipped: Bool { true }
-
-        deinit {
-            // Nothing to release.
-        }
     }
 
     /// The width of a field.
@@ -283,9 +279,5 @@ internal final class FormDialog: NSObject, NSTextViewDelegate {
         popUp.widthAnchor.constraint(lessThanOrEqualToConstant: Self.fieldWidth).isActive = true
         controls.append((field, { .index(popUp.indexOfSelectedItem) }))
         return popUp
-    }
-
-    deinit {
-        // Nothing to release.
     }
 }

@@ -189,8 +189,4 @@ internal final class MenuKeys: NSObject, NSMenuDelegate {
         }
         return true
     }
-
-    deinit {
-        // Nothing to release.
-    }
 }

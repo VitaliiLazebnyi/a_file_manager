@@ -313,8 +313,4 @@ internal final class ButtonBarView: NSView, NSDraggingSource {
         // The click itself toggled the button; what it shows is up to the command.
         validate()
     }
-
-    deinit {
-        // Nothing to release.
-    }
 }

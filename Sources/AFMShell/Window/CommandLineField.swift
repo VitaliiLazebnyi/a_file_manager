@@ -16,8 +16,4 @@ internal final class CommandLineField: NSComboBox {
         }
         return super.performKeyEquivalent(with: event)
     }
-
-    deinit {
-        // Nothing to release.
-    }
 }

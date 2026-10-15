@@ -167,8 +167,4 @@ internal final class DriveBarView: NSView {
         }
         show(places[sender.tag], inNewTab: NSApp.currentEvent?.modifierFlags.contains(.shift) == true)
     }
-
-    deinit {
-        // Nothing to release.
-    }
 }

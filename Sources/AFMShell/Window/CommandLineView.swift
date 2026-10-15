@@ -287,8 +287,4 @@ internal final class CommandLineView: NSView, NSComboBoxDelegate {
         }
         return true
     }
-
-    deinit {
-        // Nothing to release.
-    }
 }

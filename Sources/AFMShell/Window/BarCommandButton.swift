@@ -83,8 +83,4 @@ internal final class BarCommandButton: NSButton {
         }
         super.draw(dirtyRect)
     }
-
-    deinit {
-        // Nothing to release.
-    }
 }

@@ -179,8 +179,4 @@ internal final class FormList: NSObject, NSTableViewDataSource, NSTableViewDeleg
             onAccept?()
         }
     }
-
-    deinit {
-        // Nothing to release.
-    }
 }

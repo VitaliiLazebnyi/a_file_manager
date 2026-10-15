@@ -23,8 +23,4 @@ internal final class PanelKeyRecorder: NSResponder {
     override internal func noResponder(for eventSelector: Selector) {
         commands.append(eventSelector)
     }
-
-    deinit {
-        // Nothing to release.
-    }
 }

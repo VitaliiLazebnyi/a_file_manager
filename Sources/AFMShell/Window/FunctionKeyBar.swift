@@ -121,8 +121,4 @@ internal final class FunctionKeyBar: NSView {
             kernel.commands.perform(CommandID(rawValue: name))
         }
     }
-
-    deinit {
-        // Nothing to release.
-    }
 }

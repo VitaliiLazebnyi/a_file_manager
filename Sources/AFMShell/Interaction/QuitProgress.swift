@@ -170,8 +170,4 @@ internal final class QuitProgress: NSObject {
         window.orderOut(nil)
         panel = nil
     }
-
-    deinit {
-        // Nothing to release.
-    }
 }

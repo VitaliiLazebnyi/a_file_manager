@@ -83,8 +83,4 @@ internal final class PanelSplit: NSObject, NSSplitViewDelegate {
         view.setPosition((extent * CGFloat(layout.divider) / 1_000).rounded(), ofDividerAt: 0)
         isPositioningDivider = false
     }
-
-    deinit {
-        // Nothing to release.
-    }
 }
