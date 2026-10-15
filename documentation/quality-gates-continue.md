@@ -19,6 +19,21 @@ Paste this into a new Claude Code session in `/Users/cm0k/Claude/Projects/TotalC
 
 ## State
 
+### Running (started 2026-10-16 05:00)
+
+Wave 100 (`documentation/agent-briefs/wave-100.md`): six agents in worktrees, branches `w100-stability`,
+`w100-config-sync`, `w100-fileops-tools`, `w100-shell`, `w100-network`, `w100-viewer-mac-small`, base `05c77ed`, the
+deinit rule change `5b13f75` cherry-picked. If the session ended before they were merged: look at each branch's commits,
+merge what is finished, and restart the rest with the same section of `wave-100.md`.
+
+- Merged: **w100-config-sync** (`d90172f`): Configuration 25 / 15 / 27 and DirectorySync 13 / 5 / 10 uncovered lines /
+  functions / regions left: the `.system` effects and `present` defaults (UI tests), list row clicks (UI tests),
+  `ConfigurationPlugin.storedKeys(of:)` for `UserDefaultsSettings` (passed to w100-shell), `ChildProcess` 5 regions
+  (spawn attribute init failing, EINTR retry, a reap race), one race branch each in `CommandRunner:562` and
+  `SyncSession:576`.
+- Owner questions open: the two TCC prompts on the VM desktop (microphone: from Viewer media tests, being fixed;
+  removable volumes: every test that mounts a disk image asks; recommended: Allow, keep the real-image tests).
+
 ### Done and pushed
 
 - Swift 6 migration, thread-safety audits, leak fixes, the gates (lint config, mutation, UI tests, architecture, API,

@@ -436,7 +436,7 @@ private final class Collected<Value>: @unchecked Sendable {
         let wanted = archive.entries.filter { !$0.isDirectory }
         #expect(wanted.count > 8 && !archive.allowsParallelReads)
         var delivered = 0
-        try archive.readInOnePass(wanted) { _, stream in
+        try archive.readInOnePass(wanted, throughTheEnd: false) { _, stream in
             while try stream.read(upToCount: 1 << 16) != nil {}
             delivered += 1
         }
@@ -448,7 +448,7 @@ private final class Collected<Value>: @unchecked Sendable {
         try handle.close()
         delivered = 0
         #expect(throws: (any Error).self) {
-            try archive.readInOnePass(wanted) { _, stream in
+            try archive.readInOnePass(wanted, throughTheEnd: false) { _, stream in
                 while try stream.read(upToCount: 1 << 16) != nil {}
                 delivered += 1
             }

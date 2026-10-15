@@ -175,12 +175,8 @@ struct CheckedSettings: @unchecked Sendable {
             }
             var object = Self.limitingNumbers(parsed, &limited)
             if key == SettingsSchema.frequentFoldersKey { object = Self.limitingCounts(object, &limited) }
-            guard
-                let clean = try? JSONSerialization.data(
-                    withJSONObject: object, options: [.fragmentsAllowed, .sortedKeys])
-            else {
-                throw Problem.unreadable(key)
-            }
+            // What was read as JSON, its numbers limited, is JSON again.
+            let clean = try JSONSerialization.data(withJSONObject: object, options: [.fragmentsAllowed, .sortedKeys])
             try Self.checkShape(of: key, clean, object, schema: schema)
             values[key] = clean
             objects[key] = object
@@ -194,10 +190,11 @@ struct CheckedSettings: @unchecked Sendable {
         if let list = object as? [Any] { return list.map { limitingNumbers($0, &limited) } }
         if let dictionary = object as? [String: Any] { return dictionary.mapValues { limitingNumbers($0, &limited) } }
         guard let number = object as? NSNumber, !isBoolean(number) else { return object }
+        // (JSON has no NaN.)
         let value = number.doubleValue
-        guard value.isNaN || abs(value) > numberLimit else { return object }
+        guard abs(value) > numberLimit else { return object }
         limited += 1
-        return NSNumber(value: value.isNaN ? 0 : (value < 0 ? -Int64(numberLimit) : Int64(numberLimit)))
+        return NSNumber(value: value < 0 ? -Int64(numberLimit) : Int64(numberLimit))
     }
 
     /// The visit counters of the frequently used folders are counted on with every visit.
@@ -245,7 +242,8 @@ struct CheckedSettings: @unchecked Sendable {
             try require(
                 list.elements.allSatisfy {
                     UserCommand.name(from: $0.name) == $0.name && $0.title.utf8.count <= textLimit && isShort($0.action)
-                })
+                }
+            )
 
         case SettingsSchema.startMenuKey:
             let list = try decoded(LenientList<StartMenuEntry>.self)
@@ -328,44 +326,57 @@ struct SettingsImportPlan {
             }
             objects[SettingsSchema.connectionsKey] = fresh
             values[SettingsSchema.connectionsKey] = try? JSONSerialization.data(
-                withJSONObject: fresh, options: [.sortedKeys])
+                withJSONObject: fresh,
+                options: [.sortedKeys]
+            )
             if let last = objects[SettingsSchema.lastConnectionKey] as? String, let new = renumbered[last.uppercased()]
             {
                 objects[SettingsSchema.lastConnectionKey] = new
                 values[SettingsSchema.lastConnectionKey] = try? JSONSerialization.data(
-                    withJSONObject: new, options: [.fragmentsAllowed])
+                    withJSONObject: new,
+                    options: [.fragmentsAllowed]
+                )
             }
         }
 
-        for (key, data) in values {
-            guard let object = objects[key] else { continue }
+        // (The values and the objects have the same keys.)
+        for (key, object) in objects {
             let isSame = same(key, object)
             if let group = schema.group(of: key, value: object) {
                 // What is stored already was the user's own doing and needs no question.
                 if !isSame {
                     grouped[group, default: []].append(key)
-                    guarded[key] = data
+                    guarded[key] = values[key]
                 }
             } else {
-                ordinary[key] = data
+                ordinary[key] = values[key]
                 if !isSame { changed.append(key) }
             }
         }
         changed.sort()
         // What an export leaves out by default is not removed for being absent, and neither
         // is anything the user is asked about separately.
-        removed = knownKeys.filter { key in
-            guard values[key] == nil, let stored = current[key], !SettingsSchema.tabKeys.contains(key),
-                !schema.isHistory(key),
-                !schema.isConnectionData(key), !schema.isBackup(key)
-            else { return false }
-            return schema.group(
-                of: key, value: try? JSONSerialization.jsonObject(with: stored, options: .fragmentsAllowed)) == nil
-        }.sorted()
+        removed =
+            knownKeys.filter { key in
+                guard values[key] == nil, let stored = current[key], !SettingsSchema.tabKeys.contains(key),
+                    !schema.isHistory(key),
+                    !schema.isConnectionData(key), !schema.isBackup(key)
+                else { return false }
+                return schema.group(
+                    of: key,
+                    value: try? JSONSerialization.jsonObject(with: stored, options: .fragmentsAllowed)
+                ) == nil
+            }
+            .sorted()
         parts = SettingsSchema.Group.allCases.compactMap { group in
             guard let keys = grouped[group]?.sorted(), !keys.isEmpty else { return nil }
             return Self.part(group, keys: keys, objects: objects)
         }
+    }
+
+    /// A value of the file as the type its check gave it; `empty` for anything else.
+    static func value<Value>(_ object: Any?, or empty: Value) -> Value {
+        object as? Value ?? empty
     }
 
     private static func part(_ group: SettingsSchema.Group, keys: [String], objects: [String: Any]) -> Part {
@@ -375,7 +386,7 @@ struct SettingsImportPlan {
         switch group {
         case .commands:
             for key in keys {
-                for entry in objects[key] as? [[String: Any]] ?? [] {
+                for entry in value(objects[key], or: [[String: Any]]()) {
                     let action = entry["action"] as? [String: Any] ?? [:]
                     let name =
                         key == SettingsSchema.userCommandsKey
@@ -390,11 +401,12 @@ struct SettingsImportPlan {
             title = "Import the user commands and the Start menu (\(lines.count)). They run programs and shell lines."
 
         case .keys:
-            for (command, keys) in (objects[keys[0]] as? [String: [String]] ?? [:]).sorted(by: { $0.key < $1.key }) {
+            for (command, keys) in value(objects[keys[0]], or: [String: [String]]()).sorted(by: { $0.key < $1.key }) {
                 lines.append(
                     "\(DisplayText.oneLine(command, limit: 80)):  "
                         + (keys.isEmpty
-                            ? "no key" : keys.map { DisplayText.oneLine($0, limit: 40) }.joined(separator: ", ")))
+                            ? "no key" : keys.map { DisplayText.oneLine($0, limit: 40) }.joined(separator: ", "))
+                )
             }
             title = "Import the key bindings (\(lines.count) commands). They decide what every key does."
 
@@ -419,7 +431,7 @@ struct SettingsImportPlan {
                 + "without protection. Such a server is connected to, or sent the password, without a question."
 
         case .connections:
-            for connection in objects[SettingsSchema.connectionsKey] as? [[String: Any]] ?? [] {
+            for connection in value(objects[SettingsSchema.connectionsKey], or: [[String: Any]]()) {
                 lines.append("\(show(connection["name"])):  \(show(connection["user"]))@\(show(connection["host"]))")
             }
             title =
@@ -442,7 +454,7 @@ struct SettingsImportPlan {
 
         case .tabs:
             for key in keys {
-                for tab in (objects[key] as? [String: Any])?["tabs"] as? [[String: Any]] ?? [] {
+                for tab in value((objects[key] as? [String: Any])?["tabs"], or: [[String: Any]]()) {
                     let location = show(tab["location"])
                     if !location.lowercased().hasPrefix("file:") { lines.append("\(key):  \(location)") }
                 }
@@ -483,7 +495,8 @@ struct SettingsImportPlan {
         if !parts.isEmpty {
             lines.append(
                 "The parts below can make the program run something, change what a key does or change whom it trusts. "
-                    + "Each is imported only if you tick it; otherwise it stays as it is now.")
+                    + "Each is imported only if you tick it; otherwise it stays as it is now."
+            )
         }
         return lines.joined(separator: "\n")
     }
@@ -536,16 +549,18 @@ extension SettingsArchive {
     /// it: a failure leaves an earlier file whole. Blocks: not for the main thread.
     func write(to url: URL) throws {
         let data = try encoded()
-        let temporary = url.deletingLastPathComponent().appendingPathComponent(
-            ".\(url.lastPathComponent).\(UUID().uuidString).tmp")
+        let temporary = url.deletingLastPathComponent()
+            .appendingPathComponent(
+                ".\(url.lastPathComponent).\(UUID().uuidString).tmp"
+            )
         let descriptor = open(temporary.path, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0o600)
-        guard descriptor >= 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+        guard descriptor >= 0 else { throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno)) }
         let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
         do {
             try handle.write(contentsOf: data)
             try handle.close()
             guard rename(temporary.path, url.path) == 0 else {
-                throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+                throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
             }
         } catch {
             try? FileManager.default.removeItem(at: temporary)

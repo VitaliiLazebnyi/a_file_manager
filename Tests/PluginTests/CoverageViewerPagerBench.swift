@@ -1,5 +1,6 @@
 import AFMKernel
 import AppKit
+import TestSupport
 
 @testable import ViewerPlugin
 
@@ -42,7 +43,8 @@ internal final class CoverageViewerPagerBench {
 
     /// `wait(until:)` without a bench.
     internal static func waitAlone(until condition: () -> Bool) async -> Bool {
-        let deadline = Date(timeIntervalSinceNow: 60)
+        // Only a hang reaches the ceiling: on a busy machine a minute is not enough.
+        let deadline = Date(timeIntervalSinceNow: Wait.ceiling)
         while !condition() {
             if Date() > deadline {
                 return false

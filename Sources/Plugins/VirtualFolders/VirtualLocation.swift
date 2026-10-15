@@ -72,8 +72,11 @@ public enum VirtualLocation: Equatable {
             let folder = origin.map(Self.path(of:)) ?? ""
             components.path = (folder == "/" ? "" : folder) + "/" + Self.pathComponent(title)
         }
-        // Scheme, host and path are all of a form a URL takes; the fallback is never reached.
-        return components.url ?? URL(fileURLWithPath: "/")
+        // Scheme, host and path are all of a form a URL takes (the path starts with `/` and is
+        // escaped as it is set, the host holds letters, digits, dots and `-` only), so a URL
+        // always comes out.
+        // swiftlint:disable:next force_unwrapping
+        return components.url!
     }
 
     var isList: Bool {

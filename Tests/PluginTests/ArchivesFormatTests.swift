@@ -512,10 +512,17 @@ func snapshot(_ folder: URL) -> [String: Data?] {
         #expect(runTool("/usr/bin/unzip", ["-tq", "-P", "nope", own.path]).status != 0)
         #expect(try bench.store.archive(at: own).hasEncryptedMembers)
 
-        // Three wrong answers end the attempt with a clear error.
+        // Three wrong answers end the attempt with a clear error. (With AES, whose check of the
+        // password lets a wrong one through once in 65,536 times; the old way's check, once in 256
+        // times, and the member's checksum then tells.)
+        let strong = box.url("strong.zip")
+        try bench.pack([tree], to: strong) {
+            $0.password = "open sesame"
+            $0.encryption = .aes256
+        }
         let fresh = try ArchiveBench()
         fresh.passwords.set(["a", "b", "c"])
-        #expect { try fresh.read(fresh.inside(own, "tree/readme.txt")) } throws: { error in
+        #expect { try fresh.read(fresh.inside(strong, "tree/readme.txt")) } throws: { error in
             if case ArchiveError.wrongPassword = error { return true }
             return false
         }

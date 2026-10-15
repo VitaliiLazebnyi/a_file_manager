@@ -130,6 +130,10 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
         }
     }
 
+    /// Puts the window on screen. Tests replace it, so that no window shows in the
+    /// session they run in, and look at what it was asked to show.
+    internal var present: @MainActor (NSWindowController) -> Void = { $0.showWindow(nil) }
+
     /// `hiddenScanLimit`: how long a scan goes on after the window was closed (a quarter of an
     /// hour); `beep`: the sound of a search that found nothing. Tests replace both.
     init(
@@ -228,7 +232,7 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
     func show(for directory: URL, showHidden: Bool) {
         guard let provider = try? kernel.fileSystems.provider(for: directory) else { return }
         isShown = true
-        showWindow(nil)
+        present(self)
         window?.makeFirstResponder(outline)
         searchField.stringValue = ""
         if tree == nil { statusLabel.stringValue = "Reading the directory tree…" }
@@ -342,12 +346,10 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
         tree = nil
         (reloadQueue, reloadQueued, emptied, waiting, waitingHead, waitingLinked) = ([], [], [], [], 0, 0)
         // The nodes of a tree of millions of folders are freed away from the main thread, also
-        // those that were made and not linked yet.
-        if old != nil || !unlinked.isEmpty || !unreloaded.isEmpty {
-            // The main thread has let go of them; they are only freed there.
-            let released = Handover((old, unlinked, unreloaded))
-            reading.async { withExtendedLifetime(released) {} }
-        }
+        // those that were made and not linked yet. The main thread has let go of them; they are
+        // only freed there.
+        let released = Handover((old, unlinked, unreloaded))
+        reading.async { withExtendedLifetime(released) {} }
     }
 
     private func adopt(_ tree: DirectoryTree, selecting directory: URL) {

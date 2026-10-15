@@ -27,7 +27,7 @@ final class CommandBrowserController: NSWindowController, NSWindowDelegate, NSSe
     private var userButtons: [NSButton] = []
     private(set) var rows: [CommandRow] = []
     private var isPicking = false
-    private var picked: CommandID?
+    private var picked: CommandRow?
 
     init(center: ConfigurationCenter) {
         self.center = center
@@ -86,17 +86,17 @@ final class CommandBrowserController: NSWindowController, NSWindowDelegate, NSSe
     /// Opens the dialog on its own: the chosen command is run.
     func show(category: String? = nil) {
         prepare(picking: false, category: category)
-        showWindow(nil)
+        center.effects.present(self)
         window?.makeFirstResponder(filter)
     }
 
     /// Runs the dialog for an editor; nil when the user cancelled.
-    func pick() -> CommandID? {
+    func pick() -> CommandRow? {
         guard let window, !isPicking else { return nil }
-        if window.isVisible { window.orderOut(nil) }
+        window.orderOut(nil)
         prepare(picking: true, category: nil)
         window.makeFirstResponder(filter)
-        NSApp.runModal(for: window)
+        center.effects.runModal(window)
         isPicking = false
         window.orderOut(nil)
         return picked
@@ -110,14 +110,13 @@ final class CommandBrowserController: NSWindowController, NSWindowDelegate, NSSe
         filter.stringValue = ""
         let all = center.commandRows()
         categories.removeAllItems()
+        // The user commands' category is always offered, last; a pop-up holds a title once (an
+        // item added again moves to the end).
         categories.addItems(
             withTitles: ["All"] + CommandCatalog.categories(of: all, menus: center.kernel.menus.menus) + [
                 CommandRow.userCategory
             ]
         )
-        if categories.itemTitles.filter({ $0 == CommandRow.userCategory }).count > 1 {
-            categories.removeItem(at: categories.numberOfItems - 1)
-        }
         categories.selectItem(withTitle: category ?? "All")
         reload()
     }
@@ -135,7 +134,7 @@ final class CommandBrowserController: NSWindowController, NSWindowDelegate, NSSe
         updateButtons()
     }
 
-    private var selected: CommandRow? { table.selectedRow.flatMap { rows.indices.contains($0) ? rows[$0] : nil } }
+    private var selected: CommandRow? { table.selectedRow.flatMap { rows.dropFirst($0).first } }
     private var selectedUserCommand: UserCommand? { selected.flatMap { center.userCommand(named: $0.id.rawValue) } }
 
     private func updateButtons() {
@@ -152,12 +151,12 @@ final class CommandBrowserController: NSWindowController, NSWindowDelegate, NSSe
     /// OK, Return or a double click: hands the command to the editor, or runs it.
     private func accept() {
         guard let row = selected else {
-            NSSound.beep()
+            center.effects.beep()
             return
         }
         if isPicking {
-            picked = row.id
-            NSApp.stopModal()
+            picked = row
+            center.effects.stopModal()
         } else {
             window?.close()
             center.kernel.commands.perform(row.id)
@@ -167,8 +166,8 @@ final class CommandBrowserController: NSWindowController, NSWindowDelegate, NSSe
     /// Cmd+C in the list copies the command's name (spec 14 › Elements).
     private func copyName() -> Bool {
         guard let row = selected, window?.firstResponder === table.tableView else { return false }
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(row.id.rawValue, forType: .string)
+        center.effects.pasteboard.clearContents()
+        center.effects.pasteboard.setString(row.id.rawValue, forType: .string)
         return true
     }
 
@@ -211,13 +210,13 @@ final class CommandBrowserController: NSWindowController, NSWindowDelegate, NSSe
     }
 
     func windowWillClose(_: Notification) {
-        if isPicking { NSApp.stopModal() }
+        if isPicking { center.effects.stopModal() }
     }
 }
 
 extension ConfigurationCenter {
     /// Lets the user pick a command for an editor (the magnifier button of spec 14).
-    func pickCommand() -> CommandID? {
+    func pickCommand() -> CommandRow? {
         browser().pick()
     }
 
@@ -237,7 +236,7 @@ extension ConfigurationCenter {
     func showText(_ text: String, title: String) {
         let controller = textWindows[title] ?? TextWindowController(title: title)
         textWindows[title] = controller
-        controller.show(text)
+        controller.show(text, present: effects.present)
     }
 
     func closeWindows() {

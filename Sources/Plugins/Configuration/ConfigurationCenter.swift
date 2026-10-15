@@ -18,6 +18,8 @@ final class ConfigurationCenter {
     var textWindows: [String: TextWindowController] = [:]
     /// Told when key bindings were stored from outside the Keyboard page, which then takes them over.
     var keysCommitted: (() -> Void)?
+    /// The beep, the modal run of the command picker and the settings file panel.
+    var effects: ConfigurationEffects
     private lazy var startMenuTarget = StartMenuTarget(kernel: kernel)
 
     static let startMenuHint = """
@@ -26,9 +28,15 @@ final class ConfigurationCenter {
         %L a file listing the selected names with their paths   %% the percent sign
         """
 
-    init(kernel: Kernel, runner: CommandRunner, enumeratedKeys: @escaping () -> [String]) {
+    init(
+        kernel: Kernel,
+        runner: CommandRunner,
+        effects: ConfigurationEffects,
+        enumeratedKeys: @escaping () -> [String]
+    ) {
         self.kernel = kernel
         self.runner = runner
+        self.effects = effects
         self.enumeratedKeys = enumeratedKeys
         store = ConfigurationStore(settings: kernel.settings)
         runner.userCommand = { [unowned self] in userCommand(named: $0) }
@@ -38,8 +46,9 @@ final class ConfigurationCenter {
             let entries = store.startMenu
             return entries.indices.contains(number - 1) && !entries[number - 1].isSeparator ? entries[number - 1] : nil
         }
-        store.onProblem = { [unowned kernel] in
-            kernel.interaction.inform("Some settings could not be read", detail: $0, style: .warning)
+        // The problem is told later, from the run loop: by then the kernel may be gone.
+        store.onProblem = { [weak kernel] in
+            kernel?.interaction.inform("Some settings could not be read", detail: $0, style: .warning)
         }
     }
 
@@ -57,9 +66,12 @@ final class ConfigurationCenter {
         kernel.commands.register(
             Command(command.id, DisplayText.oneLine(command.caption, limit: 120)),
             enabled: { [unowned self] in userCommand(named: name) != nil },
+            // (The registry runs only an enabled command: the definition is there.)
             parameterized: { [unowned self] argument in
-                guard let current = userCommand(named: name) else { return }
-                runner.run(current.action, arguments: argument.text ?? "", as: name, title: current.caption)
+                userCommand(named: name)
+                    .map {
+                        runner.run($0.action, arguments: argument.text ?? "", as: name, title: $0.caption)
+                    }
             }
         )
     }
@@ -196,14 +208,17 @@ final class ConfigurationCenter {
                     DisplayText.oneLine(title.replacingOccurrences(of: "&", with: ""), limit: 120)
                 ),
                 enabled: { entry() != nil },
+                // (The registry runs only an enabled command: the entry is there.)
                 parameterized: { [unowned self] argument in
-                    guard let entry = entry() else { return }
-                    runner.run(
-                        entry.action,
-                        arguments: argument.text ?? "",
-                        as: StartMenuEntry.commandID(at: index).rawValue,
-                        title: entry.title
-                    )
+                    entry()
+                        .map {
+                            runner.run(
+                                $0.action,
+                                arguments: argument.text ?? "",
+                                as: StartMenuEntry.commandID(at: index).rawValue,
+                                title: $0.title
+                            )
+                        }
                 }
             )
             slotCount += 1
@@ -311,7 +326,7 @@ final class ConfigurationCenter {
     /// Brings the menu bar in line with the key bindings and the Start menu. The shell builds
     /// its menus once; this changes the items in place.
     func refreshMenus() {
-        guard let menu = NSApp?.mainMenu else { return }
+        guard let menu = effects.mainMenu() else { return }
         LiveMenus.rebuildStartMenu(in: menu, entries: store.startMenu, target: startMenuTarget)
         LiveMenus.refreshKeys(in: menu, kernel: kernel)
     }
@@ -340,7 +355,9 @@ final class ConfigurationCenter {
         schema.known = Set(settingsKeys())
         // Copied here, on the main thread where the registry lives: the schema is used on any thread.
         let declared = kernel.settingsKeys.all
-        let exact = Dictionary(declared.filter { !$0.isPrefix }.map { ($0.key, $0.kind) }, uniquingKeysWith: { $1 })
+        let exact = declared.reduce(into: [String: SettingsKeyKind]()) { kinds, declaration in
+            if !declaration.isPrefix { kinds[declaration.key] = declaration.kind }
+        }
         let families = declared.filter(\.isPrefix)
         schema.declaredKind = { key in
             // As the registry answers: the key itself, else the longest family it belongs to.
@@ -510,7 +527,7 @@ final class ConfigurationCenter {
     }
 
     func savePosition() {
-        for window in NSApp?.windows ?? [] where !window.frameAutosaveName.isEmpty {
+        for window in effects.windows() where !window.frameAutosaveName.isEmpty {
             window.saveFrame(usingName: window.frameAutosaveName)
         }
         // Handing the preferences to the system's store is a call to another process: not here.

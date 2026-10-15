@@ -131,7 +131,7 @@ public enum SpotlightQuery {
 ///
 /// `completion` and `isStopped` are guarded by `lock`. The metadata query is set up in `init`
 /// and started on the main thread; after that only `queue` touches it.
-final class SpotlightSearch: NSObject, @unchecked Sendable {
+final class SpotlightSearch: NSObject, SpotlightQuestion, @unchecked Sendable {
     /// The most paths read out of one answer.
     static let resultLimit = 1_000_000
 
@@ -158,7 +158,8 @@ final class SpotlightSearch: NSObject, @unchecked Sendable {
         super.init()
     }
 
-    /// `completion` gets the paths and whether the answer was cut at `resultLimit`.
+    /// `completion` gets the paths and whether the answer was cut at `resultLimit`. A question
+    /// that was stopped is not started again.
     func start(completion: @escaping @MainActor @Sendable ([String], Bool) -> Void) {
         lock.lock()
         self.completion = completion
@@ -216,7 +217,8 @@ final class SpotlightSearch: NSObject, @unchecked Sendable {
             index += 5_000
         }
         lock.lock()
-        let completion = isStopped ? nil : self.completion
+        // Nil once stopped (`stop` lets go of it) or told already.
+        let completion = self.completion
         self.completion = nil
         isStopped = true
         lock.unlock()

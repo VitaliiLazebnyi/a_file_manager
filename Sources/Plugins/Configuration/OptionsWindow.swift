@@ -10,7 +10,7 @@ protocol OptionsPage: AnyObject {
     var view: NSView { get }
     var isChanged: Bool { get }
     /// Called by the page when the user changed something, so Apply can be offered.
-    var onEdit: () -> Void { get set }
+    var onEdit: (() -> Void)? { get set }
     /// Apply and OK.
     func commit()
     /// Cancel, and every time the window opens: show what is stored.
@@ -38,7 +38,7 @@ final class PreferencesPage: NSObject, OptionsPage, NSTextFieldDelegate {
     private let model: PreferencePageModel
     private var controls: [(preference: Preference, control: NSControl)] = []
     let view = NSView()
-    var onEdit: () -> Void = {}
+    var onEdit: (() -> Void)?
 
     init(model: PreferencePageModel) {
         self.model = model
@@ -93,10 +93,13 @@ final class PreferencesPage: NSObject, OptionsPage, NSTextFieldDelegate {
             switch preference.kind {
             case .flag: model.set(.flag((control as? NSButton)?.state == .on), for: preference)
             case .text: model.set(.text(control.stringValue), for: preference)
-            case .choice: model.set(.index((control as? NSPopUpButton)?.indexOfSelectedItem ?? 0), for: preference)
+            case .choice:
+                if let popUp = control as? NSPopUpButton {
+                    model.set(.index(popUp.indexOfSelectedItem), for: preference)
+                }
             }
         }
-        onEdit()
+        onEdit?()
     }
 
     func controlTextDidChange(_: Notification) { changed() }
@@ -154,7 +157,7 @@ final class KeyboardPage: NSObject, OptionsPage, NSSearchFieldDelegate {
             vertical: true
         )
     }()
-    var onEdit: () -> Void = {}
+    var onEdit: (() -> Void)?
 
     init(center: ConfigurationCenter) {
         self.center = center
@@ -176,17 +179,17 @@ final class KeyboardPage: NSObject, OptionsPage, NSSearchFieldDelegate {
         table.show(rows.map { [$0.title, $0.id.rawValue, $0.keys + (editor.isCustomized($0.id) ? "  •" : "")] })
     }
 
-    private var selected: CommandRow? { table.selectedRow.flatMap { rows.indices.contains($0) ? rows[$0] : nil } }
+    private var selected: CommandRow? { table.selectedRow.flatMap { rows.dropFirst($0).first } }
 
     private func edited() {
         reload()
-        onEdit()
+        onEdit?()
     }
 
     private func change(_ body: (CommandID) -> Void) {
         stopRecording()
         guard let row = selected else {
-            NSSound.beep()
+            center.effects.beep()
             return
         }
         body(row.id)
@@ -196,7 +199,7 @@ final class KeyboardPage: NSObject, OptionsPage, NSSearchFieldDelegate {
     func controlTextDidChange(_: Notification) { reload() }
 
     private func stopRecording() {
-        if let monitor { NSEvent.removeMonitor(monitor) }
+        if let monitor { center.effects.removeKeyMonitor(monitor) }
         monitor = nil
         status.stringValue = ""
     }
@@ -205,12 +208,12 @@ final class KeyboardPage: NSObject, OptionsPage, NSSearchFieldDelegate {
     private func record(adding: Bool) {
         stopRecording()
         guard let row = selected else {
-            NSSound.beep()
+            center.effects.beep()
             return
         }
         status.stringValue = "Press the new shortcut for “\(row.title)”. Esc cancels."
         view.window?.makeFirstResponder(table.tableView)
-        monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+        monitor = center.effects.monitorKeys { [weak self] event in
             guard let self, event.window === view.window else { return event }
             stopRecording()
             var modifiers: KeyModifiers = []
@@ -255,7 +258,7 @@ final class KeyboardPage: NSObject, OptionsPage, NSSearchFieldDelegate {
     func bindingsStoredElsewhere() {
         editor.rebase(kernel: center.kernel)
         reload()
-        onEdit()
+        onEdit?()
     }
 }
 
@@ -269,8 +272,8 @@ final class ButtonBarPage: NSObject, OptionsPage {
         table,
         buttons: [
             ActionButton("Add Command…") { [unowned self] in
-                guard let id = center.pickCommand() else { return }
-                edited(selecting: editor.insert(id, after: table.selectedRow))
+                guard let picked = center.pickCommand() else { return }
+                edited(selecting: editor.insert(picked.id, after: table.selectedRow))
             },
             ActionButton("Add Separator") { [unowned self] in
                 edited(selecting: editor.insert(nil, after: table.selectedRow))
@@ -279,7 +282,7 @@ final class ButtonBarPage: NSObject, OptionsPage {
                 edited(selecting: editor.insert(ToolbarRegistry.lineBreak, after: table.selectedRow))
             },
             ActionButton("Remove") { [unowned self] in
-                guard let row = table.selectedRow else { return NSSound.beep() }
+                guard let row = table.selectedRow else { return center.effects.beep() }
                 editor.remove(at: row)
                 edited(selecting: row)
             },
@@ -298,7 +301,7 @@ final class ButtonBarPage: NSObject, OptionsPage {
             )
         ]
     )
-    var onEdit: () -> Void = {}
+    var onEdit: (() -> Void)?
 
     init(center: ConfigurationCenter) {
         self.center = center
@@ -325,12 +328,12 @@ final class ButtonBarPage: NSObject, OptionsPage {
 
     private func edited(selecting row: Int?) {
         reload(selecting: row)
-        onEdit()
+        onEdit?()
     }
 
     private func move(_ offset: Int) {
         guard let row = table.selectedRow else {
-            NSSound.beep()
+            center.effects.beep()
             return
         }
         edited(selecting: editor.move(row, by: offset))
@@ -341,7 +344,7 @@ final class ButtonBarPage: NSObject, OptionsPage {
         guard let row = table.selectedRow, editor.items.indices.contains(row), let id = editor.items[row],
             id != ToolbarRegistry.lineBreak
         else {
-            NSSound.beep()
+            center.effects.beep()
             return
         }
         let ui = center.kernel.interaction
@@ -386,19 +389,19 @@ final class StartMenuPage: NSObject, OptionsPage {
         buttons: [
             ActionButton("Add Item…") { [unowned self] in add(center.editStartMenuRow(nil)) },
             ActionButton("Add Command…") { [unowned self] in
-                guard let id = center.pickCommand() else { return }
+                guard let picked = center.pickCommand() else { return }
                 add(
                     center.editStartMenuRow(
                         nil,
-                        proposing: CommandAction(command: id.rawValue),
-                        title: center.kernel.commands[id]?.title ?? ""
+                        proposing: CommandAction(command: picked.id.rawValue),
+                        title: picked.title
                     )
                 )
             },
             ActionButton("Add Separator") { [unowned self] in add(StartMenuDraft.Row(entry: .separator)) },
             ActionButton("Change…") { [unowned self] in change() },
             ActionButton("Remove") { [unowned self] in
-                guard let row = table.selectedRow else { return NSSound.beep() }
+                guard let row = table.selectedRow else { return center.effects.beep() }
                 draft.rows.remove(at: row)
                 edited(selecting: row)
             },
@@ -412,7 +415,7 @@ final class StartMenuPage: NSObject, OptionsPage {
             )
         ]
     )
-    var onEdit: () -> Void = {}
+    var onEdit: (() -> Void)?
 
     init(center: ConfigurationCenter) {
         self.center = center
@@ -439,7 +442,7 @@ final class StartMenuPage: NSObject, OptionsPage {
 
     private func edited(selecting row: Int?) {
         reload(selecting: row)
-        onEdit()
+        onEdit?()
     }
 
     private func add(_ row: StartMenuDraft.Row?) {
@@ -450,7 +453,7 @@ final class StartMenuPage: NSObject, OptionsPage {
     private func change() {
         guard let index = table.selectedRow, draft.rows.indices.contains(index), !draft.rows[index].entry.isSeparator
         else {
-            NSSound.beep()
+            center.effects.beep()
             return
         }
         guard let row = center.editStartMenuRow(draft.rows[index]) else { return }
@@ -460,7 +463,7 @@ final class StartMenuPage: NSObject, OptionsPage {
 
     private func move(_ offset: Int) {
         guard let row = table.selectedRow else {
-            NSSound.beep()
+            center.effects.beep()
             return
         }
         edited(selecting: draft.move(row, by: offset))
@@ -485,7 +488,7 @@ final class SettingsFilePage: NSObject, OptionsPage {
     let title = "Settings File"
     let view: NSView
     let isChanged = false
-    var onEdit: () -> Void = {}
+    var onEdit: (() -> Void)?
 
     init(center: ConfigurationCenter) {
         let commands = center.kernel.commands
@@ -535,6 +538,7 @@ final class OptionsWindowController: NSWindowController, NSWindowDelegate {
         case first, keyboard, buttonBar, startMenu, settingsFile
     }
 
+    private unowned let center: ConfigurationCenter
     private let pages: [any OptionsPage]
     private let firstOwnPage: Int
     private let pageList = RowsTable(columns: [("", 150)])
@@ -543,6 +547,7 @@ final class OptionsWindowController: NSWindowController, NSWindowDelegate {
     private var applyButton = NSButton()
 
     init(center: ConfigurationCenter) {
+        self.center = center
         let registered: [any OptionsPage] = center.kernel.preferences.pages.filter { !$0.preferences.isEmpty }
             .map {
                 PreferencesPage(model: PreferencePageModel(page: $0, settings: center.kernel.settings))
@@ -599,7 +604,7 @@ final class OptionsWindowController: NSWindowController, NSWindowDelegate {
     /// Opens the window on a page. A window that was closed shows what is stored now.
     func show(_ section: Section) {
         prepare(section)
-        showWindow(nil)
+        center.effects.present(self)
     }
 
     var pageTitles: [String] { pages.map(\.title) }
@@ -625,8 +630,8 @@ final class OptionsWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private func showSelectedPage() {
-        guard let index = pageList.selectedRow, pages.indices.contains(index) else { return }
-        let page = pages[index]
+        // (The list has a row for every page.)
+        guard let page = pageList.selectedRow.flatMap({ pages.dropFirst($0).first }) else { return }
         caption.stringValue = page.title
         container.subviews.forEach { $0.removeFromSuperview() }
         let view = page.view
@@ -647,7 +652,8 @@ final class OptionsWindowController: NSWindowController, NSWindowDelegate {
 
     private func apply() {
         window?.makeFirstResponder(nil)
-        for page in pages where page.isChanged { page.commit() }
+        // Each page stores what was changed on it, if anything.
+        for page in pages { page.commit() }
         updateApply()
     }
 

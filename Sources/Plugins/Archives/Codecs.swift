@@ -462,6 +462,12 @@ final class ProcessStream: ByteStream, @unchecked Sendable {
     func read(upToCount count: Int) throws -> Data? {
         guard !ended else { return nil }
         try control?.check()
+        // A stream that was closed (its reader stopped) has given up its pipe: nothing can be read
+        // from it, and what it gave is not the whole output.
+        lock.lock()
+        let closed = isClosed
+        lock.unlock()
+        guard !closed else { throw ArchiveError.cancelled }
         // A pipe hands over 64 KB at a time; a larger block would only be allocated in vain.
         let capacity = min(max(count, 1), 1 << 16)
         let descriptor = output.fileHandleForReading.fileDescriptor

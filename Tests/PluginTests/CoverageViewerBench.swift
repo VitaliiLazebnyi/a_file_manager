@@ -41,6 +41,8 @@ internal final class CoverageViewerBench {
         let host = rightHost
         let lookup = CoverageViewerHostLookup()
         plugin = ViewerPlugin(overlayHost: { lookup.host(for: $0) }, quickViewDelay: 0.01, showsWindows: showsWindows)
+        // No test plays a sound: the player only records.
+        plugin.mediaPlayback = CovViewPlayback.factory
         bench = TestBench(
             plugins: [plugin],
             fileSystems: [memory, LocalFileSystem()],
@@ -51,9 +53,10 @@ internal final class CoverageViewerBench {
         lookup.rightHost = host
     }
 
-    /// Waits until `condition` holds, letting the main queue run meanwhile; false after a minute.
+    /// Waits until `condition` holds, letting the main queue run meanwhile; false only after a
+    /// hang (`Wait.ceiling`: on a busy machine a minute is not enough).
     internal func wait(until condition: () -> Bool) async -> Bool {
-        let deadline = Date(timeIntervalSinceNow: 60)
+        let deadline = Date(timeIntervalSinceNow: Wait.ceiling)
         while !condition() {
             if Date() > deadline {
                 return false

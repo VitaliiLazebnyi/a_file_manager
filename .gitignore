@@ -28,3 +28,6 @@ scratchpad/
 
 # Claude Code: agent worktrees (each a copy of the whole project) and local settings
 .claude/
+
+# Coverage counts a test process writes where no LLVM_PROFILE_FILE is set.
+*.profraw

@@ -22,7 +22,9 @@ final class CommandRunner {
     let listFolder: URL
     /// How long a list file outlives the command that was given it: a program started with
     /// `open` has ended long before the application it opened has read the list.
-    static let listGrace: TimeInterval = 60
+    static let defaultListGrace: TimeInterval = 60
+    /// The same for this runner (tests make it short).
+    var listGrace = CommandRunner.defaultListGrace
     /// How deep user commands may call each other, and how many steps one run may take with
     /// everything it calls: a loop the name check does not see still ends.
     static let depthLimit = 16
@@ -48,11 +50,11 @@ final class CommandRunner {
     private var waiting = 0
     private let children = ChildTable()
 
-    /// What one run counts with everything it calls. Main thread only.
+    /// What one run counts with everything it calls. Main thread only. (A run whose steps are
+    /// spent goes no further: nothing of it is waiting to go on then.)
     @MainActor
     private final class Budget {
         var steps = 0
-        var isSpent = false
     }
 
     /// What a run hands to everything it calls, also across a wait: the commands it is inside of.
@@ -129,10 +131,11 @@ final class CommandRunner {
             ?? []
         var kept = 0
         for file in files {
-            let written =
-                (try? file.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
-                ?? .distantPast
-            if Date().timeIntervalSince(written) < Self.listGrace {
+            // A list without a date (gone meanwhile) is removed like an old one.
+            if let written = (try? file.resourceValues(forKeys: [.contentModificationDateKey]))?
+                .contentModificationDate,
+                Date().timeIntervalSince(written) < listGrace
+            {
                 kept += 1
             } else {
                 try? fm.removeItem(at: file)
@@ -286,7 +289,7 @@ final class CommandRunner {
                 detail: "The command \(name) was not run again.",
                 style: .warning
             )
-            completion?() ?? ()
+            completion?()
             return
         }
         guard call.names.count < Self.depthLimit else {
@@ -296,7 +299,7 @@ final class CommandRunner {
                     + "The command was not run.",
                 style: .warning
             )
-            completion?() ?? ()
+            completion?()
             return
         }
         let steps = CommandLanguage.steps(action.command, environment: environment, resolve: resolve)
@@ -399,9 +402,9 @@ final class CommandRunner {
             )
         )
         let begin = { [self] in
-            perform(steps[...], chain, then: completion)
+            perform(ArraySlice(steps), chain, then: completion)
             // Commands of the program have read the list by now; a started process removes it itself.
-            if !isExternal { removeListFile(listURL, after: Self.listGrace) }
+            if !isExternal { removeListFile(listURL, after: listGrace) }
         }
         guard let list = expanded.listFile else {
             begin()
@@ -440,7 +443,7 @@ final class CommandRunner {
         _ chain: Chain,
         then done: (@MainActor @Sendable () -> Void)? = nil
     ) {
-        guard chain.call.generation == generation, !chain.call.budget.isSpent else { return }
+        guard chain.call.generation == generation else { return }
         let outer = active
         active = chain.call.names
         defer { active = outer }
@@ -448,7 +451,6 @@ final class CommandRunner {
         while let step = rest.popFirst() {
             chain.call.budget.steps += 1
             guard chain.call.budget.steps <= Self.stepLimit else {
-                chain.call.budget.isSpent = true
                 kernel.interaction.inform(
                     "“\(chain.title)” was stopped",
                     detail: "It ran \(Self.stepLimit) steps with the commands it calls, "
@@ -551,7 +553,7 @@ final class CommandRunner {
         let source = kernel.panels.source.model.directory
         let directory = folder ?? (source.isFileURL ? source.path : NSHomeDirectory())
         let (grace, listURL, generation, children) = (
-            Self.listGrace, chain.listURL, chain.call.generation, self.children
+            listGrace, chain.listURL, chain.call.generation, self.children
         )
         let program = DisplayText.oneLine(ShellWords.unquoted(ShellWords.firstWord(of: line).word), limit: 80)
         if waits { waiting += 1 }
@@ -585,7 +587,7 @@ final class CommandRunner {
             switch ChildProcess.spawn(
                 executable: shell.executable,
                 arguments: shell.options + script.arguments,
-                environment: LoginShell.environment(),
+                environment: LoginShell.environment(foreignPath: LoginShell.foreignPath),
                 directory: directory
             )
             {

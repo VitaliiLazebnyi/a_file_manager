@@ -314,9 +314,13 @@ public final class ArchivesPlugin: Plugin {
     /// thread's run loop keeps turning meanwhile, so that what other threads send to the main
     /// thread (a question to the user) is done and does not wait for this wait.
     private static func wait(until deadline: Date, for state: StopState) -> Bool {
+        // A run loop with nothing to watch returns at once: this port, which nothing sends to,
+        // gives it something, so the wait below does not spin.
+        let keeper = NSMachPort()
+        RunLoop.current.add(keeper, forMode: .default)
+        defer { RunLoop.current.remove(keeper, forMode: .default) }
         while state.reports == nil, Date() < deadline {
-            // A run loop with nothing to watch returns at once; then this must not spin.
-            if !RunLoop.current.run(mode: .default, before: Date(timeIntervalSinceNow: 0.02)) { usleep(5_000) }
+            RunLoop.current.run(mode: .default, before: Date(timeIntervalSinceNow: 0.02))
         }
         return state.reports != nil
     }

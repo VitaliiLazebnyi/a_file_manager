@@ -23,22 +23,32 @@ import Testing
 
     func bench(launches: Bool = false) -> (plugin: ConfigurationPlugin, bench: TestBench) {
         let plugin = ConfigurationPlugin(
-            launchesApplications: launches, background: nil, listFolder: box.url("lists"), settingsKeys: { [] })
+            launchesApplications: launches,
+            background: nil,
+            listFolder: box.url("lists"),
+            settingsKeys: { [] }
+        )
         let bench = TestBench(
-            plugins: [NavigationPlugin(), SelectionPlugin(), plugin], fileSystems: [LocalFileSystem()],
-            left: box.url("A"), right: box.url("B"), settings: settings)
+            plugins: [NavigationPlugin(), SelectionPlugin(), plugin],
+            fileSystems: [LocalFileSystem()],
+            left: box.url("A"),
+            right: box.url("B"),
+            settings: settings
+        )
         return (plugin, bench)
     }
 
     func define(_ plugin: ConfigurationPlugin, _ name: String, _ command: String, _ parameters: String = "") {
-        plugin.center!.save(
-            UserCommand(name: name, title: "", action: CommandAction(command: command, parameters: parameters)))
+        plugin.center!
+            .save(
+                UserCommand(name: name, title: "", action: CommandAction(command: command, parameters: parameters))
+            )
     }
 
-    /// Lets the main actor run until `done`, for at most a minute.
+    /// Lets the main thread run until `done`. Only a hang ends the wait without it: on a busy
+    /// machine other tests may hold the main thread for a long time, so no shorter limit is set.
     func wait(until done: () -> Bool) async {
-        let deadline = Date().addingTimeInterval(60)
-        while !done(), Date() < deadline { try? await Task.sleep(nanoseconds: 20_000_000) }
+        #expect(await RunLoopWait.until(done))
     }
 
     @Test func commandsThatCallEachOtherAcrossAWaitAreStopped() async {
@@ -58,8 +68,10 @@ import Testing
         var draft = plugin.center!.startMenuDraft()
         draft.insert(
             StartMenuDraft.Row(
-                entry: StartMenuEntry(title: "Loop", action: CommandAction(command: "cm_wait 1, cm_UserMenu1"))),
-            after: nil)
+                entry: StartMenuEntry(title: "Loop", action: CommandAction(command: "cm_wait 1, cm_UserMenu1"))
+            ),
+            after: nil
+        )
         plugin.center!.commit(draft)
         bench.commands.perform("cm_UserMenu1")
         await wait { bench.interaction.log.contains { $0.contains("calls itself") } }
@@ -71,8 +83,10 @@ import Testing
         var probes = 0
         bench.commands.register(Command("cm_ConfigProbe", "Probe")) { probes += 1 }
         define(
-            plugin, "em_many",
-            Array(repeating: "cm_ConfigProbe", count: CommandRunner.stepLimit + 50).joined(separator: ","))
+            plugin,
+            "em_many",
+            Array(repeating: "cm_ConfigProbe", count: CommandRunner.stepLimit + 50).joined(separator: ",")
+        )
         bench.commands.perform("em_many")
         #expect(probes == CommandRunner.stepLimit && bench.interaction.log == ["inform: “many” was stopped"])
         // Commands nested deeper than the limit are refused, not run.
@@ -144,11 +158,17 @@ import Testing
         for number in 0..<count { memory.addFile("/Big/f\(number) x.txt") }
         memory.addDirectory("/B")
         let plugin = ConfigurationPlugin(
-            launchesApplications: false, background: .global(qos: .userInitiated), listFolder: box.url("lists-big"),
-            settingsKeys: { [] })
+            launchesApplications: false,
+            background: .global(qos: .userInitiated),
+            listFolder: box.url("lists-big"),
+            settingsKeys: { [] }
+        )
         let bench = TestBench(
-            plugins: [NavigationPlugin(), SelectionPlugin(), plugin], fileSystems: [LocalFileSystem(), memory],
-            left: memory.url("/Big"), right: memory.url("/B"))
+            plugins: [NavigationPlugin(), SelectionPlugin(), plugin],
+            fileSystems: [LocalFileSystem(), memory],
+            left: memory.url("/Big"),
+            right: memory.url("/B")
+        )
         define(plugin, "em_all", "tool", "%S")
         define(plugin, "em_cursor", "tool", "%N")
         bench.commands.perform(.selectAll)
@@ -178,10 +198,12 @@ import Testing
         #expect(ParameterExpander.usesSelection([.text("%S")]) && ParameterExpander.usesSelection([.text("a %P%s")]))
         #expect(
             ParameterExpander.usesSelection([.text("%L")]) && ParameterExpander.usesSelection([.text("%C1")])
-                && ParameterExpander.usesSelection([.text("%UF")]))
+                && ParameterExpander.usesSelection([.text("%UF")])
+        )
         #expect(
             !ParameterExpander.usesSelection([.text("%P%N %T%M %%S %O.%E")])
-                && !ParameterExpander.usesSelection([.value("%S")]))
+                && !ParameterExpander.usesSelection([.value("%S")])
+        )
     }
 
     @Test func anApplicationPathWithASpaceIsOneWord() throws {
@@ -196,22 +218,31 @@ import Testing
         #expect(ShellWords.firstWord(of: [.text("  \"a b\"c d e")]).word == [.text("\"a b\"c")])
         #expect(
             ShellWords.unquoted(ShellWords.firstWord(of: [.text("pre"), .value("x y"), .text("post rest")]).word)
-                == "prex ypost")
+                == "prex ypost"
+        )
     }
 
     @Test func listFilesOfARunThatQuitsAreKeptWhileAProgramMayReadThem() throws {
         let made = bench()
         let runner = CommandRunner(
-            kernel: made.bench.kernel, launchesApplications: false, background: nil, listFolder: box.url("lists2"))
+            kernel: made.bench.kernel,
+            launchesApplications: false,
+            background: nil,
+            listFolder: box.url("lists2")
+        )
         let folder = try box.folder("lists2")
         let old = try box.file("lists2/list-old.txt")
         let fresh = try box.file("lists2/list-new.txt")
         try FileManager.default.setAttributes(
-            [.modificationDate: Date().addingTimeInterval(-CommandRunner.listGrace * 3)], ofItemAtPath: old.path)
+            [.modificationDate: Date().addingTimeInterval(-CommandRunner.defaultListGrace * 3)],
+            ofItemAtPath: old.path
+        )
         runner.removeListFilesNow()
         #expect(!FileManager.default.fileExists(atPath: old.path) && FileManager.default.fileExists(atPath: fresh.path))
         try FileManager.default.setAttributes(
-            [.modificationDate: Date().addingTimeInterval(-CommandRunner.listGrace * 3)], ofItemAtPath: fresh.path)
+            [.modificationDate: Date().addingTimeInterval(-CommandRunner.defaultListGrace * 3)],
+            ofItemAtPath: fresh.path
+        )
         runner.removeListFilesNow()
         #expect(!FileManager.default.fileExists(atPath: folder.path))
     }
@@ -228,15 +259,23 @@ import Testing
         try box.folder("A")
         try box.folder("B")
         plugin = ConfigurationPlugin(
-            launchesApplications: true, background: nil, listFolder: box.url("lists"), settingsKeys: { [] })
+            launchesApplications: true,
+            background: nil,
+            listFolder: box.url("lists"),
+            settingsKeys: { [] }
+        )
         bench = TestBench(
-            plugins: [NavigationPlugin(), SelectionPlugin(), plugin], fileSystems: [LocalFileSystem()],
-            left: box.url("A"), right: box.url("B"))
+            plugins: [NavigationPlugin(), SelectionPlugin(), plugin],
+            fileSystems: [LocalFileSystem()],
+            left: box.url("A"),
+            right: box.url("B")
+        )
     }
 
+    /// Lets the main thread run until `done`. Only a hang ends the wait without it: on a busy
+    /// machine other tests may hold the main thread for a long time, so no shorter limit is set.
     func wait(until done: () -> Bool) async {
-        let deadline = Date().addingTimeInterval(90)
-        while !done(), Date() < deadline { try? await Task.sleep(nanoseconds: 50_000_000) }
+        #expect(await RunLoopWait.until(done))
     }
 
     @Test func aHostileFileNameReachesTheProgramAsItIsAndRunsNothing() async throws {
@@ -249,35 +288,47 @@ import Testing
         // The panel's folder is where the line runs: a marker would appear in it.
         center.save(
             UserCommand(
-                name: "em_show", title: "",
-                action: CommandAction(command: "printf '%s\\0'", parameters: "%N \"%P%N\" x%Ny > '\(out)'")))
+                name: "em_show",
+                title: "",
+                action: CommandAction(command: "printf '%s\\0'", parameters: "%N \"%P%N\" x%Ny > '\(out)'")
+            )
+        )
         for name in names {
             try? FileManager.default.removeItem(atPath: out)
             bench.left.moveCursor(toName: name)
             bench.commands.perform("em_show")
             func written() -> Data { (try? Data(contentsOf: URL(fileURLWithPath: out))) ?? Data() }
             await wait { written().filter { $0 == 0 }.count == 3 }
-            let words = String(decoding: written(), as: UTF8.self).split(
-                separator: "\0", omittingEmptySubsequences: false
-            ).dropLast().map(String.init)
+            let words = String(decoding: written(), as: UTF8.self)
+                .split(
+                    separator: "\0",
+                    omittingEmptySubsequences: false
+                )
+                .dropLast().map(String.init)
             let guarded = name.hasPrefix("-") ? "./" + name : name
             let folder = bench.left.model.directory.path
             #expect(
                 words.map { Array($0.utf8) }
                     == [guarded, folder + "/" + name, "x" + name + "y"].map { Array($0.utf8) },
-                "\(name.debugDescription): \(words.map(\.debugDescription))")
+                "\(name.debugDescription): \(words.map(\.debugDescription))"
+            )
         }
-        let created = try FileManager.default.contentsOfDirectory(atPath: box.url("A").path).filter {
-            $0.hasPrefix("PWNED")
-        }
+        let created = try FileManager.default.contentsOfDirectory(atPath: box.url("A").path)
+            .filter {
+                $0.hasPrefix("PWNED")
+            }
         #expect(created.isEmpty && bench.interaction.log.isEmpty)
     }
 
     @Test func aProgramTheShellDoesNotFindIsReported() async {
-        plugin.center!.save(
-            UserCommand(
-                name: "em_missing", title: "",
-                action: CommandAction(command: "afm-no-such-program-\(UUID().uuidString)")))
+        plugin.center!
+            .save(
+                UserCommand(
+                    name: "em_missing",
+                    title: "",
+                    action: CommandAction(command: "afm-no-such-program-\(UUID().uuidString)")
+                )
+            )
         bench.commands.perform("em_missing")
         await wait { bench.interaction.log.contains { $0.hasPrefix("inform:") } }
         #expect(bench.interaction.log.count == 1 && bench.interaction.log[0].contains("cannot be started"))
@@ -289,12 +340,16 @@ import Testing
         let center = plugin.center!
         center.save(
             UserCommand(
-                name: "em_bad", title: "", action: CommandAction(command: "afm-no-such-program-\(UUID().uuidString)"))
+                name: "em_bad",
+                title: "",
+                action: CommandAction(command: "afm-no-such-program-\(UUID().uuidString)")
+            )
         )
         center.save(UserCommand(name: "em_chain", title: "", action: CommandAction(command: "em_bad, cm_ConfigProbe")))
         center.save(UserCommand(name: "em_good", title: "", action: CommandAction(command: "true")))
         center.save(
-            UserCommand(name: "em_chain2", title: "", action: CommandAction(command: "em_good, cm_ConfigProbe")))
+            UserCommand(name: "em_chain2", title: "", action: CommandAction(command: "em_good, cm_ConfigProbe"))
+        )
         bench.commands.perform("em_chain")
         await wait { bench.interaction.log.contains { $0.contains("cannot be started") } }
         bench.commands.perform("em_chain2")

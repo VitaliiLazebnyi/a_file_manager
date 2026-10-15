@@ -124,7 +124,10 @@ public struct FileCriteria: Codable, Equatable, Sendable {
     public var package = TriState.any
 
     public init(
-        dateFrom: Date? = nil, dateTo: Date? = nil, notOlderThan: Age? = nil, olderThan: Age? = nil,
+        dateFrom: Date? = nil,
+        dateTo: Date? = nil,
+        notOlderThan: Age? = nil,
+        olderThan: Age? = nil,
         size: SizeRule? = nil
     ) {
         self.dateFrom = dateFrom
@@ -203,7 +206,8 @@ public struct SearchField: Sendable {
     /// The built-in fields followed by the plugins' columns.
     public static func all(fileSystems: FileSystemRegistry, columns: ColumnRegistry?) -> [Self] {
         builtIn(fileSystems: fileSystems)
-            + (columns?.all ?? []).map { column in
+            + (columns?.all ?? [])
+            .map { column in
                 Self(id: column.id, title: column.title, value: column.value)
             }
     }
@@ -344,9 +348,10 @@ struct PreparedFieldRules {
         func holds(_ index: Int) -> Bool {
             let rule = rules.rules[index]
             guard !cancelled() else { return false }
-            return fields[rule.field].map {
-                rule.matches($0.value(item), expression: expressions[index], trip: trip, cancelled: cancelled)
-            } ?? false
+            return fields[rule.field]
+                .map {
+                    rule.matches($0.value(item), expression: expressions[index], trip: trip, cancelled: cancelled)
+                } ?? false
         }
         return rules.matchAll ? rules.rules.indices.allSatisfy(holds) : rules.rules.indices.contains(where: holds)
     }

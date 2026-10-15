@@ -108,7 +108,7 @@ internal struct CoverageArchivesReadingTests {
             return true
         }
         #expect {
-            try opened.readInOnePass([try entry(opened, 0), beyond]) { _, _ in
+            try opened.readInOnePass([try entry(opened, 0), beyond], throughTheEnd: false) { _, _ in
                 // Nothing is read.
             }
         } throws: { error in

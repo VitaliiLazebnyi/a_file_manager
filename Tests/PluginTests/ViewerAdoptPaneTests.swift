@@ -17,12 +17,13 @@ import Testing
     init() {
         _ = NSApplication.shared
         plugin = ViewerPlugin(overlayHost: { _ in nil }, quickViewDelay: 0.01, showsWindows: false)
+        plugin.mediaPlayback = CovViewPlayback.factory
         bench = TestBench(plugins: [plugin], fileSystems: [memory], left: memory.url("/A"), right: memory.url("/B"))
         memory.addFile("/A/small.txt", "small file\nsecond line")
     }
 
     @discardableResult
-    func wait(upTo seconds: TimeInterval = 30, until condition: () -> Bool) async -> Bool {
+    func wait(upTo seconds: TimeInterval = Wait.ceiling, until condition: () -> Bool) async -> Bool {
         let deadline = Date().addingTimeInterval(seconds)
         while !condition(), Date() < deadline {
             try? await Task.sleep(nanoseconds: 3_000_000)
