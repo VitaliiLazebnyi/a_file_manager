@@ -6,6 +6,8 @@ Regions are Swift's branch coverage: each arm of an `if`, `guard`, `switch` or `
 
 Run after `swift test --enable-code-coverage`. SwiftPM writes one profile per test bundle and its
 own summary covers only one of them, so this merges every profile and reports over all bundles.
+
+Arguments, if any, are path prefixes (e.g. `Sources/Plugins/Viewer`): only the files under them are counted and reported.
 """
 
 import json
@@ -52,6 +54,8 @@ def main() -> int:
     for entry in report["data"][0]["files"]:
         name = entry["filename"]
         if f"{ROOT}/Sources/" not in name:
+            continue
+        if sys.argv[1:] and not any(name.startswith(f"{ROOT}/{prefix}") for prefix in sys.argv[1:]):
             continue
         summary = entry["summary"]
         for kind in totals:
