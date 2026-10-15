@@ -74,7 +74,7 @@ internal struct CoverageNetworkReplacing {
         server.center.environment.log = { line in lines.set(line) }
         try server.fileSystem.move(source, to: target, replacing: true)
         #expect(lines.wait()?.hasPrefix("The replaced file could not be removed") == true)
-        #expect(try memory.entry(at: "/docs/b.txt", cancellation: nil)?.size == 5)
+        #expect(memory.entry(at: "/docs/b.txt", cancellation: nil)?.size == 5)
     }
 
     /// Without a way to make sessions, a server cannot be used.
