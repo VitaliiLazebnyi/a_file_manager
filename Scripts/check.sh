@@ -137,6 +137,8 @@ for gate in "${gates[@]}"; do
       step "SwiftLint"
       swiftlint_env
       swiftlint lint --strict --quiet
+      step "required_deinit (Swift classes only)"
+      python3 Scripts/required-deinit.py
       step "SwiftLint analyzer rules"
       analyzer_log .build-tools/compile.log
       analyzer_coverage .build-tools/compile.log
