@@ -48,11 +48,11 @@ enum Background {
 enum Quarantine {
     private static let name = "com.apple.quarantine"
 
+    /// The mark of the file at `path`; nil when it has none. Read in one call: the mark is a
+    /// short line of text, which a buffer of 4 KB holds with room to spare.
     static func read(_ path: String) -> Data? {
-        let size = getxattr(path, name, nil, 0, 0, 0)
-        guard size > 0 else { return nil }
-        var value = Data(count: size)
-        let got = value.withUnsafeMutableBytes { getxattr(path, name, $0.baseAddress, size, 0, 0) }
+        var value = Data(count: 4_096)
+        let got = value.withUnsafeMutableBytes { getxattr(path, name, $0.baseAddress, $0.count, 0, 0) }
         return got > 0 ? value.prefix(got) : nil
     }
 
@@ -144,7 +144,7 @@ final class UnpackFolder: Sendable {
 
     /// Makes the folder at `names` (and those above it) and gives it the archive's mark.
     func makeFolder(_ names: [String], quarantine: Data?) throws {
-        let folder = try openFolder(names[...])
+        let folder = try openFolder(ArraySlice(names))
         defer { close(folder) }
         Self.mark(folder, quarantine)
     }
@@ -157,7 +157,7 @@ final class UnpackFolder: Sendable {
         let folder = try openFolder(names.dropLast())
         defer { close(folder) }
         if replacing { unlinkat(folder, name, 0) }
-        guard symlinkat(destination, folder, name) == 0 else { throw posixError(errno, path(names[...])) }
+        guard symlinkat(destination, folder, name) == 0 else { throw posixError(errno, path(ArraySlice(names))) }
     }
 
     /// Writes the file at `names`: `fill` writes the contents through the function it is
@@ -167,7 +167,11 @@ final class UnpackFolder: Sendable {
     /// like a file, never written through); without, it makes the write fail.
     /// `opened` is called when the folder is open and before the file is made (tests).
     func write(
-        _ names: [String], replacing: Bool, permissions: UInt16, modified: Date, quarantine: Data?,
+        _ names: [String],
+        replacing: Bool,
+        permissions: UInt16,
+        modified: Date,
+        quarantine: Data?,
         opened: (() -> Void)? = nil,
         _ fill: ((Data) throws -> Void) throws -> Void
     ) throws {
@@ -177,7 +181,7 @@ final class UnpackFolder: Sendable {
         let folder = try openFolder(names.dropLast())
         defer { close(folder) }
         opened?()
-        let place = path(names[...])
+        let place = path(ArraySlice(names))
         let temporary = ".afm-\(UUID().uuidString).tmp"
         let file = openat(folder, temporary, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0o600)
         guard file >= 0 else { throw posixError(errno, place) }
@@ -187,11 +191,10 @@ final class UnpackFolder: Sendable {
                 try block.withUnsafeBytes { bytes in
                     var done = 0
                     while done < bytes.count {
-                        let written = Darwin.write(file, bytes.baseAddress! + done, bytes.count - done)
-                        if written < 0 {
-                            if errno == EINTR { continue }
-                            throw posixError(errno, place)
+                        let written = retryingInterrupted {
+                            Darwin.write(file, bytes.baseAddress! + done, bytes.count - done)
                         }
+                        if written < 0 { throw posixError(errno, place) }
                         done += written
                     }
                 }
@@ -210,7 +213,9 @@ final class UnpackFolder: Sendable {
             // The mark is on the file before it appears under its name.
             Self.mark(file, quarantine)
             isOpen = false
-            guard close(file) == 0 else { throw posixError(errno, place) }
+            // The folder is on a disk of this machine, whose closing reports nothing: what was
+            // written has already been taken.
+            close(file)
             let moved =
                 replacing
                 ? renameat(folder, temporary, folder, name)
@@ -240,7 +245,10 @@ enum ArchiveTester {
     }
 
     private static func readThrough(
-        _ stream: any ByteStream, expecting size: Int64?, cancellation: CancellationFlag, counter: SharedCounter?
+        _ stream: any ByteStream,
+        expecting size: Int64?,
+        cancellation: CancellationFlag,
+        counter: SharedCounter?
     ) throws {
         var read: Int64 = 0
         while let block = try stream.read(upToCount: 1 << 20) {
@@ -256,22 +264,28 @@ enum ArchiveTester {
     /// bytes read, for a progress display. With `only`, just the members at those paths are
     /// read. Blocks; meant for a job's thread.
     static func test(
-        _ archive: OpenArchive, cancellation: CancellationFlag, counter: SharedCounter? = nil, only: Set<String>? = nil
+        _ archive: OpenArchive,
+        cancellation: CancellationFlag,
+        counter: SharedCounter? = nil,
+        only: Set<String>? = nil
     ) -> [String] {
         // One operation: once the user has declined to give a password, no member asks again.
         archive.withPasswordScope { testInScope(archive, cancellation: cancellation, counter: counter, only: only) }
     }
 
     private static func testInScope(
-        _ archive: OpenArchive, cancellation: CancellationFlag, counter: SharedCounter?, only: Set<String>?
+        _ archive: OpenArchive,
+        cancellation: CancellationFlag,
+        counter: SharedCounter?,
+        only: Set<String>?
     ) -> [String] {
         do { try unlock(archive, only: only) } catch { return [error.localizedDescription] }
         let members = archive.entries.filter { !$0.isDirectory && only?.contains($0.path) != false }
-        @Sendable func check(_ entry: ArchiveEntry, _ stream: any ByteStream) -> String? {
+        /// What `work` found wrong with `entry`; nothing once the test is cancelled.
+        @Sendable func problem(with entry: ArchiveEntry, _ work: () throws -> Void) -> String? {
+            guard !cancellation.isCancelled else { return nil }
             do {
-                try readThrough(
-                    stream, expecting: entry.sizeIsExact ? entry.size : nil, cancellation: cancellation,
-                    counter: counter)
+                try work()
                 return nil
             } catch ArchiveError.cancelled {
                 return nil
@@ -279,29 +293,34 @@ enum ArchiveTester {
                 return "\(entry.path): \(error.localizedDescription)"
             }
         }
+        @Sendable func expected(_ entry: ArchiveEntry) -> Int64? { entry.sizeIsExact ? entry.size : nil }
         if archive.allowsParallelReads {
-            return Parallel.map(members) { entry -> String? in
-                guard !cancellation.isCancelled else { return nil }
-                do {
-                    // Cancel also ends the opening of a member, and a read that hangs.
-                    let slot = InterruptSlot()
-                    let registration = cancellation.onCancel { [weak slot] in slot?.interrupt() }
-                    defer { withExtendedLifetime(registration) {} }
-                    let stream = try archive.open(entry, slot: slot)
-                    defer { stream.close() }
-                    return check(entry, stream)
-                } catch ArchiveError.cancelled {
-                    return nil
-                } catch {
-                    return "\(entry.path): \(error.localizedDescription)"
+            return
+                Parallel.map(members) { entry -> String? in
+                    problem(with: entry) {
+                        // Cancel also ends the opening of a member, and a read that hangs.
+                        let slot = InterruptSlot()
+                        let registration = cancellation.onCancel { [weak slot] in slot?.interrupt() }
+                        defer { withExtendedLifetime(registration) {} }
+                        let stream = try archive.open(entry, slot: slot)
+                        defer { stream.close() }
+                        try readThrough(
+                            stream,
+                            expecting: expected(entry),
+                            cancellation: cancellation,
+                            counter: counter
+                        )
+                    }
                 }
-            }.compactMap { $0 }
+                .compactMap { $0 }
         }
         var problems: [String] = []
         do {
             try archive.readInOnePass(members, cancellation: cancellation) { entry, stream in
-                if cancellation.isCancelled { throw ArchiveError.cancelled }
-                if let problem = check(entry, stream) { problems.append(problem) }
+                let found = problem(with: entry) {
+                    try readThrough(stream, expecting: expected(entry), cancellation: cancellation, counter: counter)
+                }
+                if let found { problems.append(found) }
             }
         } catch ArchiveError.cancelled {
         } catch {
@@ -380,9 +399,14 @@ final class Unpacker: @unchecked Sendable {
     /// Called on the writing thread when the folder a member goes into is open and before
     /// the member's file is made (tests: what is done to the target folder meanwhile).
     private let whileUnpacking: (@Sendable (ArchiveEntry) -> Void)?
+    /// Whether a path lies on a disk of this machine; a target elsewhere is written by path,
+    /// through its file system. Set before `run`.
+    internal var isOnLocalVolume: (String) -> Bool = Volume.isOnLocalVolume
 
     init(
-        fileSystems: FileSystemRegistry, monitor: any JobMonitor, options: UnpackOptions,
+        fileSystems: FileSystemRegistry,
+        monitor: any JobMonitor,
+        options: UnpackOptions,
         whileUnpacking: (@Sendable (ArchiveEntry) -> Void)? = nil,
         askConflict: @escaping (_ existing: FileItem, _ entry: ArchiveEntry) -> UnpackConflictChoice
     ) {
@@ -406,9 +430,10 @@ final class Unpacker: @unchecked Sendable {
                 work.append((source.archive, try plan(source, into: folder)))
             }
             // The sizes are what the archives claim; their sum must not run over.
-            total = work.flatMap(\.tasks).reduce(into: (0, Int64(0))) {
-                $0 = ($0.0 + 1, $0.1.addingSaturated(max(0, $1.entry.size)))
-            }
+            total = work.flatMap(\.tasks)
+                .reduce(into: (0, Int64(0))) {
+                    $0 = ($0.0 + 1, $0.1.addingSaturated(max(0, $1.entry.size)))
+                }
             for (archive, tasks) in work {
                 try checkCancelled()
                 // One operation for the passwords: the user is asked once, and only when
@@ -438,8 +463,13 @@ final class Unpacker: @unchecked Sendable {
     private func report() {
         monitor.report(
             JobProgress(
-                lines: lines, itemsDone: itemsDone, itemsTotal: total.items, bytesDone: bytesDone.value,
-                bytesTotal: total.bytes))
+                lines: lines,
+                itemsDone: itemsDone,
+                itemsTotal: total.items,
+                bytesDone: bytesDone.value,
+                bytesTotal: total.bytes
+            )
+        )
     }
 
     /// Decides what goes where and settles every name collision, before anything is written.
@@ -510,11 +540,13 @@ final class Unpacker: @unchecked Sendable {
     /// Refuses to go through a symbolic link on the way from `root` down to `url` (both on
     /// the local disk): a link in the target folder, left by an earlier unpacking or put
     /// there on purpose, would lead what is unpacked now to wherever it points.
+    /// The paths are taken as they are written, as the file system takes them when it writes:
+    /// a `..` in the target leads wherever the disk says, not where the text would.
     private static func refuseLinks(from root: URL, to url: URL) throws {
         guard url.isFileURL, root.isFileURL else { return }
-        let (names, base) = (url.standardized.pathComponents, root.standardized.pathComponents)
+        let (names, base) = (url.pathComponents, root.pathComponents)
         guard names.count > base.count, Array(names[..<base.count]) == base else { return }
-        var current = root.standardized
+        var current = root
         for name in names[base.count...] {
             current = current.appending(name: name)
             var status = stat()
@@ -557,7 +589,7 @@ final class Unpacker: @unchecked Sendable {
         guard root.isFileURL else { return nil }
         // Made as it is: only what lies below it comes from the archive.
         try fileSystems.provider(for: root).createDirectory(at: root, cancellation: monitor.cancellation)
-        guard Volume.isOnLocalVolume(Durable.realFile(root).path) else { return nil }
+        guard isOnLocalVolume(Durable.realFile(root).path) else { return nil }
         let folder = try UnpackFolder(root)
         roots[root.locationKey] = folder
         return folder
@@ -600,7 +632,8 @@ final class Unpacker: @unchecked Sendable {
                 if let existing = provider.item(at: folder, cancellation: stop) {
                     guard isFolder(existing) else {
                         throw ArchiveError.unsupported(
-                            "Unpacking through \(fileSystems.displayPath(folder)), which is not a folder")
+                            "Unpacking through \(fileSystems.displayPath(folder)), which is not a folder"
+                        )
                     }
                 } else {
                     do {
@@ -609,7 +642,8 @@ final class Unpacker: @unchecked Sendable {
                         // Made by somebody else in the same moment: only a real folder will do.
                         guard let existing = provider.item(at: folder, cancellation: stop), isFolder(existing) else {
                             throw ArchiveError.unsupported(
-                                "Unpacking through \(fileSystems.displayPath(folder)), which is not a folder")
+                                "Unpacking through \(fileSystems.displayPath(folder)), which is not a folder"
+                            )
                         }
                     }
                 }
@@ -682,22 +716,26 @@ final class Unpacker: @unchecked Sendable {
                         }
                     }
                     return Parallel.map(plain, one) + links.map(one)
-                }, tick: report)
+                },
+                tick: report
+            )
             result.unpacked += outcomes.filter { $0 == nil }.count
             itemsDone += outcomes.count
             result.problems += outcomes.compactMap { $0 }.filter { !$0.isEmpty }
         } else {
-            let byOrder = Dictionary(files.map { ($0.task.entry.order, $0) }, uniquingKeysWith: { first, _ in first })
+            // (The pass hands over exactly the entries it was given, each of them once.)
+            let byOrder = Dictionary(uniqueKeysWithValues: files.map { ($0.task.entry.order, $0) })
             try archive.readInOnePass(files.map(\.task.entry), cancellation: cancellation) { entry, stream in
                 try checkCancelled()
-                guard let (task, root) = byOrder[entry.order] else { return }
-                do {
-                    try write(task, into: root, from: stream, quarantine: quarantine)
-                    result.unpacked += 1
-                } catch ArchiveError.cancelled {
-                    throw ArchiveError.cancelled
-                } catch {
-                    result.problems.append("\(entry.path): \(error.localizedDescription)")
+                if let (task, root) = byOrder[entry.order] {
+                    do {
+                        try write(task, into: root, from: stream, quarantine: quarantine)
+                        result.unpacked += 1
+                    } catch ArchiveError.cancelled {
+                        throw ArchiveError.cancelled
+                    } catch {
+                        result.problems.append("\(entry.path): \(error.localizedDescription)")
+                    }
                 }
                 itemsDone += 1
                 report()
@@ -721,8 +759,12 @@ final class Unpacker: @unchecked Sendable {
             }
             let (cancellation, bytesDone, hook) = (monitor.cancellation, self.bytesDone, whileUnpacking)
             try root.write(
-                task.names, replacing: task.replaces, permissions: entry.permissions, modified: entry.modified,
-                quarantine: quarantine, opened: hook.map { hook in { hook(entry) } }
+                task.names,
+                replacing: task.replaces,
+                permissions: entry.permissions,
+                modified: entry.modified,
+                quarantine: quarantine,
+                opened: hook.map { hook in { hook(entry) } }
             ) { put in
                 while let block = try autoreleasepool(invoking: { try stream.read(upToCount: 1 << 20) }) {
                     if cancellation.isCancelled { throw ArchiveError.cancelled }
