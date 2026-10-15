@@ -43,13 +43,7 @@ public enum TextEncoding: Equatable, Sendable {
     }
 
     /// `detect` and `decode` in one pass over the bytes, which for UTF-8 without a mark is the
-    /// validation that decides between UTF-8 and Latin-1.
-    static func decodeDetected(_ data: Data) -> (encoding: Self, text: String) {
-        let found = decodeDetectedChecked(data)
-        return (found.encoding, found.text)
-    }
-
-    /// Like `decodeDetected`, and says whether the bytes were read without loss. A file with a
+    /// validation that decides between UTF-8 and Latin-1; and whether the bytes were read without loss. A file with a
     /// byte-order mark that holds invalid sequences is shown with replacement characters; writing it
     /// back would change those bytes.
     static func decodeDetectedChecked(_ data: Data) -> (encoding: Self, text: String, isLossless: Bool) {

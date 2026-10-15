@@ -56,11 +56,15 @@ public enum CompareLoader {
             result.wasCancelled = true
             return result
         }
-        for (url, item) in zip([left, right], items) where item == nil || item?.isDirectory == true {
-            result.message = "\(fileSystems.displayPath(url)) is not a file."
-            return result
+        var files: [FileItem] = []
+        for (url, item) in zip([left, right], items) {
+            guard let item, !item.isDirectory else {
+                result.message = "\(fileSystems.displayPath(url)) is not a file."
+                return result
+            }
+            files.append(item)
         }
-        guard let leftItem = items[0], let rightItem = items[1] else { return result }
+        let (leftItem, rightItem) = (files[0], files[1])
         result.leftItem = leftItem.isSymlink ? nil : leftItem
         result.rightItem = rightItem.isSymlink ? nil : rightItem
         do {
@@ -253,15 +257,16 @@ public enum CompareLoader {
             readers.append(reader)
             tokens.append(cancellation.interrupting(reader))
         }
-        while true {
-            if cancellation.isCancelled { return nil }
-            let verdict: Bool? = try autoreleasepool {
+        var verdict: Bool?
+        while verdict == nil, !cancellation.isCancelled {
+            verdict = try autoreleasepool {
                 let blocks = [try exactly(1 << 20, from: readers[0]), try exactly(1 << 20, from: readers[1])]
                 if blocks[0] != blocks[1] { return false }
                 return blocks[0].isEmpty ? true : nil
             }
-            if let verdict { return verdict }
         }
+        // Nil when cancelled before the end.
+        return verdict
     }
 
     // MARK: Saving
@@ -322,7 +327,9 @@ public enum CompareLoader {
         {
             throw SaveError.changedOnDisk(url.lastPathComponent)
         }
-        if existing != nil, url.isFileURL, try writeInPlaceIfLinked(url, data) { return fileSystem.item(at: url) }
+        if existing != nil, url.isFileURL, try writeInPlaceIfLinked(url, data, fileSystem) {
+            return fileSystem.item(at: url)
+        }
         let name = url.lastPathComponent
         let temporary = url.deletingLastPathComponent().appending(name: ".\(name).afm-save")
         try? fileSystem.remove(temporary)
@@ -364,29 +371,20 @@ public enum CompareLoader {
     }
 
     /// Writes into the file itself when it has more than one hard link; false when it has not.
-    private static func writeInPlaceIfLinked(_ url: URL, _ data: Data) throws -> Bool {
+    ///
+    /// The file system continues the file from its start: it opens it without waiting, refuses
+    /// anything but a regular file there (a pipe that took the name since the look), and cuts it
+    /// through the descriptor it writes with.
+    private static func writeInPlaceIfLinked(_ url: URL, _ data: Data, _ fileSystem: any FileSystemProvider) throws
+        -> Bool
+    {
         var st = stat()
         guard stat(url.path, &st) == 0, (st.st_mode & S_IFMT) == S_IFREG, st.st_nlink > 1 else { return false }
-        // Opened without waiting and looked at again before it is emptied: should a pipe have
-        // taken the name since the look above, the open would wait for a reader for good, or
-        // the first write would end the program.
-        let descriptor = open(url.path, O_WRONLY | O_NONBLOCK | O_CLOEXEC)
-        guard descriptor >= 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
-        defer { close(descriptor) }
-        guard fstat(descriptor, &st) == 0, (st.st_mode & S_IFMT) == S_IFREG, st.st_nlink > 1 else { return false }
-        _ = fcntl(descriptor, F_SETFL, fcntl(descriptor, F_GETFL) & ~O_NONBLOCK)
-        guard ftruncate(descriptor, 0) == 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
-        try data.withUnsafeBytes { buffer in
-            var done = 0
-            while done < buffer.count {
-                let count = write(descriptor, buffer.baseAddress! + done, buffer.count - done)
-                if count < 0 {
-                    if errno == EINTR { continue }
-                    throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
-                }
-                done += count
-            }
+        let writer = try fileSystem.append(to: url, at: 0, cancellation: CancellationFlag())
+        for start in stride(from: 0, to: data.count, by: 1 << 20) {
+            try writer.write(data.subdata(in: start..<min(start + (1 << 20), data.count)))
         }
+        try writer.close(attributes: FileAttributes(modified: Date()))
         return true
     }
 
