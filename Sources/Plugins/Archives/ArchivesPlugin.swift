@@ -238,9 +238,9 @@ public final class ArchivesPlugin: Plugin {
                 // an archive of their own. By archive, not by name: two may be called the same.
                 let late = environment.quitting.isCancelled
                 let rescued = store.rescueAll(quickly: late, before: late ? Date(timeIntervalSinceNow: 2) : deadline)
+                // (The table holds each archive once.)
                 let outcomes = Dictionary(
-                    rescued.map { (ObjectIdentifier($0.archive), $0.outcome) },
-                    uniquingKeysWith: { first, _ in first }
+                    uniqueKeysWithValues: rescued.map { (ObjectIdentifier($0.archive), $0.outcome) }
                 )
                 for failure in failures {
                     var text = failure.error.localizedDescription
@@ -299,17 +299,13 @@ public final class ArchivesPlugin: Plugin {
         }
     }
 
-    /// Waits until the state is finished or the time is up; true when it is finished. On the
-    /// main thread the run loop keeps turning meanwhile, so that what other threads send to
-    /// the main thread (a question to the user) is done and does not wait for this wait.
+    /// Waits until the state is finished or the time is up; true when it is finished. The main
+    /// thread's run loop keeps turning meanwhile, so that what other threads send to the main
+    /// thread (a question to the user) is done and does not wait for this wait.
     private static func wait(until deadline: Date, for state: StopState) -> Bool {
         while state.reports == nil, Date() < deadline {
-            if Thread.isMainThread {
-                // A run loop with nothing to watch returns at once; then this must not spin.
-                if !RunLoop.current.run(mode: .default, before: Date(timeIntervalSinceNow: 0.02)) { usleep(5_000) }
-            } else {
-                usleep(5_000)
-            }
+            // A run loop with nothing to watch returns at once; then this must not spin.
+            if !RunLoop.current.run(mode: .default, before: Date(timeIntervalSinceNow: 0.02)) { usleep(5_000) }
         }
         return state.reports != nil
     }
