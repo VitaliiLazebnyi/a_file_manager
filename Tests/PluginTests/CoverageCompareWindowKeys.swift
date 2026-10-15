@@ -12,8 +12,8 @@ import Testing
 internal struct CoverageCompareWindowKeys {
     /// Key codes of the named keys.
     private enum Code {
-        static let down: UInt16 = 125, up: UInt16 = 126, left: UInt16 = 123, right: UInt16 = 124
-        static let backspace: UInt16 = 51, f3: UInt16 = 99, f6: UInt16 = 97, f7: UInt16 = 98
+        static let down: UInt16 = 125, upward: UInt16 = 126, left: UInt16 = 123, right: UInt16 = 124
+        static let backspace: UInt16 = 51, findNext: UInt16 = 99, swapSides: UInt16 = 97, find: UInt16 = 98
         /// A key that produces a character: its code does not name a key.
         static let character: UInt16 = 0
     }
@@ -33,9 +33,9 @@ internal struct CoverageCompareWindowKeys {
         stage.press(Code.down, "", .option)
         #expect(stage.recorder.beeps == 1 && stage.selectedRows == [blocks[2]])
         stage.click("Previous difference")
-        stage.press(Code.up, "", .option)
+        stage.press(Code.upward, "", .option)
         #expect(stage.selectedRows == [blocks[0]])
-        stage.press(Code.up, "", .option)
+        stage.press(Code.upward, "", .option)
         #expect(stage.recorder.beeps == 2)
         // Without a selection the top of the pane counts.
         stage.tables[0].deselectAll(nil)
@@ -54,24 +54,24 @@ internal struct CoverageCompareWindowKeys {
         _ = field.target?.perform(field.action, with: field)
         let row = try #require(stage.selectedRows.first)
         #expect(stage.session.text(.right, row: row) == "new line")
-        stage.press(Code.f3, "", .shift)
-        stage.press(Code.f3)
+        stage.press(Code.findNext, "", .shift)
+        stage.press(Code.findNext, "", [])
         #expect(stage.selectedRows == [row])
         field.stringValue = "nowhere"
-        stage.press(Code.f3)
+        stage.press(Code.findNext, "", [])
         #expect(stage.recorder.beeps == 1 && stage.status == "\"nowhere\" was not found.")
         field.stringValue = ""
-        stage.press(Code.f3)
+        stage.press(Code.findNext, "", [])
         #expect(stage.window?.firstResponder === field.currentEditor() || stage.window?.firstResponder === field)
     }
 
     /// The keys of the panes do what the window's buttons do; other keys are the table's.
     @Test
-    internal func theKeysOfThePanesDoWhatTheButtonsDo() throws {
+    internal func theKeysOfThePanesDoWhatTheButtonsDo() {
         let stage = CoverageCompareStage(left: CoverageCompareWindow.left, right: CoverageCompareWindow.right)
         defer { stage.close() }
         let session = stage.session
-        stage.press(Code.f6)
+        stage.press(Code.swapSides, "", [])
         #expect(session.isEditing && stage.button("Edit mode")?.state == .on)
         stage.press(Code.right, "", .option)
         #expect(session.hasUnsavedChanges)
@@ -86,7 +86,7 @@ internal struct CoverageCompareWindowKeys {
         stage.press(Code.character, "s", .command)
         #expect(!session.hasUnsavedChanges && stage.memory.contents("/B/right.txt")?.contains("changed 3") == false)
         stage.press(Code.character, "s", .control)
-        stage.press(Code.f7)
+        stage.press(Code.find, "", [])
         stage.press(Code.character, "f", .control)
         stage.press(Code.character, "f", .command)
         #expect(stage.window?.firstResponder is NSTextView)
@@ -96,11 +96,11 @@ internal struct CoverageCompareWindowKeys {
         stage.press(Code.character, "c", .control)
         stage.press(Code.character, "u", .control)
         #expect(session.leftURL?.path == "/B/right.txt")
-        stage.press(Code.f6)
+        stage.press(Code.swapSides, "", [])
         #expect(!session.isEditing)
         // Outside edit mode Option+arrows do not copy; a plain key is the table's own.
         stage.press(Code.right, "", .option)
-        stage.press(Code.character, "x")
+        stage.press(Code.character, "x", [])
         #expect(!session.hasUnsavedChanges)
     }
 

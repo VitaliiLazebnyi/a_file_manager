@@ -41,7 +41,9 @@ public enum Myers {
     /// `costLimit` bounds the effort per split; nil chooses by size. The result is cut short
     /// (everything left counts as different) when `cancellation` is set.
     public static func diff<Element: Hashable>(
-        _ a: [Element], _ b: [Element], costLimit: Int? = nil,
+        _ a: [Element],
+        _ b: [Element],
+        costLimit: Int? = nil,
         cancellation: CancellationFlag? = nil
     ) -> [DiffSegment] {
         var numbers: [Element: Int32] = [:]
@@ -54,7 +56,8 @@ public enum Myers {
         let (first, second) = (a.map(number), b.map(number))
         return segments(
             of: matching(first, second, kinds: numbers.count, costLimit: costLimit, cancellation: cancellation),
-            counts: (a.count, b.count))
+            counts: (a.count, b.count)
+        )
     }
 
     /// The same for sequences of UTF-16 units: a unit is its own small number, so no table of
@@ -64,9 +67,14 @@ public enum Myers {
     {
         segments(
             of: matching(
-                a.map { Int32($0) }, b.map { Int32($0) }, kinds: 1 << 16, costLimit: costLimit,
-                cancellation: cancellation),
-            counts: (a.count, b.count))
+                a.map { Int32($0) },
+                b.map { Int32($0) },
+                kinds: 1 << 16,
+                costLimit: costLimit,
+                cancellation: cancellation
+            ),
+            counts: (a.count, b.count)
+        )
     }
 
     /// The sequence the segments turn `a` into; equal to `b` for a diff of `a` and `b`.
@@ -122,8 +130,11 @@ public enum Myers {
                     guard aLow < aHigh, bLow < bHigh,
                         let split = middle(
                             UnsafeBufferPointer(rebasing: first[aLow..<aHigh]),
-                            UnsafeBufferPointer(rebasing: second[bLow..<bHigh]), limit: limit, tables: tables,
-                            reach: reach)
+                            UnsafeBufferPointer(rebasing: second[bLow..<bHigh]),
+                            limit: limit,
+                            tables: tables,
+                            reach: reach
+                        )
                     else { continue }
                     if !split.isExact {
                         // The search was cut off. Lines that both sides have exactly once are fixed points
@@ -153,8 +164,11 @@ public enum Myers {
     /// have nothing in common. With a `limit`, the walks stop after that many rounds and the
     /// point is the furthest either of them reached (`isExact` is false then).
     private static func middle(
-        _ a: UnsafeBufferPointer<Int32>, _ b: UnsafeBufferPointer<Int32>, limit: Int?,
-        tables: UnsafeMutablePointer<Int>, reach: Int
+        _ a: UnsafeBufferPointer<Int32>,
+        _ b: UnsafeBufferPointer<Int32>,
+        limit: Int?,
+        tables: UnsafeMutablePointer<Int>,
+        reach: Int
     ) -> (x: Int, y: Int, isExact: Bool)? {
         let (n, m) = (a.count, b.count)
         let rounds = min((n + m + 1) / 2, limit.map { $0 + 1 } ?? Int.max)
@@ -263,7 +277,11 @@ public enum Myers {
     /// The longest run, rising on both sides, of the elements that occur exactly once in each of
     /// the two stretches: pairs of positions (patience diff). Empty when there are none.
     private static func uniqueAnchors(
-        _ a: UnsafeBufferPointer<Int32>, _ b: UnsafeBufferPointer<Int32>, _ aLow: Int, _ aHigh: Int, _ bLow: Int,
+        _ a: UnsafeBufferPointer<Int32>,
+        _ b: UnsafeBufferPointer<Int32>,
+        _ aLow: Int,
+        _ aHigh: Int,
+        _ bLow: Int,
         _ bHigh: Int,
         counts: inout AnchorCounts
     ) -> [(a: Int, b: Int)] {

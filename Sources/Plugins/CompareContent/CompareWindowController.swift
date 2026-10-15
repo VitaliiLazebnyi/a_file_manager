@@ -107,7 +107,7 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
         if let url = session.leftURL ?? session.rightURL { base = url.deletingLastPathComponent() }
         pullControls()
         refresh()
-        showWindow(nil)
+        effects.present(self)
         window?.makeFirstResponder(leftTable)
     }
 

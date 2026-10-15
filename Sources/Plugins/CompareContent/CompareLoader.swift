@@ -38,15 +38,35 @@ public struct ComparedFiles: Sendable {
 /// cores and of the disk; elsewhere (a server, an archive), where jumping around in a file may
 /// be costly, the two are read once side by side.
 public enum CompareLoader {
-    /// Files of the same size from here on are checked for identity before being loaded.
-    public static let quickCheckFrom: Int64 = 16 * 1_024 * 1_024
-    /// Larger files are not loaded for display; only whether they are identical is told.
-    public static let loadLimit: Int64 = 128 * 1_024 * 1_024
+    /// Which files are checked for being identical before they are loaded, and which are too large to be shown.
+    public struct Limits: Sendable {
+        /// The usual limits: 16 MB and 128 MB.
+        public static let standard = Self(quickCheckFrom: 16 * 1_024 * 1_024, loadLimit: 128 * 1_024 * 1_024)
+
+        /// Files of the same size from here on are checked for identity before being loaded.
+        public var quickCheckFrom: Int64
+        /// Larger files are not loaded for display; only whether they are identical is told.
+        public var loadLimit: Int64
+
+        /// Limits of these sizes, in bytes.
+        public init(quickCheckFrom: Int64, loadLimit: Int64) {
+            self.quickCheckFrom = quickCheckFrom
+            self.loadLimit = loadLimit
+        }
+    }
+
+    /// How much of a large local file one worker compares at a time.
     public static let stretch = 4 * 1_024 * 1_024
 
     public static func load(
-        left: URL, right: URL, forceBinary: Bool = false, options: DiffOptions = DiffOptions(), bytesPerLine: Int = 16,
-        fileSystems: FileSystemRegistry, cancellation: CancellationFlag = CancellationFlag()
+        left: URL,
+        right: URL,
+        forceBinary: Bool = false,
+        options: DiffOptions = DiffOptions(),
+        bytesPerLine: Int = 16,
+        fileSystems: FileSystemRegistry,
+        cancellation: CancellationFlag = CancellationFlag(),
+        limits: Limits = .standard
     ) -> ComparedFiles {
         var result = ComparedFiles()
         let items = Parallel.map([left, right]) { url in
@@ -68,10 +88,15 @@ public enum CompareLoader {
         result.leftItem = leftItem.isSymlink ? nil : leftItem
         result.rightItem = rightItem.isSymlink ? nil : rightItem
         do {
-            if leftItem.size == rightItem.size, leftItem.size >= quickCheckFrom {
+            if leftItem.size == rightItem.size, leftItem.size >= limits.quickCheckFrom {
                 guard
                     let same = try identical(
-                        left, right, size: leftItem.size, fileSystems: fileSystems, cancellation: cancellation)
+                        left,
+                        right,
+                        size: leftItem.size,
+                        fileSystems: fileSystems,
+                        cancellation: cancellation
+                    )
                 else {
                     result.wasCancelled = true
                     return result
@@ -81,30 +106,36 @@ public enum CompareLoader {
                     return result
                 }
             }
-            guard max(leftItem.size, rightItem.size) <= loadLimit else {
+            guard max(leftItem.size, rightItem.size) <= limits.loadLimit else {
                 result.message =
                     "The two files are different. They are too large to be shown side by side "
-                    + "(more than \(Format.shortSize(loadLimit)))."
+                    + "(more than \(Format.shortSize(limits.loadLimit)))."
                 return result
             }
             let loaded = Parallel.map([left, right]) { url in
                 Result { try read(url, fileSystems: fileSystems, cancellation: cancellation) }
             }
             let (first, second) = (try loaded[0].get(), try loaded[1].get())
-            guard !cancellation.isCancelled else {
-                result.wasCancelled = true
-                return result
-            }
             result.isIdentical = first == second
             if forceBinary || TextDocument.looksBinary(first) || TextDocument.looksBinary(second) {
                 result.content = .binary(
-                    left: first, right: second,
+                    left: first,
+                    right: second,
                     diff: BinaryDiff.compute(
-                        left: first, right: second, bytesPerLine: bytesPerLine, cancellation: cancellation))
+                        left: first,
+                        right: second,
+                        bytesPerLine: bytesPerLine,
+                        cancellation: cancellation
+                    )
+                )
             } else {
                 let documents = Parallel.map([first, second]) { TextDocument(data: $0) }
                 result.content = text(
-                    left: documents[0], right: documents[1], options: options, cancellation: cancellation)
+                    left: documents[0],
+                    right: documents[1],
+                    options: options,
+                    cancellation: cancellation
+                )
             }
             result.wasCancelled = cancellation.isCancelled
         } catch {
@@ -120,17 +151,26 @@ public enum CompareLoader {
 
     /// Lays two texts side by side.
     public static func text(
-        left: TextDocument, right: TextDocument, options: DiffOptions, anchors: [(left: Int, right: Int)] = [],
+        left: TextDocument,
+        right: TextDocument,
+        options: DiffOptions,
+        anchors: [(left: Int, right: Int)] = [],
         cancellation: CancellationFlag? = nil
     ) -> CompareContent {
         let diff = TextDiff.compute(
-            left: left.lines, right: right.lines, options: options, anchors: anchors, cancellation: cancellation)
+            left: left.lines,
+            right: right.lines,
+            options: options,
+            anchors: anchors,
+            cancellation: cancellation
+        )
         let widths = Parallel.map([left.lines, right.lines]) { lines in
             lines.reduce(0) { max($0, $1.text.utf16.count) }
         }
         return .text(left: left, right: right, diff: diff, width: max(widths[0], widths[1]))
     }
 
+    /// The whole file; throws `CancellationError` when cancelled before the end.
     static func read(_ url: URL, fileSystems: FileSystemRegistry, cancellation: CancellationFlag) throws -> Data {
         // What a plugin still holds back for this file (an archive written after a delay) is written first.
         try fileSystems.flushPendingWrites(to: url, cancellation: cancellation)
@@ -140,7 +180,11 @@ public enum CompareLoader {
         defer { withExtendedLifetime(token) {} }
         var data = Data()
         while try autoreleasepool(invoking: { () throws -> Bool in
-            guard !cancellation.isCancelled, let block = try reader.read(upToCount: 1 << 20), !block.isEmpty else {
+            // A part of the file is no file to compare.
+            if cancellation.isCancelled {
+                throw CancellationError()
+            }
+            guard let block = try reader.read(upToCount: 1 << 20), !block.isEmpty else {
                 return false
             }
             data.append(block)
@@ -153,16 +197,21 @@ public enum CompareLoader {
 
     /// Whether two files of `size` bytes have the same content; nil when cancelled.
     public static func identical(
-        _ first: URL, _ second: URL, size: Int64, fileSystems: FileSystemRegistry,
-        cancellation: CancellationFlag = CancellationFlag(), stretch: Int = Self.stretch
+        _ first: URL,
+        _ second: URL,
+        size: Int64,
+        fileSystems: FileSystemRegistry,
+        cancellation: CancellationFlag = CancellationFlag(),
+        stretch: Int = Self.stretch
     ) throws -> Bool? {
         if cancellation.isCancelled { return nil }
         try fileSystems.flushPendingWrites(to: first, cancellation: cancellation)
         try fileSystems.flushPendingWrites(to: second, cancellation: cancellation)
         let systems = [try fileSystems.provider(for: first), try fileSystems.provider(for: second)]
-        let isLocal = zip(systems, [first, second]).allSatisfy {
-            $0.volume(of: $1, cancellation: cancellation)?.isLocal ?? false
-        }
+        let isLocal = zip(systems, [first, second])
+            .allSatisfy {
+                $0.volume(of: $1, cancellation: cancellation)?.isLocal ?? false
+            }
         // (A size is what a file system says; a server may say anything.)
         let stretches = Int(max(0, size).addingSaturated(Int64(stretch) - 1) / Int64(stretch))
         guard isLocal, stretches > 1 else {
@@ -244,7 +293,10 @@ public enum CompareLoader {
 
     /// Reads the two files once, side by side, and stops at the first difference.
     private static func sameStream(
-        _ first: URL, _ second: URL, systems: [any FileSystemProvider], cancellation: CancellationFlag
+        _ first: URL,
+        _ second: URL,
+        systems: [any FileSystemProvider],
+        cancellation: CancellationFlag
     ) throws -> Bool? {
         var readers: [any FileReader] = []
         var tokens: [AnyObject] = []

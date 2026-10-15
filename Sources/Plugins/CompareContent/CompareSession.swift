@@ -46,6 +46,8 @@ final class CompareSession {
     var forceBinary = false
     var bytesPerLine: Int
     var runsInline = false
+    /// Which files are checked for being identical first, and which are too large to be shown.
+    var limits = CompareLoader.Limits.standard
     /// Called on the main thread whenever something the window shows has changed.
     var onChange: () -> Void = {}
 
@@ -151,8 +153,8 @@ final class CompareSession {
             completion(false)
             return
         }
-        let (fileSystems, forceBinary, options, bytesPerLine) = (
-            self.fileSystems, self.forceBinary, self.options, self.bytesPerLine
+        let (fileSystems, forceBinary, options, bytesPerLine, limits) = (
+            self.fileSystems, self.forceBinary, self.options, self.bytesPerLine, self.limits
         )
         background(
             { cancellation in
@@ -163,7 +165,8 @@ final class CompareSession {
                     options: options,
                     bytesPerLine: bytesPerLine,
                     fileSystems: fileSystems,
-                    cancellation: cancellation
+                    cancellation: cancellation,
+                    limits: limits
                 )
             },
             finish: { [self] result, wasCancelled in
@@ -444,7 +447,8 @@ final class CompareSession {
 
     private var searching: CancellationFlag?
 
-    nonisolated private static func search(
+    /// The search behind `find`; nil when nothing is found or `cancellation` was set.
+    nonisolated static func search(
         _ content: CompareContent,
         _ needle: String,
         from row: Int,
@@ -704,11 +708,12 @@ final class CompareSession {
                     if let error = saved.error {
                         kernel.interaction.report(error, title: "\(displayPath(saved.side)) could not be saved.")
                     } else {
-                        // What was written is now the file on disk, whatever was edited since.
+                        // What was written is now the file on disk, whatever was edited since (a link
+                        // is saved where it leads, so this is never the link).
                         if saved.side == .left {
-                            loaded.left = saved.item?.isSymlink == true ? nil : saved.item
+                            loaded.left = saved.item
                         } else {
-                            loaded.right = saved.item?.isSymlink == true ? nil : saved.item
+                            loaded.right = saved.item
                         }
                         // Only what was saved is settled: an edit made while the job ran is still unsaved.
                         if editGeneration == generation {
