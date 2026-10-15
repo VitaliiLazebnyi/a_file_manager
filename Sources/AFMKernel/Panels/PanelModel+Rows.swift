@@ -70,9 +70,12 @@ extension PanelModel {
     }
 
     /// Where in `items` the entry at a place of `listedItems` is shown; nil when it is not.
+    ///
+    /// `place` is a place of the present `listedItems`.
     internal func shownIndex(ofPlace place: Int) -> Int? {
         guard let shownPlaces else {
-            return place < listedItems.count ? place : nil
+            // Without a filter every entry is shown where it is listed.
+            return place
         }
         return shownPlaces.row(ofPlace: place)
     }
