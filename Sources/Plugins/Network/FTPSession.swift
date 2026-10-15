@@ -351,7 +351,8 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
             }
             var attempts = 0
             var askedUnprotected = knowsUnprotected
-            while true {
+            let opened: FTPConnection
+            login: while true {
                 attempts += 1
                 // A password on plain FTP can be read by anyone on the way.
                 if profile.tls == .none, profile.user != "anonymous", !(profile.password ?? "").isEmpty,
@@ -399,7 +400,8 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
                     // Kept only now that the server took it.
                     if remember, let password = profile.password { environment.rememberPassword(profile, password) }
                     startKeepAlive()
-                    return connection
+                    opened = connection
+                    break login
                 } catch NetworkError.untrustedCertificate(let certificate) {
                     guard attempts < 4 else { throw NetworkError.untrustedCertificate(certificate) }
                     let host = profile.key.host
@@ -422,6 +424,7 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
                     try credentials(message)
                 }
             }
+            return opened
         } catch {
             condition.lock()
             loginRounds += 1
@@ -452,7 +455,8 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
         /// After the server said it has no room for another connection (421): when to ask
         /// again, how often that was done, and what it said.
         var (openNotBefore, busyRetries, busyReply): (Date?, Int, FTPReply?) = (nil, 0, nil)
-        while true {
+        let acquired: (connection: FTPConnection, reused: Bool)
+        acquiring: while true {
             if cancellation?.isCancelled == true { throw NetworkError.cancelled }
             condition.lock()
             var candidate: FTPConnection?
@@ -516,13 +520,15 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
                     continue
                 }
                 register(connection)
-                return (connection, true)
+                acquired = (connection, true)
+                break acquiring
             }
             if mayOpen {
                 do {
                     let connection = try openConnection(cancellation: cancellation, background: background)
                     register(connection)
-                    return (connection, false)
+                    acquired = (connection, false)
+                    break acquiring
                 } catch {
                     condition.lock()
                     total -= 1
@@ -547,6 +553,7 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
                 }
             }
         }
+        return acquired
     }
 
     /// How many connections are held for files of this kind. Called with the lock held.
@@ -603,11 +610,12 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
         _ work: (FTPConnection) throws -> Result
     ) throws -> (result: Result, connection: FTPConnection) {
         var (connection, reused) = try acquire(transfer: transfer, cancellation: cancellation)
-        while true {
+        let result: Result
+        attempt: while true {
             do {
-                let result = try work(connection)
+                result = try work(connection)
                 if transfer == nil { release(connection, transfer: nil) }
-                return (result, connection)
+                break attempt
             } catch let error as NetworkError
                 where error.isConnectionLevel && reused && !connection.isUsable && mayRetry(connection)
             {
@@ -620,6 +628,7 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
                 throw error
             }
         }
+        return (result, connection)
     }
 
     /// A command, or a few that belong together. One that must not happen twice (it creates,
@@ -677,7 +686,7 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
             else {
                 isPinging = false
                 condition.unlock()
-                return
+                break
             }
             let connection = idle.remove(at: index)
             tested.insert(ObjectIdentifier(connection))
@@ -780,7 +789,7 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
                 pendingLinks = []
                 isResolving = false
                 condition.unlock()
-                return
+                break
             }
             let batch = Array(pendingLinks.prefix(Self.backgroundLinkBatch))
             pendingLinks.removeFirst(batch.count)
