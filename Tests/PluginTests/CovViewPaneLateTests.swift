@@ -182,4 +182,29 @@ internal struct CovViewPaneLateTests {
         source.release()
         #expect(await bench.wait { pane.statusText.contains("Read error") })
     }
+
+    /// A selection whose text cannot be read any more gives nothing to look up.
+    @Test
+    internal func aSelectionThatCannotBeReadOpensNothing() async throws {
+        let bench = try CoverageViewerPaneBench()
+        defer { bench.close() }
+        let pane = try #require(await bench.open(try bench.file("notes.txt", text: "notes")))
+        #expect(await bench.textShown(pane))
+        // The pager shows a text read straight from a source that then fails.
+        let source = CoverageViewerHeldSource("https://example.com/a and more")
+        let document = TextDocument(source: source, encoding: .utf8, layout: pane.layout)
+        pane.pager.show(document, select: 0..<21, parallel: false)
+        #expect(await bench.wait { pane.pager.document === document && pane.pager.selection == 0..<21 })
+        source.fail(true)
+        let menu = try #require(pane.makeContextMenu())
+        let index = try #require(menu.items.firstIndex { $0.title == "Open the selection as a link in the browser" })
+        menu.performActionForItem(at: index)
+        Self.drain(pane)
+        await CoverageViewerPagerBench.settleAlone()
+        #expect(bench.links.opened.isEmpty)
+        // Read again, it opens.
+        source.fail(false)
+        menu.performActionForItem(at: index)
+        #expect(await bench.wait { bench.links.opened.map(\.absoluteString) == ["https://example.com/a"] })
+    }
 }
