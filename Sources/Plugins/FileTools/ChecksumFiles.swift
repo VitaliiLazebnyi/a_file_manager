@@ -46,14 +46,21 @@ enum ChecksumFile {
     /// paths; the other one is that of the Windows original: CRLF and `\`. The text is UTF-8;
     /// `byteOrderMark` puts the mark in front that the original needs to read it as such.
     static func contents(
-        _ entries: [(name: String, digest: [UInt8])], method: ChecksumMethod, unixFormat: Bool, byteOrderMark: Bool
+        _ entries: [(name: String, digest: [UInt8])],
+        method: ChecksumMethod,
+        unixFormat: Bool,
+        byteOrderMark: Bool
     ) -> Data {
         let end = unixFormat ? "\n" : "\r\n"
-        let text = entries.map { entry in
-            line(
-                name: unixFormat ? entry.name : entry.name.replacingOccurrences(of: "/", with: "\\"),
-                digest: entry.digest, method: method) + end
-        }.joined()
+        let text =
+            entries.map { entry in
+                line(
+                    name: unixFormat ? entry.name : entry.name.replacingOccurrences(of: "/", with: "\\"),
+                    digest: entry.digest,
+                    method: method
+                ) + end
+            }
+            .joined()
         return (byteOrderMark ? Data([0xEF, 0xBB, 0xBF]) : Data()) + Data(text.utf8)
     }
 
@@ -176,7 +183,9 @@ enum ChecksumFile {
         var parsed = Parsed()
         // Lines end with LF, CR or CRLF only: other line separators of Unicode can be part of a name.
         let lines = text.split(
-            omittingEmptySubsequences: false, whereSeparator: { $0 == "\n" || $0 == "\r" || $0 == "\r\n" })
+            omittingEmptySubsequences: false,
+            whereSeparator: { $0 == "\n" || $0 == "\r" || $0 == "\r\n" }
+        )
         for (index, rawLine) in lines.enumerated() {
             var line = rawLine.trimmingCharacters(in: .whitespaces)
             guard !line.isEmpty else { continue }
@@ -194,8 +203,12 @@ enum ChecksumFile {
             if let open = line.firstIndex(of: "("), let close = line.range(of: ")", options: .backwards)?.lowerBound,
                 open < close,
                 let tagged = tags[
-                    line[..<open].trimmingCharacters(in: .whitespaces).uppercased().replacingOccurrences(
-                        of: "_", with: "-")]
+                    line[..<open].trimmingCharacters(in: .whitespaces).uppercased()
+                        .replacingOccurrences(
+                            of: "_",
+                            with: "-"
+                        )
+                ]
             {
                 let digest = line[line.index(after: close)...].drop { $0 == "=" || $0 == " " }
                 let name = decoded(String(line[line.index(after: open)..<close]))
@@ -220,7 +233,8 @@ enum ChecksumFile {
                     parsed.unreadableLines.append(index + 1)
                 } else {
                     parsed.entries.append(
-                        Entry(name: entryName, digest: first.lowercased(), method: fittingFileMethod(first)))
+                        Entry(name: entryName, digest: first.lowercased(), method: fittingFileMethod(first))
+                    )
                 }
                 continue
             }
@@ -267,7 +281,7 @@ struct VerifyReport {
 
     /// `<METHOD>: Errors: N`
     var title: String {
-        let method = methods.count == 1 ? methods.first?.reportName ?? "" : "Checksums"
+        let method = methods.count == 1 ? methods.map(\.reportName).joined() : "Checksums"
         return "\(method): Errors: \(errors)"
     }
 
@@ -286,15 +300,17 @@ struct VerifyReport {
         var lines: [String] = []
         for section in sections {
             lines.append(section.title + ":")
-            lines += section.rows.filter { !onlyErrors || $0.result != .ok }.map {
-                Self.row($0.name, $0.result)
-            }
+            lines += section.rows.filter { !onlyErrors || $0.result != .ok }
+                .map {
+                    Self.row($0.name, $0.result)
+                }
             lines.append("")
         }
         lines.append("Errors: \(errors)")
         lines.append(
             "OK: \(count(.ok)), not found: \(count(.notFound)), read error: \(count(.readError)), wrong checksum: \(count(.wrongChecksum))"
-                + (count(.unreadable) > 0 ? ", unreadable: \(count(.unreadable))" : ""))
+                + (count(.unreadable) > 0 ? ", unreadable: \(count(.unreadable))" : "")
+        )
         return lines.joined(separator: "\n") + "\n"
     }
 }
@@ -323,7 +339,9 @@ enum ChecksumRun {
                     // hasher at the same time, each on its own thread.
                     // BLAKE3 spreads a block over the cores itself, which pays only for large ones.
                     try run.read(
-                        file.url, counted: counted, blockSize: methods.contains(.blake3) ? 4 << 20 : ToolRun.blockSize
+                        file.url,
+                        counted: counted,
+                        blockSize: methods.contains(.blake3) ? 4 << 20 : ToolRun.blockSize
                     ) { block in
                         // BLAKE3 spreads a large block over the cores on its own; while the files themselves
                         // keep every core busy that only makes more threads than cores, so it is fed pieces too
@@ -417,8 +435,12 @@ enum ChecksumRun {
         for operand in operands {
             try run.checkCancelled()
             if operand.isRealDirectory {
-                let items = try run.provider(for: operand.url).list(
-                    operand.url, showHidden: true, cancellation: run.cancellation)
+                let items = try run.provider(for: operand.url)
+                    .list(
+                        operand.url,
+                        showHidden: true,
+                        cancellation: run.cancellation
+                    )
                 files += try self.files(below: Sorter.sorted(items, numeric: true, byName: \.name), run: run)
             } else if !operand.isDirectory {
                 files.append(operand)
@@ -446,8 +468,10 @@ enum ChecksumRun {
             return folder.appending(name: folderName + "." + options.method.fileExtension)
         }
         if options.separatePerFile {
-            return target.deletingLastPathComponent().appending(
-                name: separateName(for: file.name, pattern: target.lastPathComponent, method: options.method))
+            return target.deletingLastPathComponent()
+                .appending(
+                    name: separateName(for: file.name, pattern: target.lastPathComponent, method: options.method)
+                )
         }
         return target
     }
@@ -521,10 +545,17 @@ enum ChecksumRun {
             var written: [URL] = []
             for group in groups {
                 let mark = ChecksumFile.needsByteOrderMark(
-                    names: group.entries.map(\.name), unixFormat: options.unixFormat, alwaysUTF8: options.alwaysUTF8)
+                    names: group.entries.map(\.name),
+                    unixFormat: options.unixFormat,
+                    alwaysUTF8: options.alwaysUTF8
+                )
                 try run.provider(for: group.url).createDirectory(at: group.url.deletingLastPathComponent())
                 let data = ChecksumFile.contents(
-                    group.entries, method: options.method, unixFormat: options.unixFormat, byteOrderMark: mark)
+                    group.entries,
+                    method: options.method,
+                    unixFormat: options.unixFormat,
+                    byteOrderMark: mark
+                )
                 if let url = try run.write(data, to: group.url, deferred: true) { written.append(url) }
             }
             return written
@@ -551,12 +582,16 @@ enum ChecksumRun {
             let parsed: ChecksumFile.Parsed
             do {
                 parsed = ChecksumFile.parseLines(
-                    ChecksumFile.text(from: try run.contents(of: file.url)), fileName: file.name)
+                    ChecksumFile.text(from: try run.contents(of: file.url)),
+                    fileName: file.name
+                )
             } catch {
                 // A checksum file that cannot be read is an error of its own; the others are still checked.
                 try run.checkCancelled()
-                report.sections[report.sections.count - 1].rows.append(
-                    ("the file (\(error.localizedDescription))", .unreadable))
+                report.sections[report.sections.count - 1].rows
+                    .append(
+                        ("the file (\(error.localizedDescription))", .unreadable)
+                    )
                 continue
             }
             // What cannot be read is never "no errors": every such line counts, and so does a file without checksums.
@@ -564,8 +599,10 @@ enum ChecksumRun {
                 report.sections[report.sections.count - 1].rows.append(("line \(number)", .unreadable))
             }
             if parsed.entries.isEmpty, parsed.unreadableLines.isEmpty {
-                report.sections[report.sections.count - 1].rows.append(
-                    ("any checksum (the file has none)", .unreadable))
+                report.sections[report.sections.count - 1].rows
+                    .append(
+                        ("any checksum (the file has none)", .unreadable)
+                    )
             }
             for entry in parsed.entries {
                 // A name is taken as written; a Windows path is tried with `/` when that finds nothing.
@@ -585,12 +622,19 @@ enum ChecksumRun {
                 if let named = methods.first { report.methods.insert(named) }
                 pending.append(
                     Pending(
-                        section: report.sections.count - 1, name: entry.name, url: url, entry: entry, methods: methods,
-                        size: item.flatMap { $0.isDirectory ? nil : $0.size }))
+                        section: report.sections.count - 1,
+                        name: entry.name,
+                        url: url,
+                        entry: entry,
+                        methods: methods,
+                        size: item.flatMap { $0.isDirectory ? nil : $0.size }
+                    )
+                )
             }
         }
         let present = pending.filter { $0.size != nil }
-        run.expect(bytes: present.reduce(0) { $0.addingSaturated($1.size ?? 0) }, items: present.count)
+        let sizes = pending.compactMap(\.size)
+        run.expect(bytes: sizes.reduce(0) { $0.addingSaturated($1) }, items: sizes.count)
         run.show(["Verifying checksums"])
         let digests = digests(of: present.map { ($0.url, $0.methods, $0.entry.digest) }, run: run)
         try run.checkCancelled()
@@ -618,7 +662,9 @@ enum ChecksumRun {
         run.expect(bytes: files.reduce(0) { $0.addingSaturated($1.item.size) }, items: files.count)
         run.show(["Verifying checksums"])
         let digests = digests(
-            of: zip(files, methods).map { ($0.0.item.url, $0.1, $0.0.digest.lowercased()) }, run: run)
+            of: zip(files, methods).map { ($0.0.item.url, $0.1, $0.0.digest.lowercased()) },
+            run: run
+        )
         try run.checkCancelled()
         var rows: [(name: String, result: VerifyResult)] = []
         for (index, file) in files.enumerated() {
@@ -628,7 +674,8 @@ enum ChecksumRun {
                     report.methods = [methods[index][match]]
                 }
                 rows.append(
-                    (file.item.name, found.contains { $0.hex == file.digest.lowercased() } ? .ok : .wrongChecksum))
+                    (file.item.name, found.contains { $0.hex == file.digest.lowercased() } ? .ok : .wrongChecksum)
+                )
 
             case .failure:
                 rows.append((file.item.name, .readError))

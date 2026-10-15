@@ -25,15 +25,21 @@ public final class FileToolsPlugin: Plugin {
     public func start(in owner: Kernel) {
         // The kernel keeps what is registered here; it must not be kept by it in turn.
         unowned let kernel = owner
-        let tools = FileTools(kernel, pasteboard: pasteboard)
+        let tools = FileTools(kernel, pasteboard: pasteboard ?? .general)
         let source = { kernel.panels.source.model }
         let onFile = { source().cursorItem.map { !$0.isDirectory } ?? false }
         let hasOperands = { source().hasOperands }
         let commands = kernel.commands
-        commands.register(Command(.splitFile, "Split File…"), enabled: onFile, tools.split)
-        commands.register(Command(.combineFiles, "Combine Files…"), enabled: onFile, tools.combine)
-        commands.register(Command(.encodeFile, "Encode File (MIME, UUE, XXE)…"), enabled: onFile, tools.encode)
-        commands.register(Command(.decodeFile, "Decode File (MIME, UUE, XXE, yEnc)…"), enabled: onFile, tools.decode)
+        // The four take the file under the cursor; they are offered only on a file.
+        let file = { source().cursorItem }
+        commands.register(Command(.splitFile, "Split File…"), enabled: onFile) { _ = file().map(tools.split) }
+        commands.register(Command(.combineFiles, "Combine Files…"), enabled: onFile) { _ = file().map(tools.combine) }
+        commands.register(Command(.encodeFile, "Encode File (MIME, UUE, XXE)…"), enabled: onFile) {
+            _ = file().map(tools.encode)
+        }
+        commands.register(Command(.decodeFile, "Decode File (MIME, UUE, XXE, yEnc)…"), enabled: onFile) {
+            _ = file().map(tools.decode)
+        }
         commands.register(
             Command(.createChecksums, "Create Checksum File(s) (CRC32, MD5, SHA)…"),
             enabled: hasOperands,
@@ -115,9 +121,9 @@ final class FileTools {
 
     /// Unowned: the kernel owns the plugin, and through it this.
     private unowned let kernel: Kernel
-    private let pasteboard: NSPasteboard?
+    private let pasteboard: NSPasteboard
 
-    init(_ kernel: Kernel, pasteboard: NSPasteboard?) {
+    init(_ kernel: Kernel, pasteboard: NSPasteboard) {
         self.kernel = kernel
         self.pasteboard = pasteboard
     }
@@ -128,15 +134,6 @@ final class FileTools {
     private var fileSystems: FileSystemRegistry { kernel.fileSystems }
 
     // MARK: Common
-
-    /// The file under the cursor, or the message of the spec when there is none.
-    private func cursorFile() -> FileItem? {
-        guard let item = source.cursorItem, !item.isDirectory else {
-            ui.inform("No files selected!")
-            return nil
-        }
-        return item
-    }
 
     /// The other panel's folder, as the dialogs propose it.
     private var targetProposal: String { fileSystems.displayPath(kernel.panels.target.model.directory) }
@@ -203,8 +200,7 @@ final class FileTools {
 
     // MARK: Split and combine
 
-    func split() {
-        guard let file = cursorFile() else { return }
+    func split(_ file: FileItem) {
         let directory = source.directory
         let presets = ["(the size typed above)"] + Splitter.presets.map(\.title)
         let fields: [FormField] = [
@@ -242,8 +238,7 @@ final class FileTools {
         )
     }
 
-    func combine() {
-        guard let file = cursorFile() else { return }
+    func combine(_ file: FileItem) {
         let directory = source.directory
         let fields: [FormField] = [
             .note("Combine \(file.name) and all files with ascending names to the following directory:"),
@@ -290,8 +285,7 @@ final class FileTools {
 
     // MARK: Encode and decode
 
-    func encode() {
-        guard let file = cursorFile() else { return }
+    func encode(_ file: FileItem) {
         let directory = source.directory
         let lastLines = settings.index(Keys.encodeLines, default: 0)
         let fields: [FormField] = [
@@ -332,8 +326,7 @@ final class FileTools {
         )
     }
 
-    func decode() {
-        guard let file = cursorFile() else { return }
+    func decode(_ file: FileItem) {
         let directory = source.directory
         let fields: [FormField] = [
             .note("Decode the file \(file.name) to directory:"), .text("target", "", targetProposal),
@@ -372,32 +365,22 @@ final class FileTools {
     // MARK: Checksums
 
     /// The proposal of "Save CRC file(s) to": next to the one file under its name, or, for
-    /// several items, in the source folder under the folder's name.
-    nonisolated static func checksumProposal(for operands: [FileItem], in directory: URL, method: ChecksumMethod) -> URL
-    {
-        checksumProposal(count: operands.count, firstName: operands.first?.name, in: directory, method: method)
-    }
-
-    /// The same from how many items there are and the name of the first, which is all it needs.
+    /// several items, in the source folder under the folder's name (`checksums` at a root),
+    /// from how many items there are and the name of the first, which is all it needs.
     nonisolated static func checksumProposal(count: Int, firstName: String?, in directory: URL, method: ChecksumMethod)
         -> URL
     {
-        let name =
-            count == 1
-            ? firstName ?? "" : (directory.lastPathComponent == "/" ? "checksums" : directory.lastPathComponent)
-        return directory.appending(name: (name.isEmpty ? "checksums" : name) + "." + method.fileExtension)
+        let name = count == 1 ? firstName : (directory.lastPathComponent == "/" ? nil : directory.lastPathComponent)
+        return directory.appending(name: (name ?? "checksums") + "." + method.fileExtension)
     }
 
     func createChecksums() {
         let model = source
         // The operands are made on the job's thread: with 300,000 marks that is a pass over them, and the form needs
         // only how many there are and, for one, its name.
+        // Offered only where there are operands: the marked ones, or the item under the cursor.
         let (operands, directory) = (model.operandsSnapshot(), model.directory)
-        let count = operands.markedCount > 0 ? operands.markedCount : (operands.cursorItem == nil ? 0 : 1)
-        guard count > 0 else {
-            ui.inform("No files selected!")
-            return
-        }
+        let count = max(operands.markedCount, 1)
         let firstName = count == 1 ? operands.items().first?.name : nil
         let lastMethod = ChecksumMethod(rawValue: settings.index(Keys.checksumMethod, default: 0)) ?? .crc32
         let proposal = fileSystems.displayPath(
@@ -429,7 +412,7 @@ final class FileTools {
                 "method",
                 "Checksum method:",
                 ChecksumMethod.dialogOrder.map(\.title),
-                selected: ChecksumMethod.dialogOrder.firstIndex(of: lastMethod) ?? 0
+                selected: lastMethod.dialogPosition
             ),
             .note(
                 "The extension follows the method while the proposed name is unchanged. Separate files take a name with *: "
@@ -534,7 +517,7 @@ final class FileTools {
 
     /// The text on the clipboard. Main thread: `NSPasteboard` is not made for other threads.
     private func clipboardText() -> String? {
-        (pasteboard ?? .general).string(forType: .string)
+        pasteboard.string(forType: .string)
     }
 
     private func verify(
