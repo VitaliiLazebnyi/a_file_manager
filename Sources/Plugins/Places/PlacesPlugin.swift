@@ -1,5 +1,6 @@
 import AFMContracts
 public import AFMKernel
+import AppKit
 public import Foundation
 
 extension CommandID {
@@ -49,6 +50,9 @@ public final class PlacesPlugin: Plugin {
     private var subscription: AnyObject?
     /// The Directory Tree window, once it was opened; it is kept for the next time.
     private(set) var treeWindow: DirectoryTreeWindowController?
+    /// Puts the tree window on screen. Tests replace it, so that no window shows in the
+    /// session they run in, and look at what it was asked to show.
+    internal var present: @MainActor (NSWindowController) -> Void = { $0.showWindow(nil) }
     /// Stored data that could not be read in full is reported once per key and run.
     private var reportedKeys = Set<String>()
     private var lastNoted: URL?
@@ -124,6 +128,7 @@ public final class PlacesPlugin: Plugin {
             let source = kernel.panels.source.model
             let controller = treeWindow ?? DirectoryTreeWindowController(kernel: kernel, cache: treeCache)
             treeWindow = controller
+            controller.present = present
             controller.show(for: source.directory, showHidden: source.showHidden)
         }
 

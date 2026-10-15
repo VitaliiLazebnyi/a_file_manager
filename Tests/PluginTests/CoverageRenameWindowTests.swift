@@ -550,6 +550,8 @@ import Testing
     let box: Sandbox
     let plugin: MultiRenamePlugin
     let bench: TestBench
+    /// The windows the tool was asked to show: none is put on screen.
+    let presenter = StabilityPresenter()
 
     init() throws {
         _ = NSApplication.shared
@@ -557,13 +559,17 @@ import Testing
         memory.addFile("/p/a.txt")
         memory.addFile("/p/b.txt")
         plugin = MultiRenamePlugin(logDirectory: box.url("log"))
+        plugin.present = presenter.present
         bench = TestBench(plugins: [plugin], fileSystems: [memory], left: memory.url("/p"), right: memory.url("/p"))
     }
 
-    var windows: [NSWindow] { NSApp.windows.filter { $0.title == "Multi-Rename Tool" && $0.isVisible } }
+    var windows: [NSWindow] { presenter.open.filter { $0.title == "Multi-Rename Tool" } }
 
     @Test func openingAgainReplacesTheWindowAndClosingKeepsTheSettings() async {
-        defer { plugin.stop() }
+        defer {
+            plugin.stop()
+            presenter.closeAll()
+        }
         bench.left.model.selectAll()
         #expect(bench.commands.perform(.multiRename))
         let first = plugin.session

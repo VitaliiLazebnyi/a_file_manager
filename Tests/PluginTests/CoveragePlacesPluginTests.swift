@@ -152,13 +152,16 @@ import Testing
     @Test func theTreeCommandOpensOneWindowAndReusesIt() {
         _ = NSApplication.shared
         let bench = bench()
-        defer { plugin.treeWindow?.close() }
+        let presenter = StabilityPresenter()
+        plugin.present = presenter.present
+        defer { presenter.closeAll() }
         bench.commands.perform(.directoryTree)
         let first = plugin.treeWindow
         bench.commands.perform(.directoryTree)
-        #expect(first != nil && plugin.treeWindow === first && first?.window?.isVisible == true)
+        #expect(first != nil && plugin.treeWindow === first && presenter.isOpen(first?.window))
+        #expect(presenter.presented.count == 2)
         // A scan it started ends with the plugin.
         plugin.stop()
-        #expect(first?.window?.isVisible == false)
+        #expect(!presenter.isOpen(first?.window))
     }
 }
