@@ -181,9 +181,11 @@ extension PanelViewController {
     ) -> Bool {
         let id = ObjectIdentifier(tab)
         if renameField != nil || loads[id] != nil {
-            let isCovered =
-                renameField == nil
-                && (loads[id].map { load in reread.changedAt.map { $0 < load.started } ?? false } ?? false)
+            // A reading that began after the change sees it.
+            var isCovered = false
+            if renameField == nil, let load = loads[id], let changedAt = reread.changedAt {
+                isCovered = changedAt < load.started
+            }
             if reread.marksDirty, !isCovered {
                 noteChange(in: tab)
             }

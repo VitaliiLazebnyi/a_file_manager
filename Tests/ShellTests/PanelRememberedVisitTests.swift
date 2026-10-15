@@ -141,11 +141,14 @@ internal struct PanelRememberedVisitTests {
     @Test
     internal func aVisitThatFailsWhileTheTabWasOpeningGoesBackToWhereItCameFrom() async {
         await rememberA()
-        memory.addFile("/c/z.txt")
-        memory.listStartDelay = 2
-        panel.show(memory.url("/c"), focus: nil, history: .record, completion: nil)
+        let slow = ScriptedFileSystem()
+        slow.inner.addDirectory("/c")
+        slow.batches = [[slow.item(named: "z.txt", in: "/c")]]
+        slow.holdBefore = 0
+        kernel.fileSystems.register(slow)
+        defer { slow.open() }
+        panel.show(slow.url("/c"), focus: nil, history: .record, completion: nil)
         #expect(await PanelWait.until { panel.model.isOpening })
-        memory.listStartDelay = 0
         panel.model.setSort(ListOrder(key: .name, descending: true))
         let ahead = Ahead()
         host.joinable = ahead.joined

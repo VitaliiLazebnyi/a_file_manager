@@ -59,6 +59,8 @@ internal struct PanelGridDropTests {
         info.draggingLocation = PanelDropHelpers.point(ofRow: 2, in: grid)
         #expect(grid.draggingUpdated(info) == .move && grid.dropRow == -1)
         grid.display()
+        // (A drag of this program that another test left under way would keep the session.)
+        PanelDrop.endDrag()
         grid.draggingExited(info)
         #expect(grid.dropRow == nil && PanelDrop.session == nil)
         let own = PanelDropHelpers.pasteboard([program.box.url("A/one.txt")])

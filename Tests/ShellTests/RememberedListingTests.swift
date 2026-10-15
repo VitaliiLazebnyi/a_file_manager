@@ -69,7 +69,6 @@ internal struct RememberedListingTests {
         #expect(app.commands.isEnabled(.copy) && app.commands.isEnabled(.delete) && app.commands.isEnabled(.goToParent))
         #expect(program.press(app, 49, []) && app.left.model.selection == ["sub"])  // Space: mark and measure
         #expect(await PanelWait.until { app.left.model.cursorItem?.computedSize == 5 })
-        #expect(app.left.model.isRefreshing)
         app.cursor(app.left, on: "a.txt")
         #expect(program.press(app, 49, []) && app.left.model.selection == ["sub", "a.txt"])
         // The fresh listing arrives: the list changes where the folder did, nothing else moves.

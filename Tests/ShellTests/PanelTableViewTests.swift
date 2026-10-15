@@ -85,6 +85,8 @@ internal struct PanelTableViewTests {
             allowed: PanelDraggingInfo.anything
         )
         _ = PanelDrop.session(for: info)
+        // (A drag of this program that another test left under way would keep the session.)
+        PanelDrop.endDrag()
         table.draggingExited(info)
         #expect(PanelDrop.session == nil)
         _ = PanelDrop.session(for: info)
