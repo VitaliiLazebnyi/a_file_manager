@@ -44,15 +44,16 @@ extension ParallelPool {
 
     /// The caller's share of its own job: pieces until none is left to take.
     internal func work(on job: Job) {
-        while true {
-            condition.lock()
-            let piece = take(from: job)
-            condition.unlock()
-            guard let piece else {
-                return
-            }
+        while let piece = takeLocked(from: job) {
             perform(piece, of: job, countedFor: nil)
         }
+    }
+
+    /// `take(from:)` under the lock.
+    private func takeLocked(from job: Job) -> Range<Int>? {
+        condition.lock()
+        defer { condition.unlock() }
+        return take(from: job)
     }
 
     /// Starts a thread of the pool's own, counted in `threads` already.

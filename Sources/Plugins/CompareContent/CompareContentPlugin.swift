@@ -13,6 +13,7 @@ import Foundation
 public final class CompareContentPlugin: Plugin {
     public let name = "CompareContent"
     private let opensWindows: Bool
+    private let effects: CompareWindowEffects
     /// The sessions of the open windows; without windows (tests), the last one started.
     private(set) var sessions: [CompareSession] = []
     private var windows: [CompareWindowController] = []
@@ -20,8 +21,14 @@ public final class CompareContentPlugin: Plugin {
 
     /// Tests pass `opensWindows: false` and look at the session; the work then runs on the
     /// calling thread.
-    public init(opensWindows: Bool = true) {
+    public convenience init(opensWindows: Bool = true) {
+        self.init(opensWindows: opensWindows, effects: .system)
+    }
+
+    /// Windows whose beeps, file panel, font panel and clipboard are `effects`.
+    init(opensWindows: Bool, effects: CompareWindowEffects) {
         self.opensWindows = opensWindows
+        self.effects = effects
     }
 
     public func start(in owner: Kernel) {
@@ -96,7 +103,7 @@ public final class CompareContentPlugin: Plugin {
         // The window opens at once, so that loading two large files shows progress and can be
         // cancelled with Esc. Identical files only get the message, and so do files that
         // cannot be read (spec 09 › Opening and choosing the files): the window closes again.
-        let controller = CompareWindowController(session: session) { [weak self] closed in
+        let controller = CompareWindowController(session: session, effects: effects) { [weak self] closed in
             self?.windows.removeAll { $0 === closed }
             self?.sessions.removeAll { $0 === session }
         }

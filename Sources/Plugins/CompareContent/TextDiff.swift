@@ -129,7 +129,18 @@ public struct TextDiff: Equatable, Sendable {
         anchors: [(left: Int, right: Int)] = [], costLimit: Int? = nil,
         cancellation: CancellationFlag? = nil
     ) -> Self {
-        let keys = Parallel.map([left, right]) { options.hashes($0) }
+        compute(
+            left: left, right: right, options: options, anchors: anchors, costLimit: costLimit,
+            cancellation: cancellation, hashes: options.hashes)
+    }
+
+    /// The same with the lines' hashes made by `hashes`: a test that needs two different lines with
+    /// the same hash (which the real one as good as never gives) makes them.
+    static func compute(
+        left: [TextLine], right: [TextLine], options: DiffOptions, anchors: [(left: Int, right: Int)],
+        costLimit: Int?, cancellation: CancellationFlag?, hashes: @Sendable ([TextLine]) -> [UInt64]
+    ) -> Self {
+        let keys = Parallel.map([left, right]) { hashes($0) }
         let (leftKeys, rightKeys) = (keys[0], keys[1])
         var rows: [DiffRow] = []
         rows.reserveCapacity(max(left.count, right.count))

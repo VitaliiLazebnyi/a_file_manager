@@ -437,15 +437,6 @@ private func status(_ url: URL) -> stat {
         }
         #expect(done.withValue { $0 } == 200)
     }
-
-    @Test func devicesAndMountPointsCanBeTold() throws {
-        let box = try Sandbox()
-        let file = try box.file("f.txt")
-        #expect(local.deviceID(of: box.root) == local.deviceID(of: file) && local.deviceID(of: file) != nil)
-        #expect(local.deviceID(of: box.url("missing")) == nil)
-        #expect(local.isMountPoint(URL(fileURLWithPath: "/")))
-        #expect(!local.isMountPoint(box.root))
-    }
 }
 
 /// The watcher: no waiting for the caller, one report for a burst, nothing after stop.

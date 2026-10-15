@@ -1,6 +1,7 @@
 public import AFMContracts
 public import AFMKernel
 public import Foundation
+import os
 
 public enum JobKind: Equatable, Sendable {
     case transfer(TransferKind)
@@ -397,10 +398,19 @@ public final class FileJob: @unchecked Sendable {
 
         /// Starts `work` on a thread of its own; `group` is left when it has returned, and
         /// the worker's slot (taken by the caller beforehand) is given back.
+        ///
+        /// The work, and all it holds (the job), is let go of before the group is left: whoever
+        /// waits for the group finds nothing of the job left on the worker's thread.
         func start(in group: DispatchGroup, _ work: @escaping @Sendable () -> Void) {
             group.enter()
+            let task = OSAllocatedUnfairLock<(@Sendable () -> Void)?>(initialState: work)
             BlockingCalls.run { [slots] in
-                work()
+                // Taken out, so that nothing of it is left here once it has run.
+                let taken = task.withLock { work in
+                    defer { work = nil }
+                    return work
+                }
+                taken?()
                 slots.signal()
                 group.leave()
             }

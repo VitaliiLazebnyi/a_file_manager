@@ -13,6 +13,9 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
     private unowned let kernel: Kernel
     private let settings: any SettingsStore
     private let onClose: (CompareWindowController) -> Void
+    private let effects: CompareWindowEffects
+    /// The window, which the controller has from its start to its end.
+    private let toolWindow: ToolWindow
 
     private let leftField = NSTextField()
     private let rightField = NSTextField()
@@ -58,8 +61,13 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
         }
     }
 
-    init(session: CompareSession, onClose: @escaping (CompareWindowController) -> Void) {
+    init(
+        session: CompareSession,
+        effects: CompareWindowEffects,
+        onClose: @escaping (CompareWindowController) -> Void
+    ) {
         self.session = session
+        self.effects = effects
         self.onClose = onClose
         kernel = session.kernel
         settings = kernel.settings.scoped(to: CompareSettingsKey.scope)
@@ -77,19 +85,23 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
         window.isReleasedWhenClosed = false
         window.minSize = NSSize(width: 700, height: 360)
         window.center()
+        toolWindow = window
         super.init(window: window)
         window.delegate = self
         // Esc interrupts a running comparison; when idle it closes the window.
-        window.onEscape = { [weak self] in
-            guard let self, self.session.phase == .working else { return false }
-            self.session.cancel()
-            return true
-        }
+        window.onEscape = { [weak self] in self?.stopsComparison() == true }
         buildContent(in: window)
         session.onChange = { [weak self] in self?.refresh() }
     }
 
     required init?(coder _: NSCoder) { fatalError("not used") }
+
+    /// Esc: stops a comparison that runs, and says so; false when none runs (Esc then closes the window).
+    func stopsComparison() -> Bool {
+        guard session.phase == .working else { return false }
+        session.cancel()
+        return true
+    }
 
     func show() {
         if let url = session.leftURL ?? session.rightURL { base = url.deletingLastPathComponent() }
@@ -197,7 +209,7 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
         table.allowsMultipleSelection = true
         table.dataSource = self
         table.delegate = self
-        table.onKey = { [weak self, weak table] event in table.flatMap { self?.handleKey(event, in: $0) } ?? false }
+        table.onKey = { [weak self] event in self?.handleKey(event) ?? false }
         table.menu = makeMenu()
         let scroll = NSScrollView()
         scroll.documentView = table
@@ -311,23 +323,17 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
     @objc private func pickRight() { pickFile(for: rightField) }
 
     private func pickFile(for field: NSTextField) {
-        guard let window else { return }
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = true
-        panel.canChooseDirectories = false
-        panel.beginSheetModal(for: window) { [weak self] response in
-            guard response == .OK, let url = panel.url else { return }
+        effects.chooseFile(toolWindow) { [weak self] url in
+            guard let self, let url else { return }
             field.stringValue = url.path
-            if self?.leftField.stringValue.isEmpty == false, self?.rightField.stringValue.isEmpty == false {
-                self?.compare()
-            }
+            if !leftField.stringValue.isEmpty, !rightField.stringValue.isEmpty { compare() }
         }
     }
 
     @objc private func chooseFont() {
         NSFontManager.shared.target = self
         NSFontManager.shared.setSelectedFont(font, isMultiple: false)
-        NSFontManager.shared.orderFrontFontPanel(self)
+        effects.showFontPanel(self)
     }
 
     /// Called by the font panel.
@@ -379,9 +385,9 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
         window?.firstResponder === rightTable ? .right : .left
     }
 
-    /// Selects a row in both panes and shows it near the top.
+    /// Selects a row in both panes and shows it near the top. (Rows come from the session's current rows: a
+    /// search that the rows have changed under is dropped by the session.)
     private func go(toRow row: Int) {
-        guard row >= 0, row < session.rowCount else { return }
         leftTable.selectRowIndexes([row], byExtendingSelection: false)
         let top = leftTable.rect(ofRow: max(0, row - 3)).minY
         for table in [leftTable, rightTable] {
@@ -390,11 +396,11 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
     }
 
     @objc private func nextDifference() {
-        if let row = session.difference(from: currentRow, forward: true) { go(toRow: row) } else { NSSound.beep() }
+        if let row = session.difference(from: currentRow, forward: true) { go(toRow: row) } else { effects.beep() }
     }
 
     @objc private func previousDifference() {
-        if let row = session.difference(from: currentRow, forward: false) { go(toRow: row) } else { NSSound.beep() }
+        if let row = session.difference(from: currentRow, forward: false) { go(toRow: row) } else { effects.beep() }
     }
 
     @objc private func searchNext() { search(forward: true) }
@@ -407,14 +413,18 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
         }
         statusLabel.stringValue = "Searching for \"\(needle)\"…"
         session.find(needle, from: currentRow, forward: forward) { [weak self] row in
-            guard let self else { return }
-            if let row {
-                statusLabel.stringValue = session.status
-                go(toRow: row)
-            } else {
-                statusLabel.stringValue = "\"\(needle)\" was not found."
-                NSSound.beep()
-            }
+            self?.searchEnded(needle, at: row)
+        }
+    }
+
+    /// Shows the row the search found, or says it found none.
+    private func searchEnded(_ needle: String, at row: Int?) {
+        if let row {
+            statusLabel.stringValue = session.status
+            go(toRow: row)
+        } else {
+            statusLabel.stringValue = "\"\(needle)\" was not found."
+            effects.beep()
         }
     }
 
@@ -499,12 +509,12 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
     @objc private func copySelection() {
         let side = focusedSide
         let lines = leftTable.selectedRowIndexes.compactMap { session.text(side, row: $0) }
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(lines.joined(separator: "\n"), forType: .string)
+        effects.pasteboard.clearContents()
+        effects.pasteboard.setString(lines.joined(separator: "\n"), forType: .string)
     }
 
     /// The keys of the panes (spec 09 › Compare by content › Keys).
-    private func handleKey(_ event: NSEvent, in _: NSTableView) -> Bool {
+    private func handleKey(_ event: NSEvent) -> Bool {
         func key(_ character: String, _ modifiers: KeyModifiers) -> Bool {
             Shortcut(.character(character), modifiers).matches(event)
         }

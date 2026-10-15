@@ -6,10 +6,9 @@ extension URL {
     ///
     /// Two URLs show the same place exactly when their keys are equal.
     public var locationKey: String {
-        let path = self.path
         let host = (self.host ?? "") + (port.map { ":\($0)" } ?? "")
-        return (scheme ?? "file") + "://" + host
-            + (path.count > 1 && path.hasSuffix("/") ? String(path.dropLast()) : path)
+        // `path` has no trailing slash: Foundation takes it off (`/` stays `/`).
+        return (scheme ?? "file") + "://" + host + path
     }
 
     /// The location of an entry inside this directory.

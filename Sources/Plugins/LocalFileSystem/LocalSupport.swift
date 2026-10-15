@@ -1,5 +1,5 @@
 import AFMKernel
-public import Foundation
+import Foundation
 
 /// Lets another thread end a system call this thread is blocked in (an `open`, `read` or
 /// `write` on a share that has stopped answering), by a signal that does nothing except
@@ -15,13 +15,13 @@ final class Interruption: @unchecked Sendable {
     private var interrupted = false
 
     /// A handler that does nothing, installed without `SA_RESTART`: the call it interrupts
-    /// returns `EINTR` instead of carrying on.
-    private static let installed: Int32 = {
+    /// returns `EINTR` instead of carrying on. (Installing a handler for a valid signal does not fail.)
+    private static let installed: Void = {
         var action = sigaction()
         action.__sigaction_u.__sa_handler = { _ in }
         sigemptyset(&action.sa_mask)
         action.sa_flags = 0
-        return sigaction(SIGURG, &action, nil)
+        sigaction(SIGURG, &action, nil)
     }()
 
     var isInterrupted: Bool {
@@ -33,19 +33,15 @@ final class Interruption: @unchecked Sendable {
     /// The calling thread is about to make a call that may wait. False when `interrupt` was
     /// called already: the call is not to be made.
     func begin() -> Bool {
-        // Without the handler the signal would do nothing: the thread is not announced then.
-        let canBeInterrupted = Self.installed == 0
-        if canBeInterrupted {
-            // Some threads (those of Swift's concurrency pool) have it blocked, and then it would not arrive.
-            var signals = sigset_t()
-            sigemptyset(&signals)
-            sigaddset(&signals, SIGURG)
-            pthread_sigmask(SIG_UNBLOCK, &signals, nil)
-        }
+        Self.installed
+        // Some threads (those of Swift's concurrency pool) have it blocked, and then it would not arrive.
+        var signals = sigset_t()
+        sigemptyset(&signals)
+        sigaddset(&signals, SIGURG)
+        pthread_sigmask(SIG_UNBLOCK, &signals, nil)
         lock.lock()
         defer { lock.unlock() }
         if interrupted { return false }
-        guard canBeInterrupted else { return true }
         thread = pthread_self()
         return true
     }
@@ -81,19 +77,16 @@ final class Interruption: @unchecked Sendable {
     /// failure), again after an `EINTR` that nobody asked for. Throws `userCancelled` once
     /// interrupted. Returns the result, or a negative number with `errno` set.
     func run(_ call: () -> Int) throws -> Int {
-        while true {
+        var (result, code): (Int, Int32)
+        repeat {
             guard begin() else { throw CocoaError(.userCancelled) }
-            let result = call()
-            let code = errno
+            result = call()
+            code = errno
             end()
-            if result >= 0 { return result }
-            if code == EINTR {
-                if isInterrupted { throw CocoaError(.userCancelled) }
-                continue
-            }
-            errno = code
-            return result
-        }
+            if result < 0, code == EINTR, isInterrupted { throw CocoaError(.userCancelled) }
+        } while result < 0 && code == EINTR
+        errno = code
+        return result
     }
 }
 
@@ -124,27 +117,26 @@ final class MountTable: @unchecked Sendable {
         read = now
     }
 
+    /// The start-up disk, on which every path lies that lies on no other mount.
+    internal static let root = Mount(path: "/", isLocal: true)
+
     /// The mount a path lies on (by its text: the path is not looked at on disk).
-    func mount(containing path: String) -> Mount? {
+    func mount(containing path: String) -> Mount {
         lock.lock()
         refresh()
         let current = mounts
         lock.unlock()
-        return current.first { mount in
-            mount.path == "/" || path == mount.path || path.hasPrefix(mount.path + "/")
-        }
+        return current.first { mount in path == mount.path || path.hasPrefix(mount.path + "/") } ?? Self.root
     }
 
-    /// Nil when the table has nothing on the path.
-    func isLocal(_ path: String) -> Bool? { mount(containing: path)?.isLocal }
+    func isLocal(_ path: String) -> Bool { mount(containing: path).isLocal }
 
     private static func readMounts() -> [Mount] {
-        let count = getfsstat(nil, 0, MNT_NOWAIT)
-        guard count > 0 else { return [] }
+        // (A failure, -1, counts as none.)
+        let count = max(getfsstat(nil, 0, MNT_NOWAIT), 0)
         var buffer = [Darwin.statfs](repeating: Darwin.statfs(), count: Int(count) + 8)
         let size = Int32(buffer.count * MemoryLayout<statfs>.stride)
-        let filled = getfsstat(&buffer, size, MNT_NOWAIT)
-        guard filled > 0 else { return [] }
+        let filled = max(getfsstat(&buffer, size, MNT_NOWAIT), 0)
         let mounts = buffer.prefix(Int(filled))
             .map { info -> Mount in
                 var info = info
@@ -159,17 +151,18 @@ final class MountTable: @unchecked Sendable {
                     && type != "autofs"
                 return Mount(path: path, isLocal: isLocal)
             }
-        // The deepest mount first, so that the first that contains a path is the one it is on.
-        return mounts.sorted { $0.path.utf8.count > $1.path.utf8.count }
+        // The deepest mount first, so that the first that contains a path is the one it is on;
+        // the start-up disk is `root`.
+        return mounts.filter { $0.path != "/" }.sorted { $0.path.utf8.count > $1.path.utf8.count }
     }
 }
 
 /// What a symbolic link leads to.
 struct LinkTarget {
-    var isDirectory = false
-    var isRegular = false
+    var isDirectory: Bool
+    var isRegular: Bool
     /// The size of the target when it is a regular file.
-    var size: Int64 = 0
+    var size: Int64
     var isSpecial: Bool { !isDirectory && !isRegular }
 }
 
@@ -183,13 +176,27 @@ final class LinkResolver: @unchecked Sendable {
 
     private let lock = NSLock()
     private var inFlight = 0
-    private static let limit = 8
-    private static let patience: TimeInterval = 1.5
+    /// How many questions into places that are not disks of this Mac may be under way at once.
+    internal static let limit = 8
+    private let patience: TimeInterval
+    /// Asks the system where a link leads (`stat`); it may wait for as long as the volume does.
+    private let lookup: @Sendable (String) -> LinkTarget?
+
+    /// Asks the system, and waits a moment and a half for a place that is not a disk of this Mac.
+    internal convenience init() {
+        self.init(patience: 1.5, lookup: Self.lookup)
+    }
+
+    /// `lookup` and `patience` stand in for the system and its moment when a test makes a share
+    /// that does not answer.
+    internal init(patience: TimeInterval, lookup: @escaping @Sendable (String) -> LinkTarget?) {
+        (self.patience, self.lookup) = (patience, lookup)
+    }
 
     /// Nil when the target does not exist (a dangling link) or did not answer in time.
     func resolve(_ path: String) -> LinkTarget? {
-        if let target = Self.absoluteTarget(of: path), MountTable.shared.isLocal(target) == true {
-            return Self.lookup(path)
+        if let target = Self.absoluteTarget(of: path), MountTable.shared.isLocal(target) {
+            return lookup(path)
         }
         lock.lock()
         guard inFlight < Self.limit else {
@@ -206,8 +213,9 @@ final class LinkResolver: @unchecked Sendable {
         let answer = Answer()
         let done = DispatchSemaphore(value: 0)
         // A thread of the kernel's own: one that never comes back is not one of a dispatch queue's few.
+        let ask = lookup
         BlockingCalls.run {
-            let target = Self.lookup(path)
+            let target = ask(path)
             answer.lock.lock()
             answer.target = target
             answer.lock.unlock()
@@ -216,13 +224,14 @@ final class LinkResolver: @unchecked Sendable {
             self.lock.unlock()
             done.signal()
         }
-        guard done.wait(timeout: .now() + Self.patience) == .success else { return nil }
+        guard done.wait(timeout: .now() + patience) == .success else { return nil }
         answer.lock.lock()
         defer { answer.lock.unlock() }
         return answer.target
     }
 
-    private static func lookup(_ path: String) -> LinkTarget? {
+    /// What the link at `path` leads to, as the system says (`stat`); nil when nothing is there.
+    internal static func lookup(_ path: String) -> LinkTarget? {
         var st = stat()
         guard stat(path, &st) == 0 else { return nil }
         let type = st.st_mode & S_IFMT
@@ -247,9 +256,12 @@ final class LinkResolver: @unchecked Sendable {
         // By bytes, as the file system reads a path: a `/` with a combining mark after it is
         // one character that is not `/`, and a cut by characters would not see it.
         if text.utf8.first != 0x2F {
-            let directory =
-                path.utf8.lastIndex(of: 0x2F).map { String(decoding: path.utf8[..<$0], as: UTF8.self) } ?? ""
-            absolute = directory + "/" + text
+            // The folder of the link: everything before its last `/` (nothing for a bare name).
+            let directory = Array(path.utf8)
+                .split(separator: 0x2F, omittingEmptySubsequences: false)
+                .dropLast()
+                .joined(separator: [0x2F])
+            absolute = String(decoding: Array(directory), as: UTF8.self) + "/" + text
         }
         var parts: [ArraySlice<UInt8>] = []
         for part in Array(absolute.utf8).split(separator: 0x2F) {
@@ -260,6 +272,7 @@ final class LinkResolver: @unchecked Sendable {
     }
 }
 
+/// What the local file system does to the thread it runs on.
 extension LocalFileSystem {
     /// Runs `body` with the materialising of files that are only on a server (iCloud Drive,
     /// File Provider) switched off for this thread: a walk that measures a tree must not
@@ -268,29 +281,11 @@ extension LocalFileSystem {
         // IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES = 3, IOPOL_MATERIALIZE_DATALESS_FILES_OFF = 1, _DEFAULT = 0
         let kind: Int32 = 3
         let scope = IOPOL_SCOPE_THREAD
-        let previous = getiopolicy_np(kind, scope)
-        guard previous >= 0 else { return body() }
+        // (The policy of the thread itself can always be read; a failure would mean the default.)
+        let previous = max(getiopolicy_np(kind, scope), 0)
         setiopolicy_np(kind, scope, 1)
         defer { setiopolicy_np(kind, scope, previous) }
         return body()
-    }
-
-    /// The device a location is on; two items with different numbers lie on different
-    /// volumes, so a walk that must not cross a mount point compares them. The item itself is
-    /// looked at, not what a link points to. Nil when nothing is there.
-    public func deviceID(of url: URL) -> Int64? {
-        var st = stat()
-        guard lstat(url.path, &st) == 0 else { return nil }
-        return Int64(st.st_dev)
-    }
-
-    /// Whether the folder at `url` is where another volume is mounted (it is on another
-    /// device than the folder above it).
-    public func isMountPoint(_ url: URL) -> Bool {
-        guard let own = deviceID(of: url), let above = deviceID(of: url.deletingLastPathComponent()) else {
-            return false
-        }
-        return own != above || url.path == "/"
     }
 }
 
@@ -313,6 +308,29 @@ struct LocalProbes {
     /// How long a question about a volume (its name, its free space) is waited for before it
     /// is answered from what was last known.
     var volumePatience: TimeInterval = 3
+    /// How long a reading of the places may take before it is given up, in seconds.
+    internal var placesPatience: TimeInterval = 8
+    /// Called with every step the system reports while it copies a file (what it copies, and
+    /// the stage); true stops the copy there, as the caller's flag would. A test cannot choose the
+    /// moment at which a flag it sets is seen.
+    internal var copyStops: (@Sendable (_ what: Int32, _ stage: Int32) -> Bool)?
+    /// The home folder whose places are listed; nil is the user's.
+    internal var home: URL?
+    /// Failures of the system that no test can bring about on a healthy disk of this Mac (a share
+    /// that reports a write error only when the file is closed, a volume without bulk reads): for
+    /// the name of a system call and the path it is about, the error number it fails with instead
+    /// of being made; nil makes the call.
+    internal var fault: (@Sendable (_ call: String, _ path: String) -> Int32?)?
+
+    /// Makes the system call `call`, unless `fault` has it fail: the result is then -1, with
+    /// `errno` set.
+    internal func system<Result: SignedInteger>(_ name: String, _ path: String, _ call: () -> Result) -> Result {
+        if let code = fault?(name, path) {
+            errno = code
+            return -1
+        }
+        return call()
+    }
 }
 
 /// One call of the file system that changes something, and the system calls it is made of.
