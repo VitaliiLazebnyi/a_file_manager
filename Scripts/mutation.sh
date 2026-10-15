@@ -42,23 +42,45 @@ nearest_targets() {
   esac
 }
 
-# Runs a command in its own process group and stops the whole group after a time limit.
-# Returns the command's status, or 124 when the limit was reached.
+# Prints the processes under a process, all generations, on one line.
+descendants() {
+  local child
+  for child in $(pgrep -P "$1"); do
+    printf '%s ' "$child"
+    descendants "$child"
+  done
+}
+# Runs a command in its own process group and stops it after a time limit: first with TERM, then
+# with KILL. The processes under the command are noted before it is stopped and stopped with it,
+# since a test helper can leave the group or outlive its parent; left running, a mutant that
+# allocates in a loop fills memory, swap and disk. Returns the command's status, or 124 when the
+# limit was reached.
 run_limited() {
-  local limit="$1" marker pid watcher status=0
+  local limit="$1" marker pid watcher status=0 tree=()
   shift
   marker="$(mktemp -t mutation-timeout)"
   rm -f "$marker"
   set -m
   "$@" &
   pid=$!
-  (sleep "$limit" && touch "$marker" && kill -TERM -- "-$pid" && sleep 15 && kill -KILL -- "-$pid") 2> /dev/null &
+  (
+    sleep "$limit" || exit 0
+    descendants "$pid" > "$marker"
+    read -r -a tree < "$marker" || true
+    kill -TERM -- "-$pid" ${tree[@]+"${tree[@]}"}
+    sleep 15
+    kill -KILL -- "-$pid" ${tree[@]+"${tree[@]}"}
+  ) 2> /dev/null &
   watcher=$!
   set +m
   wait "$pid" || status=$?
   kill -TERM -- "-$watcher" 2> /dev/null || true
   wait "$watcher" 2> /dev/null || true
   if [[ -e "$marker" ]]; then
+    # The watcher is stopped as soon as the command ends, maybe before its KILL: whatever of the
+    # command is still alive is killed here.
+    read -r -a tree < "$marker" || true
+    kill -KILL -- "-$pid" ${tree[@]+"${tree[@]}"} 2> /dev/null || true
     rm -f "$marker"
     return 124
   fi
