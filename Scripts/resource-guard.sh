@@ -12,9 +12,9 @@
 # of level is written to the log and shown as a notification once it has lasted 30 s (a short peak
 # is not news); a change to critical, and each step taken, at once.
 #
-# Levels: warn when the memory pressure is "warn", free memory is under 20%, swap holds more than
-# 2 GiB, the load is over 4 times the cores or less than 15 GiB of disk are free; critical when the
-# pressure is "critical", free memory is under 8%, swap holds more than 6 GiB, the load is over
+# Levels: warn when the memory pressure is "warn", free memory is under 20%, anything is in swap, the
+# load is over 4 times the cores or less than 15 GiB of disk are free; critical when the
+# pressure is "critical", free memory is under 8%, swap holds 1 GiB or more, the load is over
 # 8 times the cores or less than 5 GiB of disk are free. The load is the 5-minute average: builds
 # and parallel tests keep all cores busy (a load of 1.5 to 4 times the cores) without harm; what
 # freezes the machine is memory, swap and disk, not a busy processor.
@@ -98,8 +98,9 @@ run() {
     elif ((pressure >= 2)); then warn "memory pressure warn"; fi
     if ((free < 8)); then crit "free memory ${free}%"; crit_mem=1
     elif ((free < 20)); then warn "free memory ${free}%"; fi
-    if ((swap_mb > 6144)); then crit "swap ${swap_mb} MiB"; crit_mem=1
-    elif ((swap_mb > 2048)); then warn "swap ${swap_mb} MiB"; fi
+    # macOS sizes its swap itself and cannot be told a limit; the guard keeps it under 1 GiB.
+    if ((swap_mb >= 1024)); then crit "swap ${swap_mb} MiB"; crit_mem=1
+    elif ((swap_mb > 0)); then warn "swap ${swap_mb} MiB"; fi
     if ((disk_gb < 5)); then crit "free disk ${disk_gb} GiB"; crit_mem=1
     elif ((disk_gb < 15)); then warn "free disk ${disk_gb} GiB"; fi
     local load_crit load_warn
