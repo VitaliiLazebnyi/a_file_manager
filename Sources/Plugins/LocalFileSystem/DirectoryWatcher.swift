@@ -208,13 +208,15 @@ final class DirectoryWatcher: Sendable {
         let control = DispatchQueue(label: "AFM.DirectoryWatcher.control", qos: .userInitiated)
         let streamQueue = DispatchQueue(label: "AFM.DirectoryWatcher", qos: .default)
         let gate = Gate()
+        let system: FSEvSystem
 
         // Only touched on `control`.
         private var desired: [URL] = []
         /// What `realpath` said about a folder as asked for (nil: it could not be resolved,
         /// which is remembered for a few seconds only), and when.
         private var resolutions: [String: (real: String?, at: UInt64)] = [:]
-        private var stream: FSEventStreamRef?
+        /// One stream for each watched folder (see `FSEvSystem` for why not one for all).
+        private var streams: [FSEventStreamRef] = []
         private var watch: Watch?
         private var watched: [String: URL] = [:]
         /// The pause before a stream that could not be made is tried again, and whether a try is on its way.
@@ -229,15 +231,30 @@ final class DirectoryWatcher: Sendable {
         /// The folders the stream watches now, once what was asked before has been done.
         var watchedFolders: Set<URL> { control.sync { Set(watched.values) } }
 
-        init(queue: DispatchQueue, onChange: @escaping @Sendable ([URL]) -> Void) {
-            (self.queue, self.onChange) = (queue, onChange)
+        init(queue: DispatchQueue, system: FSEvSystem, onChange: @escaping @Sendable ([URL]) -> Void) {
+            (self.queue, self.system, self.onChange) = (queue, system, onChange)
         }
 
-        /// A stream of the reports about `folders`, running on `reportQueue` and handing them to
+        /// A started stream for each of `folders`, all handing their reports to `state`; nil when
+        /// the process has too few descriptors to spare, or the system does not make or start one
+        /// of them (the ones made already are ended again).
+        private func startedStreams(for state: Watch, folders: [String]) -> [FSEventStreamRef]? {
+            let cost = folders.reduce(0) { $0 + FSEvDescriptors.cost(of: $1) }
+            guard system.spareDescriptors() - cost >= FSEvDescriptors.reserve else { return nil }
+            var made: [FSEventStreamRef] = []
+            for folder in folders {
+                guard let stream = startedStream(for: state, folder: folder) else {
+                    for stream in made { end(stream) }
+                    return nil
+                }
+                made.append(stream)
+            }
+            return made
+        }
+
+        /// A stream of the reports about `folder`, running on `streamQueue` and handing them to
         /// `state`; nil when the system makes none or does not start it.
-        private static func startedStream(for state: Watch, folders: [String], on reportQueue: DispatchQueue)
-            -> FSEventStreamRef?
-        {
+        private func startedStream(for state: Watch, folder: String) -> FSEventStreamRef? {
             // The stream holds its own reference to the state, taken and given back through these.
             var context = FSEventStreamContext(
                 version: 0,
@@ -262,18 +279,12 @@ final class DirectoryWatcher: Sendable {
                         flags: flags
                     )
             }
-            guard
-                let created = FSEventStreamCreate(
-                    nil,
-                    callback,
-                    &context,
-                    folders as CFArray,
-                    FSEventStreamEventId(kFSEventStreamEventIdSinceNow),
-                    0.5,
-                    UInt32(kFSEventStreamCreateFlagWatchRoot)
-                )
-            else { return nil }
-            FSEventStreamSetDispatchQueue(created, reportQueue)
+            guard let created = system.makeStream(folder, &context, callback) else {
+                // The system's clean-up may have closed descriptor 0 (see `FSEvSystem`).
+                FSEvDescriptors.fillZero()
+                return nil
+            }
+            FSEventStreamSetDispatchQueue(created, streamQueue)
             guard FSEventStreamStart(created) else {
                 FSEventStreamInvalidate(created)
                 FSEventStreamRelease(created)
@@ -336,19 +347,22 @@ final class DirectoryWatcher: Sendable {
             let pairs = desired.compactMap { directory in
                 resolutions[directory.path].map { ($0.real ?? directory.path, directory) }
             }
+            // A path the system cannot take is left out: it would not be watched, and the
+            // system's failure would close descriptor 0 (see `FSEvSystem`).
             let resolved = Dictionary(pairs, uniquingKeysWith: { first, _ in first })
+                .filter { FSEvDescriptors.fits($0.key) }
             guard resolved != watched else { return }
             tearDown()
             guard !resolved.isEmpty else { return }
             let watch = Watch(watched: resolved, queue: queue, streamQueue: streamQueue, gate: gate, onChange: onChange)
-            guard let stream = Self.startedStream(for: watch, folders: Array(resolved.keys), on: streamQueue) else {
+            guard let streams = startedStreams(for: watch, folders: Array(resolved.keys)) else {
                 // Not remembered as watched: the next request tries again, and so does this.
                 Census.wasRefused()
                 retryLater()
                 return
             }
-            Census.started()
-            (self.stream, self.watch, watched) = (stream, watch, resolved)
+            for _ in streams { Census.started() }
+            (self.streams, self.watch, watched) = (streams, watch, resolved)
             retryDelay = Self.firstRetry
         }
 
@@ -372,14 +386,19 @@ final class DirectoryWatcher: Sendable {
             watch?.stop()
             watch = nil
             watched = [:]
-            guard let stream else { return }
+            for stream in streams {
+                end(stream)
+                Census.ended()
+            }
+            streams = []
+        }
+
+        private func end(_ stream: FSEventStreamRef) {
             FSEventStreamStop(stream)
             FSEventStreamInvalidate(stream)
             // A report that is being sifted at this moment is finished before the stream goes.
             streamQueue.sync {}
             FSEventStreamRelease(stream)
-            self.stream = nil
-            Census.ended()
         }
     }
 
@@ -390,8 +409,9 @@ final class DirectoryWatcher: Sendable {
     internal var watchedFolders: Set<URL> { core.watchedFolders }
 
     /// `onChange` receives the watched folders whose contents changed, on `queue`.
-    init(queue: DispatchQueue = .main, onChange: @escaping @Sendable ([URL]) -> Void) {
-        core = Core(queue: queue, onChange: onChange)
+    /// `system` makes the streams: the system's FSEvents, unless a test gives its own.
+    init(queue: DispatchQueue = .main, system: FSEvSystem = .live, onChange: @escaping @Sendable ([URL]) -> Void) {
+        core = Core(queue: queue, system: system, onChange: onChange)
     }
 
     deinit { core.stop() }

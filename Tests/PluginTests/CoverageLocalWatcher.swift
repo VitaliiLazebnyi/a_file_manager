@@ -10,18 +10,28 @@ import Testing
 internal struct CoverageLocalWatcher {
     /// A folder the system cannot watch is tried again.
     @Test
-    internal func aFolderTheSystemCannotWatchIsTriedAgain() {
+    internal func aFolderTheSystemCannotWatchIsTriedAgain() throws {
+        let box = try Sandbox()
         let before = DirectoryWatcher.Census.figures.refused
-        let watcher = DirectoryWatcher(queue: DispatchQueue(label: "coverage")) { _ in
+        let tries = Shared(0)
+        // A system that makes no stream (and touches no descriptor).
+        let refusing = FSEvSystem(
+            makeStream: { _, _, _ in
+                tries.modify { $0 += 1 }
+                return nil
+            },
+            spareDescriptors: { 1_000 }
+        )
+        let watcher = DirectoryWatcher(queue: DispatchQueue(label: "coverage"), system: refusing) { _ in
             // Nothing is looked at.
         }
-        // A path longer than any path can be: the system makes no stream for it.
-        let impossible = URL(fileURLWithPath: "/" + String(repeating: "a", count: 5_000))
-        watcher.watch([impossible])
-        #expect(Wait.until(seconds: 60) { DirectoryWatcher.Census.figures.refused >= before + 1 })
+        watcher.watch([box.url("a")])
+        #expect(Wait.until(seconds: 60) { tries.value >= 1 })
         // Asked for again while a try is pending: refused again, and still tried once.
-        watcher.watch([impossible, URL(fileURLWithPath: "/" + String(repeating: "b", count: 5_000))])
-        #expect(Wait.until(seconds: 60) { DirectoryWatcher.Census.figures.refused >= before + 3 })
+        watcher.watch([box.url("a"), box.url("b")])
+        #expect(Wait.until(seconds: 60) { tries.value >= 3 })
+        #expect(DirectoryWatcher.Census.figures.refused >= before + 3)
+        #expect(watcher.watchedFolders.isEmpty)
         watcher.stop()
     }
 
