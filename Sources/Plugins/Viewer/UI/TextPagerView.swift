@@ -643,6 +643,8 @@ final class TextPagerView: NSView {
         let wanted = revealGeneration
         outstandingReveal = (offset, select, rowsAbove, keepingSelection)
         revealWaitsForIndex = false
+        // Whether a row that is not found is not there at all, or only not indexed yet.
+        let indexWasComplete = document.isIndexComplete
         let latest = latestReveal
         let request = newRequest(replacing: &revealRequest, for: document)
         queues.lookups.async { [weak self] in
@@ -655,9 +657,21 @@ final class TextPagerView: NSView {
             DispatchQueue.main.async {
                 guard let self, self.revealGeneration == wanted, self.document === document else { return }
                 guard let row else {
-                    // That part of the text is not indexed yet; `rowCountChanged` asks again.
-                    self.revealWaitsForIndex = !document.isIndexComplete
-                    if document.isIndexComplete { self.outstandingReveal = nil }
+                    if indexWasComplete {
+                        // The offset is beyond the text.
+                        self.outstandingReveal = nil
+                    } else if document.isIndexComplete {
+                        // The index was completed while the row was looked up: ask again, now for good.
+                        self.reveal(
+                            offset: offset,
+                            select: select,
+                            rowsAbove: rowsAbove,
+                            keepingSelection: keepingSelection
+                        )
+                    } else {
+                        // That part of the text is not indexed yet; `rowCountChanged` asks again.
+                        self.revealWaitsForIndex = true
+                    }
                     return
                 }
                 self.outstandingReveal = nil
