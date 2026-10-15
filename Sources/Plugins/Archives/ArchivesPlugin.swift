@@ -16,22 +16,33 @@ public final class ArchivesPlugin: Plugin {
     // (Not private: the tests set limits and hooks.)
     let environment = ArchiveEnvironment()
     let store: ArchiveStore
-    private let launchesApplications: Bool
+    /// What "Unpack and Open" hands the unpacked member to; nil opens nothing.
+    internal let openFile: (@MainActor (URL) -> Bool)?
 
     /// `flushDelay`: how long after the last change to a ZIP the changes are written into the
     /// archive file; nil leaves that to `flushPendingChanges()` (tests). `launchesApplications`
     /// is off in tests, so "Unpack and Open" starts nothing.
-    public init(flushDelay: TimeInterval? = 0.5, launchesApplications: Bool = true) {
+    public convenience init(flushDelay: TimeInterval? = 0.5, launchesApplications: Bool = true) {
+        self.init(flushDelay: flushDelay, openFile: launchesApplications ? ArchiveCommands.openInApplication : nil)
+    }
+
+    /// The same with what "Unpack and Open" hands its file to in place of the system's applications.
+    internal init(flushDelay: TimeInterval?, openFile: (@MainActor (URL) -> Bool)?) {
         environment.flushDelay = flushDelay
         store = ArchiveStore(environment: environment)
-        self.launchesApplications = launchesApplications
+        self.openFile = openFile
     }
 
     public func start(in owner: Kernel) {
         // The kernel keeps what is registered here; it must not be kept by it in turn.
         unowned let kernel = owner
         let (store, environment) = (self.store, self.environment)
-        let actions = ArchiveCommands(kernel: kernel, store: store, launchesApplications: launchesApplications)
+        let actions = ArchiveCommands(
+            kernel: kernel,
+            store: store,
+            openFile: openFile,
+            currentEvent: ArchiveCommands.handledEvent
+        )
         actions.refreshOptions()
 
         environment.fileSystems = { [weak kernel] in kernel?.fileSystems }
