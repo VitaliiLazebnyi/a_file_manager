@@ -11,11 +11,11 @@ Paste this into a new Claude Code session in `/Users/cm0k/Claude/Projects/TotalC
 
 > Read `documentation/quality-gates-continue.md`, `documentation/quality-gates-handover.md` and the briefs in
 > `documentation/agent-briefs/`, then continue the quality-gates work where the "State" section of
-> `quality-gates-continue.md` leaves it, with "Next steps" in order. Check `Scripts/resource-guard.sh status` first.
-> Use subagents in worktrees for module work (at most as many as the machine bears; each builds with `-j 3`); merge,
-> verify (clean build, `swift test --parallel --enable-code-coverage`, `python3 Scripts/coverage-gate.py`,
-> `Scripts/check.sh leaks`, the gates of the files touched), commit and push after each finished piece. The bar is
-> code quality without compromise: no weakened gates, no ignores.
+> `quality-gates-continue.md` leaves it, with "Next steps" in order. Check `Scripts/resource-guard.sh status` first. Use
+> subagents in worktrees for module work (at most as many as the machine bears; each builds with `-j 3`); merge, verify
+> (clean build, `swift test --parallel --enable-code-coverage`, `python3 Scripts/coverage-gate.py`,
+> `Scripts/check.sh leaks`, the gates of the files touched), commit and push after each finished piece. The bar is code
+> quality without compromise: no weakened gates, no ignores.
 
 ## State
 
@@ -39,37 +39,37 @@ Paste this into a new Claude Code session in `/Users/cm0k/Claude/Projects/TotalC
     folder for targets with `..`; the SFTP start raced a disconnect (crashed the test process); dropping on the Full
     view could end the program; settings lists (`selection.types`, `multirename.saved`, `findFiles.searches`,
     `directorySync.sets`) emptied on one bad entry; the pager dropped a place looked up while the index was finishing.
-- **No test reaches the real desktop** (rule in `coverage-brief.md`): opening, Finder, sounds, modal panels and
-  alerts go through seams; the one-line system adapters are left to the UI tests.
+- **No test reaches the real desktop** (rule in `coverage-brief.md`): opening, Finder, sounds, modal panels and alerts
+  go through seams; the one-line system adapters are left to the UI tests.
 - **Resource guard** (`Scripts/resource-guard.sh`, launchd agent `com.afm.resource-guard`, installed in the VM): warns
   on memory pressure, any swap, a 5-minute load over 4× the cores, disk under 15 GiB; at critical (swap ≥ 1 GiB, free
   memory < 8%, disk < 5 GiB) it ends the largest development process. Log `~/Library/Logs/afm-resource-guard.log`.
-- **Set-aside tests** (they misbehave, kept for fixing): branch `wip/set-aside-tests`,
-  `documentation/set-aside-tests/` (Find Files window/form/plugin/Spotlight tests: one over-releases on the main
-  queue's pool; the shell's `InteractionProgressWindowTests`: the process ends early with exit 0).
+- **Set-aside tests** (they misbehave, kept for fixing): branch `wip/set-aside-tests`, `documentation/set-aside-tests/`
+  (Find Files window/form/plugin/Spotlight tests: one over-releases on the main queue's pool; the shell's
+  `InteractionProgressWindowTests`: the process ends early with exit 0).
 
 ### Uncovered after the wave (files / lines / functions / regions, full suite, no UI tests)
 
-| Module | Files | Lines | Functions | Regions |
-|---|---|---|---|---|
-| Plugins/Configuration | 13 | 737 | 212 | 499 |
-| Plugins/DirectorySync | 5 | 501 | 108 | 300 |
-| Plugins/FileOperations | 11 | 215 | 65 | 267 |
-| AFMShell/Window | 19 | 501 | 70 | 242 |
-| Plugins/FindFiles | 5 | 492 | 89 | 213 |
-| Plugins/SystemTools | 6 | 393 | 61 | 186 |
-| Plugins/Network | 8 | 140 | 22 | 138 |
-| Plugins/CompareContent | 6 | 131 | 17 | 117 |
-| AFMShell/Panel | 26 | 161 | 22 | 72 |
-| AFMShell/Interaction | 8 | 150 | 23 | 52 |
-| Plugins/Viewer | 6 | 56 | 13 | 37 |
-| Plugins/MacIntegration | 4 | 70 | 18 | 31 |
-| AFMShell/App | 6 | 58 | 18 | 19 |
-| Archives, Places, VirtualFolders, MultiRename, AFMKernel, FileProperties, LocalFileSystem | 15 | 36 | 11 | 20 |
+| Module                                                                                    | Files | Lines | Functions | Regions |
+| ----------------------------------------------------------------------------------------- | ----- | ----- | --------- | ------- |
+| Plugins/Configuration                                                                     | 13    | 737   | 212       | 499     |
+| Plugins/DirectorySync                                                                     | 5     | 501   | 108       | 300     |
+| Plugins/FileOperations                                                                    | 11    | 215   | 65        | 267     |
+| AFMShell/Window                                                                           | 19    | 501   | 70        | 242     |
+| Plugins/FindFiles                                                                         | 5     | 492   | 89        | 213     |
+| Plugins/SystemTools                                                                       | 6     | 393   | 61        | 186     |
+| Plugins/Network                                                                           | 8     | 140   | 22        | 138     |
+| Plugins/CompareContent                                                                    | 6     | 131   | 17        | 117     |
+| AFMShell/Panel                                                                            | 26    | 161   | 22        | 72      |
+| AFMShell/Interaction                                                                      | 8     | 150   | 23        | 52      |
+| Plugins/Viewer                                                                            | 6     | 56    | 13        | 37      |
+| Plugins/MacIntegration                                                                    | 4     | 70    | 18        | 31      |
+| AFMShell/App                                                                              | 6     | 58    | 18        | 19      |
+| Archives, Places, VirtualFolders, MultiRename, AFMKernel, FileProperties, LocalFileSystem | 15    | 36    | 11        | 20      |
 
-Covered completely: AFMContracts, StandardPlugins, FileTools, Selection, FolderTabs, Clipboard, Navigation,
-ViewOptions. A good part of what is left in the shell, Viewer, MacIntegration, Places and Archives is the one-line
-system adapters that only the UI tests reach (their coverage is merged by the gate once `UITests/run.sh` has run).
+Covered completely: AFMContracts, StandardPlugins, FileTools, Selection, FolderTabs, Clipboard, Navigation, ViewOptions.
+A good part of what is left in the shell, Viewer, MacIntegration, Places and Archives is the one-line system adapters
+that only the UI tests reach (their coverage is merged by the gate once `UITests/run.sh` has run).
 
 ## Decisions for the owner
 
@@ -89,15 +89,16 @@ system adapters that only the UI tests reach (their coverage is merged by the ga
 
 1. **Flaky under load:** `LocalJobs.aFinishedJobIsLetGo` (FileJobTests.swift:160) failed in the full run after the
    cov-core-plugins fix; `CoverageLocalWatcherMore.aWatchedFolderThatIsRenamedIsReportedAsChanged`,
-   `ApplicationTests.aSlowFolderThatCannotBeReadIsLeftAgain` and `Review2ConfigARunner.commandsThatCallEachOtherAcrossAWaitAreStopped`
-   failed once each; `CoverageLocalWatcher.theFiguresArePrintedAtTheEndWhenAskedFor` failed once with Swift Testing's
-   own "Socket is not connected" (the exit test's channel to its child, under load). Make them deterministic.
-2. **Tests that end the process with exit 0** (the run looks passed while later tests never ran): `NSButton.performClick`,
-   `NSWindow.performClose`, `NSApp.stopModal` without a modal loop, `NSApp.nextEvent`, ending an `NSOpenPanel` sheet.
-   The plugin tests send button actions directly now (`sendAction`); the shell tests still call `performClick` in
-   `InteractionQuitProgressTests`, `PanelPathBarTests`, `PanelBarsTests`, `WindowDriveBarTests`,
-   `WindowButtonBarTests`, `PanelQuickFilterProgramTests` (they passed so far). On 2026-10-16 one full run's
-   PluginTests process ended this way after about 630 tests (no crash report; running then: `aButtonBarOfOneLineLoads`,
+   `ApplicationTests.aSlowFolderThatCannotBeReadIsLeftAgain` and
+   `Review2ConfigARunner.commandsThatCallEachOtherAcrossAWaitAreStopped` failed once each;
+   `CoverageLocalWatcher.theFiguresArePrintedAtTheEndWhenAskedFor` failed once with Swift Testing's own "Socket is not
+   connected" (the exit test's channel to its child, under load). Make them deterministic.
+2. **Tests that end the process with exit 0** (the run looks passed while later tests never ran):
+   `NSButton.performClick`, `NSWindow.performClose`, `NSApp.stopModal` without a modal loop, `NSApp.nextEvent`, ending
+   an `NSOpenPanel` sheet. The plugin tests send button actions directly now (`sendAction`); the shell tests still call
+   `performClick` in `InteractionQuitProgressTests`, `PanelPathBarTests`, `PanelBarsTests`, `WindowDriveBarTests`,
+   `WindowButtonBarTests`, `PanelQuickFilterProgramTests` (they passed so far). On 2026-10-16 one full run's PluginTests
+   process ended this way after about 630 tests (no crash report; running then: `aButtonBarOfOneLineLoads`,
    `tabsWithoutTitlesLoad`, `aTransferOnACutConnectionFails`). Then bring back the set-aside tests. Always compare the
    test counts of a run with the previous one (2,934 plugin, 336 kernel, 309 shell).
 3. **Coverage, per the agents' reports** (seams first, then tests, as in `coverage-brief.md`):
@@ -109,25 +110,25 @@ system adapters that only the UI tests reach (their coverage is merged by the ga
    - FindFiles: the set-aside window/form/plugin/Spotlight tests (find the over-release with
      `SWIFT_BACKTRACE=enable=yes`, probably a form test that puts `form.tabView` into a throwaway `NSWindow`);
      `FileSearch.swift` 357/638/703 race regions.
-   - AFMShell/Window: `ButtonBarView+Dragging`, `CommandLineView`, `DriveBarView`, `MainWindowController`,
-     `ToolWindow`, `BarCommandButton`, `FolderWatches`, `MissedChanges`, `PlacesStore`.
+   - AFMShell/Window: `ButtonBarView+Dragging`, `CommandLineView`, `DriveBarView`, `MainWindowController`, `ToolWindow`,
+     `BarCommandButton`, `FolderWatches`, `MissedChanges`, `PlacesStore`.
    - AFMShell/Panel: quick filter branches, `PanelReadingRun`, `PanelPieceStream` (sort changed while reading),
      `ReadAhead` (clock), long remembered lists, `PathBarView` text area, `tableScrolled`.
    - AFMShell/Interaction: `ProgressDisplay` (after the set-aside suite), `FormList.rowDoubleClicked`,
      `ProgressJobService` idle callback.
    - Network: SFTPSession/SFTPChannel (107 regions: end the endless loops in `open()`/`start()`, hold `lock` while the
      process starts, more `FakeSFTPServer` modes), FTPSession (injectable clock), NetStream (5).
-   - CompareContent: `CompareLoader` (16/128 MB, cancel, read errors), `CompareSession`, `TextDocument`, `TextDiff`,
-     the plugin; lint of `Tests/PluginTests/CoverageCompare*.swift`.
+   - CompareContent: `CompareLoader` (16/128 MB, cancel, read errors), `CompareSession`, `TextDocument`, `TextDiff`, the
+     plugin; lint of `Tests/PluginTests/CoverageCompare*.swift`.
    - Viewer: `ViewerPane.swift` (~23 regions, listed in the cov-viewer report: rich-mode results, late folder/HTML
-     results, `setMode` Quick Look arms); the pager's "index finished while looked up" branch needs a deterministic
-     test (the index build needs the main thread, so holding it does not work).
+     results, `setMode` Quick Look arms); the pager's "index finished while looked up" branch needs a deterministic test
+     (the index build needs the main thread, so holding it does not work).
    - MacIntegration: `MacIntegrationPlugin` 95/132, `QuickLook` `toggle([])`, `VolumeProbe.system` edges.
 4. **UI tests** (`Scripts/check.sh uitest`, takes over the screen of the logged-in session; mute first): they cover the
    system adapters (Viewer `SystemDialogs`/`SystemLinks`, MacIntegration `SystemDesktop`/`SystemPreviewPanel`,
    `AppleScript.run`, the shell's alerts, quit reply, table clicks, `showVolumeList`, drags, Places' editor `run` and
-   tree beep, Archives `openInApplication`); write `UITests/AFileManagerUITests/Panel*.swift` for the panel's;
-   rerun the accessibility audit (the type-81 element: XCUITest's TouchBar type).
+   tree beep, Archives `openInApplication`); write `UITests/AFileManagerUITests/Panel*.swift` for the panel's; rerun the
+   accessibility audit (the type-81 element: XCUITest's TouchBar type).
 5. **Bugs reported, not fixed:** testing a `.tar.gz` stops before the gzip checksum (a damaged middle goes unnoticed);
    packing a file over an empty folder of the same name in an archive on a server replaces the folder; `ProcessStream`
    read after close raises; closing a `QLPreviewView` outside a window ends the process; panels and windows are never
