@@ -73,15 +73,12 @@ that only the UI tests reach (their coverage is merged by the gate once `UITests
 
 ## Decisions for the owner
 
-1. **`required_deinit` against function coverage.** An explicit `deinit` in an AppKit (NSObject) subclass is a function
-   the runtime never calls, so 100% functions is impossible while SwiftLint demands it (about 11 in the panel, more in
-   the windows and views). Either the rule goes for NSObject subclasses, or function coverage allows them.
+1. **`required_deinit` against function coverage**: decided 2026-10-16, the rule goes for NSObject subclasses
+   (`Scripts/required-deinit.py`, see the hand-over's lint section).
 2. **lizard misreads Swift**: a `set` or `init` token outside a declaration (`private(set) var`, `super.init(frame:)`,
    `.init(rawValue:)`) makes it treat the rest of the class as one function. False findings in the shell and plugins;
    the gate needs a fix (pre-processing or another tool), not the code.
-3. **Impossible optionals of Foundation**: `VirtualLocation.url` (`components.url ?? …`) and `ZipFormat` `DOSTime` keep
-   one region each that no input reaches; removing them needs a force unwrap (forbidden). Allow a documented `!` there,
-   or accept the region.
+3. **Impossible optionals of Foundation**: decided 2026-10-16, a documented `!` is allowed in exactly those places.
 4. Exit tests: a process ended by a trap writes no coverage; `Tests/TestSupport/CoverageCoreTrap` (test-only) turns a
    trap into `exit(1)` so the counts are written. Use it, or return nil from `init?(coder:)` as the agents did.
 

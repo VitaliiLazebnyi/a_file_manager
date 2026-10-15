@@ -88,8 +88,15 @@ Every SwiftLint rule with findings was tried: real violations rewritten the way 
 // no_magic_numbers: off by agreement, not by contradiction.
 ```
 
-`required_deinit` is now on (it was off for "contradicting `no_empty_block`"): a block holding only a comment satisfies
-`no_empty_block`, so `deinit {` + `// Nothing to release.` + `}` satisfies both.
+`required_deinit` is off in SwiftLint and applied by `Scripts/required-deinit.py` instead (owner's decision,
+2026-10-16): every Swift class declares a `deinit` (a block holding only a comment satisfies `no_empty_block`, so
+`deinit {` + `// Nothing to release.` + `}` satisfies both); a subclass of an Objective-C class (NSObject, NSView, ...)
+declares one only when it has code to run, because an empty `deinit` there is never counted as run, even when the object
+is freed, and coverage could not reach 100%.
+
+Force unwraps (owner's decision, 2026-10-16): `force_unwrapping` stays on; exactly the Foundation optionals that no
+input can make nil (`VirtualLocation.url`'s `components.url`, `ZipFormat`'s `DOSTime` date) may use `!`, each with
+`// swiftlint:disable:next force_unwrapping` and a comment that says why it cannot fail.
 
 **Configured so SwiftLint and swift-format agree** (`.swiftlint.yml`, `.swift-format`):
 
@@ -201,24 +208,23 @@ reported every `Sources` finding a second time). The fuzz and stress drivers the
   swaps a ternary with operators in its second choice as a whole, removes only call statements (not declarations,
   `return` or `if`), and leaves out mutants in stored-property initial values (they cannot be switched at file scope).
   With it, the whole tree with all 11,884 mutants compiles. It also switches a mutant on with
-  `__muterActiveMutant == "<mutant>"`, a name each mutated file reads once from `AFM_MUTANT` (`mutation.sh` declares
-  it at the end of the file and sets the variable), instead of `ProcessInfo.processInfo.environment[...]`: that builds
-  the whole environment dictionary every time mutated code runs, and with the panel sorting code mutated the kernel
-  tests did not finish one test in 14 minutes (`getenv` still took 511 s; the comparison, 44 s).
+  `__muterActiveMutant == "<mutant>"`, a name each mutated file reads once from `AFM_MUTANT` (`mutation.sh` declares it
+  at the end of the file and sets the variable), instead of `ProcessInfo.processInfo.environment[...]`: that builds the
+  whole environment dictionary every time mutated code runs, and with the panel sorting code mutated the kernel tests
+  did not finish one test in 14 minutes (`getenv` still took 511 s; the comparison, 44 s).
 - **Running:** `Scripts/mutation.sh` (files changed since the branch left `origin/main`), `Scripts/mutation.sh <files>`
   or `--all`. It copies the checkout to `.build/mutation/project` (warnings are not errors in that copy only: a mutant
-  may leave a value unused). Before Muter starts, `Scripts/mutation-map.py build` records which tests run which lines
-  of the files (a coverage build of the unmutated copy in `.build/mutation/map-build`, every test run alone in its own
+  may leave a value unused). Before Muter starts, `Scripts/mutation-map.py build` records which tests run which lines of
+  the files (a coverage build of the unmutated copy in `.build/mutation/map-build`, every test run alone in its own
   process with its own profile: about 4 minutes for all 2,355 tests). Muter then runs `Scripts/mutation.sh --run-tests`
-  per mutant: the tests that run the mutant's line first (a filter per target; the whole target when they are more
-  than 60% of it), and when they all pass, the whole of each of their targets before the mutant counts as survived
-  (a test that runs the line can break a later test of the same process through shared state). A mutant whose line
-  no test runs survives at once; a line the coverage does not count, or an incomplete map (a test that crashed or hung
-  alone), falls back to the targets in order: the mutated module's first (Kernel and Contracts: KernelTests; plugins:
-  PluginTests; shell and app: ShellTests), the others only if it passes. Each run stops after 3 × its target's baseline
-  time + 60 s (a hang counts as a kill). Reports in
-  `.build/mutation/report`: Muter's `muter.json`, `mutants.json` (one record per mutant with its source text),
-  per-mutant test logs in `logs/`.
+  per mutant: the tests that run the mutant's line first (a filter per target; the whole target when they are more than
+  60% of it), and when they all pass, the whole of each of their targets before the mutant counts as survived (a test
+  that runs the line can break a later test of the same process through shared state). A mutant whose line no test runs
+  survives at once; a line the coverage does not count, or an incomplete map (a test that crashed or hung alone), falls
+  back to the targets in order: the mutated module's first (Kernel and Contracts: KernelTests; plugins: PluginTests;
+  shell and app: ShellTests), the others only if it passes. Each run stops after 3 × its target's baseline time + 60 s
+  (a hang counts as a kill). Reports in `.build/mutation/report`: Muter's `muter.json`, `mutants.json` (one record per
+  mutant with its source text), per-mutant test logs in `logs/`.
 - **The gate:** `Scripts/mutation-gate.py check <mutants.json>...` fails on every survivor not in
   `Tests/Mutation/equivalent-mutants.txt`, on outcomes that are not a kill, on listed mutants a test kills and on stale
   entries. An entry names file, operator, enclosing declaration and the statement before and after (no line number),
