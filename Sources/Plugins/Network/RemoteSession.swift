@@ -181,6 +181,7 @@ public final class SessionEnvironment: @unchecked Sendable {
         }
         var declineMemory: TimeInterval = 5
         var log: @Sendable (String) -> Void = { _ in }
+        var clock: @Sendable () -> Date = { Date() }
     }
 
     private func hook<Value>(_ path: KeyPath<Hooks, Value>) -> Value {
@@ -251,6 +252,12 @@ public final class SessionEnvironment: @unchecked Sendable {
     public var log: @Sendable (String) -> Void {
         get { hook(\.log) }
         set { setHook(\.log, newValue) }
+    }
+    /// The time by which connections age: how long one sat idle, and how long nothing was done
+    /// with a server. The system's clock unless a test sets another.
+    public var clock: @Sendable () -> Date {
+        get { hook(\.clock) }
+        set { setHook(\.clock, newValue) }
     }
 
     public init(options: NetworkOptions = NetworkOptions(), trust: CertificateTrust = CertificateTrust()) {
@@ -397,26 +404,26 @@ enum Background {
     private static func serve() {
         condition.lock()
         var waitedInVain = false
-        while true {
-            if let piece = takeNext() {
+        var next = takeNext()
+        // A thread that waited in vain looks once more, then ends: what may still wait is
+        // behind its own lane's limit, and the threads of that lane take it.
+        while next != nil || !waitedInVain {
+            if let piece = next {
                 condition.unlock()
                 piece.work()
                 condition.lock()
                 runningIn[piece.lane] = runningIn[piece.lane].flatMap { $0 > 1 ? $0 - 1 : nil }
                 condition.broadcast()
                 waitedInVain = false
-                continue
+            } else {
+                idle += 1
+                waitedInVain = !condition.wait(until: Date().addingTimeInterval(10))
+                idle -= 1
             }
-            // What may still wait is behind its own lane's limit, and the threads of that lane take it.
-            if waitedInVain {
-                threads -= 1
-                condition.unlock()
-                return
-            }
-            idle += 1
-            waitedInVain = !condition.wait(until: Date().addingTimeInterval(10))
-            idle -= 1
+            next = takeNext()
         }
+        threads -= 1
+        condition.unlock()
     }
 
     /// Waits until nothing of this lane is running or waiting, `timeout` seconds at most; for tests.
