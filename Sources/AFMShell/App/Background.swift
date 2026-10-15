@@ -46,7 +46,6 @@ enum MainLoop {
     /// that fail at the same moment show their messages one after the other and not one on
     /// top of the other. Main thread only.
     @MainActor static func dialog(_ block: @escaping @MainActor () -> Void) {
-        MainThread.assert("A dialog")
         dialogs.append(block)
         perform { showNextDialog() }
     }

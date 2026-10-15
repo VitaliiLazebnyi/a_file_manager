@@ -92,7 +92,6 @@ final class ProgressJobService: JobService {
         work: @escaping @Sendable (any JobMonitor) -> Result,
         completion: @escaping @MainActor (Result) -> Void
     ) {
-        MainThread.assert("The job service")
         let job = QueuedJob(title: title)
         // What the plugin handed in may hold panels and windows: it is let go of on the main
         // thread, whichever thread is done with it last.
@@ -184,7 +183,6 @@ final class ProgressJobService: JobService {
     }
 
     func cancelAll(then completion: @escaping () -> Void) {
-        MainThread.assert("The job service")
         guard isBusy else {
             completion()
             return
@@ -239,7 +237,6 @@ final class ProgressJobService: JobService {
     /// Holds the running job at its next progress report, or lets it go on. A job that was
     /// asked to stop is not held.
     func setPaused(_ paused: Bool) {
-        MainThread.assert("The job service")
         guard let running, paused != running.gate.isPaused, !(paused && running.cancellation.isCancelled) else {
             return
         }
@@ -251,7 +248,6 @@ final class ProgressJobService: JobService {
 
     /// Stops the running job; the jobs behind it still run.
     func cancelCurrent() {
-        MainThread.assert("The job service")
         running?.cancel()
         display.refresh()
         if let running { watchStopping(running) }
@@ -259,7 +255,6 @@ final class ProgressJobService: JobService {
 
     /// Turns the sheet into a window of its own, or back.
     func setRunsInBackground(_ inBackground: Bool) {
-        MainThread.assert("The job service")
         guard isBusy, inBackground != runsInBackground else { return }
         runsInBackground = inBackground
         display.modeChanged()

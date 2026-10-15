@@ -10,12 +10,14 @@ import AppKit
 enum ShellCommands {
     static func register(in kernel: Kernel, panels: PanelCoordinator) {
         let commands = kernel.commands
-        let source = { panels.sourcePanel }
-        let model = { panels.sourcePanel.model }
+        // The kernel keeps what is registered here, and the panels keep the kernel: the
+        // commands hold the panels weakly, so neither keeps the other alive.
+        let source = { [weak panels] in panels?.sourcePanel }
         /// Cursor keys change nothing but the cursor, so they also work while a job starts.
         func cursor(_ id: CommandID, _ title: String, _ shortcuts: [Shortcut], _ row: @escaping (PanelModel) -> Int) {
             commands.register(Command(id, title, shortcuts, runsDuringJobs: true)) {
-                model().moveCursor(to: row(model()))
+                guard let model = source()?.model else { return }
+                model.moveCursor(to: row(model))
             }
         }
 
@@ -26,11 +28,11 @@ enum ShellCommands {
         }
         cursor(.cursorToLastEntry, "Cursor to Last Entry", [Shortcut(.rightArrow), Shortcut(.end)]) { $0.rowCount - 1 }
         cursor(.cursorToTop, "Cursor to Top", [Shortcut(.home)]) { _ in 0 }
-        cursor(.cursorPageUp, "Cursor Page Up", [Shortcut(.pageUp)]) { $0.cursor - source().pageSize }
-        cursor(.cursorPageDown, "Cursor Page Down", [Shortcut(.pageDown)]) { $0.cursor + source().pageSize }
+        cursor(.cursorPageUp, "Cursor Page Up", [Shortcut(.pageUp)]) { $0.cursor - (source()?.pageSize ?? 0) }
+        cursor(.cursorPageDown, "Cursor Page Down", [Shortcut(.pageDown)]) { $0.cursor + (source()?.pageSize ?? 0) }
 
         commands.register(Command(.toggleSelectionWithSize, "Select and Calculate Size", [Shortcut(.space)])) {
-            source().toggleSelectionWithSize()
+            source()?.toggleSelectionWithSize()
         }
         commands.register(
             Command(
@@ -39,23 +41,27 @@ enum ShellCommands {
                 [Shortcut(.insert), Shortcut(.downArrow, .shift)]
             )
         ) {
-            source().toggleSelectionAndMove(1)
+            source()?.toggleSelectionAndMove(1)
         }
         commands.register(Command(.toggleSelectionAndMoveUp, "Select and Move Up", [Shortcut(.upArrow, .shift)])) {
-            source().toggleSelectionAndMove(-1)
+            source()?.toggleSelectionAndMove(-1)
         }
 
         commands.register(Command(.focusTarget, "Switch Panel", [Shortcut(.tab)], runsDuringJobs: true)) {
-            panels.targetPanel.focus()
+            [weak panels] in
+            panels?.targetPanel.focus()
         }
-        commands.register(Command(.leftVolumes, "Left Volume List", [.f(1, .option)])) {
-            panels.leftPanel.showVolumeList()
+        commands.register(Command(.leftVolumes, "Left Volume List", [.f(1, .option)])) { [weak panels] in
+            panels?.leftPanel.showVolumeList()
         }
-        commands.register(Command(.rightVolumes, "Right Volume List", [.f(2, .option)])) {
-            panels.rightPanel.showVolumeList()
+        commands.register(Command(.rightVolumes, "Right Volume List", [.f(2, .option)])) { [weak panels] in
+            panels?.rightPanel.showVolumeList()
         }
-        commands.register(Command(.editNameInPlace, "Edit Name in Place"), enabled: { model().cursorItem != nil }) {
-            source().beginRename()
+        commands.register(
+            Command(.editNameInPlace, "Edit Name in Place"),
+            enabled: { source()?.model.cursorItem != nil }
+        ) {
+            source()?.beginRename()
         }
 
         kernel.menus.add([.leftVolumes, .rightVolumes], to: .commandsVolumes)

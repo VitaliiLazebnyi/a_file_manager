@@ -29,9 +29,7 @@ extension CommandID {
 enum WindowCommands {
     /// `window` answers nil until the window exists; the commands are registered before it,
     /// because it is built from the final key bindings.
-    static func register(in owner: Kernel, layout: WindowLayout, window: @escaping () -> MainWindowController?) {
-        // The kernel keeps what is registered here; it must not be kept by it in turn.
-        unowned let kernel = owner
+    static func register(in kernel: Kernel, layout: WindowLayout, window: @escaping () -> MainWindowController?) {
         let commands = kernel.commands
         func toggle(_ id: CommandID, _ region: WindowLayout.Region) {
             commands.register(
@@ -95,9 +93,10 @@ enum WindowCommands {
         line(.nextCommandLine, "Next Command Line") { $0.recall(-1) }
         commands.register(
             Command(.resetButtonBar, "Reset Button Bar to Default", runsDuringJobs: true),
-            enabled: { kernel.toolbar.hasUserLayout(in: kernel.settings) }
-        ) {
-            kernel.toolbar.resetLayout(in: kernel.settings)
+            // The kernel keeps what is registered here; it must not be kept by it in turn.
+            enabled: { [weak kernel] in kernel.map { $0.toolbar.hasUserLayout(in: $0.settings) } ?? false }
+        ) { [weak kernel] in
+            kernel.map { $0.toolbar.resetLayout(in: $0.settings) }
         }
         commands.register(Command(.clearCommandLine, "Clear Command Line", runsDuringJobs: true)) {
             window()?.commandLine.clear()

@@ -417,7 +417,6 @@ final class PlacesStore {
     /// Asks every file system for its places again. One that has not answered the last
     /// question yet is asked once more when it has.
     func refresh() {
-        MainThread.assert("The places")
         if providers.isEmpty { isComplete = true }
         for index in providers.indices { ask(index) }
     }

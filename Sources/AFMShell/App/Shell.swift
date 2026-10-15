@@ -70,7 +70,6 @@ public final class Shell: ShellServices {
     /// work the user would lose (unsaved edits) asks about it here, and the user can call the
     /// quit off. Nothing has been stopped when this is asked. Main thread.
     public func mayQuit() -> Bool {
-        MainThread.assert("Quitting")
         // A second request while the first is still being carried out changes nothing.
         guard quitProgress == nil, !jobService.isQuitting else { return false }
         return kernel.shouldTerminate()
@@ -94,7 +93,6 @@ public final class Shell: ShellServices {
         progressDelay: TimeInterval = Shell.quitProgressDelay,
         then reply: @escaping @MainActor (Bool) -> Void
     ) {
-        MainThread.assert("Quitting")
         stopJobsToQuit(patience: patience) { [self] _ in
             let flag = CancellationFlag()
             let progress = QuitProgress()
