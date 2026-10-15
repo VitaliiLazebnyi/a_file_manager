@@ -238,8 +238,10 @@ public enum FTPSyntax {
     public static func time(_ text: String) -> Date? {
         let digits = text.prefix(14)
         guard digits.count == 14, digits.allSatisfy({ $0.isASCII && $0.isNumber }) else { return nil }
+        // Fourteen ASCII digits, read as numbers one by one.
+        let values = digits.compactMap(\.wholeNumberValue)
         func number(_ from: Int, _ length: Int) -> Int {
-            Int(digits.dropFirst(from).prefix(length)) ?? 0
+            values[from..<from + length].reduce(0) { $0 * 10 + $1 }
         }
         var components = DateComponents()
         (components.year, components.month, components.day) = (number(0, 4), number(4, 2), number(6, 2))
@@ -248,15 +250,13 @@ public enum FTPSyntax {
     }
 
     public static func timeText(_ date: Date) -> String {
-        let parts = utc.dateComponents([.year, .month, .day, .hour, .minute, .second], from: date)
-        return String(
-            format: "%04d%02d%02d%02d%02d%02d", parts.year ?? 1_970, parts.month ?? 1, parts.day ?? 1,
-            parts.hour ?? 0, parts.minute ?? 0, parts.second ?? 0)
+        let parts: [Calendar.Component] = [.year, .month, .day, .hour, .minute, .second]
+        return String(format: "%04d%02d%02d%02d%02d%02d", arguments: parts.map { utc.component($0, from: date) })
     }
 
     static let utc: Calendar = {
         var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(identifier: "UTC") ?? .current
+        calendar.timeZone = .gmt
         return calendar
     }()
 }

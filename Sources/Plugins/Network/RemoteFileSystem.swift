@@ -242,10 +242,16 @@ private final class EntryCache: @unchecked Sendable {
     private let lock = NSLock()
     private var directories: [String: Directory] = [:]
     private var journal: [String: [Change]] = [:]
+    /// The clock: the system's, or a test's.
+    let now: @Sendable () -> Date
     private static let lifetime: TimeInterval = 10
     private static let capacity = 64
     private static let journalLifetime: TimeInterval = 300
     private static let journalLimit = 1_024
+
+    init(now: @escaping @Sendable () -> Date) {
+        self.now = now
+    }
 
     /// Stores a complete listing that was started at `startedAt`.
     func store(_ entries: [RemoteEntry], for directory: URL, includesHidden: Bool, startedAt: Date) {
@@ -259,31 +265,31 @@ private final class EntryCache: @unchecked Sendable {
             byName[name] = change.entry
         }
         if directories.count >= Self.capacity { directories.removeAll() }
-        directories[key] = Directory(read: Date(), includesHidden: includesHidden, entries: byName)
+        directories[key] = Directory(read: now(), includesHidden: includesHidden, entries: byName)
     }
 
     enum Answer {
         case entry(RemoteEntry)
-        case absent, unknown
+        /// Not there. `hasNameAlike`: the listing holds a name that a server may take for this
+        /// one although it is spelled differently (in another case, or composed differently).
+        case absent(hasNameAlike: Bool)
+        case unknown
     }
 
-    func lookUp(_ name: String, in directory: URL) -> Answer {
+    /// What the listing of `directory` says about `name`; whether a name alike is there is
+    /// looked for only `lookingForAlike` (it costs a pass over the listing).
+    func lookUp(_ name: String, in directory: URL, lookingForAlike: Bool) -> Answer {
         lock.lock()
         defer { lock.unlock() }
         guard let known = fresh(directory.locationKey) else { return .unknown }
         if let entry = known.entries[name] { return .entry(entry) }
-        return known.includesHidden || !name.hasPrefix(".") ? .absent : .unknown
-    }
-
-    /// Whether the listing of the directory holds a name that a server may take for `name`
-    /// although it is spelled differently: in another case, or composed differently.
-    func hasNameAlike(_ name: String, in directory: URL) -> Bool {
-        lock.lock()
-        defer { lock.unlock() }
-        guard let known = fresh(directory.locationKey) else { return false }
-        return known.entries.keys.contains {
-            $0.compare(name, options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive]) == .orderedSame
-        }
+        guard known.includesHidden || !name.hasPrefix(".") else { return .unknown }
+        let alike =
+            lookingForAlike
+            && known.entries.keys.contains {
+                $0.compare(name, options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive]) == .orderedSame
+            }
+        return .absent(hasNameAlike: alike)
     }
 
     /// Changes what is known of an entry, when it is known; nothing else happens. For news that
@@ -302,20 +308,20 @@ private final class EntryCache: @unchecked Sendable {
     /// The listing of a directory unless it is too old. Called with the lock held.
     private func fresh(_ key: String) -> Directory? {
         guard let known = directories[key] else { return nil }
-        if Date().timeIntervalSince(known.read) < Self.lifetime { return known }
+        if now().timeIntervalSince(known.read) < Self.lifetime { return known }
         directories[key] = nil
         return nil
     }
 
     private func note(_ key: String, name: String?, entry: RemoteEntry?) {
-        let now = Date()
+        let moment = now()
         var changes = journal[key] ?? []
-        let cutoff = now.addingTimeInterval(-Self.journalLifetime)
+        let cutoff = moment.addingTimeInterval(-Self.journalLifetime)
         if let first = changes.firstIndex(where: { $0.at >= cutoff }), first > 0 { changes.removeFirst(first) }
-        if changes.count >= Self.journalLimit { changes = [Change(at: now, name: nil, entry: nil)] }
-        changes.append(Change(at: now, name: name, entry: entry))
+        if changes.count >= Self.journalLimit { changes = [Change(at: moment, name: nil, entry: nil)] }
+        changes.append(Change(at: moment, name: name, entry: entry))
         journal[key] = changes
-        if journal.count > 256 { journal = journal.filter { $0.value.last.map { $0.at >= cutoff } ?? false } }
+        if journal.count > 256 { journal = journal.filter { $0.value.contains { change in change.at >= cutoff } } }
     }
 
     /// A name that now exists in the directory (a file just created, a folder just made).
@@ -407,11 +413,19 @@ public final class RemoteFileSystem: FileSystemProvider {
     /// Showing a location of this file system may log in to a server.
     public var connectsToServer: Bool { true }
     private let center: ConnectionCenter
-    private let cache = EntryCache()
+    private let cache: EntryCache
 
     public init(scheme: String, center: ConnectionCenter) {
         self.scheme = scheme
         self.center = center
+        cache = EntryCache { Date() }
+    }
+
+    /// A file system whose remembered listings age by `clock`.
+    init(scheme: String, center: ConnectionCenter, clock: @escaping @Sendable () -> Date) {
+        self.scheme = scheme
+        self.center = center
+        cache = EntryCache(now: clock)
     }
 
     private func resolve(_ url: URL, cancellation: CancellationFlag? = nil) throws -> (
@@ -473,7 +487,7 @@ public final class RemoteFileSystem: FileSystemProvider {
         let base = key.url(path: path)
         var all: [RemoteEntry] = []
         var complete = true
-        let started = Date()
+        let started = cache.now()
         // A link the session resolves after the listing was delivered is a folder in what is remembered, too.
         session.onLinkResolved { [weak self] link, isDirectory in
             guard let self, let parent = RemotePath.parent(of: link) else { return }
@@ -506,11 +520,12 @@ public final class RemoteFileSystem: FileSystemProvider {
         let (session, key, path) = try resolve(url)
         guard let parent = RemotePath.parent(of: path) else { return RemoteEntry(name: key.host, isDirectory: true) }
         let (parentURL, name) = (key.url(path: parent), RemotePath.name(of: path))
-        switch cache.lookUp(name, in: parentURL) {
+        let isCheap = session.singleLookupsAreCheap
+        switch cache.lookUp(name, in: parentURL, lookingForAlike: beforeOverwriting && !isCheap) {
         case .entry(let entry): return entry
 
-        case .absent:
-            guard beforeOverwriting, session.singleLookupsAreCheap || cache.hasNameAlike(name, in: parentURL) else {
+        case .absent(let hasNameAlike):
+            guard beforeOverwriting, isCheap || hasNameAlike else {
                 return nil
             }
             return try session.entry(at: path, cancellation: cancellation)
@@ -522,7 +537,7 @@ public final class RemoteFileSystem: FileSystemProvider {
         if !session.singleLookupsAreCheap,
             (try? read(parentURL, showHidden: true, isVisit: false, cancellation: cancellation) { _ in true }) != nil
         {
-            switch cache.lookUp(name, in: parentURL) {
+            switch cache.lookUp(name, in: parentURL, lookingForAlike: false) {
             case .entry(let entry): return entry
             case .absent: return nil
             case .unknown: break
@@ -677,7 +692,7 @@ public final class RemoteFileSystem: FileSystemProvider {
         }
         let (parentURL, name) = (key.url(path: parent), RemotePath.name(of: path))
         var isDirectory: Bool?
-        if case .entry(let known) = cache.lookUp(name, in: parentURL) {
+        if case .entry(let known) = cache.lookUp(name, in: parentURL, lookingForAlike: false) {
             // A link is removed like a file, whatever it points to.
             isDirectory = known.isDirectory && !known.isSymlink
         }
@@ -730,9 +745,10 @@ public final class RemoteFileSystem: FileSystemProvider {
                 cache.forget(parentURL(source), parentURL(destination))
                 // Asked of the server, not of what is remembered: both answers decide over a file.
                 guard try session.entry(at: from, cancellation: cancellation) != nil,
-                    let existing = try session.entry(at: to, cancellation: cancellation), !existing.isDirectory
+                    let existing = try session.entry(at: to, cancellation: cancellation), !existing.isDirectory,
+                    let directory = RemotePath.parent(of: to)
                 else { throw refusal }
-                try replace(to, with: from, on: session, refusal: refusal, cancellation: cancellation)
+                try replace(to, in: directory, with: from, on: session, refusal: refusal, cancellation: cancellation)
             }
         } catch {
             cache.forget(parentURL(source), parentURL(destination))
@@ -763,20 +779,20 @@ public final class RemoteFileSystem: FileSystemProvider {
         return false
     }
 
-    /// Puts the file at `from` in the place of the file at `to` on a server whose rename does
-    /// not replace. The file in the way is never deleted before the new one stands in its place.
+    /// Puts the file at `from` in the place of the file at `to` (in `directory`) on a server whose
+    /// rename does not replace. The file in the way is never deleted before the new one stands in its place.
     ///
     /// The caller's flag ends only the first step. Once the file in the way stands aside, the
     /// rest is seen through whatever the flag says (it still ends with the session and at the
     /// time limits): a Cancel between the two renames would leave the name without a file.
     private func replace(
         _ to: String,
+        in directory: String,
         with from: String,
         on session: any RemoteSession,
         refusal: any Error,
         cancellation: CancellationFlag?
     ) throws {
-        let directory = RemotePath.parent(of: to) ?? "/"
         let aside = RemotePath.join(directory, Self.asideName(for: RemotePath.name(of: to)))
         do {
             try session.rename(to, to: aside, replacing: false, cancellation: cancellation)

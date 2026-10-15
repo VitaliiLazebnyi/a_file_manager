@@ -197,10 +197,11 @@ struct ArchiveTree {
         path.isEmpty || entry(path)?.isDirectory == true
     }
 
-    /// The entries directly inside a folder; nil when the path is not a folder.
+    /// The entries directly inside a folder; nil when the path is not a folder. Every folder
+    /// has a list of its own (`insert` makes it), the top folder from the start.
     func children(of path: String) -> [ArchiveEntry]? {
-        guard isDirectory(path), let folder = slot(of: path) else { return nil }
-        return (children[folder] ?? []).compactMap { slots[Int($0)] }
+        guard isDirectory(path), let folder = slot(of: path), let places = children[folder] else { return nil }
+        return places.compactMap { slots[Int($0)] }
     }
 
     func hasChildren(_ path: String) -> Bool {
@@ -213,9 +214,9 @@ struct ArchiveTree {
         guard isDirectory(path), let start = slot(of: path) else { return [] }
         var found: [ArchiveEntry] = []
         var pending = [start]
-        while let folder = pending.popLast() {
-            for place in children[folder] ?? [] {
-                guard let child = slots[Int(place)] else { continue }
+        // Folders only are pending, and every folder has a list of its own.
+        while let folder = pending.popLast(), let places = children[folder] {
+            for (place, child) in places.compactMap({ place in slots[Int(place)].map { (place, $0) } }) {
                 found.append(child)
                 if child.isDirectory { pending.append(place) }
             }
@@ -223,40 +224,44 @@ struct ArchiveTree {
         return found
     }
 
+    /// The position of the entry in a place that is taken: the sequence holds only those, and
+    /// an entry is listed and unlisted while it stands in its place.
     private func order(at place: Int32) -> Int {
-        slots[Int(place)]?.order ?? 0
+        slots[Int(place)]!.order
     }
 
-    private mutating func sort() {
-        guard sequence == nil else { return }
+    /// The sequence, sorted first if it has not been yet.
+    @discardableResult
+    private mutating func sort() -> [Int32] {
+        if let sorted = sequence {
+            return sorted
+        }
         var places: [Int32] = []
         places.reserveCapacity(index.count)
         for place in slots.indices where slots[place] != nil { places.append(Int32(place)) }
         places.sort { order(at: $0) < order(at: $1) }
         sequence = places
+        return places
     }
 
     /// Every entry in archive order. Sorted once; after that the order is kept up as entries
     /// come and go, so a write that follows a change does not sort the whole archive again.
     var ordered: [ArchiveEntry] {
         mutating get {
-            sort()
-            return (sequence ?? []).compactMap { slots[Int($0)] }
+            sort().compactMap { slots[Int($0)] }
         }
     }
 
     /// The path of the entry that has this position in the archive; nil when none has.
     mutating func path(atOrder order: Int) -> String? {
-        sort()
-        guard let sequence else { return nil }
-        let place = self.place(of: order)
-        guard place < sequence.count, let entry = slots[Int(sequence[place])], entry.order == order else { return nil }
+        let listed = sort()
+        let place = self.place(of: order, in: listed)
+        guard place < listed.count, let entry = slots[Int(listed[place])], entry.order == order else { return nil }
         return entry.path
     }
 
     /// Where an entry with this position stands, or would stand, in the sequence.
-    private func place(of order: Int) -> Int {
-        guard let sequence else { return 0 }
+    private func place(of order: Int, in sequence: [Int32]) -> Int {
         var (low, high) = (0, sequence.count)
         while low < high {
             let middle = (low + high) / 2
@@ -271,7 +276,8 @@ struct ArchiveTree {
         guard sequence != nil else { return }
         let order = self.order(at: place)
         if let last = sequence!.last, self.order(at: last) >= order {
-            sequence!.insert(place, at: self.place(of: order))
+            let position = self.place(of: order, in: sequence!)
+            sequence!.insert(place, at: position)
         } else {
             sequence!.append(place)
         }
@@ -279,15 +285,10 @@ struct ArchiveTree {
 
     private mutating func unlist(_ place: Int32) {
         guard sequence != nil else { return }
-        let order = self.order(at: place)
-        var position = self.place(of: order)
-        while position < sequence!.count, self.order(at: sequence![position]) == order {
-            if sequence![position] == place {
-                sequence!.remove(at: position)
-                return
-            }
-            position += 1
-        }
+        // The entries that share its position stand together from here, and it is among them.
+        let start = self.place(of: order(at: place), in: sequence!)
+        let position = sequence![start...].firstIndex(of: place)
+        if let position { sequence!.remove(at: position) }
     }
 
     /// Puts an entry into a free place.

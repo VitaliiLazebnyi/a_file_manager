@@ -30,10 +30,22 @@ extension ByteStream {
     }
 }
 
+/// Makes a system call that reads or writes, again for as long as a signal interrupts it
+/// (`EINTR`); the count it returns, or -1 with `errno` set.
+func retryingInterrupted(_ call: () -> Int) -> Int {
+    var result: Int
+    repeat {
+        result = call()
+    } while result < 0 && errno == EINTR
+    return result
+}
+
 func posixError(_ code: Int32, _ path: String) -> any Error {
     NSError(
-        domain: NSPOSIXErrorDomain, code: Int(code),
-        userInfo: [NSLocalizedDescriptionKey: String(cString: strerror(code)) + ": " + path])
+        domain: NSPOSIXErrorDomain,
+        code: Int(code),
+        userInfo: [NSLocalizedDescriptionKey: String(cString: strerror(code)) + ": " + path]
+    )
 }
 
 /// A file on the local disk that is read at any position, from any number of threads at once
@@ -52,10 +64,10 @@ final class RandomAccessFile: Sendable {
     init(_ url: URL, shownAs: String? = nil) throws {
         path = shownAs ?? url.path
         descriptor = open(url.path, O_RDONLY)
-        guard descriptor >= 0 else { throw posixError(errno, path) }
         var status = stat()
-        guard fstat(descriptor, &status) == 0 else {
+        guard descriptor >= 0, fstat(descriptor, &status) == 0 else {
             let code = errno
+            // (Closing -1, a file that did not open, does nothing.)
             Darwin.close(descriptor)
             throw posixError(code, path)
         }
@@ -77,9 +89,10 @@ final class RandomAccessFile: Sendable {
         guard let buffer = malloc(wanted) else { throw posixError(ENOMEM, path) }
         var done = 0
         while done < wanted {
-            let got = pread(descriptor, buffer + done, wanted - done, off_t(offset) + off_t(done))
+            let got = retryingInterrupted {
+                pread(descriptor, buffer + done, wanted - done, off_t(offset) + off_t(done))
+            }
             if got < 0 {
-                if errno == EINTR { continue }
                 let code = errno
                 free(buffer)
                 throw posixError(code, path)
@@ -313,38 +326,6 @@ final class TeeStream: ByteStream {
     func close() { source.close() }
 }
 
-/// No more than `length` bytes of another stream.
-final class LimitedStream: ByteStream {
-    private let source: any ByteStream
-    private var left: UInt64
-    private let closesSource: Bool
-
-    init(_ source: any ByteStream, length: UInt64, closesSource: Bool = true) {
-        self.source = source
-        left = length
-        self.closesSource = closesSource
-    }
-
-    func read(upToCount count: Int) throws -> Data? {
-        guard left > 0 else { return nil }
-        guard let block = try source.read(upToCount: Int(min(UInt64(count), left))) else {
-            throw ArchiveError.damaged("unexpected end of data")
-        }
-        left -= UInt64(block.count)
-        return block
-    }
-
-    func skip(_ count: UInt64) throws {
-        guard count <= left else { throw ArchiveError.damaged("unexpected end of data") }
-        try source.skip(count)
-        left -= count
-    }
-
-    func close() {
-        if closesSource { source.close() }
-    }
-}
-
 /// A new file on the local disk, written from front to back, with the possibility to go back
 /// and correct a header. Used by one thread.
 final class OutputFile {
@@ -434,15 +415,13 @@ final class OutputFile {
         try data.withUnsafeBytes { bytes in
             var done = 0
             while done < bytes.count {
-                let put =
+                let put = retryingInterrupted {
                     offset.map {
                         pwrite(descriptor, bytes.baseAddress! + done, bytes.count - done, off_t($0) + off_t(done))
                     }
-                    ?? Darwin.write(descriptor, bytes.baseAddress! + done, bytes.count - done)
-                if put < 0 {
-                    if errno == EINTR { continue }
-                    throw posixError(errno, url.path)
+                        ?? Darwin.write(descriptor, bytes.baseAddress! + done, bytes.count - done)
                 }
+                if put < 0 { throw posixError(errno, url.path) }
                 done += put
             }
         }
@@ -608,7 +587,9 @@ final class ScratchFolder: @unchecked Sendable {
 
     init(in parent: URL = FileManager.default.temporaryDirectory) {
         url = parent.appendingPathComponent(
-            "\(Self.prefix)\(getpid())-\(UUID().uuidString)", isDirectory: true)
+            "\(Self.prefix)\(getpid())-\(UUID().uuidString)",
+            isDirectory: true
+        )
     }
 
     private var listPath: String { url.path + ".external" }
@@ -622,7 +603,10 @@ final class ScratchFolder: @unchecked Sendable {
         Self.lock.unlock()
         if made, FileManager.default.fileExists(atPath: url.path) { return }
         try FileManager.default.createDirectory(
-            at: url, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+            at: url,
+            withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o700]
+        )
         Self.lock.lock()
         isMade = true
         Self.lock.unlock()
@@ -684,9 +668,14 @@ final class ScratchFolder: @unchecked Sendable {
         Self.lock.unlock()
         unlink(listPath)
         try? FileManager.default.createDirectory(
-            at: url, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+            at: url,
+            withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o700]
+        )
         FileManager.default.createFile(
-            atPath: url.appendingPathComponent(Self.keptMark).path, contents: Data())
+            atPath: url.appendingPathComponent(Self.keptMark).path,
+            contents: Data()
+        )
     }
 
     /// Removes the folders, and the temporary files noted outside them, of processes that no

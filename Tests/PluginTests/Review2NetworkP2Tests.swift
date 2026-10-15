@@ -125,7 +125,10 @@ private final class Record<Value>: @unchecked Sendable {
                 "setAttributes",
                 {
                     try fs.setAttributes(
-                        FileAttributes(permissions: 0o600), of: fixture.url("/a.txt"), cancellation: $0)
+                        FileAttributes(permissions: 0o600),
+                        of: fixture.url("/a.txt"),
+                        cancellation: $0
+                    )
                 }
             )
         ]
@@ -147,7 +150,8 @@ private final class Record<Value>: @unchecked Sendable {
         #expect(
             !fixture.server.commands.contains {
                 $0.hasPrefix("MKD") || $0.hasPrefix("DELE") || $0.hasPrefix("RNFR") || $0.hasPrefix("SITE")
-            })
+            }
+        )
         // A flag that is set before the call: nothing is asked of the server at all.
         let set = CancellationFlag()
         set.cancel()
@@ -174,8 +178,10 @@ private final class Record<Value>: @unchecked Sendable {
         let center = ConnectionCenter(environment: environment)
         center.makeSession = { profile, environment in
             SFTPSession(
-                profile: profile, environment: environment,
-                transport: SFTPTransport(executable: "/bin/sleep", arguments: ["600"]))
+                profile: profile,
+                environment: environment,
+                transport: SFTPTransport(executable: "/bin/sleep", arguments: ["600"])
+            )
         }
         let key = ServerKey(scheme: "sftp", host: "silent.invalid")
         center.noteChosen(key)
@@ -188,14 +194,21 @@ private final class Record<Value>: @unchecked Sendable {
                 "move",
                 {
                     try fs.move(
-                        key.url(path: "/a.txt"), to: key.url(path: "/b.txt"), replacing: true, cancellation: $0)
+                        key.url(path: "/a.txt"),
+                        to: key.url(path: "/b.txt"),
+                        replacing: true,
+                        cancellation: $0
+                    )
                 }
             ),
             (
                 "setAttributes",
                 {
                     try fs.setAttributes(
-                        FileAttributes(permissions: 0o600), of: key.url(path: "/a.txt"), cancellation: $0)
+                        FileAttributes(permissions: 0o600),
+                        of: key.url(path: "/a.txt"),
+                        cancellation: $0
+                    )
                 }
             )
         ]
@@ -301,7 +314,8 @@ private final class Record<Value>: @unchecked Sendable {
         consent.userChose(URL(string: "smb://127.0.0.1:\(fixture.server.port)/share")!)
         // Another port of the same host is another server.
         consent.userChose(
-            ServerKey(scheme: "ftp", host: "127.0.0.1", port: fixture.server.port == 21 ? 2_121 : 21).url(path: "/"))
+            ServerKey(scheme: "ftp", host: "127.0.0.1", port: fixture.server.port == 21 ? 2_121 : 21).url(path: "/")
+        )
         #expect(throws: (any Error).self) { _ = try fixture.names("/") }
         #expect(asked.all == [fixture.key])
     }
@@ -361,7 +375,7 @@ private final class Record<Value>: @unchecked Sendable {
                 items[account(query)] = (changes as NSDictionary)[kSecValueData] as? Data
                 return errSecSuccess
             }
-            calls.add = { [self] item in
+            calls.add = { [self] item, _ in
                 lock.lock()
                 defer { lock.unlock() }
                 log.append("add \(account(item))")
@@ -454,18 +468,17 @@ private final class Record<Value>: @unchecked Sendable {
 /// a mount that is never answered is taken back on Cancel, and an eject that is never
 /// answered is given up after its time.
 @Suite struct Review2NetworkP2Mounting {
-    private final class Token: Sendable {}
-
     @Test func aMountThatIsNeverAnsweredIsTakenBackWhenItIsCancelled() {
-        let token = Token()
-        let cancelled = Record<ObjectIdentifier>()
-        let answers = Record<(Int32, [String]) -> Void>()
-        var calls = SystemVolumeMounter.Calls()
-        calls.mount = { _, answer in
+        let cancelled = Record<Int>()
+        let answers = Record<(Int32, CFArray?) -> Void>()
+        var calls = SystemVolumeMounter.Calls.mounting(request: 0x5EED) { _, answer in
             answers.add(answer)
-            return (0, token)
+            return 0
         }
-        calls.cancel = { cancelled.add(ObjectIdentifier($0)) }
+        calls.cancel = { request in
+            cancelled.add(Int(bitPattern: request))
+            return 0
+        }
         let mounter = SystemVolumeMounter(calls: calls, unmountTime: 600)
         let flag = CancellationFlag()
         let outcome = AdoptOutcome {
@@ -475,23 +488,30 @@ private final class Record<Value>: @unchecked Sendable {
         #expect(!outcome.ended(within: 0.3), "the mount did not wait for the system")
         flag.cancel()
         #expect(outcome.ended(within: 120) && outcome.failed)
-        #expect(cancelled.all == [ObjectIdentifier(token)])
+        #expect(cancelled.all == [0x5EED])
         // The system's answer that comes after all goes nowhere, and harms nothing.
-        answers.all.first?(0, ["/Volumes/share"])
+        answers.all.first?(0, ["/Volumes/share"] as CFArray)
     }
 
     @Test func aMountIsAnsweredAndAFailureNamesNoPassword() throws {
-        var calls = SystemVolumeMounter.Calls()
-        calls.mount = { _, answer in
-            DispatchQueue.global().async { answer(0, ["/Volumes/share"]) }
-            return (0, nil)
+        var calls = SystemVolumeMounter.Calls.mounting(request: 0) { _, answer in
+            DispatchQueue.global().async { answer(0, ["/Volumes/share"] as CFArray) }
+            return 0
         }
         let mounter = SystemVolumeMounter(calls: calls, unmountTime: 600)
         #expect(try mounter.mount(URL(string: "smb://host.invalid/share")!).map(\.path) == ["/Volumes/share"])
+        // A mount that names no mount point.
+        calls = .mounting(request: 0) { _, answer in
+            DispatchQueue.global().async { answer(0, nil) }
+            return 0
+        }
+        #expect(
+            try SystemVolumeMounter(calls: calls, unmountTime: 600).mount(URL(string: "smb://h.invalid/s")!).isEmpty
+        )
 
-        calls.mount = { _, answer in
-            DispatchQueue.global().async { answer(ECONNREFUSED, []) }
-            return (0, nil)
+        calls = .mounting(request: 0) { _, answer in
+            DispatchQueue.global().async { answer(ECONNREFUSED, [] as CFArray) }
+            return 0
         }
         let refused = SystemVolumeMounter(calls: calls, unmountTime: 600)
         do {
@@ -499,10 +519,11 @@ private final class Record<Value>: @unchecked Sendable {
             Issue.record("the mount did not fail")
         } catch {
             #expect(
-                !error.localizedDescription.contains("secret") && error.localizedDescription.contains("host.invalid"))
+                !error.localizedDescription.contains("secret") && error.localizedDescription.contains("host.invalid")
+            )
         }
         // The system refuses to even start.
-        calls.mount = { _, _ in (EINVAL, nil) }
+        calls = .mounting(request: 0) { _, _ in EINVAL }
         #expect(throws: VolumeError.self) {
             _ = try SystemVolumeMounter(calls: calls, unmountTime: 600).mount(URL(string: "smb://host.invalid/s")!)
         }

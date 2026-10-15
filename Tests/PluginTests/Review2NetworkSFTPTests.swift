@@ -113,7 +113,7 @@ import Testing
         let login = AdoptOutcome { _ = try session.connect(cancellation: nil) }
         #expect(adoptWait(30) { session.isConnecting })
         // A second caller without a flag waits behind the login.
-        let waiting = AdoptOutcome { try session.makeDirectory("/x") }
+        let waiting = AdoptOutcome { try session.makeDirectory("/x", cancellation: nil) }
         let started = Date()
         session.disconnect()
         #expect(Date().timeIntervalSince(started) < 60, "closing returns at once")

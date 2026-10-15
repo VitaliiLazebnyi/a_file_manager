@@ -16,12 +16,11 @@ public final class KeychainPasswords: PasswordStore {
     /// The four calls of the Security framework this class makes; tests put a recording
     /// stand-in in their place, so the order of the calls is tested without a Keychain.
     struct Calls {
-        var copy: @Sendable (_ query: CFDictionary, _ result: UnsafeMutablePointer<CFTypeRef?>?) -> OSStatus = {
-            SecItemCopyMatching($0, $1)
-        }
-        var update: @Sendable (_ query: CFDictionary, _ changes: CFDictionary) -> OSStatus = { SecItemUpdate($0, $1) }
-        var add: @Sendable (_ item: CFDictionary) -> OSStatus = { SecItemAdd($0, nil) }
-        var delete: @Sendable (_ query: CFDictionary) -> OSStatus = { SecItemDelete($0) }
+        var copy: @Sendable (_ query: CFDictionary, _ result: UnsafeMutablePointer<CFTypeRef?>?) -> OSStatus =
+            SecItemCopyMatching
+        var update: @Sendable (_ query: CFDictionary, _ changes: CFDictionary) -> OSStatus = SecItemUpdate
+        var add: @Sendable (_ item: CFDictionary, _ result: UnsafeMutablePointer<CFTypeRef?>?) -> OSStatus = SecItemAdd
+        var delete: @Sendable (_ query: CFDictionary) -> OSStatus = SecItemDelete
     }
 
     private let service: String
@@ -64,7 +63,7 @@ public final class KeychainPasswords: PasswordStore {
         var item = query(account)
         item[kSecValueData] = data
         item[kSecAttrLabel] = service
-        _ = calls.add(item as CFDictionary)
+        _ = calls.add(item as CFDictionary, nil)
     }
 }
 
@@ -172,8 +171,10 @@ public final class PasswordVault: @unchecked Sendable {
             var all = Self.decode(store.password(for: Self.trustedAccount))
             let kept = adding ? (all[host] ?? []).filter { !fingerprints.contains($0) } : []
             all[host] = kept + fingerprints
-            guard let data = try? JSONEncoder().encode(all) else { return }
-            store.setPassword(String(decoding: data, as: UTF8.self), for: Self.trustedAccount)
+            // A dictionary of strings is always written.
+            if let data = try? JSONEncoder().encode(all) {
+                store.setPassword(String(decoding: data, as: UTF8.self), for: Self.trustedAccount)
+            }
         }
     }
 
@@ -317,9 +318,10 @@ public struct SavedConnection: Codable, Equatable, Sendable {
         name = read(.name, "")
         kind = read(.kind, Kind.ftp)
         host = read(.host, "")
-        port = (try? values.decodeIfPresent(Int.self, forKey: .port)).flatMap {
-            ServerKey.validPorts.contains($0) ? $0 : nil
-        }
+        port = (try? values.decodeIfPresent(Int.self, forKey: .port))
+            .flatMap {
+                ServerKey.validPorts.contains($0) ? $0 : nil
+            }
         user = read(.user, "")
         anonymous = read(.anonymous, false)
         remoteDirectory = read(.remoteDirectory, "")
@@ -343,12 +345,18 @@ public struct SavedConnection: Codable, Equatable, Sendable {
 
     public var profile: ConnectionProfile {
         ConnectionProfile(
-            key: key, name: name.isEmpty ? nil : name, savedID: id, tls: kind.tls,
+            key: key,
+            name: name.isEmpty ? nil : name,
+            savedID: id,
+            tls: kind.tls,
             user: anonymous || user.isEmpty ? nil : user,
-            anonymous: anonymous, passive: passive, encoding: encoding,
+            anonymous: anonymous,
+            passive: passive,
+            encoding: encoding,
             remoteDirectory: remoteDirectory.isEmpty ? nil : RemotePath.normalized(remoteDirectory),
             initCommands: FTPServerConfig.initCommands(from: initCommands),
-            usesMLSD: listing == .automatic ? nil : listing == .mlsd)
+            usesMLSD: listing == .automatic ? nil : listing == .mlsd
+        )
     }
 
     /// Fills host, port, protocol and user from what was typed into the host field, which may
@@ -365,6 +373,11 @@ public struct SavedConnection: Codable, Equatable, Sendable {
         if let user = address.user { (self.user, anonymous) = (user, false) }
         if address.hasPath, remoteDirectory.isEmpty { remoteDirectory = address.path }
         return true
+    }
+
+    /// Stores `port`, unless it is the one the protocol uses anyway.
+    mutating func setPort(_ port: Int) {
+        self.port = port == kind.defaultPort ? nil : port
     }
 }
 
@@ -436,7 +449,8 @@ public final class ConnectionStore {
         let text = address.textWithoutPassword
         settings.set(
             Array(([text] + history.filter { $0 != text }).prefix(Self.historyLimit)),
-            forKey: Self.historyKey)
+            forKey: Self.historyKey
+        )
     }
 
     /// What an earlier version kept in the settings: certificates to always trust, by host.

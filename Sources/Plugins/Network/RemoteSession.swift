@@ -95,11 +95,18 @@ public struct ConnectionProfile: Sendable {
     public var asksBeforeConnecting = false
 
     public init(
-        key: ServerKey, name: String? = nil, savedID: UUID? = nil, tls: TLSMode? = nil, user: String? = nil,
+        key: ServerKey,
+        name: String? = nil,
+        savedID: UUID? = nil,
+        tls: TLSMode? = nil,
+        user: String? = nil,
         password: String? = nil,
-        anonymous: Bool = false, passive: Bool? = nil, encoding: NameEncoding = .automatic,
+        anonymous: Bool = false,
+        passive: Bool? = nil,
+        encoding: NameEncoding = .automatic,
         remoteDirectory: String? = nil,
-        initCommands: [String] = [], usesMLSD: Bool? = nil
+        initCommands: [String] = [],
+        usesMLSD: Bool? = nil
     ) {
         self.key = key
         self.name = name
@@ -158,14 +165,18 @@ public final class SessionEnvironment: @unchecked Sendable {
         }
         var askToTrustChanged:
             @Sendable (_ profile: ConnectionProfile, _ certificate: CertificateInfo, _ known: [String]) -> Bool = {
-                _, _, _ in false
+                _,
+                _,
+                _ in false
             }
         var askToConnect: @Sendable (_ profile: ConnectionProfile) -> Bool = { _ in true }
         var askToSendPasswordUnprotected: @Sendable (_ profile: ConnectionProfile) -> Bool = { _ in true }
         var asksAboutUnprotectedLoopback = false
         var rememberPassword: @Sendable (_ profile: ConnectionProfile, _ password: String) -> Void = { _, _ in }
         var askSecret: @Sendable (_ profile: ConnectionProfile, _ question: String, _ isSecret: Bool) -> String? = {
-            _, _, _ in
+            _,
+            _,
+            _ in
             nil
         }
         var declineMemory: TimeInterval = 5
@@ -307,32 +318,15 @@ protocol RemoteSession: AnyObject, Sendable {
 extension RemoteSession {
     var singleLookupsAreCheap: Bool { true }
     var isConnecting: Bool { false }
-    func rename(_ source: String, to destination: String) throws {
-        try rename(source, to: destination, replacing: false, cancellation: nil)
-    }
-    func makeDirectory(_ path: String) throws { try makeDirectory(path, cancellation: nil) }
     func remove(_ path: String, isDirectory: Bool?) throws {
         try remove(path, isDirectory: isDirectory, cancellation: nil)
     }
     func rename(_ source: String, to destination: String, replacing: Bool) throws {
         try rename(source, to: destination, replacing: replacing, cancellation: nil)
     }
-    func setAttributes(_ attributes: FileAttributes, of path: String) throws {
-        try setAttributes(attributes, of: path, cancellation: nil)
-    }
-    func canAppend(_: String) -> Bool { false }
     func onLinkResolved(_: @escaping @Sendable (_ path: String, _ isDirectory: Bool) -> Void) {}
-    func openAppend(_: String, at _: Int64?, cancellation _: CancellationFlag?) throws -> (
-        writer: any FileWriter, size: Int64
-    ) {
-        throw FileSystemError.notSupported("Continuing a file on this server")
-    }
 
-    func list(_ path: String, showHidden: Bool, receive: ([RemoteEntry]) -> Bool) throws {
-        try list(path, showHidden: showHidden, cancellation: nil, receive: receive)
-    }
     func entry(at path: String) throws -> RemoteEntry? { try entry(at: path, cancellation: nil) }
-    func openRead(_ path: String) throws -> any FileReader { try openRead(path, cancellation: nil) }
     func openWrite(_ path: String) throws -> any FileWriter { try openWrite(path, cancellation: nil) }
 }
 
@@ -353,7 +347,7 @@ extension RemoteSession {
 /// back to their pool only after the dead one's time limits.
 enum Background {
     private struct Piece {
-        let lane: ObjectIdentifier?
+        let lane: ObjectIdentifier
         let work: @Sendable () -> Void
     }
 
@@ -365,23 +359,21 @@ enum Background {
     /// Guarded by `condition`.
     nonisolated(unsafe) private static var idle = 0
     /// Guarded by `condition`.
-    nonisolated(unsafe) private static var running = 0
-    /// Guarded by `condition`.
     nonisolated(unsafe) private static var runningIn: [ObjectIdentifier: Int] = [:]
     /// Guarded by `condition`.
     nonisolated(unsafe) private static var waitingIn: [ObjectIdentifier: Int] = [:]
     static let mostThreads = 24
     static let mostPerLane = 3
 
-    static func run(lane: AnyObject? = nil, _ work: @escaping @Sendable () -> Void) {
-        let lane = lane.map(ObjectIdentifier.init)
+    static func run(lane owner: AnyObject, _ work: @escaping @Sendable () -> Void) {
+        let lane = ObjectIdentifier(owner)
         condition.lock()
         waiting.append(Piece(lane: lane, work: work))
-        if let lane { waitingIn[lane, default: 0] += 1 }
+        waitingIn[lane, default: 0] += 1
         if idle > 0 {
             // Every sleeper looks: the one that is woken must be one that may take this piece.
             condition.broadcast()
-        } else if threads < mostThreads, lane.map({ runningIn[$0, default: 0] < mostPerLane }) ?? true {
+        } else if threads < mostThreads, runningIn[lane, default: 0] < mostPerLane {
             threads += 1
             let thread = Thread { Self.serve() }
             thread.name = "afm.network.background"
@@ -394,16 +386,11 @@ enum Background {
     /// The first piece in line whose lane has room. Called with the lock held.
     private static func takeNext() -> Piece? {
         guard
-            let index = waiting.firstIndex(where: { piece in
-                piece.lane.map { runningIn[$0, default: 0] < mostPerLane } ?? true
-            })
+            let index = waiting.firstIndex(where: { piece in runningIn[piece.lane, default: 0] < mostPerLane })
         else { return nil }
         let piece = waiting.remove(at: index)
-        if let lane = piece.lane {
-            runningIn[lane, default: 0] += 1
-            waitingIn[lane] = waitingIn[lane].flatMap { $0 > 1 ? $0 - 1 : nil }
-        }
-        running += 1
+        runningIn[piece.lane, default: 0] += 1
+        waitingIn[piece.lane] = waitingIn[piece.lane].flatMap { $0 > 1 ? $0 - 1 : nil }
         return piece
     }
 
@@ -415,8 +402,7 @@ enum Background {
                 condition.unlock()
                 piece.work()
                 condition.lock()
-                running -= 1
-                if let lane = piece.lane { runningIn[lane] = runningIn[lane].flatMap { $0 > 1 ? $0 - 1 : nil } }
+                runningIn[piece.lane] = runningIn[piece.lane].flatMap { $0 > 1 ? $0 - 1 : nil }
                 condition.broadcast()
                 waitedInVain = false
                 continue
@@ -431,12 +417,6 @@ enum Background {
             waitedInVain = !condition.wait(until: Date().addingTimeInterval(10))
             idle -= 1
         }
-    }
-
-    /// Waits until nothing is running or waiting, `timeout` seconds at most; for tests.
-    @discardableResult
-    static func waitUntilIdle(timeout: TimeInterval) -> Bool {
-        wait(timeout) { running == 0 && waiting.isEmpty }
     }
 
     /// Waits until nothing of this lane is running or waiting, `timeout` seconds at most; for tests.
@@ -469,7 +449,9 @@ enum Background {
 /// by Disconnect) and the caller's (Cancel in the progress window). Without a caller's flag
 /// the session's own is passed as it is.
 func withEither<Result>(
-    _ own: CancellationFlag, _ callers: CancellationFlag?, _ body: (CancellationFlag) throws -> Result
+    _ own: CancellationFlag,
+    _ callers: CancellationFlag?,
+    _ body: (CancellationFlag) throws -> Result
 ) rethrows -> Result {
     guard let callers, callers !== own else { return try body(own) }
     let both = CancellationFlag()

@@ -80,18 +80,15 @@ public struct ServerKey: Hashable, CustomStringConvertible, Sendable {
     /// that has none gets a location on a server that does not exist (the reserved name
     /// `invalid`), never one on the local disk.
     public func url(path: String = "/") -> URL {
-        if let url = validURL(path: path) { return url }
-        var components = URLComponents()
-        components.scheme = Self.schemes.contains(scheme) ? scheme : "ftp"
-        components.host = "host.invalid"
-        components.path = RemotePath.normalized(path)
-        return components.url ?? URL(string: "ftp://host.invalid/")!
+        // `host.invalid` of a known scheme always has a URL, so the second call ends there.
+        validURL(path: path)
+            ?? ServerKey(scheme: Self.schemes.contains(scheme) ? scheme : "ftp", host: "host.invalid").url(path: path)
     }
 
     /// `ftp://host:port`, as the server is named in menus and messages.
     public var description: String {
-        let text = url().absoluteString
-        return text.hasSuffix("/") ? String(text.dropLast()) : text
+        // The location of the root, without the slash it ends with.
+        String(url().absoluteString.dropLast())
     }
 }
 
@@ -307,8 +304,20 @@ public struct ServerAddress: Equatable, Sendable {
     public var textWithoutPassword: String {
         let text = key.url(path: hasPath ? path : "/").absoluteString
         guard let user, let range = text.range(of: "://") else { return text }
-        let escaped = user.addingPercentEncoding(withAllowedCharacters: .urlUserAllowed) ?? user
-        return text.replacingCharacters(in: range, with: "://" + escaped + "@")
+        return text.replacingCharacters(in: range, with: "://" + Self.escaped(user) + "@")
+    }
+
+    /// A user name as a URL writes it: what may not stand there as it is, as `%` and its bytes.
+    private static func escaped(_ user: String) -> String {
+        var text = ""
+        for scalar in user.unicodeScalars {
+            if CharacterSet.urlUserAllowed.contains(scalar) {
+                text.unicodeScalars.append(scalar)
+            } else {
+                text += String(scalar).utf8.map { String(format: "%%%02X", $0) }.joined()
+            }
+        }
+        return text
     }
 }
 

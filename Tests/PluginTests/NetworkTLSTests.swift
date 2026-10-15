@@ -81,7 +81,8 @@ final class TLSServer {
     private let process = Process()
 
     /// `refusesProtection`: the server answers PROT with an error, as one that cannot encrypt its data connections.
-    init(mode: TLSMode, box: Sandbox, refusesProtection: Bool = false) throws {
+    /// `requiresReuse`: every data connection is refused for not resuming the control connection's TLS session.
+    init(mode: TLSMode, box: Sandbox, refusesProtection: Bool = false, requiresReuse: Bool = false) throws {
         let (certificate, key, script) = (box.url("cert.pem"), box.url("key.pem"), box.url("ftps.py"))
         let make = Process()
         make.executableURL = URL(fileURLWithPath: Self.openssl)
@@ -99,7 +100,7 @@ final class TLSServer {
         process.executableURL = URL(fileURLWithPath: Self.python)
         process.arguments =
             [script.path, mode == .implicit ? "implicit" : "explicit", certificate.path, key.path, box.url("srv").path]
-            + (refusesProtection ? ["refuse-prot"] : [])
+            + (refusesProtection ? ["refuse-prot"] : []) + (requiresReuse ? ["require-reuse"] : [])
         process.standardOutput = output
         process.standardError = FileHandle.nullDevice
         try process.run()
@@ -124,6 +125,7 @@ final class TLSServer {
         import os, socket, ssl, sys, threading
         mode, cert, key, root = sys.argv[1:5]
         refuse_prot = "refuse-prot" in sys.argv[5:]
+        require_reuse = "require-reuse" in sys.argv[5:]
         context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
         context.load_cert_chain(cert, key)
         listener = socket.socket()
@@ -144,6 +146,10 @@ final class TLSServer {
                 def data(work):
                     say("150 Here it comes")
                     channel, _ = passive.accept()
+                    if require_reuse:
+                        channel.close()
+                        say("522 SSL connection failed; session reuse required")
+                        return
                     if protect:
                         channel = context.wrap_socket(channel, server_side=True)
                     work(channel)

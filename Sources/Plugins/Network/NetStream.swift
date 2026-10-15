@@ -201,7 +201,10 @@ final class TLSSettings: @unchecked Sendable {
     /// Where certificates are checked. The check may ask the network (revocation) and take
     /// seconds; on a queue of its own it holds up neither the stream it belongs to nor another.
     private static let verifyQueue = DispatchQueue(
-        label: "afm.network.verify", qos: .userInitiated, attributes: .concurrent)
+        label: "afm.network.verify",
+        qos: .userInitiated,
+        attributes: .concurrent
+    )
 
     /// Options for `NWProtocolTLS` that verify the server like the system does, and accept what
     /// the user accepted before.
@@ -215,7 +218,9 @@ final class TLSSettings: @unchecked Sendable {
             { [self] _, secTrust, complete in
                 beforeEvaluating()
                 complete(evaluate(sec_trust_copy_ref(secTrust).takeRetainedValue()))
-            }, Self.verifyQueue)
+            },
+            Self.verifyQueue
+        )
         return options
     }
 
@@ -232,8 +237,12 @@ final class TLSSettings: @unchecked Sendable {
         SecTrustSetPolicies(trust, SecPolicyCreateSSL(true, host as CFString))
         var error: CFError?
         if SecTrustEvaluateWithError(trust, &error) { return true }
-        let problem = error.map { CFErrorCopyDescription($0) as String } ?? "It could not be verified."
-        guard let info = CertificateInfo(trust: trust, problem: problem) else { return false }
+        // A failed evaluation always says why, and a chain starts with the server's own
+        // certificate; were either missing, the chain is refused without a question.
+        guard let error, let leaf = (SecTrustCopyCertificateChain(trust) as? [SecCertificate])?.first else {
+            return false
+        }
+        let info = CertificateInfo(leaf: leaf, problem: CFErrorCopyDescription(error) as String)
         if self.trust.isAccepted(info.fingerprint, for: host) { return true }
         rejected = info
         return false
@@ -242,14 +251,13 @@ final class TLSSettings: @unchecked Sendable {
 
 extension CertificateInfo {
     /// Describes the server's own certificate, the first of the chain.
-    init?(trust: SecTrust, problem: String) {
-        guard let chain = SecTrustCopyCertificateChain(trust) as? [SecCertificate], let leaf = chain.first else {
-            return nil
-        }
+    init(leaf: SecCertificate, problem: String) {
         let digest = SHA256.hash(data: SecCertificateCopyData(leaf) as Data)
         self.init(
             fingerprint: digest.map { String(format: "%02X", $0) }.joined(separator: ":"),
-            subject: (SecCertificateCopySubjectSummary(leaf) as String?) ?? "", problem: problem)
+            subject: (SecCertificateCopySubjectSummary(leaf) as String?) ?? "",
+            problem: problem
+        )
     }
 }
 
@@ -311,26 +319,19 @@ final class FTPAuthTLSFramer: NWProtocolFramerImplementation {
     func cleanup(framer _: NWProtocolFramer.Instance) {}
 
     func handleOutput(
-        framer: NWProtocolFramer.Instance, message _: NWProtocolFramer.Message, messageLength: Int, isComplete _: Bool
+        framer: NWProtocolFramer.Instance,
+        message _: NWProtocolFramer.Message,
+        messageLength: Int,
+        isComplete _: Bool
     ) {
         try? framer.writeOutputNoCopy(length: messageLength)
     }
 
     func handleInput(framer: NWProtocolFramer.Instance) -> Int {
         let report = framer.options[Self.reportKey] as? ExplicitTLSReport
-        while true {
-            var line: String?
-            // One line at a time, so nothing that follows the last reply is taken away.
-            let parsed = framer.parseInput(minimumIncompleteLength: 1, maximumLength: 16_384) { buffer, _ in
-                guard let buffer, let end = buffer.firstIndex(of: 0x0A) else { return 0 }
-                var bytes = Array(buffer[..<end])
-                if bytes.last == 0x0D { bytes.removeLast() }
-                line = String(decoding: bytes, as: UTF8.self)
-                return end + 1
-            }
-            guard parsed, let line else { return 0 }
-            guard let reply = parser.feed(line) else { continue }
-            if reply.code == 120 { continue }
+        while let line = Self.nextLine(framer) {
+            // A reply of several lines is complete with its last; 120 says the server is not ready yet.
+            guard let reply = parser.feed(line), reply.code != 120 else { continue }
             if !askedForTLS {
                 guard reply.code == 220 else { return fail(framer, report, reply) }
                 report?.greeting = reply
@@ -338,12 +339,9 @@ final class FTPAuthTLSFramer: NWProtocolFramerImplementation {
                 framer.writeOutput(data: Data("AUTH TLS\r\n".utf8))
                 continue
             }
-            guard reply.code == 234, let tls = framer.options[Self.tlsKey] as? NWProtocolTLS.Options else {
-                return fail(framer, report, reply)
-            }
-            do {
-                try framer.prependApplicationProtocol(options: tls)
-            } catch {
+            guard reply.code == 234, let tls = framer.options[Self.tlsKey] as? NWProtocolTLS.Options,
+                (try? framer.prependApplicationProtocol(options: tls)) != nil
+            else {
                 return fail(framer, report, reply)
             }
             framer.passThroughInput()
@@ -351,6 +349,21 @@ final class FTPAuthTLSFramer: NWProtocolFramerImplementation {
             framer.markReady()
             return 0
         }
+        return 0
+    }
+
+    /// The next whole line that arrived, without its line end; nil while none has. One line at a
+    /// time, so nothing that follows the last reply is taken away.
+    private static func nextLine(_ framer: NWProtocolFramer.Instance) -> String? {
+        var line: String?
+        _ = framer.parseInput(minimumIncompleteLength: 1, maximumLength: 16_384) { buffer, _ in
+            guard let buffer, let end = buffer.firstIndex(of: 0x0A) else { return 0 }
+            var bytes = Array(buffer[..<end])
+            if bytes.last == 0x0D { bytes.removeLast() }
+            line = String(decoding: bytes, as: UTF8.self)
+            return end + 1
+        }
+        return line
     }
 
     private func fail(_ framer: NWProtocolFramer.Instance, _ report: ExplicitTLSReport?, _ reply: FTPReply) -> Int {
@@ -461,10 +474,8 @@ final class NetStream: @unchecked Sendable {
                         ? NetworkError.connectionLost : NetworkError.connectionFailed(error.localizedDescription)
                 }
 
-            case .cancelled:
-                if failure == nil { failure = NetworkError.connectionLost }
-
             default:
+                // `cancelled` comes only after `close`, or after `waiting` above, which set the failure.
                 break
             }
             condition.broadcast()
@@ -488,9 +499,9 @@ final class NetStream: @unchecked Sendable {
 
     /// The address of the other end, as the network layer reached it; nil when only a name is known.
     var remoteAddress: String? {
-        guard case .hostPort(let host, _)? = connection.currentPath?.remoteEndpoint else { return nil }
-        switch host {
-        case .ipv4, .ipv6: return "\(host)"
+        switch connection.currentPath?.remoteEndpoint {
+        case .hostPort(.ipv4(let address), _)?: return "\(address)"
+        case .hostPort(.ipv6(let address), _)?: return "\(address)"
         default: return nil
         }
     }
@@ -537,7 +548,10 @@ final class NetStream: @unchecked Sendable {
 
     /// Waits until `ready` returns a value, the stream fails, the time is up or the caller cancels.
     private func wait<Result>(
-        timeout: TimeInterval, cancellation: CancellationFlag?, for what: String, _ ready: () throws -> Result?
+        timeout: TimeInterval,
+        cancellation: CancellationFlag?,
+        for what: String,
+        _ ready: () throws -> Result?
     ) throws -> Result {
         let deadline = Date().addingTimeInterval(timeout)
         condition.lock()
@@ -676,8 +690,11 @@ final class NetStream: @unchecked Sendable {
     private func submit(_ data: Data?, isFinal: Bool) -> Pending<Bool> {
         let sent = Pending<Bool>()
         connection.send(
-            content: data, contentContext: isFinal ? .finalMessage : .defaultMessage, isComplete: true,
-            completion: .contentProcessed { error in sent.fulfill(error == nil) })
+            content: data,
+            contentContext: isFinal ? .finalMessage : .defaultMessage,
+            isComplete: true,
+            completion: .contentProcessed { error in sent.fulfill(error == nil) }
+        )
         return sent
     }
 
@@ -707,7 +724,6 @@ final class NetStream: @unchecked Sendable {
 /// receives an upload nor supplies a download or a listing.
 final class DataListener {
     private var listener: NWListener
-    private var isBound: Bool
     private let queue = DispatchQueue(label: "afm.network.listener")
     private let accepted = Pending<NWConnection>()
     private let peer: String
@@ -722,35 +738,26 @@ final class DataListener {
     }
 
     /// `peer` is the address of the server, `local` the address of this end of the control connection.
-    init(peer: String, local: String?) throws {
+    init(peer: String, local: String) throws {
         self.peer = Self.comparable(peer)
-        var bound: NWListener?
-        if let local {
-            let parameters = NWParameters.tcp
-            parameters.requiredLocalEndpoint = .hostPort(host: NWEndpoint.Host(local), port: .any)
-            bound = try? NWListener(using: parameters)
-        }
-        isBound = bound != nil
-        listener = try bound ?? NWListener(using: .tcp, on: .any)
+        let parameters = NWParameters.tcp
+        parameters.requiredLocalEndpoint = .hostPort(host: NWEndpoint.Host(local), port: .any)
+        listener = try NWListener(using: parameters)
     }
 
     deinit { listener.cancel() }
 
     /// Starts listening and returns the port.
     func start(timeout: TimeInterval) throws -> Int {
-        if let port = try begin(timeout: timeout) { return port }
-        if isBound {
-            // The one address could not be listened on (an address with a zone, say): every
-            // address then, with the same check of who connects.
-            listener.cancel()
-            listener = try NWListener(using: .tcp, on: .any)
-            isBound = false
-            if let port = try begin(timeout: timeout) { return port }
-        }
-        throw NetworkError.connectionFailed("No port is available for the server to connect to.")
+        if let port = try? begin(timeout: timeout) { return port }
+        // The one address could not be listened on (an address with a zone, say): every
+        // address then, with the same check of who connects.
+        listener.cancel()
+        listener = try NWListener(using: .tcp, on: .any)
+        return try begin(timeout: timeout)
     }
 
-    private func begin(timeout: TimeInterval) throws -> Int? {
+    private func begin(timeout: TimeInterval) throws -> Int {
         let started = Pending<Bool>()
         listener.newConnectionHandler = { [accepted, peer] connection in
             guard case .hostPort(let host, _) = connection.endpoint, Self.comparable("\(host)") == peer else {
@@ -768,7 +775,9 @@ final class DataListener {
             }
         }
         listener.start(queue: queue)
-        guard try started.wait(timeout: timeout) == true, let port = listener.port else { return nil }
+        guard try started.wait(timeout: timeout) == true, let port = listener.port else {
+            throw NetworkError.connectionFailed("No port is available for the server to connect to.")
+        }
         return Int(port.rawValue)
     }
 

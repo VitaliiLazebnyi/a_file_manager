@@ -59,66 +59,75 @@ final class ArchiveStore: @unchecked Sendable {
         if known != nil { slots[key]?.lastUsed = clock }
         lock.unlock()
         if let known, known.isCurrent(cancellation: cancellation) { return known }
-        while true {
-            if cancellation?.isCancelled == true { throw ArchiveError.cancelled }
-            lock.lock()
-            clock += 1
-            let slot = slots[key] ?? Slot()
-            slots[key] = slot
-            slot.lastUsed = clock
-            lock.unlock()
+        return try archiveInTurn(at: url, key: key, cancellation: cancellation)
+    }
 
-            if let cancellation {
-                // Waits in turns, so that the wait for an opening that takes long can end.
-                while !slot.lock.lock(before: Date(timeIntervalSinceNow: 0.05)) {
-                    if cancellation.isCancelled { throw ArchiveError.cancelled }
-                }
-            } else {
-                slot.lock.lock()
+    /// The archive from its slot, behind whoever opens it now: opened or read again there
+    /// when needed.
+    private func archiveInTurn(at url: URL, key: String, cancellation: CancellationFlag?) throws -> OpenArchive {
+        if cancellation?.isCancelled == true { throw ArchiveError.cancelled }
+        lock.lock()
+        clock += 1
+        let slot = slots[key] ?? Slot()
+        slots[key] = slot
+        slot.lastUsed = clock
+        lock.unlock()
+
+        if let cancellation {
+            // Waits in turns, so that the wait for an opening that takes long can end.
+            var isLocked: Bool
+            repeat {
+                isLocked = slot.lock.lock(before: Date(timeIntervalSinceNow: 0.05))
+            } while !isLocked && !cancellation.isCancelled
+            guard isLocked else { throw ArchiveError.cancelled }
+        } else {
+            slot.lock.lock()
+        }
+        // The slot may have been let go between the two locks; an archive opened into it
+        // now would be a second one beside the table's. The table is asked again.
+        lock.lock()
+        let isListed = slots[key] === slot
+        lock.unlock()
+        guard isListed else {
+            slot.lock.unlock()
+            return try archiveInTurn(at: url, key: key, cancellation: cancellation)
+        }
+        defer { slot.lock.unlock() }
+        if let archive = slot.archive {
+            if archive.isCurrent(cancellation: cancellation) { return archive }
+            // Its file was changed by someone else. It is let go for a fresh reading,
+            // unless a change has just begun in it: then it stays the archive.
+            guard archive.retireIfIdle() else { return archive }
+        }
+        if let failure = slot.failure {
+            let age = Date().timeIntervalSince(failure.time)
+            let unchanged =
+                url.isFileURL
+                ? age < Self.failureMemory && FileSignature.of(url.path) == failure.signature : age < 2
+            if unchanged { throw failure.error }
+            slot.failure = nil
+        }
+        setArchive(nil, of: slot, key: key)
+        do {
+            let archive = try open(url, cancellation: cancellation)
+            setArchive(archive, of: slot, key: key)
+            evict(keeping: key)
+            return archive
+        } catch {
+            if cancellation?.isCancelled == true {
+                // A stopped attempt says nothing about the archive: no failure is kept, and
+                // the empty slot goes (whoever waits for it makes a new one).
+                lock.lock()
+                if slots[key] === slot { slots[key] = nil }
+                lock.unlock()
+                throw ArchiveError.cancelled
             }
-            defer { slot.lock.unlock() }
-            // The slot may have been let go between the two locks; an archive opened into it
-            // now would be a second one beside the table's.
-            lock.lock()
-            let isListed = slots[key] === slot
-            lock.unlock()
-            guard isListed else { continue }
-            if let archive = slot.archive {
-                if archive.isCurrent(cancellation: cancellation) { return archive }
-                // Its file was changed by someone else. It is let go for a fresh reading,
-                // unless a change has just begun in it: then it stays the archive.
-                guard archive.retireIfIdle() else { return archive }
+            // Only what the file itself is to blame for is remembered; a full disk or a
+            // tool that was killed may be over the next time.
+            if Self.isAboutTheFile(error) {
+                slot.failure = (error, url.isFileURL ? FileSignature.of(url.path) : nil, Date())
             }
-            if let failure = slot.failure {
-                let age = Date().timeIntervalSince(failure.time)
-                let unchanged =
-                    url.isFileURL
-                    ? age < Self.failureMemory && FileSignature.of(url.path) == failure.signature : age < 2
-                if unchanged { throw failure.error }
-                slot.failure = nil
-            }
-            setArchive(nil, of: slot, key: key)
-            do {
-                let archive = try open(url, cancellation: cancellation)
-                setArchive(archive, of: slot, key: key)
-                evict(keeping: key)
-                return archive
-            } catch {
-                if cancellation?.isCancelled == true {
-                    // A stopped attempt says nothing about the archive: no failure is kept, and
-                    // the empty slot goes (whoever waits for it makes a new one).
-                    lock.lock()
-                    if slots[key] === slot { slots[key] = nil }
-                    lock.unlock()
-                    throw ArchiveError.cancelled
-                }
-                // Only what the file itself is to blame for is remembered; a full disk or a
-                // tool that was killed may be over the next time.
-                if Self.isAboutTheFile(error) {
-                    slot.failure = (error, url.isFileURL ? FileSignature.of(url.path) : nil, Date())
-                }
-                throw error
-            }
+            throw error
         }
     }
 
@@ -304,8 +313,7 @@ final class ArchiveStore: @unchecked Sendable {
 
     /// Makes the archive at `url` hold what was written into it, see `OpenArchive.commit`.
     /// An archive that is not in the table holds nothing unwritten (see the class comment).
-    func commit(_ url: URL, cancellation: CancellationFlag, progress: (Int64, Int64) -> Bool = { _, _ in true }) throws
-    {
+    func commit(_ url: URL, cancellation: CancellationFlag, progress: (Int64, Int64) -> Bool) throws {
         try openArchive(at: url)?.commit(cancellation: cancellation, progress: progress)
     }
 
@@ -316,11 +324,16 @@ final class ArchiveStore: @unchecked Sendable {
     /// none that has nothing waiting is touched.
     func bringUpToDate(_ url: URL, cancellation: CancellationFlag) throws {
         let concerns = { (archive: OpenArchive) in Self.archive(archive, liesIn: url) }
-        for _ in 0..<(2 * environment.maxNesting + 4) {
-            let pending = openArchives.filter { $0.hasPendingChanges && concerns($0) }
+        func pending() -> [OpenArchive] {
+            openArchives.filter { $0.hasPendingChanges && concerns($0) }
                 .sorted { ArchiveURL.nesting(of: $0.archiveURL) > ArchiveURL.nesting(of: $1.archiveURL) }
-            guard !pending.isEmpty else { return }
-            for archive in pending { try archive.commit(cancellation: cancellation) }
+        }
+        // Writing an archive gives the one it lies in changes of its own: the rounds go on
+        // until nothing waits, but not for ever.
+        var (waiting, rounds) = (pending(), 0)
+        while !waiting.isEmpty, rounds < 2 * environment.maxNesting + 4 {
+            for archive in waiting { try archive.commit(cancellation: cancellation) }
+            (waiting, rounds) = (pending(), rounds + 1)
         }
     }
 
@@ -405,9 +418,19 @@ final class ArchiveFileSystem: FileSystemProvider {
     let capabilities: FileSystemCapabilities
     private let store: ArchiveStore
 
-    init(scheme: String, store: ArchiveStore) {
+    /// What lies at a path of this machine, without asking a volume that may not answer
+    /// (`Volume.kind(ofLocalPath:)`).
+    private let pathKind: @Sendable (String) -> Volume.PathKind
+
+    internal convenience init(scheme: String, store: ArchiveStore) {
+        self.init(scheme: scheme, store: store) { Volume.kind(ofLocalPath: $0) }
+    }
+
+    /// The same with `pathKind` in place of the look at the disks (tests: a path on a server).
+    internal init(scheme: String, store: ArchiveStore, pathKind: @escaping @Sendable (String) -> Volume.PathKind) {
         self.scheme = scheme
         self.store = store
+        self.pathKind = pathKind
         capabilities = scheme == ArchiveURL.writableScheme ? [.write, .deferredWrites] : []
     }
 
@@ -615,11 +638,10 @@ final class ArchiveFileSystem: FileSystemProvider {
     /// (its file was replaced, or it was the least recently used): the archive then refuses
     /// the change, and the change is made in the archive the store has now. So a change
     /// never lands in an archive that nobody will write.
-    private func changing<T>(_ body: () throws -> T) throws -> T {
-        for _ in 0..<8 {
-            do { return try body() } catch ArchiveError.retired { continue }
+    private func changing<T>(attempts: Int = 8, _ body: () throws -> T) throws -> T {
+        do { return try body() } catch ArchiveError.retired where attempts > 0 {
+            return try changing(attempts: attempts - 1, body)
         }
-        return try body()
     }
 
     // Each change also comes with a `cancellation`: the wait for an archive that is being
@@ -937,7 +959,9 @@ final class ArchiveFileSystem: FileSystemProvider {
                 let open = store.openArchive(at: location.archive)
                 archives[key] = .some(open?.allowsParallelReads == false ? open : nil)
             }
-            guard let archive = archives[key] ?? nil, let entry = archive.entry(location.innerPath) else { continue }
+            guard let archive = archives[key].flatMap(\.self), let entry = archive.entry(location.innerPath) else {
+                continue
+            }
             places[key, default: []].append((index, entry.order))
         }
         guard !places.isEmpty else { return urls }
@@ -993,7 +1017,7 @@ final class ArchiveFileSystem: FileSystemProvider {
             prefix += "/" + name
             let ext = (name as NSString).pathExtension.lowercased()
             guard !ext.isEmpty, known.contains(ext) else { continue }
-            switch Volume.kind(ofLocalPath: prefix) {
+            switch pathKind(prefix) {
             case .regularFile: break
             case .directory, .other: continue
             case .missing: return nil

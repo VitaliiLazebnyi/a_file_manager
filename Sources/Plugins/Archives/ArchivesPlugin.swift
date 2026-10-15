@@ -16,22 +16,33 @@ public final class ArchivesPlugin: Plugin {
     // (Not private: the tests set limits and hooks.)
     let environment = ArchiveEnvironment()
     let store: ArchiveStore
-    private let launchesApplications: Bool
+    /// What "Unpack and Open" hands the unpacked member to; nil opens nothing.
+    internal let openFile: (@MainActor (URL) -> Bool)?
 
     /// `flushDelay`: how long after the last change to a ZIP the changes are written into the
     /// archive file; nil leaves that to `flushPendingChanges()` (tests). `launchesApplications`
     /// is off in tests, so "Unpack and Open" starts nothing.
-    public init(flushDelay: TimeInterval? = 0.5, launchesApplications: Bool = true) {
+    public convenience init(flushDelay: TimeInterval? = 0.5, launchesApplications: Bool = true) {
+        self.init(flushDelay: flushDelay, openFile: launchesApplications ? ArchiveCommands.openInApplication : nil)
+    }
+
+    /// The same with what "Unpack and Open" hands its file to in place of the system's applications.
+    internal init(flushDelay: TimeInterval?, openFile: (@MainActor (URL) -> Bool)?) {
         environment.flushDelay = flushDelay
         store = ArchiveStore(environment: environment)
-        self.launchesApplications = launchesApplications
+        self.openFile = openFile
     }
 
     public func start(in owner: Kernel) {
         // The kernel keeps what is registered here; it must not be kept by it in turn.
         unowned let kernel = owner
         let (store, environment) = (self.store, self.environment)
-        let actions = ArchiveCommands(kernel: kernel, store: store, launchesApplications: launchesApplications)
+        let actions = ArchiveCommands(
+            kernel: kernel,
+            store: store,
+            openFile: openFile,
+            currentEvent: ArchiveCommands.handledEvent
+        )
         actions.refreshOptions()
 
         environment.fileSystems = { [weak kernel] in kernel?.fileSystems }
@@ -238,9 +249,9 @@ public final class ArchivesPlugin: Plugin {
                 // an archive of their own. By archive, not by name: two may be called the same.
                 let late = environment.quitting.isCancelled
                 let rescued = store.rescueAll(quickly: late, before: late ? Date(timeIntervalSinceNow: 2) : deadline)
+                // (The table holds each archive once.)
                 let outcomes = Dictionary(
-                    rescued.map { (ObjectIdentifier($0.archive), $0.outcome) },
-                    uniquingKeysWith: { first, _ in first }
+                    uniqueKeysWithValues: rescued.map { (ObjectIdentifier($0.archive), $0.outcome) }
                 )
                 for failure in failures {
                     var text = failure.error.localizedDescription
@@ -299,17 +310,13 @@ public final class ArchivesPlugin: Plugin {
         }
     }
 
-    /// Waits until the state is finished or the time is up; true when it is finished. On the
-    /// main thread the run loop keeps turning meanwhile, so that what other threads send to
-    /// the main thread (a question to the user) is done and does not wait for this wait.
+    /// Waits until the state is finished or the time is up; true when it is finished. The main
+    /// thread's run loop keeps turning meanwhile, so that what other threads send to the main
+    /// thread (a question to the user) is done and does not wait for this wait.
     private static func wait(until deadline: Date, for state: StopState) -> Bool {
         while state.reports == nil, Date() < deadline {
-            if Thread.isMainThread {
-                // A run loop with nothing to watch returns at once; then this must not spin.
-                if !RunLoop.current.run(mode: .default, before: Date(timeIntervalSinceNow: 0.02)) { usleep(5_000) }
-            } else {
-                usleep(5_000)
-            }
+            // A run loop with nothing to watch returns at once; then this must not spin.
+            if !RunLoop.current.run(mode: .default, before: Date(timeIntervalSinceNow: 0.02)) { usleep(5_000) }
         }
         return state.reports != nil
     }
