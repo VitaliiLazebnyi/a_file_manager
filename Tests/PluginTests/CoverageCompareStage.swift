@@ -57,8 +57,34 @@ internal final class CoverageCompareStage {
     /// Whether the window told that it closed.
     internal private(set) var wasClosed = false
 
-    /// `/A/left.txt` and `/B/right.txt` with the given texts, compared, and the window shown (as far as a test shows it: never on screen).
-    internal init(left: String, right: String, settings: MemorySettings = MemorySettings()) {
+    /// The window.
+    internal var window: NSWindow? { controller?.window }
+
+    /// The two path fields, left first.
+    internal var pathFields: [NSTextField] {
+        views(NSTextField.self).filter { $0.isEditable && !($0 is NSSearchField) && $0.superview is NSStackView }
+    }
+
+    /// The search field.
+    internal var searchField: NSSearchField? { views(NSSearchField.self).first }
+
+    /// The two panes, left first.
+    internal var tables: [NSTableView] { views(NSTableView.self) }
+
+    /// The status line.
+    internal var status: String { views(NSTextField.self).last?.stringValue ?? "" }
+
+    /// The rows selected in the left pane.
+    internal var selectedRows: [Int] { tables.first.map { Array($0.selectedRowIndexes) } ?? [] }
+
+    /// `/A/left.txt` and `/B/right.txt` with the given texts, compared, and the window shown (as far as a test
+    /// shows it: never on screen).
+    internal convenience init(left: String, right: String) {
+        self.init(left: left, right: right, settings: MemorySettings())
+    }
+
+    /// The same with the settings `settings`.
+    internal init(left: String, right: String, settings: MemorySettings) {
         memory.addFile("/A/left.txt", left)
         memory.addFile("/B/right.txt", right)
         bench = TestBench(
@@ -82,13 +108,6 @@ internal final class CoverageCompareStage {
         made.show()
     }
 
-    deinit {
-        // `close()` has closed the window.
-    }
-
-    /// The window.
-    internal var window: NSWindow? { controller?.window }
-
     /// Asks the window to close, as its close button does (`performClose` would run the event loop for a moment).
     internal func askToClose() {
         guard let window, let controller else {
@@ -104,7 +123,7 @@ internal final class CoverageCompareStage {
     }
 
     /// Every view of `type` in the window, in the order of the view tree.
-    internal func views<View: NSView>(_ type: View.Type) -> [View] {
+    internal func views<View: NSView>(_: View.Type) -> [View] {
         func walk(_ view: NSView) -> [View] {
             ([view as? View].compactMap(\.self)) + view.subviews.flatMap(walk)
         }
@@ -134,27 +153,8 @@ internal final class CoverageCompareStage {
         click(title)
     }
 
-    /// The two path fields, left first.
-    internal var pathFields: [NSTextField] {
-        views(NSTextField.self).filter { $0.isEditable && !($0 is NSSearchField) && $0.superview is NSStackView }
-    }
-
-    /// The search field.
-    internal var searchField: NSSearchField? { views(NSSearchField.self).first }
-
-    /// The two panes, left first.
-    internal var tables: [NSTableView] { views(NSTableView.self) }
-
-    /// The status line.
-    internal var status: String { views(NSTextField.self).last?.stringValue ?? "" }
-
-    /// A key press in a pane: a named key by its key code, or a character.
-    internal func press(
-        _ keyCode: UInt16,
-        _ characters: String = "",
-        _ flags: NSEvent.ModifierFlags = [],
-        in pane: Int = 0
-    ) {
+    /// A key press in the left pane: a named key by its key code, or a character.
+    internal func press(_ keyCode: UInt16, _ characters: String, _ flags: NSEvent.ModifierFlags) {
         guard
             let event = NSEvent.keyEvent(
                 with: .keyDown,
@@ -171,9 +171,10 @@ internal final class CoverageCompareStage {
         else {
             return
         }
-        tables[pane].keyDown(with: event)
+        tables[0].keyDown(with: event)
     }
 
-    /// The rows selected in the left pane.
-    internal var selectedRows: [Int] { tables.first.map { Array($0.selectedRowIndexes) } ?? [] }
+    deinit {
+        // `close()` has closed the window.
+    }
 }

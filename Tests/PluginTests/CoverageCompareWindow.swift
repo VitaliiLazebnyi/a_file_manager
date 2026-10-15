@@ -18,10 +18,17 @@ internal struct CoverageCompareWindow {
         (0..<20)
         .compactMap { index -> String? in
             switch index {
-            case 3: return "changed 3"
-            case 10: return nil
-            case 15: return "line 15\nnew line"
-            default: return "line \(index)"
+            case 3:
+                return "changed 3"
+
+            case 10:
+                return nil
+
+            case 15:
+                return "line 15\nnew line"
+
+            default:
+                return "line \(index)"
             }
         }
         .joined(separator: "\n") + "\n"
@@ -57,21 +64,21 @@ internal struct CoverageCompareWindow {
     internal func unsavedEditsAreAskedAboutBeforeTheFilesAreReadAgain() {
         let stage = CoverageCompareStage(left: Self.left, right: Self.right)
         defer { stage.close() }
-        let ui = stage.bench.interaction
+        let interaction = stage.bench.interaction
         stage.toggle("Edit mode")
         stage.session.copy(rows: 3..<4, to: .right)
         #expect(stage.session.hasUnsavedChanges)
         // Cancel: nothing happens.
-        ui.choiceAnswers = [2]
+        interaction.choiceAnswers = [2]
         stage.click("Compare")
         #expect(stage.session.hasUnsavedChanges)
         // Don't Save: the files are read again as they are.
-        ui.choiceAnswers = [1]
+        interaction.choiceAnswers = [1]
         stage.click("Compare")
         #expect(!stage.session.hasUnsavedChanges && stage.memory.contents("/B/right.txt") == Self.right)
         // Save: written first, then read again.
         stage.session.copy(rows: 3..<4, to: .right)
-        ui.choiceAnswers = [0]
+        interaction.choiceAnswers = [0]
         stage.toggle("Binary")
         #expect(stage.session.isBinary && stage.memory.contents("/B/right.txt")?.contains("changed 3") == false)
     }
