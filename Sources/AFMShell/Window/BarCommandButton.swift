@@ -1,3 +1,4 @@
+import AFMKernel
 import AppKit
 
 /// A button of the button bar.
@@ -7,6 +8,8 @@ import AppKit
 /// pressed, in the accent colour while its command is on. A ⌘-press is handed to the bar, which
 /// may start a drag, instead of pressing the button. Main thread only.
 internal final class BarCommandButton: NSButton {
+    /// The command the button runs on the button bar; empty for a button of another bar.
+    internal var command: CommandID = ""
     /// Takes a press with ⌘ instead of the button; nil leaves it to the button.
     internal var onCommandMouseDown: ((NSEvent) -> Void)?
     /// The area that tells of the mouse coming and going.

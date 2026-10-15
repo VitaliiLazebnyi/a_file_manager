@@ -64,8 +64,7 @@ internal struct WindowCovButtonBarDragTests {
         let app = await fixture.startWindow(with: WindowTestPlugin())
         defer { app.stop() }
         let bar = arrange(app)
-        let hidden = try #require(bar.buttons.first { $0.identifier?.rawValue == CommandID.showHidden.rawValue })
-        let button = try #require(hidden as? BarCommandButton)
+        let button = try #require(bar.buttons.first { $0.command == .showHidden })
         let start = NSPoint(x: 10, y: 10)
         let drags = script(
             bar,
@@ -106,7 +105,7 @@ internal struct WindowCovButtonBarDragTests {
         let app = await fixture.startWindow(with: WindowTestPlugin())
         defer { app.stop() }
         let bar = arrange(app)
-        let button = try #require(bar.buttons.first as? BarCommandButton)
+        let button = try #require(bar.buttons.first)
         let start = NSPoint(x: 10, y: 10)
         let drags = script(bar, [try Self.mouse(.leftMouseDragged, at: NSPoint(x: 20, y: 10), in: bar)])
         button.mouseDown(with: try Self.mouse(.leftMouseDown, at: start, in: bar))
@@ -126,18 +125,21 @@ internal struct WindowCovButtonBarDragTests {
         #expect(bar.dragged == nil && bar.flow.extraHeight == 0 && button.alphaValue == 1)
         #expect(bar.entries.contains(.copy))
 
-        // The handle of the second group drags the group with its buttons; they fly back.
+        // The handle of the second group drags the group with its buttons; they fly back. A part
+        // without a size has no picture: the drag shows the rest.
         let handle = try #require(bar.flow.items[3] as? BarSeparatorView)
+        bar.flow.items[4].frame.size.width = 0
         let groupDrags = script(bar, [try Self.mouse(.leftMouseDragged, at: NSPoint(x: 10, y: 20), in: bar)])
         handle.mouseDown(with: try Self.mouse(.leftMouseDown, at: start, in: bar))
         #expect(bar.dragged == .group(line: 0, group: 1) && groupDrags().first?.fliesBack == true)
         let groupPicture = try #require(groupDrags().first?.items.first?.imageComponents?.first?.contents as? NSImage)
-        #expect(groupPicture.size.width == handle.frame.width + bar.flow.items[4].frame.width)
+        #expect(groupPicture.size.width == handle.frame.width)
         // A group let go of beside the bar stays.
         bar.draggingSession(session, endedAt: NSPoint(x: -50_000, y: -50_000), operation: [])
         #expect(bar.entries.contains(.showCommandLine) && bar.dragged == nil)
         // Something that is no longer on the bar has nothing to drag.
         bar.dragged = nil
+        _ = script(bar, [try Self.mouse(.leftMouseDragged, at: NSPoint(x: 30, y: 10), in: bar)])
         bar.trackDrag(
             .button(line: 5, group: 0, index: 0),
             of: bar,
@@ -172,7 +174,6 @@ internal struct WindowCovButtonBarDragTests {
         #expect(bar.entries.first == .copy)
         // A bar outside a window.
         let alone = ButtonBarView(kernel: app.kernel)
-        alone.dragWasCancelled = { false }
         alone.dragged = copy
         alone.draggingSession(session, endedAt: outside, operation: [])
         #expect(app.kernel.toolbar.layout(from: fixture.settings).first??.command == .copy)
