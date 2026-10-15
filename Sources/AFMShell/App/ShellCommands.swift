@@ -31,28 +31,33 @@ internal enum ShellCommands {
         in commands: CommandRegistry,
         source: @escaping () -> PanelViewController?
     ) {
-        func cursor(_ id: CommandID, _ title: String, _ shortcuts: [Shortcut], _ row: @escaping (PanelModel) -> Int) {
+        func cursor(
+            _ id: CommandID,
+            _ title: String,
+            _ shortcuts: [Shortcut],
+            _ row: @escaping (PanelViewController) -> Int
+        ) {
             commands.register(Command(id, title, shortcuts, runsDuringJobs: true)) {
-                guard let model = source()?.model else {
+                guard let panel = source() else {
                     return
                 }
-                model.moveCursor(to: row(model))
+                panel.model.moveCursor(to: row(panel))
             }
         }
         // ← and → jump to the first and the last entry of the folder (`SpecialCursorMovement` 1
         // of the spec); `[..]` is not an entry, Home still reaches it.
-        cursor(.cursorToFirstEntry, "Cursor to First Entry", [Shortcut(.leftArrow)]) { model in
-            model.hasParentRow && !model.items.isEmpty ? 1 : 0
+        cursor(.cursorToFirstEntry, "Cursor to First Entry", [Shortcut(.leftArrow)]) { panel in
+            panel.model.hasParentRow && !panel.model.items.isEmpty ? 1 : 0
         }
-        cursor(.cursorToLastEntry, "Cursor to Last Entry", [Shortcut(.rightArrow), Shortcut(.end)]) { model in
-            model.rowCount - 1
+        cursor(.cursorToLastEntry, "Cursor to Last Entry", [Shortcut(.rightArrow), Shortcut(.end)]) { panel in
+            panel.model.rowCount - 1
         }
         cursor(.cursorToTop, "Cursor to Top", [Shortcut(.home)]) { _ in 0 }
-        cursor(.cursorPageUp, "Cursor Page Up", [Shortcut(.pageUp)]) { model in
-            model.cursor - (source()?.pageSize ?? 0)
+        cursor(.cursorPageUp, "Cursor Page Up", [Shortcut(.pageUp)]) { panel in
+            panel.model.cursor - panel.pageSize
         }
-        cursor(.cursorPageDown, "Cursor Page Down", [Shortcut(.pageDown)]) { model in
-            model.cursor + (source()?.pageSize ?? 0)
+        cursor(.cursorPageDown, "Cursor Page Down", [Shortcut(.pageDown)]) { panel in
+            panel.model.cursor + panel.pageSize
         }
     }
 

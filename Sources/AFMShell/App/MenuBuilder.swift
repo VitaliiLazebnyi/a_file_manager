@@ -29,7 +29,13 @@ internal enum MenuBuilder {
 
     /// The number of entries a menu can show without scrolling on the main screen.
     internal static var screenLimit: Int {
-        guard let height = NSScreen.main?.visibleFrame.height else {
+        limit(forScreenHeight: NSScreen.main?.visibleFrame.height)
+    }
+
+    /// The number of entries a menu can show without scrolling on a screen `height` points
+    /// high; 36 when there is no screen to ask.
+    internal static func limit(forScreenHeight height: CGFloat?) -> Int {
+        guard let height else {
             return 36
         }
         return max(20, Int(height / 22) - 2)

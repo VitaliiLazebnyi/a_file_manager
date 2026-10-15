@@ -21,7 +21,7 @@ internal enum Mounts {
     /// The last answer and when it came (in the system's uptime), guarded by `lock`.
     nonisolated(unsafe) private static var cached: (at: TimeInterval, volumes: [Volume])?
 
-    /// The mounted volumes; `/` alone when the system does not say.
+    /// The mounted volumes; none when the system does not say.
     internal static func volumes() -> [Volume] {
         lock.lock()
         defer { lock.unlock() }
@@ -30,22 +30,17 @@ internal enum Mounts {
             return cached.volumes
         }
         // The system's list lives in a buffer of its own that the next call overwrites; the
-        // lock keeps the calls apart.
+        // lock keeps the calls apart. Without an answer the buffer is empty.
         var buffer: UnsafeMutablePointer<statfs>?
         let count = getmntinfo(&buffer, MNT_NOWAIT)
-        var volumes: [Volume] = []
-        if count > 0, let buffer {
-            volumes = (0..<Int(count))
-                .map { index in
-                    let path = withUnsafePointer(to: &buffer[index].f_mntonname) { pointer in
-                        pointer.withMemoryRebound(to: CChar.self, capacity: Int(MAXPATHLEN)) { String(cString: $0) }
-                    }
-                    return Volume(path: path, isLocal: buffer[index].f_flags & UInt32(MNT_LOCAL) != 0)
+        let volumes = UnsafeMutableBufferPointer(start: buffer, count: Int(max(count, 0)))
+            .map { system in
+                var system = system
+                let path = withUnsafePointer(to: &system.f_mntonname) { pointer in
+                    pointer.withMemoryRebound(to: CChar.self, capacity: Int(MAXPATHLEN)) { String(cString: $0) }
                 }
-        }
-        if volumes.isEmpty {
-            volumes = [Volume(path: "/", isLocal: true)]
-        }
+                return Volume(path: path, isLocal: system.f_flags & UInt32(MNT_LOCAL) != 0)
+            }
         cached = (now, volumes)
         return volumes
     }
@@ -57,7 +52,12 @@ internal enum Mounts {
 
     /// Whether a local path lies on a volume of this machine; true where the volume is not known.
     internal static func isLocal(path: String) -> Bool {
-        volume(of: path, among: volumes())?.isLocal ?? true
+        isLocal(path: path, among: volumes())
+    }
+
+    /// Whether a local path lies on one of `volumes` that is on this machine; true where none holds it.
+    internal static func isLocal(path: String, among volumes: [Volume]) -> Bool {
+        volume(of: path, among: volumes)?.isLocal ?? true
     }
 
     /// Whether the volume mounted at `mountPoint` holds `path`: it is the mount point, or a path

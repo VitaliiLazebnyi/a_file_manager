@@ -10,8 +10,6 @@ internal enum Notice {
     internal static let duration: TimeInterval = 3
     /// The message on screen, until it has faded.
     internal private(set) static var shown: NSPanel?
-    /// Counts the messages, so that the fading of one that was replaced leaves the new one alone.
-    private static var generation = 0
 
     /// Shows `message` over `window`, or at the bottom of the main screen without one.
     internal static func show(_ message: String, over window: NSWindow?) {
@@ -19,10 +17,10 @@ internal enum Notice {
             shown.parent?.removeChildWindow(shown)
             shown.orderOut(nil)
         }
-        generation += 1
         let panel = makePanel(message, maximumWidth: max((window?.frame.width ?? 600) - 80, 200))
-        let area = window?.frame ?? NSScreen.main?.visibleFrame ?? panel.frame
-        panel.setFrameOrigin(NSPoint(x: area.midX - panel.frame.width / 2, y: area.minY + 70))
+        if let area = window?.frame ?? NSScreen.main?.visibleFrame {
+            panel.setFrameOrigin(NSPoint(x: area.midX - panel.frame.width / 2, y: area.minY + 70))
+        }
         panel.alphaValue = 0
         if let window {
             window.addChildWindow(panel, ordered: .above)
@@ -39,8 +37,7 @@ internal enum Notice {
             context.duration = 0.15
             panel.animator().alphaValue = 1
         }
-        let current = generation
-        MainLoop.after(duration) { fade(panel, generation: current) }
+        MainLoop.after(duration) { fade(panel) }
     }
 
     /// The window of a message: a rounded, translucent plate with one line of text.
@@ -77,11 +74,10 @@ internal enum Notice {
         return panel
     }
 
-    /// Fades the message out and takes it away, unless a newer one has replaced it meanwhile.
-    private static func fade(_ panel: NSPanel, generation current: Int) {
-        guard current == generation else {
-            return
-        }
+    /// Fades the message out and takes it away.
+    ///
+    /// A message a newer one has replaced is off the screen already; fading it changes nothing.
+    private static func fade(_ panel: NSPanel) {
         NSAnimationContext.runAnimationGroup(
             { context in
                 context.duration = 0.4
@@ -89,18 +85,17 @@ internal enum Notice {
             },
             completionHandler: {
                 // AppKit calls the completion handler on the main thread.
-                MainActor.assumeIsolated { remove(panel, generation: current) }
+                MainActor.assumeIsolated { remove(panel) }
             }
         )
     }
 
-    /// Takes the faded message off the screen, unless a newer one has replaced it meanwhile.
-    private static func remove(_ panel: NSPanel, generation current: Int) {
-        guard current == generation else {
-            return
-        }
+    /// Takes the faded message off the screen; the newer one that replaced it stays.
+    private static func remove(_ panel: NSPanel) {
         panel.parent?.removeChildWindow(panel)
         panel.orderOut(nil)
-        shown = nil
+        if shown === panel {
+            shown = nil
+        }
     }
 }

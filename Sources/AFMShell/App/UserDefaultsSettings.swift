@@ -14,16 +14,6 @@ public final class UserDefaultsSettings: SettingsStore, @unchecked Sendable {
     /// Where a large value that cannot be written is reported.
     private static let log = Log.logger("Shell")
 
-    /// The folder for the large values of the standard preferences.
-    ///
-    /// The program's folder in Application Support; nil when the system names none.
-    internal static var standardLargeFolder: URL? {
-        let name = Bundle.main.bundleIdentifier ?? ProcessInfo.processInfo.processName
-        return FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?
-            .appendingPathComponent(name, isDirectory: true)
-            .appendingPathComponent("Settings", isDirectory: true)
-    }
-
     /// Where the large values are kept; nil keeps them with the rest.
     public let largeFolder: URL?
     /// The preferences.
@@ -43,7 +33,19 @@ public final class UserDefaultsSettings: SettingsStore, @unchecked Sendable {
     /// Support; any other store keeps them with the rest unless it is given a folder.
     public init(defaults: UserDefaults = .standard, largeFolder: URL? = nil) {
         self.defaults = defaults
-        self.largeFolder = largeFolder ?? (defaults === UserDefaults.standard ? Self.standardLargeFolder : nil)
+        self.largeFolder =
+            largeFolder ?? (defaults === UserDefaults.standard ? Self.standardLargeFolder(of: .main) : nil)
+    }
+
+    /// The folder for the large values of the standard preferences of the program in `bundle`.
+    ///
+    /// The program's folder in Application Support, named by its bundle identifier (by the
+    /// process's name when it has none); nil when the system names no such folder.
+    internal static func standardLargeFolder(of bundle: Bundle) -> URL? {
+        let name = bundle.bundleIdentifier ?? ProcessInfo.processInfo.processName
+        return FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?
+            .appendingPathComponent(name, isDirectory: true)
+            .appendingPathComponent("Settings", isDirectory: true)
     }
 
     /// The value stored under `key` in the preferences; any thread.
@@ -85,11 +87,9 @@ public final class UserDefaultsSettings: SettingsStore, @unchecked Sendable {
         let read = (try? Data(contentsOf: file)) ?? defaults.data(forKey: key)
         return lock.withLock {
             // Set meanwhile: that is the value.
-            if let known = large[key] {
-                return known
-            }
-            large[key] = .some(read)
-            return read
+            let value = large[key] ?? read
+            large[key] = .some(value)
+            return value
         }
     }
 
@@ -122,12 +122,10 @@ public final class UserDefaultsSettings: SettingsStore, @unchecked Sendable {
         let deadline = Date(timeIntervalSinceNow: timeout)
         lock.lock()
         defer { lock.unlock() }
-        while isWriting {
-            if !lock.wait(until: deadline) {
-                return !isWriting
-            }
+        while isWriting, lock.wait(until: deadline) {
+            // Woken by the writer when it is done: look again. A wait that ran out of time ends it.
         }
-        return true
+        return !isWriting
     }
 
     /// Writes the large values that are behind, one by one, until none is; on the writer's

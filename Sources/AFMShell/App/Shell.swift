@@ -91,7 +91,6 @@ public final class Shell: ShellServices {
         ShellCommands.register(in: kernel, panels: panelCoordinator)
         PanelShellCommands.register(in: kernel, panels: panelCoordinator)
         WindowCommands.register(in: kernel, layout: layout) { [weak self] in self?.mainWindow }
-        kernel.commands.onRejected = { NSSound.beep() }
         // From here on the key bindings are final and commands may run.
         kernel.attach(self)
         // The main window is made here, with the final key bindings.
@@ -192,12 +191,11 @@ public final class Shell: ShellServices {
             return
         }
         let answer = OnceAnswer(reply)
-        let (service, interaction) = (jobService, kernel.interaction)
+        let service = jobService
+        let interaction = kernel.interaction
+        // The wait ends when the answer is given (`stopWaiting`): the jobs are still running when it fires.
         func ask(after wait: TimeInterval) {
             answer.stopWaiting = MainLoop.after(wait) {
-                guard !answer.isGiven, service.isBusy else {
-                    return
-                }
                 if Self.quitsAnyway(asking: interaction) {
                     answer.give(true)
                 } else if !answer.isGiven {

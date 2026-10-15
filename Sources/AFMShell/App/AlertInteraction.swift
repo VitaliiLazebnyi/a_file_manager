@@ -21,10 +21,20 @@ internal final class AlertInteraction: UserInteraction {
         return style == .critical && buttons.count > 1 ? buttons.count - 1 : 0
     }
 
+    /// The index of the button that ended a question, counted from the first.
+    internal static func index(of response: NSApplication.ModalResponse) -> Int {
+        response.rawValue - NSApplication.ModalResponse.alertFirstButtonReturn.rawValue
+    }
+
+    /// What a prompt answers: the text of `field` when its first button (OK) ended it, nil otherwise.
+    internal static func text(of field: NSTextField, after response: NSApplication.ModalResponse) -> String? {
+        response == .alertFirstButtonReturn ? field.stringValue : nil
+    }
+
     /// Presses the last button of `alert` for Esc (key code 53) in its window, and swallows the
     /// key; any other key goes on as it came.
-    private static func pressLastButton(of alert: NSAlert?, for event: NSEvent) -> NSEvent? {
-        guard event.keyCode == 53, let alert, event.window === alert.window else {
+    internal static func pressLastButton(of alert: NSAlert?, for event: NSEvent) -> NSEvent? {
+        guard event.keyCode == 53, let alert, event.windowNumber == alert.window.windowNumber else {
             return event
         }
         alert.buttons.last?.performClick(nil)
@@ -33,6 +43,12 @@ internal final class AlertInteraction: UserInteraction {
 
     /// Asks for a line of text, starting with `value`; nil when the user cancels.
     internal func prompt(_ message: String, value: String, detail: String) -> String? {
+        let (alert, field) = makePrompt(message, value: value, detail: detail)
+        return Self.text(of: field, after: alert.runModal())
+    }
+
+    /// Builds a prompt without showing it: OK, Cancel, and the field that starts with `value`.
+    internal func makePrompt(_ message: String, value: String, detail: String) -> (NSAlert, NSTextField) {
         let alert = alert(message, detail, .information)
         alert.addButton(withTitle: "OK")
         alert.addButton(withTitle: "Cancel")
@@ -41,7 +57,7 @@ internal final class AlertInteraction: UserInteraction {
         field.lineBreakMode = .byTruncatingHead
         alert.accessoryView = field
         alert.window.initialFirstResponder = field
-        return alert.runModal() == .alertFirstButtonReturn ? field.stringValue : nil
+        return (alert, field)
     }
 
     /// Asks the user to pick one of `buttons`; returns its index.
@@ -71,15 +87,22 @@ internal final class AlertInteraction: UserInteraction {
         defaultButton: Int?
     ) -> Int {
         let alert = makeQuestion(message, detail: detail, buttons: buttons, style: style, defaultButton: defaultButton)
-        // Esc on a last button that is also Return's: a button has one key of its own.
-        var monitor: Any?
-        if let last = alert.buttons.last, last.keyEquivalent != "\u{1b}" {
-            monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak alert] event in
-                Self.pressLastButton(of: alert, for: event)
-            }
-        }
+        let monitor = escapeMonitor(for: alert)
         defer { monitor.map(NSEvent.removeMonitor) }
-        return alert.runModal().rawValue - NSApplication.ModalResponse.alertFirstButtonReturn.rawValue
+        return Self.index(of: alert.runModal())
+    }
+
+    /// Watches the keys while `alert` is up so that Esc presses its last button.
+    ///
+    /// Only where that button is Return's and so cannot have Esc as well (a button has one key
+    /// of its own); nil where the last button has Esc. Whoever gets a monitor removes it.
+    internal func escapeMonitor(for alert: NSAlert) -> Any? {
+        guard let last = alert.buttons.last, last.keyEquivalent != "\u{1b}" else {
+            return nil
+        }
+        return NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak alert] event in
+            Self.pressLastButton(of: alert, for: event)
+        }
     }
 
     /// Builds a question without showing it.

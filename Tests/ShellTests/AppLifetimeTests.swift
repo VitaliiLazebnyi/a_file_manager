@@ -50,4 +50,26 @@ internal struct AppLifetimeTests {
         }
         #expect(await AppWait.until { released == nil })
     }
+
+    /// The panel commands of a window that has gone do nothing; the bar's reset of a kernel
+    /// that has gone is off.
+    @Test
+    internal func commandsWhoseWindowOrKernelHasGoneDoNothing() {
+        let kernel = Self.makeKernel()
+        do {
+            let panels = PanelCoordinator(kernel: kernel, home: URL(fileURLWithPath: "/"))
+            ShellCommands.register(in: kernel, panels: panels)
+            panels.shutDown()
+        }
+        #expect(kernel.commands.perform(.cursorToTop) && kernel.commands.perform(.cursorPageDown))
+        #expect(!kernel.commands.isEnabled(.editNameInPlace))
+        var commands: CommandRegistry?
+        do {
+            let other = Self.makeKernel()
+            WindowCommands.register(in: other, layout: WindowLayout(settings: other.settings)) { nil }
+            commands = other.commands
+        }
+        #expect(commands?.isEnabled(.resetButtonBar) == false)
+        #expect(commands?.perform(.focusCommandLine) == true)
+    }
 }

@@ -51,10 +51,15 @@ internal final class FormDialog: NSObject, NSTextViewDelegate {
 
     /// Shows the form and waits for an answer; nil when the user cancels.
     internal func run(title: String, detail: String, buttons: [String]) -> FormValues? {
-        let shown = makeAlert(title: title, detail: detail, buttons: buttons)
-        let response = shown.runModal().rawValue - NSApplication.ModalResponse.alertFirstButtonReturn.rawValue
+        answer(after: makeAlert(title: title, detail: detail, buttons: buttons).runModal(), buttons: buttons)
+    }
+
+    /// The answer of the form once `response` ended it: the fields with the button pressed, nil
+    /// for Cancel (the button after `buttons`).
+    internal func answer(after response: NSApplication.ModalResponse, buttons: [String]) -> FormValues? {
+        let index = AlertInteraction.index(of: response)
         focusObservation = nil
-        return buttons.indices.contains(response) ? values(button: response) : nil
+        return buttons.indices.contains(index) ? values(button: index) : nil
     }
 
     /// What the fields hold now, as the answer given with a button.

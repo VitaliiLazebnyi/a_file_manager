@@ -3,12 +3,13 @@ public import AppKit
 
 /// The kernel's shortcuts as the Mac's key events and as the Mac writes them.
 extension Shortcut {
-    /// The signs of the named keys that are not written with a letter or a number.
-    private static let keyNames: [Key: String] = [
-        .returnKey: "↩", .enter: "⌤", .tab: "⇥", .space: "Space", .backspace: "⌫", .forwardDelete: "⌦", .insert: "Ins",
-        .home: "↖", .end: "↘", .pageUp: "⇞", .pageDown: "⇟", .leftArrow: "←", .rightArrow: "→", .upArrow: "↑",
-        .downArrow: "↓", .keypadPlus: "Num +", .keypadMinus: "Num −", .keypadMultiply: "Num ×",
-        .keypadDivide: "Num ÷"
+    /// The signs of the named keys that are not written with a letter or a number: every key
+    /// but those two kinds.
+    private static let keyNames: [(key: Key, sign: String)] = [
+        (.returnKey, "↩"), (.enter, "⌤"), (.tab, "⇥"), (.space, "Space"), (.backspace, "⌫"), (.forwardDelete, "⌦"),
+        (.insert, "Ins"), (.home, "↖"), (.end, "↘"), (.pageUp, "⇞"), (.pageDown, "⇟"), (.leftArrow, "←"),
+        (.rightArrow, "→"), (.upArrow, "↑"), (.downArrow, "↓"), (.keypadPlus, "Num +"), (.keypadMinus, "Num −"),
+        (.keypadMultiply, "Num ×"), (.keypadDivide, "Num ÷")
     ]
     /// The signs of the modifiers, in the order the Mac writes them.
     private static let modifierSigns: [(modifier: KeyModifiers, sign: String)] = [
@@ -26,7 +27,8 @@ extension Shortcut {
             return modifiers + "F\(number)"
 
         default:
-            return modifiers + (Self.keyNames[key] ?? "?")
+            // Every other key has its sign in `keyNames`.
+            return modifiers + Self.keyNames.filter { $0.key == key }.map(\.sign).joined()
         }
     }
 

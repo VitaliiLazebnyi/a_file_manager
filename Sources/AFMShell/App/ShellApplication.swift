@@ -7,18 +7,6 @@ public import AppKit
 @preconcurrency
 @MainActor
 public final class ShellApplication: NSObject, NSApplicationDelegate, NSMenuItemValidation {
-    /// The answer to a request to quit, which comes at once or later from the run loop.
-    private final class QuitReply {
-        /// The answer, when it came before the request returned.
-        var answer: NSApplication.TerminateReply?
-        /// True once the request has returned `.terminateLater`.
-        var isLater = false
-
-        deinit {
-            // Nothing to release.
-        }
-    }
-
     /// How long quitting waits for settings that are still on their way to the disk.
     public static let settingsPatience: TimeInterval = 5
 
@@ -39,26 +27,32 @@ public final class ShellApplication: NSObject, NSApplicationDelegate, NSMenuItem
         self.plugins = plugins
     }
 
-    /// Runs the program until the user quits.
-    public func run() {
-        let app = NSApplication.shared
-        app.delegate = self
-        app.setActivationPolicy(.regular)
-        app.run()
+    /// Starts the kernel, the plugins and the shell, and shows the main window.
+    ///
+    /// The program's own preferences and alerts; a refused command beeps.
+    public func applicationDidFinishLaunching(_: Notification) {
+        let windows = start(settings: UserDefaultsSettings(), interaction: AlertInteraction()) { NSSound.beep() }
+        MenuBuilder.install(windows.makeMainMenu())
+        windows.showMainWindow()
+        NSApp.activate(ignoringOtherApps: true)
     }
 
-    /// Starts the kernel, the plugins and the shell, and shows the main window.
-    public func applicationDidFinishLaunching(_: Notification) {
-        let preferences = UserDefaultsSettings()
-        let program = Kernel(productName: productName, settings: preferences, interaction: AlertInteraction())
+    /// Starts the kernel with `settings` and `interaction`, the plugins and the shell, without
+    /// showing anything; `rejected` is called for a command that cannot run now.
+    @discardableResult
+    internal func start(
+        settings preferences: UserDefaultsSettings,
+        interaction: any UserInteraction,
+        rejected: @escaping () -> Void
+    ) -> Shell {
+        let program = Kernel(productName: productName, settings: preferences, interaction: interaction)
         program.load(plugins)
+        program.commands.onRejected = rejected
         let windows = Shell(kernel: program)
         settings = preferences
         kernel = program
         shell = windows
-        MenuBuilder.install(windows.makeMainMenu())
-        windows.showMainWindow()
-        NSApp.activate(ignoringOtherApps: true)
+        return windows
     }
 
     /// Quitting asks the plugins first, then stops the file jobs and lets the plugins finish.
@@ -67,25 +61,19 @@ public final class ShellApplication: NSObject, NSApplicationDelegate, NSMenuItem
     /// so no half-written file is left behind, and the plugins write what they have not written
     /// yet. The program stays in use until all of that has been answered (`Shell.finishToQuit`).
     public func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        requestQuit { sender.reply(toApplicationShouldTerminate: $0) }
+    }
+
+    /// Whether the program may quit now, never, or after `reply` is called with the answer
+    /// (on the main thread, from the run loop).
+    internal func requestQuit(then reply: @escaping @MainActor (Bool) -> Void) -> NSApplication.TerminateReply {
         guard let shell else {
             return .terminateNow
         }
         guard shell.mayQuit() else {
             return .terminateCancel
         }
-        // The answer comes on the main thread: at once, or later from the run loop.
-        let reply = QuitReply()
-        shell.finishToQuit { quits in
-            if reply.isLater {
-                sender.reply(toApplicationShouldTerminate: quits)
-            } else {
-                reply.answer = quits ? .terminateNow : .terminateCancel
-            }
-        }
-        if let answer = reply.answer {
-            return answer
-        }
-        reply.isLater = true
+        shell.finishToQuit(then: reply)
         return .terminateLater
     }
 
