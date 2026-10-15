@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Fails unless every source file is fully covered by the tests (lines and functions).
+"""Fails unless every source file is fully covered by the tests: lines, functions and regions.
+
+Regions are Swift's branch coverage: each arm of an `if`, `guard`, `switch` or `catch`, each side of `&&`, `||` and
+`??` is a region of its own (the Swift compiler writes no LLVM branch counts).
 
 Run after `swift test --enable-code-coverage`. SwiftPM writes one profile per test bundle and its
 own summary covers only one of them, so this merges every profile and reports over all bundles.
@@ -56,7 +59,7 @@ def main() -> int:
             totals[kind][1] += summary[kind]["count"]
         missing = {
             kind: summary[kind]["count"] - summary[kind]["covered"]
-            for kind in ("lines", "functions")
+            for kind in ("lines", "functions", "regions")
             if summary[kind]["percent"] < REQUIRED
         }
         if missing:
@@ -65,7 +68,7 @@ def main() -> int:
     for kind, (covered, count) in totals.items():
         print(f"{kind:9} {covered:7} / {count:7}  {100 * covered / max(count, 1):6.2f}%")
     if short:
-        print(f"\n{len(short)} files below {REQUIRED:.0f}% (uncovered lines / functions):", file=sys.stderr)
+        print(f"\n{len(short)} files below {REQUIRED:.0f}% (uncovered lines / functions / regions):", file=sys.stderr)
         for name, missing in sorted(short):
             detail = ", ".join(f"{n} {kind}" for kind, n in missing.items())
             print(f"  {name}: {detail}", file=sys.stderr)

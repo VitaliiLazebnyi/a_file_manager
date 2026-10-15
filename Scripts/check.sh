@@ -20,7 +20,7 @@
 #   architecture  the module rules of Package.swift's header, on the manifest and every import
 #   api         no break of the plugin API (AFMKernel, AFMContracts) against origin/main that
 #               Scripts/api-breaks.txt does not acknowledge
-#   test        the tests, with coverage; Scripts/coverage-gate.py demands 100%
+#   test        the tests, with coverage; Scripts/coverage-gate.py demands 100% of lines, functions and regions
 #   memory      long loops (panels, folders, jobs, viewers, archives, a server) must not make the
 #               memory footprint grow (Tests/PluginTests/MemoryGrowth)
 #   benchmarks  the hot paths within the time and memory limits recorded for this machine
