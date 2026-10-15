@@ -198,9 +198,13 @@ final class XZCoder {
     private let stream = UnsafeMutablePointer<compression_stream>.allocate(capacity: 1)
     private var isOpen = false
     private let encodes: Bool
+    private let algorithm: compression_algorithm
 
-    init(encoding: Bool) throws {
+    /// An LZMA coder; a test passes an `algorithm` the system does not know, which it refuses
+    /// as it would refuse to start one without memory for it.
+    init(encoding: Bool, algorithm: compression_algorithm = COMPRESSION_LZMA) throws {
         encodes = encoding
+        self.algorithm = algorithm
         try start()
     }
 
@@ -215,7 +219,7 @@ final class XZCoder {
             compression_stream_init(
                 stream,
                 encodes ? COMPRESSION_STREAM_ENCODE : COMPRESSION_STREAM_DECODE,
-                COMPRESSION_LZMA
+                algorithm
             )
             == COMPRESSION_STATUS_OK
         guard isOpen else { throw ArchiveError.unsupported("LZMA compression") }
