@@ -62,7 +62,7 @@ internal struct CoverageNetworkSFTPPackets {
         #expect(throws: NetworkError.self) { try SFTPPacket(kind: .closed, body: Data()).expect(.handle) }
         #expect(throws: NetworkError.self) { try SFTPPacket(kind: .data, body: Data()).expect(.handle) }
         let bare = #expect(throws: SFTPError.self) { try status(3, message: nil).expect(.handle) }
-        #expect(bare?.message == "")
+        #expect(bare?.message.isEmpty == true)
         #expect(throws: Never.self) { try status(0, message: "OK").checkStatus() }
     }
 }
