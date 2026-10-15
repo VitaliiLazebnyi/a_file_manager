@@ -39,12 +39,11 @@ public struct BranchWalker: Sendable {
         var info = statfs()
         guard statfs(path, &info) == 0 else { return false }
         // The system names the mount point by its real path.
-        let real =
-            realpath(path, nil)
+        let real = realpath(path, nil)
             .map { pointer -> String in
                 defer { free(pointer) }
                 return String(cString: pointer)
-            } ?? path
+            }
         return withUnsafePointer(to: &info.f_mntonname) {
             $0.withMemoryRebound(to: CChar.self, capacity: Int(MAXPATHLEN)) { String(cString: $0) }
         } == real

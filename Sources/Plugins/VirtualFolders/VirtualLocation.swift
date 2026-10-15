@@ -44,9 +44,9 @@ public enum VirtualLocation: Equatable {
 
         case "list":
             guard let id else { return nil }
+            // The path starts with a slash, so the folder is at least the root.
             let folder = (path as NSString).deletingLastPathComponent
-            let origin =
-                prefix.isEmpty ? nil : Self.realURL(prefix: prefix, path: folder.isEmpty ? "/" : folder)
+            let origin = prefix.isEmpty ? nil : Self.realURL(prefix: prefix, path: folder)
             self = .list(id: id, title: (path as NSString).lastPathComponent, origin: origin)
 
         default:
@@ -95,10 +95,10 @@ public enum VirtualLocation: Equatable {
         return cleaned.isEmpty || cleaned == "." || cleaned == ".." ? "List" : cleaned
     }
 
+    /// The path of a real location; `URL.path` has no trailing slash already.
     private static func path(of real: URL) -> String {
         let path = real.standardized.path
-        if path.isEmpty { return "/" }
-        return path.count > 1 && path.hasSuffix("/") ? String(path.dropLast()) : path
+        return path.isEmpty ? "/" : path
     }
 
     /// What stands in front of the path of a real URL: `file://`, `sftp://user@host:22`. A
@@ -121,11 +121,12 @@ public enum VirtualLocation: Equatable {
         guard var components = URLComponents(string: prefix), components.scheme != nil,
             components.path.isEmpty, components.query == nil, components.fragment == nil, components.password == nil
         else { return nil }
-        components.path = path.hasPrefix("/") ? path : "/" + path
+        components.path = path
         return components.url
     }
 
-    /// A path without `.` and `..` components and empty ones, resolved on the text alone.
+    /// A path without `.` and `..` components and empty ones, resolved on the text alone; it
+    /// starts with a slash.
     static func plain(_ path: String) -> String {
         var kept: [String] = []
         // By scalars: a slash followed by a combining mark is not a separator to `Character`.

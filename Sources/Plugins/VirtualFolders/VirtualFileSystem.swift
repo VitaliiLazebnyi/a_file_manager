@@ -232,16 +232,14 @@ public final class VirtualFileSystem: FileSystemProvider, @unchecked Sendable {
 
     /// What identifies a file in a list, as exact bytes: two names that differ only in Unicode
     /// normalisation are two files (a `String` key would merge them). The scheme, host, port and
-    /// path, without a trailing slash, as `locationKey` has them.
+    /// path, without a trailing slash (which `URL.path` never has), as `locationKey` has them.
     static func identity(of url: URL) -> [UInt8] {
         var bytes = Array((url.scheme ?? "file").utf8)
         bytes.append(0)
         if let host = url.host { bytes.append(contentsOf: host.utf8) }
         if let port = url.port { bytes.append(contentsOf: ":\(port)".utf8) }
         bytes.append(0)
-        var path = Array(url.path.utf8)
-        if path.count > 1, path.last == 0x2F { path.removeLast() }
-        bytes.append(contentsOf: path)
+        bytes.append(contentsOf: url.path.utf8)
         return bytes
     }
 
@@ -641,16 +639,9 @@ public final class VirtualFileSystem: FileSystemProvider, @unchecked Sendable {
         }
         for kind in ["selected branch ", "list "] where note.hasPrefix(kind) {
             guard let id = Int(note.dropFirst(kind.count)), let list = synchronized({ lists[id] }) else { return nil }
-            // What `displayPath` wrote in front of the note must be the list's own: another
-            // text that merely ends alike is not this list.
-            switch list.location {
-            case .list(_, let title, _): return kind == "list " && front == title ? list.location.url : nil
-
-            case .picked(_, let real):
-                return kind == "selected branch " && front == fileSystems.displayPath(real) ? list.location.url : nil
-
-            case .branch: return nil
-            }
+            // It must be what `displayPath` writes for the list: another text that merely ends
+            // alike is not this list.
+            return displayPath(list.location.url) == text ? list.location.url : nil
         }
         return nil
     }
@@ -667,7 +658,7 @@ public final class VirtualFileSystem: FileSystemProvider, @unchecked Sendable {
             }
             return VolumeInfo(
                 name: "Search result:",
-                isLocal: list.preparedIfReady?.isLocal ?? list.raw.first?.isFileURL ?? true
+                isLocal: list.preparedIfReady?.isLocal ?? (list.raw.first?.isFileURL != false)
             )
 
         case nil:
@@ -715,7 +706,7 @@ public final class VirtualFileSystem: FileSystemProvider, @unchecked Sendable {
             // folder walked again for each report.
             let coalescer = Coalescer { onChange([virtual]) }
             coalescers.append(coalescer)
-            for (_, group) in Dictionary(grouping: real, by: { $0.scheme ?? "file" }) {
+            for (_, group) in Dictionary(grouping: real, by: \.scheme) {
                 guard let provider = try? fileSystems.provider(for: group[0]), provider !== self,
                     let watcher = provider.watch(group, onChange: { _ in coalescer.signal() })
                 else { continue }
@@ -731,8 +722,7 @@ public final class VirtualFileSystem: FileSystemProvider, @unchecked Sendable {
             guard let self else { return }
             synchronized {
                 for id in shownLists {
-                    guard let count = self.watchedLists[id] else { continue }
-                    self.watchedLists[id] = count > 1 ? count - 1 : nil
+                    if let count = self.watchedLists[id] { self.watchedLists[id] = count > 1 ? count - 1 : nil }
                 }
             }
         }

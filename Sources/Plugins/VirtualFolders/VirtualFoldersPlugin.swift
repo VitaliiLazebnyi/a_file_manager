@@ -25,8 +25,6 @@ public final class VirtualFoldersPlugin: Plugin, FileListService {
     static let listsFoldersKey = "virtualFolders.listsFolders"
     static let entersPackagesKey = "virtualFolders.entersPackages"
 
-    /// Weak: the kernel owns the plugin.
-    private weak var owner: Kernel?
     /// The file system this plugin provides; nil until the plugin has started.
     public private(set) var fileSystem: VirtualFileSystem?
 
@@ -35,12 +33,11 @@ public final class VirtualFoldersPlugin: Plugin, FileListService {
     public func start(in owner: Kernel) {
         // The kernel keeps what is registered here; it must not be kept by it in turn.
         unowned let kernel = owner
-        self.owner = owner
         let fileSystem = VirtualFileSystem(fileSystems: kernel.fileSystems)
         self.fileSystem = fileSystem
         kernel.fileSystems.register(fileSystem)
         kernel.services.register((any FileListService).self, self)
-        applyOptions()
+        Self.applyOptions(kernel.settings, to: fileSystem)
 
         let commands = kernel.commands
         let source = { kernel.panels.source }
@@ -55,7 +52,9 @@ public final class VirtualFoldersPlugin: Plugin, FileListService {
         commands.register(
             Command(.branchView, "Branch View (With Subdirs)", [Shortcut(.character("b"), .control)]),
             checked: { isBranch(source()) },
-            parameterized: { [self] in setBranchView($0, in: source(), selectedOnly: false) }
+            parameterized: { [self] in
+                setBranchView($0, in: source(), selectedOnly: false, kernel: kernel, fileSystem: fileSystem)
+            }
         )
         commands.register(
             Command(
@@ -64,7 +63,9 @@ public final class VirtualFoldersPlugin: Plugin, FileListService {
                 [Shortcut(.character("b"), [.control, .shift])]
             ),
             enabled: { isVirtual(source()) || source().model.hasOperands },
-            parameterized: { [self] in setBranchView($0, in: source(), selectedOnly: true) }
+            parameterized: { [self] in
+                setBranchView($0, in: source(), selectedOnly: true, kernel: kernel, fileSystem: fileSystem)
+            }
         )
         let sided: [(CommandID, String, Bool, Bool)] = [
             (.leftBranchView, "Left: Branch View", true, false),
@@ -77,12 +78,14 @@ public final class VirtualFoldersPlugin: Plugin, FileListService {
             commands.register(
                 Command(id, title),
                 checked: { isBranch(panel()) },
-                parameterized: { [self] in setBranchView($0, in: panel(), selectedOnly: selectedOnly) }
+                parameterized: { [self] in
+                    setBranchView($0, in: panel(), selectedOnly: selectedOnly, kernel: kernel, fileSystem: fileSystem)
+                }
             )
         }
         commands.register(
             Command(.loadFileList, "Load File List into Panel…"),
-            parameterized: { [self] in loadList($0) }
+            parameterized: { [self] in loadList($0, kernel: kernel) }
         )
 
         kernel.menus.add([.branchView, .branchViewSelected], to: .commandsPlaces)
@@ -108,8 +111,8 @@ public final class VirtualFoldersPlugin: Plugin, FileListService {
                         .flag(default: false)
                     )
                 ],
-                onChange: { [self] in
-                    applyOptions()
+                onChange: {
+                    Self.applyOptions(kernel.settings, to: fileSystem)
                     for panel in kernel.panels.all where isVirtual(panel) { panel.reload() }
                 }
             )
@@ -117,11 +120,10 @@ public final class VirtualFoldersPlugin: Plugin, FileListService {
     }
 
     /// Hands the user's options to the file system, which reads them on background threads.
-    private func applyOptions() {
-        guard let kernel = owner else { return }
-        fileSystem?.options = VirtualFileSystem.Options(
-            listsFolders: kernel.settings.flag(Self.listsFoldersKey, default: false),
-            entersPackages: kernel.settings.flag(Self.entersPackagesKey, default: false)
+    private static func applyOptions(_ settings: any SettingsStore, to fileSystem: VirtualFileSystem) {
+        fileSystem.options = VirtualFileSystem.Options(
+            listsFolders: settings.flag(listsFoldersKey, default: false),
+            entersPackages: settings.flag(entersPackagesKey, default: false)
         )
     }
 
@@ -144,8 +146,15 @@ public final class VirtualFoldersPlugin: Plugin, FileListService {
 
     /// The commands take the specification's tri-state parameter (17 › Command parameters):
     /// none or 0 toggles, 1 switches on, 2 or -1 off.
-    private func setBranchView(_ argument: CommandArgument, in panel: any PanelHandle, selectedOnly: Bool) {
-        let isOn = VirtualLocation(panel.model.directory) != nil
+    private func setBranchView(
+        _ argument: CommandArgument,
+        in panel: any PanelHandle,
+        selectedOnly: Bool,
+        kernel: Kernel,
+        fileSystem: VirtualFileSystem
+    ) {
+        let location = VirtualLocation(panel.model.directory)
+        let isOn = location != nil
         let wanted: Bool
         switch argument.index ?? argument.text.flatMap({ Int($0.trimmingCharacters(in: .whitespaces)) }) ?? 0 {
         case 1: wanted = true
@@ -153,11 +162,14 @@ public final class VirtualFoldersPlugin: Plugin, FileListService {
         default: wanted = !isOn
         }
         guard wanted != isOn else { return }
-        if wanted { enter(panel, selectedOnly: selectedOnly) } else { leave(panel) }
+        if let location {
+            leave(panel, location, kernel: kernel, fileSystem: fileSystem)
+        } else {
+            enter(panel, selectedOnly: selectedOnly, fileSystem: fileSystem)
+        }
     }
 
-    private func enter(_ panel: any PanelHandle, selectedOnly: Bool) {
-        guard let fileSystem else { return }
+    private func enter(_ panel: any PanelHandle, selectedOnly: Bool, fileSystem: VirtualFileSystem) {
         let model = panel.model
         if selectedOnly {
             let items = model.operands()
@@ -172,8 +184,12 @@ public final class VirtualFoldersPlugin: Plugin, FileListService {
     /// it (spec 03 › Branch view, "Leaving with Ctrl+B"). On `[..]` the panel goes back to the
     /// directory the view was made from; after a selected branch, the items it was made from
     /// are selected again.
-    private func leave(_ panel: any PanelHandle) {
-        guard let kernel = owner, let location = VirtualLocation(panel.model.directory) else { return }
+    private func leave(
+        _ panel: any PanelHandle,
+        _ location: VirtualLocation,
+        kernel: Kernel,
+        fileSystem: VirtualFileSystem
+    ) {
         let tab = panel.model
         if let item = tab.cursorItem,
             let folder = (try? kernel.fileSystems.provider(for: item.url))?.parent(of: item.url)
@@ -191,7 +207,7 @@ public final class VirtualFoldersPlugin: Plugin, FileListService {
                 tab.setSelected(true, names: names)
             }
         }
-        guard case .picked = location, let fileSystem else {
+        guard case .picked = location else {
             show(selecting: [])
             return
         }
@@ -209,8 +225,7 @@ public final class VirtualFoldersPlugin: Plugin, FileListService {
 
     // MARK: Lists from files
 
-    private func loadList(_ argument: CommandArgument) {
-        guard let kernel = owner else { return }
+    private func loadList(_ argument: CommandArgument, kernel: Kernel) {
         let panel = kernel.panels.source
         let base = VirtualLocation(panel.model.directory).map(\.realDirectory) ?? panel.model.directory
         let home = URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
