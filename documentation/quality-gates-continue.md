@@ -31,6 +31,20 @@ merge what is finished, and restart the rest with the same section of `wave-100.
   `ConfigurationPlugin.storedKeys(of:)` for `UserDefaultsSettings` (passed to w100-shell), `ChildProcess` 5 regions
   (spawn attribute init failing, EINTR retry, a reap race), one race branch each in `CommandRunner:562` and
   `SyncSession:576`.
+- Merged: **w100-viewer-mac-small** (`2ed15d9`): AFMKernel 100%; Viewer, MacIntegration, Archives, Places,
+  VirtualFolders, MultiRename, FileProperties, LocalFileSystem 145 / 45 / 70 left, mostly system adapters (UI tests);
+  races in `ViewerPane.stripHTML` and `ArchiveFileSystem:100`; `Codecs:218` (`compression_stream_init` failing); the
+  `Unpacker` path-traversal guard (~520, owner's call, kept); `MultiRenameWindowController:785` `?? []`.
+- Merged: **w100-stability** (`bd653d1`): Find Files 1 / 1 / 2 left (open-panel adapter, a Spotlight stop race,
+  `FileSearch.claim` firmlink arm); set-aside tests back; flaky tests fixed. Not found by it: "Socket is not connected"
+  and early SIGSEGV.
+- Found 07:39: **FSEvents closes fd 0** when `FSEventStreamCreate` fails (EXC_GUARD crash report
+  `swiftpm-testing-helper-2026-10-16-073947.ips`, from `DirectoryWatcher.startedStream`); the likely cause of the socket
+  error, the early crashes and EBADF / ECONNREFUSED failures in full runs. Agent **w101-fsevents** on it.
+- To do after the wave (from the reports): `Deflater` ignores `deflateInit2_` / `Z_STREAM_ERROR`; one-pass unpack of a
+  compressed TAR does not read to the checksum; many tests still wait 60 s instead of `Wait.ceiling`;
+  `PluginCommandTests` builds `ViewerPlugin()` with windows shown; `TextPattern("\\x81")` throws under TSan; TSan run on
+  the `ProcessStream` lock, the Archives quit port and the Viewer key monitor.
 - Owner questions open: the two TCC prompts on the VM desktop (microphone: from Viewer media tests, being fixed;
   removable volumes: every test that mounts a disk image asks; recommended: Allow, keep the real-image tests).
 
