@@ -122,13 +122,13 @@ internal final class ProgressSheet: JobMonitor, @unchecked Sendable {
             return
         }
         DispatchQueue.main.async { [self] in
-            guard number > shownReport else {
-                return
+            // A report that arrives after a newer one is dropped.
+            if number > shownReport {
+                shownReport = number
+                latest = progress
+                rate.add(amount: progress.amountDone, at: time)
+                display?.render(self)
             }
-            shownReport = number
-            latest = progress
-            rate.add(amount: progress.amountDone, at: time)
-            display?.render(self)
         }
     }
 

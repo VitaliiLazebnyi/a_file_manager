@@ -151,7 +151,8 @@ internal final class FormList: NSObject, NSTableViewDataSource, NSTableViewDeleg
             ?? NSTextField(labelWithString: "")
         label.identifier = identifier
         label.lineBreakMode = .byTruncatingMiddle
-        let text = shown.indices.contains(row) ? rows[shown[row]] : ""
+        // The table asks only for the rows it has (`numberOfRows`).
+        let text = rows[shown[row]]
         label.stringValue = text
         label.toolTip = text
         return label
@@ -159,7 +160,7 @@ internal final class FormList: NSObject, NSTableViewDataSource, NSTableViewDeleg
 
     /// What typing the beginning of a row finds it by: its text.
     internal func tableView(_: NSTableView, typeSelectStringFor _: NSTableColumn?, row: Int) -> String? {
-        shown.indices.contains(row) ? rows[shown[row]] : nil
+        rows[shown[row]]
     }
 
     /// Chooses the row at position `row` of `rows`, when it is shown.

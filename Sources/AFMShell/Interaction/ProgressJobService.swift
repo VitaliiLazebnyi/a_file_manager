@@ -142,12 +142,13 @@ internal final class ProgressJobService: JobService {
             Background.start(named: "afm.job", qos: .userInitiated) {
                 // `held` is read here although the box is the main thread's: it was filled before
                 // this thread existed and is emptied only after the work has returned.
-                guard let result = ownedWork.held.map({ $0(progress) }) else {
-                    return
-                }
-                MainLoop.perform { [self] in
-                    _ = ownedWork.take()
-                    ended(job, progress) { ownedCompletion.take()?(result) }
+                // The work is in its box until its result is back on the main thread.
+                ownedWork.held.map { work in
+                    let result = work(progress)
+                    MainLoop.perform { [self] in
+                        _ = ownedWork.take()
+                        ended(job, progress) { ownedCompletion.take()?(result) }
+                    }
                 }
             }
         }
@@ -254,11 +255,10 @@ internal final class ProgressJobService: JobService {
         }
     }
 
-    /// Starts the first waiting job, unless one runs.
+    /// Starts the first waiting job.
+    ///
+    /// Called only while none runs and one waits.
     private func startNext() {
-        guard running == nil, !waiting.isEmpty else {
-            return
-        }
         let job = waiting.removeFirst()
         running = job
         let start = job.start
@@ -302,14 +302,10 @@ internal final class ProgressJobService: JobService {
 
     /// Asks about `job` after `wait`, if it is still running then.
     private func askAboutStopping(_ job: QueuedJob, after wait: TimeInterval) {
-        stopQuestion = MainLoop.after(wait) { [weak self, weak job] in
-            guard let self else {
-                return
-            }
+        // The job's thread holds the service while the job runs, and the wait is called off
+        // whenever the job stops being the running one: it fires only for the running job.
+        stopQuestion = MainLoop.after(wait) { [self] in
             stopQuestion = nil
-            guard let job, running === job, !job.isFinished else {
-                return
-            }
             let abandons = !isQuitting && askToAbandon?(job.title) == true
             // The job may have ended while the question was on screen.
             guard running === job, !job.isFinished else {

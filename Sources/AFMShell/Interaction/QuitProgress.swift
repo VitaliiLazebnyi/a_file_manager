@@ -156,10 +156,8 @@ internal final class QuitProgress: NSObject {
 
     /// The time is up: the window is shown and run as a modal one until `close`.
     private func present() {
+        // `close` calls the timer off: the window is not closed yet.
         cancelTimer = nil
-        guard !isClosed else {
-            return
-        }
         isDue = true
         // Only a running application has a screen and a modal loop to show it in.
         guard panel == nil, NSApplication.shared.isRunning else {

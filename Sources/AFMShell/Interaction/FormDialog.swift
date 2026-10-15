@@ -26,7 +26,7 @@ internal final class FormDialog: NSObject, NSTextViewDelegate {
     ///
     /// What the screen has left beside the alert's own title, text and buttons.
     internal static var maximumHeight: CGFloat {
-        min(560, max(240, (NSScreen.main?.visibleFrame.height ?? 800) - 340))
+        maximumHeight(forScreenHeight: NSScreen.main?.visibleFrame.height)
     }
 
     /// The list fields, in the order of the form.
@@ -47,6 +47,15 @@ internal final class FormDialog: NSObject, NSTextViewDelegate {
     /// A dialog for `fields`.
     internal init(fields: [FormField]) {
         self.fields = fields
+    }
+
+    /// The height the rows may take on a screen `height` points high; as on a screen 800
+    /// points high when there is none to ask.
+    internal static func maximumHeight(forScreenHeight height: CGFloat?) -> CGFloat {
+        guard let height else {
+            return 460
+        }
+        return min(560, max(240, height - 340))
     }
 
     /// Shows the form and waits for an answer; nil when the user cancels.

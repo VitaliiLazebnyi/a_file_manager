@@ -200,10 +200,9 @@ internal final class ProgressDisplay {
     /// The Pause and Resume button.
     @objc
     private func pausePressed() {
-        guard let service else {
-            return
+        if let service {
+            service.setPaused(!service.isPaused)
         }
-        service.setPaused(!service.isPaused)
     }
 
     /// The Cancel button.
@@ -215,10 +214,9 @@ internal final class ProgressDisplay {
     /// The Background and Foreground button.
     @objc
     private func backgroundPressed() {
-        guard let service else {
-            return
+        if let service {
+            service.setRunsInBackground(!service.runsInBackground)
         }
-        service.setRunsInBackground(!service.runsInBackground)
     }
 
     deinit {
