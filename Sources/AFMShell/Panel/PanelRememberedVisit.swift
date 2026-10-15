@@ -35,8 +35,10 @@ internal final class PanelRememberedVisit {
     /// The item the cursor should go to that the remembered listing did not have.
     private var focusStillWanted: String?
 
+    /// The panel, while this is still its tab's reading.
+    private var currentPanel: PanelViewController? { panel.flatMap { $0.loads[id] === load ? $0 : nil } }
     /// Whether this is still the tab's reading.
-    private var isCurrent: Bool { panel?.loads[id] === load }
+    private var isCurrent: Bool { currentPanel != nil }
     /// Whether the remembered listing may still be shown: the reading is the tab's, has not ended
     /// and the fresh listing has not come.
     private var isStillWanted: Bool { isCurrent && !hasEnded && !freshHasCome }
@@ -138,7 +140,7 @@ internal final class PanelRememberedVisit {
         let change = PanelListChange(
             of: tab,
             count: listing.items.count,
-            while: { [weak self] in self?.isStillWanted ?? false },
+            while: { [self] in isStillWanted },
             by: { basis in
                 PanelModel.prepare(
                     basis,
@@ -192,59 +194,53 @@ internal final class PanelRememberedVisit {
     }
 
     /// The fresh reading has ended.
+    ///
+    /// A reading that was overtaken (it comes back with nothing, or after the newer one began) is
+    /// no longer the tab's: the newer one has taken over.
     private func finish(_ outcome: Result<PanelLoading.Whole?, any Error>) {
-        guard isCurrent else {
-            return
-        }
         switch outcome {
-        case .success(let whole?):
-            freshHasCome = true
-            if isShown {
-                update(with: whole)
-            } else {
-                enter(whole)
+        case .success(let whole):
+            if let current = currentPanel, let whole {
+                freshHasCome = true
+                if isShown {
+                    update(with: whole, in: current)
+                } else {
+                    enter(whole, in: current)
+                }
             }
 
-        case .success(nil):
-            // Stopped, which only a newer reading does; that one has taken over.
-            break
-
         case .failure(let error):
-            failed(error)
+            if let current = currentPanel {
+                failed(error, in: current)
+            }
         }
     }
 
     /// The fresh listing is compared with the remembered one, filtered, and the marks and the
     /// cursor found in it, in the background for a long list; in whatever order the list is by then.
-    private func update(with whole: PanelLoading.Whole) {
-        guard let panel else {
-            return
-        }
+    private func update(with whole: PanelLoading.Whole, in panel: PanelViewController) {
         let wanted = focusStillWanted
         let change = PanelListChange(
             of: request.tab,
             bringing: whole.listing.items,
-            while: { [weak self] in self?.isCurrent ?? false },
+            while: { [self] in isCurrent },
             by: { PanelModel.prepare($0, update: whole.listing, focus: wanted, presorted: whole.order) }
         )
         panel.apply(change) { [self] outcome in
-            guard outcome != nil else {
-                return
+            // Nothing comes when the visit was overtaken meanwhile.
+            if outcome != nil {
+                panel.dropSnapshot(of: id)
+                end(nil, in: panel)
             }
-            self.panel?.dropSnapshot(of: id)
-            end(nil)
         }
     }
 
     /// The remembered listing never made it into the list: the fresh one is shown as a
     /// listing is shown after any reading; a long one is entered from the background.
-    private func enter(_ fresh: PanelLoading.Whole) {
-        guard let panel else {
-            return
-        }
+    private func enter(_ fresh: PanelLoading.Whole, in panel: PanelViewController) {
         let tab = request.tab
         panel.sorted(fresh, for: tab) { [self] whole in
-            guard let panel = self.panel, isCurrent else {
+            guard isCurrent else {
                 return
             }
             panel.dropSnapshot(of: id)
@@ -252,12 +248,12 @@ internal final class PanelRememberedVisit {
             let (focus, history) = (request.focus ?? whole.focus, request.history)
             guard whole.listing.items.count >= PanelViewController.backgroundSortThreshold else {
                 tab.show(whole.listing, focus: focus, history: history, presorted: whole.order)
-                return end(nil)
+                return end(nil, in: panel)
             }
             let change = PanelListChange(
                 of: tab,
                 bringing: whole.listing.items,
-                while: { [weak self] in self?.isCurrent ?? false },
+                while: { [self] in isCurrent },
                 by: { basis in
                     PanelModel.prepare(
                         basis,
@@ -270,7 +266,7 @@ internal final class PanelRememberedVisit {
             )
             panel.apply(change) { [self] outcome in
                 if outcome != nil {
-                    end(nil)
+                    end(nil, in: panel)
                 }
             }
         }
@@ -278,10 +274,7 @@ internal final class PanelRememberedVisit {
 
     /// The fresh reading failed: the remembered listing is forgotten and the tab goes back to
     /// where it came from.
-    private func failed(_ error: any Error) {
-        guard let panel else {
-            return
-        }
+    private func failed(_ error: any Error, in panel: PanelViewController) {
         let tab = request.tab
         cache.forget(request.location)
         // (A remembered listing that was still on its way into the list has taken the quick
@@ -290,7 +283,7 @@ internal final class PanelRememberedVisit {
             panel.restore(tab, to: before, quickFilter: quickBefore)
         }
         panel.dropSnapshot(of: id)
-        end(error)
+        end(error, in: panel)
         // The folder the tab is back in was itself still arriving when it was left (and is
         // read again once; that reading does not come back here).
         if tab.isListed, !tab.isComplete {
@@ -299,10 +292,7 @@ internal final class PanelRememberedVisit {
     }
 
     /// The visit is over, with `error` when the fresh reading failed.
-    private func end(_ error: (any Error)?) {
-        guard let panel else {
-            return
-        }
+    private func end(_ error: (any Error)?, in panel: PanelViewController) {
         panel.loads[id] = nil
         hasEnded = true
         panel.readingEnded(of: request.tab, load, succeeded: error == nil, changed: true)

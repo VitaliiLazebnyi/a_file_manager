@@ -10,6 +10,8 @@ internal final class PanelFakeHost: PanelHost {
     internal var places: [Place] = []
     /// The drive that can be ejected, wherever the panel is.
     internal var ejectable: Place?
+    /// A reading ahead the panel may take over, for any location.
+    internal var joinable: ReadAhead.Joined?
     /// What the panel told, in order.
     internal private(set) var told: [String] = []
 
@@ -38,9 +40,10 @@ internal final class PanelFakeHost: PanelHost {
         told.append("activity")
     }
 
-    /// No reading ahead.
+    /// `joinable`, once: a reading that was taken over is gone.
     internal func panel(_: PanelViewController, joinReadingOf _: URL, showHidden _: Bool) -> ReadAhead.Joined? {
-        nil
+        defer { joinable = nil }
+        return joinable
     }
 
     /// `places`.
