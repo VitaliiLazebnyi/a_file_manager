@@ -193,32 +193,32 @@ private final class WindowTestPlugin: Plugin {
         let copy = ButtonBarView.Dragged.button(line: 0, group: 0, index: 0)
         #expect(
             bar.dropTarget(for: copy, at: NSPoint(x: frames[4].minX + 2, y: frames[4].midY))
-                == .button(.inGroup(line: 0, group: 1, at: 0))
+                == .button(.inGroup(line: 0, group: 1, beforeButton: 0))
         )
         #expect(
             bar.dropTarget(for: copy, at: NSPoint(x: frames[5].maxX - 2, y: frames[5].midY))
-                == .button(.inGroup(line: 0, group: 1, at: 2))
+                == .button(.inGroup(line: 0, group: 1, beforeButton: 2))
         )
-        #expect(bar.dropTarget(for: copy, at: middle(3)) == .button(.newGroup(.line(0, at: 1))))
-        #expect(bar.dropTarget(for: copy, at: middle(6)) == .button(.newGroup(.line(1, at: 0))))
+        #expect(bar.dropTarget(for: copy, at: middle(3)) == .button(.newGroup(.line(0, beforeGroup: 1))))
+        #expect(bar.dropTarget(for: copy, at: middle(6)) == .button(.newGroup(.line(1, beforeGroup: 0))))
         // Past the end of the first line: a new group there, though the line has room left.
         #expect(
             bar.dropTarget(for: copy, at: NSPoint(x: frames[5].maxX + 200, y: frames[5].midY))
-                == .button(.newGroup(.line(0, at: 2)))
+                == .button(.newGroup(.line(0, beforeGroup: 2)))
         )
         // A group goes to the nearest handle or line end.
-        #expect(bar.dropTarget(for: .group(line: 1, group: 0), at: middle(3)) == .group(.line(0, at: 1)))
+        #expect(bar.dropTarget(for: .group(line: 1, group: 0), at: middle(3)) == .group(.line(0, beforeGroup: 1)))
         #expect(
             bar.dropTarget(for: .group(line: 0, group: 0), at: NSPoint(x: frames[7].maxX + 50, y: frames[7].midY))
-                == .group(.line(1, at: 1))
+                == .group(.line(1, beforeGroup: 1))
         )
-        bar.apply(.group(line: 1, group: 0), to: .group(.line(0, at: 0)))
+        bar.apply(.group(line: 1, group: 0), to: .group(.line(0, beforeGroup: 0)))
         // The line it leaves empty disappears.
         #expect(bar.entries == [.showDriveButtons, nil, .copy, .showHidden, nil, .showCommandLine, .showFunctionKeys])
         // A group dropped below the bar starts a new line.
-        bar.apply(.group(line: 0, group: 1), to: .group(.newLine(at: 1)))
+        bar.apply(.group(line: 0, group: 1), to: .group(.newLine(beforeLine: 1)))
         #expect(bar.entries == [.showDriveButtons, nil, .showCommandLine, .showFunctionKeys, br, .copy, .showHidden])
-        bar.apply(.button(line: 0, group: 1, index: 1), to: .button(.inGroup(line: 1, group: 0, at: 1)))
+        bar.apply(.button(line: 0, group: 1, index: 1), to: .button(.inGroup(line: 1, group: 0, beforeButton: 1)))
         #expect(bar.entries == [.showDriveButtons, nil, .showCommandLine, br, .copy, .showFunctionKeys, .showHidden])
         // A button dragged off the bar is removed, and so is the group it leaves empty.
         bar.apply(.button(line: 0, group: 0, index: 0), to: nil)
@@ -284,20 +284,20 @@ private final class WindowTestPlugin: Plugin {
         var bar = ButtonBarArrangement(entries: [a, b, nil, c, br, d])
         #expect(bar.lines == [[[a, b], [c]], [[d]]])
         // Within its own group, after itself: the original place is accounted for.
-        bar.moveButton(line: 0, group: 0, index: 0, to: .inGroup(line: 0, group: 0, at: 2))
+        bar.moveButton(line: 0, group: 0, index: 0, to: .inGroup(line: 0, group: 0, beforeButton: 2))
         #expect(bar.entries == [b, a, nil, c, br, d])
         // The last button of a line takes the line with it.
-        bar.moveButton(line: 1, group: 0, index: 0, to: .inGroup(line: 0, group: 1, at: 0))
+        bar.moveButton(line: 1, group: 0, index: 0, to: .inGroup(line: 0, group: 1, beforeButton: 0))
         #expect(bar.entries == [b, a, nil, d, c])
-        bar.moveButton(line: 0, group: 0, index: 1, to: .newGroup(.newLine(at: 1)))
+        bar.moveButton(line: 0, group: 0, index: 1, to: .newGroup(.newLine(beforeLine: 1)))
         #expect(bar.entries == [b, nil, d, c, br, a])
-        bar.moveButton(line: 0, group: 0, index: 0, to: .newGroup(.newLine(at: 0)))
+        bar.moveButton(line: 0, group: 0, index: 0, to: .newGroup(.newLine(beforeLine: 0)))
         #expect(bar.entries == [b, br, d, c, br, a])
-        bar.moveGroup(line: 2, group: 0, to: .line(0, at: 0))
+        bar.moveGroup(line: 2, group: 0, to: .line(0, beforeGroup: 0))
         #expect(bar.entries == [a, nil, b, br, d, c])
-        bar.moveGroup(line: 0, group: 0, to: .line(0, at: 2))
+        bar.moveGroup(line: 0, group: 0, to: .line(0, beforeGroup: 2))
         #expect(bar.entries == [b, nil, a, br, d, c])
-        bar.moveGroup(line: 1, group: 0, to: .newLine(at: 0))
+        bar.moveGroup(line: 1, group: 0, to: .newLine(beforeLine: 0))
         #expect(bar.entries == [d, c, br, b, nil, a])
         bar.removeButton(line: 1, group: 0, index: 0)
         #expect(bar.entries == [d, c, br, a])
@@ -318,7 +318,7 @@ private final class WindowTestPlugin: Plugin {
         #expect(bar.buttons.count == bar.places.count && bar.buttons.first?.title == "Home")
         // A press shows the place in the source panel. (A stand-in place: the user's own
         // folders are none of a test's business.)
-        bar.show(Place(name: "B", url: box.url("B"), kind: .folder))
+        bar.show(Place(name: "B", url: box.url("B"), kind: .folder), inNewTab: false)
         await settle(app)
         #expect(app.left.model.directory.lastPathComponent == "B")
     }
