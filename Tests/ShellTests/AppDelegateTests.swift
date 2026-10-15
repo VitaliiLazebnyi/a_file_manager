@@ -106,20 +106,27 @@ internal struct AppDelegateTests {
     /// the Settings entry follows whether a plugin offers the dialog; quitting keeps the state.
     @Test
     internal func reopeningShowsTheWindowAndQuittingKeepsTheState() {
+        // Nothing comes on the screen, and nothing is left open.
+        let windows = StabilityWindows()
+        defer {
+            #expect(windows.shown.isEmpty && windows.open.isEmpty, "\(windows.shown) \(windows.openTitles)")
+            windows.closeAll()
+        }
         let delegate = ShellApplication(productName: "Test", plugins: [])
         let shell = delegate.start(settings: settings, interaction: ScriptedInteraction()) {
             // Nothing is refused here.
         }
         defer {
-            shell.mainWindow.window?.orderOut(nil)
             shell.shutDown()
             UserDefaults().removePersistentDomain(forName: suite)
         }
+        // The window is shown by asking for it; nothing comes on the screen of the test.
+        var shown: [NSWindow] = []
+        shell.mainWindow.present = { window, _ in shown.append(window) }
         #expect(delegate.applicationShouldHandleReopen(NSApp, hasVisibleWindows: false))
-        #expect(shell.mainWindow.window?.isVisible == true)
-        shell.mainWindow.window?.orderOut(nil)
+        #expect(shown.count == 1 && shown.first === shell.mainWindow.window)
         delegate.showMainWindow(nil)
-        #expect(shell.mainWindow.window?.isVisible == true)
+        #expect(shown.count == 2)
         let settingsItem = NSMenuItem(
             title: "Settings…",
             action: #selector(ShellApplication.showSettings(_:)),

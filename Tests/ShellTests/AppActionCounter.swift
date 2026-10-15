@@ -16,8 +16,4 @@ internal final class AppActionCounter: NSObject {
     internal func run(_: Any?) {
         onAction()
     }
-
-    deinit {
-        // Nothing to release.
-    }
 }

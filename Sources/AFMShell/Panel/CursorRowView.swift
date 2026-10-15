@@ -21,8 +21,4 @@ internal final class CursorRowView: NSTableRowView {
         }
         CursorBar.draw(in: bounds)
     }
-
-    deinit {
-        // Nothing to release.
-    }
 }

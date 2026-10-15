@@ -22,8 +22,9 @@ internal final class PanelCoordinator: PanelSet, PanelHost {
     internal private(set) var sourcePanel: PanelViewController
     /// Called when a panel started or stopped reading and nothing else changed.
     internal var onActivityChanged: (() -> Void)?
-    /// Refreshing waits while this is true (a job is running; the panels are re-read when it ends).
-    internal var isPaused: () -> Bool = { false }
+    /// Refreshing waits while this says true (a job is running; the panels are re-read when it
+    /// ends); without it nothing waits.
+    internal var isPaused: (() -> Bool)?
     /// Whether the main window is the one the user works in; nothing is read ahead while it is not.
     ///
     /// The shell says how to tell.
@@ -291,7 +292,7 @@ internal final class PanelCoordinator: PanelSet, PanelHost {
     /// shows, which was asked when it was read; nothing here touches a file system.
     private func readAheadTarget() -> ReadAhead.Target? {
         let model = sourcePanel.model
-        guard readsAhead, isWindowActive(), !isPaused(), !sourcePanel.isLoading, model.isComplete,
+        guard readsAhead, isWindowActive(), isPaused?() != true, !sourcePanel.isLoading, model.isComplete,
             model.volume?.isLocal == false,
             let item = model.cursorItem, item.isFolder, kernel.listingCache.isEnabled
         else {
@@ -306,7 +307,7 @@ internal final class PanelCoordinator: PanelSet, PanelHost {
     /// ago; a folder whose reading began after that is not read once more. While a job runs the
     /// change is noted instead, and read when the job has ended (`jobsEnded`).
     private func reload(_ changed: ChangedFolders, changedAt: TimeInterval?) {
-        guard !isPaused() else {
+        guard isPaused?() != true else {
             missedChanges.note(changed, at: ProcessInfo.processInfo.systemUptime)
             return
         }

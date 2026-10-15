@@ -29,10 +29,6 @@ internal struct PanelReview2ShellPartsTests {
                 senders.append(item)
             }
         }
-
-        deinit {
-            // Nothing to release.
-        }
     }
 
     /// A menu bar with a menu of commands, which holds a submenu.

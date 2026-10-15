@@ -27,10 +27,6 @@ internal struct AppMenuKeysTests {
         internal func validateUserInterfaceItem(_: any NSValidatedUserInterfaceItem) -> Bool {
             isOffered
         }
-
-        deinit {
-            // Nothing to release.
-        }
     }
 
     /// A target that says nothing about its entries: they can always be chosen.
@@ -42,10 +38,6 @@ internal struct AppMenuKeysTests {
         @objc
         internal func run(_ sender: NSMenuItem) {
             ran.append(sender.title)
-        }
-
-        deinit {
-            // Nothing to release.
         }
     }
 

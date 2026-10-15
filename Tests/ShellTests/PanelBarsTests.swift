@@ -127,10 +127,10 @@ internal struct PanelBarsTests {
         let app = await start()
         defer { app.stop() }
         app.layOut()
-        try #require(button(.goToParent, in: app.left.view)).performClick(nil)
+        Controls.send(try #require(button(.goToParent, in: app.left.view)))
         await program.settle(app)
         #expect(app.left.model.directory.path == program.box.root.path)
-        try #require(button(.goToRoot, in: app.left.view)).performClick(nil)
+        Controls.send(try #require(button(.goToRoot, in: app.left.view)))
         await program.settle(app)
         #expect(app.left.model.directory.path == "/")
         // The volume list: the places, disks apart, each leading there.

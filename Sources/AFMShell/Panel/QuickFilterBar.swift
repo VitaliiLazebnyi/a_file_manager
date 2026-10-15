@@ -101,8 +101,4 @@ internal final class QuickFilterBar: NSView, NSTextFieldDelegate {
     private func closePressed() {
         onCancel?()
     }
-
-    deinit {
-        // Nothing to release.
-    }
 }

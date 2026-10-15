@@ -12,8 +12,4 @@ internal final class PanelDragSession: NSDraggingSession {
         self.board = board
         super.init()
     }
-
-    deinit {
-        // Nothing to release.
-    }
 }

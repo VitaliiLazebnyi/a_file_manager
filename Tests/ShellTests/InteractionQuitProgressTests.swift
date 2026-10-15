@@ -54,8 +54,8 @@ internal struct InteractionQuitProgressTests {
         let buttons = Self.views(in: try #require(panel.contentView)).compactMap { $0 as? NSButton }
         let stay = try #require(buttons.first { $0.title == "Don’t Quit" })
         #expect(stay.keyEquivalent == "\r")
-        stay.performClick(nil)
-        try #require(buttons.first { $0.title == "Quit Now" }).performClick(nil)
+        Controls.send(stay)
+        Controls.send(try #require(buttons.first { $0.title == "Quit Now" }))
         #expect(answers == ["stay", "quit"])
     }
 

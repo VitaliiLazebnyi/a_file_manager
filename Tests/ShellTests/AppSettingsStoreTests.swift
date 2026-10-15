@@ -51,4 +51,16 @@ internal struct AppSettingsStoreTests {
         // Asked again, the value is the one in memory.
         #expect(store.largeData(forKey: "history") == Data("kept".utf8))
     }
+
+    /// Without a folder for them, large values are kept with the rest.
+    @Test
+    internal func withoutAFolderLargeValuesAreKeptWithTheRest() throws {
+        let suite = "afm-tests-" + UUID().uuidString
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = UserDefaultsSettings(defaults: defaults)
+        store.setLarge(Data("small after all".utf8), forKey: "history")
+        #expect(store.largeData(forKey: "history") == Data("small after all".utf8))
+        #expect(store.data(forKey: "history") == Data("small after all".utf8))
+    }
 }

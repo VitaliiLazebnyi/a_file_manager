@@ -45,11 +45,17 @@ internal struct PanelRereadingTests {
         app.left.show(program.box.url("A/docs"))
         await program.settle(app)
         #expect(places == 1 && app.left.model.directory.lastPathComponent == "docs")
+        // The folder does not answer until the test lets it: it is still being opened when it is
+        // shown again, however busy the machine is.
         program.memory.addFile("/slow/a.txt")
-        program.memory.listStartDelay = 1
+        program.memory.stalledPaths = ["/slow"]
+        program.memory.stallsListings = true
         app.left.show(program.memory.url("/slow"))
-        await PanelWait.until { app.left.model.isOpening }
+        #expect(await PanelWait.until { app.left.model.isOpening })
         app.left.show(program.memory.url("/slow"))
+        #expect(app.left.model.isOpening)
+        program.memory.stallsListings = false
+        program.memory.releaseStalls()
         await program.settle(app)
         #expect(app.left.model.directory.path == "/slow" && places == 2)
     }

@@ -31,8 +31,4 @@ internal final class BarSeparatorView: NSView {
             addCursorRect(bounds, cursor: .openHand)
         }
     }
-
-    deinit {
-        // Nothing to release.
-    }
 }
