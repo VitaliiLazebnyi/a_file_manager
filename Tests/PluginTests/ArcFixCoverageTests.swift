@@ -22,6 +22,23 @@ internal struct ArcFixCoverageTests {
         )
     }
 
+    /// A member without the exact time field has the time of its DOS fields, read in the time
+    /// zone of this Mac as zip wrote it.
+    @Test
+    internal func aMemberWithoutTheExactTimeHasItsDOSTime() throws {
+        let box = try Sandbox()
+        let file = try box.file("plain.txt", "plain")
+        var parts = DateComponents()
+        (parts.year, parts.month, parts.day, parts.hour, parts.minute, parts.second) = (2_020, 1, 2, 3, 4, 6)
+        let stamp = try #require(Calendar(identifier: .gregorian).date(from: parts))
+        try FileManager.default.setAttributes([.modificationDate: stamp], ofItemAtPath: file.path)
+        let archive = box.url("plain.zip")
+        #expect(runTool("/usr/bin/zip", ["-q", "-X", archive.path, "plain.txt"], in: box.root).status == 0)
+        let records = try ZipDirectory.read(try RandomAccessFile(archive)).records
+        #expect(records.map(\.name) == ["plain.txt"])
+        #expect(records.first?.modified == stamp)
+    }
+
     /// Paths that the archive's directory would never let through (an archive's own folder
     /// named `..`, or `/`) are refused by Unpack itself: nothing is made outside the target,
     /// and each says why; the rest of the archive is unpacked.
