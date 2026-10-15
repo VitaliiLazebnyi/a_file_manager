@@ -8,14 +8,19 @@ import Testing
 
 /// Spotlight's side of Find Files at its edges: questions it cannot read, a question started
 /// twice, and the check of its answer.
-@MainActor @Suite struct CoverageFindSpotlight {
-    @Test func aSearchWithoutTextNeedsNoCheckOfIt() {
+@MainActor
+@Suite
+internal struct CoverageFindSpotlight {
+    /// A search without text needs no check of it.
+    @Test
+    internal func aSearchWithoutTextNeedsNoCheckOfIt() {
         #expect(!SpotlightQuery.recheckingText(of: SearchQuery(directory: URL(fileURLWithPath: "/"))))
     }
 
     /// Started a second time, the question is answered at once with what there is; the answer
     /// of the first start then finds nobody waiting.
-    @Test func aQuestionStartedTwiceAnswersOnce() async throws {
+    @Test
+    internal func aQuestionStartedTwiceAnswersOnce() async {
         let search = SpotlightSearch(
             "kMDItemFSName == \"Calculator.app\"",
             scopes: [URL(fileURLWithPath: "/System/Applications")]
@@ -28,7 +33,9 @@ import Testing
         #expect(answers == 1)
     }
 
-    @Test func theAnswerIsCheckedBelowTheTopOfTheDisk() throws {
+    /// The answer is checked below the top of the disk.
+    @Test
+    internal func theAnswerIsCheckedBelowTheTopOfTheDisk() {
         let registry = FileSystemRegistry()
         registry.register(LocalFileSystem())
         let query = SearchQuery(directory: URL(fileURLWithPath: "/"), names: "Calculator.app")

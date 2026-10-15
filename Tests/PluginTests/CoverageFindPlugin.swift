@@ -10,13 +10,23 @@ import Testing
 /// Find Files through its commands, as the program opens it: the one window, the separate ones,
 /// the folder under the cursor and a volume that is about to go. The windows are presented to a
 /// recorder, never put on screen.
-@MainActor @Suite(.serialized) struct CoverageFindPlugin {
-    let memory = MemoryFileSystem()
-    let plugin = FindFilesPlugin()
-    let bench: TestBench
-    let presenter = StabilityPresenter()
+@MainActor
+@Suite(.serialized)
+internal struct CoverageFindPlugin {
+    /// The panels' folder.
+    internal let memory = MemoryFileSystem()
+    /// The plugin, its windows presented to `presenter`.
+    internal let plugin = FindFilesPlugin()
+    /// The kernel and its panels.
+    internal let bench: TestBench
+    /// Where the windows would be put on screen.
+    internal let presenter = StabilityPresenter()
 
-    init() {
+    /// The windows of Find Files that were presented and are not closed.
+    internal var windows: [NSWindow] { presenter.open.filter { $0.title.hasPrefix("Find Files") } }
+
+    /// The plugin over a folder with a file and a subfolder.
+    internal init() {
         _ = NSApplication.shared
         memory.addFile("/A/one.txt")
         memory.addDirectory("/A/docs")
@@ -29,9 +39,9 @@ import Testing
         plugin.present = presenter.present
     }
 
-    var windows: [NSWindow] { presenter.open.filter { $0.title.hasPrefix("Find Files") } }
-
-    @Test func theCommandsOpenTheirWindows() {
+    /// The commands open their windows.
+    @Test
+    internal func theCommandsOpenTheirWindows() {
         defer {
             plugin.stop()
             presenter.closeAll()
@@ -55,7 +65,9 @@ import Testing
         #expect(windows.isEmpty)
     }
 
-    @Test func aVolumeAboutToGoStopsTheSearchesOnIt() async {
+    /// A volume about to go stops the searches on it.
+    @Test
+    internal func aVolumeAboutToGoStopsTheSearchesOnIt() async {
         defer {
             plugin.stop()
             presenter.closeAll()
