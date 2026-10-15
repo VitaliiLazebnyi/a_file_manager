@@ -396,6 +396,17 @@ public final class FileJob: @unchecked Sendable {
             slots = DispatchSemaphore(value: width)
         }
 
+        /// Takes the work out of `task` and runs it. The work is let go of when this returns: a
+        /// local that held it until the end of the closure in `start` would still hold the job while
+        /// the group is left.
+        private static func runOnce(_ task: OSAllocatedUnfairLock<(@Sendable () -> Void)?>) {
+            let taken = task.withLock { work in
+                defer { work = nil }
+                return work
+            }
+            taken?()
+        }
+
         /// Starts `work` on a thread of its own; `group` is left when it has returned, and
         /// the worker's slot (taken by the caller beforehand) is given back.
         ///
@@ -405,12 +416,7 @@ public final class FileJob: @unchecked Sendable {
             group.enter()
             let task = OSAllocatedUnfairLock<(@Sendable () -> Void)?>(initialState: work)
             BlockingCalls.run { [slots] in
-                // Taken out, so that nothing of it is left here once it has run.
-                let taken = task.withLock { work in
-                    defer { work = nil }
-                    return work
-                }
-                taken?()
+                Self.runOnce(task)
                 slots.signal()
                 group.leave()
             }

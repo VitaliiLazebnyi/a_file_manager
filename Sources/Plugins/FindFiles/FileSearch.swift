@@ -842,24 +842,26 @@ public final class FileSearch: @unchecked Sendable {
         }
 
         private func work() {
-            while true {
-                condition.lock()
-                var next: Job?
-                while next == nil {
-                    while stack.isEmpty, !isClosed { condition.wait() }
-                    guard !isClosed, let top = stack.last else {
-                        condition.unlock()
-                        return
-                    }
-                    if let shouldHold, shouldHold(top) {
-                        condition.wait(until: Date(timeIntervalSinceNow: 0.02))
-                    } else {
-                        next = stack.removeLast()
-                    }
-                }
-                condition.unlock()
-                autoreleasepool { next?.run() }
+            while let next = take() {
+                autoreleasepool { next.run() }
             }
+        }
+
+        /// The next job, once there is one that is not held back; nil when the stack is closed.
+        private func take() -> Job? {
+            condition.lock()
+            defer { condition.unlock() }
+            while !isClosed {
+                guard let top = stack.last else {
+                    condition.wait()
+                    continue
+                }
+                guard let shouldHold, shouldHold(top) else {
+                    return stack.removeLast()
+                }
+                condition.wait(until: Date(timeIntervalSinceNow: 0.02))
+            }
+            return nil
         }
     }
 

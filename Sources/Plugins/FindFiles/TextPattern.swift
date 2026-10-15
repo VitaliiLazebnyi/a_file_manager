@@ -159,7 +159,8 @@ public struct TextPattern: Sendable {
             positions[0] = start
             tried[0] = 0
             var element = 0
-            while true {
+            // Back before the first element, every way to write the text was tried.
+            while element >= 0 {
                 if element == count {
                     if accept(positions[count]) { return true }
                     // Not accepted (a word continues): look for another way to write the text.
@@ -190,9 +191,9 @@ public struct TextPattern: Sendable {
                     if element < count { tried[element] = 0 }
                 } else {
                     element -= 1
-                    if element < 0 { return false }
                 }
             }
+            return false
         }
 
         private func isWordUnit(_ bytes: UnsafeBufferPointer<UInt8>, at position: Int) -> Bool {
