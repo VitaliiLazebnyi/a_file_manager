@@ -42,10 +42,12 @@ internal enum CoverageArchives {
     }
 
     /// Writes a ZIP of stored members with the plugin's own writer, for archives the system's
-    /// zip cannot make; `shape` may change each record before it is written.
+    /// zip cannot make; `shape` may change each record before it is written, and `localExtra`
+    /// gives the extra field of the headers in front of the data.
     internal static func craft(
         _ url: URL,
         _ members: [(name: String, data: Data)],
+        localExtra: Data?,
         shape: (inout ZipRecord) -> Void
     ) throws {
         let output = try OutputFile(creating: url)
@@ -61,7 +63,7 @@ internal enum CoverageArchives {
                 CRC32.of(member.data), UInt64(member.data.count), UInt64(member.data.count)
             )
             shape(&record)
-            let opened = try writer.begin(record)
+            let opened = try writer.begin(record, localExtra: localExtra)
             try writer.append(member.data)
             try writer.end(opened, record, headerChanged: false)
         }

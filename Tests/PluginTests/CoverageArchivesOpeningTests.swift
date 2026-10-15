@@ -108,7 +108,7 @@ internal struct CoverageArchivesOpeningTests {
         // Every member lies 255 folders deep, in folders of its own.
         let deep = Array(repeating: String(repeating: "x", count: 15), count: 254).joined(separator: "/")
         let members = (0..<110).map { index in (name: "top\(index)/\(deep)/file", data: Data()) }
-        try CoverageArchives.craft(box.url("deep.zip"), members) { _ in }
+        try CoverageArchives.craft(box.url("deep.zip"), members, localExtra: nil) { _ in }
         #expect {
             try bench.store.archive(at: box.url("deep.zip"))
         } throws: { error in

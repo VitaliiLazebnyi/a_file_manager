@@ -2303,12 +2303,15 @@ final class OpenArchive: @unchecked Sendable {
         stamp.appendLE(record.dosTime)
         stamp.appendLE(record.dosDate)
         try writer.patch(stamp, at: offset + 10)
-        guard let exact = ZipRecord.field(0x5455, in: record.extra), exact.count >= 5 else { return }
+        // (A changed time always comes with the exact field: `ZipRecord.setModified`.)
+        let exact = ZipRecord.field(0x5455, in: record.extra)
         var fields = ByteReader(try file.read(at: offset + 30 + nameLength, count: extraLength))
         while fields.remaining >= 4 {
             let (id, size) = (fields.u16(), Int(fields.u16()))
             guard size <= fields.remaining else { return }
-            if id == 0x5455, size >= 5, fields.data[fields.data.startIndex + fields.position] & 1 != 0 {
+            if id == 0x5455, size >= 5, fields.data[fields.data.startIndex + fields.position] & 1 != 0, let exact,
+                exact.count >= 5
+            {
                 try writer.patch(
                     Data(exact.dropFirst().prefix(4)),
                     at: offset + 30 + nameLength + UInt64(fields.position) + 1
@@ -2380,9 +2383,9 @@ final class OpenArchive: @unchecked Sendable {
         if snapshot.isComplete { writtenCount = snapshot.changeCount }
         if built.isRewrite { writtenRemovals = snapshot.removals }
         if vanished > 0 {
-            // The next write takes them out again; it is due like any other change.
+            // The next write takes them out again; it is due like any other change. (Taking
+            // one out counted as a change, after the snapshot: that change is still waiting.)
             removals += vanished
-            if changeCount == writtenCount { changeCount += 1 }
             if let delay = environment.flushDelay { armTimer(after: idleDelay(delay)) }
         }
         pendingBytes -= min(pendingBytes, snapshot.pendingBytes)

@@ -168,7 +168,7 @@ internal struct CoverageArchivesPasswordTests {
     @Test
     internal func membersThatCannotBeUnpackedSayWhy() throws {
         let url = box.url("odd.zip")
-        try CoverageArchives.craft(url, [(name: "aes.bin", data: Data("x".utf8))]) { $0.method = ZipAES.method }
+        try CoverageArchives.craft(url, [(name: "aes.bin", data: Data("x".utf8))], localExtra: nil) { $0.method = ZipAES.method }
         let odd = try bench.store.archive(at: url)
         #expect {
             _ = try read(odd, "aes.bin")
@@ -177,7 +177,7 @@ internal struct CoverageArchivesPasswordTests {
             return false
         }
         let other = box.url("bzip.zip")
-        try CoverageArchives.craft(other, [(name: "bzip.bin", data: Data("x".utf8))]) { $0.method = 12 }
+        try CoverageArchives.craft(other, [(name: "bzip.bin", data: Data("x".utf8))], localExtra: nil) { $0.method = 12 }
         let bzip = try bench.store.archive(at: other)
         #expect {
             _ = try read(bzip, "bzip.bin")
