@@ -249,6 +249,7 @@ enum Volume {
     /// main thread.
     static func kind(ofLocalPath path: String) -> PathKind {
         var current = path
+        var buffer = [CChar](repeating: 0, count: Int(PATH_MAX))
         for _ in 0..<16 {
             guard isOnLocalVolume(current) else { return .unasked }
             let names = ArchiveTree.names(of: current)
@@ -259,11 +260,9 @@ enum Volume {
                 var status = stat()
                 guard lstat(prefix, &status) == 0 else { return .missing }
                 let type = status.st_mode & S_IFMT
-                if type == S_IFLNK {
-                    var buffer = [CChar](repeating: 0, count: Int(PATH_MAX) + 1)
-                    let length = readlink(prefix, &buffer, Int(PATH_MAX))
-                    guard length > 0 else { return .missing }
-                    let target = buffer.withUnsafeBufferPointer { String(cString: $0.baseAddress!) }
+                // (A link that cannot be read is taken for what it is: not a folder.)
+                if type == S_IFLNK, case let length = readlink(prefix, &buffer, buffer.count), length > 0 {
+                    let target = String(decoding: buffer.prefix(length).map { UInt8(bitPattern: $0) }, as: UTF8.self)
                     let base =
                         target.hasPrefix("/") ? target : (prefix as NSString).deletingLastPathComponent + "/" + target
                     let rest = names[(index + 1)...].joined(separator: "/")
