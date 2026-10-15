@@ -157,7 +157,7 @@ extension PanelModel {
         // and the versions stay as they are.
         swap(&listedItems, &prepared.lists.listed)
         swap(&items, &prepared.lists.shown)
-        if lookups.index == nil { lookups.index = prepared.lists.index }
+        if let index = prepared.lists.index { lookups.index = index }
         self.sized = sized
         counted.setList(prepared.lists.tally)
         counted.selected = nil

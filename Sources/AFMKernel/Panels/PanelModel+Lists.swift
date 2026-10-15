@@ -45,7 +45,7 @@ extension PanelModel {
 
     /// The places whose entries have a calculated size.
     internal func sizedPlaces() -> Bitset {
-        if let sized, sized.size == listedItems.count {
+        if let sized {
             return sized
         }
         let found = ListWork.sized(listedItems)

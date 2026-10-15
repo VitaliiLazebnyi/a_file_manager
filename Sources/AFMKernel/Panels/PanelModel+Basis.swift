@@ -30,7 +30,7 @@ extension PanelModel {
         internal let places: ShownPlaces?
         /// The index of the names, if the model had made one.
         internal let index: NameIndex?
-        /// The places with a calculated size, if the model knew them.
+        /// The places with a calculated size, if the model knew them; as long as the list.
         internal let sized: Bitset?
         /// Whether the lists are released in the background when the basis goes.
         private let discards: Bool
@@ -47,7 +47,7 @@ extension PanelModel {
             (directory, listedItems, items) = (model.directory, model.listedItems, model.items)
             (filter, sort, stamp, places) = (model.filter, model.sort, model.stamp, model.shownPlaces)
             (sizeStamp, requestedSort, index) = (model.sizeStamp, model.requestedSort, model.lookups.index)
-            sized = model.sized.flatMap { $0.size == model.listedItems.count ? $0 : nil }
+            sized = model.sized
             self.discards = discards
         }
 

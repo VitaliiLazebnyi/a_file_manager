@@ -43,6 +43,38 @@ internal struct PanelsLoaderTests {
         #expect(names == ["first"])
     }
 
+    /// Climbing ends at the first folder above that delivers anything, even if its listing then
+    /// breaks off: what came is shown, and no error.
+    @Test
+    internal func climbingEndsWhereSomethingArrived() throws {
+        let broken = PanelsBrokenListing(failing: ["/gone", "/gone/away"])
+        let fileSystems = FileSystemRegistry()
+        fileSystems.register(broken)
+        var batches: [PanelLoader.Batch] = []
+        let away = broken.url("/gone/away")
+        try PanelLoader.stream(climbingFrom: away, showHidden: false, fileSystems: fileSystems) { batch in
+            batches.append(batch)
+            return true
+        }
+        #expect(batches.map(\.listing.directory.path) == ["/"] && batches.allSatisfy(\.isFirst))
+    }
+
+    /// A listing whose first batch is not wanted is told to stop: its file system sees the flag.
+    @Test
+    internal func aListingNotWantedIsToldToStop() throws {
+        let broken = PanelsBrokenListing()
+        let fileSystems = FileSystemRegistry()
+        fileSystems.register(broken)
+        var batches = 0
+        try PanelLoader.stream(broken.url("/folder"), showHidden: false, fileSystems: fileSystems) { _ in
+            batches += 1
+            return false
+        }
+        let end = Date(timeIntervalSinceNow: 6)
+        while !broken.wasToldToStop, Date() < end { Thread.sleep(forTimeInterval: 0.01) }
+        #expect(batches == 1 && broken.wasToldToStop)
+    }
+
     /// A reading that was cancelled before it began is no listing.
     @Test
     internal func aCancelledReadingIsNoListing() {

@@ -49,7 +49,7 @@ internal struct PanelsTabsTests {
 
     /// Titles: the folder's name, the user's, with a star on a locked tab; the root is `/`.
     @Test
-    internal func tabTitles() {
+    internal func tabTitles() throws {
         let tabs = Self.tabs(["/", "/work"])
         tabs.tabs[1].customTitle = "Mine"
         tabs.tabs[1].isLocked = true
@@ -57,6 +57,10 @@ internal struct PanelsTabsTests {
         #expect(tabs.title(at: 0) == "*/" && tabs.title(at: 1) == "*Mine")
         tabs.tabs[1].isLocked = false
         #expect(tabs.title(at: 1) == "Mine")
+        // A server's top has no name of its own.
+        let server = try #require(URL(string: "smb://server"))
+        tabs.insertTab(showing: server, at: 2, activate: false)
+        #expect(tabs.title(at: 2) == "/")
     }
 
     /// The state of a session goes out and comes back, a tab whose location is no URL left out;

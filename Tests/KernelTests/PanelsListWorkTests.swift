@@ -109,6 +109,22 @@ internal struct PanelsListWorkTests {
         #expect(lookups.row(alike: "\u{E9}7", in: shown) == 7)
     }
 
+    /// The top of the directory above, found a moment ago, is not asked for again.
+    @Test
+    internal func aTopFoundAMomentAgoIsNotAskedAgain() {
+        let broken = PanelsBrokenListing()
+        let cache = RootCache()
+        let (upper, lower) = (broken.url("/a/b"), broken.url("/a/b/c"))
+        #expect(cache.root(of: upper, parent: broken.url("/a"), in: broken) == broken.url("/"))
+        #expect(broken.rootQuestionCount == 1)
+        // Another tree in between does not push the first out of a cache with room for it.
+        #expect(cache.root(of: broken.url("/x/y"), parent: broken.url("/x"), in: broken) == broken.url("/"))
+        #expect(broken.rootQuestionCount == 2)
+        #expect(cache.root(of: lower, parent: upper, in: broken) == broken.url("/"))
+        #expect(broken.rootQuestionCount == 2)
+        #expect(cache.root(of: broken.url("/top"), parent: nil, in: broken) == broken.url("/top"))
+    }
+
     /// The tops of trees are remembered by a cache of their own, which lets go of them.
     @Test
     internal func aRootCacheCanBeLetGo() {

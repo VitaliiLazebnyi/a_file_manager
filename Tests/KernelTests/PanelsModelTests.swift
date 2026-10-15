@@ -172,6 +172,35 @@ internal struct PanelsModelTests {
         #expect(accented.listedItems[0].computedSize == 3)
     }
 
+    /// A fresh reading counts as a change when any one thing the panel shows is different: the
+    /// entries, the volume, being listed at all, or being complete.
+    @Test
+    internal func aReadingIsAChangeWhenAnyOneThingDiffers() {
+        let items = [Self.file("a"), Self.file("b")]
+        // Other entries, the cursor where it was.
+        let entries = Self.model(items)
+        #expect(entries.update(with: Self.listing(items + [Self.file("c")])) && entries.cursor == 0)
+        // Another volume.
+        let volume = Self.model(items)
+        let other = Listing(
+            directory: Self.directory,
+            items: items,
+            parent: URL(fileURLWithPath: "/"),
+            root: URL(fileURLWithPath: "/"),
+            volume: VolumeInfo(name: "Other", freeBytes: 5, totalBytes: 10)
+        )
+        #expect(volume.update(with: other))
+        // Listed for the first time, the list as empty as it was.
+        let fresh = PanelModel(directory: Self.directory)
+        #expect(fresh.update(with: Self.listing([])))
+        // Complete now, the entries as they were.
+        let partial = PanelModel(directory: Self.directory)
+        partial.show(Self.listing(items), complete: false)
+        #expect(partial.update(with: Self.listing(items)) && partial.isComplete)
+        // Nothing different.
+        #expect(!partial.update(with: Self.listing(items)))
+    }
+
     /// The history remembers where the panel was; the most recent wanted place is found.
     @Test
     internal func theLastVisitedPlaceIsFound() {
