@@ -355,7 +355,7 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
             login: while true {
                 attempts += 1
                 // A password on plain FTP can be read by anyone on the way.
-                if profile.tls == .none, profile.user != "anonymous", !(profile.password ?? "").isEmpty,
+                if profile.tls == .none, profile.user != "anonymous", profile.password?.isEmpty == false,
                     !askedUnprotected,
                     environment.asksAboutUnprotectedLoopback || !Self.isLoopback(profile.key.host)
                 {
@@ -821,7 +821,7 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
 
     func entry(at path: String, cancellation: CancellationFlag?) throws -> RemoteEntry? {
         let path = RemotePath.normalized(path)
-        if path == "/" { return RemoteEntry(name: "/", isDirectory: true) }
+        guard let parent = RemotePath.parent(of: path) else { return RemoteEntry(name: "/", isDirectory: true) }
         return try command(cancellation: cancellation) { connection in
             if connection.offers("MLST") { return try connection.status(of: path, cancellation: cancellation) }
             let name = RemotePath.name(of: path)
@@ -838,7 +838,7 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
                 // Neither a file whose size the server tells nor a directory to enter: the listing decides.
             }
             var found: RemoteEntry?
-            try connection.list(RemotePath.parent(of: path) ?? "/", showHidden: true, cancellation: cancellation) {
+            try connection.list(parent, showHidden: true, cancellation: cancellation) {
                 entries in
                 found = entries.first { $0.name == name }
                 return found == nil
