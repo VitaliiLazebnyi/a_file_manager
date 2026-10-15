@@ -31,6 +31,10 @@ disabled_rules:
   - sorted_imports
   # Flags every literal but 0 and 1 (sizes, offsets, test data); agreed to leave off.
   - no_magic_numbers
+  # Demands a deinit in every class, NSObject subclasses too, where a deinit with nothing to do is never counted as
+  # run, even when the object is freed, so coverage could not reach 100% (owner's decision, 2026-10-16).
+  # Scripts/required-deinit.py applies it to Swift classes (`Scripts/check.sh lint` runs it).
+  - required_deinit
 
 # Everything git tracks is linted. Left out: build output, and the `Sources`/`TestSupport` links of the
 # fuzz and stress packages, which point at code that is linted where it lives (the analyzer follows
