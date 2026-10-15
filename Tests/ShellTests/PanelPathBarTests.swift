@@ -136,8 +136,10 @@ internal struct PanelPathBarTests {
         )
         Controls.send(bar.ejectButton)
         #expect(ejected == 1)
+        // The path gives the button its room.
+        let besideTheButton = bar.textOrigin
         bar.ejectableVolumeName = nil
-        #expect(bar.ejectButton.isHidden)
+        #expect(bar.ejectButton.isHidden && bar.textOrigin >= besideTheButton)
         // A mouse-down is a click with the event's count; the menu is the provider's.
         var clicks: [Int] = []
         bar.onClick = { clicks.append($0) }
