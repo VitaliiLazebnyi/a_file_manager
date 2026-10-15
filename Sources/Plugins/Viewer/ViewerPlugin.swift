@@ -37,9 +37,9 @@ public final class ViewerPlugin: Plugin, ViewerService {
     private(set) var quickView: QuickViewPanel?
     /// What the panes play sounds and films with: the system's player, or a test's that plays nothing.
     internal var mediaPlayback: @MainActor () -> any MediaPlayback = { SystemMediaPlayback() }
-    /// Puts a Lister window on screen (with `showsWindows`): the window's own way, or a test's
-    /// that keeps it off screen (AppKit moves a titled window placed off screen back onto it).
-    internal var present: @MainActor (ViewerWindowController) -> Void = { $0.showWindow(nil) }
+    /// Puts a Lister window on screen (with `showsWindows`). Tests replace it, so that no window
+    /// shows in the session they run in, and look at what it was asked to show.
+    var present: @MainActor (NSWindowController) -> Void = { $0.showWindow(nil) }
 
     /// `overlayHost` finds the part of a panel that can be covered by the quick view;
     /// `quickViewDelay` is how long the quick view waits for the cursor to rest before it

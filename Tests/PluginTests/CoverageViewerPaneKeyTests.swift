@@ -136,7 +136,7 @@ internal struct CoverageViewerPaneKeyTests {
     internal func aPaneOutsideAListerWindow() async throws {
         let bench = try CoverageViewerPaneBench()
         defer { bench.close() }
-        let window = NSWindow(
+        let window = CovViewSheetWindow(
             contentRect: NSRect(x: 0, y: 0, width: 800, height: 500),
             styleMask: [.titled],
             backing: .buffered,
@@ -212,12 +212,10 @@ internal struct CoverageViewerPaneKeyTests {
         defer { elsewhere.close() }
         let foreign = try key("w", 13, in: elsewhere)
         #expect(pane.monitored(foreign) === foreign)
-        window.beginSheet(elsewhere) { _ in
-            // Nothing to do.
-        }
+        window.openSheet = elsewhere
         let sheeted = try key("w", 13, in: window)
         #expect(pane.monitored(sheeted) === sheeted)
-        window.endSheet(elsewhere)
+        window.openSheet = nil
         let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 50, height: 20))
         pane.addSubview(field)
         defer { field.removeFromSuperview() }

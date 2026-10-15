@@ -41,13 +41,14 @@ internal struct CoverageViewerPluginTests {
     internal func listerWindowsAreShownWhenAskedFor() async {
         let setup = CoverageViewerBench(left: nil, showsWindows: true)
         defer { setup.plugin.stop() }
-        var presented: [ViewerWindowController] = []
-        setup.plugin.present = { presented.append($0) }
+        let presenter = StabilityPresenter()
+        defer { presenter.closeAll() }
+        setup.plugin.present = presenter.present
         setup.plugin.view(text: "shown", title: "Shown")
         let controller = setup.plugin.windows.last
         defer { controller?.close() }
-        #expect(presented.count == 1 && presented.first === controller)
-        #expect(controller?.window?.isVisible == false)
+        #expect(presenter.presented.count == 1 && presenter.presented.first === controller)
+        #expect(presenter.isOpen(controller?.window) && controller?.window?.isVisible == false)
         controller?.close()
         #expect(await setup.wait { setup.plugin.windows.isEmpty })
     }
