@@ -10,7 +10,11 @@
 #     the file is parsed again or an enclosing block is rewritten): every mutant is written in,
 #     nested ones too (inner blocks are rewritten first);
 #   - keeps files of the same name in different folders apart (they were merged into one);
-#   - swaps a ternary whose second choice holds operators (`c ? a : b..<d`) as a whole.
+#   - swaps a ternary whose second choice holds operators (`c ? a : b..<d`) as a whole;
+#   - switches a mutant on with `getenv("<mutant>") != nil`, not
+#     `ProcessInfo.processInfo.environment[...]`, which builds the whole environment dictionary
+#     every time mutated code runs and made the tests of hot code take hours instead of seconds
+#     (a file that imports neither Foundation nor Darwin gets `import func Darwin.getenv`).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

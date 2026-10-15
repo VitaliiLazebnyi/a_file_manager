@@ -200,7 +200,9 @@ reported every `Sources` finding a second time). The fuzz and stress drivers the
   development branch writes no mutant into the sources at all. The patch fixes both, keeps files of the same name apart,
   swaps a ternary with operators in its second choice as a whole, removes only call statements (not declarations,
   `return` or `if`), and leaves out mutants in stored-property initial values (they cannot be switched at file scope).
-  With it, the whole tree with all 11,884 mutants compiles.
+  With it, the whole tree with all 11,884 mutants compiles. It also switches a mutant on with `getenv("<mutant>")`
+  instead of `ProcessInfo.processInfo.environment[...]`: that builds the whole environment dictionary every time mutated
+  code runs, and with the panel sorting code mutated the kernel tests did not finish one test in 14 minutes.
 - **Running:** `Scripts/mutation.sh` (files changed since the branch left `origin/main`), `Scripts/mutation.sh <files>`
   or `--all`. It copies the checkout to `.build/mutation/project` (warnings are not errors in that copy only: a mutant
   may leave a value unused), and Muter runs `Scripts/mutation.sh --run-tests` per mutant: the test target of the mutated

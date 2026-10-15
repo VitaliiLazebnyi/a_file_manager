@@ -19,7 +19,7 @@
 # it loses mutants inside blocks that hold mutants themselves and crashes on Swift 6 syntax.
 #
 # Muter works on a copy of the project with every mutant compiled in at once, switched on one at a
-# time by an environment variable. Its test command is this script with --run-tests (see
+# time by an environment variable (and by AFM_MUTANT, which the mutated files read once). Its test command is this script with --run-tests (see
 # muter.conf.yml): it builds once, then for each mutant runs the test target of the mutated
 # file's module first and the other test targets only if that one passes, each with a time limit
 # (MUTATION_TIMEOUT_FACTOR times the target's baseline time, plus a minute; a hung mutant counts as
@@ -79,6 +79,14 @@ run_tests() {
     exit 0
   fi
   if [[ -z "$mutant" ]]; then
+    # Muter's switch compares __muterActiveMutant with the mutant's name (Scripts/muter.patch);
+    # each mutated file reads it once from AFM_MUTANT, which the test runs below set.
+    while IFS= read -r file; do
+      if grep -q '__muterActiveMutant == "' "$file" && ! grep -q 'let __muterActiveMutant' "$file"; then
+        printf '\n%s\n%s\n' '// The mutant that is switched on (Scripts/mutation.sh).' \
+          'private let __muterActiveMutant = getenv("AFM_MUTANT").map { String(cString: $0) } ?? ""' >> "$file"
+      fi
+    done < "$state/files"
     echo "baseline: building the tests with every mutant compiled in"
     if ! swift build --build-tests > "$state/logs/build.log" 2>&1; then
       cat "$state/logs/build.log"
@@ -118,7 +126,9 @@ run_tests() {
     exit 0
   fi
 
-  for target in "${first[@]}" "${rest[@]}"; do
+  export AFM_MUTANT="$mutant"
+  # bash 3.2 under set -u counts an empty "${list[@]}" as unset.
+  for target in ${first[@]+"${first[@]}"} ${rest[@]+"${rest[@]}"}; do
     limit=$(($(cat "$state/baseline/$target") * factor + 60))
     base=$SECONDS
     status=0

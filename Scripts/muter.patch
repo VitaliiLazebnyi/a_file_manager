@@ -147,6 +147,144 @@ index f0a9756..88bbd5d 100644
              }
          }
  
+diff --git a/Sources/muterCore/Rewriters/AddImportRewriter.swift b/Sources/muterCore/Rewriters/AddImportRewriter.swift
+index 1246436..5557a14 100644
+--- a/Sources/muterCore/Rewriters/AddImportRewriter.swift
++++ b/Sources/muterCore/Rewriters/AddImportRewriter.swift
+@@ -39,17 +39,18 @@ final class AddImportRewriter: SyntaxRewriter {
+                                 )
+                             ),
+                         ],
+-                        importKeyword: .keyword(.class),
++                        // The mutation switch calls getenv.
++                        importKeyword: .keyword(.func),
+                         path: ImportPathComponentListSyntax([
+                             ImportPathComponentSyntax(
+                                 leadingTrivia: .space,
+-                                name: .identifier("Foundation")
++                                name: .identifier("Darwin")
+                             ),
+                             ImportPathComponentSyntax(
+                                 name: .periodToken()
+                             ),
+                             ImportPathComponentSyntax(
+-                                name: .identifier("ProcessInfo")
++                                name: .identifier("getenv")
+                             ),
+                         ]),
+                         trailingTrivia: .newlines(2)
+@@ -74,7 +75,7 @@ final class AddImportVisitior: SyntaxAnyVisitor {
+     }
+ 
+     override func visit(_ node: ImportDeclSyntax) -> SyntaxVisitorContinueKind {
+-        if isImportingProcessInfo(node) || isImportingFoundation(node) {
++        if isImportingGetenv(node) || isImportingFoundation(node) {
+             isImportingFoundation = true
+         }
+ 
+@@ -82,10 +83,10 @@ final class AddImportVisitior: SyntaxAnyVisitor {
+     }
+ 
+     private func isImportingFoundation(_ node: ImportDeclSyntax) -> Bool {
+-        node.path.count == 1 && node.path.first?.name.text == "Foundation"
++        node.path.count == 1 && ["Foundation", "Darwin"].contains(node.path.first?.name.text)
+     }
+ 
+-    private func isImportingProcessInfo(_ node: ImportDeclSyntax) -> Bool {
+-        node.description.contains("Foundation.ProcessInfo")
++    private func isImportingGetenv(_ node: ImportDeclSyntax) -> Bool {
++        node.description.contains("Darwin.getenv")
+     }
+ }
+diff --git a/Sources/muterCore/Rewriters/MutationSwitch.swift b/Sources/muterCore/Rewriters/MutationSwitch.swift
+index f65a74f..c45fb32 100644
+--- a/Sources/muterCore/Rewriters/MutationSwitch.swift
++++ b/Sources/muterCore/Rewriters/MutationSwitch.swift
+@@ -74,65 +74,37 @@ enum MutationSwitch {
+         ConditionElementListSyntax([
+             ConditionElementSyntax(
+                 condition: ConditionElementSyntax.Condition(
++                    // `__muterActiveMutant == "<id>"`: the name of the mutant that is on, read
++                    // once per file (Scripts/mutation.sh declares it at the end of every mutated
++                    // file). Reading the environment here instead, as Muter does, costs a scan of
++                    // it every time the mutated code runs, for every mutant of the block.
+                     SequenceExprSyntax(
+                         elements: ExprListSyntax([
+                             ExprSyntax(
+-                                SubscriptCallExprSyntax(
+-                                    calledExpression:
+-                                    MemberAccessExprSyntax(
+-                                        base: MemberAccessExprSyntax(
+-                                            base: MemberAccessExprSyntax(
+-                                                period: .periodToken(presence: .missing),
+-                                                declName: DeclReferenceExprSyntax(
+-                                                    baseName: .identifier("ProcessInfo")
+-                                                )
+-                                            ),
+-                                            declName: DeclReferenceExprSyntax(
+-                                                baseName: .identifier("processInfo")
+-                                            )
+-                                        ),
+-                                        declName: DeclReferenceExprSyntax(
+-                                            baseName: .identifier("environment")
+-                                        )
+-                                    ),
+-                                    leftSquare: .leftSquareToken(),
+-                                    arguments:
+-                                    LabeledExprListSyntax([
+-                                        LabeledExprSyntax(
+-                                            label: nil,
+-                                            colon: nil,
+-                                            expression: StringLiteralExprSyntax(
+-                                                openingQuote: .stringQuoteToken(),
+-                                                segments: StringLiteralSegmentListSyntax(
+-                                                    [
+-                                                        .stringSegment(
+-                                                            StringSegmentSyntax(
+-                                                                content:
+-                                                                .stringSegment(id)
+-                                                            )
+-                                                        ),
+-                                                    ]
+-                                                ),
+-                                                closingQuote: .stringQuoteToken()
+-                                            )
+-                                        ),
+-                                    ]),
+-                                    rightSquare: .rightSquareToken(),
+-                                    trailingClosure: nil,
+-                                    additionalTrailingClosures: []
++                                DeclReferenceExprSyntax(
++                                    baseName: .identifier("__muterActiveMutant")
+                                 )
+                             ),
+                             ExprSyntax(
+                                 BinaryOperatorExprSyntax(
+-                                    operator: .binaryOperator("!=")
++                                    operator: .binaryOperator("==")
+                                         .withLeadingTrivia(.spaces(1))
+                                         .withTrailingTrivia(.spaces(1))
+                                 )
+                             ),
+                             ExprSyntax(
+-                                NilLiteralExprSyntax(
+-                                    nilKeyword: .keyword(.nil)
+-                                        .withTrailingTrivia(.spaces(1))
++                                StringLiteralExprSyntax(
++                                    openingQuote: .stringQuoteToken(),
++                                    segments: StringLiteralSegmentListSyntax(
++                                        [
++                                            .stringSegment(
++                                                StringSegmentSyntax(
++                                                    content: .stringSegment(id)
++                                                )
++                                            ),
++                                        ]
++                                    ),
++                                    closingQuote: .stringQuoteToken(trailingTrivia: .spaces(1))
+                                 )
+                             ),
+                         ])
 diff --git a/Sources/muterCore/Rewriters/MuterRewriter.swift b/Sources/muterCore/Rewriters/MuterRewriter.swift
 index f4b4d50..893d3f1 100644
 --- a/Sources/muterCore/Rewriters/MuterRewriter.swift
