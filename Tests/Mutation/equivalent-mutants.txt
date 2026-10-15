@@ -66,3 +66,125 @@ in: nonisolated public func askUser<Answer: Sendable>(
 before: Parallel.assertMayWaitForMainThread()
 after: (statement removed)
 reason: The check only logs a fault for a caller that the main thread waits for; such a caller then waits for the main thread for ever with or without the log, so no test can make the call and see the difference.
+
+file: Sources/AFMKernel/Panels/ListingCache.swift
+operator: RemoveSideEffects
+in: func hash(into hasher: inout Hasher)
+before: hasher.combine(location)
+after: (statement removed)
+reason: The hash only spreads the keys over a dictionary's buckets; equal keys still hash alike and
+  `==` still tells keys apart, so every lookup gives the same answer, only more slowly.
+
+file: Sources/AFMKernel/Panels/ListingCache.swift
+operator: RemoveSideEffects
+in: func hash(into hasher: inout Hasher)
+before: hasher.combine(showHidden)
+after: (statement removed)
+reason: The hash only spreads the keys over a dictionary's buckets; equal keys still hash alike and
+  `==` still tells keys apart, so every lookup gives the same answer, only more slowly.
+
+file: Sources/AFMKernel/Panels/ListingCache.swift
+operator: RemoveSideEffects
+in: private static func release(_ dropped: inout [Slot])
+before: Discard.later(&lists[index])
+after: (statement removed)
+reason: Discard only moves the release of a list's memory to a background thread; without it the
+  memory is released on the calling thread a moment later. Nothing a test can observe changes.
+
+file: Sources/AFMKernel/Panels/ListingCache.swift
+operator: RemoveSideEffects
+in: public func store(
+before: Self.release(&dropped)
+after: (statement removed)
+reason: `release` only lets go of dropped listings in the background; without it they are let go
+  of on the calling thread when the call returns. What the cache holds and answers is the same.
+
+file: Sources/AFMKernel/Panels/ListingCache.swift
+operator: RemoveSideEffects
+in: public func forget(_ directory: URL)
+before: Self.release(&dropped)
+after: (statement removed)
+reason: `release` only lets go of dropped listings in the background; without it they are let go
+  of on the calling thread when the call returns. What the cache holds and answers is the same.
+
+file: Sources/AFMKernel/Panels/ListingCache.swift
+operator: RemoveSideEffects
+in: public func invalidate(_ directories: [URL])
+before: Self.release(&dropped)
+after: (statement removed)
+reason: `release` only lets go of dropped listings in the background; without it they are let go
+  of on the calling thread when the call returns. What the cache holds and answers is the same.
+
+file: Sources/AFMKernel/Panels/ListingCache.swift
+operator: RemoveSideEffects
+in: private func slot(for key: Key) -> Slot?
+before: Self.release(&dropped)
+after: (statement removed)
+reason: `release` only lets go of dropped listings in the background; without it they are let go
+  of on the calling thread when the call returns. What the cache holds and answers is the same.
+
+file: Sources/AFMKernel/Panels/ListingRelay.swift
+operator: ChangeLogicalConnector
+in: internal func offer(_ items: [FileItem]) -> Bool
+before: return !isClosed && answer == .more
+after: return !isClosed || answer == .more
+reason: A "no" closes the relay, so a closed relay holds no "more" unless the asker leaves between
+  answering "more" and the listing waking up; then the listing offers one batch more, which the
+  closed relay refuses at once. That race cannot be arranged by a test.
+
+file: Sources/AFMKernel/Panels/PanelLoader.swift
+operator: SwapTernary
+in: private static func listing(
+before: question: "list \(showHidden ? "all" : "shown") " + directory.locationKey,
+after: question: "list \(showHidden ? "shown" : "all") " + directory.locationKey,
+reason: The words only tell the two questions apart for the kernel's book of calls; swapped, the
+  two questions are still told apart, and each listing still waits only for its own kind.
+
+file: Sources/AFMKernel/Panels/PanelModel+Navigation.swift
+operator: RemoveSideEffects
+in: public func restore(_ snapshot: Snapshot)
+before: lists.discard()
+after: (statement removed)
+reason: `discard` only moves the release of the lists that were shown to a background thread;
+  without it they are released when the call returns. The model is the same.
+
+file: Sources/AFMKernel/Panels/PanelModel+Navigation.swift
+operator: RemoveSideEffects
+in: public func open(_ directory: URL, parent: URL?, root: URL, history effect: HistoryEffect = .record)
+before: lists.discard()
+after: (statement removed)
+reason: `discard` only moves the release of the lists that were shown to a background thread;
+  without it they are released when the call returns. The model is the same.
+
+file: Sources/AFMKernel/Panels/PanelModel+Totals.swift
+operator: RelationalOperatorReplacement
+in: internal func adding(bytes: Int64, selected: Bool) -> Self?
+before: guard !overflow, old != .max, old != .min else {
+after: guard !overflow, old != .max, old == .min else {
+reason: A sum at the smallest number comes only from sizes below zero, which the model never adds
+  or subtracts (it counts again instead); for every other sum the mutant answers nil, and the
+  model then counts the figures again, which gives the same numbers.
+
+file: Sources/AFMKernel/Panels/PanelModel.swift
+operator: RemoveSideEffects
+in: internal func changed(_ change: Change)
+before: MainActor.assertIsolated()
+after: (statement removed)
+reason: The assertion only stops a debug build that calls the model off the main thread; the
+  tests call it where it belongs, so it never fires.
+
+file: Sources/AFMKernel/Panels/RootCache.swift
+operator: RemoveSideEffects
+in: internal func root(of directory: URL, parent: URL?, in provider: any FileSystemProvider) -> URL
+before: lock.lock()
+after: (statement removed)
+reason: Without the lock two threads storing a top at the very same moment would race; one thread
+  at a time, as every test can arrange, behaves the same. A race cannot be produced on demand.
+
+file: Sources/AFMKernel/Panels/PanelModel+Applying.swift
+operator: RemoveSideEffects
+in: internal func takeSortName(_ prepared: Prepared) -> Outcome
+before: prepared.forget()
+after: (statement removed)
+reason: The prepared lists are the model's own lists here; forgetting them only spares the
+  prepared change a release in the background when it goes. The model is the same either way.

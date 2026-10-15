@@ -68,8 +68,6 @@ internal struct PreparedChangeTests {
             #expect(model.apply(prepared) == .stale)
         }
         #expect(!model.setSelection(rows))
-        let presorted = Sorter.sort(items, by: ListOrder())
-        #expect(!model.setSort(ListOrder(), presorted: presorted, listVersion: model.listVersion - 1))
         #expect(PanelFigures.state(model) == before)
         #expect(announced == 0)
         try expectMarksCursorAndSizesDoNotMakeItStale(model)

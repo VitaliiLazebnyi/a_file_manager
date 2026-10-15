@@ -158,7 +158,11 @@ internal struct ListProperties {
             let filteredSorted = ListWork.arrange(sorted, by: filter)
             let sortedFiltered = Sorter.sort(ListWork.arrange(items, by: filter).shown, by: order)
             return Self.locations(filteredSorted.shown) == Self.locations(sortedFiltered)
-                && Self.placesFit(filteredSorted.shown, at: filteredSorted.places ?? Self.all(sorted), in: sorted)
+                && Self.placesFit(
+                    filteredSorted.shown,
+                    at: filteredSorted.places?.values ?? Self.all(sorted),
+                    in: sorted
+                )
                 && Self.locations(PanelModel.filtered(sorted, by: filter)) == Self.locations(filteredSorted.shown)
         }
     }
@@ -176,9 +180,9 @@ internal struct ListProperties {
             let both = PanelFilter(title: "both") { first.matches($0) && filters[1].matches($0) }
             let narrowed = ListWork.narrow(arranged.shown, at: arranged.places, by: both)
             return Self.locations(arranged.shown) == Self.locations(alone)
-                && Self.placesFit(arranged.shown, at: arranged.places ?? Self.all(items), in: items)
+                && Self.placesFit(arranged.shown, at: arranged.places?.values ?? Self.all(items), in: items)
                 && Self.locations(narrowed.shown) == Self.locations(items.filter(both.matches))
-                && Self.placesFit(narrowed.shown, at: narrowed.places ?? Self.all(items), in: items)
+                && Self.placesFit(narrowed.shown, at: narrowed.places?.values ?? Self.all(items), in: items)
         }
     }
 

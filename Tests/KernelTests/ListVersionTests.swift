@@ -25,11 +25,7 @@ internal struct ListVersionTests {
         // Calculated sizes, filters, marks.
         model.setComputedSizes([(name: "dir0", size: 500), (name: "dir10", size: 7)])
         model.setFilter(PanelFilter.mask("*.txt"))
-        _ = model.setFilter(
-            PanelFilter.mask("*.md"),
-            prefiltered: PanelModel.filtered(model.listedItems, by: .mask("*.md")),
-            listVersion: version
-        )
+        model.setFilter(PanelFilter.mask("*.md"))
         model.setFilter(nil)
         model.selectAll()
         #expect(model.listVersion == version)

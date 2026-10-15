@@ -166,10 +166,7 @@ import Testing
 
     @Test func precomposingANameIsARename() {
         let decomposed = "e\u{301}.txt"
-        let item = FileItem(
-            url: URL(string: "mem:///d/" + decomposed.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)!)!,
-            name: decomposed
-        )
+        let item = FileItem(url: URL(string: "mem:///d/" + decomposed.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)!)!, name: decomposed)
         var settings = RenameSettings()
         settings.nameMask = "[u][N]"
         let preview = RenameComputation.preview(

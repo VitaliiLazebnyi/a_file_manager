@@ -453,7 +453,9 @@ import Testing
         let changed = LocalInfo.details(box.url("A/docs/deep/more.txt"))?.modified ?? .distantPast
         #expect(abs(changed.timeIntervalSinceNow) < 60)
         // The selection the command started from can be brought back.
-        #expect(left.model.savedSelection.count == 3)
+        left.model.clearSelection()
+        left.model.restoreSelection()
+        #expect(left.model.selectionCount == 3)
     }
 
     @Test func wrongEntriesAreAskedAgainAndTargetFileCanBeLoaded() {

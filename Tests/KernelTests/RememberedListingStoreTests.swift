@@ -20,8 +20,6 @@ internal struct RememberedListingStoreTests {
         // The same place written with a trailing slash; another place.
         #expect(cache.entry(for: bench.url("/a/"), showHidden: false) != nil)
         #expect(cache.entry(for: bench.url("/b"), showHidden: false) == nil)
-        #expect(cache.folderCount == 1)
-        #expect(cache.entryCount == 2)
     }
 
     /// A local folder is kept only when it took long to read; on a share every folder is kept,
@@ -40,7 +38,7 @@ internal struct RememberedListingStoreTests {
         #expect(
             bench.remember(bench.listing("/share", ["x"], volume: share), in: cache, showHidden: false, readTime: 0.001)
         )
-        #expect(cache.folderCount == 2)
+        #expect(cache.remembers(bench.url("/slow"), bench.url("/share")) && cache.forgets(bench.url("/quick")))
         // A folder that is remembered is brought up to date by every later reading, also a quick one.
         bench.clock.time += 5
         #expect(
@@ -65,7 +63,6 @@ internal struct RememberedListingStoreTests {
         // /1 is used again, so /2 is the one that makes room.
         #expect(cache.entry(for: bench.url("/1"), showHidden: false) != nil)
         bench.remember(bench.listing("/4", ["x"]), in: cache)
-        #expect(cache.folderCount == 3)
         #expect(cache.age(of: bench.url("/2"), showHidden: false) == nil)
         #expect(["/1", "/3", "/4"].allSatisfy { cache.age(of: bench.url($0), showHidden: false) != nil })
     }
@@ -77,22 +74,21 @@ internal struct RememberedListingStoreTests {
         let cache = bench.cache(folders: 20, entries: 100)
         bench.remember(bench.listing("/1", bench.files(40)), in: cache)
         bench.remember(bench.listing("/2", bench.files(40)), in: cache)
-        #expect(cache.entryCount == 80)
+        #expect(cache.remembers(bench.url("/1"), bench.url("/2")))
         // 40 more do not fit: the oldest folder goes.
         bench.remember(bench.listing("/3", bench.files(40)), in: cache)
-        #expect(cache.entryCount == 80)
+        #expect(cache.remembers(bench.url("/2"), bench.url("/3")))
         #expect(cache.age(of: bench.url("/1"), showHidden: false) == nil)
         // A folder that is larger than the whole limit is not remembered, and what was
         // remembered of it before is dropped rather than left out of date.
         #expect(!bench.remember(bench.listing("/huge", bench.files(101)), in: cache))
-        #expect(cache.folderCount == 2)
+        #expect(cache.forgets(bench.url("/huge")) && cache.remembers(bench.url("/2"), bench.url("/3")))
         #expect(!bench.remember(bench.listing("/2", bench.files(101)), in: cache))
         #expect(cache.age(of: bench.url("/2"), showHidden: false) == nil)
-        #expect(cache.entryCount == 40)
+        #expect(cache.remembers(bench.url("/3")))
         // Exactly the limit fits, alone.
         #expect(bench.remember(bench.listing("/full", bench.files(100)), in: cache))
-        #expect(cache.folderCount == 1)
-        #expect(cache.entryCount == 100)
+        #expect(cache.remembers(bench.url("/full")) && cache.forgets(bench.url("/3")))
     }
 
     /// A folder read with hidden files and the same folder read without them are kept apart.
@@ -104,8 +100,8 @@ internal struct RememberedListingStoreTests {
         bench.remember(bench.listing("/a", [".secret", "x.txt"]), in: cache, showHidden: true, readTime: 0)
         #expect(cache.entry(for: bench.url("/a"), showHidden: false)?.listing.items.count == 1)
         #expect(cache.entry(for: bench.url("/a"), showHidden: true)?.listing.items.count == 2)
-        #expect(cache.entry(for: bench.url("/a"), showHidden: true)?.showHidden == true)
-        #expect(cache.folderCount == 2)
+        #expect(cache.entry(for: bench.url("/a"), showHidden: true)?.listing.items.first?.name == ".secret")
+        #expect(cache.remembers(bench.url("/a")))
     }
 
     /// A listing older than ten minutes is dropped for good, even if the clock goes back.
@@ -118,7 +114,7 @@ internal struct RememberedListingStoreTests {
         bench.clock.time += 1
         #expect(cache.entry(for: bench.url("/a"), showHidden: false) == nil)
         // It is gone for good, not only hidden.
-        #expect(cache.folderCount == 0)
+        #expect(cache.forgets(bench.url("/a")))
         bench.clock.time -= 60
         #expect(cache.entry(for: bench.url("/a"), showHidden: false) == nil)
     }

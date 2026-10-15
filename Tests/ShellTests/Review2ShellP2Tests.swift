@@ -481,7 +481,7 @@ extension Application {
     @Test func aTabOnAServerIsNotTheOneInFrontWhenTheProgramStarts() async {
         let server = ServerFileSystem()
         server.inner.addFile("/pub/a.txt")
-        let remote = PanelTabs.State.Tab(location: server.inner.url("/pub"))
+        let remote = PanelTabState(location: server.inner.url("/pub"))
         // The left panel was left on the server with a local tab behind; the right one has
         // nothing but the server.
         settings.set(PanelTabs.State(tabs: [remote, .init(location: box.url("A"))], active: 0), forKey: "left.tabs")

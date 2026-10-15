@@ -129,15 +129,16 @@ internal struct MarkTests {
         // A set of rows found on another thread.
         let basis = model.basis
         let rows = try #require(OtherThread.result { PanelModel.rows(of: basis) { !$0.isFolder && $0.size > 50 } })
+        let wanted = model.items.filter { !$0.isFolder && $0.size > 50 }.count
         #expect(model.setSelection(rows))
-        #expect(model.selectionCount == rows.count)
-        #expect(rows.count >= 1)
+        #expect(model.selectionCount == wanted)
+        #expect(wanted >= 1)
         #expect(model.operands().allSatisfy { $0.size > 50 && $0.name.hasSuffix(".txt") })
         #expect(model.totals == PanelFigures.counted(model))
         #expect(model.setSelection(rows, .remove))
         #expect(model.selectionCount == 0)
         #expect(model.setSelection(rows, .add))
-        #expect(model.selectionCount == rows.count)
+        #expect(model.selectionCount == wanted)
     }
 
     /// Marking by the twins' name marks both; the figures follow, also once the model has its index of names.

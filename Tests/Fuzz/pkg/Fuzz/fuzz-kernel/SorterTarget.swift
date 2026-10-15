@@ -147,7 +147,10 @@ internal enum SorterTarget {
         let cut = items.isEmpty ? 0 : choices.int(items.count + 1)
         let first = Sorter.sort(Array(items[..<cut]), by: order)
         let second = Sorter.sort(Array(items[cut...]), by: order)
-        let merged = Sorter.merge(first, with: second, by: order)
+        var collected = SortedFileList(order: order)
+        collected.add(first)
+        collected.add(second)
+        let merged = collected.items
         fzCheck(
             ids(merged).sorted() == Array(items.indices),
             "merge-not-a-permutation",

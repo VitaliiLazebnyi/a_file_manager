@@ -17,7 +17,11 @@ import Testing
         let active = PanelTabs.State(
             tabs: [
                 .init(location: memory.url("/A"), title: "Work", locked: true),
-                .init(location: memory.url("/A/my docs"), sortKey: 3, descending: true, showHidden: true)
+                .init(
+                    location: memory.url("/A/my docs"),
+                    order: ListOrder(key: .date, descending: true),
+                    showHidden: true
+                )
             ],
             active: 1
         )
@@ -53,7 +57,7 @@ import Testing
         #expect(file.active.tabs.map(\.location) == [memory.url("/A").absoluteString, memory.url("/C").absoluteString])
         #expect(file.active.active == 1 && file.inactive == nil)
         #expect(
-            file.active.tabs[0].title == nil && file.active.tabs[0].locked == nil && !file.active.tabs[0].showHidden
+            file.active.tabs[0].title == nil && !file.active.tabs[0].locked && !file.active.tabs[0].showHidden
         )
         #expect(read("") == nil && read("[activetabs]\nactivetab=0\n") == nil)
         // A file with only the other side's section still gives tabs.

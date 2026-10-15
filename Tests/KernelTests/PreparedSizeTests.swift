@@ -45,8 +45,8 @@ internal struct PreparedSizeTests {
         #expect(model.shownVersion == shown)
         #expect(announced.count == 1)
         // A size set later, by either route, lands on top of these.
-        plain.setComputedSize(11, forName: "dir6")
-        model.setComputedSize(11, forName: "dir6")
+        plain.setComputedSizes([(name: "dir6", size: 11)])
+        model.setComputedSizes([(name: "dir6", size: 11)])
         #expect(model.listedItems == plain.listedItems)
         #expect(model.totals == plain.totals)
     }
@@ -58,7 +58,7 @@ internal struct PreparedSizeTests {
         let model = panel((0..<50).map { folder("dir\($0)") })
         // Another size was set meanwhile: taking the prepared list would lose it.
         var prepared = PanelModel.prepare(model.basis, computedSizes: [(name: "dir1", size: 10)])
-        model.setComputedSize(5, forName: "dir2")
+        model.setComputedSizes([(name: "dir2", size: 5)])
         #expect(model.apply(prepared) == .stale)
         #expect(size(of: "dir2", in: model) == 5)
         #expect(size(of: "dir1", in: model) == nil)

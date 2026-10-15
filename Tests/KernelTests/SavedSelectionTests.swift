@@ -16,13 +16,11 @@ internal struct SavedSelectionTests {
         let model = Fixture.panel(ModelSample.items(100), at: ModelSample.folder)
         model.setSelected(true, names: ["file1.md", "file2.md", "dir10"])
         model.saveSelection()
-        #expect(model.savedSelection == ["file1.md", "file2.md", "dir10"])
         let other = URL(fileURLWithPath: "/review2/other")
         let there = [
             Fixture.file("file2.md", in: other), Fixture.file("zzz", in: other), Fixture.folder("dir10", in: other)
         ]
         model.show(Fixture.listing(there, at: other))
-        #expect(model.savedSelection == ["file1.md", "file2.md", "dir10"])
         model.restoreSelection()
         #expect(model.selectedNames.sorted() == ["dir10", "file2.md"])
         // A long saved selection is kept without making its names on the way out.

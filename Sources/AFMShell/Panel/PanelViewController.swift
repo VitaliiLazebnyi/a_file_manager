@@ -1181,10 +1181,9 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
                 by: {
                     PanelModel.prepare(
                         $0,
-                        show: listing,
+                        showRemembered: listing,
                         focus: focus,
                         history: history,
-                        remembered: true,
                         presorted: entry.order
                     )
                 },

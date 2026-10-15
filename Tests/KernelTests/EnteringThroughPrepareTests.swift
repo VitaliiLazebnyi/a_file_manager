@@ -73,7 +73,7 @@ internal struct EnteringThroughPrepareTests {
         let basis = model.basis
         let change = try #require(
             OtherThread.result {
-                PanelModel.prepare(basis, show: Self.otherListing(Self.arrival), history: .keep, remembered: true)
+                PanelModel.prepare(basis, showRemembered: Self.otherListing(Self.arrival), history: .keep)
             }
         )
         #expect(model.apply(change) == .changed)

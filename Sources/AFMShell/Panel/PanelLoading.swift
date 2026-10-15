@@ -110,14 +110,20 @@ final class PanelLoading: Sendable {
         let (started, ticket) = (Date(), cache.startReading())
         var items: [FileItem] = []
         var header: PanelLoader.Batch?
-        try PanelLoader.stream(
-            location, showHidden: showHidden, fileSystems: fileSystems, climbing: climbing,
-            cancellation: cancellation
-        ) { batch in
+        func receive(_ batch: PanelLoader.Batch) -> Bool {
             if header == nil { header = batch }
             items += batch.listing.items
             if let progress, !progress(items.count) { cancellation.cancel() }
             return !cancellation.isCancelled
+        }
+        if climbing {
+            try PanelLoader.stream(
+                climbingFrom: location, showHidden: showHidden, fileSystems: fileSystems, cancellation: cancellation,
+                receive: receive)
+        } else {
+            try PanelLoader.stream(
+                location, showHidden: showHidden, fileSystems: fileSystems, cancellation: cancellation,
+                receive: receive)
         }
         guard !cancellation.isCancelled, let header else { return nil }
         let readTime = Date().timeIntervalSince(started)

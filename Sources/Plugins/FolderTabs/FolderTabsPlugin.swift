@@ -55,7 +55,7 @@ public final class FolderTabsPlugin: Plugin {
 
     /// A tab that was closed, and where it was.
     private struct ClosedTab {
-        let tab: PanelTabs.State.Tab
+        let tab: PanelTabState
         let index: Int
     }
 
@@ -380,14 +380,13 @@ public final class FolderTabsPlugin: Plugin {
 
     // MARK: Tabs as records
 
-    private func record(of tab: PanelModel) -> PanelTabs.State.Tab {
-        PanelTabs.State.Tab(
+    private func record(of tab: PanelModel) -> PanelTabState {
+        PanelTabState(
             location: tab.directory,
-            sortKey: tab.sort.key.rawValue,
-            descending: tab.sort.descending,
+            order: tab.sort,
             showHidden: tab.showHidden,
             title: tab.customTitle,
-            locked: tab.isLocked ? true : nil
+            locked: tab.isLocked
         )
     }
 
@@ -422,7 +421,7 @@ public final class FolderTabsPlugin: Plugin {
     /// would connect to a server is opened but never made the shown one, so that loading a
     /// file connects nowhere; it connects when the user activates it.
     private func restore(
-        _ records: [PanelTabs.State.Tab],
+        _ records: [PanelTabState],
         in tabs: PanelTabs,
         at index: Int? = nil,
         activating active: Int?,
@@ -438,7 +437,7 @@ public final class FolderTabsPlugin: Plugin {
                 let order = ListOrder(key: SortKey(rawValue: record.sortKey) ?? .name, descending: record.descending)
                 if tab.sort != order { tab.setSort(order) }
                 tab.setShowHidden(record.showHidden)
-                (tab.customTitle, tab.isLocked) = (record.title, record.locked ?? false)
+                (tab.customTitle, tab.isLocked) = (record.title, record.locked)
                 opened.append(tab)
                 position += 1
             }

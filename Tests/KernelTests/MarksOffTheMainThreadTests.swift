@@ -56,8 +56,7 @@ internal struct MarksOffTheMainThreadTests {
         ]
         let model = Fixture.panel(items, at: Self.folder)
         let filter = PanelFilter(title: "big") { $0.size > 1 }
-        let prefiltered = PanelModel.filtered(model.listedItems, by: filter)
-        #expect(model.setFilter(filter, prefiltered: prefiltered, listVersion: model.listVersion))
+        model.setFilter(filter)
         #expect(model.items.map(\.size) == model.listedItems.filter(filter.matches).map(\.size))
         #expect(model.items.count == 3)
         model.selectAll()

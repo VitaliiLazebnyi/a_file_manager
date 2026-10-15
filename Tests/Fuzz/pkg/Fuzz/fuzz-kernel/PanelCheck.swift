@@ -35,7 +35,6 @@ internal enum PanelCheck {
         _ = model.cursorFile
         _ = model.parentTarget
         _ = model.rootTarget
-        _ = model.savedSelection
     }
 
     /// Rows, cursor, and the list: what was listed, filtered, in order.
