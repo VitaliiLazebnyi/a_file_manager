@@ -157,12 +157,18 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
 
     var limits = Limits()
     private var earlierIndex = 0
-    private var search: FileSearch?
-    private var spotlight: SpotlightSearch?
+    /// The search that runs now, if any.
+    private(set) var search: FileSearch?
+    private var spotlight: (any SpotlightQuestion)?
+    /// Makes the question to Spotlight from its text, the folders it looks in and the most paths
+    /// it reads. Tests put a question in its place that answers when they say.
+    internal var makeSpotlight: (String, [URL], Int) -> any SpotlightQuestion = { text, scopes, limit in
+        SpotlightSearch(text, scopes: scopes, limit: limit)
+    }
 
     /// Puts the window on screen. Tests replace it, so that no window shows in the session they
     /// run in, and look at what it was asked to show.
-    var present: @MainActor (NSWindowController) -> Void = { $0.showWindow(nil) }
+    internal var present: @MainActor (NSWindowController) -> Void = { $0.showWindow(nil) }
 
     init(kernel: Kernel, title: String = "Find Files") {
         self.kernel = kernel
@@ -411,12 +417,10 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
         updateButtons()
 
         if settings.useSpotlight, SpotlightQuery.isAvailable(for: query) {
-            let spotlight = SpotlightSearch(
-                SpotlightQuery.string(for: query),
-                scopes: query.directories,
-                limit: limits.spotlight
+            askSpotlight(
+                makeSpotlight(SpotlightQuery.string(for: query), query.directories, limits.spotlight),
+                for: search
             )
-            askSpotlight(spotlight, for: search)
         } else if query.duplicates.isActive {
             walkForDuplicates(search)
         } else {
@@ -485,15 +489,26 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
             /// Used by one thread at a time: the walk reports its folders first, and the comparing
             /// that follows reports under the lock of `DuplicateFinder`.
             nonisolated(unsafe) var lastReport = Date.distantPast
-            @Sendable func status(_ text: @autoclosure () -> String) {
-                guard Date().timeIntervalSince(lastReport) > 0.1 else { return }
+            /// Whether a tenth of a second has passed since the status line last changed: if so, it changes now.
+            @Sendable func isDue() -> Bool {
+                guard Date().timeIntervalSince(lastReport) > 0.1 else { return false }
                 lastReport = Date()
-                let text = text()
-                DispatchQueue.main.async { show(text) }
+                return true
             }
             let groups = search.runForDuplicates(
-                onDirectory: { directory in status(fileSystems.displayPath(directory)) },
-                onHashing: { done, total in status("Comparing contents: \(done) of \(total)") }
+                onDirectory: { directory in
+                    // The path is only made when it is shown: a walk meets very many folders.
+                    if isDue() {
+                        let text = fileSystems.displayPath(directory)
+                        DispatchQueue.main.async { show(text) }
+                    }
+                },
+                onHashing: { done, total in
+                    // A file was read whole for this: the text costs nothing beside that. The
+                    // first file says at once that the comparing has begun.
+                    let text = "Comparing contents: \(done) of \(total)"
+                    if done == 1 || isDue() { DispatchQueue.main.async { show(text) } }
+                }
             )
             let built = Built.make(groups: groups)
             DispatchQueue.main.async { [weak self] in
@@ -503,7 +518,7 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
         }
     }
 
-    private func askSpotlight(_ spotlight: SpotlightSearch, for search: FileSearch) {
+    private func askSpotlight(_ spotlight: any SpotlightQuestion, for search: FileSearch) {
         self.spotlight = spotlight
         statusLabel.stringValue = "[Asking Spotlight...]"
         let (fileSystems, limit) = (kernel.fileSystems, spotlight.limit)

@@ -18,7 +18,7 @@ public final class FindFilesPlugin: Plugin {
     private var separateWindows: [FindFilesWindowController] = []
     /// Puts a window of Find Files on screen. Tests replace it, so that no window shows in the session they
     /// run in, and look at what it was asked to show.
-    var present: @MainActor (NSWindowController) -> Void = { $0.showWindow(nil) }
+    internal var present: @MainActor (NSWindowController) -> Void = { $0.showWindow(nil) }
 
     public init() {}
 
