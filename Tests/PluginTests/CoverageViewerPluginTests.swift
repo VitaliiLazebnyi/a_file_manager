@@ -35,15 +35,19 @@ internal struct CoverageViewerPluginTests {
         #expect(plugin.quickView == nil && rejected == 1)
     }
 
-    /// With windows shown, a Lister window is put on screen.
+    /// With windows shown, a Lister window is put on screen (here: handed to the test, which
+    /// keeps it off the screen).
     @Test
     internal func listerWindowsAreShownWhenAskedFor() async {
         let setup = CoverageViewerBench(left: nil, showsWindows: true)
         defer { setup.plugin.stop() }
+        var presented: [ViewerWindowController] = []
+        setup.plugin.present = { presented.append($0) }
         setup.plugin.view(text: "shown", title: "Shown")
         let controller = setup.plugin.windows.last
         defer { controller?.close() }
-        #expect(controller?.window?.isVisible == true)
+        #expect(presented.count == 1 && presented.first === controller)
+        #expect(controller?.window?.isVisible == false)
         controller?.close()
         #expect(await setup.wait { setup.plugin.windows.isEmpty })
     }

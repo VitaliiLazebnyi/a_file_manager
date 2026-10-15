@@ -43,6 +43,8 @@ final class ViewerPane: NSView, NSMenuDelegate {
     var links: any LinkOpening = SystemLinks()
     /// The panels the pane asks with, and printing.
     var dialogs: any ViewerDialogs = SystemDialogs()
+    /// What sounds and films are played with: the system's player, or a test's that plays nothing.
+    var mediaPlayback: @MainActor () -> any MediaPlayback = { SystemMediaPlayback() }
 
     /// The window title changed (a file was loaded, a track names itself).
     var onTitleChange: (String) -> Void = { _ in }
@@ -789,7 +791,7 @@ final class ViewerPane: NSView, NSMenuDelegate {
                     self.setContent(views.scroll)
 
                 case .local(let local) where content == .media:
-                    let view = MediaView(frame: self.contentHost.bounds)
+                    let view = MediaView(frame: self.contentHost.bounds, playback: self.mediaPlayback())
                     view.onEnd = { [weak self] in self?.onStep(1) }
                     view.onTitle = { [weak self] in self?.onTitleChange($0) }
                     self.mediaView = view

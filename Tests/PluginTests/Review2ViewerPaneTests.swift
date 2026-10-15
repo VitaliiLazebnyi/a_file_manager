@@ -20,6 +20,7 @@ import UniformTypeIdentifiers
     init() {
         _ = NSApplication.shared
         plugin = ViewerPlugin(overlayHost: { _ in nil }, quickViewDelay: 0.01, showsWindows: false)
+        plugin.mediaPlayback = CovViewPlayback.factory
         bench = TestBench(
             plugins: [plugin], fileSystems: [memory, hook], left: memory.url("/A"), right: memory.url("/B"))
         memory.addFile("/A/small.txt", "small file\nsecond line")

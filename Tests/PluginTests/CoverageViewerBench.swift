@@ -41,6 +41,8 @@ internal final class CoverageViewerBench {
         let host = rightHost
         let lookup = CoverageViewerHostLookup()
         plugin = ViewerPlugin(overlayHost: { lookup.host(for: $0) }, quickViewDelay: 0.01, showsWindows: showsWindows)
+        // No test plays a sound: the player only records.
+        plugin.mediaPlayback = CovViewPlayback.factory
         bench = TestBench(
             plugins: [plugin],
             fileSystems: [memory, LocalFileSystem()],

@@ -39,53 +39,53 @@ internal struct CoverageViewerRichTests {
 
     // MARK: The player
 
+    /// A view that plays with a recording player, and that player.
+    private static func mediaView() throws -> (view: MediaView, playback: CovViewPlayback) {
+        let view = MediaView(frame: NSRect(x: 0, y: 0, width: 300, height: 200), playback: CovViewPlayback())
+        return (view, try #require(view.playback as? CovViewPlayback))
+    }
+
     /// A track plays, can be paused, muted, made louder and quieter, moved in, and stopped; at its
     /// end the player says so.
     @Test
-    internal func aTrackIsPlayedAndControlled() async throws {
-        let directory = try Self.folder()
-        defer { try? FileManager.default.removeItem(at: directory) }
-        let file = directory.appendingPathComponent("tone.wav")
-        try CoverageViewerMediaFiles.wav(seconds: 1).write(to: file)
-        let view = MediaView(frame: NSRect(x: 0, y: 0, width: 300, height: 200))
-        let player = try #require(try Self.playerView(of: view).player)
+    internal func aTrackIsPlayedAndControlled() throws {
+        let (view, playback) = try Self.mediaView()
+        // The controls on screen drive the player (the recording one has none).
+        #expect(try Self.playerView(of: view).player == nil)
         var ended = false
         view.onEnd = { ended = true }
-        // Silent: the player is muted before it is made louder.
-        view.play(file, volume: 0)
-        #expect(view.volume == 0 && player.rate > 0)
+        let file = URL(fileURLWithPath: "/tmp/tone.wav")
+        view.play(file, volume: 0.25)
+        #expect(playback.loaded == [file] && playback.isPlaying && view.volume == 0.25)
         view.togglePlaying()
-        #expect(player.rate == 0)
+        #expect(!playback.isPlaying)
         view.togglePlaying()
-        #expect(player.rate > 0)
-        // Before the track is ready a step is a tenth of a second too.
-        let early = MediaView(frame: .zero)
-        early.play(file, volume: 0)
-        early.step()
-        #expect(try #require(try Self.playerView(of: early).player).rate == 0)
-        early.stop()
+        #expect(playback.isPlaying)
         view.toggleMute()
-        #expect(player.isMuted)
+        #expect(playback.isMuted)
+        view.toggleMute()
+        #expect(!playback.isMuted)
         view.changeVolume(by: 0.5)
-        #expect(view.volume == 0.5)
+        #expect(view.volume == 0.75)
         view.changeVolume(by: 0.8)
         #expect(view.volume == 1)
         view.changeVolume(by: -2)
         #expect(view.volume == 0)
+        // Moving goes from where the track is, never before its start.
         view.seek(by: 0.5)
-        #expect(await Self.wait { player.currentTime().seconds >= 0.5 })
-        // A step goes on a little and pauses.
-        #expect(await Self.wait { player.currentItem?.status == .readyToPlay })
-        let before = player.currentTime().seconds
+        #expect(playback.currentSeconds == 0.5)
+        view.seek(by: -10)
+        #expect(playback.currentSeconds == 0)
+        // A sound does not go on by frames: a step is a tenth of a second, and pauses.
         view.step()
-        #expect(await Self.wait { player.currentTime().seconds >= before } && player.rate == 0)
-        view.togglePlaying()
-        #expect(await Self.wait { ended })
+        #expect(playback.currentSeconds == 0.1 && !playback.isPlaying)
+        playback.finish()
+        #expect(ended)
         view.stop()
-        #expect(player.currentItem == nil)
-        // Without a track a step does nothing.
+        #expect(!playback.hasItem && playback.calls.suffix(2) == ["pause", "unload"])
+        // Without a track a step does nothing but pause.
         view.step()
-        #expect(player.currentItem == nil)
+        #expect(playback.calls.last == "pause" && playback.currentSeconds == 0.1)
     }
 
     /// The tags of a track name it, with the artist when there is one; a file without tags or
@@ -98,7 +98,7 @@ internal struct CoverageViewerRichTests {
         let titleOnly = directory.appendingPathComponent("title.mov")
         try CoverageViewerMediaFiles.taggedSound(at: both, title: "Song", artist: "Band")
         try CoverageViewerMediaFiles.taggedSound(at: titleOnly, title: "Alone", artist: nil)
-        let view = MediaView(frame: NSRect(x: 0, y: 0, width: 300, height: 200))
+        let (view, _) = try Self.mediaView()
         var titles: [String] = []
         view.onTitle = { titles.append($0) }
         view.play(both, volume: 0)
@@ -107,41 +107,28 @@ internal struct CoverageViewerRichTests {
         #expect(await Self.wait { titles == ["Song – Band", "Alone"] })
         let untagged = directory.appendingPathComponent("plain.wav")
         try CoverageViewerMediaFiles.wav(seconds: 0.2).write(to: untagged)
-        let quiet = MediaView(frame: NSRect(x: 0, y: 0, width: 300, height: 200))
         // The player that tells nothing to anyone: what it would tell goes nowhere.
-        quiet.play(untagged, volume: 0)
+        let (quiet, quietPlayback) = try Self.mediaView()
         quiet.play(directory.appendingPathComponent("missing.wav"), volume: 0)
-        let ended = ViewerAdoptBox(false)
-        let observer = NotificationCenter.default.addObserver(
-            forName: .AVPlayerItemDidPlayToEndTime,
-            object: nil,
-            queue: .main
-        ) { _ in ended.value = true }
-        defer { NotificationCenter.default.removeObserver(observer) }
         quiet.play(untagged, volume: 0)
-        #expect(await Self.wait { ended.value })
-        #expect(titles.count == 2)
+        quietPlayback.finish()
+        // A third file with tags, read after the two without: only its name comes.
+        view.play(both, volume: 0)
+        #expect(await Self.wait { titles.count == 3 })
+        #expect(titles == ["Song – Band", "Alone", "Song – Band"])
         view.stop()
         quiet.stop()
     }
 
     /// A film goes on by one frame at a time; F fits it to the window or fills the window.
     @Test
-    internal func aFilmStepsByFrames() async throws {
-        let directory = try Self.folder()
-        defer { try? FileManager.default.removeItem(at: directory) }
-        let film = directory.appendingPathComponent("film.mov")
-        try CoverageViewerMediaFiles.film(at: film, frames: 10)
-        let view = MediaView(frame: NSRect(x: 0, y: 0, width: 300, height: 200))
+    internal func aFilmStepsByFrames() throws {
+        let (view, playback) = try Self.mediaView()
         let playerView = try Self.playerView(of: view)
-        let player = try #require(playerView.player)
-        view.play(film, volume: 0)
-        #expect(await Self.wait { player.currentItem?.status == .readyToPlay })
-        view.togglePlaying()
-        view.seek(by: -10)
-        #expect(await Self.wait { player.currentTime().seconds == 0 })
+        view.play(URL(fileURLWithPath: "/tmp/film.mov"), volume: 0)
+        playback.canStepForward = true
         view.step()
-        #expect(await Self.wait { player.currentTime().seconds > 0 })
+        #expect(playback.calls.suffix(2) == ["pause", "step"] && playback.currentSeconds > 0)
         let gravity = playerView.videoGravity
         view.toggleFit()
         #expect(playerView.videoGravity != gravity)

@@ -362,20 +362,21 @@ final class TemporaryCopies: @unchecked Sendable {
     }
 }
 
-/// The media player mode (spec 10 › Media player mode), on AVKit. Main thread only.
+/// The media player mode (spec 10 › Media player mode), on AVKit. It plays with a
+/// `MediaPlayback`: the system's in the program, a recording one in tests. Main thread only.
 final class MediaView: NSView {
     private let playerView = AVPlayerView()
-    private let player = AVPlayer()
-    /// Set on the main thread, read in `deinit`.
-    nonisolated(unsafe) private var endObserver: any NSObjectProtocol?
+    /// What it plays with.
+    let playback: any MediaPlayback
     /// Called when the track has played to its end (a playlist then moves on).
     var onEnd: () -> Void = {}
     /// Called with "track – artist" when the file's tags name them.
     var onTitle: ((String) -> Void)?
 
-    override init(frame: NSRect) {
+    init(frame: NSRect, playback: any MediaPlayback) {
+        self.playback = playback
         super.init(frame: frame)
-        playerView.player = player
+        playerView.player = playback.player
         playerView.controlsStyle = .floating
         playerView.autoresizingMask = [.width, .height]
         playerView.frame = bounds
@@ -385,25 +386,11 @@ final class MediaView: NSView {
     /// Made in code only: an archive gives none.
     required init?(coder _: NSCoder) { nil }
 
-    deinit {
-        if let endObserver { NotificationCenter.default.removeObserver(endObserver) }
-    }
-
     func play(_ url: URL, volume: Float) {
-        let item = AVPlayerItem(url: url)
-        if let endObserver { NotificationCenter.default.removeObserver(endObserver) }
-        endObserver = NotificationCenter.default.addObserver(
-            forName: .AVPlayerItemDidPlayToEndTime,
-            object: item,
-            queue: .main
-        ) { [weak self] _ in
-            // Delivered on the main queue.
-            MainActor.assumeIsolated { self?.onEnd() }
-        }
-        player.replaceCurrentItem(with: item)
-        player.volume = volume
-        player.play()
-        let asset = item.asset
+        playback.load(url) { [weak self] in self?.onEnd() }
+        playback.volume = volume
+        playback.play()
+        let asset = AVURLAsset(url: url)
         // Reading the tags may take a moment on a slow disk; it is not done on the main thread.
         Task { [weak self] in
             guard let metadata = try? await asset.load(.commonMetadata) else { return }
@@ -419,32 +406,32 @@ final class MediaView: NSView {
     }
 
     func stop() {
-        player.pause()
-        player.replaceCurrentItem(with: nil)
+        playback.pause()
+        playback.unload()
     }
 
-    var volume: Float { player.volume }
+    var volume: Float { playback.volume }
 
     func togglePlaying() {
-        if player.rate == 0 { player.play() } else { player.pause() }
+        if playback.isPlaying { playback.pause() } else { playback.play() }
     }
 
-    func toggleMute() { player.isMuted.toggle() }
+    func toggleMute() { playback.isMuted.toggle() }
 
     func changeVolume(by delta: Float) {
-        player.volume = min(1, max(0, player.volume + delta))
+        playback.volume = min(1, max(0, playback.volume + delta))
     }
 
+    /// Moves by `seconds`, not before the start.
     func seek(by seconds: Double) {
-        let target = CMTimeAdd(player.currentTime(), CMTime(seconds: seconds, preferredTimescale: 600))
-        player.seek(to: CMTimeMaximum(target, .zero), toleranceBefore: .zero, toleranceAfter: .zero)
+        playback.seek(toSeconds: max(0, playback.currentSeconds + seconds))
     }
 
     /// One video frame, or a tenth of a second of audio (key E).
     func step() {
-        player.pause()
-        guard let item = player.currentItem else { return }
-        if item.canStepForward { item.step(byCount: 1) } else { seek(by: 0.1) }
+        playback.pause()
+        guard playback.hasItem else { return }
+        if playback.canStepForward { playback.stepForward() } else { seek(by: 0.1) }
     }
 
     /// Fit the video to the window, or fill the window with it (key F).
