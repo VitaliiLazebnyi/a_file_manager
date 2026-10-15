@@ -18,10 +18,25 @@ enum ChecksumMethod: Int, CaseIterable, Codable {
     case md5, sha1, sha256, sha512, sha224, sha384, sha3_256, sha3_512, sha3_224, sha3_384, blake3
 
     /// The order of the dialog.
-    static let dialogOrder: [Self] = [
-        .crc32, .md5, .sha1, .blake3, .sha224, .sha256, .sha384, .sha512,
-        .sha3_224, .sha3_256, .sha3_384, .sha3_512
-    ]
+    static let dialogOrder = allCases.sorted { $0.dialogPosition < $1.dialogPosition }
+
+    /// The place in the dialog.
+    var dialogPosition: Int {
+        switch self {
+        case .crc32: return 0
+        case .md5: return 1
+        case .sha1: return 2
+        case .blake3: return 3
+        case .sha224: return 4
+        case .sha256: return 5
+        case .sha384: return 6
+        case .sha512: return 7
+        case .sha3_224: return 8
+        case .sha3_256: return 9
+        case .sha3_384: return 10
+        case .sha3_512: return 11
+        }
+    }
 
     var title: String {
         switch self {
@@ -95,28 +110,10 @@ enum ChecksumMethod: Int, CaseIterable, Codable {
         case .sha512: return CryptoHasher<SHA512>()
         case .sha224: return SHA224Hasher()
 
-        case .sha3_256:
-            // CryptoKit has SHA-3 from the macOS 26 SDK on (Swift 6.2); older toolchains use the fallback.
-            #if swift(>=6.2)
-                if #available(macOS 26.0, *) { return CryptoHasher<SHA3_256>() }
-            #endif
-            return SHA3Hasher(digestLength: digestLength)
-
-        case .sha3_384:
-            // CryptoKit has SHA-3 from the macOS 26 SDK on (Swift 6.2); older toolchains use the fallback.
-            #if swift(>=6.2)
-                if #available(macOS 26.0, *) { return CryptoHasher<SHA3_384>() }
-            #endif
-            return SHA3Hasher(digestLength: digestLength)
-
-        case .sha3_512:
-            // CryptoKit has SHA-3 from the macOS 26 SDK on (Swift 6.2); older toolchains use the fallback.
-            #if swift(>=6.2)
-                if #available(macOS 26.0, *) { return CryptoHasher<SHA3_512>() }
-            #endif
-            return SHA3Hasher(digestLength: digestLength)
-
-        case .sha3_224: return SHA3Hasher(digestLength: digestLength)
+        // The own implementation on every system: CryptoKit has SHA-3 only from macOS 26 on, and
+        // is about a sixth faster there (845 against 705 MB/s for SHA3-256 on one core), less
+        // than the disks the files come from deliver.
+        case .sha3_224, .sha3_256, .sha3_384, .sha3_512: return SHA3Hasher(digestLength: digestLength)
         case .blake3: return BLAKE3Hasher()
         }
     }
@@ -134,7 +131,7 @@ final class CRC32Hasher: StreamHasher, @unchecked Sendable {
 
     func update(_ data: Data) {
         data.withUnsafeBytes { buffer in
-            guard var pointer = buffer.bindMemory(to: Bytef.self).baseAddress else { return }
+            guard !buffer.isEmpty, var pointer = buffer.bindMemory(to: Bytef.self).baseAddress else { return }
             var left = buffer.count
             // zlib counts in 32 bits.
             while left > 0 {
@@ -351,7 +348,7 @@ final class SHA3Hasher: StreamHasher, @unchecked Sendable {
 
     func update(_ data: Data) {
         data.withUnsafeBytes { (input: UnsafeRawBufferPointer) in
-            guard let base = input.baseAddress else { return }
+            guard !input.isEmpty, let base = input.baseAddress else { return }
             var offset = 0
             if pendingCount > 0 {
                 let take = min(rate - pendingCount, input.count)
@@ -374,10 +371,15 @@ final class SHA3Hasher: StreamHasher, @unchecked Sendable {
     func finish() -> [UInt8] {
         _ = (pending + pendingCount).initializeMemory(as: UInt8.self, repeating: 0, count: rate - pendingCount)
         pending.storeBytes(
-            of: pending.load(fromByteOffset: pendingCount, as: UInt8.self) ^ 0x06, toByteOffset: pendingCount,
-            as: UInt8.self)
+            of: pending.load(fromByteOffset: pendingCount, as: UInt8.self) ^ 0x06,
+            toByteOffset: pendingCount,
+            as: UInt8.self
+        )
         pending.storeBytes(
-            of: pending.load(fromByteOffset: rate - 1, as: UInt8.self) ^ 0x80, toByteOffset: rate - 1, as: UInt8.self)
+            of: pending.load(fromByteOffset: rate - 1, as: UInt8.self) ^ 0x80,
+            toByteOffset: rate - 1,
+            as: UInt8.self
+        )
         absorb(pending)
         return Array(UnsafeRawBufferPointer(start: state, count: digestLength))
     }
@@ -428,7 +430,13 @@ final class BLAKE3Hasher: StreamHasher, @unchecked Sendable {
 
     @inline(__always)
     private static func mix(
-        _ s: UnsafeMutablePointer<UInt32>, _ a: Int, _ b: Int, _ c: Int, _ d: Int, _ x: UInt32, _ y: UInt32
+        _ s: UnsafeMutablePointer<UInt32>,
+        _ a: Int,
+        _ b: Int,
+        _ c: Int,
+        _ d: Int,
+        _ x: UInt32,
+        _ y: UInt32
     ) {
         s[a] = s[a] &+ s[b] &+ x
         s[d] = rotr(s[d] ^ s[a], 16)
@@ -444,8 +452,12 @@ final class BLAKE3Hasher: StreamHasher, @unchecked Sendable {
     /// `s`, 16 words: the first eight are the new chaining value, all sixteen the output
     /// of a root.
     private static func compress(
-        _ value: UnsafePointer<UInt32>, _ m: UnsafePointer<UInt32>, _ counter: UInt64, _ blockLength: UInt32,
-        _ flags: UInt32, _ s: UnsafeMutablePointer<UInt32>
+        _ value: UnsafePointer<UInt32>,
+        _ m: UnsafePointer<UInt32>,
+        _ counter: UInt64,
+        _ blockLength: UInt32,
+        _ flags: UInt32,
+        _ s: UnsafeMutablePointer<UInt32>
     ) {
         for index in 0..<8 { s[index] = value[index] }
         for index in 0..<4 { s[8 + index] = iv[index] }
@@ -476,7 +488,11 @@ final class BLAKE3Hasher: StreamHasher, @unchecked Sendable {
     /// The chaining value (8 words) of a chunk of `length` bytes (1…1024). With `isRoot` the
     /// chunk is the whole input and the eight words are the start of the digest.
     private static func chunk(
-        _ input: UnsafeRawPointer, length: Int, counter: UInt64, isRoot: Bool, into out: UnsafeMutablePointer<UInt32>
+        _ input: UnsafeRawPointer,
+        length: Int,
+        counter: UInt64,
+        isRoot: Bool,
+        into out: UnsafeMutablePointer<UInt32>
     ) {
         withUnsafeTemporaryAllocation(of: UInt32.self, capacity: 40) { scratch in
             let value = scratch.baseAddress!
@@ -490,7 +506,8 @@ final class BLAKE3Hasher: StreamHasher, @unchecked Sendable {
                 if blockLength == 64 {
                     for index in 0..<16 {
                         m[index] = UInt32(
-                            littleEndian: input.loadUnaligned(fromByteOffset: offset + index * 4, as: UInt32.self))
+                            littleEndian: input.loadUnaligned(fromByteOffset: offset + index * 4, as: UInt32.self)
+                        )
                     }
                 } else {
                     for index in 0..<16 { m[index] = 0 }
@@ -508,7 +525,9 @@ final class BLAKE3Hasher: StreamHasher, @unchecked Sendable {
     /// The chaining value (8 words) of the parent of two subtrees; with `isRoot` the start of the digest.
     /// `out` may be one of the two.
     private static func join(
-        _ left: UnsafePointer<UInt32>, _ right: UnsafePointer<UInt32>, isRoot: Bool,
+        _ left: UnsafePointer<UInt32>,
+        _ right: UnsafePointer<UInt32>,
+        isRoot: Bool,
         into out: UnsafeMutablePointer<UInt32>
     ) {
         withUnsafeTemporaryAllocation(of: UInt32.self, capacity: 32) { scratch in
@@ -525,7 +544,10 @@ final class BLAKE3Hasher: StreamHasher, @unchecked Sendable {
 
     /// The chaining value of `chunks` (a power of two) whole chunks, on this thread.
     private static func serialSubtree(
-        _ input: UnsafeRawPointer, chunks: Int, counter: UInt64, into out: UnsafeMutablePointer<UInt32>
+        _ input: UnsafeRawPointer,
+        chunks: Int,
+        counter: UInt64,
+        into out: UnsafeMutablePointer<UInt32>
     ) {
         if chunks == 1 {
             chunk(input, length: chunkSize, counter: counter, isRoot: false, into: out)
@@ -544,7 +566,10 @@ final class BLAKE3Hasher: StreamHasher, @unchecked Sendable {
     /// Like `serialSubtree`, but a large subtree is cut into equal parts that the cores hash
     /// side by side; their chaining values are joined here.
     private static func subtree(
-        _ input: UnsafeRawPointer, chunks: Int, counter: UInt64, into out: UnsafeMutablePointer<UInt32>
+        _ input: UnsafeRawPointer,
+        chunks: Int,
+        counter: UInt64,
+        into out: UnsafeMutablePointer<UInt32>
     ) {
         let cores = ProcessInfo.processInfo.activeProcessorCount
         var parts = 1
@@ -560,8 +585,11 @@ final class BLAKE3Hasher: StreamHasher, @unchecked Sendable {
         let target = UncheckedPointer(values)
         DispatchQueue.concurrentPerform(iterations: parts) { index in
             serialSubtree(
-                source.pointer + index * size * chunkSize, chunks: size, counter: counter + UInt64(index * size),
-                into: target.pointer + index * 8)
+                source.pointer + index * size * chunkSize,
+                chunks: size,
+                counter: counter + UInt64(index * size),
+                into: target.pointer + index * 8
+            )
         }
         var count = parts
         while count > 1 {
@@ -612,7 +640,11 @@ final class BLAKE3Hasher: StreamHasher, @unchecked Sendable {
     private func closeBufferedChunk() {
         withUnsafeTemporaryAllocation(of: UInt32.self, capacity: 8) { value in
             Self.chunk(
-                buffer, length: Self.chunkSize, counter: chunkCounter, isRoot: false, into: value.baseAddress!
+                buffer,
+                length: Self.chunkSize,
+                counter: chunkCounter,
+                isRoot: false,
+                into: value.baseAddress!
             )
             add(value.baseAddress!, level: 0)
         }
@@ -642,7 +674,11 @@ final class BLAKE3Hasher: StreamHasher, @unchecked Sendable {
                 while 1 << (level + 1) <= chunks, chunkCounter % (1 << UInt64(level + 1)) == 0 { level += 1 }
                 withUnsafeTemporaryAllocation(of: UInt32.self, capacity: 8) { value in
                     Self.subtree(
-                        base + offset, chunks: 1 << level, counter: chunkCounter, into: value.baseAddress!)
+                        base + offset,
+                        chunks: 1 << level,
+                        counter: chunkCounter,
+                        into: value.baseAddress!
+                    )
                     add(value.baseAddress!, level: level)
                 }
                 offset += size << level
@@ -658,7 +694,12 @@ final class BLAKE3Hasher: StreamHasher, @unchecked Sendable {
         withUnsafeTemporaryAllocation(of: UInt32.self, capacity: 8) { value in
             let value = value.baseAddress!
             Self.chunk(
-                buffer, length: bufferLength, counter: chunkCounter, isRoot: stackCount == 0, into: value)
+                buffer,
+                length: bufferLength,
+                counter: chunkCounter,
+                isRoot: stackCount == 0,
+                into: value
+            )
             // The last chunk is joined with the finished subtrees from the smallest up.
             for index in stride(from: stackCount - 1, through: 0, by: -1) {
                 Self.join(stack + index * 8, value, isRoot: index == 0, into: value)

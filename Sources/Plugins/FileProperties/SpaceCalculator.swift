@@ -18,10 +18,13 @@ struct SpaceTotals: Equatable {
 
     static func + (left: Self, right: Self) -> Self {
         Self(
-            bytes: left.bytes.addingSaturated(right.bytes), allocated: left.allocated.addingSaturated(right.allocated),
+            bytes: left.bytes.addingSaturated(right.bytes),
+            allocated: left.allocated.addingSaturated(right.allocated),
             rounded: left.rounded.addingSaturated(right.rounded),
-            files: left.files + right.files, folders: left.folders + right.folders,
-            unreadable: left.unreadable + right.unreadable)
+            files: left.files + right.files,
+            folders: left.folders + right.folders,
+            unreadable: left.unreadable + right.unreadable
+        )
     }
 }
 
@@ -86,8 +89,11 @@ struct SpaceCalculator {
         let allocated =
             measuresAllocated && item.url.isFileURL ? LocalInfo.details(item.url)?.allocated ?? item.size : item.size
         return SpaceTotals(
-            bytes: item.size, allocated: allocated, rounded: Self.round(item.size, to: targetCluster),
-            files: 1)
+            bytes: item.size,
+            allocated: allocated,
+            rounded: Self.round(item.size, to: targetCluster),
+            files: 1
+        )
     }
 
     static func round(_ size: Int64, to cluster: Int64?) -> Int64 {
@@ -102,8 +108,12 @@ struct SpaceCalculator {
         // Listed with the flag: a folder on a server that has stopped answering ends when the
         // job is cancelled, and does not keep a thread of the pool.
         guard
-            let items = try? fileSystems.provider(for: directory).list(
-                directory, showHidden: true, cancellation: cancellation)
+            let items = try? fileSystems.provider(for: directory)
+                .list(
+                    directory,
+                    showHidden: true,
+                    cancellation: cancellation
+                )
         else {
             return cancellation.isCancelled ? SpaceTotals() : SpaceTotals(unreadable: 1)
         }
@@ -127,7 +137,11 @@ struct SpaceCalculator {
 /// The wording of the result box of Calculate Occupied Space.
 enum SpaceReport {
     static func text(
-        _ totals: SpaceTotals, sourceIsLocal: Bool, targetCluster: Int64?, volume: VolumeInfo?, cancelled: Bool
+        _ totals: SpaceTotals,
+        sourceIsLocal: Bool,
+        targetCluster: Int64?,
+        volume: VolumeInfo?,
+        cancelled: Bool
     ) -> String {
         var lines = ["\(Format.bytes(totals.bytes)) bytes in \(Format.bytes(Int64(totals.files))) file(s)"]
         if totals.folders > 0 { lines[0] += ",\nin \(Format.bytes(Int64(totals.folders))) directories" }

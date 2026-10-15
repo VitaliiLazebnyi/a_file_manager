@@ -142,7 +142,7 @@ public final class SelectionPlugin: Plugin {
         ]
         for (id, title, shortcuts, similarity, select) in similar {
             commands.register(Command(id, title, shortcuts), enabled: hasCursorItem) {
-                selections.similar(to: similarity, select: select)
+                _ = model().cursorItem.map { selections.similar(to: similarity, as: $0, select: select) }
             }
         }
         commands.register(
@@ -401,11 +401,11 @@ final class Selections {
             // Made on the main thread and used there only: the background thread only carries them.
             let onMain = Handover((apply: apply, again: attempt))
             // (Some of this work asks a file system: on a thread of the kernel's own.)
-            BlockingCalls.run { [weak self] in
+            // `onMain` keeps this object (its `again` is a method of it) until the result is in.
+            BlockingCalls.run {
                 let result = autoreleasepool { work(frozen, flag) }
                 // A result can ask the user something (a mask that took too long): from the run loop.
-                performOnMainLoop { [weak self] in
-                    guard let self else { return }
+                performOnMainLoop {
                     @MainActor func finish() { if self.running === flag { self.running = nil } }
                     // A newer command, or a panel that went to another folder: the result is of no use.
                     guard !flag.isCancelled,
@@ -453,24 +453,20 @@ final class Selections {
 
     /// The same for what is found by walking the whole list in order (a step, a mask that
     /// pairs files, the marks of an inversion): `find` returns indexes of the shown items.
+    /// (A mask that pairs files is never a regular expression, which cannot run out of time here.)
     private func mark(
         _ model: PanelModel,
         _ change: PanelModel.SelectionChange,
-        timedOut mask: SelectionMask? = nil,
         indices find: @escaping @Sendable ([FileItem], PanelModel.Operands, CancellationFlag) -> [Int]
     ) {
         compute(
-            heavy: model.items.count > Self.longList || mask?.isRegex == true,
+            heavy: model.items.count > Self.longList,
             models: [model],
             { frozen, flag in
                 find(frozen[0].items, frozen[0].operands, flag)
             },
-            apply: { [weak self] frozen, indices in
-                if let mask, mask.timedOut {
-                    self?.ui.inform("The regular expression takes too long.", detail: mask.text, style: .warning)
-                    return true
-                }
-                return Self.take(indices, change, in: frozen[0])
+            apply: { frozen, indices in
+                Self.take(indices, change, in: frozen[0])
             }
         )
     }
@@ -538,7 +534,6 @@ final class Selections {
             mark(
                 model,
                 change,
-                timedOut: rule.mask,
                 indices: { items, _, flag in
                     rule.matchingIndices(among: items, base: base, scope: scope, cancelled: { flag.isCancelled })
                 }
@@ -737,9 +732,8 @@ final class Selections {
     /// Selects or unselects everything that is like the item under the cursor. The same
     /// extension is asked of files only; the same folder matters where a list gathers
     /// entries of several folders (a branch view, a search result).
-    func similar(to similarity: Similarity, select: Bool) {
+    func similar(to similarity: Similarity, as cursor: FileItem, select: Bool) {
         let model = source
-        guard let cursor = model.cursorItem else { return }
         @Sendable func same(_ first: String, _ second: String) -> Bool {
             first.caseInsensitiveCompare(second) == .orderedSame
         }
@@ -799,8 +793,8 @@ final class Selections {
     func saveToFile(_ encoding: SelectionFile.Encoding, argument: CommandArgument) {
         let model = source
         // The marked entries are picked out in the job, not here (a long selection).
+        // Offered only where there are operands.
         let (operands, directory) = (model.operandsSnapshot(), model.directory)
-        guard operands.markedCount > 0 || operands.cursorItem != nil else { return }
         let fileSystems = kernel.fileSystems
         guard
             var url = file(
@@ -863,7 +857,8 @@ final class Selections {
                     if let temporary, let provider = try? fileSystems.provider(for: temporary) {
                         try? provider.remove(temporary)
                     }
-                    return .failed(error)
+                    // A write ended by cancelling the job is no failure to report.
+                    return monitor.cancellation.isCancelled ? .cancelled : .failed(error)
                 }
             },
             completion: { [kernel] outcome in
@@ -900,7 +895,7 @@ final class Selections {
         kernel.jobs.run(
             title: "Loading selection:",
             work: { monitor -> Result<ListedNames?, any Error> in
-                Result {
+                let result = Result { () throws -> ListedNames? in
                     let reader = try fileSystems.provider(for: url).read(url, cancellation: monitor.cancellation)
                     defer { reader.close() }
                     // A read blocked on a server ends when the job is cancelled.
@@ -912,9 +907,10 @@ final class Selections {
                     {
                         data.append(autoreleasepool { block })
                     }
-                    guard !monitor.cancellation.isCancelled else { return nil }
                     return ListedNames(SelectionFile.text(from: data), among: items)
                 }
+                // A cancelled job ends quietly, whatever its reading came to.
+                return monitor.cancellation.isCancelled ? .success(nil) : result
             },
             completion: { [weak self] result in
                 switch result {
@@ -995,14 +991,14 @@ final class Selections {
         compute(
             heavy: true,
             models: [left, right],
-            { [weak self] frozen, flag in
+            { frozen, flag in
                 DirectoryComparison.compareIndices(
                     left: frozen[0].items,
                     right: frozen[1].items,
                     mode: mode,
                     withSubdirectories: withSubdirectories,
                     ignoringOneHour: ignoresOneHour,
-                    foldingCase: self?.foldsCase(leftFolder, rightFolder, cancellation: flag) ?? false,
+                    foldingCase: Self.foldsCase(leftFolder, rightFolder, cancellation: flag),
                     cancelled: { flag.isCancelled }
                 )
             },
@@ -1018,17 +1014,25 @@ final class Selections {
     /// Whether both folders are on local volumes that treat `A.txt` and `a.txt` as one name.
     /// Asks the volumes on a thread of the kernel's, which is given up when `cancellation`
     /// is set (a stalled mount holds that thread, not this one); not for the main thread.
-    nonisolated private func foldsCase(_ folders: URL..., cancellation: CancellationFlag) -> Bool {
+    nonisolated private static func foldsCase(_ folders: URL..., cancellation: CancellationFlag) -> Bool {
         folders.allSatisfy { folder in
             guard folder.isFileURL else { return false }
             let key = "case " + folder.path
-            let answer = BlockingCalls.answer(from: self, to: key, cancellation: cancellation) { _ in
+            let answer = BlockingCalls.answer(from: volumeQuestions, to: key, cancellation: cancellation) { _ in
                 (try? folder.resourceValues(forKeys: [.volumeSupportsCaseSensitiveNamesKey]))?
                     .volumeSupportsCaseSensitiveNames == false
             }
-            return answer ?? false
+            // Given up (a newer command): taken as a volume that tells the cases apart.
+            return answer == true
         }
     }
+
+    /// The owner of the questions to the volumes: a stalled volume holds at most as many
+    /// threads as one owner may have.
+    nonisolated private static let volumeQuestions = VolumeQuestions()
+
+    /// Who asks the volumes; stands for the plugin in `BlockingCalls`.
+    private final class VolumeQuestions: Sendable {}
 
     /// Mark Newer, Hide Same Files: marks like Compare Directories and leaves what is the
     /// same on both sides out of both lists, until the command is chosen again or the panel
@@ -1053,14 +1057,14 @@ final class Selections {
         compute(
             heavy: true,
             models: models,
-            { [weak self] frozen, flag in
+            { frozen, flag in
                 let (leftList, rightList) = (frozen[0].basis.listedItems, frozen[1].basis.listedItems)
                 let marks = DirectoryComparison.compareIndices(
                     left: leftList,
                     right: rightList,
                     mode: .newer,
                     ignoringOneHour: ignoresOneHour,
-                    foldingCase: self?.foldsCase(folders[0], folders[1], cancellation: flag) ?? false,
+                    foldingCase: Self.foldsCase(folders[0], folders[1], cancellation: flag),
                     cancelled: { flag.isCancelled }
                 )
                 // Exact bytes, so that of two names that differ in normalisation only the same one is left out.
@@ -1082,8 +1086,8 @@ final class Selections {
                     ]
                 )
             },
-            apply: { [weak self] _, outcome in
-                guard let self else { return true }
+            // `compute` hands results over only while this object is there.
+            apply: { [unowned self] _, outcome in
                 var fresh = true
                 for (model, prepared) in zip(models, outcome.filters) where model.apply(prepared) == .stale {
                     fresh = false

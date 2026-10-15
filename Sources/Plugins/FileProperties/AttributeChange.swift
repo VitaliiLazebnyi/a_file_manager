@@ -35,9 +35,10 @@ enum PermissionChange: Equatable {
         } else if let mode = Self.mode(fromLetters: text) {
             self = .absolute(mode, keepingSpecialBits: true)
         } else {
-            let clauses = text.split(separator: ",", omittingEmptySubsequences: false).map {
-                Self.clause(String($0))
-            }
+            let clauses = text.split(separator: ",", omittingEmptySubsequences: false)
+                .map {
+                    Self.clause(String($0))
+                }
             guard !clauses.contains(nil) else { return nil }
             self = .symbolic(clauses.compactMap { $0 })
         }
@@ -72,8 +73,11 @@ enum PermissionChange: Equatable {
             }
         }
         var clause = Clause(
-            shifts: shifts.isEmpty ? [6, 3, 0] : shifts, operation: text[operatorIndex], bits: 0,
-            conditionalExecute: false)
+            shifts: shifts.isEmpty ? [6, 3, 0] : shifts,
+            operation: text[operatorIndex],
+            bits: 0,
+            conditionalExecute: false
+        )
         for permission in text[text.index(after: operatorIndex)...] {
             switch permission {
             case "r": clause.bits |= 4
@@ -107,15 +111,17 @@ enum PermissionChange: Equatable {
                 .joined()
 
         case .symbolic(let clauses):
-            return clauses.map { clause in
-                let who =
-                    clause.shifts == [6, 3, 0]
-                    ? "a" : clause.shifts.map { $0 == 6 ? "u" : ($0 == 3 ? "g" : "o") }.joined()
-                let what =
-                    (clause.bits & 4 != 0 ? "r" : "") + (clause.bits & 2 != 0 ? "w" : "")
-                    + (clause.bits & 1 != 0 ? "x" : "")
-                return who + String(clause.operation) + what + (clause.conditionalExecute ? "X" : "")
-            }.joined(separator: ",")
+            return
+                clauses.map { clause in
+                    let who =
+                        clause.shifts == [6, 3, 0]
+                        ? "a" : clause.shifts.map { $0 == 6 ? "u" : ($0 == 3 ? "g" : "o") }.joined()
+                    let what =
+                        (clause.bits & 4 != 0 ? "r" : "") + (clause.bits & 2 != 0 ? "w" : "")
+                        + (clause.bits & 1 != 0 ? "x" : "")
+                    return who + String(clause.operation) + what + (clause.conditionalExecute ? "X" : "")
+                }
+                .joined(separator: ",")
         }
     }
 
@@ -195,7 +201,9 @@ struct TimestampChange: Equatable {
     func applied(to original: Date, now: Date, calendar: Calendar = .current) -> Date? {
         if usesCurrentTime { return now }
         var components = calendar.dateComponents(
-            [.year, .month, .day, .hour, .minute, .second, .nanosecond], from: original)
+            [.year, .month, .day, .hour, .minute, .second, .nanosecond],
+            from: original
+        )
         if let year = parts[0] { components.year = year }
         if let month = parts[1] { components.month = month }
         if let day = parts[2] { components.day = day }
@@ -211,10 +219,10 @@ struct TimestampChange: Equatable {
 
     /// A date as the fields of the dialog show it.
     static func fieldTexts(for date: Date, calendar: Calendar = .current) -> (date: String, time: String) {
-        let parts = calendar.dateComponents([.year, .month, .day, .hour, .minute, .second], from: date)
+        func part(_ component: Calendar.Component) -> Int { calendar.component(component, from: date) }
         return (
-            String(format: "%04d-%02d-%02d", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0),
-            String(format: "%02d:%02d:%02d", parts.hour ?? 0, parts.minute ?? 0, parts.second ?? 0)
+            String(format: "%04d-%02d-%02d", part(.year), part(.month), part(.day)),
+            String(format: "%02d:%02d:%02d", part(.hour), part(.minute), part(.second))
         )
     }
 }
@@ -321,7 +329,9 @@ final class AttributeJob: @unchecked Sendable {
     private var groupID: gid_t?
 
     init(
-        change: AttributeChange, fileSystems: FileSystemRegistry, cancellation: CancellationFlag = CancellationFlag(),
+        change: AttributeChange,
+        fileSystems: FileSystemRegistry,
+        cancellation: CancellationFlag = CancellationFlag(),
         meter: ProgressMeter? = nil
     ) {
         self.change = change
@@ -370,8 +380,12 @@ final class AttributeJob: @unchecked Sendable {
         // Listed with the job's flag, so that a server that has stopped answering does not
         // hold the job (and a thread of the pool) after Cancel.
         let list = {
-            try? self.fileSystems.provider(for: item.url).list(
-                item.url, showHidden: true, cancellation: self.cancellation)
+            try? self.fileSystems.provider(for: item.url)
+                .list(
+                    item.url,
+                    showHidden: true,
+                    cancellation: self.cancellation
+                )
         }
         var children = list()
         // A listing that ended because of the cancel says nothing about the folder.
@@ -428,7 +442,9 @@ final class AttributeJob: @unchecked Sendable {
             var attributes = FileAttributes()
             if change.permissions != .unchanged {
                 attributes.permissions = change.permissions.applied(
-                    to: item.permissions, isDirectory: item.isDirectory)
+                    to: item.permissions,
+                    isDirectory: item.isDirectory
+                )
             }
             if let timestamp {
                 guard let date = timestamp.applied(to: item.modified, now: now) else { throw InvalidDate() }

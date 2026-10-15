@@ -54,7 +54,7 @@ enum Splitter {
             return preset.bytes
         }
         var digits = text.replacingOccurrences(of: ",", with: "").lowercased()
-        if digits.hasSuffix("b"), digits.count > 1, !(digits.dropLast().last?.isNumber ?? false) { digits.removeLast() }
+        if digits.hasSuffix("b"), digits.count > 1, digits.dropLast().last?.isNumber != true { digits.removeLast() }
         var factor = 1.0
         if let unit = digits.last, let shift = ["k": 10.0, "m": 20.0, "g": 30.0][unit] {
             factor = pow(2, shift)
@@ -99,7 +99,6 @@ enum Splitter {
         run.expect(bytes: source.size, items: 0)
         return try run.transaction {
             var written: [URL] = []
-            var output: ToolOutput?
             let crc = CRC32Hasher()
             var total: Int64 = 0
             func nextPart() throws -> ToolOutput {
@@ -112,28 +111,32 @@ enum Splitter {
                 written.append(part.url)
                 return part
             }
-            output = try nextPart()
+            var output = try nextPart()
             readerIsOpen = false
             try run.read(reader) { block in
                 crc.update(block)
                 total += Int64(block.count)
                 var offset = 0
                 while offset < block.count {
-                    if let full = output, full.bytesWritten == partSize {
-                        try full.finish()
+                    if output.bytesWritten == partSize {
+                        try output.finish()
                         output = try nextPart()
                     }
-                    let room = Int(min(partSize - (output?.bytesWritten ?? 0), Int64(block.count - offset)))
-                    try output?.write(
-                        block.subdata(in: (block.startIndex + offset)..<(block.startIndex + offset + room)))
+                    let room = Int(min(partSize - output.bytesWritten, Int64(block.count - offset)))
+                    try output.write(
+                        block.subdata(in: (block.startIndex + offset)..<(block.startIndex + offset + room))
+                    )
                     offset += room
                 }
             }
-            try output?.finish()
+            try output.finish()
             let info = SplitInfo(name: source.name, size: total, crc: crc.checksum)
             guard
                 let crcFile = try run.write(
-                    Data(info.text.utf8), to: directory.appending(name: base + ".crc"), deferred: true)
+                    Data(info.text.utf8),
+                    to: directory.appending(name: base + ".crc"),
+                    deferred: true
+                )
             else {
                 throw ToolError.cancelled
             }
@@ -160,7 +163,7 @@ enum PartSeries {
         let numericExtension =
             dot.map { name.index(after: $0) < name.endIndex && name[name.index(after: $0)...].allSatisfy(isDigit) }
             ?? false
-        let searched = numericExtension ? name[...] : name[..<(dot ?? name.endIndex)]
+        let searched = numericExtension ? Substring(name) : name[..<(dot ?? name.endIndex)]
         if let last = searched.lastIndex(where: isDigit) {
             var first = last
             while first > name.startIndex, case let before = name.index(before: first), isDigit(name[before]) {
@@ -184,7 +187,9 @@ enum PartSeries {
             let next = String(value + 1)
             guard next.count <= digits.count else { return nil }
             return name.replacingCharacters(
-                in: range, with: String(repeating: "0", count: digits.count - next.count) + next)
+                in: range,
+                with: String(repeating: "0", count: digits.count - next.count) + next
+            )
 
         case .letters(let range):
             var letters = Array(name[range].utf8)
@@ -221,7 +226,8 @@ enum PartSeries {
 
     /// `first` and the files that follow it in its folder, until a name is missing.
     static func parts(
-        startingAt first: FileItem, provider: any FileSystemProvider,
+        startingAt first: FileItem,
+        provider: any FileSystemProvider,
         cancellation: CancellationFlag = CancellationFlag()
     ) -> [FileItem] {
         var parts = [first]
@@ -255,7 +261,8 @@ enum Combiner {
         if item.ext.lowercased() == "crc" {
             guard
                 let part = provider.item(
-                    at: directory.appending(name: Splitter.partName(item.baseName, 1)), cancellation: run.cancellation
+                    at: directory.appending(name: Splitter.partName(item.baseName, 1)),
+                    cancellation: run.cancellation
                 )
             else {
                 throw ToolError.failed("\(Splitter.partName(item.baseName, 1)) not found!")
@@ -307,8 +314,10 @@ enum Combiner {
             }
             try output.finish()
             return Outcome(
-                output: output.url, parts: parts.count,
-                verified: info.map { $0.size == output.bytesWritten && $0.crc == crc.checksum })
+                output: output.url,
+                parts: parts.count,
+                verified: info.map { $0.size == output.bytesWritten && $0.crc == crc.checksum }
+            )
         }
     }
 }

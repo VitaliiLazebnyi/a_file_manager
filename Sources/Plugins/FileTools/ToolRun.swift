@@ -51,7 +51,8 @@ final class ToolRun: @unchecked Sendable {
     /// Without a job (in tests of the tools themselves) nothing is reported and existing
     /// files are overwritten.
     init(
-        fileSystems: FileSystemRegistry, cancellation: CancellationFlag = CancellationFlag(),
+        fileSystems: FileSystemRegistry,
+        cancellation: CancellationFlag = CancellationFlag(),
         report: @escaping @Sendable (JobProgress) -> Void = { _ in },
         askExisting: @escaping @Sendable (URL) -> ExistingFileChoice = { _ in .overwrite }
     ) {
@@ -63,15 +64,17 @@ final class ToolRun: @unchecked Sendable {
 
     /// A run inside a job: progress goes to its window, questions through `ask`.
     convenience init(
-        fileSystems: FileSystemRegistry, monitor: any JobMonitor,
+        fileSystems: FileSystemRegistry,
+        monitor: any JobMonitor,
         askExisting: @escaping @MainActor @Sendable (URL) -> ExistingFileChoice
     ) {
         self.init(
-            fileSystems: fileSystems, cancellation: monitor.cancellation, report: { monitor.report($0) },
-            askExisting: { url in monitor.ask { @MainActor @Sendable in askExisting(url) } })
+            fileSystems: fileSystems,
+            cancellation: monitor.cancellation,
+            report: { monitor.report($0) },
+            askExisting: { url in monitor.ask { @MainActor @Sendable in askExisting(url) } }
+        )
     }
-
-    var isCancelled: Bool { cancellation.isCancelled }
 
     // MARK: Where the data came from
 
@@ -128,28 +131,31 @@ final class ToolRun: @unchecked Sendable {
     /// Counts bytes (and finished files) and passes the state on, at most twenty times a
     /// second. Safe from any thread.
     func advance(_ bytes: Int64, items: Int = 0, force: Bool = false) {
-        lock.lock()
-        bytesDone += bytes
-        itemsDone += items
-        let due = force || Date().timeIntervalSince(lastReport) > 0.05
-        lock.unlock()
+        // The decision is one step under the lock: a report that is due takes its turn at once
+        // (the time of the last report moves on), so no other thread finds it due as well.
+        let due = lock.withLock { () -> Bool in
+            bytesDone += bytes
+            itemsDone += items
+            let now = Date()
+            guard force || now.timeIntervalSince(lastReport) > 0.05 else { return false }
+            lastReport = now
+            return true
+        }
         guard due else { return }
         // One report at a time; the state is read after the turn has come, so that a later
-        // report never shows less than an earlier one. Every thread waits for its turn (a
-        // paused job blocks inside the report of the thread whose turn it is, and the others
-        // queue up behind it, so Pause stops all of them); a thread whose turn comes after
-        // another has reported just now has nothing to add, unless it is forced.
+        // report never shows less than an earlier one. A paused job blocks inside the report
+        // of the thread whose turn it is, and every report after it queues up behind it.
         reportLock.lock()
         defer { reportLock.unlock() }
-        lock.lock()
-        if !force, Date().timeIntervalSince(lastReport) <= 0.05 {
-            lock.unlock()
-            return
+        let progress = lock.withLock {
+            JobProgress(
+                lines: lines,
+                itemsDone: itemsDone,
+                itemsTotal: itemsTotal,
+                bytesDone: bytesDone,
+                bytesTotal: bytesTotal
+            )
         }
-        lastReport = Date()
-        let progress = JobProgress(
-            lines: lines, itemsDone: itemsDone, itemsTotal: itemsTotal, bytesDone: bytesDone, bytesTotal: bytesTotal)
-        lock.unlock()
         report(progress)
     }
 
@@ -182,7 +188,9 @@ final class ToolRun: @unchecked Sendable {
     }
 
     func read(
-        _ reader: any FileReader, counted: Bool = true, blockSize: Int = ToolRun.blockSize,
+        _ reader: any FileReader,
+        counted: Bool = true,
+        blockSize: Int = ToolRun.blockSize,
         _ body: (Data) throws -> Void
     ) throws {
         defer { reader.close() }
@@ -263,18 +271,31 @@ final class ToolRun: @unchecked Sendable {
             case .overwrite, .overwriteAll:
                 // The old file stays until the new one is complete: it is written under a
                 // temporary name that replaces the old file when it is finished.
-                let temporary = url.deletingLastPathComponent().appending(
-                    name: ".\(url.lastPathComponent).afm-\(UUID().uuidString.prefix(8))")
+                let temporary = url.deletingLastPathComponent()
+                    .appending(
+                        name: ".\(url.lastPathComponent).afm-\(UUID().uuidString.prefix(8))"
+                    )
                 output = ToolOutput(
-                    url: url, writer: try openWriter(temporary, in: provider), provider: provider, temporary: temporary,
-                    cancellation: cancellation, deferred: deferred, origin: { [weak self] in self?.originMark })
+                    url: url,
+                    writer: try openWriter(temporary, in: provider),
+                    provider: provider,
+                    temporary: temporary,
+                    cancellation: cancellation,
+                    deferred: deferred,
+                    origin: { [weak self] in self?.originMark }
+                )
             }
         }
         let created =
             try output
             ?? ToolOutput(
-                url: url, writer: openWriter(url, in: provider), provider: provider, cancellation: cancellation,
-                deferred: deferred, origin: { [weak self] in self?.originMark })
+                url: url,
+                writer: openWriter(url, in: provider),
+                provider: provider,
+                cancellation: cancellation,
+                deferred: deferred,
+                origin: { [weak self] in self?.originMark }
+            )
         if deferred { journal.append(created) }
         return created
     }
@@ -318,13 +339,12 @@ final class ToolRun: @unchecked Sendable {
     /// `name(2).ext`, `name(3).ext`, …: the first that is free (spec 08 › Decode).
     static func freeName(for url: URL, provider: any FileSystemProvider) -> URL {
         let (base, ext) = FileItem.split(url.lastPathComponent)
-        var number = 2
-        while true {
-            let candidate = url.deletingLastPathComponent().appending(
-                name: "\(base)(\(number))" + (ext.isEmpty ? "" : "." + ext))
-            if provider.item(at: candidate) == nil { return candidate }
-            number += 1
+        func candidate(_ number: Int) -> URL {
+            url.deletingLastPathComponent().appending(name: "\(base)(\(number))" + (ext.isEmpty ? "" : "." + ext))
         }
+        var number = 2
+        while provider.item(at: candidate(number)) != nil { number += 1 }
+        return candidate(number)
     }
 
     /// Writes a small file in one go.
@@ -368,9 +388,13 @@ final class ToolOutput {
     private let origin: () -> Data?
 
     init(
-        url: URL, writer: any FileWriter, provider: any FileSystemProvider, temporary: URL? = nil,
+        url: URL,
+        writer: any FileWriter,
+        provider: any FileSystemProvider,
+        temporary: URL? = nil,
         cancellation: CancellationFlag? = nil,
-        deferred: Bool = false, origin: @escaping () -> Data? = { nil }
+        deferred: Bool = false,
+        origin: @escaping () -> Data?
     ) {
         self.origin = origin
         self.url = url

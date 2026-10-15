@@ -69,8 +69,8 @@ struct DescriptIon: Equatable {
         if let utf8 = String(data: data, encoding: .utf8) {
             return (utf8, data.allSatisfy { $0 < 0x80 } ? .ansi : .utf8(bom: false))
         }
-        // Latin-1 reads any bytes, so this cannot fail.
-        let ansi = text(data, .windowsCP1252).flatMap { $0.isEmpty ? nil : $0 } ?? text(data, .isoLatin1) ?? ""
+        // What the code page leaves undefined is read as Latin-1, byte for character.
+        let ansi = text(data, .windowsCP1252) ?? String(String.UnicodeScalarView(data.map { Unicode.Scalar($0) }))
         return (ansi, .ansi)
     }
 
@@ -93,8 +93,12 @@ struct DescriptIon: Equatable {
         var comment = String(Substring(rest))
         let marker = Array(multilineMarker.unicodeScalars)
         if rest.count >= marker.count, Array(rest.suffix(marker.count)) == marker {
-            comment = String(Substring(rest.dropLast(marker.count))).replacingOccurrences(
-                of: "\\n", with: "\n", options: .literal)
+            comment = String(Substring(rest.dropLast(marker.count)))
+                .replacingOccurrences(
+                    of: "\\n",
+                    with: "\n",
+                    options: .literal
+                )
         }
         return Entry(name: String(Substring(name)), comment: comment)
     }
@@ -180,17 +184,27 @@ struct DescriptIon: Equatable {
                 }
                 return bytes
             }
-            return Data([0xFF, 0xFE]) + (text.data(using: .utf16LittleEndian) ?? Data())
+            return Data([0xFF, 0xFE]) + Self.utf16(text, bigEndian: false)
 
         case .utf8(let bom):
             return bom ? Data([0xEF, 0xBB, 0xBF]) + Data(text.utf8) : unmarked(Data(text.utf8))
 
         case .utf16LittleEndian:
-            return Data([0xFF, 0xFE]) + (text.data(using: .utf16LittleEndian) ?? Data())
+            return Data([0xFF, 0xFE]) + Self.utf16(text, bigEndian: false)
 
         case .utf16BigEndian:
-            return Data([0xFE, 0xFF]) + (text.data(using: .utf16BigEndian) ?? Data())
+            return Data([0xFE, 0xFF]) + Self.utf16(text, bigEndian: true)
         }
+    }
+
+    /// The text in UTF-16, without a byte-order mark.
+    private static func utf16(_ text: String, bigEndian: Bool) -> Data {
+        Data(
+            text.utf16.flatMap { unit in
+                let (high, low) = (UInt8(unit >> 8), UInt8(unit & 0xFF))
+                return bigEndian ? [high, low] : [low, high]
+            }
+        )
     }
 }
 
@@ -350,7 +364,10 @@ final class CommentStore: @unchecked Sendable {
     /// file without comments is removed. With `hidden`, the file gets the hidden flag where the
     /// file system has one (a new `descript.ion` is hidden in Total Commander).
     func setComment(
-        _ comment: String, for name: String, in directory: URL, hidden: Bool,
+        _ comment: String,
+        for name: String,
+        in directory: URL,
+        hidden: Bool,
         cancellation: CancellationFlag = CancellationFlag()
     ) throws {
         let provider = try fileSystems.provider(for: directory)
@@ -372,8 +389,10 @@ final class CommentStore: @unchecked Sendable {
         let wasHidden = LocalInfo.details(url)?.isHidden ?? false
         let existed = provider.item(at: url, cancellation: cancellation) != nil
         if cancellation.isCancelled { throw CocoaError(.userCancelled) }
-        let draft = url.deletingLastPathComponent().appending(
-            name: ".\(DescriptIon.fileName).\(UUID().uuidString.prefix(8)).tmp")
+        let draft = url.deletingLastPathComponent()
+            .appending(
+                name: ".\(DescriptIon.fileName).\(UUID().uuidString.prefix(8)).tmp"
+            )
         do {
             let writer = try provider.write(draft, cancellation: cancellation)
             do {

@@ -15,7 +15,7 @@ enum SelectionFile {
     static func encode(_ items: [FileItem], as encoding: Encoding) -> Data {
         let text = items.map { $0.isFolder ? $0.name + "\\" : $0.name }.joined(separator: "\r\n")
         switch encoding {
-        case .unicode: return Data([0xFF, 0xFE]) + (text.data(using: .utf16LittleEndian) ?? Data())
+        case .unicode: return Data([0xFF, 0xFE]) + Data(text.utf16.flatMap { [UInt8($0 & 0xFF), UInt8($0 >> 8)] })
         case .ansi: return windows1252(text)
         }
     }
@@ -40,8 +40,10 @@ enum SelectionFile {
                 bytes.append(byte)
             } else {
                 let byte =
-                    code(scalar) ?? String(scalar).decomposedStringWithCanonicalMapping.unicodeScalars.first.flatMap(
-                        code) ?? UInt8(ascii: "?")
+                    code(scalar) ?? String(scalar).decomposedStringWithCanonicalMapping.unicodeScalars.first
+                    .flatMap(
+                        code
+                    ) ?? UInt8(ascii: "?")
                 known[scalar.value] = byte
                 bytes.append(byte)
             }
@@ -100,19 +102,19 @@ struct NameBytes: Hashable {
     }
 
     static func == (a: Self, b: Self) -> Bool {
-        let same = a.name.utf8.withContiguousStorageIfAvailable { first in
-            b.name.utf8.withContiguousStorageIfAvailable { second in
-                first.count == second.count
-                    && (first.isEmpty || memcmp(first.baseAddress!, second.baseAddress!, first.count) == 0)
+        // The copies share the names' storage, which is one piece of UTF-8 already (`init`).
+        var (first, second) = (a.name, b.name)
+        return first.withUTF8 { one in
+            second.withUTF8 { other in
+                one.count == other.count
+                    && (one.isEmpty || memcmp(one.baseAddress!, other.baseAddress!, one.count) == 0)
             }
         }
-        return (same ?? nil) ?? a.name.utf8.elementsEqual(b.name.utf8)
     }
 
     func hash(into hasher: inout Hasher) {
-        if name.utf8.withContiguousStorageIfAvailable({ hasher.combine(bytes: UnsafeRawBufferPointer($0)) }) == nil {
-            Array(name.utf8).withUnsafeBytes { hasher.combine(bytes: $0) }
-        }
+        var name = name
+        name.withUTF8 { hasher.combine(bytes: UnsafeRawBufferPointer($0)) }
     }
 }
 
@@ -162,12 +164,21 @@ enum DirectoryComparison {
     }
 
     static func compare(
-        left: [FileItem], right: [FileItem], mode: Mode = .newer, withSubdirectories: Bool = false,
-        ignoringOneHour: Bool = false, foldingCase: Bool = false
+        left: [FileItem],
+        right: [FileItem],
+        mode: Mode = .newer,
+        withSubdirectories: Bool = false,
+        ignoringOneHour: Bool = false,
+        foldingCase: Bool = false
     ) -> Marks {
         let found = compareIndices(
-            left: left, right: right, mode: mode, withSubdirectories: withSubdirectories,
-            ignoringOneHour: ignoringOneHour, foldingCase: foldingCase)
+            left: left,
+            right: right,
+            mode: mode,
+            withSubdirectories: withSubdirectories,
+            ignoringOneHour: ignoringOneHour,
+            foldingCase: foldingCase
+        )
         var marks = Marks()
         marks.leftNames = found.left.map { left[$0].name }
         marks.rightNames = found.right.map { right[$0].name }
@@ -186,8 +197,12 @@ enum DirectoryComparison {
     /// `cancelled` is looked at every few thousand entries; a cancelled comparison returns
     /// what it had.
     static func compareIndices(
-        left: [FileItem], right: [FileItem], mode: Mode = .newer, withSubdirectories: Bool = false,
-        ignoringOneHour: Bool = false, foldingCase: Bool = false,
+        left: [FileItem],
+        right: [FileItem],
+        mode: Mode = .newer,
+        withSubdirectories: Bool = false,
+        ignoringOneHour: Bool = false,
+        foldingCase: Bool = false,
         cancelled: () -> Bool = { false }
     ) -> IndexMarks {
         var marks = IndexMarks()

@@ -2,60 +2,57 @@ import AFMKernel
 import AppKit
 import Quartz
 
-/// The system's Quick Look panel for the files of the active panel. The panel finds whoever
+/// Feeds the system's Quick Look panel with the files of the active panel. The panel finds whoever
 /// feeds it in the responder chain of the main window, so this object puts itself there, behind
 /// the window; keys the panel does not use go on to the file list, which lets the cursor keys
-/// move through the folder while the preview follows. Main thread only.
+/// move through the folder while the preview follows. The panel itself is reached through
+/// `PreviewPanel` (none in tests of the plugin that start nothing). Main thread only.
 final class QuickLookController: NSResponder, @preconcurrency QLPreviewPanelDataSource,
     @preconcurrency QLPreviewPanelDelegate
 {
     private var urls: [URL] = []
     private weak var host: NSWindow?
+    /// The panel this feeds; without one, nothing is ever shown.
+    var panel: (any PreviewPanel)?
 
-    private var visiblePanel: QLPreviewPanel? {
-        guard QLPreviewPanel.sharedPreviewPanelExists(), let panel = QLPreviewPanel.shared(), panel.isVisible else {
-            return nil
-        }
-        return panel
-    }
-
-    var isVisible: Bool { visiblePanel != nil }
+    var isVisible: Bool { panel?.isVisible == true }
 
     /// Shows the panel with these files, or closes it when it is open.
     func toggle(_ urls: [URL]) {
-        if let panel = visiblePanel {
-            panel.orderOut(nil)
+        if isVisible {
+            panel?.close()
             return
         }
-        guard !urls.isEmpty, let panel = QLPreviewPanel.shared() else { return }
+        guard !urls.isEmpty else { return }
         self.urls = urls
-        if host == nil, let window = NSApp.mainWindow {
+        panel?.show(for: self)
+    }
+
+    /// Puts this object behind `window` in the responder chain, once; false when there is no
+    /// window to join and the panel is to be fed directly.
+    func join(_ window: NSWindow?) -> Bool {
+        if host == nil, let window {
             nextResponder = window.nextResponder
             window.nextResponder = self
             host = window
         }
-        if host == nil {
-            panel.dataSource = self
-            panel.delegate = self
-        }
-        panel.makeKeyAndOrderFront(nil)
-        panel.reloadData()
+        return host != nil
     }
 
     /// Follows the cursor: the open panel shows other files.
     func follow(_ urls: [URL]) {
-        guard let panel = visiblePanel, urls != self.urls else { return }
+        guard isVisible, urls != self.urls else { return }
         self.urls = urls
-        panel.reloadData()
+        panel?.reload()
     }
 
     func close() {
-        visiblePanel?.orderOut(nil)
+        if isVisible { panel?.close() }
     }
 
     /// Closes the panel when it previews a file of `volume`.
     func close(ifShowing volume: URL) {
-        if isVisible, urls.contains(where: { $0.isSameLocation(as: volume) || $0.isInside(volume) }) { close() }
+        if urls.contains(where: { $0.isSameLocation(as: volume) || $0.isInside(volume) }) { close() }
     }
 
     override func acceptsPreviewPanelControl(_: QLPreviewPanel!) -> Bool { true }

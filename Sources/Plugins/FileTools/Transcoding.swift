@@ -84,35 +84,36 @@ enum SixBitText {
 
     /// The bytes of one line, nil when the line is not one of this format.
     static func decode(_ line: ArraySlice<UInt8>, xx: Bool) -> [UInt8]? {
-        (xx ? xxValues : uuValues).withUnsafeBufferPointer { table in
-            line.withUnsafeBufferPointer { text -> [UInt8]? in
-                guard let first = text.first, table[Int(first)] != 255 else { return nil }
-                let count = Int(table[Int(first)])
-                // Every character of the line must belong to the alphabet.
-                for index in 1..<max(text.count, 1) where table[Int(text[index])] == 255 { return nil }
-                let available = text.count - 1
-                let needed = (count + 2) / 3 * 4
-                // Programs that cut spaces off the end of a line leave UUEncode lines short.
-                guard available >= needed || (!xx && available + 3 >= needed) else { return nil }
-                // An empty array is never made with `unsafeUninitializedCapacity`: for a capacity of zero
-                // the standard library writes the count into the storage all empty arrays share, a write
-                // that races with any other thread reading an empty array.
-                guard count > 0 else { return [] }
-                return [UInt8](unsafeUninitializedCapacity: count) { bytes, initialized in
-                    func six(_ index: Int) -> UInt8 { index < available ? table[Int(text[index + 1])] : 0 }
-                    var (group, written) = (0, 0)
-                    while written < count {
-                        let (a, b, c, d) = (six(group), six(group + 1), six(group + 2), six(group + 3))
-                        bytes[written] = a << 2 | b >> 4
-                        if written + 1 < count { bytes[written + 1] = b << 4 | c >> 2 }
-                        if written + 2 < count { bytes[written + 2] = c << 6 | d }
-                        written += 3
-                        group += 4
+        (xx ? xxValues : uuValues)
+            .withUnsafeBufferPointer { table in
+                line.withUnsafeBufferPointer { text -> [UInt8]? in
+                    guard let first = text.first, table[Int(first)] != 255 else { return nil }
+                    let count = Int(table[Int(first)])
+                    // Every character of the line must belong to the alphabet.
+                    for index in 1..<max(text.count, 1) where table[Int(text[index])] == 255 { return nil }
+                    let available = text.count - 1
+                    let needed = (count + 2) / 3 * 4
+                    // Programs that cut spaces off the end of a line leave UUEncode lines short.
+                    guard available >= needed || (!xx && available + 3 >= needed) else { return nil }
+                    // An empty array is never made with `unsafeUninitializedCapacity`: for a capacity of zero
+                    // the standard library writes the count into the storage all empty arrays share, a write
+                    // that races with any other thread reading an empty array.
+                    guard count > 0 else { return [] }
+                    return [UInt8](unsafeUninitializedCapacity: count) { bytes, initialized in
+                        func six(_ index: Int) -> UInt8 { index < available ? table[Int(text[index + 1])] : 0 }
+                        var (group, written) = (0, 0)
+                        while written < count {
+                            let (a, b, c, d) = (six(group), six(group + 1), six(group + 2), six(group + 3))
+                            bytes[written] = a << 2 | b >> 4
+                            if written + 1 < count { bytes[written + 1] = b << 4 | c >> 2 }
+                            if written + 2 < count { bytes[written + 2] = c << 6 | d }
+                            written += 3
+                            group += 4
+                        }
+                        initialized = count
                     }
-                    initialized = count
                 }
             }
-        }
     }
 }
 
@@ -151,14 +152,19 @@ enum Encoder {
     /// none of them is left, and a file that was there before is never touched (see `Splitter.split`).
     @discardableResult
     static func encode(
-        _ source: FileItem, into directory: URL, method: EncodeMethod, linesPerFile: Int = 0, bytesPerFile: Int64 = 0,
+        _ source: FileItem,
+        into directory: URL,
+        method: EncodeMethod,
+        linesPerFile: Int = 0,
+        bytesPerFile: Int64 = 0,
         run: ToolRun
     ) throws -> [URL] {
         run.carriesOrigin = true
         let limit = Self.linesPerFile(lines: linesPerFile, bytes: bytesPerFile, method: method)
         // (The size is what a file system says and the limit what the user typed: neither may overflow a sum.)
         let totalLines = Int(
-            max(0, source.size).addingSaturated(Int64(method.bytesPerLine) - 1) / Int64(method.bytesPerLine))
+            max(0, source.size).addingSaturated(Int64(method.bytesPerLine) - 1) / Int64(method.bytesPerLine)
+        )
         // Counted before the names are made: a size of exabytes, said by a server, is not a list of that many names.
         let parts = limit > 0 ? max(1, totalLines.addingSaturated(limit - 1) / limit) : 1
         guard parts <= 999 else {
@@ -191,7 +197,8 @@ enum Encoder {
                 // The source may have grown since the panel listed it; more parts than names are not made up.
                 guard written.count < names.count else {
                     throw ToolError.failed(
-                        "\(source.name) changed while it was encoded (it needs more parts than planned).")
+                        "\(source.name) changed while it was encoded (it needs more parts than planned)."
+                    )
                 }
                 let url = directory.appending(name: names[written.count])
                 run.show([
@@ -377,8 +384,9 @@ final class DecodeMachine {
         return has("mime-version:", folded: true) || has("content-", folded: true) || has("begin ", folded: false)
     }
 
+    /// A line as text: UTF-8, else Latin-1, which takes every byte as the character of its value.
     private func text(_ bytes: ArraySlice<UInt8>) -> String {
-        String(bytes: bytes, encoding: .utf8) ?? String(bytes: bytes, encoding: .isoLatin1) ?? ""
+        String(bytes: bytes, encoding: .utf8) ?? String(String.UnicodeScalarView(bytes.map { Unicode.Scalar($0) }))
     }
 
     private func report(_ message: String) {
@@ -625,7 +633,7 @@ final class DecodeMachine {
                 // A line that fits UUEncode exactly is UUEncode; XXEncode has no character below `+`.
                 let asUU = SixBitText.decode(line, xx: false)
                 let asXX = SixBitText.decode(line, xx: true)
-                let fitsUU = asUU != nil && line.count - 1 == ((asUU?.count ?? 0) + 2) / 3 * 4
+                let fitsUU = asUU.map { line.count - 1 == ($0.count + 2) / 3 * 4 } == true
                 xx = fitsUU ? false : asXX != nil ? true : asUU != nil ? false : nil
                 state = .sixBit(xx: xx)
             }
@@ -746,7 +754,7 @@ enum Decoder {
         }
 
         mutating func flush(_ body: (ArraySlice<UInt8>) throws -> Void) rethrows {
-            var line = pending[...]
+            var line = pending[pending.indices]
             if line.last == 13 { line = line.dropLast() }
             if !line.isEmpty { try body(line) }
             pending = []
@@ -816,14 +824,14 @@ enum Decoder {
         }
         let result = String(cleaned).trimmingCharacters(in: .whitespaces)
         // A name longer than the file system takes is cut at a code point, not refused.
-        guard let name = result.utf8.count > 255 ? trimmedToLimit(result) : result, !name.isEmpty, name != ".",
-            name != ".."
-        else { return nil }
+        let name = result.utf8.count > 255 ? trimmedToLimit(result) : result
+        guard !name.isEmpty, name != ".", name != ".." else { return nil }
         return name
     }
 
-    private static func trimmedToLimit(_ name: String) -> String? {
-        guard !name.isEmpty else { return nil }
+    /// The longest start of `name` that takes at most 255 bytes, cut at a code point. Called
+    /// for names longer than that, so it is never empty, `.` or `..`.
+    private static func trimmedToLimit(_ name: String) -> String {
         var scalars = String.UnicodeScalarView()
         var bytes = 0
         for scalar in name.unicodeScalars {
@@ -832,8 +840,7 @@ enum Decoder {
             scalars.append(scalar)
             bytes += width
         }
-        let result = String(scalars)
-        return result.isEmpty || result == "." || result == ".." ? nil : result
+        return String(scalars)
     }
 
     /// The name of the decoded file when the data gives none: the encoded file's without its extension.
@@ -879,7 +886,11 @@ enum Decoder {
         let provider = try run.provider(for: first.url)
         run.carriesOrigin = true
         let sink = FolderSink(
-            directory: directory, fallbackName: fallbackName(for: first.name), autoRename: autoRename, run: run)
+            directory: directory,
+            fallbackName: fallbackName(for: first.name),
+            autoRename: autoRename,
+            run: run
+        )
         let machine = DecodeMachine(sink: sink)
         let candidates = PartSeries.parts(startingAt: first, provider: provider, cancellation: run.cancellation)
         run.expect(bytes: first.size, items: 0)

@@ -138,7 +138,10 @@ struct SelectionRule {
 
     /// The same as places in `items`, of the entries `scope` lets through.
     func matchingIndices(
-        among items: [FileItem], base: URL, now: Date = Date(), scope: SelectionScope = .both,
+        among items: [FileItem],
+        base: URL,
+        now: Date = Date(),
+        scope: SelectionScope = .both,
         cancelled: () -> Bool
     ) -> [Int] {
         let entry = entryMaker(base: base)
@@ -211,7 +214,10 @@ final class SelectionStore {
         scoped.set(history.filter { $0 != mask }, forKey: "maskHistory")
     }
 
-    var types: [SelectionType] { scoped.value([SelectionType].self, forKey: "types") ?? [] }
+    /// The saved types; one that does not read is left out, the others stay.
+    var types: [SelectionType] {
+        (scoped.value([Readable<SelectionType>].self, forKey: "types") ?? []).compactMap(\.value)
+    }
 
     func type(named name: String) -> SelectionType? {
         types.first { $0.name.caseInsensitiveCompare(name) == .orderedSame }

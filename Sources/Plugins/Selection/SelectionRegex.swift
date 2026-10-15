@@ -47,7 +47,9 @@ enum SelectionRegex {
         var found = false
         var timedOut = false
         regex.enumerateMatches(
-            in: name, options: [.reportProgress], range: NSRange(location: 0, length: name.utf16.count)
+            in: name,
+            options: [.reportProgress],
+            range: NSRange(location: 0, length: name.utf16.count)
         ) { result, _, stop in
             if result != nil {
                 found = true

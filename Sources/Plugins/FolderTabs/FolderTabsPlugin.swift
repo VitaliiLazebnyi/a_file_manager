@@ -53,9 +53,10 @@ public final class FolderTabsPlugin: Plugin {
     /// How many closed tabs of a panel can be brought back.
     static let closedTabsLimit = 20
 
-    /// A tab that was closed, and where it was.
+    /// A tab that was closed, the folder it showed, and where it was.
     private struct ClosedTab {
         let tab: PanelTabState
+        let directory: URL
         let index: Int
     }
 
@@ -148,7 +149,8 @@ public final class FolderTabsPlugin: Plugin {
             enabled: { hasSeveralTabs() && !tabs().active.isLocked }
         ) { [self] in
             let moved = record(of: tabs().active)
-            guard tabs().closeTab(at: tabs().activeIndex) else { return }
+            // Offered only for an unlocked tab beside others: it can be closed.
+            _ = tabs().closeTab(at: tabs().activeIndex)
             restore([moved], in: target().tabs, activating: 0)
         }
 
@@ -184,18 +186,16 @@ public final class FolderTabsPlugin: Plugin {
         }
         commands.register(
             Command(.reopenClosedTab, "Reopen Closed Tab"),
-            enabled: { [self] in closedTabs[ObjectIdentifier(tabs())]?.isEmpty == false }
+            enabled: { [self] in !closedList(of: tabs()).isEmpty }
         ) { [self] in
-            reopen(nil, in: tabs())
+            reopen(closedList(of: tabs()).count - 1, in: tabs())
         }
         commands.register(
             Command(.recentlyClosedTabs, "Recently Closed Tabs…"),
-            enabled: { [self] in closedTabs[ObjectIdentifier(tabs())]?.isEmpty == false }
+            enabled: { [self] in !closedList(of: tabs()).isEmpty }
         ) { [self] in
-            let closed = Array((closedTabs[ObjectIdentifier(tabs())] ?? []).reversed())
-            let rows = closed.map { entry in
-                URL(string: entry.tab.location).map(kernel.fileSystems.displayPath) ?? entry.tab.location
-            }
+            let closed = Array(closedList(of: tabs()).reversed())
+            let rows = closed.map { kernel.fileSystems.displayPath($0.directory) }
             guard let row = kernel.interaction.pickRow("Recently closed tabs", rows: rows, button: "Reopen") else {
                 return
             }
@@ -431,8 +431,9 @@ public final class FolderTabsPlugin: Plugin {
         var position = min(index ?? tabs.count, tabs.count)
         var opened: [PanelModel] = []
         batch(tabs) {
-            for record in records.prefix(max(room ?? Self.tabsPerPanelLimit - tabs.count, 0)) {
-                guard let location = URL(string: record.location) else { continue }
+            // A location that cannot be read is left out.
+            let readable = records.compactMap { record in URL(string: record.location).map { (record, $0) } }
+            for (record, location) in readable.prefix(max(room ?? Self.tabsPerPanelLimit - tabs.count, 0)) {
                 let tab = tabs.insertTab(showing: location, at: position, activate: false)
                 let order = ListOrder(key: SortKey(rawValue: record.sortKey) ?? .name, descending: record.descending)
                 if tab.sort != order { tab.setSort(order) }
@@ -468,8 +469,6 @@ public final class FolderTabsPlugin: Plugin {
                 fromFile: fromFile,
                 room: Self.tabsPerPanelLimit
             )
-            // Nothing was opened when no location could be read; the panel then keeps its tabs.
-            guard tabs.count > old.count else { return }
             for tab in old where tab !== kept {
                 tab.isLocked = false
                 if let index = tabs.tabs.firstIndex(where: { $0 === tab }) { tabs.closeTab(at: index) }
@@ -490,7 +489,11 @@ public final class FolderTabsPlugin: Plugin {
     /// Closes the tabs at `indices` and remembers them for "Reopen Closed Tab".
     private func close(_ indices: [Int], in tabs: PanelTabs) {
         for index in indices.sorted(by: >) where tabs.tabs.indices.contains(index) {
-            let closed = ClosedTab(tab: record(of: tabs.tabs[index]), index: index)
+            let closed = ClosedTab(
+                tab: record(of: tabs.tabs[index]),
+                directory: tabs.tabs[index].directory,
+                index: index
+            )
             guard tabs.closeTab(at: index) else { continue }
             var list = closedTabs[ObjectIdentifier(tabs), default: []]
             list.append(closed)
@@ -498,11 +501,15 @@ public final class FolderTabsPlugin: Plugin {
         }
     }
 
-    /// Brings a closed tab back to where it was and shows it; without a number, the one
-    /// closed last.
-    private func reopen(_ number: Int?, in tabs: PanelTabs) {
-        var list = closedTabs[ObjectIdentifier(tabs)] ?? []
-        guard let number = number ?? list.indices.last, list.indices.contains(number) else { return }
+    /// The closed tabs of a panel, the most recent last.
+    private func closedList(of tabs: PanelTabs) -> [ClosedTab] {
+        closedTabs[ObjectIdentifier(tabs)] ?? []
+    }
+
+    /// Brings the closed tab numbered `number` (0 is the one closed first) back to where it
+    /// was and shows it. The commands offer only the numbers there are.
+    private func reopen(_ number: Int, in tabs: PanelTabs) {
+        var list = closedList(of: tabs)
         let closed = list.remove(at: number)
         closedTabs[ObjectIdentifier(tabs)] = list
         restore([closed.tab], in: tabs, at: closed.index, activating: 0)

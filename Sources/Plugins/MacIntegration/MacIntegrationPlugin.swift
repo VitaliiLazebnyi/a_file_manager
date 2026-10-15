@@ -13,9 +13,10 @@ import UniformTypeIdentifiers
 /// happen in the background.
 public final class MacIntegrationPlugin: Plugin {
     public let name = "Mac integration"
-    /// Off in tests, so they do not start other applications or show system panels; what
-    /// would have been opened is recorded in `opened` and `log` either way.
-    private let launchesApplications: Bool
+    /// Where requests to other applications and the system's panels go: the Mac's desktop, a
+    /// test's recording one, or nowhere (tests that start nothing). What would have been opened
+    /// is recorded in `opened` and `log` either way.
+    private let desktop: (any MacDesktop)?
     private let pasteboard: NSPasteboard
     private let applications: @Sendable (URL) -> [URL]
     /// The files most recently handed to an application (or that would have been); for tests.
@@ -106,7 +107,6 @@ public final class MacIntegrationPlugin: Plugin {
     }
     private let quickLook = QuickLookController()
     private var subscription: AnyObject?
-    private var sharingPicker: NSSharingServicePicker?
 
     /// The preference that names the editor for F4: an application's name, its path, or its
     /// bundle identifier.
@@ -121,15 +121,26 @@ public final class MacIntegrationPlugin: Plugin {
     public static let editTags: CommandID = "afm_EditTags"
     public static let copyAsPathname: CommandID = "afm_CopyAsPathname"
 
-    /// Tests pass a pasteboard of their own and say which applications open a file.
-    public init(
+    /// Tests pass a pasteboard of their own and say which applications open a file; with
+    /// `launchesApplications` off they start nothing and show no system panel.
+    public convenience init(
         launchesApplications: Bool = true,
         pasteboard: NSPasteboard = .general,
         applications: (@Sendable (URL) -> [URL])? = nil
     ) {
-        self.launchesApplications = launchesApplications
+        self.init(
+            desktop: launchesApplications ? SystemDesktop() : nil,
+            pasteboard: pasteboard,
+            applications: applications ?? { Self.installedApplications(for: $0) }
+        )
+    }
+
+    /// A plugin that hands its requests to `desktop`.
+    init(desktop: (any MacDesktop)?, pasteboard: NSPasteboard, applications: @escaping @Sendable (URL) -> [URL]) {
+        self.desktop = desktop
         self.pasteboard = pasteboard
-        self.applications = applications ?? { Self.installedApplications(for: $0) }
+        self.applications = applications
+        quickLook.panel = desktop?.preview
     }
 
     /// The applications that open a file, the default one first. Launch Services looks at the
@@ -169,16 +180,12 @@ public final class MacIntegrationPlugin: Plugin {
 
     private func open(_ urls: [URL], with application: URL?) {
         remember(opened: urls)
-        guard launchesApplications else { return }
+        guard let desktop else { return }
         if let application {
-            NSWorkspace.shared.open(
-                urls,
-                withApplicationAt: application,
-                configuration: NSWorkspace.OpenConfiguration()
-            )
+            desktop.open(urls, with: application)
         } else {
             // Launch Services answers each file in its own time; none of them holds up the main thread.
-            urls.forEach { NSWorkspace.shared.open($0, configuration: NSWorkspace.OpenConfiguration()) }
+            urls.forEach { desktop.open($0) }
         }
     }
 
@@ -218,15 +225,9 @@ public final class MacIntegrationPlugin: Plugin {
                 )
                 remember(opened: [url])
                 remember("edit \(DisplayText.oneLine(editor, limit: 200)) \(url.path)")
-                guard launchesApplications else { return }
+                guard let desktop else { return }
                 // (The system looks at the file and the application: on a thread of the kernel's own.)
-                BlockingCalls.run {
-                    NSWorkspace.shared.open(
-                        [url],
-                        withApplicationAt: Self.editorApplication(named: editor),
-                        configuration: NSWorkspace.OpenConfiguration()
-                    )
-                }
+                BlockingCalls.run { desktop.open([url], with: Self.editorApplication(named: editor)) }
             }
         )
         // `.text`: the editor's name, path or bundle identifier; `.location`: the application;
@@ -246,79 +247,51 @@ public final class MacIntegrationPlugin: Plugin {
             Command(Self.openWithDefault, "Open with Default Application", runsDuringJobs: true),
             enabled: { cursorItem() != nil }
         ) { [self] in
-            guard let url = cursorItem() else { return }
-            remember("open \(url.path)")
-            open([url], with: nil)
+            // Offered only on a local item.
+            _ = cursorItem()
+                .map { url in
+                    remember("open \(url.path)")
+                    open([url], with: nil)
+                }
         }
         commands.register(
             Command(Self.openWith, "Open With…", runsDuringJobs: true),
             enabled: { cursorItem() != nil }
         ) { [self] in
-            guard let url = cursorItem() else { return }
-            let applications = applications
-            // Launch Services looks at the file to know what opens it; on a volume that has
-            // stopped answering that never returns. It is asked in a job, which can be cancelled.
-            kernel.jobs.run(
-                title: "Applications:",
-                work: { monitor -> [URL]? in
-                    BlockingCalls.answer(
-                        from: Self.launchServices,
-                        to: "applications " + url.path,
-                        cancellation: monitor.cancellation
-                    ) { _ in applications(url) }
-                },
-                completion: { [self] found in
-                    guard let candidates = found else { return }
-                    let rows = candidates.enumerated()
-                        .map {
-                            Self.applicationName($0.element) + ($0.offset == 0 ? " (default)" : "")
-                        }
-                    guard
-                        let row = kernel.interaction.pickRow(
-                            "Open “\(DisplayText.oneLine(url.lastPathComponent))” with",
-                            rows: rows + ["Other…"],
-                            button: "Open"
-                        )
-                    else { return }
-                    guard
-                        let application = candidates.indices.contains(row)
-                            ? candidates[row]
-                            : chooseApplication(title: "Choose an application")
-                    else { return }
-                    remember("open-with \(Self.applicationName(application)) \(url.path)")
-                    open([url], with: application)
-                }
-            )
+            // Offered only on a local item.
+            _ = cursorItem().map { url in openWith(url, in: kernel) }
         }
         commands.register(
             Command(.revealInFinder, "Reveal in Finder", [.cmd("r", .shift)], runsDuringJobs: true),
             enabled: { model().directory.isFileURL }
         ) { [self] in
             let directory = model().directory
-            let launches = launchesApplications
+            let desktop = desktop
             // Finder is shown the first items of a very large selection; it could not show more.
             withLocalOperands(of: model(), { Array($0.prefix(Self.revealLimit)) }) { [self] urls in
-                remember("reveal " + Self.described(urls.isEmpty ? [directory] : urls))
-                guard launches else { return }
+                // Without operands, the folder itself.
+                let shown = urls.isEmpty ? [directory] : urls
+                remember("reveal " + Self.described(shown))
+                guard let desktop else { return }
                 // Finder is asked away from the main thread: it looks at every file it is to select.
-                BlockingCalls.run { NSWorkspace.shared.activateFileViewerSelecting(urls.isEmpty ? [directory] : urls) }
+                BlockingCalls.run { desktop.reveal(shown) }
             }
         }
 
         commands.register(
             Command(Self.quickLook, "Quick Look", [.cmd("y")], runsDuringJobs: true),
             enabled: hasLocalOperands,
-            checked: { [self] in launchesApplications && quickLook.isVisible }
+            checked: { [self] in quickLook.isVisible }
         ) { [self] in
             withLocalOperands(of: model(), { $0 }) { [self] urls in
                 remember("quicklook " + Self.described(urls))
                 followed = nil
-                if launchesApplications { quickLook.toggle(urls) }
+                quickLook.toggle(urls)
             }
         }
         // The open Quick Look panel follows the cursor and the active panel.
         subscription = kernel.panelEvents.subscribe { [weak self] _, panel in
-            guard let self, launchesApplications, quickLook.isVisible, panel === kernel.panels.source else {
+            guard let self, quickLook.isVisible, panel === kernel.panels.source else {
                 return
             }
             follow(panel.model)
@@ -339,14 +312,7 @@ public final class MacIntegrationPlugin: Plugin {
                     )
                 }
                 remember("share " + Self.described(urls))
-                guard launchesApplications, let view = NSApp?.keyWindow?.contentView else { return }
-                let picker = NSSharingServicePicker(items: urls)
-                sharingPicker = picker
-                picker.show(
-                    relativeTo: NSRect(x: view.bounds.midX, y: view.bounds.midY, width: 1, height: 1),
-                    of: view,
-                    preferredEdge: .minY
-                )
+                desktop?.share(urls)
             }
         }
         commands.register(Command(Self.editTags, "Finder Tags…"), enabled: hasLocalOperands) { [self] in
@@ -428,17 +394,50 @@ public final class MacIntegrationPlugin: Plugin {
 
     public func stop() {
         subscription = nil
-        if launchesApplications { quickLook.close() }
+        quickLook.close()
     }
 
-    /// Lets the user pick an application from the Applications folder. Never in tests.
+    /// Lets the user pick the application that opens `url`: one of those that open it, or another.
+    private func openWith(_ url: URL, in kernel: Kernel) {
+        let applications = applications
+        // Launch Services looks at the file to know what opens it; on a volume that has
+        // stopped answering that never returns. It is asked in a job, which can be cancelled.
+        kernel.jobs.run(
+            title: "Applications:",
+            work: { monitor -> [URL]? in
+                BlockingCalls.answer(
+                    from: Self.launchServices,
+                    to: "applications " + url.path,
+                    cancellation: monitor.cancellation
+                ) { _ in applications(url) }
+            },
+            completion: { [self] found in
+                guard let candidates = found else { return }
+                let rows = candidates.enumerated()
+                    .map {
+                        Self.applicationName($0.element) + ($0.offset == 0 ? " (default)" : "")
+                    }
+                guard
+                    let row = kernel.interaction.pickRow(
+                        "Open “\(DisplayText.oneLine(url.lastPathComponent))” with",
+                        rows: rows + ["Other…"],
+                        button: "Open"
+                    )
+                else { return }
+                guard
+                    let application = candidates.indices.contains(row)
+                        ? candidates[row]
+                        : chooseApplication(title: "Choose an application")
+                else { return }
+                remember("open-with \(Self.applicationName(application)) \(url.path)")
+                open([url], with: application)
+            }
+        )
+    }
+
+    /// Lets the user pick an application from the Applications folder; nil without a desktop.
     private func chooseApplication(title: String) -> URL? {
-        guard launchesApplications else { return nil }
-        let panel = NSOpenPanel()
-        panel.title = title
-        panel.directoryURL = URL(fileURLWithPath: "/Applications")
-        panel.allowedContentTypes = [.application]
-        return panel.runModal() == .OK ? panel.url : nil
+        desktop?.chooseApplication(title: title)
     }
 
     // MARK: Finder tags

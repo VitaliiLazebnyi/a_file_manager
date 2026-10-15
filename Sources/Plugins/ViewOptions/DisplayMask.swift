@@ -14,9 +14,10 @@ struct DisplayMask: Sendable {
     init(_ text: String) {
         let text = text.trimmingCharacters(in: .whitespaces)
         self.text = text
-        let parts = text.split(separator: "|", maxSplits: 1, omittingEmptySubsequences: false).map {
-            $0.trimmingCharacters(in: .whitespaces)
-        }
+        let parts = text.split(separator: "|", maxSplits: 1, omittingEmptySubsequences: false)
+            .map {
+                $0.trimmingCharacters(in: .whitespaces)
+            }
         func words(_ part: String) -> [String] {
             part.split(whereSeparator: { $0 == " " || $0 == ";" }).map(String.init)
         }
@@ -24,7 +25,8 @@ struct DisplayMask: Sendable {
         let excluded = parts.count > 1 ? words(parts[1]) : []
         // The Windows form of a folder exclusion, `name\`, is read as well.
         let isFolderMask = { (word: String) in word.hasSuffix("/") || word.hasSuffix("\\") }
-        includes = mask(words(parts.first ?? ""))
+        // Split without leaving out empty parts, the text has at least one part: all of it when it has no `|`.
+        includes = mask(words(parts[0]))
         excludes = mask(excluded.filter { !isFolderMask($0) })
         folderExcludes = mask(excluded.filter(isFolderMask).map { String($0.dropLast()) }.filter { !$0.isEmpty })
     }

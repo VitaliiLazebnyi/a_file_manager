@@ -19,48 +19,61 @@ enum PropertyColumns {
         // for it, end when the panel no longer wants the answer.
         columns.register(
             ContentColumn(
-                id: "comment", title: "Comment", width: 220,
+                id: "comment",
+                title: "Comment",
+                width: 220,
                 cancellableValue: { item, cancellation in
                     comments.comment(for: item, cancellation: cancellation).replacingOccurrences(of: "\n", with: " ")
-                }))
+                }
+            )
+        )
         columns.register(
             ContentColumn(id: "owner", title: "Owner", width: 90) { item in
                 local(item) { LocalInfo.userName($0.ownerID) }
-            })
+            }
+        )
         columns.register(
             ContentColumn(id: "group", title: "Group", width: 90) { item in
                 local(item) { LocalInfo.groupName($0.groupID) }
-            })
+            }
+        )
         columns.register(
             ContentColumn(id: "created", title: "Created", width: 120) { item in local(item) { Format.date($0.created) }
-            })
+            }
+        )
         columns.register(
             ContentColumn(id: "accessed", title: "Accessed", width: 120) { item in
                 local(item) { Format.date($0.accessed) }
-            })
+            }
+        )
         columns.register(
             ContentColumn(id: "octal", title: "Mode", width: 50, alignsRight: true) { item in
                 PropertyText.octal(item.permissions)
-            })
+            }
+        )
         columns.register(
             ContentColumn(id: "linkTarget", title: "Link Target", width: 200) { item in
                 item.isSymlink ? LocalInfo.linkTarget(item.url) ?? "" : ""
-            })
+            }
+        )
         columns.register(ContentColumn(id: "kind", title: "Kind", width: 140) { item in LocalInfo.kind(of: item) })
         columns.register(
             ContentColumn(id: "tags", title: "Tags", width: 120) { item in
                 LocalInfo.tags(item.url).joined(separator: ", ")
-            })
+            }
+        )
         columns.register(
             ContentColumn(id: "xattrCount", title: "Ext. Attributes", width: 60, alignsRight: true) { item in
                 let count = LocalInfo.extendedAttributeNames(item.url).count
                 return count > 0 ? String(count) : ""
-            })
+            }
+        )
         columns.register(
             ContentColumn(id: "sizeOnDisk", title: "Size on Disk", width: 100, alignsRight: true) { item in
                 // A folder's own entry says nothing about its contents; measuring those is a command.
                 item.isRealDirectory ? "" : local(item) { Format.bytes($0.allocated) }
-            })
+            }
+        )
     }
 }
 
@@ -135,7 +148,9 @@ struct PropertySheet {
             rows.append(
                 PropertyRow(
                     "Contains",
-                    "\(Format.bytes(Int64(totals.files))) file(s), \(Format.bytes(Int64(totals.folders))) folder(s)"))
+                    "\(Format.bytes(Int64(totals.files))) file(s), \(Format.bytes(Int64(totals.folders))) folder(s)"
+                )
+            )
         } else {
             rows.append(PropertyRow("Size", PropertyText.size(item.size)))
             if let details { rows.append(PropertyRow("Size on disk", PropertyText.size(details.allocated))) }
@@ -145,7 +160,10 @@ struct PropertySheet {
         if let details { rows.append(PropertyRow("Accessed", PropertyText.longDate(details.accessed))) }
         rows.append(
             PropertyRow(
-                "Permissions", "\(Format.permissions(item.permissions)) (\(PropertyText.octal(item.permissions)))"))
+                "Permissions",
+                "\(Format.permissions(item.permissions)) (\(PropertyText.octal(item.permissions)))"
+            )
+        )
         if let details {
             rows.append(PropertyRow("Owner", "\(LocalInfo.userName(details.ownerID)) (\(details.ownerID))"))
             rows.append(PropertyRow("Group", "\(LocalInfo.groupName(details.groupID)) (\(details.groupID))"))
@@ -165,7 +183,8 @@ struct PropertySheet {
         let attributes = LocalInfo.extendedAttributeNames(url)
         if !attributes.isEmpty {
             rows.append(
-                PropertyRow("Extended attributes", "\(attributes.count): " + attributes.joined(separator: ", ")))
+                PropertyRow("Extended attributes", "\(attributes.count): " + attributes.joined(separator: ", "))
+            )
         }
         if let volume = volumeText(for: url) { rows.append(PropertyRow("Volume", volume)) }
         let comment = comments.comment(for: item, cancellation: cancellation)
@@ -181,25 +200,33 @@ struct PropertySheet {
             PropertyRow(
                 "Items",
                 "\(items.count): " + items.prefix(4).map(\.name).joined(separator: ", ")
-                    + (items.count > 4 ? ", …" : ""))
+                    + (items.count > 4 ? ", …" : "")
+            )
         ]
         if let first = items.first {
             rows.append(PropertyRow("Where", fileSystems.displayPath(first.url.deletingLastPathComponent())))
         }
         rows.append(
             PropertyRow(
-                "Size", PropertyText.size(totals.bytes) + (cancellation.isCancelled ? " (stopped; incomplete)" : "")))
+                "Size",
+                PropertyText.size(totals.bytes) + (cancellation.isCancelled ? " (stopped; incomplete)" : "")
+            )
+        )
         if isLocal { rows.append(PropertyRow("Size on disk", PropertyText.size(totals.allocated))) }
         rows.append(
             PropertyRow(
                 "Contains",
-                "\(Format.bytes(Int64(totals.files))) file(s), \(Format.bytes(Int64(totals.folders))) folder(s)"))
+                "\(Format.bytes(Int64(totals.files))) file(s), \(Format.bytes(Int64(totals.folders))) folder(s)"
+            )
+        )
         if let newest = items.map(\.modified).max(), let oldest = items.map(\.modified).min() {
             rows.append(
                 PropertyRow(
                     "Modified",
                     oldest == newest
-                        ? PropertyText.longDate(newest) : "\(Format.date(oldest)) – \(Format.date(newest))"))
+                        ? PropertyText.longDate(newest) : "\(Format.date(oldest)) – \(Format.date(newest))"
+                )
+            )
         }
         let modes = Set(items.map(\.permissions))
         if modes.count == 1, let mode = modes.first {
@@ -254,7 +281,10 @@ enum LinkMaker {
 
         case .alias:
             let bookmark = try source.bookmarkData(
-                options: .suitableForBookmarkFile, includingResourceValuesForKeys: nil, relativeTo: nil)
+                options: .suitableForBookmarkFile,
+                includingResourceValuesForKeys: nil,
+                relativeTo: nil
+            )
             try URL.writeBookmarkData(bookmark, to: destination)
         }
     }

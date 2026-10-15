@@ -157,14 +157,17 @@ public struct TabFile: Equatable, Sendable {
                 current = line.dropFirst().dropLast().lowercased()
             } else if let equals = line.firstIndex(of: "="), !line.hasPrefix(";") {
                 sections[current, default: [:]][line[..<equals].lowercased()] = String(
-                    line[line.index(after: equals)...])
+                    line[line.index(after: equals)...]
+                )
             }
         }
 
         func state(_ name: String) -> PanelTabs.State? {
             guard let keys = sections[name] else { return nil }
-            let numbers = keys.keys.compactMap { key in key.hasSuffix("_path") ? Int(key.dropLast("_path".count)) : nil
-            }.sorted()
+            let numbers = keys.keys
+                .compactMap { key in key.hasSuffix("_path") ? Int(key.dropLast("_path".count)) : nil
+                }
+                .sorted()
             var tabs: [PanelTabState] = []
             var active = 0
             let wanted = keys["activetab"].flatMap(Int.init) ?? 0
@@ -178,11 +181,14 @@ public struct TabFile: Equatable, Sendable {
                 func field(_ index: Int) -> Int { fields.indices.contains(index) ? fields[index] : 0 }
                 if number == wanted { active = tabs.count }
                 var tab = PanelTabState(
-                    location: url, showHidden: field(6) == 1,
-                    title: keys["\(number)_caption"].map(Self.unquoted).flatMap {
-                        $0.isEmpty || $0.count > Self.captionLimit ? nil : $0
-                    },
-                    locked: field(5) == 1)
+                    location: url,
+                    showHidden: field(6) == 1,
+                    title: keys["\(number)_caption"].map(Self.unquoted)
+                        .flatMap {
+                            $0.isEmpty || $0.count > Self.captionLimit ? nil : $0
+                        },
+                    locked: field(5) == 1
+                )
                 // The sort key as the file has it, known or not.
                 (tab.sortKey, tab.descending) = (field(1), field(2) == 1)
                 tabs.append(tab)

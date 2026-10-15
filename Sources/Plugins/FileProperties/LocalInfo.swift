@@ -39,8 +39,10 @@ enum LocalInfo {
 
     static func posixError(_ code: Int32, _ url: URL) -> any Error {
         NSError(
-            domain: NSPOSIXErrorDomain, code: Int(code),
-            userInfo: [NSLocalizedDescriptionKey: String(cString: strerror(code)) + ": " + url.path])
+            domain: NSPOSIXErrorDomain,
+            code: Int(code),
+            userInfo: [NSLocalizedDescriptionKey: String(cString: strerror(code)) + ": " + url.path]
+        )
     }
 
     /// The item itself; a link is not followed. Nil when nothing is there.
@@ -49,10 +51,16 @@ enum LocalInfo {
         var st = stat()
         guard lstat(url.path, &st) == 0 else { return nil }
         return LocalDetails(
-            mode: UInt16(st.st_mode & 0o7777), ownerID: st.st_uid, groupID: st.st_gid,
+            mode: UInt16(st.st_mode & 0o7777),
+            ownerID: st.st_uid,
+            groupID: st.st_gid,
             created: date(st.st_birthtimespec),
-            modified: date(st.st_mtimespec), accessed: date(st.st_atimespec), flags: st.st_flags,
-            allocated: Int64(st.st_blocks) * 512, linkCount: Int(st.st_nlink))
+            modified: date(st.st_mtimespec),
+            accessed: date(st.st_atimespec),
+            flags: st.st_flags,
+            allocated: Int64(st.st_blocks) * 512,
+            linkCount: Int(st.st_nlink)
+        )
     }
 
     /// Whether the entry itself is a symbolic link, asked from the disk now.
@@ -154,8 +162,11 @@ enum LocalInfo {
         else { return nil }
         var isStale = false
         return try? URL(
-            resolvingBookmarkData: bookmark, options: [.withoutUI, .withoutMounting], relativeTo: nil,
-            bookmarkDataIsStale: &isStale)
+            resolvingBookmarkData: bookmark,
+            options: [.withoutUI, .withoutMounting],
+            relativeTo: nil,
+            bookmarkDataIsStale: &isStale
+        )
     }
 
     /// The names of the item's extended attributes; a link is not followed.
@@ -164,11 +175,12 @@ enum LocalInfo {
         let length = listxattr(url.path, nil, 0, XATTR_NOFOLLOW)
         guard length > 0 else { return [] }
         var buffer = [CChar](repeating: 0, count: length)
+        // The names may have gone meanwhile: what the second call fills is what there is.
         let filled = listxattr(url.path, &buffer, length, XATTR_NOFOLLOW)
-        guard filled > 0 else { return [] }
-        return buffer.prefix(filled).split(separator: 0).map {
-            (Array($0) + [0]).withUnsafeBufferPointer { String(cString: $0.baseAddress!) }
-        }
+        return buffer.prefix(max(filled, 0)).split(separator: 0)
+            .map {
+                (Array($0) + [0]).withUnsafeBufferPointer { String(cString: $0.baseAddress!) }
+            }
     }
 
     static func tags(_ url: URL) -> [String] {
