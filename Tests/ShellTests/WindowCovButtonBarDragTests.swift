@@ -117,7 +117,9 @@ internal struct WindowCovButtonBarDragTests {
         #expect(picture.size == button.frame.size)
         #expect(picture.cgImage(forProposedRect: nil, context: nil, hints: nil) != nil)
         // Let go of on the bar, nothing is taken off; the bar looks as before.
-        let session = PanelDragSession(NSPasteboard.withUniqueName())
+        let board = NSPasteboard.withUniqueName()
+        defer { board.releaseGlobally() }
+        let session = PanelDragSession(board)
         bar.dragWasCancelled = { false }
         let inside = try #require(bar.window)
             .convertToScreen(bar.convert(NSRect(x: 30, y: 10, width: 1, height: 1), to: nil))
@@ -155,7 +157,9 @@ internal struct WindowCovButtonBarDragTests {
         let app = await fixture.startWindow(with: WindowTestPlugin())
         defer { app.stop() }
         let bar = arrange(app)
-        let session = PanelDragSession(NSPasteboard.withUniqueName())
+        let board = NSPasteboard.withUniqueName()
+        defer { board.releaseGlobally() }
+        let session = PanelDragSession(board)
         let outside = NSPoint(x: -50_000, y: -50_000)
         let copy = ButtonBarView.Dragged.button(line: 0, group: 0, index: 0)
         // Nothing of the bar's dragged: only the marks go.

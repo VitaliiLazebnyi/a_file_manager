@@ -66,19 +66,28 @@ internal struct AppShellLifetimeTests {
         var parts = Parts()
         do {
             let app = await fixture.startProgram()
-            app.cursor(app.left, on: "docs")
-            app.commands.perform(.open)
+            // What AppKit hands back autoreleased goes with the pool of each step, as the
+            // program's event loop empties one after every event: the test process runs no such
+            // loop on its main thread.
+            autoreleasepool {
+                app.cursor(app.left, on: "docs")
+                app.commands.perform(.open)
+            }
             await app.settle()
-            app.commands.perform(.focusCommandLine)
-            app.commands.perform(.commandLineHistory)
-            app.commands.perform(.quickFilter)
-            app.window.validateBars()
             var ended = false
-            app.kernel.jobs.run(title: "Short", work: { _ in 1 }, completion: { _ in ended = true })
+            autoreleasepool {
+                app.commands.perform(.focusCommandLine)
+                app.commands.perform(.commandLineHistory)
+                app.commands.perform(.quickFilter)
+                app.window.validateBars()
+                app.kernel.jobs.run(title: "Short", work: { _ in 1 }, completion: { _ in ended = true })
+            }
             #expect(await AppWait.until { ended })
             await app.settle()
-            app.stop()
-            parts = Self.parts(of: app)
+            autoreleasepool {
+                app.stop()
+                parts = Self.parts(of: app)
+            }
         }
         await PanelWait.drainMainQueue()
         #expect(await AppWait.until { parts.areGone })

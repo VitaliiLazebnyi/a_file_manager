@@ -7,8 +7,8 @@ internal final class WindowCovDraggingInfo: NSObject, @preconcurrency NSDragging
     internal let draggingSource: Any?
     /// Where the mouse is, in the window.
     internal var draggingLocation: NSPoint
-    /// The pasteboard of the drag.
-    internal let draggingPasteboard = NSPasteboard.withUniqueName()
+    /// The pasteboard of the drag: the system's one for drags, which nobody here writes to.
+    internal let draggingPasteboard = NSPasteboard(name: .drag)
     /// What the source allows.
     internal var draggingSourceOperationMask: NSDragOperation = .move
     /// Which drag this is.
