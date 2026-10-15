@@ -139,8 +139,15 @@ internal struct AppSlowFolderTests {
         app.left.show(locked.url("/locked"))
         #expect(await AppWait.until { app.left.model.directory.path == "/locked" && app.left.model.isOpening })
         locked.open()
+        // The message comes from the run loop after the panel went back, whenever the machine gets
+        // to it: waited for, not given a time.
+        #expect(
+            await AppWait.until {
+                !fixture.user.log.isEmpty && app.left.model.directory.lastPathComponent == "A"
+                    && app.left.model.isComplete
+            }
+        )
         await app.settle()
-        await AppWait.until(seconds: 2) { !fixture.user.log.isEmpty }
         // Back in the folder it came from, with the cursor where it was, and the user is told.
         #expect(
             app.left.model.directory.lastPathComponent == "A" && app.names(app.left) == ["docs", "one.txt", "two.txt"]

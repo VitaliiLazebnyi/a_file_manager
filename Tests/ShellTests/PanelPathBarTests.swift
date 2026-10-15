@@ -1,4 +1,5 @@
 import AppKit
+import TestSupport
 import Testing
 
 @testable import AFMShell
@@ -133,7 +134,7 @@ internal struct PanelPathBarTests {
         #expect(
             !bar.ejectButton.isHidden && bar.ejectButton.frame.maxX == 200 && bar.ejectButton.toolTip == "Eject “Stick”"
         )
-        bar.ejectButton.performClick(nil)
+        Controls.send(bar.ejectButton)
         #expect(ejected == 1)
         bar.ejectableVolumeName = nil
         #expect(bar.ejectButton.isHidden)
