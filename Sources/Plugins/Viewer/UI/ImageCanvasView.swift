@@ -32,41 +32,60 @@ enum ImageDecoder {
     /// frame of an animation stays (the specification's `GifMinDelay`). Photos are turned as
     /// their EXIF orientation says.
     static func decode(
-        _ data: Data, minimumDelay: Double = 0.08, largestSide: Int = largestSide, pixelLimit: Double = pixelLimit,
-        cancellation: CancellationFlag = CancellationFlag(), firstFrame: ((DecodedImage) -> Void)? = nil
+        _ data: Data,
+        minimumDelay: Double = 0.08,
+        largestSide: Int = largestSide,
+        pixelLimit: Double = pixelLimit,
+        memoryLimit: Int = animationMemoryLimit,
+        cancellation: CancellationFlag = CancellationFlag(),
+        firstFrame: ((DecodedImage) -> Void)? = nil
     ) -> DecodedImage? {
-        guard
-            let source = CGImageSourceCreateWithData(
-                data as CFData, [kCGImageSourceShouldCache: false] as CFDictionary)
-        else { return nil }
-        return decode(
-            source, minimumDelay: minimumDelay, largestSide: largestSide, pixelLimit: pixelLimit,
-            cancellation: cancellation, firstFrame: firstFrame)
+        decode(
+            CGImageSourceCreateWithData(data as CFData, [kCGImageSourceShouldCache: false] as CFDictionary),
+            minimumDelay: minimumDelay,
+            largestSide: largestSide,
+            pixelLimit: pixelLimit,
+            memoryLimit: memoryLimit,
+            cancellation: cancellation,
+            firstFrame: firstFrame
+        )
     }
 
     /// The same for a file on the local disk, which ImageIO reads as it needs it instead of
     /// the whole file being read into memory first.
     static func decode(
-        contentsOf url: URL, minimumDelay: Double = 0.08, largestSide: Int = largestSide,
+        contentsOf url: URL,
+        minimumDelay: Double = 0.08,
+        largestSide: Int = largestSide,
         pixelLimit: Double = pixelLimit,
-        cancellation: CancellationFlag = CancellationFlag(), firstFrame: ((DecodedImage) -> Void)? = nil
+        memoryLimit: Int = animationMemoryLimit,
+        cancellation: CancellationFlag = CancellationFlag(),
+        firstFrame: ((DecodedImage) -> Void)? = nil
     ) -> DecodedImage? {
-        guard let source = CGImageSourceCreateWithURL(url as CFURL, [kCGImageSourceShouldCache: false] as CFDictionary)
-        else { return nil }
-        return decode(
-            source, minimumDelay: minimumDelay, largestSide: largestSide, pixelLimit: pixelLimit,
-            cancellation: cancellation, firstFrame: firstFrame)
+        decode(
+            CGImageSourceCreateWithURL(url as CFURL, [kCGImageSourceShouldCache: false] as CFDictionary),
+            minimumDelay: minimumDelay,
+            largestSide: largestSide,
+            pixelLimit: pixelLimit,
+            memoryLimit: memoryLimit,
+            cancellation: cancellation,
+            firstFrame: firstFrame
+        )
     }
 
     /// With `firstFrame`, an animation's first frame is handed over as soon as it is decoded,
-    /// before the other frames are.
+    /// before the other frames are. Nil also without a source (a file that cannot be opened).
     private static func decode(
-        _ source: CGImageSource, minimumDelay: Double, largestSide: Int, pixelLimit: Double,
+        _ source: CGImageSource?,
+        minimumDelay: Double,
+        largestSide: Int,
+        pixelLimit: Double,
+        memoryLimit: Int,
         cancellation: CancellationFlag,
         firstFrame: ((DecodedImage) -> Void)?
     ) -> DecodedImage? {
+        guard let source, CGImageSourceGetCount(source) > 0 else { return nil }
         var count = CGImageSourceGetCount(source)
-        guard count > 0 else { return nil }
         // Only a file that is an animation plays as one; the images of an icon file, a TIFF of
         // several pages or a collection are alternatives or pages, and the biggest is shown.
         var first = 0
@@ -78,18 +97,14 @@ enum ImageDecoder {
                 count = first + 1
             }
         }
-        let properties = CGImageSourceCopyPropertiesAtIndex(source, first, nil) as? [CFString: Any] ?? [:]
-        var width = (properties[kCGImagePropertyPixelWidth] as? NSNumber)?.doubleValue ?? 0
-        var height = (properties[kCGImagePropertyPixelHeight] as? NSNumber)?.doubleValue ?? 0
+        let properties = properties(of: source, at: first)
+        var width = number(kCGImagePropertyPixelWidth, in: properties)
+        var height = number(kCGImagePropertyPixelHeight, in: properties)
         guard width * height <= pixelLimit else { return nil }
         if let orientation = (properties[kCGImagePropertyOrientation] as? NSNumber)?.intValue, orientation >= 5 {
             swap(&width, &height)
         }
-        let options: [CFString: Any] = [
-            kCGImageSourceCreateThumbnailFromImageAlways: true, kCGImageSourceCreateThumbnailWithTransform: true,
-            kCGImageSourceShouldCacheImmediately: true,
-            kCGImageSourceThumbnailMaxPixelSize: max(1, min(largestSide, Int(max(width, height, 1))))
-        ]
+        let options = thumbnailOptions(width: width, height: height, largestSide: largestSide)
         var frames: [(CGImage, Double)] = []
         var memory = 0
         var dropped = 0
@@ -106,44 +121,59 @@ enum ImageDecoder {
                     firstFrame?(
                         DecodedImage(
                             frames: [(image: frame, delay: frames[0].1)],
-                            pixelSize: CGSize(width: width, height: height)))
+                            pixelSize: CGSize(width: width, height: height)
+                        )
+                    )
                 }
             }
-            if memory > animationMemoryLimit {
+            if memory > memoryLimit {
                 dropped = count - index - 1
                 break
             }
         }
         guard !frames.isEmpty else { return nil }
         return DecodedImage(
-            frames: frames.map { (image: $0.0, delay: $0.1) }, pixelSize: CGSize(width: width, height: height),
-            framesDropped: dropped)
+            frames: frames.map { (image: $0.0, delay: $0.1) },
+            pixelSize: CGSize(width: width, height: height),
+            framesDropped: dropped
+        )
+    }
+
+    /// How the frames are made: turned, at most `largestSide` pixels on a side.
+    private static func thumbnailOptions(width: Double, height: Double, largestSide: Int) -> [CFString: Any] {
+        var options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true, kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceShouldCacheImmediately: true
+        ]
+        // A picture whose size is not named (a PDF) is made at its own size, not as one pixel.
+        if width > 0, height > 0 {
+            options[kCGImageSourceThumbnailMaxPixelSize] = max(1, min(largestSide, Int(max(width, height))))
+        }
+        return options
     }
 
     /// Whether the frames of the source are those of an animation: a GIF, an animated PNG or
     /// WebP, or a HEIC sequence says so with a dictionary of its own.
     private static func isAnimation(_ source: CGImageSource) -> Bool {
-        let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any] ?? [:]
-        let containers = CGImageSourceCopyProperties(source, nil) as? [CFString: Any] ?? [:]
+        let properties = properties(of: source, at: 0)
+        let containers = dictionary(CGImageSourceCopyProperties(source, nil))
         let keys: [CFString] = [
             kCGImagePropertyGIFDictionary, kCGImagePropertyPNGDictionary, kCGImagePropertyHEICSDictionary,
             kCGImagePropertyWebPDictionary
         ]
-        for key in keys {
-            if let values = properties[key] as? [CFString: Any] ?? containers[key] as? [CFString: Any] {
-                // An animation names a delay or a loop count (a PNG dictionary alone is not one).
-                let names: [CFString] = [
-                    kCGImagePropertyGIFDelayTime, kCGImagePropertyGIFUnclampedDelayTime, kCGImagePropertyAPNGDelayTime,
-                    kCGImagePropertyAPNGUnclampedDelayTime, kCGImagePropertyGIFLoopCount, kCGImagePropertyAPNGLoopCount
-                ]
-                if names.contains(where: { values[$0] != nil }) || key == kCGImagePropertyHEICSDictionary
-                    || key == kCGImagePropertyWebPDictionary
-                {
-                    return true
-                }
+        // An animation names a delay or a loop count (a PNG dictionary alone is not one).
+        let names: [CFString] = [
+            kCGImagePropertyGIFDelayTime, kCGImagePropertyGIFUnclampedDelayTime, kCGImagePropertyAPNGDelayTime,
+            kCGImagePropertyAPNGUnclampedDelayTime, kCGImagePropertyGIFLoopCount, kCGImagePropertyAPNGLoopCount
+        ]
+        return keys.contains { key in
+            guard let values = properties[key] as? [CFString: Any] ?? containers[key] as? [CFString: Any] else {
+                return false
             }
+            // A HEIC sequence or a WebP is one whatever it names.
+            return key == kCGImagePropertyHEICSDictionary || key == kCGImagePropertyWebPDictionary
+                || names.contains { values[$0] != nil }
         }
-        return false
     }
 
     /// The index of the image with the most pixels.
@@ -151,10 +181,9 @@ enum ImageDecoder {
         var best = 0
         var area = -1.0
         for index in 0..<CGImageSourceGetCount(source) {
-            let properties = CGImageSourceCopyPropertiesAtIndex(source, index, nil) as? [CFString: Any] ?? [:]
+            let properties = properties(of: source, at: index)
             let size =
-                ((properties[kCGImagePropertyPixelWidth] as? NSNumber)?.doubleValue ?? 0)
-                * ((properties[kCGImagePropertyPixelHeight] as? NSNumber)?.doubleValue ?? 0)
+                number(kCGImagePropertyPixelWidth, in: properties) * number(kCGImagePropertyPixelHeight, in: properties)
             if size > area {
                 best = index
                 area = size
@@ -163,8 +192,23 @@ enum ImageDecoder {
         return best
     }
 
+    /// The properties of image `index` of `source`; none for an image it does not have.
+    internal static func properties(of source: CGImageSource, at index: Int) -> [CFString: Any] {
+        dictionary(CGImageSourceCopyPropertiesAtIndex(source, index, nil))
+    }
+
+    /// The keys and values of a dictionary of properties; none for none.
+    private static func dictionary(_ properties: CFDictionary?) -> [CFString: Any] {
+        properties as? [CFString: Any] ?? [:]
+    }
+
+    /// A number among `properties`; 0 when it is not there (a PDF names no size in pixels).
+    internal static func number(_ key: CFString, in properties: [CFString: Any]) -> Double {
+        (properties[key] as? NSNumber)?.doubleValue ?? 0
+    }
+
     private static func delay(of source: CGImageSource, at index: Int) -> Double {
-        let properties = CGImageSourceCopyPropertiesAtIndex(source, index, nil) as? [CFString: Any] ?? [:]
+        let properties = properties(of: source, at: index)
         for (dictionary, unclamped, clamped) in [
             (kCGImagePropertyGIFDictionary, kCGImagePropertyGIFUnclampedDelayTime, kCGImagePropertyGIFDelayTime),
             (kCGImagePropertyPNGDictionary, kCGImagePropertyAPNGUnclampedDelayTime, kCGImagePropertyAPNGDelayTime)
@@ -271,8 +315,14 @@ final class ScaledFrameCache {
         let space = frame.colorSpace.flatMap { $0.model == .rgb ? $0 : nil } ?? CGColorSpace(name: CGColorSpace.sRGB)
         guard let space,
             let context = CGContext(
-                data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0, space: space,
-                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+                data: nil,
+                width: width,
+                height: height,
+                bitsPerComponent: 8,
+                bytesPerRow: 0,
+                space: space,
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            )
         else { return nil }
         context.interpolationQuality = .high
         context.draw(frame, in: CGRect(x: 0, y: 0, width: width, height: height))
@@ -306,10 +356,11 @@ final class ImageCanvasView: NSScrollView {
             // while an animation or the window's edge changes the picture, the frame is resampled.
             let scale = window?.backingScaleFactor ?? 1
             if let bitmap = scaled.image(
-                for: frameImage, width: Int((size.width * scale).rounded()),
+                for: frameImage,
+                width: Int((size.width * scale).rounded()),
                 height: Int((size.height * scale).rounded()),
-                building: !isAnimated && !inLiveResize)
-            {
+                building: !isAnimated && !inLiveResize
+            ) {
                 context.interpolationQuality = .default
                 context.draw(bitmap, in: rect)
             } else {
@@ -350,7 +401,8 @@ final class ImageCanvasView: NSScrollView {
         canvas.scaled.onReady = { [weak canvas] in canvas?.needsDisplay = true }
     }
 
-    required init?(coder _: NSCoder) { fatalError("not used") }
+    /// Made in code only: an archive gives none.
+    required init?(coder _: NSCoder) { nil }
 
     deinit { timer?.invalidate() }
 
@@ -393,10 +445,15 @@ final class ImageCanvasView: NSScrollView {
     /// of the screen.
     private var turnedSize: CGSize {
         guard let size = image?.size else { return .zero }
-        let scale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 1
+        let scale = Self.pixelsPerPoint(window: window, screen: NSScreen.main)
         return quarterTurns % 2 != 0
             ? CGSize(width: size.height / scale, height: size.width / scale)
             : CGSize(width: size.width / scale, height: size.height / scale)
+    }
+
+    /// The pixels of the screen per point: those of the window, else of the main screen, else 1.
+    internal static func pixelsPerPoint(window: NSWindow?, screen: NSScreen?) -> CGFloat {
+        window?.backingScaleFactor ?? screen?.backingScaleFactor ?? 1
     }
 
     /// The factor the image is drawn with; 1 is actual size.
@@ -423,11 +480,15 @@ final class ImageCanvasView: NSScrollView {
     func scroll(byX deltaX: CGFloat, y deltaY: CGFloat) {
         let origin = contentView.bounds.origin
         contentView.scroll(
-            to: contentView.constrainBoundsRect(
-                NSRect(
-                    origin: NSPoint(x: origin.x + deltaX, y: origin.y + deltaY),
-                    size: contentView.bounds.size)
-            ).origin)
+            to:
+                contentView.constrainBoundsRect(
+                    NSRect(
+                        origin: NSPoint(x: origin.x + deltaX, y: origin.y + deltaY),
+                        size: contentView.bounds.size
+                    )
+                )
+                .origin
+        )
         reflectScrolledClipView(contentView)
     }
 
@@ -462,8 +523,11 @@ final class ImageCanvasView: NSScrollView {
         canvas.imageRect =
             centered
             ? NSRect(
-                x: (document.width - shown.width) / 2, y: (document.height - shown.height) / 2, width: shown.width,
-                height: shown.height)
+                x: (document.width - shown.width) / 2,
+                y: (document.height - shown.height) / 2,
+                width: shown.width,
+                height: shown.height
+            )
             : NSRect(x: 0, y: document.height - shown.height, width: shown.width, height: shown.height)
         canvas.quarterTurns = quarterTurns
         canvas.frameImage = currentFrame
@@ -477,14 +541,15 @@ final class ImageCanvasView: NSScrollView {
         timer = Timer.scheduledTimer(withTimeInterval: image.frames[frameIndex].delay, repeats: false) {
             [weak self] _ in
             // A scheduled timer fires on the main run loop.
-            MainActor.assumeIsolated {
-                guard let self, let image = self.image else { return }
-                self.frameIndex = (self.frameIndex + 1) % image.frames.count
-                self.canvas.frameImage = image.frames[self.frameIndex].image
-                self.canvas.needsDisplay = true
-                self.scheduleNextFrame()
-            }
+            MainActor.assumeIsolated { self?.showNextFrame() }
         }
+    }
+
+    private func showNextFrame() {
+        frameIndex = (frameIndex + 1) % max(1, frameCount)
+        canvas.frameImage = currentFrame
+        canvas.needsDisplay = true
+        scheduleNextFrame()
     }
 
     override func scrollWheel(with event: NSEvent) {

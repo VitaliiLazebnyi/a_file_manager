@@ -9,6 +9,7 @@ enum HTMLText {
         "p", "div", "br", "li", "tr", "h1", "h2", "h3", "h4", "h5", "h6", "table", "ul", "ol",
         "blockquote", "pre", "hr", "section", "article", "header", "footer", "title", "dt", "dd"
     ]
+    /// Elements whose content is not text. Each name has 8 letters at most (the scan relies on it).
     private static let skippedElements: Set<String> = ["script", "style", "noscript", "template", "svg"]
     private static let entities: [String: String] = [
         "amp": "&", "lt": "<", "gt": ">", "quot": "\"", "apos": "'", "nbsp": " ", "copy": "©", "reg": "®", "trade": "™",
@@ -27,7 +28,7 @@ enum HTMLText {
     }
 
     static func plainText(from html: String, linkBraces: Bool = true) -> Result {
-        plainText(units: Array(html.utf16), linkBraces: linkBraces) ?? Result(text: "", links: [])
+        convert(Array(html.utf16), linkBraces: linkBraces, cancellation: nil).result
     }
 
     /// White space as `Character.isWhitespace` and trimming know it.
@@ -105,7 +106,10 @@ enum HTMLText {
 
     /// The entities of the most text, found without making a string of the name.
     private static let commonEntities: [(name: [UInt16], replacement: [UInt16])] =
-        ["amp", "lt", "gt", "quot", "apos", "nbsp"].map { (Array($0.utf16), Array((entities[$0] ?? "").utf16)) }
+        entities.filter { ["amp", "lt", "gt", "quot", "apos", "nbsp"].contains($0.key) }
+        .map {
+            (Array($0.key.utf16), Array($0.value.utf16))
+        }
 
     /// The text for an entity name given as units, when it is one of `commonEntities`.
     @inline(__always)
@@ -241,6 +245,15 @@ enum HTMLText {
     static func plainText(units html: [UInt16], linkBraces: Bool = true, cancellation: CancellationFlag? = nil)
         -> Result?
     {
+        let converted = convert(html, linkBraces: linkBraces, cancellation: cancellation)
+        return converted.cancelled ? nil : converted.result
+    }
+
+    /// The text of `html`; `cancelled` when `cancellation` was set before it was all read (the
+    /// text is then empty).
+    private static func convert(_ html: [UInt16], linkBraces: Bool, cancellation: CancellationFlag?) -> (
+        result: Result, cancelled: Bool
+    ) {
         var text: [UInt16] = []
         text.reserveCapacity(html.count + 16)
         var links: [String] = []
@@ -255,10 +268,6 @@ enum HTMLText {
             var index = 0
             var checked = 0
 
-            func append(_ units: [UInt16]) {
-                text.append(contentsOf: units)
-                endsInWhitespace = text.last.map(isWhitespace) ?? true
-            }
             func lineBreak() {
                 while text.last == 0x20 { text.removeLast() }
                 if !text.isEmpty, text.last != 0x0A { text.append(0x0A) }
@@ -434,10 +443,9 @@ enum HTMLText {
                 }
                 let kind = tags.kind(of: key)
                 if !isClosing, kind == .skipped {
-                    // Everything up to the matching end tag is not text.
-                    let name = (0..<key.length).map {
-                        UInt8(truncatingIfNeeded: ($0 < 8 ? key.first : key.second) >> UInt64(($0 % 8) * 8))
-                    }
+                    // Everything up to the matching end tag is not text. (The names of these
+                    // elements have 8 letters at most: they are all in `key.first`.)
+                    let name = (0..<key.length).map { UInt8(truncatingIfNeeded: key.first >> UInt64($0 * 8)) }
                     if let end = findClosing(name, from: index) {
                         let after = find(0x3E, from: end)
                         index = after < count ? after + 1 : count
@@ -446,7 +454,9 @@ enum HTMLText {
                     }
                 } else if kind == .anchor {
                     if isClosing, let target = pendingLink {
-                        append([0x20] + (linkBraces ? [0x7B] + target + [0x7D] : target))
+                        text.append(0x20)
+                        text.append(contentsOf: linkBraces ? [0x7B] + target + [0x7D] : target)
+                        endsInWhitespace = isWhitespace(text[text.count - 1])
                         pendingLink = nil
                     } else if !isClosing, let found = link(open: open, close: close) {
                         pendingLink = found.units
@@ -460,13 +470,13 @@ enum HTMLText {
                 }
             }
         }
-        if cancelled { return nil }
+        if cancelled { return (Result(text: "", links: []), true) }
         var lower = 0
         var upper = text.count
         while lower < upper, isWhitespace(text[lower]) { lower += 1 }
         while upper > lower, isWhitespace(text[upper - 1]) { upper -= 1 }
         let trimmed = String(decoding: text[lower..<upper], as: UTF16.self)
-        return Result(text: trimmed + (text.isEmpty ? "" : "\n"), links: links)
+        return (Result(text: trimmed + (text.isEmpty ? "" : "\n"), links: links), false)
     }
 
     /// The value of an attribute of a tag: `href="x"`, `href='x'` or `href=x`.
@@ -518,7 +528,8 @@ enum HTMLText {
     /// Context menu rules): it starts with `http://`, `https://` or `www.`.
     static func url(from text: String) -> URL? {
         let trimmed = text.trimmingCharacters(
-            in: CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: "{}<>\"'()[],;")))
+            in: CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: "{}<>\"'()[],;"))
+        )
         let lowered = trimmed.lowercased()
         guard !trimmed.contains(" ") else { return nil }
         if lowered.hasPrefix("http://") || lowered.hasPrefix("https://") { return URL(string: trimmed) }

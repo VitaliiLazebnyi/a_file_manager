@@ -35,14 +35,17 @@ struct RowSplitter {
     /// not part of a reported row: the start of the unfinished row to hand in again. With
     /// `final`, the text ends here and the last row is reported too.
     mutating func split(
-        _ units: UnsafeBufferPointer<UInt16>, final: Bool, row: (_ start: Int, _ end: Int, _ startsLine: Bool) -> Bool
+        _ units: UnsafeBufferPointer<UInt16>,
+        final: Bool,
+        row: (_ start: Int, _ end: Int, _ startsLine: Bool) -> Bool
     ) -> Int {
         runUnits(units, final: final) { start, end, startsLine, _ in row(start, end, startsLine) }
     }
 
     /// `split`, which also tells how many columns each row takes (its line end not counted).
     mutating func splitMeasuring(
-        _ units: UnsafeBufferPointer<UInt16>, final: Bool,
+        _ units: UnsafeBufferPointer<UInt16>,
+        final: Bool,
         row: (_ start: Int, _ end: Int, _ startsLine: Bool, _ width: Int) -> Bool
     ) -> Int {
         runUnits(units, final: final, row: row)
@@ -51,7 +54,8 @@ struct RowSplitter {
     /// The same for text that is plain ASCII, cut straight from its bytes: no decoding, no
     /// table of offsets (a byte is a unit).
     mutating func splitMeasuring(
-        _ bytes: UnsafeBufferPointer<UInt8>, final: Bool,
+        _ bytes: UnsafeBufferPointer<UInt8>,
+        final: Bool,
         row: (_ start: Int, _ end: Int, _ startsLine: Bool, _ width: Int) -> Bool
     ) -> Int {
         runBytes(bytes, final: final, row: row)
@@ -59,7 +63,9 @@ struct RowSplitter {
 
     // The same code twice, for 16-bit units and for bytes: a generic one is slow where nothing is optimised.
     private mutating func runUnits(
-        _ units: UnsafeBufferPointer<UInt16>, final: Bool, row: (Int, Int, Bool, Int) -> Bool
+        _ units: UnsafeBufferPointer<UInt16>,
+        final: Bool,
+        row: (Int, Int, Bool, Int) -> Bool
     ) -> Int {
         let count = units.count
         let columns = options.columns
@@ -149,7 +155,9 @@ struct RowSplitter {
     }
 
     private mutating func runBytes(
-        _ units: UnsafeBufferPointer<UInt8>, final: Bool, row: (Int, Int, Bool, Int) -> Bool
+        _ units: UnsafeBufferPointer<UInt8>,
+        final: Bool,
+        row: (Int, Int, Bool, Int) -> Bool
     ) -> Int {
         let count = units.count
         let columns = options.columns
@@ -309,9 +317,9 @@ final class TextRowIndex: @unchecked Sendable {
             let count = checkpoints.count
             guard count > 1 else { return }
             let span = max(1, bytes)
-            let (product, overflow) = Int64(count).multipliedReportingOverflow(
-                by: Int64(TextRowIndex.minimumCheckpointDistance))
-            let byDistance = overflow ? Int.max : Int(product / span + (product % span == 0 ? 0 : 1))
+            // (A number of checkpoints, which are in memory, times 4 KB does not overflow.)
+            let product = Int64(count) * Int64(TextRowIndex.minimumCheckpointDistance)
+            let byDistance = Int((product + span - 1) / span)
             let byCount = (count + TextRowIndex.maximumCheckpoints - 1) / TextRowIndex.maximumCheckpoints
             let wanted = max(byDistance, byCount)
             guard wanted > 1 else { return }
@@ -424,7 +432,13 @@ final class TextRowIndex: @unchecked Sendable {
     /// of them changed.
     private func mirror() {
         overview.store(
-            rows: rows, lines: lines, covered: coveredEnd, complete: complete, failure: firstFailure, reused: reused)
+            rows: rows,
+            lines: lines,
+            covered: coveredEnd,
+            complete: complete,
+            failure: firstFailure,
+            reused: reused
+        )
     }
 
     // None of these waits for the index lock: they are read on the main thread.
@@ -451,10 +465,16 @@ final class TextRowIndex: @unchecked Sendable {
     /// from the working threads whenever more of the start of the file is known. `rawScan`
     /// off decodes every byte (the reference the fast scan is tested against).
     func build(
-        source: any ByteSource, content: Range<Int64>, encoding: ViewerEncoding, options: TextLayoutOptions,
+        source: any ByteSource,
+        content: Range<Int64>,
+        encoding: ViewerEncoding,
+        options: TextLayoutOptions,
         parallel: Bool,
-        segmentSize: Int = 4 << 20, chunkSize: Int = 1 << 20, rawScan: Bool = true, cancellation: CancellationFlag,
-        progress: @escaping @Sendable () -> Void = {}
+        segmentSize: Int = 4 << 20,
+        chunkSize: Int = 1 << 20,
+        rawScan: Bool = true,
+        cancellation: CancellationFlag,
+        progress: @escaping @Sendable () -> Void
     ) {
         let unit = Int64(encoding.unitSize)
         let size = max(unit, Int64(segmentSize) / unit * unit)
@@ -504,16 +524,23 @@ final class TextRowIndex: @unchecked Sendable {
                     // The segment that comes next in file order shows what it has found so far, so a
                     // file whose first line is gigabytes long is not blank until it is all read.
                     segment = try Self.scan(
-                        source: source, content: content, segment: bounds[number], isFirst: number == 0,
+                        source: source,
+                        content: content,
+                        segment: bounds[number],
+                        isFirst: number == 0,
                         encoding: encoding,
-                        options: options, chunkSize: chunkSize, rawScan: rawScan, cancellation: cancellation,
+                        options: options,
+                        chunkSize: chunkSize,
+                        rawScan: rawScan,
+                        cancellation: cancellation,
                         from: lineStart,
                         partial: { partial, covered in
                             if self.publishPartial(number, partial, coveredEnd: covered) { progress() }
                         },
                         changed: {
                             if !cancellation.isCancelled { self.recordFailure(ViewerError.fileChanged) }
-                        })
+                        }
+                    )
                 } catch {
                     // A read that was ended because the work is dropped is no failure of the file.
                     if !cancellation.isCancelled { recordFailure(error) }
@@ -713,8 +740,11 @@ final class TextRowIndex: @unchecked Sendable {
             while row < first + count {
                 addCheckpoint(
                     Checkpoint(
-                        offset: offset + Int64(row - first), linesBefore: result.lineCount + row - first,
-                        startsLine: true))
+                        offset: offset + Int64(row - first),
+                        linesBefore: result.lineCount + row - first,
+                        startsLine: true
+                    )
+                )
                 // The stride may have doubled meanwhile.
                 row = (row / result.stride + 1) * result.stride
             }
@@ -753,9 +783,18 @@ final class TextRowIndex: @unchecked Sendable {
     /// for the first line start behind its lower bound and reads on past its upper bound to
     /// the end of its last line. `partial` is handed what is found so far, every few megabytes.
     static func scan(
-        source: any ByteSource, content: Range<Int64>, segment: Range<Int64>, isFirst: Bool, encoding: ViewerEncoding,
-        options: TextLayoutOptions, chunkSize: Int, rawScan: Bool = true, cancellation: CancellationFlag,
-        from lineStart: Int64? = nil, partial: ((Segment, Int64) -> Void)? = nil, changed: (() -> Void)? = nil
+        source: any ByteSource,
+        content: Range<Int64>,
+        segment: Range<Int64>,
+        isFirst: Bool,
+        encoding: ViewerEncoding,
+        options: TextLayoutOptions,
+        chunkSize: Int,
+        rawScan: Bool = true,
+        cancellation: CancellationFlag,
+        from lineStart: Int64? = nil,
+        partial: ((Segment, Int64) -> Void)? = nil,
+        changed: (() -> Void)? = nil
     ) throws -> Segment {
         let unit = encoding.unitSize
         // With `lineStart`, a line is known to begin there (inside the segment): nothing before it is read.
@@ -775,7 +814,10 @@ final class TextRowIndex: @unchecked Sendable {
             let origin = base + Int64(range.lowerBound)
             if rawScan, unit == 1, let start = buffer.baseAddress, isASCII(start + range.lowerBound, range.count) {
                 return splitter.splitMeasuring(UnsafeBufferPointer(rebasing: buffer[range]), final: final) {
-                    first, _, startsLine, width in
+                    first,
+                    _,
+                    startsLine,
+                    width in
                     state.take(offset: origin + Int64(first), startsLine: startsLine, width: width)
                 }
             }
@@ -805,7 +847,7 @@ final class TextRowIndex: @unchecked Sendable {
                 // row, or with tabs) and to the ends of unfinished lines.
                 let count = buffer.count
                 let columns = options.columns
-                guard let start = buffer.baseAddress else { return 0 }
+                guard !buffer.isEmpty, let start = buffer.baseAddress else { return 0 }
                 @inline(__always) func load(_ at: Int) -> UInt64 {
                     UnsafeRawPointer(start + at).loadUnaligned(as: UInt64.self)
                 }
@@ -926,7 +968,11 @@ final class TextRowIndex: @unchecked Sendable {
     /// The checkpoint to start from to reach `row`; nil when the row is not known (yet).
     func position(ofRow row: Int) -> Position? {
         synchronized {
-            guard row >= 0, row < rows, let segment = lastSegment(where: { $0.firstRow <= row }) else { return nil }
+            guard row >= 0, row < rows else {
+                return nil
+            }
+            // The first segment begins with row 0.
+            let segment = published[Self.prefixCount(in: published) { $0.firstRow <= row } - 1]
             return position(segment, min((row - segment.firstRow) / segment.stride, segment.checkpoints.count - 1))
         }
     }
@@ -934,41 +980,48 @@ final class TextRowIndex: @unchecked Sendable {
     /// The last checkpoint at or before a byte offset; nil when that part is not indexed yet.
     func position(before offset: Int64) -> Position? {
         synchronized {
-            guard offset < coveredEnd || complete,
-                let segment = lastSegment(where: { $0.checkpoints[0].offset <= offset })
-            else { return nil }
-            return position(segment, Self.lastIndex(in: segment.checkpoints) { $0.offset <= offset } ?? 0)
+            // None when the offset is before the first segment that could be read.
+            let segments = Self.prefixCount(in: published) { $0.checkpoints[0].offset <= offset }
+            guard offset < coveredEnd || complete, segments > 0 else {
+                return nil
+            }
+            let segment = published[segments - 1]
+            // Its first checkpoint is at or before the offset.
+            return position(segment, Self.prefixCount(in: segment.checkpoints) { $0.offset <= offset } - 1)
         }
     }
 
     /// The last checkpoint at or before the first row of a line (counted from 0).
     func position(beforeLine line: Int) -> Position? {
         synchronized {
-            guard line >= 0, line < lines, let segment = lastSegment(where: { $0.firstLine <= line }) else {
+            guard line >= 0, line < lines else {
                 return nil
             }
+            // The first segment begins with line 0, and the first checkpoint of a segment with its first line.
+            let segment = published[Self.prefixCount(in: published) { $0.firstLine <= line } - 1]
             return position(
                 segment,
-                Self.lastIndex(in: segment.checkpoints) { $0.linesBefore <= line - segment.firstLine } ?? 0)
+                Self.prefixCount(in: segment.checkpoints) { $0.linesBefore <= line - segment.firstLine } - 1
+            )
         }
     }
 
     private func position(_ segment: Segment, _ checkpoint: Int) -> Position {
         let point = segment.checkpoints[checkpoint]
         return Position(
-            offset: point.offset, row: segment.firstRow + checkpoint * segment.stride, startsLine: point.startsLine,
+            offset: point.offset,
+            row: segment.firstRow + checkpoint * segment.stride,
+            startsLine: point.startsLine,
             linesBefore: segment.firstLine + point.linesBefore,
-            endRow: segment.endsAtGap ? segment.firstRow + segment.rowCount : nil)
+            endRow: segment.endsAtGap ? segment.firstRow + segment.rowCount : nil
+        )
     }
 
-    private func lastSegment(where matches: (Segment) -> Bool) -> Segment? {
-        Self.lastIndex(in: published, where: matches).map { published[$0] }
-    }
-
-    /// The last element of a sorted array for which `matches` holds (it holds for a prefix).
-    private static func lastIndex<Elements: RandomAccessCollection>(
-        in elements: Elements, where matches: (Elements.Element) -> Bool
-    ) -> Int?
+    /// How many elements of a sorted array `matches` holds for (it holds for a prefix).
+    private static func prefixCount<Elements: RandomAccessCollection>(
+        in elements: Elements,
+        where matches: (Elements.Element) -> Bool
+    ) -> Int
     where Elements.Index == Int {
         var low = 0
         var high = elements.count
@@ -976,7 +1029,7 @@ final class TextRowIndex: @unchecked Sendable {
             let middle = (low + high) / 2
             if matches(elements[middle]) { low = middle + 1 } else { high = middle }
         }
-        return low > 0 ? low - 1 : nil
+        return low
     }
 }
 

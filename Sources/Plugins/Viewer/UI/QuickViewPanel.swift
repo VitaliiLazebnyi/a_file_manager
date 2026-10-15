@@ -28,9 +28,15 @@ final class QuickViewPanel {
     private(set) var shownItem: FileItem?
 
     init(
-        kernel: Kernel, settings: ListerSettings, temporaryCopies: TemporaryCopies, host: any PanelOverlayHost,
+        kernel: Kernel,
+        settings: ListerSettings,
+        temporaryCopies: TemporaryCopies,
+        host: any PanelOverlayHost,
         covering covered: any PanelHandle,
-        following followed: any PanelHandle, internalOnly: Bool, delay: TimeInterval, onDismiss: @escaping () -> Void
+        following followed: any PanelHandle,
+        internalOnly: Bool,
+        delay: TimeInterval,
+        onDismiss: @escaping () -> Void
     ) {
         self.kernel = kernel
         self.host = host

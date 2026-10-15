@@ -39,6 +39,10 @@ final class ViewerPane: NSView, NSMenuDelegate {
     var internalOnly = false
     /// Where Copy puts its result.
     var pasteboard = NSPasteboard.general
+    /// Where links that may be opened go: the browser, the mail program.
+    var links: any LinkOpening = SystemLinks()
+    /// The panels the pane asks with, and printing.
+    var dialogs: any ViewerDialogs = SystemDialogs()
 
     /// The window title changed (a file was loaded, a track names itself).
     var onTitleChange: (String) -> Void = { _ in }
@@ -141,7 +145,8 @@ final class ViewerPane: NSView, NSMenuDelegate {
         applySettings()
     }
 
-    required init?(coder _: NSCoder) { fatalError("not used") }
+    /// Made in code only: an archive gives none.
+    required init?(coder _: NSCoder) { nil }
 
     deinit {
         cancellation.cancel()
@@ -250,12 +255,18 @@ final class ViewerPane: NSView, NSMenuDelegate {
         // inside the main window, only while the pane has the keyboard (spec 10 › Embedded
         // Lister: "these keep their Lister meaning").
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            guard let self, let window, event.window === window, window.attachedSheet == nil,
-                !isEmbedded || hasKeyboard,
-                !(window.firstResponder is NSText) || richText === window.firstResponder
-            else { return event }
-            return handleKey(event) ? nil : event
+            self?.monitored(event) ?? event
         }
+    }
+
+    /// What the key monitor does with a key of the application: a key of this pane's window
+    /// that the pane handles is taken (nil), any other is passed on.
+    func monitored(_ event: NSEvent) -> NSEvent? {
+        guard let window, event.window === window, window.attachedSheet == nil,
+            !isEmbedded || hasKeyboard,
+            !(window.firstResponder is NSText) || richText === window.firstResponder
+        else { return event }
+        return handleKey(event) ? nil : event
     }
 
     // MARK: Loading
@@ -287,8 +298,13 @@ final class ViewerPane: NSView, NSMenuDelegate {
                     case .text(let text):
                         let data = Data(text.utf8)
                         return Loaded(
-                            item: item, source: DataByteSource(data), sample: data.prefix(ViewerDetection.sampleSize),
-                            guess: ViewerDetection.TextGuess(encoding: .utf8), content: .other, parallel: true)
+                            item: item,
+                            source: DataByteSource(data),
+                            sample: data.prefix(ViewerDetection.sampleSize),
+                            guess: ViewerDetection.TextGuess(encoding: .utf8),
+                            content: .other,
+                            parallel: true
+                        )
 
                     case .file(let url):
                         let provider = try fileSystems.provider(for: url)
@@ -308,16 +324,29 @@ final class ViewerPane: NSView, NSMenuDelegate {
                             isLocal
                             ? CachedByteSource(opened)
                             : CachedByteSource(
-                                opened, blockSize: 256 << 10, capacity: 256, wholeFileLimit: 64 << 20,
-                                spillsToDisk: true)
+                                opened,
+                                blockSize: 256 << 10,
+                                capacity: 256,
+                                wholeFileLimit: 64 << 20,
+                                spillsToDisk: true
+                            )
                         let sample = try source.read(at: 0, count: ViewerDetection.sampleSize, cancellation: flag)
                         return Loaded(
-                            item: item, source: source, sample: sample,
+                            item: item,
+                            source: source,
+                            sample: sample,
                             guess: ViewerDetection.guessText(
-                                sample, isWholeFile: Int64(sample.count) >= source.length),
+                                sample,
+                                isWholeFile: Int64(sample.count) >= source.length
+                            ),
                             content: ViewerDetection.content(
-                                name: url.lastPathComponent, sample: sample, additionalMedia: media, vetoed: vetoed),
-                            parallel: isLocal)
+                                name: url.lastPathComponent,
+                                sample: sample,
+                                additionalMedia: media,
+                                vetoed: vetoed
+                            ),
+                            parallel: isLocal
+                        )
                     }
                 }
             }
@@ -327,7 +356,10 @@ final class ViewerPane: NSView, NSMenuDelegate {
             let result: Result<Loaded, any Error>
             if case .file(let url) = item.source, let provider = try? fileSystems.provider(for: url) {
                 let answer = BlockingCalls.answer(
-                    from: provider, to: "view " + url.absoluteString, sharing: false, cancellation: cancellation
+                    from: provider,
+                    to: "view " + url.absoluteString,
+                    sharing: false,
+                    cancellation: cancellation
                 ) { flag in
                     open(item, flag)
                 }
@@ -400,8 +432,11 @@ final class ViewerPane: NSView, NSMenuDelegate {
             // A tree on a server is a trip per folder: the quick view counts a part of it only.
             let isLocal = provider.volume(of: url, cancellation: cancellation)?.isLocal ?? true
             let summary = FolderSummary.measure(
-                url, provider: provider, cancellation: cancellation,
-                limit: isLocal ? nil : Self.remoteFolderEntryLimit)
+                url,
+                provider: provider,
+                cancellation: cancellation,
+                limit: isLocal ? nil : Self.remoteFolderEntryLimit
+            )
             DispatchQueue.main.async {
                 guard let self, self.loadGeneration == generation, !cancellation.isCancelled else { return }
                 self.folderSummary = summary
@@ -507,7 +542,8 @@ final class ViewerPane: NSView, NSMenuDelegate {
         default:
             guard settings.wrap else {
                 return .text(
-                    TextLayoutOptions(columns: settings.unwrapWidth, wordWrap: false, tabWidth: settings.tabWidth))
+                    TextLayoutOptions(columns: settings.unwrapWidth, wordWrap: false, tabWidth: settings.tabWidth)
+                )
             }
             let columns = settings.textWidth > 0 ? settings.textWidth : pager.columnsThatFit
             return .text(TextLayoutOptions(columns: columns, wordWrap: true, tabWidth: settings.tabWidth))
@@ -532,15 +568,22 @@ final class ViewerPane: NSView, NSMenuDelegate {
             setContent(pager, keyboardTo: pager)
             // The width decides where a text wrapped at the window's edge is cut.
             if window != nil { layoutSubtreeIfNeeded() }
-            let source = mode == .html ? strippedHTML?.source ?? loaded.source : loaded.source
+            let source = (mode == .html ? strippedHTML?.source : nil) ?? loaded.source
             let hasMark = mode != .html && ViewerDetection.byteOrderMark(loaded.sample)?.encoding == encoding
             // The text laid out before is given: what is the same in both is not read again.
             let document = TextDocument(
-                source: source, encoding: encoding, bomLength: hasMark ? loaded.guess.bomLength : 0, layout: layout,
-                reusing: pager.document)
+                source: source,
+                encoding: encoding,
+                bomLength: hasMark ? loaded.guess.bomLength : 0,
+                layout: layout,
+                reusing: pager.document
+            )
             pager.show(
-                document, at: offset ?? 0, keepingSelection: offset != nil && pager.document?.source === source,
-                parallel: loaded.parallel)
+                document,
+                at: offset ?? 0,
+                keepingSelection: offset != nil && pager.document?.source === source,
+                parallel: loaded.parallel
+            )
         } else {
             pager.clear()
             presentRich(loaded)
@@ -582,7 +625,10 @@ final class ViewerPane: NSView, NSMenuDelegate {
             }
             guard !cancel.isCancelled,
                 let result = HTMLText.plainText(
-                    units: encoding.units(from: data), linkBraces: braces, cancellation: cancel)
+                    units: encoding.units(from: data),
+                    linkBraces: braces,
+                    cancellation: cancel
+                )
             else { return }
             let stripped = DataByteSource(Data(result.text.utf8))
             DispatchQueue.main.async {
@@ -656,9 +702,7 @@ final class ViewerPane: NSView, NSMenuDelegate {
             // A file on the local disk is read by the framework that shows it, as far as it needs;
             // only other file systems are read whole into memory here.
             func whole() -> Data? {
-                guard loaded.source.length <= Self.wholeFileLimit else { return nil }
-                if url.isFileURL { return try? Data(contentsOf: url, options: .mappedIfSafe) }
-                return try? loaded.source.read(0..<loaded.source.length, cancellation: presentCancel)
+                Self.wholeData(of: loaded.source, at: url, limit: Self.wholeFileLimit, cancellation: presentCancel)
             }
             var ready = Ready.failed("The file cannot be shown in this mode.")
             switch content {
@@ -673,11 +717,20 @@ final class ViewerPane: NSView, NSMenuDelegate {
                 let image =
                     url.isFileURL
                     ? ImageDecoder.decode(
-                        contentsOf: url, minimumDelay: minimumDelay, cancellation: presentCancel, firstFrame: early)
-                    : whole().flatMap {
-                        ImageDecoder.decode(
-                            $0, minimumDelay: minimumDelay, cancellation: presentCancel, firstFrame: early)
-                    }
+                        contentsOf: url,
+                        minimumDelay: minimumDelay,
+                        cancellation: presentCancel,
+                        firstFrame: early
+                    )
+                    : whole()
+                        .flatMap {
+                            ImageDecoder.decode(
+                                $0,
+                                minimumDelay: minimumDelay,
+                                cancellation: presentCancel,
+                                firstFrame: early
+                            )
+                        }
                 if let image { ready = .image(image) }
 
             case .pdf:
@@ -764,6 +817,19 @@ final class ViewerPane: NSView, NSMenuDelegate {
         }
     }
 
+    /// All the bytes of a file, for a mode that needs them at once; nil beyond `limit` or when they
+    /// cannot be read. A file on the local disk is mapped, the others are read through `source`.
+    nonisolated static func wholeData(
+        of source: any ByteSource,
+        at url: URL,
+        limit: Int64,
+        cancellation: CancellationFlag
+    ) -> Data? {
+        guard source.length <= limit else { return nil }
+        if url.isFileURL { return try? Data(contentsOf: url, options: .mappedIfSafe) }
+        return try? source.read(0..<source.length, cancellation: cancellation)
+    }
+
     /// Puts an image (or the first frame of an animation) on the screen.
     private func showImage(_ image: DecodedImage) {
         let view = ImageCanvasView(frame: contentHost.bounds)
@@ -782,7 +848,7 @@ final class ViewerPane: NSView, NSMenuDelegate {
     /// file it does not sit beside.
     func followLink(_ link: URL) {
         if LinkPolicy.opensInBrowser(link) {
-            NSWorkspace.shared.open(link)
+            links.open(link)
         } else if let base = item?.url, let target = LinkPolicy.target(of: link, relativeTo: base) {
             load(ViewerItem(source: .file(target), title: kernel.fileSystems.displayPath(target)))
         }
@@ -795,17 +861,23 @@ final class ViewerPane: NSView, NSMenuDelegate {
     /// go of), with the same text at the top.
     private func pagerResized() {
         resizeWork?.cancel()
-        let work = DispatchWorkItem { [weak self] in
-            guard let self else { return }
-            resizeWork = nil
-            // The end of the live resize asks again.
-            guard !inLiveResize, !pager.inLiveResize else { return }
-            guard contentView === pager, pager.shownLayout != nil, pager.shownLayout != layout
-            else { return }
-            present(keeping: pager.topOffset)
-        }
+        let work = DispatchWorkItem { [weak self] in self?.resizeSettled() }
         resizeWork = work
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25, execute: work)
+    }
+
+    private func resizeSettled() {
+        resizeWork = nil
+        layOutAfterResize(whileResizing: inLiveResize || pager.inLiveResize)
+    }
+
+    /// Lays a text wrapped at the window's edge out anew for the width it has now, unless the
+    /// window is still being resized (the end of the live resize asks again).
+    func layOutAfterResize(whileResizing: Bool) {
+        guard !whileResizing, contentView === pager, pager.shownLayout != nil, pager.shownLayout != layout else {
+            return
+        }
+        present(keeping: pager.topOffset)
     }
 
     override func viewDidEndLiveResize() {
@@ -875,11 +947,13 @@ final class ViewerPane: NSView, NSMenuDelegate {
             if imageView.framesDropped > 0 { parts.append("\(imageView.framesDropped) frames left out") }
         } else if contentView === pager, let document = pager.document {
             parts.append(
-                mode == .hex || mode == .binary ? "\(mode.title), \(document.encoding.name)" : document.encoding.name)
+                mode == .hex || mode == .binary ? "\(mode.title), \(document.encoding.name)" : document.encoding.name
+            )
             if let position = pager.position {
                 parts.append(
                     mode == .hex || mode == .binary
-                        ? "Offset \(Format.bytes(position.offset))" : "Line \(Format.bytes(Int64(position.line)))")
+                        ? "Offset \(Format.bytes(position.offset))" : "Line \(Format.bytes(Int64(position.line)))"
+                )
             }
             if let selection = pager.selection {
                 parts.append("\(Format.bytes(selection.upperBound - selection.lowerBound)) bytes selected")

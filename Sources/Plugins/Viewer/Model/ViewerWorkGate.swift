@@ -16,7 +16,9 @@ import Foundation
 final class ViewerWorkGate: @unchecked Sendable {
     /// Index builds of text documents.
     static let indexBuilds = ViewerWorkGate(
-        live: max(2, min(4, ProcessInfo.processInfo.activeProcessorCount / 2)), stuck: 8)
+        live: max(2, min(4, ProcessInfo.processInfo.activeProcessorCount / 2)),
+        stuck: 8
+    )
 
     let live: Int
     let stuck: Int
@@ -24,7 +26,6 @@ final class ViewerWorkGate: @unchecked Sendable {
     private struct Waiting {
         let flag: CancellationFlag
         let work: @Sendable () -> Void
-        let refused: @Sendable () -> Void
     }
     private struct Running {
         let flag: CancellationFlag
@@ -57,7 +58,8 @@ final class ViewerWorkGate: @unchecked Sendable {
     /// before; or calls `refused` (on this thread) when `stuck` threads are held by cancelled
     /// jobs that have not come back. Any thread.
     func submit(
-        cancellation flag: CancellationFlag, refused: @escaping @Sendable () -> Void = {},
+        cancellation flag: CancellationFlag,
+        refused: @Sendable () -> Void = {},
         _ work: @escaping @Sendable () -> Void
     ) {
         lock.lock()
@@ -67,7 +69,7 @@ final class ViewerWorkGate: @unchecked Sendable {
             refused()
             return
         }
-        waiting.append(Waiting(flag: flag, work: work, refused: refused))
+        waiting.append(Waiting(flag: flag, work: work))
         let ready = takeReady()
         lock.unlock()
         start(ready)

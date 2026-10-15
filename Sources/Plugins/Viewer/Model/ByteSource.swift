@@ -305,53 +305,58 @@ final class ProviderByteSource: ByteSource, @unchecked Sendable {
 /// per source), so reading the whole file again, as laying a big text out anew does, is a
 /// read of the local disk and not of the server. The file has no name once it is open, so
 /// nothing is left behind whatever happens to the program. All the sources together keep at
-/// most `totalLimit` bytes and one source at most 1 GB; a source that finds the room used up
-/// goes on without caching more.
-/// Safe to use from several threads: the state of a cache is guarded by `lock`, the shared
-/// budget by `budget`.
+/// most what their `DiskBudget` allows (2 GB) and one source at most 1 GB; a source that finds
+/// the room used up goes on without caching more.
+/// Safe to use from several threads: the state of a cache is guarded by `lock`; the shared
+/// budget guards itself; the rest is immutable.
 final class DiskBlockCache: @unchecked Sendable {
-    /// The most all caches together hold.
-    static let totalLimit: Int64 = 2 << 30
-    private static let budget = NSLock()
-    /// Guarded by `budget`.
-    nonisolated(unsafe) private static var held: Int64 = 0
-
-    /// Bytes all caches hold now.
-    static var totalHeld: Int64 {
-        budget.lock()
-        defer { budget.unlock() }
-        return held
-    }
-
-    private static func reserve(_ bytes: Int64) -> Bool {
-        budget.lock()
-        defer { budget.unlock() }
-        guard held + bytes <= totalLimit else { return false }
-        held += bytes
-        return true
-    }
-
-    private static func release(_ bytes: Int64) {
-        budget.lock()
-        held -= bytes
-        budget.unlock()
-    }
-
     let blockSize: Int
     private let length: Int64
     /// The most this one cache holds.
     private let limit: Int64
+    /// The room on disk this cache shares with the others.
+    private let budget: DiskBudget
+    /// Opens the file the blocks are kept in: a descriptor open for reading and writing, or a
+    /// negative number when there is none.
+    private let openFile: @Sendable () -> Int32
     private let lock = NSLock()
     private var descriptor: Int32 = -1
     private var present: [UInt64]
     private var held: Int64 = 0
     private var failed = false
 
-    init(blockSize: Int, length: Int64, limit: Int64 = 1 << 30) {
+    convenience init(blockSize: Int, length: Int64, limit: Int64 = 1 << 30) {
+        self.init(blockSize: blockSize, length: length, limit: limit, budget: .shared, openFile: Self.openUnnamedFile)
+    }
+
+    /// A cache that shares `budget` with others and keeps its blocks in the file `openFile`
+    /// opens when the first block is stored.
+    internal init(
+        blockSize: Int,
+        length: Int64,
+        limit: Int64,
+        budget: DiskBudget,
+        openFile: @escaping @Sendable () -> Int32
+    ) {
         self.blockSize = blockSize
         self.length = length
         self.limit = limit
+        self.budget = budget
+        self.openFile = openFile
         present = Array(repeating: 0, count: Int((length / Int64(blockSize) + 64) / 64))
+    }
+
+    /// A new temporary file that is gone from the directory at once: the system removes the
+    /// data when the file is closed, whatever happens to the program.
+    internal static func openUnnamedFile() -> Int32 {
+        let path = FileManager.default.temporaryDirectory
+            .appendingPathComponent(
+                "afm-viewer-p\(getpid())-blocks-\(UUID().uuidString)"
+            )
+            .path
+        let opened = open(path, O_RDWR | O_CREAT | O_EXCL | O_CLOEXEC, 0o600)
+        if opened >= 0 { unlink(path) }
+        return opened
     }
 
     /// Bytes this cache holds.
@@ -394,7 +399,7 @@ final class DiskBlockCache: @unchecked Sendable {
             // The block is gone (a failing disk): its room goes back to the budget.
             present[Int(block / 64)] &= ~(1 << UInt64(block % 64))
             held -= Int64(wanted)
-            Self.release(Int64(wanted))
+            budget.release(Int64(wanted))
             return nil
         }
         return data
@@ -406,20 +411,15 @@ final class DiskBlockCache: @unchecked Sendable {
         defer { lock.unlock() }
         guard !failed, data.count == size(of: block), data.count > 0, !isPresent(block),
             held + Int64(data.count) <= limit,
-            Self.reserve(Int64(data.count))
+            budget.reserve(Int64(data.count))
         else { return }
         if descriptor < 0 {
-            let path = FileManager.default.temporaryDirectory.appendingPathComponent(
-                "afm-viewer-p\(getpid())-blocks-\(UUID().uuidString)"
-            ).path
-            let opened = open(path, O_RDWR | O_CREAT | O_EXCL | O_CLOEXEC, 0o600)
+            let opened = openFile()
             guard opened >= 0 else {
                 failed = true
-                Self.release(Int64(data.count))
+                budget.release(Int64(data.count))
                 return
             }
-            // Gone from the directory at once: the system removes the data when the file is closed.
-            unlink(path)
             descriptor = opened
         }
         let wrote = data.withUnsafeBytes {
@@ -428,7 +428,7 @@ final class DiskBlockCache: @unchecked Sendable {
         guard wrote == data.count else {
             // A full disk: no more is tried.
             failed = true
-            Self.release(Int64(data.count))
+            budget.release(Int64(data.count))
             return
         }
         present[Int(block / 64)] |= 1 << UInt64(block % 64)
@@ -445,7 +445,7 @@ final class DiskBlockCache: @unchecked Sendable {
         held = 0
         failed = false
         lock.unlock()
-        if given > 0 { Self.release(given) }
+        if given > 0 { budget.release(given) }
     }
 
     deinit { discard() }
@@ -474,7 +474,10 @@ final class CachedByteSource: ByteSource, @unchecked Sendable {
     private var order: [Int64] = []
 
     init(
-        _ base: any ByteSource, blockSize: Int = 128 * 1_024, capacity: Int = 48, wholeFileLimit: Int64 = 0,
+        _ base: any ByteSource,
+        blockSize: Int = 128 * 1_024,
+        capacity: Int = 48,
+        wholeFileLimit: Int64 = 0,
         spillsToDisk: Bool = false,
         diskLimit: Int64 = 1 << 30
     ) {
@@ -516,7 +519,7 @@ final class CachedByteSource: ByteSource, @unchecked Sendable {
         // Four blocks or more is a scan, not a look at what is shown.
         if upper - lower >= Int64(blockSize) * 4 {
             if keepsWholeFile { return try readAndKeep(lower, upper, flag) }
-            if spill != nil { return try readThroughDisk(lower, upper, flag) }
+            if let spill { return try readThroughDisk(lower, upper, spill, flag) }
             return try fetch(lower, Int(upper - lower), flag)
         }
         var result = Data(capacity: Int(upper - lower))
@@ -570,9 +573,9 @@ final class CachedByteSource: ByteSource, @unchecked Sendable {
             guard piece.count == blockSize || number * size + Int64(piece.count) == length, blocks[number] == nil else {
                 continue
             }
+            // The whole file fits in the capacity: nothing is pushed out.
             blocks[number] = piece
             order.append(number)
-            if order.count > capacity { blocks[order.removeFirst()] = nil }
         }
         lock.unlock()
         let from = Int(lower - alignedLower)
@@ -581,8 +584,9 @@ final class CachedByteSource: ByteSource, @unchecked Sendable {
 
     /// A long read of a file that is too big for memory: the blocks the disk has come from the
     /// disk, each run of the others in one request to the base, and every block is stored.
-    private func readThroughDisk(_ lower: Int64, _ upper: Int64, _ flag: CancellationFlag?) throws -> Data {
-        guard let spill else { return try fetch(lower, Int(upper - lower), flag) }
+    private func readThroughDisk(_ lower: Int64, _ upper: Int64, _ spill: DiskBlockCache, _ flag: CancellationFlag?)
+        throws -> Data
+    {
         let size = Int64(blockSize)
         let first = lower / size
         let last = (upper - 1) / size

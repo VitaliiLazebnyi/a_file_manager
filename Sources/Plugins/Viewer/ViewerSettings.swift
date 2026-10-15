@@ -68,12 +68,63 @@ final class ListerSettings {
     static let defaultQuickLookTypes =
         "doc docx xls xlsx ppt pptx pages numbers key odt ods odp epub svg eps ai usdz stl obj dae gltf"
 
+    /// The options of Configure Lister, in the order the dialog shows them.
+    static var preferences: [Preference] {
+        [
+            Preference(
+                Key.startupMode,
+                "Display at startup",
+                .choice(["Autodetect", "Text", "Binary", "Hex"], default: 0)
+            ),
+            Preference(
+                Key.startupFont,
+                "Font at startup",
+                .choice(["Autodetect", "ANSI", "ASCII (DOS)", "Variable"], default: 0)
+            ),
+            Preference(Key.fixedFont, "Fixed-width font (name, size; empty = default)", .text(default: "")),
+            Preference(Key.variableFont, "Variable-width font (name, size; empty = default)", .text(default: "")),
+            Preference(
+                Key.textWidth,
+                "Display width, text (characters per line; 0 = window width)",
+                .text(default: "0")
+            ),
+            Preference(Key.binaryWidth, "Display width, binary (characters per line)", .text(default: "75")),
+            Preference(Key.unwrapWidth, "Longest line when text is not wrapped", .text(default: "1024")),
+            Preference(Key.tabWidth, "Tab width", .text(default: "8")),
+            Preference(Key.searchGoBack, "Search result: lines from top of list", .text(default: "3")),
+            Preference(Key.wrap, "Wrap text", .flag(default: true)),
+            Preference(Key.caret, "Show text cursor", .flag(default: true)),
+            Preference(Key.graphics, "Load images and PDF as graphics at startup", .flag(default: true)),
+            Preference(Key.multimedia, "Multimedia (audio, video)", .flag(default: true)),
+            Preference(Key.rtf, "RTF", .flag(default: true)),
+            Preference(Key.htmlAsText, "Show HTML as text with links", .flag(default: true)),
+            Preference(Key.linkBraces, "Show links in HTML with surrounding { }", .flag(default: true)),
+            Preference(Key.quickLook, "Use Quick Look previews", .flag(default: true)),
+            Preference(
+                Key.quickLookTypes,
+                "File types shown with Quick Look at startup",
+                .text(default: defaultQuickLookTypes)
+            ),
+            Preference(Key.mediaTypes, "Additional multimedia file types", .text(default: "")),
+            Preference(Key.noMediaTypes, "File types never shown as image or multimedia", .text(default: "")),
+            Preference(
+                Key.fit,
+                "Images",
+                .choice(["Actual size", "Fit image to window", "Fit only larger images to window"], default: 0)
+            ),
+            Preference(Key.center, "Center images", .flag(default: false)),
+            Preference(Key.gifDelay, "Animated GIF: shortest frame delay (ms)", .text(default: "80"))
+        ]
+    }
+
     private func number(_ key: String, default value: Int, in range: ClosedRange<Int>) -> Int {
         min(
             range.upperBound,
             max(
                 range.lowerBound,
-                Int(store.text(key, default: String(value)).trimmingCharacters(in: .whitespaces)) ?? value))
+                Int(store.text(key, default: String(value)).trimmingCharacters(in: .whitespaces)) ?? value
+            )
+        )
     }
 
     // MARK: Configure Lister
@@ -104,42 +155,7 @@ final class ListerSettings {
 
     /// The page of the configuration dialog; `onChange` runs after the user changed something.
     static func preferencePage(onChange: @escaping @MainActor @Sendable () -> Void) -> PreferencePage {
-        PreferencePage(
-            title: "Lister",
-            preferences: [
-                Preference(
-                    Key.startupMode, "Display at startup",
-                    .choice(["Autodetect", "Text", "Binary", "Hex"], default: 0)),
-                Preference(
-                    Key.startupFont, "Font at startup",
-                    .choice(["Autodetect", "ANSI", "ASCII (DOS)", "Variable"], default: 0)),
-                Preference(Key.fixedFont, "Fixed-width font (name, size; empty = default)", .text(default: "")),
-                Preference(Key.variableFont, "Variable-width font (name, size; empty = default)", .text(default: "")),
-                Preference(
-                    Key.textWidth, "Display width, text (characters per line; 0 = window width)", .text(default: "0")),
-                Preference(Key.binaryWidth, "Display width, binary (characters per line)", .text(default: "75")),
-                Preference(Key.unwrapWidth, "Longest line when text is not wrapped", .text(default: "1024")),
-                Preference(Key.tabWidth, "Tab width", .text(default: "8")),
-                Preference(Key.searchGoBack, "Search result: lines from top of list", .text(default: "3")),
-                Preference(Key.wrap, "Wrap text", .flag(default: true)),
-                Preference(Key.caret, "Show text cursor", .flag(default: true)),
-                Preference(Key.graphics, "Load images and PDF as graphics at startup", .flag(default: true)),
-                Preference(Key.multimedia, "Multimedia (audio, video)", .flag(default: true)),
-                Preference(Key.rtf, "RTF", .flag(default: true)),
-                Preference(Key.htmlAsText, "Show HTML as text with links", .flag(default: true)),
-                Preference(Key.linkBraces, "Show links in HTML with surrounding { }", .flag(default: true)),
-                Preference(Key.quickLook, "Use Quick Look previews", .flag(default: true)),
-                Preference(
-                    Key.quickLookTypes, "File types shown with Quick Look at startup",
-                    .text(default: defaultQuickLookTypes)),
-                Preference(Key.mediaTypes, "Additional multimedia file types", .text(default: "")),
-                Preference(Key.noMediaTypes, "File types never shown as image or multimedia", .text(default: "")),
-                Preference(
-                    Key.fit, "Images",
-                    .choice(["Actual size", "Fit image to window", "Fit only larger images to window"], default: 0)),
-                Preference(Key.center, "Center images", .flag(default: false)),
-                Preference(Key.gifDelay, "Animated GIF: shortest frame delay (ms)", .text(default: "80"))
-            ], onChange: onChange)
+        PreferencePage(title: "Lister", preferences: preferences, onChange: onChange)
     }
 
     // MARK: Remembered by the viewer
@@ -176,13 +192,6 @@ final class ListerSettings {
         let parts = text.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
         let size = parts.count > 1 ? Double(parts[1]).map { min(96, max(6, abs($0))) } : nil
         return (parts.first.flatMap { $0.isEmpty ? nil : $0 }, size ?? (slot == .variable ? 13 : 12))
-    }
-
-    func setFontSize(_ size: Double, for slot: FontSlot) {
-        let name = font(slot).name ?? ""
-        store.set(
-            "\(name),\(Int(min(96, max(6, size)).rounded()))",
-            forKey: slot == .variable ? Key.variableFont : Key.fixedFont)
     }
 
     /// The frame of the Lister window (`quick`: of the separate quick view) in the notation of
