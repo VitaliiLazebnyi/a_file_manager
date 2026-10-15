@@ -105,7 +105,9 @@ extension PanelViewController {
 
     /// The drive button and the free space of the volume the folder is on.
     private func updateDriveLine() {
-        volumeButton.setTitle(DisplayText.clean(model.volume?.name ?? model.directory.scheme ?? "/"))
+        volumeButton.setTitle(
+            DisplayText.clean(model.volume?.name ?? String(model.directory.absoluteString.prefix { $0 != ":" }))
+        )
         if let free = model.volume?.freeBytes, let total = model.volume?.totalBytes {
             freeLabel.stringValue = "\(Format.shortSize(free)) of \(Format.shortSize(total)) free"
         } else {

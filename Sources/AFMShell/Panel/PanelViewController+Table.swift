@@ -73,11 +73,11 @@ extension PanelViewController {
         let columns = tableView.tableColumns
         tableView.enumerateAvailableRowViews { rowView, row in
             let look = look(ofRow: row, ownIcons: ownIcons)
+            // Every cell of the table is a cell view (`tableView(_:viewFor:row:)`).
             for index in columns.indices {
-                guard let cell = rowView.view(atColumn: index) as? NSTableCellView else {
-                    continue
+                if let cell = rowView.view(atColumn: index) as? NSTableCellView {
+                    fill(cell, of: columns[index], row: row, look: look)
                 }
-                fill(cell, of: columns[index], row: row, look: look)
             }
         }
     }
