@@ -1191,10 +1191,14 @@ final class OpenArchive: @unchecked Sendable {
 
     /// Hands the wanted members to `body` one by one, in archive order. For archives that can
     /// only be read front to back this takes one pass, however many members are wanted;
-    /// `body` must then read (or leave) each stream before it returns.
+    /// `body` must then read (or leave) each stream before it returns. With `throughTheEnd`, the
+    /// pass reads the archive's stream from the file to its end, also when its members are read
+    /// from a copy or none is wanted: only there are the checks of the compressed stream itself
+    /// (the checksum at the end of a GZIP file) made, on the file as it is now.
     func readInOnePass(
         _ wanted: [ArchiveEntry],
         cancellation: CancellationFlag? = nil,
+        throughTheEnd: Bool,
         _ body: (ArchiveEntry, any ByteStream) throws -> Void
     ) throws {
         // One name per member goes through the pass; further names of the same member (hard
@@ -1203,16 +1207,17 @@ final class OpenArchive: @unchecked Sendable {
         for entry in wanted {
             if case .member(let index) = entry.content, streamed[index] == nil { streamed[index] = entry }
         }
-        if !streamed.isEmpty, let source = locked({ memberSource }) {
+        if !streamed.isEmpty || throughTheEnd, let source = locked({ memberSource }) {
             // The pass runs through long stretches of decompression between two members.
             let control = StreamInterrupt()
             let following = control.following(cancellation)
             defer { withExtendedLifetime(following) {} }
-            let reader = TarReader(try source(control), control: control)
+            let stream = try source(control)
+            let reader = TarReader(stream, control: control)
             defer { reader.close() }
             var index = 0
             var left = streamed.count
-            while left > 0, let header = try reader.next() {
+            while left > 0 || throughTheEnd, let header = try reader.next() {
                 if let entry = streamed[index] {
                     try check(header, is: entry)
                     try body(entry, TarMemberStream(reader, closesReader: false))
@@ -1222,6 +1227,8 @@ final class OpenArchive: @unchecked Sendable {
             }
             // The stream ended before every member came: it is not the archive that was listed.
             if left > 0 { throw ArchiveError.changedOutside(name) }
+            // What follows the last member: the end of the TAR, the checksum of the compressed stream.
+            while throughTheEnd, try stream.read(upToCount: 1 << 16) != nil { try control.check() }
         }
         for entry in wanted {
             if case .member(let index) = entry.content, streamed[index]?.path == entry.path { continue }

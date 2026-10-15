@@ -295,6 +295,15 @@ enum ArchiveTester {
         }
         @Sendable func expected(_ entry: ArchiveEntry) -> Int64? { entry.sizeIsExact ? entry.size : nil }
         if archive.allowsParallelReads {
+            // An archive that is one compressed stream, read from a copy: the stream in the file
+            // is read to its end first, for its own checks.
+            do {
+                try archive.readInOnePass([], cancellation: cancellation, throughTheEnd: true) { _, _ in
+                    // No member is handed over.
+                }
+            } catch {
+                return cancellation.isCancelled ? [] : [error.localizedDescription]
+            }
             return
                 Parallel.map(members) { entry -> String? in
                     problem(with: entry) {
@@ -316,7 +325,7 @@ enum ArchiveTester {
         }
         var problems: [String] = []
         do {
-            try archive.readInOnePass(members, cancellation: cancellation) { entry, stream in
+            try archive.readInOnePass(members, cancellation: cancellation, throughTheEnd: true) { entry, stream in
                 let found = problem(with: entry) {
                     try readThrough(stream, expecting: expected(entry), cancellation: cancellation, counter: counter)
                 }
@@ -725,7 +734,8 @@ final class Unpacker: @unchecked Sendable {
         } else {
             // (The pass hands over exactly the entries it was given, each of them once.)
             let byOrder = Dictionary(uniqueKeysWithValues: files.map { ($0.task.entry.order, $0) })
-            try archive.readInOnePass(files.map(\.task.entry), cancellation: cancellation) { entry, stream in
+            let wanted = files.map(\.task.entry)
+            try archive.readInOnePass(wanted, cancellation: cancellation, throughTheEnd: false) { entry, stream in
                 try checkCancelled()
                 if let (task, root) = byOrder[entry.order] {
                     do {
