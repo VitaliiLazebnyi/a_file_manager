@@ -256,8 +256,10 @@ final class ViewerPane: NSView, NSMenuDelegate {
         // they are taken before anything else sees them, but only for this pane's window and,
         // inside the main window, only while the pane has the keyboard (spec 10 › Embedded
         // Lister: "these keep their Lister meaning").
-        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            self?.monitored(event) ?? event
+        // A key the pane handled is taken from the application (nil); the monitor is removed
+        // when the pane leaves its window and in `deinit`, so it never outlives the pane.
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [unowned self] event in
+            monitored(event)
         }
     }
 
