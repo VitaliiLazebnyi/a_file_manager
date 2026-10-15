@@ -61,10 +61,14 @@ public final class ConfigurationPlugin: Plugin {
 
     /// The keys of the values the program itself stored in the macOS preferences. Only the
     /// real settings store is listed this way; any other store has no list of its keys.
-    private static func storedKeys(of settings: any SettingsStore) -> [String] {
+    static func storedKeys(of settings: any SettingsStore) -> [String] {
         guard settings is UserDefaultsSettings else { return [] }
         let domain = Bundle.main.bundleIdentifier ?? ProcessInfo.processInfo.processName
-        let values = UserDefaults.standard.persistentDomain(forName: domain) ?? [:]
+        return storedKeys(in: UserDefaults.standard.persistentDomain(forName: domain) ?? [:])
+    }
+
+    /// The keys of a preferences domain whose values the program stored.
+    static func storedKeys(in values: [String: Any]) -> [String] {
         // The program stores every value as JSON text. Whether it is one is told by how it
         // begins: reading a large value through would hold up the main thread.
         let beginnings = Set("{[\"-0123456789tfn".utf8)

@@ -27,6 +27,10 @@ internal final class CovConfigStage {
     internal private(set) var fileRequests: [(saving: Bool, product: String)] = []
     /// What the file panel answers.
     internal var chosenFile: URL?
+    /// The menu bar the plugin sees.
+    internal var mainMenu: NSMenu?
+    /// The windows the plugin sees.
+    internal var windows: [NSWindow] = []
     /// What the user does while the command picker runs modally.
     internal var whilePicking: (NSWindow) -> Void = { _ in }
 
@@ -34,15 +38,22 @@ internal final class CovConfigStage {
     internal var ui: ScriptedInteraction { bench.interaction }
     internal let center: ConfigurationCenter
 
-    internal init(plugins: [any Plugin] = []) throws {
+    /// `stored` is in the settings before the plugins start; without `settingsKeys` the plugin
+    /// asks its store for the keys.
+    internal init(
+        plugins: [any Plugin] = [],
+        stored: [String: Data] = [:],
+        settingsKeys: (() -> [String])? = { ["extra.key"] }
+    ) throws {
         box = try Sandbox()
         try box.folder("A")
         try box.folder("B")
+        for (key, value) in stored { settings.set(value as Data?, forKey: key) }
         plugin = ConfigurationPlugin(
             launchesApplications: false,
             background: nil,
             listFolder: box.url("lists"),
-            settingsKeys: { ["extra.key"] }
+            settingsKeys: settingsKeys
         )
         bench = TestBench(
             plugins: [NavigationPlugin(), SelectionPlugin()] + plugins + [plugin],
@@ -62,7 +73,9 @@ internal final class CovConfigStage {
                 fileRequests.append((saving, product))
                 return chosenFile
             },
-            showAbout: { [unowned self] in aboutPanels += 1 }
+            showAbout: { [unowned self] in aboutPanels += 1 },
+            mainMenu: { [unowned self] in mainMenu },
+            windows: { [unowned self] in windows }
         )
     }
 

@@ -3,7 +3,7 @@ import UniformTypeIdentifiers
 
 /// What the configuration windows and commands do outside themselves: putting a window on
 /// screen, a beep, the modal run of the *Choose command* dialog for an editor, the panel that
-/// asks for a settings file and the About panel. The
+/// asks for a settings file, the About panel, and the program's menu bar and windows. The
 /// program uses the system's; a plugin that launches no applications (the tests') uses the
 /// silent side, and tests put recorders in its place, so that nothing sounds or opens on the
 /// desktop.
@@ -18,22 +18,26 @@ struct ConfigurationEffects {
         runModal: { _ = NSApp.runModal(for: $0) },
         stopModal: { NSApp.stopModal() },
         chooseSettingsFile: { saving, productName in Self.filePanel(saving: saving, productName) },
-        showAbout: { NSApp?.orderFrontStandardAboutPanel(nil) }
+        showAbout: { NSApp?.orderFrontStandardAboutPanel(nil) },
+        mainMenu: { NSApp?.mainMenu },
+        windows: { NSApp?.windows ?? [] }
     )
 
-    /// Nothing goes on screen or sounds, a modal run ends at once, and no file is chosen.
+    /// Nothing goes on screen or sounds, a modal run ends at once, no file is chosen, and there
+    /// is no menu bar and no window.
     static let silent = Self(
         present: { _ in },
         beep: {},
         runModal: { _ in },
         stopModal: {},
         chooseSettingsFile: { _, _ in nil },
-        showAbout: {}
+        showAbout: {},
+        mainMenu: { nil },
+        windows: { [] }
     )
 
     /// Puts a window on screen and in front.
     var present: @MainActor (NSWindowController) -> Void
-
     /// Tells the user that a button has nothing to act on.
     var beep: @MainActor () -> Void
     /// Shows the window and runs it modally until `stopModal`.
@@ -44,6 +48,10 @@ struct ConfigurationEffects {
     var chooseSettingsFile: @MainActor (_ saving: Bool, _ productName: String) -> URL?
     /// Shows the program's About panel.
     var showAbout: @MainActor () -> Void
+    /// The menu bar the shell built; nil before there is one.
+    var mainMenu: @MainActor () -> NSMenu?
+    /// The program's windows.
+    var windows: @MainActor () -> [NSWindow]
 
     /// The system's panel for a settings file.
     private static func filePanel(saving: Bool, _ productName: String) -> URL? {
