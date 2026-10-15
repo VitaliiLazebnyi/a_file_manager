@@ -39,8 +39,10 @@ internal struct CoverageViewerPluginTests {
     @Test
     internal func listerWindowsAreShownWhenAskedFor() async {
         let setup = CoverageViewerBench(left: nil, showsWindows: true)
+        defer { setup.plugin.stop() }
         setup.plugin.view(text: "shown", title: "Shown")
         let controller = setup.plugin.windows.last
+        defer { controller?.close() }
         #expect(controller?.window?.isVisible == true)
         controller?.close()
         #expect(await setup.wait { setup.plugin.windows.isEmpty })
@@ -51,6 +53,7 @@ internal struct CoverageViewerPluginTests {
     @Test
     internal func theSeparateQuickViewIsReloaded() async throws {
         let setup = CoverageViewerBench()
+        defer { setup.plugin.stop() }
         #expect(!setup.commands.isEnabled(.updateQuickView))
         setup.bench.left.moveCursor(toName: "notes.txt")
         #expect(setup.commands.perform(.separateQuickViewInternalOnly))
@@ -61,13 +64,13 @@ internal struct CoverageViewerPluginTests {
         window.pane.clear()
         #expect(setup.commands.perform(.updateQuickView))
         #expect(await setup.wait { window.pane.item?.url?.lastPathComponent == "notes.txt" })
-        window.close()
     }
 
     /// A change on the preference page reaches the open panes.
     @Test
     internal func preferenceChangesReachTheOpenPanes() throws {
         let setup = CoverageViewerBench()
+        defer { setup.plugin.stop() }
         setup.plugin.view(text: "text", title: "Text")
         let pane = try #require(setup.plugin.windows.first?.pane)
         #expect(pane.pager.showsCaret)
@@ -75,9 +78,6 @@ internal struct CoverageViewerPluginTests {
         let page = try #require(setup.bench.kernel.preferences.pages.first { $0.title == "Lister" })
         page.onChange()
         #expect(!pane.pager.showsCaret)
-        for window in setup.plugin.windows {
-            window.close()
-        }
     }
 
     /// Configure in a Lister window or in the quick view is the dialog of the command; what is
@@ -85,6 +85,7 @@ internal struct CoverageViewerPluginTests {
     @Test
     internal func configureFromAPaneStoresTheAnswers() throws {
         let setup = CoverageViewerBench()
+        defer { setup.plugin.stop() }
         setup.plugin.view(text: "text", title: "Text")
         let pane = try #require(setup.plugin.windows.first?.pane)
         setup.interaction.formAnswers = [.values(["viewer.caret": .flag(false)])]
@@ -101,9 +102,6 @@ internal struct CoverageViewerPluginTests {
         quick.pane.onConfigure()
         #expect(ListerSettings(setup.bench.kernel.settings).caret)
         #expect(setup.commands.perform(.hideQuickView))
-        for window in setup.plugin.windows {
-            window.close()
-        }
     }
 
     /// Before quitting, the windows and the quick view close, and the copies are let go of in
@@ -111,6 +109,7 @@ internal struct CoverageViewerPluginTests {
     @Test
     internal func quittingClosesEverything() async {
         let setup = CoverageViewerBench()
+        defer { setup.plugin.stop() }
         setup.plugin.view(text: "text", title: "Text")
         #expect(setup.commands.perform(.quickView))
         let done = ViewerAdoptBox(false)
@@ -132,6 +131,7 @@ internal struct CoverageViewerPluginTests {
         let file = folder.appendingPathComponent("on-volume.txt")
         try Data("on the volume".utf8).write(to: file)
         let setup = CoverageViewerBench(left: folder, showsWindows: false)
+        defer { setup.plugin.stop() }
         setup.plugin.view(file)
         setup.plugin.view(text: "elsewhere", title: "Elsewhere")
         setup.bench.left.moveCursor(toName: "on-volume.txt")
@@ -146,8 +146,5 @@ internal struct CoverageViewerPluginTests {
         setup.bench.kernel.fileSystems.releaseVolume(folder)
         #expect(quick.pane.item == nil)
         #expect(setup.commands.perform(.hideQuickView))
-        for window in setup.plugin.windows {
-            window.close()
-        }
     }
 }

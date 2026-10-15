@@ -39,16 +39,17 @@ internal struct CoverageViewerWindowTests {
     @Test
     internal func theWindowKeepsItsPlace() throws {
         let setup = CoverageViewerBench()
+        defer { setup.plugin.stop() }
         let settings = ListerSettings(setup.bench.kernel.settings)
         settings.setWindowFrame(NSStringFromRect(NSRect(x: 40, y: 60, width: 500, height: 400)), quick: false)
         let controller = Self.controller(setup)
+        defer { controller.close() }
         let window = try #require(controller.window)
         #expect(window.frame.size == NSSize(width: 500, height: 400))
         window.setFrame(NSRect(x: 80, y: 90, width: 600, height: 450), display: false)
         controller.pane.onSavePosition()
         #expect(settings.windowFrame(quick: false) == NSStringFromRect(window.frame))
         #expect(settings.windowFrame(quick: true) == nil)
-        controller.close()
     }
 
     /// Esc stops what runs first; with nothing running it is left to the window, and a window
@@ -56,9 +57,11 @@ internal struct CoverageViewerWindowTests {
     @Test
     internal func escapeStopsTheActivityFirst() throws {
         let setup = CoverageViewerBench()
+        defer { setup.plugin.stop() }
         var kept: ToolWindow?
         autoreleasepool {
             let controller = Self.controller(setup)
+            defer { controller.close() }
             kept = controller.window as? ToolWindow
             let flag = CancellationFlag()
             controller.pane.activity = ("Searching", nil, flag)
@@ -74,10 +77,11 @@ internal struct CoverageViewerWindowTests {
     @Test
     internal func aSessionWithoutFilesShowsNothing() {
         let setup = CoverageViewerBench()
+        defer { setup.plugin.stop() }
         let controller = Self.controller(setup)
+        defer { controller.close() }
         controller.show([])
         #expect(controller.pane.item == nil && controller.pane.fileCounter == (0, 1))
-        controller.close()
     }
 
     /// The separate quick view shows what a folder holds, nothing on `[..]`, and does not read
@@ -85,7 +89,9 @@ internal struct CoverageViewerWindowTests {
     @Test
     internal func theSeparateQuickViewFollowsTheCursor() async {
         let setup = CoverageViewerBench()
+        defer { setup.plugin.stop() }
         let controller = Self.controller(setup, followsCursor: true)
+        defer { controller.close() }
         let left = setup.bench.left
         left.moveCursor(toName: "folder")
         setup.bench.kernel.panelEvents.post(.cursorMoved, from: left)
@@ -104,7 +110,6 @@ internal struct CoverageViewerWindowTests {
         setup.bench.kernel.panelEvents.post(.cursorMoved, from: left)
         #expect(await setup.wait { controller.window?.title == "Lister*" })
         #expect(controller.pane.item == nil && controller.pane.folderSummary == nil)
-        controller.close()
     }
 
     /// The windows and views of the viewer are made in code only: an archive makes none.

@@ -30,7 +30,8 @@ final class TemporaryCopies: @unchecked Sendable {
     /// Why a copy was not made.
     enum Refusal: Error, Equatable {
         case cancelled
-        case tooLarge(Int64)
+        /// The size of the file, and the most that is copied.
+        case tooLarge(Int64, limit: Int64)
         case noRoom
         case unreadable
 
@@ -40,9 +41,9 @@ final class TemporaryCopies: @unchecked Sendable {
             switch self {
             case .cancelled: return ""
 
-            case .tooLarge(let size):
+            case .tooLarge(let size, let limit):
                 return
-                    "The file (\(Format.shortSize(size))) is too large to be copied from its file system for this mode (the limit is \(Format.shortSize(TemporaryCopies.sizeLimit))). "
+                    "The file (\(Format.shortSize(size))) is too large to be copied from its file system for this mode (the limit is \(Format.shortSize(limit))). "
                     + "Choose a text mode (1, 2 or 3)."
 
             case .noRoom: return "There is not enough free space on the disk to copy the file for this mode."
@@ -55,8 +56,6 @@ final class TemporaryCopies: @unchecked Sendable {
     static let idleLimit = 2
     /// ... but together no more than this many bytes.
     static let idleByteLimit: Int64 = 512 << 20
-    /// The most that is copied for one file.
-    static let sizeLimit: Int64 = 1 << 30
     /// What must stay free on the disk after a copy.
     static let freeSpaceMargin: Int64 = 256 << 20
 
@@ -69,9 +68,18 @@ final class TemporaryCopies: @unchecked Sendable {
     /// How often each owner released its copies: a copy begun before is not kept for that owner.
     private var releases: [ObjectIdentifier: Int] = [:]
     private let directory: URL
+    private let disk: CopyDisk
+    /// Taken while the folder of all copies is made: one thread makes it.
+    private let rootLock = NSLock()
 
-    init(directory: URL = FileManager.default.temporaryDirectory) {
+    convenience init(directory: URL = FileManager.default.temporaryDirectory) {
+        self.init(directory: directory, disk: .system)
+    }
+
+    /// Copies kept in `directory`, on `disk`.
+    internal init(directory: URL, disk: CopyDisk) {
         self.directory = directory
+        self.disk = disk
         _ = Self.sweepOnce
     }
 
@@ -101,7 +109,7 @@ final class TemporaryCopies: @unchecked Sendable {
         if let known = use(key, by: owner) { return .success(known) }
         if cancellation.isCancelled { return .failure(.cancelled) }
         // A file of a server is not put on the disk without asking whether it fits.
-        if let size = item?.size, size > Self.sizeLimit { return .failure(.tooLarge(size)) }
+        if let size = item?.size, size > disk.sizeLimit { return .failure(.tooLarge(size, limit: disk.sizeLimit)) }
         let started = begin(owner)
         // Changes that a plugin still holds back for this file (an archive written after a delay) are written first.
         do { try fileSystems.flushPendingWrites(to: url, cancellation: cancellation) } catch {
@@ -112,18 +120,13 @@ final class TemporaryCopies: @unchecked Sendable {
         }
         defer { reader.close() }
         guard let folder = newFolder() else { return .failure(.unreadable) }
-        if let size = item?.size, let free = freeSpace(), free - size < Self.freeSpaceMargin {
+        if let size = item?.size, let free = disk.freeSpace(directory), free - size < Self.freeSpaceMargin {
             try? FileManager.default.removeItem(at: folder)
             return .failure(.noRoom)
         }
-        let name = Self.safeName(url.lastPathComponent)
-        let target = folder.appendingPathComponent(name, isDirectory: false)
-        // The name is one component of the folder just made, and the file is new (O_EXCL).
-        guard target.deletingLastPathComponent().standardizedFileURL.path == folder.standardizedFileURL.path else {
-            try? FileManager.default.removeItem(at: folder)
-            return .failure(.unreadable)
-        }
-        let descriptor = open(target.path, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0o600)
+        // The name is one component (`safeName`) of the folder just made, and the file is new.
+        let target = folder.appendingPathComponent(Self.safeName(url.lastPathComponent), isDirectory: false)
+        let descriptor = disk.createFile(target)
         guard descriptor >= 0 else {
             try? FileManager.default.removeItem(at: folder)
             return .failure(.unreadable)
@@ -133,6 +136,7 @@ final class TemporaryCopies: @unchecked Sendable {
         // A read that waits for a server is ended by the flag; what it threw is no end of the file.
         var written: Int64 = 0
         var refusal: Refusal?
+        let limit = disk.sizeLimit
         let copied = cancellation.whileReading(reader) { () -> Bool in
             do {
                 while let block = try autoreleasepool(invoking: { try reader.read(upToCount: 1 << 20) }), !block.isEmpty
@@ -140,8 +144,8 @@ final class TemporaryCopies: @unchecked Sendable {
                     guard !cancellation.isCancelled else { return false }
                     written += Int64(block.count)
                     // A size that the listing did not tell is limited as it is read.
-                    guard written <= Self.sizeLimit else {
-                        refusal = .tooLarge(written)
+                    guard written <= limit else {
+                        refusal = .tooLarge(written, limit: limit)
                         return false
                     }
                     try handle.write(contentsOf: block)
@@ -168,10 +172,10 @@ final class TemporaryCopies: @unchecked Sendable {
             return .failure(.cancelled)
         }
         // Another thread may have copied the same file meanwhile: its copy stays.
-        if copies[key] != nil {
+        if let file = useLocked(key, by: owner) {
             lock.unlock()
             try? FileManager.default.removeItem(at: folder)
-            return use(key, by: owner).map { .success($0) } ?? .failure(.unreadable)
+            return .success(file)
         }
         clock += 1
         // The owner let go of its copies while this one was made: it is kept like the idle ones.
@@ -200,13 +204,6 @@ final class TemporaryCopies: @unchecked Sendable {
         return cleaned.first == "." ? "_" + cleaned : cleaned
     }
 
-    /// The bytes free for a program on the disk of the temporary folder.
-    private func freeSpace() -> Int64? {
-        var info = statfs()
-        guard statfs(directory.path, &info) == 0 else { return nil }
-        return Int64(info.f_bavail) * Int64(info.f_bsize)
-    }
-
     private func begin(_ owner: ObjectIdentifier) -> (epoch: Int, release: Int) {
         lock.lock()
         defer { lock.unlock() }
@@ -216,6 +213,11 @@ final class TemporaryCopies: @unchecked Sendable {
     private func use(_ key: String, by owner: ObjectIdentifier) -> URL? {
         lock.lock()
         defer { lock.unlock() }
+        return useLocked(key, by: owner)
+    }
+
+    /// `use`, with the lock held.
+    private func useLocked(_ key: String, by owner: ObjectIdentifier) -> URL? {
         guard var copy = copies[key] else { return nil }
         clock += 1
         copy.owners.insert(owner)
@@ -295,29 +297,32 @@ final class TemporaryCopies: @unchecked Sendable {
 
     /// A new, empty folder of its own for one copy.
     private func newFolder() -> URL? {
-        // The disk is asked outside the lock, which the main thread takes as well.
+        // The disk is asked outside the lock, which the main thread takes as well; the threads
+        // that make copies take turns, so one of them makes the folder of all copies.
+        rootLock.lock()
+        defer { rootLock.unlock() }
         lock.lock()
-        var base = root
+        let existing = root
         lock.unlock()
-        if base == nil {
-            let created = directory.appendingPathComponent(
+        let base: URL
+        if let existing {
+            base = existing
+        } else {
+            base = directory.appendingPathComponent(
                 "\(Self.prefix)p\(getpid())-\(UUID().uuidString)",
                 isDirectory: true
             )
             guard
                 (try? FileManager.default.createDirectory(
-                    at: created,
+                    at: base,
                     withIntermediateDirectories: true,
                     attributes: [.posixPermissions: 0o700]
                 )) != nil
             else { return nil }
             lock.lock()
-            if root == nil { root = created }
-            base = root
+            root = base
             lock.unlock()
-            if base != created { try? FileManager.default.removeItem(at: created) }
         }
-        guard let base else { return nil }
         let folder = base.appendingPathComponent(UUID().uuidString, isDirectory: true)
         return
             (try? FileManager.default.createDirectory(
@@ -366,7 +371,7 @@ final class MediaView: NSView {
     /// Called when the track has played to its end (a playlist then moves on).
     var onEnd: () -> Void = {}
     /// Called with "track – artist" when the file's tags name them.
-    var onTitle: (String) -> Void = { _ in }
+    var onTitle: ((String) -> Void)?
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -409,7 +414,7 @@ final class MediaView: NSView {
             }
             guard let title = values[.commonKeyTitle] else { return }
             let text = values[.commonKeyArtist].map { "\(title) – \($0)" } ?? title
-            await MainActor.run { self?.onTitle(text) }
+            await MainActor.run { self?.onTitle?(text) }
         }
     }
 
@@ -510,23 +515,29 @@ final class WebContentView: NSView, WKNavigationDelegate {
         decidePolicyFor navigationAction: WKNavigationAction,
         decisionHandler: @escaping @MainActor @Sendable (WKNavigationActionPolicy) -> Void
     ) {
-        let decision = Self.decide(
-            isMainFrame: navigationAction.targetFrame?.isMainFrame ?? false,
-            isLinkClick: navigationAction.navigationType == .linkActivated,
-            url: navigationAction.request.url,
-            expectsPage: expectsPage
+        decisionHandler(
+            policy(
+                isMainFrame: navigationAction.targetFrame?.isMainFrame == true,
+                isLinkClick: navigationAction.navigationType == .linkActivated,
+                url: navigationAction.request.url
+            )
         )
-        switch decision {
+    }
+
+    /// What is done with a navigation (`decide`): the page is let in once, a clicked link is
+    /// handed to `onLink`.
+    internal func policy(isMainFrame: Bool, isLinkClick: Bool, url: URL?) -> WKNavigationActionPolicy {
+        switch Self.decide(isMainFrame: isMainFrame, isLinkClick: isLinkClick, url: url, expectsPage: expectsPage) {
         case .allow:
-            if navigationAction.navigationType != .linkActivated { expectsPage = false }
-            decisionHandler(.allow)
+            if !isLinkClick { expectsPage = false }
+            return .allow
 
         case .followLink:
-            if let url = navigationAction.request.url { onLink(url) }
-            decisionHandler(.cancel)
+            if let url { onLink(url) }
+            return .cancel
 
         case .cancel:
-            decisionHandler(.cancel)
+            return .cancel
         }
     }
 
@@ -549,10 +560,11 @@ enum LinkPolicy {
     /// scheme, host and port). Nil otherwise.
     static func target(of link: URL, relativeTo base: URL) -> URL? {
         let text = link.relativeString.replacingOccurrences(of: "about:blank", with: "")
-        guard !text.isEmpty, let resolved = URL(string: text, relativeTo: base) else { return nil }
         // A link with a scheme of its own (an absolute one) is not relative.
         if let own = URL(string: text)?.scheme, own.lowercased() != base.scheme?.lowercased() { return nil }
-        guard var parts = URLComponents(url: resolved.absoluteURL, resolvingAgainstBaseURL: true) else { return nil }
+        guard !text.isEmpty, let resolved = URL(string: text, relativeTo: base),
+            var parts = URLComponents(url: resolved.absoluteURL, resolvingAgainstBaseURL: true)
+        else { return nil }
         parts.query = nil
         parts.fragment = nil
         guard let target = parts.url, target.scheme?.lowercased() == base.scheme?.lowercased(),
@@ -576,10 +588,11 @@ enum LinkPolicy {
 final class LinkGate: NSObject, NSTextViewDelegate, @preconcurrency PDFViewDelegate {
     private static var key = 0
 
-    /// What is done with a link that may be opened (tests put their own in).
-    private let opener: (URL) -> Void
+    /// Where the links it lets through go (tests put their own in).
+    private let opener: any LinkOpening
 
-    init(opener: @escaping (URL) -> Void = { NSWorkspace.shared.open($0) }) {
+    /// A gate that hands the links it lets through to `opener`.
+    init(opener: any LinkOpening = SystemLinks()) {
         self.opener = opener
     }
 
@@ -590,7 +603,7 @@ final class LinkGate: NSObject, NSTextViewDelegate, @preconcurrency PDFViewDeleg
 
     func open(_ link: Any) {
         let url = (link as? URL) ?? (link as? String).flatMap { URL(string: $0) } ?? (link as? NSURL) as URL?
-        if let url, LinkPolicy.opensInBrowser(url) { opener(url) }
+        if let url, LinkPolicy.opensInBrowser(url) { opener.open(url) }
     }
 
     func textView(_: NSTextView, clickedOnLink link: Any, at _: Int) -> Bool {
@@ -609,8 +622,18 @@ final class LinkGate: NSObject, NSTextViewDelegate, @preconcurrency PDFViewDeleg
 enum RichViews {
     /// A read-only text view in a scroll view: RTF (spec 10 › RTF) and printing.
     static func textView(_ text: NSAttributedString) -> (scroll: NSScrollView, text: NSTextView) {
-        let scroll = NSTextView.scrollableTextView()
-        let view = scroll.documentView as? NSTextView ?? NSTextView()
+        // A text view that is as wide as the scroll view and as tall as its text.
+        let scroll = NSScrollView()
+        scroll.hasVerticalScroller = true
+        scroll.borderType = .noBorder
+        let view = NSTextView()
+        view.minSize = .zero
+        view.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: .greatestFiniteMagnitude)
+        view.isVerticallyResizable = true
+        view.isHorizontallyResizable = false
+        view.autoresizingMask = [.width]
+        view.textContainer?.widthTracksTextView = true
+        scroll.documentView = view
         view.isEditable = false
         view.isSelectable = true
         view.textContainerInset = NSSize(width: 8, height: 8)
@@ -635,9 +658,9 @@ enum RichViews {
     /// The Mac's counterpart of Lister plugins and of the Explorer preview: whatever Quick
     /// Look can show (spec 10 › Explorer Preview).
     static func quickLookView(_ url: URL) -> QLPreviewView? {
-        guard let view = QLPreviewView(frame: .zero, style: .normal) else { return nil }
-        view.autostarts = true
-        view.previewItem = url as NSURL
+        let view: QLPreviewView? = QLPreviewView(frame: .zero, style: .normal)
+        view?.autostarts = true
+        view?.previewItem = url as NSURL
         return view
     }
 

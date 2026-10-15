@@ -17,6 +17,7 @@ internal struct CoverageViewerQuickViewTests {
     @Test
     internal func aTrackNameReplacesTheFileName() async throws {
         let setup = CoverageViewerBench()
+        defer { setup.plugin.stop() }
         setup.bench.left.moveCursor(toName: "notes.txt")
         #expect(setup.commands.perform(.quickView))
         let quick = try #require(setup.plugin.quickView)
@@ -33,6 +34,7 @@ internal struct CoverageViewerQuickViewTests {
     @Test
     internal func theKeyboardGoesBackToTheFollowedList() throws {
         let setup = CoverageViewerBench()
+        defer { setup.plugin.stop() }
         setup.bench.left.moveCursor(toName: "notes.txt")
         #expect(setup.commands.perform(.quickView))
         let quick = try #require(setup.plugin.quickView)
@@ -43,12 +45,12 @@ internal struct CoverageViewerQuickViewTests {
             defer: true
         )
         window.isReleasedWhenClosed = false
+        defer { window.close() }
         window.contentView = setup.rightHost.overlay
         #expect(window.makeFirstResponder(quick.pane))
         setup.bench.panelSet.source = setup.bench.right
         #expect(setup.commands.perform(.hideQuickView))
         #expect(setup.bench.panelSet.source === setup.bench.left)
         #expect(setup.rightHost.overlay == nil)
-        window.close()
     }
 }

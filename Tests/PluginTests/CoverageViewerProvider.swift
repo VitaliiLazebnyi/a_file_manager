@@ -9,6 +9,8 @@ internal final class CoverageViewerProvider: FileSystemProvider {
     internal let capabilities: FileSystemCapabilities = []
     private let entry: @Sendable (URL) -> FileItem?
     private let reader: @Sendable (URL) throws -> any FileReader
+    /// The mark of having come from elsewhere that every file carries; nil for none.
+    private let mark: Data?
 
     /// A registry with this file system alone.
     internal var registry: FileSystemRegistry {
@@ -17,15 +19,27 @@ internal final class CoverageViewerProvider: FileSystemProvider {
         return made
     }
 
-    /// A file system for `scheme` whose entries `entry` gives and whose files `reader` opens.
+    /// A file system for `scheme` whose entries `entry` gives and whose files `reader` opens;
+    /// every file carries `mark` as its quarantine mark.
     internal init(
         scheme: String,
+        mark: Data?,
         entry: @escaping @Sendable (URL) -> FileItem?,
         reader: @escaping @Sendable (URL) throws -> any FileReader
     ) {
         self.scheme = scheme
+        self.mark = mark
         self.entry = entry
         self.reader = reader
+    }
+
+    /// The same without quarantine marks.
+    internal convenience init(
+        scheme: String,
+        entry: @escaping @Sendable (URL) -> FileItem?,
+        reader: @escaping @Sendable (URL) throws -> any FileReader
+    ) {
+        self.init(scheme: scheme, mark: nil, entry: entry, reader: reader)
     }
 
     /// No listings.
@@ -60,6 +74,9 @@ internal final class CoverageViewerProvider: FileSystemProvider {
 
     /// What `reader` opens.
     internal func read(_ url: URL) throws -> any FileReader { try reader(url) }
+
+    /// The mark every file carries.
+    internal func quarantine(of _: URL) -> Data? { mark }
 
     deinit {
         // Nothing to release.

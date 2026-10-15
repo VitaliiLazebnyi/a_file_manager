@@ -361,7 +361,7 @@ final class Review2HookProvider: FileSystemProvider, @unchecked Sendable {
             cancellation: CancellationFlag()
         )
         if case .failure(let refusal) = result {
-            #expect(refusal == .tooLarge(50 << 30) && refusal.message.contains("too large"))
+            #expect(refusal == .tooLarge(50 << 30, limit: 1 << 30) && refusal.message.contains("too large"))
         } else {
             Issue.record("copied")
         }

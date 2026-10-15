@@ -544,8 +544,8 @@ import UniformTypeIdentifiers
     // MARK: Links in RTF and PDF (V021)
 
     @MainActor @Test func onlyWebAndMailLinksAreOpenedFromRTFAndPDF() {
-        let opened = Locked<[URL]>([])
-        let gate = LinkGate(opener: { url in opened.withValue { $0.append(url) } })
+        let links = CoverageViewerLinks()
+        let gate = LinkGate(opener: links)
         let textView = NSTextView()
         for link: Any in [
             URL(string: "https://example.com/a")!, "http://example.org", URL(string: "mailto:me@example.com")!,
@@ -564,7 +564,7 @@ import UniformTypeIdentifiers
         gate.pdfViewWillClick(onLink: PDFView(), with: URL(string: "file:///Users/someone/secret")!)
         gate.pdfViewWillClick(onLink: PDFView(), with: URL(string: "ssh://host")!)
         #expect(
-            opened.withValue { $0.map(\.absoluteString) } == [
+            links.opened.map(\.absoluteString) == [
                 "https://example.com/a", "http://example.org", "mailto:me@example.com", "https://nsurl.example",
                 "https://pdf.example/x.pdf"
             ]
