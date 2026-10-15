@@ -90,11 +90,7 @@ final class SyncWindowController: NSWindowController, NSWindowDelegate, NSTableV
         super.init(window: window)
         window.delegate = self
         // Esc interrupts a running comparison; when idle it closes the window.
-        window.onEscape = { [weak self] in
-            guard let self, self.session.phase == .comparing else { return false }
-            self.session.cancelComparison()
-            return true
-        }
+        window.onEscape = { [weak self] in self?.interruptComparison() == true }
         buildContent(in: window)
         session.onChange = { [weak self] in self?.refresh() }
         session.onRowsChange = { [weak self] rows in self?.refreshRows(rows) }
@@ -202,7 +198,7 @@ final class SyncWindowController: NSWindowController, NSWindowDelegate, NSTableV
         table.target = self
         table.action = #selector(rowClicked)
         table.doubleAction = #selector(rowDoubleClicked)
-        table.onKey = { [weak self] event in self?.handleKey(event) ?? false }
+        table.onKey = { [weak self] event in self?.handleKey(event) == true }
         rowMenu.delegate = self
         table.menu = rowMenu
         let scroll = NSScrollView()
@@ -289,6 +285,13 @@ final class SyncWindowController: NSWindowController, NSWindowDelegate, NSTableV
     private func toggleShow(_ part: SyncShow) {
         session.show.formSymmetricDifference(part)
         pullControls()
+    }
+
+    /// Esc: interrupts a running comparison and says so; false when nothing runs.
+    func interruptComparison() -> Bool {
+        guard session.phase == .comparing else { return false }
+        session.cancelComparison()
+        return true
     }
 
     @objc private func compareFromField() {
