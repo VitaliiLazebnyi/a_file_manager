@@ -4,14 +4,53 @@ import Foundation
 import LocalFileSystemPlugin
 import TestSupport
 import Testing
+import os
 
 @testable import NetworkPlugin
 
 /// The plugin as the program starts it, its settings, the defaults of what connections ask,
-/// and the Keychain.
+/// and the Keychain (with the Security framework's calls replaced: no test touches the real one).
 @MainActor
 @Suite
 internal struct CoverageNetworkPluginParts {
+    /// The Security framework's calls on items kept in memory, by account.
+    private static func keychainInMemory() -> KeychainPasswords.Calls {
+        let items = OSAllocatedUnfairLock(initialState: [String: Data]())
+        @Sendable
+        func account(_ query: CFDictionary) -> String {
+            ((query as? [String: Any])?[kSecAttrAccount as String] as? String) ?? ""
+        }
+        var calls = KeychainPasswords.Calls()
+        calls.copy = { query, result in
+            let key = account(query)
+            guard let data = items.withLock({ $0[key] }) else {
+                return errSecItemNotFound
+            }
+            result?.pointee = data as CFData
+            return errSecSuccess
+        }
+        calls.update = { query, changes in
+            let (key, data) = (account(query), (changes as? [String: Any])?[kSecValueData as String] as? Data)
+            return items.withLock { stored in
+                guard stored[key] != nil else {
+                    return errSecItemNotFound
+                }
+                stored[key] = data
+                return errSecSuccess
+            }
+        }
+        calls.add = { item, _ in
+            let (key, data) = (account(item), (item as? [String: Any])?[kSecValueData as String] as? Data)
+            items.withLock { $0[key] = data }
+            return errSecSuccess
+        }
+        calls.delete = { query in
+            let key = account(query)
+            return items.withLock { $0.removeValue(forKey: key) } == nil ? errSecItemNotFound : errSecSuccess
+        }
+        return calls
+    }
+
     /// Settings that are no numbers or out of range fall back to the defaults.
     @Test
     internal func oddSettingsFallBackToTheDefaults() {
@@ -27,11 +66,12 @@ internal struct CoverageNetworkPluginParts {
         #expect(NetworkSettings.values(from: settings).parallelConnections == 8)
     }
 
-    /// As the program starts it, the plugin keeps passwords in the Keychain and can eject volumes.
+    /// As the program starts it, the plugin can eject volumes through the system. (The store of
+    /// passwords is given: the program's own is the login Keychain, which no test touches.)
     @Test
-    internal func theProgramsPluginUsesTheKeychainAndTheSystem() throws {
+    internal func theProgramsPluginCanEjectThroughTheSystem() throws {
         let box = try Sandbox()
-        let plugin = NetworkPlugin()
+        let plugin = NetworkPlugin(passwords: MemoryPasswords())
         #expect(plugin.connections.isEmpty)
         let bench = TestBench(
             plugins: [plugin],
@@ -42,8 +82,6 @@ internal struct CoverageNetworkPluginParts {
         )
         plugin.waitForStoredSecrets()
         #expect(plugin.commands?.canEject == true)
-        // Without saved connections nothing is stored at the start.
-        #expect(KeychainPasswords(service: "Test network").password(for: PasswordVault.boundAccount) == nil)
         // Sessions for each scheme of the plugin, none for others.
         let make = plugin.center.makeSession
         let environment = plugin.center.environment
@@ -58,7 +96,7 @@ internal struct CoverageNetworkPluginParts {
     /// A password is kept in the Keychain, changed in place, and removed.
     @Test
     internal func aPasswordIsKeptInTheKeychain() {
-        let keychain = KeychainPasswords(service: "local.a-file-manager.tests.\(UUID().uuidString)")
+        let keychain = KeychainPasswords(service: "tests", calls: Self.keychainInMemory())
         keychain.setPassword("first", for: "anna")
         keychain.setPassword("second", for: "anna")
         #expect(keychain.password(for: "anna") == "second")

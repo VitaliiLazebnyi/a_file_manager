@@ -420,7 +420,7 @@ final class FTPConnection: @unchecked Sendable {
         let deadline = Date().addingTimeInterval(timeout ?? config.timeout)
         do {
             var read = 0
-            while true {
+            repeat {
                 let left = deadline.timeIntervalSinceNow
                 guard left > 0 else { throw NetworkError.timedOut("waiting for a reply") }
                 let line = encoding.decode(try control.readLine(timeout: left, cancellation: cancellation))
@@ -431,10 +431,8 @@ final class FTPConnection: @unchecked Sendable {
                     onActivity?()
                     return reply
                 }
-                if read > FTPLimits.replyLinesRead {
-                    throw NetworkError.unexpected("a reply of more than \(FTPLimits.replyLinesRead) lines")
-                }
-            }
+            } while read <= FTPLimits.replyLinesRead
+            throw NetworkError.unexpected("a reply of more than \(FTPLimits.replyLinesRead) lines")
         } catch {
             // A reply that did not arrive would be taken for the answer to the next command.
             isBroken = true
@@ -575,12 +573,10 @@ final class FTPConnection: @unchecked Sendable {
         let security: NetStream.Security = protectsData ? .tls(TLSSettings(host: config.host, trust: trust)) : .none
         // Encrypted data connections cannot be accepted, so TLS always goes the passive way.
         guard config.passive || protectsData else {
-            // Only the machine the control connection reached may open the data connection.
-            guard let peer = control.remoteAddress else {
-                throw NetworkError.connectionFailed("The address of the server is unknown.")
-            }
-            guard let address = control.localAddress else {
-                throw NetworkError.connectionFailed("The local address is unknown.")
+            // Only the machine the control connection reached may open the data connection. Both
+            // addresses are known while the control connection is up.
+            guard let peer = control.remoteAddress, let address = control.localAddress else {
+                throw NetworkError.connectionFailed("The addresses of the control connection are unknown.")
             }
             let listener = try DataListener(peer: peer, local: address)
             let port = try listener.start(timeout: config.timeout)
@@ -594,6 +590,11 @@ final class FTPConnection: @unchecked Sendable {
             }
             return .listening(listener)
         }
+        // The same machine the control connection reached: the name may lead to another one on
+        // a second lookup (round-robin DNS, IPv4 against IPv6). It stays the name that the
+        // certificate is checked for. Only a connection that is gone (or one through a proxy)
+        // knows no address.
+        let server = control.remoteAddress ?? config.host
         var extendedPort: Int?
         if !extendedPassiveFailed {
             let reply = try send("EPSV", cancellation: cancellation)
@@ -612,10 +613,7 @@ final class FTPConnection: @unchecked Sendable {
             // connection goes to the host the control connection reached.
             port = endpoint.port
         }
-        // The same machine the control connection reached: the name may lead to another one on
-        // a second lookup (round-robin DNS, IPv4 against IPv6). It stays the name that the
-        // certificate is checked for.
-        let stream = NetStream(host: control.remoteAddress ?? config.host, port: port, security: security)
+        let stream = NetStream(host: server, port: port, security: security)
         stream.start()
         return .connecting(stream)
     }

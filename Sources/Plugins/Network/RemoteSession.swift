@@ -324,13 +324,7 @@ extension RemoteSession {
     func rename(_ source: String, to destination: String, replacing: Bool) throws {
         try rename(source, to: destination, replacing: replacing, cancellation: nil)
     }
-    func canAppend(_: String) -> Bool { false }
     func onLinkResolved(_: @escaping @Sendable (_ path: String, _ isDirectory: Bool) -> Void) {}
-    func openAppend(_: String, at _: Int64?, cancellation _: CancellationFlag?) throws -> (
-        writer: any FileWriter, size: Int64
-    ) {
-        throw FileSystemError.notSupported("Continuing a file on this server")
-    }
 
     func entry(at path: String) throws -> RemoteEntry? { try entry(at: path, cancellation: nil) }
     func openWrite(_ path: String) throws -> any FileWriter { try openWrite(path, cancellation: nil) }

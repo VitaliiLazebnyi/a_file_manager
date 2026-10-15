@@ -80,12 +80,9 @@ public struct ServerKey: Hashable, CustomStringConvertible, Sendable {
     /// that has none gets a location on a server that does not exist (the reserved name
     /// `invalid`), never one on the local disk.
     public func url(path: String = "/") -> URL {
-        if let url = validURL(path: path) { return url }
-        var components = URLComponents()
-        components.scheme = Self.schemes.contains(scheme) ? scheme : "ftp"
-        components.host = "host.invalid"
-        components.path = RemotePath.normalized(path)
-        return components.url ?? URL(string: "ftp://host.invalid/")!
+        // `host.invalid` of a known scheme always has a URL, so the second call ends there.
+        validURL(path: path)
+            ?? ServerKey(scheme: Self.schemes.contains(scheme) ? scheme : "ftp", host: "host.invalid").url(path: path)
     }
 
     /// `ftp://host:port`, as the server is named in menus and messages.

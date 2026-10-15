@@ -35,44 +35,21 @@ public struct VolumeError: LocalizedError, Sendable {
 public final class SystemVolumeMounter: VolumeMounter {
     /// The system's calls, which answer later or never; tests put stand-ins in their place.
     struct Calls {
-        /// Asks for the mount without waiting. Returns the status of asking and what to cancel
-        /// the request with; `answer` gets the status and the mount points, on any thread.
+        /// `NetFSMountURLAsync`: asks for the mount without waiting. Returns the status of
+        /// asking, puts what to cancel the request with into its seventh argument, and later
+        /// calls the block with the status and the mount points, on the queue it is given.
         var mount:
-            @Sendable (_ url: URL, _ answer: @escaping @Sendable (Int32, [String]) -> Void) -> (
-                status: Int32, request: AnyObject?
-            ) =
-                { url, answer in
-                    var request: AsyncRequestID?
-                    // No mount path: the system picks a folder under /Volumes. No options: it shows its
-                    // own dialog for the name and password and may use the Keychain.
-                    let status = NetFSMountURLAsync(
-                        url as CFURL,
-                        nil,
-                        nil,
-                        nil,
-                        nil,
-                        nil,
-                        &request,
-                        DispatchQueue.global(qos: .userInitiated)
-                    ) { status, _, mountPoints in
-                        answer(status, (mountPoints as? [String]) ?? [])
-                    }
-                    return (status, request.map { Request(id: $0) })
-                }
-        var cancel: @Sendable (_ request: AnyObject) -> Void = { request in
-            if let request = request as? Request { NetFSMountURLCancel(request.id) }
-        }
+            @Sendable (
+                _ url: CFURL?, _ mountPath: CFURL?, _ user: CFString?, _ password: CFString?,
+                _ openOptions: CFMutableDictionary?, _ mountOptions: CFMutableDictionary?,
+                _ request: UnsafeMutablePointer<AsyncRequestID?>?, _ queue: DispatchQueue?,
+                _ report: (@Sendable @convention(block) (Int32, AsyncRequestID?, CFArray?) -> Void)?
+            ) -> Int32 = NetFSMountURLAsync
+        /// `NetFSMountURLCancel`.
+        var cancel: @Sendable (_ request: AsyncRequestID?) -> Int32 = NetFSMountURLCancel
         var unmount: @Sendable (_ volume: URL, _ answer: @escaping @Sendable (any Error?) -> Void) -> Void = {
-            volume,
-            answer in
-            FileManager.default.unmountVolume(at: volume, options: [.withoutUI], completionHandler: answer)
+            FileManager.default.unmountVolume(at: $0, options: [.withoutUI], completionHandler: $1)
         }
-    }
-
-    /// The system's handle of a mount that was asked for.
-    private final class Request {
-        let id: AsyncRequestID
-        init(id: AsyncRequestID) { self.id = id }
     }
 
     /// How long ejecting may take before the wait for it is given up.
@@ -128,7 +105,21 @@ public final class SystemVolumeMounter: VolumeMounter {
         let shown = ServerAddress.removingPassword(from: url.absoluteString)
         let outcome = Outcome()
         // Asked for without waiting, so that Cancel can take the request back; the server may never answer.
-        let (started, request) = calls.mount(url) { status, mountPoints in outcome.set(status, mountPoints) }
+        var request: AsyncRequestID?
+        // No mount path: the system picks a folder under /Volumes. No options: it shows its own
+        // dialog for the name and password and may use the Keychain.
+        let started = calls.mount(
+            url as CFURL,
+            nil,
+            nil,
+            nil,
+            nil,
+            nil,
+            &request,
+            DispatchQueue.global(qos: .userInitiated)
+        ) { status, _, mountPoints in
+            outcome.set(status, (mountPoints as? [String]) ?? [])
+        }
         guard started == 0 else {
             throw VolumeError(
                 message: "The server \(shown) could not be connected: \(Self.reason(started))."
@@ -136,7 +127,7 @@ public final class SystemVolumeMounter: VolumeMounter {
         }
         while outcome.done.wait(timeout: .now() + 0.1) == .timedOut {
             guard cancellation.isCancelled else { continue }
-            if let request { calls.cancel(request) }
+            if let request { _ = calls.cancel(request) }
             throw NetworkError.cancelled
         }
         let result = outcome.value

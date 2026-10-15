@@ -16,12 +16,11 @@ public final class KeychainPasswords: PasswordStore {
     /// The four calls of the Security framework this class makes; tests put a recording
     /// stand-in in their place, so the order of the calls is tested without a Keychain.
     struct Calls {
-        var copy: @Sendable (_ query: CFDictionary, _ result: UnsafeMutablePointer<CFTypeRef?>?) -> OSStatus = {
-            SecItemCopyMatching($0, $1)
-        }
-        var update: @Sendable (_ query: CFDictionary, _ changes: CFDictionary) -> OSStatus = { SecItemUpdate($0, $1) }
-        var add: @Sendable (_ item: CFDictionary) -> OSStatus = { SecItemAdd($0, nil) }
-        var delete: @Sendable (_ query: CFDictionary) -> OSStatus = { SecItemDelete($0) }
+        var copy: @Sendable (_ query: CFDictionary, _ result: UnsafeMutablePointer<CFTypeRef?>?) -> OSStatus =
+            SecItemCopyMatching
+        var update: @Sendable (_ query: CFDictionary, _ changes: CFDictionary) -> OSStatus = SecItemUpdate
+        var add: @Sendable (_ item: CFDictionary, _ result: UnsafeMutablePointer<CFTypeRef?>?) -> OSStatus = SecItemAdd
+        var delete: @Sendable (_ query: CFDictionary) -> OSStatus = SecItemDelete
     }
 
     private let service: String
@@ -64,7 +63,7 @@ public final class KeychainPasswords: PasswordStore {
         var item = query(account)
         item[kSecValueData] = data
         item[kSecAttrLabel] = service
-        _ = calls.add(item as CFDictionary)
+        _ = calls.add(item as CFDictionary, nil)
     }
 }
 
