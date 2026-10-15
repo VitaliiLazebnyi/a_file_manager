@@ -29,6 +29,9 @@ internal final class ScriptedFileSystem: FileSystemProvider, @unchecked Sendable
     /// The second batch is not delivered before this long after the listing began, so that the
     /// panel shows the first batches as a first piece while the rest is held.
     internal var pauseBeforeSecondBatch: TimeInterval = 0
+    /// Once let go from its hold, the listing waits this long before the next batch: at least
+    /// that much time lies between the pieces before and after the hold.
+    internal var pauseAfterHold: TimeInterval = 0
     private let condition = NSCondition()
     private var isOpen = false
     private var began = 0
@@ -110,6 +113,9 @@ internal final class ScriptedFileSystem: FileSystemProvider, @unchecked Sendable
         for index in 0...delivered.count {
             if index == holds {
                 try hold(cancellation)
+                if pauseAfterHold > 0 {
+                    pause(until: Date(timeIntervalSinceNow: pauseAfterHold), cancellation)
+                }
             }
             if index == 1, pauseBeforeSecondBatch > 0 {
                 pause(until: started.addingTimeInterval(pauseBeforeSecondBatch), cancellation)
