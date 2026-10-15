@@ -12,7 +12,8 @@ private func fsevZero() -> [Int] {
     guard fstat(0, &status) == 0 else {
         return []
     }
-    return [Int(status.st_dev), Int(status.st_ino), Int(status.st_rdev)]
+    // (A pipe or a socket has a file number beyond what an Int holds: compared by their bits.)
+    return [Int(status.st_dev), Int(truncatingIfNeeded: status.st_ino), Int(status.st_rdev)]
 }
 
 /// The watcher never has the system close descriptor 0: no path that does not fit, one folder per
