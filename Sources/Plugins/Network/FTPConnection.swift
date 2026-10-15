@@ -423,19 +423,17 @@ final class FTPConnection: @unchecked Sendable {
         let control = try stream()
         let deadline = Date().addingTimeInterval(timeout ?? config.timeout)
         do {
-            var read = 0
-            repeat {
+            for read in 1...FTPLimits.replyLinesRead + 1 {
                 let left = deadline.timeIntervalSinceNow
                 guard left > 0 else { throw NetworkError.timedOut("waiting for a reply") }
                 let line = encoding.decode(try control.readLine(timeout: left, cancellation: cancellation))
-                read += 1
                 // The log gets the start of a very long reply, not all of it.
                 if read <= FTPLimits.replyLines { log?(line) }
                 if let reply = replies.feed(line) {
                     onActivity?()
                     return reply
                 }
-            } while read <= FTPLimits.replyLinesRead
+            }
             throw NetworkError.unexpected("a reply of more than \(FTPLimits.replyLinesRead) lines")
         } catch {
             // A reply that did not arrive would be taken for the answer to the next command.

@@ -557,14 +557,15 @@ final class NetStream: @unchecked Sendable {
         let deadline = Date().addingTimeInterval(timeout)
         condition.lock()
         defer { condition.unlock() }
-        while true {
+        var now = Date()
+        repeat {
             if let result = try ready() { return result }
             if let failure { throw failure }
             if cancellation?.isCancelled == true { throw NetworkError.cancelled }
-            let now = Date()
-            if now >= deadline { throw NetworkError.timedOut(what) }
-            condition.wait(until: min(deadline, now.addingTimeInterval(0.1)))
-        }
+            now = Date()
+            if now < deadline { condition.wait(until: min(deadline, now.addingTimeInterval(0.1))) }
+        } while now < deadline
+        throw NetworkError.timedOut(what)
     }
 
     /// Asks for more when receiving had stopped for a full buffer. Called after a read made

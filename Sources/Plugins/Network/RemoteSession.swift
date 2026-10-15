@@ -404,26 +404,26 @@ enum Background {
     private static func serve() {
         condition.lock()
         var waitedInVain = false
-        while true {
-            if let piece = takeNext() {
+        var next = takeNext()
+        // A thread that waited in vain looks once more, then ends: what may still wait is
+        // behind its own lane's limit, and the threads of that lane take it.
+        while next != nil || !waitedInVain {
+            if let piece = next {
                 condition.unlock()
                 piece.work()
                 condition.lock()
                 runningIn[piece.lane] = runningIn[piece.lane].flatMap { $0 > 1 ? $0 - 1 : nil }
                 condition.broadcast()
                 waitedInVain = false
-                continue
+            } else {
+                idle += 1
+                waitedInVain = !condition.wait(until: Date().addingTimeInterval(10))
+                idle -= 1
             }
-            // What may still wait is behind its own lane's limit, and the threads of that lane take it.
-            if waitedInVain {
-                threads -= 1
-                condition.unlock()
-                return
-            }
-            idle += 1
-            waitedInVain = !condition.wait(until: Date().addingTimeInterval(10))
-            idle -= 1
+            next = takeNext()
         }
+        threads -= 1
+        condition.unlock()
     }
 
     /// Waits until nothing of this lane is running or waiting, `timeout` seconds at most; for tests.
