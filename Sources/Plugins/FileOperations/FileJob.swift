@@ -405,15 +405,21 @@ public final class FileJob: @unchecked Sendable {
             group.enter()
             let task = OSAllocatedUnfairLock<(@Sendable () -> Void)?>(initialState: work)
             BlockingCalls.run { [slots] in
-                // Taken out, so that nothing of it is left here once it has run.
-                let taken = task.withLock { work in
-                    defer { work = nil }
-                    return work
-                }
-                taken?()
+                Self.runOnce(task)
                 slots.signal()
                 group.leave()
             }
+        }
+
+        /// Takes the work out of `task` and runs it. The work is let go of when this returns: a
+        /// local that held it until the end of the closure above would still hold the job while
+        /// the group is left.
+        private static func runOnce(_ task: OSAllocatedUnfairLock<(@Sendable () -> Void)?>) {
+            let taken = task.withLock { work in
+                defer { work = nil }
+                return work
+            }
+            taken?()
         }
 
         /// Returns when no worker is busy any more: every slot is taken once and given back. Job thread only.
