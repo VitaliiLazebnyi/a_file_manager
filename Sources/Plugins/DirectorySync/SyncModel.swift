@@ -20,7 +20,8 @@ public struct SyncMask: Sendable {
         }
         let isFolderToken = { (token: String) in token.hasSuffix("/") || token.hasSuffix("\\") }
         let excluded = parts.count > 1 ? tokens(parts[1]) : []
-        include = mask(tokens(parts.first ?? ""))
+        // (A split that keeps empty parts has one part at least.)
+        include = mask(tokens(parts[0]))
         exclude = mask(excluded.filter { !isFolderToken($0) })
         excludedFolders = mask(excluded.filter(isFolderToken).map { String($0.dropLast()) })
     }
@@ -117,9 +118,14 @@ public struct SyncRow: Equatable, Sendable {
     public var action: SyncAction
 
     init(
-        directory: String, isDirectory: Bool, left: FileItem?, right: FileItem?, leftDirectory: URL,
+        directory: String,
+        isDirectory: Bool,
+        left: FileItem?,
+        right: FileItem?,
+        leftDirectory: URL,
         rightDirectory: URL,
-        state: SyncState, asymmetric: Bool
+        state: SyncState,
+        asymmetric: Bool
     ) {
         self.directory = directory
         self.name = left?.name ?? right?.name ?? ""
@@ -154,8 +160,7 @@ public struct SyncRow: Equatable, Sendable {
     /// Whether the action makes sense for the row: something must exist to be copied or deleted,
     /// and excluded rows take nothing.
     public func accepts(_ action: SyncAction) -> Bool {
-        if action == .none { return true }
-        guard state != .excluded else { return false }
+        guard action == .none || state != .excluded else { return false }
         switch action {
         case .none: return true
         case .copyToRight, .deleteLeft: return left != nil
@@ -181,7 +186,8 @@ public struct SyncRow: Equatable, Sendable {
         where accepts(candidate) && !cycle.contains(candidate) {
             cycle.append(candidate)
         }
-        guard let index = cycle.firstIndex(of: action) else { return cycle.first ?? .none }
+        // (Every row takes no action, so the cycle is never empty.)
+        guard let index = cycle.firstIndex(of: action) else { return cycle[0] }
         return cycle[(index + 1) % cycle.count]
     }
 }

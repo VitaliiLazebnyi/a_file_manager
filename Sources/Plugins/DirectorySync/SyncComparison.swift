@@ -58,7 +58,9 @@ public final class SyncComparison: @unchecked Sendable {
     static let blockSize = 256 * 1_024
 
     public init(
-        options: SyncOptions, fileSystems: FileSystemRegistry, cancellation: CancellationFlag = CancellationFlag()
+        options: SyncOptions,
+        fileSystems: FileSystemRegistry,
+        cancellation: CancellationFlag = CancellationFlag()
     ) {
         self.options = options
         self.fileSystems = fileSystems
@@ -81,16 +83,24 @@ public final class SyncComparison: @unchecked Sendable {
         classifying.toleranceSeconds =
             Self.needsTolerance(left, right, fileSystems: fileSystems) ? options.toleranceSeconds : 0
         var rows = walk(
-            Side(url: left, exists: true), Side(url: right, exists: true), relative: "", classifying: classifying,
-            isTop: true)
+            Side(url: left, exists: true),
+            Side(url: right, exists: true),
+            relative: "",
+            classifying: classifying,
+            isTop: true
+        )
         compareContents(of: &rows)
         lock.lock()
         defer { lock.unlock() }
         // The comparison runs once: whatever the caller's closure holds is let go.
         report = nil
         var result = SyncResult(
-            rows: rows, leftDirectories: counters.leftDirectories, rightDirectories: counters.rightDirectories,
-            errors: errors, wasCancelled: cancellation.isCancelled)
+            rows: rows,
+            leftDirectories: counters.leftDirectories,
+            rightDirectories: counters.rightDirectories,
+            errors: errors,
+            wasCancelled: cancellation.isCancelled
+        )
         result.topEntries = (topEntries[0], topEntries[1])
         result.toleranceSeconds = classifying.toleranceSeconds
         return result
@@ -121,7 +131,8 @@ public final class SyncComparison: @unchecked Sendable {
     ) {
         if !options.ignoreDate {
             let difference = left.modified.timeIntervalSince(
-                right.modified.addingTimeInterval(Double(options.timeOffsetHours) * 3_600))
+                right.modified.addingTimeInterval(Double(options.timeOffsetHours) * 3_600)
+            )
             let tolerance = Double(max(0, options.toleranceSeconds))
             // Whole seconds are compared: a file system that keeps less than a nanosecond or
             // millisecond (exFAT, HFS+, SMB) would otherwise show every copy from APFS as older.
@@ -161,8 +172,12 @@ public final class SyncComparison: @unchecked Sendable {
     private func list(_ side: Side, isTop: Bool, index: Int) -> [FileItem]? {
         guard side.exists else { return [] }
         do {
-            let items = try fileSystems.provider(for: side.url).list(
-                side.url, showHidden: options.includeHidden, cancellation: cancellation)
+            let items = try fileSystems.provider(for: side.url)
+                .list(
+                    side.url,
+                    showHidden: options.includeHidden,
+                    cancellation: cancellation
+                )
             // A listing that was ended by the cancel is not an error of the folder.
             if cancellation.isCancelled { return nil }
             if isTop {
@@ -170,11 +185,12 @@ public final class SyncComparison: @unchecked Sendable {
                 topEntries[index] = items.count
                 lock.unlock()
             }
-            return (isTop ? asked(among: items) : items).filter { item in
-                // Links are never followed or copied, so the walk cannot run in circles; they
-                // are listed so that a name that is a link on one side can be kept out of the pairs.
-                item.isDirectory ? !mask.excludesFolder(item.name) : mask.matchesFile(item.name)
-            }
+            return (isTop ? asked(among: items) : items)
+                .filter { item in
+                    // Links are never followed or copied, so the walk cannot run in circles; they
+                    // are listed so that a name that is a link on one side can be kept out of the pairs.
+                    item.isDirectory ? !mask.excludesFolder(item.name) : mask.matchesFile(item.name)
+                }
         } catch {
             if !cancellation.isCancelled { note("\(fileSystems.displayPath(side.url)): \(error.localizedDescription)") }
             return nil
@@ -210,8 +226,15 @@ public final class SyncComparison: @unchecked Sendable {
         for pair in pairs {
             func row(_ state: SyncState, isDirectory: Bool = false) -> SyncRow {
                 SyncRow(
-                    directory: relative, isDirectory: isDirectory, left: pair.left, right: pair.right,
-                    leftDirectory: left.url, rightDirectory: right.url, state: state, asymmetric: options.asymmetric)
+                    directory: relative,
+                    isDirectory: isDirectory,
+                    left: pair.left,
+                    right: pair.right,
+                    leftDirectory: left.url,
+                    rightDirectory: right.url,
+                    state: state,
+                    asymmetric: options.asymmetric
+                )
             }
             if pair.left?.isSymlink == true || pair.right?.isSymlink == true {
                 // A link is neither followed nor replaced: facing another entry it is shown, but nothing is done with it.
@@ -221,14 +244,15 @@ public final class SyncComparison: @unchecked Sendable {
             let (leftIsFolder, rightIsFolder) = (pair.left?.isDirectory, pair.right?.isDirectory)
             if let leftIsFolder, let rightIsFolder, leftIsFolder != rightIsFolder {
                 rows.append(row(.excluded))
-            } else if leftIsFolder ?? rightIsFolder ?? false {
+            } else if let item = pair.left ?? pair.right, item.isDirectory {
                 guard options.subdirectories else { continue }
-                let name = (pair.left ?? pair.right)!.name
+                let name = item.name
                 folders.append(
                     (
                         Side(url: pair.left?.url ?? left.url.appending(name: name), exists: pair.left != nil),
                         Side(url: pair.right?.url ?? right.url.appending(name: name), exists: pair.right != nil), name
-                    ))
+                    )
+                )
                 if options.emptyDirectories, pair.left == nil || pair.right == nil {
                     folderRows.append(row(pair.left == nil ? .rightOnly : .leftOnly, isDirectory: true))
                 }
@@ -237,7 +261,9 @@ public final class SyncComparison: @unchecked Sendable {
                     row(
                         pair.isExactMatch
                             ? Self.classify(left: leftFile, right: rightFile, options: classifying).state
-                            : .excluded))
+                            : .excluded
+                    )
+                )
             } else {
                 // A name that differs only in case from one that is paired elsewhere is not "only here": on a
                 // file system that ignores case, copying it would replace the other.
@@ -311,7 +337,8 @@ public final class SyncComparison: @unchecked Sendable {
             }
         }
         return pairs
-            + leftovers.indices.filter { !taken[$0] }.map {
+            + leftovers.indices.filter { !taken[$0] }
+            .map {
                 Pair(left: nil, right: leftovers[$0], collides: foldedLeft.contains(folded(leftovers[$0].name)))
             }
     }
@@ -326,7 +353,8 @@ public final class SyncComparison: @unchecked Sendable {
         guard !pending.isEmpty else { return }
         update {
             $0.filesToCompare = pending.count
-            $0.bytesToCompare = pending.reduce(Int64(0)) { $0.addingSaturated(rows[$1].left?.size ?? 0) }
+            // (A pair waits for its contents only when both sides are there.)
+            $0.bytesToCompare = pending.compactMap { rows[$0].left?.size }.reduce(Int64(0)) { $0.addingSaturated($1) }
         }
         let candidates = pending.map { rows[$0] }
         let states = Parallel.map(candidates) { self.contentState(of: $0) }
@@ -342,7 +370,10 @@ public final class SyncComparison: @unchecked Sendable {
         defer { update { $0.filesCompared += 1 } }
         do {
             let same = try Self.sameContent(
-                left.url, right.url, fileSystems: fileSystems, cancellation: cancellation
+                left.url,
+                right.url,
+                fileSystems: fileSystems,
+                cancellation: cancellation
             ) { bytes in
                 self.update { $0.bytesCompared += Int64(bytes) }
             }
@@ -356,7 +387,10 @@ public final class SyncComparison: @unchecked Sendable {
     /// Reads two files side by side and stops at the first difference. Nil when cancelled.
     /// The blocks a reader hands out may be of any length; they are cut to match.
     static func sameContent(
-        _ first: URL, _ second: URL, fileSystems: FileSystemRegistry, cancellation: CancellationFlag,
+        _ first: URL,
+        _ second: URL,
+        fileSystems: FileSystemRegistry,
+        cancellation: CancellationFlag,
         progress: (Int) -> Void = { _ in }
     ) throws -> Bool? {
         if cancellation.isCancelled { return nil }
@@ -374,8 +408,7 @@ public final class SyncComparison: @unchecked Sendable {
         }
         var buffers = [Data(), Data()]
         var ended = [false, false]
-        while true {
-            if cancellation.isCancelled { return nil }
+        while !cancellation.isCancelled {
             // One block of each side per round, in a pool of its own (a long pair of files would keep every block until it ends).
             let verdict: Bool?? = try autoreleasepool {
                 for side in 0..<2 where !ended[side] && buffers[side].isEmpty {
@@ -397,5 +430,6 @@ public final class SyncComparison: @unchecked Sendable {
             }
             if let verdict { return verdict }
         }
+        return nil
     }
 }
