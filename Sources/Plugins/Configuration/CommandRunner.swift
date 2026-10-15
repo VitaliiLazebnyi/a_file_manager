@@ -587,7 +587,7 @@ final class CommandRunner {
             switch ChildProcess.spawn(
                 executable: shell.executable,
                 arguments: shell.options + script.arguments,
-                environment: LoginShell.environment(),
+                environment: LoginShell.environment(foreignPath: LoginShell.foreignPath),
                 directory: directory
             )
             {

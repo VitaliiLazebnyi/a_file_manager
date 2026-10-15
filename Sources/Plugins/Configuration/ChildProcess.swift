@@ -24,13 +24,14 @@ enum LoginShell {
     /// tcsh …), asked for once. Starts a process and waits up to a few seconds for it: never
     /// for the main thread.
     static let foreignPath = foreignPath(
-        of: usersShell(environment: ProcessInfo.processInfo.environment, account: accountShell)
+        of: usersShell(environment: ProcessInfo.processInfo.environment, account: accountShell),
+        waiting: .seconds(3)
     )
 
     /// The PATH that `shell` sets up: its start files are not read by zsh, so the PATH they set
     /// up is asked for and handed on. Nil for zsh and when the shell does not answer within
     /// `waiting`. Starts a process and waits for it: never for the main thread.
-    static func foreignPath(of shell: String, waiting: DispatchTimeInterval = .seconds(3)) -> String? {
+    static func foreignPath(of shell: String, waiting: DispatchTimeInterval) -> String? {
         guard URL(fileURLWithPath: shell).lastPathComponent != "zsh",
             FileManager.default.isExecutableFile(atPath: shell)
         else { return nil }
@@ -67,7 +68,7 @@ enum LoginShell {
 
     /// The environment a command line runs in: this program's, with the PATH of a login shell
     /// that is not zsh.
-    static func environment(foreignPath: String? = foreignPath) -> [String: String] {
+    static func environment(foreignPath: String?) -> [String: String] {
         var environment = ProcessInfo.processInfo.environment
         if let path = foreignPath { environment["PATH"] = path }
         return environment

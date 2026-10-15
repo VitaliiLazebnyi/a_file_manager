@@ -41,14 +41,14 @@ internal struct CovConfigLoginShell {
     /// zsh, and a shell that is not there or cannot run, set up no PATH of their own.
     @Test
     internal func zshAndMissingShellsGiveNoPath() throws {
-        #expect(LoginShell.foreignPath(of: "/bin/zsh") == nil)
-        #expect(LoginShell.foreignPath(of: box.url("shells/none").path) == nil)
+        #expect(LoginShell.foreignPath(of: "/bin/zsh", waiting: .seconds(60)) == nil)
+        #expect(LoginShell.foreignPath(of: box.url("shells/none").path, waiting: .seconds(60)) == nil)
         let plain = try box.file("shells/plain", "not a program")
-        #expect(LoginShell.foreignPath(of: plain.path) == nil)
+        #expect(LoginShell.foreignPath(of: plain.path, waiting: .seconds(60)) == nil)
         // An executable whose interpreter is missing does not start.
         let broken = try box.file("shells/broken", "#!/nonexistent/afm-interpreter\n")
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: broken.path)
-        #expect(LoginShell.foreignPath(of: broken.path) == nil)
+        #expect(LoginShell.foreignPath(of: broken.path, waiting: .seconds(60)) == nil)
     }
 
     /// The PATH is the last line the shell prints; start files may print lines before it.
@@ -88,6 +88,6 @@ internal struct CovConfigLoginShell {
         let own = ProcessInfo.processInfo.environment
         #expect(LoginShell.environment(foreignPath: "/x/bin")["PATH"] == "/x/bin")
         #expect(LoginShell.environment(foreignPath: nil) == own)
-        #expect(LoginShell.environment()["HOME"] == own["HOME"])
+        #expect(LoginShell.environment(foreignPath: LoginShell.foreignPath)["HOME"] == own["HOME"])
     }
 }
