@@ -12,6 +12,12 @@ import Testing
 @MainActor
 @Suite(.serialized)
 internal struct CoverageViewerPaneTextTests {
+    /// Sends a button's action, as a click does. (`performClick` runs the event loop for a moment, which can end the
+    /// run loop the test runner waits in, and the test process with it.)
+    private static func press(_ button: NSButton) {
+        button.sendAction(button.action, to: button.target)
+    }
+
     private static let text = (1...200).map { "Line \($0) of the text, with words\n" }.joined()
 
     /// Find: the dialog, its history, repeating in every direction, and what is said when nothing
@@ -185,17 +191,17 @@ internal struct CoverageViewerPaneTextTests {
         func button(_ title: String) -> NSButton? {
             Self.buttons(of: pane).first { $0.title.hasPrefix(title) }
         }
-        try #require(button(">>")).performClick(nil)
+        Self.press(try #require(button(">>")))
         #expect(await bench.wait { pane.item?.url == other })
-        try #require(button("<<")).performClick(nil)
+        Self.press(try #require(button("<<")))
         #expect(await bench.wait { pane.item?.url == notes && pane.loaded != nil })
         #expect(await bench.textShown(pane))
-        try #require(Self.buttons(of: pane).first { $0.toolTip == "Go to position (in %)" }).performClick(nil)
+        Self.press(try #require(Self.buttons(of: pane).first { $0.toolTip == "Go to position (in %)" }))
         #expect(bench.interaction.log.last?.hasPrefix("prompt: Go to position") == true)
         let flag = CancellationFlag()
         pane.activity = ("Working", 0.5, flag)
         #expect(pane.statusText == "Working")
-        try #require(button("Cancel")).performClick(nil)
+        Self.press(try #require(button("Cancel")))
         #expect(flag.isCancelled)
         pane.activity = nil
     }

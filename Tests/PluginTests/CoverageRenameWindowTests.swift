@@ -574,7 +574,10 @@ import Testing
         // The clipboard is read when a mask asks for it.
         plugin.session?.settings.nameMask = "[X+]c"
         #expect(await RunLoopWait.until { plugin.session?.isComputing == false })
-        windows.first?.performClose(nil)
+        // As the close button does, without `performClose`, which runs the event loop for a moment.
+        if let window = windows.first, window.delegate?.windowShouldClose?(window) ?? true {
+            window.close()
+        }
         #expect(plugin.session == nil && windows.isEmpty)
         #expect(bench.commands.perform(.multiRename))
         #expect(plugin.session?.settings.nameMask == "[X+]c")

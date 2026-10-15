@@ -205,8 +205,11 @@ struct CoveragePlacesEditorParts {
             parts.select(1)
             NSApp.sendAction(action, to: table.target, from: table)
             // A click turns the box on.
-            CoveragePlacesLoop.button("Hide menu items starting with this character:", in: parts.content)?
-                .performClick(nil)
+            // (`performClick` runs the event loop for a moment, which can end the test process.)
+            if let box = CoveragePlacesLoop.button("Hide menu items starting with this character:", in: parts.content) {
+                box.state = box.state == .on ? .off : .on
+                box.sendAction(box.action, to: box.target)
+            }
             parts.click("OK")
         }
         #expect(result?.entries.map(\.title) == ["?A", "!S", "-"] && result?.hidesMarked == true)
