@@ -34,7 +34,11 @@ internal struct PanelReadAheadTests {
         defer { ahead.shutDown() }
         ahead.cursorRests(on: target("/big", on: server))
         ahead.cursorRests(on: target("/big", on: server))
-        #expect(await PanelWait.until { server.listRequests(for: "/big") == 1 && ahead.reading == nil && ahead.pauses.count == 1 })
+        #expect(
+            await PanelWait.until {
+                server.listRequests(for: "/big") == 1 && ahead.reading == nil && ahead.pauses.count == 1
+            }
+        )
         #expect(cache.age(of: server.url("/big"), showHidden: false) == nil)
         // The cursor stays where it is for several rests' time: the folder is left alone.
         await PanelWait.pause(ReadAhead.dwell * 4)
@@ -46,7 +50,11 @@ internal struct PanelReadAheadTests {
         #expect(server.listRequests(for: "/big") == 1)
         // A folder that fits is read once and remembered; once there, it is not read again.
         ahead.cursorRests(on: target("/small", on: server))
-        #expect(await PanelWait.until { cache.age(of: server.url("/small"), showHidden: false) != nil && ahead.reading == nil })
+        #expect(
+            await PanelWait.until {
+                cache.age(of: server.url("/small"), showHidden: false) != nil && ahead.reading == nil
+            }
+        )
         ahead.cursorRests(on: nil)
         ahead.cursorRests(on: target("/small", on: server))
         await PanelWait.pause(ReadAhead.dwell * 2)
@@ -71,9 +79,14 @@ internal struct PanelReadAheadTests {
         ahead.cursorRests(on: target("/far", on: server))
         #expect(await PanelWait.until { ahead.reading != nil && server.listRequests(for: "/far") == 1 })
         // Only exactly this folder, read the same way, is taken over.
-        #expect(ahead.join(server.url("/other"), showHidden: false) == nil && ahead.join(server.url("/far"), showHidden: true) == nil)
+        #expect(
+            ahead.join(server.url("/other"), showHidden: false) == nil
+                && ahead.join(server.url("/far"), showHidden: true) == nil
+        )
         // Two panels take the reading over and the cursor moves on: the reading goes on for them.
-        let (first, second) = (ahead.join(server.url("/far"), showHidden: false), ahead.join(server.url("/far"), showHidden: false))
+        let (first, second) = (
+            ahead.join(server.url("/far"), showHidden: false), ahead.join(server.url("/far"), showHidden: false)
+        )
         var outcomes = 0
         first?.receive { _ in outcomes += 1 }
         second?.receive { _ in outcomes += 1 }
@@ -91,33 +104,35 @@ internal struct PanelReadAheadTests {
     }
 
     /// A folder that could not be read is left alone. A reading that does not come back after
-    /// it was told to stop holds up the next folder, until it was told so long ago that it is
-    /// left behind; nothing is taken over once it was told to stop.
+    /// it was told to stop (here its lane is held up by a call that does not return) holds up
+    /// the next folder, until it was told so long ago that it is left behind; nothing is taken
+    /// over once it was told to stop.
     @Test
     internal func aStuckReadingIsLeftBehind() async {
         let server = MemoryFileSystem()
         server.addDirectory("/locked")
         server.unreadable = ["/locked"]
+        server.addFile("/stuck/a.txt")
         server.addFile("/next/a.txt")
-        let deaf = ScriptedFileSystem()
-        deaf.batches = [[deaf.item(named: "a.txt", in: "/stuck")]]
-        deaf.holdBefore = 0
-        deaf.holdsThroughCancellation = true
         let fileSystems = FileSystemRegistry()
         fileSystems.register(server)
-        fileSystems.register(deaf)
         let ahead = ReadAhead(fileSystems: fileSystems, cache: ListingCache())
+        let gate = DispatchSemaphore(value: 0)
+        Background.storage("ahead", at: server.url("/stuck")) { gate.wait() }
         defer {
-            deaf.open()
+            gate.signal()
             ahead.shutDown()
         }
         ahead.cursorRests(on: target("/locked", on: server))
         #expect(await PanelWait.until { server.listRequests(for: "/locked") == 1 && ahead.reading == nil })
         #expect(ahead.pauses.count == 1)
-        ahead.cursorRests(on: ReadAhead.Target(location: deaf.url("/stuck"), showHidden: false, order: ListOrder()))
-        #expect(await PanelWait.until { ahead.reading != nil && deaf.listingsBegun == 1 })
+        ahead.cursorRests(on: target("/stuck", on: server))
+        #expect(await PanelWait.until { ahead.reading != nil })
         ahead.cursorRests(on: target("/next", on: server))
-        #expect(ahead.reading?.cancellation.isCancelled == true && ahead.join(deaf.url("/stuck"), showHidden: false) == nil)
+        #expect(
+            ahead.reading?.cancellation.isCancelled == true
+                && ahead.join(server.url("/stuck"), showHidden: false) == nil
+        )
         await PanelWait.pause(ReadAhead.dwell * 2)
         #expect(server.listRequests(for: "/next") == 0 && ahead.reading != nil)
         // Told to stop long ago, as far as the read-ahead knows: the next folder gets its turn.
@@ -125,5 +140,6 @@ internal struct PanelReadAheadTests {
         ahead.cursorRests(on: nil)
         ahead.cursorRests(on: target("/next", on: server))
         #expect(await PanelWait.until { server.listRequests(for: "/next") == 1 })
+        #expect(server.listRequests(for: "/stuck") == 0)
     }
 }

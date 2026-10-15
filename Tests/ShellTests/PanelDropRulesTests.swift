@@ -58,14 +58,17 @@ internal struct PanelDropRulesTests {
         let cases: [(sources: [URL], destination: URL)] = [
             ([file("/x/a/f.txt")], file("/x/a")), ([file("/x/a/f.txt")], file("/x/b")), ([file("/x/a")], file("/x/a")),
             ([file("/x/a")], file("/x/a/sub/deep")), ([file("/x/ab")], file("/x/a")),
-            ([file("/x/a"), file("/y/b")], file("/x")), ([file("/a"), file("/b")], file("/")), ([file("/")], file("/x")),
-            ([try remote("mem:///m/a")], try remote("mem:///m")), ([try remote("ftp://host/a/b")], try remote("ftp://other/a")),
+            ([file("/x/a"), file("/y/b")], file("/x")), ([file("/a"), file("/b")], file("/")),
+            ([file("/")], file("/x")),
+            ([try remote("mem:///m/a")], try remote("mem:///m")),
+            ([try remote("ftp://host/a/b")], try remote("ftp://other/a")),
             ([try remote("noslash:x")], file("/x")), ([], file("/x"))
         ]
         for (sources, destination) in cases {
             for kind in [TransferKind.copy, .move] {
                 #expect(
-                    DragSources(sources).isPointless(kind, into: destination) == isPointless(kind, sources, into: destination),
+                    DragSources(sources).isPointless(kind, into: destination)
+                        == isPointless(kind, sources, into: destination),
                     "\(kind) \(sources.map(\.absoluteString)) into \(destination.absoluteString)"
                 )
             }
@@ -102,14 +105,24 @@ internal struct PanelDropRulesTests {
         #expect(PanelDrop.mountPoint(of: "/Volumes/Stick/a/b", among: mounts) == "/Volumes/Stick")
         #expect(PanelDrop.mountPoint(of: "/Volumes/Stick 2/a", among: mounts) == "/Volumes/Stick 2")
         #expect(PanelDrop.mountPoint(of: "/Volumes/Sticky/a", among: mounts) == "/")
-        #expect(PanelDrop.mountPoint(of: "/Users/me", among: mounts) == "/" && PanelDrop.mountPoint(of: "/a", among: []) == "/")
+        #expect(
+            PanelDrop.mountPoint(of: "/Users/me", among: mounts) == "/"
+                && PanelDrop.mountPoint(of: "/a", among: []) == "/"
+        )
         #expect(PanelDrop.areOnSameVolume(file("/Users/a"), file("/tmp/b"), mountPoints: mounts))
         #expect(!PanelDrop.areOnSameVolume(file("/Users/a"), file("/Volumes/Stick/b"), mountPoints: mounts))
-        #expect(PanelDrop.areOnSameVolume(try remote("ftp://host/a"), try remote("ftp://host/b/c"), mountPoints: mounts))
-        #expect(!PanelDrop.areOnSameVolume(try remote("ftp://host/a"), try remote("ftp://other/a"), mountPoints: mounts))
+        #expect(
+            PanelDrop.areOnSameVolume(try remote("ftp://host/a"), try remote("ftp://host/b/c"), mountPoints: mounts)
+        )
+        #expect(
+            !PanelDrop.areOnSameVolume(try remote("ftp://host/a"), try remote("ftp://other/a"), mountPoints: mounts)
+        )
         #expect(!PanelDrop.areOnSameVolume(try remote("mem:///a"), file("/a"), mountPoints: mounts))
         #expect(PanelDrop.mountPoints().contains("/"))
-        #expect(PanelDrop.question(.move, count: 1) == "Move 1 item to" && PanelDrop.question(.copy, count: 3) == "Copy 3 items to")
+        #expect(
+            PanelDrop.question(.move, count: 1) == "Move 1 item to"
+                && PanelDrop.question(.copy, count: 3) == "Copy 3 items to"
+        )
     }
 
     /// The program's drag carries a ticket and keeps its items in the program; other programs
@@ -160,13 +173,14 @@ internal struct PanelDropRulesTests {
         #expect(pasteboard.string(forType: .fileURL) == "file:///many/f0")
         let paths = pasteboard.propertyList(forType: PanelDrop.fileNamesType) as? [String]
         #expect(paths?.count == items.count && paths?.first == "/many/f0")
-        // A drag of a few offers no list.
+        // A drag of a few offers no list of its own: its items name their files one by one.
         let few = NSPasteboard.withUniqueName()
         defer { few.releaseGlobally() }
         few.clearContents()
         few.writeObjects(PanelDrop.beginDrag(PanelDragPayload(items: Array(items.prefix(2)))))
+        let types = few.types
         PanelDrop.offerFileNames(on: few)
-        #expect(few.propertyList(forType: PanelDrop.fileNamesType) == nil)
+        #expect(few.types == types && few.pasteboardItems?.count == 2)
     }
 
     /// The marks of a long list are put together in the background; whoever needs them first

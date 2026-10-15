@@ -25,7 +25,9 @@ internal struct PanelTextTests {
         )
         let text = PanelViewController.detailText(for: file)
         #expect(text.hasPrefix("win  ini  1,234  ") && text.hasSuffix("  rw-r--r--"))
-        #expect(PanelViewController.detailText(for: item("docs", kind: .directory, size: 0)).hasPrefix("[docs]  <DIR>  "))
+        #expect(
+            PanelViewController.detailText(for: item("docs", kind: .directory, size: 0)).hasPrefix("[docs]  <DIR>  ")
+        )
     }
 
     /// The status line counts the marks and the totals; while a folder arrives it says so.
@@ -36,10 +38,15 @@ internal struct PanelTextTests {
         totals.selectedFiles = 4
         totals.totalBytes = 8_192
         totals.selectedBytes = 5_120
-        #expect(PanelViewController.statusText(totals, itemsSoFar: nil, refreshing: false) == "5 k / 8 k in 4 / 14 file(s)")
+        #expect(
+            PanelViewController.statusText(totals, itemsSoFar: nil, refreshing: false) == "5 k / 8 k in 4 / 14 file(s)"
+        )
         totals.totalFolders = 2
         #expect(PanelViewController.statusText(totals, itemsSoFar: nil, refreshing: false).hasSuffix(", 0 / 2 dir(s)"))
-        #expect(PanelViewController.statusText(totals, itemsSoFar: 1_500, refreshing: false).hasPrefix("Loading… 1,500 items so far   "))
+        #expect(
+            PanelViewController.statusText(totals, itemsSoFar: 1_500, refreshing: false)
+                .hasPrefix("Loading… 1,500 items so far   ")
+        )
         #expect(PanelViewController.statusText(totals, itemsSoFar: nil, refreshing: true).hasPrefix("Refreshing…   "))
     }
 
@@ -66,7 +73,9 @@ internal struct PanelTextTests {
     internal func namesThatCouldMisleadAreShownWithEveryCharacterVisible() {
         let evil = FileItem(url: URL(fileURLWithPath: "/x/evil\u{202E}txt.exe"), name: "evil\u{202E}txt.exe")
         #expect(FileListColumn.name.text(for: evil) == "evil\u{FFFD}txt")
-        #expect(GridCellPainter.caption(for: evil) == "evil\u{FFFD}txt.exe" && GridCellPainter.caption(for: nil) == "[..]")
+        #expect(
+            GridCellPainter.caption(for: evil) == "evil\u{FFFD}txt.exe" && GridCellPainter.caption(for: nil) == "[..]"
+        )
         #expect(GridCellPainter.caption(for: item("docs", kind: .directory, size: 0)) == "[docs]")
     }
 
@@ -86,7 +95,10 @@ internal struct PanelTextTests {
         }
         let name = FileListColumn.name.makeCell()
         name.textField?.textColor = .labelColor
-        FileListColumn.name.fill(name, with: RowLook(item: item(".hidden", kind: [], size: 0), color: .systemRed, ownIcons: false))
+        FileListColumn.name.fill(
+            name,
+            with: RowLook(item: item(".hidden", kind: .hidden, size: 0), color: .systemRed, ownIcons: false)
+        )
         #expect(name.textField?.textColor == .systemRed && name.imageView?.alphaValue == 0.5)
         #expect(FileListColumn.makeExtraCell().identifier == FileListColumn.extraCellIdentifier)
     }

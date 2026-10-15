@@ -27,7 +27,12 @@ internal struct PanelTabBarTests {
 
     /// A strip of three tabs, 300 points wide, in a window, laid out.
     private func strip() -> (bar: TabBarView, window: NSWindow) {
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 40), styleMask: [], backing: .buffered, defer: true)
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 400, height: 40),
+            styleMask: [],
+            backing: .buffered,
+            defer: true
+        )
         let bar = TabBarView(frame: NSRect(x: 0, y: 0, width: 400, height: 24))
         window.contentView?.addSubview(bar)
         bar.update(titles: ["first", "second", "third"], paths: ["/a", "/b", "/c"], active: 0)
@@ -98,21 +103,57 @@ internal struct PanelTabBarTests {
         let frames = buttons(of: bar).map { bar.convert($0.bounds, from: $0) }
         let start = frames[0].midX
         var dragging = false
-        #expect(bar.follow(try mouse(.leftMouseUp, at: start, clicks: 1, in: window), pressing: 0, from: start, dragging: &dragging))
+        #expect(
+            bar.follow(
+                try mouse(.leftMouseUp, at: start, clicks: 1, in: window),
+                pressing: 0,
+                from: start,
+                dragging: &dragging
+            )
+        )
         #expect(record.events == ["select 0"] && !dragging)
         // Dragged past the middle of the last tab: the marker shows the place, the release moves.
-        #expect(!bar.follow(try mouse(.leftMouseDragged, at: frames[2].midX + 5, clicks: 1, in: window), pressing: 0, from: start, dragging: &dragging))
+        #expect(
+            !bar.follow(
+                try mouse(.leftMouseDragged, at: frames[2].midX + 5, clicks: 1, in: window),
+                pressing: 0,
+                from: start,
+                dragging: &dragging
+            )
+        )
         #expect(dragging && !bar.marker.isHidden && bar.marker.frame.minX == frames[2].maxX)
-        #expect(bar.follow(try mouse(.leftMouseUp, at: frames[2].midX + 5, clicks: 1, in: window), pressing: 0, from: start, dragging: &dragging))
+        #expect(
+            bar.follow(
+                try mouse(.leftMouseUp, at: frames[2].midX + 5, clicks: 1, in: window),
+                pressing: 0,
+                from: start,
+                dragging: &dragging
+            )
+        )
         #expect(record.events == ["select 0", "move 0 2"] && bar.marker.isHidden)
         // Dragged and brought back: nothing moves.
         dragging = false
         let last = frames[2].midX
-        _ = bar.follow(try mouse(.leftMouseDragged, at: frames[0].midX - 10, clicks: 1, in: window), pressing: 2, from: last, dragging: &dragging)
+        _ = bar.follow(
+            try mouse(.leftMouseDragged, at: frames[0].midX - 10, clicks: 1, in: window),
+            pressing: 2,
+            from: last,
+            dragging: &dragging
+        )
         #expect(!bar.marker.isHidden && bar.marker.frame.minX == frames[0].minX - 2)
-        _ = bar.follow(try mouse(.leftMouseDragged, at: last, clicks: 1, in: window), pressing: 2, from: last, dragging: &dragging)
+        _ = bar.follow(
+            try mouse(.leftMouseDragged, at: last, clicks: 1, in: window),
+            pressing: 2,
+            from: last,
+            dragging: &dragging
+        )
         #expect(bar.marker.isHidden)
-        _ = bar.follow(try mouse(.leftMouseUp, at: last, clicks: 1, in: window), pressing: 2, from: last, dragging: &dragging)
+        _ = bar.follow(
+            try mouse(.leftMouseUp, at: last, clicks: 1, in: window),
+            pressing: 2,
+            from: last,
+            dragging: &dragging
+        )
         #expect(record.events == ["select 0", "move 0 2"])
     }
 
@@ -125,8 +166,8 @@ internal struct PanelTabBarTests {
         record.attach(to: bar)
         let second = buttons(of: bar)[1]
         let middle = bar.convert(second.bounds, from: second).midX
-        NSApp.postEvent(try mouse(.leftMouseUp, at: middle, clicks: 1, in: window), atStart: false)
         second.mouseDown(with: try mouse(.leftMouseDown, at: middle, clicks: 1, in: window))
+        second.mouseUp(with: try mouse(.leftMouseUp, at: middle, clicks: 1, in: window))
         second.mouseDown(with: try mouse(.leftMouseDown, at: middle, clicks: 2, in: window))
         second.otherMouseDown(with: try mouse(.otherMouseDown, at: middle, clicks: 1, in: window))
         #expect(second.menu(for: try mouse(.rightMouseDown, at: middle, clicks: 1, in: window)) != nil)

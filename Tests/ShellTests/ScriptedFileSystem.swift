@@ -18,9 +18,6 @@ internal final class ScriptedFileSystem: FileSystemProvider, @unchecked Sendable
     /// The listing waits before this batch (`batches.count` waits after the last) until `open()`
     /// is called or its cancellation flag is set. Nil never waits.
     internal var holdBefore: Int?
-    /// With this set, a hold ends only with `open()`: the listing does not hear that it was
-    /// told to stop, like a share that does not answer.
-    internal var holdsThroughCancellation = false
     /// Thrown when the listing is let go from its hold (the hold must be set for this).
     internal var failure: (any Error)?
     /// The second batch is not delivered before this long after the listing began, so that the
@@ -89,7 +86,12 @@ internal final class ScriptedFileSystem: FileSystemProvider, @unchecked Sendable
     }
 
     /// Delivers the batches as the switches say.
-    internal func list(_ directory: URL, showHidden _: Bool, cancellation: CancellationFlag, receive: ([FileItem]) -> Bool)
+    internal func list(
+        _ directory: URL,
+        showHidden _: Bool,
+        cancellation: CancellationFlag,
+        receive: ([FileItem]) -> Bool
+    )
         throws
     {
         let started = Date()
@@ -160,11 +162,11 @@ internal final class ScriptedFileSystem: FileSystemProvider, @unchecked Sendable
         try inner.copy(source, to: destination, progress: progress)
     }
 
-    /// Waits until the gate is opened (or the listing is told to stop, unless it holds through
-    /// that); throws `failure` when the listing goes on.
+    /// Waits until the gate is opened or the listing is told to stop; throws `failure` when the
+    /// listing goes on.
     private func hold(_ cancellation: CancellationFlag) throws {
         condition.withLock {
-            while !isOpen, holdsThroughCancellation || !cancellation.isCancelled {
+            while !isOpen, !cancellation.isCancelled {
                 condition.wait()
             }
         }
