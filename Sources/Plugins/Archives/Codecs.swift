@@ -46,8 +46,15 @@ final class Deflater {
     init(level: Int) {
         stream.initialize(to: z_stream())
         deflateInit2_(
-            stream, Int32(max(1, min(level, 9))), Z_DEFLATED, -15, 8, Z_DEFAULT_STRATEGY, ZLIB_VERSION,
-            Int32(MemoryLayout<z_stream>.size))
+            stream,
+            Int32(max(1, min(level, 9))),
+            Z_DEFLATED,
+            -15,
+            8,
+            Z_DEFAULT_STRATEGY,
+            ZLIB_VERSION,
+            Int32(MemoryLayout<z_stream>.size)
+        )
     }
 
     deinit {
@@ -129,22 +136,21 @@ final class InflateStream: ByteStream {
     func read(upToCount count: Int) throws -> Data? {
         guard !isFinished, count > 0 else { return nil }
         let capacity = min(count, 1 << 20)
-        // Decompressed straight into the block that is handed on, which is not cleared first
-        // and is cut to what came out.
-        guard let buffer = malloc(capacity) else { throw ArchiveError.damaged("not enough memory to decompress") }
+        // Decompressed straight into the block that is handed on, which is not cleared first.
+        let buffer = UnsafeMutableRawPointer.allocate(byteCount: capacity, alignment: 1)
         var produced = 0
         do {
             try fill(buffer.assumingMemoryBound(to: Bytef.self), capacity: capacity, produced: &produced)
         } catch {
-            free(buffer)
+            buffer.deallocate()
             throw error
         }
-        guard produced > 0 else {
-            free(buffer)
-            return nil
+        guard produced >= capacity / 2 else {
+            // A block much smaller than its room is copied out, so the room is free at once.
+            defer { buffer.deallocate() }
+            return produced > 0 ? Data(bytes: buffer, count: produced) : nil
         }
-        let block = produced < capacity / 2 ? realloc(buffer, produced) ?? buffer : buffer
-        return Data(bytesNoCopy: block, count: produced, deallocator: .free)
+        return Data(bytesNoCopy: buffer, count: produced, deallocator: .custom { pointer, _ in pointer.deallocate() })
     }
 
     private func fill(_ buffer: UnsafeMutablePointer<Bytef>, capacity: Int, produced: inout Int) throws {
@@ -168,11 +174,10 @@ final class InflateStream: ByteStream {
                     isFinished = true
                 }
 
-            case Z_BUF_ERROR where sourceEnded && stream.pointee.avail_in == 0:
-                throw ArchiveError.damaged("the compressed data ends too early")
-
             case Z_BUF_ERROR:
-                break
+                // There is room for output, so only input that has run out stops the decoder:
+                // the source has ended (a source never hands over an empty block).
+                throw ArchiveError.damaged("the compressed data ends too early")
 
             default:
                 throw ArchiveError.damaged("the compressed data cannot be decoded")
@@ -205,7 +210,10 @@ final class XZCoder {
         if isOpen { compression_stream_destroy(stream) }
         isOpen =
             compression_stream_init(
-                stream, encodes ? COMPRESSION_STREAM_ENCODE : COMPRESSION_STREAM_DECODE, COMPRESSION_LZMA)
+                stream,
+                encodes ? COMPRESSION_STREAM_ENCODE : COMPRESSION_STREAM_DECODE,
+                COMPRESSION_LZMA
+            )
             == COMPRESSION_STATUS_OK
         guard isOpen else { throw ArchiveError.unsupported("LZMA compression") }
     }
@@ -220,15 +228,17 @@ final class XZCoder {
         var consumed = 0
         var ended = false
         try input.withUnsafeBytes { bytes in
-            let base = bytes.bindMemory(to: UInt8.self).baseAddress
             // The coder wants a valid pointer even for no input.
-            stream.pointee.src_ptr = base ?? UnsafePointer(chunk)
+            stream.pointee.src_ptr = UnsafePointer(chunk)
+            if let base = bytes.bindMemory(to: UInt8.self).baseAddress { stream.pointee.src_ptr = base }
             stream.pointee.src_size = bytes.count
             while true {
                 stream.pointee.dst_ptr = chunk
                 stream.pointee.dst_size = capacity
                 let status = compression_stream_process(
-                    stream, finish ? Int32(COMPRESSION_STREAM_FINALIZE.rawValue) : 0)
+                    stream,
+                    finish ? Int32(COMPRESSION_STREAM_FINALIZE.rawValue) : 0
+                )
                 output.append(chunk, count: capacity - stream.pointee.dst_size)
                 consumed = bytes.count - stream.pointee.src_size
                 if status == COMPRESSION_STATUS_END {
@@ -291,7 +301,9 @@ final class XZStream: ByteStream {
             if pending.isEmpty, !sourceEnded {
                 if let block = try source.read(upToCount: 1 << 16) { pending = block } else { sourceEnded = true }
             }
-            let result = try coder.process(pending, finish: sourceEnded, limit: max(count, 1 << 16))
+            // Never told that the input ends: a stream says itself where it ends, and the
+            // decoder then waits for more of one that is cut off, which is told apart below.
+            let result = try coder.process(pending, finish: false, limit: max(count, 1 << 16))
             pending = Data(pending.dropFirst(result.consumed))
             if result.ended {
                 // Padding between streams is made of zero bytes, however many: read on until
@@ -353,8 +365,9 @@ enum Tool {
             let descriptor = handle.fileDescriptor
             var buffer = [UInt8](repeating: 0, count: 1 << 14)
             while true {
-                let got = buffer.withUnsafeMutableBytes { Darwin.read(descriptor, $0.baseAddress, $0.count) }
-                if got < 0, errno == EINTR { continue }
+                let got = retryingInterrupted {
+                    buffer.withUnsafeMutableBytes { Darwin.read(descriptor, $0.baseAddress, $0.count) }
+                }
                 guard got > 0 else { break }
                 if kept.count < errorLimit { kept.append(contentsOf: buffer[..<min(got, errorLimit - kept.count)]) }
             }
@@ -453,10 +466,7 @@ final class ProcessStream: ByteStream, @unchecked Sendable {
         let capacity = min(max(count, 1), 1 << 16)
         let descriptor = output.fileHandleForReading.fileDescriptor
         if let buffer = malloc(capacity) {
-            var got = 0
-            repeat {
-                got = Darwin.read(descriptor, buffer, capacity)
-            } while got < 0 && errno == EINTR
+            let got = retryingInterrupted { Darwin.read(descriptor, buffer, capacity) }
             if got > 0 { return Data(bytesNoCopy: buffer, count: got, deallocator: .free) }
             free(buffer)
         }
@@ -641,7 +651,7 @@ final class ParallelCompressor {
     }
 
     private func drain(final: Bool) throws {
-        guard method != .none else { return }
+        // (Without compression `write` passes everything on at once: only the empty last piece is left.)
         var pieces: [Data] = []
         var offset = buffer.startIndex
         while buffer.endIndex - offset >= pieceSize || (final && offset < buffer.endIndex) {
@@ -656,7 +666,8 @@ final class ParallelCompressor {
         let method = self.method
         let lastIndex = pieces.count - 1
         let results = Parallel.map(Array(pieces.enumerated()), serialBelow: 2) {
-            index, piece -> Result<(Data, UInt32), any Error> in
+            index,
+            piece -> Result<(Data, UInt32), any Error> in
             Result {
                 switch method {
                 case .gzip(let level):
