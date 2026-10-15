@@ -4,12 +4,16 @@ import TestSupport
 import Testing
 
 /// Whether a path from outside stays below the folder it was meant for.
-@Suite struct CorePathSafety {
+@Suite
+internal struct CorePathSafetyTests {
     private let root = URL(fileURLWithPath: "/tmp/core-root")
 
+    /// A location below the root, written as `text` after it.
     private func path(_ text: String) -> URL { URL(fileURLWithPath: "/tmp/core-root" + text) }
 
-    @Test func anEmptyNameIsNoNameForTheWayUp() {
+    /// An empty name is no name: `root//../a` lies beside the root, as the file system reads it.
+    @Test
+    internal func anEmptyNameIsNoNameForTheWayUp() {
         // The file system reads `//` as `/`: `root//../a` is beside the root, not in it.
         #expect(!PathSafety.isContained(path("//../a"), in: root))
         #expect(!PathSafety.isContained(path("/a//.."), in: root))
@@ -19,21 +23,27 @@ import Testing
         #expect(!PathSafety.isContained(path("/a/../../core-root/b/../.."), in: root))
     }
 
-    @Test func aWayUpAboveTheStartLiesNowhere() {
+    /// A `..` that leads above the start of the path lies nowhere, and the root `/` holds everything else.
+    @Test
+    internal func aWayUpAboveTheStartLiesNowhere() {
         #expect(!PathSafety.isContained(URL(fileURLWithPath: "/../tmp/core-root/a"), in: root))
         #expect(!PathSafety.isContained(path("/a"), in: URL(fileURLWithPath: "/..")))
         #expect(PathSafety.isContained(URL(fileURLWithPath: "/a"), in: URL(fileURLWithPath: "/")))
         #expect(!PathSafety.isContained(URL(fileURLWithPath: "/"), in: URL(fileURLWithPath: "/")))
     }
 
-    @Test func theRootItselfAndItsNeighboursAreNotBelowIt() {
+    /// The root itself, and a folder whose name only begins like it, are not below it.
+    @Test
+    internal func theRootItselfAndItsNeighboursAreNotBelowIt() {
         #expect(!PathSafety.isContained(root, in: root))
         #expect(!PathSafety.isContained(path("/"), in: root))
         #expect(!PathSafety.isContained(URL(fileURLWithPath: "/tmp/core-rootx/a"), in: root))
         #expect(PathSafety.isContained(path("/a"), in: path("/")))
     }
 
-    @Test func otherPlacesAreNeverBelowALocalFolder() {
+    /// A place of another scheme, host or port is never below the root.
+    @Test
+    internal func otherPlacesAreNeverBelowALocalFolder() {
         let server = URL(string: "ftp://host/tmp/core-root")!
         #expect(!PathSafety.isContained(URL(string: "ftp://host/tmp/core-root/a")!, in: root))
         #expect(!PathSafety.isContained(URL(string: "ftp://other/tmp/core-root/a")!, in: server))
@@ -42,7 +52,9 @@ import Testing
         #expect(!PathSafety.isContained(URL(string: "ftp://host/tmp/core-root//../a")!, in: server))
     }
 
-    @Test func linksAreFollowedOnTheDiskWhenAsked() throws {
+    /// With links resolved, a link that leads out is out, and what does not exist yet stays where it is written.
+    @Test
+    internal func linksAreFollowedOnTheDiskWhenAsked() throws {
         let box = try Sandbox()
         let inside = box.url("inside")
         try box.folder("inside/real")

@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// The columns plugins offer.
 ///
@@ -7,6 +8,8 @@ import Foundation
 ///
 /// Unchecked: `columns` is guarded by `lock`, so a late registration cannot race a reader.
 public final class ColumnRegistry: @unchecked Sendable {
+    private static let log = Log.logger("Kernel")
+
     private let lock = NSLock()
     private var columns: [ContentColumn] = []
 
@@ -24,7 +27,10 @@ public final class ColumnRegistry: @unchecked Sendable {
     public func register(_ column: ContentColumn) {
         lock.lock()
         defer { lock.unlock() }
-        precondition(!columns.contains { $0.id == column.id }, "The column \(column.id) is registered twice")
+        guard !columns.contains(where: { $0.id == column.id }) else {
+            Self.log.fault("The column \(column.id, privacy: .public) is registered twice; the first stays")
+            return
+        }
         columns.append(column)
     }
 

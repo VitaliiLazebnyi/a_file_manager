@@ -4,17 +4,18 @@ import Foundation
 /// or retires threads.
 extension ParallelPool {
     /// The processor time a thread has used so far, in nanoseconds, and whether it is ready to
-    /// run (as opposed to blocked); nil when the system does not say.
-    internal static func processorTime(of thread: thread_t) -> (used: UInt64, isRunnable: Bool)? {
+    /// run (as opposed to blocked).
+    ///
+    /// When the system does not say (the thread has just ended), the answer is no time and not
+    /// ready: such a thread seems to have gone back in time and does not count as waiting.
+    internal static func processorTime(of thread: thread_t) -> (used: UInt64, isRunnable: Bool) {
         var info = thread_basic_info()
         var count = mach_msg_type_number_t(MemoryLayout<thread_basic_info>.size / MemoryLayout<integer_t>.size)
-        let result = withUnsafeMutablePointer(to: &info) { info in
+        // On failure `info` is left as it was made: all zero.
+        _ = withUnsafeMutablePointer(to: &info) { info in
             info.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { words in
                 thread_info(thread, thread_flavor_t(THREAD_BASIC_INFO), words, &count)
             }
-        }
-        guard result == KERN_SUCCESS else {
-            return nil
         }
         let seconds = UInt64(info.user_time.seconds) + UInt64(info.system_time.seconds)
         let microseconds = UInt64(info.user_time.microseconds) + UInt64(info.system_time.microseconds)
@@ -86,7 +87,7 @@ extension ParallelPool {
         var waiting = 0
         var waitingIn: [ObjectIdentifier: Int] = [:]
         for (thread, state) in workers {
-            let (time, isRunnable) = Self.processorTime(of: thread) ?? (state.used, true)
+            let (time, isRunnable) = Self.processorTime(of: thread)
             // A thread that the machine has no core for is not waiting for anything.
             if let tree = state.tree, !isRunnable, time &- state.used < Self.patience / 4 {
                 waiting += 1

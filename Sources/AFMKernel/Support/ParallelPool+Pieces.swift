@@ -90,7 +90,7 @@ extension ParallelPool {
         var urgency = QOS_CLASS_USER_INITIATED
         var timedOut = false
         condition.lock()
-        workers[own] = (Self.processorTime(of: own)?.used ?? 0, nil)
+        workers[own] = (Self.processorTime(of: own).used, nil)
         while true {
             if retiring > 0 {
                 retiring -= 1

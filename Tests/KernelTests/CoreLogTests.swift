@@ -4,57 +4,55 @@ import OSLog
 import TestSupport
 import Testing
 
-/// What this process logged in one category of the program from about `start` on. (The
-/// store's times are coarser than `Date`'s: a second earlier is asked for, and every test
-/// looks for text of its own.)
-private func logged(in category: String, since start: Date) throws -> [OSLogEntry] {
-    let store = try OSLogStore(scope: .currentProcessIdentifier)
-    return try store.getEntries(at: store.position(date: start.addingTimeInterval(-1)))
-        .filter { entry in
-            guard let entry = entry as? any OSLogEntryWithPayload else { return false }
-            return entry.subsystem == Log.subsystem && entry.category == category
-        }
-}
-
-private func messages(in category: String, since start: Date) throws -> [String] {
-    try logged(in: category, since: start).compactMap { ($0 as? OSLogEntryLog)?.composedMessage }
-}
-
-/// A plugin that does nothing but has a name of its own.
-@MainActor private final class NamedPlugin: Plugin {
-    let name: String
-    init(_ name: String) { self.name = name }
-    func start(in _: Kernel) {
-        // Nothing to register.
-    }
-}
-
 /// The program's log: one subsystem, a category per module, and what the kernel says in it.
-@Suite(.serialized) @MainActor struct CoreLog {
-    @Test func loggersFileUnderTheProgramsSubsystem() throws {
+@MainActor
+@Suite(.serialized)
+internal struct CoreLogTests {
+    /// A plugin that does nothing but has a name of its own.
+    private final class NamedPlugin: Plugin {
+        let name: String
+
+        init(_ name: String) { self.name = name }
+
+        func start(in _: Kernel) {
+            // Nothing to register.
+        }
+
+        deinit {
+            // Nothing to release.
+        }
+    }
+
+    /// A logger files its entries under the program's subsystem and the category it was made for.
+    @Test
+    internal func loggersFileUnderTheProgramsSubsystem() throws {
         let start = Date()
         let category = "Core.Test.\(UUID().uuidString)"
         Log.logger(category).notice("A notice \(42, privacy: .public)")
         #expect(Log.subsystem == "local.a-file-manager")
-        #expect(try messages(in: category, since: start) == ["A notice 42"])
+        #expect(try CoreLogged.messages(in: category, since: start) == ["A notice 42"])
         // Signposts are recorded only while Instruments listens; outside it they cost nothing.
         let signposter = Log.signposter(category)
         signposter.endInterval("probe", signposter.beginInterval("probe", id: .exclusive))
-        #expect(try logged(in: category, since: start).count == 1)
+        #expect(try CoreLogged.entries(in: category, since: start).count == 1)
     }
 
-    @Test func startingAndStoppingThePluginsIsLoggedWithTheirNames() throws {
+    /// Each plugin that starts is logged with its name, and the stop of all of them with their number.
+    @Test
+    internal func startingAndStoppingThePluginsIsLoggedWithTheirNames() throws {
         let start = Date()
         let name = "Probe \(UUID().uuidString)"
         let kernel = Kernel(productName: "Test", settings: MemorySettings(), interaction: ScriptedInteraction())
-        kernel.load([NamedPlugin(name), NamedPlugin(name + " 2")])
+        kernel.load([NamedPlugin(name), NamedPlugin(name + " 2"), NamedPlugin(name + " 3")])
         kernel.shutdown()
-        let said = try messages(in: "Kernel", since: start)
+        let said = try CoreLogged.messages(in: "Kernel", since: start)
         #expect(said.contains("Started the plugin \(name)") && said.contains("Started the plugin \(name) 2"))
-        #expect(said.contains("Stopped 2 plugins"))
+        #expect(said.contains("Stopped 3 plugins"))
     }
 
-    @Test func twoCommandsThatWantTheSameKeyAreABug() throws {
+    /// Two commands that want one key are a bug: the first keeps it, and a fault says so once.
+    @Test
+    internal func twoCommandsThatWantTheSameKeyAreABug() throws {
         let start = Date()
         let keys = KeyBindings()
         let key = Shortcut(.character("q"), [.control, .option, .shift])
@@ -62,8 +60,7 @@ private func messages(in category: String, since start: Date) throws -> [String]
         keys.bindDefault(key, to: "core.first")
         keys.bindDefault(key, to: "core.second")
         #expect(keys.command(for: key) == "core.first" && keys.shortcuts(for: "core.second").isEmpty)
-        let faults = try logged(in: "Kernel", since: start).compactMap { $0 as? OSLogEntryLog }
-            .filter { $0.level == .fault && $0.composedMessage.contains("core.") }
-        #expect(faults.map(\.composedMessage) == ["core.first and core.second both want ctrl+opt+shift+q"])
+        let faults = try CoreLogged.faults(containing: "core.second", since: start)
+        #expect(faults == ["core.first and core.second both want ctrl+opt+shift+q"])
     }
 }

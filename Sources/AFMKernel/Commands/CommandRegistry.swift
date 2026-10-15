@@ -1,3 +1,5 @@
+import os
+
 /// The one place every command is registered and passes through, whatever triggered it: menu, key, button, context menu
 /// or another plugin (spec 20 › Command dispatch contract).
 ///
@@ -13,6 +15,7 @@ public final class CommandRegistry {
         let isChecked: () -> Bool
     }
 
+    private static let log = Log.logger("Kernel")
     /// While this returns true (a job is running, or the window does not exist yet) only
     /// commands marked `runsDuringJobs` start.
     public var isBlocked: () -> Bool = { false }
@@ -40,7 +43,10 @@ public final class CommandRegistry {
         checked: @escaping () -> Bool = { false },
         parameterized run: @escaping (CommandArgument) -> Void
     ) {
-        precondition(entries[command.id] == nil, "Command \(command.id) is registered twice")
+        guard entries[command.id] == nil else {
+            Self.log.fault("The command \(command.id, privacy: .public) is registered twice; the first stays")
+            return
+        }
         entries[command.id] = Entry(command: command, run: run, isEnabled: enabled, isChecked: checked)
         order.append(command.id)
         for shortcut in command.defaultShortcuts { keyBindings.bindDefault(shortcut, to: command.id) }

@@ -34,7 +34,6 @@ public final class PanelEvents {
     ///
     /// Called by the shell.
     public func post(_ event: PanelEvent, from panel: any PanelHandle) {
-        MainThread.assert("Panel events")
         subscriptions.removeAll { $0() == nil }
         for subscription in subscriptions.compactMap({ $0() }) { subscription.handler(event, panel) }
     }

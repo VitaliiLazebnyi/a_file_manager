@@ -13,12 +13,13 @@ public enum Format: Sendable {
     /// worked out for the region it was made in.
     ///
     /// Unchecked: `formatter` is guarded by `lock`; `observers` is set in `init` only.
-    private final class Dates: @unchecked Sendable {
+    internal final class Dates: @unchecked Sendable {
         private let lock = NSLock()
         private var formatter: DateFormatter?
         private var observers: [any NSObjectProtocol] = []
 
-        init() {
+        /// A formatter made with the first date, and made again after the region or time zone changed.
+        internal init() {
             // The first is what Foundation posts as `NSLocale.currentLocaleDidChangeNotification`.
             let localeChanged = Notification.Name("kCFLocaleCurrentLocaleDidChangeNotification")
             observers = [localeChanged, .NSSystemTimeZoneDidChange]
@@ -35,7 +36,8 @@ public enum Format: Sendable {
             lock.unlock()
         }
 
-        func string(from date: Date) -> String {
+        /// `date` in the region's order, from any thread.
+        internal func string(from date: Date) -> String {
             lock.lock()
             let current: DateFormatter
             if let formatter {

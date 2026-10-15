@@ -1,3 +1,5 @@
+import os
+
 /// Where plugins say in which menus their commands appear.
 ///
 /// The shell builds the menu bar and the context menu from this; it has no menu layout of its own.
@@ -19,6 +21,7 @@ public final class MenuRegistry {
         let onItemOnly: Bool
     }
 
+    private static let log = Log.logger("Kernel")
     /// The menus by title: two plugins that name a menu alike must mean the same one.
     private var menuIDs: [String: MenuID] = [:]
     private var entries: [(section: MenuSection, items: [CommandID])] = []
@@ -57,10 +60,11 @@ public final class MenuRegistry {
     /// Inside a section, commands appear in the order they were added (the order the plugins were loaded in).
     public func add(_ items: [CommandID], to section: MenuSection) {
         let menu = section.menu
-        precondition(
-            menuIDs[menu.title] == nil || menuIDs[menu.title] == menu,
-            "Two different menus are called \(menu.title); plugins must share one MenuID"
-        )
+        if let known = menuIDs[menu.title], known != menu {
+            Self.log.fault("Two different menus are called \(menu.title, privacy: .public); the first stays")
+            entries.append((MenuSection(known, order: section.order), items))
+            return
+        }
         menuIDs[menu.title] = menu
         entries.append((section, items))
     }

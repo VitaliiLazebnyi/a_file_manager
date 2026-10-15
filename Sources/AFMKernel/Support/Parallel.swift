@@ -1,5 +1,9 @@
+import os
+
 /// Spreads independent work over the processor's cores.
 public enum Parallel: Sendable {
+    private static let log = Log.logger("Kernel")
+
     /// True while the calling code runs as part of a `map` that the main thread is waiting
     /// for (on the main thread itself or on one of the helping threads): waiting for the
     /// main thread from here would never end.
@@ -52,14 +56,18 @@ public enum Parallel: Sendable {
     }
 
     /// To be called by whatever is about to wait for the main thread (before
-    /// `DispatchQueue.main.sync`): stops, in debug builds, a caller that is part of a `map`
-    /// the main thread waits for (see `map`).
+    /// `DispatchQueue.main.sync`): logs a fault, with the place of the call, for a caller that
+    /// is part of a `map` the main thread waits for (see `map`); the wait that follows would
+    /// never end.
     public static func assertMayWaitForMainThread(file: StaticString = #fileID, line: UInt = #line) {
-        assert(
-            !isHoldingUpMainThread,
-            "Work inside a Parallel.map that was called on the main thread must not wait for the main thread",
-            file: file,
-            line: line
+        guard isHoldingUpMainThread else {
+            return
+        }
+        log.fault(
+            """
+            Work inside a Parallel.map that the main thread waits for waits for the main thread \
+            (\(file, privacy: .public):\(line))
+            """
         )
     }
 }

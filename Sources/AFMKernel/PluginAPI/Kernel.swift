@@ -57,19 +57,7 @@ public final class Kernel {
     /// which would then no longer end when the reader of its output goes away; a handler is
     /// not passed on. A handler that is installed already (by whoever embeds the kernel) is
     /// left alone.
-    nonisolated private static let ignoreBrokenPipes: Void = {
-        var current = sigaction()
-        guard sigaction(SIGPIPE, nil, &current) == 0,
-            unsafeBitCast(current.__sigaction_u.__sa_handler, to: Int.self) == 0
-        else { return }
-        var action = sigaction()
-        action.__sigaction_u.__sa_handler = { _ in
-            // Nothing: the write that caused the signal fails with EPIPE instead.
-        }
-        sigemptyset(&action.sa_mask)
-        action.sa_flags = 0
-        sigaction(SIGPIPE, &action, nil)
-    }()
+    nonisolated private static let ignoreBrokenPipes: Void = catchBrokenPipes()
 
     /// The program's name, for window titles and dialogs.
     nonisolated public let productName: String
@@ -143,6 +131,22 @@ public final class Kernel {
         // Nothing can run before the panels exist.
         commands.isBlocked = { true }
         _ = Self.ignoreBrokenPipes
+    }
+
+    /// Installs the handler of `ignoreBrokenPipes` unless the signal has a handler already;
+    /// any thread.
+    nonisolated internal static func catchBrokenPipes() {
+        var current = sigaction()
+        guard sigaction(SIGPIPE, nil, &current) == 0,
+            unsafeBitCast(current.__sigaction_u.__sa_handler, to: Int.self) == 0
+        else { return }
+        var action = sigaction()
+        action.__sigaction_u.__sa_handler = { _ in
+            // Nothing: the write that caused the signal fails with EPIPE instead.
+        }
+        sigemptyset(&action.sa_mask)
+        action.sa_flags = 0
+        sigaction(SIGPIPE, &action, nil)
     }
 
     /// Starts the plugins in the given order.
@@ -239,8 +243,8 @@ public final class Kernel {
             }
             // Whichever block ran has let go of the question; the other holds only the hop.
         }
-        guard let answer else { preconditionFailure("The main thread ran the question without an answer") }
-        return answer
+        // The wait above ends only after a block has run the question and set the answer.
+        return answer.unsafelyUnwrapped
     }
 
     deinit {

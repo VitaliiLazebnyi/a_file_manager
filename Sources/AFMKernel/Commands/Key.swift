@@ -43,11 +43,78 @@ public enum Key: Hashable, Sendable {
     /// The arrow that moves up.
     case upArrow
 
-    /// The text form of each named key, as `Shortcut.notation` writes it.
-    internal static let names: [(Self, String)] = [
-        (.returnKey, "return"), (.enter, "enter"), (.tab, "tab"), (.space, "space"), (.backspace, "backspace"),
-        (.forwardDelete, "delete"), (.insert, "insert"), (.home, "home"), (.end, "end"), (.pageUp, "pageup"),
-        (.pageDown, "pagedown"), (.leftArrow, "left"), (.rightArrow, "right"), (.upArrow, "up"), (.downArrow, "down"),
-        (.keypadPlus, "num+"), (.keypadMinus, "num-"), (.keypadMultiply, "num*"), (.keypadDivide, "num/")
+    /// The keys with a name of their own, as opposed to characters and function keys.
+    internal static let named: [Self] = [
+        .returnKey, .enter, .tab, .space, .backspace, .forwardDelete, .insert, .home, .end, .pageUp, .pageDown,
+        .leftArrow, .rightArrow, .upArrow, .downArrow, .keypadPlus, .keypadMinus, .keypadMultiply, .keypadDivide
     ]
+
+    /// The key as `Shortcut.notation` writes it: the character itself, `f5`, or the key's name
+    /// (`return`, `pageup`, `num+`).
+    internal var notation: String {
+        switch self {
+        case .backspace:
+            "backspace"
+
+        case .character(let character):
+            character
+
+        case .downArrow:
+            "down"
+
+        case .end:
+            "end"
+
+        case .enter:
+            "enter"
+
+        case .forwardDelete:
+            "delete"
+
+        case .function(let number):
+            "f\(number)"
+
+        case .home:
+            "home"
+
+        case .insert:
+            "insert"
+
+        case .keypadDivide:
+            "num/"
+
+        case .keypadMinus:
+            "num-"
+
+        case .keypadMultiply:
+            "num*"
+
+        case .keypadPlus:
+            "num+"
+
+        case .leftArrow:
+            "left"
+
+        case .pageDown:
+            "pagedown"
+
+        case .pageUp:
+            "pageup"
+
+        case .returnKey:
+            "return"
+
+        case .rightArrow:
+            "right"
+
+        case .space:
+            "space"
+
+        case .tab:
+            "tab"
+
+        case .upArrow:
+            "up"
+        }
+    }
 }

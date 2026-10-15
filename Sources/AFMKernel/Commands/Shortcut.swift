@@ -12,17 +12,7 @@ public struct Shortcut: Hashable, Sendable {
 
     /// The shortcut as text, as it is stored in the settings: `cmd+shift+c`, `f5`, `ctrl+tab`, `num+`.
     public var notation: String {
-        let prefix = Self.modifierNames.filter { modifiers.contains($0.0) }.map { $0.1 + "+" }.joined()
-        switch key {
-        case .character(let character):
-            return prefix + character
-
-        case .function(let number):
-            return prefix + "f\(number)"
-
-        default:
-            return prefix + (Key.names.first { $0.0 == key }?.1 ?? "?")
-        }
+        Self.modifierNames.filter { modifiers.contains($0.0) }.map { $0.1 + "+" }.joined() + key.notation
     }
 
     /// `key` with `modifiers` held down.
@@ -41,7 +31,7 @@ public struct Shortcut: Hashable, Sendable {
             held.insert(modifier)
             rest.removeFirst(name.count + 1)
         }
-        if let named = Key.names.first(where: { $0.1 == rest })?.0 {
+        if let named = Key.named.first(where: { $0.notation == rest }) {
             self.init(named, held)
         } else if rest.count > 1, rest.hasPrefix("f"), let number = Int(rest.dropFirst()), (1...12).contains(number) {
             self.init(.function(number), held)

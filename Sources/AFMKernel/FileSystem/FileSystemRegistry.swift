@@ -1,4 +1,5 @@
 public import Foundation
+import os
 
 /// The file systems the plugins provide, found by URL scheme.
 ///
@@ -6,6 +7,8 @@ public import Foundation
 /// starts may already have work in the background while a later one registers), and the lists of flushers, releasers
 /// and closers by `flushLock`.
 public final class FileSystemRegistry: @unchecked Sendable {
+    private static let log = Log.logger("Kernel")
+
     /// Posted on the main thread when a file system has learned that what `volume(of:)` says about a volume (its free
     /// space, say) is no longer what it last answered.
     ///
@@ -39,10 +42,12 @@ public final class FileSystemRegistry: @unchecked Sendable {
     public func register(_ provider: any FileSystemProvider) {
         lock.lock()
         defer { lock.unlock() }
-        precondition(
-            !providers.contains { $0.scheme == provider.scheme },
-            "A file system for \(provider.scheme): is registered twice"
-        )
+        guard !providers.contains(where: { $0.scheme == provider.scheme }) else {
+            Self.log.fault(
+                "A file system for \(provider.scheme, privacy: .public): is registered twice; the first stays"
+            )
+            return
+        }
         providers.append(provider)
     }
 
@@ -180,9 +185,12 @@ public final class FileSystemRegistry: @unchecked Sendable {
             if !baseReadsIt, all.contains(where: { $0.scheme == "file" }) {
                 return URL(fileURLWithPath: text, isDirectory: false).standardized
             }
-            var components = URLComponents(url: base, resolvingAgainstBaseURL: false) ?? URLComponents()
-            components.path = text
-            return (components.url ?? URL(fileURLWithPath: text, isDirectory: false)).standardized
+            // The top of the base's place (scheme, server, root), then the path.
+            var top = base
+            while top.pathComponents.count > 1 {
+                top.deleteLastPathComponent()
+            }
+            return top.appending(path: String(text.dropFirst()), directoryHint: .notDirectory).standardized
         }
         return text.isEmpty ? base : base.appending(name: text).standardized
     }

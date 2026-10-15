@@ -135,10 +135,9 @@ public enum BlockingCalls: Sendable {
         // Only the first of answer and cancellation is delivered.
         @Sendable
         func finish(_ answer: Answer?) {
-            guard slot.close() else {
-                return
+            if slot.close() {
+                DispatchQueue.main.async { deliver(answer) }
             }
-            DispatchQueue.main.async { deliver(answer) }
         }
         if cancellation?.isCancelled == true {
             finish(nil)
