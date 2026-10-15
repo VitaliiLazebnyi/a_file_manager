@@ -131,6 +131,7 @@ final class PanelCoordinator: PanelSet, PanelHost {
         watches = [:]
         watchedLocations = []
         readAhead.shutDown()
+        places.stop()
         panels.forEach { $0.cancelLoading() }
     }
 
@@ -430,6 +431,13 @@ final class PlacesStore {
     /// `handler` is called on the main thread whenever `all` has changed.
     func observe(_ handler: @escaping () -> Void) {
         handlers.append(handler)
+    }
+
+    /// The window goes away: nobody hears of the places any more, and nothing asks for them.
+    func stop() {
+        handlers = []
+        for observer in observers { observer.center.removeObserver(observer.token) }
+        observers = []
     }
 
     /// Asks every file system for its places again. One that has not answered the last
