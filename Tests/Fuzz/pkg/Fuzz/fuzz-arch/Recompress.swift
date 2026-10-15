@@ -67,7 +67,9 @@ private func readAll(_ stream: any ByteStream, limit: Int) -> [UInt8] {
 private func compress(_ inner: [UInt8], _ codec: ArchiveFormat.Codec, into bytes: inout [UInt8]) {
     switch codec {
     case .gzip:
-        bytes = gzipped(inner)
+        if let body = try? Deflater.piece(Data(inner), level: 6, final: true) {
+            bytes = gzipped(inner, body: body)
+        }
 
     case .xz:
         if let out = try? XZCoder.compress(Data(inner)) {
@@ -80,10 +82,8 @@ private func compress(_ inner: [UInt8], _ codec: ArchiveFormat.Codec, into bytes
     }
 }
 
-/// `inner` as a gzip file: a fixed header, the deflated data, the CRC and the length.
-private func gzipped(_ inner: [UInt8]) -> [UInt8] {
-    let deflater = Deflater(level: 6)
-    let body = deflater.compress(Data(inner), flush: .finish)
+/// `inner` as a gzip file: a fixed header, `body` (the deflated data), the CRC and the length.
+private func gzipped(_ inner: [UInt8], body: Data) -> [UInt8] {
     var out: [UInt8] = [0x1F, 0x8B, 8, 0, 0, 0, 0, 0, 0, 3] + [UInt8](body)
     let crc = CRC32.of(Data(inner))
     for byte in 0..<4 {

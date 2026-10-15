@@ -16,14 +16,14 @@ internal struct CoverageArchivesFormatsCodecs {
         box = try Sandbox()
     }
 
-    private func deflated(_ text: String) -> Data {
-        Deflater(level: 6).compress(Data(text.utf8), flush: .finish)
+    private func deflated(_ text: String) throws -> Data {
+        try Deflater.piece(Data(text.utf8), level: 6, final: true)
     }
 
     /// Deflate data that is cut off ends too early.
     @Test
-    internal func deflateDataThatIsCutOffEndsTooEarly() {
-        let whole = deflated(String(repeating: "cut off in the middle ", count: 200))
+    internal func deflateDataThatIsCutOffEndsTooEarly() throws {
+        let whole = try deflated(String(repeating: "cut off in the middle ", count: 200))
         let stream = InflateStream(DataStream(whole.prefix(whole.count / 2)), wrapping: .raw)
         #expect(
             Support.failure { _ = try stream.readFully(1 << 20) }
@@ -35,7 +35,7 @@ internal struct CoverageArchivesFormatsCodecs {
     @Test
     internal func deflateDataComesInBlocksOfTheSizeAskedFor() throws {
         let text = String(repeating: "a large block of text ", count: 100_000)
-        let stream = InflateStream(DataStream(deflated(text)), wrapping: .raw)
+        let stream = InflateStream(DataStream(try deflated(text)), wrapping: .raw)
         var data = Data()
         while let block = try stream.read(upToCount: 1 << 20) {
             #expect(block.count <= 1 << 20)
