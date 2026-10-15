@@ -34,6 +34,7 @@ internal struct CovFileOpsUnits {
         try FileManager.default.createSymbolicLink(at: box.url("link"), withDestinationURL: pipe)
         #expect(FileIdentity.isSpecialNode(box.url("link"), followingLinks: true))
         #expect(!FileIdentity.isSpecialNode(box.url("link"), followingLinks: false))
+        #expect(!FileIdentity.isSpecialNode(box.url("none"), followingLinks: false))
         #expect(FileIdentity.isLocked(URL(string: "mem:/x")!) == nil)
         #expect(FileIdentity.isLocked(box.url("none")) == nil)
     }

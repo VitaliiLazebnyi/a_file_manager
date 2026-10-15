@@ -360,7 +360,7 @@ public enum NameTemplate {
         let (year, hour) = (part(.year), part(.hour))
         func two(_ value: Int) -> String { String(format: "%02d", value) }
         var text = ""
-        var characters = Array(body)[...]
+        var characters = ArraySlice(body)
         while let letter = characters.popFirst() {
             switch letter {
             case "Y": text += String(format: "%04d", year)

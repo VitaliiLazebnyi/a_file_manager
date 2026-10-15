@@ -28,7 +28,7 @@ internal struct CovFileOpsNames {
     /// Empty parts of a list name nothing; a list is no range, and neither is a range that runs backwards.
     @Test
     internal func listsAndBackwardRangesAreNoRanges() throws {
-        #expect(try NameTemplate.names(from: "<a||b", context: context) == ["a", "b"])
+        #expect(try NameTemplate.names(from: "<a| |b", context: context) == ["a", "b"])
         #expect(NameTemplate.rangePreview("<a|b", context: context) == nil)
         #expect(try NameTemplate.names(from: "<5-2>x", context: context) == ["5-2>x"])
     }

@@ -61,83 +61,97 @@ final class JobBridge: FileJobDelegate, Sendable {
             .renameExisting, .autoRenameCopied, .autoRenameExisting, .renameOlderSkipNewer, .olderOrSame, .larger,
             .smaller
         ]
-        while true {
-            let step: OverwriteStep = monitor.ask { @MainActor @Sendable [more] in
-                while true {
-                    // Return presses Skip: a file that is overwritten is gone, one that is skipped
-                    // can still be copied.
-                    let button = ui.choose(
-                        "Overwrite:",
-                        detail: detail,
-                        buttons: [
-                            "Overwrite", "Overwrite all", "Skip", "Skip all", "Overwrite all older",
-                            "Rename…", "More…", "Cancel"
-                        ],
-                        style: .warning,
-                        defaultButton: Self.overwriteDefault
-                    )
-                    switch button {
-                    case 0: return .answer(.overwrite)
-                    case 1: return .answer(.overwriteAll)
-                    case 2: return .answer(.skip)
-                    case 3: return .answer(.skipAll)
-                    case 4: return .answer(.overwriteAllOlder)
+        return resolve(job, target: target, source: source, detail: detail, more: more)
+    }
 
-                    case 5:
-                        if let name = newName("New name for the file being copied:", proposing: target.name) {
-                            return .answer(.rename(name))
-                        }
+    /// Asks the Overwrite dialog until it is answered; Compare reads the two files and asks again.
+    private func resolve(_ job: FileJob, target: FileItem, source: FileItem, detail: String, more: [MoreOption])
+        -> ConflictChoice
+    {
+        let step: OverwriteStep = monitor.ask { @MainActor @Sendable in
+            overwriteStep(target: target, detail: detail, more: more)
+        }
+        if case .answer(let choice) = step {
+            return choice
+        }
+        // Compare takes no decision: the files are read here, off the main thread, and the
+        // Overwrite dialog comes back.
+        let same = try? Checksum.sameContents(
+            source.url,
+            target.url,
+            in: fileSystems,
+            flags: [monitor.cancellation]
+        ) { self.monitor.cancellation.isCancelled }
+        if monitor.cancellation.isCancelled {
+            return .cancel
+        }
+        monitor.ask { @MainActor @Sendable in
+            let paths = "\(shown(source.url))\n\(shown(target.url))"
+            switch same {
+            case true?: ui.inform("The two files have the same content!", detail: paths, style: .information)
+            case false?: ui.inform("The two files are different!", detail: paths, style: .information)
+            default: ui.inform("The two files could not be compared.", detail: paths, style: .warning)
+            }
+        }
+        return resolve(job, target: target, source: source, detail: detail, more: more)
+    }
 
-                    case 6:
-                        guard
-                            let row = ui.pickRow(
-                                "Overwrite: more options",
-                                rows: more.map(\.rawValue),
-                                detail: shown(target.url)
-                            )
-                        else { continue }
-                        switch more[row] {
-                        case .compare: return .compare
-                        case .append: return .answer(.append)
-                        case .resume: return .answer(.resume)
+    /// One answer of the Overwrite dialog: what the job is to do, or Compare. A Rename or More… that is given up
+    /// asks again. Main thread.
+    @MainActor
+    private func overwriteStep(target: FileItem, detail: String, more: [MoreOption]) -> OverwriteStep {
+        // Return presses Skip: a file that is overwritten is gone, one that is skipped can still be copied.
+        let button = ui.choose(
+            "Overwrite:",
+            detail: detail,
+            buttons: [
+                "Overwrite", "Overwrite all", "Skip", "Skip all", "Overwrite all older", "Rename…", "More…", "Cancel"
+            ],
+            style: .warning,
+            defaultButton: Self.overwriteDefault
+        )
+        switch button {
+        case 0: return .answer(.overwrite)
+        case 1: return .answer(.overwriteAll)
+        case 2: return .answer(.skip)
+        case 3: return .answer(.skipAll)
+        case 4: return .answer(.overwriteAllOlder)
 
-                        case .renameExisting:
-                            if let name = newName("New name for the existing target file:", proposing: target.name) {
-                                return .answer(.renameExisting(name))
-                            }
+        case 5:
+            if let name = newName("New name for the file being copied:", proposing: target.name) {
+                return .answer(.rename(name))
+            }
 
-                        case .autoRenameCopied: return .answer(.autoRenameCopied)
-                        case .autoRenameExisting: return .answer(.autoRenameExisting)
-                        case .renameOlderSkipNewer: return .answer(.renameOlderSkipNewer)
-                        case .olderOrSame: return .answer(.overwriteAllOlderOrSame)
-                        case .larger: return .answer(.copyAllLarger)
-                        case .smaller: return .answer(.copyAllSmaller)
-                        }
+        case 6:
+            if let row = ui.pickRow("Overwrite: more options", rows: more.map(\.rawValue), detail: shown(target.url)),
+                let step = moreStep(more[row], target: target)
+            {
+                return step
+            }
 
-                    default: return .answer(.cancel)
-                    }
+        default: return .answer(.cancel)
+        }
+        return overwriteStep(target: target, detail: detail, more: more)
+    }
+
+    /// What an entry of More… answers; nil when renaming the target was given up. Main thread.
+    @MainActor
+    private func moreStep(_ option: MoreOption, target: FileItem) -> OverwriteStep? {
+        switch option {
+        case .compare: return .compare
+        case .append: return .answer(.append)
+        case .resume: return .answer(.resume)
+        case .renameExisting:
+            return newName("New name for the existing target file:", proposing: target.name)
+                .map {
+                    .answer(.renameExisting($0))
                 }
-            }
-            if case .answer(let choice) = step {
-                return choice
-            }
-            // Compare takes no decision: the files are read here, off the main thread, and the
-            // Overwrite dialog comes back.
-            let same = try? Checksum.sameContents(
-                source.url,
-                target.url,
-                in: fileSystems,
-                flags: [monitor.cancellation]
-            ) { self.monitor.cancellation.isCancelled }
-            if monitor.cancellation.isCancelled { return .cancel }
-            monitor.ask { @MainActor @Sendable in
-                let paths = "\(shown(source.url))\n\(shown(target.url))"
-                switch same {
-                case true?: ui.inform("The two files have the same content!", detail: paths, style: .information)
-                case false?: ui.inform("The two files are different!", detail: paths, style: .information)
-                default: ui.inform("The two files could not be compared.", detail: paths, style: .warning)
-                }
-            }
+        case .autoRenameCopied: return .answer(.autoRenameCopied)
+        case .autoRenameExisting: return .answer(.autoRenameExisting)
+        case .renameOlderSkipNewer: return .answer(.renameOlderSkipNewer)
+        case .olderOrSame: return .answer(.overwriteAllOlderOrSame)
+        case .larger: return .answer(.copyAllLarger)
+        case .smaller: return .answer(.copyAllSmaller)
         }
     }
 

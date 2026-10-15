@@ -136,7 +136,7 @@ enum OperationSettings {
 public enum CommandSwitches {
     public static func parse(_ text: String) -> [Character: String] {
         var switches: [Character: String] = [:]
-        var characters = Array(text)[...]
+        var characters = ArraySlice(text)
         while let letter = characters.popFirst() {
             guard letter.isLetter else { continue }
             if characters.first == "=" {
