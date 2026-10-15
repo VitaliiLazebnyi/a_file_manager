@@ -5,7 +5,7 @@ import AppKit
 
 /// A button that runs a closure.
 final class ActionButton: NSButton {
-    private var handler: () -> Void = {}
+    private var handler: (() -> Void)?
 
     convenience init(_ title: String, _ handler: @escaping () -> Void) {
         self.init(title: title, target: nil, action: nil)
@@ -15,7 +15,7 @@ final class ActionButton: NSButton {
         bezelStyle = .rounded
     }
 
-    @objc private func pressed() { handler() }
+    @objc private func pressed() { handler?() }
 }
 
 /// A stack whose parts fill it: across, every part is as wide (or as high) as the stack, and
@@ -82,8 +82,8 @@ final class RowsTable: NSScrollView, NSTableViewDataSource, NSTableViewDelegate 
     private var symbols: [String?] = []
     var onSelect: () -> Void = {}
     /// A double click or Return on a row.
-    var onActivate: () -> Void = {} {
-        didSet { table.onReturn = { [weak self] in self?.onActivate() } }
+    var onActivate: (() -> Void)? {
+        didSet { table.onReturn = { [weak self] in self?.onActivate?() } }
     }
 
     init(columns: [(title: String, width: CGFloat)]) {
@@ -169,7 +169,7 @@ final class RowsTable: NSScrollView, NSTableViewDataSource, NSTableViewDelegate 
     func tableViewSelectionDidChange(_: Notification) { onSelect() }
 
     @objc private func doubleClicked() {
-        if table.clickedRow >= 0 { onActivate() }
+        if table.clickedRow >= 0 { onActivate?() }
     }
 }
 

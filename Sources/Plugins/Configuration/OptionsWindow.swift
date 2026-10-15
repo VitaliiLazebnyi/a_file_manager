@@ -10,7 +10,7 @@ protocol OptionsPage: AnyObject {
     var view: NSView { get }
     var isChanged: Bool { get }
     /// Called by the page when the user changed something, so Apply can be offered.
-    var onEdit: () -> Void { get set }
+    var onEdit: (() -> Void)? { get set }
     /// Apply and OK.
     func commit()
     /// Cancel, and every time the window opens: show what is stored.
@@ -38,7 +38,7 @@ final class PreferencesPage: NSObject, OptionsPage, NSTextFieldDelegate {
     private let model: PreferencePageModel
     private var controls: [(preference: Preference, control: NSControl)] = []
     let view = NSView()
-    var onEdit: () -> Void = {}
+    var onEdit: (() -> Void)?
 
     init(model: PreferencePageModel) {
         self.model = model
@@ -99,7 +99,7 @@ final class PreferencesPage: NSObject, OptionsPage, NSTextFieldDelegate {
                 }
             }
         }
-        onEdit()
+        onEdit?()
     }
 
     func controlTextDidChange(_: Notification) { changed() }
@@ -157,7 +157,7 @@ final class KeyboardPage: NSObject, OptionsPage, NSSearchFieldDelegate {
             vertical: true
         )
     }()
-    var onEdit: () -> Void = {}
+    var onEdit: (() -> Void)?
 
     init(center: ConfigurationCenter) {
         self.center = center
@@ -183,7 +183,7 @@ final class KeyboardPage: NSObject, OptionsPage, NSSearchFieldDelegate {
 
     private func edited() {
         reload()
-        onEdit()
+        onEdit?()
     }
 
     private func change(_ body: (CommandID) -> Void) {
@@ -258,7 +258,7 @@ final class KeyboardPage: NSObject, OptionsPage, NSSearchFieldDelegate {
     func bindingsStoredElsewhere() {
         editor.rebase(kernel: center.kernel)
         reload()
-        onEdit()
+        onEdit?()
     }
 }
 
@@ -301,7 +301,7 @@ final class ButtonBarPage: NSObject, OptionsPage {
             )
         ]
     )
-    var onEdit: () -> Void = {}
+    var onEdit: (() -> Void)?
 
     init(center: ConfigurationCenter) {
         self.center = center
@@ -328,7 +328,7 @@ final class ButtonBarPage: NSObject, OptionsPage {
 
     private func edited(selecting row: Int?) {
         reload(selecting: row)
-        onEdit()
+        onEdit?()
     }
 
     private func move(_ offset: Int) {
@@ -415,7 +415,7 @@ final class StartMenuPage: NSObject, OptionsPage {
             )
         ]
     )
-    var onEdit: () -> Void = {}
+    var onEdit: (() -> Void)?
 
     init(center: ConfigurationCenter) {
         self.center = center
@@ -442,7 +442,7 @@ final class StartMenuPage: NSObject, OptionsPage {
 
     private func edited(selecting row: Int?) {
         reload(selecting: row)
-        onEdit()
+        onEdit?()
     }
 
     private func add(_ row: StartMenuDraft.Row?) {
@@ -488,7 +488,7 @@ final class SettingsFilePage: NSObject, OptionsPage {
     let title = "Settings File"
     let view: NSView
     let isChanged = false
-    var onEdit: () -> Void = {}
+    var onEdit: (() -> Void)?
 
     init(center: ConfigurationCenter) {
         let commands = center.kernel.commands
