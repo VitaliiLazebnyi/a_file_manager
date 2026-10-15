@@ -338,6 +338,9 @@ import Testing
             if index % 3 != 0 { memory.addFile("/B/d\(index % 4)/f\(index).txt", "left \(index)") }
         }
         let plugin = DirectorySyncPlugin()
+        let presenter = StabilityPresenter()
+        plugin.present = presenter.present
+        defer { presenter.closeAll() }
         let bench = TestBench(
             plugins: [plugin],
             fileSystems: [memory],
@@ -346,8 +349,8 @@ import Testing
         )
         bench.commands.perform(.synchronizeDirectories)
         let session = plugin.session!
-        let window = NSApplication.shared.windows.first { $0.title == "Synchronize directories" }
-        #expect(window?.isVisible == true)
+        let window = presenter.open.first { $0.title == "Synchronize directories" }
+        #expect(window != nil)
         session.options.byContent = true
         session.compare()
         #expect(session.phase == .comparing)
@@ -364,6 +367,6 @@ import Testing
         window?.displayIfNeeded()
         #expect(!session.canSynchronize)
         plugin.stop()
-        #expect(window?.isVisible == false)
+        #expect(!presenter.isOpen(window))
     }
 }
