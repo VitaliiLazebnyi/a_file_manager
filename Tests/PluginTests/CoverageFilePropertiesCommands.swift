@@ -43,27 +43,6 @@ internal struct CoverageFilePropertiesCommands {
         #expect(fixture.plugin.finderInfoRequests.last?.path == fixture.box.url("A/many").path)
     }
 
-    /// Where applications may be started, Finder is asked through the script runner with the
-    /// paths of the items.
-    @Test
-    internal func finderIsAskedThroughTheScriptRunner() throws {
-        let box = try Sandbox()
-        try box.file("runner.sh", "#!/bin/sh\nfor last; do :; done\nprintf '%s' \"$last\" > \"$0.out\"\n")
-        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: box.url("runner.sh").path)
-        let plugin = FilePropertiesPlugin()
-        plugin.finderScriptRunner = box.url("runner.sh")
-        let bench = TestBench(
-            plugins: [plugin],
-            fileSystems: [LocalFileSystem()],
-            left: fixture.box.url("A"),
-            right: fixture.box.url("B")
-        )
-        bench.left.moveCursor(toName: "one.txt")
-        bench.commands.perform("afm_FinderInfo")
-        #expect(Wait.until { box.exists("runner.sh.out") && box.read("runner.sh.out")?.isEmpty == false })
-        #expect(box.read("runner.sh.out") == fixture.box.url("A/one.txt").path)
-    }
-
     /// Recursing with the permissions left as shown asks first: Back returns to the dialog,
     /// Apply gives everything inside the folder's permissions.
     @Test

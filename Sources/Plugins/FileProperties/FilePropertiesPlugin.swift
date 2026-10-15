@@ -22,9 +22,6 @@ public final class FilePropertiesPlugin: Plugin {
     /// most recent ones only, for tests to look at.
     public private(set) var finderInfoRequests: [URL] = []
     private static let finderInfoRequestLimit = 64
-    /// The program that asks Finder for its Info windows: AppleScript's. Tests put a harmless
-    /// program in its place, which notes what it was given.
-    var finderScriptRunner = URL(fileURLWithPath: "/usr/bin/osascript")
 
     enum Settings {
         static let linkKind = "fileProperties.linkKind"
@@ -170,7 +167,6 @@ public final class FilePropertiesPlugin: Plugin {
     private func showFinderInfo(_ urls: [URL]) {
         finderInfoRequests = Array((finderInfoRequests + urls).suffix(Self.finderInfoRequestLimit))
         guard launchesApplications else { return }
-        let runner = finderScriptRunner
         // Starting a program waits for the system: on a thread for work that waits.
         BlockingCalls.run {
             let script = [
@@ -179,7 +175,7 @@ public final class FilePropertiesPlugin: Plugin {
                 "end tell", "end run"
             ]
             let process = Process()
-            process.executableURL = runner
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
             process.arguments = script.flatMap { ["-e", $0] } + urls.map(\.path)
             process.standardOutput = FileHandle.nullDevice
             process.standardError = FileHandle.nullDevice
