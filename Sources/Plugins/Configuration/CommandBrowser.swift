@@ -47,6 +47,7 @@ final class CommandBrowserController: NSWindowController, NSWindowDelegate, NSSe
         buildContent(in: window)
     }
 
+    @available(*, unavailable)
     required init?(coder _: NSCoder) { fatalError("not used") }
 
     private func buildContent(in window: NSWindow) {

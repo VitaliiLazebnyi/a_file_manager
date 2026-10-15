@@ -109,6 +109,7 @@ final class RowsTable: NSScrollView, NSTableViewDataSource, NSTableViewDelegate 
         translatesAutoresizingMaskIntoConstraints = false
     }
 
+    @available(*, unavailable)
     required init?(coder _: NSCoder) { fatalError("not used") }
 
     var tableView: NSTableView { table }
@@ -200,6 +201,7 @@ final class TextWindowController: NSWindowController {
         window.contentView = scroll
     }
 
+    @available(*, unavailable)
     required init?(coder _: NSCoder) { fatalError("not used") }
 
     func show(_ text: String) {
