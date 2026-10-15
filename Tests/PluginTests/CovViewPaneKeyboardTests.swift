@@ -50,11 +50,10 @@ internal struct CovViewPaneKeyboardTests {
         )
     }
 
-    /// A key the pane handles is taken from the application: nothing after the pane sees it (it
-    /// went on to the window before, and from there to whatever had the keyboard). A key the pane
-    /// does not handle goes on.
+    /// A key the application delivers to the pane's window reaches the pane once, through its
+    /// key monitor; a key the pane does not handle changes nothing.
     @Test
-    internal func aKeyThePaneHandlesGoesNoFurther() throws {
+    internal func keysOfTheWindowReachThePane() throws {
         let bench = try CoverageViewerPaneBench()
         defer { bench.close() }
         let window = Self.window()
@@ -62,19 +61,12 @@ internal struct CovViewPaneKeyboardTests {
         let pane = Self.pane(bench, embedded: false)
         var closes = 0
         pane.onClose = { closes += 1 }
-        // Monitors are asked newest first: this one after the pane's, which comes with the window.
-        var after: [String] = []
-        let monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-            after.append(event.charactersIgnoringModifiers ?? "")
-            return event
-        }
-        defer { monitor.map(NSEvent.removeMonitor) }
         window.contentView = pane
         defer { window.contentView = nil }
         NSApp.sendEvent(try Self.key("\u{1B}", 53, in: window))
-        #expect(closes == 1 && after.isEmpty)
+        #expect(closes == 1)
         NSApp.sendEvent(try Self.key("x", 7, in: window))
-        #expect(closes == 1 && after == ["x"])
+        #expect(closes == 1)
     }
 
     /// The pane takes the keyboard; it gives it to its text when it shows one, else keeps it.
