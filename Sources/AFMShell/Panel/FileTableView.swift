@@ -28,8 +28,10 @@ internal final class FileTableView: NSTableView {
     }
 
     /// What was read of a drag is let go of when the drag is over.
+    ///
+    /// The table has no `draggingEnded` of its own to pass this on to: calling it ended the
+    /// program.
     override internal func draggingEnded(_ sender: any NSDraggingInfo) {
-        super.draggingEnded(sender)
         PanelDrop.endSession(sender.draggingSequenceNumber)
     }
 

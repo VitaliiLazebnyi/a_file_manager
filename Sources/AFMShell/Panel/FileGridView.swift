@@ -52,9 +52,6 @@ internal final class FileGridView: NSView, NSUserInterfaceValidations {
 
     private var model: PanelModel? { panel?.model }
 
-    /// The side of a thumbnail tile.
-    private var tileSide: CGFloat { panel?.settings.thumbnailSide ?? 96 }
-
     // MARK: Layout
 
     /// Takes the list from the model again: the entries, their number or the layout changed.
@@ -67,7 +64,7 @@ internal final class FileGridView: NSView, NSUserInterfaceValidations {
 
     /// Works out the cells for the size the list has now.
     internal func layOut() {
-        guard let model else {
+        guard let panel else {
             return
         }
         let viewport = enclosingScrollView?.contentSize ?? bounds.size
@@ -76,19 +73,20 @@ internal final class FileGridView: NSView, NSUserInterfaceValidations {
         case .columns:
             // Measuring the names is a pass over the list; the list only changes in `reload`, while
             // the panel being resized asks for the layout on every step.
-            let widest = widestName ?? GridCellPainter.widestBriefName(in: model.items)
+            let widest = widestName ?? GridCellPainter.widestBriefName(in: panel.model.items)
             widestName = widest
             let width = GridCellPainter.briefColumnWidth(
                 widest: widest,
-                limit: panel?.settings.briefWidthLimit,
+                limit: panel.settings.briefWidthLimit,
                 viewport: viewport.width
             )
             cell = CGSize(width: width, height: GridCellPainter.briefRowHeight)
 
         case .rows:
-            cell = CGSize(width: tileSide + 20, height: tileSide + 40)
+            let side = panel.settings.thumbnailSide
+            cell = CGSize(width: side + 20, height: side + 40)
         }
-        let laidOut = GridGeometry(flow: flow, cellCount: model.rowCount, cell: cell, viewport: viewport)
+        let laidOut = GridGeometry(flow: flow, cellCount: panel.model.rowCount, cell: cell, viewport: viewport)
         guard laidOut != geometry || frame.size != laidOut.contentSize else {
             return
         }
@@ -186,8 +184,8 @@ internal final class FileGridView: NSView, NSUserInterfaceValidations {
                 GridCellPainter.drawTile(
                     cell,
                     in: frame,
-                    side: tileSide,
-                    picture: picture(of: item, ownIcons: ownIcons)
+                    side: panel.settings.thumbnailSide,
+                    picture: picture(of: item, ownIcons: ownIcons, from: panel)
                 )
             }
             if row == dropRow {
@@ -324,11 +322,12 @@ internal final class FileGridView: NSView, NSUserInterfaceValidations {
 
     /// The picture of a file of a local disk, from the panel's store; nil until it is there,
     /// and for anything else, which shows the icon of its type and costs no trip to a server.
-    private func picture(of item: FileItem?, ownIcons: Bool) -> NSImage? {
+    private func picture(of item: FileItem?, ownIcons: Bool, from panel: PanelViewController) -> NSImage? {
         guard let item, ownIcons, item.url.isFileURL, !item.isFolder, Mounts.isLocal(path: item.url.path) else {
             return nil
         }
-        return panel?.thumbnails.image(for: item, side: tileSide, scale: window?.backingScaleFactor ?? 2)
+        let side = panel.settings.thumbnailSide
+        return panel.thumbnails.image(for: item, side: side, scale: window?.backingScaleFactor ?? 2)
     }
 
     /// The list was resized: the cells are laid out anew.

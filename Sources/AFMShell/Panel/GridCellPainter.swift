@@ -36,12 +36,13 @@ internal enum GridCellPainter {
             guard longest.count < 6 || length > shortestKept else {
                 continue
             }
+            // Kept longest first: the last is the shortest kept.
             longest.append((length, item.name))
+            longest.sort { $0.length > $1.length }
             if longest.count > 6 {
-                longest.sort { $0.length > $1.length }
                 longest.removeLast()
             }
-            shortestKept = longest.map(\.length).min() ?? 0
+            shortestKept = longest[longest.count - 1].length
         }
         return
             longest.map { NSAttributedString(string: "[" + $0.name + "]", attributes: [.font: nameFont]).size().width }

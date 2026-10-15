@@ -1,4 +1,5 @@
 import AppKit
+import Testing
 
 @testable import AFMShell
 
@@ -23,5 +24,35 @@ internal enum PanelDropHelpers {
     internal static func point(ofRow row: Int, in grid: FileGridView) -> NSPoint {
         let rect = grid.geometry.frame(of: row)
         return grid.convert(NSPoint(x: rect.midX, y: rect.midY), to: nil)
+    }
+
+    /// A mouse event of `type` at `point` of `window`.
+    internal static func mouse(
+        _ type: NSEvent.EventType,
+        at point: NSPoint,
+        clicks: Int,
+        flags: NSEvent.ModifierFlags,
+        in window: NSWindow?
+    ) throws -> NSEvent {
+        try #require(
+            NSEvent.mouseEvent(
+                with: type,
+                location: point,
+                modifierFlags: flags,
+                timestamp: ProcessInfo.processInfo.systemUptime,
+                windowNumber: window?.windowNumber ?? 0,
+                context: nil,
+                eventNumber: 0,
+                clickCount: clicks,
+                pressure: 1
+            )
+        )
+    }
+
+    /// Has a view draw itself into a bitmap, as it would on screen.
+    internal static func draw(_ view: NSView) {
+        if let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds) {
+            view.cacheDisplay(in: view.bounds, to: bitmap)
+        }
     }
 }
