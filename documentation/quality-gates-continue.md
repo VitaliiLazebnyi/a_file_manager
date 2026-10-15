@@ -19,6 +19,13 @@ Paste this into a new Claude Code session in `/Users/cm0k/Claude/Projects/TotalC
 
 ## State
 
+### Running (started 2026-10-16 05:00)
+
+Wave 100 (`documentation/agent-briefs/wave-100.md`): six agents in worktrees, branches `w100-stability`,
+`w100-config-sync`, `w100-fileops-tools`, `w100-shell`, `w100-network`, `w100-viewer-mac-small`, base `05c77ed`, the
+deinit rule change `5b13f75` cherry-picked. If the session ended before they were merged: look at each branch's commits,
+merge what is finished, and restart the rest with the same section of `wave-100.md`.
+
 ### Done and pushed
 
 - Swift 6 migration, thread-safety audits, leak fixes, the gates (lint config, mutation, UI tests, architecture, API,
