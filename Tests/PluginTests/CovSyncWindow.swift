@@ -153,8 +153,8 @@ internal struct CovSyncWindow {
     internal func theSetsMenuSavesLoadsAndRemoves() throws {
         defer { stage.finish() }
         stage.controller.show()
-        let popUps = stage.views(NSPopUpButton.self)
-        let sets = try #require(popUps.first(where: \.pullsDown))
+        let pullDowns = stage.views(NSPopUpButton.self).filter(\.pullsDown)
+        let sets = try #require(pullDowns.first)
         let menu = try #require(sets.menu)
         func run(_ title: String, in items: [NSMenuItem]) {
             let item = items.first { $0.title == title }

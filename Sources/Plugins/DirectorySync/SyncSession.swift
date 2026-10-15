@@ -84,7 +84,9 @@ final class SyncSession {
     private(set) var picked: (left: URL?, right: URL?) = (nil, nil)
 
     private(set) var base = URL(fileURLWithPath: "/")
-    private var roots: (left: URL, right: URL)?
+    /// The two directories of the last finished comparison; what they are counts only once it
+    /// has finished (`phase` is `.compared` or `.synchronizing`).
+    private var roots = (left: URL(fileURLWithPath: "/"), right: URL(fileURLWithPath: "/"))
     private var running: SyncComparison?
     /// What the last finished comparison used and found, for what is done with its rows.
     private var compared = (offsetHours: 0, toleranceSeconds: 3)
@@ -99,6 +101,10 @@ final class SyncSession {
     private var actionEpoch = 0
     /// Rows from this many on are laid out and planned away from the main thread.
     static let backgroundFrom = 20_000
+    /// The same for this session (tests make it small).
+    var worksInBackgroundFrom = SyncSession.backgroundFrom
+    /// The least time between two progress reports of a comparison, in seconds (tests: none).
+    var progressInterval: TimeInterval = 0.1
     private var isPlanning = false
     /// Counts the calls of `adopt`: a long selection read in the background is dropped when another began.
     private var selectionEpoch = 0
@@ -176,7 +182,6 @@ final class SyncSession {
         running?.cancellation.cancel()
         running = nil
         rows = []
-        roots = nil
         phase = .idle
         isPartial = false
         sourceLooksEmpty = false
@@ -209,11 +214,12 @@ final class SyncSession {
         }
         // A thread of its own: listing a share that does not answer can block for as long as the server
         // takes to give up, and a few such comparisons must not use up the workers of the shared pool.
+        let interval = progressInterval
         SyncWorker.run("Synchronize directories: compare") { [weak self] in
             /// Belongs to the comparison's progress calls, which arrive one at a time.
             nonisolated(unsafe) var lastReport = Date.distantPast
             let result = comparison.run(left: left, right: right) { [weak self] progress in
-                guard Date().timeIntervalSince(lastReport) > 0.1 else { return }
+                guard Date().timeIntervalSince(lastReport) >= interval else { return }
                 lastReport = Date()
                 DispatchQueue.main.async { [weak self] in
                     guard let self, self.running === comparison else { return }
@@ -364,7 +370,7 @@ final class SyncSession {
             headerPositions = []
             actionableCount = 0
         }
-        if runsInline || rows.count < Self.backgroundFrom {
+        if runsInline || rows.count < worksInBackgroundFrom {
             apply(Self.layout(rows: rows, show: show, sort: sort))
             return
         }
@@ -548,8 +554,8 @@ final class SyncSession {
     /// Shows the Synchronize dialog and runs what the user confirmed
     /// (spec 09 › The "Synchronize" dialog and the run).
     func synchronize() {
-        guard phase == .compared, roots != nil, !isPlanning else { return }
-        if runsInline || rows.count < Self.backgroundFrom {
+        guard phase == .compared, !isPlanning else { return }
+        if runsInline || rows.count < worksInBackgroundFrom {
             present(plan())
             return
         }
@@ -584,8 +590,9 @@ final class SyncSession {
         )
     }
 
+    /// Asks about the plan of the last comparison and runs it. Only while the comparison's
+    /// rows are shown (`phase` is `.compared`).
     private func present(_ plan: SyncPlan) {
-        guard phase == .compared, let roots else { return }
         var plan = plan
         guard !plan.isEmpty else { return }
         let asymmetric = options.asymmetric
@@ -738,7 +745,7 @@ final class SyncSession {
 
     /// Says what did not go well: failures (also those after "Skip All", which asked no more), a
     /// write that could not be made durable (the deletions were then not done), a run that was stopped.
-    private func report(_ outcome: SyncOutcome) {
+    func report(_ outcome: SyncOutcome) {
         guard !outcome.errors.isEmpty || outcome.commitFailed || outcome.wasCancelled else { return }
         var lines = ["Copied: \(outcome.copied), deleted: \(outcome.deleted), left alone: \(outcome.skipped)."]
         if outcome.commitFailed {
