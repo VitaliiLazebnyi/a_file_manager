@@ -41,7 +41,10 @@ enum RenameRegex {
     /// The matches in `text` (only the first with `firstOnly`); nil when the expression took too
     /// long or the work was cancelled.
     static func matches(
-        _ regex: NSRegularExpression, in text: String, firstOnly: Bool, guardian: RenameRegexGuard,
+        _ regex: NSRegularExpression,
+        in text: String,
+        firstOnly: Bool,
+        guardian: RenameRegexGuard,
         cancelled: () -> Bool
     ) -> [NSTextCheckingResult]? {
         if guardian.isTripped || cancelled() { return nil }
@@ -50,7 +53,9 @@ enum RenameRegex {
         var found: [NSTextCheckingResult] = []
         var timedOut = false
         regex.enumerateMatches(
-            in: text, options: [.reportProgress], range: NSRange(location: 0, length: text.utf16.count)
+            in: text,
+            options: [.reportProgress],
+            range: NSRange(location: 0, length: text.utf16.count)
         ) { result, _, stop in
             if let result {
                 found.append(result)
@@ -77,10 +82,11 @@ enum RenameRegex {
 /// the rest of the name. A `*` at the start anchors the match at the beginning of the name.
 /// Neither a `*` nor a `?` stands for a line break, as the `.` of a regular expression does not.
 struct WildcardMatcher {
-    private enum Piece {
-        /// A character or `?` (`nil`); characters are compared without regard to case unless the search respects it.
-        case literal(UInt32?)
-        case star
+    /// A `*`, or a character or `?`.
+    private struct Piece {
+        var isStar = false
+        /// The character, `nil` for `?`; compared without regard to case unless the search respects it.
+        var value: UInt32?
     }
 
     private let pieces: [Piece]
@@ -92,18 +98,13 @@ struct WildcardMatcher {
         var pieces: [Piece] = []
         for scalar in search.unicodeScalars {
             switch scalar {
-            case "*": pieces.append(.star)
-            case "?": pieces.append(.literal(nil))
-            default: pieces.append(.literal(caseSensitive ? scalar.value : Self.folded(scalar)))
+            case "*": pieces.append(Piece(isStar: true))
+            case "?": pieces.append(Piece())
+            default: pieces.append(Piece(value: caseSensitive ? scalar.value : Self.folded(scalar)))
             }
         }
         // A lone `*` is the greedy kind (the whole name), not an anchored lazy one.
-        isAnchored =
-            pieces.count > 1
-            && {
-                guard case .star = pieces[0] else { return false }
-                return true
-            }()
+        isAnchored = pieces.count > 1 && pieces[0].isStar
         self.pieces = pieces
     }
 
@@ -137,7 +138,7 @@ struct WildcardMatcher {
     /// (an empty match is allowed there, unless it is the one just found), or one place on after an
     /// empty match. `firstOnly` stops at the first.
     func matches(in text: String, firstOnly: Bool) -> [NSRange] {
-        matches(in: text, firstOnly: firstOnly, budget: .infinity, cancelled: { false }) ?? []
+        scan(text, firstOnly: firstOnly, budget: .infinity, cancelled: { false }).ranges
     }
 
     /// The same within `budget` seconds of work: nil when that was not enough or the work was
@@ -145,19 +146,26 @@ struct WildcardMatcher {
     /// counted in `guardian`, and a search given up three times is not tried again).
     func matches(in text: String, firstOnly: Bool, guardian: RenameRegexGuard, cancelled: () -> Bool) -> [NSRange]? {
         if guardian.isTripped || cancelled() { return nil }
-        let found = matches(in: text, firstOnly: firstOnly, budget: Self.budget, cancelled: cancelled)
-        if found == nil, !cancelled() { guardian.recordTimeout() }
-        return found
+        let found = scan(text, firstOnly: firstOnly, budget: Self.budget, cancelled: cancelled)
+        guard found.isComplete else {
+            if !cancelled() { guardian.recordTimeout() }
+            return nil
+        }
+        return found.ranges
     }
 
-    private func matches(in text: String, firstOnly: Bool, budget: TimeInterval, cancelled: () -> Bool) -> [NSRange]? {
-        guard !pieces.isEmpty else { return [] }
+    /// The matches, and whether the search got to the end (within `budget`, not cancelled).
+    private func scan(_ text: String, firstOnly: Bool, budget: TimeInterval, cancelled: () -> Bool) -> (
+        ranges: [NSRange], isComplete: Bool
+    ) {
+        guard !pieces.isEmpty else { return ([], true) }
         let scalars = Array(text.unicodeScalars)
         var offsets = [Int](repeating: 0, count: scalars.count + 1)
         for (index, scalar) in scalars.enumerated() { offsets[index + 1] = offsets[index] + scalar.utf16.count }
         let subject = Subject(
             values: scalars.map { caseSensitive ? $0.value : Self.folded($0) },
-            breaks: scalars.map { Self.isLineBreak($0.value) })
+            breaks: scalars.map { Self.isLineBreak($0.value) }
+        )
         // Looked at every few thousand steps: the clock is not asked for every character.
         let deadline = budget.isFinite ? ThreadTime.used + budget : .infinity
         var (steps, isOver) = (0, false)
@@ -175,7 +183,7 @@ struct WildcardMatcher {
             if firstOnly { break }
             from = end > start ? end : end + 1
         }
-        return isOver ? nil : ranges
+        return (ranges, !isOver)
     }
 
     private func firstMatch(in subject: Subject, from: Int, goesOn: () -> Bool) -> (Int, Int)? {
@@ -197,10 +205,10 @@ struct WildcardMatcher {
         var position = start
         var index = 0
         while index < pieces.count {
-            if case .star = pieces[index] {
+            if pieces[index].isStar {
                 // The run of characters up to the next star (or the end of the search).
                 var end = index + 1
-                while end < pieces.count, case .literal = pieces[end] { end += 1 }
+                while end < pieces.count, !pieces[end].isStar { end += 1 }
                 if end == pieces.count, index == pieces.count - 1 {
                     // A star at the very end takes the rest of the name, up to a line break.
                     while position < subject.count, !subject.breaks[position] { position += 1 }
@@ -214,7 +222,7 @@ struct WildcardMatcher {
                 index = end
             } else {
                 var end = index
-                while end < pieces.count, case .literal = pieces[end] { end += 1 }
+                while end < pieces.count, !pieces[end].isStar { end += 1 }
                 let run = pieces[index..<end]
                 guard fits(run, in: subject, at: position) else { return nil }
                 position += run.count
@@ -228,8 +236,7 @@ struct WildcardMatcher {
         guard position + run.count <= subject.count else { return false }
         var place = position
         for piece in run {
-            guard case .literal(let wanted) = piece else { return false }
-            if let wanted {
+            if let wanted = piece.value {
                 if subject.values[place] != wanted { return false }
             } else if subject.breaks[place] {
                 return false

@@ -264,8 +264,8 @@ final class MultiRenameSession {
         }
     }
 
+    /// Takes in a preview of the list as it is: one of an older list was dropped on the way.
     private func apply(_ preview: RenamePreview, counts: RenamePreview.Counts? = nil) {
-        guard preview.names.count == entries.count else { return }
         newNames = preview.names
         statuses = preview.statuses
         let counts = counts ?? preview.counts
@@ -579,7 +579,7 @@ final class MultiRenameSession {
     private struct Outcome {
         var result = RenameRunResult()
         /// The entries the result's item numbers refer to.
-        var entries: [RenameEntry] = []
+        var entries: [RenameEntry]
         var unusable = 0
         /// The folders to read again.
         var folders: [URL] = []
@@ -628,13 +628,13 @@ final class MultiRenameSession {
                 // Names that come from a file or were typed can lead anywhere: a name with a slash
                 // moves the file into that folder, a name that starts with one anywhere on the disk.
                 if given != nil {
-                    let moving = preview.names.indices.filter {
-                        preview.statuses[$0] == .ready && preview.names[$0]?.utf8.contains(0x2F) == true
-                    }
+                    let moving = preview.names.indices
+                        .compactMap { index in
+                            preview.statuses[index] == .ready ? preview.names[index] : nil
+                        }
+                        .filter { $0.utf8.contains(0x2F) }
                     if !moving.isEmpty {
-                        let examples =
-                            moving.prefix(8).map { (preview.names[$0] ?? "") }.joined(separator: "\n")
-                            + (moving.count > 8 ? "\n…" : "")
+                        let examples = moving.prefix(8).joined(separator: "\n") + (moving.count > 8 ? "\n…" : "")
                         let go = monitor.ask { @MainActor @Sendable in
                             ui.choose(
                                 "\(moving.count) of the names given move the file into another folder.",
@@ -655,7 +655,7 @@ final class MultiRenameSession {
                 let conflicts = preview.conflicts
                 if !conflicts.isEmpty {
                     let names =
-                        conflicts.prefix(12).map { preview.names[$0] ?? "" }.joined(separator: "\n")
+                        conflicts.prefix(12).compactMap { preview.names[$0] }.joined(separator: "\n")
                         + (conflicts.count > 12 ? "\n…" : "")
                     let choice = monitor.ask { @MainActor @Sendable in
                         ui.pick(
@@ -752,22 +752,13 @@ final class MultiRenameSession {
             lastRun = result.renamed
             store.appendUndo(result.renamed)
             // The list could not change meanwhile, so the flags of the run are the list's own.
-            if outcome.renamed.count == entries.count {
-                reorder(entries.indices.filter { !outcome.renamed[$0] })
-            } else {
-                let gone = Set(result.renamed.map(\.from.locationKey))
-                reorder(entries.indices.filter { !gone.contains(entries[$0].item.url.locationKey) })
-            }
+            reorder(entries.indices.filter { !outcome.renamed[$0] })
             givenNamesStorage = nil
             kernel.panels.refresh(outcome.folders, focus: result.renamed.last?.to)
         }
         if !result.failures.isEmpty {
             let lines = result.failures.prefix(15)
-                .map { failure in
-                    (outcome.entries.indices.contains(failure.item) ? outcome.entries[failure.item].item.name : "?")
-                        + ": "
-                        + failure.message
-                }
+                .map { failure in outcome.entries[failure.item].item.name + ": " + failure.message }
             kernel.interaction.inform(
                 "\(result.failures.count) file(s) could not be renamed!",
                 detail: lines.joined(separator: "\n") + (result.failures.count > 15 ? "\n…" : ""),
@@ -855,7 +846,9 @@ final class MultiRenameSession {
                     cancelled: { monitor.cancellation.isCancelled }
                 )
                 guard !monitor.cancellation.isCancelled else {
+                    // Nothing was put back: the whole run is still to be undone.
                     outcome.result.cancelled = true
+                    (outcome.attempted, outcome.left) = (last, last)
                     return outcome
                 }
                 outcome.result = runner.run(steps, sources: sources)
@@ -880,7 +873,8 @@ final class MultiRenameSession {
                 if self.store.undoCount == runs { self.store.replaceLastUndo(with: outcome.left) }
                 self.lastRun = []
                 self.kernel.panels.refresh(outcome.folders, focus: outcome.result.renamed.last?.to)
-                if !outcome.left.isEmpty {
+                // A cancelled Undo needs no message: the user stopped it.
+                if !outcome.left.isEmpty, !outcome.result.cancelled {
                     self.kernel.interaction.inform(
                         "\(outcome.attempted.count) file(s) could not be renamed back!",
                         detail: outcome.result.failures.prefix(15).map(\.message).joined(separator: "\n"),
@@ -952,9 +946,8 @@ enum ContentDate {
     /// A regular file whose contents are on this disk.
     static func isPlainFileHere(_ url: URL) -> Bool {
         var info = stat()
-        let result = url.withUnsafeFileSystemRepresentation { path -> Int32 in path.map { stat($0, &info) } ?? -1 }
         // SF_DATALESS: the contents are in the cloud.
-        return result == 0 && info.st_mode & S_IFMT == S_IFREG && info.st_flags & 0x4000_0000 == 0
+        return stat(url.path, &info) == 0 && info.st_mode & S_IFMT == S_IFREG && info.st_flags & 0x4000_0000 == 0
     }
 
     /// One formatter for all files; formatting and parsing with it is safe from several threads.

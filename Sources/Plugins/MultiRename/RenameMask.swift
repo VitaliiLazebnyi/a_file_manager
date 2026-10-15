@@ -15,8 +15,13 @@ struct RenameSubject {
     var url: URL?
 
     init(
-        name: String, isFolder: Bool = false, size: Int64 = 0, modified: Date = Date(timeIntervalSince1970: 0),
-        directoryPath: String = "", folders: [String]? = nil, url: URL? = nil
+        name: String,
+        isFolder: Bool = false,
+        size: Int64 = 0,
+        modified: Date = Date(timeIntervalSince1970: 0),
+        directoryPath: String = "",
+        folders: [String]? = nil,
+        url: URL? = nil
     ) {
         self.name = name
         self.isFolder = isFolder
@@ -177,8 +182,13 @@ struct RenameMask {
 
     struct TimeOffset: Equatable {
         var value: Int
-        var unit: Character
+        var unit: Calendar.Component
     }
+
+    /// The units of a time offset: `[T1+5h]` is five hours later.
+    private static let offsetUnits: [Character: Calendar.Component] = [
+        "s": .second, "m": .minute, "h": .hour, "D": .day, "M": .month, "Y": .year
+    ]
 
     enum Token: Equatable {
         case literal(String)
@@ -247,7 +257,6 @@ struct RenameMask {
         let characters: [Character]
         var position = 0
 
-        var isAtEnd: Bool { position >= characters.count }
         func peek(_ offset: Int = 0) -> Character? {
             characters.indices.contains(position + offset) ? characters[position + offset] : nil
         }
@@ -300,7 +309,10 @@ struct RenameMask {
                 return nil
             }
             if accept(",") {
-                guard let length = number() else { return nil }
+                guard let length = number() else {
+                    position = start
+                    return nil
+                }
                 return CharacterRange(pad: pad, first: first, end: .length(length))
             }
             if accept("-") {
@@ -366,7 +378,7 @@ struct RenameMask {
                     tokens.append(.counter(counter.isInline ? counter.definition : nil))
 
                 case "c":
-                    let kind = scanner.isDigit() ? scanner.number() ?? 1 : 1
+                    let kind = scanner.number() ?? 1
                     guard (1...3).contains(kind) else { return fail() }
                     tokens.append(.count(kind))
 
@@ -377,7 +389,8 @@ struct RenameMask {
                     var offset: TimeOffset?
                     if scanner.peek() == "+" || scanner.peek() == "-" {
                         let negative = scanner.next() == "-"
-                        guard let value = scanner.number(), let unit = scanner.next(), "smhDMY".contains(unit) else {
+                        guard let value = scanner.number(), let unit = scanner.next().flatMap({ offsetUnits[$0] })
+                        else {
                             return fail()
                         }
                         offset = TimeOffset(value: negative ? -value : value, unit: unit)
@@ -398,7 +411,8 @@ struct RenameMask {
                         tokens.append(.text(.environment(name, .whole), scanner.range()))
                     } else if let form = scanner.next() {
                         tokens.append(
-                            .text(.environment(name, form == "\\" || form == "/" ? .lastPart : .separator(form)), nil))
+                            .text(.environment(name, form == "\\" || form == "/" ? .lastPart : .separator(form)), nil)
+                        )
                     } else {
                         tokens.append(.text(.environment(name, .whole), nil))
                     }
@@ -418,8 +432,8 @@ struct RenameMask {
     private static func inlineCounter(_ scanner: inout Scanner) -> (definition: InlineCounter, isInline: Bool)? {
         var counter = InlineCounter()
         var isInline = false
-        if scanner.isDigit() {
-            counter.start = scanner.number() ?? 1
+        if let start = scanner.number() {
+            counter.start = start
             isInline = true
         } else if let letter = scanner.peek(), letter.isASCII, letter.isLetter {
             var letters = ""
@@ -490,20 +504,46 @@ final class RenameFormats: @unchecked Sendable {
 }
 
 extension RenameMask {
+    /// A date and its parts in the calendar of the preview, worked out once per item and time source.
+    private struct Moment {
+        let date: Date
+        let year: Int
+        let month: Int
+        let day: Int
+        let hour: Int
+        let minute: Int
+        let second: Int
+        let nanosecond: Int
+
+        init(_ date: Date, calendar: Calendar) {
+            self.date = date
+            year = calendar.component(.year, from: date)
+            month = calendar.component(.month, from: date)
+            day = calendar.component(.day, from: date)
+            hour = calendar.component(.hour, from: date)
+            minute = calendar.component(.minute, from: date)
+            second = calendar.component(.second, from: date)
+            nanosecond = calendar.component(.nanosecond, from: date)
+        }
+    }
+
     /// The text the mask gives for one item. `index` is the item's place in the list, from 0.
     /// Safe to call from several threads at once.
     func evaluate(
-        _ subject: RenameSubject, index: Int, context: RenameContext, formats: RenameFormats,
+        _ subject: RenameSubject,
+        index: Int,
+        context: RenameContext,
+        formats: RenameFormats,
         state: inout MaskState
     ) throws -> String {
         var pieces: [(text: String, letterCase: LetterCase)] = []
         var letterCase = LetterCase.unchanged
         var precompose = false
-        var cachedDate: (source: Int, offset: TimeOffset?, components: DateComponents, date: Date)?
+        var cachedDate: (source: Int, offset: TimeOffset?, moment: Moment)?
 
-        func moment() throws -> (components: DateComponents, date: Date) {
+        func moment() throws -> Moment {
             if let cachedDate, cachedDate.source == state.timeSource, cachedDate.offset == state.timeOffset {
-                return (cachedDate.components, cachedDate.date)
+                return cachedDate.moment
             }
             var date: Date
             switch state.timeSource {
@@ -516,21 +556,18 @@ extension RenameMask {
 
             default: date = subject.modified
             }
-            if let offset = state.timeOffset {
-                let units: [Character: Calendar.Component] = [
-                    "s": .second, "m": .minute, "h": .hour, "D": .day, "M": .month, "Y": .year
-                ]
-                date =
-                    formats.calendar.date(byAdding: units[offset.unit] ?? .second, value: offset.value, to: date)
-                    ?? date
+            // An offset beyond what the calendar can count leaves the date as it is.
+            if let offset = state.timeOffset,
+                let shifted = formats.calendar.date(byAdding: offset.unit, value: offset.value, to: date)
+            {
+                date = shifted
             }
-            let components = formats.calendar.dateComponents(
-                [.year, .month, .day, .hour, .minute, .second, .nanosecond], from: date)
-            cachedDate = (state.timeSource, state.timeOffset, components, date)
-            return (components, date)
+            let found = Moment(date, calendar: formats.calendar)
+            cachedDate = (state.timeSource, state.timeOffset, found)
+            return found
         }
 
-        func twoDigits(_ value: Int?) -> String { String(format: "%02d", value ?? 0) }
+        func twoDigits(_ value: Int) -> String { String(format: "%02d", value) }
 
         for token in tokens {
             var text: String?
@@ -556,29 +593,33 @@ extension RenameMask {
                 case 3:
                     text = Self.padded(
                         try Self.number(
-                            context.counter.start, plus: context.counter.step, times: max(context.count - 1, 0)),
-                        digits: Self.width(context.counter.digits, context))
+                            context.counter.start,
+                            plus: context.counter.step,
+                            times: max(context.count - 1, 0)
+                        ),
+                        digits: Self.width(context.counter.digits, context)
+                    )
 
                 default: text = String(context.count)
                 }
 
             case .date(let field):
-                let (components, date) = try moment()
-                let hour = components.hour ?? 0
+                let moment = try moment()
+                let hour = moment.hour
                 switch field {
-                case .year4: text = String(format: "%04d", components.year ?? 0)
-                case .year2: text = twoDigits((components.year ?? 0) % 100)
-                case .month: text = twoDigits(components.month)
-                case .day: text = twoDigits(components.day)
+                case .year4: text = String(format: "%04d", moment.year)
+                case .year2: text = twoDigits(moment.year % 100)
+                case .month: text = twoDigits(moment.month)
+                case .day: text = twoDigits(moment.day)
                 case .hour24: text = twoDigits(hour)
                 case .hour12: text = twoDigits(hour % 12 == 0 ? 12 : hour % 12)
-                case .minute: text = twoDigits(components.minute)
-                case .second: text = twoDigits(components.second)
-                case .millisecond: text = String(format: "%03d", min(999, (components.nanosecond ?? 0) / 1_000_000))
+                case .minute: text = twoDigits(moment.minute)
+                case .second: text = twoDigits(moment.second)
+                case .millisecond: text = String(format: "%03d", min(999, moment.nanosecond / 1_000_000))
                 case .amPm: text = hour < 12 ? "am" : "pm"
                 case .amPmShort: text = hour < 12 ? "a" : "p"
-                case .date: text = Self.nameSafe(formats.date.string(from: date))
-                case .time: text = Self.nameSafe(formats.time.string(from: date))
+                case .date: text = Self.nameSafe(formats.date.string(from: moment.date))
+                case .time: text = Self.nameSafe(formats.time.string(from: moment.date))
                 }
 
             case .timeSource(let source, let offset):
@@ -622,7 +663,10 @@ extension RenameMask {
     }
 
     private static func value(
-        of source: Source, _ subject: RenameSubject, _ context: RenameContext, _ state: MaskState
+        of source: Source,
+        _ subject: RenameSubject,
+        _ context: RenameContext,
+        _ state: MaskState
     ) throws -> String {
         let folders = subject.folders
         func fromRight(_ level: Int) -> String {
@@ -694,7 +738,8 @@ extension RenameMask {
         guard let inline else {
             return padded(
                 try number(context.counter.start, plus: context.counter.step, times: index),
-                digits: width(context.counter.digits, context))
+                digits: width(context.counter.digits, context)
+            )
         }
         let steps = try number(0, plus: inline.step, times: index / inline.divisor)
         if let letters = inline.letters { return try alphabetic(letters, advancedBy: steps) }

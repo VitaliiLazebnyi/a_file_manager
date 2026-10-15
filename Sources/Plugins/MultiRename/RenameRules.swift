@@ -13,14 +13,19 @@ struct TitleCaseRule: Equatable {
 
     /// `<description>:<word list>`
     init(setting: String) {
-        let parts = setting.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false)
-        var label = parts.count == 2 ? String(parts[0]) : "English in Titles"
+        // Without a label the whole setting is the word list.
+        let colon = setting.firstIndex(of: ":")
+        var label = colon.map { String(setting[..<$0]) } ?? "English in Titles"
         allowsLowercaseLastWord = label.hasSuffix("!")
         if allowsLowercaseLastWord { label.removeLast() }
         self.label = label
+        let list = colon.map { setting[setting.index(after: $0)...] } ?? Substring(setting)
         words = Set(
-            (parts.last ?? "").split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces).lowercased() }.filter
-            { !$0.isEmpty })
+            list.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces).lowercased() }
+                .filter {
+                    !$0.isEmpty
+                }
+        )
     }
 }
 
@@ -59,8 +64,10 @@ enum LetterCase: Int, Codable, CaseIterable {
             return Self.capitalizingWords(text)
 
         case .titleWords:
-            var words = Self.capitalizingWords(text).split(separator: " ", omittingEmptySubsequences: false).map(
-                String.init)
+            var words = Self.capitalizingWords(text).split(separator: " ", omittingEmptySubsequences: false)
+                .map(
+                    String.init
+                )
             let real = words.indices.filter { !words[$0].isEmpty }
             for index in real.dropFirst() where index != real.last || rule.allowsLowercaseLastWord {
                 let core = words[index].trimmingCharacters(in: CharacterSet.letters.inverted)
@@ -146,8 +153,6 @@ struct SearchReplace {
     private let guardian = RenameRegexGuard()
     let search: String
 
-    var isEmpty: Bool { pairs.isEmpty }
-
     /// Whether the regular expression took too long for some names: those got no new name.
     var timedOut: Bool { guardian.hasTimedOut }
 
@@ -169,18 +174,23 @@ struct SearchReplace {
                 Pair(
                     finder: .regex(expression),
                     replacement: Self.template(
-                        settings.replacement, groups: expression.numberOfCaptureGroups))
+                        settings.replacement,
+                        groups: expression.numberOfCaptureGroups
+                    )
+                )
             ]
         } else {
             // Several pairs are separated by `|` in both fields and matched up by position.
             let searches = settings.search.components(separatedBy: "|")
             let replacements = settings.replacement.components(separatedBy: "|")
-            pairs = searches.enumerated().compactMap { index, search in
-                guard !search.isEmpty else { return nil }
-                return Pair(
-                    finder: .wildcard(WildcardMatcher(search, caseSensitive: settings.caseSensitive)),
-                    replacement: [.text(replacements.indices.contains(index) ? replacements[index] : "")])
-            }
+            pairs = searches.enumerated()
+                .compactMap { index, search in
+                    guard !search.isEmpty else { return nil }
+                    return Pair(
+                        finder: .wildcard(WildcardMatcher(search, caseSensitive: settings.caseSensitive)),
+                        replacement: [.text(replacements.indices.contains(index) ? replacements[index] : "")]
+                    )
+                }
         }
     }
 
@@ -201,8 +211,12 @@ struct SearchReplace {
             case .regex(let expression):
                 guard
                     let matches = RenameRegex.matches(
-                        expression, in: text, firstOnly: firstOnly || substitute, guardian: guardian,
-                        cancelled: cancelled)
+                        expression,
+                        in: text,
+                        firstOnly: firstOnly || substitute,
+                        guardian: guardian,
+                        cancelled: cancelled
+                    )
                 else {
                     return nil
                 }
@@ -215,7 +229,8 @@ struct SearchReplace {
                 var position = 0
                 for match in matches {
                     result += source.substring(
-                        with: NSRange(location: position, length: match.range.location - position))
+                        with: NSRange(location: position, length: match.range.location - position)
+                    )
                     result += expand(pair.replacement, match, source)
                     position = match.range.location + match.range.length
                 }
@@ -225,7 +240,11 @@ struct SearchReplace {
                 // Bounded like a regular expression: a long search in a long name is the name times the search.
                 guard
                     let ranges = matcher.matches(
-                        in: text, firstOnly: firstOnly, guardian: guardian, cancelled: cancelled)
+                        in: text,
+                        firstOnly: firstOnly,
+                        guardian: guardian,
+                        cancelled: cancelled
+                    )
                 else { return nil }
                 guard !ranges.isEmpty, case .text(let replacement)? = pair.replacement.first else { continue }
                 var result = ""
@@ -250,7 +269,8 @@ struct SearchReplace {
                 guard number < match.numberOfRanges, match.range(at: number).location != NSNotFound else { return "" }
                 return letterCase.apply(to: source.substring(with: match.range(at: number)))
             }
-        }.joined()
+        }
+        .joined()
     }
 
     /// The regular expression that means what the plain search means: `*` stands for any run
@@ -262,13 +282,15 @@ struct SearchReplace {
     /// which the tests compare it with.
     static func wildcardPattern(_ search: String) -> String {
         let characters = Array(search)
-        return characters.enumerated().map { index, character -> String in
-            switch character {
-            case "*": return index == characters.count - 1 ? ".*" : index == 0 ? "^.*?" : ".*?"
-            case "?": return "."
-            default: return NSRegularExpression.escapedPattern(for: String(character))
+        return characters.enumerated()
+            .map { index, character -> String in
+                switch character {
+                case "*": return index == characters.count - 1 ? ".*" : index == 0 ? "^.*?" : ".*?"
+                case "?": return "."
+                default: return NSRegularExpression.escapedPattern(for: String(character))
+                }
             }
-        }.joined()
+            .joined()
     }
 
     /// Turns the spec's dialect (18 › Regular expressions, the TRegExpr library) into the
@@ -280,13 +302,9 @@ struct SearchReplace {
         for (from, to) in [("(?P<", "(?<"), ("(?g)", ""), ("(?-g)", "")] {
             pattern = pattern.replacingOccurrences(of: from, with: to)
         }
-        func rewrite(_ expression: String, _ template: String) {
-            guard let regex = try? NSRegularExpression(pattern: expression) else { return }
-            pattern = regex.stringByReplacingMatches(
-                in: pattern, range: NSRange(pattern.startIndex..., in: pattern), withTemplate: template)
-        }
-        rewrite(#"\(\?P=(\w+)\)"#, #"\\k<$1>"#)
-        rewrite(#"\(\?'(\w+)'"#, "(?<$1>")
+        // `(?P=name)` is `\k<name>`, `(?'name'` is `(?<name>`.
+        pattern = pattern.replacing(#/\(\?P=(\w+)\)/#) { "\\k<" + $0.1 + ">" }
+        pattern = pattern.replacing(#/\(\?'(\w+)'/#) { "(?<" + $0.1 + ">" }
         // The pattern the spec singles out as rewritten to avoid a crash.
         if pattern.hasPrefix("^??") { pattern = "^?" + pattern.dropFirst(3) }
         return pattern
@@ -300,8 +318,10 @@ struct SearchReplace {
         var pending = LetterCase.unchanged
         let characters = Array(text)
         var position = 0
-        func isDigit(_ index: Int) -> Bool {
-            characters.indices.contains(index) && characters[index].isASCII && characters[index].isNumber
+        /// The value of the digit at `index`; nil where there is none.
+        func digit(_ index: Int) -> Int? {
+            guard characters.indices.contains(index), characters[index].isASCII else { return nil }
+            return characters[index].wholeNumberValue
         }
         while position < characters.count {
             let character = characters[position]
@@ -309,20 +329,18 @@ struct SearchReplace {
                 let next = characters[position + 1]
                 let cases: [Character: LetterCase] = ["U": .upper, "L": .lower, "F": .words, "n": .unchanged]
                 if let letterCase = cases[next], position + 2 < characters.count, characters[position + 2] == "$",
-                    isDigit(position + 3)
+                    digit(position + 3) != nil
                 {
                     pending = letterCase
                 } else {
                     literal.append(next)
                 }
                 position += 2
-            } else if character == "$", isDigit(position + 1) {
-                var number = Int(String(characters[position + 1])) ?? 0
+            } else if character == "$", let first = digit(position + 1) {
+                var number = first
                 var length = 2
-                if isDigit(position + 2), let wide = Int(String(characters[(position + 1)...(position + 2)])),
-                    wide <= groups
-                {
-                    number = wide
+                if let second = digit(position + 2), first * 10 + second <= groups {
+                    number = first * 10 + second
                     length = 3
                 }
                 if !literal.isEmpty { parts.append(.text(literal)) }
@@ -399,7 +417,12 @@ struct RenameEngine {
             do {
                 name = try nameMask.evaluate(subject, index: index, context: context, formats: formats, state: &state)
                 ext = try extensionMask.evaluate(
-                    subject, index: index, context: context, formats: formats, state: &state)
+                    subject,
+                    index: index,
+                    context: context,
+                    formats: formats,
+                    state: &state
+                )
             } catch {
                 return nil
             }
@@ -424,7 +447,8 @@ struct RenameEngine {
         var name = String(
             name.map { character in
                 character.unicodeScalars.contains { $0.value < 32 || $0.value == 127 } ? " " : character
-            })
+            }
+        )
         while name.hasSuffix("/") { name.removeLast() }
         return name
     }
@@ -435,8 +459,10 @@ struct RenameEngine {
         if name.isEmpty { return "The name is empty." }
         // Cut at the `/` byte, not at the character: a combining mark after a slash makes one
         // character with it, and the file system reads the slash all the same.
-        let components = name.utf8.split(separator: 0x2F, omittingEmptySubsequences: false).dropFirst(
-            name.utf8.first == 0x2F ? 1 : 0)
+        let components = name.utf8.split(separator: 0x2F, omittingEmptySubsequences: false)
+            .dropFirst(
+                name.utf8.first == 0x2F ? 1 : 0
+            )
         for component in components {
             if component.isEmpty { return "A folder name is empty." }
             if component.elementsEqual(".".utf8) || component.elementsEqual("..".utf8) {

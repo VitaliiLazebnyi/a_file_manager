@@ -84,13 +84,15 @@ struct RenamePlanner {
     func conflicts(sources: [URL], targets: [URL?], existing: Set<String>) -> [Int: RenameStatus] {
         // The keys are most of the work; they are made on all cores.
         let finalKeys = Parallel.map(Array(sources.indices), serialBelow: 512) { key(targets[$0] ?? sources[$0]) }
-        var holders: [String: Int] = [:]
-        for finalKey in finalKeys { holders[finalKey, default: 0] += 1 }
+        // The names that more than one item ends up with.
+        var seen = Set<String>()
+        var shared = Set<String>()
+        for finalKey in finalKeys where !seen.insert(finalKey).inserted { shared.insert(finalKey) }
         let sourceKeys = Set(Parallel.map(sources, serialBelow: 512) { key($0) })
         var result: [Int: RenameStatus] = [:]
         for index in sources.indices where moves(sources[index], targets[index]) {
             let finalKey = finalKeys[index]
-            if holders[finalKey, default: 0] > 1 {
+            if shared.contains(finalKey) {
                 result[index] = .duplicate
             } else if existing.contains(finalKey), !sourceKeys.contains(finalKey) {
                 result[index] = .exists
@@ -103,9 +105,11 @@ struct RenamePlanner {
     /// Of several items that want the same free name, the first in the list gets it.
     func autoRenamed(sources: [URL], targets: [URL?], isFolder: [Bool], existing: Set<String>) -> [URL?] {
         var targets = targets
-        let moving = sources.indices.filter { moves(sources[$0], targets[$0]) }
-        let movingSources = Set(moving.map { key(sources[$0]) })
-        let wanted = Set(moving.compactMap { targets[$0].map(key) })
+        let moving = sources.indices.compactMap { index in
+            targets[index].flatMap { moves(sources[index], $0) ? (index: index, target: $0) : nil }
+        }
+        let movingSources = Set(moving.map { key(sources[$0.index]) })
+        let wanted = Set(moving.map { key($0.target) })
         // Taken for good: what stays where it is, in the list or outside it.
         var claimed = existing.subtracting(movingSources)
         for index in sources.indices where !moves(sources[index], targets[index]) {
@@ -118,8 +122,7 @@ struct RenamePlanner {
             var isFolder: Bool
         }
         var nextNumber: [Wish: Int] = [:]
-        for index in moving {
-            guard let target = targets[index] else { continue }
+        for (index, target) in moving {
             var chosen = target
             let targetKey = key(target)
             if claimed.contains(targetKey) {
@@ -147,11 +150,14 @@ struct RenamePlanner {
         for index in sources.indices where moves(sources[index], targets[index]) {
             wanting[key(targets[index]!), default: []].append(index)
         }
+        // An item is taken out of the run when it is put on the list, so it is looked at once.
         var open = Array(conflicts(sources: sources, targets: targets, existing: existing).keys)
+        for index in open { targets[index] = nil }
         while let index = open.popLast() {
-            guard targets[index] != nil else { continue }
-            targets[index] = nil
-            for other in wanting[key(sources[index])] ?? [] where targets[other] != nil { open.append(other) }
+            for other in wanting[key(sources[index])] ?? [] where targets[other] != nil {
+                targets[other] = nil
+                open.append(other)
+            }
         }
         return targets
     }
@@ -173,7 +179,11 @@ struct RenamePlanner {
     /// The items in list order, except that those which lie inside another folder of the list
     /// (and the folders that hold some) come first, the deepest first.
     private func insideOut(
-        _ moving: [Int], sources: [URL], sourceKeys: [String], isFolder: [Bool], cancelled: () -> Bool
+        _ moving: [Int],
+        sources: [URL],
+        sourceKeys: [String],
+        isFolder: [Bool],
+        cancelled: () -> Bool
     ) -> [Int] {
         var folderKeys = Set<String>()
         var shallowest = Int.max
@@ -201,10 +211,12 @@ struct RenamePlanner {
         for index in moving where holding.contains(sourceKeys[index]) { involved.insert(index) }
         let depth = { (index: Int) in involved.contains(index) ? sources[index].pathComponents.count : -1 }
         // Stable: the items of equal depth stay in list order.
-        return moving.enumerated().sorted { first, second in
-            let (a, b) = (depth(first.element), depth(second.element))
-            return a != b ? a > b : first.offset < second.offset
-        }.map(\.element)
+        return moving.enumerated()
+            .sorted { first, second in
+                let (a, b) = (depth(first.element), depth(second.element))
+                return a != b ? a > b : first.offset < second.offset
+            }
+            .map(\.element)
     }
 
     /// The renames in an order that works: list order, except that an item whose new name
@@ -219,7 +231,10 @@ struct RenamePlanner {
     /// `cancelled` is looked at every few thousand items; a cancelled plan is cut short and must
     /// not be carried out. The keys of all items, which are most of the work, are made on all cores.
     func steps(
-        sources: [URL], targets: [URL?], isFolder: [Bool]? = nil, temporaryName: ((Int) -> String)? = nil,
+        sources: [URL],
+        targets: [URL?],
+        isFolder: [Bool]? = nil,
+        temporaryName: ((Int) -> String)? = nil,
         cancelled: () -> Bool = { false }
     ) -> [RenameStep] {
         let token = UUID().uuidString.prefix(8)
@@ -228,9 +243,16 @@ struct RenamePlanner {
         guard !moving.isEmpty, !cancelled() else { return [] }
         let sourceKeys = Parallel.map(sources, serialBelow: 512) { key($0) }
         let targetKeys: [String?] = Parallel.map(Array(targets), serialBelow: 512) { $0.map(key) }
+        // Where each item goes; only those that move are looked at.
+        let destinations = sources.indices.map { targets[$0] ?? sources[$0] }
         if let isFolder, moving.count > 1 {
             moving = insideOut(
-                moving, sources: sources, sourceKeys: sourceKeys, isFolder: isFolder, cancelled: cancelled)
+                moving,
+                sources: sources,
+                sourceKeys: sourceKeys,
+                isFolder: isFolder,
+                cancelled: cancelled
+            )
         }
         var holder: [String: Int] = [:]
         for index in moving { holder[sourceKeys[index]] = index }
@@ -245,7 +267,6 @@ struct RenamePlanner {
             // Followed with a stack of its own: a chain can be as long as the list.
             var stack = [root]
             while let index = stack.last {
-                guard let target = targets[index] else { break }
                 if states[index] == .waiting {
                     states[index] = .visiting
                     if let blocker = targetKeys[index].flatMap({ holder[$0] }), blocker != index {
@@ -255,11 +276,19 @@ struct RenamePlanner {
                         }
                         if states[blocker] == .visiting {
                             // The blocker waits further up for this very item: a ring.
-                            let away = sources[blocker].deletingLastPathComponent().appending(
-                                name: temporaryName(blocker))
+                            let away = sources[blocker].deletingLastPathComponent()
+                                .appending(
+                                    name: temporaryName(blocker)
+                                )
                             steps.append(
                                 RenameStep(
-                                    item: blocker, from: sources[blocker], to: away, kind: .park, ontoItself: false))
+                                    item: blocker,
+                                    from: sources[blocker],
+                                    to: away,
+                                    kind: .park,
+                                    ontoItself: false
+                                )
+                            )
                             parked[blocker] = away
                         }
                     }
@@ -267,9 +296,13 @@ struct RenamePlanner {
                 stack.removeLast()
                 steps.append(
                     RenameStep(
-                        item: index, from: parked[index] ?? sources[index], to: target,
+                        item: index,
+                        from: parked[index] ?? sources[index],
+                        to: destinations[index],
                         kind: parked[index] == nil ? .direct : .unpark,
-                        ontoItself: targetKeys[index] == sourceKeys[index]))
+                        ontoItself: targetKeys[index] == sourceKeys[index]
+                    )
+                )
                 states[index] = .done
             }
         }

@@ -27,9 +27,10 @@ public struct SearchSettings: Codable, Equatable, Sendable {
 
     /// The start directories typed into "Search in"; relative ones count from `base`.
     public func directories(relativeTo base: URL, fileSystems: FileSystemRegistry) -> [URL] {
-        let typed = searchIn.split(separator: ";").map { $0.trimmingCharacters(in: .whitespaces) }.filter {
-            !$0.isEmpty
-        }
+        let typed = searchIn.split(separator: ";").map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter {
+                !$0.isEmpty
+            }
         return typed.isEmpty ? [base] : typed.map { fileSystems.location(from: $0, relativeTo: base) }
     }
 
@@ -40,8 +41,13 @@ public struct SearchSettings: Codable, Equatable, Sendable {
     {
         let directories = directories(relativeTo: base, fileSystems: fileSystems)
         var query = SearchQuery(
-            directory: directories[0], names: searchFor, text: findText ? text : "", caseSensitive: caseSensitive,
-            includeHidden: includeHidden, maxDepth: depth.map { max($0, 0) })
+            directory: directories[0],
+            names: searchFor,
+            text: findText ? text : "",
+            caseSensitive: caseSensitive,
+            includeHidden: includeHidden,
+            maxDepth: depth.map { max($0, 0) }
+        )
         query.moreDirectories = Array(directories.dropFirst())
         query.onlyItems = onlySelected && !selected.isEmpty ? selected : nil
         query.namesAreRegex = namesAreRegex
@@ -109,9 +115,9 @@ public final class SearchStore {
         self.settings = settings.scoped(to: "findFiles")
     }
 
-    /// In name order.
+    /// In name order. A search that cannot be read is left out; the others stay.
     public var searches: [SavedSearch] {
-        (settings.value([SavedSearch].self, forKey: Self.searchesKey) ?? [])
+        (settings.value([StoredElement<SavedSearch>].self, forKey: Self.searchesKey) ?? []).compactMap(\.value)
             .sorted { Sorter.compare($0.name, $1.name) == .orderedAscending }
     }
 
@@ -123,12 +129,15 @@ public final class SearchStore {
     public func save(_ search: SavedSearch) {
         settings.set(
             searches.filter { $0.name.caseInsensitiveCompare(search.name) != .orderedSame } + [search],
-            forKey: Self.searchesKey)
+            forKey: Self.searchesKey
+        )
     }
 
     public func delete(named name: String) {
         settings.set(
-            searches.filter { $0.name.caseInsensitiveCompare(name) != .orderedSame }, forKey: Self.searchesKey)
+            searches.filter { $0.name.caseInsensitiveCompare(name) != .orderedSame },
+            forKey: Self.searchesKey
+        )
     }
 
     /// What was typed into a field before, newest first.
@@ -141,7 +150,8 @@ public final class SearchStore {
         guard !text.isEmpty else { return }
         settings.set(
             Array(([text] + history(field).filter { $0 != text }).prefix(max(limit, 1))),
-            forKey: "history." + field.rawValue)
+            forKey: "history." + field.rawValue
+        )
     }
 
     public func forget(_ text: String, in field: Field) {

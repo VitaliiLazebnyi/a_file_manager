@@ -351,7 +351,9 @@ import Testing
         session.options.byContent = true
         session.compare()
         #expect(session.phase == .comparing)
-        let deadline = Date().addingTimeInterval(20)
+        // The result comes back over the main queue, which this test shares with every other test
+        // of the process: waited for until it is there (the ceiling only ends a comparison that hangs).
+        let deadline = Date().addingTimeInterval(Wait.ceiling)
         while session.phase != .compared, Date() < deadline { try? await Task.sleep(nanoseconds: 5_000_000) }
         #expect(session.phase == .compared && session.rows.count == 40 && session.entries.count == 44)
         #expect(session.status == "Files found: 40  (Identical: 26, Different: 0, Unique left: 14, Unique right: 0)")

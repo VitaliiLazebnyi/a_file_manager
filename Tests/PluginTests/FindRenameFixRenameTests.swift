@@ -69,14 +69,16 @@ import Testing
         let planner = RenamePlanner()
         let sources = (0..<2_000).map { url("s\($0).txt") }
         let targets = sources.map { _ in Optional(url("same.txt")) }
-        let start = Date()
+        // Counting from 2 again for each of them takes seconds of processor time (the time
+        // on the clock would count what the rest of a busy machine does).
+        let start = ThreadTime.used
         let result = planner.autoRenamed(
             sources: sources,
             targets: targets,
             isFolder: sources.map { _ in false },
             existing: Set(sources.map(planner.key))
         )
-        #expect(Date().timeIntervalSince(start) < 2)
+        #expect(ThreadTime.used - start < 2)
         let names = result.compactMap { $0?.lastPathComponent }
         #expect(
             Set(names).count == 2_000 && names.first == "same.txt" && names[1] == "same (2).txt"
@@ -100,9 +102,9 @@ import Testing
         var targets: [URL?] = (2...n).map { url("\($0)") }
         targets.append(url("outside"))
         let existing = Set((sources + [url("outside")]).map(planner.key))
-        let start = Date()
+        let start = ThreadTime.used
         let skipped = planner.skippingConflicts(sources: sources, targets: targets, existing: existing)
-        #expect(Date().timeIntervalSince(start) < 2)
+        #expect(ThreadTime.used - start < 2)
         #expect(skipped.allSatisfy { $0 == nil })
         // Items that do not depend on the conflict still move.
         let mixed = planner.skippingConflicts(
@@ -254,9 +256,9 @@ import Testing
         #expect(settings.value([[RenamedItem]].self, forKey: "multirename.undo")?.map(\.count) == [5_000, 1])
         store.replaceLastUndo(with: [])
         #expect(store.undoCount == 1)
-        let start = Date()
+        let start = ThreadTime.used
         for _ in 0..<10_000 { _ = store.undoCount }
-        #expect(Date().timeIntervalSince(start) < 1)
+        #expect(ThreadTime.used - start < 1)
         let before = store.revision
         store.remember("[N]", in: .nameMask)
         #expect(store.revision == before + 1 && store.history(.nameMask) == ["[N]"])
