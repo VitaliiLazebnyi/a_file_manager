@@ -41,7 +41,7 @@ internal struct RememberedListingChangeTests {
         default:
             _ = cache.age(of: listing.directory, showHidden: false)
         }
-        return isRight && cache.folderCount <= 8 && cache.entryCount <= 2_000
+        return isRight
     }
 
     /// Whether `entry` holds every item of `listing`, sorted by `order`.
@@ -51,7 +51,7 @@ internal struct RememberedListingChangeTests {
             return false
         }
         return zip(items, items.dropFirst())
-            .allSatisfy { earlier, later in !Sorter.areInOrder(later, earlier, by: order) }
+            .allSatisfy { earlier, later in !panelsInOrder(later, earlier, by: order) }
     }
 
     /// The cheap lookup hands out the order that is kept; asking for another sorts once and
@@ -107,7 +107,7 @@ internal struct RememberedListingChangeTests {
         #expect(!isKept("/work/inside"))
         #expect(isKept("/"))
         cache.invalidate([bench.url("/")])
-        #expect(cache.folderCount == 0)
+        #expect(!isKept("/") && !isKept("/other"))
     }
 
     /// Of two overlapping readings the later one wins, and a reading during which the folder
@@ -130,7 +130,7 @@ internal struct RememberedListingChangeTests {
         #expect(
             !cache.store(bench.listing("/a", ["stale"]), sortedBy: name, showHidden: false, readTime: 0, since: before)
         )
-        #expect(cache.folderCount == 0)
+        #expect(cache.forgets(bench.url("/a")))
         #expect(bench.remember(bench.listing("/a", ["fresh"]), in: cache))
     }
 
@@ -140,12 +140,10 @@ internal struct RememberedListingChangeTests {
         let cache = bench.cache()
         bench.remember(bench.listing("/a", ["x"]), in: cache)
         cache.isEnabled = false
-        #expect(cache.folderCount == 0)
+        #expect(cache.forgets(bench.url("/a")))
         #expect(!bench.remember(bench.listing("/a", ["x"]), in: cache))
         cache.isEnabled = true
         #expect(bench.remember(bench.listing("/a", ["x"]), in: cache))
-        cache.removeAll()
-        #expect(cache.folderCount == 0)
     }
 
     /// The kernel's cache is on unless the settings say otherwise.

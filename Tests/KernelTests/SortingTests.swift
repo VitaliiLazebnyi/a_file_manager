@@ -51,11 +51,9 @@ internal struct SortingTests {
     /// Clicking the header of the current key turns its direction round; another key starts
     /// in its own direction (dates newest first, extensions ascending).
     @Test
-    internal func headerClickReversesOrStartsInOwnDirection() {
-        let byName = ListOrder()
-        #expect(byName.clicked(.name) == ListOrder(key: .name, descending: true))
-        #expect(byName.clicked(.date) == ListOrder(key: .date, descending: true))
-        #expect(byName.clicked(.ext) == ListOrder(key: .ext, descending: false))
+    internal func timeAndSizeStartDescending() {
+        #expect(SortKey.date.startsDescending && SortKey.size.startsDescending)
+        #expect(!SortKey.name.startsDescending && !SortKey.ext.startsDescending && !SortKey.unsorted.startsDescending)
     }
 
     /// Checks that merging a sorted batch into a sorted list gives the sorted whole, also with
@@ -65,10 +63,10 @@ internal struct SortingTests {
         let order = ListOrder(key: .size, descending: true)
         let first = (0..<40).map { Self.item("a\($0).txt", folder: $0.isMultiple(of: 7), size: Int64($0 * 37 % 11)) }
         let second = (0..<25).map { Self.item("b\($0).txt", folder: $0.isMultiple(of: 5), size: Int64($0 * 13 % 11)) }
-        let merged = Sorter.merge(Sorter.sort(first, by: order), with: Sorter.sort(second, by: order), by: order)
+        let merged = panelsCollected([Sorter.sort(first, by: order), Sorter.sort(second, by: order)], by: order)
         #expect(merged.map(\.name) == Sorter.sort(first + second, by: order).map(\.name))
-        #expect(Sorter.merge([], with: second, by: order).count == 25)
-        #expect(Sorter.merge(first, with: [], by: order).count == 40)
+        #expect(panelsCollected([[], second], by: order).count == 25)
+        #expect(panelsCollected([first, []], by: order).count == 40)
     }
 
     /// Checks that a list that grows batch by batch is sorted after every batch, in every order.
@@ -85,7 +83,7 @@ internal struct SortingTests {
                 all += items
                 #expect(list.items.map(\.name) == Sorter.sort(all, by: order).map(\.name))
             }
-            #expect(list.count == 180)
+            #expect(list.items.count == 180)
         }
     }
 
@@ -106,7 +104,7 @@ internal struct SortingTests {
         for order in [
             ListOrder(), ListOrder(key: .size, descending: true), ListOrder(key: .date), ListOrder(key: .unsorted)
         ] {
-            let simple = items.sorted { Sorter.areInOrder($0, $1, by: order) }
+            let simple = items.sorted { panelsInOrder($0, $1, by: order) }
             #expect(Sorter.sort(items, by: order).map(\.name) == simple.map(\.name))
         }
     }

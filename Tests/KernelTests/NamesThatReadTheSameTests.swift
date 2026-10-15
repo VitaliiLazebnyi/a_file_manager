@@ -166,7 +166,7 @@ internal struct NamesThatReadTheSameTests {
         #expect(model.totals.selectedBytes == 7)
         #expect(model.totals.totalBytes == 107 + 5 + Int64(others) * 7)
         // By one name alone, the folder written like it.
-        model.setComputedSize(9, forName: decomposed)
+        model.setComputedSizes([(name: decomposed, size: 9)])
         #expect(model.item(atRow: one)?.computedSize == 100)
         #expect(model.item(atRow: two)?.computedSize == 9)
         #expect(model.totals.selectedBytes == 9)

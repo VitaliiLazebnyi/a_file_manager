@@ -27,9 +27,9 @@ internal struct FilteringElsewhereTests {
         var announced = 0
         handed.onChange = { change in announced += change == .contents ? 1 : 0 }
         // Worked out on another thread, as a panel does it, and applied here.
-        let listed = handed.listedItems
-        let shown = try #require(OtherThread.result { PanelModel.filtered(listed, by: filter) })
-        #expect(handed.setFilter(filter, prefiltered: shown, listVersion: version))
+        let basis = handed.basis
+        let prepared = try #require(OtherThread.result { PanelModel.prepare(basis, filter: filter) })
+        #expect(handed.apply(prepared) == .changed)
         direct.setFilter(filter)
         // A filter is not another list: the version of the list stays.
         #expect(PanelFigures.state(direct) == PanelFigures.state(handed))
@@ -38,10 +38,7 @@ internal struct FilteringElsewhereTests {
         #expect(handed.selection == ["file3.txt", "dir7", "file13.txt"])
         #expect(handed.cursorItem?.name == "file23.txt")
         // Taking the filter off again, the same way.
-        let off = handed.listVersion
-        #expect(
-            handed.setFilter(nil, prefiltered: PanelModel.filtered(handed.listedItems, by: nil), listVersion: off)
-        )
+        #expect(handed.apply(PanelModel.prepare(handed.basis, filter: nil)) == .changed)
         direct.setFilter(nil)
         #expect(PanelFigures.state(direct) == PanelFigures.state(handed))
         #expect(handed.items.count == count)
@@ -54,16 +51,16 @@ internal struct FilteringElsewhereTests {
         let filter = PanelFilter(title: "1") { $0.name.contains("1") }
         let all = items(200)
         let (direct, handed) = (Fixture.panel(all, at: directory), Fixture.panel(all, at: directory))
-        let version = handed.listVersion
-        let stale = PanelModel.filtered(handed.listedItems, by: filter)
+        let stale = PanelModel.prepare(handed.basis, filter: filter)
         // The directory was read again before the filtered list came back.
         let fresh = Fixture.listing(Array(all.dropFirst(20)), at: directory)
         handed.update(with: fresh)
         direct.update(with: fresh)
-        #expect(!handed.setFilter(filter, prefiltered: stale, listVersion: version))
+        #expect(handed.apply(stale) == .stale)
+        handed.setFilter(filter)
         direct.setFilter(filter)
         #expect(PanelFigures.state(direct) == PanelFigures.state(handed))
-        #expect(handed.items.count < stale.count)
+        #expect(handed.items.count < PanelModel.filtered(all, by: filter).count)
     }
 
     /// Free and total space are announced when they change, not when the same figure comes again.

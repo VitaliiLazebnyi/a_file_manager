@@ -36,7 +36,7 @@ internal struct PanelModelListFixTests {
         model.toggleSelection(row: first)
         model.toggleSelection(row: second)
         #expect(model.totals.selectedBytes == .max)
-        model.setComputedSize(.max, forName: "d")
+        model.setComputedSizes([(name: "d", size: .max)])
         #expect(model.totals.selectedBytes == .max && model.totals.totalBytes == .max)
         #expect(Int64.max.addingSaturated(1) == .max && Int64.min.addingSaturated(-1) == .min)
         #expect(Int64(2).addingSaturated(3) == 5)
@@ -44,28 +44,6 @@ internal struct PanelModelListFixTests {
         memory.addFile("/big/a/one.bin", "x")
         memory.addFile("/big/b/two.bin", "x")
         #expect(HugeSizes(memory).totalSize(of: memory.url("/big")) == .max)
-    }
-
-    /// Checks that a list handed in sorted is taken as it is, keeping the cursor, and that a
-    /// list of another length is sorted instead.
-    @Test
-    internal func aPresortedListIsTakenAsItIs() throws {
-        let sample = TmpEntries.numbered
-        let model = Fixture.panel(sample, at: Self.directory)
-        model.moveCursor(to: try #require(model.row(ofName: "file7.txt")))
-        let order = ListOrder(key: .size, descending: true)
-        let version = model.listVersion
-        let sorted = Sorter.resort(model.listedItems, from: model.sort, to: order)
-        #expect(model.listVersion == version)
-        model.setSort(order, presorted: sorted)
-        #expect(model.sort == order && model.items == Sorter.sort(sample, by: order))
-        #expect(model.cursorItem?.name == "file7.txt" && model.listVersion != version)
-        // A list of another length cannot be this list in another order.
-        model.setSort(ListOrder(key: .name), presorted: Array(sorted.dropLast()))
-        #expect(model.items == Sorter.sort(sample, by: ListOrder(key: .name)))
-        // Turning the direction round is the same as sorting.
-        model.setSort(ListOrder(key: .name, descending: true))
-        #expect(model.items == Sorter.sort(sample, by: ListOrder(key: .name, descending: true)))
     }
 
     /// A remembered list replaced by a fresh reading that holds the same entries: nothing in

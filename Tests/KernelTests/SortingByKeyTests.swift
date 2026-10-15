@@ -22,13 +22,14 @@ internal struct SortingByKeyTests {
 
     /// The comparisons of languages with ideas of their own, and of none.
     private static var collators: [NameCollator] {
-        ["da", "sv", "de@collation=phonebook", "es@collation=traditional", "cs"].map(NameCollator.init(identifier:))
-            + [.unavailable]
+        let languages = ["da", "sv", "de@collation=phonebook", "es@collation=traditional", "cs"]
+        return languages.map { NameCollator(identifier: $0, numeric: false, library: .system) }
+            + [NameCollator(identifier: "", numeric: false, library: nil)]
     }
 
-    /// The order is defined by `areInOrder`; a stable sort with it is what sorting has to give.
+    /// The order is defined by `exactOrder`; a stable sort with it is what sorting has to give.
     private static func reference(_ items: [FileItem], _ order: ListOrder) -> [FileItem] {
-        items.sorted { Sorter.areInOrder($0, $1, by: order) }
+        items.sorted { Sorter.exactOrder($0, $1, by: order, collator: .current) < 0 }
     }
 
     /// Name and extension cut the slow way, character by character.
@@ -127,7 +128,7 @@ internal struct SortingByKeyTests {
             for collator in Self.collators {
                 let sorted = Sorter.sort(items, by: order, collator: collator)
                 #expect(
-                    sorted == items.sorted { Sorter.areInOrder($0, $1, by: order, collator: collator) },
+                    sorted == items.sorted { Sorter.exactOrder($0, $1, by: order, collator: collator) < 0 },
                     "by \(order)"
                 )
                 #expect(
@@ -164,7 +165,7 @@ internal struct SortingByKeyTests {
         let items = Self.variedItems(1_500, seed: 7)
         for order in Self.everyOrder {
             let (first, second) = (Array(items[..<900]), Array(items[900...]))
-            let merged = Sorter.merge(Sorter.sort(first, by: order), with: Sorter.sort(second, by: order), by: order)
+            let merged = panelsCollected([Sorter.sort(first, by: order), Sorter.sort(second, by: order)], by: order)
             #expect(merged == Self.reference(first + second, order), "merge by \(order)")
             var list = SortedFileList(order: order)
             var added: [FileItem] = []
@@ -172,7 +173,7 @@ internal struct SortingByKeyTests {
                 let batch = Array(items[start..<min(start + 400, items.count)])
                 list.add(batch)
                 added += batch
-                #expect(list.count == added.count)
+                #expect(list.items.count == added.count)
             }
             #expect(list.items == Self.reference(items, order), "batches by \(order)")
         }

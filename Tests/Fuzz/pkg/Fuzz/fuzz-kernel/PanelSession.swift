@@ -111,7 +111,12 @@ internal final class PanelSession {
 
         case 6:
             let order = nextOrder(&choices)
-            model.setSort(order, presorted: choices.int(6) == 0 ? [] : Sorter.sort(model.listedItems, by: order))
+            // Sorted ahead in the background, or here.
+            if choices.int(6) == 0 {
+                model.setSort(order)
+            } else {
+                _ = model.apply(PanelModel.prepare(model.basis, sort: order))
+            }
             ordered = true
 
         case 7:
@@ -167,7 +172,8 @@ internal final class PanelSession {
             model.deselect((0..<choices.int(4)).map { _ in pickName() })
 
         case 20:
-            model.setComputedSize(kSizes[choices.int(kSizes.count)], forName: pickName())
+            let size = kSizes[choices.int(kSizes.count)]
+            model.setComputedSizes([(name: pickName(), size: size)])
 
         default:
             let sizes = (0..<choices.int(4)).map { _ in (name: pickName(), size: kSizes[choices.int(kSizes.count)]) }

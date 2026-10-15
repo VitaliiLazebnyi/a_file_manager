@@ -16,7 +16,8 @@ internal enum SortReference {
 
     /// The position of the first item that should come before the one in front of it, if any.
     internal static func firstOutOfOrder(_ items: [FileItem], _ order: ListOrder) -> Int? {
-        for index in items.indices.dropFirst() where Sorter.areInOrder(items[index], items[index - 1], by: order) {
+        for index in items.indices.dropFirst()
+        where (Sorter.exactOrder(items[index], items[index - 1], by: order, collator: .current) < 0) {
             return index
         }
         return nil
@@ -30,7 +31,7 @@ internal enum SortReference {
     ) -> Bool {
         let count = min(items.count, 14)
         let before = { (lhs: Int, rhs: Int) -> Bool in
-            Sorter.areInOrder(items[lhs], items[rhs], by: order, collator: collator)
+            (Sorter.exactOrder(items[lhs], items[rhs], by: order, collator: collator) < 0)
         }
         for first in 0..<count {
             for second in 0..<count where !pairIsConsistent(first, second, count: count, before: before) {
@@ -125,7 +126,8 @@ internal enum SortReference {
         out.reserveCapacity(left.count + right.count)
         var (leftIndex, rightIndex) = (0, 0)
         while leftIndex < left.count, rightIndex < right.count {
-            if Sorter.areInOrder(right[rightIndex].element, left[leftIndex].element, by: order, collator: collator) {
+            let (later, earlier) = (right[rightIndex].element, left[leftIndex].element)
+            if Sorter.exactOrder(later, earlier, by: order, collator: collator) < 0 {
                 out.append(right[rightIndex])
                 rightIndex += 1
             } else {

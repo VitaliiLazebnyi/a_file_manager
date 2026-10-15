@@ -132,9 +132,10 @@ import Testing
 
     @Test func statusLine() {
         let totals = PanelModel.Totals(
-            selectedBytes: 5 * 1_024, totalBytes: 8 * 1_024, selectedFiles: 4, totalFiles: 14)
+            selected: PanelModel.Counts(bytes: 5 * 1_024, files: 4),
+            total: PanelModel.Counts(bytes: 8 * 1_024, files: 14))
         #expect(PanelViewController.statusText(totals) == "5 k / 8 k in 4 / 14 file(s)")
-        let withFolders = PanelModel.Totals(totalFiles: 0, totalFolders: 2)
+        let withFolders = PanelModel.Totals(total: PanelModel.Counts(folders: 2))
         #expect(PanelViewController.statusText(withFolders) == "0 k / 0 k in 0 / 0 file(s), 0 / 2 dir(s)")
         #expect(PanelViewController.statusText(totals, itemsSoFar: 12_000).hasPrefix("Loading… 12,000 items so far"))
     }

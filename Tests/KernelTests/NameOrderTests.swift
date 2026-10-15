@@ -14,7 +14,7 @@ internal struct NameOrderTests {
 
     /// Whether no entry of `items` comes after the one that follows it.
     private static func isSorted(_ items: [FileItem], by order: ListOrder) -> Bool {
-        zip(items, items.dropFirst()).allSatisfy { !Sorter.areInOrder($1, $0, by: order) }
+        zip(items, items.dropFirst()).allSatisfy { Sorter.exactOrder($1, $0, by: order, collator: .current) >= 0 }
     }
 
     /// Every pair of a set is ordered one way only, and three names never go round in a circle.
@@ -57,7 +57,8 @@ internal struct NameOrderTests {
             String(repeating: "\u{15}", count: 300)
         ]
         for (first, second) in names.flatMap({ first in names.map { (first, $0) } }) {
-            let (forth, back) = (Sorter.compareNames(first, second), Sorter.compareNames(second, first))
+            let forth = Sorter.compareNames(first, second, collator: .current)
+            let back = Sorter.compareNames(second, first, collator: .current)
             #expect(forth.rawValue == -back.rawValue)
         }
         for order in [ListOrder(key: .name), ListOrder(key: .ext, descending: true), ListOrder(key: .size)] {
@@ -82,7 +83,7 @@ internal struct NameOrderTests {
             .compactMap { String(bytes: $0, encoding: .utf8) }
             .sorted { Array($0.utf8).lexicographicallyPrecedes(Array($1.utf8)) }
         #expect(Self.isAnOrder(names, collator: .current))
-        #expect(Self.isAnOrder(names, collator: NameCollator(identifier: "ru")))
+        #expect(Self.isAnOrder(names, collator: NameCollator(identifier: "ru", numeric: false, library: .system)))
     }
 
     /// Danish `aa`, Welsh `dd`, Spanish `ch`, Hungarian `cs`, Croatian `lj`: names of plain
@@ -100,14 +101,14 @@ internal struct NameOrderTests {
         names += ["aBa", "AA", "aAB", "1aA", "1AA", "ddd", "ddf", "aa", "Aa", "aA"]
         names = Array(Set(names)).sorted()
         for identifier in ["da", "nb", "cy", "es@collation=traditional", "hu", "hr", "en"] {
-            let collator = NameCollator(identifier: identifier)
+            let collator = NameCollator(identifier: identifier, numeric: false, library: .system)
             #expect(Self.isAnOrder(names, collator: collator), "\(identifier)")
             let items = (0..<40).flatMap { round in names.map { Self.entry($0 + (round == 0 ? "" : "-\(round)")) } }
             let sorted = Sorter.sort(items, by: ListOrder(key: .name), collator: collator)
             #expect(
                 zip(sorted, sorted.dropFirst())
                     .allSatisfy { first, second in
-                        Sorter.areInOrder(first, second, by: ListOrder(key: .name), collator: collator)
+                        panelsInOrder(first, second, by: ListOrder(key: .name), collator: collator)
                     },
                 "\(identifier)"
             )
@@ -120,10 +121,10 @@ internal struct NameOrderTests {
     internal func namesThatDifferOnlyInWritingAreOrderedByTheirBytes() {
         let (composed, decomposed) = ("caf\u{E9}", "cafe\u{301}")
         #expect(composed == decomposed)
-        let forth = Sorter.compareNames(composed, decomposed)
-        let back = Sorter.compareNames(decomposed, composed)
+        let forth = Sorter.compareNames(composed, decomposed, collator: .current)
+        let back = Sorter.compareNames(decomposed, composed, collator: .current)
         #expect(forth != .orderedSame && forth.rawValue == -back.rawValue)
-        #expect(Sorter.compareNames(composed, composed) == .orderedSame)
+        #expect(Sorter.compareNames(composed, composed, collator: .current) == .orderedSame)
         let one = Sorter.sort([Self.entry(composed), Self.entry(decomposed)], by: ListOrder())
             .map { Array($0.name.utf8) }
         let two = Sorter.sort([Self.entry(decomposed), Self.entry(composed)], by: ListOrder())
@@ -148,11 +149,8 @@ internal struct NameOrderTests {
                     == Sorter.sort(sorted, by: turned).map(\.name),
                 "\(order) turned"
             )
-            let merged = Sorter.merge(
-                Sorter.sort(Array(items[..<10_000]), by: order),
-                with: Sorter.sort(Array(items[10_000...]), by: order),
-                by: order
-            )
+            let halves = [items[..<10_000], items[10_000...]].map { Sorter.sort(Array($0), by: order) }
+            let merged = panelsCollected(halves, by: order)
             #expect(Self.isSorted(merged, by: order), "merged by \(order)")
         }
     }
@@ -166,7 +164,7 @@ internal struct NameOrderTests {
             Self.entry("a")
         ]
         let sorted = Sorter.sort(items, by: ListOrder())
-        #expect(zip(sorted, sorted.dropFirst()).allSatisfy { Sorter.areInOrder($0, $1, by: ListOrder()) })
+        #expect(zip(sorted, sorted.dropFirst()).allSatisfy { panelsInOrder($0, $1, by: ListOrder()) })
         #expect(sorted.first?.name == "a")
     }
 }

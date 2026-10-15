@@ -77,10 +77,11 @@ extension PanelSession {
     internal func setSizeFilter() {
         let filter: PanelFilter? = choices.int(4) == 0 ? nil : PanelFilter(title: "size") { $0.size > 1 }
         let stale = choices.int(4) == 0
-        _ = model.setFilter(
-            filter,
-            prefiltered: stale ? [] : PanelModel.filtered(model.listedItems, by: filter),
-            listVersion: model.listVersion - (stale ? 1 : 0)
-        )
+        // Worked out ahead in the background, or here as a stale one falls back to.
+        if stale {
+            model.setFilter(filter)
+        } else {
+            _ = model.apply(PanelModel.prepare(model.basis, filter: filter))
+        }
     }
 }

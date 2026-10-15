@@ -103,7 +103,7 @@ internal enum TabFileTarget {
             }
             tab.setShowHidden(record.showHidden)
             tab.customTitle = record.title
-            tab.isLocked = record.locked ?? false
+            tab.isLocked = record.locked
             opened.append(tab)
             position += 1
         }

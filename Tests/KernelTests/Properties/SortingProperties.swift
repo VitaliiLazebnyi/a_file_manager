@@ -21,13 +21,13 @@ internal struct SortingProperties {
 
     /// Whether neither entry has to come before the other.
     private static func areEqual(_ first: FileItem, _ second: FileItem, _ order: ListOrder) -> Bool {
-        !Sorter.areInOrder(first, second, by: order) && !Sorter.areInOrder(second, first, by: order)
+        !panelsInOrder(first, second, by: order) && !panelsInOrder(second, first, by: order)
     }
 
     /// Whether no entry of the list belongs before one that comes earlier.
     private static func isInOrder(_ sorted: [FileItem], _ order: ListOrder) -> Bool {
         sorted.indices.allSatisfy { later in
-            sorted[..<later].allSatisfy { !Sorter.areInOrder(sorted[later], $0, by: order) }
+            sorted[..<later].allSatisfy { !panelsInOrder(sorted[later], $0, by: order) }
         }
     }
 
@@ -54,7 +54,7 @@ internal struct SortingProperties {
     /// coming first carries over to a third, and so does being equal.
     private static func isConsistent(_ items: [FileItem], _ order: ListOrder) -> Bool {
         let (first, second, third) = (items[0], items[1], items[2])
-        let before = { (one: FileItem, other: FileItem) in Sorter.areInOrder(one, other, by: order) }
+        let before = { (one: FileItem, other: FileItem) in panelsInOrder(one, other, by: order) }
         let isStrict = !(before(first, second) && before(second, first))
         let isTransitive = !(before(first, second) && before(second, third)) || before(first, third)
         let equalIsTransitive =
@@ -123,8 +123,8 @@ internal struct SortingProperties {
             .flatMap { items in KernelGenerators.order.map { (items: items, order: $0) } }
         expectProperty(long, count: 3) { items, order in
             let reference = items.indices.sorted { first, second in
-                Sorter.areInOrder(items[first], items[second], by: order)
-                    || (!Sorter.areInOrder(items[second], items[first], by: order) && first < second)
+                panelsInOrder(items[first], items[second], by: order)
+                    || (!panelsInOrder(items[second], items[first], by: order) && first < second)
             }
             return Self.locations(Sorter.sort(items, by: order)) == reference.map { items[$0].url.path }
         }
@@ -151,11 +151,8 @@ internal struct SortingProperties {
         }
         expectProperty(pairs) { first, second in
             let order = first.order
-            let merged = Sorter.merge(
-                Sorter.sort(first.items, by: order),
-                with: Sorter.sort(second, by: order),
-                by: order
-            )
+            let halves = [Sorter.sort(first.items, by: order), Sorter.sort(second, by: order)]
+            let merged = panelsCollected(halves, by: order)
             return Self.locations(merged) == Self.locations(Sorter.sort(first.items + second, by: order))
         }
     }

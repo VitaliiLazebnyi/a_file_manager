@@ -56,10 +56,9 @@ internal struct CancellingWhatWaitsTests {
         OtherThread.start { [memory, fileSystems] in
             var batches = 0
             try? PanelLoader.stream(
-                memory.url("/far/sub"),
+                climbingFrom: memory.url("/far/sub"),
                 showHidden: false,
                 fileSystems: fileSystems,
-                climbing: true,
                 cancellation: flag
             ) { _ in
                 batches += 1

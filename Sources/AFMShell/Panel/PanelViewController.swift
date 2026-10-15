@@ -1102,7 +1102,7 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
                 while: { [weak self] in self?.loads[id] === load && !hasEnded && !freshHasCome },
                 by: {
                     PanelModel.prepare(
-                        $0, show: listing, focus: focus, history: history, remembered: true, presorted: entry.order)
+                        $0, showRemembered: listing, focus: focus, history: history, presorted: entry.order)
                 },
                 then: { outcome in
                     isBeingShown = false

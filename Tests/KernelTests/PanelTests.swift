@@ -76,14 +76,7 @@ internal struct PanelTests {
     /// range of rows and a calculated folder size.
     @Test
     internal func selectionCommandsAndTotals() {
-        let expected = PanelModel.Totals(
-            selectedBytes: 0,
-            totalBytes: 3_072,
-            selectedFiles: 0,
-            totalFiles: 2,
-            selectedFolders: 0,
-            totalFolders: 2
-        )
+        let expected = PanelModel.Totals(total: PanelModel.Counts(bytes: 3_072, files: 2, folders: 2))
         #expect(panel.totals == expected)
         panel.selectAll()
         #expect(panel.totals.selectedBytes == 3_072 && panel.totals.selectedFiles == 2)
@@ -98,7 +91,7 @@ internal struct PanelTests {
         #expect(panel.selection == ["a.txt"])
         panel.setSelected(true, rows: 1...2)
         #expect(panel.selection == ["a.txt", "bin", "docs"])
-        panel.setComputedSize(4_096, forName: "docs")
+        panel.setComputedSizes([(name: "docs", size: 4_096)])
         #expect(panel.totals.totalBytes == 3_072 + 4_096 && panel.totals.selectedBytes == 2_048 + 4_096)
     }
 
@@ -128,7 +121,7 @@ internal struct PanelTests {
     internal func updateKeepsCursorSelectionAndFolderSizes() throws {
         panel.moveCursor(to: try row("b.md"))
         panel.toggleSelection(row: try row("a.txt"))
-        panel.setComputedSize(4_096, forName: "docs")
+        panel.setComputedSizes([(name: "docs", size: 4_096)])
         #expect(!panel.update(with: try work.listing("/work")))
         work.memory.addFile("/work/0-new.txt")
         #expect(panel.update(with: try work.listing("/work")))

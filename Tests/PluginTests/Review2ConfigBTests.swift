@@ -435,10 +435,10 @@ private final class Review2WatchFileSystem: FileSystemProvider, @unchecked Senda
 
     @Test func pathsAndCaptionsWithLineBreaksRoundTripWithoutInjectingLines() throws {
         let awkward = memory.url("/tmp/a\n1_path=sftp://evil.example/x")
-        let tab = PanelTabs.State.Tab(location: awkward, title: "t\n1_path=/etc")
+        let tab = PanelTabState(location: awkward, title: "t\n1_path=/etc")
         let file = TabFile(
             active: PanelTabs.State(
-                tabs: [tab, PanelTabs.State.Tab(location: memory.url("/second"), title: " padded ")], active: 0))
+                tabs: [tab, PanelTabState(location: memory.url("/second"), title: " padded ")], active: 0))
         let text = file.text(displayPath: memory.displayPath)
         // No line of the file starts a tab of its own that was not written as one.
         #expect(

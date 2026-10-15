@@ -71,10 +71,7 @@ internal struct CalculatedSizeTests {
         )
         #expect(model.listedItems.first { $0.name == "dir0" }?.computedSize == 5)
         #expect(model.listedItems.first { $0.name == "dir290" }?.computedSize == 9)
-        let plain = model.listedItems.map { item in
-            FileItem(url: item.url, name: item.name, isDirectory: item.isDirectory, size: item.size)
-        }
-        model.setSort(ListOrder(key: .date), presorted: Sorter.sort(plain, by: ListOrder(key: .date)))
+        model.setSort(ListOrder(key: .date))
         #expect(model.listedItems.filter { $0.computedSize != nil }.map(\.name).sorted() == ["dir0", "dir290"])
         #expect(model.totals == PanelFigures.counted(model))
     }

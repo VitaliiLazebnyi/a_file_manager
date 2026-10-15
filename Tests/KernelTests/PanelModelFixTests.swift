@@ -68,18 +68,20 @@ internal struct PanelModelFixTests {
     internal func theTotalsStayRightThroughSizesFiltersAndReadings() {
         let model = Self.model()
         model.setSelected(true, names: ["folder0", "folder10"])
-        model.setComputedSize(5_000, forName: "folder0")
+        model.setComputedSizes([(name: "folder0", size: 5_000)])
         #expect(model.totals == PanelFigures.counted(model) && model.totals.selectedBytes >= 5_000)
-        model.setComputedSize(70, forName: "folder0")
-        model.setComputedSize(9, forName: "folder10")
+        model.setComputedSizes([(name: "folder0", size: 70)])
+        model.setComputedSizes([(name: "folder10", size: 9)])
         #expect(model.totals == PanelFigures.counted(model))
-        model.setComputedSizes(["folder20": 11, "folder30": 12, "missing": 13])
+        model.setComputedSizes([
+            (name: "folder20", size: 11), (name: "folder30", size: 12), (name: "missing", size: 13)
+        ])
         #expect(model.totals == PanelFigures.counted(model))
         #expect(model.items.first { $0.name == "folder30" }?.computedSize == 12)
         #expect(model.listedItems.first { $0.name == "folder20" }?.computedSize == 11)
         model.setFilter(.mask("*1.txt"))
         #expect(model.totals == PanelFigures.counted(model))
-        model.setComputedSize(8, forName: "folder40")
+        model.setComputedSizes([(name: "folder40", size: 8)])
         #expect(model.totals == PanelFigures.counted(model))
         #expect(model.listedItems.first { $0.name == "folder40" }?.computedSize == 8)
         model.setFilter(nil)
@@ -96,12 +98,12 @@ internal struct PanelModelFixTests {
         let model = Self.model()
         var changes = 0
         model.onChange = { _ in changes += 1 }
-        model.setComputedSizes(["folder0": 1, "folder10": 2, "folder20": 3])
+        model.setComputedSizes([(name: "folder0", size: 1), (name: "folder10", size: 2), (name: "folder20", size: 3)])
         #expect(changes == 1)
         model.setSelected(true, names: ["file1.txt", "file2.txt", "file3.txt"])
         #expect(changes == 2 && model.selection.count == 3)
-        model.setComputedSizes(["missing": 1])
-        model.setComputedSizes([:])
+        model.setComputedSizes([(name: "missing", size: 1)])
+        model.setComputedSizes([])
         #expect(changes == 2)
     }
 
