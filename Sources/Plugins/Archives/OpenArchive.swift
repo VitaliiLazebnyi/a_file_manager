@@ -1805,7 +1805,10 @@ final class OpenArchive: @unchecked Sendable {
         var replaced: ArchiveEntry?
         if let existing = tree.entry(destination) {
             guard replacing else { throw FileSystemError.alreadyExists(destination) }
-            if existing.isDirectory, tree.hasChildren(destination) { throw FileSystemError.alreadyExists(destination) }
+            // As on the disk: a file takes the place of a file, and a folder that of an empty folder.
+            if existing.isDirectory != entry.isDirectory || tree.hasChildren(destination) {
+                throw FileSystemError.alreadyExists(destination)
+            }
             take(existing)
             replaced = existing
         }
