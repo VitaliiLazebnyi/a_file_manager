@@ -139,7 +139,10 @@ public struct TextDocument: Equatable, Sendable {
                 lines.append(
                     TextLine(
                         String(decoding: UnsafeBufferPointer(rebasing: bytes[start..<end]), as: UTF8.self),
-                        ending: ending, number: lines.count + 1))
+                        ending: ending,
+                        number: lines.count + 1
+                    )
+                )
             }
             while index < bytes.count {
                 let byte = bytes[index]

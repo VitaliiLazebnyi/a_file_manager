@@ -167,18 +167,17 @@ internal struct CoverageCompareWindow {
 
     /// Closing with edits that are not saved asks first.
     @Test
-    internal func closingWithUnsavedEditsAsksFirst() throws {
+    internal func closingWithUnsavedEditsAsksFirst() {
         let stage = CoverageCompareStage(left: Self.left, right: Self.right)
         defer { stage.close() }
-        let window = try #require(stage.window)
-        // Nothing to ask about: Esc closes.
+        #expect(stage.recorder.presented == 1)
         stage.toggle("Edit mode")
         stage.session.copy(rows: 3..<4, to: .right)
         stage.bench.interaction.choiceAnswers = [2]
         stage.askToClose()
-        #expect(window.isVisible && !stage.wasClosed)
+        #expect(!stage.wasClosed)
         stage.bench.interaction.choiceAnswers = [1]
         stage.askToClose()
-        #expect(stage.wasClosed && !window.isVisible)
+        #expect(stage.wasClosed)
     }
 }

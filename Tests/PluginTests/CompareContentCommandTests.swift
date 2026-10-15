@@ -358,7 +358,13 @@ import Testing
         memory.addFile("/B/same.txt", "same")
         memory.addFile("/A/data.bin", "\u{0}\u{1}binary")
         memory.addFile("/B/data.bin", "\u{0}\u{1}BINARY and more")
-        let plugin = CompareContentPlugin()
+        // The windows are made but never put on the desktop: `present` only counts.
+        var presented = 0
+        var effects = CompareWindowEffects.system
+        effects.present = { _ in presented += 1 }
+        effects.beep = {}
+        let plugin = CompareContentPlugin(opensWindows: true, effects: effects)
+        defer { plugin.stop() }
         let bench = TestBench(
             plugins: [plugin],
             fileSystems: [memory],
@@ -366,7 +372,7 @@ import Testing
             right: memory.url("/B")
         )
         func windows() -> [NSWindow] {
-            NSApplication.shared.windows.filter { $0.title == "Compare contents" && $0.isVisible }
+            plugin.windows.compactMap(\.window)
         }
 
         bench.left.moveCursor(toName: "same.txt")
@@ -390,7 +396,7 @@ import Testing
         bench.left.moveCursor(toName: "data.bin")
         bench.commands.perform(.compareByContent)
         await spin { windows().count == 2 && plugin.sessions.last?.phase == .ready }
-        #expect(windows().count == 2 && plugin.sessions.last?.isBinary == true)
+        #expect(windows().count == 2 && plugin.sessions.last?.isBinary == true && presented == 3)
         windows().forEach { $0.displayIfNeeded() }
         plugin.stop()
         #expect(windows().isEmpty && plugin.sessions.isEmpty)
