@@ -14,10 +14,6 @@ internal struct ColorRule {
         ("teal", .systemTeal), ("indigo", .systemIndigo), ("gray", .systemGray), ("grey", .systemGray)
     ]
 
-    /// The file masks, as written.
-    internal let maskText: String
-    /// The colour, as written: a name or `#RRGGBB`.
-    internal let colorText: String
     /// The colour the names that match are drawn in.
     internal let color: NSColor
     private let mask: FileMask
@@ -27,8 +23,6 @@ internal struct ColorRule {
     ///
     /// Nil when no colour has that name.
     internal init?(maskText: String, colorText: String) {
-        self.maskText = maskText
-        self.colorText = colorText
         guard let named = Self.color(named: colorText) else {
             return nil
         }

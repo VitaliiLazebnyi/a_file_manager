@@ -4,7 +4,7 @@ import AppKit
 
 /// Mouse and keyboard in the list, the same in every view (spec 05 › Mouse selection modes),
 /// and what the list itself does for the shell's commands.
-extension PanelViewController {
+extension PanelViewController: NSUserInterfaceValidations {
     /// The standard editing actions the lists answer through the responder chain, and the role
     /// each stands for: the panel's command of that role runs.
     internal static let editingActions: [Selector: EditingRole] = [

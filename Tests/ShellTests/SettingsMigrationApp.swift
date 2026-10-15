@@ -120,7 +120,7 @@ internal struct SettingsMigrationApp {
         let (shell, kernel) = try await start(on: settings)
         defer { Self.stop(shell, kernel) }
         let left = shell.panelCoordinator.leftPanel
-        #expect(left.settings.colorRules.map(\.maskText) == ["*.zip *.gz", "*.app"])
+        #expect(left.settings.colorRules.count == 2)
         interaction.formAnswers = [.accept]
         kernel.commands.perform("afm_DefineColorsByFileType")
         #expect(SettingsMigrationShell.matches(settings.data(forKey: PanelSettings.colorRulesKey), saved))
