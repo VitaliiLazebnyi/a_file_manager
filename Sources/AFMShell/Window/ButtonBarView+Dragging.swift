@@ -23,6 +23,30 @@ extension ButtonBarView {
         }
     }
 
+    /// The items of the row nearest to `point`, under it or above or below.
+    ///
+    /// The flow lays its rows out one after another, so a row is a range of its items.
+    /// `frames` is not empty.
+    private static func row(nearest point: NSPoint, frames: [NSRect]) -> Range<Int> {
+        func distance(to frame: NSRect) -> CGFloat {
+            frame.minY > point.y ? frame.minY - point.y : max(point.y - frame.maxY, 0)
+        }
+        var nearest = 0
+        for index in frames.indices where distance(to: frames[index]) < distance(to: frames[nearest]) {
+            nearest = index
+        }
+        let top = frames[nearest].minY
+        var start = nearest
+        while start > 0, frames[start - 1].minY == top {
+            start -= 1
+        }
+        var end = nearest + 1
+        while end < frames.count, frames[end].minY == top {
+            end += 1
+        }
+        return start..<end
+    }
+
     /// Where a drop at `point` (in the bar's coordinates) would put `item`; nil for nowhere.
     internal func dropTarget(for item: Dragged, at location: NSPoint) -> DropTarget? {
         let point = flow.convert(location, from: self)
@@ -44,7 +68,7 @@ extension ButtonBarView {
             return groupTarget(at: point, frames: frames, lines: lines).map { .group($0) }
 
         case .button:
-            return buttonTarget(at: point, frames: frames, lines: lines).map { .button($0) }
+            return .button(buttonTarget(at: point, frames: frames, lines: lines))
         }
     }
 
@@ -150,36 +174,33 @@ extension ButtonBarView {
     /// Where a button dropped at `point` goes, in the row under the mouse or the nearest one.
     ///
     /// Onto a handle it makes a group of its own, well behind the end of a line one at the end;
-    /// otherwise it goes between the two items it is dropped between.
+    /// otherwise it goes between the two items it is dropped between. `frames` is not empty.
     private func buttonTarget(
         at point: NSPoint,
         frames: [NSRect],
         lines: [[[CommandID]]]
-    ) -> ButtonBarArrangement.Target? {
-        func distance(to frame: NSRect) -> CGFloat {
-            frame.minY > point.y ? frame.minY - point.y : max(point.y - frame.maxY, 0)
-        }
-        guard let nearest = frames.min(by: { distance(to: $0) < distance(to: $1) }) else {
-            return nil
-        }
-        let inRow = frames.indices.filter { frames[$0].minY == nearest.minY }
-        let onHandle = inRow.first { index in
-            if case .handle = slots[index] {
-                return abs(point.x - frames[index].midX) <= Self.handleSnap
+    ) -> ButtonBarArrangement.Target {
+        let row = Self.row(nearest: point, frames: frames)
+        let handles = row.compactMap { index -> (line: Int, group: Int)? in
+            guard case .handle(let line, let group) = slots[index], abs(point.x - frames[index].midX) <= Self.handleSnap
+            else {
+                return nil
             }
-            return false
+            return (line, group)
         }
-        if let onHandle, case .handle(let line, let group) = slots[onHandle] {
-            return .newGroup(.line(line, beforeGroup: group))
+        if let handle = handles.first {
+            return .newGroup(.line(handle.line, beforeGroup: handle.group))
         }
-        guard let last = inRow.last else {
-            return nil
-        }
+        let last = row.upperBound - 1
         if endsLine(last), point.x > frames[last].maxX + frames[last].width / 2 {
             return .newGroup(.line(slots[last].line, beforeGroup: lines[slots[last].line].count))
         }
-        let index = inRow.first { frames[$0].maxX > point.x } ?? last
-        let before = point.x < frames[index].midX
+        let index = row.first { frames[$0].maxX > point.x } ?? last
+        return insertion(at: index, before: point.x < frames[index].midX, lines: lines)
+    }
+
+    /// Where a button goes that is dropped on item `index`, `before` its middle or behind it.
+    private func insertion(at index: Int, before: Bool, lines: [[[CommandID]]]) -> ButtonBarArrangement.Target {
         switch slots[index] {
         case .button(let line, let group, let position):
             return .inGroup(line: line, group: group, beforeButton: before ? position : position + 1)

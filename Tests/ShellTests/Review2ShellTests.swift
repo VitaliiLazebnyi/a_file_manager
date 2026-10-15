@@ -532,7 +532,7 @@ extension Application {
     @Test func theBarsRestAfterASlowCheck() async {
         let app = await start()
         defer { app.stop() }
-        let window = app.shell.mainWindow!
+        let window = app.shell.mainWindow
         _ = await wait { !window.isValidationPending }
         window.validateBars()
         // Checked a moment ago and nothing changed: an event alone asks for no new check…

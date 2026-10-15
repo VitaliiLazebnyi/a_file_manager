@@ -62,8 +62,12 @@ public final class Shell: ShellServices {
     internal let jobService = ProgressJobService()
     /// What the window shows around the panels.
     internal let layout: WindowLayout
-    /// The main window; there from the end of `init` on.
-    internal private(set) var mainWindow: MainWindowController!
+    /// The main window; made in `init` once the kernel is attached (the key bindings are final then).
+    internal private(set) lazy var mainWindow = MainWindowController(
+        kernel: kernel,
+        panels: panelCoordinator,
+        layout: layout
+    )
     /// What is shown while the plugins finish before the program quits; nil when nothing is
     /// being finished.
     internal private(set) var quitProgress: QuitProgress?
@@ -90,7 +94,7 @@ public final class Shell: ShellServices {
         kernel.commands.onRejected = { NSSound.beep() }
         // From here on the key bindings are final and commands may run.
         kernel.attach(self)
-        mainWindow = MainWindowController(kernel: kernel, panels: panelCoordinator, layout: layout)
+        // The main window is made here, with the final key bindings.
         jobService.window = mainWindow.window
         connectJobsAndPanels()
     }
