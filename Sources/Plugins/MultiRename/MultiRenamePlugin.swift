@@ -15,7 +15,7 @@ public final class MultiRenamePlugin: Plugin {
     private var store: RenameStore?
     /// Puts a window of the tool on screen. Tests replace it, so that no window shows in the
     /// session they run in, and look at what it was asked to show.
-    var present: @MainActor (NSWindowController) -> Void = { $0.showWindow(nil) }
+    internal var present: @MainActor (NSWindowController) -> Void = { $0.showWindow(nil) }
 
     /// `opensWindows` false keeps the tool windowless, for tests, and computes previews at
     /// once. `logDirectory` is where the result log goes; by default a folder of the program

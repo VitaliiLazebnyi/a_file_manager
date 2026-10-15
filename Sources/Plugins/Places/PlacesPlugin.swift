@@ -52,7 +52,7 @@ public final class PlacesPlugin: Plugin {
     private(set) var treeWindow: DirectoryTreeWindowController?
     /// Puts the tree window on screen. Tests replace it, so that no window shows in the
     /// session they run in, and look at what it was asked to show.
-    var present: @MainActor (NSWindowController) -> Void = { $0.showWindow(nil) }
+    internal var present: @MainActor (NSWindowController) -> Void = { $0.showWindow(nil) }
     /// Stored data that could not be read in full is reported once per key and run.
     private var reportedKeys = Set<String>()
     private var lastNoted: URL?
