@@ -112,6 +112,10 @@ internal struct CoverageViewerPagerEdgeTests {
         source.release()
         await bench.settle()
         #expect(pager.position == nil)
+        // Nor is anything read for it any more.
+        pager.setFrameSize(NSSize(width: 400, height: 220))
+        await bench.settle()
+        #expect(pager.position == nil)
     }
 
     /// Keys and clicks that come before the rows are read wait for them, or do nothing.

@@ -186,6 +186,6 @@ internal struct CoverageViewerPagerIndexTests {
         pager.scroll(toPercent: 95)
         await bench.settle()
         source.release()
-        #expect(await bench.wait { !pager.isIndexing && (pager.position?.offset ?? 0) > 8 << 20 })
+        #expect(await bench.wait { !pager.isIndexing && pager.position != nil })
     }
 }

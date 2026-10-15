@@ -243,10 +243,10 @@ extension ViewerPane {
                     shortcuts: [Shortcut(.returnKey, .option), .cmd("f", .control)],
                     isEnabled: !isEmbedded
                 ) { [weak self] in
-                    self?.window?.toggleFullScreen(nil)
+                    self?.dialogs.toggleFullScreen(self?.window)
                 },
                 ViewerAction(title: "Maximize", shortcuts: [.f(11)], isEnabled: !isEmbedded) { [weak self] in
-                    self?.window?.zoom(nil)
+                    self?.dialogs.zoom(self?.window)
                 },
                 ViewerAction(title: "Save position", isEnabled: !isEmbedded) { [weak self] in self?.onSavePosition() }
             ]
@@ -402,7 +402,8 @@ extension ViewerPane {
             }
             return true
         }
-        guard showsText, contentView(is: pager) else { return false }
+        // Shown text is always in the pager, which is then the content.
+        guard showsText else { return false }
         let motion: TextPagerView.Motion
         if named(.upArrow) {
             motion = jump && flags.contains(.command) ? .fileStart : .up
@@ -426,8 +427,6 @@ extension ViewerPane {
         pager.perform(motion, extending: shift)
         return true
     }
-
-    private func contentView(is view: NSView) -> Bool { view.superview != nil && view.window === window }
 
     // MARK: Options
 
@@ -655,19 +654,29 @@ extension ViewerPane {
                 }
             }
             DispatchQueue.main.async {
-                guard let self else { return }
-                if self.activity?.cancel === cancel { self.activity = nil }
-                guard self.loadGeneration == generation, self.pager.document?.source === document.source,
-                    !cancel.isCancelled
-                else { return }
-                switch result {
-                case .success(let match?):
-                    self.pager.reveal(offset: match.lowerBound, select: match, rowsAbove: self.settings.searchGoBack)
-
-                case .success(nil): self.kernel.interaction.inform("\"\(lastSearch.text)\" was not found.")
-                case .failure(let error): self.kernel.interaction.report(error, title: "Find")
-                }
+                self?.searchFinished(result, for: lastSearch.text, in: document, generation: generation, cancel: cancel)
             }
+        }
+    }
+
+    /// Shows what a search found; nothing when the file or the search changed meanwhile.
+    func searchFinished(
+        _ result: Result<Range<Int64>?, any Error>,
+        for text: String,
+        in document: TextDocument,
+        generation: Int,
+        cancel: CancellationFlag
+    ) {
+        if activity?.cancel === cancel { activity = nil }
+        guard loadGeneration == generation, pager.document?.source === document.source, !cancel.isCancelled else {
+            return
+        }
+        switch result {
+        case .success(let match?):
+            pager.reveal(offset: match.lowerBound, select: match, rowsAbove: settings.searchGoBack)
+
+        case .success(nil): kernel.interaction.inform("\"\(text)\" was not found.")
+        case .failure(let error): kernel.interaction.report(error, title: "Find")
         }
     }
 
@@ -713,12 +722,7 @@ extension ViewerPane {
         guard showsText, let window else { return nil }
         var link: URL?
         if pager.selection == nil, let hit = pager.text(at: window.mouseLocationOutsideOfEventStream) {
-            let units = Array(hit.text.utf16)
-            var lower = min(hit.index, units.count)
-            var upper = lower
-            while lower > 0, units[lower - 1] != 0x20 { lower -= 1 }
-            while upper < units.count, units[upper] != 0x20 { upper += 1 }
-            link = HTMLText.url(from: String(decoding: units[lower..<upper], as: UTF16.self))
+            link = Self.link(in: hit.text, at: hit.index)
             guard link != nil else { return nil }
         }
         var entries: [ViewerAction?] = []
@@ -731,13 +735,13 @@ extension ViewerPane {
                         .withSelectedText { text in
                             var components = URLComponents(string: "https://www.google.com/search")
                             components?.queryItems = [URLQueryItem(name: "q", value: text)]
-                            if let url = components?.url { NSWorkspace.shared.open(url) }
+                            if let url = components?.url { self?.links.open(url) }
                         }
                 },
                 ViewerAction(title: "Open the selection as a link in the browser") { [weak self] in
                     self?
                         .withSelectedText { text in
-                            if let url = HTMLText.url(from: text) { NSWorkspace.shared.open(url) }
+                            if let url = HTMLText.url(from: text) { self?.links.open(url) }
                         }
                 }
             ]
@@ -749,7 +753,7 @@ extension ViewerPane {
                     pasteboard.clearContents()
                     pasteboard.setString(link.absoluteString, forType: .string)
                 },
-                ViewerAction(title: "Open in the default browser") { NSWorkspace.shared.open(link) }
+                ViewerAction(title: "Open in the default browser") { [weak self] in self?.links.open(link) }
             ]
         }
         if !htmlLinks.isEmpty {
@@ -767,6 +771,16 @@ extension ViewerPane {
         return menu
     }
 
+    /// The link in `text` around UTF-16 index `index`: the word there, when it is a link.
+    static func link(in text: String, at index: Int) -> URL? {
+        let units = Array(text.utf16)
+        var lower = min(index, units.count)
+        var upper = lower
+        while lower > 0, units[lower - 1] != 0x20 { lower -= 1 }
+        while upper < units.count, units[upper] != 0x20 { upper += 1 }
+        return HTMLText.url(from: String(decoding: units[lower..<upper], as: UTF16.self))
+    }
+
     private func withSelectedText(_ action: @escaping @MainActor @Sendable (String) -> Void) {
         guard let document = pager.document, let selection = pager.selection, selection.count <= 4_096 else { return }
         workQueue.async {
@@ -778,9 +792,7 @@ extension ViewerPane {
     // MARK: File menu
 
     private func openFile() {
-        let panel = NSOpenPanel()
-        panel.canChooseDirectories = false
-        guard panel.runModal() == .OK, let url = panel.url else { return }
+        guard let url = dialogs.fileToOpen() else { return }
         load(ViewerItem(source: .file(url), title: kernel.fileSystems.displayPath(url)))
     }
 
@@ -788,9 +800,8 @@ extension ViewerPane {
     /// from a server (spec 10 › File menu behaviour). Runs as a job with a progress window.
     private func saveAs() {
         guard let loaded else { return }
-        let panel = NSSavePanel()
-        panel.nameFieldStringValue = loaded.item.url?.lastPathComponent ?? loaded.item.title
-        guard panel.runModal() == .OK, let target = panel.url else { return }
+        guard let target = dialogs.saveTarget(proposing: loaded.item.url?.lastPathComponent ?? loaded.item.title)
+        else { return }
         // The file that is shown is read while the copy is written: it is not replaced.
         guard !ViewerSave.isSameFile(loaded.item.url, target) else {
             kernel.interaction.inform(
@@ -801,29 +812,33 @@ extension ViewerPane {
         let source = loaded.source
         kernel.jobs.run(
             title: "Save as",
-            work: { monitor -> any Error? in
-                do {
-                    try ViewerSave.save(source, to: target, cancellation: monitor.cancellation) { offset in
-                        monitor.report(
-                            JobProgress(
-                                lines: ["To: \(target.path)"],
-                                itemsDone: 0,
-                                itemsTotal: 1,
-                                bytesDone: offset,
-                                bytesTotal: source.length
-                            )
-                        )
-                    }
-                    return nil
-                } catch {
-                    return monitor.cancellation.isCancelled ? nil : error
-                }
-            },
+            work: { monitor in Self.save(source, to: target, monitor: monitor) },
             completion: { [weak self] error in
                 if let error { self?.kernel.interaction.report(error, title: "Save as") }
                 self?.kernel.panels.refresh([target.deletingLastPathComponent()])
             }
         )
+    }
+
+    /// The work of Save as: `source` written to `target`, with its progress; the error, unless
+    /// the user stopped it.
+    nonisolated static func save(_ source: any ByteSource, to target: URL, monitor: any JobMonitor) -> (any Error)? {
+        do {
+            try ViewerSave.save(source, to: target, cancellation: monitor.cancellation) { offset in
+                monitor.report(
+                    JobProgress(
+                        lines: ["To: \(target.path)"],
+                        itemsDone: 0,
+                        itemsTotal: 1,
+                        bytesDone: offset,
+                        bytesTotal: source.length
+                    )
+                )
+            }
+            return nil
+        } catch {
+            return monitor.cancellation.isCancelled ? nil : error
+        }
     }
 
     /// F4 opens the editor, for files that are files and are shown as text (spec 10 › F4
@@ -844,7 +859,11 @@ extension ViewerPane {
     nonisolated static let printPageLimit = 2_000
 
     private func printInfo() -> NSPrintInfo {
-        let info = NSPrintInfo(dictionary: NSPrintInfo.shared.dictionary() as? [NSPrintInfo.AttributeKey: Any] ?? [:])
+        var attributes: [NSPrintInfo.AttributeKey: Any] = [:]
+        for case (let key as String, let value) in NSPrintInfo.shared.dictionary() {
+            attributes[NSPrintInfo.AttributeKey(key)] = value
+        }
+        let info = NSPrintInfo(dictionary: attributes)
         if let margins = settings.printMargins, margins.count == 4 {
             (info.leftMargin, info.rightMargin, info.topMargin, info.bottomMargin) = (
                 margins[0], margins[1], margins[2], margins[3]
@@ -858,7 +877,7 @@ extension ViewerPane {
     /// File › Page Setup (the specification's Print setup): paper and margins.
     func pageSetup() {
         let info = printInfo()
-        guard NSPageLayout().runModal(with: info) == NSApplication.ModalResponse.OK.rawValue else { return }
+        guard dialogs.pageLayout(info) else { return }
         NSPrintInfo.shared = info
         settings.printMargins = [info.leftMargin, info.rightMargin, info.topMargin, info.bottomMargin]
     }
@@ -871,12 +890,7 @@ extension ViewerPane {
         // Weakly: the block that prepares a text holds this, and must not be the pane's last
         // owner on its thread (a view goes away on the main thread).
         let run: @MainActor @Sendable (NSPrintOperation) -> Void = { [weak self] operation in
-            guard let self else { return }
-            if let window = self.window {
-                operation.runModal(for: window, delegate: nil, didRun: nil, contextInfo: nil)
-            } else {
-                operation.run()
-            }
+            self?.dialogs.run(operation, for: self?.window)
         }
         if let frame = imageView?.currentFrame {
             let area = info.imageablePageBounds.size
@@ -890,7 +904,7 @@ extension ViewerPane {
             view.imageScaling = .scaleAxesIndependently
             run(NSPrintOperation(view: view, printInfo: info))
         } else if let pdfView, let window {
-            pdfView.print(with: info, autoRotate: true)
+            dialogs.print(pdfView, with: info)
             _ = window
         } else if let webView {
             run(webView.printOperation(with: info))
@@ -912,8 +926,8 @@ extension ViewerPane {
             let generation = loadGeneration
             let page = TextPrintView.pageSize(for: info)
             let linesPerPage = TextPrintView.linesPerPage(font: font, pageHeight: page.height)
-            activity = ("Preparing to print…", nil, CancellationFlag())
-            let cancel = activity?.cancel
+            let cancel = CancellationFlag()
+            activity = ("Preparing to print…", nil, cancel)
             // Made on the main thread and used there only, by the block that comes back.
             let held = Handover((font: font, info: info))
             workQueue.async { [weak self, range] in
@@ -921,26 +935,37 @@ extension ViewerPane {
                     of: document,
                     in: range,
                     maxRows: Self.printPageLimit * linesPerPage,
-                    cancellation: cancel ?? CancellationFlag()
+                    cancellation: cancel
                 )
                 DispatchQueue.main.async {
-                    guard let self else { return }
-                    if self.activity?.cancel === cancel { self.activity = nil }
-                    guard self.loadGeneration == generation, cancel?.isCancelled != true else { return }
-                    if text.truncated {
-                        self.kernel.interaction.inform(
-                            "The text is longer than the \(Self.printPageLimit) pages that are printed at most: only its first \(Self.printPageLimit) pages (\(text.lines.count) lines) are printed."
-                        )
-                    }
-                    run(
-                        NSPrintOperation(
-                            view: TextPrintView(lines: text.lines, font: held.value.font, pageSize: page),
-                            printInfo: held.value.info
-                        )
-                    )
+                    self?
+                        .textPrepared(text, generation: generation, cancel: cancel) {
+                            NSPrintOperation(
+                                view: TextPrintView(lines: text.lines, font: held.value.font, pageSize: page),
+                                printInfo: held.value.info
+                            )
+                        }
                 }
             }
         }
+    }
+
+    /// Prints the text that was prepared (`operation` makes the print operation), telling the
+    /// user when it was cut short; nothing when the file changed or printing was stopped.
+    private func textPrepared(
+        _ text: PrintableText,
+        generation: Int,
+        cancel: CancellationFlag,
+        operation: () -> NSPrintOperation
+    ) {
+        if activity?.cancel === cancel { activity = nil }
+        guard loadGeneration == generation, !cancel.isCancelled else { return }
+        if text.truncated {
+            kernel.interaction.inform(
+                "The text is longer than the \(Self.printPageLimit) pages that are printed at most: only its first \(Self.printPageLimit) pages (\(text.lines.count) lines) are printed."
+            )
+        }
+        dialogs.run(operation(), for: window)
     }
 
     /// The rows of `range` as the document's layout shows them, at most `maxRows` of them (`truncated`
