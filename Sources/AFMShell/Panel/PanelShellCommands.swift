@@ -80,7 +80,8 @@ internal enum PanelShellCommands {
             interaction
         ) {
             text = answer.text("rules")
-            let lines = text.split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) }
+            let lines = text.split(separator: "\n")
+                .map { $0.trimmingCharacters(in: .whitespaces) }
                 .filter { !$0.isEmpty }
             if let unreadable = lines.first(where: { !$0.hasPrefix("-") && ColorRule.parse($0).isEmpty }) {
                 interaction.inform("This entry cannot be read:", detail: unreadable, style: .warning)

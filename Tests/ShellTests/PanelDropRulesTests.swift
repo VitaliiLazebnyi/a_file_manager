@@ -84,7 +84,7 @@ internal struct PanelDropRulesTests {
         let (inside, elsewhere) = (file("/x"), file("/y"))
         #expect(session.isPointless(.move, into: inside) && !session.isPointless(.copy, into: inside))
         #expect(!session.isPointless(.move, into: elsewhere) && session.isPointless(.move, into: inside))
-        #expect(session.mountPoints.contains("/") && session.mountPoints == session.mountPoints)
+        #expect(session.mountPoints.contains("/") && session.mountPoints == PanelDrop.mountPoints())
         #expect(DropSession(sequence: 8, sources: []).isPointless(.copy, into: elsewhere))
         let many = (0..<DropSession.backgroundThreshold).map { file("/big/f\($0)") }
         let big = DropSession(sequence: 1, sources: many)
@@ -159,7 +159,7 @@ internal struct PanelDropRulesTests {
     /// A drag of very many items is one pasteboard item that hands out its files when asked:
     /// the first file, and the list of all as paths.
     @Test
-    internal func aDragOfVeryManyItemsIsOneItemThatHandsOutItsFilesWhenAsked() throws {
+    internal func aDragOfVeryManyItemsIsOneItemThatHandsOutItsFilesWhenAsked() {
         defer { PanelDrop.endDrag() }
         let items = (0...PanelDrop.itemsWrittenSingly).map { FileItem(url: file("/many/f\($0)"), name: "f\($0)") }
         let written = PanelDrop.beginDrag(PanelDragPayload(items: items))
@@ -191,7 +191,7 @@ internal struct PanelDropRulesTests {
         let model = Fixture.panel((0..<3_000).map { Fixture.file("f\($0)", in: folder) }, at: folder)
         model.selectAll()
         let payload = PanelDragPayload(marked: model.operandsSnapshot())
-        #expect(payload.count == 3_000 && payload.isWrittenLazily && !payload.isReady)
+        #expect(payload.itemCount == 3_000 && payload.isWrittenLazily && !payload.isReady)
         var heard: [Int] = []
         payload.whenReady { heard.append($0.count) }
         let session = DropSession(sequence: 3, payload: payload)

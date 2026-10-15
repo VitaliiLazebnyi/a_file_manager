@@ -126,8 +126,12 @@ extension PanelViewController {
             }
         }
         // A copy dropped into the folder it came from gets a new name, as a pasted one does.
-        transfers.transfer(plan.kind, plan.sources, into: plan.destination, renamingSelfCopies: plan.kind == .copy) {
-            _ in
+        transfers.transfer(
+            plan.kind,
+            plan.sources,
+            into: plan.destination,
+            renamingSelfCopies: plan.kind == .copy
+        ) { _ in
             // The service reports what happened itself.
         }
     }

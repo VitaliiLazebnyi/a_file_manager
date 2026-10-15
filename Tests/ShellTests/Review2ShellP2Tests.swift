@@ -56,6 +56,10 @@ internal struct Review2ShellP2Tests {
             pending = nil
             completion?()
         }
+
+        deinit {
+            // Nothing to release.
+        }
     }
 
     private let program: PanelProgram

@@ -40,6 +40,9 @@ internal final class PanelReadingRun {
     private var behind: [() -> Void] = []
     private var isHolding = false
 
+    /// Whether this is still the tab's reading: one that was overtaken by a newer one is dropped.
+    private var isCurrent: Bool { panel?.loads[id] === load }
+
     /// A run of `request` for `panel`, which is `load` of the tab.
     internal init(_ request: Request, of panel: PanelViewController, load: PanelLoad) {
         self.panel = panel
@@ -48,9 +51,6 @@ internal final class PanelReadingRun {
         id = ObjectIdentifier(request.tab)
         previousDirectory = request.tab.directory
     }
-
-    /// Whether this is still the tab's reading: one that was overtaken by a newer one is dropped.
-    private var isCurrent: Bool { panel?.loads[id] === load }
 
     /// Enters the folder empty, after `PanelLoading.emptyOpenDelay`, when nothing has arrived
     /// by then.
@@ -241,7 +241,7 @@ internal final class PanelReadingRun {
             // The tab shows part of a directory whose reading was overtaken by this failed
             // attempt: it is read again (once; that reading does not come back here), so it
             // does not stay half-listed.
-            panel.reload(tab, focus: nil, quietly: false, markDirty: true, changedAt: nil, completion: nil)
+            panel.reload(tab, focus: nil, as: .loud, completion: nil)
         } else {
             // An error in the middle of a listing ends it with what has arrived.
             tab.finishLoading()

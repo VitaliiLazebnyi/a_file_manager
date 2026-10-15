@@ -169,9 +169,8 @@ internal final class PanelLoading: Sendable {
     /// is doing (`PanelLoader.stream`). The callbacks, which hold the panel, stay with the main
     /// thread and are let go of there.
     internal func start(onPiece: @escaping (Piece) -> Void, onEnd: @escaping (any Error?) -> Void) {
-        let (source, order, cancellation) = (source, order, cancellation)
         let receivers = MainOwned(PanelPieceStream.Receivers(onPiece: onPiece, onEnd: onEnd))
-        Background.storage("list", at: source.location) {
+        Background.storage("list", at: source.location) { [source, order, cancellation] in
             // Overtaken while it waited for its turn: the file system is not asked at all.
             guard !cancellation.isCancelled else {
                 return MainLoop.perform { receivers.take()?.onEnd(nil) }
@@ -179,5 +178,9 @@ internal final class PanelLoading: Sendable {
             // Everything below belongs to this background thread.
             PanelPieceStream(source: source, order: order, cancellation: cancellation, receivers: receivers).run()
         }
+    }
+
+    deinit {
+        // Nothing to release: a reading that is out holds no reference to this object.
     }
 }

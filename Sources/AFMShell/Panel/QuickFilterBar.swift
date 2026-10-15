@@ -44,11 +44,21 @@ internal final class QuickFilterBar: NSView, NSTextFieldDelegate {
         stack.edgeInsets = NSEdgeInsets(top: 2, left: 6, bottom: 2, right: 6)
         stack.translatesAutoresizingMaskIntoConstraints = false
         addSubview(stack)
-        NSLayoutConstraint.activate([
-            stack.topAnchor.constraint(equalTo: topAnchor), stack.bottomAnchor.constraint(equalTo: bottomAnchor),
-            stack.leadingAnchor.constraint(equalTo: leadingAnchor),
-            stack.trailingAnchor.constraint(equalTo: trailingAnchor)
-        ])
+        // The row fills the bar from edge to edge.
+        NSLayoutConstraint.activate(
+            [NSLayoutConstraint.Attribute.top, .bottom, .leading, .trailing]
+                .map { edge in
+                    NSLayoutConstraint(
+                        item: stack,
+                        attribute: edge,
+                        relatedBy: .equal,
+                        toItem: self,
+                        attribute: edge,
+                        multiplier: 1,
+                        constant: 0
+                    )
+                }
+        )
     }
 
     /// Not made from an archive.

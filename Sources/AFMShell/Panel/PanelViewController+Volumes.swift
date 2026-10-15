@@ -138,7 +138,7 @@ extension PanelViewController {
             cancellation: question.flag,
             { provider.volume(of: question.directory, cancellation: $0) },
             then: { [weak self, weak tab] (answer: VolumeInfo??) in
-                self?.answered(question, with: answer ?? nil, for: tab)
+                self?.answered(question, with: answer.flatMap(\.self), for: tab)
             }
         )
     }

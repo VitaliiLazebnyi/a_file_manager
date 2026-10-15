@@ -9,7 +9,7 @@ import AppKit
 /// costs the same as one with a hundred. Everything it shows comes from the panel's model;
 /// clicks and keys go to the panel, which treats them exactly like those of the Full view.
 /// Main thread only.
-internal final class FileGridView: NSView, NSDraggingSource, NSUserInterfaceValidations {
+internal final class FileGridView: NSView, NSUserInterfaceValidations {
     /// How many of the dragged items carry the picture of the cell.
     internal static let imagedDragItems = 8
 
@@ -18,7 +18,7 @@ internal final class FileGridView: NSView, NSDraggingSource, NSUserInterfaceVali
     /// Where the cells are, as last laid out.
     internal private(set) var geometry = GridGeometry(
         flow: .columns,
-        count: 0,
+        cellCount: 0,
         cell: CGSize(width: 100, height: 20),
         viewport: .zero
     )
@@ -88,12 +88,12 @@ internal final class FileGridView: NSView, NSDraggingSource, NSUserInterfaceVali
         case .rows:
             cell = CGSize(width: tileSide + 20, height: tileSide + 40)
         }
-        let geometry = GridGeometry(flow: flow, count: model.rowCount, cell: cell, viewport: viewport)
-        guard geometry != self.geometry || frame.size != geometry.contentSize else {
+        let laidOut = GridGeometry(flow: flow, cellCount: model.rowCount, cell: cell, viewport: viewport)
+        guard laidOut != geometry || frame.size != laidOut.contentSize else {
             return
         }
-        self.geometry = geometry
-        setFrameSize(geometry.contentSize)
+        geometry = laidOut
+        setFrameSize(laidOut.contentSize)
         needsDisplay = true
     }
 
@@ -119,7 +119,7 @@ internal final class FileGridView: NSView, NSDraggingSource, NSUserInterfaceVali
 
     /// Scrolls the list so that `row` is on screen.
     internal func scrollRowToVisible(_ row: Int) {
-        guard row >= 0, row < geometry.count else {
+        guard row >= 0, row < geometry.cellCount else {
             return
         }
         scrollToVisible(geometry.frame(of: row))
@@ -127,7 +127,7 @@ internal final class FileGridView: NSView, NSDraggingSource, NSUserInterfaceVali
 
     /// Draws the cell of `row` again.
     internal func redraw(row: Int) {
-        guard row >= 0, row < geometry.count else {
+        guard row >= 0, row < geometry.cellCount else {
             return
         }
         setNeedsDisplay(geometry.frame(of: row))
@@ -257,22 +257,7 @@ internal final class FileGridView: NSView, NSDraggingSource, NSUserInterfaceVali
             return
         }
         self.pressed = nil
-        // The cell is drawn into an image once; only the first few items carry it (a drag of
-        // thousands of items shows a handful), the others are dragged without a picture. A drag
-        // of very many items is one item on the pasteboard (`PanelDrop.beginDrag`).
-        let frame = geometry.frame(of: pressed.row)
-        let image = dragImage(ofRow: pressed.row)
-        let items = panel.draggingItems(forRow: pressed.row).enumerated()
-            .map { index, pasteboardItem -> NSDraggingItem in
-                let dragged = NSDraggingItem(pasteboardWriter: pasteboardItem)
-                dragged.setDraggingFrame(frame, contents: index < Self.imagedDragItems ? image : nil)
-                return dragged
-            }
-        guard !items.isEmpty else {
-            return
-        }
-        let session = beginDraggingSession(with: items, event: event, source: self)
-        PanelDrop.offerFileNames(on: session.draggingPasteboard)
+        startDrag(ofRow: pressed.row, for: panel, with: event)
     }
 
     /// The button is up: a second click on the cursor's row that was not dragged renames, once
@@ -300,20 +285,7 @@ internal final class FileGridView: NSView, NSDraggingSource, NSUserInterfaceVali
         return panel?.commands.isEnabled(id) ?? false
     }
 
-    // MARK: Drag and drop
-
-    /// What a drag that starts in the list allows, inside the program and outside.
-    internal func draggingSession(_: NSDraggingSession, sourceOperationMaskFor _: NSDraggingContext)
-        -> NSDragOperation
-    {
-        [.copy, .move, .generic]
-    }
-
-    /// The drag that started here is over, wherever it ended.
-    internal func draggingSession(_: NSDraggingSession, endedAt _: NSPoint, operation _: NSDragOperation) {
-        PanelDrop.endDrag()
-        PanelDrop.endSession(nil)
-    }
+    // MARK: Drops
 
     /// A drag comes over the list: as when it moves over it.
     override internal func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation {
@@ -357,18 +329,6 @@ internal final class FileGridView: NSView, NSDraggingSource, NSUserInterfaceVali
             return nil
         }
         return panel?.thumbnails.image(for: item, side: tileSide, scale: window?.backingScaleFactor ?? 2)
-    }
-
-    /// The cell of `row` as an image, for a drag.
-    private func dragImage(ofRow row: Int) -> NSImage {
-        let frame = geometry.frame(of: row)
-        guard let bitmap = bitmapImageRepForCachingDisplay(in: frame) else {
-            return NSImage(size: frame.size)
-        }
-        cacheDisplay(in: frame, to: bitmap)
-        let image = NSImage(size: frame.size)
-        image.addRepresentation(bitmap)
-        return image
     }
 
     /// The list was resized: the cells are laid out anew.

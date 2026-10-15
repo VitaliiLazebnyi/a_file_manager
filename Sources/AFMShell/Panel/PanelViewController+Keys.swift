@@ -228,7 +228,8 @@ extension PanelViewController {
             return
         }
         guard tab.listedItems.count >= Self.backgroundSortThreshold else {
-            return tab.setComputedSizes(pending.sizes)
+            tab.setComputedSizes(pending.sizes)
+            return
         }
         // A long list is shared with whoever holds it besides the tab (the listing cache,
         // a snapshot), and writing a size into it copies it once: that copy is made in the

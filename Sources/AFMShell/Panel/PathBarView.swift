@@ -96,8 +96,8 @@ internal final class PathBarView: NSView {
         heightAnchor.constraint(equalToConstant: 22).isActive = true
         setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         ejectButton.isBordered = false
-        ejectButton.image = NSImage(systemSymbolName: "eject.fill", accessibilityDescription: "Eject")?
-            .withSymbolConfiguration(.init(pointSize: 11, weight: .semibold))
+        ejectButton.image = NSImage(systemSymbolName: "eject.fill", accessibilityDescription: "Eject")
+            .flatMap { $0.withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 11, weight: .semibold)) }
         ejectButton.imagePosition = .imageOnly
         ejectButton.refusesFirstResponder = true
         ejectButton.target = self
@@ -116,11 +116,11 @@ internal final class PathBarView: NSView {
     ///
     /// The `ancestors` are the folders from the top of the tree down to the one shown, each with
     /// the way it is written; a part is what the writing of a folder adds to that of its parent.
-    /// When the writings do not build on each other
-    /// (a file system with a notation of its own), the path has no clickable parts.
+    /// When the writings do not build on each other (a file system with a notation of its own),
+    /// the path has no clickable parts.
     internal static func segments(of text: String, ancestors: [(location: URL, path: String)]) -> [Segment] {
         let units = Array(text.utf16)
-        var segments: [Segment] = []
+        var parts: [Segment] = []
         var covered = 0
         for ancestor in ancestors {
             let length = ancestor.path.utf16.count
@@ -133,11 +133,11 @@ internal final class PathBarView: NSView {
                 range = NSRange(location: range.location + 1, length: range.length - 1)
             }
             if range.length > 0 {
-                segments.append(Segment(range: range, location: ancestor.location))
+                parts.append(Segment(range: range, location: ancestor.location))
             }
             covered = length
         }
-        return segments
+        return parts
     }
 
     /// Shows a path. `segments` are its clickable parts, in the order of the text.

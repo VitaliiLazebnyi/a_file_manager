@@ -23,7 +23,7 @@ internal struct PanelColoursTests {
     /// text, the switch turns the colours off without losing the list, and the options page
     /// changes both panels.
     @Test
-    internal func namesAreColouredByMarkAndFileType() async throws {
+    internal func namesAreColouredByMarkAndFileType() async {
         let app = await program.start(
             plugins: CorePlugins.make(pasteboard: program.scratch.pasteboard),
             fileSystems: []

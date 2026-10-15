@@ -15,13 +15,13 @@ import Testing
 internal struct PanelReadAheadProgramTests {
     private let program: PanelProgram
 
+    /// The time the cursor has to rest, and a little more.
+    private var rest: TimeInterval { ReadAhead.dwell + 0.3 }
+
     /// The program's folders.
     internal init() throws {
         program = try PanelProgram(rightFile: "one.txt", contents: "old")
     }
-
-    /// The time the cursor has to rest, and a little more.
-    private var rest: TimeInterval { ReadAhead.dwell + 0.3 }
 
     /// A share (not a local volume) with two folders and a file, shown in the left panel of a
     /// window that counts as active.
@@ -54,7 +54,8 @@ internal struct PanelReadAheadProgramTests {
         await PanelWait.pause(rest)
         app.cursor(app.left, on: "file.txt")
         await PanelWait.pause(rest)
-        #expect(memory.listRequests == ["/nas"])
+        // Only the folder shown was read (a change noticed while it was read may read it again).
+        #expect(Set(memory.listRequests) == ["/nas"])
         // On a folder: not at once, but once the cursor has rested there.
         app.cursor(app.left, on: "one")
         await PanelWait.pause(ReadAhead.dwell / 2)
@@ -165,7 +166,13 @@ internal struct PanelReadAheadProgramTests {
         let app = await startOnAShare(delay: 0.8)
         defer { app.stop() }
         let gate = DispatchSemaphore(value: 0)
-        app.kernel.jobs.run(title: "Busy", work: { _ in gate.wait() }, completion: { _ in })
+        app.kernel.jobs.run(
+            title: "Busy",
+            work: { _ in gate.wait() },
+            completion: { _ in
+                // Only that a job runs counts here.
+            }
+        )
         app.cursor(app.left, on: "one")
         await PanelWait.pause(rest)
         #expect(app.kernel.jobs.isBusy && program.memory.listRequests(for: "/nas/one") == 0)
@@ -173,7 +180,13 @@ internal struct PanelReadAheadProgramTests {
         #expect(await PanelWait.until { program.memory.listRequests(for: "/nas/one") == 1 })
         #expect(app.shell.panelCoordinator.readAhead.reading != nil)
         // A job that starts while the folder is read ahead: the answer is not used.
-        app.kernel.jobs.run(title: "Busy", work: { _ in gate.wait() }, completion: { _ in })
+        app.kernel.jobs.run(
+            title: "Busy",
+            work: { _ in gate.wait() },
+            completion: { _ in
+                // Only that a job runs counts here.
+            }
+        )
         #expect(await PanelWait.until { app.shell.panelCoordinator.readAhead.reading == nil } && app.kernel.jobs.isBusy)
         #expect(app.kernel.listingCache.age(of: program.memory.url("/nas/one"), showHidden: false) == nil)
         gate.signal()

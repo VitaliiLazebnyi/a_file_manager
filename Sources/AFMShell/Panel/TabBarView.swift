@@ -37,12 +37,21 @@ internal final class TabBarView: NSView {
         marker.layer?.backgroundColor = NSColor.controlAccentColor.cgColor
         marker.isHidden = true
         addSubview(marker)
-        NSLayoutConstraint.activate([
-            stack.topAnchor.constraint(equalTo: topAnchor),
-            stack.bottomAnchor.constraint(equalTo: bottomAnchor),
-            stack.leadingAnchor.constraint(equalTo: leadingAnchor),
-            stack.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor)
-        ])
+        // The tabs start at the leading edge and take the height; the free space is to their right.
+        NSLayoutConstraint.activate(
+            [NSLayoutConstraint.Attribute.top, .bottom, .leading]
+                .map { edge in
+                    NSLayoutConstraint(
+                        item: stack,
+                        attribute: edge,
+                        relatedBy: .equal,
+                        toItem: self,
+                        attribute: edge,
+                        multiplier: 1,
+                        constant: 0
+                    )
+                } + [stack.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor)]
+        )
     }
 
     /// Not made from an archive.

@@ -16,14 +16,14 @@ internal struct DragSources: Sendable {
     /// The places of `sources`.
     internal init(_ sources: [URL]) {
         isEmpty = sources.isEmpty
-        var places = Set<String>(minimumCapacity: sources.count)
-        var folders = Set<String>()
+        var keys = Set<String>(minimumCapacity: sources.count)
+        var parents = Set<String>()
         for source in sources {
             let key = source.locationKey
-            places.insert(key)
-            folders.insert(Self.parent(of: key) ?? source.deletingLastPathComponent().locationKey)
+            keys.insert(key)
+            parents.insert(Self.parent(of: key) ?? source.deletingLastPathComponent().locationKey)
         }
-        (self.places, self.folders) = (places, folders)
+        (places, folders) = (keys, parents)
     }
 
     /// The key of the folder a location lies in, from its key alone; nil at the top.

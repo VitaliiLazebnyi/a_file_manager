@@ -12,16 +12,10 @@ internal final class TabButton: NSButton {
     private var isDragging = false
 
     /// A double click closes the tab; a single press waits for the release or a drag.
-    ///
-    /// Outside a strip, the button is an ordinary button.
     override internal func mouseDown(with event: NSEvent) {
-        guard let bar else {
-            super.mouseDown(with: event)
-            return
-        }
         guard event.clickCount != 2 else {
             pressedAt = nil
-            bar.onClose?(tag)
+            bar?.onClose?(tag)
             return
         }
         pressedAt = event.locationInWindow.x
@@ -30,19 +24,19 @@ internal final class TabButton: NSButton {
 
     /// The pressed tab is dragged: the strip shows where it would land.
     override internal func mouseDragged(with event: NSEvent) {
-        guard let bar, let pressedAt else {
+        guard let pressedAt else {
             return
         }
-        _ = bar.follow(event, pressing: tag, from: pressedAt, dragging: &isDragging)
+        _ = bar?.follow(event, pressing: tag, from: pressedAt, dragging: &isDragging)
     }
 
     /// The tab is let go: it is shown, or moved where it was dragged.
     override internal func mouseUp(with event: NSEvent) {
-        guard let bar, let pressedAt else {
+        guard let pressedAt else {
             return
         }
         self.pressedAt = nil
-        _ = bar.follow(event, pressing: tag, from: pressedAt, dragging: &isDragging)
+        _ = bar?.follow(event, pressing: tag, from: pressedAt, dragging: &isDragging)
     }
 
     /// A middle click closes the tab.

@@ -29,7 +29,7 @@ internal final class PanelDragPayload: NSObject, NSPasteboardItemDataProvider, @
     /// The ticket of the drag, which the first pasteboard item carries.
     internal let token = UUID().uuidString
     /// How many items are dragged.
-    internal let count: Int
+    internal let itemCount: Int
     /// The files are handed out on demand, all through the first pasteboard item.
     internal let isWrittenLazily: Bool
     private var gathered: Gathered?
@@ -55,14 +55,14 @@ internal final class PanelDragPayload: NSObject, NSPasteboardItemDataProvider, @
 
     /// A drag of these items, a few or many.
     internal init(items: [FileItem]) {
-        count = items.count
+        itemCount = items.count
         isWrittenLazily = items.count > PanelDrop.itemsWrittenSingly
         gathered = Gathered(items)
     }
 
     /// The marked items of a panel, as `marks` has them; they are many.
     internal init(marked marks: PanelModel.Operands) {
-        count = marks.markedCount
+        itemCount = marks.markedCount
         isWrittenLazily = true
         self.marks = marks
         super.init()
@@ -85,7 +85,7 @@ internal final class PanelDragPayload: NSObject, NSPasteboardItemDataProvider, @
     /// Another program asks for a file: the first one of the local disks.
     ///
     /// AppKit asks on the main thread.
-    internal nonisolated func pasteboard(
+    nonisolated internal func pasteboard(
         _: NSPasteboard?,
         item: NSPasteboardItem,
         provideDataForType type: NSPasteboard.PasteboardType
@@ -116,9 +116,9 @@ internal final class PanelDragPayload: NSObject, NSPasteboardItemDataProvider, @
         }
         gathered = result
         marks = nil
-        let waiting = waiting
-        self.waiting = []
-        for receiver in waiting {
+        let receivers = waiting
+        waiting = []
+        for receiver in receivers {
             receiver(result.locations)
         }
     }

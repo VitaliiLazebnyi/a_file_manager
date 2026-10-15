@@ -85,8 +85,14 @@ final class PanelCoordinator: PanelSet, PanelHost {
 
     private func loadInitially(_ panel: PanelViewController, candidates: [URL]) {
         guard let first = candidates.first else { return }
-        panel.load(first, in: panel.model, focus: nil, history: .keep, reportFailure: false) {
-            [weak self, weak panel] succeeded in
+        let request = PanelReadingRun.Request(
+            location: first,
+            tab: panel.model,
+            focus: nil,
+            history: .keep,
+            reportsFailure: false
+        )
+        panel.load(request) { [weak self, weak panel] succeeded in
             // Not when the reading was overtaken by one the user started: that one decides.
             if let panel, !succeeded, !panel.isLoading, !panel.model.isListed {
                 self?.loadInitially(panel, candidates: Array(candidates.dropFirst()))
@@ -282,7 +288,9 @@ final class PanelCoordinator: PanelSet, PanelHost {
         // The background takes nothing along that belongs to the main thread, only two weak
         // references for the file system's callback.
         Background.storage(
-            "watch", at: directory, qos: .utility,
+            "watch",
+            at: directory,
+            qos: .utility,
             work: { [weak self, weak watch] () -> (any WatchToken)? in
                 provider.watch([directory]) { [weak self, weak watch] changed in
                     // Main thread, as the file system promises.
@@ -304,7 +312,8 @@ final class PanelCoordinator: PanelSet, PanelHost {
                 if ProcessInfo.processInfo.systemUptime - began > Self.slowWatch {
                     reloadChangedPanels(showing: [directory])
                 }
-            })
+            }
+        )
     }
 
     /// The number of folders watched or being set up, for checks.
@@ -399,7 +408,8 @@ final class PlacesStore {
                         // Delivered on the main queue.
                         MainActor.assumeIsolated { self?.refresh() }
                     }
-                ))
+                )
+            )
         }
         let center = NotificationCenter.default
         observers.append(
@@ -408,7 +418,8 @@ final class PlacesStore {
                 center.addObserver(forName: Self.placesDidChange, object: nil, queue: .main) { [weak self] _ in
                     MainActor.assumeIsolated { self?.refresh() }
                 }
-            ))
+            )
+        )
         refresh()
     }
 
@@ -438,7 +449,9 @@ final class PlacesStore {
         // On one of the kernel's threads for calls that block; one question per file system
         // is out at a time, whoever asks.
         BlockingCalls.answer(
-            from: provider as AnyObject, to: "places", { _ in provider.places() },
+            from: provider as AnyObject,
+            to: "places",
+            { _ in provider.places() },
             then: { [weak self] (answer: [Place]?) in
                 guard let self else { return }
                 let places = answer ?? []
@@ -452,7 +465,8 @@ final class PlacesStore {
                     handlers.forEach { $0() }
                 }
                 if askAgain.remove(index) != nil { ask(index) }
-            })
+            }
+        )
     }
 
     private static func areSame(_ first: [Place], _ second: [Place]) -> Bool {

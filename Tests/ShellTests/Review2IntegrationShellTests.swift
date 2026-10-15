@@ -32,7 +32,7 @@ extension Application {
         let count = PanelViewController.backgroundSortThreshold + 500
         let app = await startWithALongRememberedFolder(count)
         defer { app.stop() }
-        #expect(remembered(app, "/long")?.count == count)
+        #expect(remembered(app, "/long")?.items.count == count)
         // From now on the server does not answer until the test lets it; meanwhile the folder changes there.
         memory.stallsListings = true
         memory.stalledPaths = ["/long"]

@@ -46,7 +46,7 @@ internal struct PanelViewsTests {
         #expect(program.press(app, 122, .control) && app.left.viewMode == .brief && app.commands.isChecked(.viewBrief))
         #expect(app.left.showsGrid && app.left.tableView.enclosingScrollView?.isHidden == true)
         #expect(app.left.gridView.enclosingScrollView?.isHidden == false)
-        #expect(app.left.gridView.geometry.flow == .columns && app.left.gridView.geometry.count == 4)
+        #expect(app.left.gridView.geometry.flow == .columns && app.left.gridView.geometry.cellCount == 4)
         #expect(
             app.right.viewMode == .full && program.settings.value(PanelViewState.self, forKey: "left.view")?.mode == 1
         )
@@ -61,7 +61,7 @@ internal struct PanelViewsTests {
         defer { again.stop() }
         #expect(
             again.left.viewMode == .thumbnails && again.right.viewMode == .full
-                && again.left.gridView.geometry.count == 4
+                && again.left.gridView.geometry.cellCount == 4
         )
         #expect(again.commands.isChecked(.viewThumbnails))
         // Ctrl+F2 (key code 120) brings the table back, with the list in it.
@@ -72,23 +72,29 @@ internal struct PanelViewsTests {
         #expect(again.left.tableView.selectedRow == again.left.model.cursor)
     }
 
-    /// In the Brief view the arrows step through the grid, the other keys are those of the Full
-    /// view, letters find a file, clicks mark, and the status line describes the cursor's item.
-    @Test
-    internal func cursorMarkingAndKeysWorkInTheBriefView() async throws {
+    /// A folder of 90 files, `f00.txt` to `f89.txt`, shown in the Brief view of the left panel.
+    private func startInBrief() async throws -> PanelProgram.Running {
         for index in 0..<90 {
             try program.box.file(String(format: "A/many/f%02d.txt", index))
         }
         let app = await start()
-        defer { app.stop() }
         app.left.show(program.box.url("A/many"))
         await program.settle(app)
         app.commands.perform(.viewBrief, .nothing)
         app.layOut()
+        return app
+    }
+
+    /// In the Brief view the arrows step through the grid, the other keys are those of the Full
+    /// view, and letters find a file.
+    @Test
+    internal func theKeysWorkInTheBriefView() async throws {
+        let app = try await startInBrief()
+        defer { app.stop() }
         let grid = app.left.gridView
         let perColumn = grid.geometry.perLine
         #expect(
-            grid.geometry.count == 91 && perColumn > 5 && perColumn < 91
+            grid.geometry.cellCount == 91 && perColumn > 5 && perColumn < 91
                 && grid.frame.width >= grid.geometry.cell.width * 2
         )
         // → and ← step a column; ↓ and ↑, which are bound to nothing, a row.
@@ -115,6 +121,14 @@ internal struct PanelViewsTests {
         grid.keyDown(with: PanelProgram.key(18, "1", []))
         grid.keyDown(with: PanelProgram.key(23, "5", []))
         #expect(app.left.model.cursorItem?.name == "f15.txt")
+    }
+
+    /// In the Brief view clicks mark, the status line describes the cursor's item, and the editor,
+    /// the context menu and Enter are those of the Full view.
+    @Test
+    internal func clicksAndTheStatusLineWorkInTheBriefView() async throws {
+        let app = try await startInBrief()
+        defer { app.stop() }
         // Clicks: Cmd toggles, Shift marks the range from the cursor.
         #expect(app.left.handleClick(row: 20, modifiers: .command) && app.left.model.selection.contains("f19.txt"))
         #expect(app.left.model.cursor == 20)
@@ -137,7 +151,7 @@ internal struct PanelViewsTests {
         app.left.model.moveCursor(to: 0)
         #expect(program.press(app, 36, []))
         await program.settle(app)
-        #expect(app.left.model.directory.lastPathComponent == "A" && app.left.gridView.geometry.count == 5)
+        #expect(app.left.model.directory.lastPathComponent == "A" && app.left.gridView.geometry.cellCount == 5)
     }
 
     /// Pictures are made in the background for local files only, and given up with the folder.
@@ -163,7 +177,7 @@ internal struct PanelViewsTests {
         #expect(source.cancelled == ["two.txt"] && app.left.thumbnails.running.isEmpty)
         // Items of other file systems show the icon of their type and ask for nothing.
         draw(app.left.gridView)
-        #expect(source.requested.count == 2 && app.left.gridView.geometry.count == 2)
+        #expect(source.requested.count == 2 && app.left.gridView.geometry.cellCount == 2)
     }
 
     /// A folder of 40,000 entries costs the main thread little in every view.
@@ -187,7 +201,7 @@ internal struct PanelViewsTests {
             draw(app.left.gridView)
             app.left.model.toggleSelection(row: 39_000)
             #expect(Double(clock_gettime_nsec_np(CLOCK_THREAD_CPUTIME_ID) - started) / 1e9 < 1.5)
-            #expect(app.left.gridView.geometry.flow == flow && app.left.gridView.geometry.count == 40_001)
+            #expect(app.left.gridView.geometry.flow == flow && app.left.gridView.geometry.cellCount == 40_001)
             #expect(app.left.gridView.visibleRows.contains(39_000) && app.left.gridView.visibleRows.count < 2_000)
         }
     }

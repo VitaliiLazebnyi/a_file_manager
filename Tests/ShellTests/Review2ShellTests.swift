@@ -124,7 +124,13 @@ internal struct Review2ShellTests {
             release.signal()
             app.stop()
         }
-        app.kernel.jobs.run(title: "Stuck", work: { _ in release.wait() }, completion: { _ in })
+        app.kernel.jobs.run(
+            title: "Stuck",
+            work: { _ in release.wait() },
+            completion: { _ in
+                // The test looks at the quitting, not at the job's end.
+            }
+        )
         program.interaction.choiceAnswers = [1, 0]
         var replies: [Bool] = []
         app.shell.stopJobsToQuit(patience: 0.05) { replies.append($0) }

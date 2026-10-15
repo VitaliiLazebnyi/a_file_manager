@@ -14,14 +14,18 @@ internal struct PanelTabBarTests {
         var events: [String] = []
 
         func attach(to bar: TabBarView) {
-            bar.onSelect = { [unowned self] in events.append("select \($0)") }
-            bar.onClose = { [unowned self] in events.append("close \($0)") }
-            bar.onMove = { [unowned self] in events.append("move \($0) \($1)") }
-            bar.onNewTab = { [unowned self] in events.append("new") }
-            bar.menuProvider = { [unowned self] index in
-                events.append("menu \(index)")
+            bar.onSelect = { [weak self] in self?.events.append("select \($0)") }
+            bar.onClose = { [weak self] in self?.events.append("close \($0)") }
+            bar.onMove = { [weak self] in self?.events.append("move \($0) \($1)") }
+            bar.onNewTab = { [weak self] in self?.events.append("new") }
+            bar.menuProvider = { [weak self] index in
+                self?.events.append("menu \(index)")
                 return NSMenu()
             }
+        }
+
+        deinit {
+            // Nothing to release.
         }
     }
 
@@ -40,12 +44,14 @@ internal struct PanelTabBarTests {
         return (bar, window)
     }
 
-    /// A mouse event at `x` of the window.
-    private func mouse(_ type: NSEvent.EventType, at x: CGFloat, clicks: Int, in window: NSWindow) throws -> NSEvent {
+    /// A mouse event at `position` across the window.
+    private func mouse(_ type: NSEvent.EventType, at position: CGFloat, clicks: Int, in window: NSWindow) throws
+        -> NSEvent
+    {
         try #require(
             NSEvent.mouseEvent(
                 with: type,
-                location: NSPoint(x: x, y: 10),
+                location: NSPoint(x: position, y: 10),
                 modifierFlags: [],
                 timestamp: 0,
                 windowNumber: window.windowNumber,
@@ -100,61 +106,32 @@ internal struct PanelTabBarTests {
         let (bar, window) = strip()
         let record = Record()
         record.attach(to: bar)
-        let frames = buttons(of: bar).map { bar.convert($0.bounds, from: $0) }
-        let start = frames[0].midX
-        var dragging = false
-        #expect(
-            bar.follow(
-                try mouse(.leftMouseUp, at: start, clicks: 1, in: window),
-                pressing: 0,
-                from: start,
-                dragging: &dragging
-            )
-        )
-        #expect(record.events == ["select 0"] && !dragging)
+        let tabs = buttons(of: bar)
+        let middles = tabs.map { bar.convert($0.bounds, from: $0).midX }
+        let frames = tabs.map { bar.convert($0.bounds, from: $0) }
+        func event(_ type: NSEvent.EventType, _ position: CGFloat) throws -> NSEvent {
+            try mouse(type, at: position, clicks: 1, in: window)
+        }
+        tabs[0].mouseDown(with: try event(.leftMouseDown, middles[0]))
+        tabs[0].mouseUp(with: try event(.leftMouseUp, middles[0]))
+        #expect(record.events == ["select 0"])
         // Dragged past the middle of the last tab: the marker shows the place, the release moves.
-        #expect(
-            !bar.follow(
-                try mouse(.leftMouseDragged, at: frames[2].midX + 5, clicks: 1, in: window),
-                pressing: 0,
-                from: start,
-                dragging: &dragging
-            )
-        )
-        #expect(dragging && !bar.marker.isHidden && bar.marker.frame.minX == frames[2].maxX)
-        #expect(
-            bar.follow(
-                try mouse(.leftMouseUp, at: frames[2].midX + 5, clicks: 1, in: window),
-                pressing: 0,
-                from: start,
-                dragging: &dragging
-            )
-        )
+        tabs[0].mouseDown(with: try event(.leftMouseDown, middles[0]))
+        tabs[0].mouseDragged(with: try event(.leftMouseDragged, middles[2] + 5))
+        #expect(!bar.marker.isHidden && bar.marker.frame.minX == frames[2].maxX)
+        tabs[0].mouseUp(with: try event(.leftMouseUp, middles[2] + 5))
         #expect(record.events == ["select 0", "move 0 2"] && bar.marker.isHidden)
         // Dragged and brought back: nothing moves.
-        dragging = false
-        let last = frames[2].midX
-        _ = bar.follow(
-            try mouse(.leftMouseDragged, at: frames[0].midX - 10, clicks: 1, in: window),
-            pressing: 2,
-            from: last,
-            dragging: &dragging
-        )
+        tabs[2].mouseDown(with: try event(.leftMouseDown, middles[2]))
+        tabs[2].mouseDragged(with: try event(.leftMouseDragged, middles[0] - 10))
         #expect(!bar.marker.isHidden && bar.marker.frame.minX == frames[0].minX - 2)
-        _ = bar.follow(
-            try mouse(.leftMouseDragged, at: last, clicks: 1, in: window),
-            pressing: 2,
-            from: last,
-            dragging: &dragging
-        )
+        tabs[2].mouseDragged(with: try event(.leftMouseDragged, middles[2]))
         #expect(bar.marker.isHidden)
-        _ = bar.follow(
-            try mouse(.leftMouseUp, at: last, clicks: 1, in: window),
-            pressing: 2,
-            from: last,
-            dragging: &dragging
-        )
-        #expect(record.events == ["select 0", "move 0 2"])
+        tabs[2].mouseUp(with: try event(.leftMouseUp, middles[2]))
+        // Without a press, moving and letting go do nothing.
+        tabs[1].mouseDragged(with: try event(.leftMouseDragged, middles[0]))
+        tabs[1].mouseUp(with: try event(.leftMouseUp, middles[0]))
+        #expect(record.events == ["select 0", "move 0 2"] && bar.marker.isHidden)
     }
 
     /// The buttons follow the mouse themselves; a double or middle click closes a tab, a right

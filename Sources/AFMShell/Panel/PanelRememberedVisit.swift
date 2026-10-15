@@ -37,6 +37,9 @@ internal final class PanelRememberedVisit {
 
     /// Whether this is still the tab's reading.
     private var isCurrent: Bool { panel?.loads[id] === load }
+    /// Whether the remembered listing may still be shown: the reading is the tab's, has not ended
+    /// and the fresh listing has not come.
+    private var isStillWanted: Bool { isCurrent && !hasEnded && !freshHasCome }
 
     /// A visit for `request` of `panel`, which is `load` of the tab; a failure takes the tab
     /// back to `before`, with the quick filter `quickBefore`.
@@ -69,12 +72,16 @@ internal final class PanelRememberedVisit {
         // Should this very folder be on its way already (read ahead), that reading is the fresh one.
         let joined = panel.host?.panel(panel, joinReadingOf: request.location, showHidden: tab.showHidden)
         // Where a failure leads back to: not an empty folder some reading entered and gave up on.
-        let id = ObjectIdentifier(tab)
-        let entered = tab.isOpening ? panel.openedFrom[id] : nil
-        let quickBefore = entered != nil ? panel.openedFromFilter[id] : panel.quickFilters[id]
-        let before = entered ?? tab.snapshot()
-        let load = panel.beginLoad(for: tab, movingTo: request.location, quiet: false, completion: completion)
-        let visit = PanelRememberedVisit(request, of: panel, load: load, before: before, quickBefore: quickBefore)
+        let tabID = ObjectIdentifier(tab)
+        let entered = tab.isOpening ? panel.openedFrom[tabID] : nil
+        let filterBefore = entered != nil ? panel.openedFromFilter[tabID] : panel.quickFilters[tabID]
+        let visit = PanelRememberedVisit(
+            request,
+            of: panel,
+            load: panel.beginLoad(for: tab, movingTo: request.location, quiet: false, completion: completion),
+            before: entered ?? tab.snapshot(),
+            quickBefore: filterBefore
+        )
         if let joined {
             panel.leave(joined, whenOvertaken: visit.load)
         }
@@ -93,9 +100,9 @@ internal final class PanelRememberedVisit {
             present(entry)
             return
         }
-        let (cache, location, showHidden) = (cache, request.location, request.tab.showHidden)
+        let (location, showHidden) = (request.location, request.tab.showHidden)
         Background.compute(
-            work: { cache.entry(for: location, showHidden: showHidden, sortedBy: order) },
+            work: { [cache] in cache.entry(for: location, showHidden: showHidden, sortedBy: order) },
             then: { [self] entry in
                 if let entry {
                     present(entry)
@@ -106,7 +113,7 @@ internal final class PanelRememberedVisit {
 
     /// Shows the remembered listing, unless the fresh one got there first or the reading ended.
     private func present(_ entry: ListingCache.Entry) {
-        guard let panel, !hasEnded, !freshHasCome, isCurrent else {
+        guard let panel, isStillWanted else {
             return
         }
         let tab = request.tab
@@ -131,9 +138,15 @@ internal final class PanelRememberedVisit {
         let change = PanelListChange(
             of: tab,
             count: listing.items.count,
-            while: { [weak self] in self.map { $0.isCurrent && !$0.hasEnded && !$0.freshHasCome } ?? false },
-            by: {
-                PanelModel.prepare($0, showRemembered: listing, focus: focus, history: history, presorted: entry.order)
+            while: { [weak self] in self?.isStillWanted ?? false },
+            by: { basis in
+                PanelModel.prepare(
+                    basis,
+                    showRemembered: listing,
+                    focus: focus,
+                    history: history,
+                    presorted: entry.order
+                )
             }
         )
         panel.apply(change) { [self] outcome in
@@ -245,8 +258,14 @@ internal final class PanelRememberedVisit {
                 of: tab,
                 bringing: whole.listing.items,
                 while: { [weak self] in self?.isCurrent ?? false },
-                by: {
-                    PanelModel.prepare($0, show: whole.listing, focus: focus, history: history, presorted: whole.order)
+                by: { basis in
+                    PanelModel.prepare(
+                        basis,
+                        show: whole.listing,
+                        focus: focus,
+                        history: history,
+                        presorted: whole.order
+                    )
                 }
             )
             panel.apply(change) { [self] outcome in
@@ -275,7 +294,7 @@ internal final class PanelRememberedVisit {
         // The folder the tab is back in was itself still arriving when it was left (and is
         // read again once; that reading does not come back here).
         if tab.isListed, !tab.isComplete {
-            panel.reload(tab, focus: nil, quietly: false, markDirty: true, changedAt: nil, completion: nil)
+            panel.reload(tab, focus: nil, as: .loud, completion: nil)
         }
     }
 

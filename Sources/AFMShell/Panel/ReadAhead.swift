@@ -28,6 +28,9 @@ import Foundation
 /// back on the main thread.
 @MainActor
 internal final class ReadAhead {
+    /// What a reading brings: the folder read to its end, or why it could not be read.
+    internal typealias Outcome = Result<PanelLoading.Whole, any Error>
+
     /// A folder to read, the way the panel would read it.
     internal struct Target: Equatable, Sendable {
         /// The folder.
@@ -52,9 +55,6 @@ internal final class ReadAhead {
         /// A reading nobody waits for and the cursor does not rest on is told to stop.
         internal let leave: @MainActor () -> Void
     }
-
-    /// What a reading brings: the folder read to its end, or why it could not be read.
-    internal typealias Outcome = Result<PanelLoading.Whole, any Error>
 
     /// How long the cursor has to rest on a folder before it is read.
     internal static let dwell: TimeInterval = 0.4
@@ -95,6 +95,27 @@ internal final class ReadAhead {
     internal init(fileSystems: FileSystemRegistry, cache: ListingCache) {
         self.fileSystems = fileSystems
         self.cache = cache
+    }
+
+    /// Reads for `reading`, on its background thread; nil for a reading that was cancelled or
+    /// given up.
+    nonisolated private static func read(_ source: PanelLoading.Source, for reading: ReadAheadReading, limit: Int)
+        -> Outcome?
+    {
+        do {
+            return
+                try PanelLoading.readWhole(
+                    source,
+                    order: reading.target.order,
+                    climbing: false,
+                    cancellation: reading.cancellation
+                ) { reading.progress($0, limit: limit) }
+                .map { .success($0) }
+        } catch {
+            // A file system may end a reading that was told to stop with an error: that is
+            // no failure of the folder.
+            return reading.cancellation.isCancelled ? nil : .failure(error)
+        }
     }
 
     /// Tells where the cursor rests now: a folder that may be read ahead, or nil for anything else
@@ -184,9 +205,8 @@ internal final class ReadAhead {
 
     /// Starts the time the cursor has to rest before its folder is read.
     private func startDwell() {
-        let rest = rest
-        MainLoop.after(Self.dwell) { [weak self] in
-            guard let self, self.rest == rest else {
+        MainLoop.after(Self.dwell) { [weak self, dwelling = rest] in
+            guard let self, rest == dwelling else {
                 return
             }
             dwellEnded()
@@ -221,20 +241,20 @@ internal final class ReadAhead {
 
     /// Leaves a folder alone for a while.
     private func pause(_ location: URL, for time: TimeInterval) {
-        let now = now
+        let moment = now
         if pauses.count >= Self.pauseLimit {
-            pauses = pauses.filter { $0.value > now }
+            pauses = pauses.filter { $0.value > moment }
             if pauses.count >= Self.pauseLimit {
                 pauses = [:]
             }
         }
-        pauses[location.locationKey] = now + time
+        pauses[location.locationKey] = moment + time
     }
 
     /// Reads `target` in the background.
     private func start(_ target: Target) {
-        let reading = ReadAheadReading(target: target)
-        self.reading = reading
+        let started = ReadAheadReading(target: target)
+        reading = started
         let source = PanelLoading.Source(
             location: target.location,
             showHidden: target.showHidden,
@@ -244,31 +264,10 @@ internal final class ReadAhead {
         let limit = cache.limits.maxEntries
         Background.storage("ahead", at: target.location, qos: .utility) { [weak self] in
             // Background thread: reads, sorts and stores; touches nothing of this object.
-            reading.began()
-            let outcome = Self.read(source, for: reading, limit: limit)
-            reading.finished()
-            MainLoop.perform { [weak self, outcome] in self?.ended(reading, outcome) }
-        }
-    }
-
-    /// Reads for `reading`, on its background thread; nil for a reading that was cancelled or
-    /// given up.
-    private nonisolated static func read(_ source: PanelLoading.Source, for reading: ReadAheadReading, limit: Int)
-        -> Outcome?
-    {
-        do {
-            return
-                try PanelLoading.readWhole(
-                    source,
-                    order: reading.target.order,
-                    climbing: false,
-                    cancellation: reading.cancellation
-                ) { reading.progress($0, limit: limit) }
-                .map { .success($0) }
-        } catch {
-            // A file system may end a reading that was told to stop with an error: that is
-            // no failure of the folder.
-            return reading.cancellation.isCancelled ? nil : .failure(error)
+            started.began()
+            let outcome = Self.read(source, for: started, limit: limit)
+            started.finished()
+            MainLoop.perform { [weak self, outcome] in self?.ended(started, outcome) }
         }
     }
 

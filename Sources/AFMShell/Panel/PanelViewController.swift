@@ -40,7 +40,7 @@ internal final class PanelViewController: NSViewController, PanelHandle, PanelOv
 {
     /// Lists from this length on are put in a new order, filtered and compared in the
     /// background (as with the sort commands).
-    internal nonisolated static let backgroundSortThreshold = 20_000
+    nonisolated internal static let backgroundSortThreshold = 20_000
     /// The least time between the end of one reading of a folder and the start of a quiet
     /// re-reading; twice the cost of the last reading when that is more.
     internal static let minimumRereadInterval: TimeInterval = 0.5

@@ -29,20 +29,20 @@ internal struct ColorRule {
     internal init?(maskText: String, colorText: String) {
         self.maskText = maskText
         self.colorText = colorText
-        guard let color = Self.color(named: self.colorText) else {
+        guard let named = Self.color(named: colorText) else {
             return nil
         }
-        self.color = color
-        mask = FileMask(self.maskText)
+        color = named
+        mask = FileMask(maskText)
     }
 
     /// A colour by name (`purple`) or as `#RRGGBB`; nil when the text is neither.
     internal static func color(named text: String) -> NSColor? {
-        let text = text.trimmingCharacters(in: .whitespaces).lowercased()
-        if let named = namedColors.first(where: { $0.name == text }) {
+        let name = text.trimmingCharacters(in: .whitespaces).lowercased()
+        if let named = namedColors.first(where: { $0.name == name }) {
             return named.color
         }
-        guard text.hasPrefix("#"), text.count == 7, let value = UInt32(text.dropFirst(), radix: 16) else {
+        guard name.hasPrefix("#"), name.count == 7, let value = UInt32(name.dropFirst(), radix: 16) else {
             return nil
         }
         return NSColor(
@@ -58,17 +58,18 @@ internal struct ColorRule {
     /// An entry that cannot be read is left out, and so is one whose mask starts with `-`, which is
     /// how an entry is switched off without deleting it.
     internal static func parse(_ text: String) -> [Self] {
-        text.replacingOccurrences(of: ";;", with: "\n").split(separator: "\n")
+        text.replacingOccurrences(of: ";;", with: "\n")
+            .split(separator: "\n")
             .compactMap { line in
                 guard let equals = line.lastIndex(of: "=") else {
                     return nil
                 }
-                let mask = line[..<equals].trimmingCharacters(in: .whitespaces)
-                let colorText = line[line.index(after: equals)...].trimmingCharacters(in: .whitespaces)
-                guard !mask.isEmpty, !mask.hasPrefix("-") else {
+                let masks = line[..<equals].trimmingCharacters(in: .whitespaces)
+                let colour = line[line.index(after: equals)...].trimmingCharacters(in: .whitespaces)
+                guard !masks.isEmpty, !masks.hasPrefix("-") else {
                     return nil
                 }
-                return Self(maskText: mask, colorText: colorText)
+                return Self(maskText: masks, colorText: colour)
             }
     }
 

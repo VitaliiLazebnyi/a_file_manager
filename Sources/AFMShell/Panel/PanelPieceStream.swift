@@ -73,8 +73,7 @@ internal final class PanelPieceStream {
                 since: ticket
             )
         }
-        let receivers = receivers
-        MainLoop.perform { [failure] in receivers.take()?.onEnd(failure) }
+        MainLoop.perform { [receivers, failure] in receivers.take()?.onEnd(failure) }
     }
 
     /// A batch has arrived: a piece goes out when the pause since the last one is over.
@@ -123,8 +122,7 @@ internal final class PanelPieceStream {
         interval = sentFirst ? interval * PanelLoading.intervalGrowth : PanelLoading.secondPieceInterval
         sentFirst = true
         lastSent = Date()
-        let (receivers, cancellation) = (receivers, cancellation)
-        MainLoop.perform {
+        MainLoop.perform { [receivers, cancellation] in
             if !cancellation.isCancelled {
                 receivers.held?.onPiece(piece)
             }

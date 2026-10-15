@@ -15,7 +15,7 @@ internal enum PanelDrop {
     internal static let itemType = NSPasteboard.PasteboardType("afm.panel-item")
     /// The paths of files as a list, the way programs took files before there were file URLs;
     /// the one form in which a single pasteboard item can name many files.
-    internal nonisolated static let fileNamesType = NSPasteboard.PasteboardType("NSFilenamesPboardType")
+    nonisolated internal static let fileNamesType = NSPasteboard.PasteboardType("NSFilenamesPboardType")
     /// What the lists take when something is dropped on them.
     internal static let acceptedTypes: [NSPasteboard.PasteboardType] = [itemType, .fileURL]
     /// Up to this many dragged items each get a pasteboard item of their own, which is what other
@@ -23,7 +23,7 @@ internal enum PanelDrop {
     ///
     /// A larger drag (making a hundred thousand pasteboard items takes a third of a second and
     /// more) travels as one item that hands out its files only when a program asks for them.
-    internal nonisolated static let itemsWrittenSingly = 2_000
+    nonisolated internal static let itemsWrittenSingly = 2_000
 
     /// The drag of this program that is under way, from its start to its end.
     internal private(set) static var current: PanelDragPayload?
@@ -37,7 +37,7 @@ internal enum PanelDrop {
     /// item, on demand (and, once the items are on the drag's pasteboard, as a list:
     /// `offerFileNames`). Nothing for an empty drag.
     internal static func beginDrag(_ payload: PanelDragPayload) -> [NSPasteboardItem] {
-        guard payload.count > 0 else {
+        guard payload.itemCount > 0 else {
             return []
         }
         current = payload
@@ -101,18 +101,18 @@ internal enum PanelDrop {
         if let session, session.sequence == info.draggingSequenceNumber {
             return session
         }
-        let session: DropSession
+        let read: DropSession
         if let own = ownPayload(on: info.draggingPasteboard) {
             // The program's own drag may still be putting its items together.
-            session = DropSession(sequence: info.draggingSequenceNumber, payload: own)
+            read = DropSession(sequence: info.draggingSequenceNumber, payload: own)
         } else {
-            session = DropSession(
+            read = DropSession(
                 sequence: info.draggingSequenceNumber,
                 sources: locations(on: info.draggingPasteboard)
             )
         }
-        self.session = session
-        return session
+        session = read
+        return read
     }
 
     /// Lets go of what was read of the drag `sequence` (of any drag, for nil): it ended, or
@@ -140,18 +140,17 @@ internal enum PanelDrop {
     internal static func kind(modifiers: NSEvent.ModifierFlags, sameVolume: Bool, allowed: NSDragOperation)
         -> TransferKind?
     {
-        let canCopy = allowed.contains(.copy)
         let canMove = allowed.contains(.move) || allowed.contains(.generic)
-        if modifiers.contains(.option) {
-            return canCopy ? .copy : nil
-        }
-        if modifiers.contains(.command) {
-            return canMove ? .move : nil
-        }
-        if sameVolume {
-            return canMove ? .move : (canCopy ? .copy : nil)
-        }
-        return canCopy ? .copy : (canMove ? .move : nil)
+        // What is wanted, the first choice first.
+        let wanted: [TransferKind] =
+            if modifiers.contains(.option) {
+                [.copy]
+            } else if modifiers.contains(.command) {
+                [.move]
+            } else {
+                sameVolume ? [.move, .copy] : [.copy, .move]
+            }
+        return wanted.first { $0 == .move ? canMove : allowed.contains(.copy) }
     }
 
     /// Where the volumes of the local file system are mounted.

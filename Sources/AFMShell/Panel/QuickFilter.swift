@@ -26,8 +26,8 @@ internal struct QuickFilter {
         guard !text.isEmpty else {
             return base
         }
-        let (matches, base) = (Self.matcher(for: text), base)
-        return PanelFilter(title: title) { item in matches(item.name) && (base?.matches(item) ?? true) }
+        let matches = Self.matcher(for: text)
+        return PanelFilter(title: title) { [base] item in matches(item.name) && (base?.matches(item) ?? true) }
     }
 
     /// Whether what is typed now lets through nothing that `old` did not: both are plain ASCII text

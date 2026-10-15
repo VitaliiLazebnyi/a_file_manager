@@ -115,11 +115,13 @@ extension PanelViewController {
                     cell.textField?.isHidden = isHidden
                 }
             }
-            return
+        } else if let column = contentColumn(of: tableColumn), let field = cell.textField {
+            fill(field, of: column, look: look)
         }
-        guard let column = contentColumn(of: tableColumn), let field = cell.textField else {
-            return
-        }
+    }
+
+    /// Makes the label of a plugin's column show its value for the row.
+    private func fill(_ field: NSTextField, of column: ContentColumn, look: RowLook) {
         let alignment: NSTextAlignment = column.alignsRight ? .right : .left
         if field.alignment != alignment {
             field.alignment = alignment

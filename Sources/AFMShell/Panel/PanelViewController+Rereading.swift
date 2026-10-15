@@ -5,33 +5,50 @@ import AppKit
 /// Reading a tab's folder again: when asked, when it was reported changed, and once more for a
 /// change that came while it could not be read (spec 03 › Panel anatomy, "Reading again").
 extension PanelViewController {
+    /// Reads a folder again, on its lane's thread.
+    ///
+    /// A folder that vanished is replaced by its nearest readable parent. The listing is sorted
+    /// here and, like every complete one, handed to the cache; what is remembered of a folder that
+    /// is gone or cannot be read is forgotten.
+    nonisolated private static func reread(
+        _ source: PanelLoading.Source,
+        order: ListOrder,
+        cancellation flag: CancellationFlag
+    ) -> Result<PanelLoading.Whole?, any Error> {
+        guard !flag.isCancelled else {
+            return .success(nil)
+        }
+        let outcome = Result {
+            try PanelLoading.readWhole(source, order: order, climbing: true, cancellation: flag, progress: nil)
+        }
+        let whole = try? outcome.get()
+        if !flag.isCancelled, whole?.listing.directory.isSameLocation(as: source.location) != true {
+            source.cache.forget(source.location)
+        }
+        return outcome
+    }
+
     /// Reads the active tab's folder again (`PanelHandle.reload`); `completion` is called when
     /// it has been read, also when that happens later or is another reading's doing.
     internal func reload(focus: String?, quietly: Bool, completion: (@MainActor () -> Void)?) {
-        reload(model, focus: focus, quietly: quietly, markDirty: true, changedAt: nil, completion: completion)
+        reload(model, focus: focus, as: quietly ? .quiet : .loud, completion: completion)
     }
 
     /// The folder of the active tab was reported changed at `time` (of the system's uptime),
     /// perhaps a while ago: it is read again quietly, unless a reading that began after the
     /// change is under way already.
     internal func reloadForChange(at time: TimeInterval) {
-        reload(model, focus: nil, quietly: true, markDirty: true, changedAt: time, completion: nil)
+        reload(model, focus: nil, as: .change(at: time), completion: nil)
     }
 
-    /// Reads the folder of `tab` again, with the cursor on `focus`.
+    /// Reads the folder of `tab` again, with the cursor on `focus`, the way `reread` says.
     ///
-    /// With `quietly`, nothing is announced or redrawn unless the folder changed. With
-    /// `markDirty`, a quiet reload that is turned away because the tab is being read or renamed,
-    /// or was read a moment ago, is made up for when that is over (the folder may have changed
-    /// since the reading began). `changedAt` is when the change that asks for this was noticed,
-    /// if not now. `completion` is called when the folder has been read, also when that happens
-    /// later or is another reading's doing.
+    /// `completion` is called when the folder has been read, also when that happens later or is
+    /// another reading's doing.
     internal func reload(
         _ tab: PanelModel,
         focus: String?,
-        quietly: Bool,
-        markDirty: Bool,
-        changedAt: TimeInterval?,
+        as reread: PanelReread,
         completion: (@MainActor () -> Void)?
     ) {
         guard !isShutDown else {
@@ -40,19 +57,25 @@ extension PanelViewController {
             }
             return
         }
-        if quietly {
-            guard !putsOffQuietReload(of: tab, markDirty: markDirty, changedAt: changedAt, completion: completion)
-            else {
+        if reread.isQuiet {
+            guard !putsOffQuietReload(of: tab, as: reread, completion: completion) else {
                 return
             }
         } else if putsOffLoudReload(of: tab, completion: completion) {
             return
         }
         guard tab.isListed else {
-            load(tab.directory, in: tab, focus: focus, history: .keep, reportFailure: !quietly) { _ in completion?() }
+            let request = PanelReadingRun.Request(
+                location: tab.directory,
+                tab: tab,
+                focus: focus,
+                history: .keep,
+                reportsFailure: !reread.isQuiet
+            )
+            load(request) { _ in completion?() }
             return
         }
-        let reading = beginLoad(for: tab, movingTo: nil, quiet: quietly) { _ in completion?() }
+        let reading = beginLoad(for: tab, movingTo: nil, quiet: reread.isQuiet) { _ in completion?() }
         let source = source(of: tab.directory, for: tab)
         let (flag, order) = (reading.flag, tab.wantedSort)
         Background.storage(
@@ -94,7 +117,7 @@ extension PanelViewController {
             scheduleReread(of: tab, after: pause)
             return
         }
-        reload(tab, focus: nil, quietly: true, markDirty: true, changedAt: nil, completion: nil)
+        reload(tab, focus: nil, as: .quiet, completion: nil)
     }
 
     /// Abandons every read and calculation in progress, for good: the window goes away.
@@ -144,29 +167,6 @@ extension PanelViewController {
         }
     }
 
-    /// Reads a folder again, on its lane's thread.
-    ///
-    /// A folder that vanished is replaced by its nearest readable parent. The listing is sorted
-    /// here and, like every complete one, handed to the cache; what is remembered of a folder that
-    /// is gone or cannot be read is forgotten.
-    private nonisolated static func reread(
-        _ source: PanelLoading.Source,
-        order: ListOrder,
-        cancellation flag: CancellationFlag
-    ) -> Result<PanelLoading.Whole?, any Error> {
-        guard !flag.isCancelled else {
-            return .success(nil)
-        }
-        let outcome = Result {
-            try PanelLoading.readWhole(source, order: order, climbing: true, cancellation: flag, progress: nil)
-        }
-        let whole = try? outcome.get()
-        if !flag.isCancelled, whole?.listing.directory.isSameLocation(as: source.location) != true {
-            source.cache.forget(source.location)
-        }
-        return outcome
-    }
-
     /// A quiet reload must not disturb a rename in progress, and a directory that is being read
     /// right now is fresh anyway, unless it changed after that reading began; one that was read a
     /// moment ago is read once more when the pause is over, however many changes are reported until
@@ -176,15 +176,15 @@ extension PanelViewController {
     /// reading that makes up for it has ended.
     private func putsOffQuietReload(
         of tab: PanelModel,
-        markDirty: Bool,
-        changedAt: TimeInterval?,
+        as reread: PanelReread,
         completion: (@MainActor () -> Void)?
     ) -> Bool {
         let id = ObjectIdentifier(tab)
         if renameField != nil || loads[id] != nil {
             let isCovered =
-                renameField == nil && (loads[id].map { load in changedAt.map { $0 < load.started } ?? false } ?? false)
-            if markDirty, !isCovered {
+                renameField == nil
+                && (loads[id].map { load in reread.changedAt.map { $0 < load.started } ?? false } ?? false)
+            if reread.marksDirty, !isCovered {
                 noteChange(in: tab)
             }
             // Nothing is going to end that could tell whoever waits.
@@ -198,7 +198,7 @@ extension PanelViewController {
         guard tab.isListed, let pause = waitBeforeQuietRead(of: id) else {
             return false
         }
-        guard markDirty else {
+        guard reread.marksDirty else {
             completion?()
             return true
         }

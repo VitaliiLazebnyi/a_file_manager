@@ -15,7 +15,7 @@ internal struct PanelGridGeometryTests {
     internal func briefFillsColumnsFromTopToBottom() {
         let grid = GridGeometry(
             flow: .columns,
-            count: 23,
+            cellCount: 23,
             cell: CGSize(width: 100, height: 20),
             viewport: CGSize(width: 250, height: 105)
         )
@@ -37,7 +37,7 @@ internal struct PanelGridGeometryTests {
     internal func arrowKeysInBrief() {
         let grid = GridGeometry(
             flow: .columns,
-            count: 23,
+            cellCount: 23,
             cell: CGSize(width: 100, height: 20),
             viewport: CGSize(width: 250, height: 100)
         )
@@ -53,7 +53,7 @@ internal struct PanelGridGeometryTests {
     internal func thumbnailsFillRowsAndScrollVertically() {
         let grid = GridGeometry(
             flow: .rows,
-            count: 10,
+            cellCount: 10,
             cell: CGSize(width: 100, height: 120),
             viewport: CGSize(width: 450, height: 200)
         )
@@ -73,7 +73,7 @@ internal struct PanelGridGeometryTests {
     /// A grid without entries or without room still answers.
     @Test
     internal func anEmptyOrTinyGridDoesNotBreak() {
-        let empty = GridGeometry(flow: .columns, count: 0, cell: CGSize(width: 100, height: 20), viewport: .zero)
+        let empty = GridGeometry(flow: .columns, cellCount: 0, cell: CGSize(width: 100, height: 20), viewport: .zero)
         #expect(empty.perLine == 1 && empty.lines == 0)
         #expect(empty.indexes(in: CGRect(x: 0, y: 0, width: 50, height: 50)).isEmpty)
         #expect(empty.index(from: 0, moving: .rightArrow) == 0 && empty.index(at: .zero) == nil && empty.pageSize == 1)

@@ -36,7 +36,7 @@ internal final class IconStore {
     /// Posted on the main thread; `userInfo[pathsKey]` holds the paths (a `Set<String>`).
     internal static let didArrive = Notification.Name("AFMIconsDidArrive")
     /// The key of the paths in the `userInfo` of `didArrive`.
-    internal nonisolated static let pathsKey = "paths"
+    nonisolated internal static let pathsKey = "paths"
     /// The icons of a few screens.
     internal static let limit = 4_000
     /// Most that wait for one folder; the ones asked for longest ago (rows long out of sight) are dropped.
@@ -94,12 +94,11 @@ internal final class IconStore {
         line.removeLast(count)
         waiting[folder] = line.isEmpty ? nil : line
         busy.insert(folder)
-        let source = source
         Background.storage(
             "icons",
             at: URL(fileURLWithPath: folder, isDirectory: true),
             qos: .utility,
-            work: { batch.map { source($0.path) } },
+            work: { [source] in batch.map { source($0.path) } },
             then: { [weak self] fetched in self?.take(fetched, for: batch, in: folder) }
         )
     }

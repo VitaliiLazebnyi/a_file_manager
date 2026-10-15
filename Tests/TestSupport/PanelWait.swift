@@ -5,6 +5,7 @@ public import Foundation
 ///
 /// `Wait` blocks the calling thread, so it cannot wait for the main thread from the main thread.
 /// These waits suspend the test between looks and leave the main thread free to work meanwhile.
+@preconcurrency
 @MainActor
 public enum PanelWait {
     /// Asks `condition` every couple of milliseconds, with the main thread free in between,

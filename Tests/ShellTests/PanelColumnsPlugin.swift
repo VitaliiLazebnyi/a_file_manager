@@ -17,9 +17,8 @@ internal final class PanelColumnsPlugin: Plugin {
 
     /// Registers the two columns.
     internal func start(in kernel: Kernel) {
-        let probe = probe
         kernel.columns.register(
-            ContentColumn(id: "upper", title: "Upper", width: 90) { item in
+            ContentColumn(id: "upper", title: "Upper", width: 90) { [probe] item in
                 probe.enter(item.name)
                 Thread.sleep(forTimeInterval: 0.01)
                 probe.leave()

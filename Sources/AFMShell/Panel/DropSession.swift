@@ -20,19 +20,11 @@ internal final class DropSession {
     internal private(set) var places: DragSources?
     /// The program's own drag, until its items are known.
     private var payload: PanelDragPayload?
-    private var mounts: [String]?
     /// Whether dropping all sources on a destination is pointless, by kind and destination.
     private var verdicts: [String: Bool] = [:]
 
     /// Where the local volumes are mounted, asked of the system the first time it is needed.
-    internal var mountPoints: [String] {
-        if let mounts {
-            return mounts
-        }
-        let mounts = PanelDrop.mountPoints()
-        self.mounts = mounts
-        return mounts
-    }
+    internal private(set) lazy var mountPoints: [String] = PanelDrop.mountPoints()
 
     /// The session of the drag `sequence` of `sources`.
     internal init(sequence: Int, sources: [URL]) {
@@ -94,13 +86,12 @@ internal final class DropSession {
 
     /// Works out where the sources are: here for a few, in the background for many.
     private func locate() {
-        let sources = sources
         guard sources.count >= Self.backgroundThreshold else {
             places = DragSources(sources)
             return
         }
         Background.compute(
-            work: { DragSources(sources) },
+            work: { [sources] in DragSources(sources) },
             then: { [weak self] places in self?.settle(places) }
         )
     }

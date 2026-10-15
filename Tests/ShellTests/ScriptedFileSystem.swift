@@ -88,7 +88,7 @@ internal final class ScriptedFileSystem: FileSystemProvider, @unchecked Sendable
 
     /// Everything the batches hold, at once.
     internal func list(_: URL, showHidden _: Bool) -> [FileItem] {
-        batches.flatMap { $0 }
+        batches.flatMap(\.self)
     }
 
     /// Delivers the batches as the switches say.
@@ -102,19 +102,19 @@ internal final class ScriptedFileSystem: FileSystemProvider, @unchecked Sendable
     {
         let started = Date()
         let holds = batchesAt[directory.path] == nil ? holdBefore : nil
-        let batches = batchesAt[directory.path] ?? self.batches
+        let delivered = batchesAt[directory.path] ?? batches
         condition.withLock { began += 1 }
         defer { condition.withLock { finished += 1 } }
         let waiting = cancellation.onCancel { [condition] in condition.withLock { condition.broadcast() } }
         defer { _ = waiting }
-        for index in 0...batches.count {
+        for index in 0...delivered.count {
             if index == holds {
                 try hold(cancellation)
             }
             if index == 1, pauseBeforeSecondBatch > 0 {
                 pause(until: started.addingTimeInterval(pauseBeforeSecondBatch), cancellation)
             }
-            guard index < batches.count, !cancellation.isCancelled, receive(batches[index]) else {
+            guard index < delivered.count, !cancellation.isCancelled, receive(delivered[index]) else {
                 return
             }
         }

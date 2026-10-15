@@ -54,7 +54,10 @@ internal struct PanelSettingsTests {
         store.set("wide", forKey: PanelSettings.briefWidthLimitKey)
         store.set(-4, forKey: PanelSettings.thumbnailSizeKey)
         #expect(PanelSettings(from: store).briefWidthLimit == 200 && PanelSettings(from: store).thumbnailSide == 64)
-        #expect(PanelSettings.page {}.preferences.count == 6 && PanelSettings.page {}.title == "File Panels")
+        let page = PanelSettings.page {
+            // Nothing to apply.
+        }
+        #expect(page.preferences.count == 6 && page.title == "File Panels")
     }
 
     /// The looks of a panel are remembered in a form that names its layout; an unknown layout

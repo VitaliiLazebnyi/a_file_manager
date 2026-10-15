@@ -21,8 +21,11 @@ internal struct PanelLongListTests {
     /// Files called `f000000.txt`, `f000001.dat` and on, in `folder` of `script`.
     private func files(_ count: Int, in folder: String, of script: ScriptedFileSystem) -> [FileItem] {
         (0..<count)
-            .map {
-                script.item(named: String(format: "f%06d.%@", $0, $0.isMultiple(of: 2) ? "txt" : "dat"), in: folder)
+            .map { index in
+                script.item(
+                    named: String(format: "f%06d.%@", index, index.isMultiple(of: 2) ? "txt" : "dat"),
+                    in: folder
+                )
             }
     }
 
@@ -198,10 +201,10 @@ internal struct PanelLongListTests {
         let model = app.left.model
         model.selectAll()
         model.toggleSelection(row: 2)
-        #expect(model.selectionCount == count - 1 && app.left.dragPayload(fromRow: 2)?.count == 1)
+        #expect(model.selectionCount == count - 1 && app.left.dragPayload(fromRow: 2)?.itemCount == 1)
         let written = app.left.draggingItems(forRow: 5)
         let payload = try #require(PanelDrop.current)
-        #expect(written.count == 1 && payload.count == count - 1 && payload.isWrittenLazily)
+        #expect(written.count == 1 && payload.itemCount == count - 1 && payload.isWrittenLazily)
         let session = DropSession(sequence: 41, payload: payload)
         #expect(await PanelWait.until { payload.isReady && session.places != nil })
         #expect(session.sources.count == count - 1 && session.sources.first?.lastPathComponent == "f000000.txt")

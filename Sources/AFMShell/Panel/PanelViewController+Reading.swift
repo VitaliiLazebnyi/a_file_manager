@@ -8,6 +8,17 @@ extension PanelViewController {
     /// True while the active tab's folder is being read.
     internal var isLoading: Bool { loads[ObjectIdentifier(model)] != nil }
 
+    /// Lets go of a long list the change brought, in the background, once everything that
+    /// carried it across the threads (the block that runs now, with what it holds) is gone.
+    private static func letGo(of fresh: [FileItem]) {
+        guard fresh.count >= backgroundSortThreshold else {
+            return
+        }
+        // `release` empties the variable it is given.
+        var last = Optional(fresh)
+        MainLoop.queue { Background.release(&last) }
+    }
+
     /// Gives the panel the keyboard, which makes it the source (`PanelHandle`).
     internal func focus() {
         view.window?.makeFirstResponder(listView)
@@ -21,36 +32,32 @@ extension PanelViewController {
         history: PanelModel.HistoryEffect,
         completion: (@MainActor (Bool) -> Void)?
     ) {
-        load(location, in: model, focus: focus, history: history, reportFailure: true, completion: completion)
+        load(
+            PanelReadingRun.Request(
+                location: location,
+                tab: model,
+                focus: focus,
+                history: history,
+                reportsFailure: true
+            ),
+            completion: completion
+        )
     }
 
-    /// Reads a location in the background and shows it in `tab`, piece by piece when it takes long,
-    /// with the cursor on `focus` (nil: where the listing puts it).
+    /// Reads the location of `request` in the background and shows it in its tab, piece by piece
+    /// when it takes long.
     ///
-    /// A failure leaves the tab as it was, and is reported when `reportFailure` says so.
-    /// `completion` hears whether it worked. A location the listing cache remembers is shown at
-    /// once and read afresh behind (`PanelRememberedVisit`).
-    internal func load(
-        _ location: URL,
-        in tab: PanelModel,
-        focus: String?,
-        history: PanelModel.HistoryEffect,
-        reportFailure: Bool,
-        completion: ((Bool) -> Void)?
-    ) {
+    /// A failure leaves the tab as it was, and is reported when the request says so. `completion`
+    /// hears whether it worked. A location the listing cache remembers is shown at once and read
+    /// afresh behind (`PanelRememberedVisit`).
+    internal func load(_ request: PanelReadingRun.Request, completion: ((Bool) -> Void)?) {
         guard !isShutDown else {
             if let completion {
                 MainLoop.perform { completion(false) }
             }
             return
         }
-        let request = PanelReadingRun.Request(
-            location: location,
-            tab: tab,
-            focus: focus,
-            history: history,
-            reportsFailure: reportFailure
-        )
+        let (location, tab) = (request.location, request.tab)
         if let entry = kernel.listingCache.entry(for: location, showHidden: tab.showHidden) {
             PanelRememberedVisit.start(request, from: entry, in: self, completion: completion)
             return
@@ -253,15 +260,5 @@ extension PanelViewController {
         }
         load.complete(succeeded)
         rereadIfDirty(tab)
-    }
-
-    /// Lets go of a long list the change brought, in the background, once everything that
-    /// carried it across the threads (the block that runs now, with what it holds) is gone.
-    private static func letGo(of fresh: [FileItem]) {
-        guard fresh.count >= backgroundSortThreshold else {
-            return
-        }
-        var last: [FileItem]? = fresh
-        MainLoop.queue { Background.release(&last) }
     }
 }

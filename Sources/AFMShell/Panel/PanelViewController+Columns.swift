@@ -70,8 +70,8 @@ extension PanelViewController {
             return
         }
         let columns = IndexSet(
-            tableView.tableColumns.indices.filter {
-                tableView.tableColumns[$0].identifier.rawValue.hasPrefix(Self.extraColumnPrefix)
+            tableView.tableColumns.indices.filter { index in
+                tableView.tableColumns[index].identifier.rawValue.hasPrefix(Self.extraColumnPrefix)
             }
         )
         let visible = tableView.rows(in: tableView.visibleRect)

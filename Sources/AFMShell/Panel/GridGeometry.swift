@@ -31,7 +31,7 @@ internal struct GridGeometry: Equatable {
     /// How the cells are laid out.
     internal let flow: Flow
     /// How many cells there are.
-    internal let count: Int
+    internal let cellCount: Int
     /// The size of each cell.
     internal let cell: CGSize
     /// The size of the visible part of the list.
@@ -49,7 +49,7 @@ internal struct GridGeometry: Equatable {
     }
 
     /// Columns (Brief) or rows (Thumbnails).
-    internal var lines: Int { (count + perLine - 1) / perLine }
+    internal var lines: Int { (cellCount + perLine - 1) / perLine }
 
     /// The size of all the cells together, at least that of the visible part.
     internal var contentSize: CGSize {
@@ -102,12 +102,12 @@ internal struct GridGeometry: Equatable {
             return nil
         }
         let index = line * perLine + offset
-        return index < count ? index : nil
+        return index < cellCount ? index : nil
     }
 
     /// The cells that may touch a rectangle, for drawing: all cells of the lines it crosses.
     internal func indexes(in rect: CGRect) -> Range<Int> {
-        guard count > 0 else {
+        guard cellCount > 0 else {
             return 0..<0
         }
         let (start, end) =
@@ -115,7 +115,7 @@ internal struct GridGeometry: Equatable {
             ? (rect.minX / cell.width, rect.maxX / cell.width) : (rect.minY / cell.height, rect.maxY / cell.height)
         let first = min(max(Int(start.rounded(.down)), 0), lines)
         let last = min(max(Int(end.rounded(.up)), first), lines)
-        return min(first * perLine, count)..<min(last * perLine, count)
+        return min(first * perLine, cellCount)..<min(last * perLine, cellCount)
     }
 
     /// Where an arrow key takes the cursor.
@@ -123,17 +123,17 @@ internal struct GridGeometry: Equatable {
     /// In Brief, ← and → jump a column and stop at the first and the last entry (spec 03 › Brief);
     /// in Thumbnails, ↑ and ↓ jump a row.
     internal func index(from index: Int, moving direction: Direction) -> Int {
-        guard count > 0 else {
+        guard cellCount > 0 else {
             return 0
         }
         let step = step(of: direction)
         let target = index + step
-        if flow == .rows, abs(step) > 1, !(0..<count).contains(target) {
+        if flow == .rows, abs(step) > 1, !(0..<cellCount).contains(target) {
             // No tile straight above or below: the cursor stays, except on the way down into a
             // last row that is shorter, where it goes to the last tile.
-            return step > 0 && place(of: index).line < lines - 1 ? count - 1 : index
+            return step > 0 && place(of: index).line < lines - 1 ? cellCount - 1 : index
         }
-        return max(0, min(target, count - 1))
+        return max(0, min(target, cellCount - 1))
     }
 
     /// How far an arrow key moves the cursor in the numbering of the cells.

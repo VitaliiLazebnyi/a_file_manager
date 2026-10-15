@@ -124,15 +124,14 @@ internal final class ColumnValueStore {
 
     /// Starts the next batch of the folder shown, unless one is out for it already.
     private func work() {
-        let location = location
-        guard !working.contains(location), !waiting.isEmpty else {
+        let shown = location
+        guard !working.contains(shown), !waiting.isEmpty else {
             return
         }
-        working.insert(location)
+        working.insert(shown)
         let count = min(Self.batchSize, waiting.count)
         let batch = Array(waiting.suffix(count).reversed())
         waiting.removeLast(count)
-        let generation = generation
         let lane = folder ?? URL(fileURLWithPath: "/")
         let flag = cancellation
         Background.storage(
@@ -140,7 +139,7 @@ internal final class ColumnValueStore {
             at: lane,
             qos: .utility,
             work: { Parallel.map(batch) { $0.column.cancellableValue($0.item, flag) } },
-            then: { [weak self] texts in self?.take(texts, of: batch, for: location, generation: generation) }
+            then: { [weak self, generation] texts in self?.take(texts, of: batch, for: shown, generation: generation) }
         )
     }
 

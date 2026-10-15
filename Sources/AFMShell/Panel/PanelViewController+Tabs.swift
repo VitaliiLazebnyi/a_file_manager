@@ -58,7 +58,7 @@ extension PanelViewController {
         // A tab that was never shown is read now; one that was in the background may be out of date.
         // One that is being read already is not asked again.
         if model.isListed {
-            reload(model, focus: nil, quietly: true, markDirty: false, changedAt: nil, completion: nil)
+            reload(model, focus: nil, as: .quietOnce, completion: nil)
         } else if loads[ObjectIdentifier(model)] == nil {
             loadRestored(model.directory, in: model)
         }
@@ -159,8 +159,8 @@ extension PanelViewController {
     private func giveCopiedTabsTheirDisplayFilter() {
         for tab in tabs.tabs where quickFilters[ObjectIdentifier(tab)] == nil {
             guard let title = tab.filter?.title,
-                let source = quickFilters.values.first(where: {
-                    !$0.text.isEmpty && $0.title == title && $0.directory.isSameLocation(as: tab.directory)
+                let source = quickFilters.values.first(where: { quick in
+                    !quick.text.isEmpty && quick.title == title && quick.directory.isSameLocation(as: tab.directory)
                 })
             else {
                 continue
@@ -178,7 +178,14 @@ extension PanelViewController {
     private func loadRestored(_ location: URL, in tab: PanelModel) {
         let parent = (try? kernel.fileSystems.provider(for: location))?.parent(of: location)
         let next = parent.flatMap { $0.isSameLocation(as: location) ? nil : $0 }
-        load(location, in: tab, focus: nil, history: .keep, reportFailure: next == nil) { [weak self] succeeded in
+        let request = PanelReadingRun.Request(
+            location: location,
+            tab: tab,
+            focus: nil,
+            history: .keep,
+            reportsFailure: next == nil
+        )
+        load(request) { [weak self] succeeded in
             guard let self, !succeeded, let next, !tab.isListed, loads[ObjectIdentifier(tab)] == nil else {
                 return
             }
