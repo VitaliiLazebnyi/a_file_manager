@@ -200,4 +200,21 @@ internal struct CoverageArchivesFSStoreTests {
         #expect(error?.errorDescription == ArchiveError.noScratchRoom("big.zip").errorDescription)
         #expect(asked.value == 2)
     }
+
+    /// An archive on a server that was changed there stays the archive when a change began
+    /// in it while the server was asked: what was begun is not lost to a fresh reading.
+    @Test
+    internal func anArchiveInWhichAChangeBeganIsNotLetGo() throws {
+        let url = try CoverageArchivesFSHookedMemory.put(zipBytes, at: "/store/tree.zip", on: hooked.base)
+        let first = try store.archive(at: url)
+        let (base, bytes) = (hooked.base, zipBytes)
+        let writer = Shared<(any FileWriter)?>(nil)
+        hooked.onNextItem {
+            _ = try? CoverageArchivesFSHookedMemory.put(bytes + Data("changed".utf8), at: "/store/tree.zip", on: base)
+            writer.value = try? first.write("begun.txt")
+        }
+        #expect(try store.archive(at: url) === first)
+        #expect(writer.value != nil && first.isBusy)
+        try writer.value?.close(attributes: FileAttributes())
+    }
 }
