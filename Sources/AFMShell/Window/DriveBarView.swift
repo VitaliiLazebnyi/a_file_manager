@@ -153,18 +153,16 @@ internal final class DriveBarView: NSView {
     /// An eject button was pressed: the drive of its place is ejected.
     @objc
     private func ejectPressed(_ sender: NSButton) {
-        guard places.indices.contains(sender.tag) else {
-            return
+        if places.indices.contains(sender.tag) {
+            kernel.commands.perform(.ejectVolume, .location(places[sender.tag].url))
         }
-        kernel.commands.perform(.ejectVolume, .location(places[sender.tag].url))
     }
 
     /// A place's button was pressed: the source panel goes there, with Shift in a new tab.
     @objc
     private func buttonPressed(_ sender: NSButton) {
-        guard places.indices.contains(sender.tag) else {
-            return
+        if places.indices.contains(sender.tag) {
+            show(places[sender.tag], inNewTab: NSApp.currentEvent?.modifierFlags.contains(.shift) == true)
         }
-        show(places[sender.tag], inNewTab: NSApp.currentEvent?.modifierFlags.contains(.shift) == true)
     }
 }

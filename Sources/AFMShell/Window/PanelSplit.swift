@@ -15,6 +15,8 @@ internal final class PanelSplit: NSObject, NSSplitViewDelegate {
     private let left: NSView
     /// True while the divider is moved by the window itself, not by the user.
     private var isPositioningDivider = false
+    /// Whether the user is dragging something with the mouse: the event being handled says.
+    internal var isDragging: () -> Bool = { NSApp.currentEvent?.type == .leftMouseDragged }
 
     /// The length of the split view along its divider's axis, without the divider.
     private var extent: CGFloat {
@@ -64,8 +66,7 @@ internal final class PanelSplit: NSObject, NSSplitViewDelegate {
     ///
     /// The same notification follows every resizing of the window; only a drag counts.
     internal func splitViewDidResizeSubviews(_ notification: Notification) {
-        let isDragging = NSApp.currentEvent?.type == .leftMouseDragged
-        guard isDragging, !isPositioningDivider, notification.userInfo?["NSSplitViewDividerIndex"] != nil,
+        guard isDragging(), !isPositioningDivider, notification.userInfo?["NSSplitViewDividerIndex"] != nil,
             extent > 0
         else {
             return
