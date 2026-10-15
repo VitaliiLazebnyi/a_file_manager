@@ -22,6 +22,9 @@ public final class FilePropertiesPlugin: Plugin {
     /// most recent ones only, for tests to look at.
     public private(set) var finderInfoRequests: [URL] = []
     private static let finderInfoRequestLimit = 64
+    /// The program that asks Finder for its Info windows: AppleScript's. Tests put a harmless
+    /// program in its place, which notes what it was given.
+    var finderScriptRunner = URL(fileURLWithPath: "/usr/bin/osascript")
 
     enum Settings {
         static let linkKind = "fileProperties.linkKind"
@@ -84,9 +87,10 @@ public final class FilePropertiesPlugin: Plugin {
         )
         commands.register(
             Command(.showLinkTarget, "Show Link Target"),
-            enabled: { model().cursorItem?.url.isFileURL ?? false },
-            actions.showLinkTarget
-        )
+            enabled: { model().cursorItem?.url.isFileURL ?? false }
+        ) {
+            _ = model().cursorItem.map(actions.showLinkTarget)
+        }
         commands.register(
             Command(.finderInfo, "Finder Info", runsDuringJobs: true),
             enabled: { isLocal() && model().isListed }
@@ -161,11 +165,12 @@ public final class FilePropertiesPlugin: Plugin {
     /// Opens Finder's Info window for local items. Finder is asked through `osascript`, off
     /// the main thread; the first time, macOS asks the user whether the program may control
     /// Finder.
+    /// Asked for local items only: the command is offered in local folders, the button of the
+    /// Properties dialog for local items.
     private func showFinderInfo(_ urls: [URL]) {
-        let urls = urls.filter(\.isFileURL)
-        guard !urls.isEmpty else { return }
         finderInfoRequests = Array((finderInfoRequests + urls).suffix(Self.finderInfoRequestLimit))
         guard launchesApplications else { return }
+        let runner = finderScriptRunner
         // Starting a program waits for the system: on a thread for work that waits.
         BlockingCalls.run {
             let script = [
@@ -174,7 +179,7 @@ public final class FilePropertiesPlugin: Plugin {
                 "end tell", "end run"
             ]
             let process = Process()
-            process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+            process.executableURL = runner
             process.arguments = script.flatMap { ["-e", $0] } + urls.map(\.path)
             process.standardOutput = FileHandle.nullDevice
             process.standardError = FileHandle.nullDevice
@@ -231,8 +236,8 @@ final class PropertyActions {
         let model = source.model
         // What is marked is noted here at no cost; the list of it is made on the job's thread
         // (for a selection of several hundred thousand that is time the main thread does not have).
+        // Offered only where there are operands.
         let (operands, directory) = (model.operandsSnapshot(), model.directory)
-        guard operands.markedCount > 0 || operands.cursorItem != nil else { return }
         var parsed: (change: AttributeChange, applyAtOnce: Bool)?
         if let text = argument.text {
             guard let read = AttributeChange.parse(parameters: text) else {
@@ -257,7 +262,6 @@ final class PropertyActions {
             },
             completion: { [self] read in
                 let items = read.items
-                guard !items.isEmpty else { return }
                 if let parsed, parsed.applyAtOnce { return apply(parsed.change, to: items, in: directory) }
                 // The panel may show something else by now; a dialog about what it showed would mislead.
                 guard model.directory.isSameLocation(as: directory) else { return }
@@ -273,16 +277,14 @@ final class PropertyActions {
         let isLocal = items.allSatisfy { $0.url.isFileURL }
         let title = "Change attributes: " + (items.count == 1 ? items[0].name : String(items.count))
         let targetFile = kernel.panels.target.model.cursorItem
-        while true {
-            let buttons = ["OK"] + (targetFile != nil ? ["Load from Target File"] : [])
-            guard
-                let answer = ui.form(
-                    title,
-                    detail: "",
-                    fields: draft.fields(isLocal: isLocal, details: details),
-                    buttons: buttons
-                )
-            else { return }
+        let buttons = ["OK"] + (targetFile != nil ? ["Load from Target File"] : [])
+        // Asked until the answer can be applied or the dialog is cancelled.
+        while let answer = ui.form(
+            title,
+            detail: "",
+            fields: draft.fields(isLocal: isLocal, details: details),
+            buttons: buttons
+        ) {
             draft.read(answer)
             if answer.button == 1, let targetFile {
                 // Load from file under cursor › From target (spec 07 › Load from file under cursor).
@@ -413,7 +415,7 @@ final class PropertyActions {
         // grows with it: the sum, which folders were measured, whether all of it is local.
         let (operands, directory, basis) = (model.operandsSnapshot(), model.directory, model.basis)
         let targetDirectory = kernel.panels.target.model.directory
-        guard operands.markedCount > 0 || operands.cursorItem != nil else { return }
+        // Offered only where there are operands.
         let fileSystems = self.fileSystems
         let title = "Calculating occupied space:"
         struct Result {
@@ -524,14 +526,8 @@ final class PropertyActions {
     /// shows, whose comment is kept in the folder above (spec 07 › File comments).
     func editComment() {
         let model = source.model
-        let subject: URL
-        if let item = model.cursorItem {
-            subject = item.url
-        } else if model.parentTarget != nil {
-            subject = model.directory
-        } else {
-            return
-        }
+        // Offered on an item, or on `[..]` of a folder that has a parent to keep its comment.
+        let subject = model.cursorItem?.url ?? model.directory
         let (name, folder) = (subject.lastPathComponent, subject.deletingLastPathComponent())
         let comments = self.comments
         let directory = model.directory
@@ -615,9 +611,9 @@ final class PropertyActions {
         let model = source.model
         // The dialog needs how many items there are and, for one, its name; the list of a
         // long selection is made on the job's thread.
+        // Offered only where there are operands: the marked ones, or the item under the cursor.
         let (operands, directory) = (model.operandsSnapshot(), model.directory)
-        let count = operands.markedCount > 0 ? operands.markedCount : (operands.cursorItem == nil ? 0 : 1)
-        guard count > 0 else { return }
+        let count = max(operands.markedCount, 1)
         let single = count == 1 ? operands.items().first : nil
         let settings = kernel.settings
         let targetPath = fileSystems.displayPath(kernel.panels.target.model.directory)
@@ -699,9 +695,8 @@ final class PropertyActions {
         )
     }
 
-    /// Goes to the item the link under the cursor leads to, with the cursor on it.
-    func showLinkTarget() {
-        guard let item = source.model.cursorItem else { return }
+    /// Goes to the item the link `item` (under the cursor) leads to, with the cursor on it.
+    func showLinkTarget(_ item: FileItem) {
         let panel = source
         let directory = panel.model.directory
         kernel.jobs.run(
