@@ -10,13 +10,15 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation, NSSp
     private let kernel: Kernel
     private let panels: PanelCoordinator
     private let layout: WindowLayout
-    private let splitView = NSSplitView()
+    let splitView = NSSplitView()
     let buttonBar: ButtonBarView
     let driveBar: DriveBarView
     let commandLine: CommandLineView
     let functionKeyBar: FunctionKeyBar
-    private var subscription: AnyObject?
-    private var validationPending = false
+    /// The panel events listened to; the kernel stops calling once they are let go of.
+    private var subscriptions: [AnyObject] = []
+    /// True while a check of the bars is on its way.
+    private(set) var isValidationPending = false
     /// When the bars were last checked (in the system's uptime), and how long that took.
     private var lastValidation: (at: TimeInterval, cost: TimeInterval) = (0, 0)
     /// How soon the bars follow something that changed.
@@ -76,11 +78,12 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation, NSSp
             self?.buttonBar.rebuild()
             self?.applyLayout()
         }
-        subscription = kernel.panelEvents.subscribe { [weak self] event, panel in
+        let subscription = kernel.panelEvents.subscribe { [weak self] event, panel in
             guard let self else { return }
             if event == .becameSource { self.layout.sourceIsRight = panel === self.panels.rightPanel }
             scheduleValidation()
         }
+        subscriptions.append(subscription)
         observe()
     }
 
@@ -138,9 +141,6 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation, NSSp
         validateBars()
     }
 
-    /// Whether the panels are one above the other on screen.
-    var panelsAreStacked: Bool { !splitView.isVertical }
-
     private var splitExtent: CGFloat {
         (splitView.isVertical ? splitView.bounds.width : splitView.bounds.height) - splitView.dividerThickness
     }
@@ -187,12 +187,12 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation, NSSp
     /// long buys a rest in proportion (`validationRest` times its own duration): the bars then
     /// follow a little later, and the main thread keeps all but a twentieth of its time.
     @objc func scheduleValidation() {
-        guard !validationPending else { return }
-        validationPending = true
+        guard !isValidationPending else { return }
+        isValidationPending = true
         let earliest = lastValidation.at + Self.validationRest * lastValidation.cost
         let delay = max(Self.validationDelay, earliest - uptime)
         MainLoop.after(delay) { [weak self] in
-            self?.validationPending = false
+            self?.isValidationPending = false
             self?.validateBars()
         }
     }
@@ -203,9 +203,6 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation, NSSp
         if uptime - lastValidation.at >= Self.quietValidationInterval { scheduleValidation() }
     }
 
-    /// True while a check of the bars is on its way.
-    var isValidationPending: Bool { validationPending }
-
     func validateBars() {
         let began = uptime
         if !buttonBar.isHidden { buttonBar.validate() }
@@ -214,9 +211,6 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation, NSSp
         let ended = uptime
         lastValidation = (ended, ended - began)
     }
-
-    /// The captions of the function-key bar, for checks.
-    var functionKeyTitles: [String] { functionKeyBar.entries.map(\.title) }
 
     /// While Shift, Option or Control is held, the function-key bar shows what the function
     /// keys do with it (spec 02 › Function-key bar). Not while text is typed: capital letters

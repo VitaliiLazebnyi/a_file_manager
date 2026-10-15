@@ -232,11 +232,6 @@ enum MenuBuilder {
 
     private static var keyAnswersKey = 0
 
-    /// The object that answers for the keys of a menu bar built by `mainMenu`.
-    static func keyAnswers(of main: NSMenu) -> MenuKeys? {
-        objc_getAssociatedObject(main, &keyAnswersKey) as? MenuKeys
-    }
-
     /// Makes a menu bar built by `mainMenu` the program's, and tells the application object
     /// which of its menus are the Services, Window and Help menus: the system fills the first
     /// two and puts its search field into the third.

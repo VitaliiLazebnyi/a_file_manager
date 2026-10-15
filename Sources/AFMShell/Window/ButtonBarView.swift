@@ -31,12 +31,6 @@ enum BarButton {
         button.font = .systemFont(ofSize: 11)
         return button
     }
-
-    static func separator() -> NSView {
-        let line = NSBox(frame: NSRect(x: 0, y: 0, width: 5, height: height))
-        line.boxType = .separator
-        return line
-    }
 }
 
 /// A button of the button bar. It draws its own frame, a rounded square over the whole button

@@ -63,9 +63,6 @@ final class ProgressJobService: JobService {
     /// The number of jobs waiting behind the running one.
     var queueLength: Int { waiting.count }
 
-    /// The progress of the running job; nil while none runs.
-    var current: ProgressSheet? { running?.monitor }
-
     @MainActor private final class QueuedJob {
         let title: String
         let cancellation = CancellationFlag()
@@ -233,17 +230,6 @@ final class ProgressJobService: JobService {
         } else {
             startNext()
         }
-    }
-
-    /// Leaves the running job behind without asking, if it was told to stop and has not:
-    /// for quitting, once the user has said not to wait. Jobs behind it were told to stop
-    /// as well and are given their turn.
-    func abandonStoppingJob() {
-        MainThread.assert("The job service")
-        guard let running, running.cancellation.isCancelled, !running.isFinished else { return }
-        stopQuestion?()
-        stopQuestion = nil
-        abandon(running)
     }
 
     // MARK: What the progress window offers

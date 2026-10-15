@@ -29,13 +29,10 @@ final class QuitProgress: NSObject {
     private(set) var isClosed = false
     private var cancelTimer: (() -> Void)?
     private var panel: NSPanel?
-    private let heading = NSTextField(labelWithString: QuitProgress.waitingText)
+    /// The first line of the window: what the program is doing.
+    let heading = NSTextField(labelWithString: QuitProgress.waitingText)
     private let quitButton = NSButton(title: "Quit Now", target: nil, action: nil)
     private let stayButton = NSButton(title: "Don’t Quit", target: nil, action: nil)
-
-    /// True while the window is on screen.
-    var isShown: Bool { panel != nil }
-    var text: String { heading.stringValue }
 
     /// Shows the window after `delay`, unless `close` comes first.
     func show(after delay: TimeInterval) {

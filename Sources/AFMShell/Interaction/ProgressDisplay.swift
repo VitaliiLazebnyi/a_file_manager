@@ -10,7 +10,8 @@ final class ProgressDisplay {
     weak var window: NSWindow?
     weak var service: ProgressJobService?
     private var monitor: ProgressSheet?
-    private var panel: NSPanel?
+    /// The progress window while it is on screen.
+    private(set) var panel: NSPanel?
     private var panelIsSheet = false
     private let content = ProgressContentView()
     /// The count shows what is left instead of what is done (toggled by a click on it).
@@ -30,10 +31,6 @@ final class ProgressDisplay {
             self?.refresh()
         }
     }
-
-    /// Whether the progress window is on screen, and in which form.
-    var isShown: Bool { panel != nil }
-    var isShownAsSheet: Bool { panel != nil && panelIsSheet }
 
     /// A job started. Short jobs finish before the window would appear; a window that is
     /// already there for the job before simply carries on.

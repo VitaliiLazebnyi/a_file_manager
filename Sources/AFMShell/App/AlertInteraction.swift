@@ -2,8 +2,8 @@ public import AFMKernel
 public import AppKit
 
 /// Asks the user with standard alerts.
-public final class AlertInteraction: UserInteraction {
-    public init() {}
+final class AlertInteraction: UserInteraction {
+    init() {}
 
     private func alert(_ message: String, _ detail: String, _ style: QuestionStyle) -> NSAlert {
         let alert = NSAlert()
@@ -19,7 +19,7 @@ public final class AlertInteraction: UserInteraction {
         return alert
     }
 
-    public func prompt(_ message: String, value: String, detail: String) -> String? {
+    func prompt(_ message: String, value: String, detail: String) -> String? {
         let alert = alert(message, detail, .information)
         alert.addButton(withTitle: "OK")
         alert.addButton(withTitle: "Cancel")
@@ -35,7 +35,7 @@ public final class AlertInteraction: UserInteraction {
     /// something for good, or trusts somebody): there it presses the last one, the one that
     /// changes nothing, so a reflexive Return never answers it with yes. Esc takes the last
     /// button in every question.
-    public func choose(_ message: String, detail: String, buttons: [String], style: QuestionStyle) -> Int {
+    func choose(_ message: String, detail: String, buttons: [String], style: QuestionStyle) -> Int {
         choose(
             message, detail: detail, buttons: buttons, style: style,
             defaultButton: Self.defaultButton(for: style, of: buttons))
@@ -43,7 +43,7 @@ public final class AlertInteraction: UserInteraction {
 
     /// The same with the caller's say in which button Return presses; nil for none, where the
     /// user has to click, or to press Esc for the last one.
-    public func choose(_ message: String, detail: String, buttons: [String], style: QuestionStyle, defaultButton: Int?)
+    func choose(_ message: String, detail: String, buttons: [String], style: QuestionStyle, defaultButton: Int?)
         -> Int
     {
         let alert = makeQuestion(message, detail: detail, buttons: buttons, style: style, defaultButton: defaultButton)
@@ -90,17 +90,17 @@ public final class AlertInteraction: UserInteraction {
         return alert
     }
 
-    public func inform(_ message: String, detail: String, style: QuestionStyle) {
+    func inform(_ message: String, detail: String, style: QuestionStyle) {
         alert(message, detail, style).runModal()
     }
 
     /// A message near the bottom of the main window that goes away by itself; clicks go
     /// through it to what lies below.
-    public func notice(_ message: String) {
+    func notice(_ message: String) {
         Notice.show(message, over: NSApp.mainWindow ?? NSApp.keyWindow)
     }
 
-    public func form(_ title: String, detail: String, fields: [FormField], buttons: [String]) -> FormValues? {
+    func form(_ title: String, detail: String, fields: [FormField], buttons: [String]) -> FormValues? {
         FormDialog(fields: fields).run(title: title, detail: detail, buttons: buttons)
     }
 }

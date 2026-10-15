@@ -104,9 +104,6 @@ final class PanelCoordinator: PanelSet, PanelHost {
     var targetPanel: PanelViewController { sourcePanel === leftPanel ? rightPanel : leftPanel }
     private var panels: [PanelViewController] { [leftPanel, rightPanel] }
 
-    /// True while either panel is reading a directory.
-    var isLoading: Bool { panels.contains(where: \.isLoading) }
-
     /// Makes a panel the source; the other one becomes the target (spec 01 › Two panels).
     private func activate(_ panel: PanelViewController) {
         sourcePanel = panel
@@ -306,10 +303,6 @@ final class PanelCoordinator: PanelSet, PanelHost {
                 }
             })
     }
-
-    /// The number of folders watched or being set up, for checks.
-    var watchCount: Int { watches.count }
-    var watchedDirectories: [URL] { watches.values.filter { $0.isWanted && !$0.isStarting }.map(\.directory) }
 
     // MARK: PanelHost
 

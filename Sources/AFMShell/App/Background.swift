@@ -103,13 +103,6 @@ enum Background {
     nonisolated(unsafe) private static var computeThreads = 0
     private static let computeLimit = max(2, ProcessInfo.processInfo.activeProcessorCount)
 
-    /// The lanes that have work right now, for checks.
-    static var busyLanes: Int {
-        lock.lock()
-        defer { lock.unlock() }
-        return lanes.count
-    }
-
     /// Whether the lane of this purpose and location is at work or has work waiting.
     static func isBusy(_ purpose: String, at location: URL) -> Bool {
         let key = laneKey(purpose, location)

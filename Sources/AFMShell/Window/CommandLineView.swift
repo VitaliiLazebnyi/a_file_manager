@@ -25,7 +25,8 @@ final class CommandLineView: NSView, NSComboBoxDelegate {
     let history: CommandLineHistory
     let prompt = NSTextField(labelWithString: "")
     let field = CommandLineField()
-    private var subscription: AnyObject?
+    /// The panel events listened to; the kernel stops calling once they are let go of.
+    private var subscriptions: [AnyObject] = []
     /// Where Ctrl+E is in the history; -1 while the line is the user's own.
     private var recalled = -1
 
@@ -68,9 +69,10 @@ final class CommandLineView: NSView, NSComboBoxDelegate {
         reloadHistory()
         updatePrompt()
         // The prompt follows the source panel wherever it goes.
-        subscription = kernel.panelEvents.subscribe { [weak self] event, _ in
+        let subscription = kernel.panelEvents.subscribe { [weak self] event, _ in
             if event == .locationChanged || event == .becameSource { self?.updatePrompt() }
         }
+        subscriptions.append(subscription)
     }
 
     required init?(coder _: NSCoder) { fatalError("not used") }

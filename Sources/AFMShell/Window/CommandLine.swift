@@ -121,9 +121,4 @@ final class CommandLineHistory {
         entries = Array(entries.prefix(Self.limit))
         settings.set(entries, forKey: Self.settingsKey)
     }
-
-    func remove(_ line: String) {
-        entries.removeAll { $0 == line }
-        settings.set(entries, forKey: Self.settingsKey)
-    }
 }

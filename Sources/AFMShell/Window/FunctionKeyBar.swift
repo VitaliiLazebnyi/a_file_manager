@@ -15,8 +15,7 @@ final class FunctionKeyBar: NSView {
     private let kernel: Kernel
     private let stack = NSStackView()
     private(set) var entries: [Entry] = []
-    private(set) var modifiers: KeyModifiers = []
-    private var buttons: [NSButton] = []
+    private(set) var buttons: [NSButton] = []
 
     init(kernel: Kernel) {
         self.kernel = kernel
@@ -60,7 +59,6 @@ final class FunctionKeyBar: NSView {
     func show(_ held: KeyModifiers) {
         let held = held.contains(.command) ? [] : held.intersection([.shift, .option, .control])
         let shown = Self.entries(for: held, commands: kernel.commands, keys: kernel.keyBindings)
-        modifiers = held
         guard shown != entries else { return }
         entries = shown
         buttons.forEach { $0.removeFromSuperview() }
@@ -88,11 +86,6 @@ final class FunctionKeyBar: NSView {
             let isEnabled = kernel.commands.isEnabled(CommandID(rawValue: name))
             if button.isEnabled != isEnabled { button.isEnabled = isEnabled }
         }
-    }
-
-    /// Whether the button of a command can be pressed; nil when the bar does not show it.
-    func isEnabled(_ command: CommandID) -> Bool? {
-        buttons.first { $0.identifier?.rawValue == command.rawValue }?.isEnabled
     }
 
     @objc private func buttonPressed(_ sender: NSButton) {

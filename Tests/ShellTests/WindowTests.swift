@@ -338,36 +338,41 @@ private final class WindowTestPlugin: Plugin {
     @Test func theFunctionKeyBarFollowsTheModifiersAndTheCommands() async {
         let app = await start()
         defer { app.stop() }
+        let bar = app.window.functionKeyBar
+        func titles() -> [String] { bar.entries.map(\.title) }
+        func isEnabled(_ command: CommandID) -> Bool? {
+            bar.buttons.first { $0.identifier?.rawValue == command.rawValue }?.isEnabled
+        }
         let plain = ["F3 View", "F4 Edit", "F5 Copy", "F6 Move", "F7 NewFolder", "F8 Delete", "⌘Q Exit"]
-        #expect(app.window.functionKeyTitles == plain)
+        #expect(titles() == plain)
         app.window.modifiersChanged(to: .shift)
         #expect(
             ["⇧F4 New Text File", "⇧F5 Copy in Same Folder", "⇧F6 Rename"]
                 .allSatisfy(
-                    app.window.functionKeyTitles.contains
+                    titles().contains
                 )
         )
-        #expect(app.window.functionKeyTitles.last == "⌘Q Exit")
+        #expect(titles().last == "⌘Q Exit")
         app.window.modifiersChanged(to: .control)
         #expect(
-            app.window.functionKeyTitles.dropLast().allSatisfy { $0.hasPrefix("⌃F") }
-                && app.window.functionKeyTitles.count > 3
+            titles().dropLast().allSatisfy { $0.hasPrefix("⌃F") }
+                && titles().count > 3
         )
         app.window.modifiersChanged(to: [.option])
-        #expect(app.window.functionKeyTitles.contains("⌥F7 Find Files"))
+        #expect(titles().contains("⌥F7 Find Files"))
         // Cmd shortcuts are not the bar's; letting go brings the plain bar back.
         app.window.modifiersChanged(to: [.command, .shift])
-        #expect(app.window.functionKeyTitles == plain)
+        #expect(titles() == plain)
         // The buttons are greyed out like the menu entries.
         app.left.model.moveCursor(to: 0)
         app.window.validateBars()
         #expect(
-            app.window.functionKeyBar.isEnabled(.copy) == false
-                && app.window.functionKeyBar.isEnabled(.makeDirectory) == true
+            isEnabled(.copy) == false
+                && isEnabled(.makeDirectory) == true
         )
         app.left.model.row(ofName: "one.txt").map(app.left.model.moveCursor(to:))
         app.window.validateBars()
-        #expect(app.window.functionKeyBar.isEnabled(.copy) == true)
+        #expect(isEnabled(.copy) == true)
     }
 
     // MARK: Layout
@@ -385,7 +390,7 @@ private final class WindowTestPlugin: Plugin {
         )
         #expect(
             app.commands.isChecked(.panelsEqualWidth) && !app.commands.isChecked(.panelsStacked)
-                && !window.panelsAreStacked
+                && window.splitView.isVertical
         )
         for command in [
             CommandID.showButtonBar, .showCommandLine, .showFunctionKeys, .showDriveButtons, .panelsStacked
@@ -397,7 +402,7 @@ private final class WindowTestPlugin: Plugin {
                 && window.functionKeyBar.isHidden
         )
         #expect(
-            window.panelsAreStacked && app.commands.isChecked(.panelsStacked) && !app.commands.isChecked(.showButtonBar)
+            !window.splitView.isVertical && app.commands.isChecked(.panelsStacked) && !app.commands.isChecked(.showButtonBar)
         )
         app.shell.layout.divider = 300
         #expect(!app.commands.isChecked(.panelsEqualWidth))
@@ -416,7 +421,7 @@ private final class WindowTestPlugin: Plugin {
             again.buttonBar.isHidden && !again.driveBar.isHidden && again.commandLine.isHidden
                 && again.functionKeyBar.isHidden
         )
-        #expect(again.panelsAreStacked && app.shell.layout.divider == 300)
+        #expect(!again.splitView.isVertical && app.shell.layout.divider == 300)
         #expect(app.kernel.panels.source === app.right && app.right.isActive)
         #expect(again.window?.frame.size == frame.size)
         // The 50 % command puts the divider back; a hidden command line returns when asked for.
@@ -611,8 +616,7 @@ private final class WindowTestPlugin: Plugin {
         history.add("line 10")
         history.add("  ")
         #expect(history.entries.count == 20 && history.entries.prefix(2) == ["line 10", "line 25"])
-        history.remove("line 25")
-        #expect(CommandLineHistory(settings: settings).entries.prefix(2) == ["line 10", "line 24"])
+        #expect(CommandLineHistory(settings: settings).entries == history.entries)
     }
 
     // MARK: Menu bar
@@ -795,7 +799,7 @@ private final class WindowTestPlugin: Plugin {
         service.run(title: "First", work: { first.work($0) }, completion: { results.append($0) })
         service.run(title: "Second", work: { second.work($0) }, completion: { results.append($0) })
         service.run(title: "Third", work: { _ in "third" }, completion: { results.append($0) })
-        #expect(service.queueLength == 2 && service.current?.title == "First")
+        #expect(service.queueLength == 2)
         service.setRunsInBackground(true)
         #expect(service.runsInBackground && service.isBusy)
         // The main window is free, but only for what may run beside a job.
@@ -805,9 +809,9 @@ private final class WindowTestPlugin: Plugin {
                 && app.commands.isEnabled(.focusTarget)
         )
         // The window is not shown in a test; the queue goes on behind it all the same.
-        #expect(!service.display.isShown)
+        #expect(service.display.panel == nil)
         first.end()
-        await wait { service.current?.title == "Second" }
+        await wait { second.count > 0 }
         #expect(service.queueLength == 1 && service.runsInBackground && results == ["finished"])
         second.end()
         await settle(app)

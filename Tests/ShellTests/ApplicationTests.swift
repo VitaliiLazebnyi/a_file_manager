@@ -144,7 +144,7 @@ import Testing
         #expect(contributed.allSatisfy { app.commands[$0] != nil })
         #expect(app.kernel.keyClashes.isEmpty)
         #expect(
-            app.shell.mainWindow.functionKeyTitles == [
+            app.shell.mainWindow.functionKeyBar.entries.map(\.title) == [
                 "F3 View", "F4 Edit", "F5 Copy", "F6 Move", "F7 NewFolder", "F8 Delete", "⌘Q Exit"
             ]
         )
@@ -166,7 +166,7 @@ import Testing
         let app = await start()
         defer { app.stop() }
         #expect(
-            app.shell.mainWindow.functionKeyTitles == [
+            app.shell.mainWindow.functionKeyBar.entries.map(\.title) == [
                 "F4 Edit", "F5 View", "F6 Move", "F7 NewFolder", "F8 Delete", "F9 Copy", "⌘Q Exit"
             ]
         )
