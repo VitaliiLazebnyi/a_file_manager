@@ -1,6 +1,6 @@
 # Quality gates: where the work stands and how to continue
 
-State saved on 2026-10-15 at commit `be5feb3` + this file (branch `quality-gates`, pushed). The plan, decisions and
+State saved on 2026-10-15 (work stopped at 22:45 JST) (branch `quality-gates`, pushed). The plan, decisions and
 gotchas are in `documentation/quality-gates-handover.md`; the briefs every agent follows are in
 `documentation/agent-briefs/`.
 
@@ -11,8 +11,8 @@ Paste this into a new Claude Code session in `/Users/cm0k/Claude/Projects/TotalC
 
 > Read `documentation/quality-gates-continue.md`, `documentation/quality-gates-handover.md` and the briefs in
 > `documentation/agent-briefs/`, then continue the quality-gates work exactly where the "State" section of
-> `quality-gates-continue.md` leaves it. First check what is still running or left over (the shell-panel and
-> shell-app worktrees, the panel mutation run in `.build/mutation/panels`), then go on with "Next steps" in order.
+> `quality-gates-continue.md` leaves it. The shell agents and the panel mutation run were stopped part-way;
+> resume them as that section says, then go on with "Next steps" in order.
 > Use subagents in worktrees for module work as before; merge, verify (clean build, `swift test --parallel`,
 > `Scripts/check.sh leaks`, the gates of the files touched), commit and push after each finished piece. The bar is
 > code quality without compromise: no weakened gates, no ignores.
@@ -34,31 +34,37 @@ Paste this into a new Claude Code session in `/Users/cm0k/Claude/Projects/TotalC
   `Scripts/mutation-map.py` builds in about 4 minutes, then the whole of their targets before it counts as survived.
   A trial on `SortedFileList.swift`: 8 of 8 killed, about 10 to 20 s per mutant instead of 2.3 minutes.
 
-### Running when this was saved (check whether it finished)
+### Stopped on request (2026-10-15, 22:45 JST)
 
-- **Panel mutation run:** `Scripts/mutation.sh --report-dir .build/mutation/panels <the 63 files under
-  Sources/AFMKernel/Panels>`, 523 mutants, log `.build/mutation/panels.log`, Muter's log
-  `.build/mutation/panels/muter.log`. If it finished: survivors get a killing test (in `Tests/KernelTests/Panels*`) or
-  an entry in `Tests/Mutation/equivalent-mutants.txt` with a real reason; then the gate
-  (`python3 Scripts/mutation-gate.py check .build/mutation/panels/mutants.json`) must pass. If it was killed: remove
-  `.build/mutation/lock` (only when no `muter` process runs) and start it again.
+Nothing runs any more; the work below was stopped part-way and is kept as it was.
+
+- **Panel mutation run** (523 mutants in the 63 files under `Sources/AFMKernel/Panels`): stopped after about 30
+  mutants, so it has no report; the per-mutant logs of those are in `.build/mutation/project_mutated/.mutation/logs`
+  until the next run replaces that folder. Start it again from scratch:
+  `Scripts/mutation.sh --report-dir .build/mutation/panels $(find Sources/AFMKernel/Panels -name '*.swift' | sort)`
+  (remove `.build/mutation/lock` first if it exists and no `muter` process runs). It took about 88 s per mutant while
+  the shell agents loaded the machine; alone, expect 30 to 50 s, about 5 to 7 hours. Then: survivors get a killing test
+  (in `Tests/KernelTests/Panels*`) or an entry in `Tests/Mutation/equivalent-mutants.txt` with a real reason, and
+  `python3 Scripts/mutation-gate.py check .build/mutation/panels/mutants.json` must pass.
 - **Shell wave, two agents** (assignments in `documentation/agent-briefs/shell-panel.md` and `shell-app.md`, base
-  `203576a`, mutation left to the coordinator):
-  - shell-panel, worktree `.claude/worktrees/agent-ab0b327b2e7d0b7e8`, branch `shell-panel`: `Sources/AFMShell/Panel/**`
-    and the panel test files, the file-list accessibility findings, the only one that runs `Scripts/check.sh uitest`.
-    When saved: no commit yet, about 100 files changed, work in progress.
-  - shell-app, worktree `.claude/worktrees/agent-ac064839e3432db2b`, branch `shell-app` (its commits so far are also
-    pushed as `wip/shell-app`): `Sources/AFMShell/{App,Interaction,Window}/**`, `Sources/AFileManager/**`, the other
-    shell tests, the menu-bar accessibility finding (type 81). When saved: 4 commits (unused code removed, the shell's
-    commands hold panels and kernel weakly to break a retain cycle, formatting, one declaration per file and docs),
-    more in progress.
-  - If the agents are gone (a new session): resume each in its worktree with a new agent given its assignment file
-    plus "continue from the work already in this worktree (commits and uncommitted changes); keep everything that is
-    right, finish the rest, report as the briefs say".
+  `203576a`, mutation left to the coordinator), stopped mid-work. Everything they had, committed or not, is committed
+  on their branches and pushed as backup branches; the last commit of each is a work-in-progress snapshot that may not
+  build:
+  - shell-panel: worktree `.claude/worktrees/agent-ab0b327b2e7d0b7e8`, branch `shell-panel`, pushed as
+    `wip/shell-panel` (`5873ee2`): one snapshot commit of about 100 changed files (`Sources/AFMShell/Panel/**` split
+    and lint work, its test files, ScriptedFileSystem being rewritten when stopped).
+  - shell-app: worktree `.claude/worktrees/agent-ac064839e3432db2b`, branch `shell-app`, pushed as `wip/shell-app`
+    (`3326f8b`): 4 finished commits (unused code removed; the shell's commands hold panels and kernel weakly, which
+    broke a retain cycle; formatting; one declaration per file, docs, long functions split, failed settings writes
+    logged) and a snapshot commit (the button-bar files being split when stopped).
+  - To resume: start one agent per assignment in its worktree (or in a new worktree checked out from its `wip/`
+    branch), with its assignment file plus "continue from the work already on this branch: the last commit is an
+    unverified snapshot; check it, keep what is right, finish the rest, report as the briefs say".
 
 ## Next steps, in order
 
-1. Finish the panel mutation run (above).
+1. Run the panel mutation again and finish it (above), and resume the two shell agents (above), in parallel or one
+   after the other (the mutation run is faster on an otherwise idle machine).
 2. Mutation for core-api's hot files, never run because of the old switch: `Sources/AFMKernel/Support/**`,
    `Sources/AFMKernel/FileSystem/FileItem*.swift`, `URL+Locations`, and `Sources/AFMContracts/**`. Same handling of
    survivors. Known: PluginTests timing tests (`FindRenameFixRenameTests:79`, `DirectorySyncCommandTests:356`) failed in
