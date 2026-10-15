@@ -26,6 +26,9 @@ internal final class PanelWatchedFileSystem: FileSystemProvider, @unchecked Send
     internal let inner = MemoryFileSystem(scheme: "watched")
     private let condition = NSCondition()
     private var holds = false
+    private var ejectable = false
+    private var isServer = false
+    private var extraPlaces: [Place] = []
     private var watchCalls: [(path: String, onMain: Bool)] = []
     private var placeCalls: [Bool] = []
     private var living = 0
@@ -55,6 +58,21 @@ internal final class PanelWatchedFileSystem: FileSystemProvider, @unchecked Send
     internal var scheme: String { inner.scheme }
     /// The memory file system's capabilities.
     internal var capabilities: FileSystemCapabilities { inner.capabilities }
+    /// Whether its place is a drive that can be ejected; false at first.
+    internal var placeCanBeEjected: Bool {
+        get { condition.withLock { ejectable } }
+        set { condition.withLock { ejectable = newValue } }
+    }
+    /// Places it names besides its own; none at first.
+    internal var morePlaces: [Place] {
+        get { condition.withLock { extraPlaces } }
+        set { condition.withLock { extraPlaces = newValue } }
+    }
+    /// Whether it says it is on a server (`connectsToServer`); false at first.
+    internal var connectsToServer: Bool {
+        get { condition.withLock { isServer } }
+        set { condition.withLock { isServer = newValue } }
+    }
 
     /// A file system that has been asked nothing.
     internal init() {
@@ -95,7 +113,8 @@ internal final class PanelWatchedFileSystem: FileSystemProvider, @unchecked Send
     /// One place, noting on which thread it was asked for.
     internal func places() -> [Place] {
         condition.withLock { placeCalls.append(Thread.isMainThread) }
-        return [Place(name: "Watched", url: url("/"), kind: .externalDisk)]
+        return [Place(name: "Watched", url: url("/"), kind: .externalDisk, canBeEjected: placeCanBeEjected)]
+            + morePlaces
     }
 
     /// The memory file system's listing.

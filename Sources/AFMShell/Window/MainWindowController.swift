@@ -232,16 +232,19 @@ internal final class MainWindowController: NSWindowController, NSMenuItemValidat
             self?.buttonBar.rebuild()
             self?.applyLayout()
         }
+        // The window keeps the subscription, so it hears of the panels for as long as it lives.
         let subscription = kernel.panelEvents.subscribe { [weak self] event, panel in
-            guard let self else {
-                return
-            }
-            if event == .becameSource {
-                layout.sourceIsRight = panel === panels.rightPanel
-            }
-            scheduleValidation()
+            self?.panelDid(event, panel)
         }
         subscriptions.append(subscription)
+    }
+
+    /// A panel became the source, changed its folder or its selection: the bars follow.
+    private func panelDid(_ event: PanelEvent, _ panel: any PanelHandle) {
+        if event == .becameSource {
+            layout.sourceIsRight = panel === panels.rightPanel
+        }
+        scheduleValidation()
     }
 
     /// Listens to the program and the window becoming active, moving and changing size.
