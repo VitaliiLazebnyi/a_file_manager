@@ -190,27 +190,68 @@ enum ShortcutText {
     /// How a key is written on the Mac: `C`, `F5`, `↩`.
     static func name(of key: Key) -> String {
         switch key {
-        case .character(let character): character.uppercased()
-        case .function(let number): "F\(number)"
-        case .returnKey: "↩"
-        case .enter: "⌤"
-        case .tab: "⇥"
-        case .space: "Space"
-        case .backspace: "⌫"
-        case .forwardDelete: "⌦"
-        case .insert: "Insert"
-        case .home: "↖"
-        case .end: "↘"
-        case .pageUp: "⇞"
-        case .pageDown: "⇟"
-        case .leftArrow: "←"
-        case .rightArrow: "→"
-        case .upArrow: "↑"
-        case .downArrow: "↓"
-        case .keypadPlus: "Num +"
-        case .keypadMinus: "Num −"
-        case .keypadMultiply: "Num *"
-        case .keypadDivide: "Num /"
+        case .character(let character):
+            character.uppercased()
+
+        case .function(let number):
+            "F\(number)"
+
+        case .returnKey:
+            "↩"
+
+        case .enter:
+            "⌤"
+
+        case .tab:
+            "⇥"
+
+        case .space:
+            "Space"
+
+        case .backspace:
+            "⌫"
+
+        case .forwardDelete:
+            "⌦"
+
+        case .insert:
+            "Insert"
+
+        case .home:
+            "↖"
+
+        case .end:
+            "↘"
+
+        case .pageUp:
+            "⇞"
+
+        case .pageDown:
+            "⇟"
+
+        case .leftArrow:
+            "←"
+
+        case .rightArrow:
+            "→"
+
+        case .upArrow:
+            "↑"
+
+        case .downArrow:
+            "↓"
+
+        case .keypadPlus:
+            "Num +"
+
+        case .keypadMinus:
+            "Num −"
+
+        case .keypadMultiply:
+            "Num *"
+
+        case .keypadDivide:
+            "Num /"
         }
     }
 
