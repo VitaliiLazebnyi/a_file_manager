@@ -18,7 +18,7 @@ internal final class FolderWatches {
     /// The file systems that watch.
     private let fileSystems: FileSystemRegistry
     /// Called with the folders that changed.
-    private let onChange: (ChangedFolders) -> Void
+    private let onChange: ([URL]) -> Void
     /// The folders that are watched or about to be, by location.
     private var watches: [String: FolderWatch] = [:]
     /// The locations last asked for.
@@ -27,7 +27,7 @@ internal final class FolderWatches {
     private var isShutDown = false
 
     /// Watches of the folders of `fileSystems`; `onChange` hears of changes, on the main thread.
-    internal init(fileSystems: FileSystemRegistry, onChange: @escaping (ChangedFolders) -> Void) {
+    internal init(fileSystems: FileSystemRegistry, onChange: @escaping ([URL]) -> Void) {
         self.fileSystems = fileSystems
         self.onChange = onChange
     }
@@ -91,7 +91,7 @@ internal final class FolderWatches {
                     guard let self, let watch, watch.isWanted, watches[key] === watch else {
                         return
                     }
-                    onChange(.only(changed))
+                    onChange(changed)
                 }
             },
             then: { [weak self] watcher in
@@ -122,7 +122,7 @@ internal final class FolderWatches {
         }
         watch.watcher = watcher
         if ProcessInfo.processInfo.systemUptime - began > Self.slowWatch {
-            onChange(.only([watch.directory]))
+            onChange([watch.directory])
         }
     }
 

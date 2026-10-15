@@ -34,7 +34,7 @@ internal final class PanelCoordinator: PanelSet, PanelHost {
     private let readsAhead: Bool
     /// The folders the panels show, watched for changes.
     private lazy var watches = FolderWatches(fileSystems: kernel.fileSystems) { [weak self] changed in
-        self?.reload(changed, changedAt: nil)
+        self?.reloadChangedPanels(showing: changed)
     }
     /// Changes reported while a job was running.
     private var missedChanges = MissedChanges()

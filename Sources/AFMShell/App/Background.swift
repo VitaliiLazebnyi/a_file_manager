@@ -36,14 +36,6 @@ internal enum Background {
     /// The most threads the pool starts.
     private static let computeLimit = max(2, ProcessInfo.processInfo.activeProcessorCount)
 
-    /// Whether the lane of this purpose and location is at work or has work waiting.
-    internal static func isBusy(_ purpose: String, at location: URL) -> Bool {
-        let key = laneKey(purpose, location)
-        lock.lock()
-        defer { lock.unlock() }
-        return lanes[key] != nil
-    }
-
     /// Runs `work`, which may wait on the file system of `location`, in the lane of that purpose
     /// and location.
     ///
