@@ -122,8 +122,9 @@ final class ViewerPane: NSView, NSMenuDelegate {
     private let statusLabel = NSTextField(labelWithString: "")
     private let progressBar = NSProgressIndicator()
     private let cancelButton = NSButton(title: "Cancel", target: nil, action: nil)
-    /// Set on the main thread, read in `deinit`.
-    nonisolated(unsafe) private var keyMonitor: Any?
+    /// Set while the pane is in a window. A pane leaves its window (`viewDidMoveToWindow`) before
+    /// it can go: the window holds it, and takes it out of itself when it goes.
+    private var keyMonitor: Any?
     static let menuTitles = ["File", "Edit", "Options", "Encoding"]
 
     init(kernel: Kernel, settings: ListerSettings, temporaryCopies: TemporaryCopies, isEmbedded: Bool) {
@@ -155,7 +156,6 @@ final class ViewerPane: NSView, NSMenuDelegate {
         presentCancellation.cancel()
         resizeWork?.cancel()
         temporaryCopies.release(owner: ObjectIdentifier(self))
-        if let keyMonitor { NSEvent.removeMonitor(keyMonitor) }
     }
 
     // MARK: Layout
@@ -259,7 +259,7 @@ final class ViewerPane: NSView, NSMenuDelegate {
         // inside the main window, only while the pane has the keyboard (spec 10 › Embedded
         // Lister: "these keep their Lister meaning").
         // A key the pane handled is taken from the application (nil); the monitor is removed
-        // when the pane leaves its window and in `deinit`, so it never outlives the pane.
+        // when the pane leaves its window, which it does before it goes, so it never outlives it.
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [unowned self] event in
             monitored(event)
         }

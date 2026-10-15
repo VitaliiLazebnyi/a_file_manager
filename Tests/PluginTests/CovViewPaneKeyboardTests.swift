@@ -125,5 +125,9 @@ internal struct CovViewPaneKeyboardTests {
             window.close()
         }
         #expect(await bench.wait { gone == nil && goneWindow == nil })
+        // Its monitor went with it: a key of the application reaches no pane that is gone.
+        let other = Self.window()
+        defer { other.close() }
+        NSApp.sendEvent(try Self.key("x", 7, in: other))
     }
 }
