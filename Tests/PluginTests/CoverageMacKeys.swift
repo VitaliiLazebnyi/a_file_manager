@@ -11,8 +11,4 @@ internal final class CoverageMacKeys: NSView {
     override internal func keyDown(with event: NSEvent) {
         typed.append(event.characters ?? "")
     }
-
-    deinit {
-        // Nothing to release.
-    }
 }
