@@ -85,9 +85,9 @@ public enum FTPListParser {
 
     /// A date built from numbers a server sent; nil when they are not a date of our era.
     static func date(_ components: DateComponents, calendar: Calendar) -> Date? {
-        guard let year = components.year, (1...9_999).contains(year),
-            (components.month ?? 1) >= 1, (components.month ?? 1) <= 12, (components.day ?? 1) >= 1,
-            (components.day ?? 1) <= 31,
+        // Every caller gives a year, a month and a day; the time of day may be left out.
+        guard let year = components.year, (1...9_999).contains(year), let month = components.month,
+            (1...12).contains(month), let day = components.day, (1...31).contains(day),
             (0...24).contains(components.hour ?? 0), (0...59).contains(components.minute ?? 0),
             (0...60).contains(components.second ?? 0)
         else { return nil }
@@ -127,7 +127,7 @@ public enum FTPListParser {
                     }
                 }
 
-            case "size", "sizd": entry.size = size(value[...])
+            case "size", "sizd": entry.size = size(Substring(value))
             case "modify": entry.modified = FTPSyntax.time(value)
             case "unix.mode": entry.permissions = UInt16(value, radix: 8).map { $0 & 0o7777 }
             default: break
@@ -374,7 +374,7 @@ public enum FTPListParser {
             name = String(name[..<arrow.lowerBound])
         }
         entry.name = name
-        if hasMode { entry.permissions = permissions(characters.dropFirst().map(Character.init)[...]) }
+        if hasMode { entry.permissions = permissions(ArraySlice(characters.dropFirst().map(Character.init))) }
         return entry
     }
 
@@ -465,7 +465,7 @@ public enum FTPListParser {
                 position += 1
             }
             guard position > kindStart else { return nil }
-            size = self.size(Substring(text(line[kindStart..<position].filter(isDigit)[...])))
+            size = self.size(Substring(text(ArraySlice(line[kindStart..<position].filter(isDigit)))))
         }
         guard space() > 0, position < line.count else { return nil }
         if year < 100 { year += year < 70 ? 2_000 : 1_900 }
@@ -485,20 +485,20 @@ public enum FTPListParser {
     private static func eplf(_ line: Scalars) -> RemoteEntry? {
         guard let tab = line.firstIndex(of: "\t") else { return nil }
         var entry = RemoteEntry(name: text(line[(tab + 1)...]), isDirectory: false)
+        // Empty facts are left out by the split, so every fact has a kind.
         for fact in line[1..<tab].split(separator: ",") {
-            guard let kind = fact.first else { continue }
             let value = text(fact.dropFirst())
-            switch kind {
-            case "/": entry.isDirectory = true
-            case "s": entry.size = size(value[...])
+            switch fact.first {
+            case "/"?: entry.isDirectory = true
+            case "s"?: entry.size = size(Substring(value))
 
-            case "m":
+            case "m"?:
                 // Seconds since 1970; anything else, or a time beyond the year 9999, is no date.
                 if value.utf8.count <= 12, let seconds = Int64(value), (0...253_402_300_799).contains(seconds) {
                     entry.modified = Date(timeIntervalSince1970: TimeInterval(seconds))
                 }
 
-            case "u" where value.hasPrefix("p"):
+            case "u"? where value.hasPrefix("p"):
                 entry.permissions = UInt16(value.dropFirst(), radix: 8).map { $0 & 0o7777 }
 
             default: break

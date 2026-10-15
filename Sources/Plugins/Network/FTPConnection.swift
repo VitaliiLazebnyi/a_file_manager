@@ -74,7 +74,8 @@ public enum NameEncoding: Int, Codable, CaseIterable, Sendable {
         func bytes(_ piece: String, as encoding: String.Encoding) throws -> Data {
             guard let data = piece.data(using: encoding, allowLossyConversion: false) else {
                 throw FileSystemError.notSupported(
-                    "Writing the name \(piece) in the encoding of this server (\(title))")
+                    "Writing the name \(piece) in the encoding of this server (\(title))"
+                )
             }
             return data
         }
@@ -155,8 +156,14 @@ public struct FTPServerConfig: Sendable {
     public var usesMLSD: Bool?
 
     public init(
-        host: String, port: Int = 21, tls: TLSMode = .none, user: String = "anonymous", password: String = "",
-        passive: Bool = true, encoding: NameEncoding = .automatic, timeout: TimeInterval = 30,
+        host: String,
+        port: Int = 21,
+        tls: TLSMode = .none,
+        user: String = "anonymous",
+        password: String = "",
+        passive: Bool = true,
+        encoding: NameEncoding = .automatic,
+        timeout: TimeInterval = 30,
         initCommands: [String] = [],
         usesMLSD: Bool? = nil
     ) {
@@ -176,7 +183,8 @@ public struct FTPServerConfig: Sendable {
     public static func initCommands(from text: String) -> [String] {
         let marker = "\u{1}"
         return text.replacingOccurrences(of: ";;", with: marker).split(separator: ";")
-            .map { $0.replacingOccurrences(of: marker, with: ";").trimmingCharacters(in: .whitespaces) }.filter {
+            .map { $0.replacingOccurrences(of: marker, with: ";").trimmingCharacters(in: .whitespaces) }
+            .filter {
                 !$0.isEmpty
             }
     }
@@ -258,8 +266,11 @@ final class FTPConnection: @unchecked Sendable {
 
     /// `knownLinks` and `knownNames` are the session's, shared by its connections.
     init(
-        config: FTPServerConfig, trust: CertificateTrust, knownLinks: LinkMemory = LinkMemory(),
-        knownNames: NameMemory = NameMemory(), onActivity: (@Sendable () -> Void)? = nil,
+        config: FTPServerConfig,
+        trust: CertificateTrust,
+        knownLinks: LinkMemory = LinkMemory(),
+        knownNames: NameMemory = NameMemory(),
+        onActivity: (@Sendable () -> Void)? = nil,
         log: (@Sendable (String) -> Void)? = nil
     ) {
         self.config = config
@@ -313,15 +324,16 @@ final class FTPConnection: @unchecked Sendable {
     }
 
     private func logIn(explicitGreeting: FTPReply?, cancellation: CancellationFlag?) throws {
-        var hello = explicitGreeting
-        while hello == nil {
+        var hello: FTPReply
+        if let explicitGreeting {
+            hello = explicitGreeting
+        } else {
             // 120 announces a delay; the greeting follows.
-            let reply = try readReply(cancellation: cancellation)
-            if reply.code != 120 { hello = reply }
+            repeat {
+                hello = try readReply(cancellation: cancellation)
+            } while hello.code == 120
         }
-        guard let hello, hello.code == 220 else {
-            throw NetworkError.refused(hello ?? FTPReply(code: 421, lines: ["No greeting"]))
-        }
+        guard hello.code == 220 else { throw NetworkError.refused(hello) }
         greeting = hello.text
 
         if config.tls != .none {
@@ -332,7 +344,8 @@ final class FTPConnection: @unchecked Sendable {
             guard protection.isSuccess else {
                 throw NetworkError.unexpected(
                     "The server refused to encrypt its data connections (PROT P: \(protection.message)). "
-                        + "The files would travel unprotected, so the connection was not used.")
+                        + "The files would travel unprotected, so the connection was not used."
+                )
             }
             protectsData = true
         }
@@ -432,7 +445,9 @@ final class FTPConnection: @unchecked Sendable {
     /// Sends one command and returns the server's answer, whatever it is.
     @discardableResult
     func send(
-        _ command: String, shown: String? = nil, replyWithin: TimeInterval? = nil,
+        _ command: String,
+        shown: String? = nil,
+        replyWithin: TimeInterval? = nil,
         cancellation: CancellationFlag? = nil
     ) throws -> FTPReply {
         let control = try stream()
@@ -445,8 +460,10 @@ final class FTPConnection: @unchecked Sendable {
         commandMayHaveRun = false
         do {
             try control.write(
-                try encoding.encode(command, names: knownNames) + Data("\r\n".utf8), timeout: config.timeout,
-                cancellation: cancellation)
+                try encoding.encode(command, names: knownNames) + Data("\r\n".utf8),
+                timeout: config.timeout,
+                cancellation: cancellation
+            )
         } catch let error as FileSystemError {
             // Nothing was sent; the connection is as good as before.
             throw error
@@ -553,7 +570,7 @@ final class FTPConnection: @unchecked Sendable {
 
     /// Opens the data connection for the next transfer command, without waiting for it: with
     /// TLS the handshake only happens once the server has seen the command.
-    private func openData(cancellation: CancellationFlag?) throws -> (stream: NetStream?, listener: DataListener?) {
+    private func openData(cancellation: CancellationFlag?) throws -> DataSide {
         let control = try stream()
         let security: NetStream.Security = protectsData ? .tls(TLSSettings(host: config.host, trust: trust)) : .none
         // Encrypted data connections cannot be accepted, so TLS always goes the passive way.
@@ -571,17 +588,22 @@ final class FTPConnection: @unchecked Sendable {
                 try perform("PORT \(argument)", cancellation: cancellation)
             } else {
                 try perform(
-                    "EPRT \(FTPSyntax.extendedPortArgument(host: address, port: port))", cancellation: cancellation)
+                    "EPRT \(FTPSyntax.extendedPortArgument(host: address, port: port))",
+                    cancellation: cancellation
+                )
             }
-            return (nil, listener)
+            return .listening(listener)
         }
-        var port: Int?
+        var extendedPort: Int?
         if !extendedPassiveFailed {
             let reply = try send("EPSV", cancellation: cancellation)
-            port = reply.code == 229 ? FTPSyntax.extendedPassivePort(reply.text) : nil
-            if port == nil { extendedPassiveFailed = true }
+            extendedPort = reply.code == 229 ? FTPSyntax.extendedPassivePort(reply.text) : nil
+            if extendedPort == nil { extendedPassiveFailed = true }
         }
-        if port == nil {
+        let port: Int
+        if let extendedPort {
+            port = extendedPort
+        } else {
             let reply = try send("PASV", cancellation: cancellation)
             guard reply.code == 227, let endpoint = FTPSyntax.passiveEndpoint(reply.text) else {
                 throw NetworkError.refused(reply)
@@ -593,20 +615,37 @@ final class FTPConnection: @unchecked Sendable {
         // The same machine the control connection reached: the name may lead to another one on
         // a second lookup (round-robin DNS, IPv4 against IPv6). It stays the name that the
         // certificate is checked for.
-        let stream = NetStream(host: control.remoteAddress ?? config.host, port: port ?? 0, security: security)
+        let stream = NetStream(host: control.remoteAddress ?? config.host, port: port, security: security)
         stream.start()
-        return (stream, nil)
+        return .connecting(stream)
+    }
+
+    /// The data connection of a transfer while it is set up: one this program opens (passive
+    /// mode), or a port the server is to connect to (active mode).
+    private enum DataSide {
+        case connecting(NetStream)
+        case listening(DataListener)
+
+        /// Gives the data connection up before it was used.
+        func cancel() {
+            switch self {
+            case .connecting(let stream): stream.close()
+            case .listening(let listener): listener.cancel()
+            }
+        }
     }
 
     /// Starts a transfer: `RETR`, `STOR`, `LIST` and the like. The returned stream carries the
     /// data; `finishTransfer` or `abortTransfer` must follow.
     func beginTransfer(
-        _ command: String, type: Character, restartAt offset: UInt64 = 0,
+        _ command: String,
+        type: Character,
+        restartAt offset: UInt64 = 0,
         cancellation: CancellationFlag? = nil
     ) throws -> NetStream {
         guard data == nil else { throw NetworkError.unexpected("A transfer is still running on this connection.") }
         try setType(type, cancellation: cancellation)
-        let (stream, listener) = try openData(cancellation: cancellation)
+        let side = try openData(cancellation: cancellation)
         do {
             if offset > 0 {
                 let rest = try send("REST \(offset)", cancellation: cancellation)
@@ -619,15 +658,20 @@ final class FTPConnection: @unchecked Sendable {
             // unread, it would be taken for the answer to the next command.
             var channel: NetStream?
             do {
-                channel = try stream ?? listener?.accept(timeout: config.timeout, cancellation: cancellation)
-                guard let channel else { throw NetworkError.connectionFailed("No data connection.") }
-                try channel.waitUntilReady(timeout: config.timeout, cancellation: cancellation)
-                setStreams(control: control, data: channel)
-                return channel
+                let opened: NetStream
+                switch side {
+                case .connecting(let stream): opened = stream
+                case .listening(let listener):
+                    opened = try listener.accept(timeout: config.timeout, cancellation: cancellation)
+                }
+                channel = opened
+                try opened.waitUntilReady(timeout: config.timeout, cancellation: cancellation)
+                setStreams(control: control, data: opened)
+                return opened
             } catch {
                 // The command is under way; the server ends it when the data connection fails.
                 channel?.close()
-                listener?.cancel()
+                side.cancel()
                 // A server that wants the control connection's TLS session reused says so here.
                 if cancellation?.isCancelled != true,
                     let said = try? readReply(timeout: min(config.timeout, 5), cancellation: cancellation),
@@ -639,8 +683,7 @@ final class FTPConnection: @unchecked Sendable {
                 throw error
             }
         } catch {
-            stream?.close()
-            listener?.cancel()
+            side.cancel()
             throw error
         }
     }
@@ -731,15 +774,18 @@ final class FTPConnection: @unchecked Sendable {
     /// hidden files are wanted). `receive` gets the entries piece by piece and returns false
     /// to stop.
     func list(
-        _ path: String, showHidden: Bool, cancellation: CancellationFlag? = nil, receive: ([RemoteEntry]) -> Bool
+        _ path: String,
+        showHidden: Bool,
+        cancellation: CancellationFlag? = nil,
+        receive: ([RemoteEntry]) -> Bool
     ) throws {
         let path = RemotePath.normalized(path)
         unresolvedLinks = []
         var asMLSD = config.usesMLSD ?? offersMLSD
-        var channel: NetStream?
+        var mlsdChannel: NetStream?
         if asMLSD {
             do {
-                channel = try beginTransfer("MLSD \(path)", type: "I", cancellation: cancellation)
+                mlsdChannel = try beginTransfer("MLSD \(path)", type: "I", cancellation: cancellation)
             } catch NetworkError.refused(let reply)
                 where config.usesMLSD == nil && [500, 502, 504].contains(reply.code)
             {
@@ -749,12 +795,14 @@ final class FTPConnection: @unchecked Sendable {
                 asMLSD = false
             }
         }
-        if !asMLSD {
+        let channel: NetStream
+        if let mlsdChannel {
+            channel = mlsdChannel
+        } else {
             // LIST with a path trips over names with spaces and leading dashes on many servers.
             try changeDirectory(path, cancellation: cancellation)
             channel = try beginTransfer(showHidden ? "LIST -la" : "LIST", type: "A", cancellation: cancellation)
         }
-        guard let channel else { throw NetworkError.connectionLost }
         // Links are held back: whether one leads to a directory is asked when the listing is through.
         var links: [RemoteEntry] = []
         var splitter = LineSplitter()
@@ -786,7 +834,10 @@ final class FTPConnection: @unchecked Sendable {
         do {
             while wanted,
                 let block = try channel.read(
-                    upToCount: 256 * 1_024, timeout: config.timeout, cancellation: cancellation)
+                    upToCount: 256 * 1_024,
+                    timeout: config.timeout,
+                    cancellation: cancellation
+                )
             {
                 onActivity?()
                 bytesSoFar += Int64(block.count)

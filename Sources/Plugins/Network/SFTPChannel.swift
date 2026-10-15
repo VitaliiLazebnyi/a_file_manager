@@ -50,9 +50,13 @@ struct SFTPAttributes {
 
     func entry(named name: String) -> RemoteEntry {
         var entry = RemoteEntry(
-            name: name, isDirectory: isDirectory, isSymlink: isSymlink, size: Int64(clamping: size ?? 0),
+            name: name,
+            isDirectory: isDirectory,
+            isSymlink: isSymlink,
+            size: Int64(clamping: size ?? 0),
             modified: modified.map { Date(timeIntervalSince1970: TimeInterval($0)) },
-            permissions: permissions.map { UInt16($0 & 0o7777) })
+            permissions: permissions.map { UInt16($0 & 0o7777) }
+        )
         entry.isSpecial = isSpecial
         return entry
     }
@@ -139,7 +143,10 @@ struct SFTPDecoder {
         return data[offset..<offset + count]
     }
 
-    mutating func u8() throws -> UInt8 { try take(1).first ?? 0 }
+    mutating func u8() throws -> UInt8 {
+        let byte = try take(1)
+        return byte[byte.startIndex]
+    }
     mutating func u32() throws -> UInt32 { try take(4).reduce(UInt32(0)) { $0 << 8 | UInt32($1) } }
     mutating func u64() throws -> UInt64 { try take(8).reduce(UInt64(0)) { $0 << 8 | UInt64($1) } }
     mutating func bytes() throws -> Data { try take(Int(try u32())) }
@@ -151,7 +158,10 @@ struct SFTPDecoder {
     mutating func name() throws -> (text: String, encoding: String.Encoding) {
         let raw = Data(try bytes())
         if let text = String(data: raw, encoding: .utf8) { return (text, .utf8) }
-        return (String(data: raw, encoding: .isoLatin1) ?? String(decoding: raw, as: UTF8.self), .isoLatin1)
+        // Latin 1 is the first 256 code points, one byte each.
+        var text = String.UnicodeScalarView()
+        text.append(contentsOf: raw.map { Unicode.Scalar($0) })
+        return (String(text), .isoLatin1)
     }
     var isAtEnd: Bool { offset >= data.endIndex }
 
@@ -271,7 +281,10 @@ final class AskpassHelper {
     init() throws {
         directory = FileManager.default.temporaryDirectory.appendingPathComponent("afm-askpass-\(UUID().uuidString)")
         try FileManager.default.createDirectory(
-            at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+            at: directory,
+            withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o700]
+        )
         let (questionPath, answerPath) = (
             directory.appendingPathComponent("question").path, directory.appendingPathComponent("answer").path
         )
@@ -390,7 +403,10 @@ final class SFTPChannel: @unchecked Sendable {
     private var serverExtensions: [String: String] = [:]
 
     init(
-        executable: String, arguments: [String], environment: [String: String], writeTimeout: TimeInterval = 60,
+        executable: String,
+        arguments: [String],
+        environment: [String: String],
+        writeTimeout: TimeInterval = 60,
         names: NameMemory? = nil
     ) {
         self.writeTimeout = writeTimeout
@@ -418,8 +434,10 @@ final class SFTPChannel: @unchecked Sendable {
     var errorMessage: String {
         lock.lock()
         defer { lock.unlock() }
-        return String(decoding: errorText, as: UTF8.self).split(whereSeparator: \.isNewline).suffix(3).joined(
-            separator: "\n")
+        return String(decoding: errorText, as: UTF8.self).split(whereSeparator: \.isNewline).suffix(3)
+            .joined(
+                separator: "\n"
+            )
     }
 
     /// `errorMessage` once the child process has had its say: when the dialogue broke off, the
@@ -781,7 +799,9 @@ final class SFTPChannel: @unchecked Sendable {
     }
 
     func request(
-        _ type: SFTPRequest, timeout: TimeInterval, cancellation: CancellationFlag? = nil,
+        _ type: SFTPRequest,
+        timeout: TimeInterval,
+        cancellation: CancellationFlag? = nil,
         _ build: (inout SFTPEncoder) -> Void
     ) throws -> SFTPPacket {
         let ticket = try send(type, cancellation: cancellation, build)

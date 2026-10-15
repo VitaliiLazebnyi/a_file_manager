@@ -350,7 +350,7 @@ import Testing
         _ = try fixture.names("/")
         let session = try fixture.center.session(for: fixture.key)
         fixture.server.options.dropReplyFor = "MKD"
-        #expect(throws: NetworkError.self) { try session.makeDirectory("/made") }
+        #expect(throws: NetworkError.self) { try session.makeDirectory("/made", cancellation: nil) }
         fixture.server.options.dropReplyFor = nil
         #expect(fixture.box.exists("srv/made"))
         #expect(fixture.server.commands.filter { $0.hasPrefix("MKD") }.count == 1)

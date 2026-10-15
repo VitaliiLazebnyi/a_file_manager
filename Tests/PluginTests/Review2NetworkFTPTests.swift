@@ -357,7 +357,7 @@ private final class Notes: @unchecked Sendable {
         let first = AdoptOutcome { _ = try session.connect(cancellation: nil) }
         #expect(asked.wait(timeout: .now() + 30) == .success)
         // Called without a flag, it ends with the session.
-        let waiting = AdoptOutcome { try session.makeDirectory("/made") }
+        let waiting = AdoptOutcome { try session.makeDirectory("/made", cancellation: nil) }
         #expect(!waiting.ended(within: 0.5))
         let started = Date()
         session.disconnect()
