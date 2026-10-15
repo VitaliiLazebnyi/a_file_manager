@@ -23,7 +23,7 @@ import Testing
     }
 
     @discardableResult
-    func wait(upTo seconds: TimeInterval = 30, until condition: () -> Bool) async -> Bool {
+    func wait(upTo seconds: TimeInterval = Wait.ceiling, until condition: () -> Bool) async -> Bool {
         let deadline = Date().addingTimeInterval(seconds)
         while !condition(), Date() < deadline {
             try? await Task.sleep(nanoseconds: 3_000_000)
