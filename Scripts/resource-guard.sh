@@ -8,13 +8,16 @@
 #   Scripts/resource-guard.sh status     the last sample and the last alerts
 #   Scripts/resource-guard.sh run        run it in the foreground (what launchd starts)
 #
-# Every sample (each AFM_GUARD_INTERVAL seconds, default 5) is written to the status file; each
-# change of level and each step taken is written to the log and shown as a notification.
+# Every sample (each AFM_GUARD_INTERVAL seconds, default 5) is written to the status file. A change
+# of level is written to the log and shown as a notification once it has lasted 30 s (a short peak
+# is not news); a change to critical, and each step taken, at once.
 #
 # Levels: warn when the memory pressure is "warn", free memory is under 20%, swap holds more than
-# 2 GiB, the load is over 1.5 times the cores or less than 15 GiB of disk are free; critical when
-# the pressure is "critical", free memory is under 8%, swap holds more than 6 GiB, the load is over
-# 4 times the cores or less than 5 GiB of disk are free.
+# 2 GiB, the load is over 4 times the cores or less than 15 GiB of disk are free; critical when the
+# pressure is "critical", free memory is under 8%, swap holds more than 6 GiB, the load is over
+# 8 times the cores or less than 5 GiB of disk are free. The load is the 5-minute average: builds
+# and parallel tests keep all cores busy (a load of 1.5 to 4 times the cores) without harm; what
+# freezes the machine is memory, swap and disk, not a busy processor.
 #
 # Steps, only on development processes (tests, compiler, build, Muter, the gates' tools), never on
 # anything else: at a critical load they are lowered to the least priority; at a critical memory,
@@ -77,7 +80,7 @@ lower_priority() {
 
 run() {
   mkdir -p "$(dirname "$log")"
-  local cores last_level="ok" last_end=0
+  local cores last_level="ok" last_end=0 seen_level="ok" seen_count=0
   cores="$(sysctl -n hw.ncpu)"
   note "started (interval ${interval}s, action $action, $cores cores)"
   while true; do
@@ -86,7 +89,7 @@ run() {
     free="$(sysctl -n kern.memorystatus_level)"
     swap_mb="$(sysctl -n vm.swapusage | sed -E 's/.*used = ([0-9.]+)M.*/\1/')"
     swap_mb="${swap_mb%.*}"
-    load="$(sysctl -n vm.loadavg | awk '{print $2}')"
+    load="$(sysctl -n vm.loadavg | awk '{print $3}')"
     disk_gb="$(df -k / | awk 'NR==2 {print int($4 / 1048576)}')"
 
     warn() { reasons+="$1; "; [[ "$level" == "ok" ]] && level="warn"; }
@@ -100,14 +103,21 @@ run() {
     if ((disk_gb < 5)); then crit "free disk ${disk_gb} GiB"; crit_mem=1
     elif ((disk_gb < 15)); then warn "free disk ${disk_gb} GiB"; fi
     local load_crit load_warn
-    load_crit="$(awk -v l="$load" -v c="$cores" 'BEGIN {print (l > 4 * c) ? 1 : 0}')"
-    load_warn="$(awk -v l="$load" -v c="$cores" 'BEGIN {print (l > 1.5 * c) ? 1 : 0}')"
+    load_crit="$(awk -v l="$load" -v c="$cores" 'BEGIN {print (l > 8 * c) ? 1 : 0}')"
+    load_warn="$(awk -v l="$load" -v c="$cores" 'BEGIN {print (l > 4 * c) ? 1 : 0}')"
     if ((load_crit)); then crit "load $load"
     elif ((load_warn)); then warn "load $load"; fi
 
     echo "$(date '+%H:%M:%S') $level | pressure $pressure, free ${free}%, swap ${swap_mb} MiB, load $load/$cores, disk ${disk_gb} GiB free${reasons:+ | $reasons}" >"$status_file"
 
-    if [[ "$level" != "$last_level" ]]; then
+    # A level counts once it has held for 6 samples; critical counts at once.
+    if [[ "$level" == "$seen_level" ]]; then
+      seen_count=$((seen_count + 1))
+    else
+      seen_level="$level"
+      seen_count=1
+    fi
+    if [[ "$level" != "$last_level" ]] && { ((seen_count >= 6)) || [[ "$level" == "critical" ]]; }; then
       note "$(echo "$level" | tr '[:lower:]' '[:upper:]'): ${reasons:-back to normal} (free ${free}%, swap ${swap_mb} MiB, load $load, disk ${disk_gb} GiB)"
       [[ "$level" != "ok" ]] && notify "${level}: ${reasons}"
       last_level="$level"
