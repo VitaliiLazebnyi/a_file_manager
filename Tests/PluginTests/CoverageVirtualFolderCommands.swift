@@ -39,7 +39,7 @@ internal struct CoverageVirtualFolderCommands {
     /// A plugin that has not started shows no list; a list shown from a real folder leads back
     /// to it.
     @Test
-    internal func listsAreShownFromRealFoldersOnly() throws {
+    internal func listsAreShownFromRealFoldersOnly() {
         VirtualFoldersPlugin().show([memory.url("/A/one.txt")], title: "Found", in: left)
         #expect(left.model.directory == memory.url("/A"))
         plugin.show([memory.url("/A/one.txt")], title: "Found", in: left)

@@ -146,15 +146,15 @@ internal struct CoverageVirtualFileSystem {
     /// Files of other servers are told apart by host and port.
     @Test
     internal func filesOfOtherServersAreToldApart() throws {
-        let files = try ["sftp://h:22/x", "sftp://h:2222/x", "sftp://g:22/x", "sftp://h:22/x"]
+        let servers = try ["sftp://h:22/x", "sftp://h:2222/x", "sftp://g:22/x", "sftp://h:22/x"]
             .map { try #require(URL(string: $0)) }
-        let list = virtual.register(files: files, title: "Servers", origin: nil)
+        let list = virtual.register(files: servers, title: "Servers", origin: nil)
         #expect(virtual.entries(of: list)?.count == 3)
     }
 
     /// When every remembered list is shown, none is forgotten for a new one.
     @Test
-    internal func shownListsAreNotForgotten() throws {
+    internal func shownListsAreNotForgotten() {
         files.watches = true
         var tokens: [any WatchToken] = []
         var lists: [URL] = []

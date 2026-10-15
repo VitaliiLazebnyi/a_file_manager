@@ -48,13 +48,14 @@ public final class CoverageSmallFiles: FileSystemProvider, @unchecked Sendable {
     private final class Reader: FileReader {
         let inner: any FileReader
         let owner: CoverageSmallFiles
+        let path: String
 
-        init(_ inner: any FileReader, _ owner: CoverageSmallFiles) {
-            (self.inner, self.owner) = (inner, owner)
+        init(_ inner: any FileReader, _ owner: CoverageSmallFiles, path: String) {
+            (self.inner, self.owner, self.path) = (inner, owner, path)
         }
 
         func read(upToCount count: Int) throws -> Data? {
-            try owner.check(.read)
+            try owner.check(.read, path)
             return try inner.read(upToCount: count)
         }
 
@@ -104,6 +105,8 @@ public final class CoverageSmallFiles: FileSystemProvider, @unchecked Sendable {
     private var watchers: [@MainActor @Sendable ([URL]) -> Void] = []
     private var attributeChanges: [String] = []
     private var trashedPaths: [String] = []
+    private var rootIsNameless = false
+    private var pathsThatFail: Set<String> = []
 
     /// The scheme of the memory file system.
     public var scheme: String { base.scheme }
@@ -151,6 +154,25 @@ public final class CoverageSmallFiles: FileSystemProvider, @unchecked Sendable {
     /// How many watches were started.
     public var watchCount: Int { lock.withLock { watchers.count } }
 
+    /// Whether the root is given without a name, as some servers give theirs; false at first.
+    public var namesRootEmpty: Bool {
+        get { lock.withLock { rootIsNameless } }
+        set { lock.withLock { rootIsNameless = newValue } }
+    }
+
+    /// The paths that went to the Trash, in order.
+    public var trashed: [String] { lock.withLock { trashedPaths } }
+
+    /// The paths whose date or permissions were changed, in order (the memory file system
+    /// keeps neither change).
+    public var changedAttributes: [String] { lock.withLock { attributeChanges } }
+
+    /// The paths whose calls fail, whatever the call; none at first.
+    public var failingPaths: Set<String> {
+        get { lock.withLock { pathsThatFail } }
+        set { lock.withLock { pathsThatFail = newValue } }
+    }
+
     /// A layer over `base`, failing nothing yet.
     public init(_ base: MemoryFileSystem) {
         self.base = base
@@ -161,11 +183,12 @@ public final class CoverageSmallFiles: FileSystemProvider, @unchecked Sendable {
         lock.withLock { failingTimes[call] = times }
     }
 
-    /// Throws when `call` fails, after `onFailure`; `onCall` hears of it first.
-    private func check(_ call: Call) throws {
+    /// Throws when `call` (on `path`, when it is about one) fails, after `onFailure`; `onCall`
+    /// hears of it first.
+    private func check(_ call: Call, _ path: String? = nil) throws {
         onCall?(call)
         let (isFailing, hook) = lock.withLock { () -> (Bool, (@Sendable (Call) -> Void)?) in
-            var isFailing = failing.contains(call)
+            var isFailing = failing.contains(call) || path.map(pathsThatFail.contains) == true
             if !isFailing, let left = failingTimes[call], left > 0 {
                 failingTimes[call] = left - 1
                 isFailing = true
@@ -203,7 +226,7 @@ public final class CoverageSmallFiles: FileSystemProvider, @unchecked Sendable {
         } catch {
             return nil
         }
-        return base.item(at: url)
+        return named(base.item(at: url))
     }
 
     /// The memory file system's item, unless `.item` fails or the flag is set.
@@ -213,7 +236,15 @@ public final class CoverageSmallFiles: FileSystemProvider, @unchecked Sendable {
         } catch {
             return nil
         }
-        return base.item(at: url, cancellation: cancellation)
+        return named(base.item(at: url, cancellation: cancellation))
+    }
+
+    /// The item as this layer names it: the root without a name while `namesRootEmpty` is set.
+    private func named(_ item: FileItem?) -> FileItem? {
+        guard let item, item.url.path == "/", namesRootEmpty else {
+            return item
+        }
+        return FileItem(url: item.url, name: "", kind: item.kind, stat: item.stat)
     }
 
     /// The memory file system's parent, unless `.parent` fails.
@@ -247,14 +278,14 @@ public final class CoverageSmallFiles: FileSystemProvider, @unchecked Sendable {
 
     /// A reader of the memory file, unless `.open` fails.
     public func read(_ url: URL) throws -> any FileReader {
-        try check(.open)
-        return Reader(try base.read(url), self)
+        try check(.open, url.path)
+        return Reader(try base.read(url), self, path: url.path)
     }
 
     /// A reader of the memory file, unless `.open` fails or the flag is set.
     public func read(_ url: URL, cancellation: CancellationFlag) throws -> any FileReader {
-        try check(.open)
-        return Reader(try base.read(url, cancellation: cancellation), self)
+        try check(.open, url.path)
+        return Reader(try base.read(url, cancellation: cancellation), self, path: url.path)
     }
 
     /// Creates the folder, unless `.createDirectory` fails.
@@ -281,9 +312,6 @@ public final class CoverageSmallFiles: FileSystemProvider, @unchecked Sendable {
         try base.remove(url)
     }
 
-    /// The paths that went to the Trash, in order.
-    public var trashed: [String] { lock.withLock { trashedPaths } }
-
     /// Takes the item away as the Trash would, unless `.remove` fails.
     public func trash(_ url: URL) throws {
         try check(.remove)
@@ -301,10 +329,6 @@ public final class CoverageSmallFiles: FileSystemProvider, @unchecked Sendable {
     public func copy(_ source: URL, to destination: URL, progress: (Int64) -> Bool) throws {
         try base.copy(source, to: destination, progress: progress)
     }
-
-    /// The paths whose date or permissions were changed, in order (the memory file system
-    /// keeps neither change).
-    public var changedAttributes: [String] { lock.withLock { attributeChanges } }
 
     /// Notes a change of the date or permissions, unless `.setAttributes` fails.
     public func setAttributes(_: FileAttributes, of url: URL) throws {

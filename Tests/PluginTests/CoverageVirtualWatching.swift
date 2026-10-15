@@ -33,7 +33,7 @@ internal struct CoverageVirtualWatching {
     /// watched at their folders; a forgotten list, a foreign location and folders that cannot
     /// be watched give no token.
     @Test
-    internal func whatIsWatched() throws {
+    internal func whatIsWatched() {
         let branch = VirtualLocation.branch(of: memory.url("/A")).url
         let picked = virtual.registerPicked([memory.url("/A/one.txt")], in: memory.url("/A"))
         let token = virtual.watch([branch, picked, memory.url("/A")]) { _ in
@@ -97,7 +97,9 @@ internal struct CoverageVirtualWatching {
         let entered = Shared(false)
         let release = DispatchSemaphore(value: 0)
         files.onCall = { call in
-            guard call == .parent, !Thread.isMainThread, !entered.value else { return }
+            guard call == .parent, !Thread.isMainThread, !entered.value else {
+                return
+            }
             entered.value = true
             release.wait()
         }
