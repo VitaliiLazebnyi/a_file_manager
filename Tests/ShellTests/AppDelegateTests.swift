@@ -111,15 +111,16 @@ internal struct AppDelegateTests {
             // Nothing is refused here.
         }
         defer {
-            shell.mainWindow.window?.orderOut(nil)
             shell.shutDown()
             UserDefaults().removePersistentDomain(forName: suite)
         }
+        // The window is shown by asking for it; nothing comes on the screen of the test.
+        var shown: [NSWindow] = []
+        shell.mainWindow.present = { window, _ in shown.append(window) }
         #expect(delegate.applicationShouldHandleReopen(NSApp, hasVisibleWindows: false))
-        #expect(shell.mainWindow.window?.isVisible == true)
-        shell.mainWindow.window?.orderOut(nil)
+        #expect(shown.count == 1 && shown.first === shell.mainWindow.window)
         delegate.showMainWindow(nil)
-        #expect(shell.mainWindow.window?.isVisible == true)
+        #expect(shown.count == 2)
         let settingsItem = NSMenuItem(
             title: "Settings…",
             action: #selector(ShellApplication.showSettings(_:)),

@@ -17,12 +17,19 @@ internal struct AppNoticeTests {
     /// it; the last one fades and goes by itself.
     @Test
     internal func aNoticeIsReplacedByANewerOneAndGoesByItself() async {
+        // Over a window that is never shown, and alone without coming on the screen.
         let window = NSWindow(
             contentRect: NSRect(x: 100, y: 100, width: 800, height: 500),
             styleMask: [.titled],
             backing: .buffered,
-            defer: false
+            defer: true
         )
+        var alone: [NSPanel] = []
+        let orderInAlone = Notice.orderInAlone
+        Notice.orderInAlone = { alone.append($0) }
+        defer {
+            Notice.orderInAlone = orderInAlone
+        }
         Notice.show("Copied 3 files.", over: window)
         let first = Notice.shown
         #expect(first?.parent === window && first?.ignoresMouseEvents == true)
@@ -34,6 +41,7 @@ internal struct AppNoticeTests {
         Notice.show("Moved.", over: nil)
         let second = Notice.shown
         #expect(second !== first && second?.parent == nil && second?.accessibilityLabel() == "Moved.")
+        #expect(alone.count == 1 && alone.first === second)
         #expect(window.childWindows?.isEmpty != false && first?.isVisible == false)
         #expect(await AppWait.until { Notice.shown == nil })
         #expect(second?.isVisible == false)
