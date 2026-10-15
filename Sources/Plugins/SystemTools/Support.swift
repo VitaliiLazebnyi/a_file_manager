@@ -13,7 +13,7 @@ internal enum LoginShell {
     /// The PATH of the user's login shell when that is another shell than zsh, asked for once
     /// (`foreignPath(of:)`). Starts a process the first time: never for the main thread.
     internal static let foreignPath: String? = foreignPath(
-        of: usersShell(environment: ProcessInfo.processInfo.environment, account: accountShell)
+        of: usersShell(environment: ProcessInfo.processInfo.environment, account: accountShell())
     )
 
     /// The PATH a terminal would have: that of the user's login shell, asked for once; the
@@ -29,8 +29,8 @@ internal enum LoginShell {
     internal static let answerTime: TimeInterval = 3
 
     /// The shell the user logs in with: `SHELL` of `environment`, else that of the account, else zsh.
-    internal static func usersShell(environment: [String: String], account: () -> String?) -> String {
-        let path = environment["SHELL"].flatMap { $0.isEmpty ? nil : $0 } ?? account() ?? ""
+    internal static func usersShell(environment: [String: String], account: String?) -> String {
+        let path = environment["SHELL"].flatMap { $0.isEmpty ? nil : $0 } ?? account ?? ""
         return path.isEmpty ? "/bin/zsh" : path
     }
 

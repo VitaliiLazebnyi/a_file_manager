@@ -142,8 +142,8 @@ struct ProcessRunner {
     /// Without, nothing is read: the child writes into the void and is not waited for longer
     /// than it takes the shell to start it.
     var collectsOutput = true
-    /// The child's environment; nil gives it this program's.
-    var environment: [String: String]?
+    /// The child's environment; this program's unless told otherwise.
+    var environment = ProcessInfo.processInfo.environment
 
     /// All state is guarded by `lock`.
     private final class Buffer: @unchecked Sendable {
@@ -179,7 +179,7 @@ struct ProcessRunner {
         process.executableURL = executable
         process.arguments = arguments
         process.currentDirectoryURL = directory
-        if let environment { process.environment = environment }
+        process.environment = environment
         process.standardInput = FileHandle.nullDevice
         let buffer = Buffer()
         let (exited, drained) = (DispatchSemaphore(value: 0), DispatchSemaphore(value: 0))

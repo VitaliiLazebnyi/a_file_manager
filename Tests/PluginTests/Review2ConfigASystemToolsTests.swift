@@ -151,7 +151,7 @@ import Testing
     @Test func theShellIsAlwaysAPosixShell() {
         #expect(LoginShell.posix.executable == "/bin/zsh" && LoginShell.posix.options.last == "-c")
         #expect(
-            !LoginShell.usersShell(environment: ProcessInfo.processInfo.environment, account: LoginShell.accountShell)
+            !LoginShell.usersShell(environment: ProcessInfo.processInfo.environment, account: LoginShell.accountShell())
                 .isEmpty
         )
     }

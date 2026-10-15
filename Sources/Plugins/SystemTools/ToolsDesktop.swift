@@ -14,43 +14,61 @@ internal struct ToolsDesktop: Sendable {
         searchPath: { LoginShell.searchPath },
         environment: { LoginShell.environment(ProcessInfo.processInfo.environment, path: LoginShell.foreignPath) },
         applicationWithIdentifier: { NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0) },
-        applicationsToOpen: {
-            (NSWorkspace.shared.urlForApplication(toOpen: $0), NSWorkspace.shared.urlsForApplications(toOpen: $0))
+        applicationsToOpen: { file in
+            (NSWorkspace.shared.urlForApplication(toOpen: file), NSWorkspace.shared.urlsForApplications(toOpen: file))
         },
-        renameVolume: { try ($0 as NSURL).setResourceValue($1, forKey: .volumeNameKey) },
+        renameVolume: { volume, name in
+            var (location, values) = (volume, URLResourceValues())
+            values.volumeName = name
+            try location.setResourceValues(values)
+        },
         volumes: SystemVolumes(unmount: SystemVolumes.unmount),
         printer: URL(fileURLWithPath: "/usr/bin/lpr"),
         start: { NSWorkspace.shared.openApplication(at: $0, configuration: NSWorkspace.OpenConfiguration()) },
         open: { NSWorkspace.shared.open($0, withApplicationAt: $1, configuration: NSWorkspace.OpenConfiguration()) },
         print: { Self.run($0, sheetOf: NSApp.mainWindow) },
-        copy: {
+        copy: { text in
             NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString($0, forType: .string)
+            NSPasteboard.general.setString(text, forType: .string)
         },
         quit: { NSApp.terminate(nil) },
-        minimize: { (NSApp.mainWindow ?? NSApp.windows.first { $0.isVisible })?.miniaturize(nil) }
+        minimize: { (NSApp.mainWindow ?? NSApp.windows.first(where: \.isVisible))?.miniaturize(nil) }
     )
 
-    /// Nothing outside the program: only harmless lines run, by the plain system shell with the PATH of this
-    /// process; no application is known by its identifier and none opens a file; renaming and ejecting a volume
-    /// succeed without touching it; printing, copying, quitting and minimizing do nothing. The volumes are those of
-    /// the Mac as they are.
+    /// Nothing outside the program: only harmless lines run, by the plain system shell with the PATH and the
+    /// environment of this process; no application is known by its identifier and none opens a file; renaming and
+    /// ejecting a volume succeed without touching it; printing, copying, quitting and minimizing do nothing. The
+    /// volumes are those of the Mac as they are.
     internal static let quiet = Self(
         mayRun: SystemTools.isHarmless,
         shell: (URL(fileURLWithPath: "/bin/sh"), ["-c"]),
         searchPath: { TypedCommand.processPath },
-        environment: { nil },
+        environment: { ProcessInfo.processInfo.environment },
         applicationWithIdentifier: { _ in nil },
         applicationsToOpen: { _ in (nil, []) },
-        renameVolume: { _, _ in },
+        renameVolume: { _, _ in
+            // The volume keeps its name.
+        },
         volumes: SystemVolumes { _, _, done in done(nil) },
         printer: URL(fileURLWithPath: "/usr/bin/true"),
-        start: { _ in },
-        open: { _, _ in },
-        print: { _ in },
-        copy: { _ in },
-        quit: {},
-        minimize: {}
+        start: { _ in
+            // Nothing starts.
+        },
+        open: { _, _ in
+            // Nothing opens.
+        },
+        print: { _ in
+            // Nothing prints.
+        },
+        copy: { _ in
+            // The clipboard stays as it is.
+        },
+        quit: {
+            // The program goes on.
+        },
+        minimize: {
+            // The windows stay.
+        }
     )
 
     /// Whether a typed line may run at all.
@@ -60,8 +78,8 @@ internal struct ToolsDesktop: Sendable {
     /// The PATH that decides whether a bare name is a program or an application. May start a process the first
     /// time.
     internal var searchPath: @Sendable () -> String
-    /// The environment a line runs in; nil gives it this program's.
-    internal var environment: @Sendable () -> [String: String]?
+    /// The environment a line runs in.
+    internal var environment: @Sendable () -> [String: String]
     /// The application with this bundle identifier.
     internal var applicationWithIdentifier: @Sendable (String) -> URL?
     /// The applications that can open a file, and the one that usually does. Asks the file's volume.

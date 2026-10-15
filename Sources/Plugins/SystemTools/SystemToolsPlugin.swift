@@ -216,6 +216,8 @@ final class SystemTools {
     static let printOutputKey = "systemTools.printOutput"
     /// In a list of this length or longer, the marked items are picked out off the main thread.
     static let backgroundSelectionThreshold = 5_000
+    /// How many files one run of the printer program is given.
+    nonisolated static let filesPerPrint = 256
 
     /// What tests may really run: programs that only write text.
     nonisolated static let harmlessCommands: Set<String> = ["echo", "printf", "true", "false", "pwd"]
@@ -455,13 +457,14 @@ final class SystemTools {
 
     // MARK: System information
 
+    /// A screen as the dialog shows it: its pixels, and its points and scale when they differ.
+    nonisolated static func display(_ size: NSSize, scale: CGFloat) -> String {
+        let pixels = "\(Int(size.width * scale))x\(Int(size.height * scale))"
+        return scale == 1 ? pixels : "\(pixels) (\(Int(size.width))x\(Int(size.height)) @\(Int(scale))x)"
+    }
+
     func showSystemInformation() {
-        let displays = NSScreen.screens.map { screen -> String in
-            let scale = screen.backingScaleFactor
-            let pixels = "\(Int(screen.frame.width * scale))x\(Int(screen.frame.height * scale))"
-            return scale == 1
-                ? pixels : "\(pixels) (\(Int(screen.frame.width))x\(Int(screen.frame.height)) @\(Int(scale))x)"
-        }
+        let displays = NSScreen.screens.map { Self.display($0.frame.size, scale: $0.backingScaleFactor) }
         kernel.jobs.run(
             title: "System Information:",
             work: { monitor in
@@ -582,6 +585,13 @@ final class SystemTools {
         }
     }
 
+    /// Where a printed file list goes.
+    private enum Destination {
+        case printer
+        case file(URL)
+        case viewer
+    }
+
     /// Files › Print › File list (spec 12 › Printing): the selected items, or the whole list
     /// when the cursor is on `[..]` and nothing is selected; Brief prints names only. With
     /// subfolders, the depth and the files to include are asked first.
@@ -657,13 +667,20 @@ final class SystemTools {
         settings.set(formatter.linesPerPage, forKey: Self.printLinesKey)
         settings.set(output.rawValue, forKey: Self.printOutputKey)
 
-        var file: URL?
-        if output == .textFile {
+        let destination: Destination
+        switch output {
+        case .printer:
+            destination = .printer
+
+        case .viewer:
+            destination = .viewer
+
+        case .textFile:
             guard
                 let name = ui.prompt("Save file list as:", value: "filelist.txt")?.trimmingCharacters(in: .whitespaces),
                 !name.isEmpty
             else { return }
-            file = kernel.fileSystems.location(from: name, relativeTo: directory)
+            destination = .file(kernel.fileSystems.location(from: name, relativeTo: directory))
         }
         let (fileSystems, ui) = (kernel.fileSystems, self.ui)
         let base = fileSystems.displayPath(directory)
@@ -671,7 +688,7 @@ final class SystemTools {
         kernel.jobs.run(
             title: "Reading file list:",
             work: {
-                [depth, mask, formatter, file] monitor -> (
+                [depth, mask, formatter, destination] monitor -> (
                     pages: [[String]], longest: Int, text: String, error: (any Error)?, cancelled: Bool
                 ) in
                 let items = gather(monitor)
@@ -692,7 +709,7 @@ final class SystemTools {
                 // Measured here: the view that prints would otherwise count every line on the main thread.
                 let longest = pages.reduce(0) { longest, page in page.reduce(longest) { max($0, $1.count) } }
                 if monitor.cancellation.isCancelled { return (pages, longest, text, nil, true) }
-                guard let file else { return (pages, longest, text, nil, false) }
+                guard case .file(let file) = destination else { return (pages, longest, text, nil, false) }
                 do {
                     let provider = try fileSystems.provider(for: file)
                     let exists = provider.item(at: file) != nil
@@ -729,12 +746,11 @@ final class SystemTools {
             completion: { [self] result in
                 // A cancelled read leaves a partial list, which is neither printed nor shown.
                 guard !result.cancelled else { return }
-                switch output {
+                switch destination {
                 case .printer:
                     print(result.pages, longestLine: result.longest, linesPerPage: formatter.linesPerPage, title: base)
 
-                case .textFile:
-                    guard let file else { return }
+                case .file(let file):
                     if let error = result.error {
                         if (error as? CocoaError)?.code != .userCancelled {
                             ui.report(error, title: "The file list cannot be saved!")
@@ -781,8 +797,8 @@ final class SystemTools {
         )
     }
 
+    /// `files` are never empty: the command is offered only with a file among the operands.
     func printFiles(_ files: [FileItem]) {
-        guard !files.isEmpty else { return }
         let what = files.count == 1 ? DisplayText.oneLine(files[0].name) : "\(files.count) files"
         guard
             ui.choose(
@@ -797,14 +813,21 @@ final class SystemTools {
             "print-file: "
             + (files.count <= 8
                 ? files.map { DisplayText.oneLine($0.name) }.joined(separator: ", ") : "\(files.count) files")
-        let runner = ProcessRunner(
-            executable: desktop.printer,
-            arguments: files.map(\.url.path),
-            directory: nil
-        )
+        let (printer, paths) = (desktop.printer, files.map(\.url.path))
         kernel.jobs.run(
             title: "Printing:",
-            work: { monitor in runner.run(cancellation: monitor.cancellation) },
+            work: { monitor in
+                // A few hundred files at a time: the system starts no program with more than 4,096 arguments (it
+                // raises an exception instead), and their length is limited too. The first failure stops.
+                var outcome = ProcessOutcome()
+                for start in stride(from: 0, to: paths.count, by: Self.filesPerPrint)
+                where outcome.failure == nil && outcome.status == 0 {
+                    let part = Array(paths[start..<min(start + Self.filesPerPrint, paths.count)])
+                    outcome = ProcessRunner(executable: printer, arguments: part, directory: nil)
+                        .run(cancellation: monitor.cancellation)
+                }
+                return outcome
+            },
             completion: { [self] outcome in
                 if outcome.failure != nil || outcome.status != 0 {
                     return ui.inform(
