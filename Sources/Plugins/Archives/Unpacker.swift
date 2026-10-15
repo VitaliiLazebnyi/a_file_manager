@@ -728,7 +728,12 @@ final class Unpacker: @unchecked Sendable {
             // (The pass hands over exactly the entries it was given, each of them once.)
             let byOrder = Dictionary(uniqueKeysWithValues: files.map { ($0.task.entry.order, $0) })
             let wanted = files.map(\.task.entry)
-            try archive.readInOnePass(wanted, cancellation: cancellation, throughTheEnd: false) { entry, stream in
+            // Read to the end of the stream when anything is read from it: only there is its
+            // checksum checked, which vouches for the members written too (TAR has none).
+            let throughTheEnd = !wanted.isEmpty
+            try archive.readInOnePass(wanted, cancellation: cancellation, throughTheEnd: throughTheEnd) {
+                entry,
+                stream in
                 try checkCancelled()
                 if let (task, root) = byOrder[entry.order] {
                     do {
