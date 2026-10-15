@@ -28,6 +28,8 @@ internal struct CovSyncSession {
         memory.addFile("/B/odd.txt", "rightxtext", modified: early.addingTimeInterval(1))
         memory.addFile("/A/zero.txt", "", modified: early)
         memory.addFile("/B/zero.txt", "", modified: early.addingTimeInterval(1))
+        memory.addFile("/A/alike.txt", "abc", modified: early)
+        memory.addFile("/B/alike.txt", "abd", modified: early)
         bench = TestBench(
             plugins: [plugin, CompareContentPlugin(opensWindows: false)],
             fileSystems: [LocalFileSystem(), memory],
@@ -53,8 +55,14 @@ internal struct CovSyncSession {
         session.onChange = { statuses.append(session.status) }
         session.compare()
         #expect(await AppWait.until { session.phase == .compared })
-        #expect(statuses.contains { $0.hasPrefix("Comparing by content:") })
+        #expect(statuses.contains { $0.hasPrefix("Comparing by content:") && $0.hasSuffix("%)") })
         #expect(statuses.contains { $0.hasPrefix("Comparing: ") })
+        // Only files without bytes to read: no share of bytes.
+        statuses = []
+        session.options.mask = "zero.txt"
+        session.compare()
+        #expect(await AppWait.until { session.phase == .compared })
+        #expect(statuses.contains { $0.hasPrefix("Comparing by content:") && $0.hasSuffix("bytes") })
     }
 
     /// Reports and results of a comparison that was replaced meanwhile are dropped.
@@ -88,12 +96,17 @@ internal struct CovSyncSession {
             }
             preparing += 1
             session.setAction(.none, rows: Array(session.rows.indices))
-            session.sort = (.size, .right, false)
+            session.markDefault(rows: Array(session.rows.indices))
         }
         session.compare()
         #expect(await AppWait.until { session.phase == .compared && !session.entries.isEmpty })
         #expect(await AppWait.until { !session.status.hasPrefix("Preparing") })
-        #expect(!session.canSynchronize && preparing == 1)
+        #expect(session.canSynchronize && preparing == 1)
+        // A layout overtaken by the next is dropped.
+        session.show = [.copyToRight, .duplicates, .singles]
+        session.show = .all
+        #expect(await AppWait.until { !session.status.hasPrefix("Preparing") })
+        #expect(session.entries.count - session.visibleRows.count == 1)
     }
 
     /// A large plan is made away from the main thread; nothing changes meanwhile, and a plan
@@ -176,6 +189,8 @@ internal struct CovSyncSession {
         session.compareContents(row: folder)
         let new = try #require(session.rows.firstIndex { $0.name == "new.txt" })
         session.compareContents(row: new)
+        let arrives = try #require(session.rows.firstIndex { $0.name == "arrives.txt" })
+        session.compareContents(row: arrives)
         #expect(!bench.interaction.log.contains("inform: Compare by content is not available."))
         let lonely = DirectorySyncPlugin(opensWindows: false)
         let alone = TestBench(

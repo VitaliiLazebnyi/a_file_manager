@@ -216,20 +216,22 @@ final class SyncSession {
         // takes to give up, and a few such comparisons must not use up the workers of the shared pool.
         let interval = progressInterval
         SyncWorker.run("Synchronize directories: compare") { [weak self] in
-            /// Belongs to the comparison's progress calls, which arrive one at a time.
-            nonisolated(unsafe) var lastReport = Date.distantPast
-            let result = comparison.run(left: left, right: right) { [weak self] progress in
-                guard Date().timeIntervalSince(lastReport) >= interval else { return }
-                lastReport = Date()
+            // What comes back for a comparison that was stopped or replaced meanwhile is dropped.
+            let whileCurrent: @Sendable (@escaping @MainActor @Sendable (SyncSession) -> Void) -> Void = {
+                [weak self] work in
                 DispatchQueue.main.async { [weak self] in
                     guard let self, self.running === comparison else { return }
-                    self.show(progress)
+                    work(self)
                 }
             }
-            DispatchQueue.main.async { [weak self] in
-                guard let self, self.running === comparison else { return }
-                self.finish(comparison, result, left, right)
+            /// Belongs to the comparison's progress calls, which arrive one at a time.
+            nonisolated(unsafe) var lastReport = Date.distantPast
+            let result = comparison.run(left: left, right: right) { progress in
+                guard Date().timeIntervalSince(lastReport) >= interval else { return }
+                lastReport = Date()
+                whileCurrent { $0.show(progress) }
             }
+            whileCurrent { $0.finish(comparison, result, left, right) }
         }
     }
 
