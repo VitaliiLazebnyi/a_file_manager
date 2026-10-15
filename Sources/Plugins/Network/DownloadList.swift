@@ -31,39 +31,42 @@ public enum DownloadList {
 
     /// The lines of a list file. Empty lines are skipped; lines beyond `mostLines` are left out.
     public static func parse(_ text: String) -> [Action] {
-        text.split(whereSeparator: \.isNewline).prefix(mostLines).compactMap { rawLine in
-            // A byte-order mark starts files written by Windows programs.
-            let line = rawLine.trimmingCharacters(
-                in: CharacterSet.whitespaces.union(CharacterSet(charactersIn: "\u{FEFF}")))
-            guard !line.isEmpty else { return nil }
-            let lowered = line.lowercased()
-            func body(after prefix: String) -> String {
-                String(line.dropFirst(prefix.count)).trimmingCharacters(in: .whitespaces)
-            }
-            func pair(_ text: String) -> (String, String?) {
-                guard let range = text.range(of: separator) else { return (text, nil) }
-                return (
-                    String(text[..<range.lowerBound]).trimmingCharacters(in: .whitespaces),
-                    String(text[range.upperBound...]).trimmingCharacters(in: .whitespaces)
+        text.split(whereSeparator: \.isNewline).prefix(mostLines)
+            .compactMap { rawLine in
+                // A byte-order mark starts files written by Windows programs.
+                let line = rawLine.trimmingCharacters(
+                    in: CharacterSet.whitespaces.union(CharacterSet(charactersIn: "\u{FEFF}"))
                 )
+                guard !line.isEmpty else { return nil }
+                let lowered = line.lowercased()
+                func body(after prefix: String) -> String {
+                    String(line.dropFirst(prefix.count)).trimmingCharacters(in: .whitespaces)
+                }
+                func pair(_ text: String) -> (String, String?) {
+                    guard let range = text.range(of: separator) else { return (text, nil) }
+                    return (
+                        String(text[..<range.lowerBound]).trimmingCharacters(in: .whitespaces),
+                        String(text[range.upperBound...]).trimmingCharacters(in: .whitespaces)
+                    )
+                }
+                if lowered.hasPrefix("sleep:") {
+                    let milliseconds = TimeInterval(body(after: "sleep:")) ?? 0
+                    // Not a number, below zero, or longer than anyone would wait: clamped.
+                    return .pause(milliseconds.isFinite ? min(longestPause, max(0, milliseconds / 1_000)) : 0)
+                }
+                if lowered.hasPrefix("header:") || lowered.hasPrefix("copyflags:") { return .unsupported(line) }
+                if lowered.hasPrefix("move:") {
+                    let (source, target) = pair(body(after: "move:"))
+                    return source.isEmpty ? .unsupported(line) : .move(source: source, target: target)
+                }
+                for prefix in ["put:", "copy:"] where lowered.hasPrefix(prefix) {
+                    let (source, target) = pair(body(after: prefix))
+                    return source.isEmpty ? .unsupported(line) : .copy(source: source, target: target)
+                }
+                // Never an empty source: the line is trimmed, and the separator starts with a space.
+                let (source, target) = pair(line)
+                return .download(source: source, target: target)
             }
-            if lowered.hasPrefix("sleep:") {
-                let milliseconds = TimeInterval(body(after: "sleep:")) ?? 0
-                // Not a number, below zero, or longer than anyone would wait: clamped.
-                return .pause(milliseconds.isFinite ? min(longestPause, max(0, milliseconds / 1_000)) : 0)
-            }
-            if lowered.hasPrefix("header:") || lowered.hasPrefix("copyflags:") { return .unsupported(line) }
-            if lowered.hasPrefix("move:") {
-                let (source, target) = pair(body(after: "move:"))
-                return source.isEmpty ? .unsupported(line) : .move(source: source, target: target)
-            }
-            for prefix in ["put:", "copy:"] where lowered.hasPrefix(prefix) {
-                let (source, target) = pair(body(after: prefix))
-                return source.isEmpty ? .unsupported(line) : .copy(source: source, target: target)
-            }
-            let (source, target) = pair(line)
-            return source.isEmpty ? .unsupported(line) : .download(source: source, target: target)
-        }
     }
 
     /// Whether a location can stand in a line: a line break (of any kind) in it would start a
