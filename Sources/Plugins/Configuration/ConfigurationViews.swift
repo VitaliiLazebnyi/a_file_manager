@@ -204,9 +204,10 @@ final class TextWindowController: NSWindowController {
     @available(*, unavailable)
     required init?(coder _: NSCoder) { fatalError("not used") }
 
-    func show(_ text: String) {
+    /// Shows `text`; `present` puts the window on screen.
+    func show(_ text: String, present: (NSWindowController) -> Void) {
         textView.string = text
-        showWindow(nil)
+        present(self)
         window?.makeFirstResponder(textView)
     }
 }

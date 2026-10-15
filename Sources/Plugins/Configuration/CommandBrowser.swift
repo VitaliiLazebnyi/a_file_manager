@@ -86,7 +86,7 @@ final class CommandBrowserController: NSWindowController, NSWindowDelegate, NSSe
     /// Opens the dialog on its own: the chosen command is run.
     func show(category: String? = nil) {
         prepare(picking: false, category: category)
-        showWindow(nil)
+        center.effects.present(self)
         window?.makeFirstResponder(filter)
     }
 
@@ -96,7 +96,7 @@ final class CommandBrowserController: NSWindowController, NSWindowDelegate, NSSe
         if window.isVisible { window.orderOut(nil) }
         prepare(picking: true, category: nil)
         window.makeFirstResponder(filter)
-        NSApp.runModal(for: window)
+        center.effects.runModal(window)
         isPicking = false
         window.orderOut(nil)
         return picked
@@ -152,12 +152,12 @@ final class CommandBrowserController: NSWindowController, NSWindowDelegate, NSSe
     /// OK, Return or a double click: hands the command to the editor, or runs it.
     private func accept() {
         guard let row = selected else {
-            NSSound.beep()
+            center.effects.beep()
             return
         }
         if isPicking {
             picked = row.id
-            NSApp.stopModal()
+            center.effects.stopModal()
         } else {
             window?.close()
             center.kernel.commands.perform(row.id)
@@ -211,7 +211,7 @@ final class CommandBrowserController: NSWindowController, NSWindowDelegate, NSSe
     }
 
     func windowWillClose(_: Notification) {
-        if isPicking { NSApp.stopModal() }
+        if isPicking { center.effects.stopModal() }
     }
 }
 
@@ -237,7 +237,7 @@ extension ConfigurationCenter {
     func showText(_ text: String, title: String) {
         let controller = textWindows[title] ?? TextWindowController(title: title)
         textWindows[title] = controller
-        controller.show(text)
+        controller.show(text, present: effects.present)
     }
 
     func closeWindows() {

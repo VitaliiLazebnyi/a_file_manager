@@ -177,7 +177,9 @@ struct CheckedSettings: @unchecked Sendable {
             if key == SettingsSchema.frequentFoldersKey { object = Self.limitingCounts(object, &limited) }
             guard
                 let clean = try? JSONSerialization.data(
-                    withJSONObject: object, options: [.fragmentsAllowed, .sortedKeys])
+                    withJSONObject: object,
+                    options: [.fragmentsAllowed, .sortedKeys]
+                )
             else {
                 throw Problem.unreadable(key)
             }
@@ -245,7 +247,8 @@ struct CheckedSettings: @unchecked Sendable {
             try require(
                 list.elements.allSatisfy {
                     UserCommand.name(from: $0.name) == $0.name && $0.title.utf8.count <= textLimit && isShort($0.action)
-                })
+                }
+            )
 
         case SettingsSchema.startMenuKey:
             let list = try decoded(LenientList<StartMenuEntry>.self)
@@ -328,12 +331,16 @@ struct SettingsImportPlan {
             }
             objects[SettingsSchema.connectionsKey] = fresh
             values[SettingsSchema.connectionsKey] = try? JSONSerialization.data(
-                withJSONObject: fresh, options: [.sortedKeys])
+                withJSONObject: fresh,
+                options: [.sortedKeys]
+            )
             if let last = objects[SettingsSchema.lastConnectionKey] as? String, let new = renumbered[last.uppercased()]
             {
                 objects[SettingsSchema.lastConnectionKey] = new
                 values[SettingsSchema.lastConnectionKey] = try? JSONSerialization.data(
-                    withJSONObject: new, options: [.fragmentsAllowed])
+                    withJSONObject: new,
+                    options: [.fragmentsAllowed]
+                )
             }
         }
 
@@ -354,14 +361,18 @@ struct SettingsImportPlan {
         changed.sort()
         // What an export leaves out by default is not removed for being absent, and neither
         // is anything the user is asked about separately.
-        removed = knownKeys.filter { key in
-            guard values[key] == nil, let stored = current[key], !SettingsSchema.tabKeys.contains(key),
-                !schema.isHistory(key),
-                !schema.isConnectionData(key), !schema.isBackup(key)
-            else { return false }
-            return schema.group(
-                of: key, value: try? JSONSerialization.jsonObject(with: stored, options: .fragmentsAllowed)) == nil
-        }.sorted()
+        removed =
+            knownKeys.filter { key in
+                guard values[key] == nil, let stored = current[key], !SettingsSchema.tabKeys.contains(key),
+                    !schema.isHistory(key),
+                    !schema.isConnectionData(key), !schema.isBackup(key)
+                else { return false }
+                return schema.group(
+                    of: key,
+                    value: try? JSONSerialization.jsonObject(with: stored, options: .fragmentsAllowed)
+                ) == nil
+            }
+            .sorted()
         parts = SettingsSchema.Group.allCases.compactMap { group in
             guard let keys = grouped[group]?.sorted(), !keys.isEmpty else { return nil }
             return Self.part(group, keys: keys, objects: objects)
@@ -394,7 +405,8 @@ struct SettingsImportPlan {
                 lines.append(
                     "\(DisplayText.oneLine(command, limit: 80)):  "
                         + (keys.isEmpty
-                            ? "no key" : keys.map { DisplayText.oneLine($0, limit: 40) }.joined(separator: ", ")))
+                            ? "no key" : keys.map { DisplayText.oneLine($0, limit: 40) }.joined(separator: ", "))
+                )
             }
             title = "Import the key bindings (\(lines.count) commands). They decide what every key does."
 
@@ -483,7 +495,8 @@ struct SettingsImportPlan {
         if !parts.isEmpty {
             lines.append(
                 "The parts below can make the program run something, change what a key does or change whom it trusts. "
-                    + "Each is imported only if you tick it; otherwise it stays as it is now.")
+                    + "Each is imported only if you tick it; otherwise it stays as it is now."
+            )
         }
         return lines.joined(separator: "\n")
     }
@@ -536,8 +549,10 @@ extension SettingsArchive {
     /// it: a failure leaves an earlier file whole. Blocks: not for the main thread.
     func write(to url: URL) throws {
         let data = try encoded()
-        let temporary = url.deletingLastPathComponent().appendingPathComponent(
-            ".\(url.lastPathComponent).\(UUID().uuidString).tmp")
+        let temporary = url.deletingLastPathComponent()
+            .appendingPathComponent(
+                ".\(url.lastPathComponent).\(UUID().uuidString).tmp"
+            )
         let descriptor = open(temporary.path, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0o600)
         guard descriptor >= 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
         let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)

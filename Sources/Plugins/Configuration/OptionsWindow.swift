@@ -186,7 +186,7 @@ final class KeyboardPage: NSObject, OptionsPage, NSSearchFieldDelegate {
     private func change(_ body: (CommandID) -> Void) {
         stopRecording()
         guard let row = selected else {
-            NSSound.beep()
+            center.effects.beep()
             return
         }
         body(row.id)
@@ -205,7 +205,7 @@ final class KeyboardPage: NSObject, OptionsPage, NSSearchFieldDelegate {
     private func record(adding: Bool) {
         stopRecording()
         guard let row = selected else {
-            NSSound.beep()
+            center.effects.beep()
             return
         }
         status.stringValue = "Press the new shortcut for “\(row.title)”. Esc cancels."
@@ -279,7 +279,7 @@ final class ButtonBarPage: NSObject, OptionsPage {
                 edited(selecting: editor.insert(ToolbarRegistry.lineBreak, after: table.selectedRow))
             },
             ActionButton("Remove") { [unowned self] in
-                guard let row = table.selectedRow else { return NSSound.beep() }
+                guard let row = table.selectedRow else { return center.effects.beep() }
                 editor.remove(at: row)
                 edited(selecting: row)
             },
@@ -330,7 +330,7 @@ final class ButtonBarPage: NSObject, OptionsPage {
 
     private func move(_ offset: Int) {
         guard let row = table.selectedRow else {
-            NSSound.beep()
+            center.effects.beep()
             return
         }
         edited(selecting: editor.move(row, by: offset))
@@ -341,7 +341,7 @@ final class ButtonBarPage: NSObject, OptionsPage {
         guard let row = table.selectedRow, editor.items.indices.contains(row), let id = editor.items[row],
             id != ToolbarRegistry.lineBreak
         else {
-            NSSound.beep()
+            center.effects.beep()
             return
         }
         let ui = center.kernel.interaction
@@ -398,7 +398,7 @@ final class StartMenuPage: NSObject, OptionsPage {
             ActionButton("Add Separator") { [unowned self] in add(StartMenuDraft.Row(entry: .separator)) },
             ActionButton("Change…") { [unowned self] in change() },
             ActionButton("Remove") { [unowned self] in
-                guard let row = table.selectedRow else { return NSSound.beep() }
+                guard let row = table.selectedRow else { return center.effects.beep() }
                 draft.rows.remove(at: row)
                 edited(selecting: row)
             },
@@ -450,7 +450,7 @@ final class StartMenuPage: NSObject, OptionsPage {
     private func change() {
         guard let index = table.selectedRow, draft.rows.indices.contains(index), !draft.rows[index].entry.isSeparator
         else {
-            NSSound.beep()
+            center.effects.beep()
             return
         }
         guard let row = center.editStartMenuRow(draft.rows[index]) else { return }
@@ -460,7 +460,7 @@ final class StartMenuPage: NSObject, OptionsPage {
 
     private func move(_ offset: Int) {
         guard let row = table.selectedRow else {
-            NSSound.beep()
+            center.effects.beep()
             return
         }
         edited(selecting: draft.move(row, by: offset))
@@ -535,6 +535,7 @@ final class OptionsWindowController: NSWindowController, NSWindowDelegate {
         case first, keyboard, buttonBar, startMenu, settingsFile
     }
 
+    private unowned let center: ConfigurationCenter
     private let pages: [any OptionsPage]
     private let firstOwnPage: Int
     private let pageList = RowsTable(columns: [("", 150)])
@@ -543,6 +544,7 @@ final class OptionsWindowController: NSWindowController, NSWindowDelegate {
     private var applyButton = NSButton()
 
     init(center: ConfigurationCenter) {
+        self.center = center
         let registered: [any OptionsPage] = center.kernel.preferences.pages.filter { !$0.preferences.isEmpty }
             .map {
                 PreferencesPage(model: PreferencePageModel(page: $0, settings: center.kernel.settings))
@@ -599,7 +601,7 @@ final class OptionsWindowController: NSWindowController, NSWindowDelegate {
     /// Opens the window on a page. A window that was closed shows what is stored now.
     func show(_ section: Section) {
         prepare(section)
-        showWindow(nil)
+        center.effects.present(self)
     }
 
     var pageTitles: [String] { pages.map(\.title) }

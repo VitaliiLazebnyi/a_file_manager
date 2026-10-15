@@ -18,6 +18,8 @@ final class ConfigurationCenter {
     var textWindows: [String: TextWindowController] = [:]
     /// Told when key bindings were stored from outside the Keyboard page, which then takes them over.
     var keysCommitted: (() -> Void)?
+    /// The beep, the modal run of the command picker and the settings file panel.
+    var effects: ConfigurationEffects
     private lazy var startMenuTarget = StartMenuTarget(kernel: kernel)
 
     static let startMenuHint = """
@@ -26,9 +28,15 @@ final class ConfigurationCenter {
         %L a file listing the selected names with their paths   %% the percent sign
         """
 
-    init(kernel: Kernel, runner: CommandRunner, enumeratedKeys: @escaping () -> [String]) {
+    init(
+        kernel: Kernel,
+        runner: CommandRunner,
+        effects: ConfigurationEffects,
+        enumeratedKeys: @escaping () -> [String]
+    ) {
         self.kernel = kernel
         self.runner = runner
+        self.effects = effects
         self.enumeratedKeys = enumeratedKeys
         store = ConfigurationStore(settings: kernel.settings)
         runner.userCommand = { [unowned self] in userCommand(named: $0) }
