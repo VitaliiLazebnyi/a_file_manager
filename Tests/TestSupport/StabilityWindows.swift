@@ -56,8 +56,11 @@ public final class StabilityWindows {
         guard isNew(window) else {
             return
         }
+        // Only a window that is ordered in counts: one that never was reports itself unoccluded when it is
+        // ordered out, and a test may post the key notification of a window that never came on screen.
         let onScreen =
-            name != NSWindow.didChangeOcclusionStateNotification || window.occlusionState.contains(.visible)
+            window.isVisible
+            && (name != NSWindow.didChangeOcclusionStateNotification || window.occlusionState.contains(.visible))
         if onScreen { shown.append(window.title) }
     }
 
