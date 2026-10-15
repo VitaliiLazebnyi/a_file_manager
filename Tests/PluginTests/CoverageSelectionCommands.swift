@@ -123,16 +123,17 @@ internal struct CoverageSelectionCommands {
         #expect(selected == ["one.txt", "three.md", "two.md"])
     }
 
-    /// A comparison view whose filter another one replaced is left alone when the panel goes
-    /// elsewhere: the other filter is not taken away.
+    /// A comparison view whose filter another one replaced is left alone when the view is
+    /// ended: the other filter is not taken away.
     @Test
     internal func aReplacedComparisonViewIsLeftAlone() {
         commands.perform(Ids.markNewerHideSame)
         #expect(commands.isChecked(Ids.markNewerHideSame))
         left.model.setFilter(PanelFilter.mask("*.md"))
         #expect(!commands.isChecked(Ids.markNewerHideSame))
-        left.show(memory.url("/A/docs"))
-        #expect(left.model.filter?.title == "*.md")
+        // Chosen again, the view ends where it is still shown and leaves the other filter.
+        commands.perform(Ids.markNewerHideSame)
+        #expect(left.model.filter?.title == "*.md" && bench.right.model.filter == nil)
     }
 
     /// The list of types and masks: a row that is not there does nothing, Remove on a type

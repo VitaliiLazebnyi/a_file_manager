@@ -12,6 +12,9 @@ public final class CoverageSmallJobs: JobService {
     public enum Mode {
         /// At once, on the calling thread, with the flag set before the work starts.
         case cancelled
+        /// At once, on the calling thread; from the job numbered `first` on (0 is the first
+        /// job), with the flag set before the work starts.
+        case cancelledFrom(first: Int)
         /// On a thread of its own; the completion is queued on the main thread.
         case background
     }
@@ -87,6 +90,13 @@ public final class CoverageSmallJobs: JobService {
         switch mode {
         case .cancelled:
             monitor.cancellation.cancel()
+            let result = work(monitor)
+            finish(monitor, result, completion)
+
+        case .cancelledFrom(let first):
+            if titles.count > first {
+                monitor.cancellation.cancel()
+            }
             let result = work(monitor)
             finish(monitor, result, completion)
 

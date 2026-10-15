@@ -31,6 +31,8 @@ public final class CoverageSmallFiles: FileSystemProvider, @unchecked Sendable {
         case list
         /// Asking for the folder above (it fails by answering nil).
         case parent
+        /// Looking at one item (it fails by answering nil).
+        case item
     }
 
     /// What a failing call throws.
@@ -100,6 +102,8 @@ public final class CoverageSmallFiles: FileSystemProvider, @unchecked Sendable {
     private var isServer = false
     private var isWatching = false
     private var watchers: [@MainActor @Sendable ([URL]) -> Void] = []
+    private var attributeChanges: [String] = []
+    private var trashedPaths: [String] = []
 
     /// The scheme of the memory file system.
     public var scheme: String { base.scheme }
@@ -192,8 +196,25 @@ public final class CoverageSmallFiles: FileSystemProvider, @unchecked Sendable {
         return try base.list(directory, showHidden: showHidden, cancellation: cancellation)
     }
 
-    /// The memory file system's item.
-    public func item(at url: URL) -> FileItem? { base.item(at: url) }
+    /// The memory file system's item, unless `.item` fails.
+    public func item(at url: URL) -> FileItem? {
+        do {
+            try check(.item)
+        } catch {
+            return nil
+        }
+        return base.item(at: url)
+    }
+
+    /// The memory file system's item, unless `.item` fails or the flag is set.
+    public func item(at url: URL, cancellation: CancellationFlag) -> FileItem? {
+        do {
+            try check(.item)
+        } catch {
+            return nil
+        }
+        return base.item(at: url, cancellation: cancellation)
+    }
 
     /// The memory file system's parent, unless `.parent` fails.
     public func parent(of directory: URL) -> URL? {
@@ -260,6 +281,16 @@ public final class CoverageSmallFiles: FileSystemProvider, @unchecked Sendable {
         try base.remove(url)
     }
 
+    /// The paths that went to the Trash, in order.
+    public var trashed: [String] { lock.withLock { trashedPaths } }
+
+    /// Takes the item away as the Trash would, unless `.remove` fails.
+    public func trash(_ url: URL) throws {
+        try check(.remove)
+        base.removeTree(url.path)
+        lock.withLock { trashedPaths.append(url.path) }
+    }
+
     /// Renames the item, unless `.move` fails.
     public func move(_ source: URL, to destination: URL, replacing: Bool) throws {
         try check(.move)
@@ -271,15 +302,24 @@ public final class CoverageSmallFiles: FileSystemProvider, @unchecked Sendable {
         try base.copy(source, to: destination, progress: progress)
     }
 
-    /// Changes the date or permissions, unless `.setAttributes` fails.
-    public func setAttributes(_ attributes: FileAttributes, of url: URL) throws {
+    /// The paths whose date or permissions were changed, in order (the memory file system
+    /// keeps neither change).
+    public var changedAttributes: [String] { lock.withLock { attributeChanges } }
+
+    /// Notes a change of the date or permissions, unless `.setAttributes` fails.
+    public func setAttributes(_: FileAttributes, of url: URL) throws {
         try check(.setAttributes)
-        try base.setAttributes(attributes, of: url)
+        lock.withLock { attributeChanges.append(url.path) }
     }
 
     /// The memory file system's metadata copy.
     public func copyMetadata(from source: URL, to destination: URL) throws {
         try base.copyMetadata(from: source, to: destination)
+    }
+
+    /// Makes durable what was written, as the memory file system records it.
+    public func commit(_ url: URL, cancellation: CancellationFlag) throws {
+        try base.commit(url, cancellation: cancellation)
     }
 
     /// The path as the memory file system writes it.
