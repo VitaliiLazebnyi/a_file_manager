@@ -19,11 +19,15 @@
 # it loses mutants inside blocks that hold mutants themselves and crashes on Swift 6 syntax.
 #
 # Muter works on a copy of the project with every mutant compiled in at once, switched on one at a
-# time by an environment variable (and by AFM_MUTANT, which the mutated files read once). Its test command is this script with --run-tests (see
-# muter.conf.yml): it builds once, then for each mutant runs the test target of the mutated
-# file's module first and the other test targets only if that one passes, each with a time limit
-# (MUTATION_TIMEOUT_FACTOR times the target's baseline time, plus a minute; a hung mutant counts as
-# killed). Full test logs of every mutant are kept in .mutation/logs inside Muter's copy.
+# time by an environment variable (and by AFM_MUTANT, which the mutated files read once). Before
+# Muter starts, Scripts/mutation-map.py records which tests run which lines (a coverage build of the
+# unmutated copy, every test run on its own). Muter's test command is this script with --run-tests
+# (see muter.conf.yml): it builds once, then for each mutant runs the tests that reach its line,
+# and, if they all pass, the whole of their targets (the test target of the mutated file's module
+# first and the others after it when the line is not in the map); a mutant no test reaches survives
+# at once. Each run has a time limit (MUTATION_TIMEOUT_FACTOR times the target's baseline time,
+# plus a minute; a hung mutant counts as killed). Full test logs of every mutant are kept in
+# .mutation/logs inside Muter's copy.
 set -euo pipefail
 
 targets=(KernelTests PluginTests ShellTests)
@@ -64,7 +68,7 @@ run_limited() {
 # The test command Muter runs, inside its copy of the project. What it prints is Muter's log of
 # the run; Muter reads "with N failure" as a kill, so the wording below is part of the protocol.
 run_tests() {
-  local root state mutant file target limit status base factor
+  local root state mutant file target base factor
   root="$(cd "$(dirname "$0")/.." && pwd)"
   state="$root/.mutation"
   # The switched-on mutant is the variable Muter set to YES:
@@ -84,7 +88,7 @@ run_tests() {
     while IFS= read -r file; do
       if grep -q '__muterActiveMutant == "' "$file" && ! grep -q 'let __muterActiveMutant' "$file"; then
         printf '\n%s\n%s\n' '// The mutant that is switched on (Scripts/mutation.sh).' \
-          'private let __muterActiveMutant = getenv("AFM_MUTANT").map { String(cString: $0) } ?? ""' >> "$file"
+          "private let __muterActiveMutant = getenv(\"AFM_MUTANT\").map { String(cString: \$0) } ?? \"\"" >> "$file"
       fi
     done < "$state/files"
     echo "baseline: building the tests with every mutant compiled in"
@@ -107,11 +111,12 @@ run_tests() {
     exit 0
   fi
 
-  local name="${mutant%_*_*_*}" first=() rest=() seen=" " inserted=0
+  local name="${mutant%_*_*_*}" first=() rest=() seen=" " inserted=0 mutated="" line selection
   name="${name%_*}"
   while IFS= read -r file; do
-    if [[ "$(basename "$file" .swift)" == "$name" ]]; then
-      grep -qF "\"$mutant\"" "$file" && inserted=1
+    if [[ "$(basename "$file" .swift)" == "$name" ]] && grep -qF "\"$mutant\"" "$file"; then
+      inserted=1
+      mutated="$file"
       for target in $(nearest_targets "$file"); do
         [[ "$seen" == *" $target "* ]] || first+=("$target")
         seen+="$target "
@@ -125,26 +130,56 @@ run_tests() {
     echo "$mutant: not inserted: Muter did not write this mutant into the source"
     exit 0
   fi
-
   export AFM_MUTANT="$mutant"
+
+  # The tests that run the mutant's line (Scripts/mutation-map.py), target by target: a kill by
+  # them is a kill. When they all pass, the whole of each of their targets runs before the mutant
+  # counts as survived (a test that runs the line may break a later one through shared state).
+  line="${mutant%_*_*}"
+  line="${line##*_}"
+  selection="unknown"
+  if [[ -e "$state/map.json" ]]; then
+    selection="$(python3 "$root/Scripts/mutation-map.py" select --map "$state/map.json" --file "$mutated" \
+      --line "$line")"
+  fi
+  if [[ -z "$selection" ]]; then
+    echo "$mutant: survived: no test runs line $line"
+    exit 0
+  fi
+  if [[ "$selection" != "unknown" ]]; then
+    local chosen=() target_filter
+    while read -r target target_filter; do
+      chosen+=("$target")
+      [[ "$target_filter" == "all" ]] && target_filter="^$target\\."
+      run_target "$mutant" "$target" "$target (selected)" "$target_filter"
+    done <<< "$selection"
+    first=("${chosen[@]}")
+    rest=()
+  fi
   # bash 3.2 under set -u counts an empty "${list[@]}" as unset.
   for target in ${first[@]+"${first[@]}"} ${rest[@]+"${rest[@]}"}; do
-    limit=$(($(cat "$state/baseline/$target") * factor + 60))
-    base=$SECONDS
-    status=0
-    run_limited "$limit" swift test --skip-build --disable-xctest --filter "^$target\\." \
-      > "$state/logs/$mutant-$target.log" 2>&1 || status=$?
-    if [[ $status -eq 124 ]]; then
-      echo "$mutant: killed by $target: timed out after $limit s, with 1 failure"
-      exit 1
-    elif [[ $status -ne 0 ]]; then
-      echo "$mutant: killed by $target after $((SECONDS - base)) s, with 1 failure"
-      exit 1
-    fi
-    echo "$mutant: $target passed in $((SECONDS - base)) s"
+    run_target "$mutant" "$target" "$target" "^$target\\."
   done
   echo "$mutant: survived"
   exit 0
+}
+
+# Runs the tests of one target that match a filter with the mutant switched on, within the time
+# limit; a failure or a timeout is a kill and ends the test command.
+run_target() {
+  local mutant="$1" target="$2" label="$3" filter="$4" limit base status=0
+  limit=$(($(cat "$state/baseline/$target") * factor + 60))
+  base=$SECONDS
+  run_limited "$limit" swift test --skip-build --disable-xctest --filter "$filter" \
+    >> "$state/logs/$mutant-$target.log" 2>&1 || status=$?
+  if [[ $status -eq 124 ]]; then
+    echo "$mutant: killed by $label: timed out after $limit s, with 1 failure"
+    exit 1
+  elif [[ $status -ne 0 ]]; then
+    echo "$mutant: killed by $label after $((SECONDS - base)) s, with 1 failure"
+    exit 1
+  fi
+  echo "$mutant: $label passed in $((SECONDS - base)) s"
 }
 
 if [[ "${1:-}" == "--run-tests" ]]; then
@@ -248,13 +283,27 @@ if [[ -n "$count" ]]; then
   touch "$project/.mutation/list-only"
   gate=0
 else
+  # Which tests run which lines, from a coverage build of the unmutated copy (its own build folder
+  # under $work, kept between runs): each mutant then runs the tests that reach it first.
+  echo "mapping which tests run the lines of ${#files[@]} file(s)"
+  map_build="$work/map-build"
+  if ! (cd "$project" && swift build --build-tests --enable-code-coverage --scratch-path "$map_build") \
+    > "$report_dir/map-build.log" 2>&1; then
+    tail -n 40 "$report_dir/map-build.log"
+    echo "the coverage build for the test map failed; the full log: $report_dir/map-build.log" >&2
+    exit 1
+  fi
+  products="$(cd "$project" && swift build --show-bin-path --scratch-path "$map_build")"
+  python3 Scripts/mutation-map.py build --products "$products" --root "$project" \
+    --files "$project/.mutation/files" --output "$project/.mutation/map.json" | tee "$report_dir/map.log"
   echo "mutating ${#files[@]} file(s); Muter's log: $report_dir/muter.log"
 fi
 start=$SECONDS
 status=0
 (cd "$project" && "$muter" run --skip-update-check --skip-coverage --format json --output "$report_dir/muter.json" \
   "${file_options[@]}") > "$report_dir/muter.log" 2>&1 || status=$?
-if [[ $status -ne 0 ]] && grep -q "wasn't able to discover any code it could mutation test" "$report_dir/muter.log"; then
+if [[ $status -ne 0 ]] \
+  && grep -q "wasn't able to discover any code it could mutation test" "$report_dir/muter.log"; then
   echo "no mutants in these files"
   echo '{"fileReports": []}' > "$report_dir/muter.json"
 elif [[ $status -ne 0 || ! -s "$report_dir/muter.json" ]]; then

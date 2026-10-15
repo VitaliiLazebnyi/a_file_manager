@@ -200,14 +200,23 @@ reported every `Sources` finding a second time). The fuzz and stress drivers the
   development branch writes no mutant into the sources at all. The patch fixes both, keeps files of the same name apart,
   swaps a ternary with operators in its second choice as a whole, removes only call statements (not declarations,
   `return` or `if`), and leaves out mutants in stored-property initial values (they cannot be switched at file scope).
-  With it, the whole tree with all 11,884 mutants compiles. It also switches a mutant on with `getenv("<mutant>")`
-  instead of `ProcessInfo.processInfo.environment[...]`: that builds the whole environment dictionary every time mutated
-  code runs, and with the panel sorting code mutated the kernel tests did not finish one test in 14 minutes.
+  With it, the whole tree with all 11,884 mutants compiles. It also switches a mutant on with
+  `__muterActiveMutant == "<mutant>"`, a name each mutated file reads once from `AFM_MUTANT` (`mutation.sh` declares
+  it at the end of the file and sets the variable), instead of `ProcessInfo.processInfo.environment[...]`: that builds
+  the whole environment dictionary every time mutated code runs, and with the panel sorting code mutated the kernel
+  tests did not finish one test in 14 minutes (`getenv` still took 511 s; the comparison, 44 s).
 - **Running:** `Scripts/mutation.sh` (files changed since the branch left `origin/main`), `Scripts/mutation.sh <files>`
   or `--all`. It copies the checkout to `.build/mutation/project` (warnings are not errors in that copy only: a mutant
-  may leave a value unused), and Muter runs `Scripts/mutation.sh --run-tests` per mutant: the test target of the mutated
-  module first (Kernel and Contracts: KernelTests; plugins: PluginTests; shell and app: ShellTests), the others only if
-  it passes, each stopped after 3 × its baseline time + 60 s (a hang counts as a kill). Reports in
+  may leave a value unused). Before Muter starts, `Scripts/mutation-map.py build` records which tests run which lines
+  of the files (a coverage build of the unmutated copy in `.build/mutation/map-build`, every test run alone in its own
+  process with its own profile: about 4 minutes for all 2,355 tests). Muter then runs `Scripts/mutation.sh --run-tests`
+  per mutant: the tests that run the mutant's line first (a filter per target; the whole target when they are more
+  than 60% of it), and when they all pass, the whole of each of their targets before the mutant counts as survived
+  (a test that runs the line can break a later test of the same process through shared state). A mutant whose line
+  no test runs survives at once; a line the coverage does not count, or an incomplete map (a test that crashed or hung
+  alone), falls back to the targets in order: the mutated module's first (Kernel and Contracts: KernelTests; plugins:
+  PluginTests; shell and app: ShellTests), the others only if it passes. Each run stops after 3 × its target's baseline
+  time + 60 s (a hang counts as a kill). Reports in
   `.build/mutation/report`: Muter's `muter.json`, `mutants.json` (one record per mutant with its source text),
   per-mutant test logs in `logs/`.
 - **The gate:** `Scripts/mutation-gate.py check <mutants.json>...` fails on every survivor not in
