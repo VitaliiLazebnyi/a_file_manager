@@ -187,7 +187,9 @@ internal final class FormDialog: NSObject, NSTextViewDelegate {
                 // The field editor stands in for the text field it edits.
                 let responder = window.firstResponder
                 let view = ((responder as? NSTextView)?.delegate as? NSView) ?? responder as? NSView
-                view?.scrollToVisible(view?.bounds.insetBy(dx: 0, dy: -8) ?? .zero)
+                if let view {
+                    view.scrollToVisible(view.bounds.insetBy(dx: 0, dy: -8))
+                }
             }
         }
     }

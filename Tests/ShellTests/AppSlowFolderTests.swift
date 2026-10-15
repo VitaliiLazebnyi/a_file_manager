@@ -118,8 +118,10 @@ internal struct AppSlowFolderTests {
         #expect(
             app.left.model.directory.path == "/" && app.left.model.cursorItem?.name == "late" && !app.left.showsActivity
         )
-        // The abandoned reading is ended, and the answer it might have given changes nothing.
-        #expect(await AppWait.until { late.listingsBegun == 2 && late.listingsEnded == 2 })
+        // The abandoned reading is ended, and the answer it might have given changes nothing. (On
+        // a busy machine the root may be read once more: a watch that was slow to set up has the
+        // folder read again, so the readings are counted, not their number guessed.)
+        #expect(await AppWait.until { late.listingsBegun >= 2 && late.listingsEnded == late.listingsBegun })
         late.open()
         #expect(app.left.model.directory.path == "/" && app.left.model.isComplete)
     }

@@ -157,6 +157,33 @@ internal struct InteractionProgressWindowTests {
         #expect(service.display.panel === panel && screen.calls == ["sheet"])
     }
 
+    /// A display that serves no queue shows its job as a sheet and changes nothing on it; between
+    /// two jobs it shows no title; the end of a job it does not show changes nothing.
+    @Test
+    internal func aDisplayWithoutAQueueAndBetweenJobs() throws {
+        let screen = Screen()
+        let window = NSWindow(contentRect: .zero, styleMask: [.titled], backing: .buffered, defer: true)
+        let display = ProgressDisplay()
+        display.screen = screen.calling
+        display.window = window
+        let first = ProgressSheet(title: "First", cancellation: CancellationFlag())
+        display.begin(first)
+        display.show()
+        let panel = try #require(display.panel)
+        #expect(screen.calls == ["sheet"])
+        // Between jobs, for a queue: no title, nothing cancelled.
+        let service = ProgressJobService()
+        display.service = service
+        display.end(ProgressSheet(title: "Other", cancellation: CancellationFlag()), keepOpen: false)
+        #expect(display.panel === panel)
+        display.end(first, keepOpen: true)
+        display.refresh()
+        let content = try #require(panel.contentView as? ProgressContentView)
+        #expect(display.panel === panel && content.cancelButton.isEnabled)
+        display.close()
+        #expect(screen.calls == ["sheet", "end sheet"] && display.panel == nil)
+    }
+
     /// Without a job the window has nothing to change.
     @Test
     internal func withoutAJobTheWindowHasNothingToChange() {

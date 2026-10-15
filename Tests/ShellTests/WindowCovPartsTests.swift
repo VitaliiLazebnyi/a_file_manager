@@ -67,14 +67,17 @@ internal struct WindowCovPartsTests {
         watches.watch(["nowhere": nowhere, "a": fileSystem.url("/a")])
         #expect(await AppWait.until { fileSystem.livingWatches == 1 })
         #expect(fileSystem.watches.map(\.path) == ["/a"])
+        // (A watch that was slow to set up reports its folder once by itself: on a busy machine
+        // that may come too.)
         fileSystem.reportChange(of: "/a")
-        #expect(await AppWait.until { changed.count == 1 })
+        #expect(await AppWait.until { changed.contains { $0.map(\.path) == ["/a"] } })
         // No longer wanted: its changes are not heard of, and its watch ends.
         watches.watch([:])
         #expect(await AppWait.until { fileSystem.endedWatches == 1 })
+        let heard = changed.count
         fileSystem.reportChange(of: "/a")
         await PanelWait.drainMainQueue()
-        #expect(changed.count == 1)
+        #expect(changed.count == heard)
     }
 
     /// Watches whose owner went away while they were being set up are let go of when they come.
@@ -97,6 +100,22 @@ internal struct WindowCovPartsTests {
         // A change the file system still reports reaches nobody.
         fileSystem.reportChange(of: "/a")
         await PanelWait.drainMainQueue()
+    }
+
+    /// A watch that comes after the watches were shut down is let go of.
+    @Test
+    internal func aWatchThatComesAfterTheShutDownIsLetGoOf() async {
+        let fileSystem = PanelWatchedFileSystem()
+        let kernel = Self.kernel(with: fileSystem)
+        fileSystem.holdsWatches = true
+        let watches = FolderWatches(fileSystems: kernel.fileSystems) { _ in
+            Issue.record("a change reached watches that were shut down")
+        }
+        watches.watch(["a": fileSystem.url("/a")])
+        #expect(await AppWait.until { fileSystem.watches.count == 1 })
+        watches.shutDown()
+        fileSystem.holdsWatches = false
+        #expect(await AppWait.until { fileSystem.endedWatches == 1 && fileSystem.livingWatches == 0 })
     }
 
     /// More folders than are noted one by one, or a change of everything, make everything to be

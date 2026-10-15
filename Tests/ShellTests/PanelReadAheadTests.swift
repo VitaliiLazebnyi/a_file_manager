@@ -190,7 +190,11 @@ internal struct PanelReadAheadTests {
         server.addFile("/local/a.txt")
         let fileSystems = FileSystemRegistry()
         fileSystems.register(server)
-        let ahead = ReadAhead(fileSystems: fileSystems, cache: ListingCache())
+        // A local folder that was slow to read is kept: on a busy machine any reading may be
+        // slow, so here none counts as slow.
+        var limits = ListingCache.Limits()
+        limits.slowRead = .infinity
+        let ahead = ReadAhead(fileSystems: fileSystems, cache: ListingCache(limits: limits))
         defer { ahead.shutDown() }
         ahead.cursorRests(on: target("/local", on: server))
         #expect(await PanelWait.until { server.listRequests(for: "/local") == 1 && ahead.reading == nil })

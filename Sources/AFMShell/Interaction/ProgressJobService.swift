@@ -232,10 +232,7 @@ internal final class ProgressJobService: JobService {
             deliver()
             return
         }
-        guard running === job else {
-            deliver()
-            return
-        }
+        // A job that ends was started, so it is the running one unless it was left behind.
         stopQuestion?()
         stopQuestion = nil
         // The window stays for the next job of the queue; the last one takes it away
