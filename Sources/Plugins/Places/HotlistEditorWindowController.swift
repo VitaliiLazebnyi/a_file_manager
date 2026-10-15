@@ -25,6 +25,8 @@ final class HotlistEditorWindowController: NSWindowController, NSWindowDelegate,
     private let proposedCommand: String
     private let proposedTitle: String
     private var accepted = false
+    /// The controller's window, which it always has.
+    private let dialog: NSWindow
 
     private let table = EntryTableView()
     private let numberLabel = NSTextField(labelWithString: "")
@@ -41,14 +43,17 @@ final class HotlistEditorWindowController: NSWindowController, NSWindowDelegate,
     /// Shows the editor and waits for it. Returns the changed list on OK, nil on Cancel.
     static func run(_ hotlist: Hotlist, kernel: Kernel, currentDirectory: URL) -> Hotlist? {
         let controller = HotlistEditorWindowController(hotlist, kernel: kernel, currentDirectory: currentDirectory)
-        guard let window = controller.window else { return nil }
+        let window = controller.dialog
         window.center()
         NSApp.runModal(for: window)
         window.orderOut(nil)
-        return controller.accepted ? controller.hotlist : nil
+        return controller.result
     }
 
-    private init(_ hotlist: Hotlist, kernel: Kernel, currentDirectory: URL) {
+    /// The changed list after OK; nil before and after Cancel.
+    var result: Hotlist? { accepted ? hotlist : nil }
+
+    init(_ hotlist: Hotlist, kernel: Kernel, currentDirectory: URL) {
         self.hotlist = hotlist
         self.kernel = kernel
         proposedCommand = "cd " + kernel.fileSystems.displayPath(currentDirectory)
@@ -64,12 +69,14 @@ final class HotlistEditorWindowController: NSWindowController, NSWindowDelegate,
         window.title = "Change Directory Menu"
         window.isReleasedWhenClosed = false
         window.minSize = NSSize(width: 520, height: 340)
+        dialog = window
         super.init(window: window)
         window.delegate = self
         buildContent(in: window)
         reload(selecting: hotlist.rows.first?.path)
     }
 
+    @available(*, unavailable)
     required init?(coder _: NSCoder) { fatalError("not used") }
 
     // MARK: Layout
@@ -83,7 +90,7 @@ final class HotlistEditorWindowController: NSWindowController, NSWindowDelegate,
         table.delegate = self
         table.target = self
         table.doubleAction = #selector(toggleHidden)
-        table.onKey = { [weak self] event in self?.handleKey(event) ?? false }
+        table.onKey = { [weak self] event in self?.handleKey(event) == true }
         let scroll = NSScrollView()
         scroll.documentView = table
         scroll.hasVerticalScroller = true
@@ -165,11 +172,11 @@ final class HotlistEditorWindowController: NSWindowController, NSWindowDelegate,
 
     private func showSelection() {
         let entry = selectedPath.flatMap(hotlist.entry(at:))
-        let isItem = entry?.kind == .item
-        commandField.stringValue = isItem ? entry?.command ?? "" : ""
-        targetField.stringValue = isItem ? entry?.target ?? "" : ""
-        commandField.isEnabled = isItem
-        targetField.isEnabled = isItem
+        let item = entry?.kind == .item ? entry : nil
+        commandField.stringValue = item?.command ?? ""
+        targetField.stringValue = item?.target ?? ""
+        commandField.isEnabled = item != nil
+        targetField.isEnabled = item != nil
         entryButtons.forEach { $0.isEnabled = entry != nil }
         entryButtons[1].isEnabled = entry != nil && entry?.kind != .separator
         numberLabel.stringValue = rows.isEmpty ? "" : "Entry \(table.selectedRow + 1) of \(rows.count)"
@@ -266,17 +273,18 @@ final class HotlistEditorWindowController: NSWindowController, NSWindowDelegate,
 
     /// The fields below the list belong to the selected entry and are taken over as typed.
     func controlTextDidChange(_ notification: Notification) {
-        guard let field = notification.object as? NSTextField else { return }
+        let field = notification.object as? NSTextField
         if field === hideField {
             // Any character but the dash, which already means separators and submenus.
-            let character = String(field.stringValue.prefix(1))
+            let character = String(hideField.stringValue.prefix(1))
             hotlist.hideCharacter = character == "-" ? "" : character
         } else if let path = selectedPath {
+            // The command field, or else the target path's.
             hotlist.update(at: path) { entry in
                 if field === commandField {
-                    entry.command = field.stringValue
+                    entry.command = commandField.stringValue
                 } else {
-                    entry.target = field.stringValue
+                    entry.target = targetField.stringValue
                 }
             }
             rows = hotlist.rows
@@ -327,6 +335,8 @@ final class HotlistEditorWindowController: NSWindowController, NSWindowDelegate,
     }
 
     func windowWillClose(_: Notification) {
-        NSApp.stopModal()
+        // Only the loop this window runs in is ended: a stop without one would end whatever
+        // loop the main thread runs.
+        if NSApp.modalWindow === window { NSApp.stopModal() }
     }
 }

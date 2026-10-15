@@ -36,7 +36,10 @@ enum StoredSettings {
     /// The value under `key`; nil when nothing is stored or none of it can be read.
     /// `problem` is called with a message when the data was damaged or partly left out.
     static func load<Value: Decodable>(
-        _ type: Value.Type, key: String, in settings: any SettingsStore, problem: (String) -> Void
+        _ type: Value.Type,
+        key: String,
+        in settings: any SettingsStore,
+        problem: (String) -> Void
     ) -> Value? {
         guard let data = settings.data(forKey: key) else { return nil }
         let report = DecodeReport()
@@ -49,7 +52,8 @@ enum StoredSettings {
         problem(
             value == nil
                 ? "The stored data of “\(key)” could not be read."
-                : "\(report.skipped) stored entries of “\(key)” could not be read and were left out.")
+                : "\(report.skipped) stored entries of “\(key)” could not be read and were left out."
+        )
         return value
     }
 }
