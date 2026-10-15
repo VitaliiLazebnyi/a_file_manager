@@ -257,11 +257,6 @@ public final class FileJob: @unchecked Sendable {
     /// How coarsely the volume of a folder keeps dates, by the folder's key. Guarded by `decisions`.
     private var grains: [String: TimeInterval] = [:]
 
-    /// The rule for name collisions the job stands at: what `options` said, or what an answer
-    /// "for all" made of it. For whoever runs several jobs as one operation.
-    public var overwriteInEffect: OverwriteMode { decisions.withLock { mode } }
-    public var skipsErrorsInEffect: Bool { decisions.withLock { skipAllErrors } }
-
     private let counters = NSLock()
     private var done = Measure(), total = Measure()
     private var inFlightBytes: Int64 = 0
@@ -530,18 +525,18 @@ public final class FileJob: @unchecked Sendable {
         return found
     }
 
-    /// Where a top-level source goes.
-    private func destination(for source: URL) -> URL? {
+    /// Where a top-level source goes in `target`.
+    private func destination(for source: URL, in target: TargetSpec) -> URL {
         if let name = newNames[source.locationKey] { return source.deletingLastPathComponent().appending(name: name) }
-        return target?.url(for: source.lastPathComponent)
+        return target.url(for: source.lastPathComponent)
     }
 
     /// True when the job would copy or move the items onto themselves.
     public var targetsSourceFolder: Bool {
-        guard target != nil, case .transfer = kind, !renamesSelfCopies else { return false }
+        guard let target, case .transfer = kind, !renamesSelfCopies else { return false }
         // A move onto another spelling of its own name is a rename (letter case), not a refusal.
         return sources.contains {
-            guard let destination = destination(for: $0) else { return false }
+            let destination = destination(for: $0, in: target)
             return destination.isSameLocation(as: $0) || (kind == .copy && FileIdentity.sameEntry(destination, $0))
         }
     }
@@ -577,8 +572,8 @@ public final class FileJob: @unchecked Sendable {
         // A file system may show a folder of another one under a location of its own (a plain
         // path typed inside an archive): asked, it answers with the real folder, and that is
         // where the job then goes.
-        if var spec = target, !spec.directory.isFileURL, let found = (try? entry(at: spec.directory)) ?? nil,
-            (found.url.scheme ?? "file") != (spec.directory.scheme ?? "file")
+        if var spec = target, !spec.directory.isFileURL, let found = try? entry(at: spec.directory),
+            found.url.scheme != spec.directory.scheme
         {
             spec.directory = found.url
             target = spec
@@ -668,11 +663,10 @@ public final class FileJob: @unchecked Sendable {
                 let source = sources[slot]
                 try checkCancelled()
                 try autoreleasepool {
-                    guard try hasSafeName(source, verb: isMove ? .move : .copy),
-                        var destination = destination(for: source)
-                    else {
+                    guard try hasSafeName(source, verb: isMove ? .move : .copy) else {
                         return batch.set(slot, .skipped)
                     }
+                    var destination = destination(for: source, in: target)
                     if renamesSelfCopies, destination.isSameLocation(as: source) {
                         destination = UniqueName.available(
                             for: destination,
@@ -734,7 +728,7 @@ public final class FileJob: @unchecked Sendable {
         guard sources.count > 1, let first = sources.first, !first.isFileURL, let target,
             let from = try? fileSystems.provider(for: first), let to = try? fileSystems.provider(for: target.directory),
             from !== to,
-            !sources.contains(where: { ($0.scheme ?? "file") != (first.scheme ?? "file") })
+            !sources.contains(where: { $0.scheme != first.scheme })
         else { return slots }
         let ordered = from.readOrder(of: sources)
         guard ordered.count == sources.count, ordered != sources else { return slots }
@@ -784,11 +778,11 @@ public final class FileJob: @unchecked Sendable {
         var seen = Set<String>()
         var last = ""
         for index in stride(from: 0, to: sources.count, by: max(1, sources.count / 4_096)) {
-            let folder =
-                (sources[index].path as NSString).deletingLastPathComponent + "|" + (sources[index].scheme ?? "file")
+            let parent = sources[index].deletingLastPathComponent()
+            let folder = parent.absoluteString
             if folder == last { continue }
             last = folder
-            if seen.insert(folder).inserted { folders.append(sources[index].deletingLastPathComponent()) }
+            if seen.insert(folder).inserted { folders.append(parent) }
         }
         return folders
     }
@@ -990,7 +984,7 @@ public final class FileJob: @unchecked Sendable {
             // A file system that only shows the files of another answers with the real file.
             // The real place is then what is compared and written: the other spelling of it
             // would hide that source and target are one file.
-            if !existing.isDirectory, (existing.url.scheme ?? "file") != (destination.scheme ?? "file") {
+            if !existing.isDirectory, existing.url.scheme != destination.scheme {
                 destination = existing.url
                 continue
             }
@@ -2521,7 +2515,8 @@ public final class FileJob: @unchecked Sendable {
     /// Whether the system will rename the folder to its place: both on one local volume, and
     /// nothing there under that name. A wrong guess costs a count later, nothing else.
     private func willRename(_ folder: FileItem) -> Bool {
-        guard folder.url.isFileURL, let destination = destination(for: folder.url) else { return false }
+        guard folder.url.isFileURL, let target else { return false }
+        let destination = destination(for: folder.url, in: target)
         guard destination.isFileURL, !destination.isSameLocation(as: folder.url),
             fileSystems.item(at: destination) == nil,
             let here = FileIdentity.device(of: folder.url.deletingLastPathComponent()),
