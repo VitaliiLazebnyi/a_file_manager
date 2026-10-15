@@ -17,7 +17,7 @@ internal struct SaturatingProperties {
         exact > Int128(Int64.max) ? .max : (exact < Int128(Int64.min) ? .min : Int64(exact))
     }
 
-    /// Sums, differences and products of `Int64` are exact where they fit and the nearest end of
+    /// Sums of `Int64` are exact where they fit and the nearest end of
     /// the range where they do not.
     @Test
     internal func int64ArithmeticSaturates() {
@@ -27,8 +27,6 @@ internal struct SaturatingProperties {
         expectProperty(Self.pairs, count: 5_000) { first, second in
             let (wide, other) = (Int128(first), Int128(second))
             return first.addingSaturated(second) == Self.clamped(wide + other)
-                && first.subtractingSaturated(second) == Self.clamped(wide - other)
-                && first.multipliedSaturated(by: second) == Self.clamped(wide * other)
         }
     }
 
@@ -42,7 +40,6 @@ internal struct SaturatingProperties {
             let (one, other) = (Int(first), Int(second))
             let (wide, wideOther) = (Int128(first), Int128(second))
             return Int64(one.addingSaturated(other)) == Self.clamped(wide + wideOther)
-                && Int64(one.multipliedSaturated(by: other)) == Self.clamped(wide * wideOther)
         }
     }
 

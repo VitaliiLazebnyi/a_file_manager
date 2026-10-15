@@ -67,15 +67,23 @@ public final class ViewOptionsPlugin: Plugin {
                 title: "Display",
                 preferences: [
                     Preference(
-                        Self.hiddenInBothPanelsKey, "Hidden Files switches both panels at once",
-                        .flag(default: true)),
+                        Self.hiddenInBothPanelsKey,
+                        "Hidden Files switches both panels at once",
+                        .flag(default: true)
+                    ),
                     Preference(
-                        Self.programMasksKey, "Show › Programs lists executable files and",
-                        .text(default: Self.defaultProgramMasks)),
+                        Self.programMasksKey,
+                        "Show › Programs lists executable files and",
+                        .text(default: Self.defaultProgramMasks)
+                    ),
                     Preference(
-                        Self.columnsSwitchToFullKey, "Choosing custom columns switches to the Full view",
-                        .flag(default: true))
-                ]))
+                        Self.columnsSwitchToFullKey,
+                        "Choosing custom columns switches to the Full view",
+                        .flag(default: true)
+                    )
+                ]
+            )
+        )
     }
 
     // MARK: Views and columns
@@ -118,7 +126,9 @@ public final class ViewOptionsPlugin: Plugin {
         let fields =
             [FormField.note("Columns shown after the standard ones in the Full view:")]
             + offered.map { FormField.checkbox($0.id, $0.title, panel.extraColumns.contains($0.id)) }
-        guard let answer = kernel.ui.form("Custom Columns", detail: "", fields: fields, buttons: ["OK"]) else { return }
+        guard let answer = kernel.interaction.form("Custom Columns", detail: "", fields: fields, buttons: ["OK"]) else {
+            return
+        }
         let chosen = Set(offered.map(\.id).filter(answer.flag))
         // An id whose plugin is not loaded is not in the dialog and stays as it is.
         let known = Set(offered.map(\.id))
@@ -142,44 +152,56 @@ public final class ViewOptionsPlugin: Plugin {
         let kind = { [self] in kind(of: model()) }
 
         commands.register(
-            Command(Self.allFiles, "All Files", [.f(10, .control)]), checked: { model().filter == nil }
+            Command(Self.allFiles, "All Files", [.f(10, .control)]),
+            checked: { model().filter == nil }
         ) { [self] in
             apply(nil, as: nil, to: model())
         }
         commands.register(
-            Command(Self.programs, "Programs", [.f(11, .control)]), checked: { kind() == .programs }
+            Command(Self.programs, "Programs", [.f(11, .control)]),
+            checked: { kind() == .programs }
         ) { [self] in
             let masks = FileMask(
-                settings.text(Self.programMasksKey, default: Self.defaultProgramMasks))
+                settings.text(Self.programMasksKey, default: Self.defaultProgramMasks)
+            )
             apply(
-                PanelFilter(title: "<programs>") { Self.isProgram($0, masks: masks) }, as: .programs,
-                to: model())
+                PanelFilter(title: "<programs>") { Self.isProgram($0, masks: masks) },
+                as: .programs,
+                to: model()
+            )
         }
         commands.register(
             Command(Self.lastCustomFilter, "Last Custom Filter"),
             enabled: { settings.data(forKey: Self.lastMaskKey) != nil }
         ) { [self] in
             apply(
-                DisplayMask(settings.text(Self.lastMaskKey, default: "*.*")).filter, as: .custom,
-                to: model())
+                DisplayMask(settings.text(Self.lastMaskKey, default: "*.*")).filter,
+                as: .custom,
+                to: model()
+            )
         }
         commands.register(
-            Command(Self.customFilter, "Custom…", [.f(12, .control)]), checked: { kind() == .custom },
+            Command(Self.customFilter, "Custom…", [.f(12, .control)]),
+            checked: { kind() == .custom },
             parameterized: { [self] argument in
                 let last = settings.text(Self.lastMaskKey, default: "*.*")
                 guard
                     let text = argument.text
-                        ?? kernel.ui.prompt(
-                            "Enter file types (e.g. *.doc *.txt)", value: last,
-                            detail: "Masks after “|” are left out; “| name/” hides folders.")
+                        ?? kernel.interaction.prompt(
+                            "Enter file types (e.g. *.doc *.txt)",
+                            value: last,
+                            detail: "Masks after “|” are left out; “| name/” hides folders."
+                        )
                 else { return }
                 let mask = DisplayMask(text)
                 if !mask.text.isEmpty { settings.set(mask.text, forKey: Self.lastMaskKey) }
                 // `*.*` shows everything: the filter is taken away.
                 apply(mask.filter, as: .custom, to: model())
-            })
+            }
+        )
         commands.register(
-            Command(Self.onlySelected, "Only Selected Files"), enabled: { model().hasSelection },
+            Command(Self.onlySelected, "Only Selected Files"),
+            enabled: { model().hasSelection },
             checked: { kind() == .selected }
         ) { [self] in
             // A snapshot: marking other files later does not bring hidden ones back. The marks
@@ -205,7 +227,9 @@ public final class ViewOptionsPlugin: Plugin {
             [
                 Self.allFiles, Self.programs, Self.lastCustomFilter,
                 Self.customFilter, Self.onlySelected, .showHidden
-            ], to: .showFilters)
+            ],
+            to: .showFilters
+        )
     }
 
     /// Lists from this length on are filtered in the background.
@@ -229,7 +253,10 @@ public final class ViewOptionsPlugin: Plugin {
     /// background. `make` builds the filter (in the background too, for a long list);
     /// `matches` of it is then called from several threads and looks at the entry alone.
     private func apply(
-        _ title: String?, as kind: FilterKind?, to model: PanelModel, make: @escaping @Sendable () -> PanelFilter?
+        _ title: String?,
+        as kind: FilterKind?,
+        to model: PanelModel,
+        make: @escaping @Sendable () -> PanelFilter?
     ) {
         applied = applied.filter { $0.value.model != nil }
         filterTickets = filterTickets.filter { applied[$0.key] != nil }
@@ -251,7 +278,10 @@ public final class ViewOptionsPlugin: Plugin {
     }
 
     private func filterInBackground(
-        _ model: PanelModel, _ make: @escaping @Sendable () -> PanelFilter?, ticket: Int, tries: Int
+        _ model: PanelModel,
+        _ make: @escaping @Sendable () -> PanelFilter?,
+        ticket: Int,
+        tries: Int
     ) {
         let id = ObjectIdentifier(model)
         let basis = model.basis

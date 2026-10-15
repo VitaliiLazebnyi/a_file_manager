@@ -12,11 +12,11 @@ internal struct PanelsModelTests {
     private static let directory = URL(fileURLWithPath: "/panels")
 
     private static func file(_ name: String, size: Int64 = 10, in folder: URL = directory) -> FileItem {
-        FileItem(url: folder.appendingPathComponent(name), name: name, isDirectory: false, size: size)
+        FileItem(url: folder.appendingPathComponent(name), name: name, stat: .init(size: size))
     }
 
     private static func folder(_ name: String, in parent: URL = directory) -> FileItem {
-        FileItem(url: parent.appendingPathComponent(name), name: name, isDirectory: true)
+        FileItem(url: parent.appendingPathComponent(name), name: name, kind: .directory)
     }
 
     private static func listing(_ items: [FileItem], at directory: URL = directory) -> Listing {

@@ -21,10 +21,10 @@ enum ShellCommands {
 
         // ← and → jump to the first and the last entry of the folder (`SpecialCursorMovement` 1
         // of the spec); `[..]` is not an entry, Home still reaches it.
-        cursor(.cursorToFirstEntry, "Cursor to First Entry", [Shortcut(.left)]) {
+        cursor(.cursorToFirstEntry, "Cursor to First Entry", [Shortcut(.leftArrow)]) {
             $0.hasParentRow && !$0.items.isEmpty ? 1 : 0
         }
-        cursor(.cursorToLastEntry, "Cursor to Last Entry", [Shortcut(.right), Shortcut(.end)]) { $0.rowCount - 1 }
+        cursor(.cursorToLastEntry, "Cursor to Last Entry", [Shortcut(.rightArrow), Shortcut(.end)]) { $0.rowCount - 1 }
         cursor(.cursorToTop, "Cursor to Top", [Shortcut(.home)]) { _ in 0 }
         cursor(.cursorPageUp, "Cursor Page Up", [Shortcut(.pageUp)]) { $0.cursor - source().pageSize }
         cursor(.cursorPageDown, "Cursor Page Down", [Shortcut(.pageDown)]) { $0.cursor + source().pageSize }
@@ -34,11 +34,14 @@ enum ShellCommands {
         }
         commands.register(
             Command(
-                .toggleSelectionAndMoveDown, "Select and Move Down", [Shortcut(.insert), Shortcut(.down, .shift)])
+                .toggleSelectionAndMoveDown,
+                "Select and Move Down",
+                [Shortcut(.insert), Shortcut(.downArrow, .shift)]
+            )
         ) {
             source().toggleSelectionAndMove(1)
         }
-        commands.register(Command(.toggleSelectionAndMoveUp, "Select and Move Up", [Shortcut(.up, .shift)])) {
+        commands.register(Command(.toggleSelectionAndMoveUp, "Select and Move Up", [Shortcut(.upArrow, .shift)])) {
             source().toggleSelectionAndMove(-1)
         }
 

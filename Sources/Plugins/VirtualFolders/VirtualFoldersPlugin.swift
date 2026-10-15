@@ -55,13 +55,17 @@ public final class VirtualFoldersPlugin: Plugin, FileListService {
         commands.register(
             Command(.branchView, "Branch View (With Subdirs)", [Shortcut(.character("b"), .control)]),
             checked: { isBranch(source()) },
-            parameterized: { [self] in setBranchView($0, in: source(), selectedOnly: false) })
+            parameterized: { [self] in setBranchView($0, in: source(), selectedOnly: false) }
+        )
         commands.register(
             Command(
-                .branchViewSelected, "Branch View of Selected Folders",
-                [Shortcut(.character("b"), [.control, .shift])]),
+                .branchViewSelected,
+                "Branch View of Selected Folders",
+                [Shortcut(.character("b"), [.control, .shift])]
+            ),
             enabled: { isVirtual(source()) || source().model.hasOperands },
-            parameterized: { [self] in setBranchView($0, in: source(), selectedOnly: true) })
+            parameterized: { [self] in setBranchView($0, in: source(), selectedOnly: true) }
+        )
         let sided: [(CommandID, String, Bool, Bool)] = [
             (.leftBranchView, "Left: Branch View", true, false),
             (.rightBranchView, "Right: Branch View", false, false),
@@ -71,32 +75,45 @@ public final class VirtualFoldersPlugin: Plugin, FileListService {
         for (id, title, isLeft, selectedOnly) in sided {
             let panel = { isLeft ? kernel.panels.left : kernel.panels.right }
             commands.register(
-                Command(id, title), checked: { isBranch(panel()) },
-                parameterized: { [self] in setBranchView($0, in: panel(), selectedOnly: selectedOnly) })
+                Command(id, title),
+                checked: { isBranch(panel()) },
+                parameterized: { [self] in setBranchView($0, in: panel(), selectedOnly: selectedOnly) }
+            )
         }
         commands.register(
-            Command(.loadFileList, "Load File List into Panel…"), parameterized: { [self] in loadList($0) })
+            Command(.loadFileList, "Load File List into Panel…"),
+            parameterized: { [self] in loadList($0) }
+        )
 
         kernel.menus.add([.branchView, .branchViewSelected], to: .commandsPlaces)
         kernel.toolbar.add(
-            .branchView, symbol: "list.bullet.indent", group: 30,
-            hint: "Show the files of this folder and of all its subfolders in one list.")
+            .branchView,
+            symbol: "list.bullet.indent",
+            group: 30,
+            hint: "Show the files of this folder and of all its subfolders in one list."
+        )
         kernel.toolbar.setSymbol("list.bullet.rectangle", for: .loadFileList)
         kernel.preferences.add(
             PreferencePage(
                 title: "Branch View",
                 preferences: [
                     Preference(
-                        Self.listsFoldersKey, "List the folders too, not only the files in them",
-                        .flag(default: false)),
+                        Self.listsFoldersKey,
+                        "List the folders too, not only the files in them",
+                        .flag(default: false)
+                    ),
                     Preference(
-                        Self.entersPackagesKey, "Show the contents of packages (applications, bundles)",
-                        .flag(default: false))
+                        Self.entersPackagesKey,
+                        "Show the contents of packages (applications, bundles)",
+                        .flag(default: false)
+                    )
                 ],
                 onChange: { [self] in
                     applyOptions()
                     for panel in kernel.panels.all where isVirtual(panel) { panel.reload() }
-                }))
+                }
+            )
+        )
     }
 
     /// Hands the user's options to the file system, which reads them on background threads.
@@ -104,7 +121,8 @@ public final class VirtualFoldersPlugin: Plugin, FileListService {
         guard let kernel = owner else { return }
         fileSystem?.options = VirtualFileSystem.Options(
             listsFolders: kernel.settings.flag(Self.listsFoldersKey, default: false),
-            entersPackages: kernel.settings.flag(Self.entersPackagesKey, default: false))
+            entersPackages: kernel.settings.flag(Self.entersPackagesKey, default: false)
+        )
     }
 
     // MARK: FileListService
@@ -184,7 +202,9 @@ public final class VirtualFoldersPlugin: Plugin, FileListService {
             title: "Leave selected branch",
             work: { _ in
                 (fileSystem.entries(of: virtual) ?? []).map(\.lastPathComponent)
-            }, completion: { names in show(selecting: names) })
+            },
+            completion: { names in show(selecting: names) }
+        )
     }
 
     // MARK: Lists from files
@@ -196,7 +216,7 @@ public final class VirtualFoldersPlugin: Plugin, FileListService {
         let home = URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
         let typed =
             argument.text
-            ?? (argument.location == nil ? kernel.ui.prompt("Load the list of files from:", value: "") : nil)
+            ?? (argument.location == nil ? kernel.interaction.prompt("Load the list of files from:", value: "") : nil)
         guard
             let file = argument.location
                 ?? typed.map({ kernel.fileSystems.location(from: $0, relativeTo: base ?? home) })
@@ -211,9 +231,11 @@ public final class VirtualFoldersPlugin: Plugin, FileListService {
             completion: { [self] result in
                 switch result {
                 case .success(let files): show(files, title: FileItem.split(file.lastPathComponent).base, in: panel)
-                case .failure(let error): kernel.ui.report(error, title: "The list of files could not be loaded.")
+                case .failure(let error):
+                    kernel.interaction.report(error, title: "The list of files could not be loaded.")
                 }
-            })
+            }
+        )
     }
 }
 
@@ -245,11 +267,12 @@ public enum FileListFile {
                 String(data: data.starts(with: [0xEF, 0xBB, 0xBF]) ? data.dropFirst(3) : data, encoding: .utf8)
                 ?? String(data: data, encoding: .isoLatin1)
         }
-        return (text ?? "").split(whereSeparator: \.isNewline).compactMap { raw in
-            let line = raw.trimmingCharacters(in: .whitespaces)
-            if line.isEmpty { return nil }
-            return unquoted(line) ?? line
-        }
+        return (text ?? "").split(whereSeparator: \.isNewline)
+            .compactMap { raw in
+                let line = raw.trimmingCharacters(in: .whitespaces)
+                if line.isEmpty { return nil }
+                return unquoted(line) ?? line
+            }
     }
 
     /// The name a quoted line stands for; nil when the line is not quoted, or holds an escape

@@ -1,67 +1,71 @@
-import Foundation
+import os
 
-/// A menu of the menu bar. Menus are shown in the order of their `order` values.
-public struct MenuID: Hashable, Sendable {
-    public let title: String
-    public let order: Int
-
-    public init(_ title: String, order: Int) {
-        self.title = title
-        self.order = order
-    }
-}
-
-/// A group of entries inside a menu; groups are shown in the order of their `order` values,
-/// with a separator between them. Plugins that share a section share one constant.
-public struct MenuSection: Hashable, Sendable {
-    public let menu: MenuID
-    public let order: Int
-
-    public init(_ menu: MenuID, order: Int) {
-        self.menu = menu
-        self.order = order
-    }
-}
-
-/// A group of entries in the context menu of the file list.
-public struct ContextMenuSection: Hashable, Sendable {
-    public let order: Int
-
-    public init(order: Int) {
-        self.order = order
-    }
-}
-
-/// Where plugins say in which menus their commands appear. The shell builds the menu bar and
-/// the context menu from this; it has no menu layout of its own.
+/// Where plugins say in which menus their commands appear.
+///
+/// The shell builds the menu bar and the context menu from this; it has no menu layout of its own.
+@preconcurrency
 @MainActor
 public final class MenuRegistry {
+    /// A menu of the menu bar as the shell builds it.
     public struct Menu: Sendable {
+        /// The menu's title in the menu bar.
         public let title: String
         /// Commands in display order; `nil` is a separator between sections.
         public let items: [CommandID?]
     }
 
+    /// Commands a plugin put into the context menu, with the section they go into.
     private struct ContextEntry {
         let section: ContextMenuSection
         let items: [CommandID]
         let onItemOnly: Bool
     }
 
-    private var menus_: [String: MenuID] = [:]
+    private static let log = Log.logger("Kernel")
+    /// The menus by title: two plugins that name a menu alike must mean the same one.
+    private var menuIDs: [String: MenuID] = [:]
     private var entries: [(section: MenuSection, items: [CommandID])] = []
     private var contextEntries: [ContextEntry] = []
 
-    public init() {}
+    /// The menus of the menu bar, in order.
+    public var menus: [Menu] {
+        menuIDs.values.sorted { ($0.order, $0.title) < ($1.order, $1.title) }
+            .map { menu in
+                Menu(
+                    title: menu.title,
+                    items: Self.flatten(
+                        entries.filter { $0.section.menu == menu }.map { ($0.section.order, $0.items) }
+                    )
+                )
+            }
+    }
 
-    /// Adds commands to a section of the menu bar. Inside a section, commands appear in the
-    /// order they were added (the order the plugins were loaded in).
+    /// An empty registry; the plugins fill it while they start.
+    public init() {
+        // Nothing is in the menus yet.
+    }
+
+    /// Commands in the order of their sections, with a separator (nil) between two sections.
+    private static func flatten(_ contributions: [(order: Int, items: [CommandID])]) -> [CommandID?] {
+        var items: [CommandID?] = []
+        for (_, group) in Dictionary(grouping: contributions, by: \.order).sorted(by: { $0.key < $1.key }) {
+            if !items.isEmpty { items.append(nil) }
+            items += group.flatMap(\.items).map(Optional.some)
+        }
+        return items
+    }
+
+    /// Adds commands to a section of the menu bar.
+    ///
+    /// Inside a section, commands appear in the order they were added (the order the plugins were loaded in).
     public func add(_ items: [CommandID], to section: MenuSection) {
         let menu = section.menu
-        precondition(
-            menus_[menu.title] == nil || menus_[menu.title] == menu,
-            "Two different menus are called \(menu.title); plugins must share one MenuID")
-        menus_[menu.title] = menu
+        if let known = menuIDs[menu.title], known != menu {
+            Self.log.fault("Two different menus are called \(menu.title, privacy: .public); the first stays")
+            entries.append((MenuSection(known, order: section.order), items))
+            return
+        }
+        menuIDs[menu.title] = menu
         entries.append((section, items))
     }
 
@@ -71,27 +75,13 @@ public final class MenuRegistry {
         contextEntries.append(ContextEntry(section: section, items: items, onItemOnly: onItemOnly))
     }
 
-    /// The menus of the menu bar, in order.
-    public var menus: [Menu] {
-        menus_.values.sorted { ($0.order, $0.title) < ($1.order, $1.title) }.map { menu in
-            Menu(
-                title: menu.title,
-                items: Self.flatten(
-                    entries.filter { $0.section.menu == menu }.map { ($0.section.order, $0.items) }))
-        }
-    }
-
+    /// The context menu of the file list, opened on an item or (`onItem` false) on empty
+    /// space or `[..]`; nil is a separator.
     public func contextMenu(onItem: Bool) -> [CommandID?] {
         Self.flatten(contextEntries.filter { onItem || !$0.onItemOnly }.map { ($0.section.order, $0.items) })
     }
 
-    private static func flatten(_ contributions: [(order: Int, items: [CommandID])]) -> [CommandID?] {
-        let groups = Dictionary(grouping: contributions, by: \.order)
-        var items: [CommandID?] = []
-        for order in groups.keys.sorted() {
-            if !items.isEmpty { items.append(nil) }
-            items += groups[order]!.flatMap(\.items).map(Optional.some)
-        }
-        return items
+    deinit {
+        // Nothing to release.
     }
 }

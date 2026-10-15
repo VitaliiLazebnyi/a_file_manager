@@ -96,9 +96,10 @@ public struct Hotlist: Codable, Equatable {
     /// Every entry in display order, submenus followed by what they hold.
     public var rows: [Row] {
         func rows(_ entries: [HotlistEntry], _ prefix: Path) -> [Row] {
-            entries.enumerated().flatMap { index, entry in
-                [Row(path: prefix + [index], entry: entry)] + rows(entry.children, prefix + [index])
-            }
+            entries.enumerated()
+                .flatMap { index, entry in
+                    [Row(path: prefix + [index], entry: entry)] + rows(entry.children, prefix + [index])
+                }
         }
         return rows(entries, [])
     }
@@ -255,7 +256,8 @@ public enum HotlistAction: Equatable {
             let argument = parts.count > 1 ? parts[1].trimmingCharacters(in: .whitespaces) : ""
             self = .command(
                 CommandID(rawValue: parts[0]),
-                argument.isEmpty ? .none : Int(argument).map(CommandArgument.index) ?? .text(argument))
+                argument.isEmpty ? .nothing : Int(argument).map(CommandArgument.index) ?? .text(argument)
+            )
         } else {
             // A bare path is taken as `cd <path>`.
             var path =
@@ -322,7 +324,9 @@ public struct HotlistMenu {
     /// One level of the user's list. `isCurrent` tells whether an entry leads to the directory
     /// the panel shows; such entries, and the submenus holding one, are marked.
     public init(
-        _ hotlist: Hotlist, at path: Hotlist.Path = [], offersFavorites: Bool = false,
+        _ hotlist: Hotlist,
+        at path: Hotlist.Path = [],
+        offersFavorites: Bool = false,
         isCurrent: (HotlistEntry) -> Bool
     ) {
         var rows: [Row] = []
@@ -337,7 +341,8 @@ public struct HotlistMenu {
 
             case .submenu:
                 rows.append(
-                    Row(title: Self.mark(marked) + entry.displayTitle + "  ▸", action: .open(path + [index])))
+                    Row(title: Self.mark(marked) + entry.displayTitle + "  ▸", action: .open(path + [index]))
+                )
 
             case .item:
                 if marked, current == nil { current = path + [index] }
@@ -350,7 +355,8 @@ public struct HotlistMenu {
         }
         rows.append(
             current.map { Row(title: "− Remove current dir", action: .removeCurrent($0)) }
-                ?? Row(title: "+ Add current dir", action: .addCurrent))
+                ?? Row(title: "+ Add current dir", action: .addCurrent)
+        )
         rows.append(Row(title: "* Configure…", action: .configure))
         self.rows = rows
         self.selected = selected ?? 0
@@ -371,17 +377,21 @@ public struct HotlistMenu {
 public enum MacFavorites {
     /// Works on paths alone; nothing is asked of the disk.
     public static func entries(home: URL = FileManager.default.homeDirectoryForCurrentUser) -> [HotlistEntry] {
-        let below = ["Desktop", "Documents", "Downloads", "Movies", "Music", "Pictures"].map { name in
-            HotlistEntry.item(name, command: "cd " + home.appendingPathComponent(name, isDirectory: true).path)
-        }
+        let below = ["Desktop", "Documents", "Downloads", "Movies", "Music", "Pictures"]
+            .map { name in
+                HotlistEntry.item(name, command: "cd " + home.appendingPathComponent(name, isDirectory: true).path)
+            }
         return [.item("Home", command: "cd " + home.path), .item("Applications", command: "cd /Applications")] + below
             + [
                 .item(
                     "iCloud Drive",
                     command: "cd "
                         + home.appendingPathComponent(
-                            "Library/Mobile Documents/com~apple~CloudDocs", isDirectory: true
-                        ).path)
+                            "Library/Mobile Documents/com~apple~CloudDocs",
+                            isDirectory: true
+                        )
+                        .path
+                )
             ]
     }
 }

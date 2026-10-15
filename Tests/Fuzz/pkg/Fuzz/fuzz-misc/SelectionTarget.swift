@@ -79,7 +79,11 @@ internal enum SelectionTarget {
         let unique = known.filter { seen.insert(Array($0.utf8)).inserted }
         let items = unique.enumerated()
             .map { index, name in
-                FileItem(url: base.appending(name: name.isEmpty ? "_" : name), name: name, isDirectory: index % 3 == 1)
+                FileItem(
+                    url: base.appending(name: name.isEmpty ? "_" : name),
+                    name: name,
+                    kind: .init(isDirectory: index % 3 == 1)
+                )
             }
         let model = PanelModel(directory: base)
         model.show(Listing(directory: base, items: items, parent: nil, root: base))

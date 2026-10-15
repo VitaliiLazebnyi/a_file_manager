@@ -51,23 +51,34 @@ public final class SelectionPlugin: Plugin {
         ]
         for (id, title, shortcuts, select, scope) in groups {
             commands.register(
-                Command(id, title, shortcuts), enabled: isComplete,
+                Command(id, title, shortcuts),
+                enabled: isComplete,
                 parameterized: { argument in
                     selections.group(select: select, scope: scope(), argument: argument)
-                })
-        }
-        commands.register(
-            Command(Ids.selectGroupCurrentExtension, "Select Group with Current Extension…"), enabled: isComplete
-        ) {
-            let ext = model().cursorFile?.ext ?? ""
-            selections.group(
-                select: true, scope: selections.configured, proposal: ext.isEmpty ? "*.*" : "*." + ext, argument: .none
+                }
             )
         }
         commands.register(
-            Command(Ids.selectFromList, "Select Group from List…"), enabled: isComplete, selections.groupFromList)
+            Command(Ids.selectGroupCurrentExtension, "Select Group with Current Extension…"),
+            enabled: isComplete
+        ) {
+            let ext = model().cursorFile?.ext ?? ""
+            selections.group(
+                select: true,
+                scope: selections.configured,
+                proposal: ext.isEmpty ? "*.*" : "*." + ext,
+                argument: .nothing
+            )
+        }
         commands.register(
-            Command(Ids.defineSelectionType, "Define Selection Type…", runsDuringJobs: true), selections.defineType)
+            Command(Ids.selectFromList, "Select Group from List…"),
+            enabled: isComplete,
+            selections.groupFromList
+        )
+        commands.register(
+            Command(Ids.defineSelectionType, "Define Selection Type…", runsDuringJobs: true),
+            selections.defineType
+        )
 
         // Select all, Unselect all. `.index` n takes every n-th line from the cursor.
         // Unselecting everything is always safe, also while a directory is still arriving.
@@ -93,10 +104,12 @@ public final class SelectionPlugin: Plugin {
         ]
         for (id, title, shortcuts, select, role, scope) in wholeListCommands {
             commands.register(
-                Command(id, title, shortcuts, editingRole: role), enabled: { !select || isComplete() },
+                Command(id, title, shortcuts).editing(role),
+                enabled: { !select || isComplete() },
                 parameterized: { argument in
                     selections.all(select: select, scope: scope(), step: argument.index ?? 0)
-                })
+                }
+            )
         }
 
         let inversions: [(CommandID, String, [Shortcut], () -> SelectionScope)] = [
@@ -134,16 +147,19 @@ public final class SelectionPlugin: Plugin {
         }
         commands.register(
             Command(Ids.select, "Select and Go to Next"),
-            parameterized: { selections.step(select: true, count: $0.index ?? 1) })
+            parameterized: { selections.step(select: true, count: $0.index ?? 1) }
+        )
         commands.register(
             Command(Ids.unselect, "Unselect and Go to Next"),
-            parameterized: { selections.step(select: false, count: $0.index ?? 1) })
+            parameterized: { selections.step(select: false, count: $0.index ?? 1) }
+        )
 
         // Saving and loading.
         commands.register(Command(Ids.saveSelection, "Save Selection")) { model().saveSelection() }
         commands.register(
             Command(.restoreSelection, "Restore Selection", [.cmd("i", .shift), Shortcut(.keypadDivide)]),
-            selections.restore)
+            selections.restore
+        )
         let hasOperands = { model().hasOperands }
         let saves: [(CommandID, String, SelectionFile.Encoding)] = [
             (Ids.saveSelectionToFile, "Save Selection to File…", .unicode),
@@ -152,35 +168,49 @@ public final class SelectionPlugin: Plugin {
         ]
         for (id, title, encoding) in saves {
             commands.register(
-                Command(id, title), enabled: hasOperands,
-                parameterized: { selections.saveToFile(encoding, argument: $0) })
+                Command(id, title),
+                enabled: hasOperands,
+                parameterized: { selections.saveToFile(encoding, argument: $0) }
+            )
         }
         commands.register(
-            Command(Ids.loadSelectionFromFile, "Load Selection from File…"), enabled: isComplete,
-            parameterized: selections.loadFromFile)
+            Command(Ids.loadSelectionFromFile, "Load Selection from File…"),
+            enabled: isComplete,
+            parameterized: selections.loadFromFile
+        )
         commands.register(
-            Command(Ids.loadSelectionFromClipboard, "Load Selection from Clipboard"), enabled: isComplete,
-            selections.loadFromClipboard)
+            Command(Ids.loadSelectionFromClipboard, "Load Selection from Clipboard"),
+            enabled: isComplete,
+            selections.loadFromClipboard
+        )
 
         // Comparing the two panels.
         commands.register(
-            Command(Ids.compareDirectories, "Compare Directories", [.f(2, .shift)]), enabled: bothComplete,
+            Command(Ids.compareDirectories, "Compare Directories", [.f(2, .shift)]),
+            enabled: bothComplete,
             parameterized: {
                 selections.compare(
                     mode: DirectoryComparison.Mode(rawValue: $0.index ?? 0) ?? .newerOrDifferent,
-                    withSubdirectories: false)
-            })
+                    withSubdirectories: false
+                )
+            }
+        )
         commands.register(
             Command(Ids.compareDirectoriesWithSubdirectories, "Compare Directories, Mark Missing Folders Too"),
             enabled: bothComplete,
             parameterized: {
                 selections.compare(
                     mode: DirectoryComparison.Mode(rawValue: $0.index ?? 0) ?? .newerOrDifferent,
-                    withSubdirectories: true)
-            })
+                    withSubdirectories: true
+                )
+            }
+        )
         commands.register(
-            Command(Ids.markNewerHideSame, "Mark Newer, Hide Same Files"), enabled: bothComplete,
-            checked: { selections.shows(.comparison, in: model()) }, selections.markNewerHideSame)
+            Command(Ids.markNewerHideSame, "Mark Newer, Hide Same Files"),
+            enabled: bothComplete,
+            checked: { selections.shows(.comparison, in: model()) },
+            selections.markNewerHideSame
+        )
 
         kernel.menus.add([.selectGroup, .unselectGroup, Ids.selectFromList, Ids.defineSelectionType], to: .markGroups)
         kernel.menus.add([.selectAll, .unselectAll, .invertSelection, Ids.selectCurrentExtension], to: .markAll)
@@ -188,22 +218,38 @@ public final class SelectionPlugin: Plugin {
             [
                 Ids.saveSelection, .restoreSelection, Ids.saveSelectionToFile, Ids.loadSelectionFromFile,
                 Ids.loadSelectionFromClipboard
-            ], to: .markStore)
+            ],
+            to: .markStore
+        )
         kernel.menus.add(
-            [Ids.compareDirectories, Ids.compareDirectoriesWithSubdirectories, Ids.markNewerHideSame], to: .markCompare
+            [Ids.compareDirectories, Ids.compareDirectoriesWithSubdirectories, Ids.markNewerHideSame],
+            to: .markCompare
         )
 
         kernel.toolbar.add(
-            .selectGroup, symbol: "plus.square", group: 50,
-            hint: "Select the files that match a pattern, such as *.jpg.")
+            .selectGroup,
+            symbol: "plus.square",
+            group: 50,
+            hint: "Select the files that match a pattern, such as *.jpg."
+        )
         kernel.toolbar.add(
-            .unselectGroup, symbol: "minus.square", group: 50, hint: "Unselect the files that match a pattern.")
+            .unselectGroup,
+            symbol: "minus.square",
+            group: 50,
+            hint: "Unselect the files that match a pattern."
+        )
         kernel.toolbar.add(
-            .invertSelection, symbol: "circle.lefthalf.filled", group: 50,
-            hint: "Select what is not selected, and unselect what is.")
+            .invertSelection,
+            symbol: "circle.lefthalf.filled",
+            group: 50,
+            hint: "Select what is not selected, and unselect what is."
+        )
         kernel.toolbar.add(
-            Ids.compareDirectories, symbol: "rectangle.split.2x1", group: 50,
-            hint: "Select the files that differ between the two panels.")
+            Ids.compareDirectories,
+            symbol: "rectangle.split.2x1",
+            group: 50,
+            hint: "Select the files that differ between the two panels."
+        )
         kernel.toolbar.setSymbol("checkmark.square", for: .selectAll)
         kernel.toolbar.setSymbol("square", for: .unselectAll)
         kernel.toolbar.setSymbol("arrow.uturn.backward.square", for: .restoreSelection)
@@ -214,12 +260,18 @@ public final class SelectionPlugin: Plugin {
                 title: "Selection",
                 preferences: [
                     Preference(
-                        SelectionStore.marksFoldersKey, "Num +, Ctrl+Num + and Num * also select folders",
-                        .flag(default: true)),
+                        SelectionStore.marksFoldersKey,
+                        "Num +, Ctrl+Num + and Num * also select folders",
+                        .flag(default: true)
+                    ),
                     Preference(
-                        SelectionStore.oneHourKey, "Compare directories: times exactly one hour apart are equal",
-                        .flag(default: false))
-                ]))
+                        SelectionStore.oneHourKey,
+                        "Compare directories: times exactly one hour apart are equal",
+                        .flag(default: false)
+                    )
+                ]
+            )
+        )
     }
 }
 
@@ -293,7 +345,7 @@ final class Selections {
     }
 
     private var source: PanelModel { kernel.panels.source.model }
-    private var ui: any UserInteraction { kernel.ui }
+    private var ui: any UserInteraction { kernel.interaction }
 
     /// What Num +, Ctrl+Num + and Num * affect, and the choice their Shift variants make.
     var configured: SelectionScope { store.marksFolders ? .both : .files }
@@ -329,7 +381,9 @@ final class Selections {
     /// model refuses a result made for a list it no longer has): if not, and the panels still
     /// show the folders they showed, `work` is done again for the lists as they are now.
     private func compute<Result: Sendable>(
-        heavy: Bool, models: [PanelModel], _ work: @escaping @Sendable ([Frozen], CancellationFlag) -> Result,
+        heavy: Bool,
+        models: [PanelModel],
+        _ work: @escaping @Sendable ([Frozen], CancellationFlag) -> Result,
         apply: @escaping @MainActor ([Frozen], Result) -> Bool
     ) {
         let flag = CancellationFlag()
@@ -375,12 +429,15 @@ final class Selections {
     /// `timedOut` names a mask whose regular expression may have run out of time: nothing is
     /// changed then, and the user is told.
     private func mark(
-        _ model: PanelModel, _ change: PanelModel.SelectionChange, timedOut mask: SelectionMask? = nil,
+        _ model: PanelModel,
+        _ change: PanelModel.SelectionChange,
+        timedOut mask: SelectionMask? = nil,
         matching matches: @escaping @Sendable (FileItem) -> Bool
     ) {
         // A regular expression can take long on any list.
         compute(
-            heavy: model.items.count > Self.longList || mask?.isRegex == true, models: [model],
+            heavy: model.items.count > Self.longList || mask?.isRegex == true,
+            models: [model],
             { frozen, _ in
                 PanelModel.rows(of: frozen[0].basis, where: matches)
             },
@@ -390,17 +447,21 @@ final class Selections {
                     return true
                 }
                 return frozen[0].model.setSelection(rows, change)
-            })
+            }
+        )
     }
 
     /// The same for what is found by walking the whole list in order (a step, a mask that
     /// pairs files, the marks of an inversion): `find` returns indexes of the shown items.
     private func mark(
-        _ model: PanelModel, _ change: PanelModel.SelectionChange, timedOut mask: SelectionMask? = nil,
+        _ model: PanelModel,
+        _ change: PanelModel.SelectionChange,
+        timedOut mask: SelectionMask? = nil,
         indices find: @escaping @Sendable ([FileItem], PanelModel.Operands, CancellationFlag) -> [Int]
     ) {
         compute(
-            heavy: model.items.count > Self.longList || mask?.isRegex == true, models: [model],
+            heavy: model.items.count > Self.longList || mask?.isRegex == true,
+            models: [model],
             { frozen, flag in
                 find(frozen[0].items, frozen[0].operands, flag)
             },
@@ -410,7 +471,8 @@ final class Selections {
                     return true
                 }
                 return Self.take(indices, change, in: frozen[0])
-            })
+            }
+        )
     }
 
     private static func take(_ indices: [Int], _ change: PanelModel.SelectionChange, in frozen: Frozen) -> Bool {
@@ -440,7 +502,10 @@ final class Selections {
         }
         guard
             let mask = ui.prompt(
-                select ? "Expand selection" : "Shrink selection", value: proposal, detail: Self.maskHelp)
+                select ? "Expand selection" : "Shrink selection",
+                value: proposal,
+                detail: Self.maskHelp
+            )
         else { return }
         apply(mask, select: select, scope: scope)
     }
@@ -471,10 +536,13 @@ final class Selections {
         // `A>B` pairs files of the same folder: that is worked out over the whole list, in order.
         guard !rule.isPairwise else {
             mark(
-                model, change, timedOut: rule.mask,
+                model,
+                change,
+                timedOut: rule.mask,
                 indices: { items, _, flag in
                     rule.matchingIndices(among: items, base: base, scope: scope, cancelled: { flag.isCancelled })
-                })
+                }
+            )
             return
         }
         let probe = rule.probe(base: base)
@@ -492,8 +560,11 @@ final class Selections {
         }
         guard
             let answer = ui.form(
-                "Select group", detail: "Predefined selection types (>name) and the masks used so far:",
-                fields: [.list("row", "", rows)], buttons: ["Select", "Unselect", "Remove"])
+                "Select group",
+                detail: "Predefined selection types (>name) and the masks used so far:",
+                fields: [.list("row", "", rows)],
+                buttons: ["Select", "Unselect", "Remove"]
+            )
         else { return }
         let row = answer.index("row")
         guard rows.indices.contains(row) else { return }
@@ -517,8 +588,11 @@ final class Selections {
         if !types.isEmpty {
             guard
                 let row = ui.pickRow(
-                    "Define selection", detail: "Choose the selection type to change:",
-                    rows: ["New selection type"] + types.map(\.name), button: "Edit")
+                    "Define selection",
+                    rows: ["New selection type"] + types.map(\.name),
+                    detail: "Choose the selection type to change:",
+                    button: "Edit"
+                )
             else { return }
             if row > 0 { type = types[row - 1] }
         }
@@ -526,8 +600,11 @@ final class Selections {
             .text("name", "Name:", type.name),
             .text("mask", "File mask:", type.mask),
             .choice(
-                "kind", "Applies to:", ["Files and folders", "Files only", "Folders only"],
-                selected: type.kind.rawValue),
+                "kind",
+                "Applies to:",
+                ["Files and folders", "Files only", "Folders only"],
+                selected: type.kind.rawValue
+            ),
             .text("minSize", "Size at least (e.g. 10k, 1.5M):", SelectionType.text(ofSize: type.minSize)),
             .text("maxSize", "Size at most:", SelectionType.text(ofSize: type.maxSize)),
             .text("from", "Changed from (yyyy-MM-dd [HH:mm]):", SelectionType.text(ofDate: type.modifiedFrom)),
@@ -538,7 +615,11 @@ final class Selections {
         ]
         guard
             let answer = ui.form(
-                "Define selection", detail: Self.maskHelp, fields: fields, buttons: ["Save", "Delete"])
+                "Define selection",
+                detail: Self.maskHelp,
+                fields: fields,
+                buttons: ["Save", "Delete"]
+            )
         else { return }
         let name = answer.text("name").trimmingCharacters(in: .whitespaces)
         if answer.button == 1 {
@@ -572,8 +653,10 @@ final class Selections {
         if !SelectionMask(saved.mask).isValid { unreadable.append(saved.mask) }
         guard unreadable.isEmpty else {
             ui.inform(
-                "The selection type was not saved.", detail: "Cannot read: " + unreadable.joined(separator: ", "),
-                style: .warning)
+                "The selection type was not saved.",
+                detail: "Cannot read: " + unreadable.joined(separator: ", "),
+                style: .warning
+            )
             return
         }
         store.save(saved)
@@ -595,7 +678,8 @@ final class Selections {
         let step = max(-Int(Int32.max), min(step, Int(Int32.max)))
         let cursor = model.cursor - (model.hasParentRow ? 1 : 0)
         mark(
-            model, change,
+            model,
+            change,
             indices: { items, _, _ in
                 var picked: [Int] = []
                 var seen = 0
@@ -619,7 +703,8 @@ final class Selections {
                     }
                 }
                 return picked
-            })
+            }
+        )
     }
 
     func invert(scope: SelectionScope) {
@@ -631,14 +716,16 @@ final class Selections {
         }
         // The entries of the scope change their mark and the others keep theirs.
         mark(
-            model, .replace,
+            model,
+            .replace,
             indices: { items, marks, _ in
                 var indices: [Int] = []
                 for index in items.indices where scope.contains(items[index]) != marks.isMarked(at: index) {
                     indices.append(index)
                 }
                 return indices
-            })
+            }
+        )
     }
 
     /// Restore Selection: the saved marks that are still shown become the selection (a pass
@@ -658,7 +745,8 @@ final class Selections {
         }
         let folder = similarity == .path ? cursor.url.deletingLastPathComponent().locationKey : ""
         mark(
-            model, select ? .add : .remove,
+            model,
+            select ? .add : .remove,
             matching: { item in
                 switch similarity {
                 case .ext: return !item.isFolder && !cursor.isFolder && same(item.ext, cursor.ext)
@@ -666,7 +754,8 @@ final class Selections {
                 case .nameAndExt: return same(item.name, cursor.name)
                 case .path: return item.url.deletingLastPathComponent().locationKey == folder
                 }
-            })
+            }
+        )
     }
 
     /// Selects or unselects `count` items from the cursor on and moves the cursor past them;
@@ -695,8 +784,10 @@ final class Selections {
     {
         if let url = argument.location { return url }
         guard
-            let text = (argument.text ?? ui.prompt(prompt, value: proposal, detail: detail))?.trimmingCharacters(
-                in: .whitespaces),
+            let text = (argument.text ?? ui.prompt(prompt, value: proposal, detail: detail))?
+                .trimmingCharacters(
+                    in: .whitespaces
+                ),
             !text.isEmpty
         else { return nil }
         return kernel.fileSystems.location(from: text, relativeTo: directory)
@@ -713,10 +804,13 @@ final class Selections {
         let fileSystems = kernel.fileSystems
         guard
             var url = file(
-                from: argument, prompt: "Save selection to file", proposal: "",
+                from: argument,
+                prompt: "Save selection to file",
+                proposal: "",
                 detail:
                     "File name in \(fileSystems.displayPath(directory)); .txt is added to a name without extension.",
-                directory: directory)
+                directory: directory
+            )
         else { return }
         if url.pathExtension.isEmpty { url = url.appendingPathExtension("txt") }
         let (ui, target) = (self.ui, url)
@@ -732,7 +826,9 @@ final class Selections {
                             ui.choose(
                                 "\(fileSystems.displayPath(target)) already exists.",
                                 detail: "Do you want to overwrite it?",
-                                buttons: ["Overwrite", "Cancel"], style: .warning) == 0
+                                buttons: ["Overwrite", "Cancel"],
+                                style: .warning
+                            ) == 0
                         }
                         guard replace else { return .cancelled }
                         replaces = true
@@ -740,8 +836,10 @@ final class Selections {
                     let data = SelectionFile.encode(operands.items(), as: encoding)
                     // Written beside the target and moved into place when complete: a write that
                     // fails leaves the old file as it was.
-                    let beside = target.deletingLastPathComponent().appending(
-                        name: ".\(target.lastPathComponent).afm-\(UUID().uuidString.prefix(8)).tmp")
+                    let beside = target.deletingLastPathComponent()
+                        .appending(
+                            name: ".\(target.lastPathComponent).afm-\(UUID().uuidString.prefix(8)).tmp"
+                        )
                     temporary = beside
                     let writer = try provider.write(beside, cancellation: monitor.cancellation)
                     let token = monitor.cancellation.interrupting(writer)
@@ -770,11 +868,12 @@ final class Selections {
             },
             completion: { [kernel] outcome in
                 switch outcome {
-                case .failed(let error): kernel.ui.report(error, title: "The selection cannot be saved!")
+                case .failed(let error): kernel.interaction.report(error, title: "The selection cannot be saved!")
                 case .done: kernel.panels.refresh([target.deletingLastPathComponent()])
                 case .cancelled: break
                 }
-            })
+            }
+        )
     }
 
     /// Selection files are small; a file that is not one is not read to its end.
@@ -790,8 +889,12 @@ final class Selections {
         let fileSystems = kernel.fileSystems
         guard
             let url = file(
-                from: argument, prompt: "Load selection from file", proposal: proposal,
-                detail: "File name in \(fileSystems.displayPath(directory)), or a full path.", directory: directory)
+                from: argument,
+                prompt: "Load selection from file",
+                proposal: proposal,
+                detail: "File name in \(fileSystems.displayPath(directory)), or a full path.",
+                directory: directory
+            )
         else { return }
         let items = model.items
         kernel.jobs.run(
@@ -819,7 +922,8 @@ final class Selections {
                 case .success(let names?): self?.select(names, in: model, directory: directory)
                 case .success(nil): break
                 }
-            })
+            }
+        )
     }
 
     /// `cm_LoadSelectionFromClip`: the same with the text on the clipboard. The clipboard is
@@ -837,10 +941,11 @@ final class Selections {
             select(ListedNames(text, among: items), in: model, directory: directory)
             return
         }
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            let names = autoreleasepool { ListedNames(text, among: items) }
-            DispatchQueue.main.async { [weak self] in self?.select(names, in: model, directory: directory) }
-        }
+        DispatchQueue.global(qos: .userInitiated)
+            .async { [weak self] in
+                let names = autoreleasepool { ListedNames(text, among: items) }
+                DispatchQueue.main.async { [weak self] in self?.select(names, in: model, directory: directory) }
+            }
     }
 
     /// The most text taken from the clipboard as a list of names.
@@ -888,20 +993,26 @@ final class Selections {
         let (leftFolder, rightFolder) = (left.directory, right.directory)
         let ignoresOneHour = store.ignoresOneHour
         compute(
-            heavy: true, models: [left, right],
+            heavy: true,
+            models: [left, right],
             { [weak self] frozen, flag in
                 DirectoryComparison.compareIndices(
-                    left: frozen[0].items, right: frozen[1].items, mode: mode, withSubdirectories: withSubdirectories,
+                    left: frozen[0].items,
+                    right: frozen[1].items,
+                    mode: mode,
+                    withSubdirectories: withSubdirectories,
                     ignoringOneHour: ignoresOneHour,
                     foldingCase: self?.foldsCase(leftFolder, rightFolder, cancellation: flag) ?? false,
-                    cancelled: { flag.isCancelled })
+                    cancelled: { flag.isCancelled }
+                )
             },
             apply: { frozen, marks in
                 // Both are tried: a panel that has changed is worked out again with the other.
                 let first = Self.take(marks.left, .replace, in: frozen[0])
                 let second = Self.take(marks.right, .replace, in: frozen[1])
                 return first && second
-            })
+            }
+        )
     }
 
     /// Whether both folders are on local volumes that treat `A.txt` and `a.txt` as one name.
@@ -940,28 +1051,36 @@ final class Selections {
             var marked: [Set<NameBytes>]
         }
         compute(
-            heavy: true, models: models,
+            heavy: true,
+            models: models,
             { [weak self] frozen, flag in
                 let (leftList, rightList) = (frozen[0].basis.listedItems, frozen[1].basis.listedItems)
                 let marks = DirectoryComparison.compareIndices(
-                    left: leftList, right: rightList, mode: .newer, ignoringOneHour: ignoresOneHour,
+                    left: leftList,
+                    right: rightList,
+                    mode: .newer,
+                    ignoringOneHour: ignoresOneHour,
                     foldingCase: self?.foldsCase(folders[0], folders[1], cancellation: flag) ?? false,
-                    cancelled: { flag.isCancelled })
+                    cancelled: { flag.isCancelled }
+                )
                 // Exact bytes, so that of two names that differ in normalisation only the same one is left out.
                 var same = Set<NameBytes>()
                 for index in marks.sameLeft { same.insert(NameBytes(leftList[index].name)) }
                 for index in marks.sameRight { same.insert(NameBytes(rightList[index].name)) }
-                let filters = zip(frozen, titles).map { frozen, title in
-                    PanelModel.prepare(
-                        frozen.basis, filter: PanelFilter(title: title) { [same] in !same.contains(NameBytes($0.name)) }
-                    )
-                }
+                let filters = zip(frozen, titles)
+                    .map { frozen, title in
+                        PanelModel.prepare(
+                            frozen.basis,
+                            filter: PanelFilter(title: title) { [same] in !same.contains(NameBytes($0.name)) }
+                        )
+                    }
                 return Outcome(
                     filters: filters,
                     marked: [
                         Set(marks.left.map { NameBytes(leftList[$0].name) }),
                         Set(marks.right.map { NameBytes(rightList[$0].name) })
-                    ])
+                    ]
+                )
             },
             apply: { [weak self] _, outcome in
                 guard let self else { return true }
@@ -973,11 +1092,16 @@ final class Selections {
                 for ((model, title), marked) in zip(zip(models, titles), outcome.marked) {
                     restrictions = restrictions.filter { $0.value.model != nil }
                     restrictions[ObjectIdentifier(model)] = Restriction(
-                        model: model, view: .comparison, directory: model.directory, title: title)
+                        model: model,
+                        view: .comparison,
+                        directory: model.directory,
+                        title: title
+                    )
                     mark(model, .replace, matching: { marked.contains(NameBytes($0.name)) })
                 }
                 return true
-            })
+            }
+        )
     }
 
     // MARK: Lists shown in part

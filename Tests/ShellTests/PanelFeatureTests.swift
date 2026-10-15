@@ -48,9 +48,11 @@ import Testing
                     Thread.sleep(forTimeInterval: 0.01)
                     probe.leave()
                     return item.name.uppercased()
-                })
+                }
+            )
             kernel.columns.register(
-                ContentColumn(id: "length", title: "Length", alignsRight: true) { "\($0.name.count)" })
+                ContentColumn(id: "length", title: "Length", alignsRight: true) { "\($0.name.count)" }
+            )
         }
     }
 
@@ -92,7 +94,7 @@ import Testing
     }
 
     func start() async -> Running {
-        let kernel = Kernel(productName: StandardPlugins.productName, settings: settings, ui: ui)
+        let kernel = Kernel(productName: StandardPlugins.productName, settings: settings, interaction: ui)
         kernel.fileSystems.register(memory)
         kernel.load(CorePlugins.make(pasteboard: scratch.pasteboard) + [ColumnsPlugin(probe: probe)])
         let running = Running(kernel: kernel, shell: Shell(kernel: kernel, home: box.url("home")))
@@ -106,8 +108,17 @@ import Testing
 
     func key(_ keyCode: UInt16, _ characters: String = "", _ flags: NSEvent.ModifierFlags = []) -> NSEvent {
         NSEvent.keyEvent(
-            with: .keyDown, location: .zero, modifierFlags: flags, timestamp: 0, windowNumber: 0, context: nil,
-            characters: characters, charactersIgnoringModifiers: characters, isARepeat: false, keyCode: keyCode)!
+            with: .keyDown,
+            location: .zero,
+            modifierFlags: flags,
+            timestamp: 0,
+            windowNumber: 0,
+            context: nil,
+            characters: characters,
+            charactersIgnoringModifiers: characters,
+            isARepeat: false,
+            keyCode: keyCode
+        )!
     }
 
     func press(_ app: Running, _ keyCode: UInt16, _ flags: NSEvent.ModifierFlags = []) -> Bool {
@@ -126,18 +137,21 @@ import Testing
         let app = await start()
         #expect(
             app.left.viewMode == .full && !app.left.showsGrid
-                && app.left.tableView.enclosingScrollView?.isHidden == false)
-        #expect(app.kernel.keyBindings.conflicts.isEmpty)
+                && app.left.tableView.enclosingScrollView?.isHidden == false
+        )
+        #expect(app.kernel.keyClashes.isEmpty)
         // Ctrl+F1 (key code 122).
         #expect(press(app, 122, .control) && app.left.viewMode == .brief && app.commands.isChecked(.viewBrief))
         #expect(
             app.left.showsGrid && app.left.tableView.enclosingScrollView?.isHidden == true
-                && app.left.gridView.enclosingScrollView?.isHidden == false)
+                && app.left.gridView.enclosingScrollView?.isHidden == false
+        )
         #expect(app.left.gridView.geometry.flow == .columns && app.left.gridView.geometry.count == 4)
         #expect(app.right.viewMode == .full && settings.value(PanelViewState.self, forKey: "left.view")?.mode == 1)
         #expect(
             press(app, 122, [.control, .shift]) && app.left.viewMode == .thumbnails
-                && app.left.gridView.geometry.flow == .rows)
+                && app.left.gridView.geometry.flow == .rows
+        )
         #expect(app.left.gridView.geometry.cell == CGSize(width: 116, height: 136))
         app.stop()
 
@@ -145,7 +159,8 @@ import Testing
         defer { again.stop() }
         #expect(
             again.left.viewMode == .thumbnails && again.right.viewMode == .full
-                && again.left.gridView.geometry.count == 4)
+                && again.left.gridView.geometry.count == 4
+        )
         #expect(again.commands.isChecked(.viewThumbnails))
         // Ctrl+F2 (key code 120) brings the table back, with the list in it.
         #expect(press(again, 120, .control) && again.left.viewMode == .full && again.left.tableView.numberOfRows == 4)
@@ -164,7 +179,8 @@ import Testing
         let perColumn = grid.geometry.perLine
         #expect(
             grid.geometry.count == 91 && perColumn > 5 && perColumn < 91
-                && grid.frame.width >= grid.geometry.cell.width * 2)
+                && grid.frame.width >= grid.geometry.cell.width * 2
+        )
         // → and ← step a column; ↓ and ↑, which are bound to nothing, a row.
         #expect(press(app, 124) && app.left.model.cursor == perColumn)
         grid.keyDown(with: key(125))
@@ -186,10 +202,12 @@ import Testing
         // Clicks: Cmd toggles, Shift marks the range from the cursor.
         #expect(
             app.left.handleClick(row: 20, modifiers: .command) && app.left.model.selection.contains("f19.txt")
-                && app.left.model.cursor == 20)
+                && app.left.model.cursor == 20
+        )
         #expect(
             app.left.handleClick(row: 23, modifiers: .shift)
-                && app.left.model.selection.isSuperset(of: ["f20.txt", "f21.txt", "f22.txt"]))
+                && app.left.model.selection.isSuperset(of: ["f20.txt", "f21.txt", "f22.txt"])
+        )
         app.left.clicked(row: 2)
         #expect(app.left.model.cursorItem?.name == "f01.txt")
         // The status line describes the item under the cursor when nothing is marked.
@@ -244,7 +262,8 @@ import Testing
         let table = app.left.tableView
         #expect(
             table.tableColumns.map(\.title) == ["Name", "Ext", "Size", "Date", "Attr", "Upper"]
-                && table.tableColumns[5].width == 90)
+                && table.tableColumns[5].width == 90
+        )
         func text(_ column: Int, _ row: Int) -> String? {
             (app.left.tableView(table, viewFor: table.tableColumns[column], row: row) as? NSTableCellView)?.textField?
                 .stringValue
@@ -261,12 +280,14 @@ import Testing
         app.left.fillHeaderMenu()
         let items = app.left.headerMenu.items
         #expect(
-            items.map(\.title) == ["Brief", "Full", "Thumbnail View", "", "Upper", "Length", "", "Custom Columns…"])
+            items.map(\.title) == ["Brief", "Full", "Thumbnail View", "", "Upper", "Length", "", "Custom Columns…"]
+        )
         #expect(items[1].state == .on && items[4].state == .on && items[5].state == .off)
         app.left.extraColumnChosen(items[5])
         #expect(
             app.left.extraColumns == ["upper", "unknown", "length"] && table.tableColumns.count == 7
-                && text(6, 2) == "")
+                && text(6, 2) == ""
+        )
         await wait { !app.left.columnValues.isBusy }
         #expect(text(6, 2) == "7")
         app.left.toggleExtraColumn("upper")
@@ -279,14 +300,16 @@ import Testing
         let saved = settings.value(PanelViewState.self, forKey: "left.view")
         #expect(
             saved?.extraColumns == ["unknown", "length"] && saved?.columnWidths["size"] == 137
-                && saved?.columnWidths["+length"] == 61)
+                && saved?.columnWidths["+length"] == 61
+        )
         app.stop()
         let again = await start()
         defer { again.stop() }
         #expect(again.left.extraColumns == ["unknown", "length"] && again.right.extraColumns.isEmpty)
         #expect(
             again.left.tableView.tableColumns.map(\.title).last == "Length"
-                && again.right.tableView.tableColumns.count == 5)
+                && again.right.tableView.tableColumns.count == 5
+        )
         #expect(again.left.tableView.tableColumns[2].width == 137 && again.left.tableView.tableColumns[5].width == 61)
         // The Custom Columns dialog of the Show menu sets the same list.
         ui.formAnswers = [.values(["upper": .flag(true), "length": .flag(false)])]
@@ -301,10 +324,12 @@ import Testing
         defer { app.stop() }
         #expect(
             app.left.quickFilterBar.isHidden
-                && app.kernel.keyBindings.command(for: Shortcut(.character("s"), .control)) == .quickFilter)
+                && app.kernel.keyBindings.command(for: Shortcut(.character("s"), .control)) == .quickFilter
+        )
         app.commands.perform(.quickFilter)
         #expect(
-            !app.left.quickFilterBar.isHidden && app.left.quickFilterText == "" && app.right.quickFilterBar.isHidden)
+            !app.left.quickFilterBar.isHidden && app.left.quickFilterText == "" && app.right.quickFilterBar.isHidden
+        )
         app.left.quickFilterTyped("t")
         #expect(app.names(app.left) == ["one.txt", "two.txt"] && app.left.tableView.numberOfRows == 3)
         app.left.quickFilterTyped("tw")
@@ -319,7 +344,8 @@ import Testing
         app.left.leaveQuickFilterField()
         #expect(
             !app.left.quickFilterBar.isHidden && app.names(app.left) == ["one.txt"]
-                && app.left.pathBarText.hasSuffix("/A/*.*"))
+                && app.left.pathBarText.hasSuffix("/A/*.*")
+        )
         // A reading of the folder keeps the filter.
         app.commands.perform(.reread)
         await settle(app)
@@ -327,7 +353,8 @@ import Testing
         // Esc in the list takes it away.
         #expect(
             press(app, 53) && app.left.quickFilterBar.isHidden && app.names(app.left).count == 3
-                && app.left.quickFilterText == nil)
+                && app.left.quickFilterText == nil
+        )
         #expect(!app.left.statusLineText.contains("Filter") && !press(app, 53))
         // A field that was left empty goes away by itself.
         app.commands.perform(.quickFilter)
@@ -357,7 +384,8 @@ import Testing
         app.left.quickFilterTyped("on")
         #expect(
             app.names(app.left) == ["one.txt"] && app.commands.isChecked("cm_SrcUserDef")
-                && app.left.pathBarText.hasSuffix("/A/*.txt | docs/"))
+                && app.left.pathBarText.hasSuffix("/A/*.txt | docs/")
+        )
         app.left.removeQuickFilter()
         #expect(app.names(app.left) == ["one.txt", "two.txt"] && app.left.model.filter?.title == "*.txt | docs/")
         // All Files removes a quick filter as well.
@@ -379,7 +407,8 @@ import Testing
         await settle(app)
         #expect(
             !app.left.quickFilterBar.isHidden && app.left.quickFilterBar.text == "one"
-                && app.names(app.left) == ["one.txt"])
+                && app.names(app.left) == ["one.txt"]
+        )
     }
 
     @Test func typingInTheQuickFilterWaitsForTheLastKeyAndEnterDoesNotWaitAtAll() async {
@@ -419,7 +448,8 @@ import Testing
         app.commands.isBlocked = { false }
         #expect(
             app.left.handleClick(row: 2, modifiers: .command)
-                && app.left.model.selection == [app.left.model.item(atRow: 2)!.name])
+                && app.left.model.selection == [app.left.model.item(atRow: 2)!.name]
+        )
     }
 
     // MARK: Path bar and tabs
@@ -462,13 +492,15 @@ import Testing
         await settle(app)
         app.left.tabs.insertTab(showing: box.url("home"), activate: false)
         #expect(
-            app.left.tabBar.titles == ["A", "docs", "home"] && !app.left.tabBar.isHidden && app.right.tabBar.isHidden)
+            app.left.tabBar.titles == ["A", "docs", "home"] && !app.left.tabBar.isHidden && app.right.tabBar.isHidden
+        )
         // The menu of a tab shows that tab and offers the commands the plugins registered.
         let menu = app.left.tabMenu(forTab: 0)?.items.map(\.title) ?? []
         await settle(app)
         #expect(
             app.left.tabs.activeIndex == 0
-                && ["New Folder Tab", "Close Tab", "Next Tab", "Previous Tab"].allSatisfy(menu.contains))
+                && ["New Folder Tab", "Close Tab", "Next Tab", "Previous Tab"].allSatisfy(menu.contains)
+        )
         app.left.moveTab(from: 0, to: 2)
         #expect(app.left.tabBar.titles == ["docs", "home", "A"] && app.left.tabs.activeIndex == 2)
         // Custom titles and the mark of locked tabs come from the model.
@@ -487,11 +519,13 @@ import Testing
         let all: NSDragOperation = [.copy, .move, .generic]
         // Rows of the left panel: [..], docs, one.txt, two.txt.
         #expect(
-            app.left.draggedItems(fromRow: 0).isEmpty && app.left.draggedItems(fromRow: 2).map(\.name) == ["one.txt"])
+            app.left.draggedItems(fromRow: 0).isEmpty && app.left.draggedItems(fromRow: 2).map(\.name) == ["one.txt"]
+        )
         app.left.model.setSelected(true, rows: 2...3)
         #expect(
             app.left.draggedItems(fromRow: 3).map(\.name) == ["one.txt", "two.txt"]
-                && app.left.draggedItems(fromRow: 1).map(\.name) == ["docs"])
+                && app.left.draggedItems(fromRow: 1).map(\.name) == ["docs"]
+        )
         #expect(app.left.draggingItems(forRow: 3).count == 2)
 
         let fresh = box.url("B/fresh.txt")
@@ -503,7 +537,8 @@ import Testing
         #expect(app.left.dropPlan(for: [fresh], row: -1, modifiers: [], allowed: all)?.row == -1)
         // Onto [..]: into the folder above.
         #expect(
-            app.left.dropPlan(for: [fresh], row: 0, modifiers: [], allowed: all)?.destination.path == box.root.path)
+            app.left.dropPlan(for: [fresh], row: 0, modifiers: [], allowed: all)?.destination.path == box.root.path
+        )
         // A panel's own items dropped on its background change nothing, unless copied.
         let own = [box.url("A/one.txt")]
         #expect(app.left.dropPlan(for: own, row: -1, modifiers: [], allowed: all) == nil)
@@ -513,7 +548,8 @@ import Testing
         #expect(app.left.dropPlan(for: [], row: 1, modifiers: [], allowed: all) == nil)
         // Between file systems it is a copy; a file system that cannot be written takes nothing.
         #expect(
-            app.left.dropPlan(for: [memory.url("/M/remote.txt")], row: -1, modifiers: [], allowed: all)?.kind == .copy)
+            app.left.dropPlan(for: [memory.url("/M/remote.txt")], row: -1, modifiers: [], allowed: all)?.kind == .copy
+        )
         app.right.show(memory.url("/M"))
         await settle(app)
         #expect(app.right.dropPlan(for: own, row: -1, modifiers: [], allowed: all)?.kind == .copy)
@@ -537,7 +573,8 @@ import Testing
         // While the job runs, nothing else is taken.
         #expect(
             app.left.dropPlan(for: [box.url("B/fresh.txt")], row: 1, modifiers: [], allowed: all) == nil
-                && app.left.draggedItems(fromRow: 2).isEmpty)
+                && app.left.draggedItems(fromRow: 2).isEmpty
+        )
         await settle(app)
         #expect(box.read("A/docs/fresh.txt") == "fresh" && !box.exists("B/fresh.txt") && app.names(app.right).isEmpty)
 
@@ -545,14 +582,17 @@ import Testing
         settings.set(false, forKey: PanelSettings.confirmsDropsKey)
         app.shell.panelCoordinator.applySettings()
         let copy = try #require(
-            app.left.dropPlan(for: [memory.url("/M/remote.txt")], row: -1, modifiers: [], allowed: all))
+            app.left.dropPlan(for: [memory.url("/M/remote.txt")], row: -1, modifiers: [], allowed: all)
+        )
         app.left.carryOut(copy)
         await settle(app)
         #expect(
             box.read("A/remote.txt") == "far" && memory.exists("/M/remote.txt")
-                && app.names(app.left).contains("remote.txt"))
+                && app.names(app.left).contains("remote.txt")
+        )
         let duplicate = try #require(
-            app.left.dropPlan(for: [box.url("A/one.txt")], row: -1, modifiers: .option, allowed: all))
+            app.left.dropPlan(for: [box.url("A/one.txt")], row: -1, modifiers: .option, allowed: all)
+        )
         app.left.carryOut(duplicate)
         await settle(app)
         #expect(box.read("A/one (2).txt") == "new" && box.exists("A/one.txt") && ui.log.count == 2)
@@ -572,7 +612,8 @@ import Testing
         }
         #expect(
             color("one.txt") == .labelColor && color(".secret") == .secondaryLabelColor
-                && color("one.txt", selected: true) == .systemRed)
+                && color("one.txt", selected: true) == .systemRed
+        )
         #expect(!app.commands.isChecked("cm_SwitchColorsByFileType"))
         // The list is edited as text; an entry that cannot be read is shown again.
         ui.formAnswers = [
@@ -583,18 +624,21 @@ import Testing
         #expect(ui.log.filter { $0.hasPrefix("inform") } == ["inform: This entry cannot be read:"])
         #expect(app.commands.isChecked("cm_SwitchColorsByFileType"))
         #expect(
-            color("one.txt") == .systemBlue && color("two.txt") == NSColor(srgbRed: 0, green: 1, blue: 0, alpha: 1))
+            color("one.txt") == .systemBlue && color("two.txt") == NSColor(srgbRed: 0, green: 1, blue: 0, alpha: 1)
+        )
         #expect(color(".secret") == NSColor(srgbRed: 0, green: 1, blue: 0, alpha: 1) && color("docs") == .labelColor)
         // The mark colour wins; the switch turns the colours off without losing the list.
         #expect(color("one.txt", selected: true) == .systemRed)
         app.commands.perform("cm_SwitchColorsByFileType")
         #expect(
             color("one.txt") == .labelColor
-                && settings.text(PanelSettings.colorRulesKey, default: "").hasPrefix("one.* = blue;;"))
+                && settings.text(PanelSettings.colorRulesKey, default: "").hasPrefix("one.* = blue;;")
+        )
         // The options page of the lists is there, next to the plugin's.
         #expect(
             app.kernel.preferences.pages.map(\.title).contains("File Panels")
-                && app.kernel.preferences.pages.map(\.title).contains("Display"))
+                && app.kernel.preferences.pages.map(\.title).contains("Display")
+        )
         settings.set(4, forKey: PanelSettings.thumbnailSizeKey)
         app.kernel.preferences.pages.first { $0.title == "File Panels" }?.onChange()
         #expect(app.left.settings.thumbnailSide == 256 && app.right.settings.thumbnailSide == 256)
@@ -618,7 +662,8 @@ import Testing
             app.left.model.toggleSelection(row: 39_000)
             #expect(
                 Double(clock_gettime_nsec_np(CLOCK_THREAD_CPUTIME_ID) - started) / 1e9 < 1.5
-                    && app.left.gridView.geometry.flow == flow)
+                    && app.left.gridView.geometry.flow == flow
+            )
             #expect(app.left.gridView.geometry.count == 40_001 && app.left.gridView.visibleRows.contains(39_000))
             #expect(app.left.gridView.visibleRows.count < 2_000)
         }

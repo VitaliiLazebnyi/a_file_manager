@@ -10,9 +10,7 @@ public enum Fixture {
         FileItem(
             url: folder.appending(name: name),
             name: name,
-            isDirectory: false,
-            size: size,
-            modified: Date(timeIntervalSince1970: modified)
+            stat: .init(size: size, modified: Date(timeIntervalSince1970: modified))
         )
     }
 
@@ -21,8 +19,8 @@ public enum Fixture {
         FileItem(
             url: folder.appending(name: name),
             name: name,
-            isDirectory: true,
-            modified: Date(timeIntervalSince1970: modified)
+            kind: .directory,
+            stat: .init(modified: Date(timeIntervalSince1970: modified))
         )
     }
 

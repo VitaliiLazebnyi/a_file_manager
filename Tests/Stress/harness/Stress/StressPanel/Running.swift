@@ -30,7 +30,7 @@ internal final class Running {
         let settings = MemorySettings()
         settings.set(Self.state(left), forKey: "left.tabs")
         settings.set(Self.state(right), forKey: "right.tabs")
-        kernel = Kernel(productName: StandardPlugins.productName, settings: settings, ui: interaction)
+        kernel = Kernel(productName: StandardPlugins.productName, settings: settings, interaction: interaction)
         for provider in providers {
             kernel.fileSystems.register(provider)
         }

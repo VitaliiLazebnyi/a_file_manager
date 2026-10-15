@@ -1,6 +1,7 @@
 import AFMKernel
 import FindFilesPlugin
 import Foundation
+import TestSupport
 import Testing
 
 /// The saved searches and the field histories of Find Files, as earlier versions wrote them,

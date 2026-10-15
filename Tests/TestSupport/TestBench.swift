@@ -36,7 +36,7 @@ public final class TestBench: ShellServices {
         right: URL,
         settings: any SettingsStore = MemorySettings()
     ) {
-        kernel = Kernel(productName: "Test", settings: settings, ui: interaction)
+        kernel = Kernel(productName: "Test", settings: settings, interaction: interaction)
         fileSystems.forEach(kernel.fileSystems.register)
         kernel.load(plugins)
         panelSet = FakePanelSet(

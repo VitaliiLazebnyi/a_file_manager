@@ -1,5 +1,6 @@
 import AFMKernel
 import Foundation
+import TestSupport
 import Testing
 
 /// The settings store kept in memory, and its scopes.

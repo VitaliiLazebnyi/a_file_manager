@@ -5,22 +5,6 @@ import Foundation
 ///
 /// Main thread only.
 public final class ImmediateJobService: JobService {
-    /// A job that is over by the time anybody holds it.
-    private final class Handle: JobHandle {
-        let title: String
-        let isFinished = true
-
-        init(title: String) { self.title = title }
-
-        func cancel() {
-            // The job is over; there is nothing to stop.
-        }
-
-        deinit {
-            // Nothing to release.
-        }
-    }
-
     /// The monitor a job reports to.
     ///
     /// Unchecked: the reports are guarded by `lock`.
@@ -64,13 +48,12 @@ public final class ImmediateJobService: JobService {
 
     /// Runs `work` on this thread, records its title and reports, then calls `completion` with
     /// its result, all before returning.
-    @discardableResult
     @preconcurrency
     public func run<Result: Sendable>(
         title: String,
         work: @Sendable (any JobMonitor) -> Result,
         completion: @MainActor (Result) -> Void
-    ) -> any JobHandle {
+    ) {
         titles.append(title)
         let monitor = Monitor()
         isBusy = true
@@ -78,12 +61,6 @@ public final class ImmediateJobService: JobService {
         isBusy = false
         reports += monitor.reports
         completion(result)
-        return Handle(title: title)
-    }
-
-    /// Calls `completion` at once: no job is ever left.
-    public func cancelAll(then completion: () -> Void) {
-        completion()
     }
 
     deinit {

@@ -83,8 +83,8 @@ internal struct FilteringElsewhereTests {
                 return FileItem(
                     url: directory.appending(name: "n\(index)"),
                     name: isFolder ? "dir\(index)" : "file\(index).txt",
-                    isDirectory: isFolder,
-                    size: Int64(index)
+                    kind: .init(isDirectory: isFolder),
+                    stat: .init(size: Int64(index))
                 )
             }
     }

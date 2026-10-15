@@ -94,7 +94,8 @@ final class CompareSession {
         options = DiffOptions(
             ignoreCase: settings.flag(CompareSettingsKey.ignoreCase, default: true),
             ignoreRepeatedSpaces: settings.flag(CompareSettingsKey.ignoreSpaces, default: true),
-            ignoreLineEndings: settings.flag(CompareSettingsKey.ignoreLineEndings, default: true))
+            ignoreLineEndings: settings.flag(CompareSettingsKey.ignoreLineEndings, default: true)
+        )
         let choice = settings.index(CompareSettingsKey.bytesPerLine, default: 1)
         bytesPerLine = CompareSettingsKey.bytesPerLineChoices[max(0, min(3, choice))]
     }
@@ -156,9 +157,14 @@ final class CompareSession {
         background(
             { cancellation in
                 CompareLoader.load(
-                    left: leftURL, right: rightURL, forceBinary: forceBinary, options: options,
+                    left: leftURL,
+                    right: rightURL,
+                    forceBinary: forceBinary,
+                    options: options,
                     bytesPerLine: bytesPerLine,
-                    fileSystems: fileSystems, cancellation: cancellation)
+                    fileSystems: fileSystems,
+                    cancellation: cancellation
+                )
             },
             finish: { [self] result, wasCancelled in
                 running = nil
@@ -187,14 +193,18 @@ final class CompareSession {
                 updateStatus()
                 if let message = result.message {
                     status = message
-                    kernel.ui.inform("Compare contents", detail: message, style: .warning)
+                    kernel.interaction.inform("Compare contents", detail: message, style: .warning)
                 } else if result.isIdentical {
-                    kernel.ui.inform(
-                        "Compare contents", detail: "The two files have the same content!", style: .information)
+                    kernel.interaction.inform(
+                        "Compare contents",
+                        detail: "The two files have the same content!",
+                        style: .information
+                    )
                 }
                 onChange()
                 if case .none = result.content { completion(false) } else { completion(true) }
-            })
+            }
+        )
     }
 
     /// Compares what is loaded again, after an option or the texts changed.
@@ -210,13 +220,19 @@ final class CompareSession {
                 { BinaryDiff.compute(left: left, right: right, bytesPerLine: bytesPerLine, cancellation: $0) },
                 finish: { [self] diff, cancelled in
                     show(.binary(left: left, right: right, diff: diff), cancelled: cancelled)
-                })
+                }
+            )
 
         case .text(let left, let right, _, let width):
             let (options, anchors) = (self.options, self.anchors)
             let work: @Sendable (CancellationFlag?) -> CompareContent = { cancellation in
                 CompareLoader.text(
-                    left: left, right: right, options: options, anchors: anchors, cancellation: cancellation)
+                    left: left,
+                    right: right,
+                    options: options,
+                    anchors: anchors,
+                    cancellation: cancellation
+                )
             }
             if left.lines.count + right.lines.count < Self.inlineRecompareBelow,
                 width <= Self.inlineRecompareWidth
@@ -256,7 +272,8 @@ final class CompareSession {
         settings.set(options.ignoreLineEndings, forKey: CompareSettingsKey.ignoreLineEndings)
         settings.set(
             CompareSettingsKey.bytesPerLineChoices.firstIndex(of: bytesPerLine) ?? 1,
-            forKey: CompareSettingsKey.bytesPerLine)
+            forKey: CompareSettingsKey.bytesPerLine
+        )
         recompute()
     }
 
@@ -428,7 +445,11 @@ final class CompareSession {
     private var searching: CancellationFlag?
 
     nonisolated private static func search(
-        _ content: CompareContent, _ needle: String, from row: Int, forward: Bool, cancellation: CancellationFlag?
+        _ content: CompareContent,
+        _ needle: String,
+        from row: Int,
+        forward: Bool,
+        cancellation: CancellationFlag?
     ) -> Int? {
         let count: Int
         let sides: (Int, CompareSide) -> String?
@@ -570,10 +591,11 @@ final class CompareSession {
                 target.lines.contains { $0.ending != .none }
                 ? target.usualEnding(sampleLimit: 10_000) : source.usualEnding(sampleLimit: 10_000)
             // The rows were made from these texts; an index outside them is skipped, never trusted.
-            let incoming = diff.rows[rows].compactMap { index($0, side.other) }.filter {
-                source.lines.indices.contains($0)
-            }
-            .map { TextLine(source.lines[$0].text, ending: ending, number: 0) }
+            let incoming = diff.rows[rows].compactMap { index($0, side.other) }
+                .filter {
+                    source.lines.indices.contains($0)
+                }
+                .map { TextLine(source.lines[$0].text, ending: ending, number: 0) }
             let replaced = diff.rows[rows].compactMap { index($0, side) }.filter { target.lines.indices.contains($0) }
             // Where nothing is replaced, the lines go in before the target's next line.
             let start =
@@ -583,7 +605,11 @@ final class CompareSession {
             guard range.upperBound <= target.lines.count, Array(target.lines[range]).map(\.text) != incoming.map(\.text)
             else { return [] }
             let splice = Splice(
-                side: side, start: start, removed: Array(target.lines[range]), insertedCount: incoming.count)
+                side: side,
+                start: start,
+                removed: Array(target.lines[range]),
+                insertedCount: incoming.count
+            )
             // Released before the change, so that it is made in the lines of the document itself.
             target = TextDocument()
             if side == .left {
@@ -638,8 +664,10 @@ final class CompareSession {
         if modified.right, let rightURL { files.append((.right, rightURL, right, loaded.right)) }
         // Two edited texts of one file cannot both be written: the second would silently replace the first.
         if files.count == 2, CompareLoader.isSameFile(files[0].url, files[1].url) {
-            kernel.ui.report(
-                CompareLoader.SaveError.sameFile(fileSystems.displayPath(files[0].url)), title: "Nothing was saved.")
+            kernel.interaction.report(
+                CompareLoader.SaveError.sameFile(fileSystems.displayPath(files[0].url)),
+                title: "Nothing was saved."
+            )
             completion(false)
             return
         }
@@ -648,25 +676,33 @@ final class CompareSession {
         kernel.jobs.run(
             title: "Save",
             work: { [files] monitor -> [Saved] in
-                files.enumerated().map { index, file in
-                    monitor.report(
-                        JobProgress(
-                            lines: ["Save: " + fileSystems.displayPath(file.url)], itemsDone: index,
-                            itemsTotal: files.count))
-                    do {
-                        let data = try file.document.encodedData(named: file.url.lastPathComponent)
-                        let item = try CompareLoader.replace(
-                            file.url, with: data, expected: file.expected, fileSystems: fileSystems)
-                        return Saved(side: file.side, error: nil, item: item)
-                    } catch {
-                        return Saved(side: file.side, error: error, item: nil)
+                files.enumerated()
+                    .map { index, file in
+                        monitor.report(
+                            JobProgress(
+                                lines: ["Save: " + fileSystems.displayPath(file.url)],
+                                itemsDone: index,
+                                itemsTotal: files.count
+                            )
+                        )
+                        do {
+                            let data = try file.document.encodedData(named: file.url.lastPathComponent)
+                            let item = try CompareLoader.replace(
+                                file.url,
+                                with: data,
+                                expected: file.expected,
+                                fileSystems: fileSystems
+                            )
+                            return Saved(side: file.side, error: nil, item: item)
+                        } catch {
+                            return Saved(side: file.side, error: error, item: nil)
+                        }
                     }
-                }
             },
             completion: { [self] results in
                 for saved in results {
                     if let error = saved.error {
-                        kernel.ui.report(error, title: "\(displayPath(saved.side)) could not be saved.")
+                        kernel.interaction.report(error, title: "\(displayPath(saved.side)) could not be saved.")
                     } else {
                         // What was written is now the file on disk, whatever was edited since.
                         if saved.side == .left {
@@ -684,7 +720,8 @@ final class CompareSession {
                 updateStatus()
                 onChange()
                 completion(results.allSatisfy { $0.error == nil } && !hasUnsavedChanges)
-            })
+            }
+        )
     }
 
     /// Writes the changed files at once on the calling thread, for the program quitting, where a
@@ -703,7 +740,7 @@ final class CompareSession {
                 if side == .left { modified.left = false } else { modified.right = false }
             } catch {
                 ok = false
-                kernel.ui.report(error, title: "\(fileSystems.displayPath(url)) could not be saved.")
+                kernel.interaction.report(error, title: "\(fileSystems.displayPath(url)) could not be saved.")
             }
         }
         return ok

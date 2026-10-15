@@ -7,6 +7,33 @@ import Testing
 /// The kernel's pool of threads for parallel work (review 2, K006, K008, K009, K025-K029, K044).
 @Suite(.serialized)
 internal struct ParallelPoolTests {
+    /// The threads of the pool there are now, found by their name.
+    private static func poolThreads() -> Int {
+        var list: thread_act_array_t?
+        var count: mach_msg_type_number_t = 0
+        guard task_threads(mach_task_self_, &list, &count) == KERN_SUCCESS, let list else {
+            return 0
+        }
+        defer {
+            let size = vm_size_t(Int(count) * MemoryLayout<thread_act_t>.stride)
+            vm_deallocate(mach_task_self_, vm_address_t(bitPattern: list), size)
+        }
+        var found = 0
+        for index in 0..<Int(count) {
+            defer { mach_port_deallocate(mach_task_self_, list[index]) }
+            guard let thread = pthread_from_mach_thread_np(list[index]) else {
+                continue
+            }
+            var name = [CChar](repeating: 0, count: 64)
+            pthread_getname_np(thread, &name, name.count)
+            let bytes = name.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }
+            if String(decoding: bytes, as: UTF8.self) == "AFM.Parallel" {
+                found += 1
+            }
+        }
+        return found
+    }
+
     /// Waits for `release` to be signalled by the test, at most as long as any wait lasts.
     private static func hold(_ release: DispatchSemaphore) {
         _ = release.wait(timeout: .now() + Wait.ceiling)
@@ -67,7 +94,7 @@ internal struct ParallelPoolTests {
         #expect(Wait.until { finished.count == 1 })
         #expect(stalled.count == pieces)
         // The threads beyond the cores go away again without waiting for all to be idle for long.
-        #expect(Wait.until { ParallelPool.shared.census.threads <= width })
+        #expect(Wait.until { Self.poolThreads() <= width })
     }
 
     /// Pieces that wait a moment each, as for a server, get more threads than cores, up to a limit.
@@ -95,21 +122,20 @@ internal struct ParallelPoolTests {
     /// Threads that give up waiting just as they are called lose no call, now or later.
     @Test
     internal func helpersStillComeAfterManyCallsWithIdleTimesBetween() {
-        let pool = ParallelPool.shared
+        // With the wait made short, threads give up just as they are called all the time.
+        let pool = ParallelPool(linger: 0.002)
         guard pool.width > 1 else {
             return
         }
-        // With the wait made short, threads give up just as they are called all the time.
-        pool.lingering = 0.002
-        defer { pool.lingering = 2 }
         for round in 0..<600 {
-            #expect(Parallel.map(Array(0..<40)) { $0 * 2 }.reduce(0, +) == 1_560)
+            let sum = Counter()
+            pool.run(count: 40) { _ in sum.add() }
+            #expect(sum.count == 40)
             // Idle times of different lengths between the calls: what lets the threads give up.
             usleep(UInt32(round % 5) * 1_000)
         }
-        pool.lingering = 2
         let later = Counter()
-        _ = Parallel.map(Array(0..<64)) { _ in
+        pool.run(count: 64) { _ in
             later.note()
             // Each piece takes a moment, so that helpers are worth calling.
             usleep(20_000)

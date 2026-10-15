@@ -40,7 +40,8 @@ public struct BranchWalker: Sendable {
         guard statfs(path, &info) == 0 else { return false }
         // The system names the mount point by its real path.
         let real =
-            realpath(path, nil).map { pointer -> String in
+            realpath(path, nil)
+            .map { pointer -> String in
                 defer { free(pointer) }
                 return String(cString: pointer)
             } ?? path
@@ -65,7 +66,10 @@ public struct BranchWalker: Sendable {
     public var entersPackages: Bool
 
     public init(
-        fileSystems: FileSystemRegistry, showHidden: Bool, listsFolders: Bool = false, entersPackages: Bool = false
+        fileSystems: FileSystemRegistry,
+        showHidden: Bool,
+        listsFolders: Bool = false,
+        entersPackages: Bool = false
     ) {
         self.fileSystems = fileSystems
         self.showHidden = showHidden
@@ -100,7 +104,10 @@ public struct BranchWalker: Sendable {
     /// `keeping` of them (a walk of a million folders does not hold a million locations).
     @discardableResult
     public func walk(
-        _ starts: [Start], mustRead: Bool = false, keeping: Int = Int.max, cancellation: CancellationFlag? = nil,
+        _ starts: [Start],
+        mustRead: Bool = false,
+        keeping: Int = Int.max,
+        cancellation: CancellationFlag? = nil,
         receive: ([FileItem]) -> Bool
     ) throws -> [URL] {
         func isCancelled() -> Bool { cancellation?.isCancelled == true }
@@ -176,10 +183,8 @@ public struct BranchWalker: Sendable {
 extension FileItem {
     /// The same entry under another name: its place in a virtual folder.
     func named(_ name: String) -> FileItem {
-        FileItem(
-            url: url, name: name, isDirectory: isDirectory, isSymlink: isSymlink, isPackage: isPackage,
-            isHidden: isHidden,
-            size: size, modified: modified, permissions: permissions, computedSize: computedSize, isSpecial: isSpecial
-        )
+        var item = FileItem(url: url, name: name, kind: kind, stat: stat)
+        item.computedSize = computedSize
+        return item
     }
 }

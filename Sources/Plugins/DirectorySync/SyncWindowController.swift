@@ -25,7 +25,10 @@ final class SyncWindowController: NSWindowController, NSWindowDelegate, NSTableV
     private let asymmetricBox = NSButton(checkboxWithTitle: "Asymmetric", target: nil, action: nil)
     private let emptyDirectoriesBox = NSButton(checkboxWithTitle: "Empty directories", target: nil, action: nil)
     private let onlySelectedBox = NSButton(
-        checkboxWithTitle: "Only selected (in main window)", target: nil, action: nil)
+        checkboxWithTitle: "Only selected (in main window)",
+        target: nil,
+        action: nil
+    )
     private let oneHourBox = NSButton(checkboxWithTitle: "ignore 1 h difference", target: nil, action: nil)
     private let tolerancePopup = NSPopUpButton()
     private let offsetField = NSTextField()
@@ -70,7 +73,10 @@ final class SyncWindowController: NSWindowController, NSWindowDelegate, NSTableV
         kernel = session.kernel
         let window = ToolWindow(
             contentRect: NSRect(x: 0, y: 0, width: 1_000, height: 620),
-            styleMask: [.titled, .closable, .resizable, .miniaturizable], backing: .buffered, defer: false)
+            styleMask: [.titled, .closable, .resizable, .miniaturizable],
+            backing: .buffered,
+            defer: false
+        )
         window.title = "Synchronize directories"
         window.isReleasedWhenClosed = false
         window.minSize = NSSize(width: 760, height: 380)
@@ -163,7 +169,8 @@ final class SyncWindowController: NSWindowController, NSWindowDelegate, NSTableV
                     indicatorLabel, NSView(), tolerancePopup, oneHourBox, NSTextField(labelWithString: "dT="),
                     offsetField,
                     NSTextField(labelWithString: "h")
-                ])
+                ]
+        )
         indicatorLabel.textColor = .secondaryLabelColor
         indicatorLabel.lineBreakMode = .byTruncatingMiddle
         indicatorLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
@@ -242,7 +249,7 @@ final class SyncWindowController: NSWindowController, NSWindowDelegate, NSTableV
         for (typed, known) in [
             (leftField.stringValue, session.leftPath), (rightField.stringValue, session.rightPath)
         ] {
-            kernel.userTyped(location: typed, proposal: known, relativeTo: session.base)
+            kernel.userTyped(location: typed, relativeTo: session.base, proposal: known)
         }
         session.leftPath = leftField.stringValue
         session.rightPath = rightField.stringValue
@@ -328,7 +335,8 @@ final class SyncWindowController: NSWindowController, NSWindowDelegate, NSTableV
         let positions = IndexSet(
             rows.compactMap {
                 session.positions.indices.contains($0) && session.positions[$0] >= 0 ? session.positions[$0] : nil
-            })
+            }
+        )
         if !positions.isEmpty {
             table.reloadData(forRowIndexes: positions, columnIndexes: IndexSet(0..<table.numberOfColumns))
         }
@@ -435,7 +443,10 @@ final class SyncWindowController: NSWindowController, NSWindowDelegate, NSTableV
     }
 
     private func item(
-        _ title: String, _ key: String = "", _ modifiers: NSEvent.ModifierFlags = .control, enabled: Bool = true,
+        _ title: String,
+        _ key: String = "",
+        _ modifiers: NSEvent.ModifierFlags = .control,
+        enabled: Bool = true,
         _ action: @escaping () -> Void
     ) -> NSMenuItem {
         let item = ClosureMenuItem(title: title, keyEquivalent: key, run: action)
@@ -519,7 +530,7 @@ final class SyncWindowController: NSWindowController, NSWindowDelegate, NSTableV
     private func saveSet() {
         pushControls()
         guard
-            let name = kernel.ui.prompt("Name under which the directories and settings are saved:", value: "")?
+            let name = kernel.interaction.prompt("Name under which the directories and settings are saved:", value: "")?
                 .trimmingCharacters(in: .whitespaces), !name.isEmpty
         else { return }
         session.saveSet(named: name)

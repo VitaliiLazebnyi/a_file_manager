@@ -16,13 +16,20 @@ import UniformTypeIdentifiers
 /// that takes the place of a file.
 @Suite struct Review2PluginsBP2Viewer {
     private func document(
-        _ data: Data, encoding: ViewerEncoding = .utf8, columns: Int, wrap: Bool = true, segment: Int = 4 << 20,
+        _ data: Data,
+        encoding: ViewerEncoding = .utf8,
+        columns: Int,
+        wrap: Bool = true,
+        segment: Int = 4 << 20,
         chunk: Int = 1 << 20,
-        parallel: Bool = false, raw: Bool = true
+        parallel: Bool = false,
+        raw: Bool = true
     ) -> TextDocument {
         let document = TextDocument(
-            source: DataByteSource(data), encoding: encoding,
-            layout: .text(TextLayoutOptions(columns: columns, wordWrap: wrap)))
+            source: DataByteSource(data),
+            encoding: encoding,
+            layout: .text(TextLayoutOptions(columns: columns, wordWrap: wrap))
+        )
         document.buildIndex(parallel: parallel, segmentSize: segment, chunkSize: chunk, rawScan: raw)
         return document
     }
@@ -67,14 +74,16 @@ import UniformTypeIdentifiers
         #expect(
             try rows(document(Data("\u{20000}\u{20000}\u{20000}\n".utf8), columns: 4)) == [
                 "\u{20000}\u{20000}", "\u{20000}"
-            ])
+            ]
+        )
         #expect(try rows(document(Data("𝐀𝐀𝐀𝐀\n".utf8), columns: 2)) == ["𝐀𝐀", "𝐀𝐀"])
         // In a row of one column a wide character is past the width at once; its second half stays with it.
         #expect(try rows(document(Data("😀😀\n".utf8), columns: 1)) == ["😀", "😀"])
         #expect(try rows(document(Data("日\u{301}日\n".utf8), columns: 1)) == ["日\u{301}", "日"])
         // A combining mark after a wide character adds no column.
         #expect(
-            try rows(document(Data("日\u{301}日\u{301}日\u{301}\n".utf8), columns: 4)) == ["日\u{301}日\u{301}", "日\u{301}"])
+            try rows(document(Data("日\u{301}日\u{301}日\u{301}\n".utf8), columns: 4)) == ["日\u{301}日\u{301}", "日\u{301}"]
+        )
     }
 
     @Test func wideCharactersInUTF16AreCutLikeThoseInUTF8() throws {
@@ -103,13 +112,23 @@ import UniformTypeIdentifiers
             for encoding in [ViewerEncoding.utf8, .utf16LE, .utf16BE] {
                 let data = try #require(
                     text.data(
-                        using: encoding == .utf8 ? .utf8 : encoding == .utf16LE ? .utf16LittleEndian : .utf16BigEndian))
+                        using: encoding == .utf8 ? .utf8 : encoding == .utf16LE ? .utf16LittleEndian : .utf16BigEndian
+                    )
+                )
                 let fast = document(
-                    data, encoding: encoding, columns: columns, wrap: false, segment: 64, chunk: 40, raw: true)
+                    data,
+                    encoding: encoding,
+                    columns: columns,
+                    wrap: false,
+                    segment: 64,
+                    chunk: 40,
+                    raw: true
+                )
                 let plain = document(data, encoding: encoding, columns: columns, wrap: false, raw: false)
                 #expect(
                     fast.rowCount == plain.rowCount && fast.lineCount == plain.lineCount,
-                    "round \(round) \(encoding.name) columns \(columns)")
+                    "round \(round) \(encoding.name) columns \(columns)"
+                )
                 #expect(try rows(fast) == rows(plain), "round \(round) \(encoding.name) columns \(columns)")
             }
         }
@@ -144,7 +163,10 @@ import UniformTypeIdentifiers
         data.append(Data("\nsecond line\nthird\n".utf8))
         let source = CountingSource(DataByteSource(data))
         let counted = TextDocument(
-            source: source, encoding: .utf8, layout: .text(TextLayoutOptions(columns: 80, wordWrap: true)))
+            source: source,
+            encoding: .utf8,
+            layout: .text(TextLayoutOptions(columns: 80, wordWrap: true))
+        )
         counted.buildIndex(parallel: false, segmentSize: 64 << 10, chunkSize: 32 << 10)
         #expect(counted.isIndexComplete && counted.readError == nil)
         // The first segment reads the line to its end; the segments inside the line are not read at all.
@@ -178,10 +200,12 @@ import UniformTypeIdentifiers
             let whole = document(data, columns: columns)
             #expect(
                 sequential.rowCount == whole.rowCount && sequential.lineCount == whole.lineCount,
-                "round \(round) segment \(segment)")
+                "round \(round) segment \(segment)"
+            )
             #expect(
                 parallel.rowCount == whole.rowCount && parallel.lineCount == whole.lineCount,
-                "round \(round) segment \(segment)")
+                "round \(round) segment \(segment)"
+            )
             #expect(try rows(sequential) == rows(whole), "round \(round) segment \(segment) chunk \(chunk)")
         }
     }
@@ -268,8 +292,10 @@ import UniformTypeIdentifiers
         let refused = Locked(false)
         let ran = Locked(false)
         gate.submit(
-            cancellation: CancellationFlag(), refused: { refused.withValue { $0 = true } },
-            { ran.withValue { $0 = true } })
+            cancellation: CancellationFlag(),
+            refused: { refused.withValue { $0 = true } },
+            { ran.withValue { $0 = true } }
+        )
         #expect(refused.withValue { $0 } && !ran.withValue { $0 })
         #expect(gate.threadsInUse == 2)
         latch.release()
@@ -398,7 +424,10 @@ import UniformTypeIdentifiers
             let (data, starts) = try encode(characters, encoding)
             for spacing in [16, 17, 50, 1 << 14] {
                 let boundaries = CharacterBoundaries(
-                    source: DataByteSource(data), content: 0..<Int64(data.count), encoding: encoding, spacing: spacing
+                    source: DataByteSource(data),
+                    content: 0..<Int64(data.count),
+                    encoding: encoding,
+                    spacing: spacing
                 )
                 var expected = 0
                 for offset in stride(from: data.count - 1, through: 0, by: -3) {
@@ -407,7 +436,8 @@ import UniformTypeIdentifiers
                     let want = starts.last(where: { $0 <= offset })!
                     #expect(
                         try boundaries.characterStart(atOrBefore: Int64(offset)) == Int64(want),
-                        "\(encoding.name) spacing \(spacing) offset \(offset)")
+                        "\(encoding.name) spacing \(spacing) offset \(offset)"
+                    )
                 }
             }
         }
@@ -432,16 +462,26 @@ import UniformTypeIdentifiers
             for chunk in [3, 7, 16, 61, 4_096] {
                 let pattern = try SearchPattern(needle, options: SearchOptions(), encoding: encoding)
                 let found = try ViewerSearch.find(
-                    pattern, in: DataByteSource(data), content: 0..<Int64(data.count), from: 0, backwards: false,
+                    pattern,
+                    in: DataByteSource(data),
+                    content: 0..<Int64(data.count),
+                    from: 0,
+                    backwards: false,
                     encoding: encoding,
-                    chunkSize: chunk)
+                    chunkSize: chunk
+                )
                 #expect(found == want, "\(encoding.name) chunk \(chunk)")
                 var backwards = SearchOptions()
                 backwards.backwards = true
                 let last = try ViewerSearch.find(
-                    try SearchPattern(needle, options: backwards, encoding: encoding), in: DataByteSource(data),
-                    content: 0..<Int64(data.count), from: Int64(data.count), backwards: true, encoding: encoding,
-                    chunkSize: chunk)
+                    try SearchPattern(needle, options: backwards, encoding: encoding),
+                    in: DataByteSource(data),
+                    content: 0..<Int64(data.count),
+                    from: Int64(data.count),
+                    backwards: true,
+                    encoding: encoding,
+                    chunkSize: chunk
+                )
                 #expect(last == want, "\(encoding.name) backwards chunk \(chunk)")
             }
         }
@@ -489,7 +529,8 @@ import UniformTypeIdentifiers
         #expect(view.knowsPageRange(&range) && range == NSRange(location: 1, length: view.pageCount))
         let second = view.rectForPage(2)
         #expect(
-            second.origin.y == CGFloat(perPage) * TextPrintView.lineHeight(of: font) && second.height <= page.height)
+            second.origin.y == CGFloat(perPage) * TextPrintView.lineHeight(of: font) && second.height <= page.height
+        )
         // The last page holds what is left, and every page can be drawn.
         for number in 1...view.pageCount {
             let rect = view.rectForPage(number)
@@ -526,7 +567,8 @@ import UniformTypeIdentifiers
             opened.withValue { $0.map(\.absoluteString) } == [
                 "https://example.com/a", "http://example.org", "mailto:me@example.com", "https://nsurl.example",
                 "https://pdf.example/x.pdf"
-            ])
+            ]
+        )
     }
 
     @MainActor @Test func theRichViewsAreGivenTheGateAsTheirDelegate() {
@@ -540,14 +582,21 @@ import UniformTypeIdentifiers
     private func png(_ width: Int, _ height: Int) throws -> Data {
         let context = try #require(
             CGContext(
-                data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
+                data: nil,
+                width: width,
+                height: height,
+                bitsPerComponent: 8,
+                bytesPerRow: 0,
                 space: CGColorSpace(name: CGColorSpace.sRGB)!,
-                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            )
+        )
         context.setFillColor(CGColor(red: 0.3, green: 0.6, blue: 0.1, alpha: 1))
         context.fill(CGRect(x: 0, y: 0, width: width, height: height))
         let data = NSMutableData()
         let destination = try #require(
-            CGImageDestinationCreateWithData(data, UTType.png.identifier as CFString, 1, nil))
+            CGImageDestinationCreateWithData(data, UTType.png.identifier as CFString, 1, nil)
+        )
         CGImageDestinationAddImage(destination, try #require(context.makeImage()), nil)
         #expect(CGImageDestinationFinalize(destination))
         return data as Data
@@ -592,7 +641,12 @@ import UniformTypeIdentifiers
     @Test func aLinkWhoseTargetSizeIsKnownIsNotReadToMeasureIt() throws {
         let url = URL(string: "link:///current.log")!
         let entry = FileItem(
-            url: url, name: "current.log", isDirectory: false, isSymlink: true, size: 0, linkTargetSize: 123_456)
+            url: url,
+            name: "current.log",
+            kind: .symlink,
+            stat: .init(size: 0),
+            linkTargetSize: 123_456
+        )
         let registry = FileSystemRegistry()
         registry.register(LinkProvider(entry))
         let source = try ProviderByteSource.open(url, fileSystems: registry)
@@ -610,8 +664,11 @@ import UniformTypeIdentifiers
         let owner = ObjectIdentifier(copies)
         guard
             case .success(let local) = copies.localCopy(
-                for: memory.url("/remote/clip.mov"), fileSystems: registry, owner: owner,
-                cancellation: CancellationFlag())
+                for: memory.url("/remote/clip.mov"),
+                fileSystems: registry,
+                owner: owner,
+                cancellation: CancellationFlag()
+            )
         else {
             Issue.record("no copy")
             return
@@ -681,7 +738,8 @@ import UniformTypeIdentifiers
         Thread {
             do { _ = try direct.read(at: 0, count: 10) } catch { threw.withValue { $0 = true } }
             done.signal()
-        }.start()
+        }
+        .start()
         let finished = done.wait(timeout: .now() + 30) == .success
         if !finished {
             let fd = open(url.path, O_WRONLY | O_NONBLOCK)

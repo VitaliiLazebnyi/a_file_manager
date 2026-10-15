@@ -47,7 +47,7 @@ internal struct KernelAndPluginTests {
     @Test
     internal func aPluginAddsItsFeaturesThroughTheKernelOnly() throws {
         let plugin = MemoryPlugin()
-        let kernel = Kernel(productName: "Test", settings: MemorySettings(), ui: ScriptedInteraction())
+        let kernel = Kernel(productName: "Test", settings: MemorySettings(), interaction: ScriptedInteraction())
         kernel.load([plugin])
         #expect(kernel.plugins.map(\.name) == ["Memory"])
         let location = try #require(URL(string: "mem:///x"))
@@ -63,7 +63,7 @@ internal struct KernelAndPluginTests {
     /// panels is never asked and nothing runs.
     @Test
     internal func nothingRunsBeforeTheWindowExists() {
-        let kernel = Kernel(productName: "Test", settings: MemorySettings(), ui: ScriptedInteraction())
+        let kernel = Kernel(productName: "Test", settings: MemorySettings(), interaction: ScriptedInteraction())
         var runs = 0
         // The enabled check would crash on kernel.panels; a blocked registry never asks it.
         kernel.commands.register(
@@ -128,7 +128,7 @@ internal struct KernelAndPluginTests {
             log.append("archive \(file.name)")
             return true
         }
-        func file(_ name: String) -> FileItem { FileItem(url: memory.url("/" + name), name: name, isDirectory: false) }
+        func file(_ name: String) -> FileItem { FileItem(url: memory.url("/" + name), name: name) }
         #expect(bench.kernel.openers.open(file("a.zip"), in: bench.left))
         #expect(bench.kernel.openers.open(file("a.txt"), in: bench.left))
         #expect(log == ["archive a.zip", "general a.txt"])

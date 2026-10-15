@@ -155,7 +155,7 @@ final class Shared<Value>: @unchecked Sendable {
 /// that does not answer holds up only itself.
 extension Application {
     func start(with extra: any FileSystemProvider) async -> Running {
-        let kernel = Kernel(productName: StandardPlugins.productName, settings: settings, ui: ui)
+        let kernel = Kernel(productName: StandardPlugins.productName, settings: settings, interaction: ui)
         kernel.fileSystems.register(memory)
         kernel.fileSystems.register(extra)
         kernel.load(StandardPlugins.make(pasteboard: scratch.pasteboard, launchesApplications: false))
@@ -369,7 +369,8 @@ extension Application {
         app.left.model.setSort(ListOrder(key: app.left.model.sort.key, descending: !app.left.model.sort.descending))
         #expect(
             app.left.isRenaming && app.left.renamingRow == app.left.model.row(ofName: "one.txt")
-                && app.left.renamingRow != before)
+                && app.left.renamingRow != before
+        )
         // The item is gone: so is the editor.
         try FileManager.default.removeItem(at: box.url("A/one.txt"))
         read = false
@@ -422,7 +423,9 @@ extension Application {
                 thread.value = Thread.current.name ?? ""
                 release.wait()
                 return "late"
-            }, completion: { log.append($0) })
+            },
+            completion: { log.append($0) }
+        )
         service.run(title: "Next", work: { _ in "next" }, completion: { log.append($0) })
         // Asked twice: the first time the user keeps waiting.
         ui.choiceAnswers = [1, 0]
@@ -472,9 +475,15 @@ extension Application {
             told?()
         }
         service.run(
-            title: "One", work: { _ in 1 }, completion: { _ in states.append("first done, busy \(service.isBusy)") })
+            title: "One",
+            work: { _ in 1 },
+            completion: { _ in states.append("first done, busy \(service.isBusy)") }
+        )
         service.run(
-            title: "Two", work: { _ in 2 }, completion: { _ in states.append("second done, busy \(service.isBusy)") })
+            title: "Two",
+            work: { _ in 2 },
+            completion: { _ in states.append("second done, busy \(service.isBusy)") }
+        )
         await settle(app)
         _ = await wait { states.count == 4 }
         #expect(states == ["busy true", "first done, busy true", "busy false", "second done, busy false"])
@@ -492,8 +501,17 @@ extension Application {
         let keys = try #require(MenuBuilder.keyAnswers(of: menu))
         func key(_ characters: String, _ code: UInt16, _ flags: NSEvent.ModifierFlags = []) -> NSEvent {
             NSEvent.keyEvent(
-                with: .keyDown, location: .zero, modifierFlags: flags, timestamp: 0, windowNumber: 0, context: nil,
-                characters: characters, charactersIgnoringModifiers: characters, isARepeat: false, keyCode: code)!
+                with: .keyDown,
+                location: .zero,
+                modifierFlags: flags,
+                timestamp: 0,
+                windowNumber: 0,
+                context: nil,
+                characters: characters,
+                charactersIgnoringModifiers: characters,
+                isARepeat: false,
+                keyCode: code
+            )!
         }
         // A letter, an arrow and a Cmd key nothing is bound to: the plugins' menus are asked, and check no entry.
         for event in [
@@ -548,7 +566,8 @@ extension Application {
         pasteboard.writeObjects(written)
         #expect(
             written.count == 2
-                && PanelDrop.locations(on: pasteboard).map(\.lastPathComponent) == ["one.txt", "two.txt"])
+                && PanelDrop.locations(on: pasteboard).map(\.lastPathComponent) == ["one.txt", "two.txt"]
+        )
         // Other programs get the files of the local disks as file URLs.
         let files =
             pasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL]
@@ -558,7 +577,8 @@ extension Application {
         PanelDrop.endDrag()
         #expect(
             PanelDrop.current == nil
-                && PanelDrop.locations(on: pasteboard).map(\.lastPathComponent) == ["one.txt", "two.txt"])
+                && PanelDrop.locations(on: pasteboard).map(\.lastPathComponent) == ["one.txt", "two.txt"]
+        )
         // Items of another file system are in the drag, but not for other programs.
         memory.addFile("/M/far.txt")
         app.right.show(memory.url("/M"))
@@ -569,7 +589,8 @@ extension Application {
         #expect(PanelDrop.locations(on: pasteboard).map(\.absoluteString) == ["mem:///M/far.txt"])
         #expect(
             (pasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL] ?? [])
-                .isEmpty)
+                .isEmpty
+        )
         PanelDrop.endDrag()
         #expect(PanelDrop.locations(on: pasteboard).isEmpty)
     }
@@ -658,7 +679,7 @@ extension Application {
     }
 
     @Test func theKeyOfAMenuEntryRunsThatEntryAndChecksNoOther() {
-        let kernel = Kernel(productName: "Test", settings: MemorySettings(), ui: ScriptedInteraction())
+        let kernel = Kernel(productName: "Test", settings: MemorySettings(), interaction: ScriptedInteraction())
         var asked = 0
         kernel.commands.register(
             Command("test_Bound", "Bound", [.f(9), .cmd("j")]),
@@ -701,21 +722,33 @@ extension Application {
         keys.answer(for: menu)
         func key(_ characters: String, _ code: UInt16, _ flags: NSEvent.ModifierFlags = []) -> NSEvent {
             NSEvent.keyEvent(
-                with: .keyDown, location: .zero, modifierFlags: flags, timestamp: 0, windowNumber: 0, context: nil,
-                characters: characters, charactersIgnoringModifiers: characters, isARepeat: false, keyCode: code)!
+                with: .keyDown,
+                location: .zero,
+                modifierFlags: flags,
+                timestamp: 0,
+                windowNumber: 0,
+                context: nil,
+                characters: characters,
+                charactersIgnoringModifiers: characters,
+                isARepeat: false,
+                keyCode: code
+            )!
         }
         // Keys nothing has: asked, and not one entry brought up to date.
         #expect(
-            !bar.performKeyEquivalent(with: key("a", 0)) && !bar.performKeyEquivalent(with: key("k", 40, .command)))
+            !bar.performKeyEquivalent(with: key("a", 0)) && !bar.performKeyEquivalent(with: key("k", 40, .command))
+        )
         #expect(keys.lookups > 0 && target.validated == 0 && asked == 0 && target.senders.isEmpty)
         // The key of the entry in the submenu: that entry is checked and runs, with itself as the sender.
         #expect(bar.performKeyEquivalent(with: key(String(UnicodeScalar(NSF9FunctionKey)!), 101)))
         #expect(
-            target.senders.map(\.title) == ["Bound"] && target.validated == 1 && keys.validations == 1 && asked == 0)
+            target.senders.map(\.title) == ["Bound"] && target.validated == 1 && keys.validations == 1 && asked == 0
+        )
         // A standard entry by its own key, also on a keyboard that writes another script.
         #expect(
             bar.performKeyEquivalent(with: key("z", 6, .command))
-                && bar.performKeyEquivalent(with: key("я", 6, .command)))
+                && bar.performKeyEquivalent(with: key("я", 6, .command))
+        )
         #expect(target.senders.map(\.title) == ["Bound", "Undo", "Undo"])
         // Only the key the menu shows belongs to the menu; the command's other key is the list's.
         #expect(!bar.performKeyEquivalent(with: key("j", 38, .command)))
@@ -726,7 +759,8 @@ extension Application {
         _ = bar.performKeyEquivalent(with: key(String(UnicodeScalar(NSF9FunctionKey)!), 101))
         #expect(
             target.senders.count == 3 && target.validated > 3 && target.validated <= 3 + 6
-                && inner.items.first?.isEnabled == false)
+                && inner.items.first?.isEnabled == false
+        )
         // When a menu is about to be shown, its own entries are brought up to date, and no other menu's.
         target.isOffered = true
         var before = target.validated
@@ -750,7 +784,9 @@ extension Application {
         // Changed by the observer on the main thread, where the test reads it.
         nonisolated(unsafe) var arrived: Set<String> = []
         let observer = NotificationCenter.default.addObserver(
-            forName: IconStore.didArrive, object: store, queue: .main
+            forName: IconStore.didArrive,
+            object: store,
+            queue: .main
         ) { note in
             arrived.formUnion(note.userInfo?[IconStore.pathsKey] as? Set<String> ?? [])
         }
@@ -759,7 +795,8 @@ extension Application {
         // Not there yet: the caller shows the icon of the type, and nothing was asked on this thread.
         #expect(
             store.icon(forPath: "/icons/a.app", modified: date) == nil
-                && store.icon(forPath: "/icons/a.app", modified: date) == nil)
+                && store.icon(forPath: "/icons/a.app", modified: date) == nil
+        )
         let came = await wait { arrived == ["/icons/a.app"] }
         #expect(came && asked.value == ["/icons/a.app on main: false"])
         #expect(store.icon(forPath: "/icons/a.app", modified: date) === image && asked.value.count == 1)
@@ -785,18 +822,19 @@ extension Application {
     @Test func namesThatCouldMisleadAreShownWithEveryCharacterVisible() {
         #expect(
             DisplayText.clean("report.txt") == "report.txt"
-                && DisplayText.clean("Übergrößen – 日本.txt") == "Übergrößen – 日本.txt")
+                && DisplayText.clean("Übergrößen – 日本.txt") == "Übergrößen – 日本.txt"
+        )
         #expect(DisplayText.clean("invoice\u{202E}fdp.exe") == "invoice\u{FFFD}fdp.exe")
         #expect(DisplayText.clean("two\nlines\ttab\u{7}") == "two\u{240A}lines\u{2409}tab\u{2407}")
         #expect(DisplayText.clean("two\nlines \u{202E}x", keepingLines: true) == "two\nlines \u{FFFD}x")
         // One sign for one: positions in the text stay what they were.
         let name = "a\u{2066}b\u{85}c\u{200F}d"
         #expect(DisplayText.clean(name).utf16.count == name.utf16.count)
-        let item = FileItem(
-            url: URL(fileURLWithPath: "/x/evil\u{202E}txt.exe"), name: "evil\u{202E}txt.exe", isDirectory: false)
+        let item = FileItem(url: URL(fileURLWithPath: "/x/evil\u{202E}txt.exe"), name: "evil\u{202E}txt.exe")
         #expect(
             FileListColumn.name.text(for: item) == "evil\u{FFFD}txt"
-                && FileGridView.caption(for: item) == "evil\u{FFFD}txt.exe")
+                && FileGridView.caption(for: item) == "evil\u{FFFD}txt.exe"
+        )
     }
 
     // MARK: Drag and drop (S003, S055)
@@ -816,7 +854,8 @@ extension Application {
                 #expect(
                     DragSources(sources).isPointless(kind, into: destination)
                         == PanelDrop.isPointless(kind, sources, into: destination),
-                    "\(kind) \(sources.map(\.absoluteString)) into \(destination.absoluteString)")
+                    "\(kind) \(sources.map(\.absoluteString)) into \(destination.absoluteString)"
+                )
             }
         }
         // A drag of very many items is looked at in the background; until then nothing is taken.
@@ -826,14 +865,16 @@ extension Application {
         let ready = await wait { session.isReady }
         #expect(
             ready && !session.isPointless(.copy, into: file("/elsewhere"))
-                && session.isPointless(.move, into: file("/big")))
+                && session.isPointless(.move, into: file("/big"))
+        )
     }
 
     @Test func aDragOfVeryManyItemsIsOneItemThatHandsOutItsFilesWhenAsked() {
         defer { PanelDrop.endDrag() }
-        let items = (0...PanelDrop.itemsWrittenSingly).map {
-            FileItem(url: URL(fileURLWithPath: "/many/f\($0)"), name: "f\($0)", isDirectory: false)
-        }
+        let items = (0...PanelDrop.itemsWrittenSingly)
+            .map {
+                FileItem(url: URL(fileURLWithPath: "/many/f\($0)"), name: "f\($0)")
+            }
         let written = PanelDrop.beginDrag(of: items)
         #expect(written.count == 1 && written[0].types.contains(.fileURL))
         let pasteboard = NSPasteboard.withUniqueName()
@@ -860,21 +901,25 @@ extension Application {
             for name in names {
                 #expect(
                     matches(name) == (name.range(of: prefix, options: [.caseInsensitive, .anchored]) != nil),
-                    "\(prefix) in \(name)")
+                    "\(prefix) in \(name)"
+                )
             }
         }
-        let items = names.map { FileItem(url: URL(fileURLWithPath: "/x/" + $0), name: $0, isDirectory: false) }
+        let items = names.map { FileItem(url: URL(fileURLWithPath: "/x/" + $0), name: $0) }
         #expect(
             TypeSelect.row(matching: "al", in: items, from: 0) == 7
-                && TypeSelect.row(matching: "a", in: items, from: 7) == 8)
+                && TypeSelect.row(matching: "a", in: items, from: 7) == 8
+        )
         #expect(
             TypeSelect.row(matching: "zz", in: items, from: 3) == nil
-                && TypeSelect.row(matching: "r", in: [FileItem](), from: 0) == nil)
+                && TypeSelect.row(matching: "r", in: [FileItem](), from: 0) == nil
+        )
         let cancelled = CancellationFlag()
         cancelled.cancel()
-        let long = (0..<10_000).map {
-            FileItem(url: URL(fileURLWithPath: "/x/n\($0)"), name: "n\($0)", isDirectory: false)
-        }
+        let long = (0..<10_000)
+            .map {
+                FileItem(url: URL(fileURLWithPath: "/x/n\($0)"), name: "n\($0)")
+            }
         #expect(TypeSelect.row(matching: "zz", in: long, from: 0, cancellation: cancelled) == nil)
     }
 

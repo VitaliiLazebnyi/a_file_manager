@@ -52,10 +52,8 @@ internal enum SorterTarget {
                 FileItem(
                     url: item.url,
                     name: name,
-                    isDirectory: item.isDirectory,
-                    isPackage: item.isPackage,
-                    size: item.size &+ Int64(counter % 5),
-                    modified: item.modified
+                    kind: .init(isDirectory: item.isDirectory, isPackage: item.isPackage),
+                    stat: .init(size: item.size &+ Int64(counter % 5), modified: item.modified)
                 )
             )
             counter += 1

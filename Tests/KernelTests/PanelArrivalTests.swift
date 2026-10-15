@@ -106,7 +106,7 @@ internal struct PanelArrivalTests {
         panel.extend(to: Sorter.sort(all, by: panel.sort), sortedBy: panel.sort)
         #expect(panel.cursorItem?.name == "b.md" && panel.cursor == 4)
         panel.moveCursor(to: 0)
-        let more = all + [FileItem(url: work.memory.url("/work/0.txt"), name: "0.txt", isDirectory: false)]
+        let more = all + [FileItem(url: work.memory.url("/work/0.txt"), name: "0.txt")]
         panel.extend(to: Sorter.sort(more, by: panel.sort), sortedBy: panel.sort)
         #expect(panel.cursorIsOnParentRow && panel.items.count == 5)
     }

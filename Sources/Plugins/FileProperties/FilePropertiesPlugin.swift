@@ -49,33 +49,47 @@ public final class FilePropertiesPlugin: Plugin {
         let isLocal = { model().directory.isFileURL }
 
         commands.register(
-            Command(.setAttributes, "Change Attributes…"), enabled: { hasOperands() && isWritable() },
-            parameterized: actions.changeAttributes)
+            Command(.setAttributes, "Change Attributes…"),
+            enabled: { hasOperands() && isWritable() },
+            parameterized: actions.changeAttributes
+        )
         commands.register(
             Command(.properties, "Properties…", [Shortcut(.returnKey, .option), .cmd("i")]),
             enabled: { model().isListed },
-            actions.showProperties)
+            actions.showProperties
+        )
         commands.register(
             Command(.occupiedSpace, "Calculate Occupied Space…", [Shortcut(.character("l"), .control)]),
             enabled: hasOperands,
-            actions.calculateOccupiedSpace)
+            actions.calculateOccupiedSpace
+        )
         commands.register(
             Command(
-                .countDirectoryContents, "Calculate All Folder Sizes", [Shortcut(.returnKey, [.option, .shift])]),
-            enabled: { model().isComplete && model().totals.totalFolders > 0 }, actions.countDirectoryContents)
+                .countDirectoryContents,
+                "Calculate All Folder Sizes",
+                [Shortcut(.returnKey, [.option, .shift])]
+            ),
+            enabled: { model().isComplete && model().totals.totalFolders > 0 },
+            actions.countDirectoryContents
+        )
         commands.register(
             Command(.editComment, "Edit Comment…", [Shortcut(.character("z"), .control)]),
             enabled: { isWritable() && (model().cursorItem != nil || model().parentTarget != nil) },
-            actions.editComment)
+            actions.editComment
+        )
         commands.register(
             Command(.createShortcut, "Create Link…", [.f(5, [.control, .shift])]),
             enabled: { hasOperands() && isLocal() },
-            actions.createLinks)
+            actions.createLinks
+        )
         commands.register(
-            Command(.showLinkTarget, "Show Link Target"), enabled: { model().cursorItem?.url.isFileURL ?? false },
-            actions.showLinkTarget)
+            Command(.showLinkTarget, "Show Link Target"),
+            enabled: { model().cursorItem?.url.isFileURL ?? false },
+            actions.showLinkTarget
+        )
         commands.register(
-            Command(.finderInfo, "Finder Info", runsDuringJobs: true), enabled: { isLocal() && model().isListed }
+            Command(.finderInfo, "Finder Info", runsDuringJobs: true),
+            enabled: { isLocal() && model().isListed }
         ) {
             // Finder opens one window per item: more than a handful is never meant, and the
             // list of a long selection is not made for it.
@@ -94,17 +108,27 @@ public final class FilePropertiesPlugin: Plugin {
 
         kernel.menus.add(
             [.setAttributes, .properties, .finderInfo, .occupiedSpace, .countDirectoryContents, .editComment],
-            to: .filesProperties)
+            to: .filesProperties
+        )
         kernel.menus.add([.createShortcut, .showLinkTarget], to: .filesAdvanced)
         kernel.menus.addToContextMenu(
-            [.setAttributes, .editComment, .createShortcut], in: .properties, onItemOnly: true)
+            [.setAttributes, .editComment, .createShortcut],
+            in: .properties,
+            onItemOnly: true
+        )
         kernel.menus.addToContextMenu([.occupiedSpace, .properties], in: .properties)
         kernel.toolbar.add(
-            .properties, symbol: "info.circle", group: 60,
-            hint: "Show the properties of the selected file or folder: size, dates, permissions.")
+            .properties,
+            symbol: "info.circle",
+            group: 60,
+            hint: "Show the properties of the selected file or folder: size, dates, permissions."
+        )
         kernel.toolbar.add(
-            .occupiedSpace, symbol: "chart.pie", group: 60,
-            hint: "Calculate how much space the selected folders take, with everything in them.")
+            .occupiedSpace,
+            symbol: "chart.pie",
+            group: 60,
+            hint: "Calculate how much space the selected folders take, with everything in them."
+        )
         kernel.toolbar.setSymbol("slider.horizontal.3", for: .setAttributes)
         kernel.toolbar.setSymbol("text.bubble", for: .editComment)
         kernel.toolbar.setSymbol("link", for: .createShortcut)
@@ -114,15 +138,24 @@ public final class FilePropertiesPlugin: Plugin {
                 title: "File properties",
                 preferences: [
                     Preference(
-                        Settings.linkKind, "Create Link proposes:",
-                        .choice(LinkKind.allCases.map(\.title), default: LinkKind.symbolic.rawValue)),
+                        Settings.linkKind,
+                        "Create Link proposes:",
+                        .choice(LinkKind.allCases.map(\.title), default: LinkKind.symbolic.rawValue)
+                    ),
                     Preference(
-                        Settings.relativeLinks, "Symbolic links point to relative paths", .flag(default: false)),
+                        Settings.relativeLinks,
+                        "Symbolic links point to relative paths",
+                        .flag(default: false)
+                    ),
                     Preference(
-                        Settings.selectMeasured, "Calculate Occupied Space selects the measured folders",
-                        .flag(default: true)),
+                        Settings.selectMeasured,
+                        "Calculate Occupied Space selects the measured folders",
+                        .flag(default: true)
+                    ),
                     Preference(Settings.hideCommentFile, "Hide the comment file descript.ion", .flag(default: true))
-                ]))
+                ]
+            )
+        )
     }
 
     /// Opens Finder's Info window for local items. Finder is asked through `osascript`, off
@@ -170,16 +203,17 @@ final class PropertyActions {
     }
 
     private var source: any PanelHandle { kernel.panels.source }
-    private var ui: any UserInteraction { kernel.ui }
+    private var ui: any UserInteraction { kernel.interaction }
     private var fileSystems: FileSystemRegistry { kernel.fileSystems }
 
     /// The folders whose listings an operation on `items` may have changed. Grows with the
     /// selection, so it is worked out on a job's thread.
     nonisolated private static func folders(of items: [FileItem], and directory: URL) -> [URL] {
         var seen = Set<String>()
-        return ([directory] + items.map { $0.url.deletingLastPathComponent() }).filter {
-            seen.insert($0.locationKey).inserted
-        }
+        return ([directory] + items.map { $0.url.deletingLastPathComponent() })
+            .filter {
+                seen.insert($0.locationKey).inserted
+            }
     }
 
     /// The first failures of an operation as the text of a message: a message is laid out
@@ -230,7 +264,8 @@ final class PropertyActions {
                 var draft = AttributeDraft(items: items)
                 if let parsed { draft.take(parsed.change) }
                 ask(draft, items: items, directory: directory, details: read.details)
-            })
+            }
+        )
     }
 
     private func ask(_ draft: AttributeDraft, items: [FileItem], directory: URL, details: LocalDetails?) {
@@ -242,7 +277,11 @@ final class PropertyActions {
             let buttons = ["OK"] + (targetFile != nil ? ["Load from Target File"] : [])
             guard
                 let answer = ui.form(
-                    title, detail: "", fields: draft.fields(isLocal: isLocal, details: details), buttons: buttons)
+                    title,
+                    detail: "",
+                    fields: draft.fields(isLocal: isLocal, details: details),
+                    buttons: buttons
+                )
             else { return }
             draft.read(answer)
             if answer.button == 1, let targetFile {
@@ -262,7 +301,9 @@ final class PropertyActions {
                         ui.choose(
                             "Nothing was changed.",
                             detail: "Do you want to give the permissions \(shown) to everything inside as well?",
-                            buttons: ["Apply \(shown)", "Back"], style: .warning) == 0
+                            buttons: ["Apply \(shown)", "Back"],
+                            style: .warning
+                        ) == 0
                     if applies { draft.confirmPermissions() }
                     continue
                 }
@@ -283,18 +324,25 @@ final class PropertyActions {
             work: { monitor -> (AttributeJob.Outcome, [URL]) in
                 let meter = ProgressMeter(monitor, title: title, total: change.recurse ? 0 : items.count)
                 let outcome = AttributeJob(
-                    change: change, fileSystems: fileSystems, cancellation: monitor.cancellation, meter: meter
-                ).run(items)
+                    change: change,
+                    fileSystems: fileSystems,
+                    cancellation: monitor.cancellation,
+                    meter: meter
+                )
+                .run(items)
                 return (outcome, Self.folders(of: items, and: directory))
             },
             completion: { [self] outcome, folders in
                 if outcome.failed > 0 {
                     ui.inform(
                         "\(outcome.failed) item(s) could not be changed!",
-                        detail: Self.summary(of: outcome.failures, total: outcome.failed), style: .warning)
+                        detail: Self.summary(of: outcome.failures, total: outcome.failed),
+                        style: .warning
+                    )
                 }
                 kernel.panels.refresh(folders)
-            })
+            }
+        )
     }
 
     // MARK: Properties
@@ -313,16 +361,22 @@ final class PropertyActions {
             title: title,
             work: { monitor -> (name: String, rows: [PropertyRow], urls: [URL]) in
                 let sheet = PropertySheet(
-                    fileSystems: fileSystems, comments: comments, cancellation: monitor.cancellation,
-                    meter: ProgressMeter(monitor, title: title))
+                    fileSystems: fileSystems,
+                    comments: comments,
+                    cancellation: monitor.cancellation,
+                    meter: ProgressMeter(monitor, title: title)
+                )
                 let selected = operands.markedCount > 1 ? operands.markedItems() : []
                 if !selected.isEmpty {
                     return ("\(selected.count) items", sheet.rows(forSeveral: selected), selected.map(\.url))
                 }
                 guard
                     let item = cursorItem
-                        ?? (try? fileSystems.provider(for: directory))?.item(
-                            at: directory, cancellation: monitor.cancellation)
+                        ?? (try? fileSystems.provider(for: directory))?
+                        .item(
+                            at: directory,
+                            cancellation: monitor.cancellation
+                        )
                 else {
                     return (directory.lastPathComponent, [], [])
                 }
@@ -334,16 +388,21 @@ final class PropertyActions {
             completion: { [self] report in
                 guard !report.rows.isEmpty else {
                     return ui.inform(
-                        "The properties of \(PropertyText.shown(report.name)) cannot be read!", detail: "",
-                        style: .warning)
+                        "The properties of \(PropertyText.shown(report.name)) cannot be read!",
+                        detail: "",
+                        style: .warning
+                    )
                 }
                 let canShowFinderInfo = report.urls.allSatisfy(\.isFileURL)
                 let answer = ui.form(
-                    "Properties: \(report.name)", detail: "",
+                    "Properties: \(report.name)",
+                    detail: "",
                     fields: report.rows.map { .note("\($0.label): \($0.value)") },
-                    buttons: ["OK"] + (canShowFinderInfo ? ["Finder Info"] : []))
+                    buttons: ["OK"] + (canShowFinderInfo ? ["Finder Info"] : [])
+                )
                 if answer?.button == 1 { showFinderInfo(report.urls) }
-            })
+            }
+        )
     }
 
     // MARK: Occupied space
@@ -375,8 +434,11 @@ final class PropertyActions {
                 let items = operands.items()
                 result.targetCluster = LocalInfo.clusterSize(at: targetDirectory)
                 let calculator = SpaceCalculator(
-                    fileSystems: fileSystems, cancellation: monitor.cancellation, targetCluster: result.targetCluster,
-                    meter: ProgressMeter(monitor, title: title))
+                    fileSystems: fileSystems,
+                    cancellation: monitor.cancellation,
+                    targetCluster: result.targetCluster,
+                    meter: ProgressMeter(monitor, title: title)
+                )
                 let perItem = calculator.measure(items)
                 result.totals = perItem.reduce(SpaceTotals(), +)
                 for (item, measured) in zip(items, perItem) where item.isFolder && item.isRealDirectory {
@@ -386,8 +448,11 @@ final class PropertyActions {
                 if !monitor.cancellation.isCancelled, !result.sizes.isEmpty {
                     result.prepared = PanelModel.prepare(basis, computedSizes: result.sizes)
                 }
-                result.volume = (try? fileSystems.provider(for: directory))?.volume(
-                    of: directory, cancellation: monitor.cancellation)
+                result.volume = (try? fileSystems.provider(for: directory))?
+                    .volume(
+                        of: directory,
+                        cancellation: monitor.cancellation
+                    )
                 result.cancelled = monitor.cancellation.isCancelled
                 return result
             },
@@ -402,10 +467,16 @@ final class PropertyActions {
                 ui.inform(
                     "Total space occupied:",
                     detail: SpaceReport.text(
-                        result.totals, sourceIsLocal: result.isLocal,
-                        targetCluster: result.targetCluster, volume: result.volume,
-                        cancelled: result.cancelled), style: .information)
-            })
+                        result.totals,
+                        sourceIsLocal: result.isLocal,
+                        targetCluster: result.targetCluster,
+                        volume: result.volume,
+                        cancelled: result.cancelled
+                    ),
+                    style: .information
+                )
+            }
+        )
     }
 
     /// The size of every folder of the source panel, shown in the Size column
@@ -422,17 +493,20 @@ final class PropertyActions {
             work: { monitor -> (sizes: [(name: String, size: Int64)], prepared: PanelModel.Prepared?) in
                 let folders = shown.filter { $0.isFolder && $0.isRealDirectory }
                 let measured = SpaceCalculator(
-                    fileSystems: fileSystems, cancellation: monitor.cancellation,
+                    fileSystems: fileSystems,
+                    cancellation: monitor.cancellation,
                     meter: ProgressMeter(monitor, title: title),
                     measuresAllocated: false
-                ).measure(folders)
+                )
+                .measure(folders)
                 let sizes = zip(folders, measured).map { (name: $0.0.name, size: $0.1.bytes) }
                 return (sizes, sizes.isEmpty ? nil : PanelModel.prepare(basis, computedSizes: sizes))
             },
             completion: { result in
                 guard model.directory.isSameLocation(as: directory) else { return }
                 Self.show(result.sizes, prepared: result.prepared, in: model)
-            })
+            }
+        )
     }
 
     /// Shows calculated folder sizes in a panel. They were written into a copy of the list on
@@ -476,9 +550,11 @@ final class PropertyActions {
                 while true {
                     guard
                         let answer = ui.form(
-                            "File comment", detail: "Edit comment for:\n\(PropertyText.shown(name))",
+                            "File comment",
+                            detail: "Edit comment for:\n\(PropertyText.shown(name))",
                             fields: [.lines("comment", "", text)],
-                            buttons: ["OK"])
+                            buttons: ["OK"]
+                        )
                     else { return }
                     text = DescriptIon.normalized(answer.text("comment"))
                     // A line break counts two characters, as it does in the file.
@@ -487,11 +563,13 @@ final class PropertyActions {
                     ui.inform(
                         "The comment is too long!",
                         detail: "It has \(length) characters; \(DescriptIon.commentLimit) can be stored.",
-                        style: .warning)
+                        style: .warning
+                    )
                 }
                 guard text != existing else { return }
                 save(text, for: name, in: folder)
-            })
+            }
+        )
     }
 
     private func save(_ comment: String, for name: String, in folder: URL) {
@@ -502,7 +580,12 @@ final class PropertyActions {
             work: { monitor -> any Error? in
                 do {
                     try comments.setComment(
-                        comment, for: name, in: folder, hidden: hidden, cancellation: monitor.cancellation)
+                        comment,
+                        for: name,
+                        in: folder,
+                        hidden: hidden,
+                        cancellation: monitor.cancellation
+                    )
                     return nil
                 } catch {
                     return error
@@ -512,13 +595,16 @@ final class PropertyActions {
                 // Stopped by the user: the old comments are as they were, and there is nothing to tell.
                 if (error as? CocoaError)?.code == .userCancelled { return }
                 if let error {
-                    return kernel.ui.report(
-                        error, title: "The comment of \(PropertyText.shown(name)) cannot be saved!")
+                    return kernel.interaction.report(
+                        error,
+                        title: "The comment of \(PropertyText.shown(name)) cannot be saved!"
+                    )
                 }
                 // Saving a comment re-reads both panels.
                 kernel.panels.contentsChanged(in: [folder])
                 kernel.panels.all.forEach { $0.reload() }
-            })
+            }
+        )
     }
 
     // MARK: Links
@@ -540,16 +626,24 @@ final class PropertyActions {
         let kinds = LinkKind.allCases
         guard
             let answer = ui.form(
-                "Create link", detail: detail,
+                "Create link",
+                detail: detail,
                 fields: [
                     .text("target", "", proposal),
                     .choice(
-                        "kind", "Type:", kinds.map(\.title),
-                        selected: settings.index(FilePropertiesPlugin.Settings.linkKind, default: 0)),
+                        "kind",
+                        "Type:",
+                        kinds.map(\.title),
+                        selected: settings.index(FilePropertiesPlugin.Settings.linkKind, default: 0)
+                    ),
                     .checkbox(
-                        "relative", "Symbolic link with a relative path",
-                        settings.flag(FilePropertiesPlugin.Settings.relativeLinks, default: false))
-                ], buttons: ["OK"])
+                        "relative",
+                        "Symbolic link with a relative path",
+                        settings.flag(FilePropertiesPlugin.Settings.relativeLinks, default: false)
+                    )
+                ],
+                buttons: ["OK"]
+            )
         else { return }
         let text = answer.text("target").trimmingCharacters(in: .whitespaces)
         let kind = kinds.indices.contains(answer.index("kind")) ? kinds[answer.index("kind")] : .symbolic
@@ -565,8 +659,12 @@ final class PropertyActions {
                 // folder the links go into under the names of their originals.
                 let isFolder =
                     text.hasSuffix("/") || items.count > 1
-                    || (try? fileSystems.provider(for: location))?.item(
-                        at: location, cancellation: monitor.cancellation)?.isDirectory == true
+                    || (try? fileSystems.provider(for: location))?
+                        .item(
+                            at: location,
+                            cancellation: monitor.cancellation
+                        )?
+                        .isDirectory == true
                 // What the completion shows is put together here: the first failures only, and
                 // each folder that got a link once.
                 var (created, failed, failures): (URL?, Int, [String]) = (nil, 0, [])
@@ -590,12 +688,15 @@ final class PropertyActions {
             },
             completion: { [kernel] result in
                 if result.failed > 0 {
-                    kernel.ui.inform(
+                    kernel.interaction.inform(
                         "\(result.failed) link(s) could not be created!",
-                        detail: Self.summary(of: result.failures, total: result.failed), style: .warning)
+                        detail: Self.summary(of: result.failures, total: result.failed),
+                        style: .warning
+                    )
                 }
                 kernel.panels.refresh(result.changed, focus: result.created)
-            })
+            }
+        )
     }
 
     /// Goes to the item the link under the cursor leads to, with the cursor on it.
@@ -604,16 +705,21 @@ final class PropertyActions {
         let panel = source
         let directory = panel.model.directory
         kernel.jobs.run(
-            title: "Reading link:", work: { _ in LocalInfo.resolvedLinkTarget(item.url) },
+            title: "Reading link:",
+            work: { _ in LocalInfo.resolvedLinkTarget(item.url) },
             completion: { [ui] target in
                 // The answer belongs to the folder it was asked in; elsewhere it would take the panel away.
                 guard panel.model.directory.isSameLocation(as: directory) else { return }
                 guard let target else {
                     return ui.inform(
-                        "\(PropertyText.shown(item.name)) is not a link.", detail: "", style: .information)
+                        "\(PropertyText.shown(item.name)) is not a link.",
+                        detail: "",
+                        style: .information
+                    )
                 }
                 panel.show(target)
-            })
+            }
+        )
     }
 }
 
@@ -704,7 +810,8 @@ struct AttributeDraft {
             .note(
                 "Octal (755), letters (rwxr-xr-x) or changes (u+x,go-w). Empty leaves them unchanged. "
                     + "Octal sets the mode as chmod does: 755 also clears set-user-ID, set-group-ID and sticky; 4755 sets them. "
-                    + "Letters and changes keep those three.")
+                    + "Letters and changes keep those three."
+            )
         ]
         if isLocal {
             fields += [

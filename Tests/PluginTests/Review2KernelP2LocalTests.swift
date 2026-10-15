@@ -121,15 +121,18 @@ private final class DeadVolume: @unchecked Sendable {
         try FileManager.default.createSymbolicLink(atPath: box.url("to-folder").path, withDestinationPath: "folder")
         try FileManager.default.createSymbolicLink(atPath: box.url("to-nothing").path, withDestinationPath: "missing")
         let listed = Dictionary(
-            uniqueKeysWithValues: try local.list(box.root, showHidden: true).map { ($0.name, $0) })
+            uniqueKeysWithValues: try local.list(box.root, showHidden: true).map { ($0.name, $0) }
+        )
         // The link itself has no size (the entry is what `lstat` sees); the file's is said besides.
         #expect(
             listed["to-file"]?.size == 0 && listed["to-file"]?.linkTargetSize == 5
-                && listed["to-file"]?.isSymlink == true)
+                && listed["to-file"]?.isSymlink == true
+        )
         #expect(listed["to-folder"]?.linkTargetSize == nil && listed["to-folder"]?.isDirectory == true)
         #expect(
             listed["to-nothing"]?.linkTargetSize == nil && listed["big.bin"]?.linkTargetSize == nil
-                && listed["big.bin"]?.size == 5)
+                && listed["big.bin"]?.size == 5
+        )
         // Asked one by one, the same.
         for name in ["to-file", "to-folder", "to-nothing", "big.bin", "folder"] {
             #expect(local.item(at: box.root.appending(name: name)) == listed[name], "\(name)")
@@ -137,51 +140,6 @@ private final class DeadVolume: @unchecked Sendable {
         // The figure is the target's as it was when the entry was read: read again, it follows.
         try "1234567890".write(to: box.url("big.bin"), atomically: false, encoding: .utf8)
         #expect(local.item(at: box.url("to-file"))?.linkTargetSize == 10)
-    }
-
-    @Test func everyEntrySaysWhichVolumeItIsOn() throws {
-        let box = try Sandbox()
-        for index in 0..<700 { try box.file("f\(index).txt") }
-        try box.folder("folder")
-        var st = stat()
-        #expect(lstat(box.root.path, &st) == 0)
-        let device = Int64(st.st_dev)
-        // A long folder, whose entries are made on several threads, and each of them asked alone.
-        let listed = try local.list(box.root, showHidden: true)
-        #expect(listed.count == 701 && listed.allSatisfy { $0.device == device })
-        #expect(local.item(at: box.url("folder"))?.device == device && local.item(at: box.root)?.device == device)
-        #expect(local.item(at: box.url("missing")) == nil)
-        // The same folder reached through a link (`/tmp` is one): still the folder's volume.
-        let linked = box.url("way-in")
-        try FileManager.default.createSymbolicLink(at: linked, withDestinationURL: box.url("folder"))
-        try box.file("folder/inside.txt")
-        #expect(try local.list(linked, showHidden: true).map(\.device) == [device])
-    }
-
-    @Test func aFolderAnotherVolumeIsMountedOnHasThatVolumesNumber() {
-        // Every Mac has volumes mounted below `/`: the device files at `/dev`, and more.
-        // What the listing of the folder above says must be what the folder says for itself.
-        var checked = 0
-        for parent in ["/", "/System/Volumes", "/Volumes"] {
-            let folder = URL(fileURLWithPath: parent, isDirectory: true)
-            guard let own = local.item(at: folder)?.device, let listed = try? local.list(folder, showHidden: true)
-            else { continue }
-            for item in listed where item.isDirectory && !item.isSymlink {
-                // Only disks of this Mac are asked one by one here: a share may not answer.
-                guard MountTable.shared.isLocal(item.url.path) == true || item.url.path == "/dev" else { continue }
-                var st = stat()
-                guard lstat(item.url.path, &st) == 0 else { continue }
-                #expect(item.device == Int64(st.st_dev), "\(item.url.path)")
-                if Int64(st.st_dev) != own {
-                    // A mount point: told from its neighbours by the number alone.
-                    #expect(
-                        item.device != own && local.isMountPoint(item.url)
-                            && local.deviceID(of: item.url) == item.device)
-                    checked += 1
-                }
-            }
-        }
-        #expect(checked > 0, "no mount point was found below / to check")
     }
 
     @Test func theTopOfEveryLocalLocationIsKnownWithoutGoingUp() {
@@ -213,7 +171,9 @@ private final class DeadVolume: @unchecked Sendable {
         #expect(throws: FileSystemError.self) { try local.createDirectory(at: box.url("a/link"), exclusive: true) }
         // A dangling link has the name too, and nothing is made where it points.
         try FileManager.default.createSymbolicLink(
-            atPath: box.url("a/dangling").path, withDestinationPath: box.url("elsewhere").path)
+            atPath: box.url("a/dangling").path,
+            withDestinationPath: box.url("elsewhere").path
+        )
         #expect(throws: FileSystemError.self) { try local.createDirectory(at: box.url("a/dangling"), exclusive: true) }
         let inside = try FileManager.default.contentsOfDirectory(atPath: outside.path)
         #expect(!box.exists("elsewhere") && inside.isEmpty)
@@ -264,7 +224,8 @@ private final class DeadVolume: @unchecked Sendable {
         #expect(
             try FileManager.default.contentsOfDirectory(atPath: box.url("shared/a/b/c").path).sorted() == [
                 "leaf0", "leaf1", "leaf2", "leaf3"
-            ])
+            ]
+        )
         // Of many that want the same new folder, one gets it.
         let made = Locked(0)
         DispatchQueue.concurrentPerform(iterations: 32) { _ in
@@ -349,7 +310,10 @@ private final class DeadVolume: @unchecked Sendable {
         #expect(box.read("made/c.txt") == "abc")
         let date = Date(timeIntervalSince1970: 1_500_000_000)
         try local.setAttributes(
-            FileAttributes(modified: date, permissions: 0o640), of: box.url("made/c.txt"), cancellation: flag)
+            FileAttributes(modified: date, permissions: 0o640),
+            of: box.url("made/c.txt"),
+            cancellation: flag
+        )
         let item = try #require(local.item(at: box.url("made/c.txt")))
         #expect(item.modified == date && item.permissions == 0o640)
         let mark = Data("0081;65f0a1b2;Safari;".utf8)
@@ -360,7 +324,8 @@ private final class DeadVolume: @unchecked Sendable {
         #expect(
             tag.withUnsafeBytes {
                 setxattr(box.url("made/c.txt").path, "afm.test.tag", $0.baseAddress, $0.count, 0, 0)
-            } == 0)
+            } == 0
+        )
         try local.copyMetadata(from: box.url("made/c.txt"), to: box.url("made/d.txt"), cancellation: flag)
         var carried = [UInt8](repeating: 0, count: 16)
         let length = getxattr(box.url("made/d.txt").path, "afm.test.tag", &carried, carried.count, 0, 0)
@@ -400,12 +365,17 @@ private final class DeadVolume: @unchecked Sendable {
         #expect(stopped { try local.createDirectory(at: box.url("new"), exclusive: true, cancellation: flag) })
         #expect(stopped { try local.remove(box.url("a.txt"), cancellation: flag) })
         #expect(
-            stopped { try local.move(box.url("a.txt"), to: box.url("b.txt"), replacing: true, cancellation: flag) })
+            stopped { try local.move(box.url("a.txt"), to: box.url("b.txt"), replacing: true, cancellation: flag) }
+        )
         #expect(
             stopped {
                 try local.setAttributes(
-                    FileAttributes(modified: Date(), permissions: 0o600), of: box.url("a.txt"), cancellation: flag)
-            })
+                    FileAttributes(modified: Date(), permissions: 0o600),
+                    of: box.url("a.txt"),
+                    cancellation: flag
+                )
+            }
+        )
         #expect(stopped { try local.setQuarantine(Data("0081;0;x;".utf8), of: box.url("a.txt"), cancellation: flag) })
         #expect(stopped { try local.copyMetadata(from: box.url("a.txt"), to: box.url("a.txt"), cancellation: flag) })
         var asked = 0
@@ -415,7 +385,8 @@ private final class DeadVolume: @unchecked Sendable {
                     asked += 1
                     return true
                 }
-            })
+            }
+        )
         #expect(asked == 0 && local.volume(of: box.root, cancellation: flag) == nil)
         // Nothing was touched.
         #expect(try FileManager.default.contentsOfDirectory(atPath: box.root.path) == ["a.txt"])
@@ -443,14 +414,17 @@ private final class DeadVolume: @unchecked Sendable {
         var failure: (any Error)?
         do {
             try stopping.setAttributes(
-                FileAttributes(modified: Date(timeIntervalSince1970: 1_000_000), permissions: 0o644), of: file,
-                cancellation: flag)
+                FileAttributes(modified: Date(timeIntervalSince1970: 1_000_000), permissions: 0o644),
+                of: file,
+                cancellation: flag
+            )
         } catch { failure = error }
         #expect((failure as? CocoaError)?.code == .userCancelled && steps == 3)
         var st = stat()
         #expect(lstat(file.path, &st) == 0 && st.st_flags & UInt32(UF_IMMUTABLE) != 0)
         #expect(
-            Date(timeIntervalSince1970: TimeInterval(st.st_mtimespec.tv_sec)) != Date(timeIntervalSince1970: 1_000_000))
+            Date(timeIntervalSince1970: TimeInterval(st.st_mtimespec.tv_sec)) != Date(timeIntervalSince1970: 1_000_000)
+        )
     }
 
     @Test func aCopyIsStoppedBetweenTheStepsTheSystemReports() throws {
@@ -500,7 +474,8 @@ private final class DeadVolume: @unchecked Sendable {
         flag.cancel()
         #expect(wasCancelled(removal.wait()))
         #expect(
-            RemoteChanges.shared.strandedCalls(on: dead.root) == 1 && dead.waiting == 1 && box.exists("share/a.txt"))
+            RemoteChanges.shared.strandedCalls(on: dead.root) == 1 && dead.waiting == 1 && box.exists("share/a.txt")
+        )
         // The server answers again: the call that was left behind makes no further step.
         dead.answer()
         #expect(waitUntil { RemoteChanges.shared.strandedCalls(on: dead.root) == 0 })
@@ -533,7 +508,8 @@ private final class DeadVolume: @unchecked Sendable {
         }
         #expect(
             (error as NSError).domain == NSPOSIXErrorDomain && (error as NSError).code == Int(ETIMEDOUT)
-                && dead.asked == asked)
+                && dead.asked == asked
+        )
         // Another volume is none of its business.
         try local.createDirectory(at: box.url("here/new"), cancellation: CancellationFlag())
         #expect(box.exists("here/new"))
@@ -562,7 +538,8 @@ private final class DeadVolume: @unchecked Sendable {
         #expect(wasCancelled(moving.wait()))
         #expect(
             RemoteChanges.shared.strandedCalls(on: dead.root) == 0 && box.exists("share/a.txt")
-                && !box.exists("share/b.txt"))
+                && !box.exists("share/b.txt")
+        )
     }
 
     @Test func aCopyOntoAVolumeThatDoesNotAnswerLeavesNothingAndReportsToNobodyAfterItWasLeft() throws {
@@ -604,13 +581,14 @@ private final class DeadVolume: @unchecked Sendable {
         // However many ask now, with flags or without: the one question that is under way
         // is the only one, and after the moment a volume is given everybody is answered
         // from what is known (here: only the name of its folder).
-        let askers = (0..<20).map { index in
-            Running {
-                index % 2 == 0
-                    ? local.volume(of: box.url("share"))
-                    : local.volume(of: box.url("share/x/y"), cancellation: CancellationFlag())
+        let askers = (0..<20)
+            .map { index in
+                Running {
+                    index % 2 == 0
+                        ? local.volume(of: box.url("share"))
+                        : local.volume(of: box.url("share/x/y"), cancellation: CancellationFlag())
+                }
             }
-        }
         for asker in askers {
             guard case .success(let info)? = asker.wait() else {
                 Issue.record("a question about a silent volume did not come back")
@@ -631,7 +609,9 @@ private final class DeadVolume: @unchecked Sendable {
         }
         let heard = Heard()
         let observer = NotificationCenter.default.addObserver(
-            forName: FileSystemRegistry.volumeInfoDidChange, object: local, queue: nil
+            forName: FileSystemRegistry.volumeInfoDidChange,
+            object: local,
+            queue: nil
         ) { note in
             guard let root = note.userInfo?[FileSystemRegistry.volumeRootKey] as? URL else { return }
             heard.lock.lock()
@@ -655,7 +635,8 @@ private final class DeadVolume: @unchecked Sendable {
             waitUntil {
                 let fresh = local.volume(of: box.url("share/a.txt"), cancellation: CancellationFlag())
                 return fresh?.totalBytes != nil && fresh?.freeBytes != nil
-            })
+            }
+        )
     }
 
     /// K004 / K007 / K040 end to end, as far as a stand-in can show it: a panel that is
@@ -698,76 +679,25 @@ private final class DeadVolume: @unchecked Sendable {
         }
         // Forty tries, and what is stuck is what the first one left: the question about the
         // volume and one listing. Nothing was begun behind the listing that was given up.
-        #expect(dead.waiting == 2 && dead.asked == 2 && BlockingCalls.unanswered(for: local) == 1)
+        #expect(dead.waiting == 2 && dead.asked == 2)
         // A folder on a disk that answers is read meanwhile, by the same file system.
         let healthy = try PanelLoader.load(
-            box.url("here"), showHidden: true, fileSystems: fileSystems, cancellation: CancellationFlag())
+            box.url("here"),
+            showHidden: true,
+            fileSystems: fileSystems,
+            cancellation: CancellationFlag()
+        )
         #expect(healthy.listing.items.map(\.name) == ["b.txt"] && healthy.listing.volume != nil)
         #expect(waitUntil { local.volume(of: box.url("here"), cancellation: CancellationFlag())?.totalBytes != nil })
         // The server is back: the stuck questions return, and the folder loads.
         dead.answer()
-        #expect(waitUntil { BlockingCalls.unanswered(for: local) == 0 })
+        #expect(waitUntil { dead.waiting == 0 })
         let back = try PanelLoader.load(
-            location, showHidden: true, fileSystems: fileSystems, cancellation: CancellationFlag())
+            location,
+            showHidden: true,
+            fileSystems: fileSystems,
+            cancellation: CancellationFlag()
+        )
         #expect(back.listing.items.map(\.name) == ["a.txt"])
-    }
-}
-
-/// A whole tree watched at the cost of one folder.
-@Suite struct Review2KernelP2Watching {
-    @Test func aTreeIsWatchedAsOneAndAFolderOnlyForItself() async throws {
-        let box = try Sandbox()
-        try box.file("tree/a/b/c/deep.txt")
-        try box.file("single/sub/deep.txt")
-        let local = LocalFileSystem()
-        final class Seen: @unchecked Sendable {
-            let lock = NSLock()
-            var paths: Set<String> = []
-            func note(_ urls: [URL]) {
-                lock.lock()
-                urls.forEach { paths.insert($0.lastPathComponent) }
-                lock.unlock()
-            }
-            func has(_ name: String) -> Bool {
-                lock.lock()
-                defer { lock.unlock() }
-                return paths.contains(name)
-            }
-        }
-        let (tree, single) = (Seen(), Seen())
-        // The folders were made a moment ago, and what changed up to a few milliseconds
-        // before a stream starts is still reported to it (measured: 18 of 20 times at 2 ms,
-        // never at 50 ms): the making of `single/sub` would then count as a change of
-        // `single`, which the test says below was not reported. So the watching starts
-        // when the making is well past.
-        try await Task.sleep(nanoseconds: 1_500_000_000)
-        let whole = try #require(local.watch([box.url("tree")], recursively: true) { tree.note($0) })
-        let plain = try #require(local.watch([box.url("single")], recursively: false) { single.note($0) })
-        defer { withExtendedLifetime((whole, plain)) {} }
-        // The stream is made in the background, so the change is made again and again until
-        // the first report: a condition, not a length of time.
-        // (Counted and timed: the reports come over the main queue, which the tests of the
-        // process share; under the thread sanitizer other tests held it for over a minute.)
-        var round = 0
-        let started = Date()
-        func mayGoOn() -> Bool { round < 600 || Date().timeIntervalSince(started) < 600 }
-        while !tree.has("tree"), mayGoOn() {
-            try "x\(round)".write(to: box.url("tree/a/b/c/deep.txt"), atomically: false, encoding: .utf8)
-            try "x\(round)".write(to: box.url("single/sub/deep.txt"), atomically: false, encoding: .utf8)
-            try await Task.sleep(nanoseconds: 100_000_000)
-            round += 1
-        }
-        // Three levels down, and the tree's watcher names the tree.
-        #expect(tree.has("tree"))
-        // The folder watched for itself heard nothing of what happened below it…
-        #expect(!single.has("single"))
-        // …and hears what happens in it.
-        round = 0
-        while !single.has("single"), round < 600 || Date().timeIntervalSince(started) < 1_200 {
-            try "y\(round)".write(to: box.url("single/new\(round).txt"), atomically: false, encoding: .utf8)
-            try await Task.sleep(nanoseconds: 100_000_000)
-            round += 1
-        }
-        #expect(single.has("single"))
     }
 }

@@ -15,7 +15,7 @@ internal struct MainThreadQuestionTests {
     internal func aQuestionFromAnotherThreadIsAskedOnTheMainThread() async {
         let interaction = ScriptedInteraction()
         interaction.choiceAnswers = [1]
-        let kernel = Kernel(productName: "Test", settings: MemorySettings(), ui: interaction)
+        let kernel = Kernel(productName: "Test", settings: MemorySettings(), interaction: interaction)
         let answer: (Int, Bool) = await withCheckedContinuation { continuation in
             OtherThread.start {
                 // Written on the main thread while this thread waits for the answer.

@@ -151,7 +151,8 @@ final class KeyboardPage: NSObject, OptionsPage, NSSearchFieldDelegate {
                     "A key belongs to one command. Menus show the new keys at once; the function-key bar after a restart."
                 )
             ],
-            vertical: true)
+            vertical: true
+        )
     }()
     var onEdit: () -> Void = {}
 
@@ -167,7 +168,10 @@ final class KeyboardPage: NSObject, OptionsPage, NSSearchFieldDelegate {
     private func reload() {
         let kernel = center.kernel
         let all = CommandCatalog.rows(
-            commands: kernel.commands.all, menus: kernel.menus.menus, shortcuts: editor.shortcuts(for:))
+            commands: kernel.commands.all,
+            menus: kernel.menus.menus,
+            shortcuts: editor.shortcuts(for:)
+        )
         rows = CommandCatalog.filter(all, text: filter.stringValue)
         table.show(rows.map { [$0.title, $0.id.rawValue, $0.keys + (editor.isCustomized($0.id) ? "  •" : "")] })
     }
@@ -217,12 +221,14 @@ final class KeyboardPage: NSObject, OptionsPage, NSSearchFieldDelegate {
             let isEscape = event.keyCode == 53 && modifiers.isEmpty
             guard !isEscape,
                 let shortcut = ShortcutText.shortcut(
-                    keyCode: event.keyCode, characters: event.charactersIgnoringModifiers,
-                    modifiers: modifiers)
+                    keyCode: event.keyCode,
+                    characters: event.charactersIgnoringModifiers,
+                    modifiers: modifiers
+                )
             else { return nil }
             // The question about a key that is in use is asked after the key press is dealt with.
             MainLoop.perform {
-                if self.editor.assign(shortcut, to: row.id, adding: adding, asking: self.center.kernel.ui) {
+                if self.editor.assign(shortcut, to: row.id, adding: adding, asking: self.center.kernel.interaction) {
                     self.edited()
                 }
             }
@@ -288,8 +294,10 @@ final class ButtonBarPage: NSObject, OptionsPage {
         below: [
             note(
                 "A new button goes directly after the selected one. A program with parameters goes on the bar as a user command "
-                    + "(Configuration › User Commands).")
-        ])
+                    + "(Configuration › User Commands)."
+            )
+        ]
+    )
     var onEdit: () -> Void = {}
 
     init(center: ConfigurationCenter) {
@@ -310,7 +318,9 @@ final class ButtonBarPage: NSObject, OptionsPage {
             },
             symbols: editor.items.map { id in
                 id.flatMap { $0 == ToolbarRegistry.lineBreak ? nil : editor.symbol(for: $0) }
-            }, selecting: row)
+            },
+            selecting: row
+        )
     }
 
     private func edited(selecting row: Int?) {
@@ -334,17 +344,22 @@ final class ButtonBarPage: NSObject, OptionsPage {
             NSSound.beep()
             return
         }
-        let ui = center.kernel.ui
+        let ui = center.kernel.interaction
         guard
             let name = ui.prompt(
-                "Symbol for “\(center.kernel.commands[id]?.title ?? id.rawValue)”:", value: editor.symbol(for: id),
+                "Symbol for “\(center.kernel.commands[id]?.title ?? id.rawValue)”:",
+                value: editor.symbol(for: id),
                 detail:
-                    "The name of a system symbol (SF Symbols), such as folder.badge.plus. Empty: the command's own.")?
-                .trimmingCharacters(in: .whitespaces)
+                    "The name of a system symbol (SF Symbols), such as folder.badge.plus. Empty: the command's own."
+            )?
+            .trimmingCharacters(in: .whitespaces)
         else { return }
         guard name.isEmpty || NSImage(systemSymbolName: name, accessibilityDescription: nil) != nil else {
             ui.inform(
-                "No symbol is called “\(name)”", detail: "The SF Symbols app lists the names.", style: .warning)
+                "No symbol is called “\(name)”",
+                detail: "The SF Symbols app lists the names.",
+                style: .warning
+            )
             return
         }
         editor.setSymbol(name, for: id)
@@ -374,8 +389,11 @@ final class StartMenuPage: NSObject, OptionsPage {
                 guard let id = center.pickCommand() else { return }
                 add(
                     center.editStartMenuRow(
-                        nil, proposing: CommandAction(command: id.rawValue),
-                        title: center.kernel.commands[id]?.title ?? ""))
+                        nil,
+                        proposing: CommandAction(command: id.rawValue),
+                        title: center.kernel.commands[id]?.title ?? ""
+                    )
+                )
             },
             ActionButton("Add Separator") { [unowned self] in add(StartMenuDraft.Row(entry: .separator)) },
             ActionButton("Change…") { [unowned self] in change() },
@@ -390,8 +408,10 @@ final class StartMenuPage: NSObject, OptionsPage {
         below: [
             note(
                 ConfigurationCenter.startMenuHint
-                    + "\nThe n-th entry also runs as the command cm_UserMenu<n>. Submenus are not available.")
-        ])
+                    + "\nThe n-th entry also runs as the command cm_UserMenu<n>. Submenus are not available."
+            )
+        ]
+    )
     var onEdit: () -> Void = {}
 
     init(center: ConfigurationCenter) {
@@ -404,14 +424,17 @@ final class StartMenuPage: NSObject, OptionsPage {
 
     private func reload(selecting row: Int? = nil) {
         table.show(
-            draft.rows.enumerated().map { index, row in
-                row.entry.isSeparator
-                    ? ["\(index + 1)", "———", "", ""]
-                    : [
-                        "\(index + 1)", row.entry.title, row.entry.action.command,
-                        ShortcutText.parse(row.shortcut).map(ShortcutText.display) ?? ""
-                    ]
-            }, selecting: row)
+            draft.rows.enumerated()
+                .map { index, row in
+                    row.entry.isSeparator
+                        ? ["\(index + 1)", "———", "", ""]
+                        : [
+                            "\(index + 1)", row.entry.title, row.entry.action.command,
+                            ShortcutText.parse(row.shortcut).map(ShortcutText.display) ?? ""
+                        ]
+                },
+            selecting: row
+        )
     }
 
     private func edited(selecting row: Int?) {
@@ -472,22 +495,29 @@ final class SettingsFilePage: NSObject, OptionsPage {
                 ActionButton("Import Settings…") { commands.perform(ConfigurationPlugin.importSettings) },
                 ActionButton("Reset All Settings…") { commands.perform(ConfigurationPlugin.resetSettings) },
                 spacer()
-            ], vertical: false)
+            ],
+            vertical: false
+        )
         view = filledStack(
             [
                 NSTextField(
                     wrappingLabelWithString:
                         "Settings are stored the moment they change; there is nothing to save by hand. "
-                        + "To keep a copy or to take the settings to another Mac, export them to a file."),
+                        + "To keep a copy or to take the settings to another Mac, export them to a file."
+                ),
                 buttons,
                 note(
                     "The file holds the options of all pages, the key bindings, the button bar, the user commands, the Start menu, the directory "
                         + "hotlist and the panels' tabs. Histories (typed command lines, visited folders) and saved connections are in it only if you "
                         + "ask for them; passwords never are. Only you can read the file. Window positions are kept by macOS and are not in it.\n"
                         + "An import shows what it would change first. User commands, key bindings, programs, connections and trusted certificates "
-                        + "from a file are taken over only when you tick them."),
+                        + "from a file are taken over only when you tick them."
+                ),
                 spacer()
-            ], vertical: true, spacing: 12)
+            ],
+            vertical: true,
+            spacing: 12
+        )
         super.init()
     }
 
@@ -513,9 +543,10 @@ final class OptionsWindowController: NSWindowController, NSWindowDelegate {
     private var applyButton = NSButton()
 
     init(center: ConfigurationCenter) {
-        let registered: [any OptionsPage] = center.kernel.preferences.pages.filter { !$0.preferences.isEmpty }.map {
-            PreferencesPage(model: PreferencePageModel(page: $0, settings: center.kernel.settings))
-        }
+        let registered: [any OptionsPage] = center.kernel.preferences.pages.filter { !$0.preferences.isEmpty }
+            .map {
+                PreferencesPage(model: PreferencePageModel(page: $0, settings: center.kernel.settings))
+            }
         firstOwnPage = registered.count
         pages =
             registered + [
@@ -524,7 +555,10 @@ final class OptionsWindowController: NSWindowController, NSWindowDelegate {
             ]
         let window = ToolWindow(
             contentRect: NSRect(x: 0, y: 0, width: 900, height: 560),
-            styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
+            styleMask: [.titled, .closable, .resizable],
+            backing: .buffered,
+            defer: false
+        )
         window.title = "Options"
         window.isReleasedWhenClosed = false
         window.minSize = NSSize(width: 760, height: 420)
@@ -543,7 +577,10 @@ final class OptionsWindowController: NSWindowController, NSWindowDelegate {
         caption.font = .boldSystemFont(ofSize: 14)
         container.translatesAutoresizingMaskIntoConstraints = false
         let top = filledStack(
-            [pageList, filledStack([caption, container], vertical: true, spacing: 10)], vertical: false, spacing: 14)
+            [pageList, filledStack([caption, container], vertical: true, spacing: 10)],
+            vertical: false,
+            spacing: 14
+        )
 
         let ok = ActionButton("OK") { [unowned self] in
             apply()
@@ -553,7 +590,8 @@ final class OptionsWindowController: NSWindowController, NSWindowDelegate {
         applyButton = ActionButton("Apply") { [unowned self] in apply() }
         let bottom = filledStack(
             [spacer(), ActionButton("Cancel") { [unowned self] in self.window?.close() }, applyButton, ok],
-            vertical: false)
+            vertical: false
+        )
         window.contentView = padded(filledStack([top, bottom], vertical: true, spacing: 12))
     }
 

@@ -39,7 +39,7 @@ NSApp.setActivationPolicy(.prohibited)
 MainWatchdog.shared.start()
 HangGuard.shared.sampleDirectory = kArguments[3]
 
-private let kKernel = Kernel(productName: "Stress", settings: MemorySettings(), ui: ScriptedInteraction())
+private let kKernel = Kernel(productName: "Stress", settings: MemorySettings(), interaction: ScriptedInteraction())
 
 kKernel.fileSystems.register(LocalFileSystem())
 

@@ -109,15 +109,10 @@ final class MountTable: @unchecked Sendable {
         /// A disk of this Mac. False for shares, and for automounted paths, which look local
         /// and fetch their contents from a server on first use.
         let isLocal: Bool
-        /// The number of the mounted volume, which is what `stat` gives as `st_dev` for
-        /// everything on it.
-        let device: Int64
     }
 
     private let lock = NSLock()
     private var mounts: [Mount] = []
-    /// Folder → the mounts that sit directly in it, by name.
-    private var below: [String: [String: Int64]] = [:]
     private var read: UInt64 = 0
     private static let lifetime: UInt64 = 2_000_000_000
 
@@ -126,12 +121,6 @@ final class MountTable: @unchecked Sendable {
         let now = DispatchTime.now().uptimeNanoseconds
         guard read == 0 || now &- read > Self.lifetime else { return }
         mounts = Self.readMounts()
-        below = [:]
-        for mount in mounts where mount.path != "/" {
-            let cut = mount.path.utf8.lastIndex(of: 0x2F) ?? mount.path.utf8.startIndex
-            let parent = cut == mount.path.utf8.startIndex ? "/" : String(mount.path[..<cut])
-            below[parent, default: [:]][String(mount.path[mount.path.index(after: cut)...])] = mount.device
-        }
         read = now
     }
 
@@ -146,15 +135,6 @@ final class MountTable: @unchecked Sendable {
         }
     }
 
-    /// The volumes mounted directly in the folder at `path` (written out in full, links
-    /// resolved, as the system writes mount points): name → device. Empty nearly everywhere.
-    func mounts(directlyIn path: String) -> [String: Int64] {
-        lock.lock()
-        defer { lock.unlock() }
-        refresh()
-        return below.isEmpty ? [:] : (below[path] ?? [:])
-    }
-
     /// Nil when the table has nothing on the path.
     func isLocal(_ path: String) -> Bool? { mount(containing: path)?.isLocal }
 
@@ -165,18 +145,20 @@ final class MountTable: @unchecked Sendable {
         let size = Int32(buffer.count * MemoryLayout<statfs>.stride)
         let filled = getfsstat(&buffer, size, MNT_NOWAIT)
         guard filled > 0 else { return [] }
-        let mounts = buffer.prefix(Int(filled)).map { info -> Mount in
-            var info = info
-            let path = withUnsafeBytes(of: &info.f_mntonname) {
-                String(cString: $0.bindMemory(to: CChar.self).baseAddress!)
+        let mounts = buffer.prefix(Int(filled))
+            .map { info -> Mount in
+                var info = info
+                let path = withUnsafeBytes(of: &info.f_mntonname) {
+                    String(cString: $0.bindMemory(to: CChar.self).baseAddress!)
+                }
+                let type = withUnsafeBytes(of: &info.f_fstypename) {
+                    String(cString: $0.bindMemory(to: CChar.self).baseAddress!)
+                }
+                let isLocal =
+                    info.f_flags & UInt32(MNT_LOCAL) != 0 && info.f_flags & UInt32(MNT_AUTOMOUNTED) == 0
+                    && type != "autofs"
+                return Mount(path: path, isLocal: isLocal)
             }
-            let type = withUnsafeBytes(of: &info.f_fstypename) {
-                String(cString: $0.bindMemory(to: CChar.self).baseAddress!)
-            }
-            let isLocal =
-                info.f_flags & UInt32(MNT_LOCAL) != 0 && info.f_flags & UInt32(MNT_AUTOMOUNTED) == 0 && type != "autofs"
-            return Mount(path: path, isLocal: isLocal, device: Int64(info.f_fsid.val.0))
-        }
         // The deepest mount first, so that the first that contains a path is the one it is on.
         return mounts.sorted { $0.path.utf8.count > $1.path.utf8.count }
     }
@@ -245,7 +227,10 @@ final class LinkResolver: @unchecked Sendable {
         guard stat(path, &st) == 0 else { return nil }
         let type = st.st_mode & S_IFMT
         return LinkTarget(
-            isDirectory: type == S_IFDIR, isRegular: type == S_IFREG, size: type == S_IFREG ? Int64(st.st_size) : 0)
+            isDirectory: type == S_IFDIR,
+            isRegular: type == S_IFREG,
+            size: type == S_IFREG ? Int64(st.st_size) : 0
+        )
     }
 
     /// Where the link says it points, as an absolute path, worked out from the text of the
@@ -407,7 +392,10 @@ final class RemoteChanges: @unchecked Sendable {
     }
 
     func run<Value: Sendable>(
-        on volume: String, patience: TimeInterval, cancellation: CancellationFlag, _ call: LocalCall,
+        on volume: String,
+        patience: TimeInterval,
+        cancellation: CancellationFlag,
+        _ call: LocalCall,
         _ body: @escaping @Sendable (LocalCall) throws -> Value
     ) throws -> Value {
         lock.lock()
@@ -415,8 +403,10 @@ final class RemoteChanges: @unchecked Sendable {
         lock.unlock()
         if isDead {
             throw NSError(
-                domain: NSPOSIXErrorDomain, code: Int(ETIMEDOUT),
-                userInfo: [NSLocalizedDescriptionKey: "The volume at \(volume) does not answer."])
+                domain: NSPOSIXErrorDomain,
+                code: Int(ETIMEDOUT),
+                userInfo: [NSLocalizedDescriptionKey: "The volume at \(volume) does not answer."]
+            )
         }
         let box = Outcome<Value>()
         let done = DispatchSemaphore(value: 0)

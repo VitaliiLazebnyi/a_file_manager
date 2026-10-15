@@ -64,9 +64,13 @@ public final class ViewerPlugin: Plugin, ViewerService {
         /// The toolbar asks `enabled` ten times a second, so it must not resolve the operands
         /// (an O(n) pass with items marked); `canView` is a cheap test, `files` runs with the command.
         func viewer(
-            _ id: CommandID, _ title: String, _ shortcuts: [Shortcut], barLabel: String? = nil,
+            _ id: CommandID,
+            _ title: String,
+            _ shortcuts: [Shortcut],
+            barLabel: String? = nil,
             internalOnly: Bool = false,
-            canView: (() -> Bool)? = nil, files: @escaping () -> [URL]
+            canView: (() -> Bool)? = nil,
+            files: @escaping () -> [URL]
         ) {
             commands.register(
                 Command(id, title, shortcuts, barLabel: barLabel, runsDuringJobs: true),
@@ -74,10 +78,13 @@ public final class ViewerPlugin: Plugin, ViewerService {
                 parameterized: { [weak self] argument in
                     let urls = argument.location.map { [$0] } ?? files()
                     guard !urls.isEmpty else { return }
-                    self?.open(
-                        urls.map { ViewerItem(source: .file($0), title: kernel.fileSystems.displayPath($0)) },
-                        internalOnly: internalOnly)
-                })
+                    self?
+                        .open(
+                            urls.map { ViewerItem(source: .file($0), title: kernel.fileSystems.displayPath($0)) },
+                            internalOnly: internalOnly
+                        )
+                }
+            )
         }
         // Something marked must be a file, or without marks the cursor must be on one (the list of files is made when the command runs).
         let canView = { model().hasOperandFile }
@@ -88,8 +95,13 @@ public final class ViewerPlugin: Plugin, ViewerService {
             cursorFile().map { [$0] } ?? []
         }
         viewer(
-            .viewInternalMarked, "View Marked Files as Text Only", [], internalOnly: true, canView: canView,
-            files: markedFiles)
+            .viewInternalMarked,
+            "View Marked Files as Text Only",
+            [],
+            internalOnly: true,
+            canView: canView,
+            files: markedFiles
+        )
 
         let isOn = { [weak self] in self?.quickView != nil }
         commands.register(
@@ -99,7 +111,8 @@ public final class ViewerPlugin: Plugin, ViewerService {
             self?.toggleQuickView(internalOnly: false)
         }
         commands.register(
-            Command(.quickViewInternalOnly, "Quick View Panel, Text Only", runsDuringJobs: true), checked: isOn
+            Command(.quickViewInternalOnly, "Quick View Panel, Text Only", runsDuringJobs: true),
+            checked: isOn
         ) { [weak self] in
             self?.toggleQuickView(internalOnly: true)
         }
@@ -117,8 +130,11 @@ public final class ViewerPlugin: Plugin, ViewerService {
         let separateIsOpen = { [weak self] in self?.windows.contains(where: \.followsCursor) == true }
         commands.register(
             Command(
-                .separateQuickView, "Separate Quick View Window", [Shortcut(.character("q"), [.control, .shift])],
-                runsDuringJobs: true),
+                .separateQuickView,
+                "Separate Quick View Window",
+                [Shortcut(.character("q"), [.control, .shift])],
+                runsDuringJobs: true
+            ),
             checked: separateIsOpen
         ) { [weak self] in self?.toggleSeparateQuickView(internalOnly: false) }
         commands.register(
@@ -134,10 +150,17 @@ public final class ViewerPlugin: Plugin, ViewerService {
         kernel.menus.addToContextMenu([.view], in: .open, onItemOnly: true)
         kernel.menus.add([.quickView, .separateQuickView], to: .showViewType)
         kernel.toolbar.add(
-            .view, symbol: "doc.text.magnifyingglass", group: 20, hint: "Open the selected file in the viewer.")
+            .view,
+            symbol: "doc.text.magnifyingglass",
+            group: 20,
+            hint: "Open the selected file in the viewer."
+        )
         kernel.toolbar.add(
-            .quickView, symbol: "sidebar.right", group: 20,
-            hint: "Show the file under the cursor in the other panel, as you move through the list.")
+            .quickView,
+            symbol: "sidebar.right",
+            group: 20,
+            hint: "Show the file under the cursor in the other panel, as you move through the list."
+        )
         kernel.toolbar.setSymbol("macwindow.on.rectangle", for: .separateQuickView)
         kernel.toolbar.setSymbol("gearshape", for: .configureLister)
         kernel.preferences.add(ListerSettings.preferencePage { [weak self] in self?.settingsChanged() })
@@ -179,8 +202,12 @@ public final class ViewerPlugin: Plugin, ViewerService {
     func open(_ items: [ViewerItem], internalOnly: Bool, followsCursor: Bool = false) -> ViewerWindowController? {
         guard let kernel = owner, let settings else { return nil }
         let controller = ViewerWindowController(
-            kernel: kernel, settings: settings, temporaryCopies: temporaryCopies, internalOnly: internalOnly,
-            followsCursor: followsCursor, followDelay: quickViewDelay
+            kernel: kernel,
+            settings: settings,
+            temporaryCopies: temporaryCopies,
+            internalOnly: internalOnly,
+            followsCursor: followsCursor,
+            followDelay: quickViewDelay
         ) { [weak self] closed in
             self?.windows.removeAll { $0 === closed }
         }
@@ -220,9 +247,14 @@ public final class ViewerPlugin: Plugin, ViewerService {
             return
         }
         quickView = QuickViewPanel(
-            kernel: kernel, settings: settings, temporaryCopies: temporaryCopies, host: host, covering: target,
+            kernel: kernel,
+            settings: settings,
+            temporaryCopies: temporaryCopies,
+            host: host,
+            covering: target,
             following: source,
-            internalOnly: internalOnly, delay: quickViewDelay
+            internalOnly: internalOnly,
+            delay: quickViewDelay
         ) { [weak self] in self?.hideQuickView() }
         quickView?.pane.onConfigure = { [weak self] in self?.configure() }
     }
@@ -268,7 +300,8 @@ public final class ViewerPlugin: Plugin, ViewerService {
             default: return .note(preference.label)
             }
         }
-        guard let answer = kernel.ui.form("Configure Lister", detail: "", fields: fields, buttons: ["OK"]) else {
+        guard let answer = kernel.interaction.form("Configure Lister", detail: "", fields: fields, buttons: ["OK"])
+        else {
             return
         }
         for preference in page.preferences {

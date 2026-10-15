@@ -38,15 +38,14 @@ final class OddFileSystem: FileSystemProvider, @unchecked Sendable {
         var items = try base.list(directory, showHidden: showHidden)
         for (index, name) in (lock.withLock { hostile[directory.path] } ?? []).enumerated() {
             items.append(
-                FileItem(
-                    url: directory.appendingPathComponent("hostile\(index)"), name: name, isDirectory: false, size: 4)
+                FileItem(url: directory.appendingPathComponent("hostile\(index)"), name: name, stat: .init(size: 4))
             )
         }
         return items
     }
     func item(at url: URL) -> FileItem? {
         if url.lastPathComponent.hasPrefix("hostile") {
-            return FileItem(url: url, name: url.lastPathComponent, isDirectory: false, size: 4)
+            return FileItem(url: url, name: url.lastPathComponent, stat: .init(size: 4))
         }
         return base.item(at: url)
     }
@@ -150,7 +149,8 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
         runJob(.copy, [source], to: TargetSpec(directory: box.url("B")), replies: again)
         #expect(
             !namesOnDisk(box.url("B")).contains { $0.hasPrefix(".afm-") }
-                && box.read("B/locked.txt") == "locked content")
+                && box.read("B/locked.txt") == "locked content"
+        )
     }
 
     // MARK: F4
@@ -161,7 +161,11 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
         try FileManager.default.createSymbolicLink(at: box.url("A/link"), withDestinationURL: box.url("A/Foo"))
         let replies = Replies()
         let result = runJob(
-            .copy, [box.url("A/Foo")], to: TargetSpec(directory: box.url("A/link/sub")), replies: replies)
+            .copy,
+            [box.url("A/Foo")],
+            to: TargetSpec(directory: box.url("A/link/sub")),
+            replies: replies
+        )
         #expect(replies.errors.count == 1 && replies.errors[0].contains("own subfolders"))
         #expect(result.completed.isEmpty && namesOnDisk(box.url("A/Foo")) == ["one.txt"])
     }
@@ -172,11 +176,17 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
         try box.file("A/Folder/in.txt", "i")
         let replies = Replies()
         let file = runJob(
-            .move, [box.url("A/readme.txt")], to: TargetSpec(directory: box.url("A"), exactName: "README.txt"),
-            replies: replies)
+            .move,
+            [box.url("A/readme.txt")],
+            to: TargetSpec(directory: box.url("A"), exactName: "README.txt"),
+            replies: replies
+        )
         let folder = runJob(
-            .move, [box.url("A/Folder")], to: TargetSpec(directory: box.url("A"), exactName: "FOLDER"),
-            replies: replies)
+            .move,
+            [box.url("A/Folder")],
+            to: TargetSpec(directory: box.url("A"), exactName: "FOLDER"),
+            replies: replies
+        )
         #expect(replies.conflicts.isEmpty && replies.merges.isEmpty && replies.errors.isEmpty)
         #expect(file.completed.count == 1 && folder.completed.count == 1)
         #expect(namesOnDisk(box.url("A")) == ["FOLDER", "README.txt"])
@@ -189,8 +199,11 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
         try box.file("A/readme.txt", "r")
         let replies = Replies()
         runJob(
-            .copy, [box.url("A/readme.txt")], to: TargetSpec(directory: box.url("A"), exactName: "README.TXT"),
-            replies: replies)
+            .copy,
+            [box.url("A/readme.txt")],
+            to: TargetSpec(directory: box.url("A"), exactName: "README.TXT"),
+            replies: replies
+        )
         #expect(replies.conflicts.isEmpty && replies.errors == ["You cannot copy a file to itself!"])
         #expect(box.read("A/readme.txt") == "r")
     }
@@ -203,7 +216,10 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
         try box.folder("C")
         let replies = Replies(.skip)
         runJob(
-            .copy, [box.url("A/x.txt"), box.url("B/X.txt")], to: TargetSpec(directory: box.url("C")), replies: replies
+            .copy,
+            [box.url("A/x.txt"), box.url("B/X.txt")],
+            to: TargetSpec(directory: box.url("C")),
+            replies: replies
         )
         #expect(replies.conflicts.count == 1 && replies.errors.isEmpty)
         #expect(namesOnDisk(box.url("C")).count == 1)
@@ -222,8 +238,12 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
         odd.addHostile(names: ["../escape.txt", "a/b.txt", "..", ".", "", "nul\0.txt"], in: "/d")
         let replies = Replies()
         let result = runJob(
-            .copy, [odd.base.url("/d")], to: TargetSpec(directory: box.url("Target")), replies: replies,
-            fileSystems: fileSystems)
+            .copy,
+            [odd.base.url("/d")],
+            to: TargetSpec(directory: box.url("Target")),
+            replies: replies,
+            fileSystems: fileSystems
+        )
         #expect(namesOnDisk(box.url("Target/d")) == ["ok.txt"])
         #expect(namesOnDisk(box.url("Target")) == ["d"] && namesOnDisk(box.root) == ["Target"])
         #expect(replies.errors.count == 6 && replies.errors.allSatisfy { $0.contains("not a valid file name") })
@@ -243,8 +263,12 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
         odd.addHostile(names: [".."], in: "/d")
         let replies = Replies()
         let result = runJob(
-            .move, [odd.base.url("/d")], to: TargetSpec(directory: box.url("Target")), replies: replies,
-            fileSystems: fileSystems)
+            .move,
+            [odd.base.url("/d")],
+            to: TargetSpec(directory: box.url("Target")),
+            replies: replies,
+            fileSystems: fileSystems
+        )
         #expect(result.completed.isEmpty && !odd.removed.contains(odd.base.url("/d")))
     }
 
@@ -284,7 +308,8 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
         let second = runJob(.delete(toTrash: true), source, replies: noTrash, fileSystems: fileSystems)
         #expect(
             noTrash.protections == ["noTrash delete one.txt"] && second.completed.count == 2
-                && !odd.base.exists("/a/one.txt"))
+                && !odd.base.exists("/a/one.txt")
+        )
     }
 
     @Test func aFailedTrashCanBeRetried() {
@@ -294,7 +319,10 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
         odd.base.addFile("/a/one.txt", "1")
         odd.trashError = CocoaError(.fileWriteNoPermission)
         let job = FileJob(
-            kind: .delete(toTrash: true), sources: [odd.base.url("/a/one.txt")], fileSystems: fileSystems)
+            kind: .delete(toTrash: true),
+            sources: [odd.base.url("/a/one.txt")],
+            fileSystems: fileSystems
+        )
         let delegate = RetryOnce()
         job.delegate = delegate
         _ = job.run()
@@ -314,8 +342,11 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
         odd.base.addFile("/a/one.txt", "payload")
         odd.failNextRemovals(1)
         let job = FileJob(
-            kind: .move, sources: [odd.base.url("/a/one.txt")], target: TargetSpec(directory: box.url("B")),
-            fileSystems: fileSystems)
+            kind: .move,
+            sources: [odd.base.url("/a/one.txt")],
+            target: TargetSpec(directory: box.url("B")),
+            fileSystems: fileSystems
+        )
         let delegate = RetryOnce()
         job.delegate = delegate
         let result = job.run()
@@ -335,8 +366,12 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
         odd.failNextRemovals(5)
         let replies = Replies()
         let result = runJob(
-            .move, [odd.base.url("/a/one.txt")], to: TargetSpec(directory: box.url("B")), replies: replies,
-            fileSystems: fileSystems)
+            .move,
+            [odd.base.url("/a/one.txt")],
+            to: TargetSpec(directory: box.url("B")),
+            replies: replies,
+            fileSystems: fileSystems
+        )
         #expect(box.read("B/one.txt") == "payload" && odd.base.exists("/a/one.txt") && result.completed.isEmpty)
     }
 
@@ -374,7 +409,10 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
         replies.merge = .skip
         try box.folder("B/docs")
         let result = runJob(
-            .copy, [box.url("A/docs"), box.url("A/one.txt")], to: TargetSpec(directory: box.url("B")), replies: replies
+            .copy,
+            [box.url("A/docs"), box.url("A/one.txt")],
+            to: TargetSpec(directory: box.url("B")),
+            replies: replies
         ) {
             $0.options.asksBeforeMerging = true
         }
@@ -397,7 +435,8 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
         let result = runJob(.delete(toTrash: false), [box.url("A/tree")], replies: replies) { $0.parallelWidth = 4 }
         // The folder stays because three of its files were kept; everything else is gone.
         #expect(
-            replies.protections == ["readOnly delete ro1.txt", "readOnly delete ro2.txt", "readOnly delete ro3.txt"])
+            replies.protections == ["readOnly delete ro1.txt", "readOnly delete ro2.txt", "readOnly delete ro3.txt"]
+        )
         #expect(namesOnDisk(box.url("A/tree")) == ["ro1.txt", "ro2.txt", "ro3.txt"] && result.completed.isEmpty)
         let last = try #require(replies.progress.last)
         #expect(last.itemsDone == last.itemsTotal)
@@ -434,7 +473,8 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
         // A reading that was cancelled at once would answer nil; the sizes answer before any reading.
         #expect(
             try Checksum.sameContents(box.url("a.txt"), box.url("b.txt"), in: fileSystems, isCancelled: { true })
-                == false)
+                == false
+        )
         #expect(try Checksum.sameContents(box.url("a.txt"), box.url("c.txt"), in: fileSystems) == true)
     }
 
@@ -461,9 +501,12 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
         memory.addFile("/b/far.txt", "old", modified: base)
         let replies = Replies(.overwriteAllOlder)
         runJob(
-            .copy, [memory.url("/a/near.txt"), memory.url("/a/far.txt")], to: TargetSpec(directory: memory.url("/b")),
+            .copy,
+            [memory.url("/a/near.txt"), memory.url("/a/far.txt")],
+            to: TargetSpec(directory: memory.url("/b")),
             replies: replies,
-            fileSystems: fileSystems)
+            fileSystems: fileSystems
+        )
         // 1.5 s is a rounding of a two-second clock, not a newer file.
         #expect(memory.contents("/b/near.txt") == "old" && memory.contents("/b/far.txt") == "new")
     }
@@ -477,9 +520,12 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
         memory.addFile("/b/far.txt", "old", modified: base.addingTimeInterval(9))
         let replies = Replies(.overwriteAllOlderOrSame)
         runJob(
-            .copy, [memory.url("/a/near.txt"), memory.url("/a/far.txt")], to: TargetSpec(directory: memory.url("/b")),
+            .copy,
+            [memory.url("/a/near.txt"), memory.url("/a/far.txt")],
+            to: TargetSpec(directory: memory.url("/b")),
             replies: replies,
-            fileSystems: fileSystems)
+            fileSystems: fileSystems
+        )
         #expect(memory.contents("/b/near.txt") == "new" && memory.contents("/b/far.txt") == "old")
     }
 
@@ -561,7 +607,8 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
         let names = namesOnDisk(box.url("logs"))
         #expect(names.contains("operations.backup.log") && names.contains("operations.notes.log"))
         #expect(
-            names.filter { $0.range(of: #"^operations\.\d+\.log$"#, options: .regularExpression) != nil }.count == 1)
+            names.filter { $0.range(of: #"^operations\.\d+\.log$"#, options: .regularExpression) != nil }.count == 1
+        )
     }
 
     @Test func theNamesOfRotatedCopiesAreRecognisedExactly() {
@@ -584,8 +631,11 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
         try box.file("A/readme", "mine")
         try box.folder("B")
         let bench = TestBench(
-            plugins: [FileOperationsPlugin()], fileSystems: [LocalFileSystem()], left: box.url("A"),
-            right: box.url("B"))
+            plugins: [FileOperationsPlugin()],
+            fileSystems: [LocalFileSystem()],
+            left: box.url("A"),
+            right: box.url("B")
+        )
         bench.left.moveCursor(toName: "readme")
         bench.commands.perform(.renameOnly, .text("README"))
         #expect(namesOnDisk(box.url("A")) == ["README"] && box.read("A/README") == "mine")
@@ -598,8 +648,11 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
         memory.addFile("/A/readme", "first")
         memory.addFile("/A/README", "second")
         let bench = TestBench(
-            plugins: [FileOperationsPlugin()], fileSystems: [LocalFileSystem(), memory], left: memory.url("/A"),
-            right: memory.url("/A"))
+            plugins: [FileOperationsPlugin()],
+            fileSystems: [LocalFileSystem(), memory],
+            left: memory.url("/A"),
+            right: memory.url("/A")
+        )
         bench.left.moveCursor(toName: "readme")
         bench.commands.perform(.renameOnly, .text("README"))
         #expect(memory.contents("/A/readme") == "first" && memory.contents("/A/README") == "second")
@@ -617,7 +670,9 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
         let bench = TestBench(
             plugins: [FileOperationsPlugin(), ClipboardPlugin(pasteboard: pasteboard)],
             fileSystems: [LocalFileSystem()],
-            left: box.url("B"), right: box.url("A"))
+            left: box.url("B"),
+            right: box.url("A")
+        )
         pasteboard.clearContents()
         #expect(!bench.commands.isEnabled(.pasteFromClipboard))
         pasteboard.writeObjects([box.url("A/one.txt") as NSURL])
@@ -631,15 +686,22 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
         let pasteboard = NSPasteboard.withUniqueName()
         defer { pasteboard.releaseGlobally() }
         let mac = MacIntegrationPlugin(
-            launchesApplications: false, pasteboard: pasteboard, applications: { _ in [] })
+            launchesApplications: false,
+            pasteboard: pasteboard,
+            applications: { _ in [] }
+        )
         let bench = TestBench(
-            plugins: [SelectionPlugin(), mac], fileSystems: [LocalFileSystem()], left: box.url("A"),
-            right: box.url("B"))
+            plugins: [SelectionPlugin(), mac],
+            fileSystems: [LocalFileSystem()],
+            left: box.url("A"),
+            right: box.url("B")
+        )
         bench.left.model.selectAll()
         #expect(
             bench.commands.isEnabled(MacIntegrationPlugin.quickLook)
                 && bench.commands.isEnabled(MacIntegrationPlugin.share)
-                && bench.commands.isEnabled(MacIntegrationPlugin.editTags))
+                && bench.commands.isEnabled(MacIntegrationPlugin.editTags)
+        )
         bench.left.model.clearSelection()
         bench.left.model.moveCursor(to: 0)
         #expect(!bench.commands.isEnabled(MacIntegrationPlugin.quickLook))
@@ -655,8 +717,11 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
         let pasteboard = NSPasteboard.withUniqueName()
         defer { pasteboard.releaseGlobally() }
         let bench = TestBench(
-            plugins: [ClipboardPlugin(pasteboard: pasteboard)], fileSystems: [LocalFileSystem()],
-            left: box.url("A"), right: box.url("A"))
+            plugins: [ClipboardPlugin(pasteboard: pasteboard)],
+            fileSystems: [LocalFileSystem()],
+            left: box.url("A"),
+            right: box.url("A")
+        )
         bench.left.moveCursor(toName: "one.txt")
         bench.commands.perform(ClipboardCommands.saveDetails, .text("details.txt"))
         #expect(box.read("A/details.txt/inside") == "precious")
@@ -679,10 +744,16 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
         let pasteboard = NSPasteboard.withUniqueName()
         defer { pasteboard.releaseGlobally() }
         let mac = MacIntegrationPlugin(
-            launchesApplications: false, pasteboard: pasteboard, applications: { _ in [] })
+            launchesApplications: false,
+            pasteboard: pasteboard,
+            applications: { _ in [] }
+        )
         let bench = TestBench(
-            plugins: [SelectionPlugin(), mac], fileSystems: [LocalFileSystem()], left: box.url("A"),
-            right: box.url("B"))
+            plugins: [SelectionPlugin(), mac],
+            fileSystems: [LocalFileSystem()],
+            left: box.url("A"),
+            right: box.url("B")
+        )
         bench.left.moveCursor(toName: "notes.txt")
         for _ in 0..<1_000 { bench.commands.perform(MacIntegrationPlugin.openWithDefault) }
         #expect(mac.opened.count <= 256 && mac.log.count <= 512 && mac.log.last?.hasPrefix("open ") == true)
@@ -697,8 +768,11 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: box.url("A/docs").path)
         try box.folder("B")
         let bench = TestBench(
-            plugins: [FilePropertiesPlugin(launchesApplications: false)], fileSystems: [LocalFileSystem()],
-            left: box.url("A"), right: box.url("B"))
+            plugins: [FilePropertiesPlugin(launchesApplications: false)],
+            fileSystems: [LocalFileSystem()],
+            left: box.url("A"),
+            right: box.url("B")
+        )
         bench.left.moveCursor(toName: "docs")
         // The permissions field keeps what the dialog proposed.
         bench.interaction.formAnswers = [
@@ -724,8 +798,11 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
         #expect(chflags(file.path, UInt32(UF_IMMUTABLE)) == 0)
         defer { chflags(file.path, 0) }
         let bench = TestBench(
-            plugins: [FilePropertiesPlugin(launchesApplications: false)], fileSystems: [LocalFileSystem()],
-            left: box.url("A"), right: box.url("B"))
+            plugins: [FilePropertiesPlugin(launchesApplications: false)],
+            fileSystems: [LocalFileSystem()],
+            left: box.url("A"),
+            right: box.url("B")
+        )
         bench.left.moveCursor(toName: "one.txt")
         bench.interaction.formAnswers = [.accept]
         bench.commands.perform(.setAttributes)
@@ -738,8 +815,11 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
         try box.file("B/other.txt", "2")
         try FileManager.default.setAttributes([.posixPermissions: 0o640], ofItemAtPath: box.url("B/other.txt").path)
         let bench = TestBench(
-            plugins: [FilePropertiesPlugin(launchesApplications: false)], fileSystems: [LocalFileSystem()],
-            left: box.url("A"), right: box.url("B"))
+            plugins: [FilePropertiesPlugin(launchesApplications: false)],
+            fileSystems: [LocalFileSystem()],
+            left: box.url("A"),
+            right: box.url("B")
+        )
         bench.left.moveCursor(toName: "one.txt")
         bench.right.moveCursor(toName: "other.txt")
         // "Load from Target File" applies what it loaded, even though it is another file's mode.
@@ -774,7 +854,9 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
         try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: box.url("B/descript.ion").path)
         defer {
             try? FileManager.default.setAttributes(
-                [.posixPermissions: 0o644], ofItemAtPath: box.url("B/descript.ion").path)
+                [.posixPermissions: 0o644],
+                ofItemAtPath: box.url("B/descript.ion").path
+            )
         }
         #expect(throws: (any Error).self) {
             try store.setComment("x", for: "other.txt", in: box.url("B"), hidden: false)

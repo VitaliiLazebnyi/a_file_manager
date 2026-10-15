@@ -48,12 +48,9 @@ internal struct PathSafetyTests {
             "../x", "a/../b", "..", ".", "a/./b", "/abs", "a//b", "a/", "", "a/\u{0}", "..\u{2F}\u{301}x",
             "..\u{2F}\u{301}/..\u{2F}\u{301}/x", "a/..\u{2F}\u{301}"
         ] {
-            #expect(PathSafety.components(ofRelativePath: path) == nil, "\(path.debugDescription)")
+            #expect(PathSafety.components(ofRelativePath: path).isEmpty, "\(path.debugDescription)")
         }
-        #expect(PathSafety.components(ofRelativePath: "a/b//", allowingTrailingSeparator: true) == nil)
-        #expect(PathSafety.location(ofRelativePath: "a/b.txt", below: Self.root)?.path == "/tmp/review2-root/a/b.txt")
-        #expect(PathSafety.location(ofRelativePath: "..\u{2F}\u{301}x", below: Self.root) == nil)
-        #expect(PathSafety.location(ofRelativePath: "../review2-root-other/x", below: Self.root) == nil)
+        #expect(PathSafety.components(ofRelativePath: "a/b//", allowingTrailingSeparator: true).isEmpty)
     }
 
     /// Below the root means below it by the bytes of the path, on the same server.

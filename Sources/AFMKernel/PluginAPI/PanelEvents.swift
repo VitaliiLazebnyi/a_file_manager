@@ -1,29 +1,26 @@
-import Foundation
-
-/// What happens in the panels, for plugins that follow them (a quick-view pane follows the
-/// cursor, a tree follows the directory).
-public enum PanelEvent: Sendable {
-    /// The cursor is on another item, or the panel's list changed under it.
-    case cursorMoved
-    /// The marked items changed.
-    case selectionChanged
-    /// The panel shows another directory or another tab.
-    case locationChanged
-    /// This panel became the source.
-    case becameSource
-}
-
-/// Where the window shell announces panel events and plugins listen. Main thread only.
+/// Where the window shell announces panel events and plugins listen.
+///
+/// Main thread only.
+@preconcurrency
 @MainActor
 public final class PanelEvents {
+    /// One listener; the list holds it weakly, the listener's owner strongly.
     private final class Subscription {
         let handler: (PanelEvent, any PanelHandle) -> Void
+
         init(_ handler: @escaping (PanelEvent, any PanelHandle) -> Void) { self.handler = handler }
+
+        deinit {
+            // Nothing to release.
+        }
     }
 
     private var subscriptions: [() -> Subscription?] = []
 
-    public init() {}
+    /// Nobody listens yet.
+    public init() {
+        // Plugins subscribe while they start.
+    }
 
     /// `handler` is called on the main thread for every event until the returned object is
     /// released; whoever subscribes keeps it.
@@ -33,10 +30,15 @@ public final class PanelEvents {
         return subscription
     }
 
+    /// Tells every listener that `event` happened in `panel`.
+    ///
     /// Called by the shell.
     public func post(_ event: PanelEvent, from panel: any PanelHandle) {
-        MainThread.assert("Panel events")
         subscriptions.removeAll { $0() == nil }
         for subscription in subscriptions.compactMap({ $0() }) { subscription.handler(event, panel) }
+    }
+
+    deinit {
+        // Nothing to release.
     }
 }

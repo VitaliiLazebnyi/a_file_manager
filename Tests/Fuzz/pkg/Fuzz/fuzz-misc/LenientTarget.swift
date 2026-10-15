@@ -1,6 +1,7 @@
 import AFMKernel
 import Foundation
 import FuzzCore
+import TestSupport
 
 @testable import ConfigurationPlugin
 

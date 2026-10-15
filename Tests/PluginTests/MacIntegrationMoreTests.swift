@@ -36,8 +36,11 @@ import Testing
             $0.pathExtension == "txt" ? apps : []
         }
         bench = TestBench(
-            plugins: [NavigationPlugin(), SelectionPlugin(), mac], fileSystems: [LocalFileSystem(), memory],
-            left: box.url("A"), right: box.url("B"))
+            plugins: [NavigationPlugin(), SelectionPlugin(), mac],
+            fileSystems: [LocalFileSystem(), memory],
+            left: box.url("A"),
+            right: box.url("B")
+        )
     }
 
     func path(_ name: String) -> String { box.url("A/" + name).path }
@@ -45,7 +48,7 @@ import Testing
     @Test func f4UsesTheEditorOfThePreferences() {
         let page = bench.kernel.preferences.pages.first { $0.title == "Edit (F4)" }
         #expect(page?.preferences.map(\.key) == [MacIntegrationPlugin.editorKey])
-        #expect(bench.kernel.keyBindings.command(for: .f(4)) == .edit && bench.kernel.keyBindings.conflicts.isEmpty)
+        #expect(bench.kernel.keyBindings.command(for: .f(4)) == .edit && bench.kernel.keyClashes.isEmpty)
         bench.left.moveCursor(toName: "notes.txt")
         commands.perform(.edit)
         // The editor is chosen by name, by path or by picking the application.
@@ -57,7 +60,8 @@ import Testing
             mac.log == [
                 "edit TextEdit " + path("notes.txt"), "edit BBEdit " + path("notes.txt"),
                 "edit /Applications/Xcode.app " + path("photo.png")
-            ])
+            ]
+        )
         #expect(mac.opened.map(\.lastPathComponent) == ["notes.txt", "notes.txt", "photo.png"])
         // Folders and files elsewhere are not edited.
         bench.left.moveCursor(toName: "sub")
@@ -66,7 +70,8 @@ import Testing
         bench.left.moveCursor(toName: "remote.txt")
         #expect(
             !commands.isEnabled(.edit) && !commands.isEnabled(MacIntegrationPlugin.openWith)
-                && !commands.isEnabled(MacIntegrationPlugin.quickLook))
+                && !commands.isEnabled(MacIntegrationPlugin.quickLook)
+        )
     }
 
     @Test func theEditorPreferenceNamesAnApplication() {
@@ -75,7 +80,8 @@ import Testing
         #expect(MacIntegrationPlugin.editorApplication(named: " TextEdit.app ").path == textEdit)
         #expect(
             MacIntegrationPlugin.editorApplication(named: "/System/Applications/Preview.app").path
-                == "/System/Applications/Preview.app")
+                == "/System/Applications/Preview.app"
+        )
         // What cannot be found falls back to TextEdit, so F4 always opens something.
         #expect(MacIntegrationPlugin.editorApplication(named: "").path == textEdit)
         #expect(MacIntegrationPlugin.editorApplication(named: "/nowhere/Missing.app").path == textEdit)
@@ -103,7 +109,8 @@ import Testing
         commands.perform(MacIntegrationPlugin.openWithDefault)
         #expect(
             mac.opened.map(\.lastPathComponent) == ["notes.txt", "notes.txt", "sub"]
-                && mac.log.last == "open " + path("sub"))
+                && mac.log.last == "open " + path("sub")
+        )
     }
 
     @Test func quickLookShareAndPathnameTakeTheOperands() {
@@ -116,18 +123,22 @@ import Testing
             mac.log == [
                 "quicklook " + path("photo.png"),
                 "share " + [path("sub"), path("notes.txt"), path("photo.png")].joined(separator: " ")
-            ])
+            ]
+        )
         #expect(
             pasteboard.string(forType: .string)
-                == [path("sub"), path("notes.txt"), path("photo.png")].joined(separator: "\n"))
+                == [path("sub"), path("notes.txt"), path("photo.png")].joined(separator: "\n")
+        )
         #expect(
             !commands.isChecked(MacIntegrationPlugin.quickLook)
-                && bench.kernel.keyBindings.command(for: .cmd("y")) == MacIntegrationPlugin.quickLook)
+                && bench.kernel.keyBindings.command(for: .cmd("y")) == MacIntegrationPlugin.quickLook
+        )
         // With nothing to act on, the folder's own path is copied.
         bench.left.show(box.url("B"))
         commands.perform(MacIntegrationPlugin.copyAsPathname)
         #expect(
-            pasteboard.string(forType: .string) == box.url("B").path && !commands.isEnabled(MacIntegrationPlugin.share))
+            pasteboard.string(forType: .string) == box.url("B").path && !commands.isEnabled(MacIntegrationPlugin.share)
+        )
         let context = bench.kernel.menus.contextMenu(onItem: true).compactMap { $0 }
         #expect(context.contains(MacIntegrationPlugin.openWith) && context.contains(MacIntegrationPlugin.editTags))
         #expect(!bench.kernel.menus.contextMenu(onItem: false).contains(MacIntegrationPlugin.share))
@@ -136,24 +147,28 @@ import Testing
     @Test func finderTagsAreReadEditedAndWritten() {
         #expect(
             MacIntegrationPlugin.tags(from: " Red, Work ,, Red,") == ["Red", "Work"]
-                && MacIntegrationPlugin.tags(from: " ").isEmpty)
+                && MacIntegrationPlugin.tags(from: " ").isEmpty
+        )
         bench.left.moveCursor(toName: "notes.txt")
         ui.promptAnswers = [.text("Work, Red"), .cancel, .text("")]
         commands.perform(MacIntegrationPlugin.editTags)
         #expect(MacIntegrationPlugin.tags(of: box.url("A/notes.txt")) == ["Work", "Red"])
         #expect(
             ui.log == ["prompt: Finder tags of “notes.txt”: []"]
-                && mac.log == ["tags " + path("notes.txt") + ": Work, Red"])
+                && mac.log == ["tags " + path("notes.txt") + ": Work, Red"]
+        )
         #expect(bench.jobService.titles == ["Reading tags", "Setting tags"])
         // The dialog proposes the tags the file has; Cancel keeps them, an empty line removes them.
         commands.perform(MacIntegrationPlugin.editTags)
         #expect(
             ui.log.last == "prompt: Finder tags of “notes.txt”: [Work, Red]"
-                && MacIntegrationPlugin.tags(of: box.url("A/notes.txt")).count == 2)
+                && MacIntegrationPlugin.tags(of: box.url("A/notes.txt")).count == 2
+        )
         commands.perform(.selectAll)
         commands.perform(MacIntegrationPlugin.editTags)
         #expect(
             ui.log.last == "prompt: Finder tags of 3 items: []"
-                && MacIntegrationPlugin.tags(of: box.url("A/notes.txt")).isEmpty)
+                && MacIntegrationPlugin.tags(of: box.url("A/notes.txt")).isEmpty
+        )
     }
 }

@@ -19,7 +19,10 @@ import Testing
     }()
 
     func name(
-        _ mask: String, ext: String = "[E]", subject: String = "a.txt", counter: CounterDefinition? = nil,
+        _ mask: String,
+        ext: String = "[E]",
+        subject: String = "a.txt",
+        counter: CounterDefinition? = nil,
         index: Int = 0
     ) -> String? {
         var settings = RenameSettings()
@@ -68,17 +71,24 @@ import Testing
         let targets = sources.map { _ in Optional(url("same.txt")) }
         let start = Date()
         let result = planner.autoRenamed(
-            sources: sources, targets: targets, isFolder: sources.map { _ in false },
-            existing: Set(sources.map(planner.key)))
+            sources: sources,
+            targets: targets,
+            isFolder: sources.map { _ in false },
+            existing: Set(sources.map(planner.key))
+        )
         #expect(Date().timeIntervalSince(start) < 2)
         let names = result.compactMap { $0?.lastPathComponent }
         #expect(
             Set(names).count == 2_000 && names.first == "same.txt" && names[1] == "same (2).txt"
-                && names.last == "same (2000).txt")
+                && names.last == "same (2000).txt"
+        )
         // A taken number is still skipped.
         let taken = planner.autoRenamed(
-            sources: [url("a"), url("b")], targets: [url("x.txt"), url("x.txt")], isFolder: [false, false],
-            existing: Set([url("a"), url("b"), url("x.txt"), url("x (2).txt")].map(planner.key)))
+            sources: [url("a"), url("b")],
+            targets: [url("x.txt"), url("x.txt")],
+            isFolder: [false, false],
+            existing: Set([url("a"), url("b"), url("x.txt"), url("x (2).txt")].map(planner.key))
+        )
         #expect(taken.map { $0?.lastPathComponent } == ["x (3).txt", "x (4).txt"])
     }
 
@@ -96,8 +106,10 @@ import Testing
         #expect(skipped.allSatisfy { $0 == nil })
         // Items that do not depend on the conflict still move.
         let mixed = planner.skippingConflicts(
-            sources: [url("a"), url("b"), url("c")], targets: [url("b"), url("outside"), url("z")],
-            existing: Set(["a", "b", "c", "outside"].map { planner.key(url($0)) }))
+            sources: [url("a"), url("b"), url("c")],
+            targets: [url("b"), url("outside"), url("z")],
+            existing: Set(["a", "b", "c", "outside"].map { planner.key(url($0)) })
+        )
         #expect(mixed.map { $0?.lastPathComponent } == [nil, nil, "z"])
     }
 
@@ -107,7 +119,8 @@ import Testing
         #expect(planner.key(url("Name.TXT", in: "/linux")) != planner.key(url("name.txt", in: "/linux")))
         let steps = planner.steps(
             sources: [url("A", in: "/mac"), url("B", in: "/linux")],
-            targets: [url("a", in: "/mac"), url("b", in: "/linux")])
+            targets: [url("a", in: "/mac"), url("b", in: "/linux")]
+        )
         #expect(steps.map(\.ontoItself) == [true, false])
     }
 
@@ -124,7 +137,8 @@ import Testing
         #expect(box.read("a.txt") == "first" && box.read("b.txt") == "second")
         #expect(
             RenameRunner.isSameFile(box.url("a.txt"), box.url("a.txt"))
-                && !RenameRunner.isSameFile(box.url("a.txt"), box.url("b.txt")))
+                && !RenameRunner.isSameFile(box.url("a.txt"), box.url("b.txt"))
+        )
         // A target that is not there is no file at all: the volume tells the cases apart after all,
         // and the rename is an ordinary one that replaces nothing.
         #expect(!RenameRunner.isSameFile(box.url("a.txt"), box.url("missing")))
@@ -138,28 +152,41 @@ import Testing
         try box.file("sub/deep/b.txt", "b")
         let memory = MemoryFileSystem()
         let bench = TestBench(
-            plugins: [], fileSystems: [LocalFileSystem(), memory], left: memory.url("/"), right: memory.url("/"),
-            settings: MemorySettings())
+            plugins: [],
+            fileSystems: [LocalFileSystem(), memory],
+            left: memory.url("/"),
+            right: memory.url("/"),
+            settings: MemorySettings()
+        )
         let items = [
-            FileItem(url: box.url("sub/a.txt"), name: "sub/a.txt", isDirectory: false),
-            FileItem(url: box.url("sub/deep/b.txt"), name: "sub/deep/b.txt", isDirectory: false)
+            FileItem(url: box.url("sub/a.txt"), name: "sub/a.txt"),
+            FileItem(url: box.url("sub/deep/b.txt"), name: "sub/deep/b.txt")
         ]
         var settings = RenameSettings()
         settings.nameMask = "[N]_x"
         let session = MultiRenameSession(
-            kernel: bench.kernel, items: items, store: RenameStore(settings: MemorySettings()), settings: settings,
-            logDirectory: box.url("log"), previewsInBackground: false)
+            kernel: bench.kernel,
+            items: items,
+            store: RenameStore(settings: MemorySettings()),
+            settings: settings,
+            logDirectory: box.url("log"),
+            previewsInBackground: false
+        )
         #expect(
-            session.rows.map(\.status) == [.ready, .ready] && session.rows.map(\.newName) == ["a_x.txt", "b_x.txt"])
+            session.rows.map(\.status) == [.ready, .ready] && session.rows.map(\.newName) == ["a_x.txt", "b_x.txt"]
+        )
         session.start()
         #expect(box.exists("sub/a_x.txt") && box.exists("sub/deep/b_x.txt"))
         #expect(!box.exists("sub/sub") && !box.exists("sub/a.txt"))
         // A list that is not changed by the masks stays unchanged.
         let again = MultiRenameSession(
             kernel: bench.kernel,
-            items: [FileItem(url: box.url("sub/a_x.txt"), name: "sub/a_x.txt", isDirectory: false)],
-            store: RenameStore(settings: MemorySettings()), settings: .unchanged, logDirectory: box.url("log"),
-            previewsInBackground: false)
+            items: [FileItem(url: box.url("sub/a_x.txt"), name: "sub/a_x.txt")],
+            store: RenameStore(settings: MemorySettings()),
+            settings: .unchanged,
+            logDirectory: box.url("log"),
+            previewsInBackground: false
+        )
         #expect(again.rows.map(\.status) == [.unchanged])
     }
 
@@ -170,25 +197,42 @@ import Testing
         for name in ["a.txt", "b.txt", "c.txt"] { try box.file(name) }
         let registry = FileSystemRegistry()
         registry.register(LocalFileSystem())
-        let entries = ["a.txt", "b.txt", "c.txt"].map {
-            RenameEntry(FileItem(url: box.url($0), name: $0, isDirectory: false))
-        }
+        let entries = ["a.txt", "b.txt", "c.txt"]
+            .map {
+                RenameEntry(FileItem(url: box.url($0), name: $0))
+            }
         var settings = RenameSettings()
         settings.nameMask = "b"
         let cache = RenameCache()
         let first = RenameComputation.preview(
-            entries, settings: settings, context: context, fileSystems: registry, cache: cache)
+            entries,
+            settings: settings,
+            context: context,
+            fileSystems: registry,
+            cache: cache
+        )
         // The folder changes behind the cache's back: only a fresh look sees it.
         try box.file("d.txt")
         settings.nameMask = "d"
         let second = RenameComputation.preview(
-            entries, settings: settings, context: context, fileSystems: registry, cache: cache)
+            entries,
+            settings: settings,
+            context: context,
+            fileSystems: registry,
+            cache: cache
+        )
         let fresh = RenameComputation.preview(entries, settings: settings, context: context, fileSystems: registry)
         #expect(first.statuses == [.duplicate, .unchanged, .duplicate] || first.statuses.contains(.duplicate))
         #expect(second.statuses.allSatisfy { $0 == .duplicate })
         #expect(fresh.statuses.allSatisfy { $0 == .duplicate })
         let cancelled = RenameComputation.preview(
-            entries, settings: settings, context: context, fileSystems: registry, cache: cache, isCancelled: { true })
+            entries,
+            settings: settings,
+            context: context,
+            fileSystems: registry,
+            cache: cache,
+            isCancelled: { true }
+        )
         #expect(cancelled.names.count == 3)
     }
 
@@ -197,9 +241,10 @@ import Testing
     @MainActor @Test func undoHistoryLivesInMemoryAndIsSaved() {
         let settings = MemorySettings()
         let store = RenameStore(settings: settings)
-        let run = (0..<5_000).map {
-            RenamedItem(from: URL(fileURLWithPath: "/d/\($0)"), to: URL(fileURLWithPath: "/d/n\($0)"))
-        }
+        let run = (0..<5_000)
+            .map {
+                RenamedItem(from: URL(fileURLWithPath: "/d/\($0)"), to: URL(fileURLWithPath: "/d/n\($0)"))
+            }
         store.appendUndo(run)
         store.appendUndo([run[0]])
         #expect(store.undoCount == 2 && store.lastUndo?.count == 1)
@@ -220,9 +265,10 @@ import Testing
     @Test func persistedUndoIsCapped() async {
         let settings = MemorySettings()
         let store = await MainActor.run { RenameStore(settings: settings) }
-        let big = (0..<(RenameStore.persistedItemLimit - 10)).map {
-            RenamedItem(from: URL(fileURLWithPath: "/d/\($0)"), to: URL(fileURLWithPath: "/d/n\($0)"))
-        }
+        let big = (0..<(RenameStore.persistedItemLimit - 10))
+            .map {
+                RenamedItem(from: URL(fileURLWithPath: "/d/\($0)"), to: URL(fileURLWithPath: "/d/n\($0)"))
+            }
         await MainActor.run {
             store.appendUndo(big)
             store.appendUndo(Array(big.prefix(100)))
@@ -247,8 +293,12 @@ import Testing
         memory.addDirectory("/other")
         plugin = MultiRenamePlugin(opensWindows: false, logDirectory: box.url("log"))
         bench = TestBench(
-            plugins: [plugin], fileSystems: [LocalFileSystem(), memory], left: memory.url("/d"),
-            right: memory.url("/other"), settings: settings)
+            plugins: [plugin],
+            fileSystems: [LocalFileSystem(), memory],
+            left: memory.url("/d"),
+            right: memory.url("/other"),
+            settings: settings
+        )
     }
 
     func open(_ pattern: String) -> MultiRenameSession {

@@ -93,7 +93,8 @@ private func background(_ work: @escaping @Sendable () -> Void) -> DispatchSemap
     Thread {
         work()
         done.signal()
-    }.start()
+    }
+    .start()
     return done
 }
 
@@ -129,7 +130,10 @@ private func isExactly(_ name: String, _ other: String) -> Bool { name.utf8.elem
         TestBench(
             plugins: [SelectionPlugin(pasteboard: pasteboard, background: false)],
             fileSystems: [LocalFileSystem(), memory],
-            left: memory.url("/A"), right: memory.url("/B"), settings: MemorySettings())
+            left: memory.url("/A"),
+            right: memory.url("/B"),
+            settings: MemorySettings()
+        )
     }
 
     func marked(_ model: PanelModel) -> [String] { model.items.filter { model.isSelected($0) }.map(\.name) }
@@ -167,10 +171,13 @@ private func isExactly(_ name: String, _ other: String) -> Bool { name.utf8.elem
     @Test func comparingKeepsTheTwinsApart() {
         let early = Date(timeIntervalSince1970: 1_000_000)
         func file(_ name: String) -> FileItem {
-            FileItem(url: memory.url("/x/" + name), name: name, isDirectory: false, size: 1, modified: early)
+            FileItem(url: memory.url("/x/" + name), name: name, stat: .init(size: 1, modified: early))
         }
         let marks = DirectoryComparison.compare(
-            left: [file(composed), file(decomposed)], right: [file(composed)], mode: .missing)
+            left: [file(composed), file(decomposed)],
+            right: [file(composed)],
+            mode: .missing
+        )
         #expect(marks.leftNames.count == 1 && isExactly(marks.leftNames[0], decomposed))
         #expect(marks.rightNames.isEmpty && marks.sameNames.count == 1 && isExactly(marks.sameNames[0], composed))
         // Only reading alike is enough where nothing is written exactly like it.
@@ -201,8 +208,12 @@ extension MemoryFileSystem {
         memory.addFile("/locked/b.txt")
         memory.capabilitiesAt = { $0.path.hasPrefix("/locked") ? [] : [.write] }
         let bench = TestBench(
-            plugins: [MultiRenamePlugin(opensWindows: false)], fileSystems: [LocalFileSystem(), memory],
-            left: memory.url("/open"), right: memory.url("/locked"), settings: MemorySettings())
+            plugins: [MultiRenamePlugin(opensWindows: false)],
+            fileSystems: [LocalFileSystem(), memory],
+            left: memory.url("/open"),
+            right: memory.url("/locked"),
+            settings: MemorySettings()
+        )
         bench.left.model.selectAll()
         bench.right.model.selectAll()
         #expect(bench.commands.isEnabled(.multiRename))
@@ -241,7 +252,8 @@ extension MemoryFileSystem {
             query.maxDepth = depth
             let found = find(query)
             #expect(
-                Set(found).count == found.count && found.contains("/D/top.txt") && found.contains("/D/sub/deep/x.txt"))
+                Set(found).count == found.count && found.contains("/D/top.txt") && found.contains("/D/sub/deep/x.txt")
+            )
         }
     }
 
@@ -313,7 +325,9 @@ extension MemoryFileSystem {
             groups.value = DuplicateFinder.groups(
                 of: items,
                 options: DuplicateOptions(isEnabled: true, sameName: false, sameSize: true, sameContents: true),
-                fileSystems: registry, cancellation: flag)
+                fileSystems: registry,
+                cancellation: flag
+            )
         }
         #expect(probe.reading.wait(timeout: .now() + adoptWait) == .success)
         cancelFromThread(flag)
@@ -322,13 +336,13 @@ extension MemoryFileSystem {
     }
 
     @Test func specialItemsAreNotHashed() {
-        let special = FileItem(
-            url: memory.url("/D/top.txt"), name: "top.txt", isDirectory: false, size: 1, isSpecial: true)
+        let special = FileItem(url: memory.url("/D/top.txt"), name: "top.txt", kind: .special, stat: .init(size: 1))
         let plain = memory.item(at: memory.url("/D/sub/s.txt"))!
         let groups = DuplicateFinder.groups(
             of: [special, plain],
             options: DuplicateOptions(isEnabled: true, sameName: false, sameSize: true, sameContents: true),
-            fileSystems: fileSystems)
+            fileSystems: fileSystems
+        )
         #expect(groups.isEmpty)
     }
 }
@@ -354,17 +368,22 @@ extension MemoryFileSystem {
             state = state &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
             var rest = state >> 20
             return String(
-                (0..<Int(1 + state % 9)).map { _ in
-                    defer { rest = rest &* 31 &+ 17 }
-                    return alphabet[Int((rest >> 5) % UInt64(alphabet.count))]
-                })
+                (0..<Int(1 + state % 9))
+                    .map { _ in
+                        defer { rest = rest &* 31 &+ 17 }
+                        return alphabet[Int((rest >> 5) % UInt64(alphabet.count))]
+                    }
+            )
         }
         let memory = MemoryFileSystem()
-        let pairs = (0..<3_000).map { index -> SyncComparison.Pair in
-            let text = name()
-            return SyncComparison.Pair(
-                left: FileItem(url: memory.url("/" + String(index)), name: text, isDirectory: false), right: nil)
-        }
+        let pairs = (0..<3_000)
+            .map { index -> SyncComparison.Pair in
+                let text = name()
+                return SyncComparison.Pair(
+                    left: FileItem(url: memory.url("/" + String(index)), name: text),
+                    right: nil
+                )
+            }
         let ordered = SyncComparison.sorted(pairs).map { $0.left!.name }
         for (one, two) in zip(ordered, ordered.dropFirst()) {
             #expect(Sorter.compare(one, two, numeric: true) != .orderedDescending)
@@ -372,12 +391,17 @@ extension MemoryFileSystem {
         #expect(ordered.count == pairs.count)
         // Names of letters and digits stand as the system has them: without regard to case, numbers by value.
         let plain = ["file10.txt", "File2.txt", "file1.txt", "b", "A", "a10", "a9", "Zebra", "apple"]
-        let walked = SyncComparison.sorted(
-            plain.enumerated().map { index, text in
-                SyncComparison.Pair(
-                    left: FileItem(url: memory.url("/p" + String(index)), name: text, isDirectory: false), right: nil)
-            }
-        ).map { $0.left!.name }
+        let walked =
+            SyncComparison.sorted(
+                plain.enumerated()
+                    .map { index, text in
+                        SyncComparison.Pair(
+                            left: FileItem(url: memory.url("/p" + String(index)), name: text),
+                            right: nil
+                        )
+                    }
+            )
+            .map { $0.left!.name }
         #expect(walked == ["A", "a9", "a10", "apple", "b", "file1.txt", "File2.txt", "file10.txt", "Zebra"])
         for (one, two) in zip(walked, walked.dropFirst()) {
             #expect(one.localizedStandardCompare(two) != .orderedDescending)
@@ -426,9 +450,13 @@ extension MemoryFileSystem {
         let probe = ProbingFileSystem(memory)
         let registry = registry(probe)
         let plan = SyncPlan(
-            rows: SyncComparison(options: SyncOptions(), fileSystems: registry).run(
-                left: memory.url("/L"), right: memory.url("/R")
-            ).rows)
+            rows: SyncComparison(options: SyncOptions(), fileSystems: registry)
+                .run(
+                    left: memory.url("/L"),
+                    right: memory.url("/R")
+                )
+                .rows
+        )
         #expect(plan.toRight.count == 1)
         memory.stallsReads = true
         defer { memory.releaseStalls() }
@@ -456,9 +484,12 @@ extension MemoryFileSystem {
     func plan(_ memory: MemoryFileSystem, _ registry: FileSystemRegistry) -> SyncPlan {
         var options = SyncOptions()
         options.emptyDirectories = true
-        var rows = SyncComparison(options: options, fileSystems: registry).run(
-            left: memory.url("/L"), right: memory.url("/R")
-        ).rows
+        var rows = SyncComparison(options: options, fileSystems: registry)
+            .run(
+                left: memory.url("/L"),
+                right: memory.url("/R")
+            )
+            .rows
         for index in rows.indices where rows[index].name == "gone.txt" { rows[index].action = .deleteRight }
         return SyncPlan(rows: rows)
     }
@@ -513,8 +544,12 @@ extension MemoryFileSystem {
         memory.addFile("/A/" + decomposed)
         memory.addDirectory("/B")
         let bench = TestBench(
-            plugins: [DirectorySyncPlugin(opensWindows: false)], fileSystems: [LocalFileSystem(), memory],
-            left: memory.url("/A"), right: memory.url("/B"), settings: MemorySettings())
+            plugins: [DirectorySyncPlugin(opensWindows: false)],
+            fileSystems: [LocalFileSystem(), memory],
+            left: memory.url("/A"),
+            right: memory.url("/B"),
+            settings: MemorySettings()
+        )
         bench.left.model.setSelected(true, names: [decomposed])
         let session = SyncSession(kernel: bench.kernel)
         session.adopt(left: bench.left.model, right: bench.right.model, includeHidden: false)
@@ -537,7 +572,9 @@ extension MemoryFileSystem {
         #expect(exact.hash(nfc) == exact.hash(nfd))
         let diff = TextDiff.compute(
             left: [nfc, TextLine("same"), TextLine("\u{c5}ngstr\u{f6}m")],
-            right: [nfd, TextLine("same"), TextLine("A\u{30a}ngstro\u{308}m")], options: options)
+            right: [nfd, TextLine("same"), TextLine("A\u{30a}ngstro\u{308}m")],
+            options: options
+        )
         #expect(diff.isIdentical)
         // ASCII is hashed as it is, and a real difference still shows.
         #expect(options.hash(TextLine("Hello  world")) == options.hash(TextLine("hello world")))
@@ -566,13 +603,18 @@ extension MemoryFileSystem {
         memory.addFile("/A/" + decomposed, "y")
         memory.addFile("/B/other.txt", "z")
         let bench = TestBench(
-            plugins: [], fileSystems: [LocalFileSystem(), memory], left: memory.url("/A"), right: memory.url("/B"),
-            settings: MemorySettings())
+            plugins: [],
+            fileSystems: [LocalFileSystem(), memory],
+            left: memory.url("/A"),
+            right: memory.url("/B"),
+            settings: MemorySettings()
+        )
         bench.left.model.setSelected(true, names: [decomposed])
         bench.right.model.setSelected(true, names: ["other.txt"])
         let (left, right) = CompareOperands.choose(source: bench.left.model, target: bench.right.model)
         #expect(
-            left.map { isExactly($0.lastPathComponent, decomposed) } == true && right?.lastPathComponent == "other.txt")
+            left.map { isExactly($0.lastPathComponent, decomposed) } == true && right?.lastPathComponent == "other.txt"
+        )
     }
 
     @Test func cancellingEndsABlockedLoad() {
@@ -588,7 +630,11 @@ extension MemoryFileSystem {
         let result = Outcome<ComparedFiles>()
         let done = background {
             result.value = CompareLoader.load(
-                left: memory.url("/a.txt"), right: memory.url("/b.txt"), fileSystems: registry, cancellation: flag)
+                left: memory.url("/a.txt"),
+                right: memory.url("/b.txt"),
+                fileSystems: registry,
+                cancellation: flag
+            )
         }
         #expect(probe.reading.wait(timeout: .now() + adoptWait) == .success)
         cancelFromThread(flag)
@@ -609,7 +655,12 @@ extension MemoryFileSystem {
         let flag = CancellationFlag()
         let done = background {
             _ = try? CompareLoader.identical(
-                memory.url("/a"), memory.url("/b"), size: 10_000, fileSystems: registry, cancellation: flag)
+                memory.url("/a"),
+                memory.url("/b"),
+                size: 10_000,
+                fileSystems: registry,
+                cancellation: flag
+            )
         }
         #expect(probe.reading.wait(timeout: .now() + adoptWait) == .success)
         cancelFromThread(flag)
@@ -623,10 +674,12 @@ extension MemoryFileSystem {
     private func random(_ count: Int, seed: UInt64) -> Data {
         var state = seed
         return Data(
-            (0..<count).map { _ in
-                state = state &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
-                return UInt8(truncatingIfNeeded: state >> 33)
-            })
+            (0..<count)
+                .map { _ in
+                    state = state &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
+                    return UInt8(truncatingIfNeeded: state >> 33)
+                }
+        )
     }
 
     /// The first form of the two six-bit codecs, kept as the reference of the pointer loops.
@@ -703,7 +756,8 @@ extension MemoryFileSystem {
                     let one = SixBitText.decode(line, xx: xx)
                     #expect(
                         one == Reference.decode(line, xx: xx)
-                            && SixBitText.decode(line, xx: !xx) == Reference.decode(line, xx: !xx))
+                            && SixBitText.decode(line, xx: !xx) == Reference.decode(line, xx: !xx)
+                    )
                     decoded += one ?? []
                     start = end + 2
                 }
@@ -716,9 +770,11 @@ extension MemoryFileSystem {
             state = state &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
             let count = Int(state >> 40) % 90
             let line = ArraySlice(
-                (0..<count).map { offset -> UInt8 in
-                    UInt8(28 + Int(((state >> UInt64(offset % 40)) &+ UInt64(offset) &* 31) % 100))
-                })
+                (0..<count)
+                    .map { offset -> UInt8 in
+                        UInt8(28 + Int(((state >> UInt64(offset % 40)) &+ UInt64(offset) &* 31) % 100))
+                    }
+            )
             for xx in [false, true] { #expect(SixBitText.decode(line, xx: xx) == Reference.decode(line, xx: xx)) }
         }
     }
@@ -742,7 +798,8 @@ extension MemoryFileSystem {
         let found = try results[0].get()
         #expect(
             found.count == 3 && found[0].hex == digest(.sha256) && found[1].hex == digest(.sha3_256)
-                && found[2].hex == wanted)
+                && found[2].hex == wanted
+        )
     }
 
     @Test func cancellingEndsABlockedHash() {

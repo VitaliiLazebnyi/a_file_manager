@@ -47,22 +47,6 @@ extension StallFS: FileSystemProvider {
         try inner.list(directory, showHidden: showHidden, cancellation: cancellation, receive: receive)
     }
 
-    /// Held until cancelled; names and kinds of the directory's entries.
-    internal func entries(
-        of directory: URL,
-        showHidden: Bool,
-        foldersOnly: Bool,
-        cancellation: CancellationFlag
-    ) throws -> [DirectoryEntry] {
-        wait("entries(of:)", cancellation: cancellation)
-        return try inner.entries(
-            of: directory,
-            showHidden: showHidden,
-            foldersOnly: foldersOnly,
-            cancellation: cancellation
-        )
-    }
-
     /// Held; the entry at `url`.
     internal func item(at url: URL) -> FileItem? {
         wait("item(at:)")

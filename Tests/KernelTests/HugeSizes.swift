@@ -23,8 +23,8 @@ internal final class HugeSizes: MemoryBacked {
                 FileItem(
                     url: item.url,
                     name: item.name,
-                    isDirectory: item.isDirectory,
-                    size: item.isDirectory ? 0 : .max - 5
+                    kind: .init(isDirectory: item.isDirectory),
+                    stat: .init(size: item.isDirectory ? 0 : .max - 5)
                 )
             }
     }

@@ -9,7 +9,7 @@ internal struct PanelsCollatorTests {
     private static let names = ["b.txt", "A.md", "c", "a.txt", "Ä.txt", "dir"]
 
     private static func item(_ name: String, folder: Bool = false) -> FileItem {
-        FileItem(url: URL(fileURLWithPath: "/collator/\(name)"), name: name, isDirectory: folder, size: 1)
+        FileItem(url: URL(fileURLWithPath: "/collator/\(name)"), name: name, kind: .init(isDirectory: folder), stat: .init(size: 1))
     }
 
     private static func records(_ mode: String) -> [SortKeys.Record] {

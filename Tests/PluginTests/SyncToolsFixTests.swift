@@ -82,22 +82,29 @@ private func fixDigest(_ method: ChecksumMethod, _ data: Data, pieces: Int = 1) 
         try data.write(to: box.url("data.001"))
         #expect(throws: ToolError.self) {
             try Splitter.split(
-                item("data.001"), into: box.url("data.001").deletingLastPathComponent(), partSize: 1_000, run: run)
+                item("data.001"),
+                into: box.url("data.001").deletingLastPathComponent(),
+                partSize: 1_000,
+                run: run
+            )
         }
         #expect(try Data(contentsOf: box.url("data.001")) == data)
 
         try data.write(to: box.url("notes.b64"))
         #expect(throws: ToolError.self) {
             try Encoder.encode(
-                item("notes.b64"), into: box.url("notes.b64").deletingLastPathComponent(), method: .mime, run: run)
+                item("notes.b64"),
+                into: box.url("notes.b64").deletingLastPathComponent(),
+                method: .mime,
+                run: run
+            )
         }
         #expect(try Data(contentsOf: box.url("notes.b64")) == data)
     }
 
     @Test func unreadableSourceCostsNoOutput() throws {
         try box.folder("out")
-        let gone = FileItem(
-            url: box.url("missing.bin"), name: "missing.bin", isDirectory: false, size: 10, modified: Date())
+        let gone = FileItem(url: box.url("missing.bin"), name: "missing.bin", stat: .init(size: 10, modified: Date()))
         #expect(throws: (any Error).self) { try Splitter.split(gone, into: box.url("out"), partSize: 5, run: run) }
         #expect(throws: (any Error).self) { try Encoder.encode(gone, into: box.url("out"), method: .mime, run: run) }
         #expect(try FileManager.default.contentsOfDirectory(atPath: box.url("out").path).isEmpty)
@@ -155,7 +162,9 @@ private func fixDigest(_ method: ChecksumMethod, _ data: Data, pieces: Int = 1) 
         let sha224 = String(repeating: "ab", count: 28)
         let sha384 = String(repeating: "cd", count: 48)
         let entries = ChecksumFile.parse(
-            "\\\(md5) *a\\\\b\\nc\nSHA2-224(x)= \(sha224)\nSHA2-384(y)= \(sha384)\n", fileName: "list.txt")
+            "\\\(md5) *a\\\\b\\nc\nSHA2-224(x)= \(sha224)\nSHA2-384(y)= \(sha384)\n",
+            fileName: "list.txt"
+        )
         #expect(entries.map(\.name) == ["a\\b\nc", "x", "y"])
         #expect(entries[1].method == .sha224 && entries[2].method == .sha384)
     }
@@ -166,7 +175,11 @@ private func fixDigest(_ method: ChecksumMethod, _ data: Data, pieces: Int = 1) 
         var options = ChecksumRun.CreateOptions()
         options.method = .crc32
         let written = try ChecksumRun.create(
-            for: [item("a.txt"), item("dir.sfv")], target: box.url("dir.sfv"), options: options, run: run)
+            for: [item("a.txt"), item("dir.sfv")],
+            target: box.url("dir.sfv"),
+            options: options,
+            run: run
+        )
         #expect(written == [box.url("dir.sfv")])
         let text = try String(contentsOf: box.url("dir.sfv"), encoding: .utf8)
         #expect(text.contains("a.txt") && !text.contains("dir.sfv"))
@@ -196,7 +209,10 @@ private func fixDigest(_ method: ChecksumMethod, _ data: Data, pieces: Int = 1) 
             [
                 (item("f.bin"), sha2), (item("f.bin"), sha3), (item("f.bin"), blake),
                 (item("f.bin"), String(repeating: "0", count: 64))
-            ], title: "t", run: run)
+            ],
+            title: "t",
+            run: run
+        )
         #expect(report.sections[0].rows.map(\.result) == [.ok, .ok, .ok, .wrongChecksum])
     }
 }
@@ -213,7 +229,7 @@ private func fixDigest(_ method: ChecksumMethod, _ data: Data, pieces: Int = 1) 
     }
 
     func file(_ name: String) -> FileItem {
-        FileItem(url: memory.url("/" + name), name: name, isDirectory: false, size: 1, modified: early)
+        FileItem(url: memory.url("/" + name), name: name, stat: .init(size: 1, modified: early))
     }
 
     @Test func caseInsensitivePairingKeepsItsOrderAndIsFast() {
@@ -232,11 +248,17 @@ private func fixDigest(_ method: ChecksumMethod, _ data: Data, pieces: Int = 1) 
         var options = SyncOptions()
         options.toleranceSeconds = 0
         let apfs = FileItem(
-            url: memory.url("/a"), name: "a", isDirectory: false, size: 1, modified: early.addingTimeInterval(0.789))
-        let fat = FileItem(url: memory.url("/a"), name: "a", isDirectory: false, size: 1, modified: early)
+            url: memory.url("/a"),
+            name: "a",
+            stat: .init(size: 1, modified: early.addingTimeInterval(0.789))
+        )
+        let fat = FileItem(url: memory.url("/a"), name: "a", stat: .init(size: 1, modified: early))
         #expect(SyncComparison.classify(left: apfs, right: fat, options: options).state == .equal)
         let later = FileItem(
-            url: memory.url("/a"), name: "a", isDirectory: false, size: 1, modified: early.addingTimeInterval(1.5))
+            url: memory.url("/a"),
+            name: "a",
+            stat: .init(size: 1, modified: early.addingTimeInterval(1.5))
+        )
         #expect(SyncComparison.classify(left: later, right: fat, options: options).state == .leftNewer)
     }
 
@@ -248,9 +270,14 @@ private func fixDigest(_ method: ChecksumMethod, _ data: Data, pieces: Int = 1) 
         try Data("y".utf8).write(to: box.url("R/target.txt"))
         try FileManager.default.createSymbolicLink(at: box.url("R/a.txt"), withDestinationURL: box.url("R/target.txt"))
         try FileManager.default.createSymbolicLink(
-            at: box.url("L/lonely"), withDestinationURL: box.url("R/target.txt"))
-        let result = SyncComparison(options: SyncOptions(), fileSystems: fileSystems).run(
-            left: box.url("L"), right: box.url("R"))
+            at: box.url("L/lonely"),
+            withDestinationURL: box.url("R/target.txt")
+        )
+        let result = SyncComparison(options: SyncOptions(), fileSystems: fileSystems)
+            .run(
+                left: box.url("L"),
+                right: box.url("R")
+            )
         let row = try #require(result.rows.first { $0.name == "a.txt" })
         #expect(row.state == .excluded && row.action == .none && !row.accepts(.copyToRight))
         #expect(result.rows.contains { $0.name == "target.txt" } && !result.rows.contains { $0.name == "lonely" })
@@ -267,9 +294,10 @@ private func fixDigest(_ method: ChecksumMethod, _ data: Data, pieces: Int = 1) 
         try Data("old\n".utf8).write(to: box.url("real.txt"))
         try FileManager.default.createSymbolicLink(at: box.url("link.txt"), withDestinationURL: box.url("real.txt"))
         let attribute = "com.example.tag"
-        _ = box.url("real.txt").withUnsafeFileSystemRepresentation { path in
-            setxattr(path, attribute, "blue", 4, 0, 0)
-        }
+        _ = box.url("real.txt")
+            .withUnsafeFileSystemRepresentation { path in
+                setxattr(path, attribute, "blue", 4, 0, 0)
+            }
         try CompareLoader.replace(box.url("link.txt"), with: Data("new\n".utf8), fileSystems: fileSystems)
         #expect((try? FileManager.default.destinationOfSymbolicLink(atPath: box.url("link.txt").path)) != nil)
         #expect(try Data(contentsOf: box.url("real.txt")) == Data("new\n".utf8))
@@ -297,7 +325,8 @@ private func fixDigest(_ method: ChecksumMethod, _ data: Data, pieces: Int = 1) 
         let diff = BinaryDiff.compute(left: Data(), right: Data(), bytesPerLine: 8)
         #expect(
             diff.text(of: Data([0x41, 0x00, 0xFF]), row: 0) == "41 00 FF"
-                + String(repeating: " ", count: 8 * 3 + 1 - 8) + "A..")
+                + String(repeating: " ", count: 8 * 3 + 1 - 8) + "A.."
+        )
     }
 }
 
@@ -314,9 +343,12 @@ private func fixDigest(_ method: ChecksumMethod, _ data: Data, pieces: Int = 1) 
         memory.addFile("/A/same.txt", "same", modified: early)
         memory.addFile("/B/same.txt", "same", modified: early)
         bench = TestBench(
-            plugins: [plugin], fileSystems: [LocalFileSystem(), memory], left: memory.url("/A"),
+            plugins: [plugin],
+            fileSystems: [LocalFileSystem(), memory],
+            left: memory.url("/A"),
             right: memory.url("/B"),
-            settings: MemorySettings())
+            settings: MemorySettings()
+        )
     }
 
     func opened() -> SyncSession {

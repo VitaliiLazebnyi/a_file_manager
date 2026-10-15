@@ -13,7 +13,7 @@ internal struct KeyTests {
         let samples: [(Shortcut, String)] = [
             (.cmd("c", .shift), "shift+cmd+c"), (.f(5), "f5"), (.f(6, .shift), "shift+f6"),
             (Shortcut(.tab, .control), "ctrl+tab"),
-            (Shortcut(.left, .option), "opt+left"), (Shortcut(.keypadPlus), "num+"),
+            (Shortcut(.leftArrow, .option), "opt+left"), (Shortcut(.keypadPlus), "num+"),
             (Shortcut(.keypadPlus, .control), "ctrl+num+"),
             (.cmd("="), "cmd+="), (.cmd("+"), "cmd++"), (Shortcut(.space), "space"),
             (Shortcut(.forwardDelete, .shift), "shift+delete")
@@ -29,7 +29,7 @@ internal struct KeyTests {
         #expect(Shortcut(notation: "cmd+nonsense") == nil)
     }
 
-    /// Registering a command binds its default keys, without conflicts.
+    /// Registering a command binds its default keys.
     @Test
     internal func commandsBringTheirDefaultKeys() {
         let keys = KeyBindings()
@@ -42,18 +42,18 @@ internal struct KeyTests {
         }
         #expect(keys.command(for: .f(5)) == "copy" && keys.command(for: .cmd("k")) == "copy")
         #expect(keys.shortcuts(for: "copy") == [.f(5), .cmd("k")])
-        #expect(keys.command(for: .f(9)) == nil && keys.conflicts.isEmpty)
+        #expect(keys.command(for: .f(9)) == nil)
     }
 
-    /// The first command to ask for a key keeps it; a later one is refused and the conflict noted once.
+    /// The first command to ask for a key keeps it; a later one goes without.
     @Test
-    internal func aKeyTakenTwiceStaysWithTheFirstAndIsReported() {
+    internal func aKeyTakenTwiceStaysWithTheFirst() {
         let keys = KeyBindings()
         keys.bindDefault(.f(5), to: "copy")
         keys.bindDefault(.f(5), to: "pack")
         keys.bindDefault(.f(5), to: "copy")
         #expect(keys.command(for: .f(5)) == "copy")
-        #expect(keys.conflicts == [KeyBindings.Conflict(shortcut: .f(5), kept: "copy", rejected: "pack")])
+        #expect(keys.shortcuts(for: "copy") == [.f(5)])
         #expect(keys.shortcuts(for: "pack").isEmpty)
     }
 

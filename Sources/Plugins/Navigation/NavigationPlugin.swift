@@ -42,11 +42,12 @@ public final class NavigationPlugin: Plugin {
         let candidates = disks.count > 1 ? disks : places
         guard candidates.count > 1 else { return candidates.first { !$0.url.isSameLocation(as: directory) } }
         // The place that holds the directory is the one with the longest path around it.
-        let current = candidates.indices.filter {
-            directory.isSameLocation(as: candidates[$0].url) || directory.isInside(candidates[$0].url)
-                || (candidates[$0].url.path == "/" && candidates[$0].url.scheme == directory.scheme)
-        }
-        .max { candidates[$0].url.path.count < candidates[$1].url.path.count }
+        let current = candidates.indices
+            .filter {
+                directory.isSameLocation(as: candidates[$0].url) || directory.isInside(candidates[$0].url)
+                    || (candidates[$0].url.path == "/" && candidates[$0].url.scheme == directory.scheme)
+            }
+            .max { candidates[$0].url.path.count < candidates[$1].url.path.count }
         guard let current else { return delta >= 0 ? candidates.first : candidates.last }
         return candidates[((current + delta) % candidates.count + candidates.count) % candidates.count]
     }
@@ -58,8 +59,10 @@ public final class NavigationPlugin: Plugin {
         // first 8 KB of it (a path is not longer), cut at a byte, which only touches the last character.
         let head = text.utf8.count > 8_192 ? String(decoding: text.utf8.prefix(8_192), as: UTF8.self) : text
         let line =
-            head.split(maxSplits: 1, omittingEmptySubsequences: true, whereSeparator: \.isNewline).first.map(
-                String.init) ?? ""
+            head.split(maxSplits: 1, omittingEmptySubsequences: true, whereSeparator: \.isNewline).first
+            .map(
+                String.init
+            ) ?? ""
         let path = line.trimmingCharacters(in: .whitespaces).trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
         return path.isEmpty ? nil : path
     }
@@ -127,16 +130,22 @@ public final class NavigationPlugin: Plugin {
         }
         commands.register(
             Command(
-                .goToDirectory, "Open Directory or Package",
-                [Shortcut(.down, .command), Shortcut(.pageDown, .control)])
+                .goToDirectory,
+                "Open Directory or Package",
+                [Shortcut(.downArrow, .command), Shortcut(.pageDown, .control)]
+            )
         ) {
             open(enterPackages: true)
         }
         commands.register(
             Command(
-                .goToParent, "Parent Directory",
-                [Shortcut(.up, .command), Shortcut(.backspace), Shortcut(.pageUp, .control)]),
-            enabled: { source().model.parentTarget != nil }, goToParent)
+                .goToParent,
+                "Parent Directory",
+                [Shortcut(.upArrow, .command), Shortcut(.backspace), Shortcut(.pageUp, .control)]
+            ),
+            enabled: { source().model.parentTarget != nil },
+            goToParent
+        )
         commands.register(
             Command(.goToRoot, "Root Directory", [.cmd("\\"), Shortcut(.character("\\"), .control)]),
             enabled: { source().model.rootTarget != nil }
@@ -144,13 +153,13 @@ public final class NavigationPlugin: Plugin {
             if let root = source().model.rootTarget { source().show(root.location, focus: root.focus) }
         }
         commands.register(
-            Command(.goBack, "Go Back", [.cmd("["), Shortcut(.left, .option)]),
+            Command(.goBack, "Go Back", [.cmd("["), Shortcut(.leftArrow, .option)]),
             enabled: { source().model.backLocation != nil }
         ) {
             if let location = source().model.backLocation { source().show(location, history: .step(-1)) }
         }
         commands.register(
-            Command(.goForward, "Go Forward", [.cmd("]"), Shortcut(.right, .option)]),
+            Command(.goForward, "Go Forward", [.cmd("]"), Shortcut(.rightArrow, .option)]),
             enabled: { source().model.forwardLocation != nil }
         ) {
             if let location = source().model.forwardLocation { source().show(location, history: .step(1)) }
@@ -177,7 +186,8 @@ public final class NavigationPlugin: Plugin {
         }
         commands.register(Command(.editPath, "Go to Folder…", [.cmd("g", .shift)])) {
             let current = source().model.directory
-            guard let text = kernel.ui.prompt("Go to folder:", value: kernel.fileSystems.displayPath(current)) else {
+            guard let text = kernel.interaction.prompt("Go to folder:", value: kernel.fileSystems.displayPath(current))
+            else {
                 return
             }
             let location = kernel.fileSystems.location(from: text, relativeTo: current)
@@ -195,7 +205,8 @@ public final class NavigationPlugin: Plugin {
                 {
                     source().show(location)
                 }
-            })
+            }
+        )
         // Offered while the clipboard holds text. Asking the clipboard for the kinds of its contents
         // is done once for each change of the clipboard (`changeCount`); the menus show that answer.
         // The clipboard is used on the main thread only: `NSPasteboard` is not safe to use from
@@ -229,10 +240,10 @@ public final class NavigationPlugin: Plugin {
                 panel.show(from.model.cursorItem.flatMap { $0.isFolder ? $0.url : nil } ?? from.model.directory)
             }
         }
-        commands.register(Command(.transferLeft, "Show Folder in Left Panel", [Shortcut(.left, .control)])) {
+        commands.register(Command(.transferLeft, "Show Folder in Left Panel", [Shortcut(.leftArrow, .control)])) {
             transfer(to: kernel.panels.left)
         }
-        commands.register(Command(.transferRight, "Show Folder in Right Panel", [Shortcut(.right, .control)])) {
+        commands.register(Command(.transferRight, "Show Folder in Right Panel", [Shortcut(.rightArrow, .control)])) {
             transfer(to: kernel.panels.right)
         }
         /// The next or previous entry of the volume list, counted from where the panel is.
@@ -247,7 +258,8 @@ public final class NavigationPlugin: Plugin {
                 completion: { place in
                     guard let place else { return commands.onRejected() }
                     panel.show(place.url)
-                })
+                }
+            )
         }
         commands.register(Command(.nextVolume, "Next Volume")) { goToVolume(1) }
         commands.register(Command(.previousVolume, "Previous Volume")) { goToVolume(-1) }
@@ -261,20 +273,35 @@ public final class NavigationPlugin: Plugin {
 
         kernel.menus.add([.open], to: .filesOpen)
         kernel.menus.add(
-            [.goBack, .goForward, .goToParent, .goToDirectory, .goToRoot, .goHome, .editPath], to: .commandsGo)
+            [.goBack, .goForward, .goToParent, .goToDirectory, .goToRoot, .goHome, .editPath],
+            to: .commandsGo
+        )
         kernel.menus.add([.changeDirectoryFromClipboard], to: .commandsGo)
         kernel.menus.add(standardPlaces.map(\.0), to: MenuSection(.commands, order: 12))
         kernel.menus.add([.previousVolume, .nextVolume], to: .commandsVolumes)
         kernel.menus.add(
             [.targetEqualsSource, .sourceEqualsTarget, .exchangePanels, .transferLeft, .transferRight, .reread],
-            to: .commandsPanels)
+            to: .commandsPanels
+        )
         kernel.toolbar.add(
-            .goBack, symbol: "chevron.left", group: 10, hint: "Go back to the folder you were in before.")
+            .goBack,
+            symbol: "chevron.left",
+            group: 10,
+            hint: "Go back to the folder you were in before."
+        )
         kernel.toolbar.add(.goForward, symbol: "chevron.right", group: 10, hint: "Go forward again after going back.")
         kernel.toolbar.add(
-            .goToParent, symbol: "arrow.up", group: 10, hint: "Go up to the folder that contains this one.")
+            .goToParent,
+            symbol: "arrow.up",
+            group: 10,
+            hint: "Go up to the folder that contains this one."
+        )
         kernel.toolbar.add(
-            .reread, symbol: "arrow.clockwise", group: 10, hint: "Read the folder again, to show the latest changes.")
+            .reread,
+            symbol: "arrow.clockwise",
+            group: 10,
+            hint: "Read the folder again, to show the latest changes."
+        )
         kernel.toolbar.setSymbol("house", for: .goHome)
         kernel.toolbar.setSymbol("arrow.left.arrow.right", for: .exchangePanels)
         kernel.menus.addToContextMenu([.open], in: .open, onItemOnly: true)

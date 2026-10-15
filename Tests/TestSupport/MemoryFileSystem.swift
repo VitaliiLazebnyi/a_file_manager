@@ -158,20 +158,20 @@ public final class MemoryFileSystem: FileSystemProvider, @unchecked Sendable {
             return FileItem(
                 url: url(path),
                 name: name,
-                isDirectory: true,
-                isHidden: name.hasPrefix("."),
-                permissions: 0o755
+                kind: .init(isDirectory: true, isHidden: name.hasPrefix(".")),
+                stat: .init(permissions: 0o755)
             )
 
         case .file(let contents):
             return FileItem(
                 url: url(path),
                 name: name,
-                isDirectory: false,
-                isHidden: name.hasPrefix("."),
-                size: Int64(contents.data.count),
-                modified: contents.modified,
-                permissions: contents.permissions
+                kind: .init(isHidden: name.hasPrefix(".")),
+                stat: .init(
+                    size: Int64(contents.data.count),
+                    modified: contents.modified,
+                    permissions: contents.permissions
+                )
             )
         }
     }

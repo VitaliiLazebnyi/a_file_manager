@@ -26,8 +26,11 @@ final class IntegrationConsent: ServerConsentService {
         memory.addDirectory("/B")
         server.addDirectory("/in")
         bench = TestBench(
-            plugins: [FileOperationsPlugin()], fileSystems: [memory, server], left: memory.url("/A"),
-            right: memory.url("/B"))
+            plugins: [FileOperationsPlugin()],
+            fileSystems: [memory, server],
+            left: memory.url("/A"),
+            right: memory.url("/B")
+        )
         bench.kernel.services.register((any ServerConsentService).self, consent)
     }
 
@@ -38,9 +41,9 @@ final class IntegrationConsent: ServerConsentService {
         bench.kernel.userTyped(location: "mem:/B", relativeTo: base)
         #expect(consent.chosen.isEmpty)
         // What the program proposed and the user left alone was not typed.
-        bench.kernel.userTyped(location: " srv://in/x ", proposal: "srv://in/x", relativeTo: base)
+        bench.kernel.userTyped(location: " srv://in/x ", relativeTo: base, proposal: "srv://in/x")
         #expect(consent.chosen.isEmpty)
-        bench.kernel.userTyped(location: "srv://in/x", proposal: "srv://in/", relativeTo: base)
+        bench.kernel.userTyped(location: "srv://in/x", relativeTo: base, proposal: "srv://in/")
         #expect(consent.chosen.map(\.scheme) == ["srv"])
     }
 
@@ -76,8 +79,11 @@ final class IntegrationConsent: ServerConsentService {
         lists.addFile("/found/one.txt", "one")
         lists.capabilitiesAt = { _ in [.write, .removeOnly] }
         let bench = TestBench(
-            plugins: [FileOperationsPlugin()], fileSystems: [memory, lists], left: memory.url("/A"),
-            right: memory.url("/B"))
+            plugins: [FileOperationsPlugin()],
+            fileSystems: [memory, lists],
+            left: memory.url("/A"),
+            right: memory.url("/B")
+        )
         #expect(bench.commands.isEnabled(.makeDirectory) && bench.commands.isEnabled(.newTextFile))
         bench.left.show(lists.url("/found"))
         bench.left.moveCursor(toName: "one.txt")

@@ -13,7 +13,7 @@ internal struct PanelsEnteringTests {
 
     private static func listing(_ names: [String], at directory: URL) -> Listing {
         let items = names.map { name in
-            FileItem(url: directory.appendingPathComponent(name), name: name, isDirectory: false, size: 3)
+            FileItem(url: directory.appendingPathComponent(name), name: name, stat: .init(size: 3))
         }
         return Listing(
             directory: directory,
@@ -91,9 +91,9 @@ internal struct PanelsEnteringTests {
     internal func aSaturatedSumIsCountedAgain() {
         let directory = URL(fileURLWithPath: "/huge")
         let items = [
-            FileItem(url: directory.appendingPathComponent("big"), name: "big", isDirectory: false, size: .max),
-            FileItem(url: directory.appendingPathComponent("small"), name: "small", isDirectory: false, size: 10),
-            FileItem(url: directory.appendingPathComponent("dir"), name: "dir", isDirectory: true)
+            FileItem(url: directory.appendingPathComponent("big"), name: "big", stat: .init(size: .max)),
+            FileItem(url: directory.appendingPathComponent("small"), name: "small", stat: .init(size: 10)),
+            FileItem(url: directory.appendingPathComponent("dir"), name: "dir", kind: .directory)
         ]
         let model = PanelModel(directory: directory)
         model.show(Listing(directory: directory, items: items, parent: nil, root: directory))

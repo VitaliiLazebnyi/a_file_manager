@@ -74,7 +74,10 @@ private final class FakeMounter: VolumeMounter, @unchecked Sendable {
         bench = TestBench(
             plugins: [plugin, NavigationPlugin(), FileOperationsPlugin(), ViewOptionsPlugin()],
             fileSystems: [LocalFileSystem()],
-            left: box.url("local"), right: box.url("other"), settings: settings)
+            left: box.url("local"),
+            right: box.url("other"),
+            settings: settings
+        )
         plugin.center.environment.declineMemory = 0
     }
 
@@ -96,9 +99,10 @@ private final class FakeMounter: VolumeMounter, @unchecked Sendable {
             net.items == [
                 .ftpConnect, .ftpNew, .ftpDisconnect, .ftpHiddenFiles, nil,
                 .ftpSelectTransferMode, .ftpAddToList, .ftpDownloadList, nil, .netConnect, .netDisconnect
-            ])
+            ]
+        )
         #expect(net.items.compactMap { $0 }.allSatisfy { commands[$0] != nil })
-        #expect(bench.kernel.keyBindings.conflicts.isEmpty)
+        #expect(bench.kernel.keyClashes.isEmpty)
         #expect(commands[.ftpConnect]?.defaultShortcuts == [Shortcut(.character("f"), .control)])
         #expect(commands[.ftpNew]?.defaultShortcuts == [Shortcut(.character("n"), .control)])
         #expect(commands[.ftpDisconnect]?.defaultShortcuts == [Shortcut(.character("f"), [.control, .shift])])
@@ -109,7 +113,8 @@ private final class FakeMounter: VolumeMounter, @unchecked Sendable {
         // Nothing is connected: nothing to disconnect, no server among the volumes, no eject on the startup disk.
         #expect(
             !commands.isEnabled(.ftpDisconnect) && !commands.isEnabled(.ftpHiddenFiles)
-                && !commands.isEnabled(.netDisconnect))
+                && !commands.isEnabled(.netDisconnect)
+        )
         #expect(bench.kernel.fileSystems.all.flatMap { $0.places() }.filter { !$0.url.isFileURL }.isEmpty)
     }
 
@@ -185,9 +190,12 @@ private final class FakeMounter: VolumeMounter, @unchecked Sendable {
         #expect(account.contains(saved.id.uuidString) && account.contains("anna@127.0.0.1:\(server.port)"))
         #expect(
             passwords.password(for: account) == "s3cret-pw"
-                && passwords.accounts == [PasswordVault.boundAccount, account].sorted())
+                && passwords.accounts == [PasswordVault.boundAccount, account].sorted()
+        )
         #expect(
-            settings.everything.range(of: Data("s3cret-pw".utf8)) == nil, "the password never reaches the settings")
+            settings.everything.range(of: Data("s3cret-pw".utf8)) == nil,
+            "the password never reaches the settings"
+        )
         #expect(ui.forms[1].contains { $0.label.contains("master password is not needed") })
         // Connected with the stored password, in the remote folder, the other panel in the local one.
         #expect(left.model.directory == url("/pub") && right.model.directory == box.url("other"))
@@ -209,12 +217,15 @@ private final class FakeMounter: VolumeMounter, @unchecked Sendable {
         plugin.waitForStoredSecrets()
         #expect(
             passwords.accounts == [PasswordVault.boundAccount],
-            "deleting a connection and unticking the box both remove the password")
+            "deleting a connection and unticking the box both remove the password"
+        )
         #expect(
-            ui.forms.last?.first.map { field -> Bool in
-                if case .list(let rows, _) = field.kind { return rows.count == 1 && rows[0].hasPrefix("Second") }
-                return false
-            } == true)
+            ui.forms.last?.first
+                .map { field -> Bool in
+                    if case .list(let rows, _) = field.kind { return rows.count == 1 && rows[0].hasPrefix("Second") }
+                    return false
+                } == true
+        )
     }
 
     @Test func asksForAPasswordThatIsNotStored() {
@@ -286,12 +297,18 @@ private final class FakeMounter: VolumeMounter, @unchecked Sendable {
         ui.choiceAnswers = [1, 0]
         #expect(!environment.askToConnect(profile) && environment.askToConnect(profile))
         #expect(
-            ui.log.filter {
-                $0.hasPrefix("choose: Connect to ftp://\(address)? / ") && $0.contains("did not choose to connect")
-            }.count == 2)
+            ui.log
+                .filter {
+                    $0.hasPrefix("choose: Connect to ftp://\(address)? / ") && $0.contains("did not choose to connect")
+                }
+                .count == 2
+        )
         // A password over plain FTP: asked, and not again for a server the user said so for.
         let secret = ConnectionProfile(
-            key: ServerKey(scheme: "ftp", host: "files.example.com"), user: "anna", password: "pw")
+            key: ServerKey(scheme: "ftp", host: "files.example.com"),
+            user: "anna",
+            password: "pw"
+        )
         ui.formAnswers = [.cancel, .values(["always": .flag(true)])]
         #expect(!environment.askToSendPasswordUnprotected(secret) && environment.askToSendPasswordUnprotected(secret))
         #expect(environment.askToSendPasswordUnprotected(secret), "no third question")
@@ -338,7 +355,8 @@ private final class FakeMounter: VolumeMounter, @unchecked Sendable {
         ui.choiceAnswers = [0]
         commands.perform(.copy)
         #expect(
-            ui.log.contains { $0.hasPrefix("choose: Overwrite:") } && box.read("srv/pub/up.txt") == "second version")
+            ui.log.contains { $0.hasPrefix("choose: Overwrite:") } && box.read("srv/pub/up.txt") == "second version"
+        )
 
         bench.panelSet.source = left
         // Rename in place, new folder, delete a tree.
@@ -346,7 +364,8 @@ private final class FakeMounter: VolumeMounter, @unchecked Sendable {
         commands.perform(.renameOnly, .text("renamed.txt"))
         #expect(
             box.exists("srv/pub/renamed.txt") && !box.exists("srv/pub/up.txt")
-                && left.model.cursorItem?.name == "renamed.txt")
+                && left.model.cursorItem?.name == "renamed.txt"
+        )
         ui.promptAnswers = [.text("new/nested")]
         commands.perform(.makeDirectory)
         #expect(box.exists("srv/pub/new/nested"))
@@ -394,7 +413,8 @@ private final class FakeMounter: VolumeMounter, @unchecked Sendable {
         let values = plugin.center.environment.options.values
         #expect(
             !values.passiveByDefault && values.parallelConnections == 8 && values.timeout == 15
-                && values.transferMode == .text)
+                && values.transferMode == .text
+        )
     }
 
     // MARK: Download list

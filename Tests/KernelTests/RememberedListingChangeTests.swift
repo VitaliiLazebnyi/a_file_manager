@@ -151,9 +151,13 @@ internal struct RememberedListingChangeTests {
     @MainActor
     internal func theKernelSwitchesItFromTheSettings() {
         let settings = MemorySettings()
-        #expect(Kernel(productName: "Test", settings: settings, ui: ScriptedInteraction()).listingCache.isEnabled)
+        #expect(
+            Kernel(productName: "Test", settings: settings, interaction: ScriptedInteraction()).listingCache.isEnabled
+        )
         settings.set(false, forKey: ListingCache.settingsKey)
-        #expect(!Kernel(productName: "Test", settings: settings, ui: ScriptedInteraction()).listingCache.isEnabled)
+        #expect(
+            !Kernel(productName: "Test", settings: settings, interaction: ScriptedInteraction()).listingCache.isEnabled
+        )
     }
 
     /// Storing, looking up, sorting, forgetting and asking ages from many threads at once

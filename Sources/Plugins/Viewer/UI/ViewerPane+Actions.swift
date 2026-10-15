@@ -29,10 +29,10 @@ extension Shortcut {
         case .returnKey, .enter: return text + "↩"
         case .keypadPlus: return text + "Num +"
         case .keypadMinus: return text + "Num −"
-        case .left: return text + "←"
-        case .right: return text + "→"
-        case .up: return text + "↑"
-        case .down: return text + "↓"
+        case .leftArrow: return text + "←"
+        case .rightArrow: return text + "→"
+        case .upArrow: return text + "↑"
+        case .downArrow: return text + "↓"
         default: return text + notation
         }
     }
@@ -56,9 +56,15 @@ extension ViewerPane {
                 ViewerAction(title: "Open…", shortcuts: [.cmd("o")]) { [weak self] in self?.openFile() },
                 ViewerAction(title: "Save as…", isEnabled: loaded != nil) { [weak self] in self?.saveAs() },
                 ViewerAction(
-                    title: "Next File", shortcuts: [key("n"), Shortcut(.right, .option)], isEnabled: several
+                    title: "Next File",
+                    shortcuts: [key("n"), Shortcut(.rightArrow, .option)],
+                    isEnabled: several
                 ) { [weak self] in self?.onStep(1) },
-                ViewerAction(title: "Previous", shortcuts: [key("p"), Shortcut(.left, .option)], isEnabled: several) {
+                ViewerAction(
+                    title: "Previous",
+                    shortcuts: [key("p"), Shortcut(.leftArrow, .option)],
+                    isEnabled: several
+                ) {
                     [weak self] in self?.onStep(-1)
                 },
                 ViewerAction(title: "Print…", shortcuts: [key("p", .control), .cmd("p")], isEnabled: loaded != nil) {
@@ -78,10 +84,13 @@ extension ViewerPane {
         case "Edit":
             return [
                 ViewerAction(
-                    title: "Copy as text", shortcuts: [key("c", .control), .cmd("c")], isEnabled: hasSelection
+                    title: "Copy as text",
+                    shortcuts: [key("c", .control), .cmd("c")],
+                    isEnabled: hasSelection
                 ) { [weak self] in self?.copySelection(asHex: false) },
                 ViewerAction(
-                    title: "Copy as hex", shortcuts: [key("c", [.control, .shift]), .cmd("c", .shift)],
+                    title: "Copy as hex",
+                    shortcuts: [key("c", [.control, .shift]), .cmd("c", .shift)],
                     isEnabled: hasSelection
                 ) { [weak self] in
                     self?.copySelection(asHex: true)
@@ -94,18 +103,22 @@ extension ViewerPane {
                     [weak self] in self?.find()
                 },
                 ViewerAction(
-                    title: "Find next", shortcuts: [.f(3), .f(5), .f(7, .shift), .cmd("g")], isEnabled: showsText
+                    title: "Find next",
+                    shortcuts: [.f(3), .f(5), .f(7, .shift), .cmd("g")],
+                    isEnabled: showsText
                 ) { [weak self] in
                     self?.findAgain(.same)
                 },
                 ViewerAction(
-                    title: "Find previous", shortcuts: [.f(3, .shift), .f(5, .shift), .cmd("g", .shift)],
+                    title: "Find previous",
+                    shortcuts: [.f(3, .shift), .f(5, .shift), .cmd("g", .shift)],
                     isEnabled: showsText
                 ) { [weak self] in
                     self?.findAgain(.backwards)
                 },
                 ViewerAction(
-                    title: "Find in the other direction", shortcuts: [.f(3, .control), .f(5, .control)],
+                    title: "Find in the other direction",
+                    shortcuts: [.f(3, .control), .f(5, .control)],
                     isEnabled: showsText
                 ) { [weak self] in
                     self?.findAgain(.reversed)
@@ -130,7 +143,8 @@ extension ViewerPane {
                     loaded != nil && (candidate.isTextual || (!internalOnly && item?.url != nil))
                     && (candidate != .preview || settings.usesQuickLook)
                 return ViewerAction(
-                    title: "\(candidate.rawValue) \(candidate.title)", shortcuts: [key(String(candidate.rawValue))],
+                    title: "\(candidate.rawValue) \(candidate.title)",
+                    shortcuts: [key(String(candidate.rawValue))],
                     isEnabled: available,
                     isChecked: mode == candidate
                 ) { [weak self] in self?.setMode(candidate) }
@@ -142,7 +156,9 @@ extension ViewerPane {
             entries.append(nil)
             entries += fonts.map { title, character, slot in
                 ViewerAction(
-                    title: title, shortcuts: [key(character)], isEnabled: showsText,
+                    title: title,
+                    shortcuts: [key(character)],
+                    isEnabled: showsText,
                     isChecked: showsText && fontSlot == slot && codePage == nil
                 ) { [weak self] in
                     self?.setFontSlot(slot)
@@ -151,7 +167,9 @@ extension ViewerPane {
             entries += [
                 nil,
                 ViewerAction(
-                    title: "Wrap text", shortcuts: [key("w")], isEnabled: showsText && mode != .binary && mode != .hex,
+                    title: "Wrap text",
+                    shortcuts: [key("w")],
+                    isEnabled: showsText && mode != .binary && mode != .hex,
                     isChecked: settings.wrap
                 ) { [weak self] in
                     guard let self else { return }
@@ -159,7 +177,10 @@ extension ViewerPane {
                     relayout()
                 },
                 ViewerAction(
-                    title: "Show text cursor", shortcuts: [.f(6)], isEnabled: showsText, isChecked: settings.caret
+                    title: "Show text cursor",
+                    shortcuts: [.f(6)],
+                    isEnabled: showsText,
+                    isChecked: settings.caret
                 ) { [weak self] in
                     guard let self else { return }
                     settings.caret.toggle()
@@ -171,29 +192,38 @@ extension ViewerPane {
                     isEnabled: showsText || isImage
                 ) { [weak self] in self?.zoom(1) },
                 ViewerAction(
-                    title: "Smaller", shortcuts: [Shortcut(.keypadMinus), key("-", .control), .cmd("-")],
+                    title: "Smaller",
+                    shortcuts: [Shortcut(.keypadMinus), key("-", .control), .cmd("-")],
                     isEnabled: showsText || isImage
                 ) { [weak self] in
                     self?.zoom(-1)
                 },
                 ViewerAction(
-                    title: "Actual size", shortcuts: [key("0", .control), .cmd("0")], isEnabled: showsText || isImage
+                    title: "Actual size",
+                    shortcuts: [key("0", .control), .cmd("0")],
+                    isEnabled: showsText || isImage
                 ) { [weak self] in self?.zoom(0) },
                 nil,
                 ViewerAction(
-                    title: "Fit image to window", shortcuts: [key("f")], isEnabled: isImage || isMedia,
+                    title: "Fit image to window",
+                    shortcuts: [key("f")],
+                    isEnabled: isImage || isMedia,
                     isChecked: settings.imageFit == .window
                 ) { [weak self] in
                     self?.toggleFit(.window)
                 },
                 ViewerAction(
-                    title: "Fit only larger images to window", shortcuts: [key("l")], isEnabled: isImage,
+                    title: "Fit only larger images to window",
+                    shortcuts: [key("l")],
+                    isEnabled: isImage,
                     isChecked: settings.imageFit == .largerOnly
                 ) { [weak self] in
                     self?.toggleFit(.largerOnly)
                 },
                 ViewerAction(
-                    title: "Center images", shortcuts: [key("c")], isEnabled: isImage,
+                    title: "Center images",
+                    shortcuts: [key("c")],
+                    isEnabled: isImage,
                     isChecked: settings.centersImages
                 ) { [weak self] in
                     guard let self else { return }
@@ -209,7 +239,8 @@ extension ViewerPane {
                 nil,
                 ViewerAction(title: "Configure…") { [weak self] in self?.onConfigure() },
                 ViewerAction(
-                    title: "Full screen", shortcuts: [Shortcut(.returnKey, .option), .cmd("f", .control)],
+                    title: "Full screen",
+                    shortcuts: [Shortcut(.returnKey, .option), .cmd("f", .control)],
                     isEnabled: !isEmbedded
                 ) { [weak self] in
                     self?.window?.toggleFullScreen(nil)
@@ -225,7 +256,8 @@ extension ViewerPane {
             let usesCodePage = showsText && mode != .utf8 && mode != .unicode
             var entries: [ViewerAction?] = [
                 ViewerAction(
-                    title: "As configured for current font", isEnabled: showsText,
+                    title: "As configured for current font",
+                    isEnabled: showsText,
                     isChecked: usesCodePage && codePage == nil
                 ) { [weak self] in
                     self?.setEncoding(nil)
@@ -243,7 +275,8 @@ extension ViewerPane {
                 entries.append(
                     ViewerAction(title: encoding.name, isEnabled: showsText, isChecked: isCurrent) { [weak self] in
                         self?.setEncoding(encoding)
-                    })
+                    }
+                )
             }
             entries += [
                 nil,
@@ -274,7 +307,8 @@ extension ViewerPane {
             if let shortcut = entry.shortcuts.first {
                 item.attributedTitle = NSAttributedString(
                     string: "\(entry.title)\t\(shortcut.displayText)",
-                    attributes: [.paragraphStyle: style, .font: NSFont.menuFont(ofSize: 0)])
+                    attributes: [.paragraphStyle: style, .font: NSFont.menuFont(ofSize: 0)]
+                )
             }
             item.target = self
             item.representedObject = entry.run
@@ -323,7 +357,8 @@ extension ViewerPane {
     private func handleNavigation(_ event: NSEvent) -> Bool {
         let flags = KeyModifiers(
             rawValue: (event.modifierFlags.contains(.shift) ? 1 : 0) | (event.modifierFlags.contains(.control) ? 2 : 0)
-                | (event.modifierFlags.contains(.option) ? 4 : 0) | (event.modifierFlags.contains(.command) ? 8 : 0))
+                | (event.modifierFlags.contains(.option) ? 4 : 0) | (event.modifierFlags.contains(.command) ? 8 : 0)
+        )
         func pressed(_ key: Key, _ modifiers: KeyModifiers = []) -> Bool { Shortcut(key, modifiers).matches(event) }
         func named(_ key: Key) -> Bool { Shortcut(key, flags).matches(event) }
         let shift = flags.contains(.shift)
@@ -337,15 +372,15 @@ extension ViewerPane {
                 mediaView.toggleMute()
             } else if pressed(.character("e")) {
                 mediaView.step()
-            } else if named(.up) {
+            } else if named(.upArrow) {
                 mediaView.changeVolume(by: step)
                 settings.playerVolume = mediaView.volume
-            } else if named(.down) {
+            } else if named(.downArrow) {
                 mediaView.changeVolume(by: -step)
                 settings.playerVolume = mediaView.volume
-            } else if named(.left), !flags.isEmpty {
+            } else if named(.leftArrow), !flags.isEmpty {
                 mediaView.seek(by: -10)
-            } else if named(.right), !flags.isEmpty {
+            } else if named(.rightArrow), !flags.isEmpty {
                 mediaView.seek(by: 10)
             } else {
                 return false
@@ -354,13 +389,13 @@ extension ViewerPane {
         }
         if let imageView {
             let step: CGFloat = shift ? 8 : 48
-            if named(.left) {
+            if named(.leftArrow) {
                 imageView.scroll(byX: -step, y: 0)
-            } else if named(.right) {
+            } else if named(.rightArrow) {
                 imageView.scroll(byX: step, y: 0)
-            } else if named(.up) {
+            } else if named(.upArrow) {
                 imageView.scroll(byX: 0, y: step)
-            } else if named(.down) {
+            } else if named(.downArrow) {
                 imageView.scroll(byX: 0, y: -step)
             } else {
                 return false
@@ -369,13 +404,13 @@ extension ViewerPane {
         }
         guard showsText, contentView(is: pager) else { return false }
         let motion: TextPagerView.Motion
-        if named(.up) {
+        if named(.upArrow) {
             motion = jump && flags.contains(.command) ? .fileStart : .up
-        } else if named(.down) {
+        } else if named(.downArrow) {
             motion = jump && flags.contains(.command) ? .fileEnd : .down
-        } else if named(.left) {
+        } else if named(.leftArrow) {
             motion = word ? .wordLeft : flags.contains(.command) ? .rowStart : .left
-        } else if named(.right) {
+        } else if named(.rightArrow) {
             motion = word ? .wordRight : flags.contains(.command) ? .rowEnd : .right
         } else if named(.pageUp) {
             motion = jump ? .fileStart : .pageUp
@@ -431,8 +466,11 @@ extension ViewerPane {
     /// added to the menu (spec 10 › Encoding menu).
     func askForCodePage() {
         guard
-            let answer = kernel.ui.prompt(
-                "Code page", value: "", detail: "A number such as 866, or \"Name (866)\" to keep it in the menu.")
+            let answer = kernel.interaction.prompt(
+                "Code page",
+                value: "",
+                detail: "A number such as 866, or \"Name (866)\" to keep it in the menu."
+            )
         else { return }
         let digits =
             answer.contains("(")
@@ -440,7 +478,7 @@ extension ViewerPane {
         guard let number = Int(digits.trimmingCharacters(in: .whitespaces)),
             let encoding = ViewerEncoding.codePage(number)
         else {
-            kernel.ui.inform("The code page \(answer) is not available on this Mac.")
+            kernel.interaction.inform("The code page \(answer) is not available on this Mac.")
             return
         }
         if answer.contains("("), !settings.userCodePages.contains(number) { settings.userCodePages.append(number) }
@@ -471,9 +509,10 @@ extension ViewerPane {
     func goToPercent() {
         let isImage = imageView != nil
         guard isImage || showsText,
-            let answer = kernel.ui.prompt(
+            let answer = kernel.interaction.prompt(
                 isImage ? "Zoom (in %)" : "Go to position (in %)",
-                value: percentText.replacingOccurrences(of: " %", with: "")),
+                value: percentText.replacingOccurrences(of: " %", with: "")
+            ),
             let value = Self.number(in: answer)
         else { return }
         if let imageView { imageView.setZoom(CGFloat(value / 100)) } else { pager.scroll(toPercent: value) }
@@ -482,8 +521,11 @@ extension ViewerPane {
     /// A number as the user types it: `50.5`, `20,7`, `50 %`.
     static func number(in text: String) -> Double? {
         Double(
-            text.replacingOccurrences(of: ",", with: ".").replacingOccurrences(of: "%", with: "").trimmingCharacters(
-                in: .whitespaces))
+            text.replacingOccurrences(of: ",", with: ".").replacingOccurrences(of: "%", with: "")
+                .trimmingCharacters(
+                    in: .whitespaces
+                )
+        )
     }
 
     /// A byte offset as the user types it: decimal, or hexadecimal with `0x` or `$`.
@@ -496,21 +538,26 @@ extension ViewerPane {
 
     func goToOffset() {
         guard let document = pager.document,
-            let answer = kernel.ui.prompt("Go to offset", value: "", detail: "Decimal, or hexadecimal as 0x1F40."),
+            let answer = kernel.interaction.prompt(
+                "Go to offset",
+                value: "",
+                detail: "Decimal, or hexadecimal as 0x1F40."
+            ),
             let offset = Self.offset(in: answer)
         else { return }
         pager.reveal(offset: min(max(0, offset), max(0, document.length - 1)))
     }
 
     func goToLine() {
-        guard showsText, let answer = kernel.ui.prompt("Go to line", value: ""),
+        guard showsText, let answer = kernel.interaction.prompt("Go to line", value: ""),
             let line = Int(answer.trimmingCharacters(in: .whitespaces))
         else { return }
         pager.scroll(toLine: line) { [weak self] found in
             guard let self, !found else { return }
-            kernel.ui.inform(
+            kernel.interaction.inform(
                 pager.isIndexing
-                    ? "Line \(line) has not been read yet; try again in a moment." : "There is no line \(line).")
+                    ? "Line \(line) has not been read yet; try again in a moment." : "There is no line \(line)."
+            )
         }
     }
 
@@ -536,12 +583,16 @@ extension ViewerPane {
             .checkbox("hex", "Search hex string", options.hex),
             .checkbox("regex", "RegEx", options.regex)
         ]
-        guard let answer = kernel.ui.form("Find", detail: "", fields: fields, buttons: ["OK"]) else { return }
+        guard let answer = kernel.interaction.form("Find", detail: "", fields: fields, buttons: ["OK"]) else { return }
         let picked = answer.index("history")
         let text = picked > 0 && picked <= history.count ? history[picked - 1] : answer.text("text")
         let chosen = SearchOptions(
-            wholeWords: answer.flag("words"), caseSensitive: answer.flag("case"), backwards: answer.flag("backwards"),
-            hex: answer.flag("hex"), regex: answer.flag("regex"))
+            wholeWords: answer.flag("words"),
+            caseSensitive: answer.flag("case"),
+            backwards: answer.flag("backwards"),
+            hex: answer.flag("hex"),
+            regex: answer.flag("regex")
+        )
         guard !text.isEmpty else { return }
         lastSearch = (text, chosen)
         settings.searchOptions = chosen
@@ -570,7 +621,7 @@ extension ViewerPane {
         do {
             pattern = try SearchPattern(lastSearch.text, options: lastSearch.options, encoding: document.encoding)
         } catch {
-            kernel.ui.report(error, title: "Find")
+            kernel.interaction.report(error, title: "Find")
             return
         }
         lastSearchWentBackwards = backwards
@@ -585,8 +636,15 @@ extension ViewerPane {
             var lastReport = Date.distantPast
             let result = Result {
                 try ViewerSearch.find(
-                    pattern, in: document.source, content: document.content, from: start, backwards: backwards,
-                    encoding: document.encoding, parallelism: parallelism, cancellation: cancel, boundaries: boundaries
+                    pattern,
+                    in: document.source,
+                    content: document.content,
+                    from: start,
+                    backwards: backwards,
+                    encoding: document.encoding,
+                    parallelism: parallelism,
+                    cancellation: cancel,
+                    boundaries: boundaries
                 ) { fraction in
                     guard Date().timeIntervalSince(lastReport) > 0.1 else { return }
                     lastReport = Date()
@@ -606,8 +664,8 @@ extension ViewerPane {
                 case .success(let match?):
                     self.pager.reveal(offset: match.lowerBound, select: match, rowsAbove: self.settings.searchGoBack)
 
-                case .success(nil): self.kernel.ui.inform("\"\(lastSearch.text)\" was not found.")
-                case .failure(let error): self.kernel.ui.report(error, title: "Find")
+                case .success(nil): self.kernel.interaction.inform("\"\(lastSearch.text)\" was not found.")
+                case .failure(let error): self.kernel.interaction.report(error, title: "Find")
                 }
             }
         }
@@ -626,7 +684,9 @@ extension ViewerPane {
         // Hex is three characters a byte; the string is made on the main thread for the clipboard.
         let limit = asHex ? Self.copyLimit / 2 : Self.copyLimit
         guard selection.upperBound - selection.lowerBound <= limit else {
-            kernel.ui.inform("The selection is too large for the clipboard (more than \(Format.shortSize(limit))).")
+            kernel.interaction.inform(
+                "The selection is too large for the clipboard (more than \(Format.shortSize(limit)))."
+            )
             return
         }
         // Carried through the background and used on the main thread only.
@@ -667,16 +727,18 @@ extension ViewerPane {
                 ViewerAction(title: "Copy as text") { [weak self] in self?.copySelection(asHex: false) },
                 ViewerAction(title: "Copy as hex") { [weak self] in self?.copySelection(asHex: true) },
                 ViewerAction(title: "Search the web for the selection") { [weak self] in
-                    self?.withSelectedText { text in
-                        var components = URLComponents(string: "https://www.google.com/search")
-                        components?.queryItems = [URLQueryItem(name: "q", value: text)]
-                        if let url = components?.url { NSWorkspace.shared.open(url) }
-                    }
+                    self?
+                        .withSelectedText { text in
+                            var components = URLComponents(string: "https://www.google.com/search")
+                            components?.queryItems = [URLQueryItem(name: "q", value: text)]
+                            if let url = components?.url { NSWorkspace.shared.open(url) }
+                        }
                 },
                 ViewerAction(title: "Open the selection as a link in the browser") { [weak self] in
-                    self?.withSelectedText { text in
-                        if let url = HTMLText.url(from: text) { NSWorkspace.shared.open(url) }
-                    }
+                    self?
+                        .withSelectedText { text in
+                            if let url = HTMLText.url(from: text) { NSWorkspace.shared.open(url) }
+                        }
                 }
             ]
         }
@@ -697,7 +759,8 @@ extension ViewerPane {
                 ViewerAction(title: "Copy all URLs") {
                     pasteboard.clearContents()
                     pasteboard.setString(links.joined(separator: "\n"), forType: .string)
-                })
+                }
+            )
         }
         let menu = NSMenu()
         fill(menu, with: entries)
@@ -730,7 +793,9 @@ extension ViewerPane {
         guard panel.runModal() == .OK, let target = panel.url else { return }
         // The file that is shown is read while the copy is written: it is not replaced.
         guard !ViewerSave.isSameFile(loaded.item.url, target) else {
-            kernel.ui.inform("The file is being shown from the place you chose. Choose another file name or folder.")
+            kernel.interaction.inform(
+                "The file is being shown from the place you chose. Choose another file name or folder."
+            )
             return
         }
         let source = loaded.source
@@ -741,8 +806,13 @@ extension ViewerPane {
                     try ViewerSave.save(source, to: target, cancellation: monitor.cancellation) { offset in
                         monitor.report(
                             JobProgress(
-                                lines: ["To: \(target.path)"], itemsDone: 0, itemsTotal: 1, bytesDone: offset,
-                                bytesTotal: source.length))
+                                lines: ["To: \(target.path)"],
+                                itemsDone: 0,
+                                itemsTotal: 1,
+                                bytesDone: offset,
+                                bytesTotal: source.length
+                            )
+                        )
                     }
                     return nil
                 } catch {
@@ -750,9 +820,10 @@ extension ViewerPane {
                 }
             },
             completion: { [weak self] error in
-                if let error { self?.kernel.ui.report(error, title: "Save as") }
+                if let error { self?.kernel.interaction.report(error, title: "Save as") }
                 self?.kernel.panels.refresh([target.deletingLastPathComponent()])
-            })
+            }
+        )
     }
 
     /// F4 opens the editor, for files that are files and are shown as text (spec 10 › F4
@@ -828,9 +899,12 @@ extension ViewerPane {
         } else if showsText, let document = pager.document {
             var range = document.content
             if let selection = pager.selection,
-                kernel.ui.choose(
-                    "Print", detail: "Print the selected text or the whole file?",
-                    buttons: ["Selection", "Whole file"], style: .information) == 0
+                kernel.interaction.choose(
+                    "Print",
+                    detail: "Print the selected text or the whole file?",
+                    buttons: ["Selection", "Whole file"],
+                    style: .information
+                ) == 0
             {
                 range = selection
             }
@@ -844,21 +918,26 @@ extension ViewerPane {
             let held = Handover((font: font, info: info))
             workQueue.async { [weak self, range] in
                 let text = Self.printableText(
-                    of: document, in: range, maxRows: Self.printPageLimit * linesPerPage,
-                    cancellation: cancel ?? CancellationFlag())
+                    of: document,
+                    in: range,
+                    maxRows: Self.printPageLimit * linesPerPage,
+                    cancellation: cancel ?? CancellationFlag()
+                )
                 DispatchQueue.main.async {
                     guard let self else { return }
                     if self.activity?.cancel === cancel { self.activity = nil }
                     guard self.loadGeneration == generation, cancel?.isCancelled != true else { return }
                     if text.truncated {
-                        self.kernel.ui.inform(
+                        self.kernel.interaction.inform(
                             "The text is longer than the \(Self.printPageLimit) pages that are printed at most: only its first \(Self.printPageLimit) pages (\(text.lines.count) lines) are printed."
                         )
                     }
                     run(
                         NSPrintOperation(
                             view: TextPrintView(lines: text.lines, font: held.value.font, pageSize: page),
-                            printInfo: held.value.info))
+                            printInfo: held.value.info
+                        )
+                    )
                 }
             }
         }
@@ -867,7 +946,9 @@ extension ViewerPane {
     /// The rows of `range` as the document's layout shows them, at most `maxRows` of them (`truncated`
     /// when there are more). Blocks.
     nonisolated static func printableText(
-        of document: TextDocument, in range: Range<Int64>, maxRows: Int = printPageLimit * 60,
+        of document: TextDocument,
+        in range: Range<Int64>,
+        maxRows: Int = printPageLimit * 60,
         cancellation: CancellationFlag = CancellationFlag()
     ) -> PrintableText {
         guard var row = (try? document.row(containing: range.lowerBound, cancellation: cancellation)) ?? nil else {
@@ -911,7 +992,8 @@ final class TextPrintView: NSView {
     static func pageSize(for info: NSPrintInfo) -> NSSize {
         NSSize(
             width: max(100, info.paperSize.width - info.leftMargin - info.rightMargin),
-            height: max(100, info.paperSize.height - info.topMargin - info.bottomMargin))
+            height: max(100, info.paperSize.height - info.topMargin - info.bottomMargin)
+        )
     }
 
     static func lineHeight(of font: NSFont) -> CGFloat { max(1, ceil(font.ascender - font.descender + font.leading)) }
@@ -930,9 +1012,15 @@ final class TextPrintView: NSView {
         // Wider than the page when a row is: the print operation then shrinks the page to fit.
         let widest = CGFloat(min(2_000, lines.reduce(0) { max($0, $1.utf16.count) })) * font.maximumAdvancement.width
         let pages = max(1, (lines.count + linesPerPage - 1) / linesPerPage)
-        super.init(
-            frame: NSRect(
-                x: 0, y: 0, width: max(pageSize.width, widest), height: CGFloat(pages * linesPerPage) * lineHeight))
+        super
+            .init(
+                frame: NSRect(
+                    x: 0,
+                    y: 0,
+                    width: max(pageSize.width, widest),
+                    height: CGFloat(pages * linesPerPage) * lineHeight
+                )
+            )
     }
 
     required init?(coder _: NSCoder) { fatalError("not used") }
@@ -948,8 +1036,11 @@ final class TextPrintView: NSView {
 
     override func rectForPage(_ page: Int) -> NSRect {
         NSRect(
-            x: 0, y: CGFloat((page - 1) * linesPerPage) * lineHeight, width: frame.width,
-            height: CGFloat(linesPerPage) * lineHeight)
+            x: 0,
+            y: CGFloat((page - 1) * linesPerPage) * lineHeight,
+            width: frame.width,
+            height: CGFloat(linesPerPage) * lineHeight
+        )
     }
 
     override func draw(_ dirtyRect: NSRect) {
@@ -958,8 +1049,11 @@ final class TextPrintView: NSView {
         let last = min(lines.count - 1, Int(dirtyRect.maxY / lineHeight))
         guard first <= last else { return }
         for index in first...last {
-            (lines[index] as NSString).draw(
-                at: NSPoint(x: 0, y: CGFloat(index) * lineHeight), withAttributes: attributes)
+            (lines[index] as NSString)
+                .draw(
+                    at: NSPoint(x: 0, y: CGFloat(index) * lineHeight),
+                    withAttributes: attributes
+                )
         }
     }
 }

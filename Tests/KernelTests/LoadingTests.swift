@@ -103,7 +103,7 @@ internal struct LoadingTests {
         memory.addFile("/big/a/deep/two.txt", String(repeating: "b", count: 50))
         memory.addFile("/big/b/three.txt", String(repeating: "c", count: 7))
         memory.addFile("/big/top.txt", String(repeating: "d", count: 3))
-        #expect(memory.totalSize(of: memory.url("/big")) == 160)
+        #expect(memory.totalSize(of: memory.url("/big"), cancellation: CancellationFlag()) == 160)
         let cancelled = CancellationFlag()
         cancelled.cancel()
         #expect(memory.totalSize(of: memory.url("/big"), cancellation: cancelled) == 0)

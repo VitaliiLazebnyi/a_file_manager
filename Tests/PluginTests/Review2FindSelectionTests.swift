@@ -16,7 +16,8 @@ import Testing
         Thread {
             work()
             done.signal()
-        }.start()
+        }
+        .start()
         return done.wait(timeout: .now() + seconds) == .success
     }
 
@@ -38,7 +39,8 @@ import Testing
         Thread {
             Thread.sleep(forTimeInterval: 0.05)
             flag.cancel()
-        }.start()
+        }
+        .start()
         let entries = (0..<5).map { MaskEntry(name: String(repeating: "a", count: 40 + $0) + ".png") }
         // Used by the work on its own thread only while the test waits for it to finish.
         nonisolated(unsafe) var result: [Bool] = []
@@ -56,18 +58,23 @@ import Testing
         #expect(mask.selected([MaskEntry(name: "x.txt", directory: directory)]) == [true])
         // The chain still means what it did.
         #expect(
-            SelectionMask("a/**/c/*.txt").selected([
-                MaskEntry(name: "f.txt", directory: ["a", "c"]),
-                MaskEntry(name: "f.txt", directory: ["a", "b", "b", "c"]),
-                MaskEntry(name: "f.txt", directory: ["a", "b"]), MaskEntry(name: "f.txt", directory: ["x", "a", "c"])
-            ]) == [true, true, false, true])
+            SelectionMask("a/**/c/*.txt")
+                .selected([
+                    MaskEntry(name: "f.txt", directory: ["a", "c"]),
+                    MaskEntry(name: "f.txt", directory: ["a", "b", "b", "c"]),
+                    MaskEntry(name: "f.txt", directory: ["a", "b"]),
+                    MaskEntry(name: "f.txt", directory: ["x", "a", "c"])
+                ]) == [true, true, false, true]
+        )
     }
 
     @Test func aNameAnsiCannotWriteDoesNotRaise() {
         let name = "\u{3000}\u{0300}"
-        let item = FileItem(url: URL(fileURLWithPath: "/tmp/x"), name: name, isDirectory: false)
+        let item = FileItem(url: URL(fileURLWithPath: "/tmp/x"), name: name)
         let data = SelectionFile.encode(
-            [item, FileItem(url: URL(fileURLWithPath: "/tmp/y"), name: "sél ą.txt", isDirectory: false)], as: .ansi)
+            [item, FileItem(url: URL(fileURLWithPath: "/tmp/y"), name: "sél ą.txt")],
+            as: .ansi
+        )
         #expect(data.count == "??\r\nsél a.txt".unicodeScalars.count)
         #expect(data.contains(0xE9))
         #expect(SelectionFile.windows1252("plain") == Data("plain".utf8))
@@ -85,7 +92,9 @@ import Testing
         TestBench(
             plugins: [SelectionPlugin(pasteboard: pasteboard, background: background)],
             fileSystems: [LocalFileSystem(), memory],
-            left: memory.url("/A"), right: memory.url("/B"))
+            left: memory.url("/A"),
+            right: memory.url("/B")
+        )
     }
 
     /// Gives the main run loop the time to hand the result of background work back.
@@ -114,7 +123,8 @@ import Testing
         await settle { bench.interaction.log.contains { $0.hasPrefix("inform:") } }
         #expect(
             bench.interaction.log.last == "inform: The regular expression takes too long."
-                && bench.left.model.selectionCount == 0)
+                && bench.left.model.selectionCount == 0
+        )
     }
 
     /// The list is read again before the answer comes back: the model refuses the rows made for the

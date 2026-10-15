@@ -10,24 +10,21 @@ import Testing
 @MainActor
 @Suite
 internal struct CrossRequestTests {
-    /// Keys declared by name and by prefix report their kind and accept values by their own
-    /// rule; large values go where the store keeps them, by default with the rest.
+    /// Keys declared by name and by prefix are listed with their kind, single keys first; large
+    /// values go where the store keeps them, by default with the rest.
     @Test
     internal func settingsKeysSayWhatTheyAre() {
-        let kernel = Kernel(productName: "Test", settings: MemorySettings(), ui: ScriptedInteraction())
+        let kernel = Kernel(productName: "Test", settings: MemorySettings(), interaction: ScriptedInteraction())
         let keys = kernel.settingsKeys
         keys.declare("commands.user", kind: .runsCode)
         keys.declare(prefix: "findFiles.history.", kind: .history)
-        keys.declare(prefix: "findFiles.", kind: .ordinary) { $0.count < 4 }
-        #expect(keys.kind(of: "commands.user") == .runsCode)
-        #expect(keys.kind(of: "findFiles.history.text") == .history)
-        #expect(keys.kind(of: "findFiles.size") == .ordinary)
-        #expect(keys.kind(of: "unknown") == nil)
-        #expect(keys.kind(of: "commands.user2") == nil)
-        #expect(keys.accepts(Data([1, 2]), forKey: "findFiles.size"))
-        #expect(!keys.accepts(Data([1, 2, 3, 4, 5]), forKey: "findFiles.size"))
-        #expect(!keys.accepts(Data(), forKey: "unknown"))
-        #expect(keys.all.count == 3)
+        keys.declare(prefix: "findFiles.", kind: .history)
+        keys.declare(prefix: "findFiles.")
+        keys.declare("commands.user", kind: .trust)
+        // Single keys first; a key or family declared twice keeps the later word.
+        #expect(keys.all.map(\.key) == ["commands.user", "findFiles.history.", "findFiles."])
+        #expect(keys.all.map(\.kind) == [.trust, .history, .ordinary])
+        #expect(keys.all.map(\.isPrefix) == [false, true, true])
         // Large values go where the store keeps them; by default, with the rest.
         let settings = MemorySettings()
         settings.scoped(to: "rename").setLarge(Data([9]), forKey: "undo")
@@ -39,7 +36,7 @@ internal struct CrossRequestTests {
     /// and a program started from here still ends by the signal when its reader is gone.
     @Test
     internal func aBrokenPipeIsAnErrorHereAndStillEndsTheProgramsWeStart() {
-        _ = Kernel(productName: "Test", settings: MemorySettings(), ui: ScriptedInteraction())
+        _ = Kernel(productName: "Test", settings: MemorySettings(), interaction: ScriptedInteraction())
         // Writing to a pipe nobody reads fails; it does not end the program.
         var ends: [Int32] = [0, 0]
         #expect(pipe(&ends) == 0)

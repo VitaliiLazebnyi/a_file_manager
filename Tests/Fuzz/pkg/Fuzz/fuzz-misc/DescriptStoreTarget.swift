@@ -37,7 +37,7 @@ internal enum DescriptStoreTarget {
         }
         let store = CommentStore(fileSystems: registry)
         let comments = store.comments(in: dir)
-        _ = store.comment(for: FileItem(url: dir.appending(name: "a.txt"), name: "a.txt", isDirectory: false))
+        _ = store.comment(for: FileItem(url: dir.appending(name: "a.txt"), name: "a.txt"))
         do {
             try store.setComment("fresh\ncomment", for: "new.txt", in: dir, hidden: false)
         } catch {

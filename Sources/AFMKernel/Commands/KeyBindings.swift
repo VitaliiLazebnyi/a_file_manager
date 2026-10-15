@@ -1,43 +1,44 @@
-import Foundation
+import os
 
-/// Which key runs which command. Plugins supply defaults with their commands; the user's own
-/// choices, kept in the settings, replace them. Every key press and every menu key is looked
-/// up here, so a key is bound in exactly one place (spec 14 › Redefining hotkeys).
+/// Which key runs which command.
+///
+/// Plugins supply defaults with their commands; the user's own choices, kept in the settings, replace them. Every key
+/// press and every menu key is looked up here, so a key is bound in exactly one place (spec 14 › Redefining hotkeys).
+@preconcurrency
 @MainActor
 public final class KeyBindings {
-    /// Two commands asked for the same key; the first one kept it.
-    public struct Conflict: Equatable, Sendable {
-        public let shortcut: Shortcut
-        public let kept: CommandID
-        public let rejected: CommandID
-
-        public init(shortcut: Shortcut, kept: CommandID, rejected: CommandID) {
-            self.shortcut = shortcut
-            self.kept = kept
-            self.rejected = rejected
-        }
-    }
-
     /// Settings key of the user's bindings: command name → shortcuts in text form.
-    public nonisolated static let settingsKey = "keyBindings"
+    nonisolated public static let settingsKey = "keyBindings"
+
+    private static let log = Log.logger("Kernel")
 
     private var commands: [Shortcut: CommandID] = [:]
     private var shortcuts: [CommandID: [Shortcut]] = [:]
-    public private(set) var conflicts: [Conflict] = []
 
-    public init() {}
+    /// No key is bound yet.
+    public init() {
+        // The commands bring their keys when they are registered.
+    }
 
-    /// Binds a command's default key. A key that is already taken stays with its command and
-    /// the clash is recorded in `conflicts`.
+    /// Binds a command's default key.
+    ///
+    /// A key that is already taken stays with its command; two plugins that want the same key are a bug, which is
+    /// logged.
     public func bindDefault(_ shortcut: Shortcut, to command: CommandID) {
         if let owner = commands[shortcut] {
-            if owner != command { conflicts.append(Conflict(shortcut: shortcut, kept: owner, rejected: command)) }
+            if owner != command {
+                let key = shortcut.notation
+                Self.log.fault(
+                    "\(owner, privacy: .public) and \(command, privacy: .public) both want \(key, privacy: .public)"
+                )
+            }
             return
         }
         commands[shortcut] = command
         shortcuts[command, default: []].append(shortcut)
     }
 
+    /// The command a key runs; nil when the key is free.
     public func command(for shortcut: Shortcut) -> CommandID? {
         commands[shortcut]
     }
@@ -47,8 +48,9 @@ public final class KeyBindings {
         shortcuts[command] ?? []
     }
 
-    /// Replaces the keys of the named commands. A key given to a command is taken away from
-    /// whichever command had it; unreadable shortcut texts are ignored.
+    /// Replaces the keys of the named commands.
+    ///
+    /// A key given to a command is taken away from whichever command had it; unreadable shortcut texts are ignored.
     public func apply(overrides: [String: [String]]) {
         for (name, notations) in overrides.sorted(by: { $0.key < $1.key }) {
             let command = CommandID(rawValue: name)
@@ -67,5 +69,9 @@ public final class KeyBindings {
         if let overrides = settings.value([String: [String]].self, forKey: Self.settingsKey) {
             apply(overrides: overrides)
         }
+    }
+
+    deinit {
+        // Nothing to release.
     }
 }

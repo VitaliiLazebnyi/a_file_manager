@@ -62,7 +62,7 @@ internal struct ListingCacheBench {
         let directory = url(path)
         let items = names.enumerated()
             .map { index, name in
-                FileItem(url: directory.appending(name: name), name: name, isDirectory: false, size: Int64(index))
+                FileItem(url: directory.appending(name: name), name: name, stat: .init(size: Int64(index)))
             }
         return Listing(
             directory: directory,

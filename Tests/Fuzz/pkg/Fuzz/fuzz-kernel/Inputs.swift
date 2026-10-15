@@ -77,16 +77,14 @@ internal func nextItem(_ choices: inout Choices, previous: String?, allowNaN: Bo
         modified = Date(timeIntervalSinceReferenceDate: .nan)
     }
     let isDirectory = flags & 3 == 0
-    return FileItem(
+    var item = FileItem(
         url: kDirectory.appendingPathComponent(name.isEmpty ? "_" : name),
         name: name,
-        isDirectory: isDirectory,
-        isPackage: isDirectory && flags & 4 != 0,
-        isHidden: flags & 8 != 0,
-        size: kSizes[choices.int(kSizes.count)],
-        modified: modified,
-        computedSize: flags & 0x30 == 0x30 ? kSizes[choices.int(kSizes.count)] : nil
+        kind: .init(isDirectory: isDirectory, isPackage: isDirectory && flags & 4 != 0, isHidden: flags & 8 != 0),
+        stat: .init(size: kSizes[choices.int(kSizes.count)], modified: modified)
     )
+    item.computedSize = flags & 0x30 == 0x30 ? kSizes[choices.int(kSizes.count)] : nil
+    return item
 }
 
 /// Up to `max` items; with `FuzzState.uniqueNames` none has the bytes of a name of another or of `besides`.
@@ -128,16 +126,14 @@ internal func describeItem(_ item: FileItem) -> String {
 internal func tagged(_ items: [FileItem]) -> [FileItem] {
     items.enumerated()
         .map { index, item in
-            FileItem(
+            var tagged = FileItem(
                 url: URL(fileURLWithPath: "/i/\(index)"),
                 name: item.name,
-                isDirectory: item.isDirectory,
-                isPackage: item.isPackage,
-                isHidden: item.isHidden,
-                size: item.size,
-                modified: item.modified,
-                computedSize: item.computedSize
+                kind: .init(isDirectory: item.isDirectory, isPackage: item.isPackage, isHidden: item.isHidden),
+                stat: .init(size: item.size, modified: item.modified)
             )
+            tagged.computedSize = item.computedSize
+            return tagged
         }
 }
 

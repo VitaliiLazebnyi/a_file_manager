@@ -33,9 +33,11 @@ internal struct MemoryGrowthTests {
                 return FileItem(
                     url: URL(fileURLWithPath: "/folder/\(name)"),
                     name: name,
-                    isDirectory: index.isMultiple(of: 25),
-                    size: Int64(index * 37 % 100_000),
-                    modified: Date(timeIntervalSinceReferenceDate: Double(index % 1_000) * 60)
+                    kind: .init(isDirectory: index.isMultiple(of: 25)),
+                    stat: .init(
+                        size: Int64(index * 37 % 100_000),
+                        modified: Date(timeIntervalSinceReferenceDate: Double(index % 1_000) * 60)
+                    )
                 )
             }
     }

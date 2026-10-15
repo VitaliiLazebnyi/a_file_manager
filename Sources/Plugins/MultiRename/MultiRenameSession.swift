@@ -160,8 +160,13 @@ final class MultiRenameSession {
     }
 
     init(
-        kernel: Kernel, items: [FileItem], store: RenameStore, settings: RenameSettings, logDirectory: URL,
-        previewsInBackground: Bool = true, clipboard: @escaping @Sendable () -> String? = { nil },
+        kernel: Kernel,
+        items: [FileItem],
+        store: RenameStore,
+        settings: RenameSettings,
+        logDirectory: URL,
+        previewsInBackground: Bool = true,
+        clipboard: @escaping @Sendable () -> String? = { nil },
         clipboardChangeCount: (@MainActor () -> Int)? = nil
     ) {
         self.kernel = kernel
@@ -232,8 +237,15 @@ final class MultiRenameSession {
         )
         @Sendable func compute() -> RenamePreview {
             RenameComputation.preview(
-                entries, settings: settings, context: context, given: given, fileSystems: fileSystems, cache: cache,
-                cancellation: cancellation, isCancelled: { cancellation.isCancelled })
+                entries,
+                settings: settings,
+                context: context,
+                given: given,
+                fileSystems: fileSystems,
+                cache: cache,
+                cancellation: cancellation,
+                isCancelled: { cancellation.isCancelled }
+            )
         }
         guard previewsInBackground else {
             apply(compute())
@@ -310,8 +322,12 @@ final class MultiRenameSession {
                 return Keys(
                     name: Sorter.key(of: entry.name, numeric: true),
                     ext: Sorter.key(
-                        of: key == .ext && !item.isFolder ? FileItem.split(entry.name).ext : "", numeric: true),
-                    size: item.size, modified: item.modified)
+                        of: key == .ext && !item.isFolder ? FileItem.split(entry.name).ext : "",
+                        numeric: true
+                    ),
+                    size: item.size,
+                    modified: item.modified
+                )
             }
         }
         @Sendable func inOrder(_ first: Keys, _ second: Keys) -> Bool {
@@ -469,7 +485,7 @@ final class MultiRenameSession {
         let finish: @MainActor @Sendable (Result<[String], any Error>) -> Void = { [self] result in
             switch result {
             case .success(let names): applyGivenNames(names)
-            case .failure(let error): kernel.ui.report(error, title: "The names cannot be loaded!")
+            case .failure(let error): kernel.interaction.report(error, title: "The names cannot be loaded!")
             }
             completion?()
         }
@@ -490,9 +506,12 @@ final class MultiRenameSession {
         let ask: @MainActor @Sendable (String) -> Void = { [self] text in
             let fields = [FormField.lines("names", "", text)]
             guard
-                let answer = kernel.ui.form(
-                    "Edit names", detail: "One name per line, in the order of the list.", fields: fields,
-                    buttons: ["OK"])
+                let answer = kernel.interaction.form(
+                    "Edit names",
+                    detail: "One name per line, in the order of the list.",
+                    fields: fields,
+                    buttons: ["OK"]
+                )
             else {
                 return
             }
@@ -504,13 +523,14 @@ final class MultiRenameSession {
             return
         }
         let (current, names, generation) = (entries, newNames, listGeneration)
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            let text = current.indices.map { names[$0] ?? current[$0].name }.joined(separator: "\n")
-            performOnMainLoop { [weak self] in
-                guard let self, self.listGeneration == generation else { return }
-                ask(text)
+        DispatchQueue.global(qos: .userInitiated)
+            .async { [weak self] in
+                let text = current.indices.map { names[$0] ?? current[$0].name }.joined(separator: "\n")
+                performOnMainLoop { [weak self] in
+                    guard let self, self.listGeneration == generation else { return }
+                    ask(text)
+                }
             }
-        }
     }
 
     /// Back to names made by the masks.
@@ -585,13 +605,19 @@ final class MultiRenameSession {
         let fresh = RenameCache()
         titleRule = store.titleRule
         let (entries, settings, context, given) = (self.entries, self.settings, makeContext(cache: fresh), givenNames)
-        let (fileSystems, ui, logURL) = (kernel.fileSystems, kernel.ui, self.logURL)
+        let (fileSystems, ui, logURL) = (kernel.fileSystems, kernel.interaction, self.logURL)
         kernel.jobs.run(
             title: "Multi-Rename:",
             work: { monitor -> Outcome in
                 let preview = RenameComputation.preview(
-                    entries, settings: settings, context: context, given: given, fileSystems: fileSystems,
-                    cache: fresh, cancellation: monitor.cancellation, isCancelled: { monitor.cancellation.isCancelled }
+                    entries,
+                    settings: settings,
+                    context: context,
+                    given: given,
+                    fileSystems: fileSystems,
+                    cache: fresh,
+                    cancellation: monitor.cancellation,
+                    isCancelled: { monitor.cancellation.isCancelled }
                 )
                 var outcome = Outcome(entries: entries)
                 outcome.unusable = preview.statuses.filter { $0 == .error || $0.isInvalid }.count
@@ -614,7 +640,9 @@ final class MultiRenameSession {
                                 "\(moving.count) of the names given move the file into another folder.",
                                 detail: examples
                                     + "\n\nA name with a / puts the file in that folder, and one that starts with a / anywhere on the disk. Rename anyway?",
-                                buttons: ["Rename", "Cancel"], style: .warning) == 0
+                                buttons: ["Rename", "Cancel"],
+                                style: .warning
+                            ) == 0
                         }
                         guard go else {
                             outcome.result.cancelled = true
@@ -634,7 +662,8 @@ final class MultiRenameSession {
                             "Name conflict: \(conflicts.count) file(s) would get a name that is already in use.",
                             detail: names + "\n\nAuto-rename them to \"name (2).ext\", \"name (3).ext\", …?",
                             [("Auto-rename", .autoRename), ("Skip these files", .skip), ("Cancel", .cancel)],
-                            fallback: ConflictChoice.cancel)
+                            fallback: ConflictChoice.cancel
+                        )
                     }
                     switch choice {
                     case .cancel:
@@ -643,18 +672,27 @@ final class MultiRenameSession {
 
                     case .autoRename:
                         targets = preview.planner.autoRenamed(
-                            sources: sources, targets: targets, isFolder: entries.map(\.item.isFolder),
-                            existing: preview.existing)
+                            sources: sources,
+                            targets: targets,
+                            isFolder: entries.map(\.item.isFolder),
+                            existing: preview.existing
+                        )
 
                     case .skip:
                         // Leaving an item where it is can put it in the way of another one.
                         targets = preview.planner.skippingConflicts(
-                            sources: sources, targets: targets, existing: preview.existing)
+                            sources: sources,
+                            targets: targets,
+                            existing: preview.existing
+                        )
                     }
                 }
                 let steps = preview.planner.steps(
-                    sources: sources, targets: targets, isFolder: entries.map(\.item.isFolder),
-                    cancelled: { monitor.cancellation.isCancelled })
+                    sources: sources,
+                    targets: targets,
+                    isFolder: entries.map(\.item.isFolder),
+                    cancelled: { monitor.cancellation.isCancelled }
+                )
                 guard !monitor.cancellation.isCancelled else {
                     outcome.result.cancelled = true
                     return outcome
@@ -672,7 +710,10 @@ final class MultiRenameSession {
                                 "From: " + fileSystems.displayPath(sources[step.item]),
                                 "To: " + step.to.lastPathComponent
                             ],
-                            itemsDone: done, itemsTotal: total))
+                            itemsDone: done,
+                            itemsTotal: total
+                        )
+                    )
                 }
                 outcome.result = runner.run(steps, sources: sources)
                 // What the main thread will need, so that it does not walk the list for it.
@@ -684,10 +725,11 @@ final class MultiRenameSession {
                         from.contains($0.item.url.locationKey)
                     }
                 var folders = Set<String>()
-                outcome.folders = outcome.result.renamed.flatMap {
-                    [$0.from.deletingLastPathComponent(), $0.to.deletingLastPathComponent()]
-                }
-                .filter { folders.insert($0.locationKey).inserted }
+                outcome.folders = outcome.result.renamed
+                    .flatMap {
+                        [$0.from.deletingLastPathComponent(), $0.to.deletingLastPathComponent()]
+                    }
+                    .filter { folders.insert($0.locationKey).inserted }
                 if !outcome.result.renamed.isEmpty {
                     RenameLog.write(outcome.result.renamed, to: logURL, fileSystems: fileSystems)
                 }
@@ -698,7 +740,8 @@ final class MultiRenameSession {
                 self.isBusy = false
                 self.finish(outcome)
                 completion?(outcome.result)
-            })
+            }
+        )
     }
 
     /// A successful run shows no message: the renamed items leave the list and Undo and the
@@ -719,17 +762,23 @@ final class MultiRenameSession {
             kernel.panels.refresh(outcome.folders, focus: result.renamed.last?.to)
         }
         if !result.failures.isEmpty {
-            let lines = result.failures.prefix(15).map { failure in
-                (outcome.entries.indices.contains(failure.item) ? outcome.entries[failure.item].item.name : "?") + ": "
-                    + failure.message
-            }
-            kernel.ui.inform(
+            let lines = result.failures.prefix(15)
+                .map { failure in
+                    (outcome.entries.indices.contains(failure.item) ? outcome.entries[failure.item].item.name : "?")
+                        + ": "
+                        + failure.message
+                }
+            kernel.interaction.inform(
                 "\(result.failures.count) file(s) could not be renamed!",
-                detail: lines.joined(separator: "\n") + (result.failures.count > 15 ? "\n…" : ""), style: .warning)
+                detail: lines.joined(separator: "\n") + (result.failures.count > 15 ? "\n…" : ""),
+                style: .warning
+            )
         } else if outcome.unusable > 0, !result.cancelled {
-            kernel.ui.inform(
+            kernel.interaction.inform(
                 "\(outcome.unusable) file(s) were left out because the rename mask gives no valid name for them.",
-                detail: "", style: .warning)
+                detail: "",
+                style: .warning
+            )
         }
         listChanged()
     }
@@ -768,7 +817,9 @@ final class MultiRenameSession {
         let detail =
             "Undo the following rename action:\n" + lines.joined(separator: "\n")
             + (last.count > 20 ? "\n… (\(last.count) files)" : "")
-        guard kernel.ui.choose(kernel.productName, detail: detail, buttons: ["Yes", "No"], style: .information) == 0
+        guard
+            kernel.interaction.choose(kernel.productName, detail: detail, buttons: ["Yes", "No"], style: .information)
+                == 0
         else {
             isBusy = false
             return
@@ -782,7 +833,8 @@ final class MultiRenameSession {
                 let (sources, targets) = (back.map(\.to), back.map { Optional($0.from) })
                 let survey = RenameSurvey(fileSystems: fileSystems, cancellation: monitor.cancellation)
                 let planner = RenamePlanner(
-                    foldsCase: survey.foldsCase(sources.prefix(16).compactMap(fileSystems.item(at:))))
+                    foldsCase: survey.foldsCase(sources.prefix(16).compactMap(fileSystems.item(at:)))
+                )
                 let runner = RenameRunner(fileSystems: fileSystems, cancellation: monitor.cancellation)
                 var lastReport = Date.distantPast
                 runner.onProgress = { step, done in
@@ -791,11 +843,17 @@ final class MultiRenameSession {
                     monitor.report(
                         JobProgress(
                             lines: ["From: " + fileSystems.displayPath(step.from), "To: " + step.to.lastPathComponent],
-                            itemsDone: done, itemsTotal: back.count))
+                            itemsDone: done,
+                            itemsTotal: back.count
+                        )
+                    )
                 }
                 var outcome = UndoOutcome()
                 let steps = planner.steps(
-                    sources: sources, targets: targets, cancelled: { monitor.cancellation.isCancelled })
+                    sources: sources,
+                    targets: targets,
+                    cancelled: { monitor.cancellation.isCancelled }
+                )
                 guard !monitor.cancellation.isCancelled else {
                     outcome.result.cancelled = true
                     return outcome
@@ -809,10 +867,11 @@ final class MultiRenameSession {
                 let stillThere = Set(zip(outcome.attempted, present).filter(\.1).map(\.0.to.locationKey))
                 outcome.left = outcome.attempted.filter { stillThere.contains($0.to.locationKey) }
                 var folders = Set<String>()
-                outcome.folders = last.flatMap {
-                    [$0.from.deletingLastPathComponent(), $0.to.deletingLastPathComponent()]
-                }
-                .filter { folders.insert($0.locationKey).inserted }
+                outcome.folders =
+                    last.flatMap {
+                        [$0.from.deletingLastPathComponent(), $0.to.deletingLastPathComponent()]
+                    }
+                    .filter { folders.insert($0.locationKey).inserted }
                 return outcome
             },
             completion: { outcome in
@@ -822,10 +881,11 @@ final class MultiRenameSession {
                 self.lastRun = []
                 self.kernel.panels.refresh(outcome.folders, focus: outcome.result.renamed.last?.to)
                 if !outcome.left.isEmpty {
-                    self.kernel.ui.inform(
+                    self.kernel.interaction.inform(
                         "\(outcome.attempted.count) file(s) could not be renamed back!",
                         detail: outcome.result.failures.prefix(15).map(\.message).joined(separator: "\n"),
-                        style: .warning)
+                        style: .warning
+                    )
                 }
                 self.cache = RenameCache()
                 self.listGeneration += 1
@@ -833,7 +893,8 @@ final class MultiRenameSession {
                 // The files are where they were: the marks of conflicts in the list are looked at again.
                 self.refresh()
                 completion?(outcome.attempted)
-            })
+            }
+        )
     }
 
     /// Shows the log of the last run in the viewer.
@@ -844,10 +905,12 @@ final class MultiRenameSession {
         } else if kernel.commands[.view] != nil {
             kernel.commands.perform(.view, .location(logURL))
         } else {
-            _ = kernel.ui.form(
-                "Result list", detail: "",
+            _ = kernel.interaction.form(
+                "Result list",
+                detail: "",
                 fields: [.lines("log", "", RenameLog.text(lastRun, fileSystems: kernel.fileSystems))],
-                buttons: ["Close"])
+                buttons: ["Close"]
+            )
         }
     }
 }

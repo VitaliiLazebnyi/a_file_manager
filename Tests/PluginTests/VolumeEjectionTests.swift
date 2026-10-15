@@ -76,11 +76,13 @@ private final class StandInDrive: VolumeAccess, @unchecked Sendable {
         #expect(bench.left.model.directory.isSameLocation(as: box.url("A")))
         #expect(
             background.directory.isSameLocation(as: home)
-                && bench.right.model.directory.isSameLocation(as: box.url("B")))
+                && bench.right.model.directory.isSameLocation(as: box.url("B"))
+        )
         #expect(released.count == 1 && released.first?.isSameLocation(as: stick) == true && drive.ejects == 1)
         #expect(
             bench.interaction.log.last == "notice: “STICK” can now be removed safely."
-                && tools.log.last == "eject: \(stick.path)")
+                && tools.log.last == "eject: \(stick.path)"
+        )
     }
 
     @Test func theDriveOfAGivenLocationIsEjectedWhicheverPanelIsActive() {
@@ -97,12 +99,16 @@ private final class StandInDrive: VolumeAccess, @unchecked Sendable {
         bench.left.show(box.url("Stick/photos"))
         bench.commands.perform(SystemToolsCommands.ejectVolume)
         #expect(bench.left.model.directory.isSameLocation(as: box.url("Stick/photos")))
-        #expect(bench.interaction.log.last == "inform: “STICK” cannot be ejected" && tools.log.isEmpty && drive.ejects == 1)
+        #expect(
+            bench.interaction.log.last == "inform: “STICK” cannot be ejected" && tools.log.isEmpty && drive.ejects == 1
+        )
     }
 
     @Test func whatThisProgramLetGoOfIsGivenAMoment() {
         let drive = StandInDrive(
-            stick, refusals: [EjectRefusal(program: "AFileManager", isThisProgram: true, reason: "busy")])
+            stick,
+            refusals: [EjectRefusal(program: "AFileManager", isThisProgram: true, reason: "busy")]
+        )
         let (bench, _) = bench(drive)
         bench.left.show(stick)
         bench.commands.perform(SystemToolsCommands.ejectVolume)
@@ -131,12 +137,18 @@ private final class StandInDrive: VolumeAccess, @unchecked Sendable {
 
     @Test func onlyDrivesThatLeaveTheMacCanBeEjected() {
         func ejectable(
-            _ path: String, root: Bool? = false, internal inside: Bool?, local: Bool? = true, removable: Bool? = false,
+            _ path: String,
+            root: Bool? = false,
+            internal inside: Bool?,
+            local: Bool? = true,
+            removable: Bool? = false,
             ejectable: Bool? = false
         ) -> Bool {
-            Place.isEjectable(
-                path: path, isRootFileSystem: root, isInternal: inside, isLocal: local, isRemovable: removable,
-                isEjectable: ejectable)
+            func fact(_ value: Bool?) -> Place.Fact { value.map(Place.Fact.known) ?? .unknown }
+            var traits = Place.VolumeTraits(path: path, values: nil)
+            (traits.isRootFileSystem, traits.isInternal, traits.isLocal) = (fact(root), fact(inside), fact(local))
+            (traits.isRemovable, traits.isEjectable) = (fact(removable), fact(ejectable))
+            return traits.mayBeEjected
         }
         // Never: the start-up disk, a system volume, a second disk or partition inside the Mac,
         // or a disk the system says nothing about.

@@ -125,7 +125,7 @@ internal struct SettingsMigrationShell {
     internal func theButtonBarKeepsItsLines() {
         _ = NSApplication.shared
         let settings = Self.settings([ToolbarRegistry.settingsKey: #"["cm_Copy","","cm_Delete"]"#])
-        let kernel = Kernel(productName: "Test", settings: settings, ui: ScriptedInteraction())
+        let kernel = Kernel(productName: "Test", settings: settings, interaction: ScriptedInteraction())
         let scratch = ScratchPasteboard()
         kernel.load(CorePlugins.make(pasteboard: scratch.pasteboard))
         defer { kernel.shutdown() }

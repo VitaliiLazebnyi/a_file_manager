@@ -33,7 +33,7 @@ final class ScriptedFileSystem: FileSystemProvider, @unchecked Sendable {
 
     func url(_ path: String) -> URL { inner.url(path) }
     func item(named name: String, in folder: String, isDirectory: Bool = false) -> FileItem {
-        FileItem(url: url(folder + "/" + name), name: name, isDirectory: isDirectory)
+        FileItem(url: url(folder + "/" + name), name: name, kind: .init(isDirectory: isDirectory))
     }
 
     var listingsBegun: Int {

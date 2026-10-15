@@ -206,7 +206,11 @@ private func created(_ url: URL) -> Date? {
         let source = base.addFile("/src/big.bin", "some data")
         let out = try box.folder("out")
         let job = FileJob(
-            kind: .copy, sources: [source], target: TargetSpec(directory: out), fileSystems: registry(probe))
+            kind: .copy,
+            sources: [source],
+            target: TargetSpec(directory: out),
+            fileSystems: registry(probe)
+        )
         let answers = Answers()
         job.delegate = answers
         cancel(job, when: gate)
@@ -226,8 +230,11 @@ private func created(_ url: URL) -> Date? {
         let source = try box.file("A/data.bin", "some data")
         base.addDirectory("/out")
         let job = FileJob(
-            kind: .copy, sources: [source], target: TargetSpec(directory: base.url("/out")),
-            fileSystems: registry(probe))
+            kind: .copy,
+            sources: [source],
+            target: TargetSpec(directory: base.url("/out")),
+            fileSystems: registry(probe)
+        )
         let answers = Answers()
         job.delegate = answers
         cancel(job, when: gate)
@@ -254,7 +261,11 @@ private func created(_ url: URL) -> Date? {
         let source = base.addFile("/src/big.bin", "some data")
         let out = try box.folder("out")
         let job = FileJob(
-            kind: .copy, sources: [source], target: TargetSpec(directory: out), fileSystems: registry(probe))
+            kind: .copy,
+            sources: [source],
+            target: TargetSpec(directory: out),
+            fileSystems: registry(probe)
+        )
         job.options.verifies = true
         let answers = Answers()
         job.delegate = answers
@@ -275,8 +286,11 @@ private func created(_ url: URL) -> Date? {
         base.addFile("/src/tree/a.txt")
         let out = try box.folder("out")
         let job = FileJob(
-            kind: .copy, sources: [base.url("/src/tree")], target: TargetSpec(directory: out),
-            fileSystems: registry(probe))
+            kind: .copy,
+            sources: [base.url("/src/tree")],
+            target: TargetSpec(directory: out),
+            fileSystems: registry(probe)
+        )
         let answers = Answers()
         job.delegate = answers
         cancel(job, when: gate)
@@ -343,7 +357,11 @@ private func created(_ url: URL) -> Date? {
         }
         try box.folder("B")
         let job = FileJob(
-            kind: .copy, sources: [tree], target: TargetSpec(directory: box.url("B")), fileSystems: registry())
+            kind: .copy,
+            sources: [tree],
+            target: TargetSpec(directory: box.url("B")),
+            fileSystems: registry()
+        )
         // Folders are made when the first file arrives in them.
         job.options.filter = CopyFilter("*.txt | **/")
         let answers = Answers()
@@ -412,7 +430,10 @@ private func created(_ url: URL) -> Date? {
         plain.addFile("/src/tree/a.txt")
         plain.addDirectory("/dst")
         runJob(
-            .copy, [plain.url("/src/tree")], to: TargetSpec(directory: plain.url("/dst")), replies: Replies(),
+            .copy,
+            [plain.url("/src/tree")],
+            to: TargetSpec(directory: plain.url("/dst")),
+            replies: Replies(),
             fileSystems: registry(plain)
         ) { $0.options.preservesAttributes = false }
         #expect(plain.metadataCopies.isEmpty)
@@ -423,8 +444,11 @@ private func created(_ url: URL) -> Date? {
         merged.addFile("/src/tree/a.txt")
         merged.addFile("/dst/tree/old.txt")
         runJob(
-            .copy, [merged.url("/src/tree")], to: TargetSpec(directory: merged.url("/dst")),
-            fileSystems: registry(merged))
+            .copy,
+            [merged.url("/src/tree")],
+            to: TargetSpec(directory: merged.url("/dst")),
+            fileSystems: registry(merged)
+        )
         #expect(merged.metadataCopies.isEmpty)
     }
 
@@ -433,7 +457,11 @@ private func created(_ url: URL) -> Date? {
         base.addFile("/src/tree/a.txt", "a")
         base.addDirectory("/dst")
         let result = runJob(
-            .copy, [base.url("/src/tree")], to: TargetSpec(directory: base.url("/dst")), fileSystems: registry(base))
+            .copy,
+            [base.url("/src/tree")],
+            to: TargetSpec(directory: base.url("/dst")),
+            fileSystems: registry(base)
+        )
         #expect(result.completed.count == 1 && result.failureCount == 0)
         #expect(base.contents("/dst/tree/a.txt") == "a")
     }
@@ -455,7 +483,10 @@ private func created(_ url: URL) -> Date? {
     private func resume(_ base: MemoryFileSystem, _ probe: ProbeFileSystem, verify: Bool = false) -> Replies {
         let replies = Replies(.resume)
         runJob(
-            .copy, [base.url("/s/file.txt")], to: TargetSpec(directory: base.url("/t")), replies: replies,
+            .copy,
+            [base.url("/s/file.txt")],
+            to: TargetSpec(directory: base.url("/t")),
+            replies: replies,
             fileSystems: registry(probe)
         ) {
             $0.options.verifies = verify
@@ -465,7 +496,10 @@ private func created(_ url: URL) -> Date? {
 
     @Test func aResumeContinuesThePartialFileWhereTheFileSystemCanAppend() {
         let (base, probe) = setUp(
-            partial: "hello wo", source: "hello world, resumed", capabilities: [.write, .append])
+            partial: "hello wo",
+            source: "hello world, resumed",
+            capabilities: [.write, .append]
+        )
         let replies = resume(base, probe)
         #expect(replies.errors.isEmpty)
         #expect(base.contents("/t/file.txt") == "hello world, resumed")
@@ -495,7 +529,10 @@ private func created(_ url: URL) -> Date? {
 
     @Test func aPartialFileThatIsNotTheStartOfTheSourceIsNotContinued() {
         let (base, probe) = setUp(
-            partial: "hellX wo", source: "hello world, resumed", capabilities: [.write, .append])
+            partial: "hellX wo",
+            source: "hello world, resumed",
+            capabilities: [.write, .append]
+        )
         let replies = resume(base, probe)
         #expect(replies.errors.count == 1 && replies.errors[0].contains("cannot be resumed"))
         #expect(base.contents("/t/file.txt") == "hellX wo")
@@ -512,7 +549,10 @@ private func created(_ url: URL) -> Date? {
         #expect(base.contents("/t/file.txt") == partial)
 
         let (good, goodProbe) = setUp(
-            partial: String(repeating: "a", count: 1_500_000), source: source, capabilities: [.write, .append])
+            partial: String(repeating: "a", count: 1_500_000),
+            source: source,
+            capabilities: [.write, .append]
+        )
         let ok = resume(good, goodProbe, verify: true)
         #expect(ok.errors.isEmpty && good.contents("/t/file.txt") == source)
         #expect(goodProbe.count(of: "append") == 1)
@@ -578,7 +618,10 @@ private func created(_ url: URL) -> Date? {
         base.commitFailure = CocoaError(.fileWriteOutOfSpace)
         let retry = RetryOnce()
         let job = FileJob(
-            kind: .move, sources: files, target: TargetSpec(directory: base.url("/out")), fileSystems: registry(probe)
+            kind: .move,
+            sources: files,
+            target: TargetSpec(directory: base.url("/out")),
+            fileSystems: registry(probe)
         )
         job.delegate = retry
         let result = withExtendedLifetime(retry) { job.run() }
@@ -604,7 +647,11 @@ private func created(_ url: URL) -> Date? {
         let files = try (1...7).map { try box.file("A/f\($0).txt", "c\($0)") }
         let (base, probe) = destination([.write, .deferredWrites])
         runJob(
-            .move, files, to: TargetSpec(directory: base.url("/out")), replies: Replies(), fileSystems: registry(probe)
+            .move,
+            files,
+            to: TargetSpec(directory: base.url("/out")),
+            replies: Replies(),
+            fileSystems: registry(probe)
         ) {
             $0.deferredBatchSize = 2
             // One file at a time, so that the count of waiting removals is the same on every run.
@@ -624,7 +671,11 @@ private func created(_ url: URL) -> Date? {
         probe.onMove = { Thread.sleep(forTimeInterval: 0.01) }
         probe.onCommit = { seen.modify { $0 += base.allPaths.filter { $0.contains(".afm-") } } }
         runJob(
-            .move, files, to: TargetSpec(directory: base.url("/out")), replies: Replies(), fileSystems: registry(probe)
+            .move,
+            files,
+            to: TargetSpec(directory: base.url("/out")),
+            replies: Replies(),
+            fileSystems: registry(probe)
         ) {
             $0.deferredBatchSize = 2
             $0.parallelWidth = 4
@@ -644,8 +695,12 @@ private func created(_ url: URL) -> Date? {
         #expect(chflags(box.url("A/tree/a.txt").path, UInt32(UF_IMMUTABLE)) == 0)
         defer { chflags(box.url("A/tree/a.txt").path, 0) }
         let result = runJob(
-            .move, [tree], to: TargetSpec(directory: base.url("/out")), replies: Replies(),
-            fileSystems: registry(probe))
+            .move,
+            [tree],
+            to: TargetSpec(directory: base.url("/out")),
+            replies: Replies(),
+            fileSystems: registry(probe)
+        )
         #expect(result.completed.isEmpty)
         #expect(box.exists("A/tree/a.txt"))
     }
@@ -670,8 +725,11 @@ private func created(_ url: URL) -> Date? {
         let target = MemoryFileSystem(scheme: "arc")
         target.addDirectory("/out")
         let result = runJob(
-            .copy, [source.url("/src/tree")], to: TargetSpec(directory: target.url("/out")),
-            fileSystems: registry(probe, target))
+            .copy,
+            [source.url("/src/tree")],
+            to: TargetSpec(directory: target.url("/out")),
+            fileSystems: registry(probe, target)
+        )
         #expect(result.completed.count == 1)
         let marks = target.quarantineMarks
         // Three files under their temporary names, two folders under their own.
@@ -689,8 +747,11 @@ private func created(_ url: URL) -> Date? {
         let target = MemoryFileSystem(scheme: "arc")
         target.addDirectory("/out")
         runJob(
-            .copy, [source.url("/src/tree")], to: TargetSpec(directory: target.url("/out")),
-            fileSystems: registry(source, target))
+            .copy,
+            [source.url("/src/tree")],
+            to: TargetSpec(directory: target.url("/out")),
+            fileSystems: registry(source, target)
+        )
         #expect(target.quarantineMarks.isEmpty)
 
         let marked = MemoryFileSystem(scheme: "mem")
@@ -698,8 +759,11 @@ private func created(_ url: URL) -> Date? {
         tree(in: marked)
         marked.addDirectory("/out")
         runJob(
-            .copy, [marked.url("/src/tree")], to: TargetSpec(directory: marked.url("/out")),
-            fileSystems: registry(marked))
+            .copy,
+            [marked.url("/src/tree")],
+            to: TargetSpec(directory: marked.url("/out")),
+            fileSystems: registry(marked)
+        )
         #expect(marked.quarantineMarks.isEmpty)
     }
 
@@ -713,8 +777,12 @@ private func created(_ url: URL) -> Date? {
             target.addFile("/t/file.txt", "hello")
             let replies = Replies(.resume)
             runJob(
-                .copy, [source.url("/s/file.txt")], to: TargetSpec(directory: target.url("/t")), replies: replies,
-                fileSystems: registry(source, target))
+                .copy,
+                [source.url("/s/file.txt")],
+                to: TargetSpec(directory: target.url("/t")),
+                replies: replies,
+                fileSystems: registry(source, target)
+            )
             #expect(target.contents("/t/file.txt") == "hello world")
             // Continued in place the file has its name already; written anew it is marked under the temporary name.
             let marks = target.quarantineMarks
@@ -735,7 +803,10 @@ private func created(_ url: URL) -> Date? {
         base.addFile("/dst/A/existing.txt")
         let probe = ProbeFileSystem(base)
         let result = runJob(
-            .move, [base.url("/src/A")], to: TargetSpec(directory: base.url("/dst")), replies: Replies(),
+            .move,
+            [base.url("/src/A")],
+            to: TargetSpec(directory: base.url("/dst")),
+            replies: Replies(),
             fileSystems: registry(probe)
         ) {
             $0.rememberedLimit = 2
@@ -750,12 +821,13 @@ private func created(_ url: URL) -> Date? {
 
 @MainActor @Suite struct FileOpsAdoptSelection {
     @Test func processedItemsAreFoundByLocationWhoseNamesArePaths() {
-        let inFolder = FileItem(url: URL(fileURLWithPath: "/x/sub/a.txt"), name: "sub/a.txt", isDirectory: false)
-        let alsoNamedA = FileItem(url: URL(fileURLWithPath: "/x/a.txt"), name: "a.txt", isDirectory: false)
-        let other = FileItem(url: URL(fileURLWithPath: "/x/other/b.txt"), name: "other/b.txt", isDirectory: false)
+        let inFolder = FileItem(url: URL(fileURLWithPath: "/x/sub/a.txt"), name: "sub/a.txt")
+        let alsoNamedA = FileItem(url: URL(fileURLWithPath: "/x/a.txt"), name: "a.txt")
+        let other = FileItem(url: URL(fileURLWithPath: "/x/other/b.txt"), name: "other/b.txt")
         let names = FileOperations.names(
             of: [URL(fileURLWithPath: "/x/sub/a.txt"), URL(fileURLWithPath: "/x/other/b.txt")],
-            among: [inFolder, alsoNamedA, other])
+            among: [inFolder, alsoNamedA, other]
+        )
         #expect(names == ["sub/a.txt", "other/b.txt"])
         #expect(FileOperations.names(of: [], among: [inFolder]).isEmpty)
     }
@@ -777,7 +849,9 @@ private func created(_ url: URL) -> Date? {
         bench = TestBench(
             plugins: [FileOperationsPlugin(), ClipboardPlugin(), FilePropertiesPlugin()],
             fileSystems: [LocalFileSystem(), memory],
-            left: memory.url("/A"), right: memory.url("/B"))
+            left: memory.url("/A"),
+            right: memory.url("/B")
+        )
     }
 
     @Test func commandsFollowTheCapabilitiesOfTheFolderShown() {

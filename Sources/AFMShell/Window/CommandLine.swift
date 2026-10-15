@@ -45,7 +45,7 @@ enum CommandLineAction: Equatable {
 
     /// A command's parameter (spec 17 › Parameters): a number is a position, other text is text.
     static func argument(from text: String) -> CommandArgument {
-        if text.isEmpty { return .none }
+        if text.isEmpty { return .nothing }
         if let number = Int(text) { return .index(number) }
         return .text(unquoted(text))
     }
@@ -82,8 +82,11 @@ final class CommandLineHistory {
     init(settings: any SettingsStore) {
         self.settings = settings
         entries = Array(
-            (settings.value([String].self, forKey: Self.settingsKey) ?? []).prefix(
-                Self.limit))
+            (settings.value([String].self, forKey: Self.settingsKey) ?? [])
+                .prefix(
+                    Self.limit
+                )
+        )
         forgetIfSwitchedOff()
     }
 

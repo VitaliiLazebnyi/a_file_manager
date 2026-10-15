@@ -121,8 +121,11 @@ final class ConfigurationStore {
         get {
             if let cachedUserCommands { return cachedUserCommands }
             let loaded = Array(
-                load(UserCommand.self, key: Self.userCommandsKey, what: "user commands").prefix(
-                    Self.userCommandLimit))
+                load(UserCommand.self, key: Self.userCommandsKey, what: "user commands")
+                    .prefix(
+                        Self.userCommandLimit
+                    )
+            )
             cachedUserCommands = loaded
             return loaded
         }
@@ -136,8 +139,11 @@ final class ConfigurationStore {
         get {
             if let cachedStartMenu { return cachedStartMenu }
             let loaded = Array(
-                load(StartMenuEntry.self, key: Self.startMenuKey, what: "Start menu").prefix(
-                    Self.startMenuLimit))
+                load(StartMenuEntry.self, key: Self.startMenuKey, what: "Start menu")
+                    .prefix(
+                        Self.startMenuLimit
+                    )
+            )
             cachedStartMenu = loaded
             return loaded
         }
@@ -263,7 +269,11 @@ final class ToolbarEditor {
         store.symbols = symbols
         for (name, symbol) in symbols { toolbar.setSymbol(symbol, for: CommandID(rawValue: name)) }
         // Storing the layout also has the bar drawn again, with the new pictures.
-        toolbar.setLayout(isDefault ? nil : items, in: settings)
+        if isDefault {
+            toolbar.resetLayout(in: settings)
+        } else {
+            toolbar.setLayout(items, in: settings)
+        }
         isChanged = false
     }
 }
@@ -373,8 +383,9 @@ struct SettingsArchive: Equatable {
             {
                 values[key] = raw
             } else if let json = try? JSONSerialization.data(
-                withJSONObject: value, options: [.fragmentsAllowed, .sortedKeys])
-            {
+                withJSONObject: value,
+                options: [.fragmentsAllowed, .sortedKeys]
+            ) {
                 values[key] = json
             }
         }

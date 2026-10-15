@@ -43,7 +43,7 @@ internal struct PanelModelListFixTests {
         let memory = MemoryFileSystem()
         memory.addFile("/big/a/one.bin", "x")
         memory.addFile("/big/b/two.bin", "x")
-        #expect(HugeSizes(memory).totalSize(of: memory.url("/big")) == .max)
+        #expect(HugeSizes(memory).totalSize(of: memory.url("/big"), cancellation: CancellationFlag()) == .max)
     }
 
     /// A remembered list replaced by a fresh reading that holds the same entries: nothing in

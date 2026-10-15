@@ -80,7 +80,7 @@ internal struct QuitTests {
     /// quit hands every plugin the flag and ends on the main thread, once, when the last is done.
     @Test
     internal func aPluginCanCallTheQuitOffAndFinishItsWorkBeforeIt() async {
-        let kernel = Kernel(productName: "Test", settings: MemorySettings(), ui: ScriptedInteraction())
+        let kernel = Kernel(productName: "Test", settings: MemorySettings(), interaction: ScriptedInteraction())
         let (first, second) = (QuittingPlugin("first"), QuittingPlugin("second"))
         kernel.load([first, PlainPlugin(), second])
         #expect(kernel.shouldTerminate())

@@ -66,7 +66,7 @@ internal struct SettingsMigrationApp {
     /// Starts the program on the settings and waits until both panels are listed.
     private func start(on settings: any SettingsStore) async throws -> (shell: Shell, kernel: Kernel) {
         _ = NSApplication.shared
-        let kernel = Kernel(productName: StandardPlugins.productName, settings: settings, ui: interaction)
+        let kernel = Kernel(productName: StandardPlugins.productName, settings: settings, interaction: interaction)
         kernel.load(CorePlugins.make(pasteboard: scratch.pasteboard))
         let shell = Shell(kernel: kernel, home: try box.folder("home"))
         let deadline = Date().addingTimeInterval(10)

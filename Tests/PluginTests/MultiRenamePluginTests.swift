@@ -23,16 +23,21 @@ import Testing
         box = try Sandbox()
         for (index, name) in ["IMG_1001.jpg", "IMG_1002.jpg", "IMG_1003.jpg"].enumerated() {
             memory.addFile(
-                "/photos/" + name, "p\(index)",
-                modified: Date(timeIntervalSince1970: 1_764_583_509 + Double(index) * 86_400))
+                "/photos/" + name,
+                "p\(index)",
+                modified: Date(timeIntervalSince1970: 1_764_583_509 + Double(index) * 86_400)
+            )
         }
         memory.addFile("/photos/notes.txt", "n")
         memory.addDirectory("/other")
         plugin = MultiRenamePlugin(opensWindows: false, logDirectory: box.url("log"))
         bench = TestBench(
-            plugins: [plugin], fileSystems: [LocalFileSystem(), memory], left: memory.url("/photos"),
+            plugins: [plugin],
+            fileSystems: [LocalFileSystem(), memory],
+            left: memory.url("/photos"),
             right: memory.url("/other"),
-            settings: settings)
+            settings: settings
+        )
     }
 
     /// Opens the tool on the given names of the left panel (all of them when none are given).
@@ -41,7 +46,7 @@ import Testing
         left.model.clearSelection()
         for name in names { left.model.select(mask: name) }
         if names.isEmpty { left.model.selectAll() }
-        #expect(bench.commands.perform(.multiRename, settingsName.map(CommandArgument.text) ?? .none))
+        #expect(bench.commands.perform(.multiRename, settingsName.map(CommandArgument.text) ?? .nothing))
         guard let session = plugin.session else { preconditionFailure("the command opens a session") }
         return session
     }
@@ -76,7 +81,8 @@ import Testing
         let session = open(["IMG_*"])
         #expect(
             names(session) == ["IMG_1001.jpg", "IMG_1002.jpg", "IMG_1003.jpg"]
-                && session.rows.allSatisfy { $0.status == .unchanged })
+                && session.rows.allSatisfy { $0.status == .unchanged }
+        )
         session.settings.nameMask = "Photo_[C]_[Y]-[M]-[D]"
         session.settings.counter = CounterDefinition(start: 110, step: 15, digits: 1)
         #expect(names(session) == ["Photo_110_2025-12-01.jpg", "Photo_125_2025-12-02.jpg", "Photo_140_2025-12-03.jpg"])
@@ -86,7 +92,8 @@ import Testing
         session.settings.nameMask = "[Q]"
         #expect(
             names(session) == [nil, nil, nil] && session.rows.allSatisfy { $0.status == .error }
-                && session.problem != nil)
+                && session.problem != nil
+        )
         #expect(photos == ["IMG_1001.jpg", "IMG_1002.jpg", "IMG_1003.jpg", "notes.txt"])
     }
 
@@ -108,14 +115,19 @@ import Testing
     }
 
     @Test func previewInTheBackground() async {
-        let items = (0..<3_000).map {
-            FileItem(url: memory.addFile("/many/f\($0).txt"), name: "f\($0).txt", isDirectory: false)
-        }
+        let items = (0..<3_000)
+            .map {
+                FileItem(url: memory.addFile("/many/f\($0).txt"), name: "f\($0).txt")
+            }
         var settings = RenameSettings()
         settings.nameMask = "[N]_[C:4]"
         let session = MultiRenameSession(
-            kernel: bench.kernel, items: items, store: RenameStore(settings: self.settings), settings: settings,
-            logDirectory: box.url("log"))
+            kernel: bench.kernel,
+            items: items,
+            store: RenameStore(settings: self.settings),
+            settings: settings,
+            logDirectory: box.url("log")
+        )
         var changes = 0
         session.onChange = { changes += 1 }
         // Changes that overtake each other leave the result of the last one.
@@ -178,7 +190,8 @@ import Testing
         session.start()
         #expect(
             memory.allPaths.filter { $0.hasPrefix("/photos/") && $0.hasSuffix(".jpg") }
-                == ["/photos/1/IMG_1001.jpg", "/photos/1/IMG_1002.jpg", "/photos/2/IMG_1003.jpg"])
+                == ["/photos/1/IMG_1001.jpg", "/photos/1/IMG_1002.jpg", "/photos/2/IMG_1003.jpg"]
+        )
         ui.choiceAnswers = [0]
         session.undo()
         // Undo puts the files back and leaves the folders.
@@ -194,14 +207,16 @@ import Testing
         #expect(
             ["IMG_1001.jpg", "IMG_1002.jpg", "IMG_1003.jpg"].map { memory.contents("/photos/" + $0) } == [
                 "p2", "p0", "p1"
-            ])
+            ]
+        )
         #expect(!memory.allPaths.contains { $0.contains("afm-rename") })
         ui.choiceAnswers = [0]
         session.undo()
         #expect(
             ["IMG_1001.jpg", "IMG_1002.jpg", "IMG_1003.jpg"].map { memory.contents("/photos/" + $0) } == [
                 "p0", "p1", "p2"
-            ])
+            ]
+        )
         #expect(!memory.allPaths.contains { $0.contains("afm-rename") })
     }
 
@@ -211,7 +226,8 @@ import Testing
         let session = open()
         session.settings.nameMask = "[C2]"
         #expect(
-            names(session) == ["2.txt", "3.txt", "4.txt", "5.txt"] && session.rows.allSatisfy { $0.status == .ready })
+            names(session) == ["2.txt", "3.txt", "4.txt", "5.txt"] && session.rows.allSatisfy { $0.status == .ready }
+        )
         session.start()
         #expect(namesOnDisk(box.url("A")) == ["2.txt", "3.txt", "4.txt", "5.txt"])
         #expect((2...5).map { box.read("A/\($0).txt") } == ["content 1", "content 2", "content 3", "content 4"])
@@ -384,7 +400,8 @@ import Testing
         #expect(session.move([1], by: -1) == [0])
         #expect(
             session.rows.map(\.entry.name).prefix(2) == ["IMG_1002.jpg", "IMG_1001.jpg"]
-                && names(session).first == "1.jpg")
+                && names(session).first == "1.jpg"
+        )
         #expect(session.move([0], by: -1) == [0] && session.move([3], by: 1) == [3])
         #expect(session.move([0, 1], by: 1) == [1, 2])
         #expect(session.rows.map(\.entry.name) == ["IMG_1003.jpg", "IMG_1002.jpg", "IMG_1001.jpg", "notes.txt"])
@@ -392,11 +409,13 @@ import Testing
         #expect(session.rows.map(\.entry.name) == ["IMG_1002.jpg", "IMG_1003.jpg", "notes.txt", "IMG_1001.jpg"])
         session.remove([0, 2])
         #expect(
-            session.rows.map(\.entry.name) == ["IMG_1003.jpg", "IMG_1001.jpg"] && names(session) == ["1.jpg", "2.jpg"])
+            session.rows.map(\.entry.name) == ["IMG_1003.jpg", "IMG_1001.jpg"] && names(session) == ["1.jpg", "2.jpg"]
+        )
         session.start()
         #expect(
             memory.contents("/photos/1.jpg") == "p2" && memory.contents("/photos/2.jpg") == "p0"
-                && memory.exists("/photos/IMG_1002.jpg"))
+                && memory.exists("/photos/IMG_1002.jpg")
+        )
     }
 
     @Test func nextStepChainsRules() {
@@ -458,7 +477,8 @@ import Testing
         session.save(as: " ")
         #expect(session.store.savedNames == ["numbered", "Zero"])
         #expect(
-            session.load("numbered") && session.settings.nameMask == "[N]_[C]" && session.settings.counter.digits == 3)
+            session.load("numbered") && session.settings.nameMask == "[N]_[C]" && session.settings.counter.digits == 3
+        )
         #expect(names(session).first == "IMG_1001_001.jpg")
         #expect(!session.load("unknown"))
         session.deleteSaved("Zero")
@@ -507,8 +527,13 @@ import Testing
         let box = try Sandbox()
         let bench = TestBench(plugins: [], fileSystems: [memory], left: memory.url("/w"), right: memory.url("/w"))
         let session = MultiRenameSession(
-            kernel: bench.kernel, items: bench.left.model.items, store: RenameStore(settings: bench.kernel.settings),
-            settings: .unchanged, logDirectory: box.url("log"), previewsInBackground: false)
+            kernel: bench.kernel,
+            items: bench.left.model.items,
+            store: RenameStore(settings: bench.kernel.settings),
+            settings: .unchanged,
+            logDirectory: box.url("log"),
+            previewsInBackground: false
+        )
         let controller = MultiRenameWindowController(kernel: bench.kernel, session: session)
         let window = try #require(controller.window)
         #expect(window.title == "Multi-Rename Tool")
@@ -519,7 +544,8 @@ import Testing
         let table = try #require(views(NSTableView.self, in: window.contentView).first)
         #expect(
             table.numberOfRows == 2
-                && table.tableColumns.map(\.title) == ["Old name", "Ext.", "New name", "Size", "Date", "Location"])
+                && table.tableColumns.map(\.title) == ["Old name", "Ext.", "New name", "Size", "Date", "Location"]
+        )
         #expect(views(NSButton.self, in: window.contentView).map(\.title).contains("Start!"))
         // A change of the session shows in the fields and in the list.
         session.settings.nameMask = "x[C]"

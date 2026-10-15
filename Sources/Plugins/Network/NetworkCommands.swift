@@ -31,7 +31,7 @@ final class NetworkCommands {
         }
     }
 
-    private var ui: any UserInteraction { kernel.ui }
+    private var ui: any UserInteraction { kernel.interaction }
     private var source: any PanelHandle { kernel.panels.source }
     var canEject: Bool { mounter != nil }
 
@@ -66,8 +66,10 @@ final class NetworkCommands {
                 else { return nil }
                 // Stored only once the server has accepted it (`rememberPassword`).
                 return Credentials(
-                    user: answer.text("user"), password: answer.text("password"),
-                    remember: profile.savedID != nil && answer.flag("save"))
+                    user: answer.text("user"),
+                    password: answer.text("password"),
+                    remember: profile.savedID != nil && answer.flag("save")
+                )
             }
         }
         environment.rememberPassword = { profile, password in
@@ -100,9 +102,12 @@ final class NetworkCommands {
                     """
                 // Return is Cancel: nobody asked for this connection.
                 return ui.choose(
-                    "Connect to \(profile.key.description)?", detail: detail, buttons: ["Connect", "Cancel"],
+                    "Connect to \(profile.key.description)?",
+                    detail: detail,
+                    buttons: ["Connect", "Cancel"],
                     style: .warning,
-                    defaultButton: 1) == 0
+                    defaultButton: 1
+                ) == 0
             }
         }
         environment.askToSendPasswordUnprotected = { profile in
@@ -119,15 +124,18 @@ final class NetworkCommands {
                     """
                 guard
                     let answer = ui.form(
-                        "Send the password unencrypted?", detail: detail,
+                        "Send the password unencrypted?",
+                        detail: detail,
                         fields: [.checkbox("always", "Do not ask again for this server", false)],
-                        buttons: ["Send Unencrypted"])
+                        buttons: ["Send Unencrypted"]
+                    )
                 else { return false }
                 if answer.flag("always") {
                     let known = kernel.settings.value([String].self, forKey: NetworkSettings.unprotectedHosts) ?? []
                     kernel.settings.set(
                         Array((known.filter { $0 != host } + [host]).suffix(200)),
-                        forKey: NetworkSettings.unprotectedHosts)
+                        forKey: NetworkSettings.unprotectedHosts
+                    )
                 }
                 return true
             }
@@ -145,8 +153,11 @@ final class NetworkCommands {
                     """
                 guard
                     let answer = ui.form(
-                        "SSL", detail: detail, fields: [.checkbox("always", "Always trust this server", false)],
-                        buttons: ["Yes"])
+                        "SSL",
+                        detail: detail,
+                        fields: [.checkbox("always", "Always trust this server", false)],
+                        buttons: ["Yes"]
+                    )
                 else { return false }
                 environment.trust.accept(certificate.fingerprint, for: profile.key.host)
                 if answer.flag("always") {
@@ -179,14 +190,19 @@ final class NetworkCommands {
                     """
                 let fields: [FormField] = [
                     .checkbox(
-                        "verified", "I have checked the new fingerprint. Trust it in place of the old certificate.",
-                        false)
+                        "verified",
+                        "I have checked the new fingerprint. Trust it in place of the old certificate.",
+                        false
+                    )
                 ]
                 // Only the ticked box is consent; the button alone, or Return, is not.
                 guard
                     let answer = ui.form(
-                        "The server's certificate has changed!", detail: detail, fields: fields,
-                        buttons: ["Replace the Trusted Certificate"]), answer.flag("verified")
+                        "The server's certificate has changed!",
+                        detail: detail,
+                        fields: fields,
+                        buttons: ["Replace the Trusted Certificate"]
+                    ), answer.flag("verified")
                 else { return false }
                 // The old certificate is trusted no longer, here and where it was stored.
                 environment.trust.replace(with: certificate.fingerprint, for: profile.key.host)
@@ -200,7 +216,12 @@ final class NetworkCommands {
                     // The secure shell asks to confirm a host key it has not seen.
                     // Return is No: a key is accepted on purpose.
                     return ui.choose(
-                        profile.title, detail: question, buttons: ["Yes", "No"], style: .warning, defaultButton: 1)
+                        profile.title,
+                        detail: question,
+                        buttons: ["Yes", "No"],
+                        style: .warning,
+                        defaultButton: 1
+                    )
                         == 0 ? "yes" : "no"
                 }
                 return ui.form(profile.title, detail: question, fields: [.password("secret", "")], buttons: ["OK"])?
@@ -214,7 +235,10 @@ final class NetworkCommands {
     /// Opens the connection in the source panel (spec 11 › Connecting). The login runs as a
     /// job with a Cancel button; the panel follows when it succeeded.
     func connect(
-        _ profile: ConnectionProfile, path: String? = nil, localDirectory: String? = nil, saved: SavedConnection? = nil
+        _ profile: ConnectionProfile,
+        path: String? = nil,
+        localDirectory: String? = nil,
+        saved: SavedConnection? = nil
     ) {
         let (center, key, panel) = (self.center, profile.key, source)
         if panel.model.directory.isFileURL { lastLocal[ObjectIdentifier(panel)] = panel.model.directory }
@@ -229,7 +253,10 @@ final class NetworkCommands {
                             "Connect to: \(key.description)",
                             "User name: \(profile.user ?? (profile.anonymous ? "anonymous" : ""))"
                         ],
-                        itemsDone: 0, itemsTotal: 0))
+                        itemsDone: 0,
+                        itemsTotal: 0
+                    )
+                )
                 return Result { try center.connect(key, cancellation: monitor.cancellation) }
             },
             completion: { [kernel, store] result in
@@ -243,16 +270,19 @@ final class NetworkCommands {
                         other.show(
                             URL(
                                 fileURLWithPath: NSString(string: localDirectory).expandingTildeInPath,
-                                isDirectory: true))
+                                isDirectory: true
+                            )
+                        )
                     }
 
                 case .failure(let error):
                     // Returns at once: what waits for the server is done in the background.
                     center.disconnect(key)
                     if case NetworkError.cancelled = error { return }
-                    kernel.ui.report(error, title: "Connect failed!")
+                    kernel.interaction.report(error, title: "Connect failed!")
                 }
-            })
+            }
+        )
     }
 
     /// `FTPOPEN session` and `FTPOPEN session|/subdir`.
@@ -277,14 +307,19 @@ final class NetworkCommands {
             let answer = ui.form(
                 "FTP: new connection",
                 detail: "host, host:port, user@host or ftp://, ftps://, ftpes://, ftpis://, sftp://…",
-                fields: fields, buttons: ["OK"])
+                fields: fields,
+                buttons: ["OK"]
+            )
         else { return }
         let recent = answer.index("recent")
         let text = recent > 0 && history.indices.contains(recent - 1) ? history[recent - 1] : answer.text("address")
         guard let address = ServerAddress(text) else {
             // What was typed may hold a password; it is not shown again.
             ui.inform(
-                "\(ServerAddress.removingPassword(from: text)) is not a server address.", detail: "", style: .warning)
+                "\(ServerAddress.removingPassword(from: text)) is not a server address.",
+                detail: "",
+                style: .warning
+            )
             return
         }
         store.remember(address: address)
@@ -293,8 +328,14 @@ final class NetworkCommands {
         let user = address.user ?? (address.scheme == "sftp" ? NSUserName() : nil)
         connect(
             ConnectionProfile(
-                key: address.key, tls: address.tls, user: user, password: address.password, anonymous: anonymous),
-            path: address.hasPath ? address.path : nil)
+                key: address.key,
+                tls: address.tls,
+                user: user,
+                password: address.password,
+                anonymous: anonymous
+            ),
+            path: address.hasPath ? address.path : nil
+        )
     }
 
     // MARK: The list of saved connections
@@ -307,9 +348,11 @@ final class NetworkCommands {
             let rows = connections.isEmpty ? ["(no saved connections)"] : connections.map(\.listTitle)
             guard
                 let answer = ui.form(
-                    "Connect to FTP server", detail: "Connect to:",
+                    "Connect to FTP server",
+                    detail: "Connect to:",
                     fields: [.list("connection", "", rows, selected: selected)],
-                    buttons: ["Connect", "New Connection…", "New URL…", "Duplicate Entry…", "Edit…", "Delete"])
+                    buttons: ["Connect", "New Connection…", "New URL…", "Duplicate Entry…", "Edit…", "Delete"]
+                )
             else { return }
             let row = answer.index("connection")
             let chosen = connections.indices.contains(row) ? connections[row] : nil
@@ -343,8 +386,11 @@ final class NetworkCommands {
             default:
                 guard let chosen,
                     ui.choose(
-                        "Delete the connection \(chosen.name)?", detail: "", buttons: ["Delete", "Cancel"],
-                        style: .warning) == 0
+                        "Delete the connection \(chosen.name)?",
+                        detail: "",
+                        buttons: ["Delete", "Cancel"],
+                        style: .warning
+                    ) == 0
                 else {
                     continue
                 }
@@ -364,7 +410,10 @@ final class NetworkCommands {
     /// whose stored password this one takes over (the original of a copy).
     @discardableResult
     func edit(
-        _ original: SavedConnection, isNew: Bool, offered: String? = nil, passwordOf source: SavedConnection? = nil
+        _ original: SavedConnection,
+        isNew: Bool,
+        offered: String? = nil,
+        passwordOf source: SavedConnection? = nil
     ) -> SavedConnection? {
         var connection = original
         while true {
@@ -372,7 +421,10 @@ final class NetworkCommands {
                 .text("name", "Session:", connection.name),
                 .text("host", "Host name[:Port]:", connection.hostText),
                 .choice(
-                    "kind", "Protocol:", SavedConnection.Kind.allCases.map(\.title), selected: connection.kind.rawValue
+                    "kind",
+                    "Protocol:",
+                    SavedConnection.Kind.allCases.map(\.title),
+                    selected: connection.kind.rawValue
                 ),
                 .checkbox("anonymous", "Anonymous login (e-mail address as password)", connection.anonymous),
                 .text("user", "User name:", connection.user),
@@ -380,18 +432,25 @@ final class NetworkCommands {
                     "password",
                     isNew && offered == nil && source == nil
                         ? "Password (empty: ask when connecting):"
-                        : "Password (empty: unchanged):"),
+                        : "Password (empty: unchanged):"
+                ),
                 .checkbox("savePassword", "Keep the password in the macOS Keychain", true),
                 .note("Passwords are stored in the Keychain, never in the settings; a master password is not needed."),
                 .text("remote", "Remote dir:", connection.remoteDirectory),
                 .text("local", "Local dir:", connection.localDirectory),
                 .checkbox("passive", "Use passive mode for transfers (like a web browser)", connection.passive),
                 .choice(
-                    "encoding", "Encoding of file names:", NameEncoding.allCases.map(\.title),
-                    selected: connection.encoding.rawValue),
+                    "encoding",
+                    "Encoding of file names:",
+                    NameEncoding.allCases.map(\.title),
+                    selected: connection.encoding.rawValue
+                ),
                 .choice(
-                    "listing", "Directory listings:", SavedConnection.Listing.allCases.map(\.title),
-                    selected: connection.listing.rawValue),
+                    "listing",
+                    "Directory listings:",
+                    SavedConnection.Listing.allCases.map(\.title),
+                    selected: connection.listing.rawValue
+                ),
                 .text("commands", "Send commands (separated by ;):", connection.initCommands)
             ]
             guard let answer = ui.form("FTP: connection details", detail: "", fields: fields, buttons: ["OK"]) else {
@@ -409,8 +468,10 @@ final class NetworkCommands {
             let kind = SavedConnection.Kind(rawValue: answer.index("kind")) ?? .ftp
             guard connection.setHost(answer.text("host"), kind: kind) else {
                 ui.inform(
-                    "\(ServerAddress.removingPassword(from: answer.text("host"))) is not a host name.", detail: "",
-                    style: .warning)
+                    "\(ServerAddress.removingPassword(from: answer.text("host"))) is not a host name.",
+                    detail: "",
+                    style: .warning
+                )
                 continue
             }
             if connection.name.isEmpty { connection.name = connection.host }
@@ -452,15 +513,20 @@ final class NetworkCommands {
         let connected = center.connected
         guard !connected.isEmpty else { return }
         let panels = [source, kernel.panels.target]
-        var profile = panels.lazy.compactMap { panel in
-            ServerKey(panel.model.directory).flatMap { key in connected.first { $0.key == key } }
-        }.first
+        var profile = panels.lazy
+            .compactMap { panel in
+                ServerKey(panel.model.directory).flatMap { key in connected.first { $0.key == key } }
+            }
+            .first
         if profile == nil, connected.count == 1 { profile = connected[0] }
         if profile == nil {
             guard
                 let row = ui.pickRow(
-                    "FTP Disconnect", detail: "Close the connection to:", rows: connected.map(\.title),
-                    button: "Disconnect")
+                    "FTP Disconnect",
+                    rows: connected.map(\.title),
+                    detail: "Close the connection to:",
+                    button: "Disconnect"
+                )
             else { return }
             profile = connected[row]
         }
@@ -470,8 +536,11 @@ final class NetworkCommands {
         // A quick connection offers to be saved first.
         if profile.savedID == nil, kernel.settings.flag(NetworkSettings.askToSave, default: true) {
             switch ui.choose(
-                "Current session not saved, save?", detail: profile.key.description, buttons: ["Yes", "No", "Cancel"],
-                style: .information)
+                "Current session not saved, save?",
+                detail: profile.key.description,
+                buttons: ["Yes", "No", "Cancel"],
+                style: .information
+            )
             {
             case 0:
                 var connection = SavedConnection()
@@ -511,9 +580,11 @@ final class NetworkCommands {
         let current = kernel.settings.index(NetworkSettings.transferMode, default: 0)
         guard
             let answer = ui.form(
-                "FTP transfer mode", detail: "Text mode converts line ends; binary transfers files unchanged.",
+                "FTP transfer mode",
+                detail: "Text mode converts line ends; binary transfers files unchanged.",
                 fields: [.choice("mode", "Transfer mode:", TransferMode.allCases.map(\.title), selected: current)],
-                buttons: ["OK"])
+                buttons: ["OK"]
+            )
         else { return }
         kernel.settings.set(answer.index("mode"), forKey: NetworkSettings.transferMode)
         center.environment.options.values = NetworkSettings.values(from: kernel.settings)
@@ -523,7 +594,9 @@ final class NetworkCommands {
 
     private func askForList(_ title: String) -> URL? {
         let proposal = kernel.settings.text(
-            NetworkSettings.listName, default: "~/Downloads/" + DownloadList.defaultName)
+            NetworkSettings.listName,
+            default: "~/Downloads/" + DownloadList.defaultName
+        )
         guard let text = ui.prompt(title, value: proposal)?.trimmingCharacters(in: .whitespaces), !text.isEmpty else {
             return nil
         }
@@ -532,7 +605,8 @@ final class NetworkCommands {
             from: text,
             relativeTo: source.model.directory.isFileURL
                 ? source.model.directory
-                : FileManager.default.homeDirectoryForCurrentUser)
+                : FileManager.default.homeDirectoryForCurrentUser
+        )
         return location.isFileURL ? location : nil
     }
 
@@ -586,7 +660,8 @@ final class NetworkCommands {
                     }
                     guard text.utf8.count <= DownloadList.largestFile else {
                         throw VolumeError(
-                            message: "The download list would become larger than \(DownloadList.largestFile >> 20) MB.")
+                            message: "The download list would become larger than \(DownloadList.largestFile >> 20) MB."
+                        )
                     }
                     try text.write(to: list, atomically: true, encoding: .utf8)
                     return refused
@@ -595,18 +670,21 @@ final class NetworkCommands {
             completion: { [kernel] result in
                 switch result {
                 case .failure(NetworkError.cancelled): break
-                case .failure(let error): kernel.ui.report(error, title: "The download list cannot be written!")
+                case .failure(let error):
+                    kernel.interaction.report(error, title: "The download list cannot be written!")
 
                 case .success(let refused) where refused > 0:
-                    kernel.ui.inform(
+                    kernel.interaction.inform(
                         "\(refused) of the files were not added to the download list.",
                         detail: "Their names contain a line break or the list's separator, which a list cannot hold.",
-                        style: .warning)
+                        style: .warning
+                    )
 
                 case .success: break
                 }
                 kernel.panels.refresh([list.deletingLastPathComponent()])
-            })
+            }
+        )
     }
 
     /// Works through a list file, one line after the other, with the usual copy job for each
@@ -632,22 +710,29 @@ final class NetworkCommands {
                 let text: String
                 switch result {
                 case .success(let read): text = read
-                case .failure(let error): return kernel.ui.report(error, title: "The download list cannot be read!")
+                case .failure(let error):
+                    return kernel.interaction.report(error, title: "The download list cannot be read!")
                 }
                 let plan = ListPlan(actions: DownloadList.parse(text), base: base, fileSystems: kernel.fileSystems)
                 guard !plan.steps.isEmpty else {
-                    return kernel.ui.inform(
+                    return kernel.interaction.inform(
                         "The download list \(list.path) holds nothing that can be carried out.",
-                        detail: ListPlan.shortened(plan.skipped), style: .warning)
+                        detail: ListPlan.shortened(plan.skipped),
+                        style: .warning
+                    )
                 }
                 let preview = plan.preview(of: list)
                 guard
-                    kernel.ui.choose(
-                        preview.message, detail: preview.detail, buttons: ["Run the List", "Cancel"],
-                        style: plan.touchesLocalFiles ? .critical : .warning) == 0
+                    kernel.interaction.choose(
+                        preview.message,
+                        detail: preview.detail,
+                        buttons: ["Run the List", "Cancel"],
+                        style: plan.touchesLocalFiles ? .critical : .warning
+                    ) == 0
                 else { return }
                 ListRun(plan: plan, kernel: kernel, transfers: transfers).next()
-            })
+            }
+        )
     }
 
     // MARK: Network volumes
@@ -658,22 +743,30 @@ final class NetworkCommands {
     func connectToServer(_ given: String?) {
         // An address stored by an older version may still carry a password; it is not shown again.
         let proposal = ServerAddress.removingPassword(
-            from: kernel.settings.text(NetworkSettings.lastServer, default: "smb://"))
+            from: kernel.settings.text(NetworkSettings.lastServer, default: "smb://")
+        )
         guard
             let text =
                 (given
                 ?? ui.prompt(
-                    "Connect to Server", value: proposal,
-                    detail: "smb://, afp://, nfs://, https:// (WebDAV), or ftp://, ftps://, sftp://"))?
+                    "Connect to Server",
+                    value: proposal,
+                    detail: "smb://, afp://, nfs://, https:// (WebDAV), or ftp://, ftps://, sftp://"
+                ))?
                 .trimmingCharacters(in: .whitespaces), !text.isEmpty
         else { return }
         if let address = ServerAddress(text), text.contains("://") {
             let user = address.user ?? (address.scheme == "sftp" ? NSUserName() : nil)
             connect(
                 ConnectionProfile(
-                    key: address.key, tls: address.tls, user: user, password: address.password, anonymous: user == nil
+                    key: address.key,
+                    tls: address.tls,
+                    user: user,
+                    password: address.password,
+                    anonymous: user == nil
                 ),
-                path: address.hasPath ? address.path : nil)
+                path: address.hasPath ? address.path : nil
+            )
             return
         }
         guard let url = URL(string: text), let scheme = url.scheme?.lowercased(),
@@ -681,8 +774,10 @@ final class NetworkCommands {
         else {
             // What was typed may hold a password; it is not shown again.
             ui.inform(
-                "\(ServerAddress.removingPassword(from: text)) is not the address of a server.", detail: "",
-                style: .warning)
+                "\(ServerAddress.removingPassword(from: text)) is not the address of a server.",
+                detail: "",
+                style: .warning
+            )
             return
         }
         // The address is offered again next time; a password in it is not kept.
@@ -703,9 +798,10 @@ final class NetworkCommands {
                     break
 
                 case .failure(let error):
-                    kernel.ui.report(error, title: "Connect failed!")
+                    kernel.interaction.report(error, title: "Connect failed!")
                 }
-            })
+            }
+        )
     }
 
     /// Ejects the volume the source panel shows; the panels leave it first.
@@ -718,12 +814,14 @@ final class NetworkCommands {
         var leaving = inside.count
         let eject = { [kernel] in
             _ = kernel.jobs.run(
-                title: "Eject \(volume.lastPathComponent)", work: { _ in Result { try mounter.unmount(volume) } },
+                title: "Eject \(volume.lastPathComponent)",
+                work: { _ in Result { try mounter.unmount(volume) } },
                 completion: { result in
                     if case .failure(let error) = result {
-                        kernel.ui.report(error, title: "\(volume.lastPathComponent) cannot be ejected!")
+                        kernel.interaction.report(error, title: "\(volume.lastPathComponent) cannot be ejected!")
                     }
-                })
+                }
+            )
         }
         if inside.isEmpty {
             eject()
@@ -812,8 +910,13 @@ struct ListPlan {
             items.append(
                 .transfer(
                     Step(
-                        kind: kind, from: from, to: to,
-                        text: "\(verb): \(fileSystems.displayPath(from))  →  \(fileSystems.displayPath(to))")))
+                        kind: kind,
+                        from: from,
+                        to: to,
+                        text: "\(verb): \(fileSystems.displayPath(from))  →  \(fileSystems.displayPath(to))"
+                    )
+                )
+            )
         }
     }
 
@@ -822,8 +925,10 @@ struct ListPlan {
 
     static func shortened(_ lines: [String]) -> String {
         let shown = lines.prefix(shownLines).map { $0.count > 300 ? String($0.prefix(300)) + "…" : $0 }
-        return (shown + (lines.count > shownLines ? ["… and \(lines.count - shownLines) more"] : [])).joined(
-            separator: "\n")
+        return (shown + (lines.count > shownLines ? ["… and \(lines.count - shownLines) more"] : []))
+            .joined(
+                separator: "\n"
+            )
     }
 
     /// What the user is asked to agree to before the list runs.
@@ -885,9 +990,11 @@ private final class ListRun {
     private func step() {
         guard let item = items.popFirst() else {
             if !skipped.isEmpty {
-                kernel.ui.inform(
-                    "Some lines of the download list were not carried out.", detail: ListPlan.shortened(skipped),
-                    style: .warning)
+                kernel.interaction.inform(
+                    "Some lines of the download list were not carried out.",
+                    detail: ListPlan.shortened(skipped),
+                    style: .warning
+                )
             }
             return
         }
@@ -927,7 +1034,12 @@ private final class ListRun {
                     let question = "\(fileSystems.displayPath(to)) already exists."
                     let detail =
                         "The download list wants the file that arrived as \(arrived.lastPathComponent) to have this name. Replace the existing file?"
-                    if kernel.ui.choose(question, detail: detail, buttons: ["Replace", "Keep Both"], style: .warning)
+                    if kernel.interaction.choose(
+                        question,
+                        detail: detail,
+                        buttons: ["Replace", "Keep Both"],
+                        style: .warning
+                    )
                         == 0
                     {
                         return rename(arrived, to: to, replacing: true)
@@ -940,6 +1052,7 @@ private final class ListRun {
                 }
                 kernel.panels.refresh([to.deletingLastPathComponent()], focus: failure == nil ? to : arrived)
                 next()
-            })
+            }
+        )
     }
 }

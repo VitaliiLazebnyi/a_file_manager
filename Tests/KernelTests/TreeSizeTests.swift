@@ -28,11 +28,11 @@ internal struct TreeSizeTests {
         func list(_ directory: URL, showHidden _: Bool) -> [FileItem] {
             lock.withLock { listed += 1 }
             let level = directory.pathComponents.count - 1
-            var items = [FileItem(url: directory.appendingPathComponent("f"), name: "f", isDirectory: false, size: 3)]
+            var items = [FileItem(url: directory.appendingPathComponent("f"), name: "f", stat: .init(size: 3))]
             if isEndless {
-                items.append(FileItem(url: directory, name: "d", isDirectory: true))
+                items.append(FileItem(url: directory, name: "d", kind: .directory))
             } else if level < depth {
-                items.append(FileItem(url: directory.appendingPathComponent("d"), name: "d", isDirectory: true))
+                items.append(FileItem(url: directory.appendingPathComponent("d"), name: "d", kind: .directory))
             }
             return items
         }
@@ -50,7 +50,11 @@ internal struct TreeSizeTests {
     /// to have; nil when it did not finish.
     private static func size(of tree: DeepFileSystem) -> Int64? {
         let top = URL(string: "deep:///")
-        return OtherThread.result(stackSize: 512 << 10) { top.map { tree.totalSize(of: $0) } }.flatMap(\.self)
+        return
+            OtherThread.result(stackSize: 512 << 10) {
+                top.map { tree.totalSize(of: $0, cancellation: CancellationFlag()) }
+            }
+            .flatMap(\.self)
     }
 
     /// Shallow and deep real trees are counted to the last level; a hostile tree of twenty

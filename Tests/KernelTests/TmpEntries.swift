@@ -25,9 +25,8 @@ internal enum TmpEntries {
         FileItem(
             url: URL(fileURLWithPath: "/tmp/\(name)"),
             name: name,
-            isDirectory: folder,
-            size: size,
-            modified: Date(timeIntervalSince1970: time)
+            kind: .init(isDirectory: folder),
+            stat: .init(size: size, modified: Date(timeIntervalSince1970: time))
         )
     }
 }

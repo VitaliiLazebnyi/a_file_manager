@@ -46,8 +46,16 @@ struct ArchiveEntry {
 
     func item(at url: URL) -> FileItem {
         FileItem(
-            url: url, name: name, isDirectory: isDirectory, isSymlink: isSymbolicLink, isHidden: name.hasPrefix("."),
-            size: isDirectory ? 0 : size, modified: modified, permissions: permissions, isSpecial: isSpecial)
+            url: url,
+            name: name,
+            kind: .init(
+                isDirectory: isDirectory,
+                isSymlink: isSymbolicLink,
+                isHidden: name.hasPrefix("."),
+                isSpecial: isSpecial
+            ),
+            stat: .init(size: isDirectory ? 0 : size, modified: modified, permissions: permissions)
+        )
     }
 }
 
@@ -342,8 +350,14 @@ struct ArchiveTree {
                 } else {
                     folder = seat(
                         ArchiveEntry(
-                            path: parent, isDirectory: true, isImplicit: true, modified: entry.modified,
-                            permissions: 0o755, order: nextOrder))
+                            path: parent,
+                            isDirectory: true,
+                            isImplicit: true,
+                            modified: entry.modified,
+                            permissions: 0o755,
+                            order: nextOrder
+                        )
+                    )
                     implicitBytes += parent.utf8.count
                     nextOrder += 1
                 }

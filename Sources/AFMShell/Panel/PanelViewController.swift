@@ -233,7 +233,8 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
         observeModels()
         // Both are delivered on the main queue.
         volumeObserver = NotificationCenter.default.addObserver(
-            forName: FileSystemRegistry.volumeInfoDidChange, object: nil,
+            forName: FileSystemRegistry.volumeInfoDidChange,
+            object: nil,
             queue: .main
         ) { [weak self] note in
             nonisolated(unsafe) let note = note
@@ -286,7 +287,9 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
         volumeAsking[id] = flag
         let directory = tab.directory
         BlockingCalls.answer(
-            from: provider as AnyObject, to: "volume " + directory.locationKey, cancellation: flag,
+            from: provider as AnyObject,
+            to: "volume " + directory.locationKey,
+            cancellation: flag,
             { provider.volume(of: directory, cancellation: $0) },
             then: { [weak self, weak tab] (answer: VolumeInfo??) in
                 guard let self, volumeAsking[id] === flag else { return }
@@ -299,7 +302,8 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
                 } else if let volume = answer, tab.directory.isSameLocation(as: directory) {
                     tab.setVolume(volume)
                 }
-            })
+            }
+        )
     }
 
     required init?(coder _: NSCoder) { fatalError("not used") }
@@ -371,8 +375,11 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
         listArea = scroll
         tableScroll.contentView.postsBoundsChangedNotifications = true
         NotificationCenter.default.addObserver(
-            self, selector: #selector(tableScrolled), name: NSView.boundsDidChangeNotification,
-            object: tableScroll.contentView)
+            self,
+            selector: #selector(tableScrolled),
+            name: NSView.boundsDidChangeNotification,
+            object: tableScroll.contentView
+        )
         quickFilterBar.isHidden = true
         quickFilterBar.onChange = { [weak self] text in self?.quickFilterEdited(text) }
         quickFilterBar.onCancel = { [weak self] in self?.removeQuickFilter() }
@@ -407,7 +414,8 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
         guard columnValues.hasWaiting, !showsGrid else { return }
         let visible = tableView.rows(in: tableView.visibleRect)
         let names = Set(
-            (visible.location..<(visible.location + visible.length)).compactMap { model.item(atRow: $0)?.name })
+            (visible.location..<(visible.location + visible.length)).compactMap { model.item(atRow: $0)?.name }
+        )
         columnValues.dropWaiting(except: names)
     }
 
@@ -425,7 +433,7 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
     }
 
     /// Commands act on the source panel, so a click in this panel makes it the source first.
-    func performFocused(_ command: CommandID, _ argument: CommandArgument = .none) {
+    func performFocused(_ command: CommandID, _ argument: CommandArgument = .nothing) {
         focus()
         commands.perform(command, argument)
     }
@@ -580,7 +588,8 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
         tabBar.update(
             titles: tabs.tabs.indices.map { DisplayText.clean(tabs.title(at: $0)) },
             paths: tabs.tabs.map { DisplayText.clean(kernel.fileSystems.displayPath($0.directory)) },
-            active: tabs.activeIndex)
+            active: tabs.activeIndex
+        )
         volumeButton.setTitle(DisplayText.clean(model.volume?.name ?? model.directory.scheme ?? "/"))
         if let free = model.volume?.freeBytes, let total = model.volume?.totalBytes {
             freeLabel.stringValue = "\(Format.shortSize(free)) of \(Format.shortSize(total)) free"
@@ -610,7 +619,9 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
             statusLabel.stringValue = Self.detailText(for: item)
         } else {
             statusLabel.stringValue = Self.statusText(
-                totals(of: model), itemsSoFar: model.isComplete ? nil : model.items.count)
+                totals(of: model),
+                itemsSoFar: model.isComplete ? nil : model.items.count
+            )
         }
         if let filter = quickFilters[ObjectIdentifier(model)], !filter.text.isEmpty {
             statusLabel.stringValue += "   ⏷ Filter: \(filter.text)"
@@ -671,7 +682,10 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
     }
 
     func show(
-        _ location: URL, focus: String?, history: PanelModel.HistoryEffect, completion: (@MainActor (Bool) -> Void)?
+        _ location: URL,
+        focus: String?,
+        history: PanelModel.HistoryEffect,
+        completion: (@MainActor (Bool) -> Void)?
     ) {
         load(location, in: model, focus: focus, history: history, reportFailure: true, completion: completion)
     }
@@ -753,7 +767,10 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
     /// here. So one more hold on it is kept until everything that carried it across the
     /// threads is gone, and that last hold is dropped in the background.
     func change(
-        _ tab: PanelModel, count: Int = 0, fresh: [FileItem] = [], while isWanted: @escaping () -> Bool = { true },
+        _ tab: PanelModel,
+        count: Int = 0,
+        fresh: [FileItem] = [],
+        while isWanted: @escaping () -> Bool = { true },
         by prepare: @escaping @Sendable (PanelModel.Basis) -> PanelModel.Prepared,
         then done: @escaping (PanelModel.Outcome?) -> Void
     ) {
@@ -783,7 +800,8 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
                     letGoOfFresh()
                     done(outcome)
                 }
-            })
+            }
+        )
     }
 
     /// Forgets what a tab showed before it entered a folder; a long list is freed in the background.
@@ -818,7 +836,11 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
     /// Reads a location in the background and shows it in `tab`, piece by piece when it takes
     /// long. A failure leaves the tab as it was.
     func load(
-        _ location: URL, in tab: PanelModel, focus: String?, history: PanelModel.HistoryEffect, reportFailure: Bool,
+        _ location: URL,
+        in tab: PanelModel,
+        focus: String?,
+        history: PanelModel.HistoryEffect,
+        reportFailure: Bool,
         completion: ((Bool) -> Void)?
     ) {
         MainThread.assert("A panel")
@@ -827,8 +849,13 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
             return
         }
         if showRemembered(
-            location, in: tab, focus: focus, history: history, reportFailure: reportFailure, completion: completion)
-        {
+            location,
+            in: tab,
+            focus: focus,
+            history: history,
+            reportFailure: reportFailure,
+            completion: completion
+        ) {
             return
         }
         // The folder under the cursor may be on its way already, read ahead: then the panel
@@ -852,8 +879,13 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
                         self.sorted(whole, for: tab) { whole in
                             onPiece(
                                 PanelLoading.Piece(
-                                    listing: whole.listing, focus: whole.focus, order: whole.order, isFirst: true,
-                                    isLast: true))
+                                    listing: whole.listing,
+                                    focus: whole.focus,
+                                    order: whole.order,
+                                    isFirst: true,
+                                    isLast: true
+                                )
+                            )
                             onEnd(nil)
                         }
                     }
@@ -862,9 +894,14 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
         } else {
             start =
                 PanelLoading(
-                    location: location, showHidden: tab.showHidden, order: load.order, fileSystems: kernel.fileSystems,
-                    cache: kernel.listingCache, cancellation: flag
-                ).start
+                    location: location,
+                    showHidden: tab.showHidden,
+                    order: load.order,
+                    fileSystems: kernel.fileSystems,
+                    cache: kernel.listingCache,
+                    cancellation: flag
+                )
+                .start
         }
         // A directory that does not answer for a while is entered anyway: the panel shows its
         // path, an empty list and a busy indicator, and fills up as the entries arrive. Should
@@ -885,7 +922,11 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
             }
             dropQuickFilter(of: tab, unlessIn: location)
             tab.open(
-                location, parent: provider.parent(of: location), root: provider.root(of: location), history: history)
+                location,
+                parent: provider.parent(of: location),
+                root: provider.root(of: location),
+                history: history
+            )
         }
         // Pieces and the end are taken in the order they come. A piece that has to be sorted
         // first, in the background, holds back whatever comes after it.
@@ -915,18 +956,26 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
                     work: { () -> PanelLoading.Piece in
                         let old = piece.listing
                         let listing = Listing(
-                            directory: old.directory, items: Sorter.resort(old.items, from: piece.order, to: wanted),
+                            directory: old.directory,
+                            items: Sorter.resort(old.items, from: piece.order, to: wanted),
                             parent: old.parent,
-                            root: old.root, volume: old.volume)
+                            root: old.root,
+                            volume: old.volume
+                        )
                         return PanelLoading.Piece(
-                            listing: listing, focus: piece.focus, order: wanted, isFirst: piece.isFirst,
-                            isLast: piece.isLast)
+                            listing: listing,
+                            focus: piece.focus,
+                            order: wanted,
+                            isFirst: piece.isFirst,
+                            isLast: piece.isLast
+                        )
                     },
                     then: { resorted in
                         isHolding = false
                         take(resorted)
                         releaseHeld()
-                    })
+                    }
+                )
                 return
             }
             nothingArrivedYet = false
@@ -937,14 +986,17 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
             func grow() {
                 isHolding = true
                 self.change(
-                    tab, count: piece.listing.items.count, fresh: piece.listing.items,
+                    tab,
+                    count: piece.listing.items.count,
+                    fresh: piece.listing.items,
                     while: { [weak self] in self?.loads[id] === load },
                     by: { PanelModel.prepare($0, extendingTo: piece.listing.items, sortedBy: piece.order) },
                     then: { outcome in
                         isHolding = false
                         if outcome != nil, piece.isLast { tab.finishLoading() }
                         releaseHeld()
-                    })
+                    }
+                )
             }
             if piece.isFirst {
                 self.dropSnapshot(of: id)
@@ -956,14 +1008,27 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
                     // over the list.
                     let whole = piece.listing
                     let head = Listing(
-                        directory: whole.directory, items: Array(whole.items.prefix(PanelLoading.firstPieceLimit)),
-                        parent: whole.parent, root: whole.root, volume: whole.volume)
+                        directory: whole.directory,
+                        items: Array(whole.items.prefix(PanelLoading.firstPieceLimit)),
+                        parent: whole.parent,
+                        root: whole.root,
+                        volume: whole.volume
+                    )
                     tab.show(
-                        head, focus: focus ?? piece.focus, history: history, complete: false, presorted: piece.order)
+                        head,
+                        focus: focus ?? piece.focus,
+                        history: history,
+                        complete: false,
+                        presorted: piece.order
+                    )
                 } else {
                     tab.show(
-                        piece.listing, focus: focus ?? piece.focus, history: history, complete: piece.isLast,
-                        presorted: piece.order)
+                        piece.listing,
+                        focus: focus ?? piece.focus,
+                        history: history,
+                        complete: piece.isLast,
+                        presorted: piece.order
+                    )
                 }
                 // The panel is in the folder from its first entries on, not only when the last has come.
                 if tab === self.model { self.announceLocation() }
@@ -1004,7 +1069,7 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
     /// from the run loop and after any message that is still on screen (`MainLoop.dialog`): the
     /// alert is modal and runs its own event loop.
     private func report(_ error: any Error) {
-        let ui = kernel.ui
+        let ui = kernel.interaction
         MainLoop.dialog { ui.report(error, title: "The folder cannot be read!") }
     }
 
@@ -1012,7 +1077,9 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
     /// changed while it was read) is sorted in the background first, so the main thread only
     /// takes over a finished list; should the order change again meanwhile, once more.
     private func sorted(
-        _ whole: PanelLoading.Whole, for tab: PanelModel, then receive: @escaping (PanelLoading.Whole) -> Void
+        _ whole: PanelLoading.Whole,
+        for tab: PanelModel,
+        then receive: @escaping (PanelLoading.Whole) -> Void
     ) {
         let order = tab.wantedSort
         guard whole.order != order else {
@@ -1023,11 +1090,16 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
             work: { () -> PanelLoading.Whole in
                 let old = whole.listing
                 let listing = Listing(
-                    directory: old.directory, items: Sorter.resort(old.items, from: whole.order, to: order),
-                    parent: old.parent, root: old.root,
-                    volume: old.volume)
+                    directory: old.directory,
+                    items: Sorter.resort(old.items, from: whole.order, to: order),
+                    parent: old.parent,
+                    root: old.root,
+                    volume: old.volume
+                )
                 return PanelLoading.Whole(listing: listing, focus: whole.focus, order: order)
-            }, then: { [self] resorted in sorted(resorted, for: tab, then: receive) })
+            },
+            then: { [self] resorted in sorted(resorted, for: tab, then: receive) }
+        )
     }
 
     /// Show old, refresh behind: when the listing cache remembers `location`, the tab shows that
@@ -1040,8 +1112,12 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
     ///
     /// Returns false, having done nothing, when nothing recent enough is remembered.
     private func showRemembered(
-        _ location: URL, in tab: PanelModel, focus: String?, history: PanelModel.HistoryEffect,
-        reportFailure: Bool, completion: ((Bool) -> Void)?
+        _ location: URL,
+        in tab: PanelModel,
+        focus: String?,
+        history: PanelModel.HistoryEffect,
+        reportFailure: Bool,
+        completion: ((Bool) -> Void)?
     ) -> Bool {
         let cache = kernel.listingCache
         guard let entry = cache.entry(for: location, showHidden: tab.showHidden) else { return false }
@@ -1074,7 +1150,8 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
             if entry.order != wanted, entry.listing.items.count >= Self.backgroundSortThreshold {
                 Background.compute(
                     work: { cache.entry(for: location, showHidden: showHidden, sortedBy: wanted) },
-                    then: { entry in if let entry { present(entry) } })
+                    then: { entry in if let entry { present(entry) } }
+                )
                 return
             }
             dropSnapshot(of: id)
@@ -1098,23 +1175,31 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
             isBeingShown = true
             let listing = entry.listing
             change(
-                tab, count: listing.items.count,
+                tab,
+                count: listing.items.count,
                 while: { [weak self] in self?.loads[id] === load && !hasEnded && !freshHasCome },
                 by: {
                     PanelModel.prepare(
-                        $0, showRemembered: listing, focus: focus, history: history, presorted: entry.order)
+                        $0,
+                        showRemembered: listing,
+                        focus: focus,
+                        history: history,
+                        presorted: entry.order
+                    )
                 },
                 then: { outcome in
                     isBeingShown = false
                     if outcome != nil { shown() }
-                })
+                }
+            )
         }
         if entry.order == order {
             present(entry)
         } else {
             Background.compute(
                 work: { cache.entry(for: location, showHidden: showHidden, sortedBy: order) },
-                then: { entry in if let entry { present(entry) } })
+                then: { entry in if let entry { present(entry) } }
+            )
         }
 
         /// Main thread: the fresh reading has ended.
@@ -1135,14 +1220,17 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
                     // whatever order the list is by then.
                     let wanted = focusStillWanted
                     change(
-                        tab, count: whole.listing.items.count, fresh: whole.listing.items,
+                        tab,
+                        count: whole.listing.items.count,
+                        fresh: whole.listing.items,
                         while: { [weak self] in self?.loads[id] === load },
                         by: { PanelModel.prepare($0, update: whole.listing, focus: wanted, presorted: whole.order) },
                         then: { [self] outcome in
                             guard outcome != nil else { return }
                             dropSnapshot(of: id)
                             end(nil)
-                        })
+                        }
+                    )
                 } else {
                     sorted(whole, for: tab) { [self] whole in
                         guard loads[id] === load else { return }
@@ -1150,22 +1238,33 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
                         dropQuickFilter(of: tab, unlessIn: whole.listing.directory)
                         guard whole.listing.items.count >= Self.backgroundSortThreshold else {
                             tab.show(
-                                whole.listing, focus: focus ?? whole.focus, history: history, presorted: whole.order)
+                                whole.listing,
+                                focus: focus ?? whole.focus,
+                                history: history,
+                                presorted: whole.order
+                            )
                             return end(nil)
                         }
                         // A long one is entered from the background, like a remembered one.
                         change(
-                            tab, count: whole.listing.items.count, fresh: whole.listing.items,
+                            tab,
+                            count: whole.listing.items.count,
+                            fresh: whole.listing.items,
                             while: { [weak self] in self?.loads[id] === load },
                             by: {
                                 PanelModel.prepare(
-                                    $0, show: whole.listing, focus: focus ?? whole.focus, history: history,
-                                    presorted: whole.order)
+                                    $0,
+                                    show: whole.listing,
+                                    focus: focus ?? whole.focus,
+                                    history: history,
+                                    presorted: whole.order
+                                )
                             },
                             then: { outcome in
                                 guard outcome != nil else { return }
                                 end(nil)
-                            })
+                            }
+                        )
                     }
                 }
 
@@ -1189,16 +1288,24 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
             joined.receive { outcome in finish(outcome.map { Optional($0) }) }
         } else {
             Background.storage(
-                "list", at: location,
+                "list",
+                at: location,
                 work: { () -> Result<PanelLoading.Whole?, any Error> in
                     // Overtaken while it waited for its turn: the file system is not asked.
                     guard !flag.isCancelled else { return .success(nil) }
                     return Result {
                         try PanelLoading.readWhole(
-                            location, showHidden: showHidden, order: order, fileSystems: fileSystems,
-                            cache: cache, cancellation: flag)
+                            location,
+                            showHidden: showHidden,
+                            order: order,
+                            fileSystems: fileSystems,
+                            cache: cache,
+                            cancellation: flag
+                        )
                     }
-                }, then: { finish($0) })
+                },
+                then: { finish($0) }
+            )
         }
         return true
     }
@@ -1253,7 +1360,11 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
     /// if not now. `completion` is called when the folder has been read, also when that
     /// happens later or is another reading's doing.
     private func reload(
-        _ tab: PanelModel, focus: String?, quietly: Bool, markDirty: Bool = true, changedAt: TimeInterval? = nil,
+        _ tab: PanelModel,
+        focus: String?,
+        quietly: Bool,
+        markDirty: Bool = true,
+        changedAt: TimeInterval? = nil,
         completion: (@MainActor () -> Void)?
     ) {
         MainThread.assert("A panel")
@@ -1309,15 +1420,22 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
             tab.directory, tab.showHidden, tab.wantedSort, kernel.fileSystems, kernel.listingCache
         )
         Background.storage(
-            "list", at: directory,
+            "list",
+            at: directory,
             work: { () -> Result<PanelLoading.Whole?, any Error> in
                 guard !flag.isCancelled else { return .success(nil) }
                 // A folder that vanished is replaced by its nearest readable parent. The listing is
                 // sorted here and, like every complete one, handed to the cache.
                 let outcome = Result {
                     try PanelLoading.readWhole(
-                        directory, showHidden: showHidden, order: order, fileSystems: fileSystems, cache: cache,
-                        climbing: true, cancellation: flag)
+                        directory,
+                        showHidden: showHidden,
+                        order: order,
+                        fileSystems: fileSystems,
+                        cache: cache,
+                        climbing: true,
+                        cancellation: flag
+                    )
                 }
                 let whole = (try? outcome.get()) ?? nil
                 // What is remembered of a folder that is gone or cannot be read is of no use.
@@ -1346,7 +1464,9 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
                 // again. The main thread takes the result, or nothing at all when the folder is
                 // as it was.
                 change(
-                    tab, count: whole.listing.items.count, fresh: whole.listing.items,
+                    tab,
+                    count: whole.listing.items.count,
+                    fresh: whole.listing.items,
                     while: { [weak self] in self?.loads[id] === reading },
                     by: { PanelModel.prepare($0, update: whole.listing, focus: focus, presorted: whole.order) },
                     then: { [self] outcome in
@@ -1355,8 +1475,10 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
                         // A folder that is merely read again is no new place; one that was replaced by
                         // its parent, or was never announced, is (`announceLocation` knows).
                         readingEnded(of: tab, reading, succeeded: true, changed: outcome == .changed)
-                    })
-            })
+                    }
+                )
+            }
+        )
     }
 
     /// Reads a tab once more if its folder changed while it was read or renamed, or too soon
@@ -1409,7 +1531,10 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
     /// Starts a reading for `tab`, which overtakes the one before. Calculations of folder sizes
     /// go on unless the tab moves to another folder (`location` is not where it is).
     private func beginLoad(
-        for tab: PanelModel, movingTo location: URL?, quiet: Bool = false, completion: ((Bool) -> Void)?
+        for tab: PanelModel,
+        movingTo location: URL?,
+        quiet: Bool = false,
+        completion: ((Bool) -> Void)?
     ) -> Load {
         let id = ObjectIdentifier(tab)
         if let overtaken = loads[id] {
@@ -1480,7 +1605,10 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
             }
             lastKind = place.kind
             let item = menu.addItem(
-                withTitle: DisplayText.clean(place.name), action: #selector(placeChosen(_:)), keyEquivalent: "")
+                withTitle: DisplayText.clean(place.name),
+                action: #selector(placeChosen(_:)),
+                keyEquivalent: ""
+            )
             item.target = self
             item.representedObject = place.url
             let symbol: String
@@ -1520,15 +1648,22 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
         // In the lane of the folder that is measured: a server that does not answer holds up
         // the measuring of that folder, and nothing else.
         Background.storage(
-            "size", at: item.url, work: { provider.totalSize(of: item.url, cancellation: flag) },
+            "size",
+            at: item.url,
+            work: { provider.totalSize(of: item.url, cancellation: flag) },
             then: { [weak self] size in
                 guard !flag.isCancelled, tab.directory.isSameLocation(as: directory) else { return }
                 self?.sizeArrived(size, forName: item.name, in: tab, directory: directory, flag: flag)
-            })
+            }
+        )
     }
 
     private func sizeArrived(
-        _ size: Int64, forName name: String, in tab: PanelModel, directory: URL, flag: CancellationFlag
+        _ size: Int64,
+        forName name: String,
+        in tab: PanelModel,
+        directory: URL,
+        flag: CancellationFlag
     ) {
         let id = ObjectIdentifier(tab)
         if arrivedSizes[id] != nil {
@@ -1548,8 +1683,11 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
             // background, and the main thread only puts it in the list's place.
             let (sizes, flag, directory) = (pending.sizes, pending.flag, pending.directory)
             change(
-                tab, while: { [weak tab] in !flag.isCancelled && tab?.directory.isSameLocation(as: directory) == true },
-                by: { PanelModel.prepare($0, computedSizes: sizes) }, then: { _ in })
+                tab,
+                while: { [weak tab] in !flag.isCancelled && tab?.directory.isSameLocation(as: directory) == true },
+                by: { PanelModel.prepare($0, computedSizes: sizes) },
+                then: { _ in }
+            )
         }
     }
 
@@ -1654,7 +1792,9 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
             gridView.setNeedsDisplay(gridView.bounds)
         } else if row < tableView.numberOfRows {
             tableView.reloadData(
-                forRowIndexes: [row], columnIndexes: IndexSet(integersIn: 0..<tableView.numberOfColumns))
+                forRowIndexes: [row],
+                columnIndexes: IndexSet(integersIn: 0..<tableView.numberOfColumns)
+            )
         }
     }
 
@@ -1686,8 +1826,10 @@ final class PanelViewController: NSViewController, PanelHandle, PanelOverlayHost
     /// Where the box for the name of a row stands in the list that is on screen.
     private func renameFrame(ofRow row: Int) -> NSRect {
         if showsGrid { return gridView.nameFrame(ofRow: row) }
-        let frame = tableView.rect(ofRow: row).intersection(
-            tableView.rect(ofColumn: 0).union(tableView.rect(ofColumn: 1)))
+        let frame = tableView.rect(ofRow: row)
+            .intersection(
+                tableView.rect(ofColumn: 0).union(tableView.rect(ofColumn: 1))
+            )
         return frame.insetBy(dx: 20, dy: 0).offsetBy(dx: 10, dy: 0)
     }
 

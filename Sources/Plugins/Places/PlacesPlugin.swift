@@ -20,7 +20,7 @@ extension CommandID {
 /// Directory hotlist, history list and directory tree (spec 03 › Directory hotlist, 03 ›
 /// Directory history list, 12 › Directory Tree dialog, 12 › Directory hotlist editor).
 ///
-/// The hotlist and the history are shown as pick lists through `kernel.ui`, so they need no
+/// The hotlist and the history are shown as pick lists through `kernel.interaction`, so they need no
 /// window of their own; the tree and the hotlist editor are windows. Everything here runs on
 /// the main thread and works on locations only; the one thing that reads file systems, the
 /// tree, does so on background threads (`TreeScanner`, `TreeCache`).
@@ -60,7 +60,8 @@ public final class PlacesPlugin: Plugin {
     /// `favorites` are the standard places offered next to the user's hotlist; `now` is the
     /// clock the history measures stays with. Tests replace all of these.
     public init(
-        treeCacheDirectory: URL? = nil, keepsTreesOnDisk: Bool = true,
+        treeCacheDirectory: URL? = nil,
+        keepsTreesOnDisk: Bool = true,
         favorites: [HotlistEntry] = MacFavorites.entries(),
         now: @escaping () -> Date = Date.init
     ) {
@@ -100,12 +101,15 @@ public final class PlacesPlugin: Plugin {
         commands.register(Command(.configureHotlist, "Configure Directory Hotlist…")) { [self] in
             configureHotlist(in: kernel)
         }
-        commands.register(Command(.directoryHistory, "Directory History…", [Shortcut(.down, .option)])) { [self] in
+        commands.register(Command(.directoryHistory, "Directory History…", [Shortcut(.downArrow, .option)])) { [self] in
             showHistory(in: kernel, thinning: settings.flag(Keys.thinning, default: true))
         }
         commands.register(
             Command(
-                .directoryHistoryUnthinned, "Directory History (All Folders)…", [Shortcut(.down, [.option, .shift])])
+                .directoryHistoryUnthinned,
+                "Directory History (All Folders)…",
+                [Shortcut(.downArrow, [.option, .shift])]
+            )
         ) { [self] in
             showHistory(in: kernel, thinning: false, limited: false)
         }
@@ -124,14 +128,23 @@ public final class PlacesPlugin: Plugin {
 
         kernel.menus.add([.directoryTree, .directoryHotlist, .directoryHistory], to: .commandsPlaces)
         kernel.toolbar.add(
-            .directoryHotlist, symbol: "star", group: 30,
-            hint: "Your favourite folders: jump to one, or add the current folder.")
+            .directoryHotlist,
+            symbol: "star",
+            group: 30,
+            hint: "Your favourite folders: jump to one, or add the current folder."
+        )
         kernel.toolbar.add(
-            .directoryHistory, symbol: "clock.arrow.circlepath", group: 30,
-            hint: "The folders you visited recently: jump back to one.")
+            .directoryHistory,
+            symbol: "clock.arrow.circlepath",
+            group: 30,
+            hint: "The folders you visited recently: jump back to one."
+        )
         kernel.toolbar.add(
-            .directoryTree, symbol: "folder.badge.gearshape", group: 30,
-            hint: "Show all folders as a tree and jump to one.")
+            .directoryTree,
+            symbol: "folder.badge.gearshape",
+            group: 30,
+            hint: "Show all folders as a tree and jump to one."
+        )
         kernel.toolbar.setSymbol("star.leadinghalf.filled", for: .toggleHotlistEntry)
         kernel.toolbar.setSymbol("star.square", for: .configureHotlist)
 
@@ -140,17 +153,26 @@ public final class PlacesPlugin: Plugin {
                 title: "Hotlist and History",
                 preferences: [
                     Preference(
-                        Keys.favorites, "Offer the Mac's standard folders (Favorites) in the directory hotlist",
-                        .flag(default: true)),
+                        Keys.favorites,
+                        "Offer the Mac's standard folders (Favorites) in the directory hotlist",
+                        .flag(default: true)
+                    ),
                     Preference(
-                        Keys.thinning, "Directory history thinning: leave out folders that were only passed through",
-                        .flag(default: true)),
+                        Keys.thinning,
+                        "Directory history thinning: leave out folders that were only passed through",
+                        .flag(default: true)
+                    ),
                     Preference(Keys.saveHistory, "Save the directory history between sessions", .flag(default: true)),
                     Preference(Keys.historyShown, "Maximum history items to show:", .text(default: "26")),
                     Preference(
-                        Keys.showFrequent, "Show frequently used folders in the history list", .flag(default: true)),
+                        Keys.showFrequent,
+                        "Show frequently used folders in the history list",
+                        .flag(default: true)
+                    ),
                     Preference(Keys.frequentShown, "Maximum frequently used folders to show:", .text(default: "30"))
-                ]))
+                ]
+            )
+        )
     }
 
     /// Writes the tree cache before the program quits, away from the main thread (a tree of
@@ -177,10 +199,11 @@ public final class PlacesPlugin: Plugin {
     private func storedDataProblem(_ message: String, in kernel: Kernel) {
         guard reportedKeys.insert(message).inserted else { return }
         performOnMainLoop {
-            kernel.ui.inform(
+            kernel.interaction.inform(
                 "Some saved data could not be read",
                 detail: message + " The original is kept in the settings under the same name with “.unreadable”.",
-                style: .warning)
+                style: .warning
+            )
         }
     }
 
@@ -201,7 +224,10 @@ public final class PlacesPlugin: Plugin {
         lastNoted = directory
         treeCache.noteFolder {
             let root = TreeRoots.root(
-                for: directory, places: provider.places(), providerRoot: provider.root(of: directory))
+                for: directory,
+                places: provider.places(),
+                providerRoot: provider.root(of: directory)
+            )
             return DirectoryTree.relativePath(of: directory, below: root).map { ($0, root) }
         }
     }
@@ -244,9 +270,11 @@ public final class PlacesPlugin: Plugin {
             switch level {
             case .user(let path):
                 menu = HotlistMenu(
-                    list, at: path,
+                    list,
+                    at: path,
                     offersFavorites: !favorites.isEmpty && kernel.settings.flag(Keys.favorites, default: true),
-                    isCurrent: isCurrent)
+                    isCurrent: isCurrent
+                )
                 if let submenu = list.entry(at: path) { title += " › " + submenu.displayTitle }
 
             case .favorites:
@@ -254,9 +282,12 @@ public final class PlacesPlugin: Plugin {
                 title += " › Favorites"
             }
             guard
-                let answer = kernel.ui.form(
-                    title, detail: "", fields: [.list("row", "", menu.titles, selected: menu.selected)],
-                    buttons: ["Go", "Open in New Tab"]), menu.rows.indices.contains(answer.index("row"))
+                let answer = kernel.interaction.form(
+                    title,
+                    detail: "",
+                    fields: [.list("row", "", menu.titles, selected: menu.selected)],
+                    buttons: ["Go", "Open in New Tab"]
+                ), menu.rows.indices.contains(answer.index("row"))
             else {
                 // Leaving a submenu shows the level above again.
                 switch level {
@@ -299,17 +330,20 @@ public final class PlacesPlugin: Plugin {
         let current = kernel.panels.source.model.directory
         // The entries the menu shows are the ones that count: a hidden entry is left alone.
         if let index = list.index(
-            in: parent, where: { $0.kind == .item && !list.isHidden($0) && leads($0, to: current, in: kernel) })
-        {
+            in: parent,
+            where: { $0.kind == .item && !list.isHidden($0) && leads($0, to: current, in: kernel) }
+        ) {
             list.remove(at: parent + [index])
         } else {
             let path = kernel.fileSystems.displayPath(current)
             let title = current.lastPathComponent.isEmpty || current.path == "/" ? path : current.lastPathComponent
             guard list.add(.item(title, command: HotlistAction.changeDirectoryCommand(to: path)), to: parent) != nil
             else {
-                kernel.ui.inform(
-                    "The directory hotlist is full.", detail: "It holds at most \(Hotlist.limit) entries.",
-                    style: .warning)
+                kernel.interaction.inform(
+                    "The directory hotlist is full.",
+                    detail: "It holds at most \(Hotlist.limit) entries.",
+                    style: .warning
+                )
                 return
             }
         }
@@ -327,9 +361,10 @@ public final class PlacesPlugin: Plugin {
     private func run(_ entry: HotlistEntry, inNewTab: Bool, in kernel: Kernel) {
         let (source, target) = (kernel.panels.source, kernel.panels.target)
         // Read before anything moves: a command may change which panel is the source.
-        let targetLocation = HotlistAction.targetPath(entry.target).map {
-            kernel.fileSystems.location(from: $0, relativeTo: target.model.directory)
-        }
+        let targetLocation = HotlistAction.targetPath(entry.target)
+            .map {
+                kernel.fileSystems.location(from: $0, relativeTo: target.model.directory)
+            }
         switch HotlistAction(entry.command) {
         case .changeDirectory(let path, let focusingOnIt):
             let location = kernel.fileSystems.location(from: path, relativeTo: source.model.directory)
@@ -356,8 +391,11 @@ public final class PlacesPlugin: Plugin {
     private func limit(_ key: String, default value: Int, in kernel: Kernel) -> Int {
         min(
             max(
-                Int(kernel.settings.text(key, default: String(value)).trimmingCharacters(in: .whitespaces)) ?? value, 1
-            ), 200)
+                Int(kernel.settings.text(key, default: String(value)).trimmingCharacters(in: .whitespaces)) ?? value,
+                1
+            ),
+            200
+        )
     }
 
     /// Alt+Down: the directories the source panel visited, the last one first, and below them
@@ -377,19 +415,31 @@ public final class PlacesPlugin: Plugin {
             tracker.visited(current, on: side)
             let showsFrequent = kernel.settings.flag(Keys.showFrequent, default: true)
             let menu = HistoryMenu(
-                history: tracker.history(of: side).shown(
-                    thinning: thinning, limit: limited ? limit(Keys.historyShown, default: 26, in: kernel) : nil),
+                history: tracker.history(of: side)
+                    .shown(
+                        thinning: thinning,
+                        limit: limited ? limit(Keys.historyShown, default: 26, in: kernel) : nil
+                    ),
                 frequent: showsFrequent
                     ? tracker.frequent.top(limited ? limit(Keys.frequentShown, default: 30, in: kernel) : nil) : [],
-                current: current, displayPath: kernel.fileSystems.displayPath)
+                current: current,
+                displayPath: kernel.fileSystems.displayPath
+            )
             let fields = [
                 FormField.list(
-                    "row", "", menu.titles, selected: min(selected ?? menu.selected, max(menu.rows.count - 1, 0)))
+                    "row",
+                    "",
+                    menu.titles,
+                    selected: min(selected ?? menu.selected, max(menu.rows.count - 1, 0))
+                )
             ]
             guard
-                let answer = kernel.ui.form(
-                    "Directory History", detail: "", fields: fields,
-                    buttons: ["Go", "Open in New Tab", "Open in Other Panel", "Remove from List"]),
+                let answer = kernel.interaction.form(
+                    "Directory History",
+                    detail: "",
+                    fields: fields,
+                    buttons: ["Go", "Open in New Tab", "Open in Other Panel", "Remove from List"]
+                ),
                 menu.rows.indices.contains(answer.index("row"))
             else { return }
             let row = menu.rows[answer.index("row")]

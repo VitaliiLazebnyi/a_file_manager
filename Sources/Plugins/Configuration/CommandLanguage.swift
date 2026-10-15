@@ -113,9 +113,10 @@ enum CommandLanguage {
     {
         let command = expandingEnvironment(command, environment).trimmingCharacters(in: .whitespaces)
         guard !command.isEmpty else { return [] }
-        let items = ShellWords.split(command, at: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter {
-            !$0.isEmpty
-        }
+        let items = ShellWords.split(command, at: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter {
+                !$0.isEmpty
+            }
         let steps = items.map { step($0, resolve: resolve) }
         return steps.contains(nil) ? [.external(command)] : steps.compactMap { $0 }
     }
@@ -137,7 +138,7 @@ enum CommandLanguage {
     /// (`cm_List /etc/hosts`), anything else text. `location` turns a path into a location.
     static func argument(from parameter: String, location: (String) -> URL) -> CommandArgument {
         let text = parameter.trimmingCharacters(in: .whitespaces)
-        guard !text.isEmpty else { return .none }
+        guard !text.isEmpty else { return .nothing }
         if let index = Int(text), text.allSatisfy(\.isNumber) { return .index(index) }
         let plain = ShellWords.unquoted(text)
         let isOneWord = ShellWords.split(text).count == 1

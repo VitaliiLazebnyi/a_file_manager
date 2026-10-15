@@ -66,20 +66,15 @@ internal struct ProviderFallbackTests {
     /// An entry carries the size of its link's target and its device, which count for equality
     /// but not for being the same entry; two names of one file, hard or followed soft, are one file.
     @Test
-    internal func anEntryCanSayWhatItsLinkPointsToAndWhereItLives() throws {
+    internal func anEntryCanSayWhatItsLinkPointsTo() throws {
         let folder = URL(fileURLWithPath: "/review2/requests")
         var item = Fixture.file("link", in: folder)
         #expect(item.linkTargetSize == nil)
-        #expect(item.device == nil)
         item.linkTargetSize = 0
-        item.device = 16_777_233
         #expect(item.linkTargetSize == 0)
-        #expect(item.device == 16_777_233)
         #expect(item != Fixture.file("link", in: folder))
-        let made = FileItem(url: folder, name: "x", isDirectory: false, linkTargetSize: 77, device: -3)
+        let made = FileItem(url: folder, name: "x", linkTargetSize: 77)
         #expect(made.linkTargetSize == 77)
-        #expect(made.device == -3)
-        #expect(made.isSameEntry(as: FileItem(url: folder, name: "x", isDirectory: false)))
         // The same file under two names.
         let sandbox = try Sandbox()
         let original = try sandbox.file("a/original.txt")

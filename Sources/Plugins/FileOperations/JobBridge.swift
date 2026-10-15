@@ -67,12 +67,15 @@ final class JobBridge: FileJobDelegate, Sendable {
                     // Return presses Skip: a file that is overwritten is gone, one that is skipped
                     // can still be copied.
                     let button = ui.choose(
-                        "Overwrite:", detail: detail,
+                        "Overwrite:",
+                        detail: detail,
                         buttons: [
                             "Overwrite", "Overwrite all", "Skip", "Skip all", "Overwrite all older",
                             "Rename…", "More…", "Cancel"
-                        ], style: .warning,
-                        defaultButton: Self.overwriteDefault)
+                        ],
+                        style: .warning,
+                        defaultButton: Self.overwriteDefault
+                    )
                     switch button {
                     case 0: return .answer(.overwrite)
                     case 1: return .answer(.overwriteAll)
@@ -88,7 +91,10 @@ final class JobBridge: FileJobDelegate, Sendable {
                     case 6:
                         guard
                             let row = ui.pickRow(
-                                "Overwrite: more options", detail: shown(target.url), rows: more.map(\.rawValue))
+                                "Overwrite: more options",
+                                rows: more.map(\.rawValue),
+                                detail: shown(target.url)
+                            )
                         else { continue }
                         switch more[row] {
                         case .compare: return .compare
@@ -119,7 +125,10 @@ final class JobBridge: FileJobDelegate, Sendable {
             // Compare takes no decision: the files are read here, off the main thread, and the
             // Overwrite dialog comes back.
             let same = try? Checksum.sameContents(
-                source.url, target.url, in: fileSystems, flags: [monitor.cancellation]
+                source.url,
+                target.url,
+                in: fileSystems,
+                flags: [monitor.cancellation]
             ) { self.monitor.cancellation.isCancelled }
             if monitor.cancellation.isCancelled { return .cancel }
             monitor.ask { @MainActor @Sendable in
@@ -145,9 +154,11 @@ final class JobBridge: FileJobDelegate, Sendable {
     func job(_: FileJob, failedAt url: URL, error: any Error) -> ErrorChoice {
         monitor.ask { @MainActor @Sendable in
             ui.pick(
-                "Error with \(DisplayName.escaped(url.lastPathComponent))", detail: error.localizedDescription,
+                "Error with \(DisplayName.escaped(url.lastPathComponent))",
+                detail: error.localizedDescription,
                 [("Skip", .skip), ("Skip all", .skipAll), ("Retry", .retry), ("Abort", .abort)],
-                fallback: ErrorChoice.abort)
+                fallback: ErrorChoice.abort
+            )
         }
     }
 
@@ -157,7 +168,9 @@ final class JobBridge: FileJobDelegate, Sendable {
                 "The directory \(shown(directory)) is not empty!",
                 detail: "Do you want to delete it with all its files and subdirectories?",
                 [("Delete", .delete), ("All", .all), ("Skip", .skip), ("Cancel", .cancel)],
-                fallback: FolderDeleteChoice.cancel, returnPresses: 2)
+                fallback: FolderDeleteChoice.cancel,
+                returnPresses: 2
+            )
         }
     }
 
@@ -165,9 +178,12 @@ final class JobBridge: FileJobDelegate, Sendable {
         let text = OperationText.protection(question, path: shown(question.item.url))
         return monitor.ask { @MainActor @Sendable in
             pick(
-                text.message, detail: text.detail,
+                text.message,
+                detail: text.detail,
                 [(text.action, .proceed), ("All", .all), ("Skip", .skip), ("Cancel", .cancel)],
-                fallback: ProtectionChoice.cancel, returnPresses: 2)
+                fallback: ProtectionChoice.cancel,
+                returnPresses: 2
+            )
         }
     }
 
@@ -177,7 +193,8 @@ final class JobBridge: FileJobDelegate, Sendable {
                 "The folder \(shown(existing.url)) already exists!",
                 detail: "Do you want to copy into it? Files with the same names are asked about one by one.",
                 [("Merge", .merge), ("All", .mergeAll), ("Skip", .skip), ("Cancel", .cancel)],
-                fallback: MergeChoice.cancel)
+                fallback: MergeChoice.cancel
+            )
         }
     }
 
@@ -189,10 +206,13 @@ final class JobBridge: FileJobDelegate, Sendable {
             : ("Delete its contents", "Deleting it would delete everything on that volume. Do you want that?")
         return monitor.ask { @MainActor @Sendable in
             pick(
-                "\(shown(folder.url)) is another volume (a mounted disk, disk image or share)!", detail: detail,
+                "\(shown(folder.url)) is another volume (a mounted disk, disk image or share)!",
+                detail: detail,
                 [("Skip", .skip), (action, .proceed), ("All Volumes", .all), ("Cancel", .cancel)],
                 fallback: ProtectionChoice.cancel,
-                style: .critical, returnPresses: 0)
+                style: .critical,
+                returnPresses: 0
+            )
         }
     }
 
@@ -204,8 +224,12 @@ final class JobBridge: FileJobDelegate, Sendable {
     /// and the destroying answer has to be chosen. Main thread.
     @MainActor
     private func pick<Choice>(
-        _ message: String, detail: String, _ choices: [(String, Choice)], fallback: Choice,
-        style: QuestionStyle = .warning, returnPresses safe: Int
+        _ message: String,
+        detail: String,
+        _ choices: [(String, Choice)],
+        fallback: Choice,
+        style: QuestionStyle = .warning,
+        returnPresses safe: Int
     ) -> Choice {
         let index = ui.choose(message, detail: detail, buttons: choices.map(\.0), style: style, defaultButton: safe)
         return choices.indices.contains(index) ? choices[index].1 : fallback

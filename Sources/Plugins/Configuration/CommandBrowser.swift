@@ -33,7 +33,10 @@ final class CommandBrowserController: NSWindowController, NSWindowDelegate, NSSe
         self.center = center
         let window = Window(
             contentRect: NSRect(x: 0, y: 0, width: 680, height: 520),
-            styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
+            styleMask: [.titled, .closable, .resizable],
+            backing: .buffered,
+            defer: false
+        )
         window.title = "Choose Command"
         window.isReleasedWhenClosed = false
         window.minSize = NSSize(width: 560, height: 320)
@@ -72,7 +75,8 @@ final class CommandBrowserController: NSWindowController, NSWindowDelegate, NSSe
         ]
         let bottom = filledStack(
             userButtons + [spacer(), ActionButton("Cancel") { [unowned self] in self.window?.close() }, primaryButton],
-            vertical: false)
+            vertical: false
+        )
         window.contentView = padded(filledStack([top, table, bottom], vertical: true, spacing: 10), by: 12)
     }
 
@@ -108,7 +112,8 @@ final class CommandBrowserController: NSWindowController, NSWindowDelegate, NSSe
         categories.addItems(
             withTitles: ["All"] + CommandCatalog.categories(of: all, menus: center.kernel.menus.menus) + [
                 CommandRow.userCategory
-            ])
+            ]
+        )
         if categories.itemTitles.filter({ $0 == CommandRow.userCategory }).count > 1 {
             categories.removeItem(at: categories.numberOfItems - 1)
         }
@@ -124,7 +129,8 @@ final class CommandBrowserController: NSWindowController, NSWindowDelegate, NSSe
             }
         table.show(
             rows.map { [$0.id.rawValue, $0.title, $0.keys] },
-            selecting: id.flatMap { id in rows.firstIndex { $0.id == id } } ?? 0)
+            selecting: id.flatMap { id in rows.firstIndex { $0.id == id } } ?? 0
+        )
         updateButtons()
     }
 
@@ -167,10 +173,12 @@ final class CommandBrowserController: NSWindowController, NSWindowDelegate, NSSe
 
     private func deleteSelected() {
         guard let command = selectedUserCommand else { return }
-        let answer = center.kernel.ui.choose(
+        let answer = center.kernel.interaction.choose(
             "Delete the user command \(command.name)?",
             detail: "Buttons, menu entries and keys that use it stop working.",
-            buttons: ["Delete", "Cancel"], style: .warning)
+            buttons: ["Delete", "Cancel"],
+            style: .warning
+        )
         guard answer == 0 else { return }
         center.removeUserCommand(named: command.name)
         reload()
@@ -178,17 +186,21 @@ final class CommandBrowserController: NSWindowController, NSWindowDelegate, NSSe
 
     private func renameOrCopy() {
         guard let command = selectedUserCommand else { return }
-        let ui = center.kernel.ui
+        let ui = center.kernel.interaction
         guard
             let answer = ui.form(
-                "Rename or Copy \(command.name)", detail: "",
+                "Rename or Copy \(command.name)",
+                detail: "",
                 fields: [.text("name", "New name:  em_", String(command.name.dropFirst(UserCommand.prefix.count)))],
-                buttons: ["Rename", "Copy"])
+                buttons: ["Rename", "Copy"]
+            )
         else { return }
         guard let name = UserCommand.name(from: answer.text("name")), center.userCommand(named: name) == nil else {
             ui.inform(
                 "The name cannot be used",
-                detail: "It is empty, in use, or has characters other than letters, digits and _.", style: .warning)
+                detail: "It is empty, in use, or has characters other than letters, digits and _.",
+                style: .warning
+            )
             return
         }
         var renamed = command

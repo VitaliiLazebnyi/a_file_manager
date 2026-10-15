@@ -24,6 +24,7 @@ internal struct StalledLoadingTests {
         private var counts: [String: Int] = [:]
         private var flags: [CancellationFlag] = []
         private var givenUp = 0
+        private var waiting = 0
 
         var capabilities: FileSystemCapabilities { [.write] }
 
@@ -32,6 +33,9 @@ internal struct StalledLoadingTests {
 
         /// How many blocked questions were never released and gave up after the longest wait: a hang.
         var waitsGivenUp: Int { lock.withLock { givenUp } }
+
+        /// How many blocked questions are waiting right now.
+        var stuck: Int { lock.withLock { waiting } }
 
         /// How many questions of a kind (`volume`, `list`) blocked.
         func count(_ what: String) -> Int { lock.withLock { counts[what] ?? 0 } }
@@ -62,11 +66,13 @@ internal struct StalledLoadingTests {
         private func block(_ what: String, _ flag: CancellationFlag) {
             lock.withLock {
                 counts[what, default: 0] += 1
+                waiting += 1
                 flags.append(flag)
             }
             if release.wait(timeout: .now() + Wait.ceiling) == .timedOut {
                 lock.withLock { givenUp += 1 }
             }
+            lock.withLock { waiting -= 1 }
         }
 
         private func isDead(_ url: URL) -> Bool { url.path.hasPrefix("/dead") }
@@ -108,7 +114,7 @@ internal struct StalledLoadingTests {
             #expect(ended.wait() != nil)
         }
         #expect(stalled.count("volume") == 1)
-        #expect(BlockingCalls.unanswered(for: stalled) == 1)
+        #expect(stalled.stuck == 1)
         // The question was told that nobody waits for it.
         #expect(stalled.handedFlags.first?.isCancelled == true)
         // A healthy folder of the same file system still loads.
@@ -117,7 +123,7 @@ internal struct StalledLoadingTests {
         for _ in 0..<4 {
             stalled.release.signal()
         }
-        #expect(Wait.until { BlockingCalls.unanswered(for: stalled) == 0 })
+        #expect(Wait.until { stalled.stuck == 0 })
         stalled.stallsVolume = false
         let result = try? PanelLoader.load(stalled.inner.url("/dead"), showHidden: true, fileSystems: registry)
         #expect(result?.listing.items.map(\.name) == ["a.txt"] && result?.listing.volume?.name == "alive")
@@ -138,7 +144,7 @@ internal struct StalledLoadingTests {
             cancellation.cancel()
             #expect(ended.wait() != nil)
         }
-        #expect(stalled.count("list") == 1 && BlockingCalls.unanswered(for: stalled) == 1)
+        #expect(stalled.count("list") == 1 && stalled.stuck == 1)
         let reading = load("/dead", cancellation: CancellationFlag())
         // Nothing more is asked meanwhile: an absence, which no condition can show, so it is
         // looked for after a moment.
@@ -147,7 +153,7 @@ internal struct StalledLoadingTests {
         stalled.stallsListing = false
         stalled.release.signal()
         #expect(reading.wait() == ["a.txt"])
-        #expect(Wait.until { BlockingCalls.unanswered(for: stalled) == 0 })
+        #expect(Wait.until { stalled.stuck == 0 })
         #expect(stalled.waitsGivenUp == 0)
     }
 
@@ -190,7 +196,6 @@ internal struct StalledLoadingTests {
         #expect(climbed.listing.items.count == 50)
         let atFile = try PanelLoader.load(memory.url("/big/file3.txt"), showHidden: true, fileSystems: memoryRegistry)
         #expect(atFile.focus == "file3.txt" && atFile.listing.items.count == 50)
-        #expect(BlockingCalls.unanswered(for: memory) == 0)
     }
 
     /// One try at reading `path` of the stalled file system, on a thread of its own; the

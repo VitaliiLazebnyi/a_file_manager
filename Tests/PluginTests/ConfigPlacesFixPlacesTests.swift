@@ -50,18 +50,22 @@ import Testing
         settings.set(
             Data(
                 #"{"visits":[{"location":"file:///a"},{"isVisible":true},{"location":"file:///b","isVisible":true,"x":1}]}"#
-                    .utf8) as Data?, forKey: "history.left")
+                    .utf8
+            ) as Data?,
+            forKey: "history.left"
+        )
         settings.set(Data(#"{"counts":{"file:///a":2},"extra":1}"#.utf8) as Data?, forKey: "history.frequent")
         var told: [String] = []
         let tracker = DirectoryHistoryTracker(settings: settings, problem: { told.append($0) })
         #expect(
             tracker.history(of: .left).visits.map(\.location) == ["file:///a", "file:///b"]
-                && tracker.frequent.counts == ["file:///a": 2])
+                && tracker.frequent.counts == ["file:///a": 2]
+        )
         #expect(told.count == 1 && settings.data(forKey: "history.left.unreadable") != nil)
     }
 
     @Test func hotlistEntriesRunUserCommands() {
-        #expect(HotlistAction("em_build") == .command("em_build", .none))
+        #expect(HotlistAction("em_build") == .command("em_build", .nothing))
         #expect(HotlistAction("em_open some words") == .command("em_open", .text("some words")))
         #expect(HotlistAction("emotion") == .changeDirectory(path: "emotion", focusingOnIt: false))
     }
@@ -154,7 +158,8 @@ extension TreeNode {
         let restarted = TreeCache(directory: box.url("cache")).entry(for: root)
         #expect(
             restarted
-                == TreeCache.Entry(paths: ["a", "a/b", "Volumes"], unscanned: ["Volumes", "a/b"], isComplete: false))
+                == TreeCache.Entry(paths: ["a", "a/b", "Volumes"], unscanned: ["Volumes", "a/b"], isComplete: false)
+        )
         #expect(TreeCache.parse("root=file:///Volumes/Disk/\n[a]\n(a)\n", root: root) == ["a"])
     }
 
@@ -189,10 +194,12 @@ extension TreeNode {
             var levels: [TreeScanner.Level] = []
             #expect(scanner.run { levels += $0 })
             #expect(
-                levels.first?.children == (hidden ? [".hid", "a", "b"] : ["a", "b"]) && levels.allSatisfy(\.isSorted))
+                levels.first?.children == (hidden ? [".hid", "a", "b"] : ["a", "b"]) && levels.allSatisfy(\.isSorted)
+            )
             #expect(
                 scanner.paths == (hidden ? [".hid", "a", "b", ".hid/in", "b/inner"] : ["a", "b", "b/inner"])
-                    && scanner.unscanned.isEmpty)
+                    && scanner.unscanned.isEmpty
+            )
         }
     }
 

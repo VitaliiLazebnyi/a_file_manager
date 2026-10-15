@@ -120,7 +120,9 @@ final class SyncSession {
 
     /// Presets the window with the directories and the selection of the two panels.
     func adopt(
-        left: PanelModel, right: PanelModel, includeHidden: Bool,
+        left: PanelModel,
+        right: PanelModel,
+        includeHidden: Bool,
         readsInBackgroundFrom: Int = SyncSession.backgroundFrom
     ) {
         // While the files are being synchronized the window keeps showing that: the paths, rows and
@@ -142,14 +144,15 @@ final class SyncSession {
         } else {
             selectedNames = []
             let snapshots = marked.map { $0.operandsSnapshot() }
-            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-                let names = Self.names(of: snapshots)
-                DispatchQueue.main.async { [weak self] in
-                    guard let self, self.selectionEpoch == epoch else { return }
-                    self.selectedNames = names
-                    self.changed()
+            DispatchQueue.global(qos: .userInitiated)
+                .async { [weak self] in
+                    let names = Self.names(of: snapshots)
+                    DispatchQueue.main.async { [weak self] in
+                        guard let self, self.selectionEpoch == epoch else { return }
+                        self.selectedNames = names
+                        self.changed()
+                    }
                 }
-            }
         }
         onlySelected = false
         options.includeHidden = includeHidden
@@ -257,21 +260,24 @@ final class SyncSession {
             comparison.options.asymmetric && result.topEntries.left == 0 && (result.topEntries.right ?? 0) > 0
         rebuild(rowsChanged: true)
         if sourceLooksEmpty {
-            kernel.ui.inform(
+            kernel.interaction.inform(
                 "The left directory is empty.",
                 detail:
                     "\(fileSystems.displayPath(left)) holds nothing, but \(fileSystems.displayPath(right)) does. Synchronizing would "
                     + "delete everything on the right. If the left directory is a network share or a drive, it may not be mounted. "
                     + "The deletion is not ticked in the Synchronize dialog; tick it only if this is what you want.",
-                style: .warning)
+                style: .warning
+            )
         }
         if !result.errors.isEmpty, settings.flag(SyncSettingsKey.warnReadErrors, default: true) {
             let shown =
                 result.errors.prefix(12).joined(separator: "\n")
                 + (result.errors.count > 12 ? "\n… and \(result.errors.count - 12) more" : "")
-            kernel.ui.inform(
-                "Some directories or files could not be read. They are left out of the comparison.", detail: shown,
-                style: .warning)
+            kernel.interaction.inform(
+                "Some directories or files could not be read. They are left out of the comparison.",
+                detail: shown,
+                style: .warning
+            )
         }
     }
 
@@ -300,7 +306,9 @@ final class SyncSession {
 
     /// Filters by the Show buttons, sorts inside each subdirectory and puts the captions in.
     nonisolated static func layout(
-        rows: [SyncRow], show: SyncShow, sort: (key: SyncSortKey, side: SyncSide, ascending: Bool)
+        rows: [SyncRow],
+        show: SyncShow,
+        sort: (key: SyncSortKey, side: SyncSide, ascending: Bool)
     )
         -> Layout
     {
@@ -400,7 +408,9 @@ final class SyncSession {
     /// Orders the rows of one folder. The keys (a size, a date) are taken out once, and the pairs of key and
     /// row are sorted: sorting the rows by looking into their files on every comparison takes seconds at a million.
     nonisolated private static func sorted(
-        _ indexes: [Int], rows: [SyncRow], by sort: (key: SyncSortKey, side: SyncSide, ascending: Bool)
+        _ indexes: [Int],
+        rows: [SyncRow],
+        by sort: (key: SyncSortKey, side: SyncSide, ascending: Bool)
     ) -> [Int] {
         // The comparison delivers the rows by name already.
         if sort.key == .name { return sort.ascending ? indexes : indexes.reversed() }
@@ -409,8 +419,10 @@ final class SyncSession {
             guard let item = sort.side == .left ? row.left ?? row.right : row.right ?? row.left else { return 0 }
             return sort.key == .size ? item.size : Int64((item.modified.timeIntervalSince1970 * 1_000_000).rounded())
         }
-        let ordered = indexes.map { (key: key($0), index: $0) }.sorted { ($0.key, $0.index) < ($1.key, $1.index) }.map(
-            \.index)
+        let ordered = indexes.map { (key: key($0), index: $0) }.sorted { ($0.key, $0.index) < ($1.key, $1.index) }
+            .map(
+                \.index
+            )
         return sort.ascending ? ordered : ordered.reversed()
     }
 
@@ -510,12 +522,14 @@ final class SyncSession {
         }
         guard files.left != nil || files.right != nil else { return }
         guard kernel.commands[.compareByContent] != nil else {
-            kernel.ui.inform("Compare by content is not available.")
+            kernel.interaction.inform("Compare by content is not available.")
             return
         }
         picked = (nil, nil)
         kernel.commands.perform(
-            .compareByContent, .text((files.left?.absoluteString ?? "") + "\n" + (files.right?.absoluteString ?? "")))
+            .compareByContent,
+            .text((files.left?.absoluteString ?? "") + "\n" + (files.right?.absoluteString ?? ""))
+        )
         changed()
     }
 
@@ -562,8 +576,12 @@ final class SyncSession {
 
     private var currentLayout: Layout {
         Layout(
-            entries: entries, positions: positions, headerPositions: headerPositions, actionableCount: actionableCount,
-            summary: summary)
+            entries: entries,
+            positions: positions,
+            headerPositions: headerPositions,
+            actionableCount: actionableCount,
+            summary: summary
+        )
     }
 
     private func present(_ plan: SyncPlan) {
@@ -594,31 +612,45 @@ final class SyncSession {
             fields.append(
                 .note(
                     "The left directory is empty or not available. Tick the deletion only if everything on the right is to go."
-                ))
+                )
+            )
         }
         if !plan.deleteRight.isEmpty {
             fields.append(
                 .checkbox(
-                    "deleteRight", "Right: Delete \(plan.deleteRight.count) file(s) in \(rightText)", deletionsTicked)
+                    "deleteRight",
+                    "Right: Delete \(plan.deleteRight.count) file(s) in \(rightText)",
+                    deletionsTicked
+                )
             )
         }
         if !plan.deleteLeft.isEmpty {
             fields.append(
-                .checkbox("deleteLeft", "Left: Delete \(plan.deleteLeft.count) file(s) in \(leftText)", true))
+                .checkbox("deleteLeft", "Left: Delete \(plan.deleteLeft.count) file(s) in \(leftText)", true)
+            )
         }
         if asymmetric {
             fields.append(.checkbox("emptyDirectories", "Right: Delete all empty directories in \(rightText)", false))
         }
         fields.append(
             .checkbox(
-                "confirm", "Confirm overwrites", settings.flag(SyncSettingsKey.confirmOverwrites, default: true)))
+                "confirm",
+                "Confirm overwrites",
+                settings.flag(SyncSettingsKey.confirmOverwrites, default: true)
+            )
+        )
         if hasDeletions {
             fields.append(
                 .checkbox(
-                    "direct", "Delete directly instead of moving to the Trash",
-                    !settings.flag(SyncSettingsKey.useTrash, default: true)))
+                    "direct",
+                    "Delete directly instead of moving to the Trash",
+                    !settings.flag(SyncSettingsKey.useTrash, default: true)
+                )
+            )
         }
-        guard let answer = kernel.ui.form("Synchronize", detail: "", fields: fields, buttons: ["OK"]) else { return }
+        guard let answer = kernel.interaction.form("Synchronize", detail: "", fields: fields, buttons: ["OK"]) else {
+            return
+        }
 
         var run = SyncRunOptions()
         run.copyToRight = answer.flag("toRight")
@@ -640,7 +672,7 @@ final class SyncSession {
             }
         }
 
-        let (ui, fileSystems) = (kernel.ui, self.fileSystems)
+        let (ui, fileSystems) = (kernel.interaction, self.fileSystems)
         // The progress window is another window: until the job is over neither Synchronize nor Compare may start.
         phase = .synchronizing
         changed()
@@ -648,7 +680,11 @@ final class SyncSession {
             title: "Synchronize",
             work: { [plan, run] monitor -> SyncOutcome in
                 let executor = SyncExecutor(
-                    plan: plan, options: run, fileSystems: fileSystems, cancellation: monitor.cancellation)
+                    plan: plan,
+                    options: run,
+                    fileSystems: fileSystems,
+                    cancellation: monitor.cancellation
+                )
                 executor.onProgress = monitor.report
                 executor.onOverwrite = { target, copy in
                     monitor.ask { @MainActor @Sendable in
@@ -661,24 +697,30 @@ final class SyncSession {
                                 ("Overwrite", SyncOverwriteAnswer.overwrite), ("Overwrite All", .overwriteAll),
                                 ("Skip", .skip),
                                 ("Skip All", .skipAll), ("Cancel", .cancel)
-                            ], fallback: .cancel)
+                            ],
+                            fallback: .cancel
+                        )
                     }
                 }
                 executor.onError = { url, error in
                     monitor.ask { @MainActor @Sendable in
                         ui.pick(
-                            "Error with \(fileSystems.displayPath(url))", detail: error.localizedDescription,
+                            "Error with \(fileSystems.displayPath(url))",
+                            detail: error.localizedDescription,
                             [
                                 ("Skip", SyncErrorAnswer.skip), ("Skip All", .skipAll), ("Retry", .retry),
                                 ("Cancel", .cancel)
-                            ], fallback: .cancel)
+                            ],
+                            fallback: .cancel
+                        )
                     }
                 }
                 return executor.run()
             },
             completion: { [weak self] outcome in
                 self?.finished(outcome)
-            })
+            }
+        )
     }
 
     private func finished(_ outcome: SyncOutcome) {
@@ -708,10 +750,12 @@ final class SyncSession {
             lines += outcome.errors.prefix(12)
             if outcome.errors.count > 12 { lines.append("… and \(outcome.errors.count - 12) more") }
         }
-        kernel.ui.inform(
+        kernel.interaction.inform(
             outcome.errors.isEmpty && !outcome.commitFailed
                 ? "Synchronize was stopped." : "Synchronize did not finish without errors.",
-            detail: lines.joined(separator: "\n"), style: .warning)
+            detail: lines.joined(separator: "\n"),
+            style: .warning
+        )
     }
 
     // MARK: Remembered options and saved sets

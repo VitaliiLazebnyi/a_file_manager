@@ -75,16 +75,6 @@ internal struct ProviderDefaultTests {
         }
         #expect(streamed == [".hidden", "one.txt", "sub"])
         #expect(plain.item(at: file, cancellation: flag)?.size == 5)
-        // The lean listing is made from the full one.
-        #expect(
-            try plain.entries(of: directory, showHidden: false, foldersOnly: false, cancellation: flag)
-                == [
-                    DirectoryEntry(name: "one.txt", isDirectory: false),
-                    DirectoryEntry(name: "sub", isDirectory: true)
-                ]
-        )
-        let folders = try plain.entries(of: directory, showHidden: true, foldersOnly: true, cancellation: flag)
-        #expect(folders.map(\.name) == ["sub"])
         try checkTransfersAndTheRest(directory: directory, file: file, flag: flag)
     }
 
@@ -139,9 +129,9 @@ internal struct ProviderDefaultTests {
         try writer.write(Data("new".utf8))
         try writer.close(attributes: FileAttributes())
         #expect(plain.inner.contents("/a/new.txt") == "new")
-        #expect(throws: FileSystemError.self) { try plain.append(to: file, at: 2) }
+        #expect(throws: FileSystemError.self) { try plain.append(to: file, at: 2, cancellation: CancellationFlag()) }
         #expect(throws: FileSystemError.self) { try plain.copyMetadata(from: directory, to: file) }
-        try plain.commit(directory)
+        plain.commit(directory, cancellation: CancellationFlag())
         #expect(plain.quarantine(of: file) == nil)
         plain.setQuarantine(Data("0081;x".utf8), of: file)
     }

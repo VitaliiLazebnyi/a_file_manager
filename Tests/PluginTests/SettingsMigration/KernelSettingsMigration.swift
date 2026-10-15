@@ -1,6 +1,7 @@
 import AFMContracts
 import AFMKernel
 import Foundation
+import TestSupport
 import Testing
 
 /// Settings of the kernel written by earlier versions: the button bar's layout and the panels'

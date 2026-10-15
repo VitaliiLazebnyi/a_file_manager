@@ -15,13 +15,7 @@ internal struct PanelsSortedFileListTests {
     private static func item(_ name: String, folder: Bool = false, size: Int64 = 0, in folderName: String = "a")
         -> FileItem
     {
-        FileItem(
-            url: URL(fileURLWithPath: "/sorted/\(folderName)/\(name)"),
-            name: name,
-            isDirectory: folder,
-            size: size,
-            modified: Date(timeIntervalSinceReferenceDate: TimeInterval(size % 7))
-        )
+        FileItem(url: URL(fileURLWithPath: "/sorted/\(folderName)/\(name)"), name: name, kind: .init(isDirectory: folder), stat: .init(size: size, modified: Date(timeIntervalSinceReferenceDate: TimeInterval(size % 7))))
     }
 
     /// Items of every kind, among them names that come more than once (from several folders),

@@ -43,14 +43,6 @@ internal struct PathSafetyProperties {
         return !wentAbove && depth > 0
     }
 
-    /// Whether a relative path has an empty name: two slashes in a row, or one at either end.
-    private static func hasEmptyName(_ path: String) -> Bool {
-        // By bytes: a `/` with an accent after it is one character, but the byte `/` all the same.
-        let bytes = Array(path.utf8)
-        return bytes.first == 0x2F || bytes.last == 0x2F
-            || zip(bytes, bytes.dropFirst()).contains { $0 == 0x2F && $1 == 0x2F }
-    }
-
     /// Whether `isContained` answers for the root and `path` what resolving the dot names says.
     ///
     /// A path with a zero byte names no file (a URL's path ends there): for those it is enough
@@ -71,10 +63,10 @@ internal struct PathSafetyProperties {
             .map { String(bytes: $0, encoding: .utf8) ?? "\u{FFFD}" }
         let acceptable = !bytes.isEmpty && parts.allSatisfy(isSafe)
         let names = PathSafety.components(ofRelativePath: path, allowingTrailingSeparator: trailing)
-        let location = PathSafety.location(ofRelativePath: path, below: root, allowingTrailingSeparator: trailing)
-        guard let names, let location else {
-            return !acceptable && names == nil && location == nil
+        guard !names.isEmpty else {
+            return !acceptable
         }
+        let location = names.reduce(root) { $0.appending(name: $1) }
         return acceptable && names == parts && PathSafety.isContained(location, in: root)
             && location.path == root.path + "/" + names.joined(separator: "/")
     }
@@ -101,22 +93,9 @@ internal struct PathSafetyProperties {
     }
 
     /// A location written as text below the root lies inside it exactly when it still does with
-    /// its dot names resolved.
+    /// its dot names resolved, empty names (`root//../a`) read as the file system reads them.
     @Test
     internal func containmentFollowsTheDotNames() {
-        // Empty names (`//`) are the known issue below.
-        expectProperty(Self.path, count: 2_000) { path in Self.hasEmptyName(path) || Self.isContainedAsExpected(path) }
-    }
-
-    /// The same for paths with empty names in them (`root//../a`).
-    ///
-    /// The file system reads `//` as one `/`, so `root//../a` is `a` next to the root;
-    /// `URL.standardized`, which `isContained` writes the paths out with, takes the empty name for
-    /// a folder that `..` leaves again, and the path counts as inside the root.
-    @Test
-    internal func containmentFollowsTheDotNamesAfterEmptyNames() {
-        withKnownIssue("PathSafety.isContained: `root//../a` counts as inside the root (URL.standardized)") {
-            expectProperty(Self.path, count: 2_000) { path in Self.isContainedAsExpected(path) }
-        }
+        expectProperty(Self.path, count: 2_000) { path in Self.isContainedAsExpected(path) }
     }
 }

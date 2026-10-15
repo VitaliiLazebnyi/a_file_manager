@@ -56,7 +56,7 @@ internal final class PanelsBrokenListing: FileSystemProvider, Sendable {
         guard !failing.contains(directory.path) else {
             throw Broken()
         }
-        let item = FileItem(url: directory.appendingPathComponent("first"), name: "first", isDirectory: false)
+        let item = FileItem(url: directory.appendingPathComponent("first"), name: "first")
         guard receive([item]) else {
             // Told to stop: the flag follows soon after the answer.
             let end = Date(timeIntervalSinceNow: 5)
@@ -78,7 +78,7 @@ internal final class PanelsBrokenListing: FileSystemProvider, Sendable {
 
     /// Every location is a folder.
     internal func item(at url: URL) -> FileItem? {
-        FileItem(url: url, name: url.lastPathComponent, isDirectory: true)
+        FileItem(url: url, name: url.lastPathComponent, kind: .directory)
     }
 
     /// The folder above, up to the host.

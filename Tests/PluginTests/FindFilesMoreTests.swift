@@ -121,8 +121,12 @@ import Testing
         var withMark = Data([0xFE, 0xFF])
         withMark.append(try #require(text.data(using: .utf16BigEndian)))
         #expect(
-            try pattern("^größe: \\d+", utf16).isFound(
-                in: try #require(text.data(using: .utf16LittleEndian)), blockSize: 9))
+            try pattern("^größe: \\d+", utf16)
+                .isFound(
+                    in: try #require(text.data(using: .utf16LittleEndian)),
+                    blockSize: 9
+                )
+        )
         #expect(try pattern("^größe: \\d+", utf16).isFound(in: withMark, blockSize: 9))
         let western = TextSearchOptions(regex: true, encodings: [.western])
         #expect(try pattern("^größe", western).isFound(in: try #require(text.data(using: .windowsCP1252))))
@@ -142,14 +146,21 @@ import Testing
     }
 
     func file(
-        _ name: String = "a.txt", size: Int64 = 0, modified: Date = Date(timeIntervalSince1970: 0),
+        _ name: String = "a.txt",
+        size: Int64 = 0,
+        modified: Date = Date(timeIntervalSince1970: 0),
         permissions: UInt16 = 0o644,
-        directory: Bool = false, hidden: Bool = false, symlink: Bool = false, package: Bool = false
+        directory: Bool = false,
+        hidden: Bool = false,
+        symlink: Bool = false,
+        package: Bool = false
     ) -> FileItem {
         FileItem(
-            url: URL(fileURLWithPath: "/x/" + name), name: name, isDirectory: directory, isSymlink: symlink,
-            isPackage: package,
-            isHidden: hidden, size: size, modified: modified, permissions: permissions)
+            url: URL(fileURLWithPath: "/x/" + name),
+            name: name,
+            kind: .init(isDirectory: directory, isSymlink: symlink, isPackage: package, isHidden: hidden),
+            stat: .init(size: size, modified: modified, permissions: permissions)
+        )
     }
 
     @Test func ageCutsOffAtMidnightForDaysAndLonger() {
@@ -160,10 +171,12 @@ import Testing
         #expect(Age(1, .weeks).cutoff(before: now, calendar: calendar) == date(5, 0))
         #expect(
             Age(1, .months).cutoff(before: now, calendar: calendar)
-                == calendar.date(from: DateComponents(year: 2_026, month: 9, day: 12)))
+                == calendar.date(from: DateComponents(year: 2_026, month: 9, day: 12))
+        )
         #expect(
             Age(1, .years).cutoff(before: now, calendar: calendar)
-                == calendar.date(from: DateComponents(year: 2_025, month: 10, day: 12)))
+                == calendar.date(from: DateComponents(year: 2_025, month: 10, day: 12))
+        )
     }
 
     @Test func dateCriteria() {
@@ -179,10 +192,12 @@ import Testing
         criteria = FileCriteria(dateFrom: date(3, 0), dateTo: date(5, 23))
         #expect(
             criteria.matches(file(modified: date(4)), now: now)
-                && criteria.matches(file(modified: date(5, 22)), now: now))
+                && criteria.matches(file(modified: date(5, 22)), now: now)
+        )
         #expect(
             !criteria.matches(file(modified: date(2)), now: now)
-                && !criteria.matches(file(modified: date(6)), now: now))
+                && !criteria.matches(file(modified: date(6)), now: now)
+        )
         #expect(FileCriteria(dateFrom: date(3)).matches(file(modified: date(30)), now: now))
         #expect(FileCriteria().isEmpty && !criteria.isEmpty)
     }
@@ -191,12 +206,14 @@ import Testing
         #expect(SizeRule(.equal, 19).matches(19) && !SizeRule(.equal, 19).matches(20))
         #expect(SizeRule(.greater, 1, .kilobytes).matches(1_025) && !SizeRule(.greater, 1, .kilobytes).matches(1_024))
         #expect(
-            SizeRule(.less, 0.5, .megabytes).matches(524_287) && !SizeRule(.less, 0.5, .megabytes).matches(524_288))
+            SizeRule(.less, 0.5, .megabytes).matches(524_287) && !SizeRule(.less, 0.5, .megabytes).matches(524_288)
+        )
         #expect(SizeRule(.equal, 2, .kilobytes).matches(2_048) && SizeRule(.equal, 2, .kilobytes).matches(3_071))
         #expect(!SizeRule(.equal, 2, .kilobytes).matches(3_072) && !SizeRule(.equal, 2, .kilobytes).matches(2_047))
         #expect(
             SizeRule(.greater, 0.1, .gigabytes).matches(107_374_183)
-                && !SizeRule(.greater, 0.1, .gigabytes).matches(107_374_182))
+                && !SizeRule(.greater, 0.1, .gigabytes).matches(107_374_182)
+        )
         let criteria = FileCriteria(size: SizeRule(.greater, 10))
         #expect(criteria.matches(file(size: 11), now: Date()) && !criteria.matches(file(size: 10), now: Date()))
         // Folders have no size to compare.
@@ -212,19 +229,22 @@ import Testing
         #expect(criteria.matches(file(hidden: true), now: Date()))
         #expect(
             !criteria.matches(file(), now: Date())
-                && !criteria.matches(file(directory: true, hidden: true), now: Date()))
+                && !criteria.matches(file(directory: true, hidden: true), now: Date())
+        )
         criteria = FileCriteria()
         criteria.readOnly = .yes
         criteria.executable = .no
         #expect(criteria.matches(file(permissions: 0o444), now: Date()))
         #expect(
             !criteria.matches(file(permissions: 0o644), now: Date())
-                && !criteria.matches(file(permissions: 0o555), now: Date()))
+                && !criteria.matches(file(permissions: 0o555), now: Date())
+        )
         criteria = FileCriteria()
         (criteria.symbolicLink, criteria.package) = (.yes, .no)
         #expect(
             criteria.matches(file(symlink: true), now: Date())
-                && !criteria.matches(file(symlink: true, package: true), now: Date()))
+                && !criteria.matches(file(symlink: true, package: true), now: Date())
+        )
     }
 
     @Test func fieldRuleOperators() {
@@ -234,11 +254,13 @@ import Testing
         #expect(rule(.equals, "testcam").matches("TestCam") && !rule(.equalsCase, "testcam").matches("TestCam"))
         #expect(
             rule(.notEquals, "x").matches("y") && !rule(.notEquals, "X").matches("x")
-                && rule(.notEqualsCase, "X").matches("x"))
+                && rule(.notEqualsCase, "X").matches("x")
+        )
         #expect(rule(.regex, "^test\\w+$").matches("TestCam") && rule(.notRegex, "^cam").matches("TestCam"))
         #expect(
             rule(.greater, "1000").matches("1,024") && !rule(.greater, "1024").matches("1,024")
-                && rule(.greaterOrEqual, "1024").matches("1,024"))
+                && rule(.greaterOrEqual, "1024").matches("1,024")
+        )
         #expect(rule(.less, "9").matches("10") == false && rule(.lessOrEqual, "10").matches("10"))
         // Text is ordered as text; an empty field is neither more nor less.
         #expect(rule(.greater, "apple").matches("Banana") && !rule(.less, "apple").matches(""))
@@ -258,8 +280,12 @@ import Testing
         // Switched off, the list is kept but does not count; a field that is gone never matches.
         #expect(FieldRules(isEnabled: false, rules: rules).matches(file("xyz"), fields: fields))
         #expect(
-            !FieldRules(isEnabled: true, rules: [FieldRule("gone", .contains, "")]).matches(
-                file("xyz"), fields: fields))
+            !FieldRules(isEnabled: true, rules: [FieldRule("gone", .contains, "")])
+                .matches(
+                    file("xyz"),
+                    fields: fields
+                )
+        )
     }
 }
 
@@ -323,7 +349,8 @@ private final class ArchiveFake: FileSystemProvider {
         #expect(SearchMask("Budget 2026.xls").matches("Budget 2026.xls"))
         #expect(
             SearchMask("*.txt | \"my notes.txt\"").matches("notes.txt")
-                && !SearchMask("*.txt | \"my notes.txt\"").matches("my notes.txt"))
+                && !SearchMask("*.txt | \"my notes.txt\"").matches("my notes.txt")
+        )
         // The words still count one by one as well, as the field is read everywhere else.
         #expect(find(query(names: "Budget 2026.xls")) == ["/work/Budget 2026.xls", "/work/old/budget.bak"])
         #expect(find(query(names: "\"Budget 2026.xls\"")) == ["/work/Budget 2026.xls"])
@@ -398,17 +425,21 @@ private final class ArchiveFake: FileSystemProvider {
     @Test func fieldRulesUseBuiltInFieldsAndPluginColumns() {
         let columns = ColumnRegistry()
         columns.register(
-            ContentColumn(id: "comment", title: "Comment") { $0.name.hasPrefix("budget") ? "checked by Ann" : "" })
+            ContentColumn(id: "comment", title: "Comment") { $0.name.hasPrefix("budget") ? "checked by Ann" : "" }
+        )
         var rules = query()
         rules.fieldRules = FieldRules(isEnabled: true, rules: [FieldRule("comment", .contains, "ann")])
         #expect(find(rules, columns: columns) == ["/work/old/budget.bak"])
         rules.fieldRules = FieldRules(
-            isEnabled: true, matchAll: false,
-            rules: [FieldRule("tc.ext", .equals, "XLS"), FieldRule("tc.size", .greater, "20")])
+            isEnabled: true,
+            matchAll: false,
+            rules: [FieldRule("tc.ext", .equals, "XLS"), FieldRule("tc.size", .greater, "20")]
+        )
         #expect(find(rules, columns: columns) == ["/work/Budget 2026.xls", "/work/notes.txt"])
         rules.fieldRules = FieldRules(
             isEnabled: true,
-            rules: [FieldRule("tc.fullname", .regex, "/old/.*\\.md$"), FieldRule("tc.name", .notEquals, "x")])
+            rules: [FieldRule("tc.fullname", .regex, "/old/.*\\.md$"), FieldRule("tc.name", .notEquals, "x")]
+        )
         #expect(find(rules, columns: columns) == ["/work/old/deep/readme.md"])
         // Without the plugin, its rule matches nothing.
         rules.fieldRules = FieldRules(isEnabled: true, rules: [FieldRule("comment", .contains, "ann")])
@@ -440,21 +471,25 @@ private final class ArchiveFake: FileSystemProvider {
         let box = try Sandbox()
         for index in 0..<300 {
             try box.file(
-                String(format: "d%d/f%03d.txt", index % 3, index), index % 4 == 0 ? "the Schlüssel is here" : "nothing"
+                String(format: "d%d/f%03d.txt", index % 3, index),
+                index % 4 == 0 ? "the Schlüssel is here" : "nothing"
             )
         }
         var query = SearchQuery(directory: box.root, text: "schlüssel")
         query.textOptions = TextSearchOptions(wholeWords: true, encodings: [.utf8, .utf16])
         query.fieldRules = FieldRules(isEnabled: true, rules: [FieldRule("tc.name", .regex, "^f\\d+")])
-        let expected = (0..<3).flatMap { folder in
-            stride(from: 0, to: 300, by: 4).filter { $0 % 3 == folder }.map {
-                String(format: "d%d/f%03d.txt", folder, $0)
+        let expected = (0..<3)
+            .flatMap { folder in
+                stride(from: 0, to: 300, by: 4).filter { $0 % 3 == folder }
+                    .map {
+                        String(format: "d%d/f%03d.txt", folder, $0)
+                    }
             }
-        }
         var found: [String] = []
-        FileSearch(query, fileSystems: fileSystems).run {
-            found.append(String($0.url.path.dropFirst(box.root.path.count + 1)))
-        }
+        FileSearch(query, fileSystems: fileSystems)
+            .run {
+                found.append(String($0.url.path.dropFirst(box.root.path.count + 1)))
+            }
         #expect(found == expected)
     }
 
@@ -497,25 +532,30 @@ private final class ArchiveFake: FileSystemProvider {
         #expect(groups(DuplicateOptions(isEnabled: true)) == [["/d/A/copy.txt", "/d/B/copy.txt"]])
         #expect(
             groups(DuplicateOptions(isEnabled: true, sameName: true, sameSize: false))
-                == [["/d/A/copy.txt", "/d/B/copy.txt", "/d/C/COPY.TXT"]])
+                == [["/d/A/copy.txt", "/d/B/copy.txt", "/d/C/COPY.TXT"]]
+        )
     }
 
     @Test func sameSizeGroupsAreOrderedBySize() {
         #expect(
             groups(DuplicateOptions(isEnabled: true, sameName: false, sameSize: true))
-                == [["/d/A/alpha.bin", "/d/B/beta.bin", "/d/B/gamma.bin"], ["/d/A/copy.txt", "/d/B/copy.txt"]])
+                == [["/d/A/alpha.bin", "/d/B/beta.bin", "/d/B/gamma.bin"], ["/d/A/copy.txt", "/d/B/copy.txt"]]
+        )
     }
 
     @Test func sameContentsIsDecidedByHashing() {
         #expect(
             groups(DuplicateOptions(isEnabled: true, sameName: false, sameSize: false, sameContents: true))
-                == [["/d/A/alpha.bin", "/d/B/beta.bin"], ["/d/A/copy.txt", "/d/B/copy.txt"]])
+                == [["/d/A/alpha.bin", "/d/B/beta.bin"], ["/d/A/copy.txt", "/d/B/copy.txt"]]
+        )
         #expect(
             groups(DuplicateOptions(isEnabled: true, sameName: true, sameSize: false, sameContents: true))
-                == [["/d/A/copy.txt", "/d/B/copy.txt"]])
+                == [["/d/A/copy.txt", "/d/B/copy.txt"]]
+        )
         #expect(
             DuplicateFinder.digest(of: memory.url("/d/A/copy.txt"), fileSystems: fileSystems)
-                == DuplicateFinder.digest(of: memory.url("/d/B/copy.txt"), fileSystems: fileSystems))
+                == DuplicateFinder.digest(of: memory.url("/d/B/copy.txt"), fileSystems: fileSystems)
+        )
         #expect(DuplicateFinder.digest(of: memory.url("/d/gone"), fileSystems: fileSystems) == nil)
     }
 
@@ -530,16 +570,18 @@ private final class ArchiveFake: FileSystemProvider {
         for index in 0..<240 {
             try box.file(
                 String(format: "set%d/file%03d.dat", index % 2, index),
-                "payload \(index / 2 % 40)".padding(toLength: 16, withPad: " ", startingAt: 0))
+                "payload \(index / 2 % 40)".padding(toLength: 16, withPad: " ", startingAt: 0)
+            )
         }
         var query = SearchQuery(directory: box.root)
         query.duplicates = DuplicateOptions(isEnabled: true, sameName: false, sameSize: true, sameContents: true)
         // Used by the callbacks, which run one at a time while the calls below wait for them.
         nonisolated(unsafe) var steps: [Int] = []
-        let found = FileSearch(query, fileSystems: fileSystems).runForDuplicates(onHashing: { done, total in
-            steps.append(done)
-            #expect(total == 240)
-        })
+        let found = FileSearch(query, fileSystems: fileSystems)
+            .runForDuplicates(onHashing: { done, total in
+                steps.append(done)
+                #expect(total == 240)
+            })
         #expect(found.count == 40 && found.allSatisfy { $0.count == 6 })
         #expect(steps == Array(1...240))
         #expect(found.allSatisfy { group in group.map(\.url.path) == group.map(\.url.path).sorted() })
@@ -556,8 +598,13 @@ private final class ArchiveFake: FileSystemProvider {
         cancelled.cancel()
         #expect(
             DuplicateFinder.groups(
-                of: items, options: query.duplicates, fileSystems: fileSystems, cancellation: cancelled
-            ).isEmpty)
+                of: items,
+                options: query.duplicates,
+                fileSystems: fileSystems,
+                cancellation: cancelled
+            )
+            .isEmpty
+        )
         #expect(DuplicateFinder.groups(of: items, options: query.duplicates, fileSystems: fileSystems).count == 1)
     }
 }
@@ -584,7 +631,8 @@ private final class ArchiveFake: FileSystemProvider {
         #expect(SearchStore(settings: memory)["pictures"]?.settings == pictures)
         store.save(SavedSearch(name: "PICTURES", settings: settings("*.gif")))
         #expect(
-            store.searches.map(\.name) == ["backups", "PICTURES"] && store["Pictures"]?.settings.searchFor == "*.gif")
+            store.searches.map(\.name) == ["backups", "PICTURES"] && store["Pictures"]?.settings.searchFor == "*.gif"
+        )
         store.delete(named: "Backups")
         #expect(store.searches.map(\.name) == ["PICTURES"])
     }
@@ -630,13 +678,18 @@ private final class ArchiveFake: FileSystemProvider {
         #expect(query.directories.map(\.absoluteString) == ["mem:///work", "mem:///tmp/x", "mem:///base/sub"])
         #expect(
             query.names == "*.txt" && query.text.isEmpty && query.caseSensitive && query.includeHidden
-                && query.maxDepth == 1)
+                && query.maxDepth == 1
+        )
         // Nothing marked in the panel: the option has nothing to work on.
         #expect(query.onlyItems == nil)
         form.findText = true
         form.searchIn = ""
         query = form.query(
-            relativeTo: base, fileSystems: fileSystems, includeHidden: false, selected: [memory.url("/base/a")])
+            relativeTo: base,
+            fileSystems: fileSystems,
+            includeHidden: false,
+            selected: [memory.url("/base/a")]
+        )
         #expect(query.directories == [base] && query.text == "ignored" && query.onlyItems == [memory.url("/base/a")])
     }
 }
@@ -650,7 +703,8 @@ private final class ArchiveFake: FileSystemProvider {
         #expect(SpotlightQuery.string(for: query()) == "kMDItemFSName == \"*\"")
         #expect(
             SpotlightQuery.string(for: query(names: "*.txt report | *.bak"))
-                == "(kMDItemFSName == \"*.txt\"c || kMDItemFSName == \"*report*\"c) && kMDItemFSName != \"*.bak\"c")
+                == "(kMDItemFSName == \"*.txt\"c || kMDItemFSName == \"*report*\"c) && kMDItemFSName != \"*.bak\"c"
+        )
         #expect(SpotlightQuery.string(for: query(names: "file_??.txt")) == "(kMDItemFSName == \"file_**.txt\"c)")
         #expect(SpotlightQuery.string(for: query(names: "*.* | a\\b")) == "kMDItemFSName != \"*a\\\\b*\"c")
         #expect(SpotlightQuery.string(for: query(text: "50* off")) == "kMDItemTextContent == \"*50\\* off*\"cd")
@@ -658,7 +712,8 @@ private final class ArchiveFake: FileSystemProvider {
         sensitive.caseSensitive = true
         sensitive.textOptions.wholeWords = true
         #expect(
-            SpotlightQuery.string(for: sensitive) == "(kMDItemFSName == \"*.md\"c) && kMDItemTextContent == \"Smith\"w")
+            SpotlightQuery.string(for: sensitive) == "(kMDItemFSName == \"*.md\"c) && kMDItemTextContent == \"Smith\"w"
+        )
     }
 
     @Test func sizesAndDates() {
@@ -670,7 +725,8 @@ private final class ArchiveFake: FileSystemProvider {
         #expect(
             SpotlightQuery.string(for: sized, now: now)
                 == "(kMDItemFSSize >= 2048 && kMDItemFSSize < 3072) && kMDItemFSContentChangeDate >= $time.iso(1970-01-01T00:00:00Z)"
-                + " && kMDItemFSContentChangeDate < $time.iso(1970-01-01T01:00:00Z)")
+                + " && kMDItemFSContentChangeDate < $time.iso(1970-01-01T01:00:00Z)"
+        )
         sized.criteria = FileCriteria(size: SizeRule(.greater, 1.5, .megabytes))
         #expect(SpotlightQuery.string(for: sized) == "kMDItemFSSize > 1572864")
     }
@@ -678,8 +734,12 @@ private final class ArchiveFake: FileSystemProvider {
     @Test func spotlightUnderstandsEveryQuestion() {
         var full = query(names: "*.txt \"my file.doc\" | *.bak a\"b", text: "a \"quoted\" \\ text*")
         full.criteria = FileCriteria(
-            dateFrom: Date(), dateTo: Date(), notOlderThan: Age(3, .days), olderThan: Age(1, .minutes),
-            size: SizeRule(.less, 0.5, .gigabytes))
+            dateFrom: Date(),
+            dateTo: Date(),
+            notOlderThan: Age(3, .days),
+            olderThan: Age(1, .minutes),
+            size: SizeRule(.less, 0.5, .gigabytes)
+        )
         for query in [query(), query(names: "report"), full] {
             #expect(NSPredicate(fromMetadataQueryString: SpotlightQuery.string(for: query)) != nil)
         }
@@ -712,29 +772,32 @@ private final class ArchiveFake: FileSystemProvider {
         try box.file("b/report.txt", "about pears")
         let fileSystems = makeFileSystems().0
         let paths =
-            ["a/deep/report.txt", "a/report.txt", "a/notes.md", "a/.cache/report.txt", "b/report.txt", "a/gone.txt"].map
-        { box.url($0).path }
+            ["a/deep/report.txt", "a/report.txt", "a/notes.md", "a/.cache/report.txt", "b/report.txt", "a/gone.txt"]
+            .map { box.url($0).path }
             + ["/somewhere/else/report.txt"]
         func verified(_ change: (inout SearchQuery) -> Void) -> [String] {
             var query = SearchQuery(directory: box.url("a"), names: "*.txt", text: "apples")
             change(&query)
             let search = FileSearch(query, fileSystems: fileSystems)
-            return SpotlightQuery.verify(paths, with: search, fileSystems: fileSystems).map {
-                String($0.url.path.dropFirst(box.root.path.count + 1))
-            }
+            return SpotlightQuery.verify(paths, with: search, fileSystems: fileSystems)
+                .map {
+                    String($0.url.path.dropFirst(box.root.path.count + 1))
+                }
         }
         #expect(verified { _ in } == ["a/deep/report.txt", "a/report.txt"])
         #expect(verified { $0.maxDepth = 0 } == ["a/report.txt"])
         #expect(verified { $0.includeHidden = true } == ["a/.cache/report.txt", "a/deep/report.txt", "a/report.txt"])
         #expect(
-            verified { $0.moreDirectories = [box.url("b")] } == ["a/deep/report.txt", "a/report.txt", "b/report.txt"])
+            verified { $0.moreDirectories = [box.url("b")] } == ["a/deep/report.txt", "a/report.txt", "b/report.txt"]
+        )
         // A text the index cannot answer is read from the files.
         #expect(
             verified {
                 $0.moreDirectories = [box.url("b")]
                 $0.text = "p[e]ars"
                 $0.textOptions.regex = true
-            } == ["b/report.txt"])
+            } == ["b/report.txt"]
+        )
         #expect(verified { $0.criteria.size = SizeRule(.greater, 100) }.isEmpty)
     }
 }
@@ -759,8 +822,11 @@ private final class ArchiveFake: FileSystemProvider {
         memory.addFile("/A/docs/three.md", "third report")
         memory.addFile("/B/x.txt", "x")
         bench = TestBench(
-            plugins: [plugin], fileSystems: [LocalFileSystem(), memory], left: memory.url("/A"),
-            right: memory.url("/B"))
+            plugins: [plugin],
+            fileSystems: [LocalFileSystem(), memory],
+            left: memory.url("/A"),
+            right: memory.url("/B")
+        )
     }
 
     /// Fills the form like a user, runs the search and waits for its end.
@@ -778,7 +844,7 @@ private final class ArchiveFake: FileSystemProvider {
         #expect(bench.commands[.searchFor]?.title == "Find Files…" && bench.commands["cm_SearchStandalone"] != nil)
         #expect(bench.kernel.keyBindings.command(for: .f(7, .option)) == .searchFor)
         #expect(bench.kernel.keyBindings.command(for: .f(7, [.option, .shift])) == "cm_SearchStandalone")
-        #expect(bench.kernel.keyBindings.conflicts.isEmpty)
+        #expect(bench.kernel.keyClashes.isEmpty)
         #expect(bench.kernel.toolbar.defaultLayout.contains { $0?.command == .searchFor })
         #expect(bench.kernel.preferences.pages.map(\.title) == ["Find Files"])
         #expect(!bench.commands.isEnabled("cm_SearchForInCurDir"))
@@ -794,16 +860,26 @@ private final class ArchiveFake: FileSystemProvider {
         ) = ("a.*", "/x;/y", true, true, true)
         (settings.depth, settings.findText, settings.text, settings.caseSensitive) = (2, true, "needle", true)
         settings.textOptions = TextSearchOptions(
-            wholeWords: true, regex: true, notContaining: true, encodings: [.utf8, .utf16])
+            wholeWords: true,
+            regex: true,
+            notContaining: true,
+            encodings: [.utf8, .utf16]
+        )
         let day = Calendar.current.startOfDay(for: Date(timeIntervalSince1970: 1_700_000_000))
         settings.criteria = FileCriteria(
-            dateFrom: day, dateTo: day.addingTimeInterval(86_399), notOlderThan: Age(3, .weeks),
-            olderThan: Age(2, .hours), size: SizeRule(.greater, 1.5, .megabytes))
+            dateFrom: day,
+            dateTo: day.addingTimeInterval(86_399),
+            notOlderThan: Age(3, .weeks),
+            olderThan: Age(2, .hours),
+            size: SizeRule(.greater, 1.5, .megabytes)
+        )
         (settings.criteria.hidden, settings.criteria.directory, settings.criteria.executable) = (.yes, .no, .yes)
         settings.duplicates = DuplicateOptions(isEnabled: true, sameName: false, sameSize: true, sameContents: true)
         settings.fieldRules = FieldRules(
-            isEnabled: true, matchAll: false,
-            rules: [FieldRule("tc.size", .greater, "10"), FieldRule("tc.name", .regex, "^a")])
+            isEnabled: true,
+            matchAll: false,
+            rules: [FieldRule("tc.size", .greater, "10"), FieldRule("tc.name", .regex, "^a")]
+        )
         window.form.settings = settings
         #expect(window.form.settings == settings)
         window.form.settings = SearchSettings()
@@ -815,7 +891,8 @@ private final class ArchiveFake: FileSystemProvider {
         #expect(
             window.lines == [
                 "[3 files and 0 directories found]", "mem:/A/one.txt", "mem:/A/two.txt", "mem:/A/docs/one.txt"
-            ])
+            ]
+        )
         await search { $0.searchFor = "docs zzz" }
         #expect(window.lines == ["[0 files and 1 directories found]", "mem:/A/docs"])
         await search { $0.searchFor = "nothing-like-this" }
@@ -824,7 +901,8 @@ private final class ArchiveFake: FileSystemProvider {
         #expect(
             SearchStore(settings: bench.kernel.settings).history(.searchFor) == [
                 "nothing-like-this", "docs zzz", "*.txt"
-            ])
+            ]
+        )
     }
 
     @Test func textAndDepthComeFromTheForm() async {
@@ -844,13 +922,16 @@ private final class ArchiveFake: FileSystemProvider {
             window.lines == [
                 "[4 files and 0 directories found]", "one.txt  -  mem:/A/docs/", "one.txt  -  mem:/A/",
                 String(repeating: "- ", count: 40), "two.txt  -  mem:/A/docs/", "two.txt  -  mem:/A/"
-            ])
+            ]
+        )
         #expect(window.copyText.components(separatedBy: "\n")[3].isEmpty)
     }
 
     @Test func aFormThatCannotBeSearchedWithIsReported() async {
         await search { ($0.findText, $0.text, $0.textOptions.hex) = (true, "xyz", true) }
-        #expect(bench.interaction.log == ["inform: The search cannot start"] && !window.isSearching && window.lines.isEmpty)
+        #expect(
+            bench.interaction.log == ["inform: The search cannot start"] && !window.isSearching && window.lines.isEmpty
+        )
     }
 
     @Test func onlySelectedItemsOfThePanel() async {
@@ -864,7 +945,8 @@ private final class ArchiveFake: FileSystemProvider {
         var went: [URL] = []
         navigation.register(
             Command(.changeDirectory, "cd"),
-            parameterized: { argument in went += [argument.location].compactMap { $0 } })
+            parameterized: { argument in went += [argument.location].compactMap { $0 } }
+        )
         await search { $0.searchFor = "three" }
         // The only result is taken although the summary line could be the selected one.
         window.goToFile()
@@ -881,7 +963,8 @@ private final class ArchiveFake: FileSystemProvider {
         bench.right.focus()
         window.feedToListbox()
         #expect(
-            lists.shown.count == 1 && lists.shown[0].title == "Search result" && lists.shown[0].panel === bench.right)
+            lists.shown.count == 1 && lists.shown[0].title == "Search result" && lists.shown[0].panel === bench.right
+        )
         #expect(lists.shown[0].files == [memory.url("/A/one.txt"), memory.url("/A/docs/one.txt")])
         // Fed results are not kept in the window.
         #expect(window.lines.isEmpty)

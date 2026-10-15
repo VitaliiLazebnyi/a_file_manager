@@ -54,10 +54,8 @@ internal enum KernelGenerators {
                             FileItem(
                                 url: URL(fileURLWithPath: "/"),
                                 name: name,
-                                isDirectory: kind < 2,
-                                isPackage: kind == 1,
-                                size: size,
-                                modified: date
+                                kind: .init(isDirectory: kind < 2, isPackage: kind == 1),
+                                stat: .init(size: size, modified: date)
                             )
                         }
                     }
@@ -72,10 +70,8 @@ internal enum KernelGenerators {
                 FileItem(
                     url: URL(fileURLWithPath: "/list/\(first + place)"),
                     name: item.name,
-                    isDirectory: item.isDirectory,
-                    isPackage: item.isPackage,
-                    size: item.size,
-                    modified: item.modified
+                    kind: .init(isDirectory: item.isDirectory, isPackage: item.isPackage),
+                    stat: .init(size: item.size, modified: item.modified)
                 )
             }
     }
@@ -94,9 +90,11 @@ internal enum KernelGenerators {
                         return FileItem(
                             url: URL(fileURLWithPath: "/"),
                             name: text,
-                            isDirectory: (word >> 40).isMultiple(of: 4),
-                            size: Int64((word >> 44) % 8),
-                            modified: Date(timeIntervalSinceReferenceDate: Double((word >> 50) % 4))
+                            kind: .init(isDirectory: (word >> 40).isMultiple(of: 4)),
+                            stat: .init(
+                                size: Int64((word >> 44) % 8),
+                                modified: Date(timeIntervalSinceReferenceDate: Double((word >> 50) % 4))
+                            )
                         )
                     },
                 from: 0

@@ -23,7 +23,7 @@ internal struct BlockingCallTests {
     @Test
     internal func theSameQuestionIsAskedOnceForAllWhoWait() {
         let owner = Owner()
-        let asked = Counter()
+        let (asked, back) = (Counter(), Counter())
         let release = DispatchSemaphore(value: 0)
         let answers = Counter()
         let done = Counter()
@@ -32,6 +32,7 @@ internal struct BlockingCallTests {
                 let answer = BlockingCalls.answer(from: owner, to: "volume /dead") { _ -> Int in
                     asked.add()
                     Self.hold(release)
+                    back.add()
                     return 7
                 }
                 if answer == 7 {
@@ -44,7 +45,7 @@ internal struct BlockingCallTests {
         // Nobody else asks meanwhile: an absence, which no condition can show, so it is looked
         // for after a moment.
         usleep(50_000)
-        #expect(asked.count == 1 && BlockingCalls.unanswered(for: owner) == 1)
+        #expect(asked.count == 1 && back.count == 0)
         release.signal()
         #expect(Wait.until { done.count == 12 })
         // Whoever came after the answer asked again; nobody asked while it was under way.
@@ -52,7 +53,7 @@ internal struct BlockingCallTests {
             release.signal()
         }
         #expect(Wait.until { answers.count == 12 })
-        #expect(Wait.until { BlockingCalls.unanswered(for: owner) == 0 })
+        #expect(Wait.until { back.count == asked.count })
     }
 
     /// Fifty tries at a question that does not answer, each given up, ask it once and are told
@@ -60,7 +61,7 @@ internal struct BlockingCallTests {
     @Test
     internal func aQuestionThatWasGivenUpIsNotAskedAgainUntilItComesBack() {
         let owner = Owner()
-        let asked = Counter()
+        let (asked, back) = (Counter(), Counter())
         let release = DispatchSemaphore(value: 0)
         let flags = Shared<[CancellationFlag]>([])
         for _ in 0..<50 {
@@ -75,6 +76,7 @@ internal struct BlockingCallTests {
                     flags.modify { $0.append(flag) }
                     asked.add()
                     Self.hold(release)
+                    back.add()
                     return 1
                 }
                 returned.set(answer == nil)
@@ -84,8 +86,7 @@ internal struct BlockingCallTests {
             // Giving up ends the wait at once, though the question itself goes on.
             #expect(returned.wait() == true)
         }
-        #expect(asked.count == 1)
-        #expect(BlockingCalls.unanswered(for: owner) == 1)
+        #expect(asked.count == 1 && back.count == 0)
         // The question was told that nobody waits.
         #expect(flags.value.first?.isCancelled == true)
         // Another question to the same owner, and the same one to another owner, are not held up.
@@ -93,7 +94,7 @@ internal struct BlockingCallTests {
         #expect(BlockingCalls.answer(from: Owner(), to: "volume /dead") { _ in 3 } == 3)
         // Once it has come back, the question can be asked afresh.
         release.signal()
-        #expect(Wait.until { BlockingCalls.unanswered(for: owner) == 0 })
+        #expect(Wait.until { back.count == 1 })
         release.signal()
         let fresh = BlockingCalls.answer(from: owner, to: "volume /dead") { _ -> Int in
             Self.hold(release)
@@ -102,12 +103,13 @@ internal struct BlockingCallTests {
         #expect(fresh == 4 && asked.count == 1)
     }
 
-    /// No more than `BlockingCalls.limit` questions of one owner are under way at once; the
+    /// No more than 64 questions of one owner are under way at once; the
     /// rest wait their turn and are all asked in the end.
     @Test
     internal func oneOwnerHasABoundedNumberOfQuestionsUnderWay() {
         let owner = Owner()
-        let limit = BlockingCalls.limit
+        // The kernel's bound.
+        let limit = 64
         let started = Counter()
         let release = DispatchSemaphore(value: 0)
         let done = Counter()
@@ -126,7 +128,7 @@ internal struct BlockingCallTests {
         // No more start meanwhile: an absence, which no condition can show, so it is looked for
         // after a moment.
         usleep(50_000)
-        #expect(started.count == limit && BlockingCalls.unanswered(for: owner) == limit)
+        #expect(started.count == limit)
         for _ in 0..<total {
             release.signal()
         }

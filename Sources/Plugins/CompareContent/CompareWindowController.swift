@@ -69,7 +69,10 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
             ?? .monospacedSystemFont(ofSize: size, weight: .regular)
         let window = ToolWindow(
             contentRect: NSRect(x: 0, y: 0, width: 1_100, height: 680),
-            styleMask: [.titled, .closable, .resizable, .miniaturizable], backing: .buffered, defer: false)
+            styleMask: [.titled, .closable, .resizable, .miniaturizable],
+            backing: .buffered,
+            defer: false
+        )
         window.title = "Compare contents"
         window.isReleasedWhenClosed = false
         window.minSize = NSSize(width: 700, height: 360)
@@ -126,21 +129,27 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
         bytesPopup.addItems(withTitles: CompareSettingsKey.bytesPerLineChoices.map { "\($0) bytes" })
         let first = NSStackView(
             views: [button("Compare", #selector(compare))] + differenceButtons
-                + [button("Font…", #selector(chooseFont)), searchField, NSView(), binaryBox, bytesPopup, verticalBox])
+                + [button("Font…", #selector(chooseFont)), searchField, NSView(), binaryBox, bytesPopup, verticalBox]
+        )
 
         editButtons = [
             button(
-                "Copy ->", #selector(copyToRight),
-                tip: "Copy the difference or the selected lines to the right (Option+Right)"),
+                "Copy ->",
+                #selector(copyToRight),
+                tip: "Copy the difference or the selected lines to the right (Option+Right)"
+            ),
             button(
-                "Copy <-", #selector(copyToLeft),
-                tip: "Copy the difference or the selected lines to the left (Option+Left)"),
+                "Copy <-",
+                #selector(copyToLeft),
+                tip: "Copy the difference or the selected lines to the left (Option+Left)"
+            ),
             button("Undo", #selector(undoEdit))
         ]
         saveButton.target = self
         saveButton.action = #selector(save)
         let resync = button(
-            "Resync", #selector(markResync),
+            "Resync",
+            #selector(markResync),
             tip:
                 "Mark the selected line of the pane that has the focus; with a line marked on each side, the two are taken to belong together"
         )
@@ -148,7 +157,8 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
             views: [editBox] + editButtons + [
                 saveButton, resync, button("Swap", #selector(swapSides), tip: "Swap panels (Ctrl+U)"),
                 NSView(), caseBox, spacesBox, endingsBox
-            ])
+            ]
+        )
         for box in [binaryBox, caseBox, spacesBox, endingsBox, verticalBox, editBox] {
             box.target = self
             box.action = #selector(optionChanged(_:))
@@ -196,8 +206,11 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
         scroll.borderType = .bezelBorder
         scroll.contentView.postsBoundsChangedNotifications = true
         NotificationCenter.default.addObserver(
-            self, selector: #selector(paneScrolled(_:)), name: NSView.boundsDidChangeNotification,
-            object: scroll.contentView)
+            self,
+            selector: #selector(paneScrolled(_:)),
+            name: NSView.boundsDidChangeNotification,
+            object: scroll.contentView
+        )
         return scroll
     }
 
@@ -245,8 +258,10 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
             pullControls()
         } else {
             session.options = DiffOptions(
-                ignoreCase: caseBox.state == .on, ignoreRepeatedSpaces: spacesBox.state == .on,
-                ignoreLineEndings: endingsBox.state == .on)
+                ignoreCase: caseBox.state == .on,
+                ignoreRepeatedSpaces: spacesBox.state == .on,
+                ignoreLineEndings: endingsBox.state == .on
+            )
             session.bytesPerLine =
                 CompareSettingsKey.bytesPerLineChoices[max(0, min(3, bytesPopup.indexOfSelectedItem))]
             session.optionsChanged()
@@ -260,9 +275,13 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
             action()
             return
         }
-        let choice = kernel.ui.pick(
-            "Save the changes?", detail: "The compared files were edited.",
-            [("Save", 0), ("Don't Save", 1), ("Cancel", 2)], fallback: 2, style: .warning)
+        let choice = kernel.interaction.pick(
+            "Save the changes?",
+            detail: "The compared files were edited.",
+            [("Save", 0), ("Don't Save", 1), ("Cancel", 2)],
+            fallback: 2,
+            style: .warning
+        )
         if choice == 0 {
             session.save { saved in if saved { action() } }
         } else if choice == 1 {
@@ -278,8 +297,8 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
                 return text.isEmpty ? nil : fileSystems.location(from: text, relativeTo: base)
             }
             // A file whose address was typed into its field: the user's own choice of that server.
-            kernel.userTyped(location: leftField.stringValue, proposal: session.displayPath(.left), relativeTo: base)
-            kernel.userTyped(location: rightField.stringValue, proposal: session.displayPath(.right), relativeTo: base)
+            kernel.userTyped(location: leftField.stringValue, relativeTo: base, proposal: session.displayPath(.left))
+            kernel.userTyped(location: rightField.stringValue, relativeTo: base, proposal: session.displayPath(.right))
             session.leftURL = location(leftField)
             session.rightURL = location(rightField)
             jumpsToFirstDifference = true
@@ -489,9 +508,9 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
         func key(_ character: String, _ modifiers: KeyModifiers) -> Bool {
             Shortcut(.character(character), modifiers).matches(event)
         }
-        if Shortcut(.down, .option).matches(event) {
+        if Shortcut(.downArrow, .option).matches(event) {
             nextDifference()
-        } else if Shortcut(.up, .option).matches(event) {
+        } else if Shortcut(.upArrow, .option).matches(event) {
             previousDifference()
         } else if Shortcut.f(6).matches(event) {
             session.setEditing(!session.isEditing)
@@ -510,9 +529,9 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
             swapSides()
         } else if key("c", .command) || key("c", .control) {
             copySelection()
-        } else if session.isEditing, Shortcut(.right, .option).matches(event) {
+        } else if session.isEditing, Shortcut(.rightArrow, .option).matches(event) {
             copyToRight()
-        } else if session.isEditing, Shortcut(.left, .option).matches(event) {
+        } else if session.isEditing, Shortcut(.leftArrow, .option).matches(event) {
             copyToLeft()
         } else {
             return false
@@ -580,12 +599,16 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
         let shown = text.map { $0.utf8.count > 4 * TextDiff.inlineLimit ? String($0.prefix(TextDiff.inlineLimit)) : $0 }
         if let text, let shown, shown.utf8.count != text.utf8.count { cell.isEditable = false }
         let attributed = NSMutableAttributedString(
-            string: shown ?? "", attributes: [.font: font, .foregroundColor: NSColor.labelColor])
+            string: shown ?? "",
+            attributes: [.font: font, .foregroundColor: NSColor.labelColor]
+        )
         for range in session.highlights(side, row: row) where range.lowerBound < attributed.length {
             attributed.addAttributes(
                 [.backgroundColor: NSColor.systemRed.withAlphaComponent(0.30), .foregroundColor: NSColor.labelColor],
                 range: NSRange(
-                    location: range.lowerBound, length: min(range.upperBound, attributed.length) - range.lowerBound)
+                    location: range.lowerBound,
+                    length: min(range.upperBound, attributed.length) - range.lowerBound
+                )
             )
         }
         cell.attributedStringValue = attributed

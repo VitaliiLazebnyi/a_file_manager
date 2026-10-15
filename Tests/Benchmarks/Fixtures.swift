@@ -32,9 +32,11 @@ internal enum Fixtures {
                 return FileItem(
                     url: base.appending(name: name),
                     name: name,
-                    isDirectory: index.isMultiple(of: 20),
-                    size: Int64(index % 10_000) * 1_024,
-                    modified: Date(timeIntervalSinceReferenceDate: Double(index % 5_000) * 3_600)
+                    kind: .init(isDirectory: index.isMultiple(of: 20)),
+                    stat: .init(
+                        size: Int64(index % 10_000) * 1_024,
+                        modified: Date(timeIntervalSinceReferenceDate: Double(index % 5_000) * 3_600)
+                    )
                 )
             }
     }
