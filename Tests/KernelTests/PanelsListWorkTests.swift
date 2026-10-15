@@ -11,7 +11,12 @@ internal struct PanelsListWorkTests {
     private static func item(_ name: String, size: Int64 = 1, folder: Bool = false, in parent: String = "/w")
         -> FileItem
     {
-        FileItem(url: URL(fileURLWithPath: "\(parent)/\(name)"), name: name, kind: .init(isDirectory: folder), stat: .init(size: size))
+        FileItem(
+            url: URL(fileURLWithPath: "\(parent)/\(name)"),
+            name: name,
+            kind: .init(isDirectory: folder),
+            stat: .init(size: size)
+        )
     }
 
     /// A string the system bridged, whose UTF-8 is not in one piece.

@@ -1,5 +1,6 @@
 public import AFMKernel
 
+/// What a test asks the registry about the kinds of declared settings keys.
 extension SettingsKeyRegistry {
     /// What was declared for a key, read the way the settings export reads it: the key itself,
     /// else the longest family it belongs to; nil when nothing was said about it.

@@ -6,6 +6,6 @@
     "MD013": { "line_length": 120, "tables": false, "code_blocks": false, "headings": false }
   },
   "globs": ["**/*.md"],
-  "ignores": [".build/**", "build/**", ".claude/**", "scratchpad/**", "Tests/Fuzz/out/**", "Tests/Stress/results/**",
-              "documentation/review-*/extracted/**"]
+  "ignores": [".build/**", ".build-*/**", "build/**", ".claude/**", "scratchpad/**", "Tests/Fuzz/out/**",
+              "Tests/Stress/results/**", "documentation/review-*/extracted/**"]
 }
