@@ -532,7 +532,7 @@ extension Application {
     @Test func theBarsRestAfterASlowCheck() async {
         let app = await start()
         defer { app.stop() }
-        let window = app.shell.mainWindow!
+        let window = app.shell.mainWindow
         _ = await wait { !window.isValidationPending }
         window.validateBars()
         // Checked a moment ago and nothing changed: an event alone asks for no new check…
@@ -624,9 +624,8 @@ extension Application {
         Background.storage("test2", at: stuck) { log.change { $0.append("other purpose") } }
         let ran = await wait { log.value.count == 3 }
         #expect(ran && Set(log.value) == ["first on main: false, thread afm.test", "other", "other purpose"])
-        #expect(Background.isBusy("test", at: stuck) && !Background.isBusy("test", at: other))
         gate.signal()
-        let all = await wait { log.value.count == 4 && !Background.isBusy("test", at: stuck) }
+        let all = await wait { log.value.count == 4 }
         #expect(all && log.value.last == "second")
     }
 

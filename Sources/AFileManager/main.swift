@@ -1,4 +1,5 @@
 import AFMShell
+import AppKit
 import StandardPlugins
 
 /// The program: the window shell with the standard plugins, run until the user quits.
@@ -7,4 +8,7 @@ private let kApplication = ShellApplication(
     plugins: StandardPlugins.make()
 )
 
-kApplication.run()
+// The application object keeps its delegate weakly; `kApplication` keeps it for the whole run.
+NSApplication.shared.delegate = kApplication
+NSApplication.shared.setActivationPolicy(.regular)
+NSApplication.shared.run()

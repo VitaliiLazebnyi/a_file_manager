@@ -2,20 +2,85 @@ import AFMContracts
 public import AFMKernel
 public import AppKit
 
-/// The window shell: the main window with its two panels, the progress window and the menu
-/// bar. It provides no file-manager features itself; it shows what the plugins registered
-/// with the kernel and hands keys, clicks and menu choices to their commands. The only
-/// commands of its own are those of the file list as a control (`ShellCommands`).
+/// The window shell: the main window with its two panels, the progress window and the menu bar.
+///
+/// It provides no file-manager features itself; it shows what the plugins registered with the
+/// kernel and hands keys, clicks and menu choices to their commands. The only commands of its
+/// own are those of the file list as a control (`ShellCommands`) and of the window around the
+/// panels (`WindowCommands`). Main thread only.
 public final class Shell: ShellServices {
-    let kernel: Kernel
-    let panelCoordinator: PanelCoordinator
-    let jobService = ProgressJobService()
-    let layout: WindowLayout
-    private(set) var mainWindow: MainWindowController!
+    /// The answer to a request to quit, given once whoever gives it first.
+    @MainActor
+    private final class OnceAnswer {
+        /// Called with the answer before it is passed on.
+        var onAnswer: ((Bool) -> Void)?
+        /// Calls off the wait that would give the answer otherwise.
+        var stopWaiting: (() -> Void)?
+        /// Who is waiting for the answer; nil once it was given.
+        private var reply: (@MainActor (Bool) -> Void)?
 
+        /// True once the answer was given.
+        var isGiven: Bool { reply == nil }
+
+        /// An answer for `reply`.
+        init(_ reply: @escaping @MainActor (Bool) -> Void) {
+            self.reply = reply
+        }
+
+        /// Gives the answer, unless it was given already.
+        func give(_ quits: Bool) {
+            guard let reply else {
+                return
+            }
+            self.reply = nil
+            stopWaiting?()
+            stopWaiting = nil
+            onAnswer?(quits)
+            onAnswer = nil
+            reply(quits)
+        }
+
+        deinit {
+            // Nothing to release.
+        }
+    }
+
+    /// How long quitting waits for the jobs to stop before it asks the user, and for the
+    /// plugins to give up once the user said not to wait for them.
+    public static var quitPatience: TimeInterval = 5
+    /// How long the plugins may take to finish before the user is shown that the program is
+    /// still at it.
+    ///
+    /// Nearly always they have nothing to do and nothing is shown.
+    public static var quitProgressDelay: TimeInterval = 0.5
+
+    /// The kernel the shell shows; the shell owns it.
+    internal let kernel: Kernel
+    /// The two panels.
+    internal let panelCoordinator: PanelCoordinator
+    /// Runs the plugins' long work with the progress window.
+    internal let jobService = ProgressJobService()
+    /// What the window shows around the panels.
+    internal let layout: WindowLayout
+    /// The main window; made in `init` once the kernel is attached (the key bindings are final then).
+    internal private(set) lazy var mainWindow = MainWindowController(
+        kernel: kernel,
+        panels: panelCoordinator,
+        layout: layout
+    )
+    /// What is shown while the plugins finish before the program quits; nil when nothing is
+    /// being finished.
+    internal private(set) var quitProgress: QuitProgress?
+
+    /// The two file panels, for the plugins (`Kernel.panels`).
     public var panels: any PanelSet { panelCoordinator }
+    /// The job service, for the plugins (`Kernel.jobs`).
     public var jobs: any JobService { jobService }
+    /// Whether a plugin provides the configuration dialog, which "Settings…" opens.
+    public var canShowSettings: Bool { kernel.commands.isEnabled(.configuration) }
 
+    /// The shell of `kernel`, with panels that start at `home` when they have no folder of their own.
+    ///
     /// Call after the plugins are loaded: the panels need the file systems, the menus and the
     /// function-key bar the commands.
     public init(kernel: Kernel, home: URL = FileManager.default.homeDirectoryForCurrentUser) {
@@ -26,61 +91,47 @@ public final class Shell: ShellServices {
         ShellCommands.register(in: kernel, panels: panelCoordinator)
         PanelShellCommands.register(in: kernel, panels: panelCoordinator)
         WindowCommands.register(in: kernel, layout: layout) { [weak self] in self?.mainWindow }
-        kernel.commands.onRejected = { NSSound.beep() }
         // From here on the key bindings are final and commands may run.
         kernel.attach(self)
-        mainWindow = MainWindowController(kernel: kernel, panels: panelCoordinator, layout: layout)
+        // The main window is made here, with the final key bindings.
         jobService.window = mainWindow.window
-        // Reading ahead rests while the user works elsewhere and while a job runs.
-        panelCoordinator.isWindowActive = { [weak self] in
-            NSApp.isActive && self?.mainWindow.window?.isKeyWindow == true
-        }
-        jobService.onBusyChanged = { [weak self, weak jobService] in
-            self?.panelCoordinator.updateReadAhead()
-            self?.mainWindow.scheduleValidation()
-            if jobService?.isBusy == false { self?.panelCoordinator.jobsEnded() }
-        }
-        panelCoordinator.onActivityChanged = { [weak self] in self?.mainWindow.scheduleValidation() }
-        let ui = kernel.interaction
-        jobService.askToAbandon = { title in
-            ui.choose(
-                "“\(title)” does not stop.",
-                detail:
-                    "It may be waiting for a disk or a server that does not answer. You can go on waiting, or stop waiting and "
-                    + "use the program again; the operation then ends by itself as soon as the disk or server lets it.",
-                buttons: ["Stop Waiting", "Keep Waiting"],
-                style: .warning,
-                defaultButton: 1
-            ) == 0
-        }
+        connectJobsAndPanels()
     }
 
-    /// How long quitting waits for the jobs to stop before it asks the user, and for the
-    /// plugins to give up once the user said not to wait for them.
-    public static var quitPatience: TimeInterval = 5
-    /// How long the plugins may take to finish before the user is shown that the program is
-    /// still at it: nearly always they have nothing to do and nothing is shown.
-    public static var quitProgressDelay: TimeInterval = 0.5
+    /// Asks the user whether to quit although a job does not stop; true quits.
+    ///
+    /// Return keeps waiting: quitting anyway may cost a file.
+    private static func quitsAnyway(asking interaction: any UserInteraction) -> Bool {
+        interaction.choose(
+            "An operation does not stop.",
+            detail: "It may be waiting for a disk or a server that does not answer. If you quit anyway, a file "
+                + "it was writing may be left incomplete.",
+            buttons: ["Quit Anyway", "Keep Waiting"],
+            style: .warning,
+            defaultButton: 1
+        ) == 0
+    }
 
-    /// What is shown while the plugins finish before the program quits; nil when nothing is
-    /// being finished.
-    private(set) var quitProgress: QuitProgress?
-
-    /// Asks the plugins whether the program may quit (`Kernel.shouldTerminate`): one with
-    /// work the user would lose (unsaved edits) asks about it here, and the user can call the
-    /// quit off. Nothing has been stopped when this is asked. Main thread.
+    /// Asks the plugins whether the program may quit (`Kernel.shouldTerminate`).
+    ///
+    /// One with work the user would lose (unsaved edits) asks about it here, and the user can
+    /// call the quit off. Nothing has been stopped when this is asked. False as well while an
+    /// earlier request to quit is still being carried out.
     public func mayQuit() -> Bool {
-        MainThread.assert("Quitting")
         // A second request while the first is still being carried out changes nothing.
-        guard quitProgress == nil, !jobService.isQuitting else { return false }
+        guard quitProgress == nil, !jobService.isQuitting else {
+            return false
+        }
         return kernel.shouldTerminate()
     }
 
-    /// Everything that has to end before the program quits, in order: the file jobs are
-    /// stopped and tidy up (`stopJobsToQuit`), then every plugin finishes what it has not
-    /// written yet (`Kernel.prepareToQuit`: changes inside archives, the operation log), in
-    /// the background. `reply` is called once, on the main thread, from the run loop: with
-    /// true when the program may quit now, with false when the user called the quit off.
+    /// Ends everything that has to end before the program quits.
+    ///
+    /// In order: the file jobs are stopped and tidy up (`stopJobsToQuit`), then every plugin
+    /// finishes what it has not written yet (`Kernel.prepareToQuit`: changes inside archives,
+    /// the operation log), in the background. `reply` is called once, on the main thread, from
+    /// the run loop: with true when the program may quit now, with false when the user called
+    /// the quit off.
     ///
     /// Plugins that are not done after `progressDelay` get a small window that says so, with
     /// two ways out. **Quit Now** tells them not to keep the user waiting (the cancellation
@@ -89,46 +140,48 @@ public final class Shell: ShellServices {
     /// safe, and they do (the archives keep the new members on the disk and say where).
     /// **Don't Quit** calls the quit off: the program goes on, and what the plugins were
     /// writing they go on writing.
+    @preconcurrency
     public func finishToQuit(
         patience: TimeInterval = Shell.quitPatience,
         progressDelay: TimeInterval = Shell.quitProgressDelay,
         then reply: @escaping @MainActor (Bool) -> Void
     ) {
-        MainThread.assert("Quitting")
         stopJobsToQuit(patience: patience) { [self] _ in
             let flag = CancellationFlag()
             let progress = QuitProgress()
-            var hasReplied = false
-            var stopWaiting: (() -> Void)?
-            @MainActor func answer(_ quits: Bool) {
-                guard !hasReplied else { return }
-                hasReplied = true
-                stopWaiting?()
+            let answer = OnceAnswer(reply)
+            answer.onAnswer = { [self] quits in
                 progress.close()
                 quitProgress = nil
                 // The program goes on: jobs are the user's to stop again.
-                if !quits { jobService.isQuitting = false }
-                reply(quits)
+                if !quits {
+                    jobService.isQuitting = false
+                }
             }
             progress.onQuitNow = {
                 flag.cancel()
                 // A plugin that does not even give up is not waited for for ever.
-                stopWaiting = MainLoop.after(patience) { answer(true) }
+                answer.stopWaiting = MainLoop.after(patience) { answer.give(true) }
             }
-            progress.onDontQuit = { answer(false) }
+            progress.onDontQuit = { answer.give(false) }
             quitProgress = progress
             jobService.isQuitting = true
-            kernel.prepareToQuit(cancellation: flag) { MainLoop.perform { answer(true) } }
-            if !hasReplied { progress.show(after: progressDelay) }
+            kernel.prepareToQuit(cancellation: flag) { MainLoop.perform { answer.give(true) } }
+            if !answer.isGiven {
+                progress.show(after: progressDelay)
+            }
         }
     }
 
-    /// Quitting in the middle of a file job first stops the jobs and lets them tidy up, so no
-    /// half-written file is left behind. `reply` is called once, on the main thread, with true
-    /// when the program may quit: at once when nothing runs, otherwise when the last job has
-    /// ended. A job that has not stopped after `patience` (it waits for a disk or a server
-    /// that does not answer) does not keep the program from quitting for ever: the user is
-    /// asked whether to quit anyway, and again after twice as long each time the answer is no.
+    /// Stops the file jobs and lets them tidy up before the program quits, so no half-written
+    /// file is left behind.
+    ///
+    /// `reply` is called once, on the main thread, with true when the program may quit: at
+    /// once when nothing runs, otherwise when the last job has ended. A job that has not
+    /// stopped after `patience` (it waits for a disk or a server that does not answer) does not
+    /// keep the program from quitting for ever: the user is asked whether to quit anyway, and
+    /// again after twice as long each time the answer is no.
+    @preconcurrency
     public func stopJobsToQuit(
         patience: TimeInterval = Shell.quitPatience,
         then reply: @escaping @MainActor (Bool) -> Void
@@ -137,41 +190,32 @@ public final class Shell: ShellServices {
             reply(true)
             return
         }
-        var hasReplied = false
-        var stopAsking: (() -> Void)?
-        let (jobService, ui) = (jobService, kernel.interaction)
-        func answer(_ quits: Bool) {
-            guard !hasReplied else { return }
-            hasReplied = true
-            stopAsking?()
-            reply(quits)
-        }
+        let answer = OnceAnswer(reply)
+        let service = jobService
+        let interaction = kernel.interaction
+        // The wait ends when the answer is given (`stopWaiting`): the jobs are still running when it fires.
         func ask(after wait: TimeInterval) {
-            stopAsking = MainLoop.after(wait) {
-                guard !hasReplied, jobService.isBusy else { return }
-                // Return keeps waiting: quitting anyway may cost a file.
-                let quits =
-                    ui.choose(
-                        "An operation does not stop.",
-                        detail:
-                            "It may be waiting for a disk or a server that does not answer. If you quit anyway, a file "
-                            + "it was writing may be left incomplete.",
-                        buttons: ["Quit Anyway", "Keep Waiting"],
-                        style: .warning,
-                        defaultButton: 1
-                    ) == 0
-                if quits { answer(true) } else if !hasReplied { ask(after: wait * 2) }
+            answer.stopWaiting = MainLoop.after(wait) {
+                if Self.quitsAnyway(asking: interaction) {
+                    answer.give(true)
+                } else if !answer.isGiven {
+                    ask(after: wait * 2)
+                }
             }
         }
-        jobService.isQuitting = true
-        jobService.cancelAll { answer(true) }
-        if !hasReplied { ask(after: patience) }
+        service.isQuitting = true
+        service.cancelAll { answer.give(true) }
+        if !answer.isGiven {
+            ask(after: patience)
+        }
     }
 
+    /// The menu bar of the program: the plugins' menus with the Mac's own around them.
     public func makeMainMenu() -> NSMenu {
         MenuBuilder.mainMenu(appName: kernel.productName, kernel: kernel)
     }
 
+    /// Puts the main window on screen and in front.
     public func showMainWindow() {
         mainWindow.showWindow(nil)
     }
@@ -180,8 +224,6 @@ public final class Shell: ShellServices {
     public func showSettings() {
         kernel.commands.perform(.configuration)
     }
-
-    public var canShowSettings: Bool { kernel.commands.isEnabled(.configuration) }
 
     /// Remembers the panels' tabs and the window for the next start.
     public func saveState() {
@@ -194,93 +236,39 @@ public final class Shell: ShellServices {
         panelCoordinator.shutDown()
         mainWindow.close()
     }
-}
 
-/// Runs the program: a kernel, the given plugins, and the shell on top.
-@MainActor
-public final class ShellApplication: NSObject, NSApplicationDelegate, NSMenuItemValidation {
-    private let productName: String
-    private let plugins: [any Plugin]
-    private var kernel: Kernel?
-    private var shell: Shell?
-    private var settings: UserDefaultsSettings?
-
-    public init(productName: String, plugins: [any Plugin]) {
-        self.productName = productName
-        self.plugins = plugins
-    }
-
-    public func run() {
-        let app = NSApplication.shared
-        app.delegate = self
-        app.setActivationPolicy(.regular)
-        app.run()
-    }
-
-    public func applicationDidFinishLaunching(_: Notification) {
-        let settings = UserDefaultsSettings()
-        self.settings = settings
-        let kernel = Kernel(productName: productName, settings: settings, interaction: AlertInteraction())
-        kernel.load(plugins)
-        let shell = Shell(kernel: kernel)
-        self.kernel = kernel
-        self.shell = shell
-        MenuBuilder.install(shell.makeMainMenu())
-        shell.showMainWindow()
-        NSApp.activate(ignoringOtherApps: true)
-    }
-
-    /// How long quitting waits for settings that are still on their way to the disk.
-    public static let settingsPatience: TimeInterval = 5
-
-    /// Quitting asks the plugins first (one with unsaved work asks the user, who may call the
-    /// quit off), then stops the file jobs and lets them tidy up, so no half-written file is
-    /// left behind, then lets the plugins write what they have not written yet. The program
-    /// stays in use until all of that has been answered (`Shell.finishToQuit`).
-    public func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        guard let shell else { return .terminateNow }
-        guard shell.mayQuit() else { return .terminateCancel }
-        // The answer comes on the main thread: at once, or later from the run loop.
-        final class Reply {
-            var answer: Bool?
-            var isLater = false
+    /// Lets the panels and the jobs follow each other.
+    ///
+    /// Reading ahead rests while the user works elsewhere and while a job runs; the bars are
+    /// checked again when either changes; the panels are read again when the last job ended;
+    /// and the user is asked about a job that does not stop.
+    private func connectJobsAndPanels() {
+        panelCoordinator.isWindowActive = { [weak self] in
+            NSApp.isActive && self?.mainWindow.window?.isKeyWindow == true
         }
-        let reply = Reply()
-        shell.finishToQuit { quits in
-            if reply.isLater { sender.reply(toApplicationShouldTerminate: quits) } else { reply.answer = quits }
+        jobService.onBusyChanged = { [weak self, weak jobService] in
+            self?.panelCoordinator.updateReadAhead()
+            self?.mainWindow.scheduleValidation()
+            if jobService?.isBusy == false {
+                self?.panelCoordinator.jobsEnded()
+            }
         }
-        if let answer = reply.answer { return answer ? .terminateNow : .terminateCancel }
-        reply.isLater = true
-        return .terminateLater
+        panelCoordinator.onActivityChanged = { [weak self] in self?.mainWindow.scheduleValidation() }
+        let interaction = kernel.interaction
+        jobService.askToAbandon = { title in
+            interaction.choose(
+                "“\(title)” does not stop.",
+                detail: "It may be waiting for a disk or a server that does not answer. You can go on waiting, or stop "
+                    + "waiting and use the program again; the operation then ends by itself as soon as the disk or "
+                    + "server lets it.",
+                buttons: ["Stop Waiting", "Keep Waiting"],
+                style: .warning,
+                defaultButton: 1
+            ) == 0
+        }
     }
 
-    public func applicationWillTerminate(_: Notification) {
-        shell?.saveState()
-        shell?.shutDown()
-        kernel?.shutdown()
-        // Large values are written in the background; the last ones are waited for, not for ever.
-        settings?.waitForWrites(atMost: Self.settingsPatience)
-    }
-
-    public func applicationShouldTerminateAfterLastWindowClosed(_: NSApplication) -> Bool { false }
-
-    // The entries of the menu bar that must work whichever window is in front; the
-    // application's delegate is the last stop of every menu action.
-
-    @objc func showSettings(_: Any?) {
-        shell?.showSettings()
-    }
-
-    @objc func showMainWindow(_: Any?) {
-        shell?.showMainWindow()
-    }
-
-    public func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
-        menuItem.action == #selector(showSettings(_:)) ? shell?.canShowSettings ?? false : true
-    }
-
-    public func applicationShouldHandleReopen(_: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        if !flag { shell?.showMainWindow() }
-        return true
+    deinit {
+        // Nothing to release: the window and the panels go with the shell.
     }
 }

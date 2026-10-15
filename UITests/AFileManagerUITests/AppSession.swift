@@ -105,4 +105,8 @@ internal final class AppSession {
         app.terminate()
         return false
     }
+
+    deinit {
+        // Nothing to release.
+    }
 }

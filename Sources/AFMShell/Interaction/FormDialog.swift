@@ -1,61 +1,138 @@
 import AFMKernel
 import AppKit
 
-/// Shows a plugin's form (`UserInteraction.form`) as an alert with one row per field. A form
-/// with more rows than fit is scrolled; a long list gets a field that narrows it down.
-/// Return takes the first button, Esc cancels, a double click on a list row accepts.
+/// Shows a plugin's form (`UserInteraction.form`) as an alert with one row per field.
+///
+/// A form with more rows than fit is scrolled; a long list gets a field that narrows it down.
+/// Return takes the first button, Esc cancels, a double click on a list row accepts. Main
+/// thread only.
 @MainActor
-final class FormDialog: NSObject, NSTextViewDelegate {
-    private let fields: [FormField]
-    private var controls: [(field: FormField, read: () -> FormValues.Value)] = []
-    private(set) var lists: [FormList] = []
-    private weak var alert: NSAlert?
-    private var focusObservation: NSKeyValueObservation?
-    /// The view that takes the keyboard when the dialog opens.
-    private(set) var firstInput: NSView?
-    /// The scroll view around the rows, when they do not fit.
-    private(set) var scrollView: NSScrollView?
+internal final class FormDialog: NSObject, NSTextViewDelegate {
+    /// A clip view that starts at the top, so a scrolled form starts at its first row.
+    private final class FlippedClipView: NSClipView {
+        override var isFlipped: Bool { true }
 
-    static let fieldWidth: CGFloat = 380
-    static let labelWidth: CGFloat = 200
-
-    /// The height the rows may take before they are scrolled: what the screen has left beside
-    /// the alert's own title, text and buttons.
-    static var maximumHeight: CGFloat {
-        min(560, max(240, (NSScreen.main?.visibleFrame.height ?? 800) - 340))
+        deinit {
+            // Nothing to release.
+        }
     }
 
-    init(fields: [FormField]) {
+    /// The width of a field.
+    internal static let fieldWidth: CGFloat = 380
+    /// The widest a label in front of a field gets before it wraps.
+    internal static let labelWidth: CGFloat = 200
+
+    /// The height the rows may take before they are scrolled.
+    ///
+    /// What the screen has left beside the alert's own title, text and buttons.
+    internal static var maximumHeight: CGFloat {
+        maximumHeight(forScreenHeight: NSScreen.main?.visibleFrame.height)
+    }
+
+    /// The list fields, in the order of the form.
+    internal private(set) var lists: [FormList] = []
+    /// The view that takes the keyboard when the dialog opens.
+    internal private(set) var firstInput: NSView?
+    /// The scroll view around the rows, when they do not fit.
+    internal private(set) var scrollView: NSScrollView?
+    /// The fields of the form.
+    private let fields: [FormField]
+    /// Each field that holds a value, with how to read it.
+    private var controls: [(field: FormField, read: () -> FormValues.Value)] = []
+    /// The alert, while it is shown.
+    private weak var alert: NSAlert?
+    /// Brings a field reached with Tab into view in a scrolled form.
+    private var focusObservation: NSKeyValueObservation?
+
+    /// A dialog for `fields`.
+    internal init(fields: [FormField]) {
         self.fields = fields
     }
 
-    func run(title: String, detail: String, buttons: [String]) -> FormValues? {
-        let alert = makeAlert(title: title, detail: detail, buttons: buttons)
-        let response = alert.runModal().rawValue - NSApplication.ModalResponse.alertFirstButtonReturn.rawValue
+    /// The height the rows may take on a screen `height` points high; as on a screen 800
+    /// points high when there is none to ask.
+    internal static func maximumHeight(forScreenHeight height: CGFloat?) -> CGFloat {
+        guard let height else {
+            return 460
+        }
+        return min(560, max(240, height - 340))
+    }
+
+    /// Shows the form and waits for an answer; nil when the user cancels.
+    internal func run(title: String, detail: String, buttons: [String]) -> FormValues? {
+        answer(after: makeAlert(title: title, detail: detail, buttons: buttons).runModal(), buttons: buttons)
+    }
+
+    /// The answer of the form once `response` ended it: the fields with the button pressed, nil
+    /// for Cancel (the button after `buttons`).
+    internal func answer(after response: NSApplication.ModalResponse, buttons: [String]) -> FormValues? {
+        let index = AlertInteraction.index(of: response)
         focusObservation = nil
-        return buttons.indices.contains(response) ? values(button: response) : nil
+        return buttons.indices.contains(index) ? values(button: index) : nil
     }
 
     /// What the fields hold now, as the answer given with a button.
-    func values(button: Int) -> FormValues {
+    internal func values(button: Int) -> FormValues {
         var answer = FormValues(button: button)
-        for control in controls { answer.values[control.field.key] = control.read() }
+        for control in controls {
+            answer.values[control.field.key] = control.read()
+        }
         return answer
     }
 
-    /// Builds the dialog without showing it.
-    func makeAlert(title: String, detail: String, buttons: [String], maximumHeight: CGFloat = FormDialog.maximumHeight)
-        -> NSAlert
-    {
-        let alert = NSAlert()
-        // Titles and texts may name files and servers; see `AlertInteraction`.
-        alert.messageText = DisplayText.clean(title, keepingLines: true)
-        alert.informativeText = DisplayText.clean(detail, keepingLines: true)
-        buttons.forEach { alert.addButton(withTitle: $0) }
-        alert.addButton(withTitle: "Cancel")
-        alert.buttons.last?.keyEquivalent = "\u{1b}"
-        self.alert = alert
+    /// Builds the dialog without showing it, for the screen it would be shown on.
+    internal func makeAlert(title: String, detail: String, buttons: [String]) -> NSAlert {
+        makeAlert(title: title, detail: detail, buttons: buttons, maximumHeight: Self.maximumHeight)
+    }
 
+    /// Builds the dialog without showing it; rows higher than `maximumHeight` are scrolled.
+    internal func makeAlert(title: String, detail: String, buttons: [String], maximumHeight: CGFloat) -> NSAlert {
+        let question = NSAlert()
+        // Titles and texts may name files and servers; see `AlertInteraction`.
+        question.messageText = DisplayText.clean(title, keepingLines: true)
+        question.informativeText = DisplayText.clean(detail, keepingLines: true)
+        for button in buttons {
+            question.addButton(withTitle: button)
+        }
+        question.addButton(withTitle: "Cancel")
+        question.buttons.last?.keyEquivalent = "\u{1b}"
+        alert = question
+        let grid = makeGrid()
+        if grid.frame.height > maximumHeight {
+            question.accessoryView = makeScrollView(around: grid, height: maximumHeight)
+        } else {
+            question.accessoryView = grid
+        }
+        question.window.initialFirstResponder = firstInput
+        question.window.recalculateKeyViewLoop()
+        question.layout()
+        for list in lists {
+            list.showSelection()
+        }
+        if scrollView != nil {
+            observeFocus(in: question.window)
+        }
+        return question
+    }
+
+    /// In a box for several lines Return starts a new line; Tab goes on to the next field
+    /// instead of writing a tab, so the dialog can be left with the keyboard.
+    internal func textView(_ textView: NSTextView, doCommandBy selector: Selector) -> Bool {
+        switch selector {
+        case #selector(NSResponder.insertTab(_:)):
+            textView.window?.selectNextKeyView(nil)
+
+        case #selector(NSResponder.insertBacktab(_:)):
+            textView.window?.selectPreviousKeyView(nil)
+
+        default:
+            return false
+        }
+        return true
+    }
+
+    /// The rows of the form in a grid of labels and controls, at the size it needs.
+    private func makeGrid() -> NSGridView {
         let rows: [[NSView]] = fields.map { field in
             let label = NSTextField(labelWithString: field.label)
             label.lineBreakMode = .byWordWrapping
@@ -65,7 +142,9 @@ final class FormDialog: NSObject, NSTextViewDelegate {
                 label.preferredMaxLayoutWidth = Self.fieldWidth + 120
                 return [label]
             }
-            if case .checkbox = field.kind { return [NSGridCell.emptyContentView, control] }
+            if case .checkbox = field.kind {
+                return [NSGridCell.emptyContentView, control]
+            }
             control.setAccessibilityLabel(field.label)
             label.alignment = .right
             label.preferredMaxLayoutWidth = Self.labelWidth
@@ -77,36 +156,18 @@ final class FormDialog: NSObject, NSTextViewDelegate {
         for (index, row) in rows.enumerated() where row.count == 1 {
             grid.mergeCells(
                 inHorizontalRange: NSRange(location: 0, length: grid.numberOfColumns),
-                verticalRange: NSRange(location: index, length: 1))
+                verticalRange: NSRange(location: index, length: 1)
+            )
         }
-        if grid.numberOfColumns > 1 { grid.column(at: 0).xPlacement = .trailing }
+        if grid.numberOfColumns > 1 {
+            grid.column(at: 0).xPlacement = .trailing
+        }
         grid.rowAlignment = .firstBaseline
-        let size = grid.fittingSize
-        grid.frame = NSRect(origin: .zero, size: size)
-        if size.height > maximumHeight {
-            alert.accessoryView = makeScrollView(around: grid, height: maximumHeight)
-        } else {
-            alert.accessoryView = grid
-        }
-        alert.window.initialFirstResponder = firstInput
-        alert.window.recalculateKeyViewLoop()
-        alert.layout()
-        lists.forEach { $0.showSelection() }
-        // A field reached with Tab is brought into view.
-        if scrollView != nil {
-            focusObservation = alert.window.observe(\.firstResponder) { window, _ in
-                // The first responder changes on the main thread, where this is called.
-                MainActor.assumeIsolated {
-                    // The field editor stands in for the text field it edits.
-                    let responder = window.firstResponder
-                    let view = ((responder as? NSTextView)?.delegate as? NSView) ?? responder as? NSView
-                    if let view { view.scrollToVisible(view.bounds.insetBy(dx: 0, dy: -8)) }
-                }
-            }
-        }
-        return alert
+        grid.frame = NSRect(origin: .zero, size: grid.fittingSize)
+        return grid
     }
 
+    /// A scroll view of `height` around the rows.
     private func makeScrollView(around grid: NSGridView, height: CGFloat) -> NSScrollView {
         let scroll = NSScrollView(frame: NSRect(x: 0, y: 0, width: grid.frame.width + 20, height: height))
         // Flipped, so the form starts at its first row.
@@ -122,48 +183,40 @@ final class FormDialog: NSObject, NSTextViewDelegate {
         return scroll
     }
 
-    private func takesKeyboard(_ view: NSView) {
-        if firstInput == nil { firstInput = view }
+    /// Brings a field reached with Tab into view.
+    private func observeFocus(in window: NSWindow) {
+        focusObservation = window.observe(\.firstResponder) { window, _ in
+            // The first responder changes on the main thread, where this is called.
+            MainActor.assumeIsolated {
+                // The field editor stands in for the text field it edits.
+                let responder = window.firstResponder
+                let view = ((responder as? NSTextView)?.delegate as? NSView) ?? responder as? NSView
+                view?.scrollToVisible(view?.bounds.insetBy(dx: 0, dy: -8) ?? .zero)
+            }
+        }
     }
 
+    /// The first view that can take the keyboard is the one that has it when the dialog opens.
+    private func takesKeyboard(_ view: NSView) {
+        if firstInput == nil {
+            firstInput = view
+        }
+    }
+
+    /// The control of a field, which also notes how to read it; nil for a note.
     private func makeControl(for field: FormField) -> NSView? {
-        let width = Self.fieldWidth
         switch field.kind {
         case .note:
             return nil
 
         case .text(let value):
-            let input = NSTextField(string: value)
-            configure(input, width: width)
-            controls.append((field, { .text(input.stringValue) }))
-            return input
+            return makeTextField(NSTextField(string: value), for: field)
 
         case .secureText:
-            let input = NSSecureTextField(string: "")
-            configure(input, width: width)
-            controls.append((field, { .text(input.stringValue) }))
-            return input
+            return makeTextField(NSSecureTextField(string: ""), for: field)
 
         case .multilineText(let value):
-            let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: width, height: 120))
-            textView.string = value
-            textView.isRichText = false
-            textView.allowsUndo = true
-            textView.isAutomaticQuoteSubstitutionEnabled = false
-            textView.isAutomaticDashSubstitutionEnabled = false
-            textView.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
-            textView.autoresizingMask = [.width]
-            textView.isVerticallyResizable = true
-            textView.delegate = self
-            let scroll = NSScrollView()
-            scroll.documentView = textView
-            scroll.hasVerticalScroller = true
-            scroll.borderType = .bezelBorder
-            scroll.widthAnchor.constraint(equalToConstant: width).isActive = true
-            scroll.heightAnchor.constraint(equalToConstant: 120).isActive = true
-            takesKeyboard(textView)
-            controls.append((field, { .text(textView.string) }))
-            return scroll
+            return makeTextBox(value, for: field)
 
         case .checkbox(let isOn):
             let box = NSButton(checkboxWithTitle: field.label, target: nil, action: nil)
@@ -172,18 +225,10 @@ final class FormDialog: NSObject, NSTextViewDelegate {
             return box
 
         case .choice(let options, let selected):
-            let popUp = NSPopUpButton(frame: .zero, pullsDown: false)
-            // Added one by one: `addItems` drops options with the same caption.
-            for option in options {
-                popUp.menu?.addItem(NSMenuItem(title: option, action: nil, keyEquivalent: ""))
-            }
-            if options.indices.contains(selected) { popUp.selectItem(at: selected) }
-            popUp.widthAnchor.constraint(lessThanOrEqualToConstant: width).isActive = true
-            controls.append((field, { .index(popUp.indexOfSelectedItem) }))
-            return popUp
+            return makePopUp(options, selected: selected, for: field)
 
         case .list(let rows, let selected):
-            let list = FormList(rows: rows, selected: selected, width: width)
+            let list = FormList(rows: rows, selected: selected, width: Self.fieldWidth)
             list.onAccept = { [weak self] in self?.alert?.buttons.first?.performClick(nil) }
             lists.append(list)
             takesKeyboard(list.keyboardView)
@@ -192,165 +237,55 @@ final class FormDialog: NSObject, NSTextViewDelegate {
         }
     }
 
-    private func configure(_ input: NSTextField, width: CGFloat) {
-        // A long path scrolls inside its one line instead of being cut off.
+    /// A one-line field; a long path scrolls inside its line instead of being cut off.
+    private func makeTextField(_ input: NSTextField, for field: FormField) -> NSView {
         input.cell?.wraps = false
         input.cell?.isScrollable = true
-        input.widthAnchor.constraint(equalToConstant: width).isActive = true
+        input.widthAnchor.constraint(equalToConstant: Self.fieldWidth).isActive = true
         takesKeyboard(input)
+        controls.append((field, { .text(input.stringValue) }))
+        return input
     }
 
-    /// In a box for several lines Return starts a new line; Tab goes on to the next field
-    /// instead of writing a tab, so the dialog can be left with the keyboard.
-    func textView(_ textView: NSTextView, doCommandBy selector: Selector) -> Bool {
-        switch selector {
-        case #selector(NSResponder.insertTab(_:)): textView.window?.selectNextKeyView(nil)
-        case #selector(NSResponder.insertBacktab(_:)): textView.window?.selectPreviousKeyView(nil)
-        default: return false
-        }
-        return true
-    }
-}
-
-private final class FlippedClipView: NSClipView {
-    override var isFlipped: Bool { true }
-}
-
-/// A list field of a form. A long list has a field above it: what is typed there narrows the
-/// list down to the rows that contain it, while ↑ and ↓ still move through the rows. A short
-/// list finds a row by typing its beginning.
-@MainActor
-final class FormList: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSearchFieldDelegate {
-    /// Lists longer than this get the filter field.
-    static let filterThreshold = 12
-
-    let rows: [String]
-    /// The rows the list shows now, as positions in `rows`.
-    private(set) var shown: [Int]
-    let table = NSTableView()
-    let searchField: NSSearchField?
-    let view: NSView
-    /// Called for a double click on a row.
-    var onAccept: (() -> Void)?
-
-    init(rows: [String], selected: Int, width: CGFloat) {
-        self.rows = rows
-        shown = Array(rows.indices)
-        let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("row"))
-        column.width = width - 20
-        table.addTableColumn(column)
-        table.headerView = nil
-        table.style = .plain
-        table.rowHeight = 18
-        table.allowsEmptySelection = true
-        table.allowsTypeSelect = true
+    /// A box for several lines of plain text, starting with `value`.
+    private func makeTextBox(_ value: String, for field: FormField) -> NSView {
+        let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: Self.fieldWidth, height: 120))
+        textView.string = value
+        textView.isRichText = false
+        textView.allowsUndo = true
+        textView.isAutomaticQuoteSubstitutionEnabled = false
+        textView.isAutomaticDashSubstitutionEnabled = false
+        textView.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
+        textView.autoresizingMask = [.width]
+        textView.isVerticallyResizable = true
+        textView.delegate = self
         let scroll = NSScrollView()
-        scroll.documentView = table
+        scroll.documentView = textView
         scroll.hasVerticalScroller = true
         scroll.borderType = .bezelBorder
-        scroll.widthAnchor.constraint(equalToConstant: width).isActive = true
-        scroll.heightAnchor.constraint(equalToConstant: min(320, max(90, CGFloat(rows.count) * 20 + 4))).isActive = true
-        if rows.count > Self.filterThreshold {
-            let search = NSSearchField()
-            search.placeholderString = "Filter"
-            search.sendsSearchStringImmediately = true
-            search.widthAnchor.constraint(equalToConstant: width).isActive = true
-            searchField = search
-            let stack = NSStackView(views: [search, scroll])
-            stack.orientation = .vertical
-            stack.spacing = 6
-            view = stack
-        } else {
-            searchField = nil
-            view = scroll
+        scroll.widthAnchor.constraint(equalToConstant: Self.fieldWidth).isActive = true
+        scroll.heightAnchor.constraint(equalToConstant: 120).isActive = true
+        takesKeyboard(textView)
+        controls.append((field, { .text(textView.string) }))
+        return scroll
+    }
+
+    /// A pop-up menu of `options` with `selected` chosen.
+    private func makePopUp(_ options: [String], selected: Int, for field: FormField) -> NSView {
+        let popUp = NSPopUpButton(frame: .zero, pullsDown: false)
+        // Added one by one: `addItems` drops options with the same caption.
+        for option in options {
+            popUp.menu?.addItem(NSMenuItem(title: option, action: nil, keyEquivalent: ""))
         }
-        super.init()
-        table.dataSource = self
-        table.delegate = self
-        table.target = self
-        table.doubleAction = #selector(rowDoubleClicked)
-        searchField?.delegate = self
-        table.reloadData()
-        select(selected)
-    }
-
-    /// The view that takes the keyboard: the filter field when there is one.
-    var keyboardView: NSView { searchField ?? table }
-
-    /// The chosen row as a position in `rows`; -1 when none is chosen.
-    var selectedRow: Int {
-        shown.indices.contains(table.selectedRow) ? shown[table.selectedRow] : -1
-    }
-
-    private func select(_ row: Int) {
-        guard let position = shown.firstIndex(of: row) else { return }
-        table.selectRowIndexes([position], byExtendingSelection: false)
-        table.scrollRowToVisible(position)
-    }
-
-    /// Brings the chosen row into view, once the list has its size.
-    func showSelection() {
-        if table.selectedRow >= 0 { table.scrollRowToVisible(table.selectedRow) }
-    }
-
-    /// Shows only the rows that contain `text`, whatever its case and accents. The chosen row
-    /// stays chosen while it is shown; otherwise the first row is.
-    func filter(_ text: String) {
-        let chosen = selectedRow
-        let text = text.trimmingCharacters(in: .whitespaces)
-        shown = rows.indices.filter {
-            text.isEmpty || rows[$0].range(of: text, options: [.caseInsensitive, .diacriticInsensitive]) != nil
+        if options.indices.contains(selected) {
+            popUp.selectItem(at: selected)
         }
-        table.reloadData()
-        table.deselectAll(nil)
-        select(shown.contains(chosen) ? chosen : shown.first ?? -1)
+        popUp.widthAnchor.constraint(lessThanOrEqualToConstant: Self.fieldWidth).isActive = true
+        controls.append((field, { .index(popUp.indexOfSelectedItem) }))
+        return popUp
     }
 
-    /// Moves the chosen row by `delta` rows, staying inside the list.
-    func moveSelection(by delta: Int) {
-        guard !shown.isEmpty else { return }
-        let position = min(shown.count - 1, max(0, table.selectedRow + delta))
-        table.selectRowIndexes([position], byExtendingSelection: false)
-        table.scrollRowToVisible(position)
-    }
-
-    @objc private func rowDoubleClicked() {
-        if table.clickedRow >= 0 { onAccept?() }
-    }
-
-    func controlTextDidChange(_: Notification) {
-        if let searchField { filter(searchField.stringValue) }
-    }
-
-    /// From the filter field the arrow and page keys move through the list.
-    func control(_: NSControl, textView _: NSTextView, doCommandBy selector: Selector) -> Bool {
-        let page = max(1, table.rows(in: table.visibleRect).length - 1)
-        switch selector {
-        case #selector(NSResponder.moveUp(_:)): moveSelection(by: -1)
-        case #selector(NSResponder.moveDown(_:)): moveSelection(by: 1)
-        case #selector(NSResponder.scrollPageUp(_:)), #selector(NSResponder.pageUp(_:)): moveSelection(by: -page)
-        case #selector(NSResponder.scrollPageDown(_:)), #selector(NSResponder.pageDown(_:)): moveSelection(by: page)
-        default: return false
-        }
-        return true
-    }
-
-    func numberOfRows(in _: NSTableView) -> Int { shown.count }
-
-    func tableView(_ tableView: NSTableView, viewFor _: NSTableColumn?, row: Int) -> NSView? {
-        let identifier = NSUserInterfaceItemIdentifier("cell")
-        let label =
-            tableView.makeView(withIdentifier: identifier, owner: nil) as? NSTextField
-            ?? NSTextField(labelWithString: "")
-        label.identifier = identifier
-        label.lineBreakMode = .byTruncatingMiddle
-        let text = shown.indices.contains(row) ? rows[shown[row]] : ""
-        label.stringValue = text
-        label.toolTip = text
-        return label
-    }
-
-    func tableView(_: NSTableView, typeSelectStringFor _: NSTableColumn?, row: Int) -> String? {
-        shown.indices.contains(row) ? rows[shown[row]] : nil
+    deinit {
+        // Nothing to release.
     }
 }

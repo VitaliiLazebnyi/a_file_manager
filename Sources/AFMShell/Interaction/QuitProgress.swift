@@ -1,9 +1,10 @@
 import AFMKernel
 import AppKit
 
-/// The small window that is shown when quitting takes a while because plugins are still
-/// writing (changes inside archives, uploads): it says so and offers two ways out, to quit
-/// without waiting and not to quit after all. What the two do is `Shell.finishToQuit`'s.
+/// The small window that is shown when quitting takes a while because plugins are still writing.
+///
+/// Changes inside archives, uploads: it says so and offers two ways out, to quit without
+/// waiting and not to quit after all. What the two do is `Shell.finishToQuit`'s.
 ///
 /// The window is run as a modal one, from the run loop: the program is on its way out, and
 /// nothing else is to be started. Everything that reaches the main thread through the run
@@ -11,90 +12,94 @@ import AppKit
 /// a running application (tests) nothing is put on screen, and the two answers are given by
 /// `pressQuitNow` and `pressDontQuit`. Main thread only.
 @MainActor
-final class QuitProgress: NSObject {
-    static let waitingText = "Finishing before quitting…"
-    static let waitingDetail =
+internal final class QuitProgress: NSObject {
+    /// The first line while the plugins are being waited for.
+    internal static let waitingText = "Finishing before quitting…"
+    /// What the window explains below it.
+    internal static let waitingDetail =
         "Changes that have not been written yet are being written (into archives, to servers). "
         + "You can wait, quit without waiting, or go on working."
-    static let stoppingText = "Quitting…"
+    /// The first line once the user chose not to wait.
+    internal static let stoppingText = "Quitting…"
 
+    /// The first line of the window: what the program is doing.
+    internal let heading = NSTextField(labelWithString: QuitProgress.waitingText)
     /// The user does not want to wait: called once.
-    var onQuitNow: (() -> Void)?
+    internal var onQuitNow: (() -> Void)?
     /// The user does not want to quit after all.
-    var onDontQuit: (() -> Void)?
+    internal var onDontQuit: (() -> Void)?
     /// The time after which the window is shown has passed.
-    private(set) var isDue = false
+    internal private(set) var isDue = false
     /// Quit Now was pressed; the plugins are giving up.
-    private(set) var isStopping = false
-    private(set) var isClosed = false
+    internal private(set) var isStopping = false
+    /// The window was taken away, or kept from coming, for good.
+    internal private(set) var isClosed = false
+    /// Calls off the timer that shows the window.
     private var cancelTimer: (() -> Void)?
+    /// The window while it is on screen.
     private var panel: NSPanel?
-    private let heading = NSTextField(labelWithString: QuitProgress.waitingText)
+    /// Quits without waiting.
     private let quitButton = NSButton(title: "Quit Now", target: nil, action: nil)
+    /// Calls the quit off.
     private let stayButton = NSButton(title: "Don’t Quit", target: nil, action: nil)
 
-    /// True while the window is on screen.
-    var isShown: Bool { panel != nil }
-    var text: String { heading.stringValue }
-
     /// Shows the window after `delay`, unless `close` comes first.
-    func show(after delay: TimeInterval) {
-        guard !isClosed, cancelTimer == nil else { return }
+    internal func show(after delay: TimeInterval) {
+        guard !isClosed, cancelTimer == nil else {
+            return
+        }
         cancelTimer = MainLoop.after(delay) { [weak self] in self?.present() }
     }
 
     /// Takes the window away, or keeps it from coming.
-    func close() {
+    internal func close() {
         isClosed = true
         // The answers hold what holds this window.
         onQuitNow = nil
         onDontQuit = nil
         cancelTimer?()
         cancelTimer = nil
-        guard panel != nil else { return }
+        guard panel != nil else {
+            return
+        }
         // Ends the modal loop from wherever this is called: a button, or a block of the run
         // loop, which the loop does not look at by itself until an event wakes it.
         NSApp.stopModal()
-        if let wake = NSEvent.otherEvent(
-            with: .applicationDefined, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0,
-            context: nil, subtype: 0, data1: 0, data2: 0)
-        {
-            NSApp.postEvent(wake, atStart: true)
-        }
+        let wake = NSEvent.otherEvent(
+            with: .applicationDefined,
+            location: .zero,
+            modifierFlags: [],
+            timestamp: 0,
+            windowNumber: 0,
+            context: nil,
+            subtype: 0,
+            data1: 0,
+            data2: 0
+        )
+        wake.map { NSApp.postEvent($0, atStart: true) }
     }
 
-    func pressQuitNow() {
-        guard !isStopping, !isClosed else { return }
+    /// The user chose not to wait: the plugins are told to give up (`onQuitNow`), once.
+    internal func pressQuitNow() {
+        guard !isStopping, !isClosed else {
+            return
+        }
         isStopping = true
         heading.stringValue = Self.stoppingText
         quitButton.isEnabled = false
         onQuitNow?()
     }
 
-    func pressDontQuit() {
-        guard !isClosed else { return }
+    /// The user chose not to quit after all (`onDontQuit`).
+    internal func pressDontQuit() {
+        guard !isClosed else {
+            return
+        }
         onDontQuit?()
     }
 
-    @objc private func quitPressed() { pressQuitNow() }
-    @objc private func stayPressed() { pressDontQuit() }
-
-    private func present() {
-        cancelTimer = nil
-        guard !isClosed else { return }
-        isDue = true
-        // Only a running application has a screen and a modal loop to show it in.
-        guard panel == nil, NSApplication.shared.isRunning else { return }
-        let panel = makePanel()
-        self.panel = panel
-        panel.center()
-        NSApp.runModal(for: panel)
-        panel.orderOut(nil)
-        self.panel = nil
-    }
-
     /// Builds the window without showing it.
-    func makePanel() -> NSPanel {
+    internal func makePanel() -> NSPanel {
         heading.font = .boldSystemFont(ofSize: 13)
         let detail = NSTextField(wrappingLabelWithString: Self.waitingDetail)
         detail.font = .systemFont(ofSize: 11)
@@ -130,10 +135,43 @@ final class QuitProgress: NSObject {
             footer.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -32),
             detail.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -32)
         ])
-        let panel = NSPanel(contentRect: .zero, styleMask: [.titled], backing: .buffered, defer: false)
-        panel.isReleasedWhenClosed = false
-        panel.contentView = content
-        panel.setContentSize(content.fittingSize)
-        return panel
+        let window = NSPanel(contentRect: .zero, styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = content
+        window.setContentSize(content.fittingSize)
+        return window
+    }
+
+    /// The Quit Now button.
+    @objc
+    private func quitPressed() {
+        pressQuitNow()
+    }
+
+    /// The Don't Quit button.
+    @objc
+    private func stayPressed() {
+        pressDontQuit()
+    }
+
+    /// The time is up: the window is shown and run as a modal one until `close`.
+    private func present() {
+        // `close` calls the timer off: the window is not closed yet.
+        cancelTimer = nil
+        isDue = true
+        // Only a running application has a screen and a modal loop to show it in.
+        guard panel == nil, NSApplication.shared.isRunning else {
+            return
+        }
+        let window = makePanel()
+        panel = window
+        window.center()
+        NSApp.runModal(for: window)
+        window.orderOut(nil)
+        panel = nil
+    }
+
+    deinit {
+        // Nothing to release.
     }
 }
