@@ -211,7 +211,10 @@ final class SelectionStore {
         scoped.set(history.filter { $0 != mask }, forKey: "maskHistory")
     }
 
-    var types: [SelectionType] { scoped.value([SelectionType].self, forKey: "types") ?? [] }
+    /// The saved types; one that does not read is left out, the others stay.
+    var types: [SelectionType] {
+        (scoped.value([Readable<SelectionType>].self, forKey: "types") ?? []).compactMap(\.value)
+    }
 
     func type(named name: String) -> SelectionType? {
         types.first { $0.name.caseInsensitiveCompare(name) == .orderedSame }
