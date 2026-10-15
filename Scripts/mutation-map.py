@@ -65,9 +65,11 @@ class Runner:
 
     def tests(self, target: str) -> list[str]:
         """The identifiers of a target's tests, as Swift Testing filters them."""
+        # The listing writes a profile too; it counts nothing worth keeping.
+        environment = dict(self.environment, LLVM_PROFILE_FILE=os.devnull)
         result = subprocess.run(
             [self.helper, "--test-bundle-path", self.binary(target), "--testing-library", "swift-testing",
-             "--list-tests"], capture_output=True, text=True, env=self.environment, check=True)
+             "--list-tests"], capture_output=True, text=True, env=environment, check=True)
         return [line for line in result.stdout.splitlines() if line.startswith(target + ".")]
 
     def run(self, target: str, test: str, profile: pathlib.Path, limit: int) -> bool:
