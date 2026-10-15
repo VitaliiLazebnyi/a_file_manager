@@ -25,8 +25,4 @@ internal final class CoverageClipboardChanger: NSObject, NSPasteboardItemDataPro
         pasteboard.clearContents()
         pasteboard.setString("changed", forType: .string)
     }
-
-    deinit {
-        // Nothing to release.
-    }
 }
