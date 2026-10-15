@@ -520,7 +520,8 @@ final class NetStream: @unchecked Sendable {
             guard let self else { return }
             condition.lock()
             isReceiving = false
-            if let data { buffer.append(data) }
+            // What comes after `close` is nobody's: a call that was cut off stays cut off.
+            if let data, !isClosed { buffer.append(data) }
             if let error, receiveFailure == nil {
                 receiveFailure = NetworkError.connectionFailed(error.localizedDescription)
             }

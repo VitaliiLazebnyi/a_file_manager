@@ -444,11 +444,12 @@ final class SFTPSession: RemoteSession, @unchecked Sendable {
         try perform(cancellation: cancellation) { channel in
             let handle = try openHandle(.opendir, on: channel, cancellation: cancellation) { $0.string(path) }
             defer { closeHandle(handle, on: channel) }
-            while true {
+            var wanted = true
+            while wanted {
                 let packet = try channel.request(.readdir, timeout: timeout, cancellation: cancellation) {
                     $0.bytes(handle)
                 }
-                if packet.statusCode == SFTPError.endOfFile { return }
+                if packet.statusCode == SFTPError.endOfFile { break }
                 var decoder = try packet.expect(.name)
                 var entries: [RemoteEntry] = []
                 for _ in 0..<(try decoder.u32()) {
@@ -495,7 +496,7 @@ final class SFTPSession: RemoteSession, @unchecked Sendable {
                         throw NetworkError.connectionLost
                     } catch {}
                 }
-                if !entries.isEmpty, !receive(entries) { return }
+                wanted = entries.isEmpty || receive(entries)
             }
         }
     }
