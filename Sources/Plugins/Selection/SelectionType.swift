@@ -138,7 +138,10 @@ struct SelectionRule {
 
     /// The same as places in `items`, of the entries `scope` lets through.
     func matchingIndices(
-        among items: [FileItem], base: URL, now: Date = Date(), scope: SelectionScope = .both,
+        among items: [FileItem],
+        base: URL,
+        now: Date = Date(),
+        scope: SelectionScope = .both,
         cancelled: () -> Bool
     ) -> [Int] {
         let entry = entryMaker(base: base)

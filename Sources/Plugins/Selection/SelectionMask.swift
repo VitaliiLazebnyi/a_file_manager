@@ -241,20 +241,17 @@ enum Wildcard {
     /// Both sides are expected in lower case. `*.*` matches every name, `name.*` and `name.`
     /// also match `name` without an extension, as they do under DOS.
     static func matches(_ pattern: [Character], _ name: [Character]) -> Bool {
-        if glob(pattern[...], name[...]) { return true }
+        let (whole, wholeName) = (pattern[pattern.indices], name[name.indices])
+        if glob(whole, wholeName) { return true }
         guard !name.contains(".") else { return false }
-        if pattern.count >= 2, pattern.suffix(2) == [".", "*"] { return glob(pattern.dropLast(2), name[...]) }
-        if pattern.last == "." { return glob(pattern.dropLast(), name[...]) }
+        if pattern.count >= 2, pattern.suffix(2) == [".", "*"] { return glob(pattern.dropLast(2), wholeName) }
+        if pattern.last == "." { return glob(pattern.dropLast(), wholeName) }
         return false
-    }
-
-    static func matches(_ pattern: String, _ name: String) -> Bool {
-        matches(Array(pattern.lowercased()), Array(name.lowercased()))
     }
 
     /// The same for a plain ASCII pattern in lower case and a plain ASCII name (of any case).
     static func matches(ascii pattern: [UInt8], _ name: UnsafeBufferPointer<UInt8>) -> Bool {
-        if glob(pattern[...], name) { return true }
+        if glob(pattern[pattern.indices], name) { return true }
         guard !name.contains(UInt8(ascii: ".")) else { return false }
         if pattern.count >= 2, pattern[pattern.count - 2] == UInt8(ascii: "."),
             pattern[pattern.count - 1] == UInt8(ascii: "*")
@@ -317,7 +314,7 @@ enum Wildcard {
 
     /// Applies a rename mask to a name, part by part (name and extension): a letter replaces
     /// the letter at its place, `?` keeps it and `*` keeps the rest. `*.cr2` turns
-    /// `IMG_1057.JPG` into `IMG_1057.cr2`, `crw*.cr2` into `crw_1057.cr2`.
+    /// `IMG_1057.JPG` into `IMG_1057.cr2`, `crw*.cr2` into `crw_1057.cr2`, `*.` into `IMG_1057`.
     static func rename(_ name: String, with mask: String) -> String {
         func apply(_ mask: String, to source: String) -> String {
             let source = Array(source)
@@ -340,7 +337,8 @@ enum Wildcard {
             }
             return result
         }
-        let (maskBase, maskExt) = FileItem.split(mask)
+        // A mask that ends in a dot gives names without an extension (`*.`).
+        let (maskBase, maskExt) = FileItem.split(mask.hasSuffix(".") ? String(mask.dropLast()) : mask)
         let (base, ext) = FileItem.split(name)
         let newExt = apply(maskExt, to: ext)
         return apply(maskBase, to: base) + (newExt.isEmpty ? "" : "." + newExt)
