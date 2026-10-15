@@ -132,7 +132,7 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
 
     /// Puts the window on screen. Tests replace it, so that no window shows in the
     /// session they run in, and look at what it was asked to show.
-    var present: @MainActor (NSWindowController) -> Void = { $0.showWindow(nil) }
+    internal var present: @MainActor (NSWindowController) -> Void = { $0.showWindow(nil) }
 
     /// `hiddenScanLimit`: how long a scan goes on after the window was closed (a quarter of an
     /// hour); `beep`: the sound of a search that found nothing. Tests replace both.
