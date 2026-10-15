@@ -25,8 +25,12 @@ import Testing
         try box.folder("A/sub")
         try box.folder("B")
         bench = TestBench(
-            plugins: [tools, SelectionPlugin()], fileSystems: [LocalFileSystem()], left: box.url("A"),
-            right: box.url("B"), settings: settings)
+            plugins: [tools, SelectionPlugin()],
+            fileSystems: [LocalFileSystem()],
+            left: box.url("A"),
+            right: box.url("B"),
+            settings: settings
+        )
     }
 
     var history: [String]? { settings.value([String].self, forKey: "systemTools.history") }
@@ -73,7 +77,8 @@ import Testing
         // A name no installed application has is still found where the panel is.
         #expect(
             found("Only.app") == only.standardizedFileURL.path && found("None.app") == nil
-                && found("sub/None.app") == nil)
+                && found("sub/None.app") == nil
+        )
     }
 
     @Test func whetherABareNameIsAProgramIsDecidedByThePathItIsGiven() throws {
@@ -84,23 +89,31 @@ import Testing
         // On the PATH of the login shell: a program for the shell. Not on it: the application.
         #expect(
             typed.application(
-                relativeTo: box.root, searching: [box.url("Apps")], path: "/nonexistent:" + box.url("bin").path)
+                relativeTo: box.root,
+                searching: [box.url("Apps")],
+                path: "/nonexistent:" + box.url("bin").path
+            )
                 == nil
         )
         #expect(
             typed.application(relativeTo: box.root, searching: [box.url("Apps")], path: "/nonexistent")?
-                .lastPathComponent == "mytool.app")
+                .lastPathComponent == "mytool.app"
+        )
     }
 
     @Test func systemInformationEndsWhenItIsCancelled() {
         let cancelled = CancellationFlag()
         cancelled.cancel()
-        #expect(SystemInformation.gather(displays: [], cancellation: cancelled) == nil)
-        #expect(SystemInformation.volumes(cancellation: cancelled).allSatisfy { $0.value.hasSuffix("not answering") })
-        let information = SystemInformation.gather(displays: ["1x1"], cancellation: CancellationFlag())
+        #expect(SystemInformation.gather(displays: [], cancellation: cancelled, asking: .system) == nil)
+        #expect(
+            SystemInformation.volumes(SystemInformation.Questions.system.volumes(), cancellation: cancelled)
+                .allSatisfy { $0.value.hasSuffix("not answering") }
+        )
+        let information = SystemInformation.gather(displays: ["1x1"], cancellation: CancellationFlag(), asking: .system)
         #expect(
             information?.sections.map(\.title) == ["Hardware", "Software", "Volumes"]
-                && information?.sections[2].rows.isEmpty == false)
+                && information?.sections[2].rows.isEmpty == false
+        )
     }
 
     @Test func aCancelledListWithSubfoldersEntersNoFolder() throws {
@@ -108,13 +121,22 @@ import Testing
         let fileSystems = bench.kernel.fileSystems
         let items = try fileSystems.provider(for: box.url("A")).list(box.url("A"), showHidden: false)
         let running = ListCollector(
-            fileSystems: fileSystems, showHidden: false, mask: ListMask("*.*"), depth: -1,
-            cancellation: CancellationFlag())
+            fileSystems: fileSystems,
+            showHidden: false,
+            mask: ListMask("*.*"),
+            depth: -1,
+            cancellation: CancellationFlag()
+        )
         #expect(running.rows(of: items).map(\.name) == ["one.txt", "sub", "sub/deep", "sub/deep/far.txt"])
         let cancelled = CancellationFlag()
         cancelled.cancel()
         let stopped = ListCollector(
-            fileSystems: fileSystems, showHidden: false, mask: ListMask("*.*"), depth: -1, cancellation: cancelled)
+            fileSystems: fileSystems,
+            showHidden: false,
+            mask: ListMask("*.*"),
+            depth: -1,
+            cancellation: cancelled
+        )
         #expect(stopped.rows(of: items).map(\.name) == ["one.txt", "sub"])
     }
 
@@ -127,7 +149,10 @@ import Testing
     }
 
     @Test func theShellIsAlwaysAPosixShell() {
-        #expect(["/bin/zsh", "/bin/sh"].contains(LoginShell.posix.executable) && LoginShell.posix.options.last == "-c")
-        #expect(!LoginShell.usersShell.isEmpty)
+        #expect(LoginShell.posix.executable == "/bin/zsh" && LoginShell.posix.options.last == "-c")
+        #expect(
+            !LoginShell.usersShell(environment: ProcessInfo.processInfo.environment, account: LoginShell.accountShell)
+                .isEmpty
+        )
     }
 }

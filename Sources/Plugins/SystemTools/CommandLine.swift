@@ -69,7 +69,8 @@ struct TypedCommand: Equatable {
     /// only when no installed one has the name, or when it is asked for by path (`./Preview.app`).
     /// `path` is the PATH that decides whether a bare name is a program instead.
     func application(
-        relativeTo directory: URL, searching folders: [URL] = Self.applicationFolders,
+        relativeTo directory: URL,
+        searching folders: [URL] = Self.applicationFolders,
         path: String = Self.processPath
     ) -> URL? {
         let fm = FileManager.default
@@ -99,7 +100,12 @@ struct TypedCommand: Equatable {
 
     /// The PATH this process was started with. A program started from the Dock has a short
     /// one; the PATH of a terminal is `LoginShell.searchPath`.
-    static var processPath: String { ProcessInfo.processInfo.environment["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin" }
+    static var processPath: String { path(in: ProcessInfo.processInfo.environment) }
+
+    /// The PATH of `environment`; the system's usual one without.
+    static func path(in environment: [String: String]) -> String {
+        environment["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin"
+    }
 
     static let applicationFolders: [URL] = [
         URL(fileURLWithPath: "/Applications"), URL(fileURLWithPath: "/System/Applications"),

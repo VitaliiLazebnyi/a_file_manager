@@ -38,34 +38,53 @@ public protocol VolumeAccess: AnyObject, Sendable {
     func eject(_ volume: VolumeFacts) -> EjectRefusal?
 }
 
-/// The volumes of this Mac.
-final class SystemVolumes: VolumeAccess {
-    func facts(of directory: URL) -> VolumeFacts {
+/// The volumes of this Mac, ejected by `unmount`: the system's, or a stand-in that ejects nothing.
+internal final class SystemVolumes: VolumeAccess {
+    /// Unmounts a volume and then calls back, on a queue of its own, with what went wrong, if anything.
+    internal typealias Unmount =
+        @Sendable (URL, FileManager.UnmountOptions, @escaping @Sendable ((any Error)?) -> Void) -> Void
+
+    /// The system's.
+    internal static let unmount: Unmount = {
+        FileManager.default.unmountVolume(at: $0, options: $1, completionHandler: $2)
+    }
+
+    private let unmountVolume: Unmount
+
+    internal init(unmount: @escaping Unmount) {
+        unmountVolume = unmount
+    }
+
+    deinit {
+        // Nothing to release.
+    }
+
+    internal func facts(of directory: URL) -> VolumeFacts {
         let keys: Set<URLResourceKey> = [
             .volumeURLKey, .volumeNameKey, .volumeIsEjectableKey, .volumeIsRemovableKey, .volumeIsInternalKey,
             .volumeIsLocalKey, .volumeIsRootFileSystemKey
         ]
-        guard let values = try? directory.resourceValues(forKeys: keys), let url = values.volume else {
+        // Every mounted volume has a name.
+        guard let values = try? directory.resourceValues(forKeys: keys), let url = values.volume,
+            let name = values.volumeName
+        else {
             return VolumeFacts()
         }
         let canBeEjected = Place.VolumeTraits(path: url.path, values: values).mayBeEjected
-        return VolumeFacts(
-            url: url,
-            name: values.volumeName ?? url.lastPathComponent,
-            canBeEjected: canBeEjected,
-            isNetwork: values.volumeIsLocal == false
-        )
+        return VolumeFacts(url: url, name: name, canBeEjected: canBeEjected, isNetwork: values.volumeIsLocal == false)
     }
 
-    func eject(_ volume: VolumeFacts) -> EjectRefusal? {
-        guard let url = volume.url else { return EjectRefusal(reason: "The volume is not known.") }
+    internal func eject(_ volume: VolumeFacts) -> EjectRefusal? {
+        guard let url = volume.url else {
+            return EjectRefusal(reason: "The volume is not known.")
+        }
         // Never forced: a drive something still writes to is refused, not cut off. A disk
         // goes as a whole, with its other volumes, so that it can be taken out.
         let options: FileManager.UnmountOptions = volume.isNetwork ? [] : [.allPartitionsAndEjectDisk]
         let done = DispatchSemaphore(value: 0)
         /// Set by the callback before `done` is signalled, and read only after the wait.
         nonisolated(unsafe) var failure: (any Error)?
-        FileManager.default.unmountVolume(at: url, options: options) { error in
+        unmountVolume(url, options) { error in
             failure = error
             done.signal()
         }
@@ -82,12 +101,18 @@ final class SystemVolumes: VolumeAccess {
     }
 
     /// The name the user knows a program by: the application's, else the process's.
-    static func programName(_ pid: pid_t) -> String? {
-        guard pid > 0 else { return nil }
-        if let name = NSRunningApplication(processIdentifier: pid)?.localizedName { return name }
+    internal static func programName(_ pid: pid_t) -> String? {
+        guard pid > 0 else {
+            return nil
+        }
+        if let name = NSRunningApplication(processIdentifier: pid)?.localizedName {
+            return name
+        }
         var buffer = [CChar](repeating: 0, count: 256)
-        guard proc_name(pid, &buffer, UInt32(buffer.count)) > 0 else { return nil }
-        return buffer.withUnsafeBufferPointer { String(cString: $0.baseAddress!) }
+        guard proc_name(pid, &buffer, UInt32(buffer.count)) > 0 else {
+            return nil
+        }
+        return SystemText.string(buffer)
     }
 }
 

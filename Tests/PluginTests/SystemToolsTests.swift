@@ -26,6 +26,17 @@ private final class RecordingViewer: Plugin, ViewerService {
     return nil
 }
 
+/// Lets the main thread run what was queued for it until `condition` holds; false when it still
+/// does not after `Wait.ceiling`.
+@MainActor private func settle(until condition: () -> Bool) async -> Bool {
+    let end = Date(timeIntervalSinceNow: Wait.ceiling)
+    while !condition() {
+        guard Date() < end else { return false }
+        try? await Task.sleep(nanoseconds: 2_000_000)
+    }
+    return true
+}
+
 /// What `pwd` printed, written the way the sandbox writes its paths.
 private func folder(_ output: String?) -> String? {
     output.map { URL(fileURLWithPath: $0.trimmingCharacters(in: .newlines)).resolvingSymlinksInPath().path }
@@ -142,8 +153,10 @@ private func folder(_ output: String?) -> String? {
 
     // MARK: Terminal, system, volumes
 
-    @Test func whatWouldStartApplicationsIsOnlyRecorded() {
+    @Test func whatWouldStartApplicationsIsOnlyRecorded() async {
         commands.perform(SystemToolsCommands.openTerminal)
+        // The terminal is looked up off the main thread.
+        #expect(await settle { !tools.log.isEmpty })
         commands.perform(SystemToolsCommands.quit)
         commands.perform(SystemToolsCommands.minimize)
         #expect(tools.log == ["terminal: \(box.url("A").path)", "quit", "minimize"])
@@ -447,8 +460,9 @@ private func folder(_ output: String?) -> String? {
         #expect(SystemInformation.space(free: nil, total: 1) == "size unknown")
     }
 
-    @Test func theSystemAnswers() {
-        let information = SystemInformation.gather(displays: ["1x1"])
+    @Test func theSystemAnswers() throws {
+        let gathered = SystemInformation.gather(displays: ["1x1"], cancellation: CancellationFlag(), asking: .system)
+        let information = try #require(gathered)
         #expect(information.sections.map(\.title) == ["Hardware", "Software", "Volumes"])
         #expect(information.sections[0].rows.contains { $0.label == "Display" && $0.value == "1x1" })
         #expect(
