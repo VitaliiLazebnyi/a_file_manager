@@ -35,6 +35,11 @@ public final class ViewerPlugin: Plugin, ViewerService {
     private let temporaryCopies = TemporaryCopies()
     private(set) var windows: [ViewerWindowController] = []
     private(set) var quickView: QuickViewPanel?
+    /// What the panes play sounds and films with: the system's player, or a test's that plays nothing.
+    internal var mediaPlayback: @MainActor () -> any MediaPlayback = { SystemMediaPlayback() }
+    /// Puts a Lister window on screen (with `showsWindows`). Tests replace it, so that no window
+    /// shows in the session they run in, and look at what it was asked to show.
+    internal var present: @MainActor (NSWindowController) -> Void = { $0.showWindow(nil) }
 
     /// `overlayHost` finds the part of a panel that can be covered by the quick view;
     /// `quickViewDelay` is how long the quick view waits for the cursor to rest before it
@@ -213,12 +218,13 @@ public final class ViewerPlugin: Plugin, ViewerService {
             self?.windows.removeAll { $0 === closed }
         }
         controller.pane.onConfigure = { [weak self] in self?.configure(kernel) }
+        controller.pane.mediaPlayback = mediaPlayback
         // Several windows do not lie exactly on top of each other.
         if let last = windows.last?.window, let window = controller.window {
             window.setFrameTopLeftPoint(window.cascadeTopLeft(from: NSPoint(x: last.frame.minX, y: last.frame.maxY)))
         }
         windows.append(controller)
-        if showsWindows { controller.showWindow(nil) }
+        if showsWindows { present(controller) }
         if followsCursor { controller.refreshFollowing() } else { controller.show(items) }
         return controller
     }
@@ -257,6 +263,7 @@ public final class ViewerPlugin: Plugin, ViewerService {
             delay: quickViewDelay
         ) { [weak self] in self?.hideQuickView() }
         quickView?.pane.onConfigure = { [weak self] in self?.configure(kernel) }
+        quickView?.pane.mediaPlayback = mediaPlayback
     }
 
     /// Before `volume` is ejected: the Lister windows that show one of its files close, and a

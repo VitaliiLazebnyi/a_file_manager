@@ -319,7 +319,11 @@ enum DOSTime {
         components.hour = Int(time >> 11)
         components.minute = Int(time >> 5 & 0x3F)
         components.second = Int(time & 0x1F) * 2
-        return Calendar(identifier: .gregorian).date(from: components) ?? Date(timeIntervalSince1970: 0)
+        // Every field is in a range the Gregorian calendar takes (a year from 1980 to 2107, a
+        // month and a day of at least 1, an hour below 32, minutes and seconds below 64; larger
+        // values roll over into the next unit), so a date always comes out.
+        // swiftlint:disable:next force_unwrapping
+        return Calendar(identifier: .gregorian).date(from: components)!
     }
 
     static func encode(_ date: Date) -> (time: UInt16, date: UInt16) {
