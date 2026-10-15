@@ -246,6 +246,7 @@ import Testing
         silent.runModal(NSWindow())
         silent.stopModal()
         silent.showAbout()
+        silent.removeKeyMonitor(silent.monitorKeys { $0 } as Any)
         #expect(controller.window?.isVisible == false)
         #expect(silent.chooseSettingsFile(true, "Test") == nil && silent.mainMenu() == nil && silent.windows().isEmpty)
     }

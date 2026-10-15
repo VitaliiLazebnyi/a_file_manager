@@ -27,6 +27,10 @@ internal final class CovConfigStage {
     internal private(set) var fileRequests: [(saving: Bool, product: String)] = []
     /// What the file panel answers.
     internal var chosenFile: URL?
+    /// Where copied names go.
+    internal let pasteboard = NSPasteboard.withUniqueName()
+    /// What watches the key presses now, as the program would call it.
+    internal private(set) var keyHandler: ((NSEvent) -> NSEvent?)?
     /// The menu bar the plugin sees.
     internal var mainMenu: NSMenu?
     /// The windows the plugin sees.
@@ -75,7 +79,13 @@ internal final class CovConfigStage {
             },
             showAbout: { [unowned self] in aboutPanels += 1 },
             mainMenu: { [unowned self] in mainMenu },
-            windows: { [unowned self] in windows }
+            windows: { [unowned self] in windows },
+            pasteboard: pasteboard,
+            monitorKeys: { [unowned self] handler in
+                keyHandler = handler
+                return "monitor"
+            },
+            removeKeyMonitor: { [unowned self] _ in keyHandler = nil }
         )
     }
 

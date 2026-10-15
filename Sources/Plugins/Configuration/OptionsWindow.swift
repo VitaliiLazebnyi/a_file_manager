@@ -93,7 +93,10 @@ final class PreferencesPage: NSObject, OptionsPage, NSTextFieldDelegate {
             switch preference.kind {
             case .flag: model.set(.flag((control as? NSButton)?.state == .on), for: preference)
             case .text: model.set(.text(control.stringValue), for: preference)
-            case .choice: model.set(.index((control as? NSPopUpButton)?.indexOfSelectedItem ?? 0), for: preference)
+            case .choice:
+                if let popUp = control as? NSPopUpButton {
+                    model.set(.index(popUp.indexOfSelectedItem), for: preference)
+                }
             }
         }
         onEdit()
@@ -176,7 +179,7 @@ final class KeyboardPage: NSObject, OptionsPage, NSSearchFieldDelegate {
         table.show(rows.map { [$0.title, $0.id.rawValue, $0.keys + (editor.isCustomized($0.id) ? "  •" : "")] })
     }
 
-    private var selected: CommandRow? { table.selectedRow.flatMap { rows.indices.contains($0) ? rows[$0] : nil } }
+    private var selected: CommandRow? { table.selectedRow.flatMap { rows.dropFirst($0).first } }
 
     private func edited() {
         reload()
@@ -196,7 +199,7 @@ final class KeyboardPage: NSObject, OptionsPage, NSSearchFieldDelegate {
     func controlTextDidChange(_: Notification) { reload() }
 
     private func stopRecording() {
-        if let monitor { NSEvent.removeMonitor(monitor) }
+        if let monitor { center.effects.removeKeyMonitor(monitor) }
         monitor = nil
         status.stringValue = ""
     }
@@ -210,7 +213,7 @@ final class KeyboardPage: NSObject, OptionsPage, NSSearchFieldDelegate {
         }
         status.stringValue = "Press the new shortcut for “\(row.title)”. Esc cancels."
         view.window?.makeFirstResponder(table.tableView)
-        monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+        monitor = center.effects.monitorKeys { [weak self] event in
             guard let self, event.window === view.window else { return event }
             stopRecording()
             var modifiers: KeyModifiers = []
@@ -269,8 +272,8 @@ final class ButtonBarPage: NSObject, OptionsPage {
         table,
         buttons: [
             ActionButton("Add Command…") { [unowned self] in
-                guard let id = center.pickCommand() else { return }
-                edited(selecting: editor.insert(id, after: table.selectedRow))
+                guard let picked = center.pickCommand() else { return }
+                edited(selecting: editor.insert(picked.id, after: table.selectedRow))
             },
             ActionButton("Add Separator") { [unowned self] in
                 edited(selecting: editor.insert(nil, after: table.selectedRow))
@@ -386,12 +389,12 @@ final class StartMenuPage: NSObject, OptionsPage {
         buttons: [
             ActionButton("Add Item…") { [unowned self] in add(center.editStartMenuRow(nil)) },
             ActionButton("Add Command…") { [unowned self] in
-                guard let id = center.pickCommand() else { return }
+                guard let picked = center.pickCommand() else { return }
                 add(
                     center.editStartMenuRow(
                         nil,
-                        proposing: CommandAction(command: id.rawValue),
-                        title: center.kernel.commands[id]?.title ?? ""
+                        proposing: CommandAction(command: picked.id.rawValue),
+                        title: picked.title
                     )
                 )
             },
@@ -627,8 +630,8 @@ final class OptionsWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private func showSelectedPage() {
-        guard let index = pageList.selectedRow, pages.indices.contains(index) else { return }
-        let page = pages[index]
+        // (The list has a row for every page.)
+        guard let page = pageList.selectedRow.flatMap({ pages.dropFirst($0).first }) else { return }
         caption.stringValue = page.title
         container.subviews.forEach { $0.removeFromSuperview() }
         let view = page.view
@@ -649,7 +652,8 @@ final class OptionsWindowController: NSWindowController, NSWindowDelegate {
 
     private func apply() {
         window?.makeFirstResponder(nil)
-        for page in pages where page.isChanged { page.commit() }
+        // Each page stores what was changed on it, if anything.
+        for page in pages { page.commit() }
         updateApply()
     }
 

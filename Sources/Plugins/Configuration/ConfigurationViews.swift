@@ -242,7 +242,8 @@ enum LiveMenus {
 
     /// The key as a menu shows it; nil for keys a menu cannot show. The same rule as the shell's.
     private static func menuEquivalent(_ key: Key) -> String? {
-        func special(_ value: Int) -> String { UnicodeScalar(UInt32(value)).map { String($0) } ?? "" }
+        // AppKit's characters of the special keys lie in one block of 16-bit code units.
+        func special(_ value: Int) -> String { String(utf16CodeUnits: [UInt16(truncatingIfNeeded: value)], count: 1) }
         switch key {
         case .character(let character): return character
         case .function(let number): return special(NSF1FunctionKey + number - 1)
