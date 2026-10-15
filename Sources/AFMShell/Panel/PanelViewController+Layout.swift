@@ -81,10 +81,17 @@ extension PanelViewController {
         tableScroll.hasHorizontalScroller = true
         tableScroll.autohidesScrollers = true
         tableScroll.contentView.postsBoundsChangedNotifications = true
+        tableScroll.contentView.postsFrameChangedNotifications = true
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(tableScrolled),
             name: NSView.boundsDidChangeNotification,
+            object: tableScroll.contentView
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(fitColumns),
+            name: NSView.frameDidChangeNotification,
             object: tableScroll.contentView
         )
         let gridScroll = NSScrollView()
@@ -180,5 +187,18 @@ extension PanelViewController {
             (visible.location..<(visible.location + visible.length)).compactMap { model.item(atRow: $0)?.name }
         )
         columnValues.dropWaiting(except: names)
+    }
+
+    /// The list area changed its size: the Name column takes what the other columns leave, so
+    /// the table fits the panel and no column lies partly outside it, down to the Name column's
+    /// least width. The table resizes its first column by itself only once it fits.
+    @objc
+    internal func fitColumns() {
+        let spacing = tableView.intercellSpacing.width
+        let spare = tableScroll.contentView.bounds.width - tableView.tableColumns.reduce(0) { $0 + $1.width + spacing }
+        // The first column is the Name column.
+        for name in tableView.tableColumns.prefix(1) {
+            name.width = max(name.minWidth, name.width + spare)
+        }
     }
 }

@@ -109,4 +109,22 @@ internal struct PanelColumnsTests {
         app.left.tableViewColumnDidResize(Notification(name: NSTableView.columnDidResizeNotification))
         #expect(app.left.columnWidths["ext"] == 77)
     }
+
+    /// The table fits its panel: the Name column takes what the other columns leave, so no column
+    /// lies partly outside the panel; a panel too narrow for that keeps the Name column's least
+    /// width.
+    @Test
+    internal func theColumnsFitThePanel() async {
+        let app = await start()
+        defer { app.stop() }
+        app.layOut()
+        let (table, clip) = (app.left.tableView, app.left.tableScroll.contentView)
+        let lastEdge = { table.rect(ofColumn: table.numberOfColumns - 1).maxX }
+        #expect(clip.bounds.width > 300 && abs(lastEdge() - clip.bounds.width) <= table.intercellSpacing.width)
+        let scroll = app.left.tableScroll
+        scroll.setFrameSize(NSSize(width: 100, height: scroll.frame.height))
+        scroll.tile()
+        #expect(table.tableColumns[0].width == table.tableColumns[0].minWidth, "\(table.tableColumns[0].width)")
+        #expect(lastEdge() > clip.bounds.width)
+    }
 }
