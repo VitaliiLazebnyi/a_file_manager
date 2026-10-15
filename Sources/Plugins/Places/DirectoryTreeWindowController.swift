@@ -346,12 +346,10 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
         tree = nil
         (reloadQueue, reloadQueued, emptied, waiting, waitingHead, waitingLinked) = ([], [], [], [], 0, 0)
         // The nodes of a tree of millions of folders are freed away from the main thread, also
-        // those that were made and not linked yet.
-        if old != nil || !unlinked.isEmpty || !unreloaded.isEmpty {
-            // The main thread has let go of them; they are only freed there.
-            let released = Handover((old, unlinked, unreloaded))
-            reading.async { withExtendedLifetime(released) {} }
-        }
+        // those that were made and not linked yet. The main thread has let go of them; they are
+        // only freed there.
+        let released = Handover((old, unlinked, unreloaded))
+        reading.async { withExtendedLifetime(released) {} }
     }
 
     private func adopt(_ tree: DirectoryTree, selecting directory: URL) {
