@@ -208,4 +208,33 @@ internal struct PanelDropRulesTests {
         #expect(early.sources.count == 3_000 && early.places != nil)
         await PanelWait.drainMainQueue()
     }
+
+    /// Another program that writes a server, an archive or anything else that is not a file into
+    /// the file URL's type names no source: only files are taken from other programs.
+    @Test
+    internal func anotherProgramCannotNameAServerAsASource() {
+        let pasteboard = NSPasteboard.withUniqueName()
+        defer { pasteboard.releaseGlobally() }
+        pasteboard.clearContents()
+        let items = ["smb://host/share/x", "mem:///A/one.txt", "not a url", "file:///x/kept.txt"]
+            .map { text in
+                let item = NSPasteboardItem()
+                item.setString(text, forType: .fileURL)
+                return item
+            }
+        pasteboard.writeObjects(items)
+        #expect(PanelDrop.locations(on: pasteboard).map(\.absoluteString) == ["file:///x/kept.txt"])
+    }
+
+    /// A payload nobody holds any more is gone.
+    @Test
+    internal func aPayloadNobodyHoldsIsGone() {
+        weak var gone: PanelDragPayload?
+        do {
+            let payload = PanelDragPayload(items: [FileItem(url: file("/x/a.txt"), name: "a.txt")])
+            gone = payload
+            #expect(payload.isReady && gone != nil)
+        }
+        #expect(gone == nil)
+    }
 }

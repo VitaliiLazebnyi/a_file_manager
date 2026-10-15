@@ -93,7 +93,11 @@ internal enum PanelDrop {
         // The class pasteboards read URLs as, which also turns the file references other
         // programs write into URLs.
         let classes: [AnyClass] = [URL._ObjectiveCType.self]
-        return pasteboard.readObjects(forClasses: classes, options: [.urlReadingFileURLsOnly: true]) as? [URL] ?? []
+        // `readObjects` answers nil, which names no file, for a pasteboard it cannot read.
+        let read = [pasteboard.readObjects(forClasses: classes, options: [.urlReadingFileURLsOnly: true])]
+        // The option keeps out what is not written as a file URL, but not a server or an archive
+        // written in the file URL's type: only file URLs are taken.
+        return read.compactMap(\.self).joined().compactMap { $0 as? URL }.filter(\.isFileURL)
     }
 
     /// What the drag `info` carries, read the first time a panel asks during the drag.

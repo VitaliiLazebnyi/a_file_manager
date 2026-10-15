@@ -38,15 +38,16 @@ extension FileGridView: NSDraggingSource {
         PanelDrop.offerFileNames(on: session.draggingPasteboard)
     }
 
-    /// The cell of `row` as an image, for a drag.
-    private func dragImage(ofRow row: Int) -> NSImage {
+    /// The cell of `row` as an image, for a drag; nil (no picture) when the view cannot be drawn
+    /// into one.
+    private func dragImage(ofRow row: Int) -> NSImage? {
         let frame = geometry.frame(of: row)
-        guard let bitmap = bitmapImageRepForCachingDisplay(in: frame) else {
-            return NSImage(size: frame.size)
-        }
-        cacheDisplay(in: frame, to: bitmap)
-        let image = NSImage(size: frame.size)
-        image.addRepresentation(bitmap)
-        return image
+        return bitmapImageRepForCachingDisplay(in: frame)
+            .map { bitmap in
+                cacheDisplay(in: frame, to: bitmap)
+                let image = NSImage(size: frame.size)
+                image.addRepresentation(bitmap)
+                return image
+            }
     }
 }

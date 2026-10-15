@@ -189,8 +189,9 @@ extension PanelViewController {
         columnValues.dropWaiting(except: names)
     }
 
-    /// The list area changed its size: the Name column takes what the other columns leave, so
-    /// the table fits the panel and no column lies partly outside it, down to the Name column's
+    /// The list area changed its size: the Name column takes what the other columns leave.
+    ///
+    /// So the table fits the panel and no column lies partly outside it, down to the Name column's
     /// least width. The table resizes its first column by itself only once it fits.
     @objc
     internal func fitColumns() {

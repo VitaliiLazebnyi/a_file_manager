@@ -32,25 +32,28 @@ internal final class PanelDragPayload: NSObject, NSPasteboardItemDataProvider, @
     internal let itemCount: Int
     /// The files are handed out on demand, all through the first pasteboard item.
     internal let isWrittenLazily: Bool
-    private var gathered: Gathered?
+    /// The marks the items come from, until the items are put together.
     private var marks: PanelModel.Operands?
+    /// The items, once they are put together.
+    private var gathered: Gathered
     private var waiting: [([URL]) -> Void] = []
 
     /// False while the items are still being put together in the background.
-    internal var isReady: Bool { gathered != nil }
+    internal var isReady: Bool { marks == nil }
 
     /// The dragged items; put together here and now if the background has not got there.
-    internal var items: [FileItem] {
-        if gathered == nil, let marks {
-            take(Gathered(marks.markedItems()))
-        }
-        return gathered?.items ?? []
-    }
+    internal var items: [FileItem] { gatheredNow.items }
 
     /// The locations of the dragged items, in their order.
-    internal var locations: [URL] {
-        _ = items
-        return gathered?.locations ?? []
+    internal var locations: [URL] { gatheredNow.locations }
+
+    /// The items with their locations, put together here and now if the background has not got
+    /// there.
+    private var gatheredNow: Gathered {
+        if let marks {
+            take(Gathered(marks.markedItems()))
+        }
+        return gathered
     }
 
     /// A drag of these items, a few or many.
@@ -65,6 +68,7 @@ internal final class PanelDragPayload: NSObject, NSPasteboardItemDataProvider, @
         itemCount = marks.markedCount
         isWrittenLazily = true
         self.marks = marks
+        gathered = Gathered([])
         super.init()
         Background.compute(
             work: { Gathered(marks.markedItems()) },
@@ -75,7 +79,7 @@ internal final class PanelDragPayload: NSObject, NSPasteboardItemDataProvider, @
     /// Calls `receive` with the locations when they are known: now, or when the
     /// background has put them together.
     internal func whenReady(_ receive: @escaping ([URL]) -> Void) {
-        if let gathered {
+        if isReady {
             receive(gathered.locations)
         } else {
             waiting.append(receive)
@@ -90,20 +94,17 @@ internal final class PanelDragPayload: NSObject, NSPasteboardItemDataProvider, @
         item: NSPasteboardItem,
         provideDataForType type: NSPasteboard.PasteboardType
     ) {
-        guard type == .fileURL else {
-            return
-        }
+        // Asked for the one type the item was given this provider for (`PanelDrop.beginDrag`).
         let location = MainActor.assumeIsolated { items.first(where: \.url.isFileURL)?.url.absoluteString }
         if let location {
-            item.setString(location, forType: .fileURL)
+            item.setString(location, forType: type)
         }
     }
 
     /// Another program asks for the list of files: only now are their paths put together.
+    ///
+    /// Asked for the one type the payload owns (`PanelDrop.offerFileNames`).
     internal func pasteboard(_ sender: NSPasteboard, provideDataForType type: NSPasteboard.PasteboardType) {
-        guard type == PanelDrop.fileNamesType else {
-            return
-        }
         sender.setPropertyList(items.lazy.filter(\.url.isFileURL).map(\.url.path) as [String], forType: type)
     }
 
@@ -111,7 +112,7 @@ internal final class PanelDragPayload: NSObject, NSPasteboardItemDataProvider, @
     ///
     /// The first to come counts.
     private func take(_ result: Gathered) {
-        guard gathered == nil else {
+        guard !isReady else {
             return
         }
         gathered = result
