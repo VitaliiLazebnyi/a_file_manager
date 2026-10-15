@@ -84,7 +84,10 @@ public struct TargetSpec: Equatable, Sendable {
     /// With a `cancellation` flag that look ends when the flag is set (a target on a server
     /// that has stopped answering); the text is then read as if nothing were there.
     public static func parse(
-        _ text: String, sourceDirectory: URL, operandCount: Int, fileSystems: FileSystemRegistry,
+        _ text: String,
+        sourceDirectory: URL,
+        operandCount: Int,
+        fileSystems: FileSystemRegistry,
         cancellation: CancellationFlag? = nil
     ) -> Self {
         let text = text.trimmingCharacters(in: .whitespaces)
@@ -113,7 +116,9 @@ public enum UniqueName {
     /// With a `cancellation` flag the looks at the file system end when it is set; the name
     /// that comes back then is not known to be free, and whoever asked is being stopped.
     public static func available(
-        for url: URL, in fileSystems: FileSystemRegistry, cancellation: CancellationFlag? = nil,
+        for url: URL,
+        in fileSystems: FileSystemRegistry,
+        cancellation: CancellationFlag? = nil,
         isTaken: (URL) -> Bool = { _ in false }
     ) -> URL {
         available(for: url) { item(at: $0, in: fileSystems, cancellation) != nil || isTaken($0) }
@@ -130,13 +135,14 @@ public enum UniqueName {
         guard exists(url) else { return url }
         let (base, ext) = FileItem.split(url.lastPathComponent)
         let folder = url.deletingLastPathComponent()
+        func candidate(_ counter: Int) -> URL {
+            folder.appending(name: ext.isEmpty ? "\(base) (\(counter))" : "\(base) (\(counter)).\(ext)")
+        }
         var counter = 2
-        while true {
-            let name = ext.isEmpty ? "\(base) (\(counter))" : "\(base) (\(counter)).\(ext)"
-            let candidate = folder.appending(name: name)
-            if !exists(candidate) { return candidate }
+        while exists(candidate(counter)) {
             counter += 1
         }
+        return candidate(counter)
     }
 }
 
@@ -173,7 +179,8 @@ public enum OperationText {
 
     public static func deleteQuestion(count: Int, single: FileItem?, toTrash: Bool) -> String {
         let what =
-            single.flatMap { count == 1 ? $0 : nil }.map {
+            single.flatMap { count == 1 ? $0 : nil }
+            .map {
                 "the selected \($0.isFolder ? "directory" : "file") \(DisplayName.escaped($0.name))"
             }
             ?? "the \(count) selected files/directories"
@@ -195,18 +202,22 @@ public enum OperationText {
     public static func protection(_ question: ProtectionQuestion, path: String) -> (
         message: String, detail: String, action: String
     ) {
-        if question.reason == .noTrash {
+        let state: String
+        switch question.reason {
+        case .noTrash:
             return (
                 "\(path) cannot be moved to the Trash.",
                 "This volume has no Trash. Do you want to delete it permanently?", "Delete"
             )
-        }
-        let state: String
-        switch question.reason {
-        case .readOnly: state = "is READ ONLY!"
-        case .hidden: state = "is HIDDEN!"
-        case .locked: state = "is LOCKED!"
-        case .noTrash: state = ""
+
+        case .readOnly:
+            state = "is READ ONLY!"
+
+        case .hidden:
+            state = "is HIDDEN!"
+
+        case .locked:
+            state = "is LOCKED!"
         }
         switch question.purpose {
         case .overwrite: return ("The file \(path) \(state)", "Do you want to overwrite it anyway?", "Overwrite")

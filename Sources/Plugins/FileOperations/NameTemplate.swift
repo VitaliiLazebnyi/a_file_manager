@@ -63,27 +63,30 @@ public enum NameTemplate {
         let dates = DateTexts(context.calendar)
         if let range = leadingRange(&mask) {
             let width = String(range.upperBound).count
-            return try range.map {
-                try expand(mask, context, dates, counter: $0, isFirst: $0 == range.lowerBound, width: width)
-            }.filter { !$0.isEmpty }
+            return
+                try range.map {
+                    try expand(mask, context, dates, counter: $0, isFirst: $0 == range.lowerBound, width: width)
+                }
+                .filter { !$0.isEmpty }
         }
-        return try mask.split(separator: "|").map(String.init).compactMap { part -> String? in
-            let part = part.trimmingCharacters(in: .whitespaces)
-            guard !part.isEmpty else { return nil }
-            guard hasCounter(part) else {
-                // A mask that comes to nothing (only a switch such as `[T2+1D]`) names nothing.
-                let name = try expand(part, context, dates, counter: nil, isFirst: true, width: 1)
-                return name.isEmpty ? nil : name
+        return try mask.split(separator: "|").map(String.init)
+            .compactMap { part -> String? in
+                let part = part.trimmingCharacters(in: .whitespaces)
+                guard !part.isEmpty else { return nil }
+                guard hasCounter(part) else {
+                    // A mask that comes to nothing (only a switch such as `[T2+1D]`) names nothing.
+                    let name = try expand(part, context, dates, counter: nil, isFirst: true, width: 1)
+                    return name.isEmpty ? nil : name
+                }
+                // The optional digit: the name without a number, then with 2, 3, … until one is free.
+                let plain = try expand(part, context, dates, counter: nil, isFirst: true, width: 1)
+                if !plain.isEmpty, !context.exists(plain) { return plain }
+                for counter in 2...9_999 {
+                    let name = try expand(part, context, dates, counter: counter, isFirst: false, width: 1)
+                    if !name.isEmpty, !context.exists(name) { return name }
+                }
+                throw Failure.noFreeName(plain)
             }
-            // The optional digit: the name without a number, then with 2, 3, … until one is free.
-            let plain = try expand(part, context, dates, counter: nil, isFirst: true, width: 1)
-            if !plain.isEmpty, !context.exists(plain) { return plain }
-            for counter in 2...9_999 {
-                let name = try expand(part, context, dates, counter: counter, isFirst: false, width: 1)
-                if !name.isEmpty, !context.exists(name) { return name }
-            }
-            throw Failure.noFreeName(plain)
-        }
     }
 
     /// The formatters behind `[d]` and `[t]`, made once per text and only when asked for.
@@ -105,8 +108,11 @@ public enum NameTemplate {
                     formatters[letter] = formatter
                     return formatter
                 }()
-            return formatter.string(from: moment).replacingOccurrences(of: "/", with: "-").replacingOccurrences(
-                of: ":", with: ".")
+            return formatter.string(from: moment).replacingOccurrences(of: "/", with: "-")
+                .replacingOccurrences(
+                    of: ":",
+                    with: "."
+                )
         }
     }
 
@@ -189,7 +195,12 @@ public enum NameTemplate {
     private enum Case { case original, upper, lower, title, englishTitle, untouched }
 
     private static func expand(
-        _ mask: String, _ context: Context, _ dates: DateTexts, counter: Int?, isFirst: Bool, width: Int
+        _ mask: String,
+        _ context: Context,
+        _ dates: DateTexts,
+        counter: Int?,
+        isFirst: Bool,
+        width: Int
     ) throws -> String {
         var runs: [(text: String, mode: Case)] = []
         var mode = Case.original
@@ -255,13 +266,14 @@ public enum NameTemplate {
     /// `/` (it would nest folders nobody typed), a leading `~`, and a text that is only dots
     /// (`..` would lead out of the folder).
     static func clipboardText(_ clipboard: String) -> String {
-        let line = clipboard.components(separatedBy: .newlines).first ?? ""
+        let line = clipboard.prefix { !$0.isNewline }
         var text = String(
             line.unicodeScalars.map { scalar -> Character in
                 "*?:|\"<>/\\".unicodeScalars.contains(scalar) || scalar.value < 0x20 || scalar.value == 0x7F
                     ? "_" : Character(scalar)
             }
-        ).trimmingCharacters(in: .whitespaces)
+        )
+        .trimmingCharacters(in: .whitespaces)
         if text.hasPrefix("~") { text = "_" + text.dropFirst() }
         if !text.isEmpty, text.allSatisfy({ $0 == "." }) { text = String(repeating: "_", count: text.count) }
         return text
@@ -315,9 +327,11 @@ public enum NameTemplate {
         guard options.allSatisfy({ $0.isNumber || $0 == "+" || $0 == "-" || $0 == ":" || $0 == "a" }) else {
             return nil
         }
-        let width = options.split(separator: ":", omittingEmptySubsequences: false).dropFirst().first.flatMap {
-            Int($0)
-        }.map { min(max($0, 0), maxWidth) }
+        let width = options.split(separator: ":", omittingEmptySubsequences: false).dropFirst().first
+            .flatMap {
+                Int($0)
+            }
+            .map { min(max($0, 0), maxWidth) }
         return (prefix, suffix, width, body.contains("\""))
     }
 
@@ -342,22 +356,22 @@ public enum NameTemplate {
         guard body.contains(where: { letters.contains($0) }),
             body.allSatisfy({ letters.contains($0) || "-_. ,1".contains($0) })
         else { return nil }
-        let parts = calendar.dateComponents([.year, .month, .day, .hour, .minute, .second, .nanosecond], from: moment)
-        let (year, hour) = (parts.year ?? 0, parts.hour ?? 0)
-        func two(_ value: Int?) -> String { String(format: "%02d", value ?? 0) }
+        func part(_ component: Calendar.Component) -> Int { calendar.component(component, from: moment) }
+        let (year, hour) = (part(.year), part(.hour))
+        func two(_ value: Int) -> String { String(format: "%02d", value) }
         var text = ""
         var characters = Array(body)[...]
         while let letter = characters.popFirst() {
             switch letter {
             case "Y": text += String(format: "%04d", year)
             case "y": text += two(year % 100)
-            case "M": text += two(parts.month)
-            case "D": text += two(parts.day)
+            case "M": text += two(part(.month))
+            case "D": text += two(part(.day))
             case "h": text += two(hour)
             case "H": text += two(hour % 12 == 0 ? 12 : hour % 12)
-            case "m": text += two(parts.minute)
-            case "s": text += two(parts.second)
-            case "v": text += String(format: "%03d", (parts.nanosecond ?? 0) / 1_000_000)
+            case "m": text += two(part(.minute))
+            case "s": text += two(part(.second))
+            case "v": text += String(format: "%03d", part(.nanosecond) / 1_000_000)
 
             case "i":
                 let short = characters.first == "1"

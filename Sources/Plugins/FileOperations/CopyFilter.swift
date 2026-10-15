@@ -43,7 +43,8 @@ public struct CopyFilter: Equatable, Sendable {
 
     public init(_ text: String = "") {
         let halves = text.split(separator: "|", maxSplits: 1, omittingEmptySubsequences: false).map(String.init)
-        for token in Self.tokens(halves.first ?? "") {
+        // Splitting keeps empty parts, so there is always a first.
+        for token in Self.tokens(halves[0]) {
             if let folder = Self.folderPattern(token) {
                 includedFolders.append(folder)
             } else {

@@ -118,9 +118,8 @@ final class JobBridge: FileJobDelegate, Sendable {
                     }
                 }
             }
-            guard case .compare = step else {
-                if case .answer(let choice) = step { return choice }
-                return .cancel
+            if case .answer(let choice) = step {
+                return choice
             }
             // Compare takes no decision: the files are read here, off the main thread, and the
             // Overwrite dialog comes back.
