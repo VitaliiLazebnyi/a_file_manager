@@ -118,7 +118,8 @@ internal final class PanelViewController: NSViewController, PanelHandle, PanelOv
     internal var overlay: NSView? {
         didSet {
             oldValue?.removeFromSuperview()
-            guard let overlay, let listArea, isViewLoaded else {
+            // The list area is there once the view is.
+            guard let overlay, let listArea else {
                 return
             }
             overlay.translatesAutoresizingMaskIntoConstraints = false

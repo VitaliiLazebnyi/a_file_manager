@@ -110,7 +110,7 @@ extension PanelViewController {
         )
         for item in views.items {
             views.removeItem(item)
-            item.state = commands.isChecked(MenuBuilder.command(of: item) ?? "") ? .on : .off
+            item.state = MenuBuilder.command(of: item).map(commands.isChecked) == true ? .on : .off
             headerMenu.addItem(item)
         }
         if !kernel.columns.all.isEmpty, !headerMenu.items.isEmpty {

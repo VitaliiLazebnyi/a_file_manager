@@ -99,4 +99,28 @@ internal struct PanelKeysTests {
         await PanelWait.drainMainQueue()
         #expect(tab.directory.lastPathComponent == "B" && tab.items.allSatisfy { $0.computedSize == nil })
     }
+
+    /// The eject button of the path bar ejects the drive the folder is on, through the Eject command.
+    ///
+    /// With no such drive it does nothing. The path bar's menu is the panel's.
+    @Test
+    internal func theEjectButtonEjectsTheDriveOfTheFolder() async {
+        let app = await start()
+        defer { app.stop() }
+        let host = PanelFakeHost()
+        app.left.host = host
+        var ejected: [URL] = []
+        app.commands.register(Command(.ejectVolume, "Eject")) { (argument: CommandArgument) in
+            ejected += argument.location.map { [$0] } ?? []
+        }
+        app.left.pathBar.onEject?()
+        #expect(ejected.isEmpty)
+        let stick = Place(name: "Stick", url: program.box.url("A"), kind: .externalDisk, canBeEjected: true)
+        host.ejectable = stick
+        app.left.updateEjectButton()
+        #expect(app.left.pathBar.ejectableVolumeName == "Stick")
+        app.left.pathBar.onEject?()
+        #expect(ejected == [stick.url] && host.told.contains("active"))
+        #expect(app.left.pathBar.menuProvider?() != nil)
+    }
 }

@@ -137,25 +137,23 @@ extension PanelViewController {
             to: "volume " + question.directory.locationKey,
             cancellation: question.flag,
             { provider.volume(of: question.directory, cancellation: $0) },
-            then: { [weak self, weak tab] (answer: VolumeInfo??) in
+            then: { [weak self] (answer: VolumeInfo??) in
                 self?.answered(question, with: answer.flatMap(\.self), for: tab)
             }
         )
     }
 
-    /// The answer to `question`, for `tab` (nil once it is gone).
-    private func answered(_ question: VolumeQuestion, with volume: VolumeInfo?, for tab: PanelModel?) {
+    /// The answer to `question`, for `tab`.
+    ///
+    /// A tab that was closed meanwhile, or a window that went, took its question out of
+    /// `volumeAsking` (and cancelled it): its answer is not taken.
+    private func answered(_ question: VolumeQuestion, with volume: VolumeInfo?, for tab: PanelModel) {
         let id = question.id
         guard volumeAsking[id] === question.flag else {
             return
         }
         volumeAsking[id] = nil
-        let again = volumeAskAgain.remove(id) != nil
-        // A tab that is gone; its address may belong to another one by now.
-        guard let tab, !question.flag.isCancelled, tabs.tabs.contains(where: { $0 === tab }) else {
-            return
-        }
-        if again {
+        if volumeAskAgain.remove(id) != nil {
             askVolume(of: tab, from: question.provider)
         } else if let volume, tab.directory.isSameLocation(as: question.directory) {
             tab.setVolume(volume)
@@ -164,9 +162,10 @@ extension PanelViewController {
 
     /// Fills the volume list with the places known so far: the disks, then the other places.
     private func fillVolumeMenu(_ menu: NSMenu) {
-        let title = menu.items.first?.title ?? ""
-        menu.removeAllItems()
-        menu.addItem(withTitle: title, action: nil, keyEquivalent: "")
+        // The first item is the button's own title; the places follow it.
+        while menu.numberOfItems > 1 {
+            menu.removeItem(at: menu.numberOfItems - 1)
+        }
         var lastKind: Place.Kind?
         for place in host?.placesForVolumeList(of: self) ?? [] {
             if let lastKind, Self.isDisk(place.kind) != Self.isDisk(lastKind) {
