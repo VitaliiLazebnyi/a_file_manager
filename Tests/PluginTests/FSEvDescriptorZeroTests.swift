@@ -6,19 +6,21 @@ import Testing
 
 @testable import LocalFileSystemPlugin
 
+/// What is open on descriptor 0 (device, file number, device it stands for); empty when nothing is.
+private func fsevZero() -> [Int] {
+    var status = stat()
+    guard fstat(0, &status) == 0 else {
+        return []
+    }
+    return [Int(status.st_dev), Int(status.st_ino), Int(status.st_rdev)]
+}
+
 /// The watcher never has the system close descriptor 0: no path that does not fit, one folder per
 /// stream, a reserve of descriptors, and descriptor 0 given back to `/dev/null` should the system
 /// close it all the same.
 ///
 /// Every test that lets the real system fail, or changes the descriptors of the process, runs in
 /// a process of its own: what it breaks there cannot reach the other tests.
-/// What is open on descriptor 0 (device, file number, device it stands for); nil when nothing is.
-private func fsevZero() -> [Int]? {
-    var status = stat()
-    guard fstat(0, &status) == 0 else { return nil }
-    return [Int(status.st_dev), Int(status.st_ino), Int(status.st_rdev)]
-}
-
 @Suite
 internal struct FSEvDescriptorZeroTests {
     /// A folder whose path is too long for the system is left out, and descriptor 0 stays.
@@ -31,7 +33,7 @@ internal struct FSEvDescriptorZeroTests {
             let box = try? Sandbox()
             guard let box, let folder = try? box.folder("short") else { exit(2) }
             let before = fsevZero()
-            let refused = DirectoryWatcher.Census.figures.refused
+            let refused = FSEvCensus.figures.refused
             let watcher = DirectoryWatcher(queue: DispatchQueue(label: "fsev")) { _ in
                 // Nothing is looked at.
             }
@@ -40,7 +42,7 @@ internal struct FSEvDescriptorZeroTests {
             // The folder that fits is watched; the other one is not asked for.
             guard Wait.until(seconds: 120, { watcher.watchedFolders == [folder] }) else { exit(3) }
             watcher.stop()
-            exit(fsevZero() == before && DirectoryWatcher.Census.figures.refused == refused ? 0 : 1)
+            exit(fsevZero() == before && FSEvCensus.figures.refused == refused ? 0 : 1)
         }
     }
 
@@ -150,12 +152,12 @@ internal struct FSEvDescriptorZeroTests {
             // What is open now, and the reserve; not enough for the folder and its 30 parents.
             limit.rlim_cur = rlim_t(FSEvDescriptors.openCount() + FSEvDescriptors.reserve + 10)
             setrlimit(RLIMIT_NOFILE, &limit)
-            let refused = DirectoryWatcher.Census.figures.refused
+            let refused = FSEvCensus.figures.refused
             let watcher = DirectoryWatcher(queue: DispatchQueue(label: "fsev")) { _ in
                 // Nothing is looked at.
             }
             watcher.watch([folder])
-            guard Wait.until(seconds: 120, { DirectoryWatcher.Census.figures.refused > refused }) else { exit(3) }
+            guard Wait.until(seconds: 120, { FSEvCensus.figures.refused > refused }) else { exit(3) }
             guard watcher.watchedFolders.isEmpty, fsevZero() == before else { exit(4) }
             limit.rlim_cur = roomy
             setrlimit(RLIMIT_NOFILE, &limit)
@@ -190,7 +192,7 @@ internal struct FSEvDescriptorZeroTests {
             _ = watcher.watchedFolders
             var null = stat()
             stat("/dev/null", &null)
-            exit(fsevZero()?.last == Int(null.st_rdev) ? 0 : 1)
+            exit(fsevZero().last == Int(null.st_rdev) ? 0 : 1)
         }
     }
 
@@ -202,7 +204,7 @@ internal struct FSEvDescriptorZeroTests {
         #expect(fsevZero() == before)
         await #expect(processExitsWith: .success) {
             close(0)
-            exit(FSEvDescriptors.fillZero() && fsevZero() != nil ? 0 : 1)
+            exit(FSEvDescriptors.fillZero() && !fsevZero().isEmpty ? 0 : 1)
         }
     }
 

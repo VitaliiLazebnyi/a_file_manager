@@ -12,7 +12,7 @@ internal struct CoverageLocalWatcher {
     @Test
     internal func aFolderTheSystemCannotWatchIsTriedAgain() throws {
         let box = try Sandbox()
-        let before = DirectoryWatcher.Census.figures.refused
+        let before = FSEvCensus.figures.refused
         let tries = Shared(0)
         // A system that makes no stream (and touches no descriptor).
         let refusing = FSEvSystem(
@@ -30,7 +30,7 @@ internal struct CoverageLocalWatcher {
         // Asked for again while a try is pending: refused again, and still tried once.
         watcher.watch([box.url("a"), box.url("b")])
         #expect(Wait.until(seconds: 60) { tries.value >= 3 })
-        #expect(DirectoryWatcher.Census.figures.refused >= before + 3)
+        #expect(FSEvCensus.figures.refused >= before + 3)
         #expect(watcher.watchedFolders.isEmpty)
         watcher.stop()
     }
@@ -73,12 +73,12 @@ internal struct CoverageLocalWatcher {
     internal func theFiguresArePrintedAtTheEndWhenAskedFor() async throws {
         let result = try await #require(processExitsWith: .success, observing: [\.standardErrorContent]) {
             setenv("AFM_WATCHER_CENSUS", "1", 1)
-            DirectoryWatcher.Census.started()
-            DirectoryWatcher.Census.wasRefused()
+            FSEvCensus.started()
+            FSEvCensus.wasRefused()
             exit(0)
         }
-        let printed = String(decoding: result.standardErrorContent, as: UTF8.self)
-        #expect(printed.contains("AFM_WATCHER_CENSUS live=1 peak=1 refused=1"))
+        let printed = String(bytes: result.standardErrorContent, encoding: .utf8)
+        #expect(printed?.contains("AFM_WATCHER_CENSUS live=1 peak=1 refused=1") == true)
     }
 
     /// Streams beyond what the system gives one program are refused and tried again.
@@ -94,7 +94,7 @@ internal struct CoverageLocalWatcher {
                 }
             for watcher in watchers { watcher.watch([folder]) }
             // Refused, and refused again when tried again a moment later.
-            guard Wait.until(seconds: 120, { DirectoryWatcher.Census.figures.refused >= 2 * 20 }) else { exit(1) }
+            guard Wait.until(seconds: 120, { FSEvCensus.figures.refused >= 2 * 20 }) else { exit(1) }
             exit(0)
         }
     }
