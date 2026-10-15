@@ -147,4 +147,22 @@ internal struct PanelBarsTests {
         #expect(app.left.model.directory.scheme == "mem")
         app.left.menuNeedsUpdate(NSMenu())
     }
+
+    /// A click on a column of the sort header (of the Brief and Thumbnails views) is heard with
+    /// its column; a click beside the columns is not; the header's menu is the one provided.
+    @Test
+    internal func theSortHeaderTakesClicksOnItsColumns() throws {
+        let header = SortHeaderView(frame: NSRect(x: 0, y: 0, width: 600, height: 22))
+        var clicked: [FileListColumn] = []
+        header.onClick = { clicked.append($0) }
+        let menu = NSMenu()
+        header.menuProvider = { menu }
+        func click(at position: CGFloat) throws -> NSEvent {
+            try PanelDropHelpers.mouse(.leftMouseDown, at: NSPoint(x: position, y: 10), clicks: 1, flags: [], in: nil)
+        }
+        header.mouseDown(with: try click(at: 10))
+        header.mouseDown(with: try click(at: 590))
+        let rightClick = try click(at: 10)
+        #expect(clicked == [.name] && header.menu(for: rightClick) === menu)
+    }
 }

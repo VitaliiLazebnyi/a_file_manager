@@ -106,6 +106,23 @@ internal struct PanelThumbnailTests {
         retina.addRepresentation(representation)
         #expect(ThumbnailStore.cost(of: retina) == 512 * 512 * 4)
         #expect(ThumbnailStore.cost(of: NSImage(size: .zero)) == 1)
+        // Of several representations the largest counts.
+        let small = try #require(
+            NSBitmapImageRep(
+                bitmapDataPlanes: nil,
+                pixelsWide: 64,
+                pixelsHigh: 64,
+                bitsPerSample: 8,
+                samplesPerPixel: 4,
+                hasAlpha: true,
+                isPlanar: false,
+                colorSpaceName: .deviceRGB,
+                bytesPerRow: 0,
+                bitsPerPixel: 0
+            )
+        )
+        retina.addRepresentation(small)
+        #expect(ThumbnailStore.cost(of: retina) == 512 * 512 * 4)
     }
 
     /// Quick Look makes the picture of a real file in the background, and a request can be given up.

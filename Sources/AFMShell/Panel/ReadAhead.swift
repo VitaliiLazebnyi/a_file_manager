@@ -132,8 +132,8 @@ internal final class ReadAhead {
         if let reading, !reading.isJoined, target.map({ !$0.isSameReading(as: reading.target) }) ?? true {
             cancel(reading)
         }
-        if target != nil {
-            startDwell()
+        if let target {
+            startDwell(on: target)
         }
     }
 
@@ -203,21 +203,20 @@ internal final class ReadAhead {
         reading.cancellation.cancel()
     }
 
-    /// Starts the time the cursor has to rest before its folder is read.
-    private func startDwell() {
+    /// Starts the time the cursor has to rest on `target` before its folder is read.
+    private func startDwell(on target: Target) {
+        // Every rest elsewhere (or nowhere) counts `rest` up.
         MainLoop.after(Self.dwell) { [weak self, dwelling = rest] in
             guard let self, rest == dwelling else {
                 return
             }
-            dwellEnded()
+            dwellEnded(on: target)
         }
     }
 
-    /// The cursor has rested long enough: its folder is read, unless something speaks against it.
-    private func dwellEnded() {
-        guard let target = resting else {
-            return
-        }
+    /// The cursor has rested on `target` long enough: its folder is read, unless something speaks
+    /// against it.
+    private func dwellEnded(on target: Target) {
         if let reading {
             // While a reading is on its way nothing starts; when it ends, the dwell starts again.
             // One that was told to stop long ago and still has not come back is left behind.
@@ -302,8 +301,8 @@ internal final class ReadAhead {
         }
         // The cursor may have come to rest on another folder meanwhile (or again on this one,
         // after its reading was cancelled): its turn comes now.
-        if resting != nil {
-            startDwell()
+        if let resting {
+            startDwell(on: resting)
         }
     }
 

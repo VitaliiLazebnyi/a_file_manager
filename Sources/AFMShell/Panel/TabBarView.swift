@@ -84,10 +84,8 @@ internal final class TabBarView: NSView {
         isHidden = titles.count < 2
         // The tabs that are there are changed in place, so a tab that is being dragged stays.
         if stack.arrangedSubviews.count == titles.count {
-            for (index, view) in stack.arrangedSubviews.enumerated() {
-                guard let button = view as? TabButton else {
-                    continue
-                }
+            // The strip holds tab buttons only.
+            for (index, button) in stack.arrangedSubviews.compactMap({ $0 as? TabButton }).enumerated() {
                 if button.title != titles[index] {
                     button.title = titles[index]
                 }

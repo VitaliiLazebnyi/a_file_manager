@@ -1,5 +1,6 @@
 import AFMKernel
 import Foundation
+import TestSupport
 import Testing
 
 @testable import AFMShell
@@ -70,5 +71,17 @@ internal struct PanelTypeSelectTests {
         let long = items((0..<10_000).map { "n\($0)" })
         #expect(TypeSelect.row(matching: "zz", in: long, from: 0, cancellation: cancelled) == nil)
         #expect(TypeSelect.row(matching: "n9999", in: long, from: 0, cancellation: CancellationFlag()) == 9_999)
+    }
+
+    /// A name that comes from Foundation without bytes of its own to look at (as the names of a
+    /// folder of the disk do) is compared by Foundation.
+    @Test
+    internal func aNameWithoutBytesOfItsOwnIsComparedByFoundation() throws {
+        let box = try Sandbox()
+        try box.file("Report.txt")
+        let listed = try FileManager.default.contentsOfDirectory(at: box.root, includingPropertiesForKeys: nil)
+        let name = try #require(listed.first?.lastPathComponent)
+        #expect(name.utf8.withContiguousStorageIfAvailable { $0.count } == nil)
+        #expect(TypeSelect.matcher(for: "rep")(name) && !TypeSelect.matcher(for: "rx")(name))
     }
 }

@@ -143,4 +143,57 @@ internal struct PanelReadAheadTests {
         #expect(await PanelWait.until { server.listRequests(for: "/next") == 1 })
         #expect(server.listRequests(for: "/stuck") == 0)
     }
+
+    /// A reading taken over before its thread began goes at the user's priority from the start;
+    /// one given up as too large cannot be taken over.
+    @Test
+    internal func aReadingIsRaisedWhenJoinedAndCannotBeJoinedOnceGivenUp() {
+        let target = ReadAhead.Target(location: URL(fileURLWithPath: "/x"), showHidden: false, order: ListOrder())
+        let joined = ReadAheadReading(target: target)
+        #expect(joined.join() && joined.isJoined)
+        joined.began()
+        #expect(joined.progress(10, limit: 5))
+        joined.finished()
+        let large = ReadAheadReading(target: target)
+        #expect(!large.progress(10, limit: 5) && large.wasGivenUp && !large.join())
+    }
+
+    /// A reading a panel took over and left again while the cursor rests nowhere is stopped.
+    @Test
+    internal func aReadingLeftWhileTheCursorRestsNowhereIsStopped() async throws {
+        let server = MemoryFileSystem()
+        server.isLocal = false
+        server.listStartDelay = 1
+        server.addFile("/slow/a.txt")
+        let fileSystems = FileSystemRegistry()
+        fileSystems.register(server)
+        let ahead = ReadAhead(fileSystems: fileSystems, cache: ListingCache())
+        defer { ahead.shutDown() }
+        ahead.cursorRests(on: target("/slow", on: server))
+        #expect(await PanelWait.until { ahead.reading != nil })
+        // Left while the cursor still rests on the folder: the reading goes on.
+        try #require(ahead.join(server.url("/slow"), showHidden: false)).leave()
+        #expect(ahead.reading?.cancellation.isCancelled == false)
+        let joined = try #require(ahead.join(server.url("/slow"), showHidden: false))
+        ahead.cursorRests(on: nil)
+        #expect(ahead.reading?.cancellation.isCancelled == false)
+        joined.leave()
+        #expect(ahead.reading?.cancellation.isCancelled != false)
+    }
+
+    /// A folder of a local disk that was read but that the cache did not keep is left alone for a
+    /// while: reading it again would end the same way.
+    @Test
+    internal func aFolderTheCacheDidNotKeepIsLeftAlone() async {
+        let server = MemoryFileSystem()
+        server.isLocal = true
+        server.addFile("/local/a.txt")
+        let fileSystems = FileSystemRegistry()
+        fileSystems.register(server)
+        let ahead = ReadAhead(fileSystems: fileSystems, cache: ListingCache())
+        defer { ahead.shutDown() }
+        ahead.cursorRests(on: target("/local", on: server))
+        #expect(await PanelWait.until { server.listRequests(for: "/local") == 1 && ahead.reading == nil })
+        #expect(ahead.pauses.count == 1)
+    }
 }

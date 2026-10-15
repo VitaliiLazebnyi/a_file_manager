@@ -123,7 +123,7 @@ internal struct PanelPathBarTests {
         bar.updateTrackingAreas()
         bar.mouseMoved(with: try mouse(.leftMouseDown, at: center(of: 10, in: bar), in: bar))
         bar.isActive = true
-        bar.display()
+        PanelDropHelpers.draw(bar)
         bar.mouseExited(with: try mouse(.leftMouseDown, at: .zero, in: bar))
         var ejected = 0
         bar.onEject = { ejected += 1 }

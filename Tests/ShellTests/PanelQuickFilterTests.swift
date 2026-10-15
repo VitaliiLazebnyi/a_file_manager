@@ -1,5 +1,6 @@
 import AFMKernel
 import Foundation
+import TestSupport
 import Testing
 
 @testable import AFMShell
@@ -85,5 +86,17 @@ internal struct PanelQuickFilterTests {
         #expect(QuickFilter(text: "", base: nil, directory: URL(fileURLWithPath: "/x")).combined == nil)
         let alone = QuickFilter(text: "re", base: nil, directory: URL(fileURLWithPath: "/x"))
         #expect(alone.title == "⏷ re" && alone.combined?.matches(item("ready", folder: false)) == true)
+    }
+
+    /// A name that comes from Foundation without bytes of its own to look at (as the names of a
+    /// folder of the disk do) is compared by Foundation.
+    @Test
+    internal func aNameWithoutBytesOfItsOwnIsComparedByFoundation() throws {
+        let box = try Sandbox()
+        try box.file("Report.txt")
+        let listed = try FileManager.default.contentsOfDirectory(at: box.root, includingPropertiesForKeys: nil)
+        let name = try #require(listed.first?.lastPathComponent)
+        #expect(name.utf8.withContiguousStorageIfAvailable { $0.count } == nil)
+        #expect(QuickFilter.matcher(for: "PORT")(name) && !QuickFilter.matcher(for: "rx")(name))
     }
 }
