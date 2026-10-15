@@ -68,6 +68,10 @@ final class SyncWindowController: NSWindowController, NSWindowDelegate, NSTableV
         }
     }
 
+    /// Puts a window of the tool on screen. Tests replace it, so that no window shows in the
+    /// session they run in, and look at what it was asked to show.
+    var present: @MainActor (NSWindowController) -> Void = { $0.showWindow(nil) }
+
     init(session: SyncSession) {
         self.session = session
         kernel = session.kernel
@@ -101,7 +105,7 @@ final class SyncWindowController: NSWindowController, NSWindowDelegate, NSTableV
     func show() {
         pullControls()
         refresh()
-        showWindow(nil)
+        present(self)
         window?.makeFirstResponder(compareButton)
     }
 
