@@ -78,7 +78,8 @@ struct ExpandedParameters: Equatable {
 enum ShellWords {
     /// What may stand in a word without quotes.
     private static let plain = CharacterSet(
-        charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789%+,-./:@_^")
+        charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789%+,-./:@_^"
+    )
     private static let quoteSpecial = CharacterSet(charactersIn: "\"\\$`")
 
     static func needsQuoting(_ text: String) -> Bool {
@@ -117,8 +118,7 @@ enum ShellWords {
     }
 
     /// The words of a line; double quotes keep a word with spaces together and stay part of it.
-    static func split(_ line: String, at separator: Character = " ") -> [String] {
-        let separator = separator.unicodeScalars.first ?? " "
+    static func split(_ line: String, at separator: Unicode.Scalar = " ") -> [String] {
         var words: [String] = []
         var current = String.UnicodeScalarView()
         var inQuotes = false
@@ -248,7 +248,8 @@ enum ShellWords {
             case .text(let text): return unquoted(text)
             case .value(let value), .raw(let value): return value
             }
-        }.joined()
+        }
+        .joined()
     }
 }
 
@@ -280,8 +281,13 @@ struct ParameterExpander {
         var run = Run(context: context, tokens: tokens)
         run.expand()
         return ExpandedParameters(
-            pieces: Self.trimmed(run.pieces), asksFirst: asksFirst, listFile: run.listFile,
-            usedArguments: run.usedArguments, missingName: run.missingName, problem: run.problem)
+            pieces: Self.trimmed(run.pieces),
+            asksFirst: asksFirst,
+            listFile: run.listFile,
+            usedArguments: run.usedArguments,
+            missingName: run.missingName,
+            problem: run.problem
+        )
     }
 
     /// Whether a text has a code that needs the marked names of a panel. Making that list
@@ -658,15 +664,22 @@ struct ParameterExpander {
             emit(value: stripped(context.environment[String(name)] ?? ""))
         }
 
-        /// The names a multi-file code stands for; nil when the list parameter is to be dropped
-        /// (spec 18 › Empty-selection and archive modifiers).
-        private func chosen(of panel: PanelSnapshot, forList: Bool) -> [String]? {
+        /// The names `%S` and `%R` stand for (spec 18 › Empty-selection and archive modifiers):
+        /// the marked ones, else the one under the cursor, unless `%Y` alone asks for none.
+        private func chosen(of panel: PanelSnapshot) -> [String] {
+            if !panel.selection.isEmpty { return panel.selection }
+            if emptyWhenUnselected, !dropsListWhenUnselected { return [] }
+            return panel.cursorName.map { [$0] } ?? []
+        }
+
+        /// The names a list file holds; nil when the list parameter is to be dropped.
+        private func listed(of panel: PanelSnapshot) -> [String]? {
             if !panel.selection.isEmpty { return panel.selection }
             let cursor = panel.cursorName.map { [$0] }
             switch (emptyWhenUnselected, dropsListWhenUnselected) {
-            case (true, true): return cursor ?? (forList ? nil : [])
+            case (true, true): return cursor
             case (true, false): return []
-            case (false, true): return forList ? nil : cursor ?? []
+            case (false, true): return nil
             case (false, false): return cursor ?? []
             }
         }
@@ -685,7 +698,7 @@ struct ParameterExpander {
             } else {
                 flushWord()
             }
-            let names = range(chosen(of: panel, forList: false) ?? []).map(cut)
+            let names = range(chosen(of: panel)).map(cut)
             guard isInsideDoubleQuotes, let quote = openQuote else {
                 for (index, name) in names.enumerated() {
                     if index > 0 { write(" ") }
@@ -699,7 +712,7 @@ struct ParameterExpander {
             var before = Array(pieces[quote.pieces...])
             pieces.removeSubrange(quote.pieces...)
             if case .text(let text)? = before.first { before[0] = .text(String(text.unicodeScalars.dropFirst())) }
-            before = ParameterExpander.joined(before)
+            before = ParameterExpander.withoutEmptyTexts(before)
             lexer = quote.lexer
             openQuote = nil
             let startsWord = lexer.isAtWordStart
@@ -725,7 +738,7 @@ struct ParameterExpander {
                 }
             }
             tail.append(.text(String(written)))
-            let affixes = ParameterExpander.split(ParameterExpander.joined(tail), at: "%E")
+            let affixes = ParameterExpander.split(ParameterExpander.withoutEmptyTexts(tail), at: "%E")
             for (index, name) in names.enumerated() {
                 if index > 0 { write(" ") }
                 write("\"")
@@ -847,7 +860,7 @@ struct ParameterExpander {
             guard !listWasRequested else { return }
             listWasRequested = true
             let panel = first
-            guard let names = chosen(of: panel, forList: true) else { return }
+            guard let names = listed(of: panel) else { return }
             // Without a path a name that begins with `-` would be an option to whoever reads the list.
             func line(_ name: String, of panel: PanelSnapshot) -> String {
                 withPath ? panel.path + name : protected(name)
@@ -873,7 +886,8 @@ struct ParameterExpander {
             switch encoding {
             case .plain: contents = Data(text.utf8)
             case .utf8WithMark: contents = Data([0xEF, 0xBB, 0xBF]) + Data(text.utf8)
-            case .utf16WithMark: contents = Data([0xFF, 0xFE]) + (text.data(using: .utf16LittleEndian) ?? Data())
+            case .utf16WithMark:
+                contents = Data([0xFF, 0xFE] + text.utf16.flatMap { [UInt8($0 & 0xFF), UInt8($0 >> 8)] })
             }
             let url = context.listFolder.appendingPathComponent("list-\(context.listName).txt")
             listFile = ListFile(url: url, contents: contents)
@@ -881,20 +895,13 @@ struct ParameterExpander {
         }
     }
 
-    /// Neighbouring texts as one, empty ones left out.
-    fileprivate static func joined(_ pieces: [ExpandedPiece]) -> [ExpandedPiece] {
-        var result: [ExpandedPiece] = []
-        for piece in pieces {
-            if case .text(let text) = piece {
-                if text.isEmpty { continue }
-                if case .text(let before)? = result.last {
-                    result[result.count - 1] = .text(before + text)
-                    continue
-                }
-            }
-            result.append(piece)
+    /// The pieces without the empty texts. (The pieces of a run never hold two texts in a
+    /// row: a text is written out only in front of a value or a quote.)
+    fileprivate static func withoutEmptyTexts(_ pieces: [ExpandedPiece]) -> [ExpandedPiece] {
+        pieces.filter { piece in
+            guard case .text(let text) = piece else { return true }
+            return !text.isEmpty
         }
-        return result
     }
 
     /// What stands before and after the first `marker` in the text of the pieces; nil without one.
@@ -905,7 +912,7 @@ struct ParameterExpander {
             guard case .text(let text) = piece, let found = text.range(of: marker, options: .literal) else { continue }
             let before = Array(pieces[..<index]) + [.text(String(text[..<found.lowerBound]))]
             let after = [.text(String(text[found.upperBound...]))] + Array(pieces[(index + 1)...])
-            return (joined(before), joined(after))
+            return (withoutEmptyTexts(before), withoutEmptyTexts(after))
         }
         return nil
     }
