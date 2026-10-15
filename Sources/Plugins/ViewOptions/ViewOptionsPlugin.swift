@@ -382,11 +382,8 @@ public final class ViewOptionsPlugin: Plugin {
                     pendingOrders[id] = nil
                     return
                 }
-                guard model.listedItems.count >= Self.backgroundSortThreshold else {
-                    // The list is short now.
-                    pendingOrders[id] = nil
-                    return model.setSort(order)
-                }
+                // Still wished for and not met: no reading came (it brings the wished order),
+                // only a filter, so the list is as long as it was and is sorted again here.
                 sortInBackground(model, to: order)
             }
         }
