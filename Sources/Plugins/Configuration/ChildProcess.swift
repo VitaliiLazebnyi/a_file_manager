@@ -4,34 +4,42 @@ import Foundation
 /// is: the lines of user commands are written for one, a reference to a value is written the
 /// way such a shell reads it, and `csh` and `tcsh` do not even take the options.
 enum LoginShell {
-    /// `/bin/zsh` as a login shell, so that a command finds the PATH of a terminal; `/bin/sh`
-    /// where there is no zsh.
-    static let posix: (executable: String, options: [String]) =
-        FileManager.default.isExecutableFile(atPath: "/bin/zsh") ? ("/bin/zsh", ["-l", "-c"]) : ("/bin/sh", ["-c"])
+    /// `/bin/zsh` as a login shell, so that a command finds the PATH of a terminal. Every macOS
+    /// the program runs on has it.
+    static let posix = (executable: "/bin/zsh", options: ["-l", "-c"])
 
-    /// The shell the user logs in with.
-    static var usersShell: String {
-        var path = ProcessInfo.processInfo.environment["SHELL"] ?? ""
-        if path.isEmpty, let entry = getpwuid(getuid()), let shell = entry.pointee.pw_shell {
-            path = String(cString: shell)
-        }
-        return path.isEmpty ? "/bin/zsh" : path
+    /// The shell the user logs in with: `SHELL`, else the shell of the user's `account`, else zsh.
+    static func usersShell(environment: [String: String], account: String?) -> String {
+        if let path = environment["SHELL"], !path.isEmpty { return path }
+        if let path = account, !path.isEmpty { return path }
+        return "/bin/zsh"
+    }
+
+    /// The shell of this user's account in the user database.
+    static var accountShell: String? {
+        getpwuid(getuid())?.pointee.pw_shell.map { String(cString: $0) }
     }
 
     /// The PATH of the user's login shell when that is another shell than zsh (bash, fish,
-    /// tcsh …): its start files are not read by zsh, so the PATH they set up is asked for once
-    /// and handed on. Nil for zsh and when the shell does not answer. Starts a process and
-    /// waits up to a few seconds for it: never for the main thread.
-    static let foreignPath: String? = {
-        let shell = usersShell
+    /// tcsh …), asked for once. Starts a process and waits up to a few seconds for it: never
+    /// for the main thread.
+    static let foreignPath = foreignPath(
+        of: usersShell(environment: ProcessInfo.processInfo.environment, account: accountShell)
+    )
+
+    /// The PATH that `shell` sets up: its start files are not read by zsh, so the PATH they set
+    /// up is asked for and handed on. Nil for zsh and when the shell does not answer within
+    /// `waiting`. Starts a process and waits for it: never for the main thread.
+    static func foreignPath(of shell: String, waiting: DispatchTimeInterval = .seconds(3)) -> String? {
         guard URL(fileURLWithPath: shell).lastPathComponent != "zsh",
             FileManager.default.isExecutableFile(atPath: shell)
         else { return nil }
         // `csh` and `tcsh` take `-c` but not `-l` with it.
-        return path(from: shell, ["-l", "-c", "printenv PATH"]) ?? path(from: shell, ["-c", "printenv PATH"])
-    }()
+        return path(from: shell, ["-l", "-c", "printenv PATH"], waiting)
+            ?? path(from: shell, ["-c", "printenv PATH"], waiting)
+    }
 
-    private static func path(from shell: String, _ arguments: [String]) -> String? {
+    private static func path(from shell: String, _ arguments: [String], _ waiting: DispatchTimeInterval) -> String? {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: shell)
         process.arguments = arguments
@@ -46,7 +54,7 @@ enum LoginShell {
             process.terminationHandler = nil
             return nil
         }
-        guard ended.wait(timeout: .now() + 3) == .success else {
+        guard ended.wait(timeout: .now() + waiting) == .success else {
             process.terminate()
             return nil
         }
@@ -57,8 +65,9 @@ enum LoginShell {
         return line.hasPrefix("/") && line.utf8.count < 16_384 ? line : nil
     }
 
-    /// The environment a command line runs in.
-    static func environment() -> [String: String] {
+    /// The environment a command line runs in: this program's, with the PATH of a login shell
+    /// that is not zsh.
+    static func environment(foreignPath: String? = foreignPath) -> [String: String] {
         var environment = ProcessInfo.processInfo.environment
         if let path = foreignPath { environment["PATH"] = path }
         return environment
@@ -103,7 +112,9 @@ enum ChildProcess {
         posix_spawnattr_setsigdefault(&attributes, &all)
         posix_spawnattr_setsigmask(&attributes, &none)
         posix_spawnattr_setflags(
-            &attributes, Int16(POSIX_SPAWN_CLOEXEC_DEFAULT | POSIX_SPAWN_SETSIGDEF | POSIX_SPAWN_SETSIGMASK))
+            &attributes,
+            Int16(POSIX_SPAWN_CLOEXEC_DEFAULT | POSIX_SPAWN_SETSIGDEF | POSIX_SPAWN_SETSIGMASK)
+        )
 
         var argv: [UnsafeMutablePointer<CChar>?] = ([executable] + arguments).map { strdup($0) } + [nil]
         var envp: [UnsafeMutablePointer<CChar>?] = environment.map { strdup($0.key + "=" + $0.value) } + [nil]
