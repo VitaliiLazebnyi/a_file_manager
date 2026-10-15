@@ -27,6 +27,7 @@ internal final class CoverageNetworkServer: @unchecked Sendable {
         internal private(set) var isClosed = false
         private var pending = Data()
         private var passive: Int32?
+        private var active: Int32?
 
         /// A control connection on `socket`.
         internal init(socket: Int32) {
@@ -78,6 +79,10 @@ internal final class CoverageNetworkServer: @unchecked Sendable {
         /// The data connection the client opened to the port of `openPassive`; nil when none came
         /// within a minute or the client spoke on the control connection instead.
         internal func acceptData() -> Int32? {
+            if let connected = active {
+                active = nil
+                return connected
+            }
             guard let waiting = passive else {
                 return nil
             }
@@ -99,6 +104,34 @@ internal final class CoverageNetworkServer: @unchecked Sendable {
                 }
             }
             return nil
+        }
+
+        /// Connects to the client for the next transfer, as EPRT asks (`|2|::1|port|`); false
+        /// when the argument is no IPv6 address and port or nobody listens there.
+        internal func connectBack(_ argument: String) -> Bool {
+            let parts = argument.split(separator: "|")
+            guard parts.count == 3, let port = UInt16(parts[2]) else {
+                return false
+            }
+            var address = sockaddr_in6()
+            address.sin6_len = UInt8(MemoryLayout<sockaddr_in6>.size)
+            address.sin6_family = sa_family_t(AF_INET6)
+            address.sin6_port = port.bigEndian
+            guard inet_pton(AF_INET6, String(parts[1]), &address.sin6_addr) == 1 else {
+                return false
+            }
+            let descriptor = Darwin.socket(AF_INET6, SOCK_STREAM, 0)
+            let result = withUnsafePointer(to: &address) {
+                $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                    Darwin.connect(descriptor, $0, socklen_t(MemoryLayout<sockaddr_in6>.size))
+                }
+            }
+            guard result == 0 else {
+                close(descriptor)
+                return false
+            }
+            active = descriptor
+            return true
         }
 
         /// A whole download: the announcement, the data, the end of the data connection, the verdict.
@@ -164,8 +197,8 @@ internal final class CoverageNetworkServer: @unchecked Sendable {
     private var stopped: Bool { lock.withLock { isStopped } }
 
     /// Starts listening. Each connection gets `greeting` first, then the script for each command.
-    internal init(greeting: [String], script: @escaping Script) throws {
-        listener = try TestFTPServer.listen()
+    internal init(onIPv6: Bool, greeting: [String], script: @escaping Script) throws {
+        listener = onIPv6 ? try Self.listenOnIPv6() : try TestFTPServer.listen()
         port = TestFTPServer.port(of: listener)
         let thread = Thread { [self] in
             while !stopped {
@@ -185,9 +218,33 @@ internal final class CoverageNetworkServer: @unchecked Sendable {
         thread.start()
     }
 
+    /// A server on 127.0.0.1 that greets with `greeting`.
+    internal convenience init(greeting: [String], script: @escaping Script) throws {
+        try self.init(onIPv6: false, greeting: greeting, script: script)
+    }
+
     /// A server with the usual greeting.
     internal convenience init(script: @escaping Script) throws {
         try self.init(greeting: ["220 Scripted server"], script: script)
+    }
+
+    /// A socket that listens on ::1, on a port the system picks.
+    internal static func listenOnIPv6() throws -> Int32 {
+        let descriptor = socket(AF_INET6, SOCK_STREAM, 0)
+        var address = sockaddr_in6()
+        address.sin6_len = UInt8(MemoryLayout<sockaddr_in6>.size)
+        address.sin6_family = sa_family_t(AF_INET6)
+        address.sin6_addr = in6addr_loopback
+        let bound = withUnsafePointer(to: &address) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                bind(descriptor, $0, socklen_t(MemoryLayout<sockaddr_in6>.size))
+            }
+        }
+        guard bound == 0, Darwin.listen(descriptor, 16) == 0 else {
+            close(descriptor)
+            throw POSIXError(.EADDRNOTAVAIL)
+        }
+        return descriptor
     }
 
     /// The command's verb, in capitals.
