@@ -62,13 +62,32 @@ final class ArchiveCommands {
     /// Unowned: the kernel owns the plugin, and through it this.
     private unowned let kernel: Kernel
     private let store: ArchiveStore
-    private let launchesApplications: Bool
+    /// What "Unpack and Open" hands the unpacked member to; nil opens nothing.
+    private let openFile: (@MainActor (URL) -> Bool)?
+    /// The event the application is handling now.
+    private let currentEvent: @MainActor () -> NSEvent?
     private var environment: ArchiveEnvironment { store.environment }
 
-    init(kernel: Kernel, store: ArchiveStore, launchesApplications: Bool) {
+    init(
+        kernel: Kernel,
+        store: ArchiveStore,
+        openFile: (@MainActor (URL) -> Bool)?,
+        currentEvent: @escaping @MainActor () -> NSEvent?
+    ) {
         self.kernel = kernel
         self.store = store
-        self.launchesApplications = launchesApplications
+        self.openFile = openFile
+        self.currentEvent = currentEvent
+    }
+
+    /// Hands a file to the application the system opens it with; false when none opened it.
+    internal static func openInApplication(_ file: URL) -> Bool {
+        NSWorkspace.shared.open(file)
+    }
+
+    /// The event the application is handling now.
+    internal static func handledEvent() -> NSEvent? {
+        NSApp?.currentEvent
     }
 
     private var ui: any UserInteraction { kernel.interaction }
@@ -95,7 +114,7 @@ final class ArchiveCommands {
     /// (spec 08 › Opening an archive). The key itself belongs to "Open Directory", which sends
     /// files to the openers like Enter does; this is how the opener tells the two apart.
     private var isForcedOpen: Bool {
-        guard let event = NSApp?.currentEvent, event.type == .keyDown else { return false }
+        guard let event = currentEvent(), event.type == .keyDown else { return false }
         return event.keyCode == 121 && event.modifierFlags.contains(.control)
     }
 
@@ -166,7 +185,7 @@ final class ArchiveCommands {
                     try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
                     let local = folder.appendingPathComponent(file.name, isDirectory: false)
                     // Cancel ends the opening of the member (which may lie behind a long stretch
-                    // of decompression) and a read that hangs, not only the loop.
+                    // of decompression), a read that hangs, and the reads after it.
                     let reader = try fileSystems.provider(for: file.url)
                         .read(
                             file.url,
@@ -176,10 +195,7 @@ final class ArchiveCommands {
                     let tie = monitor.cancellation.interrupting(reader)
                     defer { withExtendedLifetime(tie) {} }
                     let output = try OutputFile(creating: local)
-                    while let block = try reader.read(upToCount: 1 << 20) {
-                        if monitor.cancellation.isCancelled { throw ArchiveError.cancelled }
-                        try output.write(block)
-                    }
+                    while let block = try reader.read(upToCount: 1 << 20) { try output.write(block) }
                     try output.close()
                     // The application that opens it must see where the file came from.
                     if let location = ArchiveURL.location(of: file.url) {
@@ -193,7 +209,7 @@ final class ArchiveCommands {
             },
             completion: { [self] result in
                 switch result {
-                case .success(let local): if launchesApplications { NSWorkspace.shared.open(local) }
+                case .success(let local): _ = openFile?(local)
                 case .failure(ArchiveError.cancelled): break
                 case .failure(let error): ui.report(error, title: "\(file.name) cannot be unpacked!")
                 }
@@ -336,7 +352,7 @@ final class ArchiveCommands {
                 ui.inform("Only ZIP archives can be encrypted.", detail: "", style: .warning)
                 return
             }
-            guard let secret = askNewPassword() else { return }
+            guard let secret = askNewPassword(detail: Self.encryptionNote) else { return }
             (options.password, options.encryption) = (secret.password, secret.encryption)
         }
 
@@ -417,23 +433,20 @@ final class ArchiveCommands {
         + "only for programs that cannot open AES)"
 
     /// Asks twice for the password of a new archive, and how to encrypt; nil on Cancel. The
-    /// old encryption is offered for exchange with old programs, and is said to be weak.
-    private func askNewPassword() -> (password: String, encryption: ZipEncryption)? {
-        var detail = Self.encryptionNote
-        while true {
-            let fields: [FormField] = [
-                .password("password", "Password:"), .password("repeat", "Repeat password:"),
-                .checkbox("legacy", Self.legacyLabel)
-            ]
-            guard let answer = ui.form("Encrypt", detail: detail, fields: fields, buttons: ["OK"]) else { return nil }
-            let password = answer.text("password")
-            if !password.isEmpty, password == answer.text("repeat") {
-                return (password, answer.flag("legacy") ? .legacy : .aes256)
-            }
-            detail =
-                (password.isEmpty ? "The password must not be empty." : "The two passwords are not the same.") + "\n\n"
-                + Self.encryptionNote
+    /// old encryption is offered for exchange with old programs, and is said to be weak. A
+    /// password that is empty, or typed differently the second time, is asked for again.
+    private func askNewPassword(detail: String) -> (password: String, encryption: ZipEncryption)? {
+        let fields: [FormField] = [
+            .password("password", "Password:"), .password("repeat", "Repeat password:"),
+            .checkbox("legacy", Self.legacyLabel)
+        ]
+        guard let answer = ui.form("Encrypt", detail: detail, fields: fields, buttons: ["OK"]) else { return nil }
+        let password = answer.text("password")
+        if !password.isEmpty, password == answer.text("repeat") {
+            return (password, answer.flag("legacy") ? .legacy : .aes256)
         }
+        let problem = password.isEmpty ? "The password must not be empty." : "The two passwords are not the same."
+        return askNewPassword(detail: problem + "\n\n" + Self.encryptionNote)
     }
 
     // MARK: Unpack
@@ -563,7 +576,7 @@ final class ArchiveCommands {
     }
 
     /// The first problems of a longer list, for a message box.
-    private static func summary(of problems: [String]) -> String {
+    nonisolated internal static func summary(of problems: [String]) -> String {
         problems.prefix(12).joined(separator: "\n") + (problems.count > 12 ? "\n… and \(problems.count - 12) more" : "")
     }
 
