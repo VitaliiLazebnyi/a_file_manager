@@ -55,9 +55,9 @@ enum ArchiveURL {
         components.scheme = scheme
         components.host = host
         components.path = innerPath.isEmpty ? archivePath : archivePath + "/" + innerPath
-        // A URL that cannot be built would mean a host or path the system refuses; the archive
-        // file itself is the safest thing to fall back to.
-        return components.url ?? archive
+        // Components with a scheme, a host and a path that starts with `/` always make a URL:
+        // the path is escaped as it is set, and the host holds letters, digits and `-` only.
+        return components.url!
     }
 
     /// Nil for URLs of other schemes and for hosts this code did not write.
@@ -114,14 +114,15 @@ enum ArchiveURL {
 
     /// Scheme and authority, e.g. `file://` or `ftp://user@server:21`.
     private static func authority(of url: URL) -> String {
-        guard var components = URLComponents(url: url, resolvingAgainstBaseURL: true) else {
-            return (url.scheme ?? "file") + "://"
+        if var components = URLComponents(url: url, resolvingAgainstBaseURL: true) {
+            components.path = ""
+            components.query = nil
+            components.fragment = nil
+            if let text = components.string, text.contains("://") {
+                return text
+            }
         }
-        components.path = ""
-        components.query = nil
-        components.fragment = nil
-        let text = components.string ?? ""
-        return text.contains("://") ? text : (url.scheme ?? "file") + "://"
+        return (url.scheme ?? "file") + "://"
     }
 
     private static func outerURL(prefix: String, path: String) -> URL? {
