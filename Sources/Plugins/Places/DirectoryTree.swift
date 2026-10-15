@@ -213,26 +213,28 @@ public final class DirectoryTree {
         if node.children.isEmpty {
             // The usual case while scanning: nothing is known yet, so nothing is compared.
             let ordered = sorted ? names : Self.sorted(names: Set(names))
-            node.children = ordered.enumerated().map { index, name in
-                let child = TreeNode(name: name, parent: node)
-                child.indexInParent = index
-                return child
-            }
+            node.children = ordered.enumerated()
+                .map { index, name in
+                    let child = TreeNode(name: name, parent: node)
+                    child.indexInParent = index
+                    return child
+                }
             count += ordered.count
         } else {
             let known = Dictionary(node.children.map { ($0.name, $0) }, uniquingKeysWith: { first, _ in first })
             let wanted = Set(names)
             for child in node.children where !wanted.contains(child.name) { count -= 1 + folderCount(below: child) }
-            node.children = (sorted ? names : Self.sorted(names: wanted)).enumerated().map { index, name in
-                let child =
-                    known[name]
-                    ?? {
-                        count += 1
-                        return TreeNode(name: name, parent: node)
-                    }()
-                child.indexInParent = index
-                return child
-            }
+            node.children = (sorted ? names : Self.sorted(names: wanted)).enumerated()
+                .map { index, name in
+                    let child =
+                        known[name]
+                        ?? {
+                            count += 1
+                            return TreeNode(name: name, parent: node)
+                        }()
+                    child.indexInParent = index
+                    return child
+                }
         }
         node.childIndex = nil
         node.attaching = nil
@@ -246,11 +248,12 @@ public final class DirectoryTree {
     /// (`attach`). `sorted` says the names come in display order already.
     public static func makeNodes(_ names: [String], sorted: Bool = false) -> [TreeNode] {
         let ordered = sorted ? names : Array(Set(names)).sorted(by: compare)
-        return ordered.enumerated().map { index, name in
-            let node = TreeNode(name: name, parent: nil)
-            node.indexInParent = index
-            return node
-        }
+        return ordered.enumerated()
+            .map { index, name in
+                let node = TreeNode(name: name, parent: nil)
+                node.indexInParent = index
+                return node
+            }
     }
 
     /// What `setChildren` does for a folder, with the nodes made beforehand by `makeNodes`.
@@ -271,7 +274,8 @@ public final class DirectoryTree {
             let old = node.children
             node.attaching = TreeNode.Attach(
                 known: Dictionary(old.map { ($0.name, $0) }, uniquingKeysWith: { first, _ in first }),
-                isMerge: !old.isEmpty)
+                isMerge: !old.isEmpty
+            )
         }
         let attach = node.attaching ?? TreeNode.Attach(known: [:], isMerge: false)
         node.attaching = attach
@@ -410,8 +414,12 @@ public final class DirectoryTree {
     /// caller up. To go on, call again with `from` the pending node, `includingStart` true and
     /// `remaining` as given. A nil budget searches to the end.
     public func search(
-        _ typed: String, from start: TreeNode?, forward: Bool = true, includingStart: Bool = false,
-        remaining: Int? = nil, timeBudget: TimeInterval?
+        _ typed: String,
+        from start: TreeNode?,
+        forward: Bool = true,
+        includingStart: Bool = false,
+        remaining: Int? = nil,
+        timeBudget: TimeInterval?
     ) -> SearchProgress {
         let pattern = TreeQuickSearch(typed)
         guard !pattern.isEmpty, count > 0 else { return .none }
@@ -559,7 +567,10 @@ public final class TreeScanner: @unchecked Sendable {
     /// volumes mounted inside this one). Folders on the local disk that are a mount point
     /// themselves are left unread as well, whatever `isExcluded` says. It is called on several threads at once.
     public init(
-        root: URL, provider: any FileSystemProvider, showHidden: Bool = false, batchSize: Int = 256,
+        root: URL,
+        provider: any FileSystemProvider,
+        showHidden: Bool = false,
+        batchSize: Int = 256,
         isExcluded: @escaping @Sendable (URL) -> Bool = { _ in false }
     ) {
         self.root = root
@@ -691,7 +702,10 @@ public final class TreeScanner: @unchecked Sendable {
         )
         setiopolicy_np(IOPOL_TYPE_DISK, IOPOL_SCOPE_THREAD, IOPOL_THROTTLE)
         setiopolicy_np(
-            IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES, IOPOL_SCOPE_THREAD, IOPOL_MATERIALIZE_DATALESS_FILES_OFF)
+            IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES,
+            IOPOL_SCOPE_THREAD,
+            IOPOL_MATERIALIZE_DATALESS_FILES_OFF
+        )
         defer {
             // The threads are shared: they go back to what they had.
             if disk >= 0 { setiopolicy_np(IOPOL_TYPE_DISK, IOPOL_SCOPE_THREAD, disk) }
@@ -703,8 +717,9 @@ public final class TreeScanner: @unchecked Sendable {
     /// `isScan`: the folders are read for the scan, which does not go into protected ones; a
     /// folder the user opens is read whatever it is.
     private func folders(of directory: URL, isScan: Bool = false) -> [Subfolder] {
-        guard !cancellation.isCancelled else { return [] }
+        // The local disk is read entry by entry, and given up at the first entry after a cancellation.
         if directory.isFileURL, provider.scheme == "file" { return leanSubfolders(of: directory, isScan: isScan) }
+        guard !cancellation.isCancelled else { return [] }
         // Read piece by piece, so a huge or slow folder can be given up half-way.
         var items: [FileItem] = []
         let finished: Void? = try? provider.list(directory, showHidden: showHidden) { batch in
@@ -714,10 +729,11 @@ public final class TreeScanner: @unchecked Sendable {
         guard finished != nil, !cancellation.isCancelled else { return [] }
         // A name with a line break could not be written to the cache file, one with a slash
         // not into a relative path.
-        return items.filter {
-            $0.isRealDirectory && !$0.isPackage && !$0.name.utf8.contains(0x0A) && !$0.name.utf8.contains(0x2F)
-        }
-        .map { Subfolder(name: $0.name, url: $0.url) }
+        return
+            items.filter {
+                $0.isRealDirectory && !$0.isPackage && !$0.name.utf8.contains(0x0A) && !$0.name.utf8.contains(0x2F)
+            }
+            .map { Subfolder(name: $0.name, url: $0.url) }
     }
 
     /// The same for a folder of the local disk, without a `FileItem` for every file: only the
@@ -726,8 +742,9 @@ public final class TreeScanner: @unchecked Sendable {
     private func leanSubfolders(of directory: URL, isScan: Bool) -> [Subfolder] {
         guard let stream = opendir(directory.path) else { return [] }
         defer { closedir(stream) }
+        // The folder's own device; should it not be told, every subfolder is asked whether it is a mount point.
         var own = stat()
-        let ownDevice = stat(directory.path, &own) == 0 ? own.st_dev : nil
+        _ = fstat(dirfd(stream), &own)
         var folders: [Subfolder] = []
         while let entry = readdir(stream) {
             if cancellation.isCancelled { return [] }
@@ -747,7 +764,7 @@ public final class TreeScanner: @unchecked Sendable {
                 if !showHidden {
                     guard known, info.st_flags & UInt32(UF_HIDDEN) == 0 else { continue }
                 }
-                isMount = known && ownDevice.map { $0 != info.st_dev } == true && Self.isMountPoint(url.path)
+                isMount = known && info.st_dev != own.st_dev && Self.isMountPoint(url.path)
                 // A folder that is only in the cloud (SF_DATALESS) would be fetched by a listing.
                 isUnread =
                     isScan && (Self.isProtected(url) || (known && info.st_flags & Self.dataless != 0))
@@ -776,16 +793,19 @@ public final class TreeScanner: @unchecked Sendable {
     /// enough to say so: the user's folders on the start-up disk are firmlinked from the data
     /// volume, and the system answers with the volume's mount point for them, not their own.
     static func isMountPoint(_ path: String) -> Bool {
+        // The system names the mount point by its real path; a path without one is none.
+        guard let pointer = realpath(path, nil) else { return false }
+        let real = String(cString: pointer)
+        free(pointer)
         var info = statfs()
-        guard statfs(path, &info) == 0 else { return false }
-        // The system names the mount point by its real path.
-        let real =
-            realpath(path, nil).map { pointer -> String in
-                defer { free(pointer) }
-                return String(cString: pointer)
-            } ?? path
+        return statfs(real, &info) == 0 && mountPoint(info) == real
+    }
+
+    /// Where the volume a `statfs` answer describes is mounted.
+    private static func mountPoint(_ info: statfs) -> String {
+        var info = info
         return withUnsafePointer(to: &info.f_mntonname) {
             $0.withMemoryRebound(to: CChar.self, capacity: Int(MAXPATHLEN)) { String(cString: $0) }
-        } == real
+        }
     }
 }

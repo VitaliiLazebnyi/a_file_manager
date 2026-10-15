@@ -102,7 +102,7 @@ public final class PlacesPlugin: Plugin {
             configureHotlist(in: kernel)
         }
         commands.register(Command(.directoryHistory, "Directory History…", [Shortcut(.downArrow, .option)])) { [self] in
-            showHistory(in: kernel, thinning: settings.flag(Keys.thinning, default: true))
+            showHistory(in: kernel, tracker: tracker, thinning: settings.flag(Keys.thinning, default: true))
         }
         commands.register(
             Command(
@@ -111,7 +111,7 @@ public final class PlacesPlugin: Plugin {
                 [Shortcut(.downArrow, [.option, .shift])]
             )
         ) { [self] in
-            showHistory(in: kernel, thinning: false, limited: false)
+            showHistory(in: kernel, tracker: tracker, thinning: false, limited: false)
         }
         commands.register(Command(.saveDirectoryHistory, "Save Directory History Now", runsDuringJobs: true)) {
             tracker.save()
@@ -259,67 +259,64 @@ public final class PlacesPlugin: Plugin {
     /// Ctrl+D: the hotlist as a pick list, one level at a time. A submenu opens as the next
     /// list and Cancel leads back out of it; the second button opens the entry in a new tab
     /// (Shift+Enter of the specification).
-    private func showHotlist(in kernel: Kernel) {
-        var level = HotlistLevel.user([])
-        while true {
-            let list = hotlist(in: kernel)
-            let current = kernel.panels.source.model.directory
-            let isCurrent = { [self] entry in leads(entry, to: current, in: kernel) }
-            let menu: HotlistMenu
-            var title = "Directory Hotlist"
+    private func showHotlist(in kernel: Kernel, level: HotlistLevel = .user([])) {
+        let list = hotlist(in: kernel)
+        let current = kernel.panels.source.model.directory
+        let isCurrent = { [self] entry in leads(entry, to: current, in: kernel) }
+        let menu: HotlistMenu
+        // The level "Add current dir" adds to: the Favorites offer no such item.
+        let parent: Hotlist.Path
+        var title = "Directory Hotlist"
+        switch level {
+        case .user(let path):
+            parent = path
+            menu = HotlistMenu(
+                list,
+                at: path,
+                offersFavorites: !favorites.isEmpty && kernel.settings.flag(Keys.favorites, default: true),
+                isCurrent: isCurrent
+            )
+            if let submenu = list.entry(at: path) { title += " › " + submenu.displayTitle }
+
+        case .favorites:
+            parent = []
+            menu = HotlistMenu(places: favorites, isCurrent: isCurrent)
+            title += " › Favorites"
+        }
+        guard
+            let answer = kernel.interaction.form(
+                title,
+                detail: "",
+                fields: [.list("row", "", menu.titles, selected: menu.selected)],
+                buttons: ["Go", "Open in New Tab"]
+            ), menu.rows.indices.contains(answer.index("row"))
+        else {
+            // Leaving a submenu shows the level above again.
             switch level {
-            case .user(let path):
-                menu = HotlistMenu(
-                    list,
-                    at: path,
-                    offersFavorites: !favorites.isEmpty && kernel.settings.flag(Keys.favorites, default: true),
-                    isCurrent: isCurrent
-                )
-                if let submenu = list.entry(at: path) { title += " › " + submenu.displayTitle }
-
-            case .favorites:
-                menu = HotlistMenu(places: favorites, isCurrent: isCurrent)
-                title += " › Favorites"
+            case .user(let path) where !path.isEmpty: showHotlist(in: kernel, level: .user(Array(path.dropLast())))
+            case .favorites: showHotlist(in: kernel)
+            case .user: break
             }
-            guard
-                let answer = kernel.interaction.form(
-                    title,
-                    detail: "",
-                    fields: [.list("row", "", menu.titles, selected: menu.selected)],
-                    buttons: ["Go", "Open in New Tab"]
-                ), menu.rows.indices.contains(answer.index("row"))
-            else {
-                // Leaving a submenu shows the level above again.
-                switch level {
-                case .user(let path) where !path.isEmpty: level = .user(Array(path.dropLast()))
-                case .favorites: level = .user([])
-                case .user: return
-                }
-                continue
-            }
-            switch menu.rows[answer.index("row")].action {
-            case .run(let entry):
-                run(entry, inNewTab: answer.button == 1, in: kernel)
-                return
+            return
+        }
+        switch menu.rows[answer.index("row")].action {
+        case .run(let entry):
+            run(entry, inNewTab: answer.button == 1, in: kernel)
 
-            case .open(let path):
-                level = .user(path)
+        case .open(let path):
+            showHotlist(in: kernel, level: .user(path))
 
-            case .openFavorites:
-                level = .favorites
+        case .openFavorites:
+            showHotlist(in: kernel, level: .favorites)
 
-            case .separator:
-                continue
+        case .separator:
+            showHotlist(in: kernel, level: level)
 
-            case .addCurrent, .removeCurrent:
-                guard case .user(let path) = level else { return }
-                toggleCurrentDirectory(at: path, in: kernel)
-                return
+        case .addCurrent, .removeCurrent:
+            toggleCurrentDirectory(at: parent, in: kernel)
 
-            case .configure:
-                configureHotlist(in: kernel)
-                return
-            }
+        case .configure:
+            configureHotlist(in: kernel)
         }
     }
 
@@ -404,67 +401,76 @@ public final class PlacesPlugin: Plugin {
     ///
     /// The "maximum to show" settings apply to Alt+Down, with or without thinning; the
     /// unthinned list of Alt+Shift+Down shows everything (`limited: false`).
-    private func showHistory(in kernel: Kernel, thinning: Bool, limited: Bool = true) {
-        guard let tracker else { return }
+    private func showHistory(
+        in kernel: Kernel,
+        tracker: DirectoryHistoryTracker,
+        thinning: Bool,
+        limited: Bool = true,
+        selected: Int? = nil
+    ) {
         let panel = kernel.panels.source
         let side = side(of: panel, in: kernel)
-        var selected: Int?
-        while true {
-            let current = panel.model.directory
-            // Also right after the start, before any event came, the list has the current folder.
-            tracker.visited(current, on: side)
-            let showsFrequent = kernel.settings.flag(Keys.showFrequent, default: true)
-            let menu = HistoryMenu(
-                history: tracker.history(of: side)
-                    .shown(
-                        thinning: thinning,
-                        limit: limited ? limit(Keys.historyShown, default: 26, in: kernel) : nil
-                    ),
-                frequent: showsFrequent
-                    ? tracker.frequent.top(limited ? limit(Keys.frequentShown, default: 30, in: kernel) : nil) : [],
-                current: current,
-                displayPath: kernel.fileSystems.displayPath
-            )
-            let fields = [
-                FormField.list(
-                    "row",
-                    "",
-                    menu.titles,
-                    selected: min(selected ?? menu.selected, max(menu.rows.count - 1, 0))
-                )
-            ]
-            guard
-                let answer = kernel.interaction.form(
-                    "Directory History",
-                    detail: "",
-                    fields: fields,
-                    buttons: ["Go", "Open in New Tab", "Open in Other Panel", "Remove from List"]
+        let current = panel.model.directory
+        // Also right after the start, before any event came, the list has the current folder.
+        tracker.visited(current, on: side)
+        let showsFrequent = kernel.settings.flag(Keys.showFrequent, default: true)
+        let menu = HistoryMenu(
+            history: tracker.history(of: side)
+                .shown(
+                    thinning: thinning,
+                    limit: limited ? limit(Keys.historyShown, default: 26, in: kernel) : nil
                 ),
-                menu.rows.indices.contains(answer.index("row"))
-            else { return }
-            let row = menu.rows[answer.index("row")]
-            guard let directory = row.directory else { continue }
-            switch answer.button {
-            case 1:
-                _ = panel.tabs.openTab(showing: directory)
-                return
+            frequent: showsFrequent
+                ? tracker.frequent.top(limited ? limit(Keys.frequentShown, default: 30, in: kernel) : nil) : [],
+            current: current,
+            displayPath: kernel.fileSystems.displayPath
+        )
+        let fields = [
+            FormField.list(
+                "row",
+                "",
+                menu.titles,
+                selected: min(selected ?? menu.selected, max(menu.rows.count - 1, 0))
+            )
+        ]
+        guard
+            let answer = kernel.interaction.form(
+                "Directory History",
+                detail: "",
+                fields: fields,
+                buttons: ["Go", "Open in New Tab", "Open in Other Panel", "Remove from List"]
+            ),
+            menu.rows.indices.contains(answer.index("row"))
+        else { return }
+        let row = menu.rows[answer.index("row")]
+        guard let directory = row.directory else {
+            // The separator: the list comes back as it was.
+            showHistory(in: kernel, tracker: tracker, thinning: thinning, limited: limited, selected: selected)
+            return
+        }
+        switch answer.button {
+        case 1:
+            _ = panel.tabs.openTab(showing: directory)
 
-            case 2:
-                kernel.panels.target.show(directory)
-                return
+        case 2:
+            kernel.panels.target.show(directory)
 
-            case 3:
-                if case .frequent = row {
-                    tracker.removeFrequent(directory)
-                } else {
-                    tracker.remove(directory, from: side)
-                }
-                selected = answer.index("row")
-
-            default:
-                panel.show(directory)
-                return
+        case 3:
+            if case .frequent = row {
+                tracker.removeFrequent(directory)
+            } else {
+                tracker.remove(directory, from: side)
             }
+            showHistory(
+                in: kernel,
+                tracker: tracker,
+                thinning: thinning,
+                limited: limited,
+                selected: answer.index("row")
+            )
+
+        default:
+            panel.show(directory)
         }
     }
 }

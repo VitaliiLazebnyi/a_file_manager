@@ -26,11 +26,13 @@ public struct DirectoryHistory: Codable, Equatable {
     /// in the settings, which are exported and shared.
     static func stored(_ directory: URL) -> String {
         let text = directory.absoluteString
-        guard text.contains("@"), var components = URLComponents(string: text), components.password != nil else {
-            return text
-        }
-        components.password = nil
-        return components.string ?? text
+        // The range is one in the components' own text.
+        guard text.contains("@"), let components = URLComponents(string: text), var stored = components.string,
+            let password = components.rangeOfPassword
+        else { return text }
+        // The password goes with the colon that leads it in.
+        stored.removeSubrange(stored.index(before: password.lowerBound)..<password.upperBound)
+        return stored
     }
 
     /// What is kept per panel (`HistoryLenStored`).
@@ -70,9 +72,10 @@ public struct DirectoryHistory: Codable, Equatable {
     /// only passed through are left out; the current directory is always there.
     public func shown(thinning: Bool, limit: Int? = nil) -> [URL] {
         let last = visits.count - 1
-        let urls = visits.enumerated().reversed().compactMap { index, visit in
-            !thinning || visit.isVisible || index == last ? URL(string: visit.location) : nil
-        }
+        let urls = visits.enumerated().reversed()
+            .compactMap { index, visit in
+                !thinning || visit.isVisible || index == last ? URL(string: visit.location) : nil
+            }
         return limit.map { Array(urls.prefix(max($0, 1))) } ?? urls
     }
 }
@@ -83,7 +86,8 @@ extension DirectoryHistory.Visit {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.init(
             location: try container.decode(String.self, forKey: .location),
-            isVisible: try container.decodeIfPresent(Bool.self, forKey: .isVisible) ?? false)
+            isVisible: try container.decodeIfPresent(Bool.self, forKey: .isVisible) ?? false
+        )
     }
 }
 
@@ -94,8 +98,11 @@ extension DirectoryHistory {
         self.init()
         let container = try decoder.container(keyedBy: Keys.self)
         visits = Array(
-            (try container.decodeIfPresent(LenientElements<Visit>.self, forKey: .visits)?.elements ?? []).suffix(
-                Self.storedLimit))
+            (try container.decodeIfPresent(LenientElements<Visit>.self, forKey: .visits)?.elements ?? [])
+                .suffix(
+                    Self.storedLimit
+                )
+        )
     }
 }
 
@@ -144,9 +151,10 @@ public struct FrequentFolders: Codable, Equatable {
 
     /// The most visited folders, the most frequent first.
     public func top(_ limit: Int? = nil) -> [(directory: URL, visits: Int)] {
-        let ranked = counts.sorted { ($1.value, $0.key) < ($0.value, $1.key) }.compactMap { entry in
-            URL(string: entry.key).map { (directory: $0, visits: entry.value) }
-        }
+        let ranked = counts.sorted { ($1.value, $0.key) < ($0.value, $1.key) }
+            .compactMap { entry in
+                URL(string: entry.key).map { (directory: $0, visits: entry.value) }
+            }
         return limit.map { Array(ranked.prefix(max($0, 0))) } ?? ranked
     }
 }
@@ -217,17 +225,27 @@ public final class DirectoryHistoryTracker {
     /// `settings` is the plugin's own corner of the settings store. `problem` is told when
     /// stored data could not be read in full; the original is kept aside (`StoredSettings`).
     public init(
-        settings: any SettingsStore, now: @escaping () -> Date = Date.init, problem: (String) -> Void = { _ in }
+        settings: any SettingsStore,
+        now: @escaping () -> Date = Date.init,
+        problem: (String) -> Void = { _ in }
     ) {
         self.settings = settings
         self.now = now
         for side in Side.allCases {
             histories[side] = StoredSettings.load(
-                DirectoryHistory.self, key: Self.key(side), in: settings, problem: problem)
+                DirectoryHistory.self,
+                key: Self.key(side),
+                in: settings,
+                problem: problem
+            )
         }
         frequent =
             StoredSettings.load(
-                FrequentFolders.self, key: Self.frequentKey, in: settings, problem: problem)
+                FrequentFolders.self,
+                key: Self.frequentKey,
+                in: settings,
+                problem: problem
+            )
             ?? FrequentFolders()
     }
 

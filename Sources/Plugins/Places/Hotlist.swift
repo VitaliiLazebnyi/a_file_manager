@@ -153,7 +153,7 @@ public struct Hotlist: Codable, Equatable {
             guard level.indices.contains(index), level[index].kind == .submenu else { return nil }
             return descend(&level[index].children, rest.dropFirst())
         }
-        return descend(&entries, path[...])
+        return descend(&entries, ArraySlice(path))
     }
 
     /// Puts an entry at `path`, moving what is there down; an index past the end appends.
@@ -202,28 +202,42 @@ public struct Hotlist: Codable, Equatable {
 
     /// Shift+Up / Shift+Down in the editor: moves an entry one line. Past the edge of a
     /// submenu it leaves the submenu, and next to a submenu it enters it, so every position
-    /// can be reached as in a flat list. Returns the entry's new position.
+    /// can be reached as in a flat list. Returns the entry's new position; the same path when
+    /// nothing moved.
+    ///
+    /// Each move takes the entry out and puts it back within one level of the list, so it is
+    /// never lost or doubled, also in a list read from damaged data (an item holding entries,
+    /// which the editor shows but which is no submenu).
     @discardableResult
     public mutating func move(at path: Path, by direction: Int) -> Path {
-        guard let index = path.last, let entry = entry(at: path), direction != 0 else { return path }
+        guard let index = path.last, direction != 0 else { return path }
         let parent = Array(path.dropLast())
-        let siblings = children(of: parent)
-        let neighbour = index + (direction < 0 ? -1 : 1)
-        if siblings.indices.contains(neighbour) {
-            if siblings[neighbour].kind == .submenu {
-                // Into the submenu next door: at its end when coming from below, else at its start.
-                remove(at: path)
-                let door = direction < 0 ? neighbour : index
-                let position = direction < 0 ? siblings[neighbour].children.count : 0
-                return insert(entry, at: parent + [door, position]) ?? path
+        let step = direction < 0 ? -1 : 1
+        let inside = withChildren(of: parent) { level -> Path? in
+            let neighbour = index + step
+            guard level.indices.contains(index), level.indices.contains(neighbour) else { return nil }
+            guard level[neighbour].kind == .submenu else {
+                level.swapAt(index, neighbour)
+                return parent + [neighbour]
             }
-            _ = withChildren(of: parent) { $0.swapAt(index, neighbour) }
-            return parent + [neighbour]
+            // Into the submenu next door: at its end when coming from below, else at its start.
+            let entry = level.remove(at: index)
+            let door = step < 0 ? neighbour : index
+            let position = step < 0 ? level[door].children.count : 0
+            level[door].children.insert(entry, at: position)
+            return parent + [door, position]
         }
+        if let moved = inside ?? nil { return moved }
+        // At the edge of a submenu: out of it, right before or right after it.
         guard let door = parent.last else { return path }
-        // Out of the submenu: right before or right after it.
-        remove(at: path)
-        return insert(entry, at: Array(parent.dropLast()) + [direction < 0 ? door : door + 1]) ?? path
+        let outer = Array(parent.dropLast())
+        return withChildren(of: outer) { level -> Path in
+            guard level.indices.contains(door), level[door].children.indices.contains(index) else { return path }
+            let entry = level[door].children.remove(at: index)
+            let position = step < 0 ? door : door + 1
+            level.insert(entry, at: position)
+            return outer + [position]
+        } ?? path
     }
 
     /// A double click in the editor: adds or removes the hide character at the start of the

@@ -91,8 +91,11 @@ public final class TreeCache: @unchecked Sendable {
         // A readable name, plus a checksum of the whole key so two roots never share a file.
         let readable = String(root.locationKey.map { $0.isLetter || $0.isNumber ? $0 : "_" }.suffix(60))
         let checksum = key.utf8.reduce(UInt64(14_695_981_039_346_656_037)) { ($0 ^ UInt64($1)) &* 1_099_511_628_211 }
-        return directory?.appendingPathComponent(
-            "treeinfo-\(readable)-\(String(checksum, radix: 16)).txt", isDirectory: false)
+        return directory?
+            .appendingPathComponent(
+                "treeinfo-\(readable)-\(String(checksum, radix: 16)).txt",
+                isDirectory: false
+            )
     }
 
     /// What is known of the tree below `root`, from memory or from the file; nil when the
@@ -143,7 +146,11 @@ public final class TreeCache: @unchecked Sendable {
 
     /// Keeps the tree of `root` and writes its file.
     public func store(
-        _ paths: [String], unscanned: [String] = [], isComplete: Bool = true, for root: URL, showHidden: Bool = false
+        _ paths: [String],
+        unscanned: [String] = [],
+        isComplete: Bool = true,
+        for root: URL,
+        showHidden: Bool = false
     ) {
         let entry = Entry(paths: paths, unscanned: unscanned, isComplete: isComplete)
         let key = Self.key(root, showHidden)
@@ -258,21 +265,13 @@ public final class TreeCache: @unchecked Sendable {
         guard isLatest else { return }
         // Private to the user: the folder and the file are made so from the start.
         try? FileManager.default.createDirectory(
-            at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+            at: directory,
+            withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o700]
+        )
         chmod(directory.path, 0o700)
         // Too big for a file: what is there would be out of date, so it goes.
         if !Self.writePrivately(entry, root: root, to: file) { try? FileManager.default.removeItem(at: file) }
-    }
-
-    /// Writes a file nobody else can read: a new file of mode 0600 that replaces the old one.
-    static func writePrivately(_ data: Data, to file: URL) {
-        let temporary = file.path + ".tmp\(getpid())"
-        let descriptor = open(temporary, O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW, 0o600)
-        guard descriptor >= 0 else { return }
-        let ok = data.withUnsafeBytes { buffer in write(descriptor, buffer) }
-        close(descriptor)
-        if ok, rename(temporary, file.path) == 0 { return }
-        unlink(temporary)
     }
 
     /// The tree written to the file in pieces of about a megabyte, so that a tree of a million
