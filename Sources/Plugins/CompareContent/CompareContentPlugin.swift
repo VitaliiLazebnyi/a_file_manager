@@ -16,7 +16,8 @@ public final class CompareContentPlugin: Plugin {
     private let effects: CompareWindowEffects
     /// The sessions of the open windows; without windows (tests), the last one started.
     private(set) var sessions: [CompareSession] = []
-    private var windows: [CompareWindowController] = []
+    /// The open windows.
+    private(set) var windows: [CompareWindowController] = []
     private weak var owner: Kernel?
 
     /// Tests pass `opensWindows: false` and look at the session; the work then runs on the

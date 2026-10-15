@@ -69,8 +69,27 @@ public enum TextEncoding: Equatable, Sendable {
         return String(data: body, encoding: stringEncoding) ?? String(decoding: body, as: UTF8.self)
     }
 
+    /// The bytes of a text; in Latin-1 a character beyond it becomes a question mark.
     func encode(_ text: String) -> Data {
-        Data(bom) + (text.data(using: stringEncoding, allowLossyConversion: true) ?? Data(text.utf8))
+        var data = Data(bom)
+        switch self {
+        case .utf8:
+            data.append(contentsOf: text.utf8)
+
+        case .utf16LittleEndian:
+            for unit in text.utf16 {
+                data.append(contentsOf: [UInt8(truncatingIfNeeded: unit), UInt8(truncatingIfNeeded: unit >> 8)])
+            }
+
+        case .utf16BigEndian:
+            for unit in text.utf16 {
+                data.append(contentsOf: [UInt8(truncatingIfNeeded: unit >> 8), UInt8(truncatingIfNeeded: unit)])
+            }
+
+        case .latin1:
+            data.append(contentsOf: text.unicodeScalars.map { $0.value < 0x100 ? UInt8($0.value) : 0x3F })
+        }
+        return data
     }
 
     /// The bytes of a text, or nil when the encoding cannot hold it (Latin-1 and a character beyond it).
@@ -139,7 +158,10 @@ public struct TextDocument: Equatable, Sendable {
                 lines.append(
                     TextLine(
                         String(decoding: UnsafeBufferPointer(rebasing: bytes[start..<end]), as: UTF8.self),
-                        ending: ending, number: lines.count + 1))
+                        ending: ending,
+                        number: lines.count + 1
+                    )
+                )
             }
             while index < bytes.count {
                 let byte = bytes[index]

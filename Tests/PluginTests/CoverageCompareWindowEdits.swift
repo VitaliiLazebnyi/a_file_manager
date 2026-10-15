@@ -155,7 +155,7 @@ internal struct CoverageCompareWindowEdits {
         stage.click("Compare")
         #expect(stage.session.phase == .working)
         window.cancelOperation(nil)
-        #expect(window.isVisible)
+        #expect(!stage.wasClosed)
         stage.memory.releaseStalls()
         let deadline = Date(timeIntervalSinceNow: 60)
         while stage.session.phase == .working, Date() < deadline { try await Task.sleep(nanoseconds: 5_000_000) }

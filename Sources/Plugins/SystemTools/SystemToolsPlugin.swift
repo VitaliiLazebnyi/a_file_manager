@@ -22,12 +22,6 @@ public enum SystemToolsCommands {
     public static let minimize: CommandID = "cm_Minimize"
 }
 
-/// Where tests keep the plugin from ejecting: volumes as they are, ejects only recorded.
-private final class RecordedEjects: VolumeAccess {
-    func facts(of directory: URL) -> VolumeFacts { SystemVolumes().facts(of: directory) }
-    func eject(_: VolumeFacts) -> EjectRefusal? { nil }
-}
-
 /// Command line execution, terminal, system information, volume name, printing file lists
 /// and Open With (spec 02 › Command line, 12 › System Information, Volume label, Printing).
 public final class SystemToolsPlugin: Plugin {
@@ -37,8 +31,7 @@ public final class SystemToolsPlugin: Plugin {
     nonisolated public static let showOutputKey = "systemTools.showOutput"
     nonisolated public static let recordHistoryKey = "systemTools.recordHistory"
 
-    private let launchesApplications: Bool
-    private let volumes: any VolumeAccess?
+    private let desktop: ToolsDesktop
     private var tools: SystemTools?
 
     /// What the plugin started or, where tests keep it from acting, would have started:
@@ -48,24 +41,29 @@ public final class SystemToolsPlugin: Plugin {
 
     /// Tests turn `launchesApplications` off, so they do not start other applications. Then
     /// only harmless lines such as `echo` are really run (by `/bin/sh`, without the user's
-    /// profile); nothing is printed, opened, renamed, ejected or quit. `volumes` stands in for
-    /// the volumes of the Mac when a test ejects one.
-    public init(launchesApplications: Bool = true, volumes: any VolumeAccess? = nil) {
-        self.launchesApplications = launchesApplications
-        self.volumes = volumes
+    /// profile); nothing is printed, opened, renamed, ejected or quit (`ToolsDesktop.quiet`).
+    /// `volumes` stands in for the volumes of the Mac when a test ejects one.
+    public convenience init(launchesApplications: Bool = true, volumes: any VolumeAccess? = nil) {
+        var desktop = launchesApplications ? ToolsDesktop.system : .quiet
+        desktop.volumes = volumes ?? desktop.volumes
+        self.init(desktop: desktop)
+    }
+
+    /// The tools, doing what they do outside the program through `desktop`.
+    internal init(desktop: ToolsDesktop) {
+        self.desktop = desktop
     }
 
     public func start(in owner: Kernel) {
         // The kernel keeps what is registered here; it must not be kept by it in turn.
         unowned let kernel = owner
-        let tools = SystemTools(kernel, launchesApplications: launchesApplications, volumes: volumes)
+        let tools = SystemTools(kernel, desktop: desktop)
         self.tools = tools
         let commands = kernel.commands
         let model = { kernel.panels.source.model }
         let isLocal = { model().directory.isFileURL }
         // The list of operands can be a whole folder: it is made when the command runs. Whether
         // the command can run is asked ten times a second and answered without it.
-        let localFiles = { model().directory.isFileURL ? model().operandsSnapshot() : nil }
         let hasLocalFile = { isLocal() && model().hasOperandFile }
 
         commands.register(
@@ -77,9 +75,10 @@ public final class SystemToolsPlugin: Plugin {
         commands.register(Command(SystemToolsCommands.runPrompt, "Run Command…"), tools.promptAndRun)
         commands.register(
             Command(SystemToolsCommands.openTerminal, "Open Terminal Here", runsDuringJobs: true),
-            enabled: isLocal,
-            tools.openTerminal
-        )
+            enabled: isLocal
+        ) {
+            tools.openTerminal(in: model().directory)
+        }
         commands.register(
             Command(SystemToolsCommands.systemInformation, "System Information…"),
             tools.showSystemInformation
@@ -108,13 +107,18 @@ public final class SystemToolsPlugin: Plugin {
             Command(SystemToolsCommands.printFile, "Print File Contents", [.f(9, .control)]),
             enabled: hasLocalFile
         ) {
-            if let operands = localFiles() { tools.printFiles(operands) }
+            // Enabled only for a local folder.
+            tools.printFiles(model().operandsSnapshot())
         }
         commands.register(
             Command(SystemToolsCommands.openWith, "Open With…", runsDuringJobs: false),
-            enabled: { isLocal() && model().cursorItem != nil },
-            tools.openWith
-        )
+            enabled: { isLocal() && model().cursorItem != nil }
+        ) {
+            // Enabled only with an item under the cursor.
+            if let item = model().cursorItem {
+                tools.openWith(item)
+            }
+        }
         commands.register(
             Command(SystemToolsCommands.quit, "Quit", [.f(4, .option)], runsDuringJobs: true),
             tools.quit
@@ -212,6 +216,8 @@ final class SystemTools {
     static let printOutputKey = "systemTools.printOutput"
     /// In a list of this length or longer, the marked items are picked out off the main thread.
     static let backgroundSelectionThreshold = 5_000
+    /// How many files one run of the printer program is given.
+    nonisolated static let filesPerPrint = 256
 
     /// What tests may really run: programs that only write text.
     nonisolated static let harmlessCommands: Set<String> = ["echo", "printf", "true", "false", "pwd"]
@@ -220,7 +226,8 @@ final class SystemTools {
 
     /// Unowned: the kernel owns the plugin, and through it this.
     private unowned let kernel: Kernel
-    private let launchesApplications: Bool
+    /// What the tools do outside the program.
+    private let desktop: ToolsDesktop
     private(set) var log: [String] = []
     /// The log keeps its newest lines; a program that runs for weeks must not grow with every command.
     private static let logLimit = 512
@@ -232,13 +239,12 @@ final class SystemTools {
 
     private var ejection: VolumeEjection!
 
-    init(_ kernel: Kernel, launchesApplications: Bool, volumes: any VolumeAccess? = nil) {
+    init(_ kernel: Kernel, desktop: ToolsDesktop) {
         self.kernel = kernel
-        self.launchesApplications = launchesApplications
-        let access = volumes ?? (launchesApplications ? SystemVolumes() : RecordedEjects())
+        self.desktop = desktop
         ejection = VolumeEjection(
             kernel: kernel,
-            access: access,
+            access: desktop.volumes,
             home: { FileManager.default.homeDirectoryForCurrentUser },
             note: { [unowned self] in note($0) }
         )
@@ -250,14 +256,6 @@ final class SystemTools {
     private var home: URL { FileManager.default.homeDirectoryForCurrentUser }
 
     // MARK: Command line
-
-    /// The shell that runs a line: always a POSIX shell, started as a login shell, so the
-    /// command finds the same PATH as in a terminal (`LoginShell`). Tests use the plain system
-    /// shell and leave the user's profile alone.
-    private var shell: (executable: URL, arguments: [String]) {
-        guard launchesApplications else { return (URL(fileURLWithPath: "/bin/sh"), ["-c"]) }
-        return (URL(fileURLWithPath: LoginShell.posix.executable), LoginShell.posix.options)
-    }
 
     private var history: [String] { CommandHistory.load(from: settings.scoped(to: "systemTools")) }
 
@@ -293,36 +291,32 @@ final class SystemTools {
                 forKey: CommandHistory.key
             )
         }
-        guard launchesApplications || Self.isHarmless(typed) else {
+        guard desktop.mayRun(typed) else {
             note("skipped: \(DisplayText.oneLine(typed.command))")
             return
         }
         let directory = model.directory.isFileURL ? model.directory : home
         let shown = kernel.panels.all.map(\.model.directory)
-        let shell = self.shell
+        // The shell is always a POSIX shell, started as a login shell, so the command finds the same PATH as in a
+        // terminal (`LoginShell`); tests use the plain system shell and leave the user's profile alone.
+        let (shell, searchPath, environment) = (desktop.shell, desktop.searchPath, desktop.environment)
         let runner = ProcessRunner(
             executable: shell.executable,
-            arguments: shell.arguments + [typed.isDetached ? typed.command + " &" : typed.command],
+            arguments: shell.options + [typed.isDetached ? typed.command + " &" : typed.command],
             directory: directory,
             collectsOutput: !typed.isDetached
         )
-        let opensApplications = launchesApplications
         let shownCommand = DisplayText.oneLine(typed.command)
         kernel.jobs.run(
             title: "Running: \(shownCommand)",
             work: { [runner] monitor -> RunResult in
                 var runner = runner
-                if opensApplications {
-                    // What is a program is decided with the PATH of the login shell, not with the
-                    // short one this process was started with.
-                    if let application = typed.application(relativeTo: directory, path: LoginShell.searchPath) {
-                        return .application(
-                            application,
-                            files: Self.files(in: typed.arguments, relativeTo: directory)
-                        )
-                    }
-                    runner.environment = LoginShell.environment()
+                // What is a program is decided with the PATH of the login shell, not with the
+                // short one this process was started with.
+                if let application = typed.application(relativeTo: directory, path: searchPath()) {
+                    return .application(application, files: Self.files(in: typed.arguments, relativeTo: directory))
                 }
+                runner.environment = environment()
                 return .finished(
                     runner.run(cancellation: monitor.cancellation) { bytes in
                         monitor.report(
@@ -340,16 +334,9 @@ final class SystemTools {
                 case .application(let application, let files):
                     note("application: \(DisplayText.oneLine(application.path))")
                     if files.isEmpty {
-                        NSWorkspace.shared.openApplication(
-                            at: application,
-                            configuration: NSWorkspace.OpenConfiguration()
-                        )
+                        desktop.start(application)
                     } else {
-                        NSWorkspace.shared.open(
-                            files,
-                            withApplicationAt: application,
-                            configuration: NSWorkspace.OpenConfiguration()
-                        )
+                        desktop.open(files, application)
                     }
 
                 case .finished(let outcome):
@@ -423,8 +410,9 @@ final class SystemTools {
 
     // MARK: Terminal
 
-    /// Finds an application by path, bundle identifier or name. Asks the disk: background only.
-    nonisolated static func application(named name: String) -> URL? {
+    /// Finds an application by path, name or bundle identifier (`identified`). Asks the disk:
+    /// background only.
+    nonisolated static func application(named name: String, identified: (String) -> URL?) -> URL? {
         let fm = FileManager.default
         if name.contains("/") {
             let path = NSString(string: name).expandingTildeInPath
@@ -438,22 +426,20 @@ final class SystemTools {
         {
             return found
         }
-        return NSWorkspace.shared.urlForApplication(withBundleIdentifier: name)
+        return identified(name)
     }
 
     /// Opens a terminal window in the source panel's folder (spec 12 › Miscellaneous commands,
     /// "Open command prompt window"), with the terminal chosen in the preferences.
-    func openTerminal() {
-        let directory = model.directory
-        guard directory.isFileURL else { return }
-        guard launchesApplications else {
-            note("terminal: \(DisplayText.oneLine(directory.path))")
-            return
-        }
+    func openTerminal(in directory: URL) {
         let name = settings.text(SystemToolsPlugin.terminalKey, default: "Terminal")
+        let identified = desktop.applicationWithIdentifier
         // (Looking an application up asks the disk: on a thread of the kernel's own.)
         BlockingCalls.run {
-            let application = Self.application(named: name.trimmingCharacters(in: .whitespaces))
+            let application = Self.application(
+                named: name.trimmingCharacters(in: .whitespaces),
+                identified: identified
+            )
             DispatchQueue.main.async { [self] in
                 guard let application else {
                     return ui.inform(
@@ -464,28 +450,25 @@ final class SystemTools {
                 }
                 note("terminal: \(DisplayText.oneLine(directory.path))")
                 // A terminal that is handed a folder opens a window there.
-                NSWorkspace.shared.open(
-                    [directory],
-                    withApplicationAt: application,
-                    configuration: NSWorkspace.OpenConfiguration()
-                )
+                desktop.open([directory], application)
             }
         }
     }
 
     // MARK: System information
 
+    /// A screen as the dialog shows it: its pixels, and its points and scale when they differ.
+    nonisolated static func display(_ size: NSSize, scale: CGFloat) -> String {
+        let pixels = "\(Int(size.width * scale))x\(Int(size.height * scale))"
+        return scale == 1 ? pixels : "\(pixels) (\(Int(size.width))x\(Int(size.height)) @\(Int(scale))x)"
+    }
+
     func showSystemInformation() {
-        let displays = NSScreen.screens.map { screen -> String in
-            let scale = screen.backingScaleFactor
-            let pixels = "\(Int(screen.frame.width * scale))x\(Int(screen.frame.height * scale))"
-            return scale == 1
-                ? pixels : "\(pixels) (\(Int(screen.frame.width))x\(Int(screen.frame.height)) @\(Int(scale))x)"
-        }
+        let displays = NSScreen.screens.map { Self.display($0.frame.size, scale: $0.backingScaleFactor) }
         kernel.jobs.run(
             title: "System Information:",
             work: { monitor in
-                SystemInformation.gather(displays: displays, cancellation: monitor.cancellation)
+                SystemInformation.gather(displays: displays, cancellation: monitor.cancellation, asking: .system)
             },
             completion: { [self] gathered in
                 // Nil: cancelled while a volume did not answer.
@@ -496,9 +479,8 @@ final class SystemTools {
                     fields: [.lines("information", "", information.text)],
                     buttons: ["OK", "Copy"]
                 )
-                if answer?.button == 1, launchesApplications {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(information.text, forType: .string)
+                if answer?.button == 1 {
+                    desktop.copy(information.text)
                 }
             }
         )
@@ -528,10 +510,11 @@ final class SystemTools {
     /// through the system's own interface, which asks for rights itself where it needs them.
     func renameVolume() {
         let directory = model.directory
+        let (volumes, rename) = (desktop.volumes, desktop.renameVolume)
         kernel.jobs.run(
             title: "Volume:",
             work: { monitor in
-                Self.ask("volume", of: directory, monitor) { SystemVolumes().facts(of: directory) }
+                Self.ask("volume", of: directory, monitor) { volumes.facts(of: directory) }
             },
             completion: { [self] answer in
                 // Nil: the question was cancelled.
@@ -554,16 +537,12 @@ final class SystemTools {
                         style: .warning
                     )
                 }
-                guard launchesApplications else {
-                    note("rename-volume: \(volume.path) -> \(name)")
-                    return
-                }
                 kernel.jobs.run(
                     title: "Renaming volume:",
                     work: { monitor -> any Error?? in
                         Self.ask("rename to \(name)", of: volume, monitor) { () -> any Error? in
                             do {
-                                try (volume as NSURL).setResourceValue(name, forKey: .volumeNameKey)
+                                try rename(volume, name)
                                 return nil
                             } catch {
                                 return error
@@ -604,6 +583,13 @@ final class SystemTools {
             case .viewer: return "Show as text"
             }
         }
+    }
+
+    /// Where a printed file list goes.
+    private enum Destination {
+        case printer
+        case file(URL)
+        case viewer
     }
 
     /// Files › Print › File list (spec 12 › Printing): the selected items, or the whole list
@@ -681,13 +667,20 @@ final class SystemTools {
         settings.set(formatter.linesPerPage, forKey: Self.printLinesKey)
         settings.set(output.rawValue, forKey: Self.printOutputKey)
 
-        var file: URL?
-        if output == .textFile {
+        let destination: Destination
+        switch output {
+        case .printer:
+            destination = .printer
+
+        case .viewer:
+            destination = .viewer
+
+        case .textFile:
             guard
                 let name = ui.prompt("Save file list as:", value: "filelist.txt")?.trimmingCharacters(in: .whitespaces),
                 !name.isEmpty
             else { return }
-            file = kernel.fileSystems.location(from: name, relativeTo: directory)
+            destination = .file(kernel.fileSystems.location(from: name, relativeTo: directory))
         }
         let (fileSystems, ui) = (kernel.fileSystems, self.ui)
         let base = fileSystems.displayPath(directory)
@@ -695,7 +688,7 @@ final class SystemTools {
         kernel.jobs.run(
             title: "Reading file list:",
             work: {
-                [depth, mask, formatter, file] monitor -> (
+                [depth, mask, formatter, destination] monitor -> (
                     pages: [[String]], longest: Int, text: String, error: (any Error)?, cancelled: Bool
                 ) in
                 let items = gather(monitor)
@@ -716,7 +709,7 @@ final class SystemTools {
                 // Measured here: the view that prints would otherwise count every line on the main thread.
                 let longest = pages.reduce(0) { longest, page in page.reduce(longest) { max($0, $1.count) } }
                 if monitor.cancellation.isCancelled { return (pages, longest, text, nil, true) }
-                guard let file else { return (pages, longest, text, nil, false) }
+                guard case .file(let file) = destination else { return (pages, longest, text, nil, false) }
                 do {
                     let provider = try fileSystems.provider(for: file)
                     let exists = provider.item(at: file) != nil
@@ -753,12 +746,11 @@ final class SystemTools {
             completion: { [self] result in
                 // A cancelled read leaves a partial list, which is neither printed nor shown.
                 guard !result.cancelled else { return }
-                switch output {
+                switch destination {
                 case .printer:
                     print(result.pages, longestLine: result.longest, linesPerPage: formatter.linesPerPage, title: base)
 
-                case .textFile:
-                    guard let file else { return }
+                case .file(let file):
                     if let error = result.error {
                         if (error as? CocoaError)?.code != .userCancelled {
                             ui.report(error, title: "The file list cannot be saved!")
@@ -778,19 +770,16 @@ final class SystemTools {
     /// Hands the pages to the system's print dialog, which previews them and prints.
     private func print(_ pages: [[String]], longestLine: Int, linesPerPage: Int, title: String) {
         note("print: \(pages.count) pages")
-        guard launchesApplications, let info = NSPrintInfo.shared.copy() as? NSPrintInfo else { return }
-        info.isHorizontallyCentered = false
-        info.isVerticallyCentered = false
+        // The operation prints with a copy of the shared settings, which stay as they are.
+        let shared = NSPrintInfo.shared
         let operation = NSPrintOperation(
-            view: PagePrintView(pages: pages, longestLine: longestLine, linesPerPage: linesPerPage, printInfo: info),
-            printInfo: info
+            view: PagePrintView(pages: pages, longestLine: longestLine, linesPerPage: linesPerPage, printInfo: shared),
+            printInfo: shared
         )
+        operation.printInfo.isHorizontallyCentered = false
+        operation.printInfo.isVerticallyCentered = false
         operation.jobTitle = DisplayText.oneLine(title)
-        if let window = NSApp.mainWindow {
-            operation.runModal(for: window, delegate: nil, didRun: nil, contextInfo: nil)
-        } else {
-            operation.run()
-        }
+        desktop.print(operation)
     }
 
     /// Files › Print › File contents (spec 12 › Printing): sends the files to the default
@@ -808,8 +797,8 @@ final class SystemTools {
         )
     }
 
+    /// `files` are never empty: the command is offered only with a file among the operands.
     func printFiles(_ files: [FileItem]) {
-        guard !files.isEmpty else { return }
         let what = files.count == 1 ? DisplayText.oneLine(files[0].name) : "\(files.count) files"
         guard
             ui.choose(
@@ -824,18 +813,21 @@ final class SystemTools {
             "print-file: "
             + (files.count <= 8
                 ? files.map { DisplayText.oneLine($0.name) }.joined(separator: ", ") : "\(files.count) files")
-        guard launchesApplications else {
-            note(logged)
-            return
-        }
-        let runner = ProcessRunner(
-            executable: URL(fileURLWithPath: "/usr/bin/lpr"),
-            arguments: files.map(\.url.path),
-            directory: nil
-        )
+        let (printer, paths) = (desktop.printer, files.map(\.url.path))
         kernel.jobs.run(
             title: "Printing:",
-            work: { monitor in runner.run(cancellation: monitor.cancellation) },
+            work: { monitor in
+                // A few hundred files at a time: the system starts no program with more than 4,096 arguments (it
+                // raises an exception instead), and their length is limited too. The first failure stops.
+                var outcome = ProcessOutcome()
+                for start in stride(from: 0, to: paths.count, by: Self.filesPerPrint)
+                where outcome.failure == nil && outcome.status == 0 {
+                    let part = Array(paths[start..<min(start + Self.filesPerPrint, paths.count)])
+                    outcome = ProcessRunner(executable: printer, arguments: part, directory: nil)
+                        .run(cancellation: monitor.cancellation)
+                }
+                return outcome
+            },
             completion: { [self] outcome in
                 if outcome.failure != nil || outcome.status != 0 {
                     return ui.inform(
@@ -853,17 +845,17 @@ final class SystemTools {
 
     /// "Associate With" as the Mac has it: the applications able to open the item under the
     /// cursor, the usual one first. Choosing a lasting association is left to Finder.
-    func openWith() {
-        guard let item = model.cursorItem, item.url.isFileURL else { return }
+    func openWith(_ item: FileItem) {
         let shownName = DisplayText.oneLine(item.name)
+        let applicationsToOpen = desktop.applicationsToOpen
         kernel.jobs.run(
             title: "Applications:",
             work: { monitor -> [(name: String, url: URL)]? in
                 // Launch Services looks at the file to know its type: on a volume that does not answer, that waits.
                 Self.ask("applications", of: item.url, monitor) {
-                    let workspace = NSWorkspace.shared
-                    let usual = workspace.urlForApplication(toOpen: item.url)
-                    var applications = workspace.urlsForApplications(toOpen: item.url)
+                    let found = applicationsToOpen(item.url)
+                    let usual = found.usual
+                    var applications = found.all
                     if let usual {
                         applications.removeAll { $0 == usual }
                         applications.insert(usual, at: 0)
@@ -881,12 +873,7 @@ final class SystemTools {
                 else { return }
                 let application = applications[row].url
                 note("open-with: \(application.lastPathComponent) \(shownName)")
-                guard launchesApplications else { return }
-                NSWorkspace.shared.open(
-                    [item.url],
-                    withApplicationAt: application,
-                    configuration: NSWorkspace.OpenConfiguration()
-                )
+                desktop.open([item.url], application)
             }
         )
     }
@@ -896,11 +883,11 @@ final class SystemTools {
     /// Files › Quit: always closes; the shell asks about running jobs as for the Mac's Quit.
     func quit() {
         note("quit")
-        if launchesApplications { NSApp.terminate(nil) }
+        desktop.quit()
     }
 
     func minimize() {
         note("minimize")
-        if launchesApplications { (NSApp.mainWindow ?? NSApp.windows.first { $0.isVisible })?.miniaturize(nil) }
+        desktop.minimize()
     }
 }

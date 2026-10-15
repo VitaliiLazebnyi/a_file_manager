@@ -1,20 +1,23 @@
 import AppKit
 
-/// What the compare window does outside itself: a beep, the panel to choose a file, the font panel and the
-/// clipboard. The window of the program uses the system's; tests put recorders in their place, so that nothing
-/// sounds or opens on the desktop.
+/// What the compare window does outside itself: showing itself on the desktop, a beep, the panel to choose a file,
+/// the font panel and the clipboard. The window of the program uses the system's; tests put recorders in their
+/// place, so that nothing shows, sounds or opens on the desktop.
 ///
 /// Main thread only, like the window.
 @MainActor
 internal struct CompareWindowEffects {
     /// The system's own.
     internal static let system = Self(
+        present: { $0.showWindow(nil) },
         beep: { NSSound.beep() },
         chooseFile: { window, chosen in Self.openPanel(for: window, chosen) },
         showFontPanel: { NSFontManager.shared.orderFrontFontPanel($0) },
         pasteboard: .general
     )
 
+    /// Puts the window on the desktop, in front.
+    internal var present: @MainActor (NSWindowController) -> Void
     /// Tells the user that there is nothing more to go to or nothing was found.
     internal var beep: @MainActor () -> Void
     /// Asks for a file in a sheet of the window; nil when the user cancels.
