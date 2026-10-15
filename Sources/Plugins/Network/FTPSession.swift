@@ -179,10 +179,17 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
     private func config(for profile: ConnectionProfile) -> FTPServerConfig {
         let options = environment.options.values
         return FTPServerConfig(
-            host: profile.key.host, port: profile.key.port, tls: profile.tls, user: profile.user ?? "anonymous",
-            password: profile.password ?? "", passive: profile.passive ?? options.passiveByDefault,
-            encoding: profile.encoding, timeout: options.timeout, initCommands: profile.initCommands,
-            usesMLSD: profile.usesMLSD)
+            host: profile.key.host,
+            port: profile.key.port,
+            tls: profile.tls,
+            user: profile.user ?? "anonymous",
+            password: profile.password ?? "",
+            passive: profile.passive ?? options.passiveByDefault,
+            encoding: profile.encoding,
+            timeout: options.timeout,
+            initCommands: profile.initCommands,
+            usesMLSD: profile.usesMLSD
+        )
     }
 
     /// The user said no to a question; the connection is not made.
@@ -197,7 +204,9 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
             defer { self.condition.unlock() }
             if self.isClosed { return NetworkError.notConnected(self.currentProfile.key.description) }
             return self.stalled(
-                since: began, "Another login to \(self.currentProfile.key.description) is still under way.")
+                since: began,
+                "Another login to \(self.currentProfile.key.description) is still under way."
+            )
         }
     }
 
@@ -206,7 +215,10 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
     /// thread has it already and is set when it is taken here. Work in the background asks
     /// nothing. Nil is the user's refusal.
     private func ask<Answer>(
-        holdsLock: inout Bool, background: Bool, cancellation: CancellationFlag?, _ question: () -> Answer?
+        holdsLock: inout Bool,
+        background: Bool,
+        cancellation: CancellationFlag?,
+        _ question: () -> Answer?
     ) throws -> Answer? {
         if background { throw NetworkError.busy("A question to the user is not asked from the background.") }
         if !holdsLock {
@@ -315,8 +327,11 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
             if asksFirst {
                 guard
                     try ask(
-                        holdsLock: &holdsLock, background: background, cancellation: cancellation,
-                        { environment.askToConnect(profile) ? true : nil }) != nil
+                        holdsLock: &holdsLock,
+                        background: background,
+                        cancellation: cancellation,
+                        { environment.askToConnect(profile) ? true : nil }
+                    ) != nil
                 else {
                     refused = true
                     throw NetworkError.cancelled
@@ -345,8 +360,11 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
                 {
                     guard
                         try ask(
-                            holdsLock: &holdsLock, background: background, cancellation: cancellation,
-                            { environment.askToSendPasswordUnprotected(profile) ? true : nil }) != nil
+                            holdsLock: &holdsLock,
+                            background: background,
+                            cancellation: cancellation,
+                            { environment.askToSendPasswordUnprotected(profile) ? true : nil }
+                        ) != nil
                     else {
                         refused = true
                         throw NetworkError.cancelled
@@ -357,8 +375,13 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
                     condition.unlock()
                 }
                 let connection = FTPConnection(
-                    config: config(for: profile), trust: environment.trust, knownLinks: links, knownNames: names,
-                    onActivity: { [weak self] in self?.noteProgress() }, log: environment.log)
+                    config: config(for: profile),
+                    trust: environment.trust,
+                    knownLinks: links,
+                    knownNames: names,
+                    onActivity: { [weak self] in self?.noteProgress() },
+                    log: environment.log
+                )
                 do {
                     try connection.connect(cancellation: cancellation ?? closing)
                     condition.lock()
@@ -420,7 +443,9 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
     /// what is in the way). `background` work never waits at all: it takes a connection that is
     /// free now, or fails.
     private func acquire(
-        transfer: TransferKind?, fresh: Bool = false, background: Bool = false,
+        transfer: TransferKind?,
+        fresh: Bool = false,
+        background: Bool = false,
         cancellation: CancellationFlag?
     ) throws -> (connection: FTPConnection, reused: Bool) {
         let began = Date()
@@ -572,7 +597,8 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
     /// dropped control connection). `mayRetry` is asked first, because work that already had
     /// an effect outside must not be repeated.
     private func perform<Result>(
-        transfer: TransferKind? = nil, cancellation: CancellationFlag? = nil,
+        transfer: TransferKind? = nil,
+        cancellation: CancellationFlag? = nil,
         mayRetry: (FTPConnection) -> Bool = { _ in true },
         _ work: (FTPConnection) throws -> Result
     ) throws -> (result: Result, connection: FTPConnection) {
@@ -601,7 +627,8 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
     /// the command was sent, or the server said it was closing (421): after a reply that did not
     /// come, the command may well have been carried out.
     private func command<Result>(
-        repeatable: Bool = true, cancellation: CancellationFlag? = nil,
+        repeatable: Bool = true,
+        cancellation: CancellationFlag? = nil,
         _ work: (FTPConnection) throws -> Result
     ) throws -> Result {
         try perform(cancellation: cancellation, mayRetry: { repeatable || !$0.commandMayHaveRun }, work).result
@@ -731,7 +758,8 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
         condition.lock()
         var seen = Set<String>()
         pendingLinks = Array(
-            (paths + pendingLinks).filter { seen.insert($0).inserted }.prefix(Self.backgroundLinks))
+            (paths + pendingLinks).filter { seen.insert($0).inserted }.prefix(Self.backgroundLinks)
+        )
         linkDeadline = Date().addingTimeInterval(Self.backgroundLinkTime)
         let start = !isResolving && !isClosed
         if start { isResolving = true }
@@ -865,8 +893,10 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
     func openRead(_ path: String, cancellation: CancellationFlag?) throws -> any FileReader {
         if cancellation?.isCancelled == true { throw NetworkError.cancelled }
         return FTPReader(
-            session: self, path: RemotePath.normalized(path),
-            asText: environment.options.transfersAsText(RemotePath.name(of: path)))
+            session: self,
+            path: RemotePath.normalized(path),
+            asText: environment.options.transfersAsText(RemotePath.name(of: path))
+        )
     }
 
     func openWrite(_ path: String, cancellation: CancellationFlag?) throws -> any FileWriter {
@@ -914,8 +944,11 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
                 throw FileSystemError.notSupported("Continuing a file on this server")
             }
             return try connection.beginTransfer(
-                target == size ? "APPE \(path)" : "STOR \(path)", type: "I",
-                restartAt: target == size ? 0 : UInt64(target), cancellation: cancellation)
+                target == size ? "APPE \(path)" : "STOR \(path)",
+                type: "I",
+                restartAt: target == size ? 0 : UInt64(target),
+                cancellation: cancellation
+            )
         }
         return (
             FTPWriter(session: self, connection: connection, stream: stream, path: path, asText: false, start: target),
@@ -925,12 +958,18 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
 
     /// Starts a download at `offset` on a connection of its own.
     fileprivate func beginDownload(
-        _ path: String, asText: Bool, offset: UInt64,
+        _ path: String,
+        asText: Bool,
+        offset: UInt64,
         cancellation: CancellationFlag?
     ) throws -> (stream: NetStream, connection: FTPConnection) {
         let (stream, connection) = try perform(transfer: .read, cancellation: cancellation) {
             try $0.beginTransfer(
-                "RETR \(path)", type: asText ? "A" : "I", restartAt: offset, cancellation: cancellation)
+                "RETR \(path)",
+                type: asText ? "A" : "I",
+                restartAt: offset,
+                cancellation: cancellation
+            )
         }
         return (stream, connection)
     }
@@ -1041,10 +1080,13 @@ private final class FTPReader: FileReader, @unchecked Sendable {
         guard begin() else { return nil }
         defer { end() }
         while !atEnd {
-            if active == nil {
-                setActive(try session.beginDownload(path, asText: asText, offset: position, cancellation: abort))
+            let active: (stream: NetStream, connection: FTPConnection)
+            if let running = self.active {
+                active = running
+            } else {
+                active = try session.beginDownload(path, asText: asText, offset: position, cancellation: abort)
+                setActive(active)
             }
-            guard let active else { break }
             do {
                 guard
                     let block = try active.stream.read(upToCount: count, timeout: session.timeout, cancellation: abort)
@@ -1083,7 +1125,10 @@ private final class FTPReader: FileReader, @unchecked Sendable {
                 while left > 0 {
                     guard
                         let block = try active.stream.read(
-                            upToCount: left, timeout: session.timeout, cancellation: abort)
+                            upToCount: left,
+                            timeout: session.timeout,
+                            cancellation: abort
+                        )
                     else { break }
                     left -= block.count
                     position += UInt64(block.count)
@@ -1204,7 +1249,10 @@ private final class FTPWriter: FileWriter, @unchecked Sendable {
         guard let active else { throw NetworkError.connectionLost }
         do {
             try active.stream.write(
-                asText ? converter.toNetwork(data) : data, timeout: session.timeout, cancellation: abort)
+                asText ? converter.toNetwork(data) : data,
+                timeout: session.timeout,
+                cancellation: abort
+            )
             written += Int64(data.count)
             session.noteProgress()
         } catch {
@@ -1237,13 +1285,15 @@ private final class FTPWriter: FileWriter, @unchecked Sendable {
             var length: Int64?
             if active.connection.offers("SIZE") { length = try active.connection.size(of: path, cancellation: abort) }
             if length == nil, active.connection.offers("MLST") {
-                length = try active.connection.status(of: path, cancellation: abort).flatMap {
-                    $0.isDirectory ? nil : $0.size
-                }
+                length = try active.connection.status(of: path, cancellation: abort)
+                    .flatMap {
+                        $0.isDirectory ? nil : $0.size
+                    }
             }
             if let length, length != start + written {
                 throw NetworkError.unexpected(
-                    "the file on the server has \(length) bytes after the upload, not \(start + written)")
+                    "the file on the server has \(length) bytes after the upload, not \(start + written)"
+                )
             }
         }
         // On the connection the file came through, which is free again.
