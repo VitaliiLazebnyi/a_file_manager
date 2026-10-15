@@ -5,7 +5,7 @@ import AppKit
 
 /// A button that runs a closure.
 final class ActionButton: NSButton {
-    private var handler: () -> Void = {}
+    private var handler: (() -> Void)?
 
     convenience init(_ title: String, _ handler: @escaping () -> Void) {
         self.init(title: title, target: nil, action: nil)
@@ -15,7 +15,7 @@ final class ActionButton: NSButton {
         bezelStyle = .rounded
     }
 
-    @objc private func pressed() { handler() }
+    @objc private func pressed() { handler?() }
 }
 
 /// A stack whose parts fill it: across, every part is as wide (or as high) as the stack, and
@@ -82,8 +82,8 @@ final class RowsTable: NSScrollView, NSTableViewDataSource, NSTableViewDelegate 
     private var symbols: [String?] = []
     var onSelect: () -> Void = {}
     /// A double click or Return on a row.
-    var onActivate: () -> Void = {} {
-        didSet { table.onReturn = { [weak self] in self?.onActivate() } }
+    var onActivate: (() -> Void)? {
+        didSet { table.onReturn = { [weak self] in self?.onActivate?() } }
     }
 
     init(columns: [(title: String, width: CGFloat)]) {
@@ -169,7 +169,7 @@ final class RowsTable: NSScrollView, NSTableViewDataSource, NSTableViewDelegate 
     func tableViewSelectionDidChange(_: Notification) { onSelect() }
 
     @objc private func doubleClicked() {
-        if table.clickedRow >= 0 { onActivate() }
+        if table.clickedRow >= 0 { onActivate?() }
     }
 }
 
@@ -204,9 +204,10 @@ final class TextWindowController: NSWindowController {
     @available(*, unavailable)
     required init?(coder _: NSCoder) { fatalError("not used") }
 
-    func show(_ text: String) {
+    /// Shows `text`; `present` puts the window on screen.
+    func show(_ text: String, present: (NSWindowController) -> Void) {
         textView.string = text
-        showWindow(nil)
+        present(self)
         window?.makeFirstResponder(textView)
     }
 }
@@ -241,7 +242,8 @@ enum LiveMenus {
 
     /// The key as a menu shows it; nil for keys a menu cannot show. The same rule as the shell's.
     private static func menuEquivalent(_ key: Key) -> String? {
-        func special(_ value: Int) -> String { UnicodeScalar(UInt32(value)).map { String($0) } ?? "" }
+        // AppKit's characters of the special keys lie in one block of 16-bit code units.
+        func special(_ value: Int) -> String { String(utf16CodeUnits: [UInt16(truncatingIfNeeded: value)], count: 1) }
         switch key {
         case .character(let character): return character
         case .function(let number): return special(NSF1FunctionKey + number - 1)

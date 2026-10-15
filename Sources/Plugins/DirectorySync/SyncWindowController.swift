@@ -12,6 +12,7 @@ final class SyncWindowController: NSWindowController, NSWindowDelegate, NSTableV
     private let session: SyncSession
     /// Unowned: the kernel owns the plugin, and through it this.
     private unowned let kernel: Kernel
+    private let effects: SyncWindowEffects
 
     private let setsButton = NSPopUpButton(frame: .zero, pullsDown: true)
     private let leftField = NSTextField()
@@ -72,8 +73,9 @@ final class SyncWindowController: NSWindowController, NSWindowDelegate, NSTableV
     /// session they run in, and look at what it was asked to show.
     internal var present: @MainActor (NSWindowController) -> Void = { $0.showWindow(nil) }
 
-    init(session: SyncSession) {
+    init(session: SyncSession, effects: SyncWindowEffects = .system) {
         self.session = session
+        self.effects = effects
         kernel = session.kernel
         let window = ToolWindow(
             contentRect: NSRect(x: 0, y: 0, width: 1_000, height: 620),
@@ -88,11 +90,7 @@ final class SyncWindowController: NSWindowController, NSWindowDelegate, NSTableV
         super.init(window: window)
         window.delegate = self
         // Esc interrupts a running comparison; when idle it closes the window.
-        window.onEscape = { [weak self] in
-            guard let self, self.session.phase == .comparing else { return false }
-            self.session.cancelComparison()
-            return true
-        }
+        window.onEscape = { [weak self] in self?.interruptComparison() == true }
         buildContent(in: window)
         session.onChange = { [weak self] in self?.refresh() }
         session.onRowsChange = { [weak self] rows in self?.refreshRows(rows) }
@@ -103,6 +101,9 @@ final class SyncWindowController: NSWindowController, NSWindowDelegate, NSTableV
 
     /// Shows the window with what the session holds now.
     func show() {
+        // The list is drawn from this window again (closing let go of it).
+        table.dataSource = self
+        table.delegate = self
         pullControls()
         refresh()
         present(self)
@@ -197,7 +198,7 @@ final class SyncWindowController: NSWindowController, NSWindowDelegate, NSTableV
         table.target = self
         table.action = #selector(rowClicked)
         table.doubleAction = #selector(rowDoubleClicked)
-        table.onKey = { [weak self] event in self?.handleKey(event) ?? false }
+        table.onKey = { [weak self] event in self?.handleKey(event) == true }
         rowMenu.delegate = self
         table.menu = rowMenu
         let scroll = NSScrollView()
@@ -286,6 +287,13 @@ final class SyncWindowController: NSWindowController, NSWindowDelegate, NSTableV
         pullControls()
     }
 
+    /// Esc: interrupts a running comparison and says so; false when nothing runs.
+    func interruptComparison() -> Bool {
+        guard session.phase == .comparing else { return false }
+        session.cancelComparison()
+        return true
+    }
+
     @objc private func compareFromField() {
         if session.phase != .comparing, session.phase != .synchronizing { compareOrAbort() }
     }
@@ -312,11 +320,8 @@ final class SyncWindowController: NSWindowController, NSWindowDelegate, NSTableV
 
     private func pickFolder(for field: NSTextField) {
         guard let window else { return }
-        let panel = NSOpenPanel()
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = false
-        panel.beginSheetModal(for: window) { response in
-            if response == .OK, let url = panel.url { field.stringValue = url.path }
+        effects.chooseFolder(window) { url in
+            if let url { field.stringValue = url.path }
         }
     }
 
@@ -430,7 +435,7 @@ final class SyncWindowController: NSWindowController, NSWindowDelegate, NSTableV
         } else if Shortcut.f(4, .shift).matches(event) {
             rows.first.map { session.view(.right, row: $0, command: .edit) }
         } else if Shortcut.f(2).matches(event) {
-            setsButton.performClick(nil)
+            effects.showMenu(setsButton)
         } else if Shortcut(.pageDown, .control).matches(event) {
             jumpToHeader(forward: true)
         } else if Shortcut(.pageUp, .control).matches(event) {
@@ -454,7 +459,11 @@ final class SyncWindowController: NSWindowController, NSWindowDelegate, NSTableV
         enabled: Bool = true,
         _ action: @escaping () -> Void
     ) -> NSMenuItem {
-        let item = ClosureMenuItem(title: title, keyEquivalent: key, run: action)
+        let item = NSMenuItem(title: title, action: #selector(MenuAction.runAction), keyEquivalent: key)
+        let target = MenuAction(action)
+        // The item holds its target weakly; the represented object keeps it.
+        item.target = target
+        item.representedObject = target
         item.keyEquivalentModifierMask = modifiers
         item.isEnabled = enabled
         return item
@@ -636,20 +645,20 @@ final class SyncWindowController: NSWindowController, NSWindowDelegate, NSTableV
 
     func windowWillClose(_: Notification) {
         session.cancelComparison()
+        // A closed window asks nothing more of the session, whose kernel may be gone before
+        // the window's views are when the program ends; `show` takes the list up again.
+        table.dataSource = nil
+        table.delegate = nil
     }
 }
 
-/// A menu item that runs a closure.
-private final class ClosureMenuItem: NSMenuItem {
+/// What a menu item of the window runs.
+private final class MenuAction: NSObject {
     private let run: () -> Void
 
-    init(title: String, keyEquivalent: String, run: @escaping () -> Void) {
+    init(_ run: @escaping () -> Void) {
         self.run = run
-        super.init(title: title, action: #selector(runClosure), keyEquivalent: keyEquivalent)
-        target = self
     }
 
-    required init(coder _: NSCoder) { fatalError("not used") }
-
-    @objc private func runClosure() { run() }
+    @objc func runAction() { run() }
 }

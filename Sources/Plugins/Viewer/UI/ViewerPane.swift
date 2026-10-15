@@ -43,6 +43,8 @@ final class ViewerPane: NSView, NSMenuDelegate {
     var links: any LinkOpening = SystemLinks()
     /// The panels the pane asks with, and printing.
     var dialogs: any ViewerDialogs = SystemDialogs()
+    /// What sounds and films are played with: the system's player, or a test's that plays nothing.
+    var mediaPlayback: @MainActor () -> any MediaPlayback = { SystemMediaPlayback() }
 
     /// The window title changed (a file was loaded, a track names itself).
     var onTitleChange: (String) -> Void = { _ in }
@@ -120,8 +122,9 @@ final class ViewerPane: NSView, NSMenuDelegate {
     private let statusLabel = NSTextField(labelWithString: "")
     private let progressBar = NSProgressIndicator()
     private let cancelButton = NSButton(title: "Cancel", target: nil, action: nil)
-    /// Set on the main thread, read in `deinit`.
-    nonisolated(unsafe) private var keyMonitor: Any?
+    /// Set while the pane is in a window. A pane leaves its window (`viewDidMoveToWindow`) before
+    /// it can go: the window holds it, and takes it out of itself when it goes.
+    private var keyMonitor: Any?
     static let menuTitles = ["File", "Edit", "Options", "Encoding"]
 
     init(kernel: Kernel, settings: ListerSettings, temporaryCopies: TemporaryCopies, isEmbedded: Bool) {
@@ -153,7 +156,6 @@ final class ViewerPane: NSView, NSMenuDelegate {
         presentCancellation.cancel()
         resizeWork?.cancel()
         temporaryCopies.release(owner: ObjectIdentifier(self))
-        if let keyMonitor { NSEvent.removeMonitor(keyMonitor) }
     }
 
     // MARK: Layout
@@ -250,12 +252,16 @@ final class ViewerPane: NSView, NSMenuDelegate {
         if let keyMonitor { NSEvent.removeMonitor(keyMonitor) }
         keyMonitor = nil
         guard window != nil else { return }
+        // A Quick Look view closed when the pane left its window is made anew in this one.
+        if mode == .preview, previewView == nil { present() }
         // The Lister keys are plain letters and keys the main window uses for other things;
         // they are taken before anything else sees them, but only for this pane's window and,
         // inside the main window, only while the pane has the keyboard (spec 10 › Embedded
         // Lister: "these keep their Lister meaning").
-        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            self?.monitored(event) ?? event
+        // A key the pane handled is taken from the application (nil); the monitor is removed
+        // when the pane leaves its window, which it does before it goes, so it never outlives it.
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [unowned self] event in
+            monitored(event)
         }
     }
 
@@ -454,10 +460,23 @@ final class ViewerPane: NSView, NSMenuDelegate {
 
     private func dropRichViews() {
         mediaView?.stop()
-        // A Quick Look view has a window of its own until it is closed.
-        previewView?.close()
-        previewView = nil
+        closePreview()
         (imageView, mediaView, pdfView, webView, richText) = (nil, nil, nil, nil, nil)
+    }
+
+    /// Lets go of the Quick Look view. One that is in a window has a window of its own until it is
+    /// closed; closing one that is in no window (never was, or no longer is) ends the program, so
+    /// it is closed only in a window, and before the pane leaves its window (`viewWillMove`).
+    private func closePreview() {
+        if previewView?.window != nil { previewView?.close() }
+        previewView = nil
+    }
+
+    override func viewWillMove(toWindow newWindow: NSWindow?) {
+        super.viewWillMove(toWindow: newWindow)
+        guard previewView != nil, newWindow !== window else { return }
+        closePreview()
+        showMessage("")
     }
 
     /// The mode a file opens in (spec 10 › Reference algorithm).
@@ -789,7 +808,7 @@ final class ViewerPane: NSView, NSMenuDelegate {
                     self.setContent(views.scroll)
 
                 case .local(let local) where content == .media:
-                    let view = MediaView(frame: self.contentHost.bounds)
+                    let view = MediaView(frame: self.contentHost.bounds, playback: self.mediaPlayback())
                     view.onEnd = { [weak self] in self?.onStep(1) }
                     view.onTitle = { [weak self] in self?.onTitleChange($0) }
                     self.mediaView = view

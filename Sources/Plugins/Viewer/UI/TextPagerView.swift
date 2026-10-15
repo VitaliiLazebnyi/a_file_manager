@@ -55,7 +55,7 @@ private final class ProgressCoalescer: @unchecked Sendable {
 
 /// The queues the work for one document runs on, so that a read that never returns (a share that
 /// stopped answering) holds up that document only, not the next file shown.
-private final class DocumentQueues: Sendable {
+final class DocumentQueues: Sendable {
     /// Row fetches: a newer one replaces an older one that is still waiting.
     let rows = DispatchQueue(label: "viewer.rows", qos: .userInitiated)
     /// Looks for a place or a line, and for the text cursor.
@@ -120,7 +120,8 @@ final class TextPagerView: NSView {
     /// next one is asked for, and when the document is dropped.
     private var fetchRequest: LinkedCancellation?
     private var afterLoad: [(TextPagerView) -> Void] = []
-    private var queues = DocumentQueues()
+    /// The queues of the document shown (tests wait for what was handed to them).
+    private(set) var queues = DocumentQueues()
     private let progress = ProgressCoalescer()
     /// The offset of the top row when it was last on screen: where a new layout starts if the
     /// top row is not loaded just now.

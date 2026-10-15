@@ -170,7 +170,7 @@ public final class SyncExecutor: @unchecked Sendable {
     private var bytesTotal: Int64 = 0
     private var changed: [String: URL] = [:]
     private var knownDirectories: Set<String> = []
-    private var directoryDates: [(url: URL, modified: Date, source: URL)] = []
+    private var directoryDates: [(url: URL, modified: Date, source: URL, provider: any FileSystemProvider)] = []
     /// The roots of the file systems with deferred writes that something was written to, by
     /// location, still to be committed.
     private var uncommitted: [String: (provider: any FileSystemProvider, root: URL)] = [:]
@@ -236,9 +236,8 @@ public final class SyncExecutor: @unchecked Sendable {
         // Folders get their dates last: copying into a folder changes its date. What they
         // carry besides (tags, flags, a lock) comes after that, as a lock would stop the date.
         for entry in directoryDates {
-            guard let provider = try? fileSystems.provider(for: entry.url) else { continue }
-            try? provider.setAttributes(FileAttributes(modified: entry.modified), of: entry.url)
-            try? provider.copyMetadata(from: entry.source, to: entry.url)
+            try? entry.provider.setAttributes(FileAttributes(modified: entry.modified), of: entry.url)
+            try? entry.provider.copyMetadata(from: entry.source, to: entry.url)
         }
         _ = commitWrites()
         outcome.wasCancelled = outcome.wasCancelled || cancellation.isCancelled
@@ -249,8 +248,8 @@ public final class SyncExecutor: @unchecked Sendable {
     /// Does one item with the user's say on failures. Returns false when the run is to stop.
     private func step(_ url: URL, lines: [String], _ work: () throws -> Bool) -> Bool {
         defer { itemsDone += 1 }
-        while true {
-            if cancellation.isCancelled { return false }
+        // Tried again for as long as the user asks for it, unless the run is cancelled.
+        while !cancellation.isCancelled {
             currentLines = lines
             onProgress(
                 JobProgress(
@@ -293,6 +292,7 @@ public final class SyncExecutor: @unchecked Sendable {
                 }
             }
         }
+        return false
     }
 
     // MARK: Copying
@@ -302,7 +302,7 @@ public final class SyncExecutor: @unchecked Sendable {
         let targetSystem = try fileSystems.provider(for: copy.target)
         if copy.isDirectory {
             try targetSystem.createDirectory(at: copy.target)
-            directoryDates.append((copy.target, copy.targetModified, copy.source))
+            directoryDates.append((copy.target, copy.targetModified, copy.source, targetSystem))
             noteWrite(to: copy.target, in: targetSystem)
             outcome.copied += 1
             return true
