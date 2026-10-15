@@ -252,6 +252,8 @@ final class ViewerPane: NSView, NSMenuDelegate {
         if let keyMonitor { NSEvent.removeMonitor(keyMonitor) }
         keyMonitor = nil
         guard window != nil else { return }
+        // A Quick Look view closed when the pane left its window is made anew in this one.
+        if mode == .preview, previewView == nil { present() }
         // The Lister keys are plain letters and keys the main window uses for other things;
         // they are taken before anything else sees them, but only for this pane's window and,
         // inside the main window, only while the pane has the keyboard (spec 10 › Embedded
@@ -458,10 +460,23 @@ final class ViewerPane: NSView, NSMenuDelegate {
 
     private func dropRichViews() {
         mediaView?.stop()
-        // A Quick Look view has a window of its own until it is closed.
-        previewView?.close()
-        previewView = nil
+        closePreview()
         (imageView, mediaView, pdfView, webView, richText) = (nil, nil, nil, nil, nil)
+    }
+
+    /// Lets go of the Quick Look view. One that is in a window has a window of its own until it is
+    /// closed; closing one that is in no window (never was, or no longer is) ends the program, so
+    /// it is closed only in a window, and before the pane leaves its window (`viewWillMove`).
+    private func closePreview() {
+        if previewView?.window != nil { previewView?.close() }
+        previewView = nil
+    }
+
+    override func viewWillMove(toWindow newWindow: NSWindow?) {
+        super.viewWillMove(toWindow: newWindow)
+        guard previewView != nil, newWindow !== window else { return }
+        closePreview()
+        showMessage("")
     }
 
     /// The mode a file opens in (spec 10 › Reference algorithm).
