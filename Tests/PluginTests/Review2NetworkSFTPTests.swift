@@ -124,6 +124,15 @@ import Testing
         #expect(throws: NetworkError.self) { _ = try session.entry(at: "/") }
     }
 
+    @Test func aChannelClosedBeforeItStartsDoesNotStart() {
+        // A disconnect may close the channel before the login starts it; the closed pipe must
+        // not be touched (its handle raises, which ended the whole program).
+        let channel = SFTPChannel(executable: "/bin/sleep", arguments: ["600"], environment: [:])
+        channel.close()
+        #expect(throws: NetworkError.self) { try channel.start(timeout: 30, cancellation: nil) { true } }
+        #expect(channel.isClosed)
+    }
+
     @Test func aPacketThatIsNotSFTPEndsTheChannelAndItsProcess() throws {
         // Announces a packet far larger than any the protocol has, after the greeting.
         let box = try Sandbox()
