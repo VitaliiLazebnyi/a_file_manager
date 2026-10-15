@@ -103,24 +103,28 @@ final class TextDocument: @unchecked Sendable {
     /// Stops the indexing alone, which ends with `cancellation` too: rows can still be read.
     private let indexStop: LinkedCancellation
     private let index: TextRowIndex?
-    private let tableEncoding: ViewerEncoding?
+    /// The encoding of the byte layouts' characters.
+    private let tableEncoding: ViewerEncoding
     private let tableLock = NSLock()
     private var builtTable: CodeTable?
 
     /// The conversion table of the byte layouts, made when rows are first read (a table of a
     /// double-byte code page takes a moment): not on the main thread.
-    private var table: CodeTable? {
-        guard let tableEncoding else { return nil }
+    private var table: CodeTable {
         tableLock.lock()
         defer { tableLock.unlock() }
-        if builtTable == nil { builtTable = CodeTable.table(for: tableEncoding) }
-        return builtTable
+        let made = builtTable ?? CodeTable.table(for: tableEncoding)
+        builtTable = made
+        return made
     }
 
     /// `reusing` is a document of the same bytes laid out otherwise (another width): what is
     /// the same in both is not read again.
     init(
-        source: any ByteSource, encoding: ViewerEncoding, bomLength: Int = 0, layout: ViewerLayout,
+        source: any ByteSource,
+        encoding: ViewerEncoding,
+        bomLength: Int = 0,
+        layout: ViewerLayout,
         reusing previous: TextDocument? = nil
     ) {
         self.source = source
@@ -129,6 +133,7 @@ final class TextDocument: @unchecked Sendable {
         cancellation = flag
         indexStop = LinkedCancellation(flag)
         hexFormat = HexFormat(length: source.length)
+        tableEncoding = encoding.byteOriented
         switch layout {
         case .text:
             self.encoding = encoding
@@ -138,13 +143,11 @@ final class TextDocument: @unchecked Sendable {
                 previous?.source === source && previous?.encoding == encoding && previous?.content == range
                 ? previous?.index : nil
             index = TextRowIndex(start: range.lowerBound, reusing: before)
-            tableEncoding = nil
 
         case .binary, .hex:
             self.encoding = encoding.byteOriented
             content = 0..<source.length
             index = nil
-            tableEncoding = encoding.byteOriented
         }
     }
 
@@ -176,14 +179,25 @@ final class TextDocument: @unchecked Sendable {
     /// Finds the rows of a text. Blocks until done or cancelled (`cancellation`); the byte
     /// layouts need no index and return at once. `progress` is called from working threads.
     func buildIndex(
-        parallel: Bool, segmentSize: Int = 4 << 20, chunkSize: Int = 1 << 20, rawScan: Bool = true,
+        parallel: Bool,
+        segmentSize: Int = 4 << 20,
+        chunkSize: Int = 1 << 20,
+        rawScan: Bool = true,
         progress: @escaping @Sendable () -> Void = {}
     ) {
         guard let index, case .text(let options) = layout else { return }
         index.build(
-            source: source, content: content, encoding: encoding, options: options, parallel: parallel,
+            source: source,
+            content: content,
+            encoding: encoding,
+            options: options,
+            parallel: parallel,
             segmentSize: segmentSize,
-            chunkSize: chunkSize, rawScan: rawScan, cancellation: indexStop.flag, progress: progress)
+            chunkSize: chunkSize,
+            rawScan: rawScan,
+            cancellation: indexStop.flag,
+            progress: progress
+        )
     }
 
     /// The flag that ends the building of the index (the document's own ends it too).
@@ -236,19 +250,21 @@ final class TextDocument: @unchecked Sendable {
         let available = rowCount
         guard first >= 0, first < available, count > 0 else { return [] }
         let wanted = min(count, available - first)
-        guard let index else { return try fixedRows(from: first, count: wanted, cancellation) }
+        guard let index, case .text(let options) = layout else {
+            return try fixedRows(from: first, count: wanted, cancellation)
+        }
         var rows: [DisplayRow] = []
         rows.reserveCapacity(wanted)
         // A part of the file that could not be read leaves a gap in the rows: they go on at the
         // checkpoint of the next row that is known, never with the text read through the gap.
-        while rows.count < wanted {
+        // A row the index no longer knows (the partial state of a segment that failed was dropped) ends them.
+        while rows.count < wanted, let position = index.position(ofRow: first + rows.count) {
             let next = first + rows.count
-            guard let position = index.position(ofRow: next) else { break }
             let before = rows.count
-            try walk(from: position, cancellation) { row, bytes, startsLine, line, text, units, base in
+            try walk(from: position, options, cancellation) { row, bytes, startsLine, line, text, units, base in
                 if let end = position.endRow, row >= end { return false }
                 guard row >= next else { return true }
-                rows.append(makeRow(row, bytes, startsLine, line, text, units, base))
+                rows.append(makeRow(options, row, bytes, startsLine, line, text, units, base))
                 return rows.count < wanted
             }
             if rows.count == before { break }
@@ -258,13 +274,15 @@ final class TextDocument: @unchecked Sendable {
 
     /// The row a byte offset is in; nil while that part of a text is not indexed yet.
     func row(containing offset: Int64, cancellation: CancellationFlag? = nil) throws -> Int? {
-        guard let index else { return min(max(0, rowCount - 1), Int(max(0, offset) / Int64(bytesPerRow))) }
+        guard let index, case .text(let options) = layout else {
+            return min(max(0, rowCount - 1), Int(max(0, offset) / Int64(bytesPerRow)))
+        }
         let offset = min(max(offset, content.lowerBound), content.upperBound)
         guard let position = index.position(before: offset) else {
             return index.isComplete && index.rowCount == 0 ? 0 : nil
         }
         var found = position.row
-        try walk(from: position, cancellation) { row, bytes, _, _, _, _, _ in
+        try walk(from: position, options, cancellation) { row, bytes, _, _, _, _, _ in
             if let end = position.endRow, row >= end { return false }
             found = row
             return bytes.upperBound <= offset
@@ -274,10 +292,12 @@ final class TextDocument: @unchecked Sendable {
 
     /// The first row of a line (counted from 1); nil when the line is not known (yet).
     func row(ofLine line: Int, cancellation: CancellationFlag? = nil) throws -> Int? {
-        guard let index else { return line >= 1 && line <= rowCount ? line - 1 : nil }
+        guard let index, case .text(let options) = layout else {
+            return line >= 1 && line <= rowCount ? line - 1 : nil
+        }
         guard let position = index.position(beforeLine: line - 1) else { return nil }
         var found: Int?
-        try walk(from: position, cancellation) { row, _, startsLine, number, _, _, _ in
+        try walk(from: position, options, cancellation) { row, _, startsLine, number, _, _, _ in
             if let end = position.endRow, row >= end { return false }
             if startsLine, number == line { found = row }
             return found == nil && number <= line
@@ -289,10 +309,11 @@ final class TextDocument: @unchecked Sendable {
     /// false: the row's number, its bytes, whether it begins a line, the number of its line,
     /// and the decoded piece it is in with its unit range and the byte offset of that piece.
     private func walk(
-        from position: TextRowIndex.Position, _ cancellation: CancellationFlag?,
+        from position: TextRowIndex.Position,
+        _ options: TextLayoutOptions,
+        _ cancellation: CancellationFlag?,
         visit: (Int, Range<Int64>, Bool, Int, DecodedText, Range<Int>, Int64) -> Bool
     ) throws {
-        guard case .text(let options) = layout else { return }
         var splitter = RowSplitter(options)
         splitter.startsLine = position.startsLine
         var row = position.row
@@ -301,7 +322,8 @@ final class TextDocument: @unchecked Sendable {
         var base = position.offset
         var readPosition = position.offset
         var text = DecodedText()
-        while true {
+        var reading = true
+        while reading {
             let wanted = Int(min(32 * 1_024, content.upperBound - readPosition))
             let chunk = try source.read(at: readPosition, count: wanted, interruptedBy: cancellation)
             readPosition += Int64(chunk.count)
@@ -321,18 +343,26 @@ final class TextDocument: @unchecked Sendable {
                     return !stop
                 }
             }
-            if stop || atEnd { return }
-            let consumed = consumedUnits == text.units.count ? used : Int(text.offsets[consumedUnits])
-            bytes.removeFirst(consumed)
-            base += Int64(consumed)
+            if stop || atEnd {
+                reading = false
+            } else {
+                let consumed = consumedUnits == text.units.count ? used : Int(text.offsets[consumedUnits])
+                bytes.removeFirst(consumed)
+                base += Int64(consumed)
+            }
         }
     }
 
     private func makeRow(
-        _ row: Int, _ bytes: Range<Int64>, _ startsLine: Bool, _ line: Int, _ text: DecodedText, _ units: Range<Int>,
+        _ options: TextLayoutOptions,
+        _ row: Int,
+        _ bytes: Range<Int64>,
+        _ startsLine: Bool,
+        _ line: Int,
+        _ text: DecodedText,
+        _ units: Range<Int>,
         _ base: Int64
     ) -> DisplayRow {
-        guard case .text(let options) = layout else { preconditionFailure("Text rows are made for text only") }
         var end = units.upperBound
         if end > units.lowerBound, text.units[end - 1] == 0x0A { end -= 1 }
         if end > units.lowerBound, text.units[end - 1] == 0x0D { end -= 1 }
@@ -359,13 +389,18 @@ final class TextDocument: @unchecked Sendable {
             }
         }
         return DisplayRow(
-            index: row, range: bytes, contentEnd: contentEnd, text: String(decoding: shown, as: UTF16.self),
+            index: row,
+            range: bytes,
+            contentEnd: contentEnd,
+            text: String(decoding: shown, as: UTF16.self),
             offsets: offsets,
-            startsLine: startsLine, line: line)
+            startsLine: startsLine,
+            line: line
+        )
     }
 
     private func fixedRows(from first: Int, count: Int, _ cancellation: CancellationFlag?) throws -> [DisplayRow] {
-        guard let table else { return [] }
+        let characters = table
         let width = Int64(bytesPerRow)
         let lower = Int64(first) * width
         let upper = min(length, lower + Int64(count) * width)
@@ -381,16 +416,28 @@ final class TextDocument: @unchecked Sendable {
             if layout == .hex {
                 rows.append(
                     DisplayRow(
-                        index: number, range: range, contentEnd: range.upperBound,
-                        text: hexFormat.line(offset: start, bytes: bytes, table: table), offsets: [], startsLine: true,
-                        line: number + 1))
+                        index: number,
+                        range: range,
+                        contentEnd: range.upperBound,
+                        text: hexFormat.line(offset: start, bytes: bytes, table: characters),
+                        offsets: [],
+                        startsLine: true,
+                        line: number + 1
+                    )
+                )
             } else {
-                let units = bytes.map { HexFormat.printable(table.single[Int($0)]) }
+                let units = bytes.map { HexFormat.printable(characters.single[Int($0)]) }
                 rows.append(
                     DisplayRow(
-                        index: number, range: range, contentEnd: range.upperBound,
+                        index: number,
+                        range: range,
+                        contentEnd: range.upperBound,
                         text: String(decoding: units, as: UTF16.self),
-                        offsets: bytes.indices.map(Int32.init), startsLine: true, line: number + 1))
+                        offsets: bytes.indices.map(Int32.init),
+                        startsLine: true,
+                        line: number + 1
+                    )
+                )
             }
             position += Int(width)
         }
@@ -418,7 +465,8 @@ final class TextDocument: @unchecked Sendable {
     func textIndex(in row: DisplayRow, of offset: Int64) -> Int {
         if layout == .hex {
             return hexFormat.hexColumn(
-                Int(min(max(offset, row.range.lowerBound), row.range.upperBound) - row.range.lowerBound))
+                Int(min(max(offset, row.range.lowerBound), row.range.upperBound) - row.range.lowerBound)
+            )
         }
         let relative = offset - row.range.lowerBound
         var low = 0

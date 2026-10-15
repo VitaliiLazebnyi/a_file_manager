@@ -79,7 +79,11 @@ final class CharacterBoundaries: @unchecked Sendable {
         let from = try boundary(ofBlock: block, cancellation)
         guard offset > from else { return from }
         let data = try read(
-            at: from, count: Int(offset - from) + table.longestCharacter, needed: Int(offset - from), cancellation)
+            at: from,
+            count: Int(offset - from) + table.longestCharacter,
+            needed: Int(offset - from),
+            cancellation
+        )
         return from + Int64(walk(data, from: 0, whileAtOrBefore: Int(offset - from)))
     }
 
@@ -118,12 +122,14 @@ final class CharacterBoundaries: @unchecked Sendable {
         if let hit = cached(block) { return hit }
         // Back to a block with a known boundary, or to one that has a byte which is no lead
         // byte, and so a boundary right after it.
+        // The boundary of block 0, the start of the text, is always known: the walk back ends
+        // there at the latest.
         var anchor = block - 1
-        var found: (block: Int64, boundary: Int64)?
-        while anchor >= 0 {
+        var current: (block: Int64, boundary: Int64) = (0, content.lowerBound)
+        while anchor > 0 {
             try cancellation?.throwIfCancelled()
             if let hit = cached(anchor) {
-                found = (anchor, hit)
+                current = (anchor, hit)
                 break
             }
             let lower = start(ofBlock: anchor)
@@ -134,12 +140,11 @@ final class CharacterBoundaries: @unchecked Sendable {
                 let sync = lower + Int64(last) + 1
                 let boundary = try advance(from: sync, toBlock: anchor + 1, cancellation)
                 remember(anchor + 1, boundary)
-                found = (anchor + 1, boundary)
+                current = (anchor + 1, boundary)
                 break
             }
             anchor -= 1
         }
-        guard var current = found else { return content.lowerBound }
         while current.block < block {
             try cancellation?.throwIfCancelled()
             let next = current.block + 1
@@ -156,7 +161,11 @@ final class CharacterBoundaries: @unchecked Sendable {
         let target = min(content.upperBound, start(ofBlock: block))
         guard target > from else { return from }
         let data = try read(
-            at: from, count: Int(target - from) + table.longestCharacter, needed: Int(target - from), cancellation)
+            at: from,
+            count: Int(target - from) + table.longestCharacter,
+            needed: Int(target - from),
+            cancellation
+        )
         return from + Int64(walk(data, from: 0, whileAtOrBefore: Int(target - from)))
     }
 }

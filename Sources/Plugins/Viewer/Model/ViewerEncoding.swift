@@ -56,7 +56,8 @@ struct ViewerEncoding: Hashable {
         Self(codePage: 874, name: "Thai (874)"), Self(codePage: 850, name: "DOS-LATIN1 (850)"),
         Self(codePage: 866, name: "Cyrillic DOS (866)"),
         Self(codePage: 20_866, name: "Cyrillic KOI8-R (20866)")
-    ].filter(\.isAvailable)
+    ]
+    .filter(\.isAvailable)
 
     /// Any code page the system knows, for "Other (enter code page manually)"; nil otherwise.
     static func codePage(_ number: Int) -> Self? {
@@ -124,8 +125,10 @@ struct ViewerEncoding: Hashable {
 
         case .singleByte, .doubleByte:
             guard let encoding = coreFoundationEncoding else { return nil }
-            return text.data(using: String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(encoding))).map(
-                Array.init)
+            return text.data(using: String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(encoding)))
+                .map(
+                    Array.init
+                )
         }
     }
 }
@@ -221,18 +224,18 @@ final class CodeTable: Sendable {
             // The system's converter has the pairs (JIS X 0208 and the half-width katakana behind 0x8E)
             // but none of the three-byte characters of JIS X 0212: those are one replacement each.
             for trail in 0xA1...0xDF {
-                double[0x8E << 8 | trail] = convert([0x8E, UInt8(trail)]) ?? Self.replacement
+                if let unit = convert([0x8E, UInt8(trail)]) { double[0x8E << 8 | trail] = unit }
             }
             for lead in 0xA1...0xFE {
                 for trail in 0xA1...0xFE {
-                    double[lead << 8 | trail] = convert([UInt8(lead), UInt8(trail)]) ?? Self.replacement
+                    if let unit = convert([UInt8(lead), UInt8(trail)]) { double[lead << 8 | trail] = unit }
                 }
             }
 
         case .gb18030:
             longestCharacter = 4
             for byte in 0..<0x80 { single[byte] = UInt16(byte) }
-            single[0x80] = convert([0x80]) ?? Self.replacement
+            if let unit = convert([0x80]) { single[0x80] = unit }
             for lead in 0x81...0xFE {
                 single[lead] = Self.leadByte
                 for trail in 0x40...0xFE where trail != 0x7F {
@@ -370,7 +373,10 @@ extension ViewerEncoding {
     }
 
     private static func decodeTable(
-        _ bytes: UnsafeBufferPointer<UInt8>, _ final: Bool, _ table: CodeTable, _ text: inout DecodedText
+        _ bytes: UnsafeBufferPointer<UInt8>,
+        _ final: Bool,
+        _ table: CodeTable,
+        _ text: inout DecodedText
     ) -> Int {
         let count = bytes.count
         return table.single.withUnsafeBufferPointer { single in
@@ -407,7 +413,10 @@ extension ViewerEncoding {
 
     /// EUC-JP and GB 18030: the length of each character comes from the layout (`characterLength`).
     private static func decodeLayout(
-        _ bytes: UnsafeBufferPointer<UInt8>, _ final: Bool, _ table: CodeTable, _ text: inout DecodedText
+        _ bytes: UnsafeBufferPointer<UInt8>,
+        _ final: Bool,
+        _ table: CodeTable,
+        _ text: inout DecodedText
     ) -> Int {
         let count = bytes.count
         var index = 0
@@ -525,7 +534,10 @@ extension ViewerEncoding {
     }
 
     private static func decodeUTF16(
-        _ bytes: UnsafeBufferPointer<UInt8>, _ final: Bool, littleEndian: Bool, _ text: inout DecodedText
+        _ bytes: UnsafeBufferPointer<UInt8>,
+        _ final: Bool,
+        littleEndian: Bool,
+        _ text: inout DecodedText
     ) -> Int {
         let count = bytes.count
         @inline(__always) func unit(_ at: Int) -> UInt16 {

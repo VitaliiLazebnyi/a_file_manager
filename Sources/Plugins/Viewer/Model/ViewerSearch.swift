@@ -50,7 +50,8 @@ struct SearchPattern {
         func expression(_ pattern: String) throws -> Kind {
             do {
                 return .expression(
-                    try NSRegularExpression(pattern: pattern, options: insensitive.union(.anchorsMatchLines)))
+                    try NSRegularExpression(pattern: pattern, options: insensitive.union(.anchorsMatchLines))
+                )
             } catch {
                 throw SearchError.badExpression(error.localizedDescription)
             }
@@ -60,13 +61,15 @@ struct SearchPattern {
         } else if options.regex {
             kind = try expression(text)
         } else {
+            // Not empty: unescaping turns every character into one or more.
             let plain = Self.unescape(text)
-            guard !plain.isEmpty else { throw SearchError.empty }
             // `\n` stands for a line break. The specification's Lister finds CR+LF only; files
             // on a Mac end their lines with LF, so every kind of line break is found.
             if plain.contains(Self.lineBreak) {
-                let parts = plain.components(separatedBy: String(Self.lineBreak)).map(
-                    NSRegularExpression.escapedPattern(for:))
+                let parts = plain.components(separatedBy: String(Self.lineBreak))
+                    .map(
+                        NSRegularExpression.escapedPattern(for:)
+                    )
                 kind = try expression(parts.joined(separator: "(?:\\r\\n|\\r|\\n)"))
             } else {
                 kind = .text(plain)
@@ -149,10 +152,16 @@ enum ViewerSearch {
     /// is cut into characters with; a search that is repeated keeps it between the calls.
     /// `rawBytes` off decodes every chunk (the reference the raw searches are tested against).
     static func find(
-        _ pattern: SearchPattern, in source: any ByteSource, content: Range<Int64>, from start: Int64, backwards: Bool,
-        encoding: ViewerEncoding, chunkSize: Int = 1 << 20,
+        _ pattern: SearchPattern,
+        in source: any ByteSource,
+        content: Range<Int64>,
+        from start: Int64,
+        backwards: Bool,
+        encoding: ViewerEncoding,
+        chunkSize: Int = 1 << 20,
         parallelism: Int = ProcessInfo.processInfo.activeProcessorCount,
-        cancellation: CancellationFlag = CancellationFlag(), boundaries: CharacterBoundaries? = nil,
+        cancellation: CancellationFlag = CancellationFlag(),
+        boundaries: CharacterBoundaries? = nil,
         rawBytes: Bool = true,
         progress: (Double) -> Void = { _ in }
     ) throws -> Range<Int64>? {
@@ -160,8 +169,13 @@ enum ViewerSearch {
             encoding.kind == .doubleByte
             ? boundaries ?? CharacterBoundaries(source: source, content: content, encoding: encoding) : nil
         let context = Context(
-            source: source, content: content, encoding: encoding, cancellation: cancellation, boundaries: boundaries,
-            rawBytes: rawBytes)
+            source: source,
+            content: content,
+            encoding: encoding,
+            cancellation: cancellation,
+            boundaries: boundaries,
+            rawBytes: rawBytes
+        )
         let unit = Int64(encoding.unitSize)
         let size = max(unit, Int64(chunkSize) / unit * unit)
         let start = min(max(start, content.lowerBound), content.upperBound)
@@ -216,7 +230,6 @@ enum ViewerSearch {
     private static func search(_ pattern: SearchPattern, _ context: Context, accepted: Range<Int64>, last: Bool) throws
         -> Range<Int64>?
     {
-        guard !accepted.isEmpty else { return nil }
         let (source, content, encoding, cancellation) = (
             context.source, context.content, context.encoding, context.cancellation
         )
@@ -225,7 +238,8 @@ enum ViewerSearch {
             let lower = accepted.lowerBound
             let data = try source.read(
                 lower..<min(content.upperBound, accepted.upperBound + Int64(needle.count - 1)),
-                cancellation: cancellation)
+                cancellation: cancellation
+            )
             return bytes(needle, in: data, base: lower, accepted: accepted, last: last)
 
         case .text(let needle):
@@ -237,7 +251,8 @@ enum ViewerSearch {
                 let lower = accepted.lowerBound
                 let data = try source.read(
                     lower..<min(content.upperBound, accepted.upperBound + Int64(encoded.count - 1)),
-                    cancellation: cancellation)
+                    cancellation: cancellation
+                )
                 return bytes(encoded, in: data, base: lower, accepted: accepted, last: last)
             }
             // Letters of the other case and whole words need only the neighbours of an ASCII needle.
@@ -245,8 +260,12 @@ enum ViewerSearch {
                 needle.utf8.allSatisfy({ $0 < 0x80 })
             {
                 if case .answer(let found) = try rawASCII(
-                    Array(needle.utf8), pattern, context, accepted: accepted, last: last)
-                {
+                    Array(needle.utf8),
+                    pattern,
+                    context,
+                    accepted: accepted,
+                    last: last
+                ) {
                     return found
                 }
             }
@@ -270,7 +289,9 @@ enum ViewerSearch {
                     .withTransparentBounds, .withoutAnchoringBounds, .reportProgress
                 ]
                 expression.enumerateMatches(
-                    in: text as String, options: options, range: NSRange(location: first, length: text.length - first)
+                    in: text as String,
+                    options: options,
+                    range: NSRange(location: first, length: text.length - first)
                 ) { match, _, stop in
                     if cancellation.isCancelled {
                         result = nil
@@ -294,7 +315,9 @@ enum ViewerSearch {
     /// the UTF-16 units `first..<end`, whose bytes are those of `accepted`; maps what it finds
     /// back to bytes.
     private static func decoded(
-        _ context: Context, _ accepted: Range<Int64>, _ overlap: Int64,
+        _ context: Context,
+        _ accepted: Range<Int64>,
+        _ overlap: Int64,
         match: (_ text: NSString, _ units: [UInt16], _ first: Int, _ end: Int) -> NSRange?
     ) throws -> Range<Int64>? {
         let (source, content, encoding) = (context.source, context.content, context.encoding)
@@ -323,7 +346,11 @@ enum ViewerSearch {
         let string = text.units.withUnsafeBufferPointer { NSString(characters: $0.baseAddress!, length: $0.count) }
         guard
             let found = match(
-                string, text.units, firstUnit(at: accepted.lowerBound), firstUnit(at: accepted.upperBound))
+                string,
+                text.units,
+                firstUnit(at: accepted.lowerBound),
+                firstUnit(at: accepted.upperBound)
+            )
         else { return nil }
         let from = lower + Int64(text.offsets[found.location])
         let to =
@@ -498,7 +525,7 @@ enum ViewerSearch {
     private static func hasCaseFolded(utf8 data: Data) -> Bool {
         data.withUnsafeBytes { raw in
             let count = raw.count
-            guard let start = raw.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return false }
+            guard count > 0, let start = raw.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return false }
             var index = 0
             while index < count {
                 if index + 8 <= count,
@@ -532,7 +559,10 @@ enum ViewerSearch {
     /// of the letter, and for a whole word the characters on either side are looked at. The same
     /// answer as the decoded search gives; `undecided` where it could not be sure to.
     private static func rawASCII(
-        _ needle: [UInt8], _ pattern: SearchPattern, _ context: Context, accepted: Range<Int64>,
+        _ needle: [UInt8],
+        _ pattern: SearchPattern,
+        _ context: Context,
+        accepted: Range<Int64>,
         last: Bool
     ) throws -> RawAnswer {
         let (content, encoding) = (context.content, context.encoding)
@@ -541,22 +571,23 @@ enum ViewerSearch {
         let lower = max(content.lowerBound, accepted.lowerBound - 4)
         let upper = min(content.upperBound, accepted.upperBound + Int64(needle.count) * 3 + 4)
         let data = try context.source.read(lower..<upper, cancellation: context.cancellation)
+        // The characters of the bytes of a text in a code page; nil for UTF-8.
         let table = isUTF8 ? nil : CodeTable.table(for: encoding)
-        if isUTF8 {
-            if hasCaseFolded(utf8: data) { return .undecided }
-        } else if let table {
+        if let table {
             let folded = (0x80...0xFF).filter { caseFolded.contains(table.single[$0]) }.map(UInt8.init)
             let hasOne = data.withUnsafeBytes { raw in
                 folded.contains { memchr(raw.baseAddress, Int32($0), raw.count) != nil }
             }
             if hasOne { return .undecided }
+        } else if hasCaseFolded(utf8: data) {
+            return .undecided
         }
         let folded = !pattern.caseSensitive
         let wanted = needle.map { folded && $0 >= 0x41 && $0 <= 0x5A ? $0 | 0x20 : $0 }
         let count = data.count
         var result: Range<Int64>?
         data.withUnsafeBytes { raw in
-            guard let start = raw.baseAddress?.assumingMemoryBound(to: UInt8.self), count >= needle.count else {
+            guard count >= needle.count, let start = raw.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
                 return
             }
             @inline(__always) func fold(_ byte: UInt8) -> UInt8 {
@@ -571,25 +602,32 @@ enum ViewerSearch {
                 guard end > 0 else { return false }
                 let byte = start[end - 1]
                 if byte < 0x80 { return isWordUnit(UInt16(byte)) }
-                guard isUTF8 else { return isWordUnit(table?.single[Int(byte)] ?? 0xFFFD) }
+                if let table { return isWordUnit(table.single[Int(byte)]) }
                 var begin = end - 1
                 while begin > 0, end - begin < 4, start[begin] & 0xC0 == 0x80 { begin -= 1 }
                 var text = DecodedText()
                 text.tracksOffsets = false
                 _ = ViewerEncoding.utf8.decode(
-                    UnsafeBufferPointer(start: start + begin, count: end - begin), final: true, into: &text)
-                return text.units.last.map(isWordUnit) ?? false
+                    UnsafeBufferPointer(start: start + begin, count: end - begin),
+                    final: true,
+                    into: &text
+                )
+                // Bytes decoded to the end give at least one unit.
+                return isWordUnit(text.units[text.units.count - 1])
             }
             func characterAfter(_ begin: Int) -> Bool {
                 guard begin < count else { return false }
                 let byte = start[begin]
                 if byte < 0x80 { return isWordUnit(UInt16(byte)) }
-                guard isUTF8 else { return isWordUnit(table?.single[Int(byte)] ?? 0xFFFD) }
+                if let table { return isWordUnit(table.single[Int(byte)]) }
                 var text = DecodedText()
                 text.tracksOffsets = false
                 _ = ViewerEncoding.utf8.decode(
-                    UnsafeBufferPointer(start: start + begin, count: min(4, count - begin)), final: true, into: &text)
-                return text.units.first.map(isWordUnit) ?? false
+                    UnsafeBufferPointer(start: start + begin, count: min(4, count - begin)),
+                    final: true,
+                    into: &text
+                )
+                return isWordUnit(text.units[0])
             }
             let first = wanted[0]
             let alternative: UInt8 = folded && first >= 0x61 && first <= 0x7A ? first & ~0x20 : first
@@ -640,9 +678,8 @@ enum ViewerSearch {
     static func bytes(_ needle: [UInt8], in data: Data, base: Int64, accepted: Range<Int64>, last: Bool) -> Range<
         Int64
     >? {
-        guard !needle.isEmpty, data.count >= needle.count else { return nil }
-        return data.withUnsafeBytes { (haystack: UnsafeRawBufferPointer) -> Range<Int64>? in
-            guard let start = haystack.baseAddress else { return nil }
+        data.withUnsafeBytes { (haystack: UnsafeRawBufferPointer) -> Range<Int64>? in
+            guard !needle.isEmpty, haystack.count >= needle.count, let start = haystack.baseAddress else { return nil }
             var position = Int(max(0, accepted.lowerBound - base))
             var result: Range<Int64>?
             while position + needle.count <= haystack.count,
