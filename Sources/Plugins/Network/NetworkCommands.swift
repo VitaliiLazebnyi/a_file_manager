@@ -343,7 +343,7 @@ final class NetworkCommands {
     /// Ctrl+F: the saved connections (spec 11 › "Connect to ftp server" dialog).
     func showConnections() {
         var selected = store.connections.firstIndex { $0.id == store.lastUsed } ?? 0
-        while true {
+        dialog: while true {
             let connections = store.connections
             let rows = connections.isEmpty ? ["(no saved connections)"] : connections.map(\.listTitle)
             guard
@@ -353,7 +353,7 @@ final class NetworkCommands {
                     fields: [.list("connection", "", rows, selected: selected)],
                     buttons: ["Connect", "New Connection…", "New URL…", "Duplicate Entry…", "Edit…", "Delete"]
                 )
-            else { return }
+            else { break dialog }
             let row = answer.index("connection")
             let chosen = connections.indices.contains(row) ? connections[row] : nil
             selected = max(0, row)
@@ -361,16 +361,18 @@ final class NetworkCommands {
             case 0:
                 guard let chosen else { continue }
                 connect(chosen.profile, localDirectory: chosen.localDirectory, saved: chosen)
-                return
+                break dialog
 
             case 1:
-                if let created = edit(SavedConnection(), isNew: true) {
-                    selected = store.connections.firstIndex { $0.id == created.id } ?? selected
+                if let created = edit(SavedConnection(), isNew: true),
+                    let row = store.connections.firstIndex(where: { $0.id == created.id })
+                {
+                    selected = row
                 }
 
             case 2:
                 quickConnect()
-                return
+                break dialog
 
             case 3:
                 guard let chosen else { continue }
@@ -416,7 +418,8 @@ final class NetworkCommands {
         passwordOf source: SavedConnection? = nil
     ) -> SavedConnection? {
         var connection = original
-        while true {
+        var saved: SavedConnection?
+        dialog: while true {
             let fields: [FormField] = [
                 .text("name", "Session:", connection.name),
                 .text("host", "Host name[:Port]:", connection.hostText),
@@ -454,7 +457,7 @@ final class NetworkCommands {
                 .text("commands", "Send commands (separated by ;):", connection.initCommands)
             ]
             guard let answer = ui.form("FTP: connection details", detail: "", fields: fields, buttons: ["OK"]) else {
-                return nil
+                break dialog
             }
             connection.name = answer.text("name").trimmingCharacters(in: .whitespaces)
             connection.anonymous = answer.flag("anonymous")
@@ -500,8 +503,10 @@ final class NetworkCommands {
                 // Unchanged: it follows the connection to its new host or user, or to the copy.
                 vault.carryPassword(from: before, to: connection, removing: source == nil)
             }
-            return connection
+            saved = connection
+            break dialog
         }
+        return saved
     }
 
     // MARK: Disconnecting
@@ -513,13 +518,17 @@ final class NetworkCommands {
         let connected = center.connected
         guard !connected.isEmpty else { return }
         let panels = [source, kernel.panels.target]
-        var profile = panels.lazy
+        let shown = panels.lazy
             .compactMap { panel in
                 ServerKey(panel.model.directory).flatMap { key in connected.first { $0.key == key } }
             }
             .first
-        if profile == nil, connected.count == 1 { profile = connected[0] }
-        if profile == nil {
+        let profile: ConnectionProfile
+        if let shown {
+            profile = shown
+        } else if connected.count == 1 {
+            profile = connected[0]
+        } else {
             guard
                 let row = ui.pickRow(
                     "FTP Disconnect",
@@ -530,7 +539,6 @@ final class NetworkCommands {
             else { return }
             profile = connected[row]
         }
-        guard let profile else { return }
         let key = profile.key
 
         // A quick connection offers to be saved first.
@@ -546,9 +554,9 @@ final class NetworkCommands {
                 var connection = SavedConnection()
                 connection.kind = SavedConnection.Kind(scheme: key.scheme, tls: profile.tls)
                 connection.host = key.host
-                connection.port = key.port == connection.kind.defaultPort ? nil : key.port
+                connection.setPort(key.port)
                 connection.anonymous = profile.anonymous || profile.user == "anonymous"
-                connection.user = connection.anonymous ? "" : profile.user ?? ""
+                if !connection.anonymous, let user = profile.user { connection.user = user }
                 connection.remoteDirectory = center.lastPath(on: key) ?? ""
                 // The password the connection was made with is kept only if the box in the dialog stays ticked.
                 edit(connection, isNew: true, offered: connection.anonymous ? nil : profile.password)
@@ -613,12 +621,10 @@ final class NetworkCommands {
     /// The text of a list file. A list is a small text; a file that is no plain file, or
     /// larger than `DownloadList.largestFile`, is not read.
     nonisolated static func readList(_ list: URL) throws -> String {
-        let values = try list.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
+        let values = try list.resourceValues(forKeys: [.isRegularFileKey])
         guard values.isRegularFile == true else { throw VolumeError(message: "\(list.path) is not a file.") }
         let limit = DownloadList.largestFile
-        guard (values.fileSize ?? 0) <= limit else {
-            throw VolumeError(message: "\(list.path) is larger than \(limit >> 20) MB, which no download list is.")
-        }
+        // No more than one byte beyond the limit is read: enough to tell a list that is too large.
         let handle = try FileHandle(forReadingFrom: list)
         defer { try? handle.close() }
         let data = try handle.read(upToCount: limit + 1) ?? Data()
@@ -770,7 +776,7 @@ final class NetworkCommands {
             return
         }
         guard let url = URL(string: text), let scheme = url.scheme?.lowercased(),
-            ServerSchemes.mountable.contains(scheme), url.host != nil
+            ServerSchemes.mountable.contains(scheme), let host = url.host
         else {
             // What was typed may hold a password; it is not shown again.
             ui.inform(
@@ -785,7 +791,7 @@ final class NetworkCommands {
         guard let mounter else { return }
         let panel = source
         kernel.jobs.run(
-            title: "Connect to \(url.host ?? "server")",
+            title: "Connect to \(host)",
             work: { monitor in
                 Result { try mounter.mount(url, cancellation: monitor.cancellation) }
             },
@@ -811,6 +817,7 @@ final class NetworkCommands {
         let inside = kernel.panels.all.filter {
             $0.model.directory.isSameLocation(as: volume) || $0.model.directory.isInside(volume)
         }
+        // The source panel is among them, so the volume is ejected once the last has left.
         var leaving = inside.count
         let eject = { [kernel] in
             _ = kernel.jobs.run(
@@ -822,10 +829,6 @@ final class NetworkCommands {
                     }
                 }
             )
-        }
-        if inside.isEmpty {
-            eject()
-            return
         }
         for panel in inside {
             panel.show(home, focus: nil, history: .record) { _ in
@@ -890,12 +893,8 @@ struct ListPlan {
             let to =
                 target.map { fileSystems.location(from: $0, relativeTo: base) }
                 ?? base.appending(name: from.lastPathComponent)
-            guard (try? fileSystems.provider(for: from)) != nil, (try? fileSystems.provider(for: to)) != nil,
-                !from.lastPathComponent.isEmpty, !to.lastPathComponent.isEmpty
-            else {
-                skipped.append(source)
-                continue
-            }
+            // Both have a file system: a location written out in full is one of a registered file
+            // system (the registry reads it), anything else lies below `base`.
             // A plain line fetches from a server to this Mac. Anything else must say so (`put:`, `copy:`, `move:`).
             if kind == .download, from.isFileURL || !to.isFileURL {
                 skipped.append(
@@ -968,7 +967,7 @@ private final class ListRun {
     private var stepsAgain = false
 
     init(plan: ListPlan, kernel: Kernel, transfers: any FileTransferService) {
-        items = plan.items[...]
+        items = ArraySlice(plan.items)
         skipped = plan.skipped
         self.kernel = kernel
         self.transfers = transfers

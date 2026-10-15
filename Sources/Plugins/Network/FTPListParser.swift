@@ -485,20 +485,20 @@ public enum FTPListParser {
     private static func eplf(_ line: Scalars) -> RemoteEntry? {
         guard let tab = line.firstIndex(of: "\t") else { return nil }
         var entry = RemoteEntry(name: text(line[(tab + 1)...]), isDirectory: false)
+        // Empty facts are left out by the split, so every fact has a kind.
         for fact in line[1..<tab].split(separator: ",") {
-            guard let kind = fact.first else { continue }
             let value = text(fact.dropFirst())
-            switch kind {
-            case "/": entry.isDirectory = true
-            case "s": entry.size = size(Substring(value))
+            switch fact.first {
+            case "/"?: entry.isDirectory = true
+            case "s"?: entry.size = size(Substring(value))
 
-            case "m":
+            case "m"?:
                 // Seconds since 1970; anything else, or a time beyond the year 9999, is no date.
                 if value.utf8.count <= 12, let seconds = Int64(value), (0...253_402_300_799).contains(seconds) {
                     entry.modified = Date(timeIntervalSince1970: TimeInterval(seconds))
                 }
 
-            case "u" where value.hasPrefix("p"):
+            case "u"? where value.hasPrefix("p"):
                 entry.permissions = UInt16(value.dropFirst(), radix: 8).map { $0 & 0o7777 }
 
             default: break

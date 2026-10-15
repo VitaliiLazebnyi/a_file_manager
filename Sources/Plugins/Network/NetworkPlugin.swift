@@ -81,7 +81,8 @@ public final class NetworkPlugin: Plugin {
     private let sftpTransport: SFTPTransport?
     /// The live connections; tests look at them.
     public private(set) var center = ConnectionCenter()
-    private var commands: NetworkCommands?
+    /// The behaviour behind the commands, once started.
+    private(set) var commands: NetworkCommands?
     private var store: ConnectionStore?
     private var consent: TypedAddresses?
 
@@ -92,7 +93,9 @@ public final class NetworkPlugin: Plugin {
     /// pass a password store of their own, so the Keychain is not touched. Without a store the
     /// Keychain is used when applications may be launched, and memory otherwise.
     public init(
-        launchesApplications: Bool = true, passwords: any PasswordStore? = nil, mounter: any VolumeMounter? = nil,
+        launchesApplications: Bool = true,
+        passwords: any PasswordStore? = nil,
+        mounter: any VolumeMounter? = nil,
         sftpTransport: SFTPTransport? = nil
     ) {
         self.launchesApplications = launchesApplications
@@ -163,28 +166,45 @@ public final class NetworkPlugin: Plugin {
                 title: "FTP and Network",
                 preferences: [
                     Preference(
-                        NetworkSettings.passiveMode, "Use passive mode by default (like a web browser)",
-                        .flag(default: true)),
+                        NetworkSettings.passiveMode,
+                        "Use passive mode by default (like a web browser)",
+                        .flag(default: true)
+                    ),
                     Preference(
-                        NetworkSettings.transferMode, "Default transfer mode",
-                        .choice(TransferMode.allCases.map(\.title), default: 0)),
+                        NetworkSettings.transferMode,
+                        "Default transfer mode",
+                        .choice(TransferMode.allCases.map(\.title), default: 0)
+                    ),
                     Preference(
-                        NetworkSettings.textFiles, "Text files in automatic mode",
-                        .text(default: NetworkOptions.defaultTextMasks)),
+                        NetworkSettings.textFiles,
+                        "Text files in automatic mode",
+                        .text(default: NetworkOptions.defaultTextMasks)
+                    ),
                     Preference(
-                        NetworkSettings.parallelConnections, "Connections per server used at the same time",
-                        .choice(NetworkSettings.parallelChoices, default: 2)),
+                        NetworkSettings.parallelConnections,
+                        "Connections per server used at the same time",
+                        .choice(NetworkSettings.parallelChoices, default: 2)
+                    ),
                     Preference(
-                        NetworkSettings.keepAlive, "Keep idle connections alive every … seconds (0 = off)",
-                        .text(default: "60")),
+                        NetworkSettings.keepAlive,
+                        "Keep idle connections alive every … seconds (0 = off)",
+                        .text(default: "60")
+                    ),
                     Preference(NetworkSettings.timeout, "Seconds to wait for a server's answer", .text(default: "30")),
                     Preference(
-                        NetworkSettings.anonymousPassword, "E-mail address as password for anonymous logins",
-                        .text(default: NetworkOptions.defaultAnonymousPassword)),
+                        NetworkSettings.anonymousPassword,
+                        "E-mail address as password for anonymous logins",
+                        .text(default: NetworkOptions.defaultAnonymousPassword)
+                    ),
                     Preference(
-                        NetworkSettings.askToSave, "Offer to save a quick connection when disconnecting",
-                        .flag(default: true))
-                ], onChange: { options.values = NetworkSettings.values(from: kernel.settings) }))
+                        NetworkSettings.askToSave,
+                        "Offer to save a quick connection when disconnecting",
+                        .flag(default: true)
+                    )
+                ],
+                onChange: { options.values = NetworkSettings.values(from: kernel.settings) }
+            )
+        )
     }
 
     private func register(_ network: NetworkCommands, in owner: Kernel, center: ConnectionCenter) {
@@ -195,51 +215,82 @@ public final class NetworkPlugin: Plugin {
         let sourceIsRemote = { ServerKey(source().directory) != nil }
 
         commands.register(
-            Command(.ftpConnect, "FTP Connect…", [Shortcut(.character("f"), .control)]), network.showConnections)
+            Command(.ftpConnect, "FTP Connect…", [Shortcut(.character("f"), .control)]),
+            network.showConnections
+        )
         commands.register(
-            Command(.ftpNew, "FTP New Connection…", [Shortcut(.character("n"), .control)]), network.quickConnect)
+            Command(.ftpNew, "FTP New Connection…", [Shortcut(.character("n"), .control)]),
+            network.quickConnect
+        )
         commands.register(
             Command(.ftpDisconnect, "FTP Disconnect", [Shortcut(.character("f"), [.control, .shift])]),
-            enabled: { !center.connected.isEmpty }, network.disconnect)
+            enabled: { !center.connected.isEmpty },
+            network.disconnect
+        )
         commands.register(
-            Command(.ftpHiddenFiles, "FTP Show Hidden Files"), enabled: sourceIsRemote,
+            Command(.ftpHiddenFiles, "FTP Show Hidden Files"),
+            enabled: sourceIsRemote,
             checked: { source().showHidden },
-            network.toggleHiddenFiles)
+            network.toggleHiddenFiles
+        )
         commands.register(
             Command(
-                .ftpSelectTransferMode, "FTP Transfer Mode…", [Shortcut(.character("m"), [.control, .shift])],
-                runsDuringJobs: true), network.selectTransferMode)
+                .ftpSelectTransferMode,
+                "FTP Transfer Mode…",
+                [Shortcut(.character("m"), [.control, .shift])],
+                runsDuringJobs: true
+            ),
+            network.selectTransferMode
+        )
         commands.register(
-            Command(.ftpAddToList, "FTP Add to Download List…"), enabled: { sourceIsRemote() && source().hasOperands },
-            network.addToDownloadList)
+            Command(.ftpAddToList, "FTP Add to Download List…"),
+            enabled: { sourceIsRemote() && source().hasOperands },
+            network.addToDownloadList
+        )
         commands.register(Command(.ftpDownloadList, "FTP Download From List…"), network.downloadFromList)
         commands.register(
             Command(.ftpOpen, "Open Saved Connection"),
             parameterized: { argument in
                 if let text = argument.text { network.open(saved: text) } else { network.showConnections() }
-            })
+            }
+        )
         commands.register(
             Command(.netConnect, "Connect to Server…", [.cmd("k")]),
-            parameterized: { network.connectToServer($0.text) })
+            parameterized: { network.connectToServer($0.text) }
+        )
         commands.register(
             Command(.netDisconnect, "Eject Volume"),
             enabled: { network.canEject && ServerSchemes.mountedVolume(of: source().directory) != nil },
-            network.ejectVolume)
+            network.ejectVolume
+        )
 
         kernel.menus.add([.ftpConnect, .ftpNew, .ftpDisconnect, .ftpHiddenFiles], to: .netConnections)
         kernel.menus.add([.ftpSelectTransferMode, .ftpAddToList, .ftpDownloadList], to: .netTransfers)
         kernel.menus.add([.netConnect, .netDisconnect], to: .netVolumes)
         kernel.toolbar.add(
-            .ftpConnect, symbol: "network", group: 70,
-            hint: "Connect to an FTP or SFTP server from your saved connections.")
+            .ftpConnect,
+            symbol: "network",
+            group: 70,
+            hint: "Connect to an FTP or SFTP server from your saved connections."
+        )
         kernel.toolbar.add(
-            .ftpNew, symbol: "link", group: 70, hint: "Connect to an FTP or SFTP server by typing its address.")
+            .ftpNew,
+            symbol: "link",
+            group: 70,
+            hint: "Connect to an FTP or SFTP server by typing its address."
+        )
         kernel.toolbar.add(
-            .ftpDisconnect, symbol: "bolt.horizontal.circle", group: 70,
-            hint: "Close the connection to an FTP or SFTP server.")
+            .ftpDisconnect,
+            symbol: "bolt.horizontal.circle",
+            group: 70,
+            hint: "Close the connection to an FTP or SFTP server."
+        )
         kernel.toolbar.add(
-            .netConnect, symbol: "server.rack", group: 70,
-            hint: "Connect to a network share (SMB and others); it appears as a drive.")
+            .netConnect,
+            symbol: "server.rack",
+            group: 70,
+            hint: "Connect to a network share (SMB and others); it appears as a drive."
+        )
         kernel.toolbar.setSymbol("eject", for: .netDisconnect)
         kernel.toolbar.setSymbol("arrow.down.doc", for: .ftpDownloadList)
         kernel.toolbar.setSymbol("text.badge.plus", for: .ftpAddToList)

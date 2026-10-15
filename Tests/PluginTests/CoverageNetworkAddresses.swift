@@ -7,7 +7,7 @@ import Testing
 /// Download lists, addresses and saved connections at their edges.
 @Suite
 internal struct CoverageNetworkAddresses {
-    /// Download LIST lines at their edges.
+    /// Lines of a download list at their edges.
     @Test
     internal func downloadListLinesAtTheirEdges() {
         let actions = DownloadList.parse("   \nsleep: soon\nmove:\nput:  \n")
@@ -52,7 +52,23 @@ internal struct CoverageNetworkAddresses {
         #expect(SavedConnection.Kind.ftpExplicitTLS.tls == .explicit)
     }
 
-    /// An I pv6 host is shown in brackets.
+    /// A port is kept only when it is not the protocol's own.
+    @Test
+    internal func aPortIsKeptOnlyWhenItIsNotTheProtocolsOwn() {
+        var connection = SavedConnection()
+        connection.setPort(21)
+        #expect(connection.port == nil)
+        connection.setPort(2_121)
+        #expect(connection.port == 2_121)
+    }
+
+    /// User names are written into an address with what a URL cannot hold escaped.
+    @Test
+    internal func userNamesAreEscapedInAnAddress() {
+        #expect(ServerAddress("ftp://j\u{F6}rg:pw@host/pub")?.textWithoutPassword == "ftp://j%C3%B6rg@host/pub")
+    }
+
+    /// An IPv6 host is shown in brackets.
     @Test
     internal func anIPv6HostIsShownInBrackets() {
         var connection = SavedConnection()
