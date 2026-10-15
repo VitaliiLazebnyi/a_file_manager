@@ -196,12 +196,12 @@ final class SFTPSession: RemoteSession, @unchecked Sendable {
         // cancelled, ends with the session, and gives up when the login makes no progress.
         let began = Date()
         let timeout = environment.options.values.timeout
+        let patience = stallLimit ?? max(60, 2 * timeout) + timeout + 30
         try lockPatiently(connectLock, cancellation: cancellation) {
             self.lock.lock()
             defer { self.lock.unlock() }
             if self.isClosed { return NetworkError.notConnected(self.currentProfile.key.description) }
             // The time the user takes to answer a question does not count.
-            let patience = self.stallTime ?? max(60, 2 * timeout) + timeout + 30
             if !self.isAsking, Date().timeIntervalSince(began) > patience {
                 return NetworkError.busy("Another login to \(self.currentProfile.key.description) is still under way.")
             }

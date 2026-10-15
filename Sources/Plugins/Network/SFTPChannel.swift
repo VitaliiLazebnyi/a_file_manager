@@ -652,6 +652,8 @@ final class SFTPChannel: @unchecked Sendable {
             var sent = 0
             var moved = Date()
             while sent < buffer.count {
+                // A channel that was closed meanwhile sends nothing more, also while the pipe takes it.
+                guard !isClosed() else { throw NetworkError.connectionLost }
                 let count = Darwin.write(descriptor, buffer.baseAddress! + sent, buffer.count - sent)
                 if count > 0 {
                     sent += count
@@ -659,7 +661,6 @@ final class SFTPChannel: @unchecked Sendable {
                     continue
                 }
                 guard count < 0, errno == EAGAIN else { throw NetworkError.connectionLost }
-                guard !isClosed() else { throw NetworkError.connectionLost }
                 let stuck = Date().timeIntervalSince(moved)
                 if stuck >= writeTimeout { throw NetworkError.timedOut("sending to the server") }
                 if cancellation?.isCancelled == true {
@@ -830,16 +831,17 @@ final class SFTPChannel: @unchecked Sendable {
         // the process by now (it holds `lock` meanwhile), which is ended here.
         markClosed()
         if process.isRunning { process.terminate() }
-        // The write end goes when no writer is using it. A writer that is stalled finds the
-        // channel closed within a moment; until then the pipe is closed in the background, so
-        // this thread (possibly the main thread) does not wait for it.
+        // The write end goes when no writer is using it. A writer finds the channel closed
+        // before its next write into the pipe, or after a wait of a fifth of a second for room
+        // in it; until then the pipe is closed in the background, so this thread (possibly the
+        // main thread) does not wait for it.
         let (gate, input) = (writeLock, toServer.fileHandleForWriting)
         if gate.try() {
             try? input.close()
             gate.unlock()
         } else {
             Background.run(lane: gate) {
-                guard gate.lock(before: Date().addingTimeInterval(5)) else { return }
+                gate.lock()
                 try? input.close()
                 gate.unlock()
             }

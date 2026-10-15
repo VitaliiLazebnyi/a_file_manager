@@ -33,6 +33,8 @@ final class AdoptOutcome: @unchecked Sendable {
     /// run beside many others, and what they show is that a call ends at all where the fault
     /// would be a wait of ten minutes or for ever, not how fast it ends.
     func ended(within seconds: TimeInterval = 120) -> Bool { done.wait(timeout: .now() + seconds) == .success }
+    /// What the call threw; nil while it runs and when it succeeded.
+    var thrown: (any Error)? { lock.withLock { error } }
     var failed: Bool {
         lock.lock()
         defer { lock.unlock() }
