@@ -55,7 +55,7 @@ internal struct WindowButtonBarTests {
         app.window.validateBars()
         #expect(copy.isEnabled && hidden.state == .on)
         // A click runs the command.
-        hidden.performClick(nil)
+        Controls.send(hidden)
         await app.settle()
         #expect(!app.commands.isChecked(.showHidden) && hidden.state == .off)
         // The user's own layout replaces the proposal at once.

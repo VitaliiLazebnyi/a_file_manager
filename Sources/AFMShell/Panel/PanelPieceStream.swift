@@ -64,14 +64,19 @@ internal final class PanelPieceStream {
             failure = error
         }
         let readTime = Date().timeIntervalSince(started)
-        if !cancellation.isCancelled, failure == nil || sentFirst, let piece = send(isLast: true), failure == nil {
-            source.cache.store(
-                piece.listing,
-                sortedBy: piece.order,
-                showHidden: source.showHidden,
-                readTime: readTime,
-                since: ticket
-            )
+        // A reading that ends without an error always had its first batch (an empty folder
+        // gives an empty one); only a cancelled one has none.
+        if !cancellation.isCancelled, failure == nil || sentFirst, let header {
+            let piece = send(header, isLast: true)
+            if failure == nil {
+                source.cache.store(
+                    piece.listing,
+                    sortedBy: piece.order,
+                    showHidden: source.showHidden,
+                    readTime: readTime,
+                    since: ticket
+                )
+            }
         }
         MainLoop.perform { [receivers, failure] in receivers.take()?.onEnd(failure) }
     }
@@ -80,22 +85,19 @@ internal final class PanelPieceStream {
     ///
     /// Returns false once the reading is to stop.
     private func receive(_ batch: PanelLoader.Batch) -> Bool {
-        if header == nil {
-            header = batch
-        }
+        // The first batch tells the folder and its surroundings.
+        let first = header ?? batch
+        header = first
         pending += batch.listing.items
         if Date().timeIntervalSince(lastSent) > interval {
-            send(isLast: false)
+            send(first, isLast: false)
         }
         return !cancellation.isCancelled
     }
 
-    /// Sends what has arrived as a piece; nil (and nothing sent) before the first batch.
+    /// Sends what has arrived, below `header` (the first batch), as a piece.
     @discardableResult
-    private func send(isLast: Bool) -> PanelLoading.Piece? {
-        guard let header else {
-            return nil
-        }
+    private func send(_ header: PanelLoader.Batch, isLast: Bool) -> PanelLoading.Piece {
         // The list was put in another order meanwhile: what has arrived is sorted anew here,
         // in the background, so the panel never has to.
         let wanted = order.value

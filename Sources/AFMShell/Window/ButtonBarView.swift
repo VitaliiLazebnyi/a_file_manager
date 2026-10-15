@@ -35,6 +35,14 @@ internal final class ButtonBarView: NSView, NSDraggingSource {
         case button(line: Int, group: Int, index: Int)
         /// A group with its handle.
         case group(line: Int, group: Int)
+
+        /// True for a whole group.
+        internal var isGroup: Bool {
+            if case .group = self {
+                return true
+            }
+            return false
+        }
     }
 
     /// Where a drop would put what is dragged.
@@ -43,6 +51,16 @@ internal final class ButtonBarView: NSView, NSDraggingSource {
         case button(ButtonBarArrangement.Target)
         /// Where a group goes.
         case group(ButtonBarArrangement.Place)
+    }
+
+    /// What the bar shows for one entry of its layout.
+    private enum Shown {
+        /// The line between two groups.
+        case separator
+        /// The start of a new line.
+        case lineBreak
+        /// The button of a command, with its picture.
+        case button(Command, symbol: String)
     }
 
     /// The commands offered by a right click on the bar, when a plugin provides them.
@@ -62,13 +80,27 @@ internal final class ButtonBarView: NSView, NSDraggingSource {
     /// The mark that shows where a drop would go.
     internal let indicator = NSView()
     /// The buttons, in order.
-    internal private(set) var buttons: [NSButton] = []
+    internal private(set) var buttons: [BarCommandButton] = []
     /// What the bar shows, in order; nil is a separator, `ToolbarRegistry.lineBreak` starts a line.
     internal private(set) var entries: [CommandID?] = []
     /// What each item of `flow` stands for, in the same order.
     internal private(set) var slots: [Slot] = []
     /// What is being dragged, while a drag of the bar's lasts.
     internal var dragged: Dragged?
+    /// The next move or release of the mouse while a press may become a drag; taken from the
+    /// window's queue of events unless told otherwise.
+    internal var nextMouseEvent: (NSWindow) -> NSEvent? = { window in
+        window.nextEvent(matching: [.leftMouseDragged, .leftMouseUp])
+    }
+    /// Whether the drag that just ended was called off with Escape: the event that ended it is
+    /// a key press.
+    internal var dragWasCancelled: () -> Bool = { NSApp.currentEvent?.type == .keyDown }
+    /// Starts the system's drag of the items from the event; the last argument says whether
+    /// they fly back when the drag fails.
+    internal var startDragging: (ButtonBarView, [NSDraggingItem], NSEvent, Bool) -> Void = { bar, items, event, back in
+        bar.beginDraggingSession(with: items, event: event, source: bar).animatesToStartingPositionsOnCancelOrFail =
+            back
+    }
     /// The kernel whose commands the buttons run.
     private let kernel: Kernel
 
@@ -91,40 +123,20 @@ internal final class ButtonBarView: NSView, NSDraggingSource {
         fatalError("not used")
     }
 
-    /// The layout without what cannot be shown.
-    ///
-    /// Buttons whose command no plugin registered are left out, and so are the separators and
-    /// line breaks that would then stand at an end, side by side, or around an empty line.
-    internal static func entries(
-        of layout: [ToolbarRegistry.Button?],
-        commands: CommandRegistry
-    ) -> [ToolbarRegistry.Button?] {
-        let shown = layout.filter { button in
-            button.map { $0.command == ToolbarRegistry.lineBreak || commands[$0.command] != nil } ?? true
-        }
-        var remaining = shown.compactMap(\.self).filter { $0.command != ToolbarRegistry.lineBreak }.makeIterator()
-        return ButtonBarArrangement(entries: shown.map { $0?.command }).entries
-            .map { id in
-                guard let id else {
-                    return nil
-                }
-                return id == ToolbarRegistry.lineBreak
-                    ? ToolbarRegistry.Button(command: id, symbol: "") : remaining.next()
-            }
-    }
-
-    /// The tooltip of a button: the command's title and its main key, `Find Files… (⌥F7)`, and
-    /// below them what the button does, when its plugin says (`hint`).
-    internal static func toolTip(for command: Command, keys: KeyBindings, hint: String?) -> String {
-        let title =
-            keys.shortcuts(for: command.id).first.map { "\(command.title) (\($0.displayText))" } ?? command.title
-        return hint.map { "\(title)\n\($0)" } ?? title
-    }
-
     /// Draws the bar again from the registry; called when the layout changed.
     internal func rebuild() {
         let layout = Self.entries(of: kernel.toolbar.layout(from: kernel.settings), commands: kernel.commands)
         entries = layout.map { $0?.command }
+        // `entries(of:commands:)` kept only the buttons whose commands are registered.
+        let shown = layout.compactMap { entry -> Shown? in
+            guard let entry else {
+                return .separator
+            }
+            if entry.command == ToolbarRegistry.lineBreak {
+                return .lineBreak
+            }
+            return kernel.commands[entry.command].map { .button($0, symbol: entry.symbol) }
+        }
         buttons = []
         slots = []
         let iconSize = BarButton.iconSize(from: kernel.settings)
@@ -137,30 +149,31 @@ internal final class ButtonBarView: NSView, NSDraggingSource {
             slots.append(.handle(line: line, group: group))
             items.append(makeHandle(for: .group(line: line, group: group), side: side))
         }
-        if !layout.isEmpty {
+        if !shown.isEmpty {
             addHandle()
         }
-        for entry in layout {
-            guard let entry else {
+        for item in shown {
+            switch item {
+            case .separator:
                 (group, index) = (group + 1, 0)
                 addHandle()
-                continue
-            }
-            if entry.command == ToolbarRegistry.lineBreak {
+
+            case .lineBreak:
                 (line, group, index) = (line + 1, 0, 0)
                 lineBreaks.insert(items.count)
                 addHandle()
-                continue
+
+            case .button(let command, let symbol):
+                let button = makeButton(for: command, symbol: symbol, pictures: pictures, side: side)
+                button.onCommandMouseDown = dragHandler(
+                    for: .button(line: line, group: group, index: index),
+                    of: button
+                )
+                slots.append(.button(line: line, group: group, index: index))
+                index += 1
+                buttons.append(button)
+                items.append(button)
             }
-            guard let command = kernel.commands[entry.command] else {
-                continue
-            }
-            let button = makeButton(for: command, symbol: entry.symbol, pictures: pictures, side: side)
-            button.onCommandMouseDown = dragHandler(for: .button(line: line, group: group, index: index), of: button)
-            slots.append(.button(line: line, group: group, index: index))
-            index += 1
-            buttons.append(button)
-            items.append(button)
         }
         flow.lineBreaks = lineBreaks
         flow.items = items
@@ -170,10 +183,7 @@ internal final class ButtonBarView: NSView, NSDraggingSource {
     /// Makes the buttons follow what their commands say: available or not, pressed or not.
     internal func validate() {
         for button in buttons {
-            guard let name = button.identifier?.rawValue else {
-                continue
-            }
-            let id = CommandID(rawValue: name)
+            let id = button.command
             let isEnabled = kernel.commands.isEnabled(id)
             let state: NSControl.StateValue = kernel.commands.isChecked(id) ? .on : .off
             if button.isEnabled != isEnabled {
@@ -269,8 +279,10 @@ internal final class ButtonBarView: NSView, NSDraggingSource {
     ) -> BarCommandButton {
         let button = BarButton.style(BarCommandButton(title: "", target: self, action: #selector(buttonPressed(_:))))
         button.isBordered = false
+        button.command = command.id
         if let image = NSImage(systemSymbolName: symbol, accessibilityDescription: command.title) {
-            button.image = image.withSymbolConfiguration(pictures) ?? image
+            button.image = image
+            button.symbolConfiguration = pictures
             button.imagePosition = .imageOnly
             button.imageScaling = .scaleNone
             // Square, so that the frame shown under the mouse is a square too.
@@ -306,15 +318,9 @@ internal final class ButtonBarView: NSView, NSDraggingSource {
 
     /// A button was pressed: its command runs.
     @objc
-    private func buttonPressed(_ sender: NSButton) {
-        if let name = sender.identifier?.rawValue {
-            kernel.commands.perform(CommandID(rawValue: name))
-        }
+    private func buttonPressed(_ sender: BarCommandButton) {
+        kernel.commands.perform(sender.command)
         // The click itself toggled the button; what it shows is up to the command.
         validate()
-    }
-
-    deinit {
-        // Nothing to release.
     }
 }

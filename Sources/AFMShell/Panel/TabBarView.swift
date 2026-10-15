@@ -173,8 +173,4 @@ internal final class TabBarView: NSView {
         marker.frame = NSRect(x: position, y: 2, width: 2, height: bounds.height - 4)
         marker.isHidden = false
     }
-
-    deinit {
-        // Nothing to release.
-    }
 }

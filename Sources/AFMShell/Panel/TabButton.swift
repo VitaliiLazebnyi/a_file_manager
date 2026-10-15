@@ -48,8 +48,4 @@ internal final class TabButton: NSButton {
     override internal func menu(for _: NSEvent) -> NSMenu? {
         bar?.menuProvider?(tag)
     }
-
-    deinit {
-        // Nothing to release.
-    }
 }

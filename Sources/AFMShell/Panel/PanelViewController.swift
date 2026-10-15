@@ -305,8 +305,4 @@ internal final class PanelViewController: NSViewController, PanelHandle, PanelOv
         rebuildExtraColumns()
         applyViewMode()
     }
-
-    deinit {
-        // Nothing to release: the notification center forgets the panel by itself.
-    }
 }

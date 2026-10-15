@@ -12,7 +12,10 @@ extension ButtonBarView {
             view.cacheDisplay(in: view.bounds, to: rep)
             return rep
         }
-        let size = NSSize(width: views.reduce(0) { $0 + $1.frame.width }, height: views.map(\.frame.height).max() ?? 0)
+        let size = NSSize(
+            width: views.reduce(0) { $0 + $1.frame.width },
+            height: views.reduce(0) { max($0, $1.frame.height) }
+        )
         return NSImage(size: size, flipped: false) { _ in
             var left: CGFloat = 0
             for (view, rep) in zip(views, reps) {
@@ -81,7 +84,7 @@ extension ButtonBarView {
             return false
         }
         let start = event.locationInWindow
-        while let next = window.nextEvent(matching: [.leftMouseDragged, .leftMouseUp]) {
+        while let next = nextMouseEvent(window) {
             if next.type == .leftMouseUp {
                 return false
             }
@@ -136,8 +139,7 @@ extension ButtonBarView {
             return
         }
         dragged = nil
-        let cancelled = NSApp.currentEvent?.type == .keyDown
-        guard case .button = item, operation.isEmpty, !cancelled, let bar else {
+        guard case .button = item, operation.isEmpty, !dragWasCancelled(), let bar else {
             return
         }
         if !bar.insetBy(dx: -4, dy: -4).contains(screenPoint) {
@@ -258,12 +260,9 @@ extension ButtonBarView {
             view.alphaValue = 0.3
         }
         // Room for a new line below the bar while the drag lasts.
-        flow.extraHeight = (flow.items.first?.frame.height ?? BarButton.height) + 2
-        let session = beginDraggingSession(with: [draggingItem], event: event, source: self)
+        flow.extraHeight = first.frame.height + 2
         // A button dropped off the bar is removed: it does not fly back.
-        if case .button = item {
-            session.animatesToStartingPositionsOnCancelOrFail = false
-        }
+        startDragging(self, [draggingItem], event, item.isGroup)
     }
 
     /// Where the bar shows that a drop would go, in the flow's coordinates.

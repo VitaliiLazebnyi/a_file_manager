@@ -80,6 +80,11 @@ internal struct PanelKeysTests {
         #expect(app.left.model.selection.isEmpty && app.left.sizeCalculations.isEmpty)
         app.left.rowDoubleClicked()
         #expect(app.left.model.directory.lastPathComponent == "A")
+        // On a row: the item under the cursor opens.
+        app.cursor(app.left, on: "docs")
+        app.left.doubleClicked(row: app.left.model.cursor)
+        await program.settle(app)
+        #expect(app.left.model.directory.lastPathComponent == "docs")
         app.commands.perform(.viewBrief, .nothing)
         app.layOut()
         #expect(app.left.pageSize == app.left.gridView.geometry.pageSize)

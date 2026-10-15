@@ -254,8 +254,4 @@ internal final class PathBarView: NSView {
     private func ejectPressed() {
         onEject?()
     }
-
-    deinit {
-        // Nothing to release.
-    }
 }

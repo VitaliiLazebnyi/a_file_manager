@@ -93,8 +93,4 @@ internal final class FlowView: NSView {
             invalidateIntrinsicContentSize()
         }
     }
-
-    deinit {
-        // Nothing to release.
-    }
 }

@@ -69,7 +69,7 @@ internal struct WindowDriveBarTests {
         #expect(
             !bar.ejectButton.isHidden && bar.ejectButton.toolTip == "Eject “STICK”" && bar.ejectButton.frame.maxX == 300
         )
-        bar.ejectButton.performClick(nil)
+        Controls.send(bar.ejectButton)
         #expect(ejected == 1)
         bar.ejectableVolumeName = nil
         #expect(bar.ejectButton.isHidden)

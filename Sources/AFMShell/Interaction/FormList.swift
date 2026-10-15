@@ -175,12 +175,13 @@ internal final class FormList: NSObject, NSTableViewDataSource, NSTableViewDeleg
     /// A double click on a row accepts the form.
     @objc
     private func rowDoubleClicked() {
-        if table.clickedRow >= 0 {
-            onAccept?()
-        }
+        doubleClicked(row: table.clickedRow)
     }
 
-    deinit {
-        // Nothing to release.
+    /// A double click on row `row` (-1 for none, beside the rows) accepts the form.
+    internal func doubleClicked(row: Int) {
+        if row >= 0 {
+            onAccept?()
+        }
     }
 }

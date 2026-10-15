@@ -77,7 +77,12 @@ extension PanelViewController: NSUserInterfaceValidations {
     /// A double click in the table opens the item.
     @objc
     internal func rowDoubleClicked() {
-        if tableView.clickedRow >= 0 {
+        doubleClicked(row: tableView.clickedRow)
+    }
+
+    /// A double click on row `row` (-1 beside the rows) opens the item under the cursor.
+    internal func doubleClicked(row: Int) {
+        if row >= 0 {
             commands.perform(.open, .nothing)
         }
     }
