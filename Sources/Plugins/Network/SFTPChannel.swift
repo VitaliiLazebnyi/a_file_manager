@@ -450,16 +450,30 @@ final class SFTPChannel: @unchecked Sendable {
             if errorText.count > 8_192 { errorText = Data(errorText.suffix(4_096)) }
             lock.unlock()
         }
+        // The channel may be closed from another thread (a disconnect) at any moment, also
+        // before the process runs; a closed pipe's handle raises instead of throwing.
+        guard !isClosed else { throw NetworkError.connectionLost }
         do {
             try process.run()
         } catch {
             throw NetworkError.connectionFailed(error.localizedDescription)
         }
         // A write into a pipe whose reader died must fail, not kill this program. It must not
-        // block either: a packet that cannot be written is waited for with a time limit.
-        let input = toServer.fileHandleForWriting.fileDescriptor
-        _ = fcntl(input, F_SETNOSIGPIPE, 1)
-        _ = fcntl(input, F_SETFL, fcntl(input, F_GETFL) | O_NONBLOCK)
+        // block either: a packet that cannot be written is waited for with a time limit. The
+        // pipe is only closed with `writeLock` held and the channel marked closed (`close`).
+        writeLock.lock()
+        let isOver = isClosed
+        if !isOver {
+            let input = toServer.fileHandleForWriting.fileDescriptor
+            _ = fcntl(input, F_SETNOSIGPIPE, 1)
+            _ = fcntl(input, F_SETFL, fcntl(input, F_GETFL) | O_NONBLOCK)
+        }
+        writeLock.unlock()
+        guard !isOver else {
+            // Closed while the process started: `close` may have found it not running yet.
+            process.terminate()
+            throw NetworkError.connectionLost
+        }
         // The thread has a descriptor of its own, closed there, whatever happens to the pipe.
         let output = dup(fromServer.fileHandleForReading.fileDescriptor)
         guard output >= 0 else {
