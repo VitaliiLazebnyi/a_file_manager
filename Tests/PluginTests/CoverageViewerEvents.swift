@@ -13,9 +13,19 @@ internal enum CoverageViewerEvents {
         try wheel(lines, 0, flags: flags, units: .line)
     }
 
+    /// A turn of both wheels of a mouse: `vertical` and `horizontal` rows.
+    internal static func scroll(lines vertical: Int32, columns horizontal: Int32) throws -> NSEvent {
+        try wheel(vertical, horizontal, flags: [], units: .line)
+    }
+
     /// A trackpad's precise scroll of `vertical` and `horizontal` points.
     internal static func preciseScroll(vertical: Int32, horizontal: Int32) throws -> NSEvent {
         try wheel(vertical, horizontal, flags: [], units: .pixel)
+    }
+
+    /// A trackpad's precise scroll of `vertical` points, with `flags`.
+    internal static func preciseScroll(vertical: Int32, flags: CGEventFlags) throws -> NSEvent {
+        try wheel(vertical, 0, flags: flags, units: .pixel)
     }
 
     /// A pinch on the trackpad that magnifies by `amount` (0.5 is half as big again).
