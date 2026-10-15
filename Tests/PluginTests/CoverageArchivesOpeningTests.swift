@@ -51,8 +51,10 @@ internal struct CoverageArchivesOpeningTests {
         #expect {
             try bench.store.archive(at: box.url("bad.xar"))
         } throws: { error in
-            if case ArchiveError.notAnArchive = error { return true }
-            return false
+            guard case ArchiveError.notAnArchive = error else {
+                return false
+            }
+            return true
         }
     }
 
@@ -71,8 +73,10 @@ internal struct CoverageArchivesOpeningTests {
         #expect {
             _ = try read(archive, "tree/b.txt")
         } throws: { error in
-            if case ArchiveError.changedOutside = error { return true }
-            return false
+            guard case ArchiveError.changedOutside = error else {
+                return false
+            }
+            return true
         }
     }
 
@@ -81,7 +85,7 @@ internal struct CoverageArchivesOpeningTests {
     @Test
     internal func compressedTarsOfTheOldFormatAreRead() throws {
         try box.file("tree/a.txt", "hello")
-        run("/usr/bin/tar", ["-cf", "tree.tar", "tree"])
+        run("/usr/bin/tar", ["--no-mac-metadata", "-cf", "tree.tar", "tree"])
         run("/usr/bin/compress", ["-f", "tree.tar"])
         let archive = try bench.store.archive(at: box.url("tree.tar.Z"))
         #expect(try read(archive, "tree/a.txt") == Data("hello".utf8))
@@ -97,8 +101,10 @@ internal struct CoverageArchivesOpeningTests {
         #expect {
             try bench.store.archive(at: box.url("plain.txt.Z"))
         } throws: { error in
-            if case ArchiveError.notAnArchive = error { return true }
-            return false
+            guard case ArchiveError.notAnArchive = error else {
+                return false
+            }
+            return true
         }
     }
 
@@ -108,12 +114,16 @@ internal struct CoverageArchivesOpeningTests {
         // Every member lies 255 folders deep, in folders of its own.
         let deep = Array(repeating: String(repeating: "x", count: 15), count: 254).joined(separator: "/")
         let members = (0..<110).map { index in (name: "top\(index)/\(deep)/file", data: Data()) }
-        try CoverageArchives.craft(box.url("deep.zip"), members, localExtra: nil) { _ in }
+        try CoverageArchives.craft(box.url("deep.zip"), members, localExtra: nil) { _ in
+            // Every record as it is.
+        }
         #expect {
             try bench.store.archive(at: box.url("deep.zip"))
         } throws: { error in
-            if case ArchiveError.unsupported(let what) = error { return what.contains("folders inside folders") }
-            return false
+            guard case ArchiveError.unsupported(let what) = error else {
+                return false
+            }
+            return what.contains("folders inside folders")
         }
     }
 
@@ -122,7 +132,7 @@ internal struct CoverageArchivesOpeningTests {
     @Test
     internal func aStreamTooLargeForItsCopyIsReadFromTheStream() throws {
         try box.file("tree/a.txt", String(repeating: "spacious ", count: 200))
-        run("/usr/bin/tar", ["-czf", "tree.tar.gz", "tree"])
+        run("/usr/bin/tar", ["--no-mac-metadata", "-czf", "tree.tar.gz", "tree"])
         bench.environment.unpackedLimit = 100
         let archive = try bench.store.archive(at: box.url("tree.tar.gz"))
         #expect(archive.scratchBytes == 0 && !archive.allowsParallelReads)
@@ -161,6 +171,52 @@ internal struct CoverageArchivesOpeningTests {
             let entry = try #require(archive.entry("data.txt"))
             #expect(entry.size == Int64(text.utf8.count) && archive.scratchBytes == 0)
             #expect(try read(archive, "data.txt") == Data(text.utf8))
+        }
+    }
+
+    /// Checks that a TAR that lists more entries than an archive may hold is refused.
+    @Test
+    internal func aTarWithTooManyEntriesIsRefused() throws {
+        for name in ["a", "b", "c"] {
+            try box.file("many/\(name).txt", name)
+        }
+        run("/usr/bin/tar", ["--no-mac-metadata", "-cf", "many.tar", "many"])
+        bench.environment.maxEntries = 2
+        #expect {
+            try bench.store.archive(at: box.url("many.tar"))
+        } throws: { error in
+            guard case ArchiveError.unsupported(let what) = error else {
+                return false
+            }
+            return what.contains("more than 2 entries")
+        }
+    }
+
+    /// Checks that a file of the old `compress` format that cannot be unpacked is no archive,
+    /// and that bsdtar's own words about a damaged foreign archive are passed on.
+    @Test
+    internal func damagedFilesOfOtherFormatsSayWhatIsWrong() throws {
+        var compressed = Data([0x1F, 0x9D, 0x90])
+        compressed.append(Data(repeating: 0xFF, count: 64))
+        try compressed.write(to: box.url("broken.Z"))
+        #expect {
+            try bench.store.archive(at: box.url("broken.Z"))
+        } throws: { error in
+            guard case ArchiveError.notAnArchive = error else {
+                return false
+            }
+            return true
+        }
+        var sevenZip = Data([0x37, 0x7A, 0xBC, 0xAF, 0x27, 0x1C, 0, 4])
+        sevenZip.append(Data("garbage garbage garbage garbage".utf8))
+        try sevenZip.write(to: box.url("broken.7z"))
+        #expect {
+            try bench.store.archive(at: box.url("broken.7z"))
+        } throws: { error in
+            guard case ArchiveError.toolFailed = error else {
+                return false
+            }
+            return true
         }
     }
 }

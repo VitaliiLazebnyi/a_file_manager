@@ -21,7 +21,7 @@ internal struct CoverageArchivesAppendTests {
     private func read(_ archive: OpenArchive, _ path: String) throws -> String {
         let stream = try archive.open(try #require(archive.entry(path)))
         defer { stream.close() }
-        return String(decoding: try stream.readFully(1 << 20), as: UTF8.self)
+        return try #require(String(bytes: try stream.readFully(1 << 20), encoding: .utf8))
     }
 
     /// Two stored members, `first.txt` and `last`; the directory says the data of `last` runs
@@ -77,7 +77,9 @@ internal struct CoverageArchivesAppendTests {
             // A field of another kind, then the time without its "modified" flag; or a field
             // whose length runs past the end of the header's fields.
             let local = shape == 1 ? Data([0x75, 0x78, 1, 0, 0, 0x55, 0x54, 1, 0, 0]) : Data([0x55, 0x54, 0xFF, 0])
-            try CoverageArchives.craft(url, [(name: "plain.txt", data: Data("plain".utf8))], localExtra: local) { _ in }
+            try CoverageArchives.craft(url, [(name: "plain.txt", data: Data("plain".utf8))], localExtra: local) { _ in
+                // Every record as it is.
+            }
         }
         let archive = try bench.store.archive(at: url)
         try archive.setAttributes(FileAttributes(modified: stamp), of: "plain.txt")
@@ -98,8 +100,11 @@ internal struct CoverageArchivesAppendTests {
         let output = try OutputFile(creating: url)
         let writer = ZipWriter(output)
         var first = ZipRecord.new(
-            name: "first.txt", isDirectory: false, modified: Date(timeIntervalSince1970: 1_600_000_000),
-            permissions: 0o644)
+            name: "first.txt",
+            isDirectory: false,
+            modified: Date(timeIntervalSince1970: 1_600_000_000),
+            permissions: 0o644
+        )
         let payload = Data(String(repeating: "first member data ", count: 4).utf8)
         (first.crc, first.compressedSize, first.uncompressedSize) = (
             CRC32.of(payload), UInt64(payload.count), UInt64(payload.count)
@@ -108,8 +113,11 @@ internal struct CoverageArchivesAppendTests {
         try writer.append(payload)
         try writer.end(opened, first, headerChanged: false)
         var second = ZipRecord.new(
-            name: "second.txt", isDirectory: false, modified: Date(timeIntervalSince1970: 1_600_000_000),
-            permissions: 0o644)
+            name: "second.txt",
+            isDirectory: false,
+            modified: Date(timeIntervalSince1970: 1_600_000_000),
+            permissions: 0o644
+        )
         (second.crc, second.compressedSize, second.uncompressedSize) = (first.crc, 4, 4)
         // Its header would lie in the middle of the first member's data.
         writer.adopt(second, at: 40)
@@ -117,12 +125,17 @@ internal struct CoverageArchivesAppendTests {
         try output.close()
         let before = try Data(contentsOf: url)
         let archive = try bench.store.archive(at: url)
-        try archive.setAttributes(FileAttributes(modified: Date(timeIntervalSince1970: 1_700_000_000)), of: "second.txt")
+        try archive.setAttributes(
+            FileAttributes(modified: Date(timeIntervalSince1970: 1_700_000_000)),
+            of: "second.txt"
+        )
         #expect {
             try archive.commit()
         } throws: { error in
-            if case ArchiveError.damaged = error { return true }
-            return false
+            guard case ArchiveError.damaged = error else {
+                return false
+            }
+            return true
         }
         #expect(try Data(contentsOf: url) == before)
     }
@@ -141,8 +154,10 @@ internal struct CoverageArchivesAppendTests {
                 return true
             }
         } throws: { error in
-            if case ArchiveError.cancelled = error { return true }
-            return false
+            guard case ArchiveError.cancelled = error else {
+                return false
+            }
+            return true
         }
         #expect(try Data(contentsOf: url) == before && archive.hasPendingChanges)
     }

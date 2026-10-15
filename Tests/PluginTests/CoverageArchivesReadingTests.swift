@@ -22,7 +22,10 @@ internal struct CoverageArchivesReadingTests {
         for name in ["a", "b", "c"] {
             try bench.box.file("tree/\(name).txt", String(repeating: name, count: 3_000))
         }
-        #expect(runTool("/usr/bin/tar", ["-czf", "tree.tar.gz", "tree"], in: bench.box.root).status == 0)
+        #expect(
+            runTool("/usr/bin/tar", ["--no-mac-metadata", "-czf", "tree.tar.gz", "tree"], in: bench.box.root).status
+                == 0
+        )
     }
 
     private func archive() throws -> OpenArchive {
@@ -99,14 +102,20 @@ internal struct CoverageArchivesReadingTests {
         #expect {
             _ = try read(opened, beyond)
         } throws: { error in
-            if case ArchiveError.changedOutside = error { return true }
-            return false
+            guard case ArchiveError.changedOutside = error else {
+                return false
+            }
+            return true
         }
         #expect {
-            try opened.readInOnePass([try entry(opened, 0), beyond]) { _, _ in }
+            try opened.readInOnePass([try entry(opened, 0), beyond]) { _, _ in
+                // Nothing is read.
+            }
         } throws: { error in
-            if case ArchiveError.changedOutside = error { return true }
-            return false
+            guard case ArchiveError.changedOutside = error else {
+                return false
+            }
+            return true
         }
     }
 
@@ -122,9 +131,29 @@ internal struct CoverageArchivesReadingTests {
             #expect {
                 _ = try read(zip, stranger)
             } throws: { error in
-                if case ArchiveError.notFound = error { return true }
-                return false
+                guard case ArchiveError.notFound = error else {
+                    return false
+                }
+                return true
             }
         }
+    }
+
+    /// Checks that no more than four readers wait at a time: the oldest is let go.
+    @Test
+    internal func noMoreThanFourReadersWait() throws {
+        for name in ["d", "e", "f"] {
+            try box.file("tree/\(name).txt", String(repeating: name, count: 3_000))
+        }
+        #expect(runTool("/usr/bin/tar", ["--no-mac-metadata", "-czf", "six.tar.gz", "tree"], in: box.root).status == 0)
+        let opened = try bench.store.archive(at: box.url("six.tar.gz"))
+        // Read backwards, each member needs a pass of its own and leaves a reader behind.
+        for number in (0..<5).reversed() {
+            #expect(try read(opened, try entry(opened, number)).count == 3_000)
+        }
+        #expect(opened.streamStarts == 5)
+        // The one behind the fifth file was let go: the sixth is read from the one behind the fourth.
+        #expect(try read(opened, try entry(opened, 5)).count == 3_000)
+        #expect(opened.streamStarts == 5)
     }
 }

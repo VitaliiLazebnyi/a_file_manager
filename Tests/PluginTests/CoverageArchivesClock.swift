@@ -19,7 +19,7 @@ internal final class CoverageArchivesClock: @unchecked Sendable {
     /// Notes `work` instead of running it; the shape of `ArchiveEnvironment.Scheduler`.
     internal func schedule(
         _ delay: TimeInterval,
-        _ priority: QualityOfService,
+        _: QualityOfService,
         _ work: @escaping @Sendable () -> Void
     ) {
         lock.lock()

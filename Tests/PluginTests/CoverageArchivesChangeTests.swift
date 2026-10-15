@@ -1,8 +1,8 @@
 import AFMKernel
 import Foundation
-import os
 import TestSupport
 import Testing
+import os
 
 @testable import ArchivesPlugin
 
@@ -23,7 +23,11 @@ internal struct CoverageArchivesChangeTests {
     /// A ZIP with a file and a folder holding a file, opened.
     private func archive(_ options: [String] = []) throws -> OpenArchive {
         let url = try CoverageArchives.zip(
-            "changes.zip", in: box, ["file.txt": "file", "folder/inner.txt": "inner"], options: options)
+            "changes.zip",
+            in: box,
+            ["file.txt": "file", "folder/inner.txt": "inner"],
+            options: options
+        )
         return try bench.store.archive(at: url)
     }
 
@@ -36,7 +40,7 @@ internal struct CoverageArchivesChangeTests {
     private func read(_ archive: OpenArchive, _ path: String) throws -> String {
         let stream = try archive.open(try #require(archive.entry(path)))
         defer { stream.close() }
-        return String(decoding: try stream.readFully(1 << 20), as: UTF8.self)
+        return try #require(String(bytes: try stream.readFully(1 << 20), encoding: .utf8))
     }
 
     /// Checks that the paths a change names are checked: a folder below a file, a member
@@ -180,5 +184,30 @@ internal struct CoverageArchivesChangeTests {
         try archive.commit()
         next.first?.work()
         #expect(told.withLock { $0 } == 2)
+    }
+
+    /// Checks that when no folder for new members can be made next to an archive on another
+    /// volume, they wait in the temporary folder.
+    @Test
+    internal func newMembersWaitInTheTemporaryFolderWhenNoneCanBeMadeNextToTheArchive() throws {
+        // A folder so deep that the archive's path fits the system's limit and a folder in it does not.
+        var deep = box.root
+        while deep.path.utf8.count < 1_000 {
+            let room = min(200, 1_000 - deep.path.utf8.count)
+            deep.appendPathComponent(String(repeating: "d", count: max(room, 1)))
+        }
+        try FileManager.default.createDirectory(at: deep, withIntermediateDirectories: true)
+        let url = deep.appendingPathComponent("a.zip")
+        #expect(url.path.utf8.count < Int(PATH_MAX))
+        try FileManager.default.moveItem(
+            at: try CoverageArchives.zip("deep.zip", in: box, ["file.txt": "file"], options: []),
+            to: url
+        )
+        let scratch = bench.environment.scratch.url.deletingLastPathComponent().path
+        bench.environment.volume = { path in path == scratch ? 1 : 2 }
+        let archive = try bench.store.archive(at: url)
+        try add("new.txt", "new", to: archive)
+        #expect(try read(archive, "new.txt") == "new")
+        #expect(try FileManager.default.contentsOfDirectory(atPath: deep.path) == ["a.zip"])
     }
 }

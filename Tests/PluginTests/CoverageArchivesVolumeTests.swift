@@ -64,7 +64,9 @@ internal struct CoverageArchivesVolumeTests {
         // Links are followed by hand, relative and absolute ones.
         try FileManager.default.createSymbolicLink(atPath: box.url("near").path, withDestinationPath: "folder")
         try FileManager.default.createSymbolicLink(
-            atPath: box.url("far").path, withDestinationPath: file.deletingLastPathComponent().path)
+            atPath: box.url("far").path,
+            withDestinationPath: file.deletingLastPathComponent().path
+        )
         #expect(Volume.kind(ofLocalPath: box.url("near/file.txt").path) == .regularFile)
         #expect(Volume.kind(ofLocalPath: box.url("far/file.txt").path) == .regularFile)
         #expect(Volume.kind(ofLocalPath: box.url("near").path) == .directory)

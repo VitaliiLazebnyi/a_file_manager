@@ -1352,13 +1352,11 @@ final class OpenArchive: @unchecked Sendable {
         defer { passwordGate.unlock() }
         if let opened = try tryKnown() { return opened }
         if locked({ isRefusedLocked }) { throw ArchiveError.passwordNeeded(name) }
-        var attempt = 0
-        while true {
+        for attempt in 0..<3 {
             guard let given = environment.askPassword(name, attempt > 0) else {
                 noteRefusal()
                 throw ArchiveError.passwordNeeded(name)
             }
-            attempt += 1
             do {
                 let stream = try make(given)
                 locked {
@@ -1369,12 +1367,11 @@ final class OpenArchive: @unchecked Sendable {
                 }
                 return (stream, given)
             } catch ArchiveError.wrongPassword {
-                if attempt >= 3 {
-                    noteRefusal()
-                    throw ArchiveError.wrongPassword(name)
-                }
+                // Asked again, three times at most.
             }
         }
+        noteRefusal()
+        throw ArchiveError.wrongPassword(name)
     }
 
     /// Sets the password to try first, for callers that already know it; nil forgets them all.
@@ -2097,13 +2094,9 @@ final class OpenArchive: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         guard changeCount != writtenCount else { return nil }
+        // (A folder that loses its last member without ever having had an entry gets one
+        // then: `keepFolder`. So every folder without an entry has something in it.)
         var entries = tree.ordered
-        // A folder that lost its last member without ever having an entry gets one now.
-        let hollow = entries.filter { $0.isImplicit && !tree.hasChildren($0.path) }
-        if !hollow.isEmpty {
-            for entry in hollow { keepFolder(entry.path) }
-            entries = tree.ordered
-        }
         var (isComplete, hasWork, bytes) = (true, removals != writtenRemovals, UInt64(0))
         entries.removeAll { entry in
             guard case .zip(let record) = entry.content else { return false }

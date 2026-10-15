@@ -125,15 +125,19 @@ internal struct CoverageArchivesRescueTests {
         #expect {
             try archive.commit()
         } throws: { error in
-            if case ArchiveError.readOnly = error { return true }
-            return false
+            guard case ArchiveError.readOnly = error else {
+                return false
+            }
+            return true
         }
         bench.environment.fileSystems = { fileSystems }
         #expect {
             try archive.commit { _, _ in false }
         } throws: { error in
-            if case ArchiveError.cancelled = error { return true }
-            return false
+            guard case ArchiveError.cancelled = error else {
+                return false
+            }
+            return true
         }
         // A transfer that stalls is interrupted when the commit is cancelled.
         bench.memory.stallsWrites = true
@@ -178,8 +182,12 @@ internal struct CoverageArchivesRescueTests {
         let copy = box.url("unstamped-copy.zip")
         try FileManager.default.copyItem(at: box.url("unstamped-local.zip"), to: copy)
         let unstamped = try OpenArchive(
-            archiveURL: url, localURL: copy, fetchedCopy: TemporaryFile(copy), remoteStamp: nil,
-            environment: bench.environment)
+            archiveURL: url,
+            localURL: copy,
+            fetchedCopy: TemporaryFile(copy),
+            remoteStamp: nil,
+            environment: bench.environment
+        )
         #expect(unstamped.isCurrent())
     }
 }

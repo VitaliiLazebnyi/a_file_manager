@@ -19,7 +19,11 @@ internal enum CoverageArchives {
             try box.file("\(folder)/\(path)", text)
         }
         let archive = box.url(name)
-        let result = runTool("/usr/bin/zip", ["-q"] + options + [archive.path] + files.keys.sorted(), in: box.url(folder))
+        let result = runTool(
+            "/usr/bin/zip",
+            ["-q"] + options + [archive.path] + files.keys.sorted(),
+            in: box.url(folder)
+        )
         guard result.status == 0 else {
             throw CocoaError(.fileWriteUnknown, userInfo: [NSLocalizedDescriptionKey: result.output])
         }

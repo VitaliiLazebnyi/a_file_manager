@@ -18,11 +18,27 @@ internal struct CoverageArchivesPasswordTests {
     }
 
     /// Reads a whole member.
-    private func read(_ archive: OpenArchive, _ path: String) throws -> Data {
+    private static func readFully(_ archive: OpenArchive, _ path: String) throws -> Data {
         let entry = try #require(archive.entry(path))
         let stream = try archive.open(entry)
         defer { stream.close() }
         return try stream.readFully(1 << 20)
+    }
+
+    /// The state of a thread: true while it waits (for a lock, here).
+    private static func isWaiting(_ thread: mach_port_t) -> Bool {
+        var info = thread_basic_info_data_t()
+        var count = mach_msg_type_number_t(MemoryLayout<thread_basic_info_data_t>.size / MemoryLayout<integer_t>.size)
+        let status = withUnsafeMutablePointer(to: &info) { pointer in
+            pointer.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { fields in
+                thread_info(thread, thread_flavor_t(THREAD_BASIC_INFO), fields, &count)
+            }
+        }
+        return status == KERN_SUCCESS && info.run_state == TH_STATE_WAITING
+    }
+
+    private func read(_ archive: OpenArchive, _ path: String) throws -> Data {
+        try Self.readFully(archive, path)
     }
 
     /// Whether `password` passes the two bytes that check the password of an AES member, as
@@ -37,7 +53,11 @@ internal struct CoverageArchivesPasswordTests {
         }
         let start = try ZipDirectory.localHeader(of: record, at: offset, in: file).dataOffset
         let head = try file.read(at: start, count: field.saltLength + ZipAES.verifierLength)
-        let cipher = try ZipAES.Cipher(password: password, salt: head.prefix(field.saltLength), keyLength: field.keyLength)
+        let cipher = try ZipAES.Cipher(
+            password: password,
+            salt: head.prefix(field.saltLength),
+            keyLength: field.keyLength
+        )
         return cipher.verifier == head.suffix(ZipAES.verifierLength)
     }
 
@@ -85,7 +105,9 @@ internal struct CoverageArchivesPasswordTests {
     @Test
     internal func eachMemberGetsThePasswordThatFitsIt() throws {
         let archive = try encrypted(
-            [(name: "one.txt", password: "first"), (name: "two.txt", password: "second")], refused: ["wrong"])
+            [(name: "one.txt", password: "first"), (name: "two.txt", password: "second")],
+            refused: ["wrong"]
+        )
         bench.passwords.set(["first", "wrong", "second"])
         #expect(try read(archive, "one.txt") == Data("one.txt".utf8))
         #expect(try read(archive, "two.txt") == Data("two.txt".utf8))
@@ -168,22 +190,30 @@ internal struct CoverageArchivesPasswordTests {
     @Test
     internal func membersThatCannotBeUnpackedSayWhy() throws {
         let url = box.url("odd.zip")
-        try CoverageArchives.craft(url, [(name: "aes.bin", data: Data("x".utf8))], localExtra: nil) { $0.method = ZipAES.method }
+        try CoverageArchives.craft(url, [(name: "aes.bin", data: Data("x".utf8))], localExtra: nil) { record in
+            record.method = ZipAES.method
+        }
         let odd = try bench.store.archive(at: url)
         #expect {
             _ = try read(odd, "aes.bin")
         } throws: { error in
-            if case ArchiveError.unsupported(let what) = error { return what.contains("encryption") }
-            return false
+            guard case ArchiveError.unsupported(let what) = error else {
+                return false
+            }
+            return what.contains("encryption")
         }
         let other = box.url("bzip.zip")
-        try CoverageArchives.craft(other, [(name: "bzip.bin", data: Data("x".utf8))], localExtra: nil) { $0.method = 12 }
+        try CoverageArchives.craft(other, [(name: "bzip.bin", data: Data("x".utf8))], localExtra: nil) { record in
+            record.method = 12
+        }
         let bzip = try bench.store.archive(at: other)
         #expect {
             _ = try read(bzip, "bzip.bin")
         } throws: { error in
-            if case ArchiveError.unsupported(let what) = error { return what.contains("compression method 12") }
-            return false
+            guard case ArchiveError.unsupported(let what) = error else {
+                return false
+            }
+            return what.contains("compression method 12")
         }
     }
 
@@ -196,5 +226,27 @@ internal struct CoverageArchivesPasswordTests {
         let writer = try archive.write("nothing.txt")
         try writer.close(attributes: FileAttributes())
         #expect(try read(archive, "nothing.txt").isEmpty && archive.hasPendingChanges)
+    }
+
+    /// Checks that a thread that waited while another asked for the password takes the answer
+    /// without asking again.
+    @Test
+    internal func whoWaitedForTheQuestionTakesItsAnswer() throws {
+        let archive = try encrypted([(name: "one.txt", password: "pw")], refused: [])
+        let other = Signal<Bool>()
+        bench.environment.askPassword = { [bench] _, _ in
+            let port = Signal<mach_port_t>()
+            OtherThread.start {
+                port.set(pthread_mach_thread_np(pthread_self()))
+                other.set((try? Self.readFully(archive, "one.txt")) == Data("one.txt".utf8))
+            }
+            // Answered once the other reader waits for the question to end.
+            let thread = port.wait() ?? 0
+            _ = Wait.until { Self.isWaiting(thread) }
+            return bench.passwords.next()
+        }
+        bench.passwords.set(["pw"])
+        #expect(try read(archive, "one.txt") == Data("one.txt".utf8))
+        #expect(other.wait() == true && bench.passwords.asked == 1)
     }
 }

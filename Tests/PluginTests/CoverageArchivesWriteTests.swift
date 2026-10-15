@@ -21,8 +21,11 @@ internal struct CoverageArchivesWriteTests {
     /// A ZIP with a few members, opened.
     private func opened(_ options: [String] = []) throws -> OpenArchive {
         _ = try CoverageArchives.zip(
-            "write.zip", in: box, ["file.txt": "file", "target.txt": "target", "folder/inner.txt": "inner"],
-            options: options)
+            "write.zip",
+            in: box,
+            ["file.txt": "file", "target.txt": "target", "folder/inner.txt": "inner"],
+            options: options
+        )
         return try bench.store.archive(at: url)
     }
 
@@ -40,12 +43,14 @@ internal struct CoverageArchivesWriteTests {
     private func read(_ archive: OpenArchive, _ path: String) throws -> String {
         let stream = try archive.open(try #require(archive.entry(path)))
         defer { stream.close() }
-        return String(decoding: try stream.readFully(1 << 20), as: UTF8.self)
+        return try #require(String(bytes: try stream.readFully(1 << 20), encoding: .utf8))
     }
 
     private func isChangedOutside(_ error: any Error) -> Bool {
-        if case ArchiveError.changedOutside = error { return true }
-        return false
+        guard case ArchiveError.changedOutside = error else {
+            return false
+        }
+        return true
     }
 
     /// Checks that a write whose archive file is replaced, or whose folder takes no new file,
@@ -123,7 +128,13 @@ internal struct CoverageArchivesWriteTests {
         let archive = try opened()
         try add("new.txt", "new", to: archive)
         let twice = box.url("twice.zip")
-        try CoverageArchives.craft(twice, [(name: "a.txt", data: Data("1".utf8)), (name: "a.txt", data: Data("2".utf8))], localExtra: nil) { _ in }
+        try CoverageArchives.craft(
+            twice,
+            [(name: "a.txt", data: Data("1".utf8)), (name: "a.txt", data: Data("2".utf8))],
+            localExtra: nil
+        ) { _ in
+            // Every record as it is.
+        }
         try CoverageArchives.replace(url, with: twice)
         #expect { try archive.commit() } throws: { isChangedOutside($0) }
         #expect(CoverageArchives.listed(url) == ["a.txt", "a.txt"])
@@ -171,7 +182,10 @@ internal struct CoverageArchivesWriteTests {
         let temporary = ".afm-\(UUID().uuidString).tmp"
         try add(temporary, "arrived", to: archive)
         try archive.move(temporary, to: "arrived.txt", replacing: false)
-        #expect(CoverageArchives.listed(url).contains("arrived.txt") && !CoverageArchives.listed(url).contains("arriving.txt"))
+        #expect(
+            CoverageArchives.listed(url).contains("arrived.txt")
+                && !CoverageArchives.listed(url).contains("arriving.txt")
+        )
         #expect(archive.hasPendingChanges)
         try archive.commit()
         try archive.move("arriving.txt", to: "renamed.txt", replacing: false)
@@ -203,5 +217,33 @@ internal struct CoverageArchivesWriteTests {
         #expect(!CoverageArchives.listed(url).contains("arrived.txt") && archive.hasPendingChanges)
         try archive.commit()
         #expect(CoverageArchives.listed(url).contains("arrived.txt"))
+    }
+
+    /// Checks that a member renamed while the file is written is found by its position, and
+    /// its new name is written next time.
+    @Test
+    internal func aMemberRenamedWhileTheFileIsWrittenKeepsItsData() throws {
+        let archive = try opened()
+        try add("moving.txt", "moving", to: archive)
+        bench.environment.whileWriting = { try? archive.move("moving.txt", to: "moved.txt", replacing: false) }
+        try archive.commit()
+        bench.environment.whileWriting = nil
+        #expect(CoverageArchives.listed(url).contains("moving.txt") && archive.hasPendingChanges)
+        #expect(try read(archive, "moved.txt") == "moving")
+        try archive.commit()
+        #expect(CoverageArchives.contents(of: "moved.txt", in: url) == "moving")
+        #expect(!CoverageArchives.listed(url).contains("moving.txt"))
+    }
+
+    /// Checks that new members join an archive that another program replaced without a word
+    /// of loss, when nothing else was changed here.
+    @Test
+    internal func newMembersJoinAReplacedArchiveWithoutLoss() throws {
+        let archive = try opened()
+        #expect(archive.entry("folder")?.isImplicit == true)
+        try add("new.txt", "new", to: archive)
+        try CoverageArchives.replace(url, with: try stranger(["other.txt": "other"], options: []))
+        try archive.commit()
+        #expect(CoverageArchives.listed(url).sorted() == ["new.txt", "other.txt"])
     }
 }
