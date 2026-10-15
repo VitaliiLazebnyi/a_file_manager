@@ -29,6 +29,8 @@ public final class CoverageSmallFiles: FileSystemProvider, @unchecked Sendable {
         case setAttributes
         /// Listing a folder.
         case list
+        /// Asking for the folder above (it fails by answering nil).
+        case parent
     }
 
     /// What a failing call throws.
@@ -91,9 +93,13 @@ public final class CoverageSmallFiles: FileSystemProvider, @unchecked Sendable {
     public let base: MemoryFileSystem
     private let lock = NSLock()
     private var failing: Set<Call> = []
+    private var failingTimes: [Call: Int] = [:]
     private var beforeFailing: (@Sendable (Call) -> Void)?
+    private var onEveryCall: (@Sendable (Call) -> Void)?
     private var extraCapabilities: FileSystemCapabilities = []
     private var isServer = false
+    private var isWatching = false
+    private var watchers: [@MainActor @Sendable ([URL]) -> Void] = []
 
     /// The scheme of the memory file system.
     public var scheme: String { base.scheme }
@@ -113,6 +119,13 @@ public final class CoverageSmallFiles: FileSystemProvider, @unchecked Sendable {
         set { lock.withLock { beforeFailing = newValue } }
     }
 
+    /// Called on the calling thread at every call that can be made to fail, before it is
+    /// carried out or fails: for a test that wants something to happen at that moment.
+    public var onCall: (@Sendable (Call) -> Void)? {
+        get { lock.withLock { onEveryCall } }
+        set { lock.withLock { onEveryCall = newValue } }
+    }
+
     /// Claimed on top of what the memory file system can do.
     public var claims: FileSystemCapabilities {
         get { lock.withLock { extraCapabilities } }
@@ -125,14 +138,36 @@ public final class CoverageSmallFiles: FileSystemProvider, @unchecked Sendable {
         set { lock.withLock { isServer = newValue } }
     }
 
+    /// Whether folders can be watched (`watch` gives a token); false at first.
+    public var watches: Bool {
+        get { lock.withLock { isWatching } }
+        set { lock.withLock { isWatching = newValue } }
+    }
+
+    /// How many watches were started.
+    public var watchCount: Int { lock.withLock { watchers.count } }
+
     /// A layer over `base`, failing nothing yet.
     public init(_ base: MemoryFileSystem) {
         self.base = base
     }
 
-    /// Throws when `call` fails, after `onFailure`.
+    /// Makes the next `times` calls of `call` fail; the ones after succeed again.
+    public func fail(_ call: Call, times: Int) {
+        lock.withLock { failingTimes[call] = times }
+    }
+
+    /// Throws when `call` fails, after `onFailure`; `onCall` hears of it first.
     private func check(_ call: Call) throws {
-        let (isFailing, hook) = lock.withLock { (failing.contains(call), beforeFailing) }
+        onCall?(call)
+        let (isFailing, hook) = lock.withLock { () -> (Bool, (@Sendable (Call) -> Void)?) in
+            var isFailing = failing.contains(call)
+            if !isFailing, let left = failingTimes[call], left > 0 {
+                failingTimes[call] = left - 1
+                isFailing = true
+            }
+            return (isFailing, beforeFailing)
+        }
         guard isFailing else {
             return
         }
@@ -160,8 +195,34 @@ public final class CoverageSmallFiles: FileSystemProvider, @unchecked Sendable {
     /// The memory file system's item.
     public func item(at url: URL) -> FileItem? { base.item(at: url) }
 
-    /// The memory file system's parent.
-    public func parent(of directory: URL) -> URL? { base.parent(of: directory) }
+    /// The memory file system's parent, unless `.parent` fails.
+    public func parent(of directory: URL) -> URL? {
+        do {
+            try check(.parent)
+        } catch {
+            return nil
+        }
+        return base.parent(of: directory)
+    }
+
+    /// A token for the watch while `watches` is set; nil otherwise. `report` calls `onChange`.
+    @preconcurrency
+    public func watch(_: [URL], onChange: @escaping @MainActor @Sendable ([URL]) -> Void) -> (any WatchToken)? {
+        lock.withLock {
+            guard isWatching else {
+                return nil
+            }
+            watchers.append(onChange)
+            return Shared(watchers.count)
+        }
+    }
+
+    /// Tells every watch that `directories` changed, as the file system would. Main thread.
+    @preconcurrency
+    @MainActor
+    public func report(_ directories: [URL]) {
+        lock.withLock { watchers }.forEach { $0(directories) }
+    }
 
     /// A reader of the memory file, unless `.open` fails.
     public func read(_ url: URL) throws -> any FileReader {
