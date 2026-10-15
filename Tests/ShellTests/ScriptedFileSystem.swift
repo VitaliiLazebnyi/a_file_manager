@@ -2,13 +2,33 @@ import AFMKernel
 import Foundation
 import TestSupport
 
-/// A file system whose listing is told exactly what to do: it delivers prepared batches, can
-/// hold at a chosen batch until a gate is opened (or the listing is cancelled), and counts how
-/// many listings began and ended. It also answers `volume(of:)` with a settable figure, and
-/// counts the questions. Everything else is a memory file system's.
+/// A file system whose listing is told exactly what to do: it delivers prepared batches, can hold
+/// at a chosen batch until a gate is opened (or the listing is cancelled), and counts how many
+/// listings began and ended.
+///
+/// It also answers `volume(of:)` with a settable figure, and counts the questions. Everything else
+/// is a memory file system's.
+///
 /// Unchecked: what it records is guarded by `condition`; its switches are set by the test before use.
-final class ScriptedFileSystem: FileSystemProvider, @unchecked Sendable {
-    let inner: MemoryFileSystem
+internal final class ScriptedFileSystem: FileSystemProvider, @unchecked Sendable {
+    /// The memory file system that answers everything but listings and volumes.
+    internal let inner: MemoryFileSystem
+    /// The batches a listing delivers.
+    ///
+    /// Set before the first listing starts.
+    internal var batches: [[FileItem]] = []
+    /// What the folders at these paths deliver instead (the others deliver `batches`); they never hold.
+    internal var batchesAt: [String: [[FileItem]]] = [:]
+    /// The listing waits before this batch (`batches.count` waits after the last) until `open()` is
+    /// called or its cancellation flag is set.
+    ///
+    /// Nil never waits.
+    internal var holdBefore: Int?
+    /// Thrown when the listing is let go from its hold (the hold must be set for this).
+    internal var failure: (any Error)?
+    /// The second batch is not delivered before this long after the listing began, so that the
+    /// panel shows the first batches as a first piece while the rest is held.
+    internal var pauseBeforeSecondBatch: TimeInterval = 0
     private let condition = NSCondition()
     private var isOpen = false
     private var began = 0
@@ -16,120 +36,161 @@ final class ScriptedFileSystem: FileSystemProvider, @unchecked Sendable {
     private var asks = 0
     private var figure: VolumeInfo?
 
-    /// The batches a listing delivers. Set before the first listing starts.
-    var batches: [[FileItem]] = []
-    /// What the folders at these paths deliver instead (the others deliver `batches`); they never hold.
-    var batchesAt: [String: [[FileItem]]] = [:]
-    /// The listing waits before this batch (`batches.count` waits after the last) until `open()`
-    /// is called or its cancellation flag is set. Nil never waits.
-    var holdBefore: Int?
-    /// Thrown when the listing is let go from its hold (the hold must be set for this).
-    var failure: (any Error)?
-    /// The second batch is not delivered before this long after the listing began, so that the
-    /// panel shows the first batches as a first piece while the rest is held.
-    var pauseBeforeSecondBatch: TimeInterval = 0
+    /// How many listings began.
+    internal var listingsBegun: Int { condition.withLock { began } }
+    /// How many listings ended.
+    internal var listingsEnded: Int { condition.withLock { finished } }
+    /// How many times the volume was asked about.
+    internal var volumeQuestions: Int { condition.withLock { asks } }
+    /// What `volume(of:)` answers.
+    internal var volumeFigure: VolumeInfo? {
+        get { condition.withLock { figure } }
+        set { condition.withLock { figure = newValue } }
+    }
 
-    init(scheme: String = "script") { inner = MemoryFileSystem(scheme: scheme) }
+    /// The memory file system's scheme, `scheme`.
+    internal var scheme: String { inner.scheme }
+    /// The memory file system's capabilities.
+    internal var capabilities: FileSystemCapabilities { inner.capabilities }
 
-    func url(_ path: String) -> URL { inner.url(path) }
-    func item(named name: String, in folder: String, isDirectory: Bool = false) -> FileItem {
+    /// A file system of `scheme`.
+    internal init(scheme: String) {
+        inner = MemoryFileSystem(scheme: scheme)
+    }
+
+    /// A file system of the scheme `script`.
+    internal convenience init() {
+        self.init(scheme: "script")
+    }
+
+    /// The location of `path`.
+    internal func url(_ path: String) -> URL {
+        inner.url(path)
+    }
+
+    /// An entry called `name` in `folder`.
+    internal func item(named name: String, in folder: String, isDirectory: Bool) -> FileItem {
         FileItem(url: url(folder + "/" + name), name: name, kind: .init(isDirectory: isDirectory))
     }
 
-    var listingsBegun: Int {
-        condition.lock()
-        defer { condition.unlock() }
-        return began
+    /// A file called `name` in `folder`.
+    internal func item(named name: String, in folder: String) -> FileItem {
+        item(named: name, in: folder, isDirectory: false)
     }
-    var listingsEnded: Int {
-        condition.lock()
-        defer { condition.unlock() }
-        return finished
-    }
-    var volumeQuestions: Int {
-        condition.lock()
-        defer { condition.unlock() }
-        return asks
-    }
-    var volumeFigure: VolumeInfo? {
-        get {
-            condition.lock()
-            defer { condition.unlock() }
-            return figure
-        }
-        set {
-            condition.lock()
-            figure = newValue
-            condition.unlock()
+
+    /// Lets every listing that holds go on.
+    internal func open() {
+        condition.withLock {
+            isOpen = true
+            condition.broadcast()
         }
     }
 
-    func open() {
-        condition.lock()
-        isOpen = true
-        condition.broadcast()
-        condition.unlock()
+    /// Everything the batches hold, at once.
+    internal func list(_: URL, showHidden _: Bool) -> [FileItem] {
+        batches.flatMap(\.self)
     }
 
-    var scheme: String { inner.scheme }
-    var capabilities: FileSystemCapabilities { inner.capabilities }
-
-    func list(_: URL, showHidden _: Bool) -> [FileItem] { batches.flatMap { $0 } }
-
-    func list(_ directory: URL, showHidden _: Bool, cancellation: CancellationFlag, receive: ([FileItem]) -> Bool)
+    /// Delivers the batches as the switches say.
+    internal func list(
+        _ directory: URL,
+        showHidden _: Bool,
+        cancellation: CancellationFlag,
+        receive: ([FileItem]) -> Bool
+    )
         throws
     {
         let started = Date()
         let holds = batchesAt[directory.path] == nil ? holdBefore : nil
-        let batches = batchesAt[directory.path] ?? self.batches
-        condition.lock()
-        began += 1
-        condition.unlock()
-        defer {
-            condition.lock()
-            finished += 1
-            condition.unlock()
-        }
-        let waiting = cancellation.onCancel { [condition] in
-            condition.lock()
-            condition.broadcast()
-            condition.unlock()
-        }
+        let delivered = batchesAt[directory.path] ?? batches
+        condition.withLock { began += 1 }
+        defer { condition.withLock { finished += 1 } }
+        let waiting = cancellation.onCancel { [condition] in condition.withLock { condition.broadcast() } }
         defer { _ = waiting }
-        for index in 0...batches.count {
+        for index in 0...delivered.count {
             if index == holds {
-                condition.lock()
-                while !isOpen, !cancellation.isCancelled { condition.wait() }
-                condition.unlock()
-                if let failure, !cancellation.isCancelled { throw failure }
+                try hold(cancellation)
             }
             if index == 1, pauseBeforeSecondBatch > 0 {
-                condition.lock()
-                let end = started.addingTimeInterval(pauseBeforeSecondBatch)
-                while !cancellation.isCancelled, end.timeIntervalSinceNow > 0 { condition.wait(until: end) }
-                condition.unlock()
+                pause(until: started.addingTimeInterval(pauseBeforeSecondBatch), cancellation)
             }
-            guard index < batches.count, !cancellation.isCancelled, receive(batches[index]) else { return }
+            guard index < delivered.count, !cancellation.isCancelled, receive(delivered[index]) else {
+                return
+            }
         }
     }
 
-    func volume(of _: URL) -> VolumeInfo? {
-        condition.lock()
-        defer { condition.unlock() }
-        asks += 1
-        return figure
+    /// Answers with `volumeFigure`, counting the question.
+    internal func volume(of _: URL) -> VolumeInfo? {
+        condition.withLock {
+            asks += 1
+            return figure
+        }
     }
 
-    func item(at url: URL) -> FileItem? { inner.item(at: url) }
-    func parent(of directory: URL) -> URL? { inner.parent(of: directory) }
-    func read(_ url: URL) throws -> any FileReader { try inner.read(url) }
-    func createDirectory(at url: URL) throws { inner.createDirectory(at: url) }
-    func write(_ url: URL) throws -> any FileWriter { try inner.write(url) }
-    func remove(_ url: URL) throws { try inner.remove(url) }
-    func move(_ source: URL, to destination: URL, replacing: Bool) throws {
+    /// The memory file system's entry.
+    internal func item(at url: URL) -> FileItem? {
+        inner.item(at: url)
+    }
+
+    /// The memory file system's parent.
+    internal func parent(of directory: URL) -> URL? {
+        inner.parent(of: directory)
+    }
+
+    /// The memory file system's reader.
+    internal func read(_ url: URL) throws -> any FileReader {
+        try inner.read(url)
+    }
+
+    /// Makes a folder in the memory file system.
+    internal func createDirectory(at url: URL) {
+        inner.createDirectory(at: url)
+    }
+
+    /// The memory file system's writer.
+    internal func write(_ url: URL) throws -> any FileWriter {
+        try inner.write(url)
+    }
+
+    /// Removes from the memory file system.
+    internal func remove(_ url: URL) throws {
+        try inner.remove(url)
+    }
+
+    /// Moves in the memory file system.
+    internal func move(_ source: URL, to destination: URL, replacing: Bool) throws {
         try inner.move(source, to: destination, replacing: replacing)
     }
-    func copy(_ source: URL, to destination: URL, progress: (Int64) -> Bool) throws {
+
+    /// Copies in the memory file system.
+    internal func copy(_ source: URL, to destination: URL, progress: (Int64) -> Bool) throws {
         try inner.copy(source, to: destination, progress: progress)
+    }
+
+    /// Waits until the gate is opened or the listing is told to stop; throws `failure` when the
+    /// listing goes on.
+    private func hold(_ cancellation: CancellationFlag) throws {
+        condition.withLock {
+            while !isOpen, !cancellation.isCancelled {
+                condition.wait()
+            }
+        }
+        if let failure, !cancellation.isCancelled {
+            throw failure
+        }
+    }
+
+    /// Waits until `end`, or until the listing is told to stop.
+    private func pause(until end: Date, _ cancellation: CancellationFlag) {
+        condition.withLock {
+            while !cancellation.isCancelled, end.timeIntervalSinceNow > 0 {
+                condition.wait(until: end)
+            }
+        }
+    }
+
+    deinit {
+        // Nothing to release.
     }
 }

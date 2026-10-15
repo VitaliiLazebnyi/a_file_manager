@@ -19,46 +19,77 @@ import Foundation
 /// it needs to the background and brings its results back. The column's own `value` function
 /// is called on several background threads at once, as its contract says.
 @MainActor
-final class ColumnValueStore {
+internal final class ColumnValueStore {
     /// A value belongs to a column and to an entry as it was listed: a file that changed gets
     /// its value computed again.
     private struct Key: Hashable {
+        /// The column's id.
         let column: String
+        /// The entry's name.
         let name: String
+        /// The entry's size when it was listed.
         let size: Int64
+        /// The entry's date when it was listed.
         let modified: Date
+
+        static func == (lhs: Self, rhs: Self) -> Bool {
+            lhs.column == rhs.column && lhs.name == rhs.name && lhs.size == rhs.size && lhs.modified == rhs.modified
+        }
+
+        func hash(into hasher: inout Hasher) {
+            hasher.combine(column)
+            hasher.combine(name)
+            hasher.combine(size)
+            hasher.combine(modified)
+        }
     }
 
+    /// One value that is wanted: for which column and entry.
     private struct Request {
+        /// What the value is kept under.
         let key: Key
+        /// The column that computes it.
         let column: ContentColumn
+        /// The entry it is computed for.
         let item: FileItem
     }
+
+    /// Rows computed in one go: a few per core, so the rows scrolled to meanwhile get their turn soon.
+    internal static var batchSize: Int { max(16, ProcessInfo.processInfo.activeProcessorCount * 4) }
+
+    /// Called on the main thread with the names of the entries whose values arrived.
+    internal var onArrival: ((Set<String>) -> Void)?
+    /// The folders (`URL.locationKey`) a batch is out for.
+    internal private(set) var working: Set<String> = []
 
     private var values: [Key: String] = [:]
     /// What is waiting, oldest first; the end of the line is served first.
     private var waiting: [Request] = []
     private var asked: Set<Key> = []
-    /// The folder the values are for, and the folders a batch is out for.
+    /// The folder the values are for.
     private var folder: URL?
-    private var location: String { folder?.locationKey ?? "" }
-    private var working: Set<String> = []
     /// Counts the folders shown; a batch that returns for an earlier one is dropped.
     private var generation = 0
     /// Set when the panel leaves the folder: a column that reads its file or asks a server
     /// gives up then (`ContentColumn.cancellableValue`), and the lane is free for the next folder.
     private var cancellation = CancellationFlag()
-    /// Called on the main thread with the names of the entries whose values arrived.
-    var onArrival: ((Set<String>) -> Void)?
 
-    /// Rows computed in one go: a few per core, so the rows scrolled to meanwhile get their turn soon.
-    static var batchSize: Int { max(16, ProcessInfo.processInfo.activeProcessorCount * 4) }
+    /// True while requests wait for their turn.
+    internal var hasWaiting: Bool { !waiting.isEmpty }
+
+    private var location: String { folder?.locationKey ?? "" }
+
+    /// Nothing known and nothing asked for yet.
+    internal init() {
+        // Every value is asked for when a row is drawn.
+    }
 
     /// The value, when it is known; otherwise nil, and the value is on its way.
-    func text(of column: ContentColumn, for item: FileItem) -> String? {
-        MainThread.assert("The column values")
+    internal func text(of column: ContentColumn, for item: FileItem) -> String? {
         let key = Key(column: column.id, name: item.name, size: item.size, modified: item.modified)
-        if let value = values[key] { return value }
+        if let value = values[key] {
+            return value
+        }
         if asked.insert(key).inserted {
             waiting.append(Request(key: key, column: column, item: item))
             work()
@@ -66,25 +97,22 @@ final class ColumnValueStore {
         return nil
     }
 
-    /// True while requests wait for their turn.
-    var hasWaiting: Bool { !waiting.isEmpty }
-
-    /// True while values are being computed or wait for it.
-    var isBusy: Bool { working.contains(location) || !waiting.isEmpty }
-
     /// Drops the requests that wait for rows that are no longer on screen (their names are not in
-    /// `names`); they are asked for again if the rows come back. A batch that is being computed
-    /// is finished.
-    func dropWaiting(except names: Set<String>) {
-        MainThread.assert("The column values")
-        guard !waiting.isEmpty else { return }
-        for request in waiting where !names.contains(request.item.name) { asked.remove(request.key) }
+    /// `names`); they are asked for again if the rows come back.
+    ///
+    /// A batch that is being computed is finished.
+    internal func dropWaiting(except names: Set<String>) {
+        guard !waiting.isEmpty else {
+            return
+        }
+        for request in waiting where !names.contains(request.item.name) {
+            asked.remove(request.key)
+        }
         waiting.removeAll { !names.contains($0.item.name) }
     }
 
-    /// Forgets everything: the panel shows another folder, `folder`.
-    func reset(folder: URL? = nil) {
-        MainThread.assert("The column values")
+    /// Forgets everything: the panel shows another folder, `folder` (nil for none).
+    internal func reset(folder: URL?) {
         self.folder = folder
         generation += 1
         cancellation.cancel()
@@ -94,27 +122,41 @@ final class ColumnValueStore {
         asked = []
     }
 
+    /// Starts the next batch of the folder shown, unless one is out for it already.
     private func work() {
-        let location = location
-        guard !working.contains(location), !waiting.isEmpty else { return }
-        working.insert(location)
+        let shown = location
+        guard !working.contains(shown), !waiting.isEmpty else {
+            return
+        }
+        working.insert(shown)
         let count = min(Self.batchSize, waiting.count)
         let batch = Array(waiting.suffix(count).reversed())
         waiting.removeLast(count)
-        let generation = self.generation
         let lane = folder ?? URL(fileURLWithPath: "/")
         let flag = cancellation
         Background.storage(
-            "columns", at: lane, qos: .utility,
+            "columns",
+            at: lane,
+            qos: .utility,
             work: { Parallel.map(batch) { $0.column.cancellableValue($0.item, flag) } },
-            then: { [weak self] texts in
-                guard let self else { return }
-                working.remove(location)
-                if generation == self.generation {
-                    for (request, text) in zip(batch, texts) { values[request.key] = text }
-                    onArrival?(Set(batch.map(\.item.name)))
-                }
-                work()
-            })
+            then: { [weak self, generation] texts in self?.take(texts, of: batch, for: shown, generation: generation) }
+        )
+    }
+
+    /// A batch came back: its values are kept unless the folder was left meanwhile, and the
+    /// next batch starts.
+    private func take(_ texts: [String], of batch: [Request], for location: String, generation: Int) {
+        working.remove(location)
+        if generation == self.generation {
+            for (request, text) in zip(batch, texts) {
+                values[request.key] = text
+            }
+            onArrival?(Set(batch.map(\.item.name)))
+        }
+        work()
+    }
+
+    deinit {
+        // Nothing to release: a batch out holds no reference to the store.
     }
 }

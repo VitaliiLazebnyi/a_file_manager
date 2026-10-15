@@ -61,6 +61,15 @@ internal final class PlacesStore {
         handlers.append(handler)
     }
 
+    /// The window goes away: nobody hears of the places any more, and nothing asks for them.
+    internal func stop() {
+        handlers = []
+        for observer in observers {
+            observer.center.removeObserver(observer.token)
+        }
+        observers = []
+    }
+
     /// Asks every file system for its places again.
     ///
     /// One that has not answered the last question yet is asked once more when it has.

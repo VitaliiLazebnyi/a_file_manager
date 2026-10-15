@@ -116,6 +116,7 @@ internal final class PanelCoordinator: PanelSet, PanelHost {
     internal func shutDown() {
         watches.shutDown()
         readAhead.shutDown()
+        places.stop()
         for panel in panels {
             panel.cancelLoading()
         }
@@ -259,13 +260,14 @@ internal final class PanelCoordinator: PanelSet, PanelHost {
         guard let first = candidates.first else {
             return
         }
-        panel.load(
-            first,
-            in: panel.model,
+        let request = PanelReadingRun.Request(
+            location: first,
+            tab: panel.model,
             focus: nil,
             history: .keep,
-            reportFailure: false
-        ) { [weak self, weak panel] succeeded in
+            reportsFailure: false
+        )
+        panel.load(request) { [weak self, weak panel] succeeded in
             // Not when the reading was overtaken by one the user started: that one decides.
             if let panel, !succeeded, !panel.isLoading, !panel.model.isListed {
                 self?.loadInitially(panel, candidates: Array(candidates.dropFirst()))

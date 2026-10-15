@@ -17,9 +17,9 @@ internal struct AppBackgroundTests {
         let finished = Shared(0)
         for _ in 0..<count {
             Background.compute {
-                started.change { $0 += 1 }
+                started.modify { $0 += 1 }
                 gate.wait()
-                finished.change { $0 += 1 }
+                finished.modify { $0 += 1 }
             }
         }
         // The pool is full: the rest waits, and nothing has finished.

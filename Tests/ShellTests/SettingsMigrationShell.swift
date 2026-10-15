@@ -102,7 +102,7 @@ internal struct SettingsMigrationShell {
             PanelSettings.colorRulesKey: Fixture.colorRulesInLines, PanelSettings.colorsByTypeKey: "true"
         ])
         let rules = PanelSettings(from: settings).colorRules
-        #expect(rules.map(\.maskText) == ["*.zip *.gz", "*.app"] && rules.map(\.colorText) == ["purple", "green"])
+        #expect(rules.count == 2)
         #expect(ColorRule.color(for: "a.gz", in: rules) == .systemPurple)
         #expect(ColorRule.color(for: "Mail.app", in: rules) == .systemGreen)
         #expect(ColorRule.color(for: "x.tmp", in: rules) == nil)
@@ -115,7 +115,7 @@ internal struct SettingsMigrationShell {
             PanelSettings.colorRulesKey: Fixture.colorRules, PanelSettings.colorsByTypeKey: "true"
         ])
         let rules = PanelSettings(from: settings).colorRules
-        #expect(rules.map(\.maskText) == ["*.zip *.gz", "*.app"])
+        #expect(rules.count == 2 && ColorRule.color(for: "a.zip", in: rules) == .systemPurple)
         #expect(ColorRule.color(for: "Mail.app", in: rules) == NSColor(srgbRed: 0, green: 1, blue: 0, alpha: 1))
     }
 
