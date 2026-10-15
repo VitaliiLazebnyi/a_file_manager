@@ -1,4 +1,5 @@
 import Dispatch
+import Foundation
 
 /// The jobs: what one call of `run` hands out.
 extension ParallelPool {
@@ -45,17 +46,14 @@ extension ParallelPool {
         internal var piecesLeft: Int { (count - next + grain - 1) / grain }
 
         /// A job of `count` indexes in pieces of `grain`, opened from a piece of `parent`.
-        internal init(
-            count: Int,
-            grain: Int,
-            parent: Job?,
-            isForMain: Bool,
-            urgency: qos_class_t,
-            body: @escaping @Sendable (Int) -> Void
-        ) {
+        ///
+        /// A job opened from no piece is the top of a tree: it notes whether the main thread
+        /// opened it and the urgency of the thread that did.
+        internal init(count: Int, grain: Int, parent: Job?, body: @escaping @Sendable (Int) -> Void) {
             (self.count, self.grain, self.parent, self.body) = (count, grain, parent, body)
             top = parent.map(\.root)
-            (self.isForMain, self.urgency) = (isForMain, urgency)
+            isForMain = parent == nil && Thread.isMainThread
+            urgency = parent == nil ? ParallelPool.urgencyOfCaller() : QOS_CLASS_UNSPECIFIED
         }
 
         /// Whether this job was opened, at any depth, from a piece of `ancestor`.

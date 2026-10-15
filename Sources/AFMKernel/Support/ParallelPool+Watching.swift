@@ -84,6 +84,27 @@ extension ParallelPool {
     private func look() -> Int {
         condition.lock()
         defer { condition.unlock() }
+        let (waiting, waitingIn) = countWaiting()
+        blocked = waiting
+        let (demand, grew) = demandOfOpenJobs(waitingIn: waitingIn)
+        let woken = summon(demand)
+        let ready = threads - min(waiting, threads)
+        let starts = max(0, min(demand - woken, width - ready, limit - threads))
+        threads += starts
+        // More threads ready to run than cores, the idle ones among them: the stall that
+        // made them is over.
+        retiring = starts > 0 ? 0 : max(0, ready - width - woken)
+        if retiring > 0, idle > 0 { condition.broadcast() }
+        let changed = grew || starts > 0 || woken > 0 || retiring > 0
+        interval = changed ? Self.patience : min(interval * 2, Self.longestPatience)
+        if open.isEmpty, threads <= width { isWatching = false }
+        return starts
+    }
+
+    /// The pool's threads that are at a piece and have hardly used the processor since the last look.
+    ///
+    /// Counted in all and by tree; the time each has used is noted. Called with the lock held.
+    private func countWaiting() -> (all: Int, byTree: [ObjectIdentifier: Int]) {
         var waiting = 0
         var waitingIn: [ObjectIdentifier: Int] = [:]
         for (thread, state) in workers {
@@ -95,42 +116,43 @@ extension ParallelPool {
             }
             workers[thread]?.used = time
         }
-        blocked = waiting
-        var changed = false
-        // The pieces that threads could be put to.
+        return (waiting, waitingIn)
+    }
+
+    /// The pieces of the open jobs that threads could be put to, and whether a tree was given more.
+    ///
+    /// Each tree counts as far as it may have threads. Called with the lock held.
+    private func demandOfOpenJobs(waitingIn: [ObjectIdentifier: Int]) -> (demand: Int, grew: Bool) {
+        var grew = false
         var demand = 0
         var seen = Set<ObjectIdentifier>()
         for job in open {
             let root = job.root
             if seen.insert(ObjectIdentifier(root)).inserted {
-                // A tree whose threads wait and whose pieces get done all the same is waiting
-                // for answers that come: more threads make it faster. One whose pieces do not
-                // get done keeps what it has.
-                if root.finished != root.seenFinished {
-                    root.seenFinished = root.finished
-                    let stuck = waitingIn[ObjectIdentifier(root)] ?? 0
-                    if stuck > 0, root.threads >= width + root.allowance, root.allowance < treeLimit - width {
-                        root.allowance = min(treeLimit - width, root.allowance + stuck)
-                        changed = true
-                    }
-                }
+                grew = grow(root, stuck: waitingIn[ObjectIdentifier(root)] ?? 0) || grew
                 root.room = max(0, width + root.allowance - root.threads)
             }
             let given = min(job.piecesLeft, root.room)
             root.room -= given
             demand += given
         }
-        let woken = summon(demand)
-        let ready = threads - min(waiting, threads)
-        let starts = max(0, min(demand - woken, width - ready, limit - threads))
-        threads += starts
-        // More threads ready to run than cores, the idle ones among them: the stall that
-        // made them is over.
-        retiring = starts > 0 ? 0 : max(0, ready - width - woken)
-        if retiring > 0, idle > 0 { condition.broadcast() }
-        changed = changed || starts > 0 || woken > 0 || retiring > 0
-        interval = changed ? Self.patience : min(interval * 2, Self.longestPatience)
-        if open.isEmpty, threads <= width { isWatching = false }
-        return starts
+        return (demand, grew)
+    }
+
+    /// Gives a tree more threads than cores when its threads wait and its pieces get done all the same.
+    ///
+    /// Such a tree waits for answers that come, and more threads make it faster. One whose
+    /// pieces do not get done keeps what it has. True when it was given more. Called with the
+    /// lock held.
+    private func grow(_ root: Job, stuck: Int) -> Bool {
+        guard root.finished != root.seenFinished else {
+            return false
+        }
+        root.seenFinished = root.finished
+        guard stuck > 0, root.threads >= width + root.allowance, root.allowance < treeLimit - width else {
+            return false
+        }
+        root.allowance = min(treeLimit - width, root.allowance + stuck)
+        return true
     }
 }

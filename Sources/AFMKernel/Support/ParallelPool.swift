@@ -106,7 +106,7 @@ internal final class ParallelPool: @unchecked Sendable {
 
     /// The urgency the pool's threads work with for a caller: the caller's own, but never so
     /// low that the system may leave the work lying for long.
-    private static func urgencyOfCaller() -> qos_class_t {
+    internal static func urgencyOfCaller() -> qos_class_t {
         let own = qos_class_self()
         if own == QOS_CLASS_UNSPECIFIED {
             return QOS_CLASS_USER_INITIATED
@@ -124,8 +124,6 @@ internal final class ParallelPool: @unchecked Sendable {
             count: count,
             grain: max(1, count / ((width + 1) * 16)),
             parent: parent,
-            isForMain: parent == nil && Thread.isMainThread,
-            urgency: parent == nil ? Self.urgencyOfCaller() : QOS_CLASS_UNSPECIFIED,
             body: body
         )
         let root = job.root
