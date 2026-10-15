@@ -1243,6 +1243,12 @@ final class OpenArchive: @unchecked Sendable {
         locked { memberSource == nil || unpacked != nil }
     }
 
+    /// Whether the archive is one compressed stream (a compressed TAR, or another format read
+    /// through the system's tool), whose checks are made only by reading it to its end.
+    var isOneStream: Bool {
+        locked { memberSource != nil }
+    }
+
     private func openZip(_ record: ZipRecord, path: String) throws -> any ByteStream {
         var method = record.method
         var aes: ZipAES.Field?

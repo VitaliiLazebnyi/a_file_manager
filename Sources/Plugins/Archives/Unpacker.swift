@@ -294,16 +294,9 @@ enum ArchiveTester {
             }
         }
         @Sendable func expected(_ entry: ArchiveEntry) -> Int64? { entry.sizeIsExact ? entry.size : nil }
-        if archive.allowsParallelReads {
-            // An archive that is one compressed stream, read from a copy: the stream in the file
-            // is read to its end first, for its own checks.
-            do {
-                try archive.readInOnePass([], cancellation: cancellation, throughTheEnd: true) { _, _ in
-                    // No member is handed over.
-                }
-            } catch {
-                return cancellation.isCancelled ? [] : [error.localizedDescription]
-            }
+        // An archive that is one compressed stream is tested in a pass through the stream in its
+        // file, to its end, for the stream's own checks; members it has a copy of come from there.
+        if archive.allowsParallelReads, !archive.isOneStream {
             return
                 Parallel.map(members) { entry -> String? in
                     problem(with: entry) {
