@@ -94,7 +94,8 @@ final class SyncWindowController: NSWindowController, NSWindowDelegate, NSTableV
         session.onRowsChange = { [weak self] rows in self?.refreshRows(rows) }
     }
 
-    required init?(coder _: NSCoder) { fatalError("not used") }
+    /// The window is made in code, never from an archive.
+    required init?(coder _: NSCoder) { nil }
 
     /// Shows the window with what the session holds now.
     func show() {

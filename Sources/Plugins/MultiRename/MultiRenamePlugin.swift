@@ -16,7 +16,7 @@ public final class MultiRenamePlugin: Plugin {
 
     /// `opensWindows` false keeps the tool windowless, for tests, and computes previews at
     /// once. `logDirectory` is where the result log goes; by default a folder of the program
-    /// in the temporary directory.
+    /// in the user's Logs folder.
     public init(opensWindows: Bool = true, logDirectory: URL? = nil) {
         self.opensWindows = opensWindows
         self.logDirectory = logDirectory
@@ -33,31 +33,43 @@ public final class MultiRenamePlugin: Plugin {
             enabled: { source().hasOperands && isWritable() },
             parameterized: { [self] argument in
                 open(kernel, settingsName: argument.text)
-            })
+            }
+        )
         kernel.menus.add([.multiRename], to: .filesAdvanced)
         kernel.menus.addToContextMenu([.multiRename], in: .tools, onItemOnly: true)
         kernel.toolbar.add(
-            .multiRename, symbol: "character.cursor.ibeam", group: 50,
-            hint: "Rename many files at once, with a pattern, counters and search and replace.")
+            .multiRename,
+            symbol: "character.cursor.ibeam",
+            group: 50,
+            hint: "Rename many files at once, with a pattern, counters and search and replace."
+        )
         kernel.preferences.add(
             PreferencePage(
                 title: "Multi-Rename Tool",
                 preferences: [
                     Preference(
-                        RenameStore.undoLimitKey, "Rename runs that can be undone (0 = no Undo)", .text(default: "20")
+                        RenameStore.undoLimitKey,
+                        "Rename runs that can be undone (0 = no Undo)",
+                        .text(default: "20")
                     ),
                     Preference(
-                        RenameStore.startupSettingsKey, "Saved settings to open the tool with (empty = last used)",
-                        .text(default: "")),
+                        RenameStore.startupSettingsKey,
+                        "Saved settings to open the tool with (empty = last used)",
+                        .text(default: "")
+                    ),
                     Preference(
-                        RenameStore.lowercaseWordsKey, "Words kept in lower case in titles",
-                        .text(default: TitleCaseRule.defaultSetting))
-                ]))
+                        RenameStore.lowercaseWordsKey,
+                        "Words kept in lower case in titles",
+                        .text(default: TitleCaseRule.defaultSetting)
+                    )
+                ]
+            )
+        )
     }
 
+    /// Runs only while the source panel has operands (the command is enabled then).
     private func open(_ kernel: Kernel, settingsName: String?) {
         let items = kernel.panels.source.model.operands()
-        guard !items.isEmpty else { return }
         let store = RenameStore(settings: kernel.settings)
         self.store = store
         lastSettings = session?.settings ?? lastSettings
@@ -67,12 +79,7 @@ public final class MultiRenamePlugin: Plugin {
         let settings = wanted.map { store.saved[$0] ?? .unchanged } ?? lastSettings ?? .unchanged
         // The log of a run is kept in the user's own Logs folder, not in the temporary one.
         let product = kernel.productName.replacingOccurrences(of: "/", with: "_")
-        let log =
-            logDirectory
-            ?? FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first?.appendingPathComponent(
-                "Logs"
-            ).appendingPathComponent(product)
-            ?? FileManager.default.temporaryDirectory.appendingPathComponent(product)
+        let log = logDirectory ?? URL.libraryDirectory.appending(path: "Logs").appending(path: product)
         // Asked for from a queue of the session, which waits; read on the main thread, as
         // `NSPasteboard` is not made for other threads.
         var clipboard: @Sendable () -> String? = { nil }
@@ -82,8 +89,15 @@ public final class MultiRenamePlugin: Plugin {
             changeCount = { NSPasteboard.general.changeCount }
         }
         let session = MultiRenameSession(
-            kernel: kernel, items: items, store: store, settings: settings, logDirectory: log,
-            previewsInBackground: opensWindows, clipboard: clipboard, clipboardChangeCount: changeCount)
+            kernel: kernel,
+            items: items,
+            store: store,
+            settings: settings,
+            logDirectory: log,
+            previewsInBackground: opensWindows,
+            clipboard: clipboard,
+            clipboardChangeCount: changeCount
+        )
         self.session = session
         guard opensWindows else { return }
         // The tool that is open is closed first, and its closing is not told to anyone: it
@@ -97,13 +111,15 @@ public final class MultiRenamePlugin: Plugin {
         window = controller
         // A closed tool lets go of its window and session (a running job holds on to the
         // session itself); the settings last used are kept for the next time.
-        controller.onClose = { [weak self, weak controller] in
-            guard let self, window === controller else { return }
-            lastSettings = self.session?.settings ?? lastSettings
-            window = nil
-            self.session = nil
-        }
+        controller.onClose = { [weak self] in self?.windowClosed() }
         controller.showWindow(nil)
+    }
+
+    /// The window of the tool closed (one that was replaced is not told).
+    private func windowClosed() {
+        if let settings = session?.settings { lastSettings = settings }
+        window = nil
+        session = nil
     }
 
     public func stop() {

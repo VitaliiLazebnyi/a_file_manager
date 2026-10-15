@@ -9,7 +9,14 @@ final class SearchForm: NSObject, NSTableViewDataSource, NSTableViewDelegate {
     let tabView = NSTabView()
     let searchForField = NSComboBox()
     /// Enter in one of the text fields.
-    var onSubmit: () -> Void = {}
+    var onSubmit: (() -> Void)?
+    /// Shows an open panel as a sheet of the window and hands on the button and the locations
+    /// chosen. The program shows the real panel; a test answers in its place.
+    var presentOpenPanel: (NSOpenPanel, NSWindow, @escaping (NSApplication.ModalResponse, [URL]) -> Void) -> Void = {
+        panel,
+        window,
+        done in panel.beginSheetModal(for: window) { done($0, panel.urls) }
+    }
 
     private let fields: [SearchField]
     private let store: SearchStore
@@ -49,9 +56,10 @@ final class SearchForm: NSObject, NSTableViewDataSource, NSTableViewDelegate {
     private let sizeField = NSTextField(string: "1")
     private let sizeUnit = NSPopUpButton()
     private let attributesBox = SearchForm.box("Attributes:")
-    private let attributeBoxes = ["Hidden", "Directory", "Symbolic link", "Read only", "Executable", "Package"].map {
-        SearchForm.box($0)
-    }
+    private let attributeBoxes = ["Hidden", "Directory", "Symbolic link", "Read only", "Executable", "Package"]
+        .map {
+            SearchForm.box($0)
+        }
     private let duplicatesBox = SearchForm.box("Find duplicate files:")
     private let sameNameBox = SearchForm.box("same name")
     private let sameSizeBox = SearchForm.box("same size")
@@ -59,10 +67,15 @@ final class SearchForm: NSObject, NSTableViewDataSource, NSTableViewDelegate {
 
     // Plugins
     @MainActor private struct RuleRow {
-        let field = NSPopUpButton()
-        let comparison = NSPopUpButton()
-        let value = NSTextField()
+        let field: NSPopUpButton
+        let comparison: NSPopUpButton
+        let value: NSTextField
         let view: NSStackView
+
+        init(view: NSStackView) {
+            (field, comparison, value) = (NSPopUpButton(), NSPopUpButton(), NSTextField())
+            self.view = view
+        }
     }
     private let rulesBox = SearchForm.box("Search in plugins (columns):")
     private let combinePopup = NSPopUpButton()
@@ -150,7 +163,8 @@ final class SearchForm: NSObject, NSTableViewDataSource, NSTableViewDelegate {
 
         // General
         depthPopup.addItems(
-            withTitles: ["all (unlimited depth)", "current dir only"] + (1...10).map { "\($0) level(s)" })
+            withTitles: ["all (unlimited depth)", "current dir only"] + (1...10).map { "\($0) level(s)" }
+        )
         let browse = NSButton(title: ">>", target: self, action: #selector(browse))
         let grid = NSGridView(views: [
             [label("Search for:"), searchForField, namesRegexBox],
@@ -175,7 +189,8 @@ final class SearchForm: NSObject, NSTableViewDataSource, NSTableViewDelegate {
                 row([label("Search in subdirectories:"), depthPopup]),
                 row([textOptions], indent: 20),
                 row([notContainingBox], indent: 20)
-            ])
+            ]
+        )
 
         // Advanced
         for picker in [fromPicker, toPicker] {
@@ -203,7 +218,8 @@ final class SearchForm: NSObject, NSTableViewDataSource, NSTableViewDelegate {
                 row([attributesBox] + attributeBoxes[0..<3]),
                 row(Array(attributeBoxes[3...]), indent: 96),
                 row([duplicatesBox, sameNameBox, sameSizeBox, sameContentsBox])
-            ])
+            ]
+        )
 
         // Plugins
         combinePopup.addItems(withTitles: ["AND (all match)", "OR (any match)"])
@@ -219,7 +235,8 @@ final class SearchForm: NSObject, NSTableViewDataSource, NSTableViewDelegate {
                     NSButton(title: "More rules", target: self, action: #selector(moreRules)),
                     NSButton(title: "Fewer rules", target: self, action: #selector(fewerRules))
                 ])
-            ])
+            ]
+        )
         addRuleRow()
 
         // Load/Save
@@ -265,8 +282,7 @@ final class SearchForm: NSObject, NSTableViewDataSource, NSTableViewDelegate {
         updateEnabled()
     }
 
-    private func removeLastRuleRow() {
-        guard let row = ruleRows.popLast() else { return }
+    private func remove(_ row: RuleRow) {
         rulesStack.removeArrangedSubview(row.view)
         row.view.removeFromSuperview()
     }
@@ -278,7 +294,8 @@ final class SearchForm: NSObject, NSTableViewDataSource, NSTableViewDelegate {
         }
         enable(
             [textField, wholeWordsBox, caseBox, textRegexBox, hexBox, notContainingBox] + encodingBoxes,
-            when: findTextBox)
+            when: findTextBox
+        )
         if findTextBox.state == .on {
             // Hex bytes are their own encoding, and a regular expression is not a hex string.
             encodingBoxes.forEach { $0.isEnabled = hexBox.state == .off }
@@ -292,7 +309,9 @@ final class SearchForm: NSObject, NSTableViewDataSource, NSTableViewDelegate {
         enable(attributeBoxes, when: attributesBox)
         enable([sameNameBox, sameSizeBox, sameContentsBox], when: duplicatesBox)
         enable(
-            [combinePopup] + ruleRows.flatMap { [$0.field, $0.comparison, $0.value] as [NSControl] }, when: rulesBox)
+            [combinePopup] + ruleRows.flatMap { [$0.field, $0.comparison, $0.value] as [NSControl] },
+            when: rulesBox
+        )
         let hasSaved = saved.indices.contains(savedTable.selectedRow)
         savedButtons.first?.isEnabled = hasSaved
         savedButtons.last?.isEnabled = hasSaved
@@ -325,15 +344,24 @@ final class SearchForm: NSObject, NSTableViewDataSource, NSTableViewDelegate {
             settings.caseSensitive = isOn(caseBox)
             let encodings = zip(TextEncoding.allCases, encodingBoxes).filter { isOn($0.1) }.map(\.0)
             settings.textOptions = TextSearchOptions(
-                wholeWords: isOn(wholeWordsBox), regex: isOn(textRegexBox), hex: isOn(hexBox),
-                notContaining: isOn(notContainingBox), encodings: encodings.isEmpty ? [.utf8] : encodings)
+                wholeWords: isOn(wholeWordsBox),
+                regex: isOn(textRegexBox),
+                hex: isOn(hexBox),
+                notContaining: isOn(notContainingBox),
+                encodings: encodings.isEmpty ? [.utf8] : encodings
+            )
             let calendar = Calendar.current
             if isOn(dateBox) {
                 settings.criteria.dateFrom = calendar.startOfDay(for: fromPicker.dateValue)
                 // The whole last day counts.
                 settings.criteria.dateTo = calendar.date(
-                    byAdding: .day, value: 1, to: calendar.startOfDay(for: toPicker.dateValue))?.addingTimeInterval(
-                        -1)
+                    byAdding: .day,
+                    value: 1,
+                    to: calendar.startOfDay(for: toPicker.dateValue)
+                )?
+                .addingTimeInterval(
+                    -1
+                )
             }
             func age(_ box: NSButton, _ field: NSTextField, _ unit: NSPopUpButton) -> Age? {
                 isOn(box)
@@ -345,15 +373,19 @@ final class SearchForm: NSObject, NSTableViewDataSource, NSTableViewDelegate {
                 settings.criteria.size = SizeRule(
                     SizeRule.Comparison(rawValue: sizeComparison.indexOfSelectedItem) ?? .equal,
                     Double(sizeField.stringValue.replacingOccurrences(of: ",", with: ".")) ?? 0,
-                    SizeRule.Unit(rawValue: sizeUnit.indexOfSelectedItem) ?? .bytes)
+                    SizeRule.Unit(rawValue: sizeUnit.indexOfSelectedItem) ?? .bytes
+                )
             }
             (settings.criteria.hidden, settings.criteria.directory, settings.criteria.symbolicLink) =
                 (tri(attributeBoxes[0]), tri(attributeBoxes[1]), tri(attributeBoxes[2]))
             (settings.criteria.readOnly, settings.criteria.executable, settings.criteria.package) =
                 (tri(attributeBoxes[3]), tri(attributeBoxes[4]), tri(attributeBoxes[5]))
             settings.duplicates = DuplicateOptions(
-                isEnabled: isOn(duplicatesBox), sameName: isOn(sameNameBox), sameSize: isOn(sameSizeBox),
-                sameContents: isOn(sameContentsBox))
+                isEnabled: isOn(duplicatesBox),
+                sameName: isOn(sameNameBox),
+                sameSize: isOn(sameSizeBox),
+                sameContents: isOn(sameContentsBox)
+            )
             let rules = ruleRows.compactMap { row -> FieldRule? in
                 guard fields.indices.contains(row.field.indexOfSelectedItem), !row.value.stringValue.isEmpty else {
                     return nil
@@ -361,10 +393,14 @@ final class SearchForm: NSObject, NSTableViewDataSource, NSTableViewDelegate {
                 return FieldRule(
                     fields[row.field.indexOfSelectedItem].id,
                     FieldRule.Operator(rawValue: row.comparison.indexOfSelectedItem) ?? .contains,
-                    row.value.stringValue)
+                    row.value.stringValue
+                )
             }
             settings.fieldRules = FieldRules(
-                isEnabled: isOn(rulesBox), matchAll: combinePopup.indexOfSelectedItem == 0, rules: rules)
+                isEnabled: isOn(rulesBox),
+                matchAll: combinePopup.indexOfSelectedItem == 0,
+                rules: rules
+            )
             return settings
         }
         set {
@@ -382,7 +418,9 @@ final class SearchForm: NSObject, NSTableViewDataSource, NSTableViewDelegate {
             depthPopup.selectItem(
                 at: min(
                     newValue.depth.map { max($0, 0) < Int.max ? max($0, 0) + 1 : Int.max } ?? 0,
-                    depthPopup.numberOfItems - 1))
+                    depthPopup.numberOfItems - 1
+                )
+            )
             set(findTextBox, newValue.findText)
             textField.stringValue = newValue.text
             set(caseBox, newValue.caseSensitive)
@@ -417,15 +455,15 @@ final class SearchForm: NSObject, NSTableViewDataSource, NSTableViewDelegate {
                 [
                     criteria.hidden, criteria.directory, criteria.symbolicLink, criteria.readOnly,
                     criteria.executable, criteria.package
-                ])
-            { set(box, state) }
+                ]
+            ) { set(box, state) }
             set(duplicatesBox, newValue.duplicates.isEnabled)
             set(sameNameBox, newValue.duplicates.sameName)
             set(sameSizeBox, newValue.duplicates.sameSize)
             set(sameContentsBox, newValue.duplicates.sameContents)
             set(rulesBox, newValue.fieldRules.isEnabled)
             combinePopup.selectItem(at: newValue.fieldRules.matchAll ? 0 : 1)
-            while !ruleRows.isEmpty { removeLastRuleRow() }
+            while let row = ruleRows.popLast() { remove(row) }
             newValue.fieldRules.rules.forEach { addRuleRow($0) }
             if ruleRows.isEmpty { addRuleRow() }
             updateEnabled()
@@ -452,11 +490,11 @@ final class SearchForm: NSObject, NSTableViewDataSource, NSTableViewDelegate {
     // MARK: Actions
 
     @objc private func optionChanged() { updateEnabled() }
-    @objc private func submit() { onSubmit() }
+    @objc private func submit() { onSubmit?() }
     @objc private func moreRules() { addRuleRow() }
 
     @objc private func fewerRules() {
-        if ruleRows.count > 1 { removeLastRuleRow() }
+        if ruleRows.count > 1, let row = ruleRows.popLast() { remove(row) }
     }
 
     /// `>>`: choosing start directories on the local disks; several may be picked.
@@ -465,9 +503,9 @@ final class SearchForm: NSObject, NSTableViewDataSource, NSTableViewDelegate {
         (panel.canChooseDirectories, panel.canChooseFiles, panel.allowsMultipleSelection) = (true, false, true)
         panel.prompt = "Search here"
         guard let window = tabView.window else { return }
-        panel.beginSheetModal(for: window) { [weak self] response in
-            guard response == .OK, !panel.urls.isEmpty else { return }
-            self?.searchInField.stringValue = panel.urls.map(\.path).joined(separator: ";")
+        presentOpenPanel(panel, window) { [weak self] response, urls in
+            guard response == .OK, !urls.isEmpty else { return }
+            self?.searchInField.stringValue = urls.map(\.path).joined(separator: ";")
         }
     }
 

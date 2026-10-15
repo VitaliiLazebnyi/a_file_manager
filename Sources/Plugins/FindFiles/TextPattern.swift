@@ -25,7 +25,9 @@ public enum TextEncoding: String, Codable, CaseIterable, Sendable {
         case .dos:
             return String.Encoding(
                 rawValue: CFStringConvertEncodingToNSStringEncoding(
-                    CFStringEncoding(CFStringEncodings.dosLatinUS.rawValue)))
+                    CFStringEncoding(CFStringEncodings.dosLatinUS.rawValue)
+                )
+            )
 
         case .utf16: return .utf16LittleEndian
         }
@@ -46,7 +48,10 @@ public struct TextSearchOptions: Codable, Equatable, Sendable {
     public var encodings: [TextEncoding]
 
     public init(
-        wholeWords: Bool = false, regex: Bool = false, hex: Bool = false, notContaining: Bool = false,
+        wholeWords: Bool = false,
+        regex: Bool = false,
+        hex: Bool = false,
+        notContaining: Bool = false,
         encodings: [TextEncoding] = [.utf8]
     ) {
         self.wholeWords = wholeWords
@@ -100,10 +105,13 @@ public struct TextPattern: Sendable {
             self.unit = unit
             self.bigEndian = bigEndian
             self.wholeWords = wholeWords
-            minLength = elements.reduce(0) { $0 + ($1.map(\.count).min() ?? 0) }
-            maxLength = elements.reduce(0) { $0 + ($1.map(\.count).max() ?? 0) }
+            // Every element has at least one way to be written.
+            minLength = elements.reduce(0) { sum, element in sum + element.reduce(Int.max) { min($0, $1.count) } }
+            maxLength = elements.reduce(0) { sum, element in sum + element.reduce(0) { max($0, $1.count) } }
             var first = [Bool](repeating: false, count: 256)
-            for alternative in elements.first ?? [] { if let byte = alternative.first { first[Int(byte)] = true } }
+            for alternative in elements.prefix(1).joined() {
+                if let byte = alternative.first { first[Int(byte)] = true }
+            }
             firstBytes = first
             literal = !wholeWords && elements.allSatisfy({ $0.count == 1 }) ? elements.flatMap { $0[0] } : nil
         }
@@ -122,12 +130,15 @@ public struct TextPattern: Sendable {
             var tried = [Int](repeating: 0, count: elements.count)
             for start in skip...(hay.count - minLength) where firstBytes[Int(bytes[start])] {
                 if match(
-                    bytes, at: start, positions: &positions, tried: &tried,
+                    bytes,
+                    at: start,
+                    positions: &positions,
+                    tried: &tried,
                     accept: { end in
                         !wholeWords
                             || (isBoundary(bytes, before: start) && isBoundary(bytes, after: end, isLast: isLast))
-                    })
-                {
+                    }
+                ) {
                     return true
                 }
             }
@@ -138,7 +149,10 @@ public struct TextPattern: Sendable {
         /// element before when one has none left. Iterative, with the state in two arrays: a
         /// text of any length is matched on the small stack of a search thread.
         private func match(
-            _ bytes: UnsafeBufferPointer<UInt8>, at start: Int, positions: inout [Int], tried: inout [Int],
+            _ bytes: UnsafeBufferPointer<UInt8>,
+            at start: Int,
+            positions: inout [Int],
+            tried: inout [Int],
             accept: (Int) -> Bool
         ) -> Bool {
             let count = elements.count
@@ -149,8 +163,8 @@ public struct TextPattern: Sendable {
                 if element == count {
                     if accept(positions[count]) { return true }
                     // Not accepted (a word continues): look for another way to write the text.
+                    // (There is at least one element, so there is one to go back to.)
                     element -= 1
-                    if element < 0 { return false }
                     continue
                 }
                 let alternatives = elements[element]
@@ -222,7 +236,8 @@ public struct TextPattern: Sendable {
             matcher = .bytes([
                 Needle(
                     elements: try Self.hexElements(text, caseSensitive: caseSensitive),
-                    wholeWords: options.wholeWords)
+                    wholeWords: options.wholeWords
+                )
             ])
             droppedEncodings = []
         } else if options.regex {
@@ -230,7 +245,8 @@ public struct TextPattern: Sendable {
                 let pattern = options.wholeWords ? "\\b(?:\(text))\\b" : text
                 let regex = try NSRegularExpression(
                     pattern: pattern,
-                    options: caseSensitive ? [.anchorsMatchLines] : [.anchorsMatchLines, .caseInsensitive])
+                    options: caseSensitive ? [.anchorsMatchLines] : [.anchorsMatchLines, .caseInsensitive]
+                )
                 matcher = .regex(regex, encodings)
                 droppedEncodings = []
             } catch {
@@ -242,7 +258,11 @@ public struct TextPattern: Sendable {
             var dropped: [TextEncoding] = []
             for encoding in encodings {
                 let found = Self.needles(
-                    for: plain, in: encoding, caseSensitive: caseSensitive, wholeWords: options.wholeWords)
+                    for: plain,
+                    in: encoding,
+                    caseSensitive: caseSensitive,
+                    wholeWords: options.wholeWords
+                )
                 if found.isEmpty { dropped.append(encoding) }
                 for needle in found
                 where !needles.contains(where: { $0.elements == needle.elements && $0.unit == needle.unit }) {
@@ -307,10 +327,12 @@ public struct TextPattern: Sendable {
             return elements
         }
         if encoding == .utf16 {
-            return [(String.Encoding.utf16LittleEndian, false), (.utf16BigEndian, true)].compactMap {
-                order, bigEndian in
-                elements(order).map { Needle(elements: $0, unit: 2, bigEndian: bigEndian, wholeWords: wholeWords) }
-            }
+            return [(String.Encoding.utf16LittleEndian, false), (.utf16BigEndian, true)]
+                .compactMap {
+                    order,
+                    bigEndian in
+                    elements(order).map { Needle(elements: $0, unit: 2, bigEndian: bigEndian, wholeWords: wholeWords) }
+                }
         }
         return elements(encoding.stringEncoding).map { [Needle(elements: $0, wholeWords: wholeWords)] } ?? []
     }
@@ -386,9 +408,12 @@ public struct TextPattern: Sendable {
     /// Reads block by block. The end of each block is looked at again together with the next
     /// one, so a hit across a block border is found, with the characters around it.
     private static func search(
-        _ needles: [Needle], _ reader: any FileReader, _ cancellation: CancellationFlag?, _ blockSize: Int
+        _ needles: [Needle],
+        _ reader: any FileReader,
+        _ cancellation: CancellationFlag?,
+        _ blockSize: Int
     ) -> Bool? {
-        let overlap = (needles.map(\.maxLength).max() ?? 1) + 2
+        let overlap = needles.reduce(0) { max($0, $1.maxLength) } + 2
         var carry = Data()
         var carryStartsFile = true
         do {
@@ -424,8 +449,12 @@ public struct TextPattern: Sendable {
     /// text into lines. A piece that takes the expression too long ends the search of the file
     /// (it is not found in it), and a cancelled search ends at once, also in the middle of a piece.
     private static func search(
-        _ regex: NSRegularExpression, _ encodings: [TextEncoding], _ reader: any FileReader,
-        _ cancellation: CancellationFlag?, _ blockSize: Int, _ trip: RegexTrip
+        _ regex: NSRegularExpression,
+        _ encodings: [TextEncoding],
+        _ reader: any FileReader,
+        _ cancellation: CancellationFlag?,
+        _ blockSize: Int,
+        _ trip: RegexTrip
     ) -> Bool? {
         var decoders = encodings.map { LineDecoder(encoding: $0) }
         var gaveUp = false
@@ -436,7 +465,11 @@ public struct TextPattern: Sendable {
                 return false
             }
             switch FindRegex.firstMatch(
-                regex, in: text, budget: pieceBudget, cancelled: { cancellation?.isCancelled == true })
+                regex,
+                in: text,
+                budget: pieceBudget,
+                cancelled: { cancellation?.isCancelled == true }
+            )
             {
             case .matched: return true
             case .unmatched: return false
@@ -516,7 +549,6 @@ public struct TextPattern: Sendable {
             // A line without a break that is too long: handed out in pieces, cut between
             // characters, with the end of each piece repeated at the start of the next.
             let cut = boundary(atOrBefore: pending.count)
-            guard cut > 0 else { return nil }
             let text = decode(pending.prefix(cut))
             pending.removeFirst(boundary(atOrBefore: max(0, cut - Self.cutOverlap)))
             return text
@@ -534,7 +566,7 @@ public struct TextPattern: Sendable {
                         lead -= 1
                         back += 1
                     }
-                    guard lead >= 0, !pending.isEmpty else { return pending.count }
+                    // (Asked only of a line longer than `longestLine`.)
                     let byte = pending[pending.startIndex + lead]
                     let needed = byte >= 0xF0 ? 4 : byte >= 0xE0 ? 3 : byte >= 0xC0 ? 2 : 1
                     return lead + needed > pending.count ? lead : pending.count
@@ -584,7 +616,9 @@ public struct TextPattern: Sendable {
 
             case .utf16:
                 return String(
-                    data: data.prefix(data.count / 2 * 2), encoding: bigEndian ? .utf16BigEndian : .utf16LittleEndian)
+                    data: data.prefix(data.count / 2 * 2),
+                    encoding: bigEndian ? .utf16BigEndian : .utf16LittleEndian
+                )
 
             case .western, .dos:
                 return String(data: data, encoding: encoding.stringEncoding)
@@ -595,7 +629,7 @@ public struct TextPattern: Sendable {
 
     /// Used by one thread at a time, as `FileReader` allows; `interrupt` (which does nothing)
     /// is the only call from another thread.
-    private final class DataReader: FileReader, @unchecked Sendable {
+    final class DataReader: FileReader, @unchecked Sendable {
         private let data: Data
         private var position = 0
 

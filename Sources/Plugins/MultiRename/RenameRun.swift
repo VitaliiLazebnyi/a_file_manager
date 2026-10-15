@@ -103,7 +103,9 @@ final class RenameCache: @unchecked Sendable {
     private let dates: ContentDateStore
 
     init(
-        dates: ContentDateStore = ContentDateStore(), folding: [String: Bool] = [:], keys: [String: Set<String>] = [:]
+        dates: ContentDateStore = ContentDateStore(),
+        folding: [String: Bool] = [:],
+        keys: [String: Set<String>] = [:]
     ) {
         self.dates = dates
         self.folding = folding
@@ -181,18 +183,24 @@ enum RenameComputation {
 
     static func subject(for entry: RenameEntry, directory: URL, fileSystems: FileSystemRegistry) -> RenameSubject {
         RenameSubject(
-            name: entry.name, isFolder: entry.item.isFolder, size: entry.item.size, modified: entry.item.modified,
+            name: entry.name,
+            isFolder: entry.item.isFolder,
+            size: entry.item.size,
+            modified: entry.item.modified,
             directoryPath: fileSystems.displayPath(directory),
-            folders: directory.pathComponents.filter { $0 != "/" }, url: entry.item.url)
+            folders: directory.pathComponents.filter { $0 != "/" },
+            url: entry.item.url
+        )
     }
 
     /// Where a new name puts an item: next to where it is, or, with slashes in the name, in
     /// a folder below (or, with a slash in front, anywhere on the same file system).
     static func target(of entry: RenameEntry, named name: String) -> URL {
         if name.utf8.first == 0x2F {
-            var components = URLComponents(url: entry.item.url, resolvingAgainstBaseURL: false) ?? URLComponents()
-            components.path = name
-            return (components.url ?? entry.directory.appending(name: name)).standardized
+            // From the top of the item's file system.
+            var root = entry.directory
+            while root.pathComponents.count > 1 { root.deleteLastPathComponent() }
+            return root.appending(path: String(name.dropFirst())).standardized
         }
         if name.utf8.contains(0x2F) {
             return entry.directory.appendingPathComponent(name, isDirectory: false).standardized
@@ -203,13 +211,21 @@ enum RenameComputation {
         let old = entry.diskName
         if !name.utf8.elementsEqual(old.utf8),
             name.precomposedStringWithCanonicalMapping.utf8.elementsEqual(
-                old.precomposedStringWithCanonicalMapping.utf8),
-            var components = URLComponents(url: entry.directory, resolvingAgainstBaseURL: false)
+                old.precomposedStringWithCanonicalMapping.utf8
+            ),
+            let url = location(named: name, in: entry.directory)
         {
-            components.path = (components.path.hasSuffix("/") ? components.path : components.path + "/") + name
-            if let url = components.url { return url }
+            return url
         }
         return entry.directory.appending(name: name)
+    }
+
+    /// The name in the folder exactly as it is written; nil where no location can hold it.
+    private static func location(named name: String, in directory: URL) -> URL? {
+        var components = URLComponents(url: directory, resolvingAgainstBaseURL: false)
+        // The folder's path ends with a slash (`deletingLastPathComponent`).
+        components?.path += name
+        return components?.url
     }
 
     /// The new names only: masks, Search & Replace and case, on all cores. `subjects` are the
@@ -217,8 +233,12 @@ enum RenameComputation {
     /// that are not to be used. `isCancelled` also ends a regular expression that is working on
     /// a name; one that takes too long gives that name no new name (`<Error!>`).
     static func names(
-        _ entries: [RenameEntry], settings: RenameSettings, context: RenameContext, given: [String]?,
-        fileSystems: FileSystemRegistry, subjects: [RenameSubject]? = nil,
+        _ entries: [RenameEntry],
+        settings: RenameSettings,
+        context: RenameContext,
+        given: [String]?,
+        fileSystems: FileSystemRegistry,
+        subjects: [RenameSubject]? = nil,
         isCancelled: @Sendable () -> Bool = { false }
     ) -> (names: [String?], problem: any Error?) {
         var context = context
@@ -230,8 +250,10 @@ enum RenameComputation {
                 // A list of given names may be shorter than the list of files; the rest keep their masks.
                 let given = given.flatMap { $0.indices.contains(index) ? $0[index] : nil }
                 return engine.newName(
-                    for: subjects?[index] ?? subject(for: entries[index], fileSystems: fileSystems), index: index,
-                    given: given)
+                    for: subjects?[index] ?? subject(for: entries[index], fileSystems: fileSystems),
+                    index: index,
+                    given: given
+                )
             }
             return (names, engine.problem ?? engine.tooSlow)
         }
@@ -242,14 +264,25 @@ enum RenameComputation {
     /// saves listing the same folders and building the same subjects for every keystroke.
     /// `cancellation` ends the listing of a folder that does not answer.
     static func preview(
-        _ entries: [RenameEntry], settings: RenameSettings, context: RenameContext, given: [String]? = nil,
-        fileSystems: FileSystemRegistry, cache: RenameCache = RenameCache(),
-        cancellation: CancellationFlag? = nil, isCancelled: @Sendable () -> Bool = { false }
+        _ entries: [RenameEntry],
+        settings: RenameSettings,
+        context: RenameContext,
+        given: [String]? = nil,
+        fileSystems: FileSystemRegistry,
+        cache: RenameCache = RenameCache(),
+        cancellation: CancellationFlag? = nil,
+        isCancelled: @Sendable () -> Bool = { false }
     ) -> RenamePreview {
         let rows = cache.rows(for: entries, fileSystems: fileSystems)
         let (names, problem) = names(
-            entries, settings: settings, context: context, given: given, fileSystems: fileSystems,
-            subjects: rows.subjects, isCancelled: isCancelled)
+            entries,
+            settings: settings,
+            context: context,
+            given: given,
+            fileSystems: fileSystems,
+            subjects: rows.subjects,
+            isCancelled: isCancelled
+        )
         let placed = Parallel.map(Array(entries.indices), serialBelow: parallelThreshold) {
             index -> (RenameStatus, URL?) in
             guard let name = names[index] else { return (.error, nil) }
@@ -263,8 +296,13 @@ enum RenameComputation {
         let targets = placed.map(\.1)
         let sources = entries.map(\.item.url)
         var preview = RenamePreview(
-            names: names, targets: targets, statuses: statuses, planner: RenamePlanner(), existing: [],
-            problem: problem)
+            names: names,
+            targets: targets,
+            statuses: statuses,
+            planner: RenamePlanner(),
+            existing: [],
+            problem: problem
+        )
         guard !isCancelled(), statuses.contains(.ready) else { return preview }
 
         let survey = RenameSurvey(fileSystems: fileSystems, cache: cache, cancellation: cancellation)
@@ -308,7 +346,9 @@ struct RenameSurvey {
     /// The keys of every entry of the given folders (by `locationKey`). A folder that does not
     /// exist yet has none.
     func existingKeys(
-        in folders: [String: URL], planner: RenamePlanner, isCancelled: @Sendable () -> Bool = { false }
+        in folders: [String: URL],
+        planner: RenamePlanner,
+        isCancelled: @Sendable () -> Bool
     ) -> Set<String> {
         let listed = Parallel.map(Array(folders)) { folderKey, folder -> Set<String> in
             if let known = cache?.existingKeys(folderKey: folderKey) { return known }
@@ -371,19 +411,11 @@ struct RenameSurvey {
     /// What a local volume says about letter case in names; nil for anything else or when it does not say.
     static func volumeFoldsCase(_ folder: URL) -> Bool? {
         guard folder.isFileURL else { return nil }
-        // The nearest folder that exists answers for one that does not exist yet.
+        // The nearest folder that exists answers for one that does not exist yet (the top always exists).
         var current = folder
-        for _ in 0..<max(folder.pathComponents.count, 1) {
-            if let values = try? current.resourceValues(forKeys: [.volumeSupportsCaseSensitiveNamesKey]),
-                let sensitive = values.volumeSupportsCaseSensitiveNames
-            {
-                return !sensitive
-            }
-            let parent = current.deletingLastPathComponent()
-            if parent.path == current.path { break }
-            current = parent
-        }
-        return nil
+        while !FileManager.default.fileExists(atPath: current.path) { current.deleteLastPathComponent() }
+        let values = try? current.resourceValues(forKeys: [.volumeSupportsCaseSensitiveNamesKey])
+        return values?.volumeSupportsCaseSensitiveNames.map { !$0 }
     }
 
     /// Whether the file system of the items takes names that differ only in letter case for
@@ -403,14 +435,10 @@ struct RenameSurvey {
                     ?? provider.item(at: directory.appending(name: swapped))
             else { return false }
             // A file that really has the other spelling proves nothing; try the next item. On the
-            // local disk that is told by the files' identities (no listing of the folder at all);
-            // elsewhere the folder is listed only as far as the other spelling, and not at all
-            // twice for one folder.
-            if item.url.isFileURL,
-                let same = RenameRunner.isSameFileOnDisk(item.url, directory.appending(name: swapped))
-            {
-                if same { return true }
-                continue
+            // local disk one file under both spellings is told by its identity (no listing of the
+            // folder at all); otherwise the folder is listed only as far as the other spelling.
+            if item.url.isFileURL, RenameRunner.isSameFileOnDisk(item.url, directory.appending(name: swapped)) == true {
+                return true
             }
             var exists = false
             let receive: ([FileItem]) -> Bool = { batch in
@@ -475,8 +503,7 @@ final class RenameRunner {
         guard first.isFileURL, second.isFileURL else { return true }
         func identity(_ url: URL) -> (dev_t, ino_t)? {
             var info = stat()
-            let result = url.withUnsafeFileSystemRepresentation { $0.map { lstat($0, &info) } ?? -1 }
-            return result == 0 ? (info.st_dev, info.st_ino) : nil
+            return lstat(url.path, &info) == 0 ? (info.st_dev, info.st_ino) : nil
         }
         guard let target = identity(second) else { return false }
         guard let source = identity(first) else { return false }
@@ -489,8 +516,7 @@ final class RenameRunner {
     static func isSameFileOnDisk(_ first: URL, _ second: URL) -> Bool? {
         func identity(_ url: URL) -> (dev_t, ino_t, nlink_t)? {
             var info = stat()
-            let result = url.withUnsafeFileSystemRepresentation { $0.map { lstat($0, &info) } ?? -1 }
-            return result == 0 ? (info.st_dev, info.st_ino, info.st_nlink) : nil
+            return lstat(url.path, &info) == 0 ? (info.st_dev, info.st_ino, info.st_nlink) : nil
         }
         guard let one = identity(first), let other = identity(second) else { return nil }
         guard one.0 == other.0, one.1 == other.1 else { return false }
@@ -505,8 +531,9 @@ final class RenameRunner {
         var madeFolders = Set<String>()
         var done = 0
 
+        // Each item fails once: the steps of an item that failed are not tried.
         func fail(_ item: Int, _ error: any Error) {
-            guard failed.insert(item).inserted else { return }
+            failed.insert(item)
             result.failures.append((item, error.localizedDescription))
         }
 
@@ -525,8 +552,10 @@ final class RenameRunner {
             // takes for the file's own, and never as a replacement of "itself" (a file system
             // that cleans up after such a replacement could take the file away).
             if Self.differsInNormalizationOnly(step.from, step.to) {
-                let temporary = step.from.deletingLastPathComponent().appending(
-                    name: ".afm-nf-\(UUID().uuidString.prefix(8)).tmp")
+                let temporary = step.from.deletingLastPathComponent()
+                    .appending(
+                        name: ".afm-nf-\(UUID().uuidString.prefix(8)).tmp"
+                    )
                 try provider.move(step.from, to: temporary, replacing: false)
                 do {
                     try provider.move(temporary, to: step.to, replacing: false)
@@ -540,7 +569,10 @@ final class RenameRunner {
             // that is checked, not assumed, so that a wrong guess about the volume cannot
             // overwrite a different file (it is reported as a collision instead).
             try provider.move(
-                step.from, to: step.to, replacing: step.ontoItself && Self.isSameFile(step.from, step.to))
+                step.from,
+                to: step.to,
+                replacing: step.ontoItself && Self.isSameFile(step.from, step.to)
+            )
         }
 
         for step in steps {
@@ -576,9 +608,9 @@ final class RenameRunner {
             do {
                 try move(RenameStep(item: item, from: park.to, to: park.from, kind: .unpark, ontoItself: false))
             } catch {
-                failed.remove(item)
                 fail(
-                    item, RenameRunError.leftUnderTemporaryName(park.to.lastPathComponent, error.localizedDescription)
+                    item,
+                    RenameRunError.leftUnderTemporaryName(park.to.lastPathComponent, error.localizedDescription)
                 )
             }
         }
@@ -607,8 +639,10 @@ enum RenameLog {
     static func write(_ renamed: [RenamedItem], to url: URL, fileSystems: FileSystemRegistry) {
         let manager = FileManager.default
         try? manager.createDirectory(
-            at: url.deletingLastPathComponent(), withIntermediateDirectories: true,
-            attributes: [.posixPermissions: 0o700])
+            at: url.deletingLastPathComponent(),
+            withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o700]
+        )
         guard (try? Data(text(renamed, fileSystems: fileSystems).utf8).write(to: url, options: .atomic)) != nil else {
             return
         }
@@ -626,6 +660,7 @@ enum RenameLog {
                     ? String(item.to.path.dropFirst(oldFolder.path.count).drop(while: { $0 == "/" }))
                     : fileSystems.displayPath(item.to)
             return "\"\(fileSystems.displayPath(item.from))\" -> \"\(newName)\"\n"
-        }.joined()
+        }
+        .joined()
     }
 }

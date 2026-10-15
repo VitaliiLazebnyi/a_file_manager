@@ -32,8 +32,23 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
     /// Unowned: the kernel owns the plugin, and through it this.
     private unowned let kernel: Kernel
     private let session: MultiRenameSession
+    /// The window, which this controller keeps for as long as it lives.
+    private let toolWindow: Window
     /// Called when the window has closed, so that its owner can let go of it.
     var onClose: (() -> Void)?
+    /// Shows an open panel as a sheet of the window and hands on the button and the locations
+    /// chosen. The program shows the real panel; a test answers in its place.
+    /// Opens a menu under a button. The program shows the real menu; a test records it.
+    var popUpMenu: (NSMenu, NSView) -> Void = { menu, view in
+        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: view.bounds.height + 2), in: view)
+    }
+    /// Opens the menu of a pull-down button, as a click on it does. A test records it instead.
+    var clickPopUp: (NSPopUpButton) -> Void = { $0.performClick(nil) }
+    var presentOpenPanel: (NSOpenPanel, NSWindow, @escaping (NSApplication.ModalResponse, [URL]) -> Void) -> Void = {
+        panel,
+        window,
+        done in panel.beginSheetModal(for: window) { done($0, panel.urls) }
+    }
     /// What the histories and menus were last built from; they are built again only when it changes.
     private var shownRevision = -1
     private var shownGivenNames: Bool?
@@ -89,16 +104,18 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
         window.isReleasedWhenClosed = false
         window.minSize = NSSize(width: 860, height: 420)
         window.center()
+        toolWindow = window
         super.init(window: window)
         window.delegate = self
-        window.onKeyDown = { [weak self] event in self?.handleWindowKey(event) ?? false }
+        window.onKeyDown = { [weak self] event in self?.handleWindowKey(event) == true }
         buildContent(in: window)
         showSettings()
         update()
         session.onChange = { [weak self] in self?.update() }
     }
 
-    required init?(coder _: NSCoder) { fatalError("not used") }
+    /// The window is made in code, never from an archive.
+    required init?(coder _: NSCoder) { nil }
 
     // MARK: Layout
 
@@ -236,7 +253,7 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
         table.allowsMultipleSelection = true
         table.allowsColumnReordering = false
         table.registerForDraggedTypes([Self.rowType])
-        table.onKey = { [weak self] event in self?.handleListKey(event) ?? false }
+        table.onKey = { [weak self] event in self?.handleListKey(event) == true }
         let scroll = NSScrollView()
         scroll.documentView = table
         scroll.hasVerticalScroller = true
@@ -379,7 +396,8 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
         table.selectRowIndexes(selection.filteredIndexSet { $0 < session.rowCount }, byExtendingSelection: false)
     }
 
-    private static func describe(_ problem: any Error) -> String {
+    /// What the status line says about a problem of the settings.
+    static func describe(_ problem: any Error) -> String {
         switch problem {
         case RenameMaskError.invalidPlaceholder(let text): return "Invalid placeholder: \(text)"
         case RenameMaskError.contentPluginsUnavailable: return "Content-plugin fields [=…] are not available."
@@ -488,7 +506,7 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
             item.representedObject = code
             menu.addItem(item)
         }
-        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: sender.bounds.height + 2), in: sender)
+        popUpMenu(menu, sender)
     }
 
     @objc private func showRangeFields(_ sender: NSButton) {
@@ -503,7 +521,7 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
             item.representedObject = letter
             menu.addItem(item)
         }
-        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: sender.bounds.height + 2), in: sender)
+        popUpMenu(menu, sender)
     }
 
     @objc private func insertFromMenu(_ sender: NSMenuItem) {
@@ -593,14 +611,18 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
             let panel = NSOpenPanel()
             panel.message = "Load names from file: one name per line, in the order of the list"
             panel.allowsMultipleSelection = false
-            guard let window else { return }
-            panel.beginSheetModal(for: window) { [weak self] response in
-                if response == .OK, let url = panel.url { self?.session.loadNames(from: url) }
+            presentOpenPanel(panel, toolWindow) { [weak self] response, urls in
+                self?.namesFileChosen(response == .OK ? urls.first : nil)
             }
 
         case "edit": session.editNames()
         default: session.clearGivenNames()
         }
+    }
+
+    /// The file chosen with "Load names from file"; nil when the user chose none.
+    func namesFileChosen(_ url: URL?) {
+        if let url { session.loadNames(from: url) }
     }
 
     // MARK: Actions
@@ -610,7 +632,7 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
     }
 
     @objc private func start() {
-        guard !session.isBusy, window?.makeFirstResponder(nil) != false else { return }
+        guard !session.isBusy, toolWindow.makeFirstResponder(nil) else { return }
         session.settings = readFields()
         session.start { [weak self] _ in
             self?.update()
@@ -633,13 +655,13 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
     /// F2, F5 and F10 (spec 09 › Keys), and Shift+Del to drop an entry from a field's history.
     private func handleWindowKey(_ event: NSEvent) -> Bool {
         if Shortcut.f(2).matches(event) {
-            settingsPopup.performClick(nil)
+            clickPopUp(settingsPopup)
         } else if Shortcut.f(5).matches(event) {
             nextStep()
         } else if Shortcut.f(10).matches(event) {
-            namesPopup.performClick(nil)
+            clickPopUp(namesPopup)
         } else if Shortcut(.forwardDelete, .shift).matches(event) || Shortcut(.backspace, .shift).matches(event),
-            let editor = window?.firstResponder as? NSText, let combo = editor.delegate as? NSComboBox
+            let editor = toolWindow.firstResponder as? NSText, let combo = editor.delegate as? NSComboBox
         {
             let histories: [(NSComboBox, RenameStore.History)] = [
                 (nameMaskBox, .nameMask), (searchBox, .search), (replaceBox, .replacement)
@@ -663,9 +685,9 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
             table.selectRowIndexes(moved, byExtendingSelection: false)
             if let first = moved.first { table.scrollRowToVisible(first) }
         } else if Shortcut(.forwardDelete).matches(event) || Shortcut(.backspace).matches(event) {
-            guard !selection.isEmpty else { return true }
+            guard let first = selection.first else { return true }
             session.remove(selection)
-            let next = min(selection.first ?? 0, session.rowCount - 1)
+            let next = min(first, session.rowCount - 1)
             if next >= 0 { table.selectRowIndexes([next], byExtendingSelection: false) }
         } else if Shortcut(.character("1")).matches(event) {
             onceBox.state = onceBox.state == .on ? .off : .on
@@ -776,6 +798,10 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
     func windowWillClose(_: Notification) {
         // The preview under way, and one that waits out the pause, are not wanted any more.
         session.close()
+        // A closed tool is not opened again: its list asks nothing more of the session or the kernel
+        // (which may be gone before the views are, when the program ends).
+        table.dataSource = nil
+        table.delegate = nil
         onClose?()
     }
 }

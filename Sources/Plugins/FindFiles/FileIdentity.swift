@@ -13,23 +13,19 @@ struct FileIdentity: Hashable {
     static let datalessFlag: UInt32 = 0x4000_0000
 
     /// What a local path is, with one system call; nil for other locations or a path that
-    /// cannot be examined. Links are followed unless `followingLinks` is off.
-    static func of(_ url: URL, followingLinks: Bool = true) -> (identity: Self, isRegularFile: Bool)? {
-        guard let info = status(of: url, followingLinks: followingLinks) else { return nil }
+    /// cannot be examined. Links are followed.
+    static func of(_ url: URL) -> (identity: Self, isRegularFile: Bool)? {
+        guard let info = status(of: url) else { return nil }
         return (
             Self(device: UInt64(bitPattern: Int64(info.st_dev)), inode: UInt64(info.st_ino)),
             info.st_mode & S_IFMT == S_IFREG
         )
     }
 
-    private static func status(of url: URL, followingLinks: Bool) -> stat? {
+    private static func status(of url: URL) -> stat? {
         guard url.isFileURL else { return nil }
         var info = stat()
-        let result = url.withUnsafeFileSystemRepresentation { path -> Int32 in
-            guard let path else { return -1 }
-            return followingLinks ? stat(path, &info) : lstat(path, &info)
-        }
-        return result == 0 ? info : nil
+        return stat(url.path, &info) == 0 ? info : nil
     }
 
     /// False for a FIFO, a device or a socket, which would block or never end when read, and
@@ -37,7 +33,7 @@ struct FileIdentity: Hashable {
     /// every file of a search). A location that is not a local path is given the benefit of the doubt.
     static func canBeRead(_ url: URL) -> Bool {
         guard url.isFileURL else { return true }
-        guard let info = status(of: url, followingLinks: true) else { return false }
+        guard let info = status(of: url) else { return false }
         return info.st_mode & S_IFMT == S_IFREG && info.st_flags & datalessFlag == 0
     }
 }
@@ -48,20 +44,23 @@ struct FileIdentity: Hashable {
 /// The descriptor is guarded by `lock`; it is used outside the lock, which is safe because a
 /// `FileReader` is used by one thread at a time (`close` too) and `interrupt` does nothing.
 final class LocalFileReader: FileReader, @unchecked Sendable {
+    /// Reads from a descriptor into a buffer, as `read(2)` does, setting `errno` when it fails.
+    typealias SystemRead = @Sendable (Int32, UnsafeMutableRawPointer, Int) -> Int
+
     private var descriptor: Int32
     private let lock = NSLock()
+    private let systemRead: SystemRead
 
-    private init(descriptor: Int32) {
+    private init(descriptor: Int32, systemRead: @escaping SystemRead) {
         self.descriptor = descriptor
+        self.systemRead = systemRead
     }
 
-    /// Nil when the file cannot be opened or is not a plain file that is here.
-    static func open(_ url: URL) -> LocalFileReader? {
+    /// Nil when the file cannot be opened or is not a plain file that is here. `systemRead`
+    /// does the reading: the system's `read`, unless a test stands in for the disk.
+    static func open(_ url: URL, systemRead: @escaping SystemRead = { Darwin.read($0, $1, $2) }) -> LocalFileReader? {
         guard url.isFileURL else { return nil }
-        let descriptor = url.withUnsafeFileSystemRepresentation { path -> Int32 in
-            guard let path else { return -1 }
-            return Darwin.open(path, O_RDONLY | O_NONBLOCK | O_CLOEXEC)
-        }
+        let descriptor = Darwin.open(url.path, O_RDONLY | O_NONBLOCK | O_CLOEXEC)
         guard descriptor >= 0 else { return nil }
         var info = stat()
         guard fstat(descriptor, &info) == 0, info.st_mode & S_IFMT == S_IFREG,
@@ -72,7 +71,7 @@ final class LocalFileReader: FileReader, @unchecked Sendable {
         }
         let flags = fcntl(descriptor, F_GETFL)
         if flags >= 0 { _ = fcntl(descriptor, F_SETFL, flags & ~O_NONBLOCK) }
-        return LocalFileReader(descriptor: descriptor)
+        return LocalFileReader(descriptor: descriptor, systemRead: systemRead)
     }
 
     func read(upToCount count: Int) throws -> Data? {
@@ -84,7 +83,7 @@ final class LocalFileReader: FileReader, @unchecked Sendable {
         let got = data.withUnsafeMutableBytes { buffer -> Int in
             guard let base = buffer.baseAddress, buffer.count > 0 else { return 0 }
             while true {
-                let result = Darwin.read(descriptor, base, buffer.count)
+                let result = systemRead(descriptor, base, buffer.count)
                 if result < 0, errno == EINTR { continue }
                 return result
             }

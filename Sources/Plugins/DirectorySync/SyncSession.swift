@@ -767,9 +767,10 @@ final class SyncSession {
         settings.set(show, forKey: SyncSettingsKey.show)
     }
 
-    /// The saved sets, sorted by name (spec 09 › Saved sync sets).
+    /// The saved sets, sorted by name (spec 09 › Saved sync sets). A set that cannot be read
+    /// is left out; the others stay.
     var savedSets: [SyncSet] {
-        (settings.value([SyncSet].self, forKey: SyncSettingsKey.sets) ?? [])
+        (settings.value([StoredElement<SyncSet>].self, forKey: SyncSettingsKey.sets) ?? []).compactMap(\.value)
             .sorted { Sorter.compare($0.name, $1.name, numeric: true) == .orderedAscending }
     }
 

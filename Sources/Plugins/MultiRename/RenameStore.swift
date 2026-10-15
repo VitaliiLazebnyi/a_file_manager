@@ -87,10 +87,14 @@ final class RenameStore {
 
     // MARK: Saved settings
 
+    /// Settings that cannot be read are left out; the others stay.
     var saved: [String: RenameSettings] {
         get {
-            if memory.saved == nil { memory.saved = own.value([String: RenameSettings].self, forKey: "saved") ?? [:] }
-            return memory.saved ?? [:]
+            if let known = memory.saved { return known }
+            let loaded = (own.value([String: StoredElement<RenameSettings>].self, forKey: "saved") ?? [:])
+                .compactMapValues(\.value)
+            memory.saved = loaded
+            return loaded
         }
         set {
             memory.saved = newValue
@@ -139,16 +143,17 @@ final class RenameStore {
     /// after the tool, and the program, were closed.
     var undoHistory: [[RenamedItem]] {
         get {
-            if memory.undo == nil {
-                memory.undo =
-                    own.largeData(forKey: "undo").flatMap { try? JSONDecoder().decode([[RenamedItem]].self, from: $0) }
-                    ?? []
-            }
-            return memory.undo ?? []
+            if let known = memory.undo { return known }
+            let loaded =
+                own.largeData(forKey: "undo").flatMap { try? JSONDecoder().decode([[RenamedItem]].self, from: $0) }
+                ?? []
+            memory.undo = loaded
+            return loaded
         }
         set {
-            memory.undo = Array(newValue.suffix(undoLimit))
-            persistUndo()
+            let runs = Array(newValue.suffix(undoLimit))
+            memory.undo = runs
+            persistUndo(runs)
         }
     }
 
@@ -198,10 +203,10 @@ final class RenameStore {
 
     /// The runs that are saved: the newest ones, as many as fit the limit, without a gap (a
     /// run that does not fit ends the list, so the saved runs are always the last ones).
-    private func persistedRuns() -> [[RenamedItem]] {
+    private func persistedRuns(of runs: [[RenamedItem]]) -> [[RenamedItem]] {
         var kept: [[RenamedItem]] = []
         var total = 0
-        for run in (memory.undo ?? []).reversed() {
+        for run in runs.reversed() {
             if total + run.count > Self.persistedItemLimit { break }
             kept.append(run)
             total += run.count
@@ -209,8 +214,8 @@ final class RenameStore {
         return kept.reversed()
     }
 
-    private func persistUndo() {
-        let kept = persistedRuns()
+    private func persistUndo(_ runs: [[RenamedItem]]) {
+        let kept = persistedRuns(of: runs)
         memory.undoWrite += 1
         own.set(kept.count, forKey: "undoCount")
         // The history may be megabytes: the settings keep it apart from the small values (the
@@ -234,9 +239,9 @@ final class RenameStore {
     /// Writes the undo history now, e.g. when the program ends before the background write
     /// has been handed in.
     func flush() {
-        guard memory.undo != nil else { return }
+        guard let runs = memory.undo else { return }
         memory.undoWrite += 1
-        let kept = persistedRuns()
+        let kept = persistedRuns(of: runs)
         own.set(kept.count, forKey: "undoCount")
         own.setLarge(try? JSONEncoder().encode(kept), forKey: "undo")
     }
