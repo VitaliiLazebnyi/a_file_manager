@@ -75,8 +75,6 @@ public final class ClipboardPlugin: Plugin {
     private var listRequest = 0
     /// Lists of more files than this from another program are read in slices.
     static let readAtOnce = 256
-    /// The reading of a long list that is under way; a Paste meanwhile is not a second one.
-    private var reading: FileListReading?
     /// The state of the pasteboard in which a text or picture was last found on it.
     private var contentFoundAt: Int?
 
@@ -226,9 +224,9 @@ public final class ClipboardPlugin: Plugin {
     }
 
     /// Puts the operands on the clipboard; the selection stays and nothing visible happens.
+    /// Cut and Copy are offered only where there are operands.
     private func place(_ operands: PanelModel.Operands, cut: Bool, ui: any UserInteraction) {
         let count = Self.count(of: operands)
-        guard count > 0 else { return }
         var forOthers = true
         if count > Self.eagerLimit {
             // Roughly what the system takes for that many; said so that the choice is an informed one.
@@ -281,15 +279,14 @@ public final class ClipboardPlugin: Plugin {
         return found
     }
 
-    private func files() -> [URL] {
-        // What this program put there itself is not read back through the pasteboard.
-        if let placed, placed.changeCount == pasteboard.changeCount { return placed.urls }
+    /// The files another program put on the clipboard (what this program put there itself is
+    /// not read back through the pasteboard); nil, like none, when they cannot be read.
+    private func files() -> [URL]? {
         // The whole list in one piece, where the other program offers it: one read instead of one per file.
         if let paths = pasteboard.propertyList(forType: Self.fileNamesType) as? [String], !paths.isEmpty {
             return paths.map { URL(fileURLWithPath: $0, isDirectory: false) }
         }
         return pasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL]
-            ?? []
     }
 
     /// Pastes into the source panel's folder at once, without a dialog. Files are transferred
@@ -298,7 +295,7 @@ public final class ClipboardPlugin: Plugin {
         let directory = kernel.panels.source.model.directory
         let isMove = cutChangeCount == pasteboard.changeCount
         readFiles(in: kernel) { [self] files in
-            guard !files.isEmpty else {
+            guard let files, !files.isEmpty else {
                 if hasContent(in: kernel) { pasteContent(into: directory, in: kernel) }
                 return
             }
@@ -321,20 +318,17 @@ public final class ClipboardPlugin: Plugin {
     /// there, and a short list, at once; a long list from another program after it was read
     /// slice by slice, with a job that shows the reading and lets it be cancelled. Nothing is
     /// handed over when the reading was cancelled or the clipboard changed meanwhile.
-    private func readFiles(in kernel: Kernel, then deliver: @escaping ([URL]) -> Void) {
+    private func readFiles(in kernel: Kernel, then deliver: @escaping ([URL]?) -> Void) {
         if let placed, placed.changeCount == pasteboard.changeCount {
             deliver(placed.urls)
             return
         }
-        let items = pasteboard.pasteboardItems ?? []
-        guard items.count > Self.readAtOnce else {
+        guard let items = pasteboard.pasteboardItems, items.count > Self.readAtOnce else {
             deliver(files())
             return
         }
-        // A second Paste while the first is still reading the list changes nothing.
-        guard reading == nil else { return }
+        // Paste is not offered while the reading's job runs: there is never a second reading.
         let reading = FileListReading(items, on: pasteboard)
-        self.reading = reading
         let title = "Reading the clipboard:"
         kernel.jobs.run(
             title: title,
@@ -346,7 +340,6 @@ public final class ClipboardPlugin: Plugin {
                 }
             },
             completion: { [self] (outcome: FileListReading.Outcome) in
-                self.reading = nil
                 switch outcome {
                 case .abandoned: break
 
@@ -499,8 +492,7 @@ public final class ClipboardPlugin: Plugin {
         then completion: @escaping @MainActor (String) -> Void
     ) {
         let (operands, extra) = detailsInput(in: kernel)
-        let fileSystems = kernel.fileSystems
-        let list = NameList(displayPath: { fileSystems.displayPath($0) })
+        let list = Self.nameList(in: kernel)
         kernel.jobs.run(
             title: "Reading details:",
             work: { _ in
@@ -508,6 +500,12 @@ public final class ClipboardPlugin: Plugin {
             },
             completion: completion
         )
+    }
+
+    /// A name list that writes locations as the kernel's file systems do.
+    private static func nameList(in kernel: Kernel) -> NameList {
+        let fileSystems = kernel.fileSystems
+        return NameList(displayPath: { fileSystems.displayPath($0) })
     }
 
     /// The operands and the plugin columns the source panel shows, read on the main thread.
@@ -526,7 +524,7 @@ public final class ClipboardPlugin: Plugin {
         else { return }
         let (operands, extra) = detailsInput(in: kernel)
         let (fileSystems, ui) = (kernel.fileSystems, kernel.interaction)
-        let list = NameList(displayPath: { fileSystems.displayPath($0) })
+        let list = Self.nameList(in: kernel)
         let url = fileSystems.location(from: text, relativeTo: directory)
         kernel.jobs.run(
             title: "Saving details:",
@@ -637,7 +635,8 @@ final class FileListReading: @unchecked Sendable {
     private let lock = NSLock()
     private var next = 0
     private var urls: [URL] = []
-    private var outcome: Outcome?
+    /// What the reading came to; set before `finished` is signalled.
+    private var outcome = Outcome.abandoned
     private let finished = DispatchSemaphore(value: 0)
     private var sliceCount = 0
     /// How many slices the reading took; for tests.
@@ -661,7 +660,7 @@ final class FileListReading: @unchecked Sendable {
                 progress(lock.withLock { next }, items.count)
             }
         }
-        return lock.withLock { outcome ?? .abandoned }
+        return lock.withLock { outcome }
     }
 
     /// One slice. Main thread.
@@ -699,8 +698,9 @@ final class FileListReading: @unchecked Sendable {
     /// The file an item stands for, if it is one.
     static func fileURL(of item: NSPasteboardItem) -> URL? {
         guard let text = item.string(forType: .fileURL), let url = URL(string: text), url.isFileURL else { return nil }
-        // A reference to a file by its number instead of its path is turned into the path.
-        if url.path.hasPrefix("/.file/") { return (url as NSURL).filePathURL }
+        // A reference to a file by its number instead of its path is turned into the path (newer
+        // systems give the path when it is asked for, older ones the number).
+        if text.hasPrefix("file:///.file/") { return (url as NSURL).filePathURL }
         return url
     }
 }
