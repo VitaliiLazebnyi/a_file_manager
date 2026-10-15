@@ -1,10 +1,11 @@
 import AFMKernel
 import Foundation
 
-/// The quick filter of one tab (spec 03 › Quick filter): what was typed, and what it was laid
-/// over. A tab has one filter (`PanelModel.filter`), which the Show menu's display filters use
-/// as well; the quick filter therefore keeps the filter it found (`base`) and shows only what
-/// passes both. Taking the quick filter away puts `base` back.
+/// The quick filter of one tab (spec 03 › Quick filter): what was typed, and what it was laid over.
+///
+/// A tab has one filter (`PanelModel.filter`), which the Show menu's display filters use as well;
+/// the quick filter therefore keeps the filter it found (`base`) and shows only what passes both.
+/// Taking the quick filter away puts `base` back.
 internal struct QuickFilter {
     /// What was typed.
     internal var text: String
@@ -13,8 +14,9 @@ internal struct QuickFilter {
     /// The folder the filter belongs to; it does not survive a change of directory.
     internal let directory: URL
 
-    /// What the model's filter is called while this quick filter is on. It starts with the
-    /// title of `base`, so whoever set that still recognises it.
+    /// What the model's filter is called while this quick filter is on.
+    ///
+    /// It starts with the title of `base`, so whoever set that still recognises it.
     internal var title: String {
         text.isEmpty ? (base?.title ?? "") : (base.map { $0.title + "  " } ?? "") + "⏷ " + text
     }
@@ -28,9 +30,10 @@ internal struct QuickFilter {
         return PanelFilter(title: title) { item in matches(item.name) && (base?.matches(item) ?? true) }
     }
 
-    /// Whether what is typed now lets through nothing that `old` did not: both are plain ASCII
-    /// text (no mask), and the new contains the old. The list then only has to be filtered again
-    /// from what it shows.
+    /// Whether what is typed now lets through nothing that `old` did not: both are plain ASCII text
+    /// (no mask), and the new contains the old.
+    ///
+    /// The list then only has to be filtered again from what it shows.
     internal static func narrows(from old: String, to new: String) -> Bool {
         guard !old.isEmpty, isPlainText(old), isPlainText(new) else {
             return false
@@ -39,8 +42,9 @@ internal struct QuickFilter {
     }
 
     /// How typed text is compared with a name: as a file mask when it has a `*` or `?` in it,
-    /// otherwise the name has to contain it. Upper and lower case are the same. The function
-    /// may be called on any thread.
+    /// otherwise the name has to contain it.
+    ///
+    /// Upper and lower case are the same. The function may be called on any thread.
     internal static func matcher(for text: String) -> @Sendable (String) -> Bool {
         let pattern = text.lowercased()
         if pattern.contains("*") || pattern.contains("?") {

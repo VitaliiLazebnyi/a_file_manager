@@ -84,7 +84,9 @@ internal struct PanelRereadingTests {
         let before = program.memory.listRequests(for: "/slow")
         var told: [String] = []
         app.left.reload(focus: nil, quietly: false) { told.append("loud") }
-        app.left.reload(focus: nil, quietly: true) { told.append("quiet after \(program.memory.listRequests(for: "/slow") - before)") }
+        app.left.reload(focus: nil, quietly: true) {
+            told.append("quiet after \(program.memory.listRequests(for: "/slow") - before)")
+        }
         #expect(told.isEmpty)
         #expect(await PanelWait.until { told.count == 2 })
         // The quiet one was turned away while the folder was read, and made up for afterwards.

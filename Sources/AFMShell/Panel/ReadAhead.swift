@@ -47,8 +47,9 @@ internal final class ReadAhead {
     internal struct Joined {
         /// Registers who gets the result, on the main thread.
         internal let receive: @MainActor (@escaping @MainActor (Outcome) -> Void) -> Void
-        /// The panel no longer wants the result (it moved on). A reading nobody waits for and
-        /// the cursor does not rest on is told to stop.
+        /// The panel no longer wants the result (it moved on).
+        ///
+        /// A reading nobody waits for and the cursor does not rest on is told to stop.
         internal let leave: @MainActor () -> Void
     }
 
@@ -96,8 +97,9 @@ internal final class ReadAhead {
         self.cache = cache
     }
 
-    /// Tells where the cursor rests now: a folder that may be read ahead, or nil for anything
-    /// else (a file, `[..]`, a local volume, a busy panel, an inactive window, a running job).
+    /// Tells where the cursor rests now: a folder that may be read ahead, or nil for anything else
+    /// (a file, `[..]`, a local volume, a busy panel, an inactive window, a running job).
+    ///
     /// Called on every change; the same target again means the cursor is still resting.
     internal func cursorRests(on target: Target?) {
         guard target != resting else {
@@ -114,10 +116,11 @@ internal final class ReadAhead {
         }
     }
 
-    /// For a panel that is asked to show `location`: if exactly that is being read ahead right
-    /// now, the panel takes the reading over instead of starting a second one. From then on
-    /// moving the cursor no longer cancels the reading; it runs to its end and its result is
-    /// remembered, unless every panel that waited for it has left again (`Joined.leave`).
+    /// For a panel that is asked to show `location`: if exactly that is being read ahead right now,
+    /// the panel takes the reading over instead of starting a second one.
+    ///
+    /// From then on moving the cursor no longer cancels the reading; it runs to its end and its
+    /// result is remembered, unless every panel that waited for it has left again (`Joined.leave`).
     ///
     /// A reading that has delivered nothing for `stalledAfter` is not taken over: it is told
     /// to stop, and the panel reads for itself.
@@ -254,13 +257,14 @@ internal final class ReadAhead {
         -> Outcome?
     {
         do {
-            return try PanelLoading.readWhole(
-                source,
-                order: reading.target.order,
-                climbing: false,
-                cancellation: reading.cancellation
-            ) { reading.progress($0, limit: limit) }
-            .map { .success($0) }
+            return
+                try PanelLoading.readWhole(
+                    source,
+                    order: reading.target.order,
+                    climbing: false,
+                    cancellation: reading.cancellation
+                ) { reading.progress($0, limit: limit) }
+                .map { .success($0) }
         } catch {
             // A file system may end a reading that was told to stop with an error: that is
             // no failure of the folder.
@@ -293,7 +297,9 @@ internal final class ReadAhead {
         let waiting = reading.waiting
         reading.waiting = []
         if let outcome {
-            waiting.forEach { $0(outcome) }
+            for receiver in waiting {
+                receiver(outcome)
+            }
         }
         // The cursor may have come to rest on another folder meanwhile (or again on this one,
         // after its reading was cancelled): its turn comes now.

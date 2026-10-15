@@ -24,7 +24,10 @@ internal struct PanelColoursTests {
     /// changes both panels.
     @Test
     internal func namesAreColouredByMarkAndFileType() async throws {
-        let app = await program.start(plugins: CorePlugins.make(pasteboard: program.scratch.pasteboard), fileSystems: [])
+        let app = await program.start(
+            plugins: CorePlugins.make(pasteboard: program.scratch.pasteboard),
+            fileSystems: []
+        )
         defer { app.stop() }
         app.commands.perform(.showHidden, .nothing)
         await program.settle(app)
@@ -32,8 +35,14 @@ internal struct PanelColoursTests {
         func color(_ name: String, selected: Bool) -> NSColor {
             app.left.nameColor(for: model.items.first { $0.name == name }, selected: selected)
         }
-        #expect(color("one.txt", selected: false) == .labelColor && color(".secret", selected: false) == .secondaryLabelColor)
-        #expect(color("one.txt", selected: true) == .systemRed && app.left.nameColor(for: nil, selected: false) == .labelColor)
+        #expect(
+            color("one.txt", selected: false) == .labelColor
+                && color(".secret", selected: false) == .secondaryLabelColor
+        )
+        #expect(
+            color("one.txt", selected: true) == .systemRed
+                && app.left.nameColor(for: nil, selected: false) == .labelColor
+        )
         #expect(!app.commands.isChecked("cm_SwitchColorsByFileType"))
         // The list is edited as text; an entry that cannot be read is shown again; cancelling changes nothing.
         program.interaction.formAnswers = [

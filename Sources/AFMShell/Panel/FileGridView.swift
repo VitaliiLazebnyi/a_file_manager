@@ -108,7 +108,12 @@ internal final class FileGridView: NSView, NSDraggingSource, NSUserInterfaceVali
         }
         clip.postsFrameChangedNotifications = true
         clip.postsBoundsChangedNotifications = true
-        center.addObserver(self, selector: #selector(viewportResized), name: NSView.frameDidChangeNotification, object: clip)
+        center.addObserver(
+            self,
+            selector: #selector(viewportResized),
+            name: NSView.frameDidChangeNotification,
+            object: clip
+        )
         center.addObserver(self, selector: #selector(scrolled), name: NSView.boundsDidChangeNotification, object: clip)
     }
 
@@ -170,14 +175,20 @@ internal final class FileGridView: NSView, NSDraggingSource, NSUserInterfaceVali
             let item = model.item(atRow: row)
             // The name under the rename box is left out.
             let color =
-                row == panel.renamingRow ? NSColor.clear : panel.nameColor(for: item, selected: model.isSelected(row: row))
+                row == panel.renamingRow
+                ? NSColor.clear : panel.nameColor(for: item, selected: model.isSelected(row: row))
             let cell = RowLook(item: item, color: color, ownIcons: ownIcons)
             switch flow {
             case .columns:
                 GridCellPainter.drawBriefCell(cell, in: frame)
 
             case .rows:
-                GridCellPainter.drawTile(cell, in: frame, side: tileSide, picture: picture(of: item, ownIcons: ownIcons))
+                GridCellPainter.drawTile(
+                    cell,
+                    in: frame,
+                    side: tileSide,
+                    picture: picture(of: item, ownIcons: ownIcons)
+                )
             }
             if row == dropRow {
                 CursorBar.drawDropFrame(in: frame)
@@ -193,9 +204,10 @@ internal final class FileGridView: NSView, NSDraggingSource, NSUserInterfaceVali
         return true
     }
 
-    /// Keys that are bound to commands go to the commands. The arrow keys that are bound to
-    /// nothing move the cursor, as they do in the table of the Full view, and letters find a
-    /// file by typing.
+    /// Keys that are bound to commands go to the commands.
+    ///
+    /// The arrow keys that are bound to nothing move the cursor, as they do in the table of the
+    /// Full view, and letters find a file by typing.
     override internal func keyDown(with event: NSEvent) {
         guard let panel, panel.handleListKey(event, arrowsMoveCursor: true) else {
             super.keyDown(with: event)
@@ -210,8 +222,9 @@ internal final class FileGridView: NSView, NSDraggingSource, NSUserInterfaceVali
 
     // MARK: Mouse
 
-    /// A click marks with Cmd or Shift, moves the cursor otherwise; a double click opens. A
-    /// press may become a drag, and a second, unhurried click on the cursor's row a rename.
+    /// A click marks with Cmd or Shift, moves the cursor otherwise; a double click opens.
+    ///
+    /// A press may become a drag, and a second, unhurried click on the cursor's row a rename.
     override internal func mouseDown(with event: NSEvent) {
         let wasFocused = window?.firstResponder === self
         window?.makeFirstResponder(self)

@@ -6,10 +6,12 @@ import AppKit
 /// what dropping something on it does, the same in every view.
 extension PanelViewController {
     /// What a drag that starts on a row carries: all marked items when the row is one of them,
-    /// otherwise the row's item alone. Nothing for `[..]` and while a job runs. Marked items up
-    /// to the number that are written to the pasteboard one by one are listed here; more than
-    /// that are listed in the background, from a copy of the marks that costs nothing to take,
-    /// so a drag out of a list with a million marks starts as fast as any other.
+    /// otherwise the row's item alone.
+    ///
+    /// Nothing for `[..]` and while a job runs. Marked items up to the number that are written to
+    /// the pasteboard one by one are listed here; more than that are listed in the background, from
+    /// a copy of the marks that costs nothing to take, so a drag out of a list with a million marks
+    /// starts as fast as any other.
     internal func dragPayload(fromRow row: Int) -> PanelDragPayload? {
         guard !commands.isBlocked(), let item = model.item(atRow: row) else {
             return nil
@@ -25,6 +27,7 @@ extension PanelViewController {
     }
 
     /// Starts a drag from a row: what goes on the pasteboard for it (`PanelDrop.beginDrag`).
+    ///
     /// Nothing when the row cannot be dragged.
     internal func draggingItems(forRow row: Int) -> [NSPasteboardItem] {
         dragPayload(fromRow: row).map(PanelDrop.beginDrag) ?? []
@@ -70,8 +73,9 @@ extension PanelViewController {
         return PanelDropPlan(kind: kind, sources: session.sources, destination: target.location, row: target.row)
     }
 
-    /// The mouse drags something over a row (-1: over no row). Returns what a drop would do
-    /// and the row to frame.
+    /// The mouse drags something over a row (-1: over no row).
+    ///
+    /// Returns what a drop would do and the row to frame.
     internal func validateDrop(_ info: any NSDraggingInfo, row: Int) -> (operation: NSDragOperation, row: Int?) {
         let allowed = info.draggingSourceOperationMask
         let session = PanelDrop.session(for: info)
@@ -82,8 +86,10 @@ extension PanelViewController {
         return (operation, plan.row)
     }
 
-    /// Something was dropped. The drop is carried out after the drag has ended, so the program
-    /// the files came from is not kept waiting while a question is on screen.
+    /// Something was dropped.
+    ///
+    /// The drop is carried out after the drag has ended, so the program the files came from is not
+    /// kept waiting while a question is on screen.
     internal func acceptDrop(_ info: any NSDraggingInfo, row: Int) -> Bool {
         let session = PanelDrop.session(for: info)
         // Dropped before the drag's items were all put together: they are now.
@@ -99,7 +105,9 @@ extension PanelViewController {
     }
 
     /// Copies or moves what was dropped, through the file-transfer service, which shows the
-    /// progress and asks the usual questions. Asks first when the user wants that.
+    /// progress and asks the usual questions.
+    ///
+    /// Asks first when the user wants that.
     internal func carryOut(_ plan: PanelDropPlan) {
         guard !commands.isBlocked(), let transfers = kernel.services.find((any FileTransferService).self) else {
             commands.onRejected()
@@ -118,7 +126,8 @@ extension PanelViewController {
             }
         }
         // A copy dropped into the folder it came from gets a new name, as a pasted one does.
-        transfers.transfer(plan.kind, plan.sources, into: plan.destination, renamingSelfCopies: plan.kind == .copy) { _ in
+        transfers.transfer(plan.kind, plan.sources, into: plan.destination, renamingSelfCopies: plan.kind == .copy) {
+            _ in
             // The service reports what happened itself.
         }
     }
@@ -167,7 +176,10 @@ extension PanelViewController {
         proposedRow _: Int,
         proposedDropOperation _: NSTableView.DropOperation
     ) -> NSDragOperation {
-        let (operation, target) = validateDrop(info, row: tableView.row(at: tableView.convert(info.draggingLocation, from: nil)))
+        let (operation, target) = validateDrop(
+            info,
+            row: tableView.row(at: tableView.convert(info.draggingLocation, from: nil))
+        )
         if let target {
             tableView.setDropRow(target, dropOperation: .on)
         }

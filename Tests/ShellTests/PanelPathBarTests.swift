@@ -23,7 +23,7 @@ internal struct PanelPathBarTests {
         NSPoint(x: bar.textOrigin + (bar.spans[index].minX + bar.spans[index].maxX) / 2, y: bar.bounds.midY)
     }
 
-    /// A mouse event of `type` at `point` of `view`'s window.
+    /// A mouse event of `type` at `point` in the window of `view`.
     private func mouse(_ type: NSEvent.EventType, at point: NSPoint, in view: NSView) throws -> NSEvent {
         try #require(
             NSEvent.mouseEvent(
@@ -81,7 +81,10 @@ internal struct PanelPathBarTests {
         var clicks: [Int] = []
         bar.onNavigate = { visited.append($0.path) }
         bar.onClick = { clicks.append($0) }
-        bar.update(text: "/Users/me/*.*", segments: PathBarView.segments(of: "/Users/me", ancestors: ancestors(["/", "/Users", "/Users/me"])))
+        bar.update(
+            text: "/Users/me/*.*",
+            segments: PathBarView.segments(of: "/Users/me", ancestors: ancestors(["/", "/Users", "/Users/me"]))
+        )
         bar.click(at: center(of: 1, in: bar), count: 1)
         #expect(visited == ["/Users"] && clicks.isEmpty)
         // The folder that is shown, and the space behind the text, are the bar itself.
@@ -99,12 +102,20 @@ internal struct PanelPathBarTests {
     /// to eject, and a press on it is heard.
     @Test
     internal func theBarFollowsTheMouseAndShowsTheEjectButton() throws {
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 200, height: 40), styleMask: [], backing: .buffered, defer: true)
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 200, height: 40),
+            styleMask: [],
+            backing: .buffered,
+            defer: true
+        )
         let bar = PathBarView(frame: NSRect(x: 0, y: 0, width: 200, height: 22))
         window.contentView?.addSubview(bar)
         let long = "/" + String(repeating: "folder/", count: 10)
         let paths = ["/"] + (1...10).map { "/" + String(String(repeating: "folder/", count: $0).dropLast()) }
-        bar.update(text: long + "*.*", segments: PathBarView.segments(of: String(long.dropLast()), ancestors: ancestors(paths)))
+        bar.update(
+            text: long + "*.*",
+            segments: PathBarView.segments(of: String(long.dropLast()), ancestors: ancestors(paths))
+        )
         #expect(bar.textOrigin < 0 && bar.segments.count == 11)
         bar.updateTrackingAreas()
         bar.updateTrackingAreas()
@@ -117,7 +128,9 @@ internal struct PanelPathBarTests {
         bar.ejectableVolumeName = "Stick"
         bar.ejectableVolumeName = "Stick"
         bar.layout()
-        #expect(!bar.ejectButton.isHidden && bar.ejectButton.frame.maxX == 200 && bar.ejectButton.toolTip == "Eject “Stick”")
+        #expect(
+            !bar.ejectButton.isHidden && bar.ejectButton.frame.maxX == 200 && bar.ejectButton.toolTip == "Eject “Stick”"
+        )
         bar.ejectButton.performClick(nil)
         #expect(ejected == 1)
         bar.ejectableVolumeName = nil

@@ -1,8 +1,9 @@
 import AFMKernel
 
-/// What a panel remembers of its looks between sessions: the layout of the list, the plugin
-/// columns it shows and the widths of all its columns (spec 03 › View types, 03 › Column
-/// widths). Kept per panel under `left.view` and `right.view`.
+/// What a panel remembers of its looks between sessions: the layout of the list, the plugin columns
+/// it shows and the widths of all its columns (spec 03 › View types, 03 › Column widths).
+///
+/// Kept per panel under `left.view` and `right.view`.
 internal struct PanelViewState: Codable, Equatable {
     /// The settings keys of the left and the right panel, in that order.
     internal static let keys = ["left.view", "right.view"]

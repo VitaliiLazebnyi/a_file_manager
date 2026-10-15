@@ -1,8 +1,9 @@
-/// A store that forgets what was not used for a while without ever starting over: entries
-/// live in two generations, the newer one filling up while the older is still looked at; when
-/// the newer is full, the older is dropped and the newer takes its place. What is in use is
-/// carried over as it is asked for, so it holds at most `limit` entries and a full store does
-/// not mean that everything on screen is missing again.
+/// A store that forgets what was not used for a while without ever starting over: entries live in
+/// two generations, the newer one filling up while the older is still looked at; when the newer is
+/// full, the older is dropped and the newer takes its place.
+///
+/// What is in use is carried over as it is asked for, so it holds at most `limit` entries and a
+/// full store does not mean that everything on screen is missing again.
 internal struct TwoGenerationCache<Key: Hashable, Value> {
     /// The most entries the store holds.
     internal let limit: Int

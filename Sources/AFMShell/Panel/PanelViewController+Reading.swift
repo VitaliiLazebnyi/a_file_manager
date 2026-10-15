@@ -24,11 +24,12 @@ extension PanelViewController {
         load(location, in: model, focus: focus, history: history, reportFailure: true, completion: completion)
     }
 
-    /// Reads a location in the background and shows it in `tab`, piece by piece when it takes
-    /// long, with the cursor on `focus` (nil: where the listing puts it). A failure leaves the
-    /// tab as it was, and is reported when `reportFailure` says so. `completion` hears whether
-    /// it worked. A location the listing cache remembers is shown at once and read afresh
-    /// behind (`PanelRememberedVisit`).
+    /// Reads a location in the background and shows it in `tab`, piece by piece when it takes long,
+    /// with the cursor on `focus` (nil: where the listing puts it).
+    ///
+    /// A failure leaves the tab as it was, and is reported when `reportFailure` says so.
+    /// `completion` hears whether it worked. A location the listing cache remembers is shown at
+    /// once and read afresh behind (`PanelRememberedVisit`).
     internal func load(
         _ location: URL,
         in tab: PanelModel,
@@ -69,12 +70,19 @@ extension PanelViewController {
                     run.finish(error)
 
                 case .success(let whole):
-                    self?.sorted(whole, for: tab) { whole in
-                        run.receive(
-                            PanelLoading.Piece(listing: whole.listing, focus: whole.focus, order: whole.order, isFirst: true, isLast: true)
-                        )
-                        run.finish(nil)
-                    }
+                    self?
+                        .sorted(whole, for: tab) { whole in
+                            run.receive(
+                                PanelLoading.Piece(
+                                    listing: whole.listing,
+                                    focus: whole.focus,
+                                    order: whole.order,
+                                    isFirst: true,
+                                    isLast: true
+                                )
+                            )
+                            run.finish(nil)
+                        }
                 }
             }
         } else {
@@ -101,9 +109,11 @@ extension PanelViewController {
         MainLoop.dialog { interaction.report(error, title: "The folder cannot be read!") }
     }
 
-    /// Hands on a listing in the order of `tab`. One that is in another order (the order was
-    /// changed while it was read) is sorted in the background first, so the main thread only
-    /// takes over a finished list; should the order change again meanwhile, once more.
+    /// Hands on a listing in the order of `tab`.
+    ///
+    /// One that is in another order (the order was changed while it was read) is sorted in the
+    /// background first, so the main thread only takes over a finished list; should the order
+    /// change again meanwhile, once more.
     internal func sorted(
         _ whole: PanelLoading.Whole,
         for tab: PanelModel,
@@ -124,11 +134,13 @@ extension PanelViewController {
     }
 
     /// Makes a change of a tab's list that the model works out from the list as it is
-    /// (`PanelModel.prepare`). For a long list all of that is done in the background, on all
-    /// cores, and the main thread only takes the result over (`PanelModel.apply`, a few
-    /// milliseconds at a million entries); a short one is done on the spot. Should the list,
-    /// its filter or its order have changed while the work was under way, nothing was done
-    /// here and the work starts again from the list as it is now, again in the background.
+    /// (`PanelModel.prepare`).
+    ///
+    /// For a long list all of that is done in the background, on all cores, and the main thread
+    /// only takes the result over (`PanelModel.apply`, a few milliseconds at a million entries); a
+    /// short one is done on the spot. Should the list, its filter or its order have changed while
+    /// the work was under way, nothing was done here and the work starts again from the list as it
+    /// is now, again in the background.
     ///
     /// `change.isWanted` is asked on the main thread before the result is taken: when it says
     /// no, nothing is changed and `done` hears nil. The lists that go are let go of by the
@@ -192,10 +204,11 @@ extension PanelViewController {
         load.keeps.append(load.flag.onCancel { MainLoop.perform { owned.take()?.leave() } })
     }
 
-    /// Starts a reading for `tab`, which overtakes the one before. Calculations of folder sizes
-    /// go on unless the tab moves to another folder (`location` is not where it is; nil for a
-    /// reading of the folder it shows). A `quiet` reading announces nothing unless the folder
-    /// changed.
+    /// Starts a reading for `tab`, which overtakes the one before.
+    ///
+    /// Calculations of folder sizes go on unless the tab moves to another folder (`location` is not
+    /// where it is; nil for a reading of the folder it shows). A `quiet` reading announces nothing
+    /// unless the folder changed.
     internal func beginLoad(
         for tab: PanelModel,
         movingTo location: URL?,

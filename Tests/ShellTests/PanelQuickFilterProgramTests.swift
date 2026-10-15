@@ -29,27 +29,41 @@ internal struct PanelQuickFilterProgramTests {
     internal func theQuickFilterNarrowsTheListWhileTyping() async {
         let app = await start()
         defer { app.stop() }
-        #expect(app.left.quickFilterBar.isHidden && app.kernel.keyBindings.command(for: Shortcut(.character("s"), .control)) == .quickFilter)
+        #expect(
+            app.left.quickFilterBar.isHidden
+                && app.kernel.keyBindings.command(for: Shortcut(.character("s"), .control)) == .quickFilter
+        )
         app.commands.perform(.quickFilter, .nothing)
-        #expect(!app.left.quickFilterBar.isHidden && app.left.quickFilterText?.isEmpty == true && app.right.quickFilterBar.isHidden)
+        #expect(
+            !app.left.quickFilterBar.isHidden && app.left.quickFilterText?.isEmpty == true
+                && app.right.quickFilterBar.isHidden
+        )
         app.left.quickFilterTyped("t")
         #expect(app.names(app.left) == ["one.txt", "two.txt"] && app.left.tableView.numberOfRows == 3)
         app.left.quickFilterTyped("tw")
-        #expect(app.names(app.left) == ["two.txt"] && app.left.statusLineText == "0 k / 0 k in 0 / 1 file(s)   ⏷ Filter: tw")
+        #expect(
+            app.names(app.left) == ["two.txt"] && app.left.statusLineText == "0 k / 0 k in 0 / 1 file(s)   ⏷ Filter: tw"
+        )
         app.left.quickFilterTyped("*o*")
         #expect(app.names(app.left) == ["docs", "one.txt", "two.txt"])
         app.left.quickFilterTyped("O?E*")
         #expect(app.names(app.left) == ["one.txt"])
         // Enter goes back to the list and keeps filter and field; the path bar still shows the display mask.
         app.left.leaveQuickFilterField()
-        #expect(!app.left.quickFilterBar.isHidden && app.names(app.left) == ["one.txt"] && app.left.pathBarText.hasSuffix("/A/*.*"))
+        #expect(
+            !app.left.quickFilterBar.isHidden && app.names(app.left) == ["one.txt"]
+                && app.left.pathBarText.hasSuffix("/A/*.*")
+        )
         // A reading of the folder keeps the filter.
         app.commands.perform(.reread, .nothing)
         await program.settle(app)
         #expect(app.names(app.left) == ["one.txt"] && app.left.quickFilterText == "O?E*")
         // Esc in the list takes it away.
         #expect(program.press(app, 53, []) && app.left.quickFilterBar.isHidden && app.names(app.left).count == 3)
-        #expect(app.left.quickFilterText == nil && !app.left.statusLineText.contains("Filter") && !program.press(app, 53, []))
+        #expect(
+            app.left.quickFilterText == nil && !app.left.statusLineText.contains("Filter")
+                && !program.press(app, 53, [])
+        )
         // A field that was left empty goes away by itself.
         app.commands.perform(.quickFilter, .nothing)
         app.left.leaveQuickFilterField()
@@ -97,7 +111,10 @@ internal struct PanelQuickFilterProgramTests {
         #expect(app.left.model.filter == nil && app.names(app.left).count == 3 && !program.press(app, 53, []))
         app.commands.perform(.previousTab, .nothing)
         await program.settle(app)
-        #expect(!app.left.quickFilterBar.isHidden && app.left.quickFilterBar.text == "one" && app.names(app.left) == ["one.txt"])
+        #expect(
+            !app.left.quickFilterBar.isHidden && app.left.quickFilterBar.text == "one"
+                && app.names(app.left) == ["one.txt"]
+        )
     }
 
     /// Typing waits for the last key of a burst; Enter filters at once; Esc before the list

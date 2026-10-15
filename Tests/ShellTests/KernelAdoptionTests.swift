@@ -26,7 +26,9 @@ internal struct KernelAdoptionTests {
 
     /// Waits until the left panel shows `path` complete and reads nothing.
     private func shown(_ path: String, in app: PanelProgram.Running) async -> Bool {
-        await PanelWait.until { app.left.model.directory.path == path && app.left.model.isComplete && !app.left.isLoading }
+        await PanelWait.until {
+            app.left.model.directory.path == path && app.left.model.isComplete && !app.left.isLoading
+        }
     }
 
     /// A listing that a server never ends is ended when the panel moves on: it was told to.
@@ -42,7 +44,11 @@ internal struct KernelAdoptionTests {
         #expect(await PanelWait.until { stuck.listingsBegun == 1 })
         app.left.show(program.box.url("B"))
         #expect(await PanelWait.until { stuck.listingsEnded == 1 })
-        #expect(await PanelWait.until { app.left.model.directory.lastPathComponent == "B" && app.names(app.left) == ["one.txt"] })
+        #expect(
+            await PanelWait.until {
+                app.left.model.directory.lastPathComponent == "B" && app.names(app.left) == ["one.txt"]
+            }
+        )
     }
 
     /// A listing that a server never ends is ended when its tab is closed.
@@ -154,11 +160,14 @@ internal struct KernelAdoptionTests {
         let model = app.left.model
         let rows = model.items.indices.map { $0 + (model.hasParentRow ? 1 : 0) }
         try #require(rows.count == 2)
-        let nameColumn = try #require(app.left.tableView.tableColumns.first { $0.identifier.rawValue == FileListColumn.name.rawValue })
+        let nameColumn = try #require(
+            app.left.tableView.tableColumns.first { $0.identifier.rawValue == FileListColumn.name.rawValue }
+        )
         func drawnMarked(_ row: Int) -> Bool {
             let cell = app.left.tableView(app.left.tableView, viewFor: nameColumn, row: row) as? NSTableCellView
             let marked = app.left.nameColor(for: model.item(atRow: row), selected: true)
-            return cell?.textField?.textColor == marked && marked != app.left.nameColor(for: model.item(atRow: row), selected: false)
+            return cell?.textField?.textColor == marked
+                && marked != app.left.nameColor(for: model.item(atRow: row), selected: false)
         }
         model.toggleSelection(row: rows[0])
         #expect(model.selectionCount == 1 && model.isSelected(row: rows[0]) && !model.isSelected(row: rows[1]))
@@ -186,7 +195,9 @@ internal struct KernelAdoptionTests {
         #expect(app.left.dropPlan(for: [source], row: -1, modifiers: [], allowed: .copy) == nil)
         app.left.show(program.memory.url("/writable"))
         #expect(await shown("/writable", in: app))
-        #expect(app.left.dropPlan(for: [source], row: -1, modifiers: [], allowed: .copy)?.destination.path == "/writable")
+        #expect(
+            app.left.dropPlan(for: [source], row: -1, modifiers: [], allowed: .copy)?.destination.path == "/writable"
+        )
     }
 
     /// Free space follows the file system when it reports a new figure for the volume of a

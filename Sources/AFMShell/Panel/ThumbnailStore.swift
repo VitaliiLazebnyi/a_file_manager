@@ -28,16 +28,19 @@ internal final class ThumbnailStore {
         }
     }
 
-    /// The memory the pictures may take, counted in pixels of 4 bytes. A 256 pt tile on a
-    /// Retina screen is 1 MB, so the count alone would allow gigabytes.
+    /// The memory the pictures may take, counted in pixels of 4 bytes.
+    ///
+    /// A 256 pt tile on a Retina screen is 1 MB, so the count alone would allow gigabytes.
     internal static let costLimit = 192 * 1_024 * 1_024
 
     /// Where the pictures come from.
     internal var source: any ThumbnailSource
     /// Called on the main thread with the name of the entry whose picture arrived.
     internal var onArrival: ((String) -> Void)?
-    /// The requests under way, by key. Each has a token of its own: the answer of a request that
-    /// was given up must not be taken for the answer of a newer request for the same file.
+    /// The requests under way, by key.
+    ///
+    /// Each has a token of its own: the answer of a request that was given up must not be taken for
+    /// the answer of a newer request for the same file.
     internal private(set) var running: [String: (token: UInt64, cancel: () -> Void)] = [:]
 
     private let cache = NSCache<CacheKey, NSImage>()

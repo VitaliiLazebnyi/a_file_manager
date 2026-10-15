@@ -68,7 +68,9 @@ internal final class QuickFilterBar: NSView, NSTextFieldDelegate {
         onChange?(field.stringValue)
     }
 
-    /// Esc ends the filter; Enter, ↑ and ↓ go back to the list. Other keys are the field's.
+    /// Esc ends the filter; Enter, ↑ and ↓ go back to the list.
+    ///
+    /// Other keys are the field's.
     internal func control(_: NSControl, textView _: NSTextView, doCommandBy selector: Selector) -> Bool {
         switch selector {
         case #selector(NSResponder.cancelOperation(_:)):

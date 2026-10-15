@@ -44,8 +44,9 @@ internal final class IconStore {
     /// Icons fetched in one trip.
     internal static let batchSize = 64
 
-    /// Fetches the icon of the file at a path; called on background threads. The system's own
-    /// by default, which may be asked from any thread.
+    /// Fetches the icon of the file at a path; called on background threads.
+    ///
+    /// The system's own by default, which may be asked from any thread.
     internal var source: @Sendable (String) -> NSImage = { NSWorkspace.shared.icon(forFile: $0) }
     private var icons = TwoGenerationCache<Key, NSImage>(limit: IconStore.limit)
     /// What is waiting, by folder, oldest first; the end of each line is served first.
@@ -73,7 +74,9 @@ internal final class IconStore {
         var line = waiting[folder] ?? []
         line.append(key)
         if line.count > Self.waitingLimit {
-            line.prefix(line.count - Self.waitingLimit).forEach { asked.remove($0) }
+            for old in line.prefix(line.count - Self.waitingLimit) {
+                asked.remove(old)
+            }
             line.removeFirst(line.count - Self.waitingLimit)
         }
         waiting[folder] = line
@@ -108,7 +111,11 @@ internal final class IconStore {
             asked.remove(key)
             icons[key] = icon
         }
-        NotificationCenter.default.post(name: Self.didArrive, object: self, userInfo: [Self.pathsKey: Set(batch.map(\.path))])
+        NotificationCenter.default.post(
+            name: Self.didArrive,
+            object: self,
+            userInfo: [Self.pathsKey: Set(batch.map(\.path))]
+        )
         fetch(in: folder)
     }
 

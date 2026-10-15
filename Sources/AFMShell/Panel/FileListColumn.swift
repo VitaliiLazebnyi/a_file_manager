@@ -4,6 +4,7 @@ import AppKit
 import UniformTypeIdentifiers
 
 /// The columns of the Full view and how a row is drawn in each (spec 03 › Rows in Full view).
+///
 /// The raw values are the columns' identifiers in the table and in the remembered widths.
 @MainActor
 internal enum FileListColumn: String {
@@ -28,8 +29,10 @@ internal enum FileListColumn: String {
     /// The cells of all plugin columns are alike, so they share one kind of cell.
     internal static let extraCellIdentifier = NSUserInterfaceItemIdentifier("extra")
 
-    /// The icons of file types, by extension; main thread only. Extensions are whatever the
-    /// names in a folder end in, so the store is bounded like the others.
+    /// The icons of file types, by extension; main thread only.
+    ///
+    /// Extensions are whatever the names in a folder end in, so the store is bounded like the
+    /// others.
     private static var typeIcons = TwoGenerationCache<String, NSImage>(limit: 2_000)
 
     /// What the table knows the column and its cells by.
@@ -129,13 +132,14 @@ internal enum FileListColumn: String {
         }
     }
 
-    /// On a local disk a file shows its own icon. Asking the system for it reads the file's
-    /// surroundings, which takes 30 µs for a plain file on a good day and for ever on a disk
-    /// that does not answer, so it is never asked on the main thread: until the icon has been
-    /// fetched in the background (`IconStore`) the file shows the icon of its type, which is
-    /// looked up once per extension. A file that is not on a volume of this machine (a share,
-    /// whatever the folder it is listed in says) is never asked at all: there every question
-    /// is a trip to the server.
+    /// On a local disk a file shows its own icon.
+    ///
+    /// Asking the system for it reads the file's surroundings, which takes 30 µs for a plain file
+    /// on a good day and for ever on a disk that does not answer, so it is never asked on the main
+    /// thread: until the icon has been fetched in the background (`IconStore`) the file shows the
+    /// icon of its type, which is looked up once per extension. A file that is not on a volume of
+    /// this machine (a share, whatever the folder it is listed in says) is never asked at all:
+    /// there every question is a trip to the server.
     internal static func icon(for item: FileItem, own: Bool) -> NSImage {
         if own, item.url.isFileURL {
             let path = item.url.path
@@ -186,8 +190,9 @@ internal enum FileListColumn: String {
         return column
     }
 
-    /// The text of a row; `item` is nil for the `[..]` row. Names are shown with whatever
-    /// could mislead made visible (`DisplayText`).
+    /// The text of a row; `item` is nil for the `[..]` row.
+    ///
+    /// Names are shown with whatever could mislead made visible (`DisplayText`).
     internal func text(for item: FileItem?) -> String {
         guard let item else {
             return parentText
@@ -210,11 +215,12 @@ internal enum FileListColumn: String {
         }
     }
 
-    /// Makes a cell show its row as `look` says (its entry, the colour of its text and whether
-    /// a file may be asked for its own icon). Only what differs from what the cell shows is set, so
-    /// filling a cell that is up to date costs a few comparisons and no drawing. An empty cell
-    /// (as most of the `[..]` row's are) is no element of its own to the accessibility
-    /// interface: it says nothing.
+    /// Makes a cell show its row as `look` says (its entry, the colour of its text and whether a
+    /// file may be asked for its own icon).
+    ///
+    /// Only what differs from what the cell shows is set, so filling a cell that is up to date
+    /// costs a few comparisons and no drawing. An empty cell (as most of the `[..]` row's are) is
+    /// no element of its own to the accessibility interface: it says nothing.
     internal func fill(_ cell: NSTableCellView, with look: RowLook) {
         let item = look.item
         if let field = cell.textField {
@@ -243,8 +249,10 @@ internal enum FileListColumn: String {
     }
 
     /// A cell is a label, and for the name an icon in front of it, placed by their frames: the
-    /// table makes and moves many cells while it scrolls, and layout constraints for each of
-    /// them were most of what that cost. The label is called by its column's title.
+    /// table makes and moves many cells while it scrolls, and layout constraints for each of them
+    /// were most of what that cost.
+    ///
+    /// The label is called by its column's title.
     internal func makeCell() -> NSTableCellView {
         let size = NSSize(width: 120, height: 20)
         let cell = NSTableCellView(frame: NSRect(origin: .zero, size: size))
@@ -252,7 +260,8 @@ internal enum FileListColumn: String {
         let label = NSTextField(labelWithString: "")
         label.lineBreakMode = self == .name ? .byTruncatingMiddle : .byTruncatingTail
         label.font =
-            self == .name || self == .ext ? .systemFont(ofSize: 12) : .monospacedDigitSystemFont(ofSize: 12, weight: .regular)
+            self == .name || self == .ext
+            ? .systemFont(ofSize: 12) : .monospacedDigitSystemFont(ofSize: 12, weight: .regular)
         label.alignment = self == .size ? .right : .left
         label.setAccessibilityLabel(title)
         var leading: CGFloat = 0

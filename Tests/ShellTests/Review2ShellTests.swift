@@ -103,7 +103,10 @@ internal struct Review2ShellTests {
         service.cancelCurrent()
         #expect(await PanelWait.until { !service.isBusy })
         #expect(log == ["next"] && service.abandonedCount == 1 && app.commands.isEnabled(.goToParent))
-        #expect(program.interaction.log.count == 2 && program.interaction.log.allSatisfy { $0.hasPrefix("choose: “Stuck” does not stop.") })
+        #expect(
+            program.interaction.log.count == 2
+                && program.interaction.log.allSatisfy { $0.hasPrefix("choose: “Stuck” does not stop.") }
+        )
         // Its own thread, not one of the system's shared pool.
         #expect(thread.value == "afm.job")
         release.signal()
@@ -128,7 +131,10 @@ internal struct Review2ShellTests {
         #expect(replies.isEmpty)
         #expect(await PanelWait.until { !replies.isEmpty })
         #expect(replies == [true] && app.kernel.jobs.isBusy)
-        #expect(program.interaction.log.count == 2 && program.interaction.log.allSatisfy { $0.hasPrefix("choose: An operation does not stop.") })
+        #expect(
+            program.interaction.log.count == 2
+                && program.interaction.log.allSatisfy { $0.hasPrefix("choose: An operation does not stop.") }
+        )
         release.signal()
         await program.settle(app)
         app.shell.stopJobsToQuit { replies.append($0) }
@@ -148,8 +154,16 @@ internal struct Review2ShellTests {
             states.append("busy \(service.isBusy)")
             told?()
         }
-        service.run(title: "One", work: { _ in 1 }, completion: { _ in states.append("first done, busy \(service.isBusy)") })
-        service.run(title: "Two", work: { _ in 2 }, completion: { _ in states.append("second done, busy \(service.isBusy)") })
+        service.run(
+            title: "One",
+            work: { _ in 1 },
+            completion: { _ in states.append("first done, busy \(service.isBusy)") }
+        )
+        service.run(
+            title: "Two",
+            work: { _ in 2 },
+            completion: { _ in states.append("second done, busy \(service.isBusy)") }
+        )
         await program.settle(app)
         await PanelWait.until { states.count == 4 }
         #expect(states == ["busy true", "first done, busy true", "busy false", "second done, busy false"])
@@ -166,14 +180,21 @@ internal struct Review2ShellTests {
         let menu = app.shell.makeMainMenu()
         let keys = try #require(MenuBuilder.keyAnswers(of: menu))
         let down = String(try #require(UnicodeScalar(NSDownArrowFunctionKey)))
-        for event in [PanelProgram.key(0, "a", []), PanelProgram.key(125, down, []), PanelProgram.key(38, "j", [.command, .control, .option])] {
+        for event in [
+            PanelProgram.key(0, "a", []), PanelProgram.key(125, down, []),
+            PanelProgram.key(38, "j", [.command, .control, .option])
+        ] {
             #expect(!menu.performKeyEquivalent(with: event))
         }
         #expect(keys.lookups > 0 && keys.validations == 0)
         let lookups = keys.lookups
-        _ = menu.performKeyEquivalent(with: PanelProgram.key(96, String(try #require(UnicodeScalar(NSF5FunctionKey))), []))
+        _ = menu.performKeyEquivalent(
+            with: PanelProgram.key(96, String(try #require(UnicodeScalar(NSF5FunctionKey))), [])
+        )
         #expect(keys.lookups > lookups && keys.validations <= 2)
-        #expect(MenuKeys.shortcuts(for: PanelProgram.key(8, "с", .command)).contains(Shortcut(.character("c"), .command)))
+        #expect(
+            MenuKeys.shortcuts(for: PanelProgram.key(8, "с", .command)).contains(Shortcut(.character("c"), .command))
+        )
     }
 
     /// The bars rest after a slow check: an event alone asks for no new check, a change does.

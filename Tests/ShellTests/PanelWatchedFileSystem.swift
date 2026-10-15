@@ -2,9 +2,10 @@ import AFMKernel
 import Foundation
 import TestSupport
 
-/// A file system whose `watch` and `places` say on which thread they were called, and whose
-/// `watch` can be made to wait like a share that has stopped answering. Everything else is a
-/// memory file system's.
+/// A file system whose `watch` and `places` say on which thread they were called, and whose `watch`
+/// can be made to wait like a share that has stopped answering.
+///
+/// Everything else is a memory file system's.
 ///
 /// Unchecked: what it records is guarded by `condition`; its switches are set by the test before use.
 internal final class PanelWatchedFileSystem: FileSystemProvider, @unchecked Sendable {
@@ -73,7 +74,9 @@ internal final class PanelWatchedFileSystem: FileSystemProvider, @unchecked Send
     }
 
     /// Notes the call, waits while watches are held, and hands out a counted watch.
-    internal func watch(_ directories: [URL], onChange: @escaping @MainActor @Sendable ([URL]) -> Void) -> (any WatchToken)? {
+    internal func watch(_ directories: [URL], onChange: @escaping @MainActor @Sendable ([URL]) -> Void) -> (
+        any WatchToken
+    )? {
         condition.withLock {
             for directory in directories {
                 watchCalls.append((directory.path, Thread.isMainThread))
@@ -101,7 +104,12 @@ internal final class PanelWatchedFileSystem: FileSystemProvider, @unchecked Send
     }
 
     /// The memory file system's listing in batches.
-    internal func list(_ directory: URL, showHidden: Bool, cancellation: CancellationFlag, receive: ([FileItem]) -> Bool)
+    internal func list(
+        _ directory: URL,
+        showHidden: Bool,
+        cancellation: CancellationFlag,
+        receive: ([FileItem]) -> Bool
+    )
         throws
     {
         try inner.list(directory, showHidden: showHidden, cancellation: cancellation, receive: receive)

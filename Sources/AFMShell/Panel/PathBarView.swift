@@ -1,10 +1,11 @@
 import AFMKernel
 import AppKit
 
-/// The current-directory bar: the path with the display mask, coloured by whether its panel
-/// is the source. Each part of the path can be clicked to go there
-/// (spec 03 › Current-directory bar). While the folder is on a drive that can be ejected, an
-/// eject button stands at the right end.
+/// The current-directory bar: the path with the display mask, coloured by whether its panel is the
+/// source.
+///
+/// Each part of the path can be clicked to go there (spec 03 › Current-directory bar). While the
+/// folder is on a drive that can be ejected, an eject button stands at the right end.
 internal final class PathBarView: NSView {
     /// A part of the path that leads somewhere: its place in the text (UTF-16) and the folder.
     internal struct Segment: Equatable {
@@ -66,8 +67,9 @@ internal final class PathBarView: NSView {
     }
 
     private var textWidth: CGFloat = 0
-    /// The area that follows the mouse. Only this one is replaced: the others belong to
-    /// AppKit (the tool tip's among them).
+    /// The area that follows the mouse.
+    ///
+    /// Only this one is replaced: the others belong to AppKit (the tool tip's among them).
     private var mouseArea: NSTrackingArea?
     private var hovered: Int? {
         didSet {
@@ -110,9 +112,11 @@ internal final class PathBarView: NSView {
         fatalError("not used")
     }
 
-    /// Splits a path into its clickable parts. `ancestors` are the folders from the top of the
-    /// tree down to the one shown, each with the way it is written; a part is what the writing
-    /// of a folder adds to that of its parent. When the writings do not build on each other
+    /// Splits a path into its clickable parts.
+    ///
+    /// The `ancestors` are the folders from the top of the tree down to the one shown, each with
+    /// the way it is written; a part is what the writing of a folder adds to that of its parent.
+    /// When the writings do not build on each other
     /// (a file system with a notation of its own), the path has no clickable parts.
     internal static func segments(of text: String, ancestors: [(location: URL, path: String)]) -> [Segment] {
         let units = Array(text.utf16)
@@ -156,7 +160,12 @@ internal final class PathBarView: NSView {
     /// Puts the eject button at the right end.
     override internal func layout() {
         super.layout()
-        ejectButton.frame = NSRect(x: bounds.width - Self.ejectWidth, y: 0, width: Self.ejectWidth, height: bounds.height)
+        ejectButton.frame = NSRect(
+            x: bounds.width - Self.ejectWidth,
+            y: 0,
+            width: Self.ejectWidth,
+            height: bounds.height
+        )
     }
 
     /// The path on the colour of the bar, the part under the mouse underlined.
@@ -210,9 +219,10 @@ internal final class PathBarView: NSView {
         hovered = nil
     }
 
-    /// A click on a part of the path above the current folder goes there. Everything else is
-    /// an ordinary click on the bar: the panel becomes the source, and a double click edits
-    /// the path.
+    /// A click on a part of the path above the current folder goes there.
+    ///
+    /// Everything else is an ordinary click on the bar: the panel becomes the source, and a double
+    /// click edits the path.
     override internal func mouseDown(with event: NSEvent) {
         click(at: convert(event.locationInWindow, from: nil), count: event.clickCount)
     }

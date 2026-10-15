@@ -2,8 +2,9 @@ import AFMContracts
 import AFMKernel
 import Foundation
 
-/// What a drag carries and where its sources are, worked out once for the whole drag: the
-/// mouse reports its position many times a second, and the items may be many thousands.
+/// What a drag carries and where its sources are, worked out once for the whole drag: the mouse
+/// reports its position many times a second, and the items may be many thousands.
+///
 /// Main thread only.
 @MainActor
 internal final class DropSession {

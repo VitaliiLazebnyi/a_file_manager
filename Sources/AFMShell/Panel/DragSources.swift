@@ -2,9 +2,11 @@ import AFMContracts
 import AFMKernel
 import Foundation
 
-/// Where the sources of a drag are, worked out once: the places themselves and the folders
-/// they lie in. Whether a drop on a folder is pointless is then a matter of looking up that
-/// folder and the folders above it, however many items are dragged. May be made on any thread.
+/// Where the sources of a drag are, worked out once: the places themselves and the folders they lie
+/// in.
+///
+/// Whether a drop on a folder is pointless is then a matter of looking up that folder and the
+/// folders above it, however many items are dragged. May be made on any thread.
 internal struct DragSources: Sendable {
     /// Whether nothing is dragged.
     internal let isEmpty: Bool

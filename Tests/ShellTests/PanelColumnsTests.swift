@@ -41,7 +41,10 @@ internal struct PanelColumnsTests {
         #expect(app.left.tableView.tableColumns.count == 5)
         app.left.extraColumns = ["upper", "unknown", "upper"]
         let table = app.left.tableView
-        #expect(table.tableColumns.map(\.title) == ["Name", "Ext", "Size", "Date", "Attr", "Upper"] && table.tableColumns[5].width == 90)
+        #expect(
+            table.tableColumns.map(\.title) == ["Name", "Ext", "Size", "Date", "Attr", "Upper"]
+                && table.tableColumns[5].width == 90
+        )
         // Drawing a row asks for its value and does not wait for it: the cells are empty, and
         // no value is ever worked out on the main thread (checked below).
         #expect(text(app, 5, 2)?.isEmpty == true && text(app, 5, 0)?.isEmpty == true)
@@ -71,7 +74,10 @@ internal struct PanelColumnsTests {
         let again = await start()
         defer { again.stop() }
         #expect(again.left.extraColumns == ["unknown", "length"] && again.right.extraColumns.isEmpty)
-        #expect(again.left.tableView.tableColumns.map(\.title).last == "Length" && again.right.tableView.tableColumns.count == 5)
+        #expect(
+            again.left.tableView.tableColumns.map(\.title).last == "Length"
+                && again.right.tableView.tableColumns.count == 5
+        )
         #expect(again.left.tableView.tableColumns[2].width == 137 && again.left.tableView.tableColumns[5].width == 61)
         // The Custom Columns dialog of the Show menu sets the same list.
         program.interaction.formAnswers = [.values(["upper": .flag(true), "length": .flag(false)])]
@@ -80,7 +86,9 @@ internal struct PanelColumnsTests {
     }
 
     /// A click on a header sorts by its column, and once more reverses the order; Attr does not
-    /// sort. The header of the grid offers the same menu.
+    /// sort.
+    ///
+    /// The header of the grid offers the same menu.
     @Test
     internal func aClickOnAHeaderSortsByItsColumn() async {
         let app = await start()

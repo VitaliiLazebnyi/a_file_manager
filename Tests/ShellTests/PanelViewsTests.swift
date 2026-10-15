@@ -37,24 +37,38 @@ internal struct PanelViewsTests {
     @Test
     internal func theViewOfEachPanelIsSwitchedAndRemembered() async {
         let app = await start()
-        #expect(app.left.viewMode == .full && !app.left.showsGrid && app.left.tableView.enclosingScrollView?.isHidden == false)
+        #expect(
+            app.left.viewMode == .full && !app.left.showsGrid
+                && app.left.tableView.enclosingScrollView?.isHidden == false
+        )
         #expect(app.kernel.keyClashes.isEmpty)
         // Ctrl+F1 (key code 122).
         #expect(program.press(app, 122, .control) && app.left.viewMode == .brief && app.commands.isChecked(.viewBrief))
         #expect(app.left.showsGrid && app.left.tableView.enclosingScrollView?.isHidden == true)
         #expect(app.left.gridView.enclosingScrollView?.isHidden == false)
         #expect(app.left.gridView.geometry.flow == .columns && app.left.gridView.geometry.count == 4)
-        #expect(app.right.viewMode == .full && program.settings.value(PanelViewState.self, forKey: "left.view")?.mode == 1)
+        #expect(
+            app.right.viewMode == .full && program.settings.value(PanelViewState.self, forKey: "left.view")?.mode == 1
+        )
         #expect(program.press(app, 122, [.control, .shift]) && app.left.viewMode == .thumbnails)
-        #expect(app.left.gridView.geometry.flow == .rows && app.left.gridView.geometry.cell == CGSize(width: 116, height: 136))
+        #expect(
+            app.left.gridView.geometry.flow == .rows
+                && app.left.gridView.geometry.cell == CGSize(width: 116, height: 136)
+        )
         app.stop()
 
         let again = await start()
         defer { again.stop() }
-        #expect(again.left.viewMode == .thumbnails && again.right.viewMode == .full && again.left.gridView.geometry.count == 4)
+        #expect(
+            again.left.viewMode == .thumbnails && again.right.viewMode == .full
+                && again.left.gridView.geometry.count == 4
+        )
         #expect(again.commands.isChecked(.viewThumbnails))
         // Ctrl+F2 (key code 120) brings the table back, with the list in it.
-        #expect(program.press(again, 120, .control) && again.left.viewMode == .full && again.left.tableView.numberOfRows == 4)
+        #expect(
+            program.press(again, 120, .control) && again.left.viewMode == .full
+                && again.left.tableView.numberOfRows == 4
+        )
         #expect(again.left.tableView.selectedRow == again.left.model.cursor)
     }
 
@@ -73,7 +87,10 @@ internal struct PanelViewsTests {
         app.layOut()
         let grid = app.left.gridView
         let perColumn = grid.geometry.perLine
-        #expect(grid.geometry.count == 91 && perColumn > 5 && perColumn < 91 && grid.frame.width >= grid.geometry.cell.width * 2)
+        #expect(
+            grid.geometry.count == 91 && perColumn > 5 && perColumn < 91
+                && grid.frame.width >= grid.geometry.cell.width * 2
+        )
         // → and ← step a column; ↓ and ↑, which are bound to nothing, a row.
         #expect(program.press(app, 124, []) && app.left.model.cursor == perColumn)
         grid.keyDown(with: PanelProgram.key(125, "", []))
@@ -82,10 +99,16 @@ internal struct PanelViewsTests {
         grid.keyDown(with: PanelProgram.key(126, "", []))
         #expect(app.left.model.cursorIsOnParentRow)
         // The other keys are the ones of the Full view: End, Home, Page Down, Insert, Shift+↓, Space.
-        #expect(program.press(app, 119, []) && app.left.model.cursor == 90 && program.press(app, 115, []) && app.left.model.cursor == 0)
+        #expect(
+            program.press(app, 119, []) && app.left.model.cursor == 90 && program.press(app, 115, [])
+                && app.left.model.cursor == 0
+        )
         #expect(program.press(app, 121, []) && app.left.model.cursor == min(90, grid.geometry.pageSize))
         app.cursor(app.left, on: "f03.txt")
-        #expect(program.press(app, 114, []) && program.press(app, 125, .shift) && app.left.model.selection == ["f03.txt", "f04.txt"])
+        #expect(
+            program.press(app, 114, []) && program.press(app, 125, .shift)
+                && app.left.model.selection == ["f03.txt", "f04.txt"]
+        )
         #expect(program.press(app, 49, []) && app.left.model.selection == ["f03.txt", "f04.txt", "f05.txt"])
         // Letters find a file by typing.
         grid.keyDown(with: PanelProgram.key(3, "f", []))

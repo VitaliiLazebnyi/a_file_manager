@@ -115,9 +115,10 @@ extension PanelViewController {
         host?.panelCursorDidChange(self)
     }
 
-    /// What belongs to a tab that is gone goes with it (and must not meet a new tab that
-    /// happens to get the same address). Whoever waits for its reading hears that it came to
-    /// nothing.
+    /// What belongs to a tab that is gone goes with it (and must not meet a new tab that happens to
+    /// get the same address).
+    ///
+    /// Whoever waits for its reading hears that it came to nothing.
     private func dropWhatBelongsToClosedTabs(keeping open: Set<ObjectIdentifier>) {
         for (tab, load) in loads where !open.contains(tab) {
             load.flag.cancel()
@@ -169,9 +170,11 @@ extension PanelViewController {
     }
 
     /// Reads the folder of a tab that has not shown anything yet (one restored from the last
-    /// session). A folder that is gone is replaced by its nearest parent that can be read, as for
-    /// the panels on start-up, and not complained about on every visit; only when nothing can be
-    /// read at all the error is reported.
+    /// session).
+    ///
+    /// A folder that is gone is replaced by its nearest parent that can be read, as for the panels
+    /// on start-up, and not complained about on every visit; only when nothing can be read at all
+    /// the error is reported.
     private func loadRestored(_ location: URL, in tab: PanelModel) {
         let parent = (try? kernel.fileSystems.provider(for: location))?.parent(of: location)
         let next = parent.flatMap { $0.isSameLocation(as: location) ? nil : $0 }

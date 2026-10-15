@@ -6,9 +6,10 @@ import Testing
 
 @testable import AFMShell
 
-/// Entering the folder under the cursor on a slow server through the real window: the folder
-/// is read ahead while the cursor rests on it, and modestly. The memory file system plays the
-/// server.
+/// Entering the folder under the cursor on a slow server through the real window: the folder is
+/// read ahead while the cursor rests on it, and modestly.
+///
+/// The memory file system plays the server.
 @MainActor
 @Suite(.serialized)
 internal struct PanelReadAheadProgramTests {
@@ -23,7 +24,9 @@ internal struct PanelReadAheadProgramTests {
     private var rest: TimeInterval { ReadAhead.dwell + 0.3 }
 
     /// A share (not a local volume) with two folders and a file, shown in the left panel of a
-    /// window that counts as active. The server answers after `delay`.
+    /// window that counts as active.
+    ///
+    /// The server answers after `delay`.
     private func startOnAShare(delay: TimeInterval) async -> PanelProgram.Running {
         program.memory.isLocal = false
         for index in 0..<3 {
@@ -145,7 +148,8 @@ internal struct PanelReadAheadProgramTests {
         app.cursor(app.left, on: "locked")
         #expect(
             await PanelWait.until {
-                program.memory.listRequests(for: "/nas/locked") == 1 && app.shell.panelCoordinator.readAhead.reading == nil
+                program.memory.listRequests(for: "/nas/locked") == 1
+                    && app.shell.panelCoordinator.readAhead.reading == nil
             }
         )
         app.cursor(app.left, on: "file.txt")

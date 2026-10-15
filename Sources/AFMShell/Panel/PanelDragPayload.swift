@@ -1,7 +1,9 @@
 import AFMKernel
 import AppKit
 
-/// What a drag that started in a panel carries. Main thread only.
+/// What a drag that started in a panel carries.
+///
+/// Main thread only.
 ///
 /// A drag of a few items holds them from the start. A drag of very many marked items
 /// starts with the marks alone (`PanelModel.Operands`, which costs nothing to take): the
@@ -80,8 +82,9 @@ internal final class PanelDragPayload: NSObject, NSPasteboardItemDataProvider, @
         }
     }
 
-    /// Another program asks for a file: the first one of the local disks. AppKit asks on
-    /// the main thread.
+    /// Another program asks for a file: the first one of the local disks.
+    ///
+    /// AppKit asks on the main thread.
     internal nonisolated func pasteboard(
         _: NSPasteboard?,
         item: NSPasteboardItem,
@@ -104,7 +107,9 @@ internal final class PanelDragPayload: NSObject, NSPasteboardItemDataProvider, @
         sender.setPropertyList(items.lazy.filter(\.url.isFileURL).map(\.url.path) as [String], forType: type)
     }
 
-    /// The items are put together: whoever waited hears of them. The first to come counts.
+    /// The items are put together: whoever waited hears of them.
+    ///
+    /// The first to come counts.
     private func take(_ result: Gathered) {
         guard gathered == nil else {
             return
@@ -113,7 +118,9 @@ internal final class PanelDragPayload: NSObject, NSPasteboardItemDataProvider, @
         marks = nil
         let waiting = waiting
         self.waiting = []
-        waiting.forEach { $0(result.locations) }
+        for receiver in waiting {
+            receiver(result.locations)
+        }
     }
 
     deinit {

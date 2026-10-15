@@ -22,7 +22,8 @@ internal struct PanelIconTests {
             return image
         }
         let arrived = Shared<Set<String>>([])
-        let observer = NotificationCenter.default.addObserver(forName: IconStore.didArrive, object: store, queue: nil) { note in
+        let observer = NotificationCenter.default.addObserver(forName: IconStore.didArrive, object: store, queue: nil) {
+            note in
             arrived.modify { $0.formUnion(note.userInfo?[IconStore.pathsKey] as? Set<String> ?? []) }
         }
         defer { NotificationCenter.default.removeObserver(observer) }

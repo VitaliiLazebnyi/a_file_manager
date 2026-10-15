@@ -2,21 +2,27 @@ import AFMKernel
 import Foundation
 import TestSupport
 
-/// A file system whose listing is told exactly what to do: it delivers prepared batches, can
-/// hold at a chosen batch until a gate is opened (or the listing is cancelled), and counts how
-/// many listings began and ended. It also answers `volume(of:)` with a settable figure, and
-/// counts the questions. Everything else is a memory file system's.
+/// A file system whose listing is told exactly what to do: it delivers prepared batches, can hold
+/// at a chosen batch until a gate is opened (or the listing is cancelled), and counts how many
+/// listings began and ended.
+///
+/// It also answers `volume(of:)` with a settable figure, and counts the questions. Everything else
+/// is a memory file system's.
 ///
 /// Unchecked: what it records is guarded by `condition`; its switches are set by the test before use.
 internal final class ScriptedFileSystem: FileSystemProvider, @unchecked Sendable {
     /// The memory file system that answers everything but listings and volumes.
     internal let inner: MemoryFileSystem
-    /// The batches a listing delivers. Set before the first listing starts.
+    /// The batches a listing delivers.
+    ///
+    /// Set before the first listing starts.
     internal var batches: [[FileItem]] = []
     /// What the folders at these paths deliver instead (the others deliver `batches`); they never hold.
     internal var batchesAt: [String: [[FileItem]]] = [:]
-    /// The listing waits before this batch (`batches.count` waits after the last) until `open()`
-    /// is called or its cancellation flag is set. Nil never waits.
+    /// The listing waits before this batch (`batches.count` waits after the last) until `open()` is
+    /// called or its cancellation flag is set.
+    ///
+    /// Nil never waits.
     internal var holdBefore: Int?
     /// Thrown when the listing is let go from its hold (the hold must be set for this).
     internal var failure: (any Error)?

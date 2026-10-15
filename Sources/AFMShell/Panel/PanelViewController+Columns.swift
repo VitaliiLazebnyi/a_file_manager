@@ -22,8 +22,9 @@ extension PanelViewController {
         }
     }
 
-    /// Shows the plugin columns of `extraColumns` after the standard ones. An id no plugin
-    /// offers (its plugin is not there) is kept in the list but shows nothing.
+    /// Shows the plugin columns of `extraColumns` after the standard ones.
+    ///
+    /// An id no plugin offers (its plugin is not there) is kept in the list but shows nothing.
     internal func rebuildExtraColumns() {
         guard isViewLoaded else {
             return
@@ -75,9 +76,10 @@ extension PanelViewController {
         )
         let visible = tableView.rows(in: tableView.visibleRect)
         let rows = IndexSet(
-            (visible.location..<(visible.location + visible.length)).filter { row in
-                model.item(atRow: row).map { names.contains($0.name) } ?? false
-            }
+            (visible.location..<(visible.location + visible.length))
+                .filter { row in
+                    model.item(atRow: row).map { names.contains($0.name) } ?? false
+                }
         )
         if !rows.isEmpty, !columns.isEmpty {
             tableView.reloadData(forRowIndexes: rows, columnIndexes: columns)
@@ -93,8 +95,10 @@ extension PanelViewController {
         performFocused(key == model.wantedSort.key ? .reversedOrder : command, .nothing)
     }
 
-    /// The menu of the column header: the views, the plugin columns to show or hide, and the
-    /// dialog for them (spec 05 › Column header). It acts on this panel, which becomes the source.
+    /// The menu of the column header: the views, the plugin columns to show or hide, and the dialog
+    /// for them (spec 05 › Column header).
+    ///
+    /// It acts on this panel, which becomes the source.
     internal func fillHeaderMenu() {
         focus()
         headerMenu.removeAllItems()

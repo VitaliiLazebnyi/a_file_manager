@@ -34,8 +34,9 @@ internal final class PanelReadingRun {
     private let previousDirectory: URL
     /// Nothing has arrived yet: the folder is entered empty when that goes on for long.
     private var nothingArrivedYet = true
-    /// Pieces and the end are taken in the order they come. A piece that has to be sorted
-    /// first, in the background, holds back whatever comes after it.
+    /// Pieces and the end are taken in the order they come.
+    ///
+    /// A piece that has to be sorted first, in the background, holds back whatever comes after it.
     private var behind: [() -> Void] = []
     private var isHolding = false
 
@@ -150,7 +151,9 @@ internal final class PanelReadingRun {
         Background.compute(
             work: { () -> PanelLoading.Piece in
                 PanelLoading.Piece(
-                    listing: piece.listing.with(items: Sorter.resort(piece.listing.items, from: piece.order, to: wanted)),
+                    listing: piece.listing.with(
+                        items: Sorter.resort(piece.listing.items, from: piece.order, to: wanted)
+                    ),
                     focus: piece.focus,
                     order: wanted,
                     isFirst: piece.isFirst,
@@ -178,7 +181,8 @@ internal final class PanelReadingRun {
         // if it were still arriving, and the whole list follows from the background a moment
         // later, so entering it costs the main thread no pass over the list.
         let listing =
-            isLong ? piece.listing.with(items: Array(piece.listing.items.prefix(PanelLoading.firstPieceLimit))) : piece.listing
+            isLong
+            ? piece.listing.with(items: Array(piece.listing.items.prefix(PanelLoading.firstPieceLimit))) : piece.listing
         tab.show(
             listing,
             focus: request.focus ?? piece.focus,

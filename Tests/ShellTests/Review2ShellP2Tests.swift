@@ -93,7 +93,10 @@ internal struct Review2ShellP2Tests {
         app.shell.finishToQuit(patience: 30, progressDelay: 0.05) { replies.append($0) }
         #expect(await PanelWait.until { plugin.pending != nil } && replies.isEmpty && plugin.prepared == 1)
         #expect(await PanelWait.until { app.shell.quitProgress?.isDue == true })
-        #expect(replies.isEmpty && plugin.pending?.flag.isCancelled == false && app.shell.quitProgress?.text == QuitProgress.waitingText)
+        #expect(
+            replies.isEmpty && plugin.pending?.flag.isCancelled == false
+                && app.shell.quitProgress?.text == QuitProgress.waitingText
+        )
         weak let progress = app.shell.quitProgress
         plugin.finish()
         #expect(await PanelWait.until { !replies.isEmpty })

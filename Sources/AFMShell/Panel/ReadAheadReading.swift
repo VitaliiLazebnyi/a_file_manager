@@ -58,9 +58,10 @@ internal final class ReadAheadReading: @unchecked Sendable {
         }
     }
 
-    /// Reading thread: `count` entries have arrived. Returns false when the reading is to
-    /// be given up: it has more entries than `limit` (what will be remembered) and no panel
-    /// waits for it.
+    /// Reading thread: `count` entries have arrived.
+    ///
+    /// Returns false when the reading is to be given up: it has more entries than `limit` (what
+    /// will be remembered) and no panel waits for it.
     internal func progress(_ count: Int, limit: Int) -> Bool {
         lock.withLock {
             lastProgress = ProcessInfo.processInfo.systemUptime
@@ -71,8 +72,10 @@ internal final class ReadAheadReading: @unchecked Sendable {
         }
     }
 
-    /// Main thread: a panel takes the reading over. False when it was given up meanwhile.
-    /// Somebody waits for it now, so it goes on at the user's priority.
+    /// Main thread: a panel takes the reading over.
+    ///
+    /// False when it was given up meanwhile. Somebody waits for it now, so it goes on at the user's
+    /// priority.
     internal func join() -> Bool {
         lock.withLock {
             guard !givenUp else {
@@ -94,7 +97,9 @@ internal final class ReadAheadReading: @unchecked Sendable {
         lock.withLock { ProcessInfo.processInfo.systemUptime - lastProgress > time }
     }
 
-    /// Raises the reading thread to the user's priority. Called with the lock held.
+    /// Raises the reading thread to the user's priority.
+    ///
+    /// Called with the lock held.
     private func raise() {
         if boost == nil, let thread {
             boost = pthread_override_qos_class_start_np(thread, QOS_CLASS_USER_INITIATED, 0)

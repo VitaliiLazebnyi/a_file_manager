@@ -2,8 +2,9 @@ import CoreGraphics
 import Foundation
 
 /// Where the cells of the Brief and Thumbnails views are (spec 03 › Brief, 03 › Thumbnails).
-/// Cells are numbered like the rows of the panel model. Pure arithmetic: every cell has the
-/// same size, so nothing here depends on how many entries the folder has.
+///
+/// Cells are numbered like the rows of the panel model. Pure arithmetic: every cell has the same
+/// size, so nothing here depends on how many entries the folder has.
 internal struct GridGeometry: Equatable {
     /// The order the cells are laid out in.
     internal enum Flow: Equatable {
@@ -117,8 +118,10 @@ internal struct GridGeometry: Equatable {
         return min(first * perLine, count)..<min(last * perLine, count)
     }
 
-    /// Where an arrow key takes the cursor. In Brief, ← and → jump a column and stop at the
-    /// first and the last entry (spec 03 › Brief); in Thumbnails, ↑ and ↓ jump a row.
+    /// Where an arrow key takes the cursor.
+    ///
+    /// In Brief, ← and → jump a column and stop at the first and the last entry (spec 03 › Brief);
+    /// in Thumbnails, ↑ and ↓ jump a row.
     internal func index(from index: Int, moving direction: Direction) -> Int {
         guard count > 0 else {
             return 0

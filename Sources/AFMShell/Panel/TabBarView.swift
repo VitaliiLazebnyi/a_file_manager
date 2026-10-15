@@ -1,9 +1,10 @@
 import AppKit
 
-/// The folder-tab strip above the path bar. Hidden while the panel has a single tab
-/// (spec 03 › Tab header appearance). A click shows a tab, a double or middle click closes
-/// it, a right click opens its menu, and a tab can be dragged to another place in the strip
-/// (spec 03 › Renaming and rearranging).
+/// The folder-tab strip above the path bar.
+///
+/// Hidden while the panel has a single tab (spec 03 › Tab header appearance). A click shows a tab,
+/// a double or middle click closes it, a right click opens its menu, and a tab can be dragged to
+/// another place in the strip (spec 03 › Renaming and rearranging).
 internal final class TabBarView: NSView {
     /// A tab was clicked, by its position.
     internal var onSelect: ((Int) -> Void)?
@@ -91,15 +92,19 @@ internal final class TabBarView: NSView {
             }
             return
         }
-        stack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        for view in stack.arrangedSubviews {
+            view.removeFromSuperview()
+        }
         for (index, title) in titles.enumerated() {
             stack.addArrangedSubview(makeTab(title, path: paths[index], index: index, isActive: index == active))
         }
     }
 
     /// Follows the mouse while the tab at `index` is pressed (it went down at `start` in the
-    /// window): a press that moves is a drag, which shows where the tab would land. Returns
-    /// true when the button was released; the tab is then shown, or moved where it was dragged.
+    /// window): a press that moves is a drag, which shows where the tab would land.
+    ///
+    /// Returns true when the button was released; the tab is then shown, or moved where it was
+    /// dragged.
     internal func follow(_ event: NSEvent, pressing index: Int, from start: CGFloat, dragging: inout Bool) -> Bool {
         let position = convert(event.locationInWindow, from: nil).x
         if event.type == .leftMouseUp {

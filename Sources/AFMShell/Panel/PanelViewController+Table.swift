@@ -51,7 +51,9 @@ extension PanelViewController {
         }
         let cell: NSTableCellView
         if let column = FileListColumn(rawValue: tableColumn.identifier.rawValue) {
-            cell = tableView.makeView(withIdentifier: column.identifier, owner: nil) as? NSTableCellView ?? column.makeCell()
+            cell =
+                tableView.makeView(withIdentifier: column.identifier, owner: nil) as? NSTableCellView
+                ?? column.makeCell()
         } else if contentColumn(of: tableColumn) != nil {
             cell =
                 tableView.makeView(withIdentifier: FileListColumn.extraCellIdentifier, owner: nil) as? NSTableCellView
@@ -92,11 +94,17 @@ extension PanelViewController {
     /// How the row `row` is drawn.
     private func look(ofRow row: Int, ownIcons: Bool) -> RowLook {
         let item = model.item(atRow: row)
-        return RowLook(item: item, color: rowNameColor(for: item, selected: model.isSelected(row: row)), ownIcons: ownIcons)
+        return RowLook(
+            item: item,
+            color: rowNameColor(for: item, selected: model.isSelected(row: row)),
+            ownIcons: ownIcons
+        )
     }
 
-    /// Makes a cell show its row; used for a cell that is new or used again and for one that
-    /// stays where it is (`refreshRows`). Nothing is set that is already so.
+    /// Makes a cell show its row; used for a cell that is new or used again and for one that stays
+    /// where it is (`refreshRows`).
+    ///
+    /// Nothing is set that is already so.
     private func fill(_ cell: NSTableCellView, of tableColumn: NSTableColumn, row: Int, look: RowLook) {
         if let column = FileListColumn(rawValue: tableColumn.identifier.rawValue) {
             column.fill(cell, with: look)

@@ -177,17 +177,19 @@ internal final class PanelViewController: NSViewController, PanelHandle, PanelOv
     /// One running read per tab; starting another cancels the one before.
     internal var loads: [ObjectIdentifier: PanelLoad] = [:]
     /// What a tab showed before a slow reading entered another folder, empty (`PanelModel.open`),
-    /// for as long as that reading has delivered nothing. It belongs to the tab, not to a reading:
-    /// a reading that overtakes the one that opened the folder still goes back to this if it
-    /// fails, instead of to the empty folder.
+    /// for as long as that reading has delivered nothing.
+    ///
+    /// It belongs to the tab, not to a reading: a reading that overtakes the one that opened the
+    /// folder still goes back to this if it fails, instead of to the empty folder.
     internal var openedFrom: [ObjectIdentifier: PanelModel.Snapshot] = [:]
     /// The quick filter the tab had when that snapshot was taken: it comes back with it.
     internal var openedFromFilter: [ObjectIdentifier: QuickFilter] = [:]
-    /// Tabs whose folder changed while a reading or a rename was under way, or too soon after
-    /// the last reading: read once more when that is over, so the change is not lost. The
-    /// value is the folders (`URL.locationKey`) the change may have been in: the one the tab
-    /// showed and the one it was on its way to. A tab that ends up in neither has nothing to
-    /// make up for.
+    /// Tabs whose folder changed while a reading or a rename was under way, or too soon after the
+    /// last reading: read once more when that is over, so the change is not lost.
+    ///
+    /// The value is the folders (`URL.locationKey`) the change may have been in: the one the tab
+    /// showed and the one it was on its way to. A tab that ends up in neither has nothing to make
+    /// up for.
     internal var dirty: [ObjectIdentifier: Set<String>] = [:]
     /// Who waits for a reload that was put off, per tab; told when the reading that makes up
     /// for it has ended.
@@ -248,7 +250,9 @@ internal final class PanelViewController: NSViewController, PanelHandle, PanelOv
     /// for the grabbed row and the drag beginning.
     internal var pendingDragItems: [NSPasteboardItem] = []
 
-    /// A panel showing `tabs`, working with `kernel`. Its view is made when it is first shown.
+    /// A panel showing `tabs`, working with `kernel`.
+    ///
+    /// Its view is made when it is first shown.
     internal init(tabs: PanelTabs, kernel: Kernel) {
         self.tabs = tabs
         self.kernel = kernel

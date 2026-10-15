@@ -49,8 +49,10 @@ internal struct PanelEditingTests {
         #expect(!app.left.isRenaming && app.left.renamingRow == nil && !app.names(app.left).contains("one.txt"))
     }
 
-    /// Enter in the editor renames through the Rename command; Esc and a click elsewhere take
-    /// it away; other keys are the box's own. A quiet reload while it is open waits for it.
+    /// Enter in the editor renames through the Rename command; Esc and a click elsewhere take it
+    /// away; other keys are the box's own.
+    ///
+    /// A quiet reload while it is open waits for it.
     @Test
     internal func theEditorRenamesOnEnterAndGoesOnEsc() async throws {
         let app = await program.start()
@@ -61,8 +63,16 @@ internal struct PanelEditingTests {
         app.left.reload(focus: nil, quietly: true, completion: nil)
         #expect(app.left.hasPendingReread)
         #expect(!app.left.control(field, textView: NSTextView(), doCommandBy: #selector(NSResponder.moveLeft(_:))))
-        #expect(!app.left.control(NSTextField(), textView: NSTextView(), doCommandBy: #selector(NSResponder.insertNewline(_:))))
-        #expect(app.left.control(field, textView: NSTextView(), doCommandBy: #selector(NSResponder.cancelOperation(_:))))
+        #expect(
+            !app.left.control(
+                NSTextField(),
+                textView: NSTextView(),
+                doCommandBy: #selector(NSResponder.insertNewline(_:))
+            )
+        )
+        #expect(
+            app.left.control(field, textView: NSTextView(), doCommandBy: #selector(NSResponder.cancelOperation(_:)))
+        )
         #expect(!app.left.isRenaming)
         await program.rest(app)
         app.left.beginRename()
@@ -99,7 +109,10 @@ internal struct PanelEditingTests {
             )
         )
         #expect(app.left.isRenameClick(row: row, event: click, wasFocused: true))
-        #expect(!app.left.isRenameClick(row: row, event: click, wasFocused: false) && !app.left.isRenameClick(row: 0, event: click, wasFocused: true))
+        #expect(
+            !app.left.isRenameClick(row: row, event: click, wasFocused: false)
+                && !app.left.isRenameClick(row: 0, event: click, wasFocused: true)
+        )
         app.left.scheduleRename(row: row, after: 0.01)
         #expect(await PanelWait.until { app.left.isRenaming })
         app.left.controlTextDidEndEditing(Notification(name: NSControl.textDidEndEditingNotification))

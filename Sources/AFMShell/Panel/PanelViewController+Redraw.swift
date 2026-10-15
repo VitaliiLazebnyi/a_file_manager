@@ -5,9 +5,10 @@ import AppKit
 /// Drawing the panel from the active tab: the list, the bars around it and the status line
 /// (spec 03 › Status line).
 extension PanelViewController {
-    /// `5 k / 8 k in 4 / 14 file(s), 0 / 2 dir(s)` (spec 03 › Status line). While a directory
-    /// is still arriving, the line says so and counts what has come (`itemsSoFar`); while a
-    /// remembered listing is read afresh, it says that (`refreshing`).
+    /// `5 k / 8 k in 4 / 14 file(s), 0 / 2 dir(s)` (spec 03 › Status line).
+    ///
+    /// While a directory is still arriving, the line says so and counts what has come
+    /// (`itemsSoFar`); while a remembered listing is read afresh, it says that (`refreshing`).
     internal static func statusText(_ totals: PanelModel.Totals, itemsSoFar: Int?, refreshing: Bool) -> String {
         var text =
             "\(Format.kilobytes(totals.selectedBytes)) / \(Format.kilobytes(totals.totalBytes)) in "

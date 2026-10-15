@@ -1,13 +1,14 @@
 import AFMKernel
 import Foundation
 
-/// Show old, refresh behind: a visit of a location the listing cache remembers. The tab shows
-/// that listing at once, in place of an empty "Reading…", and the location is read afresh in
-/// the background. The fresh listing is applied with `PanelModel.update(with:)`, which keeps
-/// cursor, selection and calculated folder sizes and changes the list only where it differs.
+/// Show old, refresh behind: a visit of a location the listing cache remembers.
+///
+/// The tab shows that listing at once, in place of an empty "Reading…", and the location is read
+/// afresh in the background. The fresh listing is applied with `PanelModel.update(with:)`, which
+/// keeps cursor, selection and calculated folder sizes and changes the list only where it differs.
 /// Until then the list can be used, but the model is not complete, so commands that mean
-/// "everything" wait. If the fresh reading fails, the tab goes back to where it came from, as
-/// after any failed reading, and the remembered listing is dropped.
+/// "everything" wait. If the fresh reading fails, the tab goes back to where it came from, as after
+/// any failed reading, and the remembered listing is dropped.
 ///
 /// Main thread only. The visit holds the panel weakly.
 @MainActor
@@ -131,7 +132,9 @@ internal final class PanelRememberedVisit {
             of: tab,
             count: listing.items.count,
             while: { [weak self] in self.map { $0.isCurrent && !$0.hasEnded && !$0.freshHasCome } ?? false },
-            by: { PanelModel.prepare($0, showRemembered: listing, focus: focus, history: history, presorted: entry.order) }
+            by: {
+                PanelModel.prepare($0, showRemembered: listing, focus: focus, history: history, presorted: entry.order)
+            }
         )
         panel.apply(change) { [self] outcome in
             isBeingShown = false
@@ -141,8 +144,10 @@ internal final class PanelRememberedVisit {
         }
     }
 
-    /// The remembered listing is in the list: the panel is in the folder now. (Watching it is
-    /// set up in the background, so a share that does not answer holds nothing up here.)
+    /// The remembered listing is in the list: the panel is in the folder now.
+    ///
+    /// (Watching it is set up in the background, so a share that does not answer holds nothing up
+    /// here.)
     private func shown() {
         isShown = true
         // An item that is not in the remembered listing may be in the fresh one.
@@ -240,7 +245,9 @@ internal final class PanelRememberedVisit {
                 of: tab,
                 bringing: whole.listing.items,
                 while: { [weak self] in self?.isCurrent ?? false },
-                by: { PanelModel.prepare($0, show: whole.listing, focus: focus, history: history, presorted: whole.order) }
+                by: {
+                    PanelModel.prepare($0, show: whole.listing, focus: focus, history: history, presorted: whole.order)
+                }
             )
             panel.apply(change) { [self] outcome in
                 if outcome != nil {

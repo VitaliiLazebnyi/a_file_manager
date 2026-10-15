@@ -19,9 +19,11 @@ extension PanelViewController {
         return title.isEmpty ? "*.*" : title
     }
 
-    /// Writes the path with the display mask into the bar, with every folder on the way as a
-    /// part that can be clicked. The folders above come from the file system's arithmetic on
-    /// the location, which reads nothing.
+    /// Writes the path with the display mask into the bar, with every folder on the way as a part
+    /// that can be clicked.
+    ///
+    /// The folders above come from the file system's arithmetic on the location, which reads
+    /// nothing.
     internal func updatePathBar() {
         let directory = model.directory
         let path = kernel.fileSystems.displayPath(directory)
@@ -67,8 +69,10 @@ extension PanelViewController {
         pasteboard.setString(kernel.fileSystems.displayPath(model.directory), forType: .string)
     }
 
-    /// The menu of a tab. The commands act on the active tab of the source panel, so the tab
-    /// that was clicked is shown first. Nothing while a job runs.
+    /// The menu of a tab.
+    ///
+    /// The commands act on the active tab of the source panel, so the tab that was clicked is shown
+    /// first. Nothing while a job runs.
     internal func tabMenu(forTab index: Int) -> NSMenu? {
         guard !commands.isBlocked() else {
             return nil

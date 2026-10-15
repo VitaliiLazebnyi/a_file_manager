@@ -48,9 +48,10 @@ internal final class PanelLoading: Sendable {
         internal let order: ListOrder
     }
 
-    /// The order the list should come in, which the panel may change while the reading is under
-    /// way (the user sorts a listing that is still arriving). Safe to use from any thread: the
-    /// order is guarded by `lock`.
+    /// The order the list should come in, which the panel may change while the reading is under way
+    /// (the user sorts a listing that is still arriving).
+    ///
+    /// Safe to use from any thread: the order is guarded by `lock`.
     internal final class OrderBox: @unchecked Sendable {
         private let lock = NSLock()
         private var order: ListOrder
@@ -71,11 +72,14 @@ internal final class PanelLoading: Sendable {
         }
     }
 
-    /// How long a read may take before the panel shows something: the first entries if there
-    /// are any by then, otherwise the opened but still empty folder. Short enough to feel
-    /// immediate, long enough that an ordinary folder appears whole, without a flash of emptiness.
+    /// How long a read may take before the panel shows something: the first entries if there are
+    /// any by then, otherwise the opened but still empty folder.
+    ///
+    /// Short enough to feel immediate, long enough that an ordinary folder appears whole, without a
+    /// flash of emptiness.
     internal static let firstPieceDelay: TimeInterval = 0.1
     /// How long a read may deliver nothing at all before the panel enters the folder empty.
+    ///
     /// Longer than `firstPieceDelay`, so a folder that takes a little over that shows its first
     /// entries and not an empty list for a blink before them.
     internal static let emptyOpenDelay: TimeInterval = 0.25
@@ -98,11 +102,13 @@ internal final class PanelLoading: Sendable {
         self.cancellation = cancellation
     }
 
-    /// Reads a location completely, sorts it (on all cores when it is large) and hands it to
-    /// the cache. Blocks for as long as the file system needs: **for a background thread**.
-    /// With `climbing`, a folder that is gone is replaced by its nearest parent that can be read.
-    /// Returns nil when `cancellation` was set before the end; nothing is remembered then,
-    /// because a reading that was stopped may be incomplete.
+    /// Reads a location completely, sorts it (on all cores when it is large) and hands it to the
+    /// cache.
+    ///
+    /// Blocks for as long as the file system needs: **for a background thread**. With `climbing`, a
+    /// folder that is gone is replaced by its nearest parent that can be read. Returns nil when
+    /// `cancellation` was set before the end; nothing is remembered then, because a reading that
+    /// was stopped may be incomplete.
     ///
     /// `progress` is called on the reading thread with the number of entries so far, each
     /// time more have arrived; returning false stops the reading as `cancellation` does.
@@ -153,13 +159,15 @@ internal final class PanelLoading: Sendable {
         return Whole(listing: listing, focus: header.focus, order: order)
     }
 
-    /// Both callbacks are called on the main thread, from the run loop (`MainLoop`): `onPiece`
-    /// for each piece in order (not after cancellation), then `onEnd` once, with the error if
-    /// the read failed. The reading runs in the lane of its location (`Background`: one of the
-    /// kernel's threads for calls that block, never a dispatch queue's), behind any reading of
-    /// the same location that has not come back yet; a reading that is overtaken returns at
-    /// once, whatever its file system is doing (`PanelLoader.stream`). The callbacks, which hold
-    /// the panel, stay with the main thread and are let go of there.
+    /// Both callbacks are called on the main thread, from the run loop (`MainLoop`): `onPiece` for
+    /// each piece in order (not after cancellation), then `onEnd` once, with the error if the read
+    /// failed.
+    ///
+    /// The reading runs in the lane of its location (`Background`: one of the kernel's threads for
+    /// calls that block, never a dispatch queue's), behind any reading of the same location that
+    /// has not come back yet; a reading that is overtaken returns at once, whatever its file system
+    /// is doing (`PanelLoader.stream`). The callbacks, which hold the panel, stay with the main
+    /// thread and are let go of there.
     internal func start(onPiece: @escaping (Piece) -> Void, onEnd: @escaping (any Error?) -> Void) {
         let (source, order, cancellation) = (source, order, cancellation)
         let receivers = MainOwned(PanelPieceStream.Receivers(onPiece: onPiece, onEnd: onEnd))

@@ -20,7 +20,10 @@ internal struct PanelLongListTests {
 
     /// Files called `f000000.txt`, `f000001.dat` and on, in `folder` of `script`.
     private func files(_ count: Int, in folder: String, of script: ScriptedFileSystem) -> [FileItem] {
-        (0..<count).map { script.item(named: String(format: "f%06d.%@", $0, $0.isMultiple(of: 2) ? "txt" : "dat"), in: folder) }
+        (0..<count)
+            .map {
+                script.item(named: String(format: "f%06d.%@", $0, $0.isMultiple(of: 2) ? "txt" : "dat"), in: folder)
+            }
     }
 
     /// A folder of `count` files on a scripted file system, already listed in the left panel.
@@ -29,7 +32,9 @@ internal struct PanelLongListTests {
         script.batches = [files(count, in: "/long", of: script)]
         let app = await program.start(plugins: program.standardPlugins, fileSystems: [script])
         app.left.show(script.url("/long"))
-        await PanelWait.until { app.left.model.directory.path == "/long" && app.left.model.isComplete && !app.left.isLoading }
+        await PanelWait.until {
+            app.left.model.directory.path == "/long" && app.left.model.isComplete && !app.left.isLoading
+        }
         return app
     }
 
@@ -43,7 +48,9 @@ internal struct PanelLongListTests {
         let model = app.left.model
         #expect(model.items.count == count && model.isComplete && !model.isOpening && !app.left.isLoading)
         #expect(model.totals.totalFiles == count && app.left.statusLineText.contains("\(count) file(s)"))
-        #expect(model.items.first?.name == "f000000.txt" && model.items.last?.name == String(format: "f%06d.dat", count - 1))
+        #expect(
+            model.items.first?.name == "f000000.txt" && model.items.last?.name == String(format: "f%06d.dat", count - 1)
+        )
     }
 
     /// Filtering a long list, and reading it again, never asks the filter on the main thread; the
@@ -154,12 +161,18 @@ internal struct PanelLongListTests {
         let script = ScriptedFileSystem()
         script.inner.addDirectory("/long")
         let count = PanelViewController.backgroundSortThreshold + 100
-        script.batches = [[script.item(named: "sub", in: "/long", isDirectory: true)] + files(count, in: "/long", of: script)]
-        script.batchesAt = ["/long/sub": [[FileItem(url: script.url("/long/sub/in.bin"), name: "in.bin", stat: .init(size: 7))]]]
+        script.batches = [
+            [script.item(named: "sub", in: "/long", isDirectory: true)] + files(count, in: "/long", of: script)
+        ]
+        script.batchesAt = [
+            "/long/sub": [[FileItem(url: script.url("/long/sub/in.bin"), name: "in.bin", stat: .init(size: 7))]]
+        ]
         let app = await program.start(plugins: program.standardPlugins, fileSystems: [script])
         defer { app.stop() }
         app.left.show(script.url("/long"))
-        await PanelWait.until { app.left.model.isComplete && !app.left.isLoading && app.left.model.directory.path == "/long" }
+        await PanelWait.until {
+            app.left.model.isComplete && !app.left.isLoading && app.left.model.directory.path == "/long"
+        }
         let model = app.left.model
         app.cursor(app.left, on: "sub")
         #expect(model.cursorItem?.name == "sub" && model.items.count == count + 1)
@@ -193,7 +206,10 @@ internal struct PanelLongListTests {
         #expect(await PanelWait.until { payload.isReady && session.places != nil })
         #expect(session.sources.count == count - 1 && session.sources.first?.lastPathComponent == "f000000.txt")
         #expect(!session.sources.contains { $0.lastPathComponent == "f000001.dat" })
-        #expect(session.isPointless(.move, into: script.url("/long")) && !session.isPointless(.copy, into: script.url("/elsewhere")))
+        #expect(
+            session.isPointless(.move, into: script.url("/long"))
+                && !session.isPointless(.copy, into: script.url("/elsewhere"))
+        )
         model.clearSelection()
         model.setSelected(true, rows: 1...3)
         let few = app.left.dragPayload(fromRow: 2)

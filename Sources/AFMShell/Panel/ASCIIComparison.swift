@@ -1,6 +1,7 @@
-/// What comparing typed text with a name byte by byte found out. Typed text and most names are
-/// plain ASCII, and those are compared that way, several times faster than Foundation does it;
-/// a name with anything else in it is left to Foundation (`unknown`).
+/// What comparing typed text with a name byte by byte found out.
+///
+/// Typed text and most names are plain ASCII, and those are compared that way, several times faster
+/// than Foundation does it; a name with anything else in it is left to Foundation (`unknown`).
 internal enum ASCIIComparison {
     /// The name matches.
     case match

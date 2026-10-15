@@ -1,8 +1,10 @@
 import AFMKernel
 import Foundation
 
-/// One reading of a location for a tab of a panel: its cancellation, the order the list should
-/// come in, and who is waiting for it to end. Main thread only.
+/// One reading of a location for a tab of a panel: its cancellation, the order the list should come
+/// in, and who is waiting for it to end.
+///
+/// Main thread only.
 @MainActor
 internal final class PanelLoad {
     /// Set when the reading is overtaken or abandoned.
@@ -28,7 +30,9 @@ internal final class PanelLoad {
         self.completion = completion
     }
 
-    /// The reading ended; `succeeded` is false for a failure. Whoever waits is told once.
+    /// The reading ended; `succeeded` is false for a failure.
+    ///
+    /// Whoever waits is told once.
     internal func complete(_ succeeded: Bool) {
         let waiting = completion
         completion = nil

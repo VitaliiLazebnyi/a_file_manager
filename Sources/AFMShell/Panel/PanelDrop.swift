@@ -6,20 +6,23 @@ import AppKit
 /// they happen in.
 @MainActor
 internal enum PanelDrop {
-    /// Marks a drag that started in a panel of this program. It carries no location, only
-    /// the ticket of the drag (`PanelDragPayload.token`): what is dragged stays inside the
-    /// program (`current`), where items of any file system can be named and nobody else can put
-    /// anything. A pasteboard of another program that offers this type is not believed.
+    /// Marks a drag that started in a panel of this program.
+    ///
+    /// It carries no location, only the ticket of the drag (`PanelDragPayload.token`): what is
+    /// dragged stays inside the program (`current`), where items of any file system can be named
+    /// and nobody else can put anything. A pasteboard of another program that offers this type is
+    /// not believed.
     internal static let itemType = NSPasteboard.PasteboardType("afm.panel-item")
     /// The paths of files as a list, the way programs took files before there were file URLs;
     /// the one form in which a single pasteboard item can name many files.
     internal nonisolated static let fileNamesType = NSPasteboard.PasteboardType("NSFilenamesPboardType")
     /// What the lists take when something is dropped on them.
     internal static let acceptedTypes: [NSPasteboard.PasteboardType] = [itemType, .fileURL]
-    /// Up to this many dragged items each get a pasteboard item of their own, which is what
-    /// other programs expect of a drag of several files. A larger drag (making a hundred
-    /// thousand pasteboard items takes a third of a second and more) travels as one item that
-    /// hands out its files only when a program asks for them.
+    /// Up to this many dragged items each get a pasteboard item of their own, which is what other
+    /// programs expect of a drag of several files.
+    ///
+    /// A larger drag (making a hundred thousand pasteboard items takes a third of a second and
+    /// more) travels as one item that hands out its files only when a program asks for them.
     internal nonisolated static let itemsWrittenSingly = 2_000
 
     /// The drag of this program that is under way, from its start to its end.
@@ -27,10 +30,11 @@ internal enum PanelDrop {
     /// What a drag over a panel carries, read once per drag and shared by both panels.
     internal private(set) static var session: DropSession?
 
-    /// A drag of what `payload` carries starts: what goes on the pasteboard for it. The first
-    /// item carries the ticket. Items of the local disks are also there for other programs:
-    /// each as a file URL of its own while they are few, otherwise all through the first item,
-    /// on demand (and, once the items are on the drag's pasteboard, as a list:
+    /// A drag of what `payload` carries starts: what goes on the pasteboard for it.
+    ///
+    /// The first item carries the ticket. Items of the local disks are also there for other
+    /// programs: each as a file URL of its own while they are few, otherwise all through the first
+    /// item, on demand (and, once the items are on the drag's pasteboard, as a list:
     /// `offerFileNames`). Nothing for an empty drag.
     internal static func beginDrag(_ payload: PanelDragPayload) -> [NSPasteboardItem] {
         guard payload.count > 0 else {
@@ -60,9 +64,10 @@ internal enum PanelDrop {
         return written
     }
 
-    /// For a drag of very many items, whose pasteboard holds one item only: offers the files
-    /// as a list of paths as well, made when a program asks for it. Called when the items of
-    /// `beginDrag` are on the drag's pasteboard.
+    /// For a drag of very many items, whose pasteboard holds one item only: offers the files as a
+    /// list of paths as well, made when a program asks for it.
+    ///
+    /// Called when the items of `beginDrag` are on the drag's pasteboard.
     internal static func offerFileNames(on pasteboard: NSPasteboard) {
         guard let current, current.isWrittenLazily else {
             return
@@ -75,10 +80,12 @@ internal enum PanelDrop {
         current = nil
     }
 
-    /// The items a drag carries: those of a panel of this program, or files from Finder and
-    /// other programs. The panel's own type is taken only from the program's own drag: its
-    /// ticket has to be the one of the drag under way. Anything else is read for local files
-    /// only, so no other program can make a panel name a server or an archive as a source.
+    /// The items a drag carries: those of a panel of this program, or files from Finder and other
+    /// programs.
+    ///
+    /// The panel's own type is taken only from the program's own drag: its ticket has to be the one
+    /// of the drag under way. Anything else is read for local files only, so no other program can
+    /// make a panel name a server or an archive as a source.
     internal static func locations(on pasteboard: NSPasteboard) -> [URL] {
         if let own = ownPayload(on: pasteboard) {
             return own.locations
@@ -99,7 +106,10 @@ internal enum PanelDrop {
             // The program's own drag may still be putting its items together.
             session = DropSession(sequence: info.draggingSequenceNumber, payload: own)
         } else {
-            session = DropSession(sequence: info.draggingSequenceNumber, sources: locations(on: info.draggingPasteboard))
+            session = DropSession(
+                sequence: info.draggingSequenceNumber,
+                sources: locations(on: info.draggingPasteboard)
+            )
         }
         self.session = session
         return session
@@ -113,16 +123,20 @@ internal enum PanelDrop {
         }
     }
 
-    /// A drag left a list. What was read of another program's drag is not kept while it is
-    /// elsewhere; the program's own drag stays known until it ends.
+    /// A drag left a list.
+    ///
+    /// What was read of another program's drag is not kept while it is elsewhere; the program's own
+    /// drag stays known until it ends.
     internal static func dragLeft(_ info: (any NSDraggingInfo)?) {
         if current == nil {
             endSession(info?.draggingSequenceNumber)
         }
     }
 
-    /// What a drop does: a copy between volumes and a move inside one, as in Finder; Option
-    /// asks for a copy and Cmd for a move. Nothing when the source of the drag does not allow it.
+    /// What a drop does: a copy between volumes and a move inside one, as in Finder; Option asks
+    /// for a copy and Cmd for a move.
+    ///
+    /// Nothing when the source of the drag does not allow it.
     internal static func kind(modifiers: NSEvent.ModifierFlags, sameVolume: Bool, allowed: NSDragOperation)
         -> TransferKind?
     {
@@ -140,9 +154,10 @@ internal enum PanelDrop {
         return canCopy ? .copy : (canMove ? .move : nil)
     }
 
-    /// Where the volumes of the local file system are mounted. The system answers this from
-    /// what it has in memory, without asking any disk or server, so it may be called on the
-    /// main thread.
+    /// Where the volumes of the local file system are mounted.
+    ///
+    /// The system answers this from what it has in memory, without asking any disk or server, so it
+    /// may be called on the main thread.
     internal static func mountPoints() -> [String] {
         Mounts.volumes().map(\.path)
     }
@@ -152,8 +167,9 @@ internal enum PanelDrop {
         mountPoints.filter { $0 == "/" || path == $0 || path.hasPrefix($0 + "/") }.max { $0.count < $1.count } ?? "/"
     }
 
-    /// Whether two locations are on the same volume, judged by their writing alone. Two places
-    /// of another file system count as one volume when they are on the same server.
+    /// Whether two locations are on the same volume, judged by their writing alone.
+    ///
+    /// Two places of another file system count as one volume when they are on the same server.
     internal static func areOnSameVolume(_ first: URL, _ second: URL, mountPoints: [String]) -> Bool {
         guard first.isFileURL, second.isFileURL else {
             return (first.scheme, first.host, first.port) == (second.scheme, second.host, second.port)

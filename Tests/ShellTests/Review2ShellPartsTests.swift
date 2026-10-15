@@ -127,13 +127,23 @@ internal struct Review2ShellPartsTests {
             asked += 1
             return true
         }
-        kernel.commands.register(Command("test_Bound", "Bound", [.f(9), .cmd("j")]), enabled: enabled, checked: { false }) {
-            // Runs through the menu entry.
-        }
-        for index in 0..<40 {
-            kernel.commands.register(Command(CommandID(rawValue: "test_Other\(index)"), "Other \(index)"), enabled: enabled, checked: { false }) {
+        kernel.commands.register(
+            Command("test_Bound", "Bound", [.f(9), .cmd("j")]),
+            enabled: enabled,
+            checked: { false },
+            {
                 // Runs through the menu entry.
             }
+        )
+        for index in 0..<40 {
+            kernel.commands.register(
+                Command(CommandID(rawValue: "test_Other\(index)"), "Other \(index)"),
+                enabled: enabled,
+                checked: { false },
+                {
+                    // Runs through the menu entry.
+                }
+            )
         }
         let target = MenuTarget()
         let (menu, inner, bar) = (NSMenu(title: "Commands"), NSMenu(title: "More"), NSMenu())
@@ -145,23 +155,37 @@ internal struct Review2ShellPartsTests {
         let undo = NSMenuItem(title: "Undo", action: #selector(MenuTarget.run(_:)), keyEquivalent: "z")
         undo.target = target
         menu.addItem(undo)
-        for (holder, submenu) in [(NSMenuItem(title: "More", action: nil, keyEquivalent: ""), inner), (NSMenuItem(title: "Commands", action: nil, keyEquivalent: ""), menu)] {
+        for (holder, submenu) in [
+            (NSMenuItem(title: "More", action: nil, keyEquivalent: ""), inner),
+            (NSMenuItem(title: "Commands", action: nil, keyEquivalent: ""), menu)
+        ] {
             holder.submenu = submenu
             (submenu === inner ? menu : bar).addItem(holder)
         }
         let keys = MenuKeys(kernel: kernel)
         keys.answer(for: menu)
         let nine = String(try #require(UnicodeScalar(NSF9FunctionKey)))
-        #expect(!bar.performKeyEquivalent(with: PanelProgram.key(0, "a", [])) && !bar.performKeyEquivalent(with: PanelProgram.key(40, "k", .command)))
+        #expect(
+            !bar.performKeyEquivalent(with: PanelProgram.key(0, "a", []))
+                && !bar.performKeyEquivalent(with: PanelProgram.key(40, "k", .command))
+        )
         #expect(keys.lookups > 0 && target.validated == 0 && asked == 0 && target.senders.isEmpty)
         #expect(bar.performKeyEquivalent(with: PanelProgram.key(101, nine, [])))
-        #expect(target.senders.map(\.title) == ["Bound"] && target.validated == 1 && keys.validations == 1 && asked == 0)
-        #expect(bar.performKeyEquivalent(with: PanelProgram.key(6, "z", .command)) && bar.performKeyEquivalent(with: PanelProgram.key(6, "я", .command)))
+        #expect(
+            target.senders.map(\.title) == ["Bound"] && target.validated == 1 && keys.validations == 1 && asked == 0
+        )
+        #expect(
+            bar.performKeyEquivalent(with: PanelProgram.key(6, "z", .command))
+                && bar.performKeyEquivalent(with: PanelProgram.key(6, "я", .command))
+        )
         #expect(target.senders.map(\.title) == ["Bound", "Undo", "Undo"])
         #expect(!bar.performKeyEquivalent(with: PanelProgram.key(38, "j", .command)) && target.validated == 3)
         target.isOffered = false
         _ = bar.performKeyEquivalent(with: PanelProgram.key(101, nine, []))
-        #expect(target.senders.count == 3 && target.validated > 3 && target.validated <= 3 + 6 && inner.items.first?.isEnabled == false)
+        #expect(
+            target.senders.count == 3 && target.validated > 3 && target.validated <= 3 + 6
+                && inner.items.first?.isEnabled == false
+        )
         target.isOffered = true
         var before = target.validated
         keys.menuNeedsUpdate(inner)
@@ -174,7 +198,10 @@ internal struct Review2ShellPartsTests {
     /// Names that could mislead are shown with every character visible, one for one (S066).
     @Test
     internal func namesThatCouldMisleadAreShownWithEveryCharacterVisible() {
-        #expect(DisplayText.clean("report.txt") == "report.txt" && DisplayText.clean("Übergrößen – 日本.txt") == "Übergrößen – 日本.txt")
+        #expect(
+            DisplayText.clean("report.txt") == "report.txt"
+                && DisplayText.clean("Übergrößen – 日本.txt") == "Übergrößen – 日本.txt"
+        )
         #expect(DisplayText.clean("invoice\u{202E}fdp.exe") == "invoice\u{FFFD}fdp.exe")
         #expect(DisplayText.clean("two\nlines\ttab\u{7}") == "two\u{240A}lines\u{2409}tab\u{2407}")
         #expect(DisplayText.clean("two\nlines \u{202E}x", keepingLines: true) == "two\nlines \u{FFFD}x")
@@ -195,14 +222,23 @@ internal struct Review2ShellPartsTests {
         #expect(AlertInteraction.defaultButton(for: .critical, of: ["Yes", "No"]) == 1)
         let critical = question(["Yes", "No"], .critical, 1)
         #expect(keys(critical) == ["", "\r"] && critical.alertStyle == .critical)
-        #expect(AlertInteraction.defaultButton(for: .critical, of: ["OK"]) == 0 && AlertInteraction.defaultButton(for: .critical, of: []) == nil)
+        #expect(
+            AlertInteraction.defaultButton(for: .critical, of: ["OK"]) == 0
+                && AlertInteraction.defaultButton(for: .critical, of: []) == nil
+        )
         #expect(keys(question(["Overwrite", "Skip", "Cancel"], .warning, 1)) == ["", "\r", "\u{1b}"])
         let none = question(["Trust", "Cancel"], .critical, nil)
         #expect(keys(none) == ["", "\u{1b}"] && none.window.initialFirstResponder === none.buttons.last)
         let titled = question(["Cancel", "Don't Save", "Save"], .warning, 2)
         #expect(keys(titled) == ["", "", "\r"] && titled.buttons.allSatisfy { $0.keyEquivalentModifierMask.isEmpty })
         #expect(keys(question(["A", "B"], .information, 7)) == ["", "\u{1b}"])
-        let named = interaction.makeQuestion("Delete a\u{202E}txt.exe?", detail: "", buttons: ["Delete\u{0007}", "Keep"], style: .warning, defaultButton: 1)
+        let named = interaction.makeQuestion(
+            "Delete a\u{202E}txt.exe?",
+            detail: "",
+            buttons: ["Delete\u{0007}", "Keep"],
+            style: .warning,
+            defaultButton: 1
+        )
         #expect(named.messageText == "Delete a\u{FFFD}txt.exe?" && named.buttons[0].title == "Delete\u{2407}")
     }
 
@@ -232,7 +268,10 @@ internal struct Review2ShellPartsTests {
         #expect(store.largeData(forKey: "history") == Data("old".utf8))
         store.setLarge(Data("new".utf8), forKey: "history")
         #expect(store.waitForWrites(atMost: 60) && defaults.object(forKey: "history") == nil)
-        for key in ["../../escape", "/etc/passwd", "..", ".", "a/b", ".hidden", "with space", "é", String(repeating: "x", count: 1_000)] {
+        for key in [
+            "../../escape", "/etc/passwd", "..", ".", "a/b", ".hidden", "with space", "é",
+            String(repeating: "x", count: 1_000)
+        ] {
             let named = try #require(store.largeFile(forKey: key))
             #expect(named.deletingLastPathComponent().path == folder.path && !named.lastPathComponent.hasPrefix("."))
             #expect(named.lastPathComponent.utf8.count <= 255 && named.lastPathComponent.hasSuffix(".data"))
@@ -251,12 +290,17 @@ internal struct Review2ShellPartsTests {
         for line in ["ls -l", " export TOKEN=secret", "\tmysql -psecret", "ls -l  "] {
             history.add(line)
         }
-        #expect(history.entries == ["ls -l"] && CommandLineHistory.isPrivate(" x") && !CommandLineHistory.isPrivate("x "))
+        #expect(
+            history.entries == ["ls -l"] && CommandLineHistory.isPrivate(" x") && !CommandLineHistory.isPrivate("x ")
+        )
         #expect(history.isRecording)
         settings.set(false, forKey: CommandLineHistory.recordKey)
         history.add("pwd")
         #expect(history.entries.isEmpty && settings.data(forKey: CommandLineHistory.settingsKey) == nil)
         settings.set(["old line"], forKey: CommandLineHistory.settingsKey)
-        #expect(CommandLineHistory(settings: settings).entries.isEmpty && settings.data(forKey: CommandLineHistory.settingsKey) == nil)
+        #expect(
+            CommandLineHistory(settings: settings).entries.isEmpty
+                && settings.data(forKey: CommandLineHistory.settingsKey) == nil
+        )
     }
 }

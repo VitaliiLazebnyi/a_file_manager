@@ -57,7 +57,13 @@ extension PanelViewController {
                 guard !flag.isCancelled, tab.directory.isSameLocation(as: directory) else {
                     return
                 }
-                self?.sizeArrived(size, forName: item.name, in: tab, arrivals: PanelSizeArrivals(directory: directory, flag: flag, sizes: []))
+                self?
+                    .sizeArrived(
+                        size,
+                        forName: item.name,
+                        in: tab,
+                        arrivals: PanelSizeArrivals(directory: directory, flag: flag, sizes: [])
+                    )
             }
         )
     }
@@ -76,9 +82,10 @@ extension PanelViewController {
         }
     }
 
-    /// Marking with the mouse: Cmd+click toggles an item, Shift+click selects the range from
-    /// the cursor (spec 05 › Mouse selection modes, the Mac's own conventions). Returns false
-    /// for a plain click, which is left to the list.
+    /// Marking with the mouse: Cmd+click toggles an item, Shift+click selects the range from the
+    /// cursor (spec 05 › Mouse selection modes, the Mac's own conventions).
+    ///
+    /// Returns false for a plain click, which is left to the list.
     internal func handleClick(row: Int, modifiers: NSEvent.ModifierFlags) -> Bool {
         // Marking is refused while a job runs, like the other commands that change what a job
         // may be working on; a plain click only moves the cursor, as the keys do.
@@ -104,8 +111,10 @@ extension PanelViewController {
         host?.panelDidBecomeActive(self)
     }
 
-    /// Every key is looked up in the key bindings; a key that is bound to nothing goes on to
-    /// the list. Returns false for such a key.
+    /// Every key is looked up in the key bindings; a key that is bound to nothing goes on to the
+    /// list.
+    ///
+    /// Returns false for such a key.
     ///
     /// Two keys are the list's own. Esc takes a quick filter away (it cannot be bound, and it
     /// means nothing else here). And in the Brief and Thumbnails views ← and →, as long as
@@ -132,15 +141,18 @@ extension PanelViewController {
     }
 
     /// A key pressed in a list: a bound key runs its command (`handleKey`); in the grid an arrow
-    /// key that is bound to nothing moves the cursor (`arrowsMoveCursor`), as it does in the
-    /// table; a key that types something finds a file by the start of its name. Returns false
-    /// for a key that is the list's own business.
+    /// key that is bound to nothing moves the cursor (`arrowsMoveCursor`), as it does in the table;
+    /// a key that types something finds a file by the start of its name.
+    ///
+    /// Returns false for a key that is the list's own business.
     internal func handleListKey(_ event: NSEvent, arrowsMoveCursor: Bool) -> Bool {
         if handleKey(event) {
             return true
         }
         let modifiers = event.modifierFlags.intersection([.command, .control, .option, .shift])
-        let arrows: [UInt16: GridGeometry.Direction] = [123: .leftArrow, 124: .rightArrow, 125: .downArrow, 126: .upArrow]
+        let arrows: [UInt16: GridGeometry.Direction] = [
+            123: .leftArrow, 124: .rightArrow, 125: .downArrow, 126: .upArrow
+        ]
         if arrowsMoveCursor, modifiers.isEmpty, let direction = arrows[event.keyCode] {
             moveCursor(direction)
             return true
@@ -189,8 +201,10 @@ extension PanelViewController {
         return commands.command(with: role).map(commands.isEnabled) ?? false
     }
 
-    /// A folder size came in. Sizes that come in the same turn of the main loop are taken by
-    /// the tab together (`arrivals` says for which folder and calculation).
+    /// A folder size came in.
+    ///
+    /// Sizes that come in the same turn of the main loop are taken by the tab together (`arrivals`
+    /// says for which folder and calculation).
     private func sizeArrived(_ size: Int64, forName name: String, in tab: PanelModel, arrivals: PanelSizeArrivals) {
         let id = ObjectIdentifier(tab)
         if arrivedSizes[id] != nil {

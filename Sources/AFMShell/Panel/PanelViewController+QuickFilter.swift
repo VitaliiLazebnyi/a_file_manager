@@ -12,8 +12,9 @@ extension PanelViewController {
     /// The text of the active tab's quick filter; nil when it has none.
     internal var quickFilterText: String? { quickFilters[ObjectIdentifier(model)]?.text }
 
-    /// Opens the filter field of the active tab and puts the keyboard into it. A filter that
-    /// is already on is shown, ready to be changed.
+    /// Opens the filter field of the active tab and puts the keyboard into it.
+    ///
+    /// A filter that is already on is shown, ready to be changed.
     internal func showQuickFilter() {
         let id = ObjectIdentifier(model)
         if quickFilters[id] == nil {
@@ -68,14 +69,15 @@ extension PanelViewController {
         pendingQuickFilterTyping = nil
     }
 
-    /// Gives `tab` this filter. A long list is filtered in the background, on all cores, from
-    /// the list as it is (`PanelModel.prepare`), and the result taken over when that is done
-    /// (`apply`), if no newer filtering of the tab has started since; a short one at once.
-    /// Should the list have changed meanwhile (more of the folder arrived, it was read again,
-    /// it was put in another order), the model takes nothing and the filtering starts again
-    /// from the list as it is now, again in the background: never a pass over the whole list
-    /// on the main thread. `narrowing`: the filter lets through nothing the one before did not.
-    /// Returns true when it was done at once.
+    /// Gives `tab` this filter.
+    ///
+    /// A long list is filtered in the background, on all cores, from the list as it is
+    /// (`PanelModel.prepare`), and the result taken over when that is done (`apply`), if no newer
+    /// filtering of the tab has started since; a short one at once. Should the list have changed
+    /// meanwhile (more of the folder arrived, it was read again, it was put in another order), the
+    /// model takes nothing and the filtering starts again from the list as it is now, again in the
+    /// background: never a pass over the whole list on the main thread. `narrowing`: the filter
+    /// lets through nothing the one before did not. Returns true when it was done at once.
     @discardableResult
     internal func setFilter(_ filter: PanelFilter?, of tab: PanelModel, narrowing: Bool) -> Bool {
         let id = ObjectIdentifier(tab)
@@ -114,8 +116,9 @@ extension PanelViewController {
         applyQuickFilter(text, to: model)
     }
 
-    /// Enter or an arrow key in the field: back to the list. The filter stays on, and so does
-    /// the field as long as it holds one.
+    /// Enter or an arrow key in the field: back to the list.
+    ///
+    /// The filter stays on, and so does the field as long as it holds one.
     internal func leaveQuickFilterField() {
         flushQuickFilter()
         let id = ObjectIdentifier(model)
@@ -156,9 +159,10 @@ extension PanelViewController {
     }
 
     /// Notices that a tab's quick filter is no longer what its model filters by: the folder was
-    /// changed behind the panel's back, or a display filter was chosen, which replaces it
-    /// (All Files removes a quick filter, spec 03 › Show files of type). Returns true when
-    /// this changed the model, which then reports another change.
+    /// changed behind the panel's back, or a display filter was chosen, which replaces it (All
+    /// Files removes a quick filter, spec 03 › Show files of type).
+    ///
+    /// Returns true when this changed the model, which then reports another change.
     internal func dropStaleQuickFilter(of tab: PanelModel) -> Bool {
         let id = ObjectIdentifier(tab)
         guard let filter = quickFilters[id] else {

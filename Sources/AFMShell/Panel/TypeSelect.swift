@@ -1,8 +1,9 @@
 import AFMKernel
 import Foundation
 
-/// Finds a file by typing the start of its name (spec 03 › Quick search, "Letter only"). What
-/// was typed is forgotten after a pause.
+/// Finds a file by typing the start of its name (spec 03 › Quick search, "Letter only").
+///
+/// What was typed is forgotten after a pause.
 internal struct TypeSelect {
     /// How long a pause makes what was typed before forgotten, in seconds.
     internal static let pause: TimeInterval = 1
@@ -17,10 +18,12 @@ internal struct TypeSelect {
         // Nothing typed yet.
     }
 
-    /// The row to go to: the next entry whose name starts with `prefix`, from the cursor on,
-    /// around the end of the list. A longer prefix may stay on the row it is on; a single
-    /// letter moves on to the next name with that letter. **For any thread**: a long list is
-    /// looked through in the background; gives up, with nil, once `cancellation` is set.
+    /// The row to go to: the next entry whose name starts with `prefix`, from the cursor on, around
+    /// the end of the list.
+    ///
+    /// A longer prefix may stay on the row it is on; a single letter moves on to the next name with
+    /// that letter. **For any thread**: a long list is looked through in the background; gives up,
+    /// with nil, once `cancellation` is set.
     internal static func row(
         matching prefix: String,
         in items: [FileItem],
@@ -51,10 +54,11 @@ internal struct TypeSelect {
         }
     }
 
-    /// Whether a name starts with what was typed, upper and lower case being the same. Typed
-    /// text is mostly plain ASCII, as most names are: those are compared byte by byte, which
-    /// is several times faster than Foundation's comparison (a key looks at every name of the
-    /// list when nothing matches). Anything else is left to Foundation.
+    /// Whether a name starts with what was typed, upper and lower case being the same.
+    ///
+    /// Typed text is mostly plain ASCII, as most names are: those are compared byte by byte, which
+    /// is several times faster than Foundation's comparison (a key looks at every name of the list
+    /// when nothing matches). Anything else is left to Foundation.
     internal static func matcher(for prefix: String) -> (String) -> Bool {
         let needle = Array(prefix.lowercased().utf8)
         let slow: (String) -> Bool = { $0.range(of: prefix, options: [.caseInsensitive, .anchored]) != nil }

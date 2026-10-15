@@ -46,8 +46,10 @@ internal final class PanelPieceStream {
         sorted = SortedFileList(order: order.value)
     }
 
-    /// Reads to the end. A read that failed half-way still delivers what it had; only a
-    /// listing that arrived whole and without an error is remembered.
+    /// Reads to the end.
+    ///
+    /// A read that failed half-way still delivers what it had; only a listing that arrived whole
+    /// and without an error is remembered.
     internal func run() {
         let (started, ticket) = (Date(), source.cache.startReading())
         var failure: (any Error)?
@@ -76,6 +78,7 @@ internal final class PanelPieceStream {
     }
 
     /// A batch has arrived: a piece goes out when the pause since the last one is over.
+    ///
     /// Returns false once the reading is to stop.
     private func receive(_ batch: PanelLoader.Batch) -> Bool {
         if header == nil {

@@ -45,10 +45,11 @@ extension PanelViewController {
         volumeButton.performClick(nil)
     }
 
-    /// The list is filled from the places every file system offers. They are asked for in the
-    /// background (a file system may have to look at its volumes first); the menu shows the
-    /// ones that are known, and takes the others in when they arrive while it is open. The
-    /// header menu is filled here as well.
+    /// The list is filled from the places every file system offers.
+    ///
+    /// They are asked for in the background (a file system may have to look at its volumes first);
+    /// the menu shows the ones that are known, and takes the others in when they arrive while it is
+    /// open. The header menu is filled here as well.
     internal func menuNeedsUpdate(_ menu: NSMenu) {
         if menu === headerMenu {
             fillHeaderMenu()
@@ -115,12 +116,14 @@ extension PanelViewController {
         }
     }
 
-    /// Asks the file system about the volume of a tab's folder, on one of the kernel's threads
-    /// for calls that block (`BlockingCalls`): the same question about the same folder is out
-    /// once, whoever asks (a reading of the folder asks it too), and it is given up when the
-    /// tab is closed or the window goes. While a question is out, no second one is sent for
-    /// the tab: it is asked about again when the answer has come, so the last figures always
-    /// win and a file system that does not answer holds one thread, not one per report.
+    /// Asks the file system about the volume of a tab's folder, on one of the kernel's threads for
+    /// calls that block (`BlockingCalls`): the same question about the same folder is out once,
+    /// whoever asks (a reading of the folder asks it too), and it is given up when the tab is
+    /// closed or the window goes.
+    ///
+    /// While a question is out, no second one is sent for the tab: it is asked about again when the
+    /// answer has come, so the last figures always win and a file system that does not answer holds
+    /// one thread, not one per report.
     private func askVolume(of tab: PanelModel, from provider: any FileSystemProvider) {
         let id = ObjectIdentifier(tab)
         guard volumeAsking[id] == nil else {
@@ -134,7 +137,9 @@ extension PanelViewController {
             to: "volume " + question.directory.locationKey,
             cancellation: question.flag,
             { provider.volume(of: question.directory, cancellation: $0) },
-            then: { [weak self, weak tab] (answer: VolumeInfo??) in self?.answered(question, with: answer ?? nil, for: tab) }
+            then: { [weak self, weak tab] (answer: VolumeInfo??) in
+                self?.answered(question, with: answer ?? nil, for: tab)
+            }
         )
     }
 

@@ -1,9 +1,10 @@
 import AFMKernel
 import AppKit
 
-/// The user's options for the file lists, as the panels use them. Read from the settings when
-/// the panels are made and again after the configuration page changed something; never while
-/// rows are drawn.
+/// The user's options for the file lists, as the panels use them.
+///
+/// Read from the settings when the panels are made and again after the configuration page changed
+/// something; never while rows are drawn.
 internal struct PanelSettings {
     /// Settings key: whether a Brief column is kept to `briefWidthLimitKey` (a Boolean).
     internal static let limitsBriefWidthKey = "panel.limitBriefWidth"

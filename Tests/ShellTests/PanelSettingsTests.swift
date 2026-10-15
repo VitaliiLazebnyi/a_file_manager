@@ -14,12 +14,20 @@ internal struct PanelSettingsTests {
     /// what is switched off with `-` is left out; the first entry that matches decides.
     @Test
     internal func colourEntriesAreReadFromText() {
-        let rules = ColorRule.parse("*.zip *.gz = purple\n-.tmp = red\nnonsense\n*.swift=#FF8000;;*.md = nocolour;;* = gray;; = red")
+        let rules = ColorRule.parse(
+            "*.zip *.gz = purple\n-.tmp = red\nnonsense\n*.swift=#FF8000;;*.md = nocolour;;* = gray;; = red"
+        )
         #expect(rules.count == 3)
         #expect(ColorRule.color(for: "a.GZ", in: rules) == .systemPurple)
-        #expect(ColorRule.color(for: "a.swift", in: rules) == NSColor(srgbRed: 1, green: CGFloat(0x80) / 255, blue: 0, alpha: 1))
+        #expect(
+            ColorRule.color(for: "a.swift", in: rules)
+                == NSColor(srgbRed: 1, green: CGFloat(0x80) / 255, blue: 0, alpha: 1)
+        )
         #expect(ColorRule.color(for: "a.txt", in: rules) == .systemGray)
-        #expect(ColorRule.color(for: "a.txt", in: Array(rules.prefix(2))) == nil && ColorRule.color(for: "a.md", in: []) == nil)
+        #expect(
+            ColorRule.color(for: "a.txt", in: Array(rules.prefix(2))) == nil
+                && ColorRule.color(for: "a.md", in: []) == nil
+        )
         #expect(ColorRule.color(named: "#12345") == nil && ColorRule.color(named: " Red ") == .systemRed)
         #expect(ColorRule.color(named: "#GGGGGG") == nil && ColorRule.color(named: "grey") == .systemGray)
         #expect(ColorRule.parse(PanelSettings.defaultColorRules).count == 2)

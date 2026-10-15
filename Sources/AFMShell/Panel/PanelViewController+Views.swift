@@ -14,7 +14,9 @@ extension PanelViewController {
     /// The list that is on screen; it has the keyboard when the panel is the source.
     internal var listView: NSView { showsGrid ? gridView : tableView }
 
-    /// Puts the list of the current view on screen. The keyboard goes with it.
+    /// Puts the list of the current view on screen.
+    ///
+    /// The keyboard goes with it.
     internal func applyViewMode() {
         guard isViewLoaded else {
             return
@@ -32,10 +34,11 @@ extension PanelViewController {
         redraw()
     }
 
-    /// Takes the entries from the model again, in the list that is on screen. With `full`
-    /// false the table keeps the rows it has made and only brings them up to date: the same
-    /// folder was read again, sorted or filtered, and throwing every row view away to make
-    /// it anew is most of what a redraw would cost.
+    /// Takes the entries from the model again, in the list that is on screen.
+    ///
+    /// With `full` false the table keeps the rows it has made and only brings them up to date: the
+    /// same folder was read again, sorted or filtered, and throwing every row view away to make it
+    /// anew is most of what a redraw would cost.
     internal func reloadList(full: Bool) {
         gridMarks = [:]
         guard !showsGrid else {
@@ -95,10 +98,12 @@ extension PanelViewController {
         }
     }
 
-    /// Puts the cursor of the list where the model's is. The list scrolls to it when the cursor
-    /// is on another item than the last time (or in another folder or tab), and when `forceScroll`
-    /// says the cursor was moved; a list whose contents merely changed (a refresh, another piece
-    /// of the folder arriving) stays where the user has scrolled it.
+    /// Puts the cursor of the list where the model's is.
+    ///
+    /// The list scrolls to it when the cursor is on another item than the last time (or in another
+    /// folder or tab), and when `forceScroll` says the cursor was moved; a list whose contents
+    /// merely changed (a refresh, another piece of the folder arriving) stays where the user has
+    /// scrolled it.
     internal func showCursor(forceScroll: Bool) {
         guard model.rowCount > 0 else {
             shownCursor = nil
@@ -151,9 +156,11 @@ extension PanelViewController {
         moveCursor(toNameStartingWith: typeSelect.add(characters, at: time))
     }
 
-    /// Finding a file by typing, in every view. A short list is looked through here; a long
-    /// one in the background, so a key costs the main thread nothing however long the list is,
-    /// and only the search for the last key typed moves the cursor.
+    /// Finding a file by typing, in every view.
+    ///
+    /// A short list is looked through here; a long one in the background, so a key costs the main
+    /// thread nothing however long the list is, and only the search for the last key typed moves
+    /// the cursor.
     internal func moveCursor(toNameStartingWith prefix: String) {
         let tab = model
         let offset = tab.hasParentRow ? 1 : 0
@@ -204,7 +211,9 @@ extension PanelViewController {
             return
         }
         // The tile may have been scrolled out of sight (or not be placed yet) since it was asked for.
-        if let row = gridView.visibleRows.first(where: { model.item(atRow: $0)?.name == name }) ?? model.row(ofName: name) {
+        if let row = gridView.visibleRows.first(where: { model.item(atRow: $0)?.name == name })
+            ?? model.row(ofName: name)
+        {
             gridView.redraw(row: row)
         }
     }
@@ -234,7 +243,12 @@ extension PanelViewController {
             return memo.color
         }
         let color = nameColor(for: item, selected: selected)
-        rowColor = PanelRowColor(name: item?.name, isHidden: item?.isHidden ?? false, isSelected: selected, color: color)
+        rowColor = PanelRowColor(
+            name: item?.name,
+            isHidden: item?.isHidden ?? false,
+            isSelected: selected,
+            color: color
+        )
         return color
     }
 }

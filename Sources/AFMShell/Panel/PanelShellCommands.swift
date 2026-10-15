@@ -2,18 +2,20 @@ import AFMContracts
 import AFMKernel
 import AppKit
 
-/// The commands of the file list that need the panel on screen: the quick filter, stepping
-/// sideways through the Brief and Thumbnails views, and the colours by file type
-/// (spec 03 › Quick search and quick filter, 03 › Brief, 03 › Colours by file type). The
-/// options of the lists get their configuration page here as well.
+/// The commands of the file list that need the panel on screen: the quick filter, stepping sideways
+/// through the Brief and Thumbnails views, and the colours by file type (spec 03 › Quick search and
+/// quick filter, 03 › Brief, 03 › Colours by file type).
+///
+/// The options of the lists get their configuration page here as well.
 ///
 /// What is registered here lives in the kernel. It holds neither the kernel nor the panels:
 /// the panels hold the kernel, and the kernel holding them back would keep both alive for
 /// ever. The panels are held weakly; once they are gone, the commands do nothing.
 @MainActor
 internal enum PanelShellCommands {
-    /// One step to the left in the Brief and Thumbnails views. In those views the key of
-    /// "first entry" (←) runs this instead.
+    /// One step to the left in the Brief and Thumbnails views.
+    ///
+    /// In those views the key of "first entry" (←) runs this instead.
     internal static let cursorLeft: CommandID = "afm_CursorLeft"
     /// One step to the right; the key of "last entry" (→) runs this in the grid views.
     internal static let cursorRight: CommandID = "afm_CursorRight"
@@ -65,14 +67,21 @@ internal enum PanelShellCommands {
     }
 
     /// The list of colours by file type as a text, one entry per line, the first matching entry
-    /// deciding (spec 03 › Colours by file type). Lines that cannot be read are reported and
-    /// the list is shown again. Returns true when the user changed the settings.
+    /// deciding (spec 03 › Colours by file type).
+    ///
+    /// Lines that cannot be read are reported and the list is shown again. Returns true when the
+    /// user changed the settings.
     private static func defineColors(settings: any SettingsStore, interaction: any UserInteraction) -> Bool {
         var text = settings.text(PanelSettings.colorRulesKey, default: PanelSettings.defaultColorRules)
             .replacingOccurrences(of: ";;", with: "\n")
-        while let answer = askForColors(text, isOn: settings.flag(PanelSettings.colorsByTypeKey, default: false), interaction) {
+        while let answer = askForColors(
+            text,
+            isOn: settings.flag(PanelSettings.colorsByTypeKey, default: false),
+            interaction
+        ) {
             text = answer.text("rules")
-            let lines = text.split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+            let lines = text.split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) }
+                .filter { !$0.isEmpty }
             if let unreadable = lines.first(where: { !$0.hasPrefix("-") && ColorRule.parse($0).isEmpty }) {
                 interaction.inform("This entry cannot be read:", detail: unreadable, style: .warning)
                 continue

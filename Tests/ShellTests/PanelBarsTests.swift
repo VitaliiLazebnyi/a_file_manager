@@ -51,7 +51,9 @@ internal struct PanelBarsTests {
         app.layOut()
         let bar = app.left.pathBar
         #expect(app.left.pathBarText == program.box.url("A").path + "/*.*")
-        #expect(bar.segments.last?.location.path == program.box.url("A").path && bar.segments.first?.location.path == "/")
+        #expect(
+            bar.segments.last?.location.path == program.box.url("A").path && bar.segments.first?.location.path == "/"
+        )
         // A click in the right panel's bar goes up there and makes that panel the source.
         let rightBar = app.right.pathBar
         rightBar.click(at: center(of: rightBar.segments.count - 2, in: rightBar), count: 1)
@@ -86,7 +88,9 @@ internal struct PanelBarsTests {
         app.commands.perform(.changeDirectory, .location(program.box.url("A/docs")))
         await program.settle(app)
         app.left.tabs.insertTab(showing: program.box.url("home"), activate: false)
-        #expect(app.left.tabBar.stack.arrangedSubviews.count == 3 && !app.left.tabBar.isHidden && app.right.tabBar.isHidden)
+        #expect(
+            app.left.tabBar.stack.arrangedSubviews.count == 3 && !app.left.tabBar.isHidden && app.right.tabBar.isHidden
+        )
         // The menu of a tab shows that tab and offers the commands the plugins registered.
         let menu = app.left.tabMenu(forTab: 0)?.items.map(\.title) ?? []
         await program.settle(app)

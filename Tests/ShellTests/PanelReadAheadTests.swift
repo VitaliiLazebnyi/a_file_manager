@@ -103,10 +103,11 @@ internal struct PanelReadAheadTests {
         #expect(outcomes == 0 && ahead.pauses.isEmpty)
     }
 
-    /// A folder that could not be read is left alone. A reading that does not come back after
-    /// it was told to stop (here its lane is held up by a call that does not return) holds up
-    /// the next folder, until it was told so long ago that it is left behind; nothing is taken
-    /// over once it was told to stop.
+    /// A folder that could not be read is left alone.
+    ///
+    /// A reading that does not come back after it was told to stop (here its lane is held up by a
+    /// call that does not return) holds up the next folder, until it was told so long ago that it
+    /// is left behind; nothing is taken over once it was told to stop.
     @Test
     internal func aStuckReadingIsLeftBehind() async {
         let server = MemoryFileSystem()

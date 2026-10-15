@@ -25,7 +25,9 @@ internal struct PanelThumbnailTests {
         var arrived: [String] = []
         store.onArrival = { arrived.append($0) }
         let (first, second, text) = (item("a.png", size: 1), item("b.png", size: 1), item("c.txt", size: 1))
-        #expect(store.image(for: first, side: 96, scale: 2) == nil && store.image(for: second, side: 96, scale: 2) == nil)
+        #expect(
+            store.image(for: first, side: 96, scale: 2) == nil && store.image(for: second, side: 96, scale: 2) == nil
+        )
         // Asking again while the picture is being made does not ask the source again.
         #expect(store.image(for: first, side: 96, scale: 2) == nil && source.requested == ["a.png", "b.png"])
         #expect(store.running.count == 2)
@@ -39,12 +41,16 @@ internal struct PanelThumbnailTests {
         #expect(source.cancelled == ["b.png"] && store.running.isEmpty)
         late?(picture)
         await PanelWait.drainMainQueue()
-        #expect(arrived == ["a.png"] && store.image(for: second, side: 96, scale: 2) == nil && source.requested.count == 3)
+        #expect(
+            arrived == ["a.png"] && store.image(for: second, side: 96, scale: 2) == nil && source.requested.count == 3
+        )
         // A file without a picture is not asked for twice, until the folder is shown anew.
         #expect(store.image(for: text, side: 96, scale: 2) == nil)
         source.answer("c.txt", with: nil)
         #expect(await PanelWait.until { store.running.count == 1 })
-        #expect(store.image(for: text, side: 96, scale: 2) == nil && source.requested.filter { $0 == "c.txt" }.count == 1)
+        #expect(
+            store.image(for: text, side: 96, scale: 2) == nil && source.requested.filter { $0 == "c.txt" }.count == 1
+        )
         store.reset()
         #expect(store.running.isEmpty && store.image(for: text, side: 96, scale: 2) == nil)
         #expect(source.requested.filter { $0 == "c.txt" }.count == 2)

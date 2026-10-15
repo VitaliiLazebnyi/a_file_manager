@@ -18,12 +18,14 @@ extension PanelViewController {
         reload(model, focus: nil, quietly: true, markDirty: true, changedAt: time, completion: nil)
     }
 
-    /// Reads `tab`'s folder again, with the cursor on `focus`. `quietly`: nothing is announced
-    /// or redrawn unless the folder changed. `markDirty`: a quiet reload that is turned away
-    /// because the tab is being read or renamed, or was read a moment ago, is made up for when
-    /// that is over (the folder may have changed since the reading began). `changedAt`: when the
-    /// change that asks for this was noticed, if not now. `completion` is called when the folder
-    /// has been read, also when that happens later or is another reading's doing.
+    /// Reads the folder of `tab` again, with the cursor on `focus`.
+    ///
+    /// With `quietly`, nothing is announced or redrawn unless the folder changed. With
+    /// `markDirty`, a quiet reload that is turned away because the tab is being read or renamed,
+    /// or was read a moment ago, is made up for when that is over (the folder may have changed
+    /// since the reading began). `changedAt` is when the change that asks for this was noticed,
+    /// if not now. `completion` is called when the folder has been read, also when that happens
+    /// later or is another reading's doing.
     internal func reload(
         _ tab: PanelModel,
         focus: String?,
@@ -39,7 +41,8 @@ extension PanelViewController {
             return
         }
         if quietly {
-            guard !putsOffQuietReload(of: tab, markDirty: markDirty, changedAt: changedAt, completion: completion) else {
+            guard !putsOffQuietReload(of: tab, markDirty: markDirty, changedAt: changedAt, completion: completion)
+            else {
                 return
             }
         } else if putsOffLoudReload(of: tab, completion: completion) {
@@ -95,21 +98,32 @@ extension PanelViewController {
     }
 
     /// Abandons every read and calculation in progress, for good: the window goes away.
+    ///
     /// Whoever waits for one of them hears that it came to nothing.
     internal func cancelLoading() {
         isShutDown = true
         let abandoned = Array(loads.values)
-        abandoned.forEach { $0.flag.cancel() }
-        sizeCalculations.values.forEach { $0.cancel() }
+        for load in abandoned {
+            load.flag.cancel()
+        }
+        for calculation in sizeCalculations.values {
+            calculation.cancel()
+        }
         loads = [:]
         sizeCalculations = [:]
-        rereadTimers.values.forEach { $0() }
+        for stopTimer in rereadTimers.values {
+            stopTimer()
+        }
         rereadTimers = [:]
         dirty = [:]
         typeFind?.cancel()
-        volumeAsking.values.forEach { $0.cancel() }
+        for question in volumeAsking.values {
+            question.cancel()
+        }
         (volumeAsking, volumeAskAgain) = ([:], [])
-        abandoned.forEach { $0.supersede() }
+        for load in abandoned {
+            load.supersede()
+        }
         for id in Array(waitingCompletions.keys) {
             flushWaitingCompletions(of: id)
         }
@@ -125,12 +139,16 @@ extension PanelViewController {
         guard let waiting = waitingCompletions.removeValue(forKey: id) else {
             return
         }
-        waiting.forEach { $0() }
+        for completion in waiting {
+            completion()
+        }
     }
 
-    /// Reads a folder again, on its lane's thread. A folder that vanished is replaced by its
-    /// nearest readable parent. The listing is sorted here and, like every complete one, handed
-    /// to the cache; what is remembered of a folder that is gone or cannot be read is forgotten.
+    /// Reads a folder again, on its lane's thread.
+    ///
+    /// A folder that vanished is replaced by its nearest readable parent. The listing is sorted
+    /// here and, like every complete one, handed to the cache; what is remembered of a folder that
+    /// is gone or cannot be read is forgotten.
     private nonisolated static func reread(
         _ source: PanelLoading.Source,
         order: ListOrder,
@@ -150,10 +168,12 @@ extension PanelViewController {
     }
 
     /// A quiet reload must not disturb a rename in progress, and a directory that is being read
-    /// right now is fresh anyway, unless it changed after that reading began; one that was read
-    /// a moment ago is read once more when the pause is over, however many changes are reported
-    /// until then. Returns true when the reload is put off (or not needed); whoever waits is
-    /// told when the reading that makes up for it has ended.
+    /// right now is fresh anyway, unless it changed after that reading began; one that was read a
+    /// moment ago is read once more when the pause is over, however many changes are reported until
+    /// then.
+    ///
+    /// Returns true when the reload is put off (or not needed); whoever waits is told when the
+    /// reading that makes up for it has ended.
     private func putsOffQuietReload(
         of tab: PanelModel,
         markDirty: Bool,
@@ -188,9 +208,10 @@ extension PanelViewController {
         return true
     }
 
-    /// The tab is on its way to another folder. That reading is not thrown over for one of the
-    /// folder being left; should it fail and the tab stay, the folder is read then. Returns true
-    /// when the reload is put off.
+    /// The tab is on its way to another folder.
+    ///
+    /// That reading is not thrown over for one of the folder being left; should it fail and the tab
+    /// stay, the folder is read then. Returns true when the reload is put off.
     private func putsOffLoudReload(of tab: PanelModel, completion: (@MainActor () -> Void)?) -> Bool {
         let id = ObjectIdentifier(tab)
         guard let destination = loads[id]?.destination, !destination.isSameLocation(as: tab.directory) else {
@@ -255,9 +276,10 @@ extension PanelViewController {
         }
     }
 
-    /// How long a quiet reading of a tab's folder has to wait still: after a reading there is
-    /// a pause of `minimumRereadInterval`, and of twice the time that reading took if that is
-    /// longer. Nil when it may start now.
+    /// How long a quiet reading of a tab's folder has to wait still: after a reading there is a
+    /// pause of `minimumRereadInterval`, and of twice the time that reading took if that is longer.
+    ///
+    /// Nil when it may start now.
     private func waitBeforeQuietRead(of id: ObjectIdentifier) -> TimeInterval? {
         guard let last = lastRead[id] else {
             return nil

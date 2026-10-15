@@ -52,7 +52,11 @@ extension PanelViewController {
         }
         let row = model.cursor
         renamingRow = row
-        renaming = PanelRenameTarget(tab: ObjectIdentifier(model), location: model.directory.locationKey, name: item.name)
+        renaming = PanelRenameTarget(
+            tab: ObjectIdentifier(model),
+            location: model.directory.locationKey,
+            name: item.name
+        )
         redrawName(ofRow: row)
         let field = NSTextField(string: item.name)
         if showsGrid {
@@ -78,10 +82,12 @@ extension PanelViewController {
         field.currentEditor()?.selectAll(nil)
     }
 
-    /// Before the list is drawn again: the editor stays when its item is still in the list of
-    /// the tab and folder it was opened in (the list was sorted, read again, got another
-    /// volume figure), and follows the item to its row. It goes away, and what was typed with
-    /// it, only when the item is gone or the panel shows something else.
+    /// Before the list is drawn again: the editor stays when its item is still in the list of the
+    /// tab and folder it was opened in (the list was sorted, read again, got another volume
+    /// figure), and follows the item to its row.
+    ///
+    /// It goes away, and what was typed with it, only when the item is gone or the panel shows
+    /// something else.
     internal func keepRenameIfItemRemains() {
         guard renameField != nil, let renaming else {
             return
@@ -141,7 +147,10 @@ extension PanelViewController {
         if showsGrid {
             gridView.setNeedsDisplay(gridView.bounds)
         } else if row < tableView.numberOfRows {
-            tableView.reloadData(forRowIndexes: [row], columnIndexes: IndexSet(integersIn: 0..<tableView.numberOfColumns))
+            tableView.reloadData(
+                forRowIndexes: [row],
+                columnIndexes: IndexSet(integersIn: 0..<tableView.numberOfColumns)
+            )
         }
     }
 
@@ -150,7 +159,8 @@ extension PanelViewController {
         if showsGrid {
             return gridView.nameFrame(ofRow: row)
         }
-        let frame = tableView.rect(ofRow: row).intersection(tableView.rect(ofColumn: 0).union(tableView.rect(ofColumn: 1)))
+        let frame = tableView.rect(ofRow: row)
+            .intersection(tableView.rect(ofColumn: 0).union(tableView.rect(ofColumn: 1)))
         return frame.insetBy(dx: 20, dy: 0).offsetBy(dx: 10, dy: 0)
     }
 

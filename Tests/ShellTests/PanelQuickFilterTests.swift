@@ -14,7 +14,9 @@ internal struct PanelQuickFilterTests {
         FileItem(url: URL(fileURLWithPath: "/x/" + name), name: name, kind: .init(isDirectory: folder))
     }
 
-    /// Text is a part of a name; with `*` or `?` it is a mask. Case does not matter.
+    /// Text is a part of a name; with `*` or `?` it is a mask.
+    ///
+    /// Case does not matter.
     @Test
     internal func theQuickFilterMatchesPartsOfNamesOrMasks() {
         let part = QuickFilter.matcher(for: "Port")
@@ -74,7 +76,9 @@ internal struct PanelQuickFilterTests {
         filter.text = "re"
         #expect(filter.title.hasPrefix("*.txt") && filter.title.hasSuffix("re"))
         let combined = try #require(filter.combined)
-        #expect(combined.matches(item("report.txt", folder: false)) && !combined.matches(item("report.pdf", folder: false)))
+        #expect(
+            combined.matches(item("report.txt", folder: false)) && !combined.matches(item("report.pdf", folder: false))
+        )
         #expect(!combined.matches(item("notes.txt", folder: false)))
         // Folders are filtered by name too; the display filter below lets them all through.
         #expect(combined.matches(item("recent", folder: true)) && !combined.matches(item("docs", folder: true)))

@@ -1,17 +1,19 @@
 import AFMKernel
 import AppKit
 
-/// The file list of the Full view. The table's single selected row is the cursor; marked items
-/// are kept in the panel model. Keys, clicks and the context menu go to the panel, which treats
-/// them as it does those of the other views; Cut, Copy and Paste go up the responder chain to
-/// the panel as well.
+/// The file list of the Full view.
+///
+/// The table's single selected row is the cursor; marked items are kept in the panel model. Keys,
+/// clicks and the context menu go to the panel, which treats them as it does those of the other
+/// views; Cut, Copy and Paste go up the responder chain to the panel as well.
 internal final class FileTableView: NSTableView {
     /// The panel the list belongs to.
     internal weak var panel: PanelViewController?
 
-    /// Keys that are bound to commands go to the commands. A key that types something and is
-    /// bound to nothing finds a file by the start of its name, which is the panel's doing
-    /// (`typeToFind`) and not the table's own.
+    /// Keys that are bound to commands go to the commands.
+    ///
+    /// A key that types something and is bound to nothing finds a file by the start of its name,
+    /// which is the panel's doing (`typeToFind`) and not the table's own.
     override internal func keyDown(with event: NSEvent) {
         guard let panel, panel.handleListKey(event, arrowsMoveCursor: false) else {
             super.keyDown(with: event)

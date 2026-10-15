@@ -1,7 +1,9 @@
 import AppKit
 
-/// A row of the Full view's table. It draws the cursor bar, a light bar with a darker border,
-/// in the active panel only (spec 03 › Cursor, selection and row states).
+/// A row of the Full view's table.
+///
+/// It draws the cursor bar, a light bar with a darker border, in the active panel only (spec 03 ›
+/// Cursor, selection and row states).
 internal final class CursorRowView: NSTableRowView {
     /// What the table knows the row views by, to use them again.
     internal static let reuseIdentifier = NSUserInterfaceItemIdentifier("afm.row")

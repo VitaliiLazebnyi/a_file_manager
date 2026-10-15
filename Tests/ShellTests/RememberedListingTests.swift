@@ -6,9 +6,11 @@ import Testing
 
 @testable import AFMShell
 
-/// Returning to a folder on a slow server through the real window: the listing cache ("show
-/// old, refresh behind"). The memory file system plays the server: `listStartDelay` is how long
-/// it takes to answer, `listRequests` how often it was asked.
+/// Returning to a folder on a slow server through the real window: the listing cache ("show old,
+/// refresh behind").
+///
+/// The memory file system plays the server: `listStartDelay` is how long it takes to answer,
+/// `listRequests` how often it was asked.
 @MainActor
 @Suite(.serialized)
 internal struct RememberedListingTests {
@@ -19,8 +21,10 @@ internal struct RememberedListingTests {
         program = try PanelProgram(rightFile: "one.txt", contents: "old")
     }
 
-    /// A share with a few entries, and a panel that has been in `/nas` and is back in `/`
-    /// with the cursor on `nas`, so the folder is remembered. The server answers after `delay`.
+    /// A share with a few entries, and a panel that has been in `/nas` and is back in `/` with the
+    /// cursor on `nas`, so the folder is remembered.
+    ///
+    /// The server answers after `delay`.
     private func startWithARememberedFolder(delay: TimeInterval) async -> PanelProgram.Running {
         program.memory.addFile("/nas/a.txt", "a")
         program.memory.addFile("/nas/b.txt", "bb")
@@ -43,7 +47,9 @@ internal struct RememberedListingTests {
         let app = await startWithARememberedFolder(delay: 3)
         defer { app.stop() }
         let memory = program.memory
-        #expect(app.left.model.cursorItem?.name == "nas" && program.remembered(app, "/nas") == ["sub", "a.txt", "b.txt"])
+        #expect(
+            app.left.model.cursorItem?.name == "nas" && program.remembered(app, "/nas") == ["sub", "a.txt", "b.txt"]
+        )
         // Meanwhile the folder changes on the server.
         memory.addFile("/nas/new.txt")
         memory.removeTree("/nas/b.txt")
@@ -55,7 +61,10 @@ internal struct RememberedListingTests {
         #expect(app.left.isLoading && app.left.showsActivity)
         #expect(app.left.statusLineText == "Refreshing…   0 k / 0 k in 0 / 2 file(s), 0 / 1 dir(s)")
         // "Everything" has to wait for the fresh listing; what is named can be worked with.
-        #expect(!app.commands.isEnabled(.selectAll) && !app.commands.isEnabled(.invertSelection) && !app.commands.isEnabled(.selectGroup))
+        #expect(
+            !app.commands.isEnabled(.selectAll) && !app.commands.isEnabled(.invertSelection)
+                && !app.commands.isEnabled(.selectGroup)
+        )
         app.cursor(app.left, on: "sub")
         #expect(app.commands.isEnabled(.copy) && app.commands.isEnabled(.delete) && app.commands.isEnabled(.goToParent))
         #expect(program.press(app, 49, []) && app.left.model.selection == ["sub"])  // Space: mark and measure
@@ -68,7 +77,9 @@ internal struct RememberedListingTests {
         #expect(app.names(app.left) == ["sub", "a.txt", "new.txt"] && app.left.tableView.numberOfRows == 4)
         #expect(app.left.model.cursorItem?.name == "a.txt" && app.left.model.selection == ["sub", "a.txt"])
         #expect(app.left.model.items.first?.computedSize == 5)
-        #expect(app.left.model.isComplete && !app.left.model.isRefreshing && !app.left.isLoading && !app.left.showsActivity)
+        #expect(
+            app.left.model.isComplete && !app.left.model.isRefreshing && !app.left.isLoading && !app.left.showsActivity
+        )
         #expect(app.left.statusLineText == "0 k / 0 k in 1 / 2 file(s), 1 / 1 dir(s)")
         #expect(app.commands.isEnabled(.selectAll) && app.commands.isEnabled(.invertSelection))
         // The server was asked once for the first visit and once for the refresh.
@@ -119,7 +130,9 @@ internal struct RememberedListingTests {
         // As after any reading that failed: back where the panel was, and the user is told.
         #expect(app.left.model.directory.path == "/" && app.left.model.cursorItem?.name == "nas")
         #expect(app.left.model.isComplete && !app.left.model.isRefreshing && !app.left.showsActivity)
-        #expect(app.left.model.forwardLocation == nil && program.interaction.log == ["inform: The folder cannot be read!"])
+        #expect(
+            app.left.model.forwardLocation == nil && program.interaction.log == ["inform: The folder cannot be read!"]
+        )
         #expect(app.kernel.listingCache.age(of: program.memory.url("/nas"), showHidden: false) == nil)
         program.memory.unreadable = []
         app.commands.perform(.open, .nothing)
@@ -146,7 +159,9 @@ internal struct RememberedListingTests {
         #expect(await PanelWait.until { app.left.model.isOpening } && app.left.model.directory.path == "/nas")
         // Reading it again (a refresh) overtakes the first reading, which had the way back.
         app.commands.perform(.reread, .nothing)
-        #expect(await PanelWait.until { memory.listRequests(for: "/nas") == 2 && memory.stalledListings(of: "/nas") == 1 })
+        #expect(
+            await PanelWait.until { memory.listRequests(for: "/nas") == 2 && memory.stalledListings(of: "/nas") == 1 }
+        )
         #expect(app.left.isLoading)
         // Now the server answers: the folder cannot be read.
         memory.releaseStalls()
@@ -154,7 +169,9 @@ internal struct RememberedListingTests {
         // The message comes from the run loop, a turn after the reading has ended.
         #expect(await PanelWait.until { !program.interaction.log.isEmpty })
         await PanelWait.pause(0.5)
-        #expect(app.left.model.directory.isSameLocation(as: before) && app.left.model.isListed && app.left.model.isComplete)
+        #expect(
+            app.left.model.directory.isSameLocation(as: before) && app.left.model.isListed && app.left.model.isComplete
+        )
         #expect(program.interaction.log.filter { $0 == "inform: The folder cannot be read!" }.count == 1)
         #expect(memory.listRequests(for: "/nas") == 2)
     }
@@ -230,7 +247,9 @@ internal struct RememberedListingTests {
         app.commands.perform(.open, .nothing)
         #expect(app.left.model.directory.path == "/nas")
         await program.settle(app)
-        #expect(app.names(app.left) == ["a.txt", "in.txt"] && program.memory.listRequests(for: "/nas/sub") == before + 1)
+        #expect(
+            app.names(app.left) == ["a.txt", "in.txt"] && program.memory.listRequests(for: "/nas/sub") == before + 1
+        )
     }
 
     /// Switched off, nothing is remembered.

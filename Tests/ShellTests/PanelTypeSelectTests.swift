@@ -26,7 +26,10 @@ internal struct PanelTypeSelectTests {
         #expect(row("b", in: names, from: 0) == 1)
         #expect(row("b", in: names, from: 1) == 2 && row("b", in: names, from: 2) == 1)
         #expect(row("rep", in: names, from: 3) == 3 && row("report_02", in: names, from: 3) == 4)
-        #expect(row("x", in: names, from: 0) == nil && row("a", in: [], from: 0) == nil && row("", in: names, from: 0) == nil)
+        #expect(
+            row("x", in: names, from: 0) == nil && row("a", in: [], from: 0) == nil
+                && row("", in: names, from: 0) == nil
+        )
         // From the `[..]` row, which is before the first name.
         #expect(row("a", in: names, from: -1) == 0)
     }

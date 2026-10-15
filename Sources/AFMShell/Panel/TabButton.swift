@@ -1,7 +1,8 @@
 import AppKit
 
-/// One tab of a `TabBarView`; its `tag` is its position in the strip. It takes the mouse
-/// itself, so that a press can turn into a drag to another place in the strip.
+/// One tab of a `TabBarView`; its `tag` is its position in the strip.
+///
+/// It takes the mouse itself, so that a press can turn into a drag to another place in the strip.
 internal final class TabButton: NSButton {
     /// The strip the tab is in.
     internal weak var bar: TabBarView?
@@ -10,8 +11,9 @@ internal final class TabButton: NSButton {
     /// The press under way has become a drag.
     private var isDragging = false
 
-    /// A double click closes the tab; a single press waits for the release or a drag. Outside
-    /// a strip, the button is an ordinary button.
+    /// A double click closes the tab; a single press waits for the release or a drag.
+    ///
+    /// Outside a strip, the button is an ordinary button.
     override internal func mouseDown(with event: NSEvent) {
         guard let bar else {
             super.mouseDown(with: event)

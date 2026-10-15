@@ -98,8 +98,9 @@ internal final class ColumnValueStore {
     }
 
     /// Drops the requests that wait for rows that are no longer on screen (their names are not in
-    /// `names`); they are asked for again if the rows come back. A batch that is being computed
-    /// is finished.
+    /// `names`); they are asked for again if the rows come back.
+    ///
+    /// A batch that is being computed is finished.
     internal func dropWaiting(except names: Set<String>) {
         guard !waiting.isEmpty else {
             return

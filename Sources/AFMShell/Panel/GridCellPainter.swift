@@ -24,9 +24,10 @@ internal enum GridCellPainter {
         return DisplayText.clean(item.isFolder ? "[\(item.name)]" : item.name)
     }
 
-    /// The width of the widest of the longest names of the list, as drawn. Measuring text is
-    /// slow, so only the names with the most characters are measured; finding those is one
-    /// quick pass over the list.
+    /// The width of the widest of the longest names of the list, as drawn.
+    ///
+    /// Measuring text is slow, so only the names with the most characters are measured; finding
+    /// those is one quick pass over the list.
     internal static func widestBriefName(in items: [FileItem]) -> CGFloat {
         var longest: [(length: Int, name: String)] = []
         var shortestKept = 0
@@ -42,7 +43,8 @@ internal enum GridCellPainter {
             }
             shortestKept = longest.map(\.length).min() ?? 0
         }
-        return longest.map { NSAttributedString(string: "[" + $0.name + "]", attributes: [.font: nameFont]).size().width }
+        return
+            longest.map { NSAttributedString(string: "[" + $0.name + "]", attributes: [.font: nameFont]).size().width }
             .max() ?? 0
     }
 
@@ -82,7 +84,12 @@ internal enum GridCellPainter {
             let scale = min(side / max(picture.size.width, 1), side / max(picture.size.height, 1), 1)
             let size = NSSize(width: picture.size.width * scale, height: picture.size.height * scale)
             picture.draw(
-                in: NSRect(x: box.midX - size.width / 2, y: box.midY - size.height / 2, width: size.width, height: size.height),
+                in: NSRect(
+                    x: box.midX - size.width / 2,
+                    y: box.midY - size.height / 2,
+                    width: size.width,
+                    height: size.height
+                ),
                 from: .zero,
                 operation: .sourceOver,
                 fraction: 1,
@@ -93,7 +100,12 @@ internal enum GridCellPainter {
             let iconSide = min(side, max(32, side / 2))
             icon(of: cell)?
                 .draw(
-                    in: NSRect(x: box.midX - iconSide / 2, y: box.midY - iconSide / 2, width: iconSide, height: iconSide),
+                    in: NSRect(
+                        x: box.midX - iconSide / 2,
+                        y: box.midY - iconSide / 2,
+                        width: iconSide,
+                        height: iconSide
+                    ),
                     from: .zero,
                     operation: .sourceOver,
                     fraction: cell.item?.isHidden == true ? 0.5 : 1,
