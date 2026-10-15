@@ -69,7 +69,8 @@ import Testing
     }
 }
 
-/// The script below, running as a child process on a port it picks itself.
+/// The script below, running as a child process on a port it picks itself. What goes wrong on a connection (a
+/// handshake the client gave up, among others) is written to `tls-errors.log` in the sandbox, a line each.
 final class TLSServer {
     static let python = "/usr/bin/python3"
     static let openssl = "/usr/bin/openssl"
@@ -82,7 +83,15 @@ final class TLSServer {
 
     /// `refusesProtection`: the server answers PROT with an error, as one that cannot encrypt its data connections.
     /// `requiresReuse`: every data connection is refused for not resuming the control connection's TLS session.
-    init(mode: TLSMode, box: Sandbox, refusesProtection: Bool = false, requiresReuse: Bool = false) throws {
+    /// `resumesSessions`: false gives no session tickets, so every connection makes a whole handshake and has its
+    /// certificate checked.
+    init(
+        mode: TLSMode,
+        box: Sandbox,
+        refusesProtection: Bool = false,
+        requiresReuse: Bool = false,
+        resumesSessions: Bool = true
+    ) throws {
         let (certificate, key, script) = (box.url("cert.pem"), box.url("key.pem"), box.url("ftps.py"))
         let make = Process()
         make.executableURL = URL(fileURLWithPath: Self.openssl)
@@ -101,8 +110,11 @@ final class TLSServer {
         process.arguments =
             [script.path, mode == .implicit ? "implicit" : "explicit", certificate.path, key.path, box.url("srv").path]
             + (refusesProtection ? ["refuse-prot"] : []) + (requiresReuse ? ["require-reuse"] : [])
+            + (resumesSessions ? [] : ["no-tickets"])
         process.standardOutput = output
-        process.standardError = FileHandle.nullDevice
+        let errors = box.url("tls-errors.log")
+        FileManager.default.createFile(atPath: errors.path, contents: nil)
+        process.standardError = try FileHandle(forWritingTo: errors)
         try process.run()
         // The first line the script prints is its port.
         var line = Data()
@@ -126,8 +138,15 @@ final class TLSServer {
         mode, cert, key, root = sys.argv[1:5]
         refuse_prot = "refuse-prot" in sys.argv[5:]
         require_reuse = "require-reuse" in sys.argv[5:]
-        context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-        context.load_cert_chain(cert, key)
+        def make_context():
+            made = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+            made.load_cert_chain(cert, key)
+            return made
+        context = make_context()
+        def wrap(sock):
+            # Without resumption every connection gets a context of its own, whose session cache is empty.
+            chosen = make_context() if "no-tickets" in sys.argv[5:] else context
+            return chosen.wrap_socket(sock, server_side=True)
         listener = socket.socket()
         listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         listener.bind(("127.0.0.1", 0))
@@ -139,7 +158,7 @@ final class TLSServer {
             passive = None
             try:
                 if mode == "implicit":
-                    control = context.wrap_socket(control, server_side=True)
+                    control = wrap(control)
                 lines = control.makefile("rb")
                 def say(text):
                     control.sendall((text + "\\r\\n").encode())
@@ -151,7 +170,7 @@ final class TLSServer {
                         say("522 SSL connection failed; session reuse required")
                         return
                     if protect:
-                        channel = context.wrap_socket(channel, server_side=True)
+                        channel = wrap(channel)
                     work(channel)
                     if protect:
                         try:
@@ -172,7 +191,7 @@ final class TLSServer {
                             say("502 Not here")
                             continue
                         say("234 Go ahead")
-                        control = context.wrap_socket(control, server_side=True)
+                        control = wrap(control)
                         lines = control.makefile("rb")
                     elif verb == "PBSZ":
                         say("200 OK")

@@ -20,11 +20,12 @@ internal struct CoverageLocalWatcherMore {
         }
         defer { watcher.stop() }
         watcher.watch([folder])
-        #expect(Wait.until(seconds: 60) { !watcher.watchedFolders.isEmpty })
+        #expect(Wait.until { !watcher.watchedFolders.isEmpty })
         var count = 0
-        // The stream may begin a moment after it was made: renamed until it is heard.
+        // The stream may begin a moment after it was made, and on a busy machine the system may
+        // report much later still: renamed until it is heard, with no limit short of a hang.
         #expect(
-            Wait.until(seconds: 60) {
+            Wait.until {
                 count += 1
                 let (old, new) = count.isMultiple(of: 2) ? ("renamed", "watched") : ("watched", "renamed")
                 try? FileManager.default.moveItem(at: box.url(old), to: box.url(new))

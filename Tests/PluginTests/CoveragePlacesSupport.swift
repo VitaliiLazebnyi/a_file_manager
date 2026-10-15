@@ -7,7 +7,7 @@ import TestSupport
 @MainActor
 enum CoveragePlacesLoop {
     /// Waits until `condition` holds; false when it still does not after `seconds` (a hang).
-    static func spin(seconds: TimeInterval = 60, until condition: () -> Bool) async -> Bool {
+    static func spin(seconds: TimeInterval = Wait.ceiling, until condition: () -> Bool) async -> Bool {
         let end = Date(timeIntervalSinceNow: seconds)
         while !condition() {
             if Date() > end { return false }

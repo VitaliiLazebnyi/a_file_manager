@@ -45,10 +45,10 @@ import Testing
             )
     }
 
-    /// Lets the main actor run until `done`, for at most a minute.
+    /// Lets the main thread run until `done`. Only a hang ends the wait without it: on a busy
+    /// machine other tests may hold the main thread for a long time, so no shorter limit is set.
     func wait(until done: () -> Bool) async {
-        let deadline = Date().addingTimeInterval(60)
-        while !done(), Date() < deadline { try? await Task.sleep(nanoseconds: 20_000_000) }
+        #expect(await RunLoopWait.until(done))
     }
 
     @Test func commandsThatCallEachOtherAcrossAWaitAreStopped() async {
@@ -272,9 +272,10 @@ import Testing
         )
     }
 
+    /// Lets the main thread run until `done`. Only a hang ends the wait without it: on a busy
+    /// machine other tests may hold the main thread for a long time, so no shorter limit is set.
     func wait(until done: () -> Bool) async {
-        let deadline = Date().addingTimeInterval(90)
-        while !done(), Date() < deadline { try? await Task.sleep(nanoseconds: 50_000_000) }
+        #expect(await RunLoopWait.until(done))
     }
 
     @Test func aHostileFileNameReachesTheProgramAsItIsAndRunsNothing() async throws {

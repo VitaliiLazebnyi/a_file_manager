@@ -32,6 +32,23 @@ final class FakeSFTPServer: @unchecked Sendable {
         case forgetfulWrite = "forgetwrite"
         /// A plain rename onto an existing name is refused, and so is every rename of a name ending in `locked`.
         case strictRename = "strictrename"
+        /// Where a link leads (a stat that follows it) is never told for a name ending in `hang`, refused for one
+        /// ending in `deny`, and asking about one ending in `die` ends the server.
+        case links
+        /// Reading a directory closes the server's input before the answer: what the client sends next finds
+        /// nobody reading.
+        case cutListing = "cutlisting"
+        /// The length of an open file is not told.
+        case noSize = "nosize"
+        /// A read is answered with more bytes than were asked for.
+        case overlong
+        /// A read is answered with no bytes and no end of file.
+        case emptyData = "emptydata"
+        /// No read is answered with more than 1,000 bytes; the length of every read asked for goes to
+        /// `sftp-reads.log`.
+        case shortReads = "shortreads"
+        /// The answer to the first question after the greeting is too short to name its request.
+        case shortPacket = "shortpacket"
     }
 
     let transport: SFTPTransport
@@ -41,13 +58,15 @@ final class FakeSFTPServer: @unchecked Sendable {
         try Self.script.write(to: script, atomically: true, encoding: .utf8)
         transport = SFTPTransport(
             executable: Self.python,
-            arguments: [script.path, mode.rawValue, root.path, String(delay.lowerBound), String(delay.upperBound)])
+            arguments: [script.path, mode.rawValue, root.path, String(delay.lowerBound), String(delay.upperBound)]
+        )
     }
 
     static let script = """
         import heapq, os, random, select, struct, sys, time
         mode, root, low, high = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4])
         handles = {}
+        folders = {}
         written = set()
         nextHandle = [1]
         log = open(os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), "sftp-requests.log"), "a")
@@ -63,8 +82,8 @@ final class FakeSFTPServer: @unchecked Sendable {
             return u32(len(value)) + value
         def packet(kind, body): return u32(len(body) + 1) + bytes([kind]) + body
         def status(ident, code, message=""): return packet(101, u32(ident) + u32(code) + string(message) + string(""))
-        def attributes(path):
-            info = os.lstat(path)
+        def attributes(path, follow=False):
+            info = os.stat(path) if follow else os.lstat(path)
             return u32(1 | 4 | 8) + struct.pack(">Q", info.st_size) + u32(info.st_mode) + u32(int(info.st_atime)) + u32(int(info.st_mtime))
 
         def send_later(data):
@@ -92,23 +111,62 @@ final class FakeSFTPServer: @unchecked Sendable {
             log.flush()
             if kind == 16:
                 name, at = take_string(body, at)
+                if mode == "shortpacket":
+                    os.write(1, packet(101, b"\\0\\0"))
+                    return
                 send_later(packet(104, u32(ident) + u32(1) + string("/") + string("/") + u32(0)))
             elif kind in (7, 17):
                 name, at = take_string(body, at)
                 path = os.path.join(root, name.decode().lstrip("/"))
                 if name.decode().endswith("hang") and mode in ("hang", "hangio"):
                     return
-                if os.path.lexists(path):
-                    send_later(packet(105, u32(ident) + attributes(path)))
-                else:
+                if kind == 17 and mode == "links":
+                    if name.decode().endswith("hang"):
+                        return
+                    if name.decode().endswith("die"):
+                        os._exit(0)
+                    if name.decode().endswith("deny"):
+                        send_later(status(ident, 3, "Permission denied"))
+                        return
+                try:
+                    send_later(packet(105, u32(ident) + attributes(path, follow=kind == 17)))
+                except OSError:
                     send_later(status(ident, 2, "No such file"))
+            elif kind == 11:
+                name, at = take_string(body, at)
+                if mode == "hangio":
+                    return
+                if not os.path.isdir(os.path.join(root, name.decode().lstrip("/"))):
+                    send_later(status(ident, 2, "No such file"))
+                    return
+                number = nextHandle[0]
+                nextHandle[0] += 1
+                folders[number] = os.path.join(root, name.decode().lstrip("/"))
+                send_later(packet(102, u32(ident) + string(str(number))))
+            elif kind == 12:
+                name, at = take_string(body, at)
+                folder = folders.get(int(name))
+                if folder is None:
+                    send_later(status(ident, 1, "EOF"))
+                    return
+                folders[int(name)] = None
+                names = sorted(os.listdir(folder))
+                answer = u32(ident) + u32(len(names))
+                for entry in names:
+                    answer += string(entry) + string(entry) + attributes(os.path.join(folder, entry))
+                if mode == "cutlisting":
+                    os.close(0)
+                    os.write(1, packet(104, answer))
+                    time.sleep(600)
+                send_later(packet(104, answer))
             elif kind == 3:
                 name, at = take_string(body, at)
                 (flags,) = struct.unpack_from(">I", body, at)
                 path = os.path.join(root, name.decode().lstrip("/"))
                 try:
                     if flags & 2:
-                        descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644)
+                        creating = (os.O_CREAT if flags & 8 else 0) | (os.O_EXCL if flags & 32 else 0)
+                        descriptor = os.open(path, os.O_WRONLY | creating, 0o644)
                     else:
                         descriptor = os.open(path, os.O_RDONLY)
                 except OSError as error:
@@ -127,8 +185,18 @@ final class FakeSFTPServer: @unchecked Sendable {
                 if mode == "failread" and offset >= 98304:
                     send_later(status(ident, 4, "Read failed"))
                     return
-                # Some answers are shorter than asked for.
-                if random.random() < 0.3:
+                if mode == "shortreads":
+                    with open(os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), "sftp-reads.log"), "a") as out:
+                        out.write(str(length) + "\\n")
+                    length = min(length, 1000)
+                elif mode == "emptydata":
+                    send_later(packet(103, u32(ident) + string(b"")))
+                    return
+                elif mode == "overlong":
+                    send_later(packet(103, u32(ident) + string(b"x" * (length + 10))))
+                    return
+                elif random.random() < 0.3:
+                    # Some answers are shorter than asked for.
                     length = random.randint(1, length)
                 data = os.pread(descriptor, length, offset)
                 if not data:
@@ -152,6 +220,7 @@ final class FakeSFTPServer: @unchecked Sendable {
             elif kind == 4:
                 name, at = take_string(body, at)
                 descriptor = handles.pop(int(name), None)
+                folders.pop(int(name), None)
                 if descriptor is not None:
                     os.close(descriptor)
                 if mode == "failclose" and int(name) in written:
@@ -161,6 +230,9 @@ final class FakeSFTPServer: @unchecked Sendable {
             elif kind == 8:
                 name, at = take_string(body, at)
                 info = os.fstat(handles[int(name)])
+                if mode == "nosize":
+                    send_later(packet(105, u32(ident) + u32(4) + u32(info.st_mode)))
+                    return
                 send_later(packet(105, u32(ident) + u32(1 | 4 | 8) + struct.pack(">Q", info.st_size) + u32(info.st_mode) + u32(int(info.st_atime)) + u32(int(info.st_mtime))))
             elif kind == 10:
                 name, at = take_string(body, at)
@@ -186,8 +258,6 @@ final class FakeSFTPServer: @unchecked Sendable {
                     send_later(status(ident, 0))
                 except OSError as error:
                     send_later(status(ident, 2 if error.errno == 2 else 4, str(error)))
-            elif kind == 11 and mode == "hangio":
-                return
             elif kind in (9, 10):
                 send_later(status(ident, 0))
             else:
@@ -279,7 +349,8 @@ final class FakeSFTPServer: @unchecked Sendable {
         let peak = Int((try? String(contentsOf: box.url("sftp-peak.log"), encoding: .utf8)) ?? "") ?? 0
         #expect(
             peak >= 4,
-            "at most \(peak) requests were unanswered at a time, after \(Date().timeIntervalSince(started)) s")
+            "at most \(peak) requests were unanswered at a time, after \(Date().timeIntervalSince(started)) s"
+        )
     }
 
     @Test func aFailingReadDeliversWhatCameBeforeIt() throws {
@@ -333,8 +404,11 @@ final class FakeSFTPServer: @unchecked Sendable {
         let box = try Sandbox()
         let server = try FakeSFTPServer(root: box.url("."), box: box, mode: .stalled)
         let channel = SFTPChannel(
-            executable: server.transport.executable, arguments: server.transport.arguments, environment: [:],
-            writeTimeout: 1)
+            executable: server.transport.executable,
+            arguments: server.transport.arguments,
+            environment: [:],
+            writeTimeout: 1
+        )
         try channel.start(timeout: 10, cancellation: nil) { true }
         defer { channel.close() }
         let started = Date()

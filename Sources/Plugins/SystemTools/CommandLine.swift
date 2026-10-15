@@ -69,7 +69,8 @@ struct TypedCommand: Equatable {
     /// only when no installed one has the name, or when it is asked for by path (`./Preview.app`).
     /// `path` is the PATH that decides whether a bare name is a program instead.
     func application(
-        relativeTo directory: URL, searching folders: [URL] = Self.applicationFolders,
+        relativeTo directory: URL,
+        searching folders: [URL] = Self.applicationFolders,
         path: String = Self.processPath
     ) -> URL? {
         let fm = FileManager.default
@@ -99,7 +100,12 @@ struct TypedCommand: Equatable {
 
     /// The PATH this process was started with. A program started from the Dock has a short
     /// one; the PATH of a terminal is `LoginShell.searchPath`.
-    static var processPath: String { ProcessInfo.processInfo.environment["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin" }
+    static var processPath: String { path(in: ProcessInfo.processInfo.environment) }
+
+    /// The PATH of `environment`; the system's usual one without.
+    static func path(in environment: [String: String]) -> String {
+        environment["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin"
+    }
 
     static let applicationFolders: [URL] = [
         URL(fileURLWithPath: "/Applications"), URL(fileURLWithPath: "/System/Applications"),
@@ -136,8 +142,8 @@ struct ProcessRunner {
     /// Without, nothing is read: the child writes into the void and is not waited for longer
     /// than it takes the shell to start it.
     var collectsOutput = true
-    /// The child's environment; nil gives it this program's.
-    var environment: [String: String]?
+    /// The child's environment; this program's unless told otherwise.
+    var environment = ProcessInfo.processInfo.environment
 
     /// All state is guarded by `lock`.
     private final class Buffer: @unchecked Sendable {
@@ -173,7 +179,7 @@ struct ProcessRunner {
         process.executableURL = executable
         process.arguments = arguments
         process.currentDirectoryURL = directory
-        if let environment { process.environment = environment }
+        process.environment = environment
         process.standardInput = FileHandle.nullDevice
         let buffer = Buffer()
         let (exited, drained) = (DispatchSemaphore(value: 0), DispatchSemaphore(value: 0))

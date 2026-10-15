@@ -12,7 +12,10 @@ struct ListRow: Equatable {
     let permissions: UInt16
 
     init(
-        name: String, isFolder: Bool, size: Int64 = 0, modified: Date = Date(timeIntervalSince1970: 0),
+        name: String,
+        isFolder: Bool,
+        size: Int64 = 0,
+        modified: Date = Date(timeIntervalSince1970: 0),
         permissions: UInt16 = 0o644
     ) {
         self.name = name
@@ -24,9 +27,12 @@ struct ListRow: Equatable {
 
     init(_ item: FileItem, path: String? = nil) {
         self.init(
-            name: path ?? item.name, isFolder: item.isFolder,
+            name: path ?? item.name,
+            isFolder: item.isFolder,
             size: item.isFolder ? (item.computedSize ?? 0) : item.size,
-            modified: item.modified, permissions: item.permissions)
+            modified: item.modified,
+            permissions: item.permissions
+        )
     }
 }
 
@@ -37,9 +43,10 @@ struct ListMask {
     private let exclude: FileMask?
 
     init(_ text: String) {
-        let parts = text.split(separator: "|", maxSplits: 1, omittingEmptySubsequences: false).map {
-            $0.trimmingCharacters(in: .whitespaces)
-        }
+        let parts = text.split(separator: "|", maxSplits: 1, omittingEmptySubsequences: false)
+            .map {
+                $0.trimmingCharacters(in: .whitespaces)
+            }
         // An empty include part means everything.
         include = parts.first.flatMap { $0.isEmpty ? nil : FileMask($0) }
         exclude = parts.count > 1 && !parts[1].isEmpty ? FileMask(parts[1]) : nil
@@ -67,18 +74,27 @@ struct ListCollector {
 
     private func rows(of items: [FileItem], prefix: String, level: Int) -> [ListRow] {
         let wanted = Sorter.sorted(
-            items.filter { $0.isRealDirectory || mask.matches($0.name) }, numeric: true, byName: \.name)
-        return Parallel.map(wanted) { item -> [ListRow] in
-            let path = prefix + item.name
-            var rows = [ListRow(item, path: path)]
-            guard item.isRealDirectory, depth < 0 || level < depth, !cancellation.isCancelled,
-                let children = try? fileSystems.provider(for: item.url).list(
-                    item.url, showHidden: showHidden, cancellation: cancellation),
-                !cancellation.isCancelled
-            else { return rows }
-            rows += self.rows(of: children, prefix: path + "/", level: level + 1)
-            return rows
-        }.flatMap { $0 }
+            items.filter { $0.isRealDirectory || mask.matches($0.name) },
+            numeric: true,
+            byName: \.name
+        )
+        return
+            Parallel.map(wanted) { item -> [ListRow] in
+                let path = prefix + item.name
+                var rows = [ListRow(item, path: path)]
+                guard item.isRealDirectory, depth < 0 || level < depth, !cancellation.isCancelled,
+                    let children = try? fileSystems.provider(for: item.url)
+                        .list(
+                            item.url,
+                            showHidden: showHidden,
+                            cancellation: cancellation
+                        ),
+                    !cancellation.isCancelled
+                else { return rows }
+                rows += self.rows(of: children, prefix: path + "/", level: level + 1)
+                return rows
+            }
+            .flatMap { $0 }
     }
 }
 
@@ -152,22 +168,31 @@ struct DirectoryListFormatter {
         let lines = body(rows)
         let hasHeader = !header.isEmpty
         let perPage = max(1, linesPerPage - (hasHeader ? 2 : 0))
-        let chunks = stride(from: 0, to: lines.count, by: perPage).map {
-            Array(lines[$0..<min($0 + perPage, lines.count)])
-        }
-        return chunks.enumerated().map { index, chunk in
-            guard hasHeader else { return chunk }
-            return [
-                Self.expand(
-                    header, directory: directory, page: index + 1, pages: chunks.count, now: now), ""
-            ] + chunk
-        }
+        let chunks = stride(from: 0, to: lines.count, by: perPage)
+            .map {
+                Array(lines[$0..<min($0 + perPage, lines.count)])
+            }
+        return chunks.enumerated()
+            .map { index, chunk in
+                guard hasHeader else { return chunk }
+                return [
+                    Self.expand(
+                        header,
+                        directory: directory,
+                        page: index + 1,
+                        pages: chunks.count,
+                        now: now
+                    ), ""
+                ] + chunk
+            }
     }
 
     /// The whole list as one text; pages are separated by a form feed, as text printers expect.
     func text(directory: String, rows: [ListRow], now: Date = Date()) -> String {
-        pages(directory: directory, rows: rows, now: now).map { $0.joined(separator: "\n") }.joined(
-            separator: "\n\u{0C}\n")
+        pages(directory: directory, rows: rows, now: now).map { $0.joined(separator: "\n") }
+            .joined(
+                separator: "\n\u{0C}\n"
+            )
     }
 }
 
@@ -193,17 +218,21 @@ final class PagePrintView: NSView {
         // The longest line decides the width a character may have; 0.6 em is the advance of the fixed-width system font.
         let longest = CGFloat(
             max(
-                longestLine ?? pages.reduce(0) { longest, page in page.reduce(longest) { max($0, $1.utf16.count) } }, 1
-            ))
+                longestLine ?? pages.reduce(0) { longest, page in page.reduce(longest) { max($0, $1.utf16.count) } },
+                1
+            )
+        )
         let size = max(4, min(11, lineHeight / 1.25, pageSize.width / longest / 0.6))
         attributes = [
             .font: NSFont.monospacedSystemFont(ofSize: size, weight: .regular), .foregroundColor: NSColor.black
         ]
-        super.init(
-            frame: NSRect(x: 0, y: 0, width: pageSize.width, height: pageSize.height * CGFloat(max(pages.count, 1))))
+        super
+            .init(
+                frame: NSRect(x: 0, y: 0, width: pageSize.width, height: pageSize.height * CGFloat(max(pages.count, 1)))
+            )
     }
 
-    required init?(coder _: NSCoder) { fatalError("not used") }
+    required init?(coder _: NSCoder) { nil }
 
     override var isFlipped: Bool { true }
 
@@ -220,8 +249,11 @@ final class PagePrintView: NSView {
         for (index, lines) in pages.enumerated() where rectForPage(index + 1).intersects(dirtyRect) {
             let top = CGFloat(index) * pageSize.height
             for (row, line) in lines.enumerated() {
-                (line as NSString).draw(
-                    at: NSPoint(x: 0, y: top + CGFloat(row) * lineHeight), withAttributes: attributes)
+                (line as NSString)
+                    .draw(
+                        at: NSPoint(x: 0, y: top + CGFloat(row) * lineHeight),
+                        withAttributes: attributes
+                    )
             }
         }
     }
