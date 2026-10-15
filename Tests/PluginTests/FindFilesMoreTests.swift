@@ -804,7 +804,7 @@ private final class ArchiveFake: FileSystemProvider {
 
 /// The window driven without being shown: its form, a search from start to finish, and what
 /// the buttons below the list do.
-@MainActor @Suite struct FindFilesWindow {
+@MainActor @Suite final class FindFilesWindow {
     final class Lists: FileListService {
         var shown: [(files: [URL], title: String, panel: any PanelHandle)] = []
         func show(_ files: [URL], title: String, in panel: any PanelHandle) { shown.append((files, title, panel)) }
@@ -829,6 +829,11 @@ private final class ArchiveFake: FileSystemProvider {
         )
     }
 
+    /// The window goes with the test: drawn later, its list would ask a kernel that is gone.
+    isolated deinit {
+        autoreleasepool { plugin.stop() }
+    }
+
     /// Fills the form like a user, runs the search and waits for its end.
     func search(_ change: (inout SearchSettings) -> Void) async {
         let window = window
@@ -837,7 +842,8 @@ private final class ArchiveFake: FileSystemProvider {
         change(&settings)
         window.form.settings = settings
         window.startSearch()
-        for _ in 0..<2_000 where window.isSearching { try? await Task.sleep(nanoseconds: 2_000_000) }
+        // The end comes over the main queue, shared with every other test: waited for, not timed.
+        #expect(await RunLoopWait.until { !window.isSearching })
     }
 
     @Test func registersCommandsMenusAndPreferences() {

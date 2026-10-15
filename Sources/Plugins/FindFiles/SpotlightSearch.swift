@@ -50,7 +50,8 @@ public enum SpotlightQuery {
             let flags = query.caseSensitive ? "" : "cd"
             parts.append(
                 query.textOptions.wholeWords
-                    ? "kMDItemTextContent == \"\(text)\"\(flags)w" : "kMDItemTextContent == \"*\(text)*\"\(flags)")
+                    ? "kMDItemTextContent == \"\(text)\"\(flags)w" : "kMDItemTextContent == \"*\(text)*\"\(flags)"
+            )
         }
         if let size = query.criteria.size {
             let bytes = size.bytes
@@ -140,15 +141,20 @@ final class SpotlightSearch: NSObject, @unchecked Sendable {
     private var completion: (@MainActor @Sendable ([String], Bool) -> Void)?
     private var isStopped = false
 
-    /// Nil when Spotlight does not understand the question.
-    init?(_ string: String, scopes: [URL]) {
-        guard let predicate = NSPredicate(fromMetadataQueryString: string) else { return nil }
+    /// The most paths read out of this answer.
+    let limit: Int
+
+    /// `string` is a question in Spotlight's language, as `SpotlightQuery.string` makes it (the
+    /// system stops the program at one it cannot read).
+    init(_ string: String, scopes: [URL], limit: Int = SpotlightSearch.resultLimit) {
+        let predicate = NSPredicate(fromMetadataQueryString: string)
         queue.maxConcurrentOperationCount = 1
         queue.qualityOfService = .userInitiated
         metadataQuery.predicate = predicate
         metadataQuery.searchScopes = scopes
         // The answer is delivered, and read, on this queue and not on the main run loop.
         metadataQuery.operationQueue = queue
+        self.limit = limit
         super.init()
     }
 
@@ -158,7 +164,11 @@ final class SpotlightSearch: NSObject, @unchecked Sendable {
         self.completion = completion
         lock.unlock()
         NotificationCenter.default.addObserver(
-            self, selector: #selector(finished), name: .NSMetadataQueryDidFinishGathering, object: metadataQuery)
+            self,
+            selector: #selector(finished),
+            name: .NSMetadataQueryDidFinishGathering,
+            object: metadataQuery
+        )
         if !metadataQuery.start() { queue.addOperation { [weak self] in self?.finished() } }
     }
 
@@ -187,15 +197,17 @@ final class SpotlightSearch: NSObject, @unchecked Sendable {
         metadataQuery.disableUpdates()
         var paths: [String] = []
         let total = metadataQuery.resultCount
-        let count = min(total, Self.resultLimit)
+        let count = min(total, limit)
         paths.reserveCapacity(count)
         var index = 0
         while index < count, !stopped {
             // The attribute values are autoreleased objects: a piece at a time.
             autoreleasepool {
                 for item in index..<min(index + 5_000, count) {
-                    if let path = (metadataQuery.result(at: item) as? NSMetadataItem)?.value(
-                        forAttribute: NSMetadataItemPathKey) as? String
+                    if let path = (metadataQuery.result(at: item) as? NSMetadataItem)?
+                        .value(
+                            forAttribute: NSMetadataItemPathKey
+                        ) as? String
                     {
                         paths.append(path)
                     }

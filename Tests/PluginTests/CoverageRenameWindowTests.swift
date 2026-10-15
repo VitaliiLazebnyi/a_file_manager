@@ -47,7 +47,8 @@ import Testing
 
     /// The window goes with the test: drawn later, it would ask a kernel that is gone.
     isolated deinit {
-        controller.close()
+        // What closing hands to the autorelease pool is let go of while the window still lives.
+        autoreleasepool { controller.close() }
     }
 
     var ui: ScriptedInteraction { bench.interaction }

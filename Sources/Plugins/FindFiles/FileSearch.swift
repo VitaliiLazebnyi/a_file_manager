@@ -90,10 +90,10 @@ public struct SearchMask: @unchecked Sendable {
     /// `name.*` and `name.` also match `name` without an extension, as under DOS.
     static func wildcard(_ pattern: [Character], _ name: [Character]) -> Bool {
         if pattern.count == 3, pattern == ["*", ".", "*"] { return true }
-        if glob(pattern[...], name[...]) { return true }
+        if glob(ArraySlice(pattern), ArraySlice(name)) { return true }
         guard !name.contains(".") else { return false }
-        if pattern.count >= 2, pattern.suffix(2) == [".", "*"] { return glob(pattern.dropLast(2), name[...]) }
-        if pattern.last == "." { return glob(pattern.dropLast(), name[...]) }
+        if pattern.count >= 2, pattern.suffix(2) == [".", "*"] { return glob(pattern.dropLast(2), ArraySlice(name)) }
+        if pattern.last == "." { return glob(pattern.dropLast(), ArraySlice(name)) }
         return false
     }
 
@@ -157,8 +157,12 @@ public struct SearchQuery: Sendable {
     public var resultLimit: Int?
 
     public init(
-        directory: URL, names: String = "", text: String = "", caseSensitive: Bool = false,
-        includeHidden: Bool = false, maxDepth: Int? = nil
+        directory: URL,
+        names: String = "",
+        text: String = "",
+        caseSensitive: Bool = false,
+        includeHidden: Bool = false,
+        maxDepth: Int? = nil
     ) {
         self.directory = directory
         self.names = names
@@ -172,12 +176,15 @@ public struct SearchQuery: Sendable {
     /// all subdirectories are searched, one that lies inside another.
     public var directories: [URL] {
         let all = [directory] + moreDirectories
-        return all.enumerated().filter { index, url in
-            !all.enumerated().contains { other, outer in
-                other != index
-                    && (url.isSameLocation(as: outer) ? other < index : maxDepth == nil && url.isInside(outer))
+        return all.enumerated()
+            .filter { index, url in
+                !all.enumerated()
+                    .contains { other, outer in
+                        other != index
+                            && (url.isSameLocation(as: outer) ? other < index : maxDepth == nil && url.isInside(outer))
+                    }
             }
-        }.map(\.element)
+            .map(\.element)
     }
 }
 
@@ -231,7 +238,10 @@ public final class FileSearch: @unchecked Sendable {
     static let duplicateCandidateLimit = 3_000_000
 
     public convenience init(
-        _ query: SearchQuery, fileSystems: FileSystemRegistry, columns: ColumnRegistry? = nil, now: Date = Date()
+        _ query: SearchQuery,
+        fileSystems: FileSystemRegistry,
+        columns: ColumnRegistry? = nil,
+        now: Date = Date()
     ) {
         self.init(query, fileSystems: fileSystems, columns: columns, now: now, tuning: Tuning())
     }
@@ -243,7 +253,10 @@ public final class FileSearch: @unchecked Sendable {
     }
 
     init(
-        _ query: SearchQuery, fileSystems: FileSystemRegistry, columns: ColumnRegistry? = nil, now: Date = Date(),
+        _ query: SearchQuery,
+        fileSystems: FileSystemRegistry,
+        columns: ColumnRegistry? = nil,
+        now: Date = Date(),
         tuning: Tuning
     ) {
         (budget, partialListingAfter) = (tuning.budget, tuning.partialListingAfter)
@@ -254,7 +267,8 @@ public final class FileSearch: @unchecked Sendable {
         criteria = query.criteria.prepared(now: now)
         fields = Dictionary(
             SearchField.all(fileSystems: fileSystems, columns: columns).map { ($0.id, $0) },
-            uniquingKeysWith: { first, _ in first })
+            uniquingKeysWith: { first, _ in first }
+        )
         fieldRules = query.fieldRules.prepared(trip: fieldTrip)
         var problem: any Error? = mask.isValid ? nil : TextPattern.Problem.badRegex(query.names)
         if problem == nil, let rule = query.fieldRules.unusableRule {
@@ -306,10 +320,12 @@ public final class FileSearch: @unchecked Sendable {
             DispatchQueue.global(qos: .utility).async { withExtendedLifetime(dropped) {} }
         }
         if let only = query.onlyItems {
-            let items = Parallel.map(only) { url -> FileItem? in
-                guard !self.cancellation.isCancelled else { return nil }
-                return (try? self.fileSystems.provider(for: url))?.item(at: url, cancellation: self.cancellation)
-            }.compactMap { $0 }
+            let items =
+                Parallel.map(only) { url -> FileItem? in
+                    guard !self.cancellation.isCancelled else { return nil }
+                    return (try? self.fileSystems.provider(for: url))?.item(at: url, cancellation: self.cancellation)
+                }
+                .compactMap { $0 }
             guard !cancellation.isCancelled else { return }
             let searchedInside = { (item: FileItem) in item.isRealDirectory && self.query.maxDepth != 0 }
             let folders = items.filter(searchedInside)
@@ -397,19 +413,25 @@ public final class FileSearch: @unchecked Sendable {
     /// held while they are compared, so a search stops at `duplicateCandidateLimit` of them
     /// and says so (`reachedResultLimit`).
     public func runForDuplicates(
-        onDirectory: (URL) -> Void = { _ in }, onHashing: (@Sendable (Int, Int) -> Void)? = nil
+        onDirectory: (URL) -> Void = { _ in },
+        onHashing: (@Sendable (Int, Int) -> Void)? = nil
     )
         -> [[FileItem]]
     {
         var files: [FileItem] = []
         runWalk(
-            limit: min(query.resultLimit ?? Int.max, Self.duplicateCandidateLimit), onDirectory: onDirectory
+            limit: min(query.resultLimit ?? Int.max, Self.duplicateCandidateLimit),
+            onDirectory: onDirectory
         ) {
             if !$0.isDirectory { files.append($0) }
         }
         return DuplicateFinder.groups(
-            of: files, options: query.duplicates, fileSystems: fileSystems, cancellation: cancellation,
-            onProgress: onHashing)
+            of: files,
+            options: query.duplicates,
+            fileSystems: fileSystems,
+            cancellation: cancellation,
+            onProgress: onHashing
+        )
     }
 
     /// Whether an item found by other means (Spotlight) passes the criteria. Without
@@ -489,7 +511,7 @@ public final class FileSearch: @unchecked Sendable {
 
         init(_ search: FileSearch) {
             self.search = search
-            jobs.shouldHold = { [weak self] job in self?.shouldHold(job) ?? false }
+            jobs.shouldHold = { [weak self] job in self?.shouldHold(job) == true }
         }
 
         /// Ends the walk early (the result limit): what is left is dropped.
@@ -710,7 +732,8 @@ public final class FileSearch: @unchecked Sendable {
             // The tests of this folder go first: they are needed first.
             jobs.push(
                 publish(node, candidates: wanted, children: children)
-                    + children.map { child in JobStack.Job(node: child, isListing: true) { self.list(child) } })
+                    + children.map { child in JobStack.Job(node: child, isListing: true) { self.list(child) } }
+            )
         }
 
         /// Makes a node's candidates and subfolders known, all at once under the lock (the
