@@ -35,6 +35,19 @@ autoclosure (an `assert` message, a `MainThread.assert("…")` message, a lazy d
     seams that already exist (protocols, injected providers, `ScriptedFileSystem`-style fakes, a file
     without permissions, a missing executable). Do not add test-only hooks that weaken the program;
     a seam that improves the design (dependency injection of a provider) is fine.
+- **No test reaches the real desktop.** The tests run in the logged-in session of the VM the owner
+  watches: a test must never open a URL, a file or an application (`NSWorkspace` `open`,
+  `openApplication`, `activateFileViewerSelecting`), ask Finder or another application anything
+  (`osascript`, Apple events), play a sound (`NSSound.beep`, `NSBeep`, `NSSound(named:)`), print,
+  quit or hide the app (`NSApp.terminate`, `miniaturize`), or show a modal panel or alert
+  (`runModal`). Those calls go through the seams that exist (the `launchesApplications: false`
+  switch of the plugins, injected closures such as the viewer's `opener`, the kernel's interaction)
+  or a seam you add in the same style; tests use the silent, recording side and check what was asked.
+  The thin adapter that finally calls the system stays one forwarding line and is covered by the UI
+  tests (their coverage counts, the coordinator runs them), never by calling it from a unit test.
+- **Every test closes what it opens**: windows, panels, sheets, popovers and menus are closed
+  (`close()` / `orderOut`, `endSheet`, `cancelTracking`) before the test ends, also when it fails
+  (`defer`); temporary folders are removed.
 - Behaviour does not change, except for real bugs you find: fix them with a test and list them in your
   report.
 - AppKit code: drive it in unit tests as the existing ShellTests / PluginTests do (create the views and
