@@ -9,6 +9,13 @@ struct TarHeader {
         case other
     }
 
+    static let blockSize = 512
+    /// Sizes beyond this are not sizes of anything: a header that claims more is damaged.
+    static let maxSize = UInt64(Int64.max)
+
+    /// Two empty blocks end an archive.
+    static let endOfArchive = Data(count: 2 * blockSize)
+
     var path: String
     var kind: Kind = .file
     var size: UInt64 = 0
@@ -22,10 +29,6 @@ struct TarHeader {
     var realSize: UInt64?
     /// (Old GNU sparse format.) More blocks describing the pieces follow the header.
     var hasSparseExtension = false
-
-    static let blockSize = 512
-    /// Sizes beyond this are not sizes of anything: a header that claims more is damaged.
-    static let maxSize = UInt64(Int64.max)
 
     /// Whether a block looks like a TAR header: its checksum fits.
     static func looksLikeHeader(_ block: Data) -> Bool {
@@ -107,7 +110,7 @@ struct TarHeader {
     /// the whole record, its own digits included; a record that says less ends the list.
     static func paxRecords(_ data: Data) -> [String: String] {
         var records: [String: String] = [:]
-        var rest = data[...]
+        var rest = data
         while let space = rest.firstIndex(of: 32), space - rest.startIndex <= 20,
             let length = Int(String(decoding: rest[..<space], as: UTF8.self)), length > space - rest.startIndex + 1,
             rest.count >= length
@@ -135,7 +138,12 @@ struct TarHeader {
     }
 
     private static func block(
-        name: String, prefix: String = "", typeFlag: UInt8, size: UInt64, modified: Date, permissions: UInt16,
+        name: String,
+        prefix: String = "",
+        typeFlag: UInt8,
+        size: UInt64,
+        modified: Date,
+        permissions: UInt16,
         linkTarget: String = ""
     ) -> Data {
         var block = [UInt8](repeating: 0, count: blockSize)
@@ -156,6 +164,26 @@ struct TarHeader {
         block[154] = 0
         block[155] = 32
         return Data(block)
+    }
+
+    /// Pax records for the keys and values, each `<length> <key>=<value>\n`.
+    private static func encodedRecords(_ extended: [(String, String)]) -> Data {
+        var records = Data()
+        for (key, value) in extended {
+            // The length counts itself, so it is found by trying.
+            let body = " \(key)=\(value)\n"
+            var length = body.utf8.count + 1
+            while String(length).utf8.count + body.utf8.count != length {
+                length = String(length).utf8.count + body.utf8.count
+            }
+            records.append(Data("\(length)\(body)".utf8))
+        }
+        return records
+    }
+
+    /// The zero bytes that fill a member's data up to a whole block.
+    static func padding(after size: UInt64) -> Data {
+        Data(count: Int((UInt64(blockSize) - size % UInt64(blockSize)) % UInt64(blockSize)))
     }
 
     /// The header blocks for this member: one ustar header, preceded by a pax record when the
@@ -183,38 +211,33 @@ struct TarHeader {
         if size > 0o77777777777 { extended.append(("size", String(size))) }
         var data = Data()
         if !extended.isEmpty {
-            var records = Data()
-            for (key, value) in extended {
-                // The length counts itself, so it is found by trying.
-                let body = " \(key)=\(value)\n"
-                var length = body.utf8.count + 1
-                while String(length).utf8.count + body.utf8.count != length {
-                    length = String(length).utf8.count + body.utf8.count
-                }
-                records.append(Data("\(length)\(body)".utf8))
-            }
+            let records = Self.encodedRecords(extended)
             data.append(
                 Self.block(
-                    name: "PaxHeader/" + String(name.suffix(80)), typeFlag: 120, size: UInt64(records.count),
-                    modified: modified, permissions: 0o644))
+                    name: "PaxHeader/" + String(name.suffix(80)),
+                    typeFlag: 120,
+                    size: UInt64(records.count),
+                    modified: modified,
+                    permissions: 0o644
+                )
+            )
             data.append(records)
             data.append(Self.padding(after: UInt64(records.count)))
         }
         let typeFlag: UInt8 = kind == .directory ? 53 : kind == .symbolicLink ? 50 : kind == .hardLink ? 49 : 48
         data.append(
             Self.block(
-                name: name, prefix: prefix, typeFlag: typeFlag, size: kind == .file ? size : 0, modified: modified,
-                permissions: permissions, linkTarget: linkTarget))
+                name: name,
+                prefix: prefix,
+                typeFlag: typeFlag,
+                size: kind == .file ? size : 0,
+                modified: modified,
+                permissions: permissions,
+                linkTarget: linkTarget
+            )
+        )
         return data
     }
-
-    /// The zero bytes that fill a member's data up to a whole block.
-    static func padding(after size: UInt64) -> Data {
-        Data(count: Int((UInt64(blockSize) - size % UInt64(blockSize)) % UInt64(blockSize)))
-    }
-
-    /// Two empty blocks end an archive.
-    static let endOfArchive = Data(count: 2 * blockSize)
 }
 
 /// Reads a TAR archive from a stream, member by member. After `next()` the member's data must
@@ -232,6 +255,29 @@ final class TarReader {
     init(_ stream: any ByteStream, control: StreamInterrupt? = nil) {
         self.stream = stream
         self.control = control
+    }
+
+    /// The header with what the extension records in front of it say.
+    private static func applying(longName: String?, longLink: String?, pax: [String: String], to member: TarHeader)
+        throws -> TarHeader
+    {
+        var header = member
+        if let longName { header.path = longName }
+        if let longLink { header.linkTarget = longLink }
+        if let path = pax["path"] { header.path = path }
+        if let link = pax["linkpath"] { header.linkTarget = link }
+        if let size = pax["size"].flatMap(UInt64.init) { header.size = size }
+        if let time = pax["mtime"].flatMap(Double.init) { header.modified = TarHeader.date(time) }
+        if pax.keys.contains(where: { $0.hasPrefix("GNU.sparse.") }) {
+            header.isSparse = true
+            if let name = pax["GNU.sparse.name"] { header.path = name }
+            header.realSize =
+                (pax["GNU.sparse.realsize"] ?? pax["GNU.sparse.size"]).flatMap(UInt64.init) ?? header.realSize
+        }
+        guard header.size <= TarHeader.maxSize else {
+            throw ArchiveError.damaged("a TAR header gives an impossible size")
+        }
+        return header
     }
 
     private func block() throws -> Data? {
@@ -262,7 +308,9 @@ final class TarReader {
         var longName: String?
         var longLink: String?
         var pax: [String: String] = [:]
-        while true {
+        var header: TarHeader
+        // The extension records in front of a member, then the member itself.
+        records: while true {
             try control?.check()
             guard let data = try block() else { return nil }
             // An empty block ends the archive.
@@ -270,48 +318,35 @@ final class TarReader {
             guard let (parsed, typeFlag) = TarHeader.parse(data) else {
                 throw ArchiveError.damaged("a TAR header has a wrong checksum")
             }
-            var header = parsed
             func text(_ data: Data) -> String { String(decoding: data.prefix { $0 != 0 }, as: UTF8.self) }
             switch typeFlag {
-            case 76: longName = text(try payload(header.size))  // GNU long name
-            case 75: longLink = text(try payload(header.size))  // GNU long link
-            case 120: pax.merge(TarHeader.paxRecords(try payload(header.size))) { _, new in new }
-            case 103: _ = try payload(header.size)  // pax global header
+            case 76: longName = text(try payload(parsed.size))  // GNU long name
+            case 75: longLink = text(try payload(parsed.size))  // GNU long link
+            case 120: pax.merge(TarHeader.paxRecords(try payload(parsed.size))) { _, new in new }
+            case 103: _ = try payload(parsed.size)  // pax global header
 
             default:
-                if let longName { header.path = longName }
-                if let longLink { header.linkTarget = longLink }
-                if let path = pax["path"] { header.path = path }
-                if let link = pax["linkpath"] { header.linkTarget = link }
-                if let size = pax["size"].flatMap(UInt64.init) { header.size = size }
-                if let time = pax["mtime"].flatMap(Double.init) { header.modified = TarHeader.date(time) }
-                if pax.keys.contains(where: { $0.hasPrefix("GNU.sparse.") }) {
-                    header.isSparse = true
-                    if let name = pax["GNU.sparse.name"] { header.path = name }
-                    header.realSize =
-                        (pax["GNU.sparse.realsize"] ?? pax["GNU.sparse.size"]).flatMap(UInt64.init) ?? header.realSize
-                }
-                guard header.size <= TarHeader.maxSize else {
-                    throw ArchiveError.damaged("a TAR header gives an impossible size")
-                }
-                // The list of pieces of an old-style sparse file goes on in further blocks.
-                var extended = header.hasSparseExtension
-                while extended {
-                    guard let more = try block() else {
-                        throw ArchiveError.damaged("the TAR archive ends in the middle of a header")
-                    }
-                    extended = more[more.startIndex + 504] != 0
-                }
-                if header.kind == .file, header.path.hasSuffix("/") { header.kind = .directory }
-                // Only files carry data; a size on anything else is not followed by blocks.
-                pendingData = header.kind == .file || header.kind == .other ? header.size : 0
-                if header.kind == .hardLink || header.kind == .symbolicLink || header.kind == .directory {
-                    pendingData = 0
-                }
-                pendingPadding = UInt64(TarHeader.padding(after: pendingData).count)
-                return header
+                header = parsed
+                break records
             }
         }
+        header = try Self.applying(longName: longName, longLink: longLink, pax: pax, to: header)
+        // The list of pieces of an old-style sparse file goes on in further blocks.
+        var extended = header.hasSparseExtension
+        while extended {
+            guard let more = try block() else {
+                throw ArchiveError.damaged("the TAR archive ends in the middle of a header")
+            }
+            extended = more[more.startIndex + 504] != 0
+        }
+        if header.kind == .file, header.path.hasSuffix("/") { header.kind = .directory }
+        // Only files carry data; a size on anything else is not followed by blocks.
+        pendingData = header.kind == .file || header.kind == .other ? header.size : 0
+        if header.kind == .hardLink || header.kind == .symbolicLink || header.kind == .directory {
+            pendingData = 0
+        }
+        pendingPadding = UInt64(TarHeader.padding(after: pendingData).count)
+        return header
     }
 
     /// The next block of the current member's data; nil at its end.
@@ -336,37 +371,5 @@ final class TarReader {
 
     func close() {
         stream.close()
-    }
-}
-
-/// The data of the member a `TarReader` stands on, as a stream.
-final class TarMemberStream: ByteStream {
-    private let reader: TarReader
-    private let closesReader: Bool
-    private var onClose: ((Bool) -> Void)?
-    private var failed = false
-
-    /// With `closesReader: false` the reader goes on to the next member afterwards; `onClose`
-    /// is then told, once, that the reader is free again, and whether it can still be used
-    /// (it cannot after an error).
-    init(_ reader: TarReader, closesReader: Bool = true, onClose: ((Bool) -> Void)? = nil) {
-        self.reader = reader
-        self.closesReader = closesReader
-        self.onClose = onClose
-    }
-
-    func read(upToCount count: Int) throws -> Data? {
-        do {
-            return try reader.readData(upToCount: count)
-        } catch {
-            failed = true
-            throw error
-        }
-    }
-
-    func close() {
-        if closesReader { reader.close() }
-        onClose?(!failed)
-        onClose = nil
     }
 }

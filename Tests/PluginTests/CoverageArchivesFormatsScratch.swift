@@ -53,7 +53,9 @@ internal struct CoverageArchivesFormatsScratch {
     internal func namesThatOnlyLookLikeLeftoversAreNotTouched() throws {
         let parent = try box.folder("scratch")
         let names = [
-            "\(ScratchFolder.prefix)none", "\(ScratchFolder.prefix)0-x", "\(ScratchFolder.prefix)\(getpid())-x"
+            "\(ScratchFolder.prefix)none", "\(ScratchFolder.prefix)0-x", "\(ScratchFolder.prefix)\(getpid())-x",
+            // The system's own first process: running, and not this user's to ask about.
+            "\(ScratchFolder.prefix)1-x"
         ]
         for name in names {
             try FileManager.default.createDirectory(
