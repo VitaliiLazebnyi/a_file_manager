@@ -38,7 +38,8 @@ internal struct CrossRequestTests {
     internal func aBrokenPipeIsAnErrorHereAndStillEndsTheProgramsWeStart() {
         _ = Kernel(productName: "Test", settings: MemorySettings(), interaction: ScriptedInteraction())
         // Writing to a pipe nobody reads fails; it does not end the program.
-        var ends: [Int32] = [0, 0]
+        // Not 0: should the pipe not be made, nothing is closed that is somebody else's.
+        var ends: [Int32] = [-1, -1]
         #expect(pipe(&ends) == 0)
         close(ends[0])
         let written = write(ends[1], "x", 1)

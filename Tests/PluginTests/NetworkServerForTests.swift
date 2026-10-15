@@ -497,7 +497,12 @@ private final class Session {
                 reply("500 Unknown command")
                 break
             }
-            if let passive { close(passive) }
+            // Forgotten as soon as it is closed: should no new one be had, the number may soon be
+            // somebody else's, and a later transfer or the end of the session would close that.
+            if let old = passive {
+                close(old)
+                passive = nil
+            }
             guard let listener = try? TestFTPServer.listen() else {
                 reply("425 No port")
                 break
