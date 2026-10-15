@@ -246,49 +246,19 @@ public final class MacIntegrationPlugin: Plugin {
             Command(Self.openWithDefault, "Open with Default Application", runsDuringJobs: true),
             enabled: { cursorItem() != nil }
         ) { [self] in
-            guard let url = cursorItem() else { return }
-            remember("open \(url.path)")
-            open([url], with: nil)
+            // Offered only on a local item.
+            _ = cursorItem()
+                .map { url in
+                    remember("open \(url.path)")
+                    open([url], with: nil)
+                }
         }
         commands.register(
             Command(Self.openWith, "Open With…", runsDuringJobs: true),
             enabled: { cursorItem() != nil }
         ) { [self] in
-            guard let url = cursorItem() else { return }
-            let applications = applications
-            // Launch Services looks at the file to know what opens it; on a volume that has
-            // stopped answering that never returns. It is asked in a job, which can be cancelled.
-            kernel.jobs.run(
-                title: "Applications:",
-                work: { monitor -> [URL]? in
-                    BlockingCalls.answer(
-                        from: Self.launchServices,
-                        to: "applications " + url.path,
-                        cancellation: monitor.cancellation
-                    ) { _ in applications(url) }
-                },
-                completion: { [self] found in
-                    guard let candidates = found else { return }
-                    let rows = candidates.enumerated()
-                        .map {
-                            Self.applicationName($0.element) + ($0.offset == 0 ? " (default)" : "")
-                        }
-                    guard
-                        let row = kernel.interaction.pickRow(
-                            "Open “\(DisplayText.oneLine(url.lastPathComponent))” with",
-                            rows: rows + ["Other…"],
-                            button: "Open"
-                        )
-                    else { return }
-                    guard
-                        let application = candidates.indices.contains(row)
-                            ? candidates[row]
-                            : chooseApplication(title: "Choose an application")
-                    else { return }
-                    remember("open-with \(Self.applicationName(application)) \(url.path)")
-                    open([url], with: application)
-                }
-            )
+            // Offered only on a local item.
+            _ = cursorItem().map { url in openWith(url, in: kernel) }
         }
         commands.register(
             Command(.revealInFinder, "Reveal in Finder", [.cmd("r", .shift)], runsDuringJobs: true),
@@ -298,10 +268,12 @@ public final class MacIntegrationPlugin: Plugin {
             let launches = launchesApplications
             // Finder is shown the first items of a very large selection; it could not show more.
             withLocalOperands(of: model(), { Array($0.prefix(Self.revealLimit)) }) { [self] urls in
-                remember("reveal " + Self.described(urls.isEmpty ? [directory] : urls))
+                // Without operands, the folder itself.
+                let shown = urls.isEmpty ? [directory] : urls
+                remember("reveal " + Self.described(shown))
                 guard launches else { return }
                 // Finder is asked away from the main thread: it looks at every file it is to select.
-                BlockingCalls.run { NSWorkspace.shared.activateFileViewerSelecting(urls.isEmpty ? [directory] : urls) }
+                BlockingCalls.run { NSWorkspace.shared.activateFileViewerSelecting(shown) }
             }
         }
 
@@ -429,6 +401,44 @@ public final class MacIntegrationPlugin: Plugin {
     public func stop() {
         subscription = nil
         if launchesApplications { quickLook.close() }
+    }
+
+    /// Lets the user pick the application that opens `url`: one of those that open it, or another.
+    private func openWith(_ url: URL, in kernel: Kernel) {
+        let applications = applications
+        // Launch Services looks at the file to know what opens it; on a volume that has
+        // stopped answering that never returns. It is asked in a job, which can be cancelled.
+        kernel.jobs.run(
+            title: "Applications:",
+            work: { monitor -> [URL]? in
+                BlockingCalls.answer(
+                    from: Self.launchServices,
+                    to: "applications " + url.path,
+                    cancellation: monitor.cancellation
+                ) { _ in applications(url) }
+            },
+            completion: { [self] found in
+                guard let candidates = found else { return }
+                let rows = candidates.enumerated()
+                    .map {
+                        Self.applicationName($0.element) + ($0.offset == 0 ? " (default)" : "")
+                    }
+                guard
+                    let row = kernel.interaction.pickRow(
+                        "Open “\(DisplayText.oneLine(url.lastPathComponent))” with",
+                        rows: rows + ["Other…"],
+                        button: "Open"
+                    )
+                else { return }
+                guard
+                    let application = candidates.indices.contains(row)
+                        ? candidates[row]
+                        : chooseApplication(title: "Choose an application")
+                else { return }
+                remember("open-with \(Self.applicationName(application)) \(url.path)")
+                open([url], with: application)
+            }
+        )
     }
 
     /// Lets the user pick an application from the Applications folder. Never in tests.
