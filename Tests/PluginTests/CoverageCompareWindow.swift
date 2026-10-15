@@ -177,7 +177,7 @@ internal struct CoverageCompareWindow {
     internal func closingWithUnsavedEditsAsksFirst() {
         let stage = CoverageCompareStage(left: Self.left, right: Self.right)
         defer { stage.close() }
-        #expect(stage.recorder.presented == 1)
+        #expect(stage.recorder.presenter.presented.count == 1)
         stage.toggle("Edit mode")
         stage.session.copy(rows: 3..<4, to: .right)
         stage.bench.interaction.choiceAnswers = [2]

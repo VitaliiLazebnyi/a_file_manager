@@ -15,8 +15,8 @@ internal final class CoverageCompareStage {
     /// What the window asked of the desktop.
     @MainActor
     internal final class Recorder {
-        /// How often the window asked to be put on the desktop (it never is: tests keep it off screen).
-        internal var presented = 0
+        /// Where the window is put instead of on the desktop: tests keep it off screen.
+        internal let presenter = StabilityPresenter()
         /// How often the window beeped.
         internal var beeps = 0
         /// How often the font panel was asked for.
@@ -29,7 +29,7 @@ internal final class CoverageCompareStage {
         /// The effects that record into this.
         internal var effects: CompareWindowEffects {
             CompareWindowEffects(
-                present: { [weak self] _ in self?.presented += 1 },
+                present: { [presenter] in presenter.present($0) },
                 beep: { [weak self] in self?.beeps += 1 },
                 chooseFile: { [weak self] _, done in
                     done(self?.chosen.isEmpty == false ? self?.chosen.removeFirst() : nil)
@@ -56,6 +56,8 @@ internal final class CoverageCompareStage {
     internal private(set) var controller: CompareWindowController?
     /// Whether the window told that it closed.
     internal private(set) var wasClosed = false
+    /// The compare windows of this stage that come on screen or stay open.
+    internal let windows = StabilityWindows { $0.title == "Compare contents (coverage)" }
 
     /// The window.
     internal var window: NSWindow? { controller?.window }
@@ -120,6 +122,9 @@ internal final class CoverageCompareStage {
     internal func close() {
         controller?.close()
         controller = nil
+        recorder.presenter.closeAll()
+        #expect(windows.shown.isEmpty && windows.open.isEmpty)
+        windows.closeAll()
     }
 
     /// Every view of `type` in the window, in the order of the view tree.

@@ -24,13 +24,19 @@ internal struct CovComparePlugin {
     @Test
     internal func aWindowClosedBeforeItsComparisonLetsItGo() async {
         var effects = CompareWindowEffects.system
+        // Counted, not kept: the window's controller must be able to go.
         var presented = 0
+        let windowWatch = StabilityWindows { $0.title.hasPrefix("Compare contents") }
         effects.present = { _ in presented += 1 }
         effects.beep = {
             // Silent.
         }
         let plugin = CompareContentPlugin(opensWindows: true, effects: effects)
-        defer { plugin.stop() }
+        defer {
+            plugin.stop()
+            #expect(windowWatch.shown.isEmpty && windowWatch.open.isEmpty)
+            windowWatch.closeAll()
+        }
         let bench = bench(plugin)
         memory.stallsReads = true
         bench.commands.perform(.compareByContent, .text("mem:/A/a.txt\nmem:/B/a.txt"))

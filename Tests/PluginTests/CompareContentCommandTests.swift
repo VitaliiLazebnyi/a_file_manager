@@ -359,12 +359,18 @@ import Testing
         memory.addFile("/A/data.bin", "\u{0}\u{1}binary")
         memory.addFile("/B/data.bin", "\u{0}\u{1}BINARY and more")
         // The windows are made but never put on the desktop: `present` only counts.
-        var presented = 0
+        let presenter = StabilityPresenter()
+        let windowWatch = StabilityWindows { $0.title.hasPrefix("Compare contents") }
         var effects = CompareWindowEffects.system
-        effects.present = { _ in presented += 1 }
+        effects.present = { [presenter] in presenter.present($0) }
         effects.beep = {}
         let plugin = CompareContentPlugin(opensWindows: true, effects: effects)
-        defer { plugin.stop() }
+        defer {
+            plugin.stop()
+            presenter.closeAll()
+            #expect(windowWatch.shown.isEmpty && windowWatch.open.isEmpty)
+            windowWatch.closeAll()
+        }
         let bench = TestBench(
             plugins: [plugin],
             fileSystems: [memory],
@@ -396,7 +402,7 @@ import Testing
         bench.left.moveCursor(toName: "data.bin")
         bench.commands.perform(.compareByContent)
         await spin { windows().count == 2 && plugin.sessions.last?.phase == .ready }
-        #expect(windows().count == 2 && plugin.sessions.last?.isBinary == true && presented == 3)
+        #expect(windows().count == 2 && plugin.sessions.last?.isBinary == true && presenter.presented.count == 3)
         windows().forEach { $0.displayIfNeeded() }
         plugin.stop()
         #expect(windows().isEmpty && plugin.sessions.isEmpty)
