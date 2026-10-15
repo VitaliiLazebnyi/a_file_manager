@@ -73,6 +73,12 @@ internal struct InteractionProgressWindowTests {
     /// job; it goes when the queue is empty.
     @Test
     internal func theWindowsButtonsActOnTheJob() async throws {
+        // Nothing comes on the screen, and nothing is left open.
+        let windows = StabilityWindows()
+        defer {
+            #expect(windows.shown.isEmpty && windows.open.isEmpty, "\(windows.shown) \(windows.openTitles)")
+            windows.closeAll()
+        }
         let screen = Screen()
         let (service, window) = Self.makeService(screen)
         let reporter = InteractionProgressTests.Reporter()
@@ -108,6 +114,12 @@ internal struct InteractionProgressWindowTests {
     /// shows no title.
     @Test
     internal func theWindowCarriesOnWithTheNextJob() async {
+        // Nothing comes on the screen, and nothing is left open.
+        let windows = StabilityWindows()
+        defer {
+            #expect(windows.shown.isEmpty && windows.open.isEmpty, "\(windows.shown) \(windows.openTitles)")
+            windows.closeAll()
+        }
         let screen = Screen()
         // The display holds the main window weakly: the test keeps it.
         let (service, window) = Self.makeService(screen)
@@ -136,6 +148,13 @@ internal struct InteractionProgressWindowTests {
     /// window is back.
     @Test
     internal func theWindowWaitsForTheMainWindow() async {
+        // Nothing is left open. (`shown` is not asked: a window that was never on screen reports
+        // itself unoccluded when it is ordered out, or here when the test says it became key.)
+        let windows = StabilityWindows()
+        defer {
+            #expect(windows.open.isEmpty, "\(windows.openTitles)")
+            windows.closeAll()
+        }
         let screen = Screen()
         screen.mainWindowIsShown = false
         let (service, window) = Self.makeService(screen)
@@ -161,6 +180,12 @@ internal struct InteractionProgressWindowTests {
     /// two jobs it shows no title; the end of a job it does not show changes nothing.
     @Test
     internal func aDisplayWithoutAQueueAndBetweenJobs() throws {
+        // Nothing comes on the screen, and nothing is left open.
+        let windows = StabilityWindows()
+        defer {
+            #expect(windows.shown.isEmpty && windows.open.isEmpty, "\(windows.shown) \(windows.openTitles)")
+            windows.closeAll()
+        }
         let screen = Screen()
         let window = NSWindow(contentRect: .zero, styleMask: [.titled], backing: .buffered, defer: true)
         let display = ProgressDisplay()

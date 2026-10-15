@@ -106,6 +106,12 @@ internal struct AppDelegateTests {
     /// the Settings entry follows whether a plugin offers the dialog; quitting keeps the state.
     @Test
     internal func reopeningShowsTheWindowAndQuittingKeepsTheState() {
+        // Nothing comes on the screen, and nothing is left open.
+        let windows = StabilityWindows()
+        defer {
+            #expect(windows.shown.isEmpty && windows.open.isEmpty, "\(windows.shown) \(windows.openTitles)")
+            windows.closeAll()
+        }
         let delegate = ShellApplication(productName: "Test", plugins: [])
         let shell = delegate.start(settings: settings, interaction: ScriptedInteraction()) {
             // Nothing is refused here.

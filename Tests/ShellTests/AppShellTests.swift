@@ -63,6 +63,12 @@ internal struct AppShellTests {
     /// The main window comes on screen when asked; a command nobody has is refused silently.
     @Test
     internal func theMainWindowComesOnScreenAndUnknownCommandsAreRefused() async {
+        // Nothing comes on the screen, and nothing is left open.
+        let windows = StabilityWindows()
+        defer {
+            #expect(windows.shown.isEmpty && windows.open.isEmpty, "\(windows.shown) \(windows.openTitles)")
+            windows.closeAll()
+        }
         let app = await fixture.startWindow(with: WindowTestPlugin())
         defer { app.stop() }
         var shown: [(window: NSWindow, fullScreen: Bool)] = []

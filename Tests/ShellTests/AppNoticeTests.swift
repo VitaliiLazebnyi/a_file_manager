@@ -17,6 +17,13 @@ internal struct AppNoticeTests {
     /// it; the last one fades and goes by itself.
     @Test
     internal func aNoticeIsReplacedByANewerOneAndGoesByItself() async {
+        // Nothing is left open. (`shown` is not asked: a window that was never on screen reports
+        // itself unoccluded when it is ordered out, or here when the test says it became key.)
+        let windows = StabilityWindows()
+        defer {
+            #expect(windows.open.isEmpty, "\(windows.openTitles)")
+            windows.closeAll()
+        }
         // Over a window that is never shown, and alone without coming on the screen.
         let window = NSWindow(
             contentRect: NSRect(x: 100, y: 100, width: 800, height: 500),
