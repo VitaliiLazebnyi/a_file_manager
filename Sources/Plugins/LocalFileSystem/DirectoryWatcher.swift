@@ -29,7 +29,8 @@ final class DirectoryWatcher: Sendable {
             atexit {
                 let figures = DirectoryWatcher.Census.figures
                 fputs(
-                    "AFM_WATCHER_CENSUS live=\(figures.live) peak=\(figures.peak) refused=\(figures.refused)\n", stderr
+                    "AFM_WATCHER_CENSUS live=\(figures.live) peak=\(figures.peak) refused=\(figures.refused)\n",
+                    stderr
                 )
             }
         }()
@@ -110,20 +111,17 @@ final class DirectoryWatcher: Sendable {
         /// is given longer still.
         static let delay = 0.3, rescanDelay = 1.0, minimumGap = 0.5
 
-        /// When everything below the watched folders counts: their paths as bytes, to be
-        /// compared with the start of each reported path. Nil when only the folders' own
-        /// contents count.
-        private let trees: [(path: [UInt8], key: String)]?
-
         init(
-            watched: [String: URL], recursive: Bool, queue: DispatchQueue, streamQueue: DispatchQueue, gate: Gate,
+            watched: [String: URL],
+            queue: DispatchQueue,
+            streamQueue: DispatchQueue,
+            gate: Gate,
             onChange: @escaping @Sendable ([URL]) -> Void
         ) {
             (self.watched, self.queue, self.streamQueue, self.gate, self.onChange) = (
                 watched, queue, streamQueue, gate, onChange
             )
             lengths = Set(watched.keys.map { $0.utf8.count })
-            trees = recursive ? watched.keys.map { (Array($0.utf8), $0) } : nil
         }
 
         var isStopped: Bool {
@@ -141,7 +139,9 @@ final class DirectoryWatcher: Sendable {
 
         /// Called on the stream's queue.
         func report(
-            count: Int, paths: UnsafePointer<UnsafePointer<CChar>>, flags: UnsafePointer<FSEventStreamEventFlags>
+            count: Int,
+            paths: UnsafePointer<UnsafePointer<CChar>>,
+            flags: UnsafePointer<FSEventStreamEventFlags>
         ) {
             let rescanFlags = UInt32(kFSEventStreamEventFlagMustScanSubDirs | kFSEventStreamEventFlagRootChanged)
             var changed: [String: URL] = [:]
@@ -154,32 +154,20 @@ final class DirectoryWatcher: Sendable {
                 let bytes = paths[index]
                 var length = Int(strlen(bytes))
                 if length > 1, bytes[length - 1] == CChar(UInt8(ascii: "/")) { length -= 1 }
-                if let trees {
-                    // A change anywhere below a watched folder is a change of that folder's tree.
-                    for tree in trees where changed[tree.key] == nil && length >= tree.path.count {
-                        let isBelow =
-                            length == tree.path.count || tree.path.count == 1
-                            || bytes[tree.path.count] == CChar(UInt8(ascii: "/"))
-                        if isBelow, memcmp(bytes, tree.path, tree.path.count) == 0 {
-                            changed[tree.key] = watched[tree.key]
-                        }
-                    }
-                    continue
-                }
                 guard lengths.contains(length) else { continue }
                 let path = String(
                     decoding: UnsafeBufferPointer(
-                        start: UnsafeRawPointer(bytes).assumingMemoryBound(to: UInt8.self), count: length),
-                    as: UTF8.self)
+                        start: UnsafeRawPointer(bytes).assumingMemoryBound(to: UInt8.self),
+                        count: length
+                    ),
+                    as: UTF8.self
+                )
                 if let directory = watched[path] { changed[path] = directory }
             }
             if isRescan { changed = watched }
             guard !changed.isEmpty else { return }
+            // A report that comes after the stop is dropped by `deliver`.
             lock.lock()
-            guard !stopped, !gate.isStopped else {
-                lock.unlock()
-                return
-            }
             pending.merge(changed) { first, _ in first }
             let mustSchedule = !isScheduled
             isScheduled = true
@@ -213,7 +201,6 @@ final class DirectoryWatcher: Sendable {
     private final class Core: @unchecked Sendable {
         let queue: DispatchQueue
         let onChange: @Sendable ([URL]) -> Void
-        let isRecursive: Bool
         // Not at the lowest classes: while the program (or the machine) keeps every core busy
         // with work of a higher class, queues of the utility class may get no thread for a
         // long time, and a panel would then not hear of changes for as long. Setting a stream
@@ -239,8 +226,60 @@ final class DirectoryWatcher: Sendable {
         private static let failureLifetime: UInt64 = 5_000_000_000
         private static let resolutionPatience = 2.0
 
-        init(queue: DispatchQueue, recursive: Bool, onChange: @escaping @Sendable ([URL]) -> Void) {
-            (self.queue, self.onChange, isRecursive) = (queue, onChange, recursive)
+        /// The folders the stream watches now, once what was asked before has been done.
+        var watchedFolders: Set<URL> { control.sync { Set(watched.values) } }
+
+        init(queue: DispatchQueue, onChange: @escaping @Sendable ([URL]) -> Void) {
+            (self.queue, self.onChange) = (queue, onChange)
+        }
+
+        /// A stream of the reports about `folders`, running on `reportQueue` and handing them to
+        /// `state`; nil when the system makes none or does not start it.
+        private static func startedStream(for state: Watch, folders: [String], on reportQueue: DispatchQueue)
+            -> FSEventStreamRef?
+        {
+            // The stream holds its own reference to the state, taken and given back through these.
+            var context = FSEventStreamContext(
+                version: 0,
+                info: Unmanaged.passUnretained(state).toOpaque(),
+                retain: { info in
+                    if let info { _ = Unmanaged<Watch>.fromOpaque(info).retain() }
+                    return info
+                },
+                release: { info in
+                    if let info { Unmanaged<Watch>.fromOpaque(info).release() }
+                },
+                copyDescription: nil
+            )
+            // Plain C strings and not a bridged array: below the home folder or the root there
+            // are thousands of reports a second, and only a few name a watched folder.
+            // (`info` is the context's, which is always set.)
+            let callback: FSEventStreamCallback = { _, info, count, paths, flags, _ in
+                Unmanaged<Watch>.fromOpaque(info.unsafelyUnwrapped).takeUnretainedValue()
+                    .report(
+                        count: count,
+                        paths: paths.assumingMemoryBound(to: UnsafePointer<CChar>.self),
+                        flags: flags
+                    )
+            }
+            guard
+                let created = FSEventStreamCreate(
+                    nil,
+                    callback,
+                    &context,
+                    folders as CFArray,
+                    FSEventStreamEventId(kFSEventStreamEventIdSinceNow),
+                    0.5,
+                    UInt32(kFSEventStreamCreateFlagWatchRoot)
+                )
+            else { return nil }
+            FSEventStreamSetDispatchQueue(created, reportQueue)
+            guard FSEventStreamStart(created) else {
+                FSEventStreamInvalidate(created)
+                FSEventStreamRelease(created)
+                return nil
+            }
+            return created
         }
 
         func request(_ directories: [URL]) {
@@ -261,7 +300,8 @@ final class DirectoryWatcher: Sendable {
         /// answered, or when the patience is spent without the ones that did not: those join
         /// when they do answer.
         private func resolve() {
-            let wanted = Set(desired.map { DirectoryWatcher.trimmed($0.path) })
+            // (A URL's path has no slash at the end.)
+            let wanted = Set(desired.map(\.path))
             let now = DispatchTime.now().uptimeNanoseconds
             resolutions = resolutions.filter { wanted.contains($0.key) }
             let missing = wanted.filter { path in
@@ -292,52 +332,17 @@ final class DirectoryWatcher: Sendable {
         /// Makes the stream match what is wanted and has been resolved.
         private func reconcile() {
             guard !gate.isStopped else { return }
-            let pairs = desired.compactMap { directory -> (String, URL)? in
-                let key = DirectoryWatcher.trimmed(directory.path)
-                guard let known = resolutions[key] else { return nil }
-                return (known.real ?? key, directory)
+            // (A folder still being resolved is left out.)
+            let pairs = desired.compactMap { directory in
+                resolutions[directory.path].map { ($0.real ?? directory.path, directory) }
             }
             let resolved = Dictionary(pairs, uniquingKeysWith: { first, _ in first })
             guard resolved != watched else { return }
             tearDown()
             guard !resolved.isEmpty else { return }
-            let watch = Watch(
-                watched: resolved, recursive: isRecursive, queue: queue, streamQueue: streamQueue, gate: gate,
-                onChange: onChange)
-            // The stream holds its own reference to the state, taken and given back through these.
-            var context = FSEventStreamContext(
-                version: 0, info: Unmanaged.passUnretained(watch).toOpaque(),
-                retain: { info in
-                    if let info { _ = Unmanaged<Watch>.fromOpaque(info).retain() }
-                    return info
-                },
-                release: { info in
-                    if let info { Unmanaged<Watch>.fromOpaque(info).release() }
-                },
-                copyDescription: nil)
-            // Plain C strings and not a bridged array: below the home folder or the root there
-            // are thousands of reports a second, and only a few name a watched folder.
-            let callback: FSEventStreamCallback = { _, info, count, paths, flags, _ in
-                guard let info else { return }
-                Unmanaged<Watch>.fromOpaque(info).takeUnretainedValue()
-                    .report(
-                        count: count, paths: paths.assumingMemoryBound(to: UnsafePointer<CChar>.self), flags: flags)
-            }
-            let flags = UInt32(kFSEventStreamCreateFlagWatchRoot)
-            guard
-                let stream = FSEventStreamCreate(
-                    nil, callback, &context, Array(resolved.keys) as CFArray,
-                    FSEventStreamEventId(kFSEventStreamEventIdSinceNow), 0.5, flags)
-            else {
+            let watch = Watch(watched: resolved, queue: queue, streamQueue: streamQueue, gate: gate, onChange: onChange)
+            guard let stream = Self.startedStream(for: watch, folders: Array(resolved.keys), on: streamQueue) else {
                 // Not remembered as watched: the next request tries again, and so does this.
-                Census.wasRefused()
-                retryLater()
-                return
-            }
-            FSEventStreamSetDispatchQueue(stream, streamQueue)
-            guard FSEventStreamStart(stream) else {
-                FSEventStreamInvalidate(stream)
-                FSEventStreamRelease(stream)
                 Census.wasRefused()
                 retryLater()
                 return
@@ -352,7 +357,8 @@ final class DirectoryWatcher: Sendable {
         /// unwatched until somebody asks for another set. Tried again after a pause that
         /// grows, for as long as the watcher lives.
         private func retryLater() {
-            guard !isRetryPending, !gate.isStopped else { return }
+            // (A watcher stopped meanwhile does not try again: `reconcile` looks at the gate first.)
+            guard !isRetryPending else { return }
             isRetryPending = true
             let delay = retryDelay
             retryDelay = min(retryDelay * 2, Self.longestRetry)
@@ -379,16 +385,19 @@ final class DirectoryWatcher: Sendable {
 
     private let core: Core
 
-    /// `onChange` receives the watched folders whose contents changed, on `queue`. With
-    /// `recursive`, a watched folder is reported for a change anywhere below it as well.
-    init(queue: DispatchQueue = .main, recursive: Bool = false, onChange: @escaping @Sendable ([URL]) -> Void) {
-        core = Core(queue: queue, recursive: recursive, onChange: onChange)
+    /// The folders the stream watches now, once the requests made before have been dealt with
+    /// (the folders that are still being resolved are not among them yet).
+    internal var watchedFolders: Set<URL> { core.watchedFolders }
+
+    /// `onChange` receives the watched folders whose contents changed, on `queue`.
+    init(queue: DispatchQueue = .main, onChange: @escaping @Sendable ([URL]) -> Void) {
+        core = Core(queue: queue, onChange: onChange)
     }
 
     deinit { core.stop() }
 
-    /// Replaces the set of watched folders. Only their direct contents are reported, unless
-    /// the watcher was made `recursive`. Returns at once; the stream follows in the background.
+    /// Replaces the set of watched folders. Only their direct contents are reported. Returns at
+    /// once; the stream follows in the background.
     func watch(_ directories: [URL]) {
         core.request(directories)
     }
@@ -400,12 +409,9 @@ final class DirectoryWatcher: Sendable {
     /// May wait for the file system: never on the caller's thread.
     private static func resolve(_ path: String) -> String? {
         // realpath, because the system reports /private/tmp where Foundation says /tmp.
+        // (A real path has no slash at the end.)
         guard let real = realpath(path, nil) else { return nil }
         defer { free(real) }
-        return trimmed(String(cString: real))
-    }
-
-    private static func trimmed(_ path: String) -> String {
-        path.utf8.count > 1 && path.hasSuffix("/") ? String(path.dropLast()) : path
+        return String(cString: real)
     }
 }
