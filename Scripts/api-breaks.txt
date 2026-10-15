@@ -45,7 +45,6 @@ AFMKernel: Func Parallel.map(_:serialBelow:_:) has generic signature change from
 # Sendable (`WatchToken` is `AnyObject & Sendable`); `onChange` is documented to run on the main thread and is
 # now @MainActor.
 AFMKernel: Func FileSystemProvider.watch(_:onChange:) has return type change from Swift.AnyObject? to (any AFMKernel.WatchToken)?
-AFMKernel: Func FileSystemProvider.watch(_:recursively:onChange:) has return type change from Swift.AnyObject? to (any AFMKernel.WatchToken)?
 
 # reason: Swift 6 migration. The kernel and the panel model are @MainActor now; these members are documented
 # "for any thread" (constants, thread-safe registries, the pure prepare/filter functions), so they are
@@ -59,15 +58,359 @@ AFMKernel: Func PanelModel.prepare(_:filter:) is now with nonisolated
 AFMKernel: Func PanelModel.prepare(_:show:focus:history:complete:remembered:presorted:) is now with nonisolated
 AFMKernel: Func PanelModel.prepare(_:sort:) is now with nonisolated
 AFMKernel: Func PanelModel.prepare(_:update:focus:presorted:) is now with nonisolated
-AFMKernel: Func PanelModel.rows(of:indices:) is now with nonisolated
 AFMKernel: Func PanelModel.rows(of:where:) is now with nonisolated
 AFMKernel: Var Kernel.columns is now with nonisolated
 AFMKernel: Var Kernel.fileSystems is now with nonisolated
 AFMKernel: Var Kernel.listingCache is now with nonisolated
 AFMKernel: Var Kernel.productName is now with nonisolated
 AFMKernel: Var Kernel.settings is now with nonisolated
-AFMKernel: Var Kernel.ui is now with nonisolated
 AFMKernel: Var KeyBindings.settingsKey is now with nonisolated
 AFMKernel: Var PanelModel.historyLimit is now with nonisolated
 AFMKernel: Var ToolbarRegistry.lineBreak is now with nonisolated
 AFMKernel: Var ToolbarRegistry.settingsKey is now with nonisolated
+
+# reason: Swift 6 migration, second half. The main-actor protocols and classes of the plugin API (and members
+# that differ from their type's isolation) carry @preconcurrency next to @MainActor, as SwiftLint's
+# incompatible_concurrency_annotation demands: a plugin still built in Swift 5 mode keeps compiling, with
+# isolation warnings instead of errors. The digester reports the attribute itself as a break; it softens the
+# @MainActor break acknowledged above.
+AFMKernel: Class CommandRegistry is now with @preconcurrency
+AFMKernel: Class Kernel is now with @preconcurrency
+AFMKernel: Class KeyBindings is now with @preconcurrency
+AFMKernel: Class MenuRegistry is now with @preconcurrency
+AFMKernel: Class OpenerRegistry is now with @preconcurrency
+AFMKernel: Class PanelEvents is now with @preconcurrency
+AFMKernel: Class PanelModel is now with @preconcurrency
+AFMKernel: Class PanelTabs is now with @preconcurrency
+AFMKernel: Class PreferenceRegistry is now with @preconcurrency
+AFMKernel: Class ServiceRegistry is now with @preconcurrency
+AFMKernel: Class SettingsKeyRegistry is now with @preconcurrency
+AFMKernel: Class ToolbarRegistry is now with @preconcurrency
+AFMKernel: Constructor CommandRegistry.init(keyBindings:) is now with @preconcurrency
+AFMKernel: Constructor ContentColumn.init(id:title:width:alignsRight:cancellableValue:) is now with @preconcurrency
+AFMKernel: Constructor ContentColumn.init(id:title:width:alignsRight:value:) is now with @preconcurrency
+AFMKernel: Constructor KeyBindings.init() is now with @preconcurrency
+AFMKernel: Constructor ListingCache.init(limits:now:) is now with @preconcurrency
+AFMKernel: Constructor MenuRegistry.init() is now with @preconcurrency
+AFMKernel: Constructor OpenerRegistry.init() is now with @preconcurrency
+AFMKernel: Constructor PanelEvents.init() is now with @preconcurrency
+AFMKernel: Constructor PanelFilter.init(title:matches:) is now with @preconcurrency
+AFMKernel: Constructor PanelModel.init(directory:sort:showHidden:) is now with @preconcurrency
+AFMKernel: Constructor PanelTabs.init(_:) is now with @preconcurrency
+AFMKernel: Constructor PanelTabs.init(restoring:fallback:) is now with @preconcurrency
+AFMKernel: Constructor PreferencePage.init(title:preferences:onChange:) is now with @preconcurrency
+AFMKernel: Constructor PreferenceRegistry.init() is now with @preconcurrency
+AFMKernel: Constructor SettingsKeyRegistry.init() is now with @preconcurrency
+AFMKernel: Constructor ToolbarRegistry.init() is now with @preconcurrency
+AFMKernel: Func BlockingCalls.answer(from:to:sharing:cancellation:_:) is now with @preconcurrency
+AFMKernel: Func BlockingCalls.answer(from:to:sharing:cancellation:_:then:) is now with @preconcurrency
+AFMKernel: Func BlockingCalls.run(_:) is now with @preconcurrency
+AFMKernel: Func CancellationFlag.onCancel(_:) is now with @preconcurrency
+AFMKernel: Func CommandRegistry.isChecked(_:) is now with @preconcurrency
+AFMKernel: Func CommandRegistry.isEnabled(_:) is now with @preconcurrency
+AFMKernel: Func CommandRegistry.perform(_:_:) is now with @preconcurrency
+AFMKernel: Func CommandRegistry.register(_:enabled:checked:_:) is now with @preconcurrency
+AFMKernel: Func CommandRegistry.register(_:enabled:checked:parameterized:) is now with @preconcurrency
+AFMKernel: Func FileSystemProvider.watch(_:onChange:) is now with @preconcurrency
+AFMKernel: Func FileSystemRegistry.addFlusher(_:) is now with @preconcurrency
+AFMKernel: Func FileSystemRegistry.addVolumeCloser(_:) is now with @preconcurrency
+AFMKernel: Func FileSystemRegistry.addVolumeReleaser(_:) is now with @preconcurrency
+AFMKernel: Func FileSystemRegistry.releaseVolume(_:) is now with @preconcurrency
+AFMKernel: Func JobService.run(title:work:completion:) is now with @preconcurrency
+AFMKernel: Func Kernel.askUser(_:) is now with @preconcurrency
+AFMKernel: Func Kernel.attach(_:) is now with @preconcurrency
+AFMKernel: Func Kernel.load(_:) is now with @preconcurrency
+AFMKernel: Func Kernel.prepareToQuit(cancellation:completion:) is now with @preconcurrency
+AFMKernel: Func Kernel.shouldTerminate() is now with @preconcurrency
+AFMKernel: Func Kernel.shutdown() is now with @preconcurrency
+AFMKernel: Func KeyBindings.apply(overrides:) is now with @preconcurrency
+AFMKernel: Func KeyBindings.bindDefault(_:to:) is now with @preconcurrency
+AFMKernel: Func KeyBindings.command(for:) is now with @preconcurrency
+AFMKernel: Func KeyBindings.load(from:) is now with @preconcurrency
+AFMKernel: Func KeyBindings.shortcuts(for:) is now with @preconcurrency
+AFMKernel: Func MenuRegistry.add(_:to:) is now with @preconcurrency
+AFMKernel: Func MenuRegistry.addToContextMenu(_:in:onItemOnly:) is now with @preconcurrency
+AFMKernel: Func MenuRegistry.contextMenu(onItem:) is now with @preconcurrency
+AFMKernel: Func OpenerRegistry.add(priority:_:) is now with @preconcurrency
+AFMKernel: Func OpenerRegistry.open(_:in:) is now with @preconcurrency
+AFMKernel: Func PanelEvents.post(_:from:) is now with @preconcurrency
+AFMKernel: Func PanelEvents.subscribe(_:) is now with @preconcurrency
+AFMKernel: Func PanelHandle.focus() is now with @preconcurrency
+AFMKernel: Func PanelHandle.reload(focus:) is now with @preconcurrency
+AFMKernel: Func PanelHandle.reload(focus:quietly:completion:) is now with @preconcurrency
+AFMKernel: Func PanelHandle.show(_:focus:history:) is now with @preconcurrency
+AFMKernel: Func PanelHandle.show(_:focus:history:completion:) is now with @preconcurrency
+AFMKernel: Func PanelModel.apply(_:) is now with @preconcurrency
+AFMKernel: Func PanelModel.clearSelection() is now with @preconcurrency
+AFMKernel: Func PanelModel.deselect(_:) is now with @preconcurrency
+AFMKernel: Func PanelModel.duplicate() is now with @preconcurrency
+AFMKernel: Func PanelModel.extend(to:sortedBy:) is now with @preconcurrency
+AFMKernel: Func PanelModel.finishLoading() is now with @preconcurrency
+AFMKernel: Func PanelModel.invertSelection() is now with @preconcurrency
+AFMKernel: Func PanelModel.isSelected(_:) is now with @preconcurrency
+AFMKernel: Func PanelModel.isSelected(row:) is now with @preconcurrency
+AFMKernel: Func PanelModel.item(atRow:) is now with @preconcurrency
+AFMKernel: Func PanelModel.lastVisited(where:) is now with @preconcurrency
+AFMKernel: Func PanelModel.moveCursor(to:) is now with @preconcurrency
+AFMKernel: Func PanelModel.open(_:parent:root:history:) is now with @preconcurrency
+AFMKernel: Func PanelModel.operands() is now with @preconcurrency
+AFMKernel: Func PanelModel.operandsSnapshot() is now with @preconcurrency
+AFMKernel: Func PanelModel.requestSort(_:) is now with @preconcurrency
+AFMKernel: Func PanelModel.restore(_:) is now with @preconcurrency
+AFMKernel: Func PanelModel.restoreSelection() is now with @preconcurrency
+AFMKernel: Func PanelModel.row(ofName:) is now with @preconcurrency
+AFMKernel: Func PanelModel.rows(of:where:) is now with @preconcurrency
+AFMKernel: Func PanelModel.saveSelection() is now with @preconcurrency
+AFMKernel: Func PanelModel.select(mask:select:) is now with @preconcurrency
+AFMKernel: Func PanelModel.select(where:select:) is now with @preconcurrency
+AFMKernel: Func PanelModel.selectAll() is now with @preconcurrency
+AFMKernel: Func PanelModel.setComputedSizes(_:) is now with @preconcurrency
+AFMKernel: Func PanelModel.setFilter(_:narrowing:) is now with @preconcurrency
+AFMKernel: Func PanelModel.setSelected(_:indices:shownVersion:) is now with @preconcurrency
+AFMKernel: Func PanelModel.setSelected(_:names:) is now with @preconcurrency
+AFMKernel: Func PanelModel.setSelected(_:rows:) is now with @preconcurrency
+AFMKernel: Func PanelModel.setSelection(_:_:) is now with @preconcurrency
+AFMKernel: Func PanelModel.setSelection(indices:shownVersion:) is now with @preconcurrency
+AFMKernel: Func PanelModel.setSelection(names:) is now with @preconcurrency
+AFMKernel: Func PanelModel.setShowHidden(_:) is now with @preconcurrency
+AFMKernel: Func PanelModel.setSort(_:) is now with @preconcurrency
+AFMKernel: Func PanelModel.setVolume(_:) is now with @preconcurrency
+AFMKernel: Func PanelModel.show(_:focus:history:complete:presorted:) is now with @preconcurrency
+AFMKernel: Func PanelModel.showRemembered(_:focus:history:presorted:) is now with @preconcurrency
+AFMKernel: Func PanelModel.snapshot() is now with @preconcurrency
+AFMKernel: Func PanelModel.toggleSelection(row:) is now with @preconcurrency
+AFMKernel: Func PanelModel.update(with:focus:presorted:) is now with @preconcurrency
+AFMKernel: Func PanelSet.contentsChanged(in:) is now with @preconcurrency
+AFMKernel: Func PanelSet.refresh(_:focus:) is now with @preconcurrency
+AFMKernel: Func PanelTabs.activate(_:) is now with @preconcurrency
+AFMKernel: Func PanelTabs.activateNeighbour(_:) is now with @preconcurrency
+AFMKernel: Func PanelTabs.closeTab(at:) is now with @preconcurrency
+AFMKernel: Func PanelTabs.insertTab(showing:at:activate:) is now with @preconcurrency
+AFMKernel: Func PanelTabs.moveTab(from:to:) is now with @preconcurrency
+AFMKernel: Func PanelTabs.openTab(showing:activate:) is now with @preconcurrency
+AFMKernel: Func PanelTabs.performBatch(_:) is now with @preconcurrency
+AFMKernel: Func PanelTabs.title(at:) is now with @preconcurrency
+AFMKernel: Func Parallel.map(_:serialBelow:_:) is now with @preconcurrency
+AFMKernel: Func Plugin.prepareToQuit(cancellation:completion:) is now with @preconcurrency
+AFMKernel: Func Plugin.shouldTerminate() is now with @preconcurrency
+AFMKernel: Func Plugin.start(in:) is now with @preconcurrency
+AFMKernel: Func Plugin.stop() is now with @preconcurrency
+AFMKernel: Func PreferenceRegistry.add(_:) is now with @preconcurrency
+AFMKernel: Func ServiceRegistry.find(_:) is now with @preconcurrency
+AFMKernel: Func ServiceRegistry.register(_:_:) is now with @preconcurrency
+AFMKernel: Func SettingsKeyRegistry.declare(_:kind:check:) is now with @preconcurrency
+AFMKernel: Func SettingsKeyRegistry.declare(prefix:kind:check:) is now with @preconcurrency
+AFMKernel: Func ToolbarRegistry.add(_:symbol:group:hint:) is now with @preconcurrency
+AFMKernel: Func ToolbarRegistry.hasUserLayout(in:) is now with @preconcurrency
+AFMKernel: Func ToolbarRegistry.hint(for:) is now with @preconcurrency
+AFMKernel: Func ToolbarRegistry.layout(from:) is now with @preconcurrency
+AFMKernel: Func ToolbarRegistry.setLayout(_:in:) is now with @preconcurrency
+AFMKernel: Func ToolbarRegistry.setSymbol(_:for:hint:) is now with @preconcurrency
+AFMKernel: Func ToolbarRegistry.symbol(for:) is now with @preconcurrency
+AFMKernel: Func UserInteraction.choose(_:detail:buttons:style:) is now with @preconcurrency
+AFMKernel: Func UserInteraction.choose(_:detail:buttons:style:defaultButton:) is now with @preconcurrency
+AFMKernel: Func UserInteraction.form(_:detail:fields:buttons:) is now with @preconcurrency
+AFMKernel: Func UserInteraction.form(_:fields:) is now with @preconcurrency
+AFMKernel: Func UserInteraction.inform(_:) is now with @preconcurrency
+AFMKernel: Func UserInteraction.inform(_:detail:style:) is now with @preconcurrency
+AFMKernel: Func UserInteraction.notice(_:) is now with @preconcurrency
+AFMKernel: Func UserInteraction.pick(_:detail:_:fallback:style:) is now with @preconcurrency
+AFMKernel: Func UserInteraction.pickRow(_:detail:rows:selected:button:) is now with @preconcurrency
+AFMKernel: Func UserInteraction.prompt(_:value:) is now with @preconcurrency
+AFMKernel: Func UserInteraction.prompt(_:value:detail:) is now with @preconcurrency
+AFMKernel: Func UserInteraction.report(_:title:) is now with @preconcurrency
+AFMKernel: Protocol JobService is now with @preconcurrency
+AFMKernel: Protocol PanelHandle is now with @preconcurrency
+AFMKernel: Protocol PanelSet is now with @preconcurrency
+AFMKernel: Protocol Plugin is now with @preconcurrency
+AFMKernel: Protocol ShellServices is now with @preconcurrency
+AFMKernel: Protocol UserInteraction is now with @preconcurrency
+AFMKernel: Subscript CommandRegistry.subscript(_:) is now with @preconcurrency
+AFMKernel: Var CommandRegistry.all is now with @preconcurrency
+AFMKernel: Var CommandRegistry.isBlocked is now with @preconcurrency
+AFMKernel: Var CommandRegistry.onRejected is now with @preconcurrency
+AFMKernel: Var JobService.isBusy is now with @preconcurrency
+AFMKernel: Var Kernel.commands is now with @preconcurrency
+AFMKernel: Var Kernel.jobs is now with @preconcurrency
+AFMKernel: Var Kernel.keyBindings is now with @preconcurrency
+AFMKernel: Var Kernel.menus is now with @preconcurrency
+AFMKernel: Var Kernel.openers is now with @preconcurrency
+AFMKernel: Var Kernel.panelEvents is now with @preconcurrency
+AFMKernel: Var Kernel.panels is now with @preconcurrency
+AFMKernel: Var Kernel.plugins is now with @preconcurrency
+AFMKernel: Var Kernel.preferences is now with @preconcurrency
+AFMKernel: Var Kernel.services is now with @preconcurrency
+AFMKernel: Var Kernel.settingsKeys is now with @preconcurrency
+AFMKernel: Var Kernel.toolbar is now with @preconcurrency
+AFMKernel: Var MenuRegistry.menus is now with @preconcurrency
+AFMKernel: Var PanelHandle.extraColumns is now with @preconcurrency
+AFMKernel: Var PanelHandle.model is now with @preconcurrency
+AFMKernel: Var PanelHandle.tabs is now with @preconcurrency
+AFMKernel: Var PanelHandle.viewMode is now with @preconcurrency
+AFMKernel: Var PanelModel.backLocation is now with @preconcurrency
+AFMKernel: Var PanelModel.basis is now with @preconcurrency
+AFMKernel: Var PanelModel.cursor is now with @preconcurrency
+AFMKernel: Var PanelModel.cursorFile is now with @preconcurrency
+AFMKernel: Var PanelModel.cursorIsOnParentRow is now with @preconcurrency
+AFMKernel: Var PanelModel.cursorItem is now with @preconcurrency
+AFMKernel: Var PanelModel.customTitle is now with @preconcurrency
+AFMKernel: Var PanelModel.directory is now with @preconcurrency
+AFMKernel: Var PanelModel.filter is now with @preconcurrency
+AFMKernel: Var PanelModel.forwardLocation is now with @preconcurrency
+AFMKernel: Var PanelModel.hasOperandFile is now with @preconcurrency
+AFMKernel: Var PanelModel.hasOperands is now with @preconcurrency
+AFMKernel: Var PanelModel.hasParentRow is now with @preconcurrency
+AFMKernel: Var PanelModel.hasSelection is now with @preconcurrency
+AFMKernel: Var PanelModel.isComplete is now with @preconcurrency
+AFMKernel: Var PanelModel.isInArrivalOrder is now with @preconcurrency
+AFMKernel: Var PanelModel.isListed is now with @preconcurrency
+AFMKernel: Var PanelModel.isLocked is now with @preconcurrency
+AFMKernel: Var PanelModel.isOpening is now with @preconcurrency
+AFMKernel: Var PanelModel.isRefreshing is now with @preconcurrency
+AFMKernel: Var PanelModel.items is now with @preconcurrency
+AFMKernel: Var PanelModel.listVersion is now with @preconcurrency
+AFMKernel: Var PanelModel.listedItems is now with @preconcurrency
+AFMKernel: Var PanelModel.onChange is now with @preconcurrency
+AFMKernel: Var PanelModel.parentTarget is now with @preconcurrency
+AFMKernel: Var PanelModel.requestedSort is now with @preconcurrency
+AFMKernel: Var PanelModel.rootTarget is now with @preconcurrency
+AFMKernel: Var PanelModel.rowCount is now with @preconcurrency
+AFMKernel: Var PanelModel.selectionCount is now with @preconcurrency
+AFMKernel: Var PanelModel.showHidden is now with @preconcurrency
+AFMKernel: Var PanelModel.shownVersion is now with @preconcurrency
+AFMKernel: Var PanelModel.sort is now with @preconcurrency
+AFMKernel: Var PanelModel.totals is now with @preconcurrency
+AFMKernel: Var PanelModel.volume is now with @preconcurrency
+AFMKernel: Var PanelModel.wantedSort is now with @preconcurrency
+AFMKernel: Var PanelSet.all is now with @preconcurrency
+AFMKernel: Var PanelSet.left is now with @preconcurrency
+AFMKernel: Var PanelSet.right is now with @preconcurrency
+AFMKernel: Var PanelSet.source is now with @preconcurrency
+AFMKernel: Var PanelSet.target is now with @preconcurrency
+AFMKernel: Var PanelTabs.active is now with @preconcurrency
+AFMKernel: Var PanelTabs.activeIndex is now with @preconcurrency
+AFMKernel: Var PanelTabs.count is now with @preconcurrency
+AFMKernel: Var PanelTabs.onChange is now with @preconcurrency
+AFMKernel: Var PanelTabs.state is now with @preconcurrency
+AFMKernel: Var PanelTabs.tabs is now with @preconcurrency
+AFMKernel: Var Plugin.name is now with @preconcurrency
+AFMKernel: Var PreferenceRegistry.pages is now with @preconcurrency
+AFMKernel: Var SettingsKeyRegistry.all is now with @preconcurrency
+AFMKernel: Var ShellServices.jobs is now with @preconcurrency
+AFMKernel: Var ShellServices.panels is now with @preconcurrency
+AFMKernel: Var ToolbarRegistry.defaultLayout is now with @preconcurrency
+AFMKernel: Var ToolbarRegistry.onChange is now with @preconcurrency
+AFMContracts: Func FileListService.show(_:title:in:) is now with @preconcurrency
+AFMContracts: Func FileListService.show(_:title:in:isUnique:) is now with @preconcurrency
+AFMContracts: Func FileTransferService.transfer(_:_:into:renamingSelfCopies:completion:) is now with @preconcurrency
+AFMContracts: Func ViewerService.view(_:) is now with @preconcurrency
+AFMContracts: Func ViewerService.view(text:title:) is now with @preconcurrency
+AFMContracts: Protocol FileListService is now with @preconcurrency
+AFMContracts: Protocol FileTransferService is now with @preconcurrency
+AFMContracts: Protocol ViewerService is now with @preconcurrency
+
+# reason: moved, not lost. MemorySettings is a test double and lives in TestSupport; Kernel.userTyped and
+# ServerConsentService are behaviour, so they moved from AFMContracts (which holds names only) to AFMKernel;
+# Discard and TreeWalk are kernel internals no plugin used and are internal now.
+AFMKernel: Class MemorySettings has been removed
+AFMKernel: Enum Discard has been removed
+AFMKernel: Enum TreeWalk has been removed
+AFMContracts: Func Kernel.userTyped(location:proposal:relativeTo:) has been removed
+AFMContracts: Protocol ServerConsentService has been removed
+
+# reason: dead code. Nothing in the program, its plugins or its tests used these (Periphery); they are removed
+# before any outside plugin exists. Tests that need a selection, key clashes or settings-key kinds build them
+# from the remaining API in TestSupport and the test targets.
+AFMKernel: Func BlockingCalls.unanswered(for:) has been removed
+AFMKernel: Func FileItem.isSameEntry(as:) has been removed
+AFMKernel: Func FileSystemProvider.append(to:at:) has been removed
+AFMKernel: Func FileSystemProvider.commit(_:) has been removed
+AFMKernel: Func FileSystemProvider.entries(of:showHidden:foldersOnly:cancellation:) has been removed
+AFMKernel: Func FileSystemProvider.entriesByListing(of:showHidden:foldersOnly:cancellation:) has been removed
+AFMKernel: Func FileSystemProvider.totalSize(of:) has been removed
+AFMKernel: Func FileSystemProvider.watch(_:recursively:onChange:) has been removed
+AFMKernel: Func Int.multipliedSaturated(by:) has been removed
+AFMKernel: Func Int64.multipliedSaturated(by:) has been removed
+AFMKernel: Func Int64.subtractingSaturated(_:) has been removed
+AFMKernel: Func ListOrder.clicked(_:) has been removed
+AFMKernel: Func ListingCache.removeAll() has been removed
+AFMKernel: Func PanelModel.rows(of:indices:) has been removed
+AFMKernel: Func PanelModel.setComputedSize(_:forName:) has been removed
+AFMKernel: Func PanelModel.setFilter(_:prefiltered:listVersion:) has been removed
+AFMKernel: Func PanelModel.setSort(_:presorted:) has been removed
+AFMKernel: Func PanelModel.setSort(_:presorted:listVersion:) has been removed
+AFMKernel: Func PanelTabs.closeOtherTabs() has been removed
+AFMKernel: Func PathSafety.location(ofRelativePath:below:allowingTrailingSeparator:) has been removed
+AFMKernel: Func SettingsKeyRegistry.accepts(_:forKey:) has been removed
+AFMKernel: Func SettingsKeyRegistry.declaration(for:) has been removed
+AFMKernel: Func SettingsKeyRegistry.kind(of:) has been removed
+AFMKernel: Func Sorter.areInOrder(_:_:by:) has been removed
+AFMKernel: Func Sorter.merge(_:with:by:) has been removed
+AFMKernel: Struct DirectoryEntry has been removed
+AFMKernel: Struct KeyBindings.Conflict has been removed
+AFMKernel: Var BlockingCalls.limit has been removed
+AFMKernel: Var FileItem.device has been removed
+AFMKernel: Var FileSystemRegistry.placesDidChange has been removed
+AFMKernel: Var KeyBindings.conflicts has been removed
+AFMKernel: Var ListingCache.Entry.showHidden has been removed
+AFMKernel: Var ListingCache.entryCount has been removed
+AFMKernel: Var ListingCache.folderCount has been removed
+AFMKernel: Var PanelHandle.isLoading has been removed
+AFMKernel: Var PanelModel.Basis.listVersion has been removed
+AFMKernel: Var PanelModel.Outcome.wasApplied has been removed
+AFMKernel: Var PanelModel.RowSet.count has been removed
+AFMKernel: Var PanelModel.savedSelection has been removed
+AFMKernel: Var PanelModel.selectedNames has been removed
+AFMKernel: Var PanelModel.selection has been removed
+AFMKernel: Var SettingsKeyRegistry.Declaration.check has been removed
+AFMKernel: Var SortedFileList.count has been removed
+AFMContracts: Func Format.displayName(_:limit:) has been removed
+
+# reason: reshaped to meet the lint rules (parameter limits, no optional Bool, no nesting, explicit names such as
+# upArrow, no `none` case beside Optional) or to drop parameters nothing passed: Kernel.ui is Kernel.interaction,
+# CommandArgument.none is .nothing, Command's editingRole is .editing(_:), FileItem takes Kind and Stat,
+# PanelModel.Totals takes two Counts halves, PanelTabs.State.Tab is PanelTabState, Place.isEjectable is
+# Place.VolumeTraits.mayBeEjected, JobService.run returns nothing (the handle had no user), the remembered and
+# climbing flags became prepare(_:showRemembered:...) and stream(climbingFrom:...), and a nil toolbar layout is
+# resetLayout(in:). Every caller in the repository is updated.
+AFMKernel: Constructor Command.init(_:_:_:editingRole:barLabel:runsDuringJobs:) has been removed
+AFMKernel: Constructor FileItem.init(url:name:isDirectory:isSymlink:isPackage:isHidden:size:modified:permissions:computedSize:isSpecial:linkTargetSize:device:) has been removed
+AFMKernel: Constructor Kernel.init(productName:settings:ui:) has been removed
+AFMKernel: Constructor PanelModel.Totals.init(selectedBytes:totalBytes:selectedFiles:totalFiles:selectedFolders:totalFolders:) has been removed
+AFMKernel: EnumElement CommandArgument.none has been removed
+AFMKernel: Func JobService.cancelAll(then:) has been removed
+AFMKernel: Func Place.isEjectable(path:isRootFileSystem:isInternal:isLocal:isRemovable:isEjectable:) has been removed
+AFMKernel: Func SettingsStore.set(_:forKey:) has been removed
+AFMKernel: Protocol JobHandle has been removed
+AFMKernel: Struct PanelTabs.State.Tab has been removed
+AFMKernel: Var Kernel.ui has been removed
+AFMKernel: EnumElement Key.down has been renamed to EnumElement downArrow
+AFMKernel: EnumElement Key.left has been renamed to EnumElement leftArrow
+AFMKernel: EnumElement Key.right has been renamed to EnumElement rightArrow
+AFMKernel: EnumElement Key.up has been renamed to EnumElement upArrow
+AFMKernel: Func BlockingCalls.answer(from:to:sharing:cancellation:_:then:) has been renamed to Func answer(from:to:cancellation:_:then:)
+AFMKernel: Func PanelLoader.stream(_:showHidden:fileSystems:climbing:cancellation:receive:) has been renamed to Func stream(_:showHidden:fileSystems:cancellation:receive:)
+AFMKernel: Func PanelModel.prepare(_:show:focus:history:complete:remembered:presorted:) has been renamed to Func prepare(_:show:focus:history:presorted:)
+AFMKernel: Func SettingsKeyRegistry.declare(_:kind:check:) has been renamed to Func declare(_:kind:)
+AFMKernel: Func SettingsKeyRegistry.declare(prefix:kind:check:) has been renamed to Func declare(prefix:kind:)
+AFMKernel: Func UserInteraction.pickRow(_:detail:rows:selected:button:) has been renamed to Func pickRow(_:rows:detail:selected:button:)
+AFMKernel: Accessor PanelTabs.State.tabs.Get() has return type change from [AFMKernel.PanelTabs.State.Tab] to [AFMKernel.PanelTabState]
+AFMKernel: Accessor PanelTabs.State.tabs.Set() has parameter 0 type change from [AFMKernel.PanelTabs.State.Tab] to [AFMKernel.PanelTabState]
+AFMKernel: Constructor PanelTabs.State.init(tabs:active:) has parameter 0 type change from [AFMKernel.PanelTabs.State.Tab] to [AFMKernel.PanelTabState]
+AFMKernel: Func BlockingCalls.answer(from:to:sharing:cancellation:_:then:) has parameter 2 type change from Swift.Bool to AFMKernel.CancellationFlag?
+AFMKernel: Func BlockingCalls.answer(from:to:sharing:cancellation:_:then:) has parameter 3 type change from AFMKernel.CancellationFlag? to (AFMKernel.CancellationFlag) -> Answer
+AFMKernel: Func BlockingCalls.answer(from:to:sharing:cancellation:_:then:) has parameter 4 type change from (AFMKernel.CancellationFlag) -> Answer to (Answer?) -> Swift.Void
+AFMKernel: Func BlockingCalls.answer(from:to:sharing:cancellation:_:then:) has removed default argument from parameter 3
+AFMKernel: Func JobService.run(title:work:completion:) has return type change from any AFMKernel.JobHandle to ()
+AFMKernel: Func PanelLoader.stream(_:showHidden:fileSystems:climbing:cancellation:receive:) has parameter 3 type change from Swift.Bool to AFMKernel.CancellationFlag?
+AFMKernel: Func PanelLoader.stream(_:showHidden:fileSystems:climbing:cancellation:receive:) has parameter 4 type change from AFMKernel.CancellationFlag? to (AFMKernel.PanelLoader.Batch) -> Swift.Bool
+AFMKernel: Func PanelLoader.stream(_:showHidden:fileSystems:climbing:cancellation:receive:) has removed default argument from parameter 4
+AFMKernel: Func PanelModel.prepare(_:show:focus:history:complete:remembered:presorted:) has parameter 4 type change from Swift.Bool to AFMKernel.ListOrder?
+AFMKernel: Func PanelModel.setComputedSizes(_:) has parameter 0 type change from [Swift.String : Swift.Int64] to [(name: Swift.String, size: Swift.Int64)]
+AFMKernel: Func PathSafety.components(ofRelativePath:allowingTrailingSeparator:) has return type change from [Swift.String]? to [Swift.String]
+AFMKernel: Func ToolbarRegistry.setLayout(_:in:) has parameter 0 type change from [AFMKernel.CommandID?]? to [AFMKernel.CommandID?]
+AFMKernel: Func UserInteraction.pickRow(_:detail:rows:selected:button:) has parameter 1 type change from Swift.String to [Swift.String]
+AFMKernel: Func UserInteraction.pickRow(_:detail:rows:selected:button:) has parameter 2 type change from [Swift.String] to Swift.String
+AFMKernel: Func UserInteraction.pickRow(_:detail:rows:selected:button:) has removed default argument from parameter 1
+AFMKernel: Var PanelTabs.State.tabs has declared type change from [AFMKernel.PanelTabs.State.Tab] to [AFMKernel.PanelTabState]
+AFMKernel: EnumElement CommandArgument.nothing has been added as a new enum case
