@@ -5,9 +5,11 @@ import Testing
 @testable import ConfigurationPlugin
 
 /// Which shell runs command lines, and the PATH a login shell other than zsh sets up.
-@Suite internal struct CovConfigLoginShell {
+@Suite
+internal struct CovConfigLoginShell {
     private let box: Sandbox
 
+    /// A fresh scratch folder for every test.
     internal init() throws {
         box = try Sandbox()
     }

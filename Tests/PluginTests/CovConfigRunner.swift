@@ -10,23 +10,16 @@ import Testing
 
 /// The runner of user commands at the corners the other suites leave: list files, chains that
 /// are stopped, the start of processes and the lines that open applications.
-@MainActor @Suite internal struct CovConfigRunner {
+@MainActor
+@Suite
+internal struct CovConfigRunner {
     private let box: Sandbox
     private let memory = MemoryFileSystem()
     private let bench: TestBench
-    /// What the probe command was given, in order.
-    private let probes = Probes()
+    /// What the probe commands were given, in order.
+    private let probes: CovConfigProbes
 
-    /// The arguments the probe commands got.
-    @MainActor
-    private final class Probes {
-        var seen: [String] = []
-
-        deinit {
-            // Nothing to release.
-        }
-    }
-
+    /// A fresh bench for every test.
     internal init() throws {
         box = try Sandbox()
         try box.folder("A")
@@ -38,11 +31,7 @@ import Testing
             right: memory.url("/M")
         )
         // `em_plain` is a command of the program with a user command's prefix.
-        for name in ["cov_probe", "cov_second", "em_plain"] {
-            bench.commands.register(Command(CommandID(rawValue: name), name)) { [probes] argument in
-                probes.seen.append(name + ":" + (argument.text ?? argument.location?.path ?? ""))
-            }
-        }
+        probes = CovConfigProbes(["cov_probe", "cov_second", "em_plain"], in: bench.commands)
     }
 
     private func runner(launches: Bool = false, background: DispatchQueue? = nil, lists: URL? = nil) -> CommandRunner {
@@ -163,7 +152,7 @@ import Testing
     internal func startedProgramsReportWhatWentWrong() async throws {
         bench.right.focus()
         let runner = runner(launches: true)
-        let log = { self.bench.interaction.log }
+        let log = { bench.interaction.log }
         runner.run(CommandAction(command: "/etc/hosts"), title: "Hosts")
         #expect(await AppWait.until { log().count == 1 })
         #expect(log().first == "inform: “/etc/hosts” cannot be started!")
@@ -183,7 +172,7 @@ import Testing
         bench.right.model.select(mask: "*")
         bench.right.focus()
         let runner = runner(launches: true)
-        let log = { self.bench.interaction.log }
+        let log = { bench.interaction.log }
         runner.run(CommandAction(command: "echo", parameters: "%S"), title: "Long")
         #expect(await AppWait.until { log().count == 1 })
         #expect(log().first == "inform: “echo” cannot be started!")

@@ -7,9 +7,12 @@ import Testing
 
 @testable import ConfigurationPlugin
 
-/// What the configuration windows and commands share, and the plugin's commands, at the corners
-/// the other suites leave. Nothing is put on screen: the stage records it.
-@MainActor @Suite internal struct CovConfigCenter {
+/// What the configuration windows and commands share, and the plugin's commands.
+///
+/// The corners the other suites leave. Nothing is put on screen: the stage records it.
+@MainActor
+@Suite
+internal struct CovConfigCenter {
     private static let commandsKey = ConfigurationStore.owner + "." + ConfigurationStore.userCommandsKey
     private static let symbolsKey = ConfigurationStore.owner + "." + ConfigurationStore.symbolsKey
 
@@ -29,12 +32,13 @@ import Testing
     /// A damaged stored list is reported soon after the plugin starts, and the stored pictures are used.
     @Test
     internal func storedListsAndPicturesAreTakenAtTheStart() async throws {
-        let stage = try CovConfigStage(stored: [
+        let stored = [
             Self.commandsKey: Data("[5]".utf8),
             Self.symbolsKey: Data(#"{"cm_Other":"star"}"#.utf8)
-        ])
+        ]
+        let stage = try CovConfigStage(stored: stored) { ["extra.key"] }
         defer { stage.close() }
-        #expect(await AppWait.until { stage.ui.log.contains("inform: Some settings could not be read") })
+        #expect(await AppWait.until { stage.interaction.log.contains("inform: Some settings could not be read") })
         #expect(stage.bench.kernel.toolbar.symbol(for: "cm_Other") == "star")
     }
 
@@ -46,11 +50,11 @@ import Testing
         let command = UserCommand(name: "em_tool", title: "Tool", action: CommandAction(command: "ls"))
         stage.center.save(command)
         #expect(stage.center.setShortcut("ctrl+shift+t", for: command.id))
-        stage.ui.formAnswers = [.cancel, .values(["title": .text("Better tool")])]
+        stage.interaction.formAnswers = [.cancel, .values(["title": .text("Better tool")])]
         #expect(stage.center.editUserCommand(command) == nil)
         let edited = try #require(stage.center.editUserCommand(command))
         #expect(edited.name == "em_tool" && edited.title == "Better tool")
-        #expect(stage.ui.log.filter { $0 == "form: Edit User Command" }.count == 2)
+        #expect(stage.interaction.log.filter { $0 == "form: Edit User Command" }.count == 2)
         #expect(stage.bench.kernel.keyBindings.shortcuts(for: command.id).map(\.notation) == ["ctrl+shift+t"])
     }
 
@@ -60,7 +64,7 @@ import Testing
         let stage = try CovConfigStage()
         defer { stage.close() }
         let row = StartMenuDraft.Row(entry: StartMenuEntry(title: "Old", action: CommandAction(command: "x")))
-        stage.ui.formAnswers = [
+        stage.interaction.formAnswers = [
             .cancel,
             .values(["title": .text("  ")]),
             .values(["shortcut": .text("not a key!")]),
@@ -70,9 +74,9 @@ import Testing
         #expect(stage.center.editStartMenuRow(row) == nil)
         let unkeyed = try #require(stage.center.editStartMenuRow(row))
         #expect(unkeyed.shortcut.isEmpty && unkeyed.entry.title == "Old")
-        #expect(stage.ui.log.contains("inform: “not a key!” is not a shortcut"))
+        #expect(stage.interaction.log.contains("inform: “not a key!” is not a shortcut"))
         #expect(try #require(stage.center.editStartMenuRow(row)).shortcut == "f7")
-        #expect(stage.ui.log.filter { $0 == "form: Change Start Menu Item" }.count == 4)
+        #expect(stage.interaction.log.filter { $0 == "form: Change Start Menu Item" }.count == 4)
     }
 
     /// An empty shortcut takes the keys away (and is nothing to do without keys); a text that is no shortcut says so.
@@ -81,12 +85,14 @@ import Testing
         let stage = try CovConfigStage()
         defer { stage.close() }
         let id: CommandID = "cm_Other"
-        stage.bench.commands.register(Command(id, "Other", [.f(9)])) {}
+        stage.bench.commands.register(Command(id, "Other", [.f(9)])) {
+            // A command with a key, nothing else.
+        }
         #expect(stage.center.setShortcut("", for: "cm_Nothing"))
         #expect(stage.center.setShortcut("  ", for: id))
         #expect(stage.bench.kernel.keyBindings.shortcuts(for: id).isEmpty)
         #expect(!stage.center.setShortcut("nonsense+", for: id))
-        #expect(stage.ui.log.last == "inform: “nonsense+” is not a shortcut")
+        #expect(stage.interaction.log.last == "inform: “nonsense+” is not a shortcut")
     }
 
     /// The Start menu of the menu bar follows an edited Start menu, with its keys.
@@ -121,7 +127,7 @@ import Testing
         let stage = try CovConfigStage()
         defer { stage.close() }
         stage.center.exportSettings(to: stage.box.url("missing/settings.json"))
-        #expect(stage.ui.log == ["inform: The settings could not be exported"])
+        #expect(stage.interaction.log == ["inform: The settings could not be exported"])
     }
 
     /// Saving the position writes the frames of the windows that keep one.
@@ -174,7 +180,7 @@ import Testing
         let file = stage.box.url("export.json")
         let web = try #require(URL(string: "https://example.com/settings.json"))
         stage.commands.perform(ConfigurationPlugin.exportSettings, .location(web))
-        stage.ui.formAnswers = [.cancel, .accept, .accept, .accept]
+        stage.interaction.formAnswers = [.cancel, .accept, .accept, .accept]
         stage.commands.perform(ConfigurationPlugin.exportSettings)
         stage.commands.perform(ConfigurationPlugin.exportSettings)
         stage.chosenFile = web
@@ -187,7 +193,7 @@ import Testing
             stage.fileRequests.map(\.saving) == [true, true, true]
                 && stage.fileRequests.allSatisfy { $0.product == "Test" }
         )
-        #expect(!stage.ui.log.contains { $0.hasPrefix("inform:") })
+        #expect(!stage.interaction.log.contains { $0.hasPrefix("inform:") })
     }
 
     /// Import without a file asks for one; none, or one not on this Mac's disks, imports nothing.
@@ -198,12 +204,12 @@ import Testing
         stage.commands.perform(ConfigurationPlugin.importSettings)
         stage.chosenFile = URL(string: "https://example.com/settings.json")
         stage.commands.perform(ConfigurationPlugin.importSettings)
-        #expect(stage.fileRequests.map(\.saving) == [false, false] && stage.ui.log.isEmpty)
+        #expect(stage.fileRequests.map(\.saving) == [false, false] && stage.interaction.log.isEmpty)
         let file = stage.box.url("same.json")
         stage.center.exportSettings(to: file)
         stage.chosenFile = file
         stage.commands.perform(ConfigurationPlugin.importSettings)
-        #expect(stage.ui.log.last == "inform: Nothing to import")
+        #expect(stage.interaction.log.last == "inform: Nothing to import")
     }
 
     /// A damaged list that is reported after its kernel is gone is not reported.
@@ -211,7 +217,7 @@ import Testing
     internal func aProblemReportedAfterTheKernelIsGoneIsDropped() async throws {
         weak var gone: Kernel?
         do {
-            let stage = try CovConfigStage(stored: [Self.commandsKey: Data("[5]".utf8)])
+            let stage = try CovConfigStage(stored: [Self.commandsKey: Data("[5]".utf8)], settingsKeys: nil)
             gone = stage.bench.kernel
             stage.close()
         }
@@ -261,7 +267,7 @@ import Testing
     /// preferences lists none; of a preferences domain the keys of JSON values count.
     @Test
     internal func theKeysOfTheStoreAreListedForThePreferencesAlone() throws {
-        let stage = try CovConfigStage(settingsKeys: nil)
+        let stage = try CovConfigStage(stored: [:], settingsKeys: nil)
         defer { stage.close() }
         #expect(!stage.center.settingsKeys().contains("extra.key"))
         #expect(ConfigurationPlugin.storedKeys(of: MemorySettings()).isEmpty)

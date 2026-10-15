@@ -8,10 +8,22 @@ import Testing
 @testable import ConfigurationPlugin
 
 /// The views the configuration windows are made of, and the changes to the menu bar.
-@MainActor @Suite internal struct CovConfigViews {
+@MainActor
+@Suite
+internal struct CovConfigViews {
     /// The character AppKit uses for a special key.
     private static func special(_ value: Int) -> String {
         String(utf16CodeUnits: [UInt16(value)], count: 1)
+    }
+
+    /// The modifier keys of a menu item for those of a shortcut.
+    private static func flags(_ modifiers: KeyModifiers) -> NSEvent.ModifierFlags {
+        let pairs: [(KeyModifiers, NSEvent.ModifierFlags)] = [
+            (.shift, .shift), (.control, .control), (.option, .option), (.command, .command)
+        ]
+        return pairs.reduce(into: []) { flags, pair in
+            if modifiers.contains(pair.0) { flags.insert(pair.1) }
+        }
     }
 
     /// A list with two columns.
@@ -92,28 +104,30 @@ import Testing
     internal func menuItemsShowTheKeysAMenuCanShow() throws {
         let stage = try CovConfigStage()
         defer { stage.close() }
-        let cases: [(Shortcut, String, NSEvent.ModifierFlags)] = [
-            (.f(5), Self.special(NSF5FunctionKey), []),
-            (Shortcut(.returnKey, .command), "\r", .command),
-            (Shortcut(.tab, .option), "\t", .option),
-            (Shortcut(.backspace, [.command, .shift]), "\u{8}", [.command, .shift]),
-            (Shortcut(.forwardDelete, .command), Self.special(NSDeleteFunctionKey), .command),
-            (Shortcut(.home, .command), Self.special(NSHomeFunctionKey), .command),
-            (Shortcut(.end, .command), Self.special(NSEndFunctionKey), .command),
-            (Shortcut(.pageUp, .command), Self.special(NSPageUpFunctionKey), .command),
-            (Shortcut(.pageDown, .command), Self.special(NSPageDownFunctionKey), .command),
-            (Shortcut(.leftArrow, [.control, .option]), Self.special(NSLeftArrowFunctionKey), [.control, .option]),
-            (Shortcut(.rightArrow, [.control, .option]), Self.special(NSRightArrowFunctionKey), [.control, .option]),
-            (Shortcut(.upArrow, .control), Self.special(NSUpArrowFunctionKey), .control),
-            (Shortcut(.downArrow, .control), Self.special(NSDownArrowFunctionKey), .control),
-            (Shortcut(.space, .command), "", []),
-            (Shortcut(.character("q"), .shift), "", [])
+        let cases: [(Shortcut, String)] = [
+            (.f(5), Self.special(NSF5FunctionKey)),
+            (Shortcut(.returnKey, .command), "\r"),
+            (Shortcut(.tab, .option), "\t"),
+            (Shortcut(.backspace, [.command, .shift]), "\u{8}"),
+            (Shortcut(.forwardDelete, .command), Self.special(NSDeleteFunctionKey)),
+            (Shortcut(.home, .command), Self.special(NSHomeFunctionKey)),
+            (Shortcut(.end, .command), Self.special(NSEndFunctionKey)),
+            (Shortcut(.pageUp, .command), Self.special(NSPageUpFunctionKey)),
+            (Shortcut(.pageDown, .command), Self.special(NSPageDownFunctionKey)),
+            (Shortcut(.leftArrow, [.control, .option]), Self.special(NSLeftArrowFunctionKey)),
+            (Shortcut(.rightArrow, [.control, .option]), Self.special(NSRightArrowFunctionKey)),
+            (Shortcut(.upArrow, .control), Self.special(NSUpArrowFunctionKey)),
+            (Shortcut(.downArrow, .control), Self.special(NSDownArrowFunctionKey)),
+            (Shortcut(.space, .command), ""),
+            (Shortcut(.character("q"), .shift), "")
         ]
         let menu = NSMenu()
         let submenu = NSMenu()
         for (index, entry) in cases.enumerated() {
             let id = CommandID(rawValue: "cov_key\(index)")
-            stage.commands.register(Command(id, "Key \(index)", [entry.0])) {}
+            stage.commands.register(Command(id, "Key \(index)", [entry.0])) {
+                // A command with a key, nothing else.
+            }
             let item = NSMenuItem(title: "Key \(index)", action: nil, keyEquivalent: "")
             item.representedObject = id.rawValue
             submenu.addItem(item)
@@ -127,7 +141,8 @@ import Testing
         LiveMenus.refreshKeys(in: menu, kernel: stage.bench.kernel)
         for (index, entry) in cases.enumerated() {
             let item = submenu.items[index]
-            #expect(item.keyEquivalent == entry.1 && item.keyEquivalentModifierMask == entry.2, "\(entry.0)")
+            let mask = entry.1.isEmpty ? [] : Self.flags(entry.0.modifiers)
+            #expect(item.keyEquivalent == entry.1 && item.keyEquivalentModifierMask == mask, "\(entry.0)")
         }
         #expect(unknown.keyEquivalent == "g")
     }

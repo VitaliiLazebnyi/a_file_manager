@@ -8,37 +8,27 @@ import Testing
 @testable import ConfigurationPlugin
 
 /// The *Choose command* dialog, driven as the user would, with nothing put on screen.
-@MainActor @Suite internal struct CovConfigBrowser {
+@MainActor
+@Suite
+internal struct CovConfigBrowser {
     private let stage: CovConfigStage
     private let windows = StabilityWindows { $0.title == "Choose Command" }
     private let browser: CommandBrowserController
-    /// The names the probe commands were run with.
-    private let ran = Ran()
-
-    @MainActor
-    private final class Ran {
-        var names: [String] = []
-
-        deinit {
-            // Nothing to release.
-        }
-    }
-
-    internal init() throws {
-        stage = try CovConfigStage()
-        for name in ["cov_alpha", "cov_beta"] {
-            stage.commands.register(Command(CommandID(rawValue: name), "Probe \(name)")) { [ran] in
-                ran.names.append(name)
-            }
-        }
-        stage.center.save(UserCommand(name: "em_mine", title: "Mine", action: CommandAction(command: "cov_alpha")))
-        browser = stage.center.browser()
-    }
+    /// The commands a test can run.
+    private let ran: CovConfigProbes
 
     private var content: NSView? { browser.window?.contentView }
     private var list: RowsTable? { CovConfigStage.views(RowsTable.self, in: content).first }
     private var filter: NSSearchField? { CovConfigStage.views(NSSearchField.self, in: content).first }
     private var categories: NSPopUpButton? { CovConfigStage.views(NSPopUpButton.self, in: content).first }
+
+    /// A fresh stage for every test.
+    internal init() throws {
+        stage = try CovConfigStage()
+        ran = CovConfigProbes(["cov_alpha", "cov_beta"], in: stage.commands)
+        stage.center.save(UserCommand(name: "em_mine", title: "Mine", action: CommandAction(command: "cov_alpha")))
+        browser = stage.center.browser()
+    }
 
     /// The position of a command in the list.
     private func row(_ name: String) -> Int? {
@@ -158,40 +148,40 @@ import Testing
 
     /// New, Edit, Delete and Rename/Copy manage the user commands.
     @Test
-    internal func theUserCommandsAreManagedHere() throws {
+    internal func theUserCommandsAreManagedHere() {
         defer { finish() }
         browser.show(category: CommandRow.userCategory)
-        stage.ui.formAnswers = [.cancel, .values(["name": .text("fresh")])]
+        stage.interaction.formAnswers = [.cancel, .values(["name": .text("fresh")])]
         press("New…")
         press("New…")
         #expect(Set(browser.rows.map(\.id)) == ["em_fresh", "em_mine"])
         list?.selectedRow = row("em_mine")
-        stage.ui.formAnswers = [.values(["title": .text("Mine, better")])]
+        stage.interaction.formAnswers = [.values(["title": .text("Mine, better")])]
         press("Edit…")
         #expect(stage.center.userCommand(named: "em_mine")?.title == "Mine, better")
         list?.selectedRow = row("em_fresh")
-        stage.ui.choiceAnswers = [1, 0]
+        stage.interaction.choiceAnswers = [1, 0]
         press("Delete")
         #expect(stage.center.userCommand(named: "em_fresh") != nil)
         press("Delete")
         #expect(stage.center.userCommand(named: "em_fresh") == nil && browser.rows.map(\.id) == ["em_mine"])
         list?.selectedRow = row("em_mine")
-        stage.ui.formAnswers = [
+        stage.interaction.formAnswers = [
             .cancel,
             .values(["name": .text("mine")]),
             .values(["name": .text("copy")], button: 1),
             .values(["name": .text("moved")], button: 0)
         ]
         for _ in 0..<4 { press("Rename/Copy…") }
-        #expect(stage.ui.log.contains("inform: The name cannot be used"))
+        #expect(stage.interaction.log.contains("inform: The name cannot be used"))
         // The copy is selected afterwards, so it is the one renamed.
         #expect(stage.center.store.userCommands.map(\.name).sorted() == ["em_mine", "em_moved"])
         // Without a selected user command the buttons do nothing.
         list?.selectedRow = nil
-        stage.ui.formAnswers = [.accept]
+        stage.interaction.formAnswers = [.accept]
         press("Edit…")
         press("Delete")
         press("Rename/Copy…")
-        #expect(stage.ui.formAnswers.count == 1)
+        #expect(stage.interaction.formAnswers.count == 1)
     }
 }

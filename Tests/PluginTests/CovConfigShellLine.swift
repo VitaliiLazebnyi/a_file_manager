@@ -4,12 +4,16 @@ import Testing
 @testable import ConfigurationPlugin
 
 /// The places of a command line where a value may stand, at the corners the other suites leave.
-@Suite internal struct CovConfigShellLine {
+@Suite
+internal struct CovConfigShellLine {
     /// The refusal for a value written after `text`, or nil when it may stand there.
     private static func refusal(after text: String) -> ShellContext.Refusal? {
         switch ShellLine.script([.text(text), .value("v")]) {
-        case .success: nil
-        case .failure(let refusal): refusal
+        case .success:
+            nil
+
+        case .failure(let refusal):
+            refusal
         }
     }
 

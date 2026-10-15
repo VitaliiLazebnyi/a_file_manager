@@ -7,9 +7,11 @@ import Testing
 
 /// Settings files: what is known, checked, asked about and written, at the corners the other
 /// suites leave.
-@Suite internal struct CovConfigSettingsTransfer {
+@Suite
+internal struct CovConfigSettingsTransfer {
     private let box: Sandbox
 
+    /// A fresh scratch folder for every test.
     internal init() throws {
         box = try Sandbox()
     }
@@ -30,6 +32,11 @@ import Testing
         for (key, value) in values { archive.values[key] = try json(value) }
         let checked = try CheckedSettings(archive, schema: schema)
         return SettingsImportPlan(checked, current: current, knownKeys: knownKeys, schema: schema)
+    }
+
+    /// A tab as the panels store it.
+    private static func tab(_ location: String) -> [String: Any] {
+        ["location": location, "sortKey": 0, "descending": false, "showHidden": false, "locked": false]
     }
 
     /// What a key's own plugin declares counts before its name: history and connections.
@@ -71,8 +78,8 @@ import Testing
         let checked = try CheckedSettings(archive, schema: SettingsSchema())
         #expect(checked.limited == 2)
         let sizes = try #require(checked.objects["viewer.sizes"] as? [Any])
-        #expect((sizes[0] as? NSNumber)?.int64Value == 1_000_000_000_000)
-        #expect((sizes[1] as? NSNumber)?.int64Value == -1_000_000_000_000)
+        #expect((sizes[0] as? Int) == 1_000_000_000_000)
+        #expect((sizes[1] as? Int) == -1_000_000_000_000)
         #expect((sizes[3] as? Bool) == true)
     }
 
@@ -144,11 +151,6 @@ import Testing
         #expect(lines(.hotlist) == ["Go:  cm_x", "Sub:  cd /"])
         #expect(lines(.tabs) == ["right.tabs:  sftp://h/"])
         #expect(plan.parts.allSatisfy { !$0.title.isEmpty })
-    }
-
-    /// A tab as the panels store it.
-    private static func tab(_ location: String) -> [String: Any] {
-        ["location": location, "sortKey": 0, "descending": false, "showHidden": false, "locked": false]
     }
 
     /// A value of another type than its check gave it is read as empty.

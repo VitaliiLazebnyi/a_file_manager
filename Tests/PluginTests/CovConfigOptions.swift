@@ -8,21 +8,15 @@ import Testing
 @testable import ConfigurationPlugin
 
 /// The Options window and its pages, driven as the user would, with nothing put on screen.
-@MainActor @Suite internal struct CovConfigOptions {
+@MainActor
+@Suite
+internal struct CovConfigOptions {
     private let stage: CovConfigStage
     private let windows = StabilityWindows { ["Options", "Choose Command"].contains($0.title) }
-    private let ran = Ran()
+    /// The commands a test can run.
+    private let ran: CovConfigProbes
 
-    /// The names the probe commands were run with.
-    @MainActor
-    private final class Ran {
-        var names: [String] = []
-
-        deinit {
-            // Nothing to release.
-        }
-    }
-
+    /// A fresh stage for every test.
     internal init() throws {
         stage = try CovConfigStage()
         stage.bench.kernel.preferences.add(
@@ -35,11 +29,7 @@ import Testing
                 ]
             )
         )
-        for name in ["cov_alpha", "cov_beta"] {
-            stage.commands.register(Command(CommandID(rawValue: name), "Probe \(name)")) { [ran] in
-                ran.names.append(name)
-            }
-        }
+        ran = CovConfigProbes(["cov_alpha", "cov_beta"], in: stage.commands)
     }
 
     /// Opens the window on a page.
@@ -67,23 +57,6 @@ import Testing
 
     private func isEnabled(_ title: String, _ options: OptionsWindowController) -> Bool {
         CovConfigStage.button(title, in: content(options))?.isEnabled == true
-    }
-
-    private func key(_ characters: String, code: UInt16, _ flags: NSEvent.ModifierFlags = [], in window: NSWindow?)
-        -> NSEvent?
-    {
-        NSEvent.keyEvent(
-            with: .keyDown,
-            location: .zero,
-            modifierFlags: flags,
-            timestamp: 0,
-            windowNumber: window?.windowNumber ?? 0,
-            context: nil,
-            characters: characters,
-            charactersIgnoringModifiers: characters,
-            isARepeat: false,
-            keyCode: code
-        )
     }
 
     private func finish() {
@@ -157,19 +130,22 @@ import Testing
         table.selectedRow = 0
         press("Set Shortcut…", options)
         let handler = try #require(stage.keyHandler)
-        let other = try #require(key("k", code: 40, in: nil))
+        let other = try #require(CovConfigEvents.key("k", code: 40, in: nil, []))
         #expect(handler(other) === other)
-        #expect(handler(try #require(key("\u{1B}", code: 53, in: window))) == nil && stage.keyHandler == nil)
+        let escape = try #require(CovConfigEvents.key("\u{1B}", code: 53, in: window, []))
+        #expect(handler(escape) == nil && stage.keyHandler == nil)
         press("Set Shortcut…", options)
-        #expect(stage.keyHandler?(try #require(key("", code: 255, in: window))) == nil)
+        #expect(stage.keyHandler?(try #require(CovConfigEvents.key("", code: 255, in: window, []))) == nil)
         press("Set Shortcut…", options)
         let all: NSEvent.ModifierFlags = [.shift, .control, .option, .command]
-        #expect(stage.keyHandler?(try #require(key("k", code: 40, all, in: window))) == nil)
+        #expect(stage.keyHandler?(try #require(CovConfigEvents.key("k", code: 40, in: window, all))) == nil)
         let alpha: CommandID = "cov_alpha"
-        let keys = { () -> String in table.tableView.numberOfRows > 0 ? self.cell(table, row: 0, column: 2) : "" }
+        let keys = { () -> String in
+            table.tableView.numberOfRows > 0 ? CovConfigEvents.cell(table, row: 0, column: 2) : ""
+        }
         #expect(await AppWait.until { keys().contains("K") })
         press("Add Shortcut…", options)
-        #expect(stage.keyHandler?(try #require(key("j", code: 38, .control, in: window))) == nil)
+        #expect(stage.keyHandler?(try #require(CovConfigEvents.key("j", code: 38, in: window, .control))) == nil)
         #expect(await AppWait.until { keys().contains("⌃J") })
         #expect(isEnabled("Apply", options))
         press("Apply", options)
@@ -184,16 +160,10 @@ import Testing
         #expect(stage.center.setShortcut("f8", for: "cov_beta"))
         filter.stringValue = "cov_beta"
         filter.delegate?.controlTextDidChange?(Notification(name: NSControl.textDidChangeNotification, object: filter))
-        #expect(cell(table, row: 0, column: 2).contains("F8"))
+        #expect(CovConfigEvents.cell(table, row: 0, column: 2).contains("F8"))
         press("Set Shortcut…", options)
         press("Cancel", options)
         #expect(stage.keyHandler == nil)
-    }
-
-    /// The text of a cell of a page's list.
-    private func cell(_ table: RowsTable, row: Int, column: Int) -> String {
-        let view = table.tableView(table.tableView, viewFor: table.tableView.tableColumns[column], row: row)
-        return (view as? NSTableCellView)?.textField?.stringValue ?? ""
     }
 
     /// The Button Bar page adds commands, separators and line breaks, removes and moves them,
@@ -206,8 +176,8 @@ import Testing
         let options = try open(.buttonBar)
         let table = try #require(pageTable(options))
         #expect(
-            cell(table, row: 0, column: 0) == "(unknown command)"
-                && cell(table, row: 2, column: 0) == "═══ New line ═══"
+            CovConfigEvents.cell(table, row: 0, column: 0) == "(unknown command)"
+                && CovConfigEvents.cell(table, row: 2, column: 0) == "═══ New line ═══"
         )
         table.selectedRow = nil
         for title in ["Remove", "Move Up", "Symbol…"] { press(title, options) }
@@ -219,20 +189,22 @@ import Testing
         #expect(stage.beeps == 5)
         // A command that is not there is named by its name.
         table.selectedRow = 0
-        stage.ui.promptAnswers = [.cancel]
+        stage.interaction.promptAnswers = [.cancel]
         press("Symbol…", options)
-        #expect(stage.ui.log.last == "prompt: Symbol for “cm_gone”: [square.dashed]")
-        stage.whilePicking = { _ in }
+        #expect(stage.interaction.log.last == "prompt: Symbol for “cm_gone”: [square.dashed]")
+        stage.whilePicking = { _ in
+            // The user cancels.
+        }
         table.selectedRow = 3
         press("Add Command…", options)
         stage.whilePicking = { window in
-            let browser = self.stage.center.browser()
+            let browser = stage.center.browser()
             CovConfigStage.views(NSSearchField.self, in: window.contentView).first?.stringValue = "cov_beta"
             browser.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification))
             CovConfigStage.press("OK", in: window.contentView)
         }
         press("Add Command…", options)
-        #expect(cell(table, row: 4, column: 1) == "cov_beta" && table.selectedRow == 4)
+        #expect(CovConfigEvents.cell(table, row: 4, column: 1) == "cov_beta" && table.selectedRow == 4)
         press("Add Separator", options)
         press("Add Line Break", options)
         #expect(table.tableView.numberOfRows == 7)
@@ -241,9 +213,9 @@ import Testing
         press("Move Up", options)
         press("Move Down", options)
         table.selectedRow = 4
-        stage.ui.promptAnswers = [.cancel, .text("no.such.symbol.here"), .text("star")]
+        stage.interaction.promptAnswers = [.cancel, .text("no.such.symbol.here"), .text("star")]
         for _ in 0..<3 { press("Symbol…", options) }
-        #expect(stage.ui.log.contains("inform: No symbol is called “no.such.symbol.here”"))
+        #expect(stage.interaction.log.contains("inform: No symbol is called “no.such.symbol.here”"))
         press("Apply", options)
         #expect(toolbar.layout(from: stage.settings).count == 6)
         #expect(toolbar.symbol(for: "cov_beta") == "star")
@@ -262,32 +234,40 @@ import Testing
         table.selectedRow = nil
         for title in ["Change…", "Remove", "Move Up"] { press(title, options) }
         #expect(stage.beeps == 3)
-        stage.ui.formAnswers = [
+        stage.interaction.formAnswers = [
             .cancel, .values(["title": .text("Build"), "command": .text("make"), "shortcut": .text("f6")])
         ]
         press("Add Item…", options)
         press("Add Item…", options)
-        #expect(cell(table, row: 0, column: 1) == "Build" && cell(table, row: 0, column: 3) == "F6")
-        stage.whilePicking = { _ in }
+        #expect(
+            CovConfigEvents.cell(table, row: 0, column: 1) == "Build"
+                && CovConfigEvents.cell(table, row: 0, column: 3) == "F6"
+        )
+        stage.whilePicking = { _ in
+            // The user cancels.
+        }
         press("Add Command…", options)
         stage.whilePicking = { window in
             CovConfigStage.views(NSSearchField.self, in: window.contentView).first?.stringValue = "cov_alpha"
-            self.stage.center.browser().controlTextDidChange(Notification(name: NSControl.textDidChangeNotification))
+            stage.center.browser().controlTextDidChange(Notification(name: NSControl.textDidChangeNotification))
             CovConfigStage.press("OK", in: window.contentView)
         }
-        stage.ui.formAnswers = [.accept]
+        stage.interaction.formAnswers = [.accept]
         press("Add Command…", options)
-        #expect(cell(table, row: 1, column: 2) == "cov_alpha" && cell(table, row: 1, column: 1) == "Probe cov_alpha")
+        #expect(
+            CovConfigEvents.cell(table, row: 1, column: 2) == "cov_alpha"
+                && CovConfigEvents.cell(table, row: 1, column: 1) == "Probe cov_alpha"
+        )
         press("Add Separator", options)
-        #expect(cell(table, row: 2, column: 1) == "———")
+        #expect(CovConfigEvents.cell(table, row: 2, column: 1) == "———")
         press("Change…", options)
         #expect(stage.beeps == 4)
         table.selectedRow = 0
-        stage.ui.formAnswers = [.cancel, .values(["title": .text("Build all")])]
+        stage.interaction.formAnswers = [.cancel, .values(["title": .text("Build all")])]
         press("Change…", options)
         // Return in the list changes the entry too.
-        table.tableView.keyDown(with: try #require(key("\r", code: 36, in: options.window)))
-        #expect(cell(table, row: 0, column: 1) == "Build all")
+        table.tableView.keyDown(with: try #require(CovConfigEvents.key("\r", code: 36, in: options.window, [])))
+        #expect(CovConfigEvents.cell(table, row: 0, column: 1) == "Build all")
         press("Move Down", options)
         press("Move Up", options)
         table.selectedRow = 2
@@ -304,8 +284,8 @@ import Testing
         let options = try open(.settingsFile)
         #expect(options.shownPage == "Settings File")
         for title in ["Export Settings…", "Import Settings…", "Reset All Settings…"] { press(title, options) }
-        #expect(stage.ui.log.first == "form: Export Settings" && stage.fileRequests.map(\.saving) == [false])
-        #expect(stage.ui.log.last?.hasPrefix("choose: Reset all settings?") == true)
+        #expect(stage.interaction.log.first == "form: Export Settings" && stage.fileRequests.map(\.saving) == [false])
+        #expect(stage.interaction.log.last?.hasPrefix("choose: Reset all settings?") == true)
         press("Apply", options)
     }
 }

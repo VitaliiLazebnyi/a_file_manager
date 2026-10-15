@@ -7,7 +7,9 @@ import Testing
 @testable import ConfigurationPlugin
 
 /// The models behind the configuration windows, at the corners the other suites leave.
-@MainActor @Suite internal struct CovConfigModels {
+@MainActor
+@Suite
+internal struct CovConfigModels {
     /// A stored action without fields has empty ones.
     @Test
     internal func aStoredActionWithoutFieldsIsEmpty() throws {
@@ -31,10 +33,10 @@ import Testing
     @Test
     internal func aKeyOfAnUnknownCommandNamesItByItsName() {
         let editor = KeyBindingEditor(commands: [], overrides: ["em_gone": ["f9"]])
-        let ui = ScriptedInteraction()
-        ui.choiceAnswers = [1]
-        #expect(!editor.assign(.f(9), to: "em_new", adding: false, asking: ui))
-        #expect(ui.log.first?.contains("It runs “em_gone” (em_gone).") == true)
+        let interaction = ScriptedInteraction()
+        interaction.choiceAnswers = [1]
+        #expect(!editor.assign(.f(9), to: "em_new", adding: false, asking: interaction))
+        #expect(interaction.log.first?.contains("It runs “em_gone” (em_gone).") == true)
     }
 
     /// A page model shows what is stored for a preference that is not on its page.
