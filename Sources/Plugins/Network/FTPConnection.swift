@@ -259,8 +259,9 @@ final class FTPConnection: @unchecked Sendable {
     private(set) var commandMayHaveRun = false
     /// Guards the two stream references against `interrupt`, the one call from another thread.
     private let streamsLock = NSLock()
-    /// When the connection was last used; the pool reads it while it holds the connection.
-    var lastUsed = Date()
+    /// When the connection was last used, by `clock`; the pool reads it while it holds the connection.
+    private(set) var lastUsed: Date
+    private let clock: @Sendable () -> Date
     /// Called with every line sent and received, for the log.
     let log: (@Sendable (String) -> Void)?
 
@@ -271,7 +272,8 @@ final class FTPConnection: @unchecked Sendable {
         knownLinks: LinkMemory = LinkMemory(),
         knownNames: NameMemory = NameMemory(),
         onActivity: (@Sendable () -> Void)? = nil,
-        log: (@Sendable (String) -> Void)? = nil
+        log: (@Sendable (String) -> Void)? = nil,
+        clock: @escaping @Sendable () -> Date = { Date() }
     ) {
         self.config = config
         self.trust = trust
@@ -279,6 +281,8 @@ final class FTPConnection: @unchecked Sendable {
         self.knownNames = knownNames
         self.onActivity = onActivity
         self.log = log
+        self.clock = clock
+        lastUsed = clock()
         encoding = config.encoding
     }
 
@@ -454,7 +458,7 @@ final class FTPConnection: @unchecked Sendable {
             throw FileSystemError.notSupported("A name with a line break")
         }
         log?(shown ?? command)
-        lastUsed = Date()
+        lastUsed = clock()
         commandMayHaveRun = false
         do {
             try control.write(
@@ -729,7 +733,7 @@ final class FTPConnection: @unchecked Sendable {
             }
             reply = try readReply(cancellation: cancellation)
         }
-        lastUsed = Date()
+        lastUsed = clock()
         guard reply.isSuccess else { throw refusal(reply) }
     }
 
@@ -763,7 +767,7 @@ final class FTPConnection: @unchecked Sendable {
                 return
             }
         }
-        lastUsed = Date()
+        lastUsed = clock()
     }
 
     // MARK: Listing

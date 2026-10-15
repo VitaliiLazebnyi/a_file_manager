@@ -181,6 +181,7 @@ public final class SessionEnvironment: @unchecked Sendable {
         }
         var declineMemory: TimeInterval = 5
         var log: @Sendable (String) -> Void = { _ in }
+        var clock: @Sendable () -> Date = { Date() }
     }
 
     private func hook<Value>(_ path: KeyPath<Hooks, Value>) -> Value {
@@ -251,6 +252,12 @@ public final class SessionEnvironment: @unchecked Sendable {
     public var log: @Sendable (String) -> Void {
         get { hook(\.log) }
         set { setHook(\.log, newValue) }
+    }
+    /// The time by which connections age: how long one sat idle, and how long nothing was done
+    /// with a server. The system's clock unless a test sets another.
+    public var clock: @Sendable () -> Date {
+        get { hook(\.clock) }
+        set { setHook(\.clock, newValue) }
     }
 
     public init(options: NetworkOptions = NetworkOptions(), trust: CertificateTrust = CertificateTrust()) {
