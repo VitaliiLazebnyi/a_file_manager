@@ -32,36 +32,58 @@ enum ImageDecoder {
     /// frame of an animation stays (the specification's `GifMinDelay`). Photos are turned as
     /// their EXIF orientation says.
     static func decode(
-        _ data: Data, minimumDelay: Double = 0.08, largestSide: Int = largestSide, pixelLimit: Double = pixelLimit,
-        cancellation: CancellationFlag = CancellationFlag(), firstFrame: ((DecodedImage) -> Void)? = nil
+        _ data: Data,
+        minimumDelay: Double = 0.08,
+        largestSide: Int = largestSide,
+        pixelLimit: Double = pixelLimit,
+        cancellation: CancellationFlag = CancellationFlag(),
+        firstFrame: ((DecodedImage) -> Void)? = nil
     ) -> DecodedImage? {
         guard
             let source = CGImageSourceCreateWithData(
-                data as CFData, [kCGImageSourceShouldCache: false] as CFDictionary)
+                data as CFData,
+                [kCGImageSourceShouldCache: false] as CFDictionary
+            )
         else { return nil }
         return decode(
-            source, minimumDelay: minimumDelay, largestSide: largestSide, pixelLimit: pixelLimit,
-            cancellation: cancellation, firstFrame: firstFrame)
+            source,
+            minimumDelay: minimumDelay,
+            largestSide: largestSide,
+            pixelLimit: pixelLimit,
+            cancellation: cancellation,
+            firstFrame: firstFrame
+        )
     }
 
     /// The same for a file on the local disk, which ImageIO reads as it needs it instead of
     /// the whole file being read into memory first.
     static func decode(
-        contentsOf url: URL, minimumDelay: Double = 0.08, largestSide: Int = largestSide,
+        contentsOf url: URL,
+        minimumDelay: Double = 0.08,
+        largestSide: Int = largestSide,
         pixelLimit: Double = pixelLimit,
-        cancellation: CancellationFlag = CancellationFlag(), firstFrame: ((DecodedImage) -> Void)? = nil
+        cancellation: CancellationFlag = CancellationFlag(),
+        firstFrame: ((DecodedImage) -> Void)? = nil
     ) -> DecodedImage? {
         guard let source = CGImageSourceCreateWithURL(url as CFURL, [kCGImageSourceShouldCache: false] as CFDictionary)
         else { return nil }
         return decode(
-            source, minimumDelay: minimumDelay, largestSide: largestSide, pixelLimit: pixelLimit,
-            cancellation: cancellation, firstFrame: firstFrame)
+            source,
+            minimumDelay: minimumDelay,
+            largestSide: largestSide,
+            pixelLimit: pixelLimit,
+            cancellation: cancellation,
+            firstFrame: firstFrame
+        )
     }
 
     /// With `firstFrame`, an animation's first frame is handed over as soon as it is decoded,
     /// before the other frames are.
     private static func decode(
-        _ source: CGImageSource, minimumDelay: Double, largestSide: Int, pixelLimit: Double,
+        _ source: CGImageSource,
+        minimumDelay: Double,
+        largestSide: Int,
+        pixelLimit: Double,
         cancellation: CancellationFlag,
         firstFrame: ((DecodedImage) -> Void)?
     ) -> DecodedImage? {
@@ -106,7 +128,9 @@ enum ImageDecoder {
                     firstFrame?(
                         DecodedImage(
                             frames: [(image: frame, delay: frames[0].1)],
-                            pixelSize: CGSize(width: width, height: height)))
+                            pixelSize: CGSize(width: width, height: height)
+                        )
+                    )
                 }
             }
             if memory > animationMemoryLimit {
@@ -116,8 +140,10 @@ enum ImageDecoder {
         }
         guard !frames.isEmpty else { return nil }
         return DecodedImage(
-            frames: frames.map { (image: $0.0, delay: $0.1) }, pixelSize: CGSize(width: width, height: height),
-            framesDropped: dropped)
+            frames: frames.map { (image: $0.0, delay: $0.1) },
+            pixelSize: CGSize(width: width, height: height),
+            framesDropped: dropped
+        )
     }
 
     /// Whether the frames of the source are those of an animation: a GIF, an animated PNG or
@@ -271,8 +297,14 @@ final class ScaledFrameCache {
         let space = frame.colorSpace.flatMap { $0.model == .rgb ? $0 : nil } ?? CGColorSpace(name: CGColorSpace.sRGB)
         guard let space,
             let context = CGContext(
-                data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0, space: space,
-                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+                data: nil,
+                width: width,
+                height: height,
+                bitsPerComponent: 8,
+                bytesPerRow: 0,
+                space: space,
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            )
         else { return nil }
         context.interpolationQuality = .high
         context.draw(frame, in: CGRect(x: 0, y: 0, width: width, height: height))
@@ -306,10 +338,11 @@ final class ImageCanvasView: NSScrollView {
             // while an animation or the window's edge changes the picture, the frame is resampled.
             let scale = window?.backingScaleFactor ?? 1
             if let bitmap = scaled.image(
-                for: frameImage, width: Int((size.width * scale).rounded()),
+                for: frameImage,
+                width: Int((size.width * scale).rounded()),
                 height: Int((size.height * scale).rounded()),
-                building: !isAnimated && !inLiveResize)
-            {
+                building: !isAnimated && !inLiveResize
+            ) {
                 context.interpolationQuality = .default
                 context.draw(bitmap, in: rect)
             } else {
@@ -350,7 +383,8 @@ final class ImageCanvasView: NSScrollView {
         canvas.scaled.onReady = { [weak canvas] in canvas?.needsDisplay = true }
     }
 
-    required init?(coder _: NSCoder) { fatalError("not used") }
+    /// Made in code only: an archive gives none.
+    required init?(coder _: NSCoder) { nil }
 
     deinit { timer?.invalidate() }
 
@@ -423,11 +457,15 @@ final class ImageCanvasView: NSScrollView {
     func scroll(byX deltaX: CGFloat, y deltaY: CGFloat) {
         let origin = contentView.bounds.origin
         contentView.scroll(
-            to: contentView.constrainBoundsRect(
-                NSRect(
-                    origin: NSPoint(x: origin.x + deltaX, y: origin.y + deltaY),
-                    size: contentView.bounds.size)
-            ).origin)
+            to:
+                contentView.constrainBoundsRect(
+                    NSRect(
+                        origin: NSPoint(x: origin.x + deltaX, y: origin.y + deltaY),
+                        size: contentView.bounds.size
+                    )
+                )
+                .origin
+        )
         reflectScrolledClipView(contentView)
     }
 
@@ -462,8 +500,11 @@ final class ImageCanvasView: NSScrollView {
         canvas.imageRect =
             centered
             ? NSRect(
-                x: (document.width - shown.width) / 2, y: (document.height - shown.height) / 2, width: shown.width,
-                height: shown.height)
+                x: (document.width - shown.width) / 2,
+                y: (document.height - shown.height) / 2,
+                width: shown.width,
+                height: shown.height
+            )
             : NSRect(x: 0, y: document.height - shown.height, width: shown.width, height: shown.height)
         canvas.quarterTurns = quarterTurns
         canvas.frameImage = currentFrame

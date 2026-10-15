@@ -164,7 +164,8 @@ final class TextPagerView: NSView {
         progress.handler = { [weak self] in self?.indexProgressed() }
     }
 
-    required init?(coder _: NSCoder) { fatalError("not used") }
+    /// Made in code only: an archive gives none.
+    required init?(coder _: NSCoder) { nil }
 
     deinit {
         document?.cancellation.cancel()
@@ -184,7 +185,10 @@ final class TextPagerView: NSView {
     /// `parallel`; until the wanted row is known the view keeps what it showed before.
     /// `keepingSelection` is for the same bytes laid out anew: the selection stays.
     func show(
-        _ document: TextDocument, at offset: Int64 = 0, select: Range<Int64>? = nil, keepingSelection: Bool = false,
+        _ document: TextDocument,
+        at offset: Int64 = 0,
+        select: Range<Int64>? = nil,
+        keepingSelection: Bool = false,
         parallel: Bool
     ) {
         pending?.document.cancellation.cancel()
@@ -208,7 +212,8 @@ final class TextPagerView: NSView {
             },
             {
                 document.buildIndex(parallel: parallel) { progress.signal() }
-            })
+            }
+        )
     }
 
     /// Called on the main thread when the indexing threads have news.
@@ -253,12 +258,18 @@ final class TextPagerView: NSView {
         needsDisplay = true
         if let carried {
             reveal(
-                offset: carried.offset, select: carried.select, rowsAbove: carried.rowsAbove,
-                keepingSelection: carried.keepingSelection)
+                offset: carried.offset,
+                select: carried.select,
+                rowsAbove: carried.rowsAbove,
+                keepingSelection: carried.keepingSelection
+            )
         } else if top > next.document.content.lowerBound || next.select != nil {
             reveal(
-                offset: top, select: next.select, rowsAbove: next.select == nil ? 0 : searchGoBack,
-                keepingSelection: next.select == nil)
+                offset: top,
+                select: next.select,
+                rowsAbove: next.select == nil ? 0 : searchGoBack,
+                keepingSelection: next.select == nil
+            )
         } else {
             ensureLoaded()
         }
@@ -340,8 +351,11 @@ final class TextPagerView: NSView {
     private func rowCountChanged() {
         if revealWaitsForIndex, let waiting = outstandingReveal {
             reveal(
-                offset: waiting.offset, select: waiting.select, rowsAbove: waiting.rowsAbove,
-                keepingSelection: waiting.keepingSelection)
+                offset: waiting.offset,
+                select: waiting.select,
+                rowsAbove: waiting.rowsAbove,
+                keepingSelection: waiting.keepingSelection
+            )
         }
         updateScrollers()
         if isVisibleRangeMissing { ensureLoaded() }
@@ -360,8 +374,11 @@ final class TextPagerView: NSView {
 
     private var textArea: NSRect {
         NSRect(
-            x: 0, y: 0, width: max(0, bounds.width - verticalScroller.frame.width),
-            height: max(0, bounds.height - horizontalScroller.frame.height))
+            x: 0,
+            y: 0,
+            width: max(0, bounds.width - verticalScroller.frame.width),
+            height: max(0, bounds.height - horizontalScroller.frame.height)
+        )
     }
 
     /// Rows that fit completely.
@@ -379,9 +396,17 @@ final class TextPagerView: NSView {
     private func placeScrollers() {
         let thickness = NSScroller.scrollerWidth(for: .regular, scrollerStyle: .legacy)
         verticalScroller.frame = NSRect(
-            x: bounds.width - thickness, y: 0, width: thickness, height: max(0, bounds.height - thickness))
+            x: bounds.width - thickness,
+            y: 0,
+            width: thickness,
+            height: max(0, bounds.height - thickness)
+        )
         horizontalScroller.frame = NSRect(
-            x: 0, y: bounds.height - thickness, width: max(0, bounds.width - thickness), height: thickness)
+            x: 0,
+            y: bounds.height - thickness,
+            width: max(0, bounds.width - thickness),
+            height: thickness
+        )
     }
 
     override func setFrameSize(_ newSize: NSSize) {
@@ -542,7 +567,8 @@ final class TextPagerView: NSView {
 
     @objc private func scrolledHorizontally() {
         scrollHorizontally(
-            to: CGFloat(horizontalScroller.doubleValue) * max(0, widestLine + 2 * inset - textArea.width))
+            to: CGFloat(horizontalScroller.doubleValue) * max(0, widestLine + 2 * inset - textArea.width)
+        )
     }
 
     override func scrollWheel(with event: NSEvent) {
@@ -760,8 +786,10 @@ final class TextPagerView: NSView {
                 withRow(target) { [weak self] row in
                     guard let self, let document = self.document else { return }
                     setCaret(
-                        document.byteOffset(in: row, at: textIndex(in: row, atX: x)), row: target,
-                        extending: extending)
+                        document.byteOffset(in: row, at: textIndex(in: row, atX: x)),
+                        row: target,
+                        extending: extending
+                    )
                 }
             }
 
@@ -869,7 +897,8 @@ final class TextPagerView: NSView {
     private func line(for row: DisplayRow) -> CTLine {
         if let line = lines[row.index] { return line }
         let line = CTLineCreateWithAttributedString(
-            NSAttributedString(string: row.text, attributes: [.font: font, .foregroundColor: NSColor.textColor]))
+            NSAttributedString(string: row.text, attributes: [.font: font, .foregroundColor: NSColor.textColor])
+        )
         lines[row.index] = line
         return line
     }
@@ -899,7 +928,9 @@ final class TextPagerView: NSView {
         preferredX = nil
         if event.clickCount == 2 {
             let word = Self.wordRange(
-                around: min(hit.index, max(0, hit.row.text.utf16.count - 1)), in: hit.row.text)
+                around: min(hit.index, max(0, hit.row.text.utf16.count - 1)),
+                in: hit.row.text
+            )
             let lower = document.byteOffset(in: hit.row, at: word.lowerBound)
             let upper = document.byteOffset(in: hit.row, at: word.upperBound)
             anchor = lower
@@ -909,8 +940,10 @@ final class TextPagerView: NSView {
             setCaret(hit.row.range.upperBound, row: hit.row.index, extending: true)
         } else {
             setCaret(
-                document.byteOffset(in: hit.row, at: hit.index), row: hit.row.index,
-                extending: event.modifierFlags.contains(.shift))
+                document.byteOffset(in: hit.row, at: hit.index),
+                row: hit.row.index,
+                extending: event.modifierFlags.contains(.shift)
+            )
         }
     }
 
@@ -952,7 +985,8 @@ final class TextPagerView: NSView {
             widest = max(widest, CGFloat(CTLineGetTypographicBounds(line, nil, nil, nil)))
             if let selection {
                 (window?.firstResponder === self
-                    ? NSColor.selectedTextBackgroundColor : NSColor.unemphasizedSelectedTextBackgroundColor).setFill()
+                    ? NSColor.selectedTextBackgroundColor : NSColor.unemphasizedSelectedTextBackgroundColor)
+                    .setFill()
                 for range in document.textRanges(in: row, for: selection) {
                     let from = CTLineGetOffsetForStringIndex(line, range.lowerBound, nil)
                     let to = CTLineGetOffsetForStringIndex(line, range.upperBound, nil)

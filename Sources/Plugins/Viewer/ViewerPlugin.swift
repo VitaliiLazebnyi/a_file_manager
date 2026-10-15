@@ -54,7 +54,8 @@ public final class ViewerPlugin: Plugin, ViewerService {
         // The kernel keeps what is registered here; it must not be kept by it in turn.
         unowned let kernel = owner
         self.owner = owner
-        settings = ListerSettings(kernel.settings)
+        let listerSettings = ListerSettings(kernel.settings)
+        settings = listerSettings
         let commands = kernel.commands
         kernel.fileSystems.addVolumeReleaser { [weak self] volume in self?.letGo(of: volume) }
         let model = { kernel.panels.source.model }
@@ -76,8 +77,8 @@ public final class ViewerPlugin: Plugin, ViewerService {
                 Command(id, title, shortcuts, barLabel: barLabel, runsDuringJobs: true),
                 enabled: { canView?() ?? !files().isEmpty },
                 parameterized: { [weak self] argument in
+                    // Not empty: the command is enabled only when there are files.
                     let urls = argument.location.map { [$0] } ?? files()
-                    guard !urls.isEmpty else { return }
                     self?
                         .open(
                             urls.map { ViewerItem(source: .file($0), title: kernel.fileSystems.displayPath($0)) },
@@ -108,13 +109,13 @@ public final class ViewerPlugin: Plugin, ViewerService {
             Command(.quickView, "Quick View Panel", [Shortcut(.character("q"), .control)], runsDuringJobs: true),
             checked: isOn
         ) { [weak self] in
-            self?.toggleQuickView(internalOnly: false)
+            self?.toggleQuickView(internalOnly: false, kernel: kernel, settings: listerSettings)
         }
         commands.register(
             Command(.quickViewInternalOnly, "Quick View Panel, Text Only", runsDuringJobs: true),
             checked: isOn
         ) { [weak self] in
-            self?.toggleQuickView(internalOnly: true)
+            self?.toggleQuickView(internalOnly: true, kernel: kernel, settings: listerSettings)
         }
         commands.register(Command(.hideQuickView, "Quick View Panel Off", runsDuringJobs: true), enabled: isOn) {
             [weak self] in self?.hideQuickView()
@@ -142,7 +143,7 @@ public final class ViewerPlugin: Plugin, ViewerService {
             checked: separateIsOpen
         ) { [weak self] in self?.toggleSeparateQuickView(internalOnly: true) }
         commands.register(Command(.configureLister, "Configure Lister…", runsDuringJobs: true)) { [weak self] in
-            self?.configure()
+            self?.configure(kernel)
         }
 
         // The Files menu lists View only; the other ways of viewing have their keys.
@@ -211,7 +212,7 @@ public final class ViewerPlugin: Plugin, ViewerService {
         ) { [weak self] closed in
             self?.windows.removeAll { $0 === closed }
         }
-        controller.pane.onConfigure = { [weak self] in self?.configure() }
+        controller.pane.onConfigure = { [weak self] in self?.configure(kernel) }
         // Several windows do not lie exactly on top of each other.
         if let last = windows.last?.window, let window = controller.window {
             window.setFrameTopLeftPoint(window.cascadeTopLeft(from: NSPoint(x: last.frame.minX, y: last.frame.maxY)))
@@ -234,12 +235,11 @@ public final class ViewerPlugin: Plugin, ViewerService {
 
     /// Ctrl+Q: covers the target panel with a viewer that follows the source panel's cursor;
     /// again, it brings the file list back (spec 03 › Quick View).
-    private func toggleQuickView(internalOnly: Bool) {
+    private func toggleQuickView(internalOnly: Bool, kernel: Kernel, settings: ListerSettings) {
         guard quickView == nil else {
             hideQuickView()
             return
         }
-        guard let kernel = owner, let settings else { return }
         let source = kernel.panels.source
         let target = kernel.panels.target
         guard let host = overlayHost(target) else {
@@ -256,7 +256,7 @@ public final class ViewerPlugin: Plugin, ViewerService {
             internalOnly: internalOnly,
             delay: quickViewDelay
         ) { [weak self] in self?.hideQuickView() }
-        quickView?.pane.onConfigure = { [weak self] in self?.configure() }
+        quickView?.pane.onConfigure = { [weak self] in self?.configure(kernel) }
     }
 
     /// Before `volume` is ejected: the Lister windows that show one of its files close, and a
@@ -286,25 +286,31 @@ public final class ViewerPlugin: Plugin, ViewerService {
 
     /// Configure Lister (spec 10 › Configure Lister): the options of the preference page as
     /// one dialog, for the command and for Options › Configure… in a Lister window.
-    private func configure() {
-        guard let kernel = owner else { return }
-        let page = ListerSettings.preferencePage {}
-        let fields = page.preferences.map { preference -> FormField in
-            switch (preference.kind, kernel.settings.value(of: preference)) {
-            case (.flag, .flag(let isOn)): return .checkbox(preference.key, preference.label, isOn)
+    private func configure(_ kernel: Kernel) {
+        let preferences = ListerSettings.preferences
+        let store = kernel.settings
+        let fields = preferences.map { preference -> FormField in
+            switch preference.kind {
+            case .flag(let value):
+                return .checkbox(preference.key, preference.label, store.flag(preference.key, default: value))
 
-            case (.choice(let options, _), .index(let index)):
-                return .choice(preference.key, preference.label, options, selected: index)
+            case .choice(let options, let value):
+                return .choice(
+                    preference.key,
+                    preference.label,
+                    options,
+                    selected: store.index(preference.key, default: value)
+                )
 
-            case (_, .text(let text)): return .text(preference.key, preference.label, text)
-            default: return .note(preference.label)
+            case .text(let value):
+                return .text(preference.key, preference.label, store.text(preference.key, default: value))
             }
         }
         guard let answer = kernel.interaction.form("Configure Lister", detail: "", fields: fields, buttons: ["OK"])
         else {
             return
         }
-        for preference in page.preferences {
+        for preference in preferences {
             if let value = answer.values[preference.key] { kernel.settings.set(value, for: preference) }
         }
         settingsChanged()

@@ -14,11 +14,17 @@ final class ViewerWindowController: NSWindowController, NSWindowDelegate {
     /// `Lister*` (spec 10 › Title bar).
     let followsCursor: Bool
     private var follower: CursorFollower?
+    /// The window, which the controller keeps for as long as it lives.
+    private let toolWindow: ToolWindow
 
     init(
-        kernel: Kernel, settings: ListerSettings, temporaryCopies: TemporaryCopies, internalOnly: Bool = false,
+        kernel: Kernel,
+        settings: ListerSettings,
+        temporaryCopies: TemporaryCopies,
+        internalOnly: Bool = false,
         followsCursor: Bool = false,
-        followDelay: TimeInterval = 0.12, onClose: @escaping (ViewerWindowController) -> Void
+        followDelay: TimeInterval = 0.12,
+        onClose: @escaping (ViewerWindowController) -> Void
     ) {
         self.settings = settings
         self.onClose = onClose
@@ -27,11 +33,15 @@ final class ViewerWindowController: NSWindowController, NSWindowDelegate {
         pane.internalOnly = internalOnly
         let window = ToolWindow(
             contentRect: NSRect(x: 0, y: 0, width: 860, height: 620),
-            styleMask: [.titled, .closable, .resizable, .miniaturizable], backing: .buffered, defer: false)
+            styleMask: [.titled, .closable, .resizable, .miniaturizable],
+            backing: .buffered,
+            defer: false
+        )
         window.isReleasedWhenClosed = false
         window.minSize = NSSize(width: 360, height: 220)
         window.title = followsCursor ? "Lister*" : "Lister"
         window.contentView = pane
+        toolWindow = window
         if let saved = settings.windowFrame(quick: followsCursor) {
             window.setFrame(NSRectFromString(saved), display: false)
         } else {
@@ -60,7 +70,8 @@ final class ViewerWindowController: NSWindowController, NSWindowDelegate {
         }
     }
 
-    required init?(coder _: NSCoder) { fatalError("not used") }
+    /// Made in code only: an archive gives none.
+    required init?(coder _: NSCoder) { nil }
 
     /// Shows the files of a session, the first one first.
     func show(_ items: [ViewerItem]) {
@@ -110,8 +121,7 @@ final class ViewerWindowController: NSWindowController, NSWindowDelegate {
 
     /// Options › Save position (spec 10 › Geometry); the separate quick view has a place of its own.
     func savePosition() {
-        guard let window else { return }
-        settings.setWindowFrame(NSStringFromRect(window.frame), quick: followsCursor)
+        settings.setWindowFrame(NSStringFromRect(toolWindow.frame), quick: followsCursor)
     }
 
     func windowWillClose(_: Notification) {
@@ -138,7 +148,9 @@ final class CursorFollower {
     /// `panel` names the panel to follow at the time of each event; `show` receives the item
     /// under its cursor (nil on `[..]` or in an empty folder).
     init(
-        kernel: Kernel, delay: TimeInterval, panel: @escaping () -> any PanelHandle?,
+        kernel: Kernel,
+        delay: TimeInterval,
+        panel: @escaping () -> any PanelHandle?,
         show: @escaping (FileItem?) -> Void
     ) {
         self.delay = delay

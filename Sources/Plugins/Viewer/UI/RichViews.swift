@@ -79,7 +79,9 @@ final class TemporaryCopies: @unchecked Sendable {
     /// provider, kept for `owner` until it is released. Nil when it cannot be read or
     /// `cancellation` was set.
     func localURL(
-        for url: URL, fileSystems: FileSystemRegistry, owner: ObjectIdentifier = ObjectIdentifier(TemporaryCopies.self),
+        for url: URL,
+        fileSystems: FileSystemRegistry,
+        owner: ObjectIdentifier = ObjectIdentifier(TemporaryCopies.self),
         cancellation: CancellationFlag
     ) -> URL? {
         try? localCopy(for: url, fileSystems: fileSystems, owner: owner, cancellation: cancellation).get()
@@ -87,7 +89,9 @@ final class TemporaryCopies: @unchecked Sendable {
 
     /// `localURL`, with the reason when there is none.
     func localCopy(
-        for url: URL, fileSystems: FileSystemRegistry, owner: ObjectIdentifier = ObjectIdentifier(TemporaryCopies.self),
+        for url: URL,
+        fileSystems: FileSystemRegistry,
+        owner: ObjectIdentifier = ObjectIdentifier(TemporaryCopies.self),
         cancellation: CancellationFlag
     ) -> Result<URL, Refusal> {
         if url.isFileURL { return .success(url) }
@@ -186,7 +190,9 @@ final class TemporaryCopies: @unchecked Sendable {
                 name.unicodeScalars.map { scalar in
                     scalar == "/" || scalar == ":" || scalar == "\\" || scalar.value < 0x20 || scalar.value == 0x7F
                         ? "_" : scalar
-                }))
+                }
+            )
+        )
         cleaned = cleaned.trimmingCharacters(in: .whitespaces)
         if cleaned.isEmpty || cleaned.allSatisfy({ $0 == "." }) { return "file" }
         // A name is at most 255 bytes: keep the end, which holds the extension that picks the player.
@@ -295,10 +301,15 @@ final class TemporaryCopies: @unchecked Sendable {
         lock.unlock()
         if base == nil {
             let created = directory.appendingPathComponent(
-                "\(Self.prefix)p\(getpid())-\(UUID().uuidString)", isDirectory: true)
+                "\(Self.prefix)p\(getpid())-\(UUID().uuidString)",
+                isDirectory: true
+            )
             guard
                 (try? FileManager.default.createDirectory(
-                    at: created, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])) != nil
+                    at: created,
+                    withIntermediateDirectories: true,
+                    attributes: [.posixPermissions: 0o700]
+                )) != nil
             else { return nil }
             lock.lock()
             if root == nil { root = created }
@@ -310,7 +321,10 @@ final class TemporaryCopies: @unchecked Sendable {
         let folder = base.appendingPathComponent(UUID().uuidString, isDirectory: true)
         return
             (try? FileManager.default.createDirectory(
-                at: folder, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])) != nil
+                at: folder,
+                withIntermediateDirectories: true,
+                attributes: [.posixPermissions: 0o700]
+            )) != nil
             ? folder : nil
     }
 
@@ -363,7 +377,8 @@ final class MediaView: NSView {
         addSubview(playerView)
     }
 
-    required init?(coder _: NSCoder) { fatalError("not used") }
+    /// Made in code only: an archive gives none.
+    required init?(coder _: NSCoder) { nil }
 
     deinit {
         if let endObserver { NotificationCenter.default.removeObserver(endObserver) }
@@ -373,7 +388,9 @@ final class MediaView: NSView {
         let item = AVPlayerItem(url: url)
         if let endObserver { NotificationCenter.default.removeObserver(endObserver) }
         endObserver = NotificationCenter.default.addObserver(
-            forName: .AVPlayerItemDidPlayToEndTime, object: item, queue: .main
+            forName: .AVPlayerItemDidPlayToEndTime,
+            object: item,
+            queue: .main
         ) { [weak self] _ in
             // Delivered on the main queue.
             MainActor.assumeIsolated { self?.onEnd() }
@@ -456,7 +473,8 @@ final class WebContentView: NSView, WKNavigationDelegate {
         addSubview(webView)
     }
 
-    required init?(coder _: NSCoder) { fatalError("not used") }
+    /// Made in code only: an archive gives none.
+    required init?(coder _: NSCoder) { nil }
 
     func show(html: String) {
         expectsPage = true
@@ -488,13 +506,16 @@ final class WebContentView: NSView, WKNavigationDelegate {
     }
 
     func webView(
-        _: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
+        _: WKWebView,
+        decidePolicyFor navigationAction: WKNavigationAction,
         decisionHandler: @escaping @MainActor @Sendable (WKNavigationActionPolicy) -> Void
     ) {
         let decision = Self.decide(
             isMainFrame: navigationAction.targetFrame?.isMainFrame ?? false,
             isLinkClick: navigationAction.navigationType == .linkActivated,
-            url: navigationAction.request.url, expectsPage: expectsPage)
+            url: navigationAction.request.url,
+            expectsPage: expectsPage
+        )
         switch decision {
         case .allow:
             if navigationAction.navigationType != .linkActivated { expectsPage = false }

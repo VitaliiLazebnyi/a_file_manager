@@ -1023,7 +1023,8 @@ final class TextPrintView: NSView {
             )
     }
 
-    required init?(coder _: NSCoder) { fatalError("not used") }
+    /// Made in code only: an archive gives none.
+    required init?(coder _: NSCoder) { nil }
 
     var pageCount: Int { max(1, (lines.count + linesPerPage - 1) / linesPerPage) }
 
