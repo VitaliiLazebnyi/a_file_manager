@@ -97,20 +97,20 @@ public enum VirtualLocation: Equatable {
 
     /// The path of a real location; `URL.path` has no trailing slash already.
     private static func path(of real: URL) -> String {
-        let path = real.standardized.path
-        return path.isEmpty ? "/" : path
+        // Plain and from the root, also for a location given relative to nothing.
+        plain(real.path)
     }
 
     /// What stands in front of the path of a real URL: `file://`, `sftp://user@host:22`. A
     /// password is left out: this is written into tabs, history and the hotlist, which must
     /// not hold one.
     private static func prefix(of real: URL) -> String {
-        guard var components = URLComponents(url: real, resolvingAgainstBaseURL: true) else {
-            return (real.scheme ?? "file") + "://"
-        }
-        if components.host == nil { components.host = "" }
-        (components.path, components.query, components.fragment, components.password) = ("", nil, nil, nil)
-        return components.string ?? (real.scheme ?? "file") + "://"
+        var text = (real.scheme ?? "file") + "://"
+        if let user = real.user(percentEncoded: true) { text += user + "@" }
+        // An IPv6 address stands in brackets, so that its colons are not taken for the port's.
+        if let host = real.host(percentEncoded: true) { text += host.contains(":") ? "[" + host + "]" : host }
+        if let port = real.port { text += ":\(port)" }
+        return text
     }
 
     private static func realURL(prefix: String, path: String) -> URL? {

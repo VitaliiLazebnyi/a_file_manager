@@ -131,33 +131,31 @@ final class ToolRun: @unchecked Sendable {
     /// Counts bytes (and finished files) and passes the state on, at most twenty times a
     /// second. Safe from any thread.
     func advance(_ bytes: Int64, items: Int = 0, force: Bool = false) {
-        lock.lock()
-        bytesDone += bytes
-        itemsDone += items
-        let due = force || Date().timeIntervalSince(lastReport) > 0.05
-        lock.unlock()
+        // The decision is one step under the lock: a report that is due takes its turn at once
+        // (the time of the last report moves on), so no other thread finds it due as well.
+        let due = lock.withLock { () -> Bool in
+            bytesDone += bytes
+            itemsDone += items
+            let now = Date()
+            guard force || now.timeIntervalSince(lastReport) > 0.05 else { return false }
+            lastReport = now
+            return true
+        }
         guard due else { return }
         // One report at a time; the state is read after the turn has come, so that a later
-        // report never shows less than an earlier one. Every thread waits for its turn (a
-        // paused job blocks inside the report of the thread whose turn it is, and the others
-        // queue up behind it, so Pause stops all of them); a thread whose turn comes after
-        // another has reported just now has nothing to add, unless it is forced.
+        // report never shows less than an earlier one. A paused job blocks inside the report
+        // of the thread whose turn it is, and every report after it queues up behind it.
         reportLock.lock()
         defer { reportLock.unlock() }
-        lock.lock()
-        if !force, Date().timeIntervalSince(lastReport) <= 0.05 {
-            lock.unlock()
-            return
+        let progress = lock.withLock {
+            JobProgress(
+                lines: lines,
+                itemsDone: itemsDone,
+                itemsTotal: itemsTotal,
+                bytesDone: bytesDone,
+                bytesTotal: bytesTotal
+            )
         }
-        lastReport = Date()
-        let progress = JobProgress(
-            lines: lines,
-            itemsDone: itemsDone,
-            itemsTotal: itemsTotal,
-            bytesDone: bytesDone,
-            bytesTotal: bytesTotal
-        )
-        lock.unlock()
         report(progress)
     }
 

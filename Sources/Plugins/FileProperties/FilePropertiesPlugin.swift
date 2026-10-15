@@ -17,7 +17,8 @@ extension CommandID {
 /// that show such facts in the file list.
 public final class FilePropertiesPlugin: Plugin {
     public let name = "FileProperties"
-    private let launchesApplications: Bool
+    /// Runs AppleScript with these `osascript` arguments; nil starts nothing (tests).
+    private let runScript: (@Sendable ([String]) -> Void)?
     /// The items Finder's Info window was asked for, whether or not Finder was really told; the
     /// most recent ones only, for tests to look at.
     public private(set) var finderInfoRequests: [URL] = []
@@ -31,8 +32,13 @@ public final class FilePropertiesPlugin: Plugin {
     }
 
     /// Tests turn `launchesApplications` off, so they do not start other applications.
-    public init(launchesApplications: Bool = true) {
-        self.launchesApplications = launchesApplications
+    public convenience init(launchesApplications: Bool = true) {
+        self.init(runScript: launchesApplications ? AppleScript.run : nil)
+    }
+
+    /// A plugin that hands its AppleScript to `runScript`.
+    init(runScript: (@Sendable ([String]) -> Void)?) {
+        self.runScript = runScript
     }
 
     public func start(in owner: Kernel) {
@@ -166,21 +172,20 @@ public final class FilePropertiesPlugin: Plugin {
     /// Properties dialog for local items.
     private func showFinderInfo(_ urls: [URL]) {
         finderInfoRequests = Array((finderInfoRequests + urls).suffix(Self.finderInfoRequestLimit))
-        guard launchesApplications else { return }
+        guard let runScript else { return }
+        let arguments = Self.finderInfoArguments(urls)
         // Starting a program waits for the system: on a thread for work that waits.
-        BlockingCalls.run {
-            let script = [
-                "on run paths", "tell application \"Finder\"", "repeat with itemPath in paths",
-                "open information window of ((POSIX file (contents of itemPath)) as alias)", "end repeat", "activate",
-                "end tell", "end run"
-            ]
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-            process.arguments = script.flatMap { ["-e", $0] } + urls.map(\.path)
-            process.standardOutput = FileHandle.nullDevice
-            process.standardError = FileHandle.nullDevice
-            try? process.run()
-        }
+        BlockingCalls.run { runScript(arguments) }
+    }
+
+    /// The `osascript` arguments that open Finder's Info window of each item.
+    static func finderInfoArguments(_ urls: [URL]) -> [String] {
+        let script = [
+            "on run paths", "tell application \"Finder\"", "repeat with itemPath in paths",
+            "open information window of ((POSIX file (contents of itemPath)) as alias)", "end repeat", "activate",
+            "end tell", "end run"
+        ]
+        return script.flatMap { ["-e", $0] } + urls.map(\.path)
     }
 }
 

@@ -141,4 +141,45 @@ internal struct CoverageVirtualFormats {
         // The folder itself and the first batch of its folders were read; the rest was not.
         #expect(batches == 1 && visited.count == BranchWalker.directoriesPerBatch + 1)
     }
+
+    /// The part in front of a real path keeps a user, an IPv6 host and a port; a location
+    /// without a scheme is taken as a local one.
+    @Test
+    internal func prefixesOfEveryKind() throws {
+        let server = try url("sftp://us%40er@[::1]:22/srv")
+        #expect(
+            VirtualLocation(VirtualLocation.branch(of: server).url)?.realDirectory?.absoluteString
+                == "sftp://us%40er@[::1]:22/srv"
+        )
+        let relative = try url("a/b")
+        #expect(VirtualLocation(VirtualLocation.branch(of: relative).url)?.realDirectory?.isFileURL == true)
+    }
+
+    /// A walk that crosses disks passes over a folder where a disk is mounted, and walks into a
+    /// folder of another disk that is no mount point (a firmlink).
+    @Test
+    internal func mountedFoldersAreLeftOut() throws {
+        let box = try Sandbox()
+        try box.file("L/top.txt")
+        try box.file("L/mnt/inside.txt")
+        try box.file("L/firm/linked.txt")
+        let local = FileSystemRegistry()
+        local.register(LocalFileSystem())
+        var walker = BranchWalker(fileSystems: local, showHidden: false)
+        let system = VolumeProbe.system
+        walker.volumes = VolumeProbe(
+            identity: { path, follows in
+                system.identity(path, follows)
+                    .map { path.hasSuffix("/mnt") || path.hasSuffix("/firm") ? (99, $0.inode) : $0 }
+            },
+            isMountPoint: { $0.hasSuffix("/mnt") },
+            crossesDisks: { _ in true }
+        )
+        var names: [String] = []
+        try walker.walk([BranchWalker.Start(box.url("L"))]) { batch in
+            names += batch.map(\.name)
+            return true
+        }
+        #expect(names.sorted() == ["firm/linked.txt", "top.txt"])
+    }
 }

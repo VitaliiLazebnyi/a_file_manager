@@ -63,6 +63,8 @@ public struct BranchWalker: Sendable {
     public var listsFolders: Bool
     /// Walks into packages (`.app` and the like) instead of listing them as one item.
     public var entersPackages: Bool
+    /// Where the answers about disks come from: the system's, or a test's.
+    internal var volumes = VolumeProbe.system
 
     public init(
         fileSystems: FileSystemRegistry,
@@ -80,14 +82,13 @@ public struct BranchWalker: Sendable {
     private func enter(_ url: URL, name: String, from parent: Start, entered: inout Set<DirectoryKey>) -> Start? {
         var child = Start(url, prefix: name + "/")
         guard url.isFileURL else { return child }
-        var info = stat()
-        guard lstat(url.path, &info) == 0, !Self.mountFolders.contains(url.path) else { return nil }
-        if let device = parent.device, info.st_dev != device, !parent.crossesDisks { return nil }
+        guard let info = volumes.identity(url.path, false), !Self.mountFolders.contains(url.path) else { return nil }
+        if let device = parent.device, info.device != device, !parent.crossesDisks { return nil }
         // Another device than the folder it lies in: a mounted volume, or a firmlink.
-        if let own = parent.ownDevice, info.st_dev != own, Self.isMountPoint(url.path) { return nil }
-        guard entered.insert(DirectoryKey(device: info.st_dev, inode: info.st_ino)).inserted else { return nil }
+        if let own = parent.ownDevice, info.device != own, volumes.isMountPoint(url.path) { return nil }
+        guard entered.insert(DirectoryKey(device: info.device, inode: info.inode)).inserted else { return nil }
         child.device = parent.device
-        child.ownDevice = info.st_dev
+        child.ownDevice = info.device
         child.crossesDisks = parent.crossesDisks
         return child
     }
@@ -116,16 +117,13 @@ public struct BranchWalker: Sendable {
         var entered = Set<DirectoryKey>()
         var level: [Start] = []
         for var start in starts {
-            if start.directory.isFileURL {
-                var info = stat()
-                if stat(start.directory.path, &info) == 0 {
-                    guard entered.insert(DirectoryKey(device: info.st_dev, inode: info.st_ino)).inserted else {
-                        continue
-                    }
-                    start.device = info.st_dev
-                    start.ownDevice = info.st_dev
-                    start.crossesDisks = start.directory.path == "/"
+            if start.directory.isFileURL, let info = volumes.identity(start.directory.path, true) {
+                guard entered.insert(DirectoryKey(device: info.device, inode: info.inode)).inserted else {
+                    continue
                 }
+                start.device = info.device
+                start.ownDevice = info.device
+                start.crossesDisks = volumes.crossesDisks(start.directory.path)
             }
             level.append(start)
         }

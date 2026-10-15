@@ -110,28 +110,10 @@ enum ChecksumMethod: Int, CaseIterable, Codable {
         case .sha512: return CryptoHasher<SHA512>()
         case .sha224: return SHA224Hasher()
 
-        case .sha3_256:
-            // CryptoKit has SHA-3 from the macOS 26 SDK on (Swift 6.2); older toolchains use the fallback.
-            #if swift(>=6.2)
-                if #available(macOS 26.0, *) { return CryptoHasher<SHA3_256>() }
-            #endif
-            return SHA3Hasher(digestLength: digestLength)
-
-        case .sha3_384:
-            // CryptoKit has SHA-3 from the macOS 26 SDK on (Swift 6.2); older toolchains use the fallback.
-            #if swift(>=6.2)
-                if #available(macOS 26.0, *) { return CryptoHasher<SHA3_384>() }
-            #endif
-            return SHA3Hasher(digestLength: digestLength)
-
-        case .sha3_512:
-            // CryptoKit has SHA-3 from the macOS 26 SDK on (Swift 6.2); older toolchains use the fallback.
-            #if swift(>=6.2)
-                if #available(macOS 26.0, *) { return CryptoHasher<SHA3_512>() }
-            #endif
-            return SHA3Hasher(digestLength: digestLength)
-
-        case .sha3_224: return SHA3Hasher(digestLength: digestLength)
+        // The own implementation on every system: CryptoKit has SHA-3 only from macOS 26 on, and
+        // is about a sixth faster there (845 against 705 MB/s for SHA3-256 on one core), less
+        // than the disks the files come from deliver.
+        case .sha3_224, .sha3_256, .sha3_384, .sha3_512: return SHA3Hasher(digestLength: digestLength)
         case .blake3: return BLAKE3Hasher()
         }
     }

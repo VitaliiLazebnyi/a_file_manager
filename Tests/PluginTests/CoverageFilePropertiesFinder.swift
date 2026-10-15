@@ -1,0 +1,38 @@
+import AFMContracts
+import AFMKernel
+import Foundation
+import LocalFileSystemPlugin
+import TestSupport
+import Testing
+
+@testable import FilePropertiesPlugin
+
+/// Finder's Info window is asked for through AppleScript, which a test only notes.
+@MainActor
+@Suite
+internal struct CoverageFilePropertiesFinder {
+    /// The script of a request, the paths of the items last.
+    @Test
+    internal func finderIsAskedWithAScriptAndThePaths() throws {
+        let box = try Sandbox()
+        try box.file("A/one.txt")
+        try box.folder("B")
+        let scripts = Shared<[[String]]>([])
+        let plugin = FilePropertiesPlugin { arguments in scripts.modify { $0.append(arguments) } }
+        let bench = TestBench(
+            plugins: [plugin],
+            fileSystems: [LocalFileSystem()],
+            left: box.url("A"),
+            right: box.url("B")
+        )
+        bench.left.moveCursor(toName: "one.txt")
+        bench.commands.perform("afm_FinderInfo")
+        #expect(Wait.until { !scripts.value.isEmpty })
+        let arguments = try #require(scripts.value.first)
+        #expect(arguments == FilePropertiesPlugin.finderInfoArguments([box.url("A/one.txt")]))
+        #expect(arguments.last == box.url("A/one.txt").path && arguments.first == "-e")
+        #expect(arguments.contains("tell application \"Finder\""))
+        // A plugin that may start applications starts nothing by being made.
+        #expect(FilePropertiesPlugin().finderInfoRequests.isEmpty)
+    }
+}

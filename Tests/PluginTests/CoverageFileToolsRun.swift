@@ -206,4 +206,21 @@ internal struct CoverageFileToolsRun {
         sha3.update(Data())
         #expect(sha3.finish().hex == "a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a")
     }
+
+    /// Progress from many threads at once is passed on at most twenty times a second, and a
+    /// later report never shows less than an earlier one.
+    @Test
+    internal func progressFromManyThreadsIsThrottled() {
+        let reports = Shared<[Int64]>([])
+        let tool = ToolRun(fileSystems: fileSystems) { progress in reports.modify { $0.append(progress.bytesDone) } }
+        let start = Date()
+        DispatchQueue.concurrentPerform(iterations: 8) { _ in
+            for _ in 0..<20_000 { tool.advance(1) }
+        }
+        let windows = Int(Date().timeIntervalSince(start) / 0.05) + 1
+        tool.advance(0, force: true)
+        let sent = reports.value
+        #expect(sent.count <= windows + 1 && sent.last == 160_000)
+        #expect(zip(sent, sent.dropFirst()).allSatisfy { $0 <= $1 })
+    }
 }
