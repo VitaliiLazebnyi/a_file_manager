@@ -160,6 +160,10 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
     private var search: FileSearch?
     private var spotlight: SpotlightSearch?
 
+    /// Puts the window on screen. Tests replace it, so that no window shows in the session they
+    /// run in, and look at what it was asked to show.
+    var present: @MainActor (NSWindowController) -> Void = { $0.showWindow(nil) }
+
     init(kernel: Kernel, title: String = "Find Files") {
         self.kernel = kernel
         store = SearchStore(settings: kernel.settings)
@@ -206,7 +210,7 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
     /// shown in the panel through the kernel's commands.
     func show(startingIn directory: URL, includeHidden: Bool) {
         prepare(startingIn: directory, includeHidden: includeHidden)
-        showWindow(nil)
+        present(self)
         window?.makeFirstResponder(form.searchForField)
     }
 
@@ -563,7 +567,7 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
             ? (found == 0 ? "[Search cancelled]" : "[Search cancelled, \(counts) found so far]")
             : found == 0 ? "[No files found]" : "[\(counts) found]"
         if !notes.isEmpty {
-            summary// Every summary ends with its bracket.
+            summary  // Every summary ends with its bracket.
             = String(summary.dropLast()) + " - " + notes.joined(separator: "; ") + "]"
         }
         rows[0] = .summary(summary)

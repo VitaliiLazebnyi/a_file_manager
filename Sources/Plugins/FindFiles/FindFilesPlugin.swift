@@ -16,6 +16,9 @@ public final class FindFilesPlugin: Plugin {
     private var window: FindFilesWindowController?
     /// The windows of "Find Files in Separate Window", each until it is closed.
     private var separateWindows: [FindFilesWindowController] = []
+    /// Puts a window of Find Files on screen. Tests replace it, so that no window shows in the session they
+    /// run in, and look at what it was asked to show.
+    var present: @MainActor (NSWindowController) -> Void = { $0.showWindow(nil) }
 
     public init() {}
 
@@ -44,6 +47,7 @@ public final class FindFilesPlugin: Plugin {
         ) { [self] in
             let controller = FindFilesWindowController(kernel: kernel, title: "Find Files (separate)")
             controller.onClose = { [weak self] closed in self?.separateWindows.removeAll { $0 === closed } }
+            controller.present = present
             separateWindows.append(controller)
             controller.show(startingIn: source().directory, includeHidden: source().showHidden)
         }
@@ -99,6 +103,7 @@ public final class FindFilesPlugin: Plugin {
     /// The one window of `cm_SearchFor`; it keeps its fields and results between uses.
     func mainWindow(in kernel: Kernel) -> FindFilesWindowController {
         let controller = window ?? FindFilesWindowController(kernel: kernel)
+        controller.present = present
         window = controller
         return controller
     }
