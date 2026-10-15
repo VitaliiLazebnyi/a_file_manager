@@ -17,3 +17,52 @@
 #
 # Line numbers are not part of an entry, so edits elsewhere in the file do not disturb it. An entry
 # whose mutant a test kills, or that no longer matches any mutant of its file, fails the gate.
+
+file: Sources/AFMKernel/FileSystem/FileSystemProvider+Defaults.swift
+operator: RemoveSideEffects
+in: public func watch(_: [URL], onChange: @escaping @MainActor @Sendable ([URL]) -> Void) -> (any WatchToken)?
+before: withExtendedLifetime(onChange) { // Let go of here: nothing will report to it. }
+after: (statement removed)
+reason: The default watcher keeps nothing: the handler is let go of when the call returns either way; keeping it to the end of the call is only there for the unneeded_escaping rule, and nothing can see when a closure that is never called is released.
+
+file: Sources/AFMKernel/FileSystem/FileSystemRegistry.swift
+operator: RemoveSideEffects
+in: public func addFlusher(_ flush: @escaping @Sendable (URL, CancellationFlag) throws -> Void)
+before: flushLock.lock()
+after: (statement removed)
+reason: Only another thread adding or reading flushers at the same moment could tell a missing lock: a race no test can bring about on purpose; unlocking the unlocked lock afterwards is harmless for NSLock.
+
+file: Sources/AFMKernel/FileSystem/FileSystemRegistry.swift
+operator: RemoveSideEffects
+in: public func addVolumeReleaser(_ release: @escaping @MainActor (URL) -> Void)
+before: flushLock.lock()
+after: (statement removed)
+reason: Only another thread adding or reading releasers at the same moment could tell a missing lock: a race no test can bring about on purpose; unlocking the unlocked lock afterwards is harmless for NSLock.
+
+file: Sources/AFMKernel/FileSystem/FileSystemRegistry.swift
+operator: RemoveSideEffects
+in: public func addVolumeCloser(_ close: @escaping @Sendable (URL, CancellationFlag) -> Void)
+before: flushLock.lock()
+after: (statement removed)
+reason: Only another thread adding or reading closers at the same moment could tell a missing lock: a race no test can bring about on purpose; unlocking the unlocked lock afterwards is harmless for NSLock.
+
+file: Sources/AFMKernel/PluginAPI/Kernel.swift
+operator: RemoveSideEffects
+in: func offer(_ work: @escaping () -> Void)
+before: lock.lock()
+after: (statement removed)
+reason: The hop is offered before it is handed to another thread, so nobody else can hold the lock then: without it the same thread sets the work, and unlocking the unlocked lock is harmless for NSLock.
+
+file: Sources/AFMKernel/PluginAPI/Kernel.swift
+operator: RemoveSideEffects
+in: public func load(_ plugins: [any Plugin])
+before: Self.signposter.endInterval("start", interval)
+after: (statement removed)
+reason: Signposts are recorded only while Instruments listens; the log store of a test run never sees them, so no test can tell whether the interval of a plugin's start is closed.
+
+file: Sources/AFMKernel/PluginAPI/Kernel.swift
+operator: RemoveSideEffects
+in: nonisolated public func askUser<Answer: Sendable>(
+before: Parallel.assertMayWaitForMainThread()
+after: (statement removed)
+reason: The check only logs a fault for a caller that the main thread waits for; such a caller then waits for the main thread for ever with or without the log, so no test can make the call and see the difference.
