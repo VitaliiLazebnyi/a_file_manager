@@ -33,7 +33,8 @@ enum NetworkSettings {
     static let lastServer = "network.lastServerAddress"
     /// The plain FTP servers the user agreed to send a password to without encryption.
     static let unprotectedHosts = "network.unprotectedPasswordHosts"
-    static let parallelChoices = ["1", "2", "3", "4", "6", "8"]
+    static let parallelCounts = [1, 2, 3, 4, 6, 8]
+    static let parallelChoices = parallelCounts.map(String.init)
 
     /// Reads the preferences into the form the connections use. Main thread.
     static func values(from settings: any SettingsStore) -> NetworkOptions.Values {
@@ -42,7 +43,7 @@ enum NetworkSettings {
         values.keepAliveInterval = max(0, TimeInterval(settings.text(keepAlive, default: "60")) ?? 60)
         values.transferMode = TransferMode(rawValue: settings.index(transferMode, default: 0)) ?? .binary
         let choice = settings.index(parallelConnections, default: 2)
-        values.parallelConnections = parallelChoices.indices.contains(choice) ? Int(parallelChoices[choice]) ?? 3 : 3
+        values.parallelConnections = parallelCounts.indices.contains(choice) ? parallelCounts[choice] : 3
         values.textFileMasks = settings.text(textFiles, default: NetworkOptions.defaultTextMasks)
         values.anonymousPassword = settings.text(anonymousPassword, default: NetworkOptions.defaultAnonymousPassword)
         values.timeout = min(600, max(3, TimeInterval(settings.text(timeout, default: "30")) ?? 30))

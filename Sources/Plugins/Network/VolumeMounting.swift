@@ -46,7 +46,14 @@ public final class SystemVolumeMounter: VolumeMounter {
                     // No mount path: the system picks a folder under /Volumes. No options: it shows its
                     // own dialog for the name and password and may use the Keychain.
                     let status = NetFSMountURLAsync(
-                        url as CFURL, nil, nil, nil, nil, nil, &request, DispatchQueue.global(qos: .userInitiated)
+                        url as CFURL,
+                        nil,
+                        nil,
+                        nil,
+                        nil,
+                        nil,
+                        &request,
+                        DispatchQueue.global(qos: .userInitiated)
                     ) { status, _, mountPoints in
                         answer(status, (mountPoints as? [String]) ?? [])
                     }
@@ -56,7 +63,8 @@ public final class SystemVolumeMounter: VolumeMounter {
             if let request = request as? Request { NetFSMountURLCancel(request.id) }
         }
         var unmount: @Sendable (_ volume: URL, _ answer: @escaping @Sendable (any Error?) -> Void) -> Void = {
-            volume, answer in
+            volume,
+            answer in
             FileManager.default.unmountVolume(at: volume, options: [.withoutUI], completionHandler: answer)
         }
     }
@@ -86,21 +94,23 @@ public final class SystemVolumeMounter: VolumeMounter {
     }
 
     /// What the system's answer is delivered into; it may come after the waiting thread left.
-    /// `result` and `failure` are guarded by `lock`.
+    /// The first answer counts; until it comes the value is an input/output error. `result`,
+    /// `isSet` and `failure` are guarded by `lock`.
     private final class Outcome: @unchecked Sendable {
         let done = DispatchSemaphore(value: 0)
         private let lock = NSLock()
-        private var result: (status: Int32, paths: [String])?
+        private var result: (status: Int32, paths: [String]) = (EIO, [])
+        private var isSet = false
         private var failure: (any Error)?
 
         func set(_ status: Int32, _ paths: [String], failure error: (any Error)? = nil) {
             lock.lock()
-            if result == nil { (result, failure) = ((status, paths), error) }
+            if !isSet { (result, failure, isSet) = ((status, paths), error, true) }
             lock.unlock()
             done.signal()
         }
 
-        var value: (status: Int32, paths: [String])? {
+        var value: (status: Int32, paths: [String]) {
             lock.lock()
             defer { lock.unlock() }
             return result
@@ -121,18 +131,17 @@ public final class SystemVolumeMounter: VolumeMounter {
         let (started, request) = calls.mount(url) { status, mountPoints in outcome.set(status, mountPoints) }
         guard started == 0 else {
             throw VolumeError(
-                message: "The server \(shown) could not be connected: \(Self.reason(started)).")
+                message: "The server \(shown) could not be connected: \(Self.reason(started))."
+            )
         }
         while outcome.done.wait(timeout: .now() + 0.1) == .timedOut {
             guard cancellation.isCancelled else { continue }
             if let request { calls.cancel(request) }
             throw NetworkError.cancelled
         }
-        guard let result = outcome.value, result.status == 0 else {
-            throw VolumeError(
-                message:
-                    "The server \(shown) could not be connected: \(Self.reason(outcome.value?.status ?? EIO))."
-            )
+        let result = outcome.value
+        guard result.status == 0 else {
+            throw VolumeError(message: "The server \(shown) could not be connected: \(Self.reason(result.status)).")
         }
         return result.paths.map { URL(fileURLWithPath: $0, isDirectory: true) }
     }
