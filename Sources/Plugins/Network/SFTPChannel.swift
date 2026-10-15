@@ -215,10 +215,11 @@ struct SFTPPacket {
         return try? decoder.u32()
     }
 
-    /// The payload of an answer of the expected kind; an error status is thrown.
+    /// The payload of an answer of the expected kind, which is never a status: an error status
+    /// is thrown, and so is a success where something else was expected.
     func expect(_ wanted: Kind) throws -> SFTPDecoder {
         if kind == .closed { throw NetworkError.connectionLost }
-        if kind == .status, wanted != .status { try checkStatus() }
+        if kind == .status { try checkStatus() }
         guard kind == wanted else { throw NetworkError.unexpected("SFTP packet \(kind.rawValue)") }
         return SFTPDecoder(body)
     }
@@ -278,8 +279,10 @@ final class AskpassHelper {
     /// More than this is not collected while a question has no end.
     private static let longestQuestion = 64 * 1_024
 
-    init() throws {
-        directory = FileManager.default.temporaryDirectory.appendingPathComponent("afm-askpass-\(UUID().uuidString)")
+    /// The pipes and the script go into a new folder in `parent`, the temporary folder of the user
+    /// unless said otherwise.
+    init(in parent: URL = FileManager.default.temporaryDirectory) throws {
+        directory = parent.appendingPathComponent("afm-askpass-\(UUID().uuidString)")
         try FileManager.default.createDirectory(
             at: directory,
             withIntermediateDirectories: true,
@@ -288,7 +291,11 @@ final class AskpassHelper {
         let (questionPath, answerPath) = (
             directory.appendingPathComponent("question").path, directory.appendingPathComponent("answer").path
         )
-        guard mkfifo(questionPath, 0o600) == 0, mkfifo(answerPath, 0o600) == 0 else { throw POSIXError(.EIO) }
+        guard mkfifo(questionPath, 0o600) == 0, mkfifo(answerPath, 0o600) == 0 else {
+            // Nothing is left behind of a helper that could not be made.
+            try? FileManager.default.removeItem(at: directory)
+            throw POSIXError(.EIO)
+        }
         // Opened for reading and writing, so neither end blocks or sees an end of file while
         // the script comes and goes.
         question = open(questionPath, O_RDWR | O_NONBLOCK)
@@ -469,38 +476,27 @@ final class SFTPChannel: @unchecked Sendable {
             lock.unlock()
         }
         // The channel may be closed from another thread (a disconnect) at any moment, also
-        // before the process runs; a closed pipe's handle raises instead of throwing.
-        guard !isClosed else { throw NetworkError.connectionLost }
-        do {
-            try process.run()
-        } catch {
-            throw NetworkError.connectionFailed(error.localizedDescription)
-        }
-        // A write into a pipe whose reader died must fail, not kill this program. It must not
-        // block either: a packet that cannot be written is waited for with a time limit. The
-        // pipe is only closed with `writeLock` held and the channel marked closed (`close`).
-        writeLock.lock()
-        let isOver = isClosed
-        if !isOver {
+        // before the process runs. The process is started with `lock` held, so `close`, which
+        // marks the channel closed first, either comes before (and nothing is started) or finds
+        // the process running and ends it; the write end of the pipe is only closed after that.
+        try lock.withLock {
+            guard !closed else { throw NetworkError.connectionLost }
+            // A write into a pipe whose reader died must fail, not kill this program. It must not
+            // block either: a packet that cannot be written is waited for with a time limit.
             let input = toServer.fileHandleForWriting.fileDescriptor
             _ = fcntl(input, F_SETNOSIGPIPE, 1)
             _ = fcntl(input, F_SETFL, fcntl(input, F_GETFL) | O_NONBLOCK)
+            do {
+                try process.run()
+            } catch {
+                throw NetworkError.connectionFailed(error.localizedDescription)
+            }
         }
-        writeLock.unlock()
-        guard !isOver else {
-            // Closed while the process started: `close` may have found it not running yet.
-            process.terminate()
-            throw NetworkError.connectionLost
-        }
-        // The thread has a descriptor of its own, closed there, whatever happens to the pipe.
-        let output = dup(fromServer.fileHandleForReading.fileDescriptor)
-        guard output >= 0 else {
-            close()
-            throw NetworkError.connectionFailed("The secure shell's output cannot be read.")
-        }
+        // The thread holds the reading end of the pipe, which stays open until it is done,
+        // whatever happens to the channel.
+        let output = fromServer.fileHandleForReading
         let lastWords = lastWords
         let reader = Thread { [weak self] in
-            defer { Darwin.close(output) }
             Self.readPackets(from: output) { self?.received($0) ?? false }
             // The stream ended, or what came was not SFTP: the dialogue is over, and ssh with it.
             // What ssh said last (why the login failed) is read before anyone is told: its two
@@ -518,7 +514,7 @@ final class SFTPChannel: @unchecked Sendable {
         hello.finishPacket()
         try write(hello.data)
         var deadline = Date().addingTimeInterval(timeout)
-        while true {
+        repeat {
             if let packet = try version.wait(timeout: 0.1, cancellation: cancellation) {
                 var decoder = try packet.expect(.version)
                 _ = try decoder.u32()
@@ -533,8 +529,8 @@ final class SFTPChannel: @unchecked Sendable {
             guard service() else { throw NetworkError.cancelled }
             // The time the user took to answer does not count.
             deadline.addTimeInterval(Date().timeIntervalSince(asked))
-            if Date() > deadline { throw NetworkError.timedOut("logging in") }
-        }
+        } while Date() <= deadline
+        throw NetworkError.timedOut("logging in")
     }
 
     /// Reads what the child process still has to say on its error output, for a moment at most
@@ -552,8 +548,10 @@ final class SFTPChannel: @unchecked Sendable {
         while Date() < deadline {
             var waiting = pollfd(fd: descriptor, events: Int16(POLLIN), revents: 0)
             guard Darwin.poll(&waiting, 1, 50) > 0 else { continue }
+            // Nobody else reads the pipe now (the handler above is gone, and `errorReading` is
+            // held), so a descriptor that is ready has bytes or its end: a read that does not
+            // block is not interrupted, and finds what `poll` saw.
             let count = read(descriptor, &buffer, buffer.count)
-            if count < 0, errno == EINTR || errno == EAGAIN { continue }
             guard count > 0 else { return }
             lock.lock()
             errorText.append(buffer, count: count)
@@ -568,15 +566,13 @@ final class SFTPChannel: @unchecked Sendable {
     static let endTime: TimeInterval = 8
 
     /// Reads packets until the stream ends or `handle` returns false. Runs on the reading thread.
-    private static func readPackets(from descriptor: Int32, handle: (SFTPPacket) -> Bool) {
+    private static func readPackets(from input: FileHandle, handle: (SFTPPacket) -> Bool) {
+        // `FileHandle` reads again when a signal interrupts it; a failure is the end of the stream.
         func readExactly(_ count: Int) -> Data? {
-            var data = Data(count: count)
-            var done = 0
-            while done < count {
-                let got = data.withUnsafeMutableBytes { read(descriptor, $0.baseAddress! + done, count - done) }
-                if got < 0, errno == EINTR { continue }
-                if got <= 0 { return nil }
-                done += got
+            var data = Data()
+            while data.count < count {
+                guard let piece = try? input.read(upToCount: count - data.count), !piece.isEmpty else { return nil }
+                data.append(piece)
             }
             return data
         }
@@ -624,8 +620,7 @@ final class SFTPChannel: @unchecked Sendable {
     /// Takes the right to write, waiting in short turns so that a cancellation is noticed.
     private func lockForWriting(cancellation: CancellationFlag?) throws {
         let deadline = Date().addingTimeInterval(writeTimeout)
-        while true {
-            if writeLock.lock(before: min(deadline, Date().addingTimeInterval(0.1))) { return }
+        while !writeLock.lock(before: min(deadline, Date().addingTimeInterval(0.1))) {
             if cancellation?.isCancelled == true { throw NetworkError.cancelled }
             if Date() >= deadline { throw NetworkError.timedOut("sending to the server") }
         }
@@ -643,7 +638,16 @@ final class SFTPChannel: @unchecked Sendable {
     /// slow line, where the pipe is always full but always moving, cancelling one upload costs
     /// the others nothing. Only when the pipe takes nothing for `cancelGrace` is the cancelled
     /// writer let go, and the channel with it: that line is not moving for anybody.
-    private func writeAll(_ packet: Data, to descriptor: Int32, cancellation: CancellationFlag?) throws {
+    ///
+    /// `descriptor` does not block (a write that does not block is not interrupted by a signal);
+    /// `isClosed` says whether the channel was closed meanwhile.
+    static func writeAll(
+        _ packet: Data,
+        to descriptor: Int32,
+        writeTimeout: TimeInterval,
+        cancellation: CancellationFlag?,
+        isClosed: () -> Bool
+    ) throws {
         try packet.withUnsafeBytes { buffer in
             var sent = 0
             var moved = Date()
@@ -654,19 +658,28 @@ final class SFTPChannel: @unchecked Sendable {
                     moved = Date()
                     continue
                 }
-                if count < 0, errno == EINTR { continue }
                 guard count < 0, errno == EAGAIN else { throw NetworkError.connectionLost }
-                guard !isClosed else { throw NetworkError.connectionLost }
+                guard !isClosed() else { throw NetworkError.connectionLost }
                 let stuck = Date().timeIntervalSince(moved)
                 if stuck >= writeTimeout { throw NetworkError.timedOut("sending to the server") }
                 if cancellation?.isCancelled == true {
                     if sent == 0 { throw NetworkError.cancelled }
-                    if stuck >= Self.cancelGrace { throw NetworkError.connectionLost }
+                    if stuck >= cancelGrace { throw NetworkError.connectionLost }
                 }
                 var wanted = pollfd(fd: descriptor, events: Int16(POLLOUT), revents: 0)
                 _ = Darwin.poll(&wanted, 1, 200)
             }
         }
+    }
+
+    private func writeAll(_ packet: Data, to descriptor: Int32, cancellation: CancellationFlag?) throws {
+        try Self.writeAll(
+            packet,
+            to: descriptor,
+            writeTimeout: writeTimeout,
+            cancellation: cancellation,
+            isClosed: { isClosed }
+        )
     }
 
     /// Writes one complete packet, after the packets that were put aside for it
@@ -736,11 +749,8 @@ final class SFTPChannel: @unchecked Sendable {
     {
         if cancellation?.isCancelled == true { throw NetworkError.cancelled }
         let answer = Pending<SFTPPacket>()
+        // A closed channel is found out by `write`, which looks under the lock it writes with.
         lock.lock()
-        guard !closed else {
-            lock.unlock()
-            throw NetworkError.connectionLost
-        }
         let id = nextID
         nextID &+= 1
         waiting[id] = answer
@@ -816,8 +826,10 @@ final class SFTPChannel: @unchecked Sendable {
     /// Ends the dialogue and the child process. Returns at once, from any thread.
     func close() {
         errors.fileHandleForReading.readabilityHandler = nil
-        if process.isRunning { process.terminate() }
+        // Marked closed first: a `start` under way then either starts nothing, or has started
+        // the process by now (it holds `lock` meanwhile), which is ended here.
         markClosed()
+        if process.isRunning { process.terminate() }
         // The write end goes when no writer is using it. A writer that is stalled finds the
         // channel closed within a moment; until then the pipe is closed in the background, so
         // this thread (possibly the main thread) does not wait for it.
