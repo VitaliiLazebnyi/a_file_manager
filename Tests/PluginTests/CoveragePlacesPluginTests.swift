@@ -1,5 +1,6 @@
 import AFMContracts
 import AFMKernel
+import AppKit
 import Foundation
 import TestSupport
 import Testing
@@ -146,5 +147,18 @@ import Testing
         // Passed through quickly: only the current folder stays under thinning, but the
         // frequently used folders list them all.
         #expect(rows.count == 5 && rows.first == "➤ mem:/A")
+    }
+
+    @Test func theTreeCommandOpensOneWindowAndReusesIt() {
+        _ = NSApplication.shared
+        let bench = bench()
+        defer { plugin.treeWindow?.close() }
+        bench.commands.perform(.directoryTree)
+        let first = plugin.treeWindow
+        bench.commands.perform(.directoryTree)
+        #expect(first != nil && plugin.treeWindow === first && first?.window?.isVisible == true)
+        // A scan it started ends with the plugin.
+        plugin.stop()
+        #expect(first?.window?.isVisible == false)
     }
 }

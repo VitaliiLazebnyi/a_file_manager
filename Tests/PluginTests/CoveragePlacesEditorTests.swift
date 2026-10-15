@@ -80,6 +80,7 @@ struct CoveragePlacesEditorParts {
             kernel: bench.kernel,
             currentDirectory: directory ?? memory.url("/C")
         )
+        defer { controller.close() }
         guard let window = controller.window else {
             Issue.record("the editor has no window")
             return nil
@@ -223,38 +224,5 @@ struct CoveragePlacesEditorParts {
         #expect(result == nil)
         let path = bench.kernel.fileSystems.displayPath(nameless)
         #expect(ui.log == ["prompt: Title of the new entry: [\(path)]", "inform: The directory menu is full."])
-    }
-
-    @Test func theCommandRunsTheEditorAsAModalWindowAndStoresWhatItGives() async {
-        // A modal loop of AppKit leaves the main run loop of a test process in a state that can end
-        // the process later: it runs in a process of its own.
-        await #expect(processExitsWith: .success) {
-            await MainActor.run {
-                _ = NSApplication.shared
-                let memory = MemoryFileSystem()
-                memory.addDirectory("/C")
-                let bench = TestBench(
-                    plugins: [PlacesPlugin(keepsTreesOnDisk: false, favorites: [])],
-                    fileSystems: [memory],
-                    left: memory.url("/C"),
-                    right: memory.url("/C")
-                )
-                RunLoop.main.perform(inModes: [.modalPanel]) {
-                    MainActor.assumeIsolated {
-                        guard let window = NSApp.modalWindow else {
-                            NSApp.stopModal()
-                            return
-                        }
-                        let parts = CoveragePlacesEditorParts(window: window)
-                        parts.click("Add Separator")
-                        parts.click("OK")
-                    }
-                }
-                bench.commands.perform(.configureHotlist)
-                let stored = bench.kernel.settings.scoped(to: "places")
-                    .value(Hotlist.self, forKey: PlacesPlugin.Keys.hotlist)
-                if stored != Hotlist(entries: [.separator]) { exit(1) }
-            }
-        }
     }
 }

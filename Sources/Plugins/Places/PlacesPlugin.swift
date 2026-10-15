@@ -47,7 +47,8 @@ public final class PlacesPlugin: Plugin {
     private weak var owner: Kernel?
     private var tracker: DirectoryHistoryTracker?
     private var subscription: AnyObject?
-    private var treeWindow: DirectoryTreeWindowController?
+    /// The Directory Tree window, once it was opened; it is kept for the next time.
+    private(set) var treeWindow: DirectoryTreeWindowController?
     /// Stored data that could not be read in full is reported once per key and run.
     private var reportedKeys = Set<String>()
     private var lastNoted: URL?
