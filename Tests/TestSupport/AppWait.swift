@@ -10,6 +10,7 @@ public enum AppWait {
     /// Asks `condition` on the main thread, every couple of milliseconds, until it holds.
     ///
     /// Returns false when it still does not after `seconds`: a hang, to be reported as a failure.
+    @preconcurrency
     @MainActor
     @discardableResult
     public static func until(seconds: TimeInterval = Wait.ceiling, _ condition: () -> Bool) async -> Bool {

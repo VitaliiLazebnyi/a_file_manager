@@ -35,4 +35,8 @@ internal final class AccessibilityTests: XCTestCase {
             return true
         }
     }
+
+    deinit {
+        // Nothing to release.
+    }
 }

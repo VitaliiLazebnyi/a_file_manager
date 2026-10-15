@@ -12,14 +12,14 @@ import Testing
 @MainActor
 @Suite(.serialized)
 internal struct AppLifetimeTests {
-    /// A kernel without plugins, as the shell's own registrations see it.
-    private static func makeKernel() -> Kernel {
-        Kernel(productName: "Test", settings: MemorySettings(), interaction: ScriptedInteraction())
-    }
-
     /// Makes sure AppKit is there for the views the panels build.
     internal init() {
         _ = NSApplication.shared
+    }
+
+    /// A kernel without plugins, as the shell's own registrations see it.
+    private static func makeKernel() -> Kernel {
+        Kernel(productName: "Test", settings: MemorySettings(), interaction: ScriptedInteraction())
     }
 
     /// The commands of the file list hold the panels weakly: the kernel keeps the commands,

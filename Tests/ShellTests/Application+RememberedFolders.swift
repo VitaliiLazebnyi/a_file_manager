@@ -7,10 +7,11 @@ import Testing
 
 @testable import AFMShell
 
-/// Review round 2, integration: a long folder that is remembered is entered through the
-/// model's prepared form (`PanelModel.prepare(_:show:…)`), not in one call on the main
-/// thread (shell-p2 "Not done"), through the real window. The memory file system plays the
-/// server and answers when the test lets it, so nothing here depends on how long anything takes.
+/// A long folder that is remembered is entered through the model's prepared form, in the real window.
+///
+/// The model's prepared form is `PanelModel.prepare(_:show:…)`, not one call on the main thread
+/// (review round 2, shell-p2 "Not done"). The memory file system plays the server and answers
+/// when the test lets it, so nothing here depends on how long anything takes.
 extension Application {
     /// A long folder on a share, and a panel that has been in it and is back in `/` with
     /// the cursor on it, so that it is remembered.
@@ -28,7 +29,9 @@ extension Application {
         return app
     }
 
-    @Test func aLongRememberedFolderIsEnteredFromTheBackgroundAndBroughtUpToDate() async {
+    /// The remembered listing is shown at once, without the server; the server's answer brings it up to date.
+    @Test
+    internal func aLongRememberedFolderIsEnteredFromTheBackgroundAndBroughtUpToDate() async {
         let count = PanelViewController.backgroundSortThreshold + 500
         let app = await startWithALongRememberedFolder(count)
         defer { app.stop() }
@@ -55,7 +58,9 @@ extension Application {
         #expect(app.left.model.cursorItem?.name == "f77.txt" && !app.left.model.isRefreshing)
     }
 
-    @Test func aLongRememberedFolderWhoseServerFailsLeavesThePanelWhereItWasWithItsQuickFilter() async {
+    /// When the server cannot read the folder after all, the panel goes back and forgets the listing.
+    @Test
+    internal func aLongRememberedFolderWhoseServerFailsLeavesThePanelWhereItWasWithItsQuickFilter() async {
         let count = PanelViewController.backgroundSortThreshold + 500
         let app = await startWithALongRememberedFolder(count)
         defer { app.stop() }

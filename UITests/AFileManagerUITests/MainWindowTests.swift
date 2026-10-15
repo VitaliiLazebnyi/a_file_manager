@@ -65,4 +65,8 @@ internal final class MainWindowTests: XCTestCase {
         window.typeKey(.home, modifierFlags: [])
         Wait.until(parent, \.isSelected, is: true)
     }
+
+    deinit {
+        // Nothing to release.
+    }
 }

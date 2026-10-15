@@ -58,4 +58,8 @@ internal final class CopyTests: XCTestCase {
         let original = try String(contentsOf: session.left.appendingPathComponent("report.txt"), encoding: .utf8)
         Check.that(original == contents, "the original stays as it was")
     }
+
+    deinit {
+        // Nothing to release.
+    }
 }
