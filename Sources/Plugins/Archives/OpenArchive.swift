@@ -102,6 +102,14 @@ final class ArchiveEnvironment: @unchecked Sendable {
         var schedule: Scheduler = { delay, priority, work in
             ArchiveEnvironment.later(delay, priority, name: "Archive write", work)
         }
+        /// How long a reader of an archive that can only be read front to back waits behind
+        /// the member it delivered for someone to read on; then it is closed.
+        var readerParkTime: TimeInterval = 10
+        /// Runs the housekeeping (closing the readers nobody came back for) as `schedule` runs
+        /// the delayed writes. (Tests put a clock of their own here.)
+        var housekeeping: Scheduler = { delay, priority, work in
+            ArchiveEnvironment.later(delay, priority, name: "Archive readers", work)
+        }
         /// A file that a job has just given its final name inside a ZIP is written into the
         /// archive file before the rename returns, when that means writing no more than this
         /// many bytes besides the file itself (or no more than is waiting anyway). Zero leaves
@@ -498,7 +506,7 @@ final class OpenArchive: @unchecked Sendable {
     private var parked: [(reader: TarReader, next: Int, since: DispatchTime)] = []
     private var reaperArmed = false
     private var starts = 0
-    private var signature: FileSignature?
+    private var signature: FileSignature
     private var remoteStamp: (size: Int64, modified: Date)?
     private var lastRemoteCheck = Date.distantPast
     private var comment = Data()
@@ -589,9 +597,13 @@ final class OpenArchive: @unchecked Sendable {
         lastRewriteDuration = Double(file.size) / 500_000_000
         let head = try file.read(at: 0, count: 512)
         format = ArchiveFormat.detect(head: head, name: name) { codec in
-            guard let stream = try? codec.decompressing(file) else { return false }
-            defer { stream.close() }
-            return TarHeader.looksLikeHeader((try? stream.readFully(TarHeader.blockSize)) ?? Data())
+            // A stream that cannot be started or read holds no TAR that could be listed.
+            let first = try? { () throws -> Data in
+                let stream = try codec.decompressing(file)
+                defer { stream.close() }
+                return try stream.readFully(TarHeader.blockSize)
+            }()
+            return TarHeader.looksLikeHeader(first ?? Data())
         }
         let control = StreamInterrupt()
         let following = control.following(cancellation)
@@ -878,7 +890,7 @@ final class OpenArchive: @unchecked Sendable {
         var innerName =
             name.lowercased().hasSuffix(suffix) && name.count > suffix.count
             ? String(name.dropLast(suffix.count)) : name + ".unpacked"
-        var modified = signature?.modified ?? Date()
+        var modified = signature.modified
         if codec == .gzip, let header = GzipHeader(try file.read(at: 0, count: 1_024)) {
             if let stored = header.name.flatMap(ArchiveTree.normalized).map(ArchiveTree.name(of:)) {
                 innerName = stored
@@ -960,10 +972,6 @@ final class OpenArchive: @unchecked Sendable {
         locked { tree.entry(path) }
     }
 
-    func isDirectory(_ path: String) -> Bool {
-        locked { tree.isDirectory(path) }
-    }
-
     /// The entries directly inside a folder; nil when the path is not a folder.
     func children(of path: String) -> [ArchiveEntry]? {
         locked { tree.children(of: path) }
@@ -985,7 +993,7 @@ final class OpenArchive: @unchecked Sendable {
 
     /// The date of the archive file itself.
     var modified: Date {
-        locked { signature?.modified ?? Date(timeIntervalSince1970: 0) }
+        locked { signature.modified }
     }
 
     /// How often a stream archive was read from its beginning for a member.
@@ -1009,45 +1017,41 @@ final class OpenArchive: @unchecked Sendable {
     /// server, which costs a round trip, at most once a second, and with a `cancellation`
     /// that wait ends when it is set.
     func isCurrent(cancellation: CancellationFlag? = nil) -> Bool {
-        for _ in 0..<2 {
-            lock.lock()
-            if retired {
-                lock.unlock()
-                return false
-            }
-            if isBusyLocked {
-                lock.unlock()
-                return true
-            }
-            guard fetchedCopy != nil else {
-                let known = signature
-                lock.unlock()
-                if FileSignature.of(localURL.path) == known { return true }
-                // A write of our own may have come between the look and the question.
-                if locked({ signature == known }) { return false }
-                continue
-            }
-            guard Date().timeIntervalSince(lastRemoteCheck) > 1 else {
-                lock.unlock()
-                return true
-            }
-            lastRemoteCheck = Date()
-            let stamp = remoteStamp
+        lock.lock()
+        if retired {
             lock.unlock()
-            guard let provider = try? environment.fileSystems()?.provider(for: archiveURL) else { return false }
-            let item =
-                cancellation.map { provider.item(at: archiveURL, cancellation: $0) } ?? provider.item(at: archiveURL)
-            // A question that was given up says nothing.
-            if cancellation?.isCancelled == true { return true }
-            guard let item else { return false }
-            guard let stamp else {
-                // After an upload whose result could not be read back: this is the state to compare with from now on.
-                locked { if remoteStamp == nil { remoteStamp = (item.size, item.modified) } }
-                return true
-            }
-            return item.size == stamp.size && item.modified == stamp.modified
+            return false
         }
-        return true
+        if isBusyLocked {
+            lock.unlock()
+            return true
+        }
+        guard fetchedCopy != nil else {
+            let known = signature
+            lock.unlock()
+            let now = FileSignature.of(localURL.path)
+            // A write of our own may have come between the look and the question.
+            return now == known || now == locked({ signature })
+        }
+        guard Date().timeIntervalSince(lastRemoteCheck) > 1 else {
+            lock.unlock()
+            return true
+        }
+        lastRemoteCheck = Date()
+        let stamp = remoteStamp
+        lock.unlock()
+        guard let provider = try? environment.fileSystems()?.provider(for: archiveURL) else { return false }
+        let item =
+            cancellation.map { provider.item(at: archiveURL, cancellation: $0) } ?? provider.item(at: archiveURL)
+        // A question that was given up says nothing.
+        if cancellation?.isCancelled == true { return true }
+        guard let item else { return false }
+        guard let stamp else {
+            // After an upload whose result could not be read back: this is the state to compare with from now on.
+            locked { if remoteStamp == nil { remoteStamp = (item.size, item.modified) } }
+            return true
+        }
+        return item.size == stamp.size && item.modified == stamp.modified
     }
 
     /// Lets the archive go, unless it is in use: see the class comment. True when it is retired.
@@ -1166,15 +1170,14 @@ final class OpenArchive: @unchecked Sendable {
         if arm { armReaper() }
     }
 
-    private static let parkTime: TimeInterval = 10
-
     private func armReaper() {
         // On the plugin's own clock and a thread of its own, like the delayed writes: the
         // shared queues may have no thread free for a long time, and closing a reader may
         // wait for the place the archive lies in.
-        ArchiveEnvironment.later(Self.parkTime + 0.5, .utility, name: "Archive readers") { [weak self] in
+        let parkTime = environment.readerParkTime
+        environment.housekeeping(parkTime + 0.5, .utility) { [weak self] in
             guard let self else { return }
-            let limit = UInt64(Self.parkTime * 1_000_000_000)
+            let limit = UInt64(parkTime * 1_000_000_000)
             lock.lock()
             let now = DispatchTime.now().uptimeNanoseconds
             let stale = parked.filter { now &- $0.since.uptimeNanoseconds >= limit }
@@ -1609,10 +1612,9 @@ final class OpenArchive: @unchecked Sendable {
         return !record.isInArchive && record.unwritten.contains(.arriving) && isTransferName(entry.name)
     }
 
-    /// Takes an entry out of the directory and notes what that means for the archive file.
-    @discardableResult
-    private func take(_ path: String) -> ArchiveEntry? {
-        guard let entry = tree.remove(path) else { return nil }
+    /// Takes an entry of the directory out of it and notes what that means for the archive file.
+    private func take(_ entry: ArchiveEntry) {
+        tree.remove(entry.path)
         if case .zip(let record) = entry.content {
             if record.isInArchive {
                 removals += 1
@@ -1621,7 +1623,6 @@ final class OpenArchive: @unchecked Sendable {
             }
         }
         if Self.isTransfer(entry) { transfers -= 1 }
-        return entry
     }
 
     /// Puts an entry into the directory that came through a writer or was taken out before.
@@ -1761,7 +1762,7 @@ final class OpenArchive: @unchecked Sendable {
                 throw ArchiveError.noRoom(name)
             }
             // Something else took the name meanwhile: the member that was finished last stays.
-            if let existing = tree.entry(path), !existing.isImplicit { take(path) }
+            if let existing = tree.entry(path), !existing.isImplicit { take(existing) }
             var arriving = record
             arriving.unwritten.insert(.arriving)
             put(Self.entry(path: path, for: arriving))
@@ -1780,7 +1781,7 @@ final class OpenArchive: @unchecked Sendable {
             if entry.isDirectory, tree.hasChildren(path) {
                 throw FileSystemError.notSupported("Removing the non-empty folder \(path)")
             }
-            take(path)
+            take(entry)
             keepFolder(ArchiveTree.parent(of: path))
             changed()
         }
@@ -1796,7 +1797,8 @@ final class OpenArchive: @unchecked Sendable {
         if let existing = tree.entry(destination) {
             guard replacing else { throw FileSystemError.alreadyExists(destination) }
             if existing.isDirectory, tree.hasChildren(destination) { throw FileSystemError.alreadyExists(destination) }
-            replaced = take(destination)
+            take(existing)
+            replaced = existing
         }
         let moved = [entry] + (entry.isDirectory ? tree.descendants(of: source) : [])
         for item in moved {
@@ -2017,25 +2019,22 @@ final class OpenArchive: @unchecked Sendable {
         let start = Date()
         var rewrote = false
         var lostChanges = false
-        var rebased = false
-        while true {
-            try Self.check(cancellation)
-            guard let snapshot = takeSnapshot(leavingOutArrivals: leavingOutArrivals) else { break }
-            if FileSignature.of(localURL.path) != locked({ signature }) {
-                // Another program replaced the archive. What was only renamed or deleted here
-                // cannot be carried over; new members are added to the archive as it is now.
-                guard !rebased else { throw ArchiveError.changedOutside(name) }
-                lostChanges = try rebase()
-                rebased = true
-                continue
-            }
+        try Self.check(cancellation)
+        var snapshot = takeSnapshot(leavingOutArrivals: leavingOutArrivals)
+        if snapshot != nil, FileSignature.of(localURL.path) != locked({ signature }) {
+            // Another program replaced the archive. What was only renamed or deleted here
+            // cannot be carried over; new members are added to the archive as it is now. (Should
+            // it be replaced once more meanwhile, `install` notices, and the write fails.)
+            lostChanges = try rebase()
+            snapshot = takeSnapshot(leavingOutArrivals: leavingOutArrivals)
+        }
+        if let snapshot {
             let built = try build(snapshot, cancellation: cancellation, progress: progress)
             environment.whileWriting?()
             try install(built, from: snapshot)
             // The folder's entry is what makes the new file the archive after a loss of power.
             Durable.syncFolder(of: localURL)
             rewrote = built.isRewrite
-            break
         }
         if fetchedCopy != nil, locked({ uploadPending }) {
             try upload(cancellation: cancellation, progress: progress)
@@ -2206,23 +2205,18 @@ final class OpenArchive: @unchecked Sendable {
         }
         unlink(temporary.path)
         var built = Built(url: temporary)
-        var output: OutputFile?
         if canAppend(snapshot) {
             if clonefile(localURL.path, temporary.path, 0) == 0 {
-                do {
-                    output = try OutputFile(extending: temporary, from: snapshot.directoryOffset)
-                    built.isRewrite = false
-                } catch {
-                    unlink(temporary.path)
-                    throw error
-                }
+                built.isRewrite = false
             } else if errno == ENOTSUP || errno == EXDEV {
                 locked { canClone = false }
             }
         }
         let isRewrite = built.isRewrite
         do {
-            let output = try output ?? OutputFile(creating: temporary)
+            let output =
+                try isRewrite
+                ? OutputFile(creating: temporary) : OutputFile(extending: temporary, from: snapshot.directoryOffset)
             do {
                 let writer = ZipWriter(output, limits: environment.limits)
                 if isRewrite {
@@ -2374,12 +2368,14 @@ final class OpenArchive: @unchecked Sendable {
                 }
                 path = moved
             }
+            // (The entry at the written one's position is that member, so it is a ZIP member.)
             tree.update(path) { entry in
-                guard case .zip(var record) = entry.content else { return }
-                // Changed again meanwhile: the data is in the file, the newer header is not.
-                if record.hasSameHeader(as: then) { record.unwritten.formIntersection(.arriving) }
-                record.source = .archive(headerOffset: offset, file: newFile)
-                entry.content = .zip(record)
+                if case .zip(var record) = entry.content {
+                    // Changed again meanwhile: the data is in the file, the newer header is not.
+                    if record.hasSameHeader(as: then) { record.unwritten.formIntersection(.arriving) }
+                    record.source = .archive(headerOffset: offset, file: newFile)
+                    entry.content = .zip(record)
+                }
             }
         }
         if snapshot.isComplete { writtenCount = snapshot.changeCount }
@@ -2403,8 +2399,8 @@ final class OpenArchive: @unchecked Sendable {
     private func rebase() throws -> Bool {
         let reopened: RandomAccessFile
         let listing: ZipListing
+        // (Only a ZIP is changed, so only a ZIP is read again.)
         do {
-            guard case .zip = format else { throw ArchiveError.changedOutside(name) }
             reopened = try RandomAccessFile(localURL)
             listing = try Self.readZip(reopened, environment: environment, control: nil)
             guard !listing.hasDuplicates else { throw ArchiveError.changedOutside(name) }
@@ -2413,9 +2409,9 @@ final class OpenArchive: @unchecked Sendable {
         }
         lock.lock()
         defer { lock.unlock() }
-        let fresh = tree.ordered.filter { entry in
-            if case .zip(let record) = entry.content { return !record.isInArchive }
-            return false
+        let fresh = tree.ordered.compactMap { entry -> (entry: ArchiveEntry, record: ZipRecord)? in
+            guard case .zip(let record) = entry.content, !record.isInArchive else { return nil }
+            return (entry, record)
         }
         let lost =
             removals != writtenRemovals
@@ -2429,8 +2425,7 @@ final class OpenArchive: @unchecked Sendable {
         (comment, directoryOffset, prefixEnd) = (listing.comment, listing.directoryOffset, listing.prefixEnd)
         (writtenCount, writtenRemovals, pendingBytes, transfers) = (changeCount, removals, 0, 0)
         loadCount += 1
-        for var entry in fresh {
-            guard case .zip(var record) = entry.content else { continue }
+        for (var entry, var record) in fresh {
             if entry.isDirectory {
                 if let existing = tree.entry(entry.path), !existing.isImplicit { continue }
             } else if tree.entry(entry.path) != nil {
@@ -2456,7 +2451,7 @@ final class OpenArchive: @unchecked Sendable {
 
     /// Puts the changed copy back where the archive came from. The copy stays ahead of the
     /// original until that has worked.
-    private func upload(cancellation: CancellationFlag?, progress: (Int64, Int64) -> Bool = { _, _ in true }) throws {
+    private func upload(cancellation: CancellationFlag?, progress: (Int64, Int64) -> Bool) throws {
         guard let fileSystems = environment.fileSystems() else { throw ArchiveError.readOnly(name) }
         let provider = try fileSystems.provider(for: archiveURL)
         let temporary = archiveURL.deletingLastPathComponent().appending(name: ".afm-\(UUID().uuidString).tmp")
@@ -2583,7 +2578,9 @@ private final class ZipMemberWriter: FileWriter, @unchecked Sendable {
     private var buffer = Data()
     private var crc: UInt32 = 0
     private var size: UInt64 = 0
-    private var isClosed = false
+    /// True until the writer has started: one that fails to start is given up by whoever made
+    /// it, which hears of the failure and takes its count back.
+    private var isClosed = true
     /// Set by `interrupt()`, from any thread.
     private let interruption = StreamInterrupt()
     private let window = ZipPacker.pieceSize * max(2, ProcessInfo.processInfo.activeProcessorCount)
@@ -2598,13 +2595,8 @@ private final class ZipMemberWriter: FileWriter, @unchecked Sendable {
         }
         output = try OutputFile(creating: spool)
         temporary = TemporaryFile(spool)
-        if let encryptor {
-            do { try output.write(encryptor.header) } catch {
-                // Whoever made this writer hears of the failure and takes its count back.
-                isClosed = true
-                throw error
-            }
-        }
+        if let encryptor { try output.write(encryptor.header) }
+        isClosed = false
     }
 
     deinit {
