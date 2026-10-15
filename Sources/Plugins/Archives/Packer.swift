@@ -76,15 +76,19 @@ final class ZipPacker {
 
     private func drain() throws {
         let level = self.level
-        let packed = Parallel.map(pieces, serialBelow: 2) { piece -> (data: Data, crc: UInt32, stored: Bool) in
-            let crc = CRC32.of(piece.data)
-            if piece.stored || piece.data.isEmpty && piece.isFirst { return (piece.data, crc, true) }
-            let deflated = Deflater.piece(piece.data, level: level, final: piece.isLast)
-            // A small file that does not shrink is stored as it is.
-            if piece.isFirst, piece.isLast, deflated.count >= piece.data.count { return (piece.data, crc, true) }
-            return (deflated, crc, false)
+        let packed = Parallel.map(pieces, serialBelow: 2) {
+            piece -> Result<(data: Data, crc: UInt32, stored: Bool), any Error> in
+            Result {
+                let crc = CRC32.of(piece.data)
+                if piece.stored || piece.data.isEmpty && piece.isFirst { return (piece.data, crc, true) }
+                let deflated = try Deflater.piece(piece.data, level: level, final: piece.isLast)
+                // A small file that does not shrink is stored as it is.
+                if piece.isFirst, piece.isLast, deflated.count >= piece.data.count { return (piece.data, crc, true) }
+                return (deflated, crc, false)
+            }
         }
-        for (piece, result) in zip(pieces, packed) {
+        for (piece, outcome) in zip(pieces, packed) {
+            let result = try outcome.get()
             var member = members[piece.member - firstMember]
             if piece.isFirst {
                 member.record.method = result.stored ? ZipRecord.methodStored : ZipRecord.methodDeflate

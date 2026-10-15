@@ -29,66 +29,69 @@ enum CRC32 {
     }
 }
 
+/// The two calls of zlib that compress: the one that starts a raw deflate stream at a level,
+/// and the one that runs it with a flush mode. The system's; a test passes calls that fail as
+/// zlib can fail (no memory, a stream in a state it does not accept).
+struct DeflateCalls: Sendable {
+    let start: @Sendable (UnsafeMutablePointer<z_stream>, Int32) -> Int32
+    let run: @Sendable (UnsafeMutablePointer<z_stream>, Int32) -> Int32
+
+    /// A raw stream, without the zlib or gzip wrapping.
+    static let zlib = Self(
+        start: { stream, level in
+            deflateInit2_(
+                stream,
+                level,
+                Z_DEFLATED,
+                -15,
+                8,
+                Z_DEFAULT_STRATEGY,
+                ZLIB_VERSION,
+                Int32(MemoryLayout<z_stream>.size)
+            )
+        },
+        run: { stream, flush in deflate(stream, flush) }
+    )
+}
+
 /// Deflate compression (ZIP method 8, GZIP) through zlib.
-final class Deflater {
-    enum Flush {
-        /// More input follows.
-        case none
-        /// Ends the block on a byte boundary without ending the stream, so that what the next
-        /// compressor produces can simply follow.
-        case sync
-        case finish
-    }
-
-    private let stream = UnsafeMutablePointer<z_stream>.allocate(capacity: 1)
-
-    /// A raw stream, without the zlib or gzip wrapping. Level 1 (fast) … 9 (small).
-    init(level: Int) {
+enum Deflater {
+    /// One independent piece of a deflate stream, at level 1 (fast) … 9 (small). Pieces made
+    /// this way, each on its own core, form one valid stream when written one after the other;
+    /// the last one is `final`, the others end their block on a byte boundary without ending
+    /// the stream. Throws when zlib fails, rather than hand on a piece that is cut short.
+    static func piece(_ data: Data, level: Int, final: Bool, calls: DeflateCalls = .zlib) throws -> Data {
+        let stream = UnsafeMutablePointer<z_stream>.allocate(capacity: 1)
         stream.initialize(to: z_stream())
-        deflateInit2_(
-            stream,
-            Int32(max(1, min(level, 9))),
-            Z_DEFLATED,
-            -15,
-            8,
-            Z_DEFAULT_STRATEGY,
-            ZLIB_VERSION,
-            Int32(MemoryLayout<z_stream>.size)
-        )
-    }
-
-    deinit {
-        deflateEnd(stream)
-        stream.deallocate()
-    }
-
-    func compress(_ input: Data, flush: Flush) -> Data {
+        defer { stream.deallocate() }
+        let started = calls.start(stream, Int32(max(1, min(level, 9))))
+        guard started == Z_OK else { throw failure(started) }
+        defer { deflateEnd(stream) }
         var output = Data()
-        let capacity = max(1 << 14, min(input.count / 2 + 1_024, 1 << 20))
+        let capacity = max(1 << 14, min(data.count / 2 + 1_024, 1 << 20))
         let chunk = UnsafeMutablePointer<UInt8>.allocate(capacity: capacity)
         defer { chunk.deallocate() }
-        let mode = flush == .finish ? Z_FINISH : flush == .sync ? Z_SYNC_FLUSH : Z_NO_FLUSH
-        input.withUnsafeBytes { bytes in
+        let mode = final ? Z_FINISH : Z_SYNC_FLUSH
+        try data.withUnsafeBytes { bytes in
             stream.pointee.next_in = UnsafeMutablePointer(mutating: bytes.bindMemory(to: Bytef.self).baseAddress)
             stream.pointee.avail_in = uInt(bytes.count)
+            defer { stream.pointee.next_in = nil }
             while true {
                 stream.pointee.next_out = chunk
                 stream.pointee.avail_out = uInt(capacity)
-                let status = deflate(stream, mode)
+                let status = calls.run(stream, mode)
+                guard status != Z_STREAM_ERROR else { throw failure(status) }
                 output.append(chunk, count: capacity - Int(stream.pointee.avail_out))
-                if status == Z_STREAM_END || status == Z_STREAM_ERROR { break }
+                if status == Z_STREAM_END { break }
                 // Done when the output buffer was not filled and the input is used up.
                 if stream.pointee.avail_out != 0, stream.pointee.avail_in == 0 { break }
             }
-            stream.pointee.next_in = nil
         }
         return output
     }
 
-    /// One independent piece of a deflate stream. Pieces made this way, each on its own core,
-    /// form one valid stream when written one after the other; the last one is `final`.
-    static func piece(_ data: Data, level: Int, final: Bool) -> Data {
-        Deflater(level: level).compress(data, flush: final ? .finish : .sync)
+    private static func failure(_ status: Int32) -> ArchiveError {
+        .toolFailed("The data could not be compressed (zlib error \(status)).")
     }
 }
 
@@ -677,7 +680,9 @@ final class ParallelCompressor {
             Result {
                 switch method {
                 case .gzip(let level):
-                    return (Deflater.piece(piece, level: level, final: final && index == lastIndex), CRC32.of(piece))
+                    return (
+                        try Deflater.piece(piece, level: level, final: final && index == lastIndex), CRC32.of(piece)
+                    )
 
                 case .bzip2(let level):
                     return (try Tool.filter(Tool.bzip2, ["-c", "-\(max(1, min(level, 9)))"], input: piece), 0)
