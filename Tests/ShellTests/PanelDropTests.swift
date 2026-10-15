@@ -106,7 +106,7 @@ internal struct PanelDropTests {
         defer { gate.signal() }
         let moved = PanelDropPlan(kind: .move, sources: plan.sources, destination: program.box.url("A/docs"), row: 1)
         app.left.carryOut(moved)
-        #expect(exists("B/fresh.txt") && !exists("A/docs/fresh.txt"))
+        #expect(exists("B/fresh.txt") && !exists("A/docs/fresh.txt") && app.rejections == 1)
     }
 
     /// The table's own drags: the grabbed row goes on the pasteboard, the marked items join it

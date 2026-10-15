@@ -13,6 +13,9 @@ internal final class FileGridView: NSView, NSUserInterfaceValidations {
     /// How many of the dragged items carry the picture of the cell.
     internal static let imagedDragItems = 8
 
+    /// Starts a drag of the system with these items (`NSView.beginDraggingSession`); the tests,
+    /// which must not drag on the desktop, put in one of their own.
+    internal var beginsDraggingSession = FileGridView.systemDrag
     /// The panel the list belongs to.
     internal weak var panel: PanelViewController?
     /// Where the cells are, as last laid out.

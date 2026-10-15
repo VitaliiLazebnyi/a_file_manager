@@ -3,6 +3,13 @@ import AppKit
 /// Drag and drop in the Brief and Thumbnails views: the list is the source of the drags that start
 /// in it and takes drops on its rows.
 extension FileGridView: NSDraggingSource {
+    /// The drag of the system: AppKit's own, which puts the items on the desktop.
+    internal static func systemDrag(_ view: FileGridView, _ items: [NSDraggingItem], _ event: NSEvent)
+        -> NSDraggingSession
+    {
+        view.beginDraggingSession(with: items, event: event, source: view)
+    }
+
     /// What a drag that starts in the list allows, inside the program and outside.
     internal func draggingSession(_: NSDraggingSession, sourceOperationMaskFor _: NSDraggingContext)
         -> NSDragOperation
@@ -34,7 +41,7 @@ extension FileGridView: NSDraggingSource {
         guard !items.isEmpty else {
             return
         }
-        let session = beginDraggingSession(with: items, event: event, source: self)
+        let session = beginsDraggingSession(self, items, event)
         PanelDrop.offerFileNames(on: session.draggingPasteboard)
     }
 

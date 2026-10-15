@@ -48,8 +48,13 @@ internal struct PanelTableViewTests {
         let app = await start()
         defer { app.stop() }
         let table = app.left.tableView
+        let after = PanelKeyRecorder()
+        let chain = table.nextResponder
+        table.nextResponder = after
+        defer { table.nextResponder = chain }
         table.keyDown(with: PanelProgram.key(125, String(UnicodeScalar(UInt8(0x1F))), []))
         table.keyDown(with: PanelProgram.key(105, String(UnicodeScalar(UInt8(0x10))), .function))
+        #expect(after.keys.count + after.commands.count > 0)
         table.keyDown(with: PanelProgram.key(17, "t", []))
         #expect(app.left.model.cursorItem?.name == "two.txt")
         table.mouseDown(with: try mouse(.leftMouseDown, onRow: 2, of: table, flags: .command))
@@ -92,6 +97,8 @@ internal struct PanelTableViewTests {
     @Test
     internal func aTableOfNoPanelLeavesEverythingToAppKit() {
         let table = FileTableView()
+        let after = PanelKeyRecorder()
+        table.nextResponder = after
         table.keyDown(with: PanelProgram.key(0, "a", []))
         table.selectAll(nil)
         #expect(table.menu(for: PanelProgram.key(0, "a", [])) == nil)

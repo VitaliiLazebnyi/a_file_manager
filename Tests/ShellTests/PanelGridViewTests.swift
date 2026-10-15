@@ -66,7 +66,10 @@ internal struct PanelGridViewTests {
         grid.mouseDragged(with: click)
         grid.mouseUp(with: click)
         grid.selectAll(nil)
+        let after = PanelKeyRecorder()
+        grid.nextResponder = after
         grid.keyDown(with: PanelProgram.key(0, "a", []))
+        #expect(after.keys == [0])
         let board = PanelDropHelpers.pasteboard([URL(fileURLWithPath: "/x/a.txt")])
         defer { board.releaseGlobally() }
         let info = PanelDraggingInfo(
@@ -181,7 +184,12 @@ internal struct PanelGridViewTests {
         let app = await startInBrief()
         defer { app.stop() }
         let grid = app.left.gridView
+        let after = PanelKeyRecorder()
+        let chain = grid.nextResponder
+        grid.nextResponder = after
+        defer { grid.nextResponder = chain }
         grid.keyDown(with: PanelProgram.key(105, String(UnicodeScalar(UInt8(0x10))), .function))
+        #expect(after.keys == [105])
         grid.selectAll(nil)
         #expect(app.left.model.selection == ["docs", "one.txt", "two.txt"])
         let clip = try #require(grid.superview as? NSClipView)

@@ -37,6 +37,7 @@ internal struct PanelTabBarTests {
             backing: .buffered,
             defer: true
         )
+        window.isReleasedWhenClosed = false
         let bar = TabBarView(frame: NSRect(x: 0, y: 0, width: 400, height: 24))
         window.contentView?.addSubview(bar)
         bar.update(titles: ["first", "second", "third"], paths: ["/a", "/b", "/c"], active: 0)
@@ -104,6 +105,7 @@ internal struct PanelTabBarTests {
     @Test
     internal func aPressShowsATabAndADragMovesIt() throws {
         let (bar, window) = strip()
+        defer { window.close() }
         let record = Record()
         record.attach(to: bar)
         let tabs = buttons(of: bar)
@@ -139,6 +141,7 @@ internal struct PanelTabBarTests {
     @Test
     internal func theButtonsTakeTheClicksOfTheirTab() throws {
         let (bar, window) = strip()
+        defer { window.close() }
         let record = Record()
         record.attach(to: bar)
         let second = buttons(of: bar)[1]

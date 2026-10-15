@@ -108,6 +108,8 @@ internal struct PanelPathBarTests {
             backing: .buffered,
             defer: true
         )
+        window.isReleasedWhenClosed = false
+        defer { window.close() }
         let bar = PathBarView(frame: NSRect(x: 0, y: 0, width: 200, height: 22))
         window.contentView?.addSubview(bar)
         let long = "/" + String(repeating: "folder/", count: 10)

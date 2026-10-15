@@ -26,17 +26,21 @@ internal final class PanelProgram {
         internal var right: PanelViewController { shell.panelCoordinator.rightPanel }
         /// The kernel's commands.
         internal var commands: CommandRegistry { kernel.commands }
+        /// How many times a command was turned away (the program beeps then; the tests count).
+        internal private(set) var rejections = 0
 
         /// The program of `kernel` and `shell`.
         internal init(kernel: Kernel, shell: Shell) {
             self.kernel = kernel
             self.shell = shell
+            kernel.commands.onRejected = { [weak self] in self?.rejections += 1 }
         }
 
         /// Ends watching and reading, so a finished test leaves nothing running.
         internal func stop() {
             shell.shutDown()
             kernel.shutdown()
+            shell.mainWindow.window?.close()
         }
 
         /// The names of the entries a panel shows, in their order.
@@ -128,9 +132,14 @@ internal final class PanelProgram {
         return running
     }
 
-    /// Waits until nothing is being read and no job is running.
+    /// Waits until nothing is being read, no job is running and every file system has named its
+    /// places (an answer that came after the test had let the program go would reach a window
+    /// without its shell).
     internal func settle(_ app: Running) async {
-        await PanelWait.until { !app.shell.panelCoordinator.isLoading && !app.kernel.jobs.isBusy }
+        await PanelWait.until {
+            !app.shell.panelCoordinator.isLoading && !app.kernel.jobs.isBusy
+                && app.shell.panelCoordinator.places.isComplete
+        }
     }
 
     /// Waits until nothing is read, nothing waits to be read again and no job runs.

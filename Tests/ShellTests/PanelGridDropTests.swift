@@ -90,6 +90,13 @@ internal struct PanelGridDropTests {
         app.commands.perform(.viewBrief, .nothing)
         app.layOut()
         let grid = app.left.gridView
+        let board = NSPasteboard.withUniqueName()
+        defer { board.releaseGlobally() }
+        var dragged: [Int] = []
+        grid.beginsDraggingSession = { _, items, _ in
+            dragged.append(items.count)
+            return PanelDragSession(board)
+        }
         let window = try #require(grid.window)
         func event(_ type: NSEvent.EventType, _ point: NSPoint) throws -> NSEvent {
             try #require(
@@ -111,15 +118,15 @@ internal struct PanelGridDropTests {
         grid.mouseDragged(with: try event(.leftMouseDragged, NSPoint(x: start.x + 2, y: start.y)))
         #expect(PanelDrop.current == nil)
         grid.mouseDragged(with: try event(.leftMouseDragged, NSPoint(x: start.x + 30, y: start.y)))
-        #expect(PanelDrop.current?.items.map(\.name) == ["one.txt"])
-        let session = PanelDragSession(NSPasteboard.withUniqueName())
+        #expect(PanelDrop.current?.items.map(\.name) == ["one.txt"] && dragged == [1])
+        let session = PanelDragSession(board)
         #expect(grid.draggingSession(session, sourceOperationMaskFor: .outsideApplication) == [.copy, .move, .generic])
         grid.draggingSession(session, endedAt: .zero, operation: .copy)
         #expect(PanelDrop.current == nil)
         // `[..]` drags nothing.
         grid.mouseDown(with: try event(.leftMouseDown, PanelDropHelpers.point(ofRow: 0, in: grid)))
         grid.mouseDragged(with: try event(.leftMouseDragged, PanelDropHelpers.point(ofRow: 2, in: grid)))
-        #expect(PanelDrop.current == nil)
+        #expect(PanelDrop.current == nil && dragged == [1])
     }
 
     /// A drag of many marked items in the grid carries them all; only the first few are dragged
@@ -140,6 +147,13 @@ internal struct PanelGridDropTests {
         app.layOut()
         app.left.model.selectAll()
         let grid = app.left.gridView
+        let board = NSPasteboard.withUniqueName()
+        defer { board.releaseGlobally() }
+        var dragged: [Int] = []
+        grid.beginsDraggingSession = { _, items, _ in
+            dragged.append(items.count)
+            return PanelDragSession(board)
+        }
         let window = try #require(grid.window)
         let press = try #require(
             NSEvent.mouseEvent(
@@ -155,6 +169,7 @@ internal struct PanelGridDropTests {
             )
         )
         grid.startDrag(ofRow: 3, for: app.left, with: press)
-        #expect(PanelDrop.current?.itemCount == 12 && FileGridView.imagedDragItems < 12)
+        // One pasteboard item per file up to the number written singly, each a dragged item.
+        #expect(PanelDrop.current?.itemCount == 12 && dragged == [12] && FileGridView.imagedDragItems < 12)
     }
 }
