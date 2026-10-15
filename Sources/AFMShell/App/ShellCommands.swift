@@ -2,35 +2,65 @@ import AFMContracts
 import AFMKernel
 import AppKit
 
-/// The commands only the window can provide: moving the cursor, marking with the keyboard,
-/// switching panels, the volume list and the in-place name editor. They are registered like
+/// The commands only the window can provide.
+///
+/// Moving the cursor, marking with the keyboard, switching panels, the volume list and the
+/// in-place name editor. They are registered like
 /// any plugin's commands, so their keys are in the key bindings and can be changed there
 /// (spec 06 › Navigation, 06 › Selection).
+///
+/// The kernel keeps what is registered here, and the panels keep the kernel: the commands hold
+/// the panels weakly, so neither keeps the other alive.
 @MainActor
-enum ShellCommands {
-    static func register(in kernel: Kernel, panels: PanelCoordinator) {
-        let commands = kernel.commands
-        // The kernel keeps what is registered here, and the panels keep the kernel: the
-        // commands hold the panels weakly, so neither keeps the other alive.
+internal enum ShellCommands {
+    /// Registers the commands with `kernel`, acting on `panels`.
+    ///
+    /// Main thread, while the shell is built.
+    internal static func register(in kernel: Kernel, panels: PanelCoordinator) {
         let source = { [weak panels] in panels?.sourcePanel }
-        /// Cursor keys change nothing but the cursor, so they also work while a job starts.
+        registerCursorCommands(in: kernel.commands, source: source)
+        registerSelectionCommands(in: kernel.commands, source: source)
+        registerPanelCommands(in: kernel.commands, panels: panels, source: source)
+        kernel.menus.add([.leftVolumes, .rightVolumes], to: .commandsVolumes)
+    }
+
+    /// The keys that move the cursor.
+    ///
+    /// They change nothing but the cursor, so they also work while a job starts.
+    private static func registerCursorCommands(
+        in commands: CommandRegistry,
+        source: @escaping () -> PanelViewController?
+    ) {
         func cursor(_ id: CommandID, _ title: String, _ shortcuts: [Shortcut], _ row: @escaping (PanelModel) -> Int) {
             commands.register(Command(id, title, shortcuts, runsDuringJobs: true)) {
-                guard let model = source()?.model else { return }
+                guard let model = source()?.model else {
+                    return
+                }
                 model.moveCursor(to: row(model))
             }
         }
-
         // ← and → jump to the first and the last entry of the folder (`SpecialCursorMovement` 1
         // of the spec); `[..]` is not an entry, Home still reaches it.
-        cursor(.cursorToFirstEntry, "Cursor to First Entry", [Shortcut(.leftArrow)]) {
-            $0.hasParentRow && !$0.items.isEmpty ? 1 : 0
+        cursor(.cursorToFirstEntry, "Cursor to First Entry", [Shortcut(.leftArrow)]) { model in
+            model.hasParentRow && !model.items.isEmpty ? 1 : 0
         }
-        cursor(.cursorToLastEntry, "Cursor to Last Entry", [Shortcut(.rightArrow), Shortcut(.end)]) { $0.rowCount - 1 }
+        cursor(.cursorToLastEntry, "Cursor to Last Entry", [Shortcut(.rightArrow), Shortcut(.end)]) { model in
+            model.rowCount - 1
+        }
         cursor(.cursorToTop, "Cursor to Top", [Shortcut(.home)]) { _ in 0 }
-        cursor(.cursorPageUp, "Cursor Page Up", [Shortcut(.pageUp)]) { $0.cursor - (source()?.pageSize ?? 0) }
-        cursor(.cursorPageDown, "Cursor Page Down", [Shortcut(.pageDown)]) { $0.cursor + (source()?.pageSize ?? 0) }
+        cursor(.cursorPageUp, "Cursor Page Up", [Shortcut(.pageUp)]) { model in
+            model.cursor - (source()?.pageSize ?? 0)
+        }
+        cursor(.cursorPageDown, "Cursor Page Down", [Shortcut(.pageDown)]) { model in
+            model.cursor + (source()?.pageSize ?? 0)
+        }
+    }
 
+    /// Marking with the keyboard.
+    private static func registerSelectionCommands(
+        in commands: CommandRegistry,
+        source: @escaping () -> PanelViewController?
+    ) {
         commands.register(Command(.toggleSelectionWithSize, "Select and Calculate Size", [Shortcut(.space)])) {
             source()?.toggleSelectionWithSize()
         }
@@ -46,11 +76,16 @@ enum ShellCommands {
         commands.register(Command(.toggleSelectionAndMoveUp, "Select and Move Up", [Shortcut(.upArrow, .shift)])) {
             source()?.toggleSelectionAndMove(-1)
         }
+    }
 
-        commands.register(Command(.focusTarget, "Switch Panel", [Shortcut(.tab)], runsDuringJobs: true)) {
-            [weak panels] in
-            panels?.targetPanel.focus()
-        }
+    /// Switching panels, the volume lists and the in-place name editor.
+    private static func registerPanelCommands(
+        in commands: CommandRegistry,
+        panels: PanelCoordinator,
+        source: @escaping () -> PanelViewController?
+    ) {
+        let switchPanel = Command(.focusTarget, "Switch Panel", [Shortcut(.tab)], runsDuringJobs: true)
+        commands.register(switchPanel) { [weak panels] in panels?.targetPanel.focus() }
         commands.register(Command(.leftVolumes, "Left Volume List", [.f(1, .option)])) { [weak panels] in
             panels?.leftPanel.showVolumeList()
         }
@@ -59,11 +94,8 @@ enum ShellCommands {
         }
         commands.register(
             Command(.editNameInPlace, "Edit Name in Place"),
-            enabled: { source()?.model.cursorItem != nil }
-        ) {
-            source()?.beginRename()
-        }
-
-        kernel.menus.add([.leftVolumes, .rightVolumes], to: .commandsVolumes)
+            enabled: { source()?.model.cursorItem != nil },
+            { source()?.beginRename() }
+        )
     }
 }

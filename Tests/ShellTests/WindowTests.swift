@@ -830,7 +830,7 @@ private final class WindowTestPlugin: Plugin {
             bytesTotal: 8 << 20
         )
         #expect(
-            ProgressSheet.countLine(for: copying)
+            ProgressSheet.countLine(for: copying, remaining: false)
                 == "7 / 14     \(Format.shortSize(2 << 20)) of \(Format.shortSize(8 << 20))"
         )
         #expect(

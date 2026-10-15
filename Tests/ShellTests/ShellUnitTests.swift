@@ -19,7 +19,7 @@ import Testing
     }
 
     @Test func followsTheLastSecondsOnly() {
-        var rate = TransferRate(window: 5)
+        var rate = TransferRate()
         // 100 per second for 10 s, then 1000 per second for 5 s.
         for second in 0...10 { rate.add(amount: Int64(second * 100), at: Double(second)) }
         #expect(rate.perSecond == 100)

@@ -2,8 +2,9 @@ import AFMContracts
 import AFMKernel
 import AppKit
 
-/// Runs the plugins' long work in the background, one job after another in the order they
-/// were handed in, with a progress window (spec 07 › Progress window and job sequence). The
+/// Runs the plugins' long work in the background, one job after another, with a progress window.
+///
+/// Jobs run in the order they were handed in (spec 07 › Progress window and job sequence). The
 /// user can pause the running job, cancel it, and send the progress window to the background
 /// (spec 07 › Routes into the background).
 ///
@@ -28,55 +29,35 @@ import AppKit
 /// change files or panels remain blocked until the queue is empty: plugins start their work
 /// from what the panels show and rely on that not changing under a running job, and the
 /// service cannot know which of their commands would be safe.
-final class ProgressJobService: JobService {
-    weak var window: NSWindow? {
-        didSet { display.window = window }
-    }
-    private var waiting: [QueuedJob] = []
-    private var running: QueuedJob?
-    private var idleCallbacks: [() -> Void] = []
-    /// Called on the main thread when the first job is handed in and when the last one has ended.
-    var onBusyChanged: (() -> Void)?
-    let display = ProgressDisplay()
-    /// Whether the progress is shown in a window of its own instead of a sheet. Lasts until
-    /// the queue is empty.
-    private(set) var runsInBackground = false
-    /// How long a job that was told to stop may take before the user is asked about it.
-    var patience: TimeInterval = 10
-    /// Asks the user whether a job (by its title) that does not stop should be waited for no
-    /// longer; true leaves it behind. Without it nobody is asked and the job is waited for.
-    var askToAbandon: ((String) -> Bool)?
-    /// Set while the program quits: the question above is the quitting's to ask.
-    var isQuitting = false
-    /// Jobs that were left behind and whose work has still not returned.
-    private(set) var abandonedCount = 0
-    /// Every job is being stopped (`cancelAll`): one that is handed in now is stopped as well.
-    private var isCancellingAll = false
-    private var stopQuestion: (() -> Void)?
-
-    init() {
-        display.service = self
-    }
-
-    var isBusy: Bool { running != nil || !waiting.isEmpty }
-
-    /// The number of jobs waiting behind the running one.
-    var queueLength: Int { waiting.count }
-
-    @MainActor private final class QueuedJob {
+internal final class ProgressJobService: JobService {
+    /// One job of the queue.
+    @MainActor
+    private final class QueuedJob {
+        /// The job's name, for the window and the questions about it.
         let title: String
+        /// Asks the work to stop.
         let cancellation = CancellationFlag()
+        /// Holds the work while the user pauses it.
         let gate = PauseGate()
-        private(set) var isFinished = false
-        /// Starts the work; set when the job is created, so the result type stays inside, and
-        /// let go of when it has started, so that a kept handle keeps nothing of the work.
+        /// Starts the work.
+        ///
+        /// Set when the job is created, so the result type stays inside, and let go of when it
+        /// has started, so that a kept handle keeps nothing of the work.
         var start: (() -> Void)?
+        /// The job's progress, once it has started.
         var monitor: ProgressSheet?
         /// The user gave up waiting for it; the queue has moved on.
         var isAbandoned = false
+        /// The work has returned.
+        private(set) var isFinished = false
 
-        init(title: String) { self.title = title }
+        /// A job called `title` that has not started.
+        init(title: String) {
+            self.title = title
+        }
 
+        /// Tells the work to stop.
+        ///
         /// A job that has not started yet still runs, finds the request, and ends at once, so
         /// its completion is called like any other. A paused job is let go to find it.
         func cancel() {
@@ -84,10 +65,68 @@ final class ProgressJobService: JobService {
             gate.set(paused: false)
         }
 
-        func finish() { isFinished = true }
+        /// Notes that the work has returned.
+        func finish() {
+            isFinished = true
+        }
+
+        deinit {
+            // Nothing to release.
+        }
     }
 
-    func run<Result: Sendable>(
+    /// The progress window.
+    internal let display = ProgressDisplay()
+    /// Called on the main thread when the first job is handed in and when the last one has ended.
+    internal var onBusyChanged: (() -> Void)?
+    /// How long a job that was told to stop may take before the user is asked about it.
+    internal var patience: TimeInterval = 10
+    /// Asks the user whether a job (by its title) that does not stop should be waited for no
+    /// longer; true leaves it behind.
+    ///
+    /// Without it nobody is asked and the job is waited for.
+    internal var askToAbandon: ((String) -> Bool)?
+    /// Set while the program quits: the question above is the quitting's to ask.
+    internal var isQuitting = false
+    /// Whether the progress is shown in a window of its own instead of a sheet.
+    ///
+    /// Lasts until the queue is empty.
+    internal private(set) var runsInBackground = false
+    /// Jobs that were left behind and whose work has still not returned.
+    internal private(set) var abandonedCount = 0
+    /// The jobs waiting behind the running one.
+    private var waiting: [QueuedJob] = []
+    /// The running job.
+    private var running: QueuedJob?
+    /// Who waits for the queue to be empty (`cancelAll`).
+    private var idleCallbacks: [() -> Void] = []
+    /// Every job is being stopped (`cancelAll`): one that is handed in now is stopped as well.
+    private var isCancellingAll = false
+    /// Calls off the question about a job that does not stop.
+    private var stopQuestion: (() -> Void)?
+
+    /// The main window the sheet covers.
+    internal weak var window: NSWindow? {
+        didSet { display.window = window }
+    }
+
+    /// Whether a job runs or waits.
+    internal var isBusy: Bool { running != nil || !waiting.isEmpty }
+
+    /// The number of jobs waiting behind the running one.
+    internal var queueLength: Int { waiting.count }
+
+    /// Whether the running job is held.
+    internal var isPaused: Bool { running?.gate.isPaused ?? false }
+
+    /// A service without jobs.
+    internal init() {
+        display.service = self
+    }
+
+    /// Hands in a job: `work` runs on a thread of its own after the jobs before it, and
+    /// `completion` gets its result on the main thread.
+    internal func run<Result: Sendable>(
         title: String,
         work: @escaping @Sendable (any JobMonitor) -> Result,
         completion: @escaping @MainActor (Result) -> Void
@@ -95,35 +134,94 @@ final class ProgressJobService: JobService {
         let job = QueuedJob(title: title)
         // What the plugin handed in may hold panels and windows: it is let go of on the main
         // thread, whichever thread is done with it last.
-        let (work, completion) = (MainOwned(work), MainOwned(completion))
+        let (ownedWork, ownedCompletion) = (MainOwned(work), MainOwned(completion))
         job.start = { [self, job] in
-            let progress = ProgressSheet(
-                title: title,
-                cancellation: job.cancellation,
-                gate: job.gate,
-                display: display
-            )
+            let progress = ProgressSheet(title: title, cancellation: job.cancellation, gate: job.gate, display: display)
             job.monitor = progress
             display.begin(progress)
             Background.start(named: "afm.job", qos: .userInitiated) {
                 // `held` is read here although the box is the main thread's: it was filled before
                 // this thread existed and is emptied only after the work has returned.
-                guard let result = work.held.map({ $0(progress) }) else { return }
+                guard let result = ownedWork.held.map({ $0(progress) }) else {
+                    return
+                }
                 MainLoop.perform { [self] in
-                    _ = work.take()
-                    ended(job, progress) { completion.take()?(result) }
+                    _ = ownedWork.take()
+                    ended(job, progress) { ownedCompletion.take()?(result) }
                 }
             }
         }
         // While everything is being stopped, nothing new runs to its end either.
-        if isCancellingAll { job.cancel() }
+        if isCancellingAll {
+            job.cancel()
+        }
         let wasBusy = isBusy
         waiting.append(job)
-        if !wasBusy { onBusyChanged?() }
-        if running == nil { startNext() } else { display.refresh() }
+        if !wasBusy {
+            onBusyChanged?()
+        }
+        if running == nil {
+            startNext()
+        } else {
+            display.refresh()
+        }
     }
 
-    /// Main thread: the work of `job` has returned; `deliver` calls its completion.
+    /// Stops every job, the running one and those waiting; `completion` is called once the
+    /// queue is empty, at once when it is.
+    internal func cancelAll(then completion: @escaping () -> Void) {
+        guard isBusy else {
+            completion()
+            return
+        }
+        idleCallbacks.append(completion)
+        isCancellingAll = true
+        running?.cancel()
+        for job in waiting {
+            job.cancel()
+        }
+        display.refresh()
+        if let running {
+            watchStopping(running)
+        }
+    }
+
+    /// Holds the running job at its next progress report, or lets it go on.
+    ///
+    /// A job that was asked to stop is not held.
+    internal func setPaused(_ paused: Bool) {
+        guard let running, paused != running.gate.isPaused, !(paused && running.cancellation.isCancelled) else {
+            return
+        }
+        running.gate.set(paused: paused)
+        // The pause must not count as slow copying.
+        if !paused {
+            running.monitor?.restartMeasuring()
+        }
+        display.refresh()
+    }
+
+    /// Stops the running job; the jobs behind it still run.
+    internal func cancelCurrent() {
+        running?.cancel()
+        display.refresh()
+        if let running {
+            watchStopping(running)
+        }
+    }
+
+    /// Turns the sheet into a window of its own, or back; only while a job runs.
+    internal func setRunsInBackground(_ inBackground: Bool) {
+        guard isBusy, inBackground != runsInBackground else {
+            return
+        }
+        runsInBackground = inBackground
+        display.modeChanged()
+    }
+
+    /// The work of `job` has returned; `deliver` calls its completion.
+    ///
+    /// Main thread.
     private func ended(_ job: QueuedJob, _ progress: ProgressSheet, deliver: () -> Void) {
         job.finish()
         guard !job.isAbandoned else {
@@ -156,16 +254,22 @@ final class ProgressJobService: JobService {
         }
     }
 
+    /// Starts the first waiting job, unless one runs.
     private func startNext() {
-        guard running == nil, !waiting.isEmpty else { return }
+        guard running == nil, !waiting.isEmpty else {
+            return
+        }
         let job = waiting.removeFirst()
         running = job
         let start = job.start
         job.start = nil
         start?()
-        if job.cancellation.isCancelled { watchStopping(job) }
+        if job.cancellation.isCancelled {
+            watchStopping(job)
+        }
     }
 
+    /// The queue is empty: the window goes, and whoever listens is told.
     private func becomeIdle() {
         runsInBackground = false
         display.close()
@@ -175,44 +279,47 @@ final class ProgressJobService: JobService {
     /// Tells whoever waits for the queue to be empty (`cancelAll`), unless a completion has
     /// handed in the next job meanwhile.
     private func runIdleCallbacks() {
-        guard !isBusy else { return }
+        guard !isBusy else {
+            return
+        }
         isCancellingAll = false
         let callbacks = idleCallbacks
         idleCallbacks = []
-        callbacks.forEach { $0() }
+        for callback in callbacks {
+            callback()
+        }
     }
 
-    func cancelAll(then completion: @escaping () -> Void) {
-        guard isBusy else {
-            completion()
+    /// `job` was told to stop; if it is still running after `patience`, the user is asked about it.
+    ///
+    /// Whether to wait on, and again after twice as long each time the answer is yes.
+    private func watchStopping(_ job: QueuedJob) {
+        guard stopQuestion == nil else {
             return
         }
-        idleCallbacks.append(completion)
-        isCancellingAll = true
-        running?.cancel()
-        waiting.forEach { $0.cancel() }
-        display.refresh()
-        if let running { watchStopping(running) }
-    }
-
-    // MARK: A job that does not stop
-
-    /// `job` was told to stop. If it is still running after `patience`, the user is asked
-    /// whether to wait on, and again after twice as long each time the answer is yes.
-    private func watchStopping(_ job: QueuedJob) {
-        guard stopQuestion == nil else { return }
         askAboutStopping(job, after: patience)
     }
 
+    /// Asks about `job` after `wait`, if it is still running then.
     private func askAboutStopping(_ job: QueuedJob, after wait: TimeInterval) {
         stopQuestion = MainLoop.after(wait) { [weak self, weak job] in
-            guard let self else { return }
+            guard let self else {
+                return
+            }
             stopQuestion = nil
-            guard let job, running === job, !job.isFinished else { return }
+            guard let job, running === job, !job.isFinished else {
+                return
+            }
             let abandons = !isQuitting && askToAbandon?(job.title) == true
             // The job may have ended while the question was on screen.
-            guard running === job, !job.isFinished else { return }
-            if abandons { abandon(job) } else { askAboutStopping(job, after: wait * 2) }
+            guard running === job, !job.isFinished else {
+                return
+            }
+            if abandons {
+                abandon(job)
+            } else {
+                askAboutStopping(job, after: wait * 2)
+            }
         }
     }
 
@@ -220,7 +327,9 @@ final class ProgressJobService: JobService {
     private func abandon(_ job: QueuedJob) {
         job.isAbandoned = true
         abandonedCount += 1
-        if let monitor = job.monitor { display.end(monitor, keepOpen: !waiting.isEmpty) }
+        if let monitor = job.monitor {
+            display.end(monitor, keepOpen: !waiting.isEmpty)
+        }
         running = nil
         if waiting.isEmpty {
             becomeIdle()
@@ -230,199 +339,7 @@ final class ProgressJobService: JobService {
         }
     }
 
-    // MARK: What the progress window offers
-
-    var isPaused: Bool { running?.gate.isPaused ?? false }
-
-    /// Holds the running job at its next progress report, or lets it go on. A job that was
-    /// asked to stop is not held.
-    func setPaused(_ paused: Bool) {
-        guard let running, paused != running.gate.isPaused, !(paused && running.cancellation.isCancelled) else {
-            return
-        }
-        running.gate.set(paused: paused)
-        // The pause must not count as slow copying.
-        if !paused { running.monitor?.restartMeasuring() }
-        display.refresh()
-    }
-
-    /// Stops the running job; the jobs behind it still run.
-    func cancelCurrent() {
-        running?.cancel()
-        display.refresh()
-        if let running { watchStopping(running) }
-    }
-
-    /// Turns the sheet into a window of its own, or back.
-    func setRunsInBackground(_ inBackground: Bool) {
-        guard isBusy, inBackground != runsInBackground else { return }
-        runsInBackground = inBackground
-        display.modeChanged()
-    }
-}
-
-/// Where a paused job waits. Safe to use from any thread: the state is guarded by `condition`.
-final class PauseGate: @unchecked Sendable {
-    private let condition = NSCondition()
-    private var paused = false
-
-    var isPaused: Bool {
-        condition.lock()
-        defer { condition.unlock() }
-        return paused
-    }
-
-    func set(paused: Bool) {
-        condition.lock()
-        self.paused = paused
-        condition.broadcast()
-        condition.unlock()
-    }
-
-    /// Called on the job's thread: returns at once unless the job is paused, and then when it
-    /// is resumed or cancelled. The cancellation is also looked at every now and then, because
-    /// the flag can be set by anyone without telling the gate.
-    func passWhenOpen(_ cancellation: CancellationFlag) {
-        condition.lock()
-        while paused, !cancellation.isCancelled {
-            condition.wait(until: Date().addingTimeInterval(0.1))
-        }
-        condition.unlock()
-    }
-}
-
-/// Where a job's question waits for the main thread, and its answer for the job. Unchecked:
-/// the job's thread fills it and then waits until the main thread has answered.
-private final class AskSlot<Answer>: @unchecked Sendable {
-    var question: (@MainActor () -> Answer)?
-    var answer: Answer?
-}
-
-/// The progress of one job and the job's way to ask the user something: what the work reports
-/// on its own thread is brought to the main thread here, where the progress window reads it.
-///
-/// Unchecked: the main thread's part is isolated to it, the report counters are guarded by
-/// `reportLock`, and the rest does not change (`display` is weak, and so a `var`).
-final class ProgressSheet: JobMonitor, @unchecked Sendable {
-    let cancellation: CancellationFlag
-    let title: String
-    private let gate: PauseGate
-    private weak var display: ProgressDisplay?
-
-    @MainActor private(set) var latest: JobProgress?
-    @MainActor private(set) var rate = TransferRate()
-    /// The number of the report `latest` is.
-    @MainActor private var shownReport = 0
-    /// When the last report was passed on and which number it got; behind the lock, because
-    /// a job may report from several threads at once.
-    private let reportLock = NSLock()
-    private var lastReport: TimeInterval = 0
-    private var reportCount = 0
-
-    init(title: String, cancellation: CancellationFlag, gate: PauseGate = PauseGate(), display: ProgressDisplay? = nil)
-    {
-        self.title = title
-        self.cancellation = cancellation
-        self.gate = gate
-        self.display = display
-    }
-
-    /// Forgets the measured speed, after the job stood still for a reason of the user's.
-    @MainActor func restartMeasuring() {
-        rate.reset()
-    }
-
-    // MARK: JobMonitor (called on the job's thread)
-
-    /// Passes a report on to the progress window, at most twenty a second. A paused job waits
-    /// in here (see the service for what that asks of the caller). Reports from several
-    /// threads may overtake each other on their way to the main thread: each gets a number,
-    /// and one that arrives after a newer one is dropped, so the window never steps back.
-    func report(_ progress: JobProgress) {
-        gate.passWhenOpen(cancellation)
-        let time = ProcessInfo.processInfo.systemUptime
-        reportLock.lock()
-        guard time - lastReport > 0.05 else {
-            reportLock.unlock()
-            return
-        }
-        lastReport = time
-        reportCount += 1
-        let number = reportCount
-        reportLock.unlock()
-        DispatchQueue.main.async { [self] in
-            guard number > shownReport else { return }
-            shownReport = number
-            latest = progress
-            rate.add(amount: progress.amountDone, at: time)
-            display?.render(self)
-        }
-    }
-
-    /// Asks on the main thread and waits for the answer. The question is put from the run
-    /// loop, not from inside a block of the main dispatch queue, where its dialog would keep
-    /// everything else that was sent to the main thread waiting (`MainLoop`).
-    func ask<Answer: Sendable>(_ question: @MainActor @Sendable () -> Answer) -> Answer {
-        // A job has no business on the main thread; whoever asks from there is answered there.
-        if Thread.isMainThread { return MainActor.assumeIsolated { put(question) } }
-        let slot = AskSlot<Answer>()
-        let answered = DispatchSemaphore(value: 0)
-        withoutActuallyEscaping(question) { question in
-            slot.question = question
-            MainLoop.perform {
-                // The question is let go of here, before the job's thread is woken: the run
-                // loop keeps this block a moment longer than it runs it, and the question
-                // must not be held by anybody when the job's thread goes on.
-                var asked = slot.question
-                slot.question = nil
-                slot.answer = asked.map { self.put($0) }
-                asked = nil
-                answered.signal()
-            }
-            answered.wait()
-        }
-        return slot.answer!
-    }
-
-    /// Main thread: shows the progress and asks.
-    @MainActor private func put<Answer>(_ question: @MainActor () -> Answer) -> Answer {
-        display?.show()
-        let answer = question()
-        // The wait for the answer must not count as slow copying.
-        rate.reset()
-        return answer
-    }
-
-    // MARK: Texts
-
-    /// `11.06 M/s  ·  about 1 min 20 s left`; a job that moves no data shows only the time.
-    static func speedLine(_ rate: TransferRate, for progress: JobProgress) -> String {
-        guard let perSecond = rate.perSecond else { return "Calculating…" }
-        var parts: [String] = []
-        if progress.measuresBytes { parts.append(Format.speed(perSecond)) }
-        if let remaining = rate.remaining(total: progress.amountTotal) {
-            parts.append("about \(Format.duration(remaining)) left")
-        }
-        return parts.isEmpty ? " " : parts.joined(separator: "  ·  ")
-    }
-
-    /// Items done / items, and the amount of data once the job knows it. With `remaining`,
-    /// what is still to do, with a minus sign (spec 07 › Progress window: clicking a count).
-    static func countLine(for progress: JobProgress, remaining: Bool = false) -> String {
-        let items = remaining ? "-\(max(0, progress.itemsTotal - progress.itemsDone))" : "\(progress.itemsDone)"
-        var count = "\(items) / \(progress.itemsTotal)"
-        if progress.measuresBytes {
-            let bytes =
-                remaining
-                ? "-" + Format.shortSize(max(0, progress.bytesTotal - progress.bytesDone))
-                : Format.shortSize(progress.bytesDone)
-            count += "     \(bytes) of \(Format.shortSize(progress.bytesTotal))"
-        }
-        return count
-    }
-
-    /// The jobs behind the running one: nothing, `1 more job waiting`, `3 more jobs waiting`.
-    static func queueLine(_ waiting: Int) -> String {
-        waiting <= 0 ? "" : waiting == 1 ? "1 more job waiting" : "\(waiting) more jobs waiting"
+    deinit {
+        // Nothing to release.
     }
 }
