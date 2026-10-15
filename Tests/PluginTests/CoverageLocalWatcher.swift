@@ -55,17 +55,20 @@ internal struct CoverageLocalWatcher {
     }
 
     /// The figures are printed at the end when asked for.
+    ///
+    /// The process of its own only counts a stream and ends: it makes no stream and waits for
+    /// nothing, so it is over at once also on a busy machine (where a child that waited for the
+    /// system's stream once lost its channel to the test).
     @Test
-    internal func theFiguresArePrintedAtTheEndWhenAskedFor() async {
-        await #expect(processExitsWith: .success) {
+    internal func theFiguresArePrintedAtTheEndWhenAskedFor() async throws {
+        let result = try await #require(processExitsWith: .success, observing: [\.standardErrorContent]) {
             setenv("AFM_WATCHER_CENSUS", "1", 1)
-            let watcher = DirectoryWatcher(queue: DispatchQueue(label: "coverage")) { _ in
-                // Nothing is looked at.
-            }
-            watcher.watch([URL(fileURLWithPath: NSTemporaryDirectory())])
-            _ = Wait.until(seconds: 60) { DirectoryWatcher.Census.figures.live >= 1 }
+            DirectoryWatcher.Census.started()
+            DirectoryWatcher.Census.wasRefused()
             exit(0)
         }
+        let printed = String(decoding: result.standardErrorContent, as: UTF8.self)
+        #expect(printed.contains("AFM_WATCHER_CENSUS live=1 peak=1 refused=1"))
     }
 
     /// Streams beyond what the system gives one program are refused and tried again.
