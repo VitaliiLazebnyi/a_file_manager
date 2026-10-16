@@ -1,4 +1,5 @@
 import Foundation
+import TestSupport
 
 /// An FTP server whose every answer the test writes: a script gets each command line and the
 /// control connection, and replies, opens data connections or hangs up as it likes. What the
@@ -80,7 +81,7 @@ internal final class CoverageNetworkServer: @unchecked Sendable {
         }
 
         /// The data connection the client opened to the port of `openPassive`; nil when none came
-        /// within a minute or the client spoke on the control connection instead.
+        /// within `Wait.ceiling` or the client spoke on the control connection instead.
         internal func acceptData() -> Int32? {
             if let connected = active {
                 active = nil
@@ -89,7 +90,7 @@ internal final class CoverageNetworkServer: @unchecked Sendable {
             guard let waiting = passive else {
                 return nil
             }
-            let deadline = Date().addingTimeInterval(60)
+            let deadline = Date().addingTimeInterval(Wait.ceiling)
             while Date() < deadline {
                 var descriptors = [
                     pollfd(fd: waiting, events: Int16(POLLIN), revents: 0),

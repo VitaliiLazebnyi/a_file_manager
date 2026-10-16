@@ -19,7 +19,7 @@ internal struct ParallelWorkTests {
                 running += 1
                 most = max(most, running)
             }
-            _ = Wait.until(seconds: 60) { cores == 1 || lock.withLock { most > 1 } }
+            _ = Wait.until { cores == 1 || lock.withLock { most > 1 } }
             lock.withLock { running -= 1 }
         }
         return lock.withLock { most }
@@ -70,7 +70,7 @@ internal struct ParallelWorkTests {
                     // A piece stays until a second one runs beside it (a condition, not a length
                     // of time: on a busy machine a helper thread may be long in coming); if none
                     // ever does, the check below fails.
-                    _ = Wait.until(seconds: 60) { lock.withLock { most > 1 } }
+                    _ = Wait.until { lock.withLock { most > 1 } }
                     // Work that takes a moment, so that the pieces that run at once are seen
                     // running at once.
                     Thread.sleep(forTimeInterval: 0.01)

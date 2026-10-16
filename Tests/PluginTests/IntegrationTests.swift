@@ -32,15 +32,16 @@ private func markOf(_ url: URL) -> String? {
     return got > 0 ? String(decoding: value.prefix(got), as: UTF8.self) : nil
 }
 
-/// Runs the job on a thread of its own and gives up waiting after a minute.
+/// Runs the job on a thread of its own and gives up waiting only after `Wait.ceiling`.
 private func runInBackground(_ job: FileJob) -> JobResult? {
     let finished = DispatchSemaphore(value: 0)
     let result = SharedBox<JobResult?>(nil)
     Thread {
         result.value = job.run()
         finished.signal()
-    }.start()
-    return finished.wait(timeout: .now() + 60) == .success ? result.value : nil
+    }
+    .start()
+    return finished.wait(timeout: .now() + Wait.ceiling) == .success ? result.value : nil
 }
 
 /// A value written by one thread and read by another after a semaphore ordered the two.
@@ -54,12 +55,13 @@ private final class SharedBox<Value>: @unchecked Sendable {
     }
 }
 
-/// Cancels the job from a thread of its own once `gate` is signalled (or after a minute).
+/// Cancels the job from a thread of its own once `gate` is signalled (or after `Wait.ceiling`).
 private func cancel(_ job: FileJob, when gate: DispatchSemaphore) {
     Thread {
-        _ = gate.wait(timeout: .now() + 60)
+        _ = gate.wait(timeout: .now() + Wait.ceiling)
         job.cancel()
-    }.start()
+    }
+    .start()
 }
 
 /// Answers every question with going on, and tells a test what the job is working on.
@@ -93,9 +95,10 @@ private final class BreakingAnswers: FileJobDelegate {
 
     /// Files of the given sizes in `in/`, each of its own text.
     func makeSources(_ sizes: [String: Int]) throws -> [URL] {
-        try sizes.sorted { $0.key < $1.key }.map { name, size in
-            try box.file("in/" + name, String(repeating: name + " ", count: size / (name.count + 1)))
-        }
+        try sizes.sorted { $0.key < $1.key }
+            .map { name, size in
+                try box.file("in/" + name, String(repeating: name + " ", count: size / (name.count + 1)))
+            }
     }
 
     @Test func aMoveOfSmallAndLargeFilesPutsThemInTheArchiveFileOnceAndRemovesTheSources() throws {
@@ -104,9 +107,14 @@ private final class BreakingAnswers: FileJobDelegate {
             "a.txt": 20, "b.txt": 3_000, "big1.txt": 300_000, "big2.txt": 700_000, "c.txt": 7
         ])
         let wanted = try Dictionary(
-            uniqueKeysWithValues: sources.map { ($0.lastPathComponent, try String(contentsOf: $0, encoding: .utf8)) })
+            uniqueKeysWithValues: sources.map { ($0.lastPathComponent, try String(contentsOf: $0, encoding: .utf8)) }
+        )
         let result = runJob(
-            .move, sources, to: TargetSpec(directory: bench.inside(archive, "tree")), fileSystems: bench.fileSystems)
+            .move,
+            sources,
+            to: TargetSpec(directory: bench.inside(archive, "tree")),
+            fileSystems: bench.fileSystems
+        )
         #expect(result.completed.count == 5 && !result.cancelled && result.failureCount == 0)
         #expect(sources.allSatisfy { !FileManager.default.fileExists(atPath: $0.path) })
         // Written before the sources went: nothing waits in memory any more.
@@ -140,8 +148,11 @@ private final class BreakingAnswers: FileJobDelegate {
             answers.onLines = { if $0.contains(where: { $0.hasSuffix("big3.txt") }) { setFolder(locked) } }
         }
         let job = FileJob(
-            kind: .move, sources: sources, target: TargetSpec(directory: bench.inside(archive, "tree")),
-            fileSystems: bench.fileSystems)
+            kind: .move,
+            sources: sources,
+            target: TargetSpec(directory: bench.inside(archive, "tree")),
+            fileSystems: bench.fileSystems
+        )
         job.delegate = answers
         // One file after the other, so that the folder is locked before the last one is begun and not before.
         job.parallelWidth = 1
@@ -165,9 +176,11 @@ private final class BreakingAnswers: FileJobDelegate {
         mark(archive, with: value)
         let out = try box.folder("out")
         let result = runJob(
-            .copy, [bench.inside(archive, "tree/readme.txt"), bench.inside(archive, "tree/sub")],
+            .copy,
+            [bench.inside(archive, "tree/readme.txt"), bench.inside(archive, "tree/sub")],
             to: TargetSpec(directory: out),
-            fileSystems: bench.fileSystems)
+            fileSystems: bench.fileSystems
+        )
         #expect(result.completed.count == 2 && result.failureCount == 0)
         #expect(markOf(out.appendingPathComponent("readme.txt")) == value)
         #expect(markOf(out.appendingPathComponent("sub/deep/inner.txt")) == value)
@@ -179,7 +192,11 @@ private final class BreakingAnswers: FileJobDelegate {
         mark(box.url("plain"), with: "0083;5e8b1c2d;Safari;")
         let out = try box.folder("out")
         let result = runJob(
-            .copy, [box.url("plain/x.txt")], to: TargetSpec(directory: out), fileSystems: bench.fileSystems)
+            .copy,
+            [box.url("plain/x.txt")],
+            to: TargetSpec(directory: out),
+            fileSystems: bench.fileSystems
+        )
         #expect(result.completed.count == 1 && box.read("out/x.txt") == "x")
         #expect(markOf(out.appendingPathComponent("x.txt")) == nil)
     }
@@ -226,8 +243,11 @@ private final class BreakingAnswers: FileJobDelegate {
         memory.addDirectory("/A")
         let source = try box.file("in/data.bin", "some data")
         let job = FileJob(
-            kind: .copy, sources: [source], target: TargetSpec(directory: virtual.branch(of: memory.url("/A"))),
-            fileSystems: registry)
+            kind: .copy,
+            sources: [source],
+            target: TargetSpec(directory: virtual.branch(of: memory.url("/A"))),
+            fileSystems: registry
+        )
         let answers = Answers()
         job.delegate = answers
         cancel(job, when: gate)
@@ -248,12 +268,14 @@ private final class BreakingAnswers: FileJobDelegate {
         Thread {
             _ = try? virtual.list(branch, showHidden: false, cancellation: flag)
             finished.signal()
-        }.start()
+        }
+        .start()
         Thread {
-            _ = gate.wait(timeout: .now() + 60)
+            _ = gate.wait(timeout: .now() + Wait.ceiling)
             flag.cancel()
-        }.start()
-        #expect(finished.wait(timeout: .now() + 60) == .success)
+        }
+        .start()
+        #expect(finished.wait(timeout: .now() + Wait.ceiling) == .success)
     }
 }
 
@@ -271,7 +293,8 @@ private final class BreakingAnswers: FileJobDelegate {
         memory.addFile("/A/other.txt")
         let picked = virtual.registerPicked(
             [memory.url("/A/x/same.txt"), memory.url("/A/y/same.txt"), memory.url("/A/other.txt")],
-            in: memory.url("/A"))
+            in: memory.url("/A")
+        )
         let items = try virtual.list(picked, showHidden: false)
         let (first, second) = (
             try #require(items.first { $0.url.path == "/A/x/same.txt" }),
@@ -303,12 +326,14 @@ private final class BreakingAnswers: FileJobDelegate {
         Thread {
             outcome.value = Result { try source.read(at: 10, count: 5_000, cancellation: flag) }
             finished.signal()
-        }.start()
+        }
+        .start()
         Thread {
-            _ = gate.wait(timeout: .now() + 60)
+            _ = gate.wait(timeout: .now() + Wait.ceiling)
             flag.cancel()
-        }.start()
-        #expect(finished.wait(timeout: .now() + 60) == .success)
+        }
+        .start()
+        #expect(finished.wait(timeout: .now() + Wait.ceiling) == .success)
         if case .success? = outcome.value { Issue.record("The read was not ended") }
         #expect(memory.interruptions >= 1)
         // The source is usable again afterwards, with another flag.

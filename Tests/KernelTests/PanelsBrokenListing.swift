@@ -1,4 +1,5 @@
 import Foundation
+import TestSupport
 import os
 
 @testable import AFMKernel
@@ -59,9 +60,7 @@ internal final class PanelsBrokenListing: FileSystemProvider, Sendable {
         let item = FileItem(url: directory.appendingPathComponent("first"), name: "first")
         guard receive([item]) else {
             // Told to stop: the flag follows soon after the answer.
-            let end = Date(timeIntervalSinceNow: 5)
-            while !cancellation.isCancelled, Date() < end { Thread.sleep(forTimeInterval: 0.01) }
-            sawCancellation.withLock { $0 = cancellation.isCancelled }
+            sawCancellation.withLock { $0 = Wait.until { cancellation.isCancelled } }
             return
         }
         throw Broken()

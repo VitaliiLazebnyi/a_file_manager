@@ -11,7 +11,7 @@ import Testing
 /// exponential, work off the main thread with a list-version guard, numbers that used to trap,
 /// the ANSI file that used to raise.
 @Suite struct Review2FindSelectionRules {
-    func finishes(within seconds: Double = 60, _ work: @escaping @Sendable () -> Void) -> Bool {
+    func finishes(within seconds: Double = Wait.ceiling, _ work: @escaping @Sendable () -> Void) -> Bool {
         let done = DispatchSemaphore(value: 0)
         Thread {
             work()
@@ -99,7 +99,8 @@ import Testing
 
     /// Gives the main run loop the time to hand the result of background work back.
     func settle(_ condition: () -> Bool) async {
-        for _ in 0..<5_000 where !condition() { try? await Task.sleep(nanoseconds: 2_000_000) }
+        let patience = Date(timeIntervalSinceNow: Wait.ceiling)
+        while !condition(), Date() < patience { try? await Task.sleep(nanoseconds: 2_000_000) }
     }
 
     @Test func aRegexMaskIsEvaluatedOffTheMainThread() async {

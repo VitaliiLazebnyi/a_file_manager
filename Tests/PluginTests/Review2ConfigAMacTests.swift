@@ -37,12 +37,15 @@ import Testing
             [URL(fileURLWithPath: "/Applications/First.app")]
         }
         bench = TestBench(
-            plugins: [NavigationPlugin(), SelectionPlugin(), mac], fileSystems: [LocalFileSystem()], left: box.url("A"),
-            right: box.url("B"))
+            plugins: [NavigationPlugin(), SelectionPlugin(), mac],
+            fileSystems: [LocalFileSystem()],
+            left: box.url("A"),
+            right: box.url("B")
+        )
     }
 
     func wait(until done: () -> Bool) async {
-        let deadline = Date().addingTimeInterval(60)
+        let deadline = Date().addingTimeInterval(Wait.ceiling)
         while !done(), Date() < deadline { try? await Task.sleep(nanoseconds: 20_000_000) }
     }
 
@@ -56,7 +59,8 @@ import Testing
         let paths = (pasteboard.string(forType: .string) ?? "").split(separator: "\n")
         #expect(
             paths.count == count && Set(paths).count == count
-                && paths.allSatisfy { $0.hasPrefix(bench.left.model.directory.path + "/f") })
+                && paths.allSatisfy { $0.hasPrefix(bench.left.model.directory.path + "/f") }
+        )
         // In list order, as the operands are.
         #expect(paths.map(String.init) == bench.left.model.items.map(\.url.path))
 
@@ -73,14 +77,16 @@ import Testing
         bench.left.model.setSelected(true, names: ["f7.txt", "f3.txt"])
         commands.perform(MacIntegrationPlugin.copyAsPathname)
         await wait { pasteboard.string(forType: .string) != nil }
-        let names = (pasteboard.string(forType: .string) ?? "").split(separator: "\n").map {
-            URL(fileURLWithPath: String($0)).lastPathComponent
-        }
+        let names = (pasteboard.string(forType: .string) ?? "").split(separator: "\n")
+            .map {
+                URL(fileURLWithPath: String($0)).lastPathComponent
+            }
         #expect(Set(names) == ["f3.txt", "f7.txt"] && names.count == 2)
         commands.perform(MacIntegrationPlugin.share)
         await wait { mac.log.count == 1 }
         #expect(
-            mac.log.first?.hasPrefix("share ") == true && mac.log.first?.contains("f3.txt") == true && ui.log.isEmpty)
+            mac.log.first?.hasPrefix("share ") == true && mac.log.first?.contains("f3.txt") == true && ui.log.isEmpty
+        )
     }
 
     @Test func withoutMarksNothingWaits() {

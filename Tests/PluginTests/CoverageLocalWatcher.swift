@@ -26,10 +26,10 @@ internal struct CoverageLocalWatcher {
             // Nothing is looked at.
         }
         watcher.watch([box.url("a")])
-        #expect(Wait.until(seconds: 60) { tries.value >= 1 })
+        #expect(Wait.until { tries.value >= 1 })
         // Asked for again while a try is pending: refused again, and still tried once.
         watcher.watch([box.url("a"), box.url("b")])
-        #expect(Wait.until(seconds: 60) { tries.value >= 3 })
+        #expect(Wait.until { tries.value >= 3 })
         #expect(FSEvCensus.figures.refused >= before + 3)
         #expect(watcher.watchedFolders.isEmpty)
         watcher.stop()
@@ -52,7 +52,7 @@ internal struct CoverageLocalWatcher {
         // Once the stream runs, a change in `a` is reported.
         var count = 0
         #expect(
-            Wait.until(seconds: 60) {
+            Wait.until {
                 count += 1
                 try? "x".write(to: box.url("a/\(count).txt"), atomically: false, encoding: .utf8)
                 return Wait.until(seconds: 0.5) { changed.value }
@@ -94,7 +94,7 @@ internal struct CoverageLocalWatcher {
                 }
             for watcher in watchers { watcher.watch([folder]) }
             // Refused, and refused again when tried again a moment later.
-            guard Wait.until(seconds: 120, { FSEvCensus.figures.refused >= 2 * 20 }) else { exit(1) }
+            guard Wait.until(seconds: Wait.ceiling, { FSEvCensus.figures.refused >= 2 * 20 }) else { exit(1) }
             exit(0)
         }
     }

@@ -100,10 +100,8 @@ private func background(_ work: @escaping @Sendable () -> Void) -> DispatchSemap
 
 /// Sets the flag from a thread of its own, as a Cancel button would.
 private func cancelFromThread(_ flag: CancellationFlag) {
-    _ = background { flag.cancel() }.wait(timeout: .now() + 30)
+    _ = background { flag.cancel() }.wait(timeout: .now() + Wait.ceiling)
 }
-
-private let adoptWait = 30.0
 
 /// Two names that read the same and are two files on a server or a disk from elsewhere.
 private let composed = "caf\u{e9}.txt"
@@ -291,9 +289,9 @@ extension MemoryFileSystem {
         defer { memory.releaseStalls() }
         let search = FileSearch(SearchQuery(directory: memory.url("/D")), fileSystems: registry)
         let done = background { search.run { _ in } }
-        #expect(probe.listing.wait(timeout: .now() + adoptWait) == .success)
+        #expect(probe.listing.wait(timeout: .now() + Wait.ceiling) == .success)
         cancelFromThread(search.cancellation)
-        #expect(done.wait(timeout: .now() + adoptWait) == .success)
+        #expect(done.wait(timeout: .now() + Wait.ceiling) == .success)
     }
 
     @Test func cancellingEndsABlockedContentRead() {
@@ -304,9 +302,9 @@ extension MemoryFileSystem {
         defer { memory.releaseStalls() }
         let search = FileSearch(SearchQuery(directory: memory.url("/D"), text: "needle"), fileSystems: registry)
         let done = background { search.run { _ in } }
-        #expect(probe.reading.wait(timeout: .now() + adoptWait) == .success)
+        #expect(probe.reading.wait(timeout: .now() + Wait.ceiling) == .success)
         cancelFromThread(search.cancellation)
-        #expect(done.wait(timeout: .now() + adoptWait) == .success)
+        #expect(done.wait(timeout: .now() + Wait.ceiling) == .success)
         #expect(memory.interruptions >= 1)
     }
 
@@ -329,9 +327,9 @@ extension MemoryFileSystem {
                 cancellation: flag
             )
         }
-        #expect(probe.reading.wait(timeout: .now() + adoptWait) == .success)
+        #expect(probe.reading.wait(timeout: .now() + Wait.ceiling) == .success)
         cancelFromThread(flag)
-        #expect(done.wait(timeout: .now() + adoptWait) == .success)
+        #expect(done.wait(timeout: .now() + Wait.ceiling) == .success)
         #expect(groups.value?.isEmpty == true)
     }
 
@@ -418,9 +416,9 @@ extension MemoryFileSystem {
         let comparison = SyncComparison(options: SyncOptions(), fileSystems: registry(probe))
         let result = Outcome<SyncResult>()
         let done = background { result.value = comparison.run(left: memory.url("/L"), right: memory.url("/R")) }
-        #expect(probe.listing.wait(timeout: .now() + adoptWait) == .success)
+        #expect(probe.listing.wait(timeout: .now() + Wait.ceiling) == .success)
         cancelFromThread(comparison.cancellation)
-        #expect(done.wait(timeout: .now() + adoptWait) == .success)
+        #expect(done.wait(timeout: .now() + Wait.ceiling) == .success)
         #expect(result.value?.wasCancelled == true && result.value?.errors.isEmpty == true)
     }
 
@@ -436,9 +434,9 @@ extension MemoryFileSystem {
         let comparison = SyncComparison(options: options, fileSystems: registry(probe))
         let result = Outcome<SyncResult>()
         let done = background { result.value = comparison.run(left: memory.url("/L"), right: memory.url("/R")) }
-        #expect(probe.reading.wait(timeout: .now() + adoptWait) == .success)
+        #expect(probe.reading.wait(timeout: .now() + Wait.ceiling) == .success)
         cancelFromThread(comparison.cancellation)
-        #expect(done.wait(timeout: .now() + adoptWait) == .success)
+        #expect(done.wait(timeout: .now() + Wait.ceiling) == .success)
         #expect(result.value?.wasCancelled == true && result.value?.errors.isEmpty == true && memory.interruptions >= 1)
     }
 
@@ -464,9 +462,9 @@ extension MemoryFileSystem {
         let executor = SyncExecutor(plan: plan, options: SyncRunOptions(), fileSystems: registry, cancellation: flag)
         let outcome = Outcome<SyncOutcome>()
         let done = background { outcome.value = executor.run() }
-        #expect(probe.reading.wait(timeout: .now() + adoptWait) == .success)
+        #expect(probe.reading.wait(timeout: .now() + Wait.ceiling) == .success)
         cancelFromThread(flag)
-        #expect(done.wait(timeout: .now() + adoptWait) == .success)
+        #expect(done.wait(timeout: .now() + Wait.ceiling) == .success)
         #expect(outcome.value?.wasCancelled == true && memory.interruptions >= 1)
         #expect(!memory.exists("/R/new.txt") && memory.allPaths.allSatisfy { !$0.contains("afm-sync") })
     }
@@ -636,9 +634,9 @@ extension MemoryFileSystem {
                 cancellation: flag
             )
         }
-        #expect(probe.reading.wait(timeout: .now() + adoptWait) == .success)
+        #expect(probe.reading.wait(timeout: .now() + Wait.ceiling) == .success)
         cancelFromThread(flag)
-        #expect(done.wait(timeout: .now() + adoptWait) == .success)
+        #expect(done.wait(timeout: .now() + Wait.ceiling) == .success)
         #expect(result.value?.wasCancelled == true && result.value?.message == nil && memory.interruptions >= 1)
     }
 
@@ -662,9 +660,9 @@ extension MemoryFileSystem {
                 cancellation: flag
             )
         }
-        #expect(probe.reading.wait(timeout: .now() + adoptWait) == .success)
+        #expect(probe.reading.wait(timeout: .now() + Wait.ceiling) == .success)
         cancelFromThread(flag)
-        #expect(done.wait(timeout: .now() + adoptWait) == .success)
+        #expect(done.wait(timeout: .now() + Wait.ceiling) == .success)
     }
 }
 
@@ -814,9 +812,9 @@ extension MemoryFileSystem {
         let run = ToolRun(fileSystems: registry, cancellation: flag)
         let results = Outcome<[Result<[[UInt8]], any Error>]>()
         let done = background { results.value = ChecksumRun.digests(of: [(memory.url("/h/a"), [.sha1])], run: run) }
-        #expect(probe.reading.wait(timeout: .now() + adoptWait) == .success)
+        #expect(probe.reading.wait(timeout: .now() + Wait.ceiling) == .success)
         cancelFromThread(flag)
-        #expect(done.wait(timeout: .now() + adoptWait) == .success)
+        #expect(done.wait(timeout: .now() + Wait.ceiling) == .success)
         if case .failure(let error)? = results.value?.first {
             #expect((error as? ToolError) == .cancelled)
         } else {
@@ -843,9 +841,9 @@ extension MemoryFileSystem {
                 error.value = thrown
             }
         }
-        #expect(probe.reading.wait(timeout: .now() + adoptWait) == .success)
+        #expect(probe.reading.wait(timeout: .now() + Wait.ceiling) == .success)
         cancelFromThread(flag)
-        #expect(done.wait(timeout: .now() + adoptWait) == .success)
+        #expect(done.wait(timeout: .now() + Wait.ceiling) == .success)
         #expect((error.value as? ToolError) == .cancelled)
         #expect(memory.allPaths.filter { $0.hasPrefix("/out/") }.isEmpty)
     }
@@ -868,9 +866,9 @@ extension MemoryFileSystem {
                 error.value = thrown
             }
         }
-        #expect(probe.writing.wait(timeout: .now() + adoptWait) == .success)
+        #expect(probe.writing.wait(timeout: .now() + Wait.ceiling) == .success)
         cancelFromThread(flag)
-        #expect(done.wait(timeout: .now() + adoptWait) == .success)
+        #expect(done.wait(timeout: .now() + Wait.ceiling) == .success)
         #expect((error.value as? ToolError) == .cancelled && memory.interruptions >= 1)
     }
 }

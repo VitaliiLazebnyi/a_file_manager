@@ -118,7 +118,11 @@ private final class Collected<Value>: @unchecked Sendable {
         let writer = ZipWriter(output)
         for member in members {
             var record = ZipRecord.new(
-                name: member.name, isDirectory: false, modified: Date(), permissions: member.permissions)
+                name: member.name,
+                isDirectory: false,
+                modified: Date(),
+                permissions: member.permissions
+            )
             record.setName(member.name)
             try writer.end(try writer.begin(record), record, headerChanged: false)
         }
@@ -206,7 +210,8 @@ private final class Collected<Value>: @unchecked Sendable {
         record.nameBytes = Data("dir/übung – 日本.txt".utf8)
         #expect(
             record.nameBytes == Data("dir/übung – 日本.txt".utf8) && record.nameLength == record.nameBytes.count
-                && !record.isDirectory)
+                && !record.isDirectory
+        )
         // Not text at all (code page 437), a byte-order mark, a name that ends in a slash.
         let dos = Data([0x44, 0x49, 0x52, 0x5C, 0x81, 0x62, 0x65, 0x72, 0x2E, 0x74, 0x78, 0x74])
         record.nameBytes = dos
@@ -228,7 +233,8 @@ private final class Collected<Value>: @unchecked Sendable {
         record.comment = Data("a comment".utf8)
         #expect(
             record.extra == Data([0x55, 0x54, 5, 0, 1, 1, 2, 3, 4]) && record.extraLength == 9
-                && record.comment == Data("a comment".utf8))
+                && record.comment == Data("a comment".utf8)
+        )
 
         // Through a file: names in an old character set survive a rewrite of the archive.
         let url = box.url("names.zip")
@@ -255,7 +261,8 @@ private final class Collected<Value>: @unchecked Sendable {
         let target = try box.folder("target")
         let archive = try writeZip(
             "race.zip",
-            members: [("dir/sub/planted.txt", 0o644), ("dir/sub/second.txt", 0o644), ("plain.txt", 0o644)])
+            members: [("dir/sub/planted.txt", 0o644), ("dir/sub/second.txt", 0o644), ("plain.txt", 0o644)]
+        )
         let swapped = Collected<String>()
         let fm = FileManager.default
         // The folder was looked at and opened; now somebody takes it away and puts a link
@@ -268,7 +275,9 @@ private final class Collected<Value>: @unchecked Sendable {
         let link = target.appendingPathComponent("dir.link")
         try fm.createSymbolicLink(at: link, withDestinationURL: outside)
         let unpacker = Unpacker(
-            fileSystems: bench.fileSystems, monitor: bench.monitor, options: UnpackOptions(),
+            fileSystems: bench.fileSystems,
+            monitor: bench.monitor,
+            options: UnpackOptions(),
             whileUnpacking: { entry in
                 guard entry.path == "dir/sub/planted.txt", swapped.all.isEmpty else { return }
                 swapped.add(entry.path)
@@ -296,11 +305,14 @@ private final class Collected<Value>: @unchecked Sendable {
         // A link two folders down, left there before.
         try box.folder("target/a/b")
         try FileManager.default.createSymbolicLink(
-            at: target.appendingPathComponent("a/b/c"), withDestinationURL: outside)
+            at: target.appendingPathComponent("a/b/c"),
+            withDestinationURL: outside
+        )
         let zip = try writeZip("deep.zip", members: [("a/b/c/d/planted.txt", 0o644), ("a/b/fine.txt", 0o644)])
         var result = try bench.unpack(zip, to: target)
         #expect(
-            result.unpacked >= 1 && box.exists("target/a/b/fine.txt") && !result.problems.isEmpty, "\(result.problems)"
+            result.unpacked >= 1 && box.exists("target/a/b/fine.txt") && !result.problems.isEmpty,
+            "\(result.problems)"
         )
         #expect(try FileManager.default.contentsOfDirectory(atPath: outside.path).isEmpty)
 
@@ -332,7 +344,8 @@ private final class Collected<Value>: @unchecked Sendable {
             "absolute.zip",
             members: [
                 (claimed.path + "/evil.txt", 0o644), ("//" + inner + "/second.txt", 0o644), ("/top.txt", 0o644)
-            ])
+            ]
+        )
         var tar = tarHeader(name: "/" + String(repeating: "/", count: 3) + "tar-top.txt", size: 5)
         tar.append(tarBody("hello"))
         tar.append(tarHeader(name: "/claimed-by-tar/deep.txt", size: 5))
@@ -353,27 +366,33 @@ private final class Collected<Value>: @unchecked Sendable {
         #expect(box.exists("target/" + inner + "/evil.txt") && box.exists("target/" + inner + "/second.txt"))
         #expect(
             box.exists("target/top.txt") && box.exists("target/tar-top.txt")
-                && box.exists("target/claimed-by-tar/deep.txt"))
+                && box.exists("target/claimed-by-tar/deep.txt")
+        )
         #expect(try FileManager.default.contentsOfDirectory(atPath: claimed.path).isEmpty)
         #expect(
             !FileManager.default.fileExists(atPath: "/claimed-by-tar")
-                && !FileManager.default.fileExists(atPath: "/top.txt"))
+                && !FileManager.default.fileExists(atPath: "/top.txt")
+        )
         // Everything that arrived lies below the target, links followed.
         let arrived =
             FileManager.default.enumerator(at: target, includingPropertiesForKeys: nil)?.compactMap { $0 as? URL } ?? []
         #expect(
-            arrived.count >= 5 && arrived.allSatisfy { PathSafety.isContained($0, in: target, resolvingLinks: true) })
+            arrived.count >= 5 && arrived.allSatisfy { PathSafety.isContained($0, in: target, resolvingLinks: true) }
+        )
     }
 
     @Test func unpackedFilesGetNoRightsBeyondWhatNewFilesGet() throws {
         let zip = try writeZip(
-            "open.zip", members: [("everyone.txt", 0o666), ("tool", 0o777), ("mine.txt", 0o600)])
+            "open.zip",
+            members: [("everyone.txt", 0o666), ("tool", 0o777), ("mine.txt", 0o600)]
+        )
         let target = try box.folder("target")
         let result = try bench.unpack(zip, to: target)
         #expect(result.problems.isEmpty && result.unpacked == 3)
         let allowed = Int(UnpackFolder.allowed)
         #expect(
-            mode(box.url("target/everyone.txt")) == 0o666 & allowed && mode(box.url("target/tool")) == 0o777 & allowed)
+            mode(box.url("target/everyone.txt")) == 0o666 & allowed && mode(box.url("target/tool")) == 0o777 & allowed
+        )
         #expect(mode(box.url("target/mine.txt")) == 0o600)
         // (With the usual mask nobody else may write to them.)
         if allowed & 0o022 == 0 { #expect(mode(box.url("target/everyone.txt")) & 0o022 == 0) }
@@ -381,14 +400,17 @@ private final class Collected<Value>: @unchecked Sendable {
         try FileManager.default.removeItem(at: box.url("target/mine.txt"))
         try box.file("elsewhere.txt", "untouched")
         try FileManager.default.createSymbolicLink(
-            at: box.url("target/mine.txt"), withDestinationURL: box.url("elsewhere.txt"))
+            at: box.url("target/mine.txt"),
+            withDestinationURL: box.url("elsewhere.txt")
+        )
         #expect(try bench.unpack(zip, to: target).problems.isEmpty)
         #expect(!isLink(box.url("target/mine.txt")) && box.read("elsewhere.txt") == "untouched")
         // Nothing of the temporary names is left.
         #expect(
             try FileManager.default.contentsOfDirectory(atPath: target.path).sorted() == [
                 "everyone.txt", "mine.txt", "tool"
-            ])
+            ]
+        )
     }
 
     // MARK: The kernel's hooks (A041, A044, quitting)
@@ -403,15 +425,17 @@ private final class Collected<Value>: @unchecked Sendable {
         let stream = try bench.store.archive(at: box.url("stream.tar.gz"))
         #expect(!stream.allowsParallelReads)
         let folder = bench.inside(box.url("stream.tar.gz"), "tree/many", scheme: ArchiveURL.readOnlyScheme)
-        let inArchive = try #require(stream.children(of: "tree/many")).sorted { $0.order < $1.order }.map {
-            folder.appending(name: $0.name)
-        }
+        let inArchive = try #require(stream.children(of: "tree/many")).sorted { $0.order < $1.order }
+            .map {
+                folder.appending(name: $0.name)
+            }
         // Whatever order they come in (by name, backwards), they go out in the archive's.
         let other = URL(fileURLWithPath: "/somewhere/else.txt")
         let ordered = bench.readOnly.readOrder(of: [other] + inArchive.reversed())
         #expect(ordered == [other] + inArchive)
         #expect(
-            bench.readOnly.readOrder(of: inArchive.sorted { $0.lastPathComponent < $1.lastPathComponent }) == inArchive)
+            bench.readOnly.readOrder(of: inArchive.sorted { $0.lastPathComponent < $1.lastPathComponent }) == inArchive
+        )
         // Read that way, the archive is gone through once.
         let before = stream.streamStarts
         for url in ordered.dropFirst() { #expect(try bench.read(url).starts(with: Data("contents of ".utf8))) }
@@ -481,7 +505,8 @@ private final class Collected<Value>: @unchecked Sendable {
         try bench.fileSystems.flushPendingWrites(to: box.url("outer.zip"), cancellation: flag)
         #expect(!store.hasPendingChanges)
         #expect(
-            runTool("/usr/bin/unzip", ["-qo", box.url("outer.zip").path, "-d", box.url("check").path]).status == 0)
+            runTool("/usr/bin/unzip", ["-qo", box.url("outer.zip").path, "-d", box.url("check").path]).status == 0
+        )
         #expect(listed(box.url("check/tree.zip")).contains("tree/deep.txt"))
         // A write that cannot be made is the caller's to know of: the file is not what is shown.
         try write("late", to: bench.inside(archive, "tree/late.txt"))
@@ -610,7 +635,7 @@ private final class Collected<Value>: @unchecked Sendable {
             let scratch = plugin.environment.scratch.url
             var kept = (try? FileManager.default.contentsOfDirectory(atPath: scratch.path)) ?? []
             // (On a machine too busy for the stop to see the list written, it is written a moment later.)
-            let patience = Date(timeIntervalSinceNow: 60)
+            let patience = Date(timeIntervalSinceNow: Wait.ceiling)
             while endable, !kept.contains(where: { $0.hasPrefix("index-") }), Date() < patience {
                 usleep(20_000)
                 kept = (try? FileManager.default.contentsOfDirectory(atPath: scratch.path)) ?? []
@@ -618,13 +643,15 @@ private final class Collected<Value>: @unchecked Sendable {
             // Told once, with the place; the compressed data is still there.
             #expect(
                 reports.all.count == 1 && reports.all.first?.contains(scratch.path) == true,
-                "\(endable): \(reports.all)")
+                "\(endable): \(reports.all)"
+            )
             #expect(kept.contains { $0.hasSuffix(".zipdata") }, "\(endable): \(kept)")
             if endable { #expect(kept.contains { $0.hasPrefix("index-") }) }
             // The archive itself is whole, as it was.
             #expect(
                 runTool("/usr/bin/unzip", ["-tq", archive.path]).status == 0
-                    && !listed(archive).contains("tree/added.txt"))
+                    && !listed(archive).contains("tree/added.txt")
+            )
             release.signal()
             released.wait()
             try? FileManager.default.removeItem(at: scratch)
@@ -657,7 +684,8 @@ private final class Collected<Value>: @unchecked Sendable {
         next[1].work()
         #expect(
             listed(archive).contains("tree/first.txt") && listed(archive).contains("tree/second.txt")
-                && !bench.store.hasPendingChanges)
+                && !bench.store.hasPendingChanges
+        )
         // The ones that come late find nothing to do, and arm nothing.
         due[0].work()
         next[0].work()
@@ -710,7 +738,8 @@ private final class Collected<Value>: @unchecked Sendable {
         sooner[0].work()
         #expect(
             !bench.store.hasPendingChanges && listed(archive).contains("tree/kept-back.txt")
-                && listed(archive).contains("tree/more.txt"))
+                && listed(archive).contains("tree/more.txt")
+        )
         // The old timers are overtaken: they do nothing.
         due.forEach { $0.work() }
         // After a write that worked, a failure counts from the beginning again.
@@ -742,20 +771,25 @@ private final class Collected<Value>: @unchecked Sendable {
         // (Not kept beyond its closing: a writer holds on to its temporary file.)
         var writer: (any FileWriter)? = try bench.zip.write(bench.inside(archive, "tree/large.bin"))
         try writer?.write(Data(repeating: 7, count: 100_000))
-        let folders = try FileManager.default.contentsOfDirectory(atPath: box.root.path).filter {
-            $0.hasPrefix(".afm-spool-")
-        }
+        let folders = try FileManager.default.contentsOfDirectory(atPath: box.root.path)
+            .filter {
+                $0.hasPrefix(".afm-spool-")
+            }
         #expect(folders.count == 1 && asked.all.count == 2)
         let spool = box.url(folders.first ?? "missing")
         #expect(
             try FileManager.default.contentsOfDirectory(atPath: spool.path).filter { $0.hasSuffix(".zipdata") }.count
-                == 1)
+                == 1
+        )
         #expect(mode(spool) == 0o700 && ScratchFolder.isOwnExternalName(spool.lastPathComponent))
         // Nothing of it in the temporary folder.
         #expect(
-            ((try? FileManager.default.contentsOfDirectory(atPath: scratch.path)) ?? []).filter {
-                $0.hasSuffix(".zipdata")
-            }.isEmpty)
+            ((try? FileManager.default.contentsOfDirectory(atPath: scratch.path)) ?? [])
+                .filter {
+                    $0.hasSuffix(".zipdata")
+                }
+                .isEmpty
+        )
         try writer?.close(attributes: FileAttributes())
         writer = nil
         // The volume is asked once per archive, not once per member.
@@ -764,7 +798,8 @@ private final class Collected<Value>: @unchecked Sendable {
         #expect(try FileManager.default.contentsOfDirectory(atPath: spool.path).count == 2)
         #expect(
             bench.store.flushAll().isEmpty && listed(archive).contains("tree/large.bin")
-                && listed(archive).contains("tree/small.txt"))
+                && listed(archive).contains("tree/small.txt")
+        )
         #expect(runTool("/usr/bin/unzip", ["-tq", archive.path]).status == 0)
         // Written, the members leave their folder, and the folder goes with the archive.
         #expect(try FileManager.default.contentsOfDirectory(atPath: spool.path).isEmpty)
@@ -776,7 +811,8 @@ private final class Collected<Value>: @unchecked Sendable {
             #expect(throws: (any Error).self) { try abandoned.close(attributes: FileAttributes()) }
         }()
         #expect(
-            try FileManager.default.contentsOfDirectory(atPath: spool.path).isEmpty && !bench.store.hasPendingChanges)
+            try FileManager.default.contentsOfDirectory(atPath: spool.path).isEmpty && !bench.store.hasPendingChanges
+        )
     }
 
     @Test func aChangeAsksTheDiskBeforeItTakesTheLockOfTheDirectory() throws {
@@ -804,10 +840,16 @@ private final class Collected<Value>: @unchecked Sendable {
         try bench.zip.createDirectory(at: bench.inside(archive, "tree/made"), cancellation: flag)
         try write("x", to: bench.inside(archive, "tree/made/x.txt"))
         try bench.zip.move(
-            bench.inside(archive, "tree/made/x.txt"), to: bench.inside(archive, "tree/made/y.txt"), replacing: false,
-            cancellation: flag)
+            bench.inside(archive, "tree/made/x.txt"),
+            to: bench.inside(archive, "tree/made/y.txt"),
+            replacing: false,
+            cancellation: flag
+        )
         try bench.zip.setAttributes(
-            FileAttributes(permissions: 0o600), of: bench.inside(archive, "tree/made/y.txt"), cancellation: flag)
+            FileAttributes(permissions: 0o600),
+            of: bench.inside(archive, "tree/made/y.txt"),
+            cancellation: flag
+        )
         try bench.zip.remove(bench.inside(archive, "tree/empty.txt"), cancellation: flag)
         #expect(bench.store.flushAll().isEmpty)
         #expect(listed(archive).contains("tree/made/y.txt") && !listed(archive).contains("tree/empty.txt"))
@@ -826,8 +868,10 @@ private final class Collected<Value>: @unchecked Sendable {
         // The top of a location is told at once, and is where going up one by one ends.
         #expect(runTool("/usr/bin/zip", ["-q0", "outer.zip", "tree.zip"], in: box.root).status == 0)
         let nested = ArchiveURL.make(
-            scheme: ArchiveURL.writableScheme, archive: bench.inside(box.url("outer.zip"), "tree.zip"),
-            innerPath: "tree/sub/deep")
+            scheme: ArchiveURL.writableScheme,
+            archive: bench.inside(box.url("outer.zip"), "tree.zip"),
+            innerPath: "tree/sub/deep"
+        )
         for url in [bench.inside(archive), bench.inside(archive, "tree/sub/deep/x/y/z"), outside, nested, box.root] {
             var climbed = url
             while let parent = bench.zip.parent(of: climbed) { climbed = parent }

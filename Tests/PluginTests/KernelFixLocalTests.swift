@@ -262,7 +262,8 @@ extension Int {
         bench.commands.perform("cm_SrcByName")
         // Two commands in a row: the second starts from the order the first is on its way to.
         bench.commands.perform("cm_SrcNegOrder")
-        for _ in 0..<200 where model.sort != ListOrder(key: .name, descending: true) {
+        let patience = Date(timeIntervalSinceNow: Wait.ceiling)
+        while model.sort != ListOrder(key: .name, descending: true), Date() < patience {
             try await Task.sleep(nanoseconds: 20_000_000)
         }
         #expect(model.sort == ListOrder(key: .name, descending: true))

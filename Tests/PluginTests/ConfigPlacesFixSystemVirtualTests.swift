@@ -110,7 +110,7 @@ import Testing
         #expect((1...2).contains(reports.value))
         // The rest comes as one more report once the window has passed (the timer runs at the
         // pace of a busy machine, so it is waited for rather than timed).
-        let deadline = Date().addingTimeInterval(30)
+        let deadline = Date().addingTimeInterval(Wait.ceiling)
         while reports.value < 2, Date() < deadline { try await Task.sleep(nanoseconds: 10_000_000) }
         #expect(reports.value == 2)
         _ = watcher

@@ -22,14 +22,18 @@ import UniformTypeIdentifiers
         plugin = ViewerPlugin(overlayHost: { _ in nil }, quickViewDelay: 0.01, showsWindows: false)
         plugin.mediaPlayback = CovViewPlayback.factory
         bench = TestBench(
-            plugins: [plugin], fileSystems: [memory, hook], left: memory.url("/A"), right: memory.url("/B"))
+            plugins: [plugin],
+            fileSystems: [memory, hook],
+            left: memory.url("/A"),
+            right: memory.url("/B")
+        )
         memory.addFile("/A/small.txt", "small file\nsecond line")
         memory.addFile("/A/index.html", "<html><body><a href=\"next.html\">next</a></body></html>")
         memory.addFile("/A/next.html", "<html><body>next page</body></html>")
     }
 
     @discardableResult
-    func wait(upTo seconds: TimeInterval = 300, until condition: () -> Bool) async -> Bool {
+    func wait(upTo seconds: TimeInterval = Wait.ceiling, until condition: () -> Bool) async -> Bool {
         let deadline = Date().addingTimeInterval(seconds)
         while !condition(), Date() < deadline {
             try? await Task.sleep(nanoseconds: 3_000_000)
@@ -39,8 +43,11 @@ import UniformTypeIdentifiers
 
     private func pane() -> ViewerPane {
         ViewerPane(
-            kernel: bench.kernel, settings: ListerSettings(bench.kernel.settings), temporaryCopies: TemporaryCopies(),
-            isEmbedded: true)
+            kernel: bench.kernel,
+            settings: ListerSettings(bench.kernel.settings),
+            temporaryCopies: TemporaryCopies(),
+            isEmbedded: true
+        )
     }
 
     // MARK: Nothing waits for the server
@@ -48,7 +55,7 @@ import UniformTypeIdentifiers
     @Test func stoppingThePaneDoesNotWaitForTheReadersOfAServerToClose() async {
         hook.contents["/slow.txt"] = Data(String(repeating: "a line of text\n", count: 2_000).utf8)
         let gate = DispatchSemaphore(value: 0)
-        hook.onClose = { _ = gate.wait(timeout: .now() + 30) }
+        hook.onClose = { _ = gate.wait(timeout: .now() + Wait.ceiling) }
         let pane = pane()
         pane.load(ViewerItem(source: .file(URL(string: "hook:///slow.txt")!), title: "slow"))
         #expect(await wait { pane.loaded != nil && pane.pager.document?.isIndexComplete == true })
@@ -131,7 +138,8 @@ import UniformTypeIdentifiers
             await wait(upTo: 60) {
                 pane.loaded != nil
                     && (pane.mode.isTextual ? pane.pager.document != nil : pane.richText != nil || pane.webView != nil)
-            })
+            }
+        )
         #expect(pane.richText == nil)
         pane.stopWork()
     }
@@ -141,9 +149,15 @@ import UniformTypeIdentifiers
     private func picture(_ width: Int, _ height: Int) throws -> CGImage {
         let context = try #require(
             CGContext(
-                data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
+                data: nil,
+                width: width,
+                height: height,
+                bitsPerComponent: 8,
+                bytesPerRow: 0,
                 space: CGColorSpace(name: CGColorSpace.sRGB)!,
-                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            )
+        )
         context.setFillColor(CGColor(red: 0.2, green: 0.4, blue: 0.9, alpha: 1))
         context.fill(CGRect(x: 0, y: 0, width: width, height: height))
         return try #require(context.makeImage())
@@ -167,11 +181,15 @@ import UniformTypeIdentifiers
     }
 
     private func encoded(
-        _ images: [CGImage], type: UTType, properties: [CFString: Any] = [:], frameProperties: [CFString: Any] = [:]
+        _ images: [CGImage],
+        type: UTType,
+        properties: [CFString: Any] = [:],
+        frameProperties: [CFString: Any] = [:]
     ) throws -> Data {
         let data = NSMutableData()
         let destination = try #require(
-            CGImageDestinationCreateWithData(data, type.identifier as CFString, images.count, nil))
+            CGImageDestinationCreateWithData(data, type.identifier as CFString, images.count, nil)
+        )
         if !properties.isEmpty { CGImageDestinationSetProperties(destination, properties as CFDictionary) }
         for image in images { CGImageDestinationAddImage(destination, image, frameProperties as CFDictionary) }
         #expect(CGImageDestinationFinalize(destination))
@@ -186,9 +204,11 @@ import UniformTypeIdentifiers
 
     @Test func aGIFWithSeveralFramesIsStillAnAnimation() throws {
         let gif = try encoded(
-            [try picture(20, 20), try picture(20, 20), try picture(20, 20)], type: .gif,
+            [try picture(20, 20), try picture(20, 20), try picture(20, 20)],
+            type: .gif,
             properties: [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFLoopCount: 0]],
-            frameProperties: [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFDelayTime: 0.2]])
+            frameProperties: [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFDelayTime: 0.2]]
+        )
         let animation = try #require(ImageDecoder.decode(gif, minimumDelay: 0.05))
         #expect(animation.frames.count == 3)
     }

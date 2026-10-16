@@ -1,5 +1,6 @@
 import AFMKernel
 import Foundation
+import TestSupport
 import Testing
 
 @testable import NetworkPlugin
@@ -102,12 +103,12 @@ internal struct CoverageNetworkReaders {
             let reader = try session.openRead("/stall", cancellation: nil)
             #expect(try reader.read(upToCount: 5)?.count == 5)
         }
-        #expect(Background.waitUntilIdle(lane: session, timeout: 300))
+        #expect(Background.waitUntilIdle(lane: session, timeout: Wait.ceiling))
         let interrupted = try session.openRead("/stall", cancellation: nil)
         #expect(try interrupted.read(upToCount: 5)?.count == 5)
         interrupted.interrupt()
         interrupted.close()
-        #expect(Background.waitUntilIdle(lane: session, timeout: 300))
+        #expect(Background.waitUntilIdle(lane: session, timeout: Wait.ceiling))
         #expect(server.commands.filter { $0 == "RETR /stall" }.count == 2)
     }
 }

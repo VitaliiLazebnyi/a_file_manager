@@ -174,7 +174,8 @@ let systemSFTPServer = "/usr/libexec/sftp-server"
         process.standardOutput = output
         try process.run()
         var question: AskpassHelper.Question?
-        for _ in 0..<500 where question == nil {
+        let patience = Date(timeIntervalSinceNow: Wait.ceiling)
+        while question == nil, Date() < patience {
             question = helper.pendingQuestion()
             if question == nil { Thread.sleep(forTimeInterval: 0.02) }
         }
