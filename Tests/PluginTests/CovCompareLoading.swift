@@ -128,6 +128,20 @@ internal struct CovCompareLoading {
         )
     }
 
+    /// A read that fails while two files are compared side by side is the failure.
+    @Test
+    internal func aFailingReadWhileComparingSideBySideIsTold() {
+        let disk = CovFileOpsScriptedDisk()
+        disk.base.isLocal = false
+        let registry = FileSystemRegistry()
+        registry.register(disk)
+        let (first, second) = (disk.base.addFile("/first", "same"), disk.base.addFile("/second", "same"))
+        disk.readsBeforeFailure.value = ["/second": 0]
+        #expect(throws: CocoaError.self) {
+            try CompareLoader.identical(first, second, size: 4, fileSystems: registry)
+        }
+    }
+
     /// Nothing loaded is nothing to show.
     @Test
     internal func nothingLoadedIsNone() {
