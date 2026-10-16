@@ -2,6 +2,9 @@ import AFMShell
 import AppKit
 import StandardPlugins
 
+// Before anything opens files: the program may have as many open as the system allows.
+DescriptorLimit.raise()
+
 /// The program: the window shell with the standard plugins, run until the user quits.
 private let kApplication = ShellApplication(
     productName: StandardPlugins.productName,
