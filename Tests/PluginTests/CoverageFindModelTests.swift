@@ -192,10 +192,13 @@ import Testing
         options.encodings = [.utf16]
         let wide = Data(repeating: 0x61, count: longest + 8)
         #expect(try TextPattern(".", options: options).isFound(in: wide, blockSize: longest + 16))
-        // A byte the Western code page does not have is read as Latin-1.
+        // A byte the Western code page does not have is read as Latin-1. It comes first: an
+        // expression that has to go through the 4 MB of a piece before it finds anything may
+        // use up the time a piece is given (in a build for the thread sanitizer, with other
+        // tests running, it did) and then counts as not found.
         options.encodings = [.western]
-        var western = Data(repeating: 0x61, count: longest + 8)
-        western.append(0x81)
+        var western = Data([0x81])
+        western.append(Data(repeating: 0x61, count: longest + 8))
         #expect(try TextPattern("\\x81", options: options).isFound(in: western, blockSize: longest + 16))
     }
 
