@@ -67,8 +67,10 @@ internal final class CoverageNetworkServer: @unchecked Sendable {
 
         /// Listens for a data connection and returns the port.
         internal func openPassive() -> Int {
+            // Forgotten as soon as it is closed (the number may soon be somebody else's).
             if let previous = passive {
                 close(previous)
+                passive = nil
             }
             guard let opened = try? TestFTPServer.listen() else {
                 return 0

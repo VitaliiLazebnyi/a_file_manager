@@ -408,7 +408,7 @@ import Testing
         bench.left.moveCursor(toName: "data.bin")
         bench.commands.perform(.compareByContent)
         #expect(await spin { windows().count == 2 && plugin.sessions.last?.phase == .ready })
-        #expect(windows().count == 2 && plugin.sessions.last?.isBinary == true && presenter.presented.count == 3)
+        #expect(windows().count == 2 && plugin.sessions.last?.isBinary == true && presenter.requests == 3)
         windows().forEach { $0.displayIfNeeded() }
         plugin.stop()
         #expect(windows().isEmpty && plugin.sessions.isEmpty)

@@ -129,8 +129,9 @@ private func status(_ url: URL) -> stat {
     }
 
     @Test func aBlockedCallIsEndedByInterrupt() throws {
-        var pair: [Int32] = [0, 0]
-        #expect(pipe(&pair) == 0)
+        // Not 0: should the pipe not be made, nothing is closed that is somebody else's.
+        var pair: [Int32] = [-1, -1]
+        try #require(pipe(&pair) == 0)
         defer {
             close(pair[0])
             close(pair[1])
