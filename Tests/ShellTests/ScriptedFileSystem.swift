@@ -26,6 +26,9 @@ internal final class ScriptedFileSystem: FileSystemProvider, @unchecked Sendable
     internal var holdBefore: Int?
     /// Thrown when the listing is let go from its hold (the hold must be set for this).
     internal var failure: (any Error)?
+    /// The folders at these paths are their own parents (and tops), as a file system that knows its
+    /// top without climbing to it may say of that top.
+    internal var ownParents: Set<String> = []
     /// The second batch is not delivered before this long after the listing began, so that the
     /// panel shows the first batches as a first piece while the rest is held.
     internal var pauseBeforeSecondBatch: TimeInterval = 0
@@ -139,9 +142,14 @@ internal final class ScriptedFileSystem: FileSystemProvider, @unchecked Sendable
         inner.item(at: url)
     }
 
-    /// The memory file system's parent.
+    /// The memory file system's parent; the folder itself for `ownParents`.
     internal func parent(of directory: URL) -> URL? {
-        inner.parent(of: directory)
+        ownParents.contains(directory.path) ? directory : inner.parent(of: directory)
+    }
+
+    /// The memory file system's top; a folder of `ownParents` is its own top.
+    internal func root(of url: URL) -> URL {
+        ownParents.contains(url.path) ? url : inner.root(of: url)
     }
 
     /// The memory file system's reader.
