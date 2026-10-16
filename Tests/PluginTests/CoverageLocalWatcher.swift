@@ -29,8 +29,9 @@ internal struct CoverageLocalWatcher {
         #expect(Wait.until { tries.value >= 1 })
         // Asked for again while a try is pending: refused again, and still tried once.
         watcher.watch([box.url("a"), box.url("b")])
-        #expect(Wait.until { tries.value >= 3 })
-        #expect(FSEvCensus.figures.refused >= before + 3)
+        // Each request that gets no stream is one refusal, whatever number of folders it has: two
+        // so far (three when a try again came first, which a busy machine may not get to).
+        #expect(Wait.until { tries.value >= 3 && FSEvCensus.figures.refused >= before + 2 })
         #expect(watcher.watchedFolders.isEmpty)
         watcher.stop()
     }
