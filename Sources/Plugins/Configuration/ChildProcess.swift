@@ -98,7 +98,7 @@ enum ChildProcess {
             initAttributes: { posix_spawnattr_init(&$0) },
             wait: { pid, status, options in
                 let result = waitpid(pid, &status, options)
-                return (result, result == -1 ? errno : 0)
+                return (result, errno)
             }
         )
 
@@ -106,7 +106,8 @@ enum ChildProcess {
         internal var initActions: @Sendable (inout posix_spawn_file_actions_t?) -> Int32
         /// `posix_spawnattr_init`: 0, or the number of the error.
         internal var initAttributes: @Sendable (inout posix_spawnattr_t?) -> Int32
-        /// `waitpid` with its status and options: what it returns, and `errno` when that is -1.
+        /// `waitpid` with its status and options: what it returns, and `errno` after it (which
+        /// says something only when that is -1).
         internal var wait: @Sendable (pid_t, inout Int32, Int32) -> (result: pid_t, error: Int32)
     }
 
