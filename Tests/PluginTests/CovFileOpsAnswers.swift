@@ -20,6 +20,8 @@ internal final class CovFileOpsAnswers: FileJobDelegate, Sendable {
     internal let volumes = Shared<[ProtectionChoice]>([.skip])
     /// What was asked, one line per question.
     internal let asked = Shared<[String]>([])
+    /// Runs at every failure, before it is answered.
+    internal let onFailure = Shared<(@Sendable () -> Void)?>(nil)
     /// Runs with every report of progress.
     internal let onProgress = Shared<(@Sendable (FileJob, JobProgress) -> Void)?>(nil)
 
@@ -35,7 +37,8 @@ internal final class CovFileOpsAnswers: FileJobDelegate, Sendable {
 
     /// The next answer to a failure.
     internal func job(_: FileJob, failedAt url: URL, error: any Error) -> ErrorChoice {
-        next(failures, "failed: \(url.lastPathComponent): \(error.localizedDescription)")
+        onFailure.value?()
+        return next(failures, "failed: \(url.lastPathComponent): \(error.localizedDescription)")
     }
 
     /// The next answer to a folder that is not empty.

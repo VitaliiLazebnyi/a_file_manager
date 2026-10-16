@@ -121,6 +121,7 @@ internal struct CovFileOpsJobRaces {
     @Test
     internal func resumingNeedsAWholeStartAndAWholeRead() {
         disk.abilities.value = [.write, .append]
+        disk.base.capabilities = [.write, .append]
         disk.base.addFile("/A/f.txt", "0123456789")
         disk.base.addFile("/B/f.txt", "012")
         disk.seen.value = ["/B/f.txt": FileItem(url: disk.base.url("/B/f.txt"), name: "f.txt", stat: .init(size: 5))]
@@ -161,10 +162,60 @@ internal struct CovFileOpsJobRaces {
         )
         job.options.verifies = true
         let answers = CovFileOpsAnswers()
+        // Cancelled at the second report of the verify: its reads are open by then.
+        let reports = Shared(0)
         answers.onProgress.value = { job, progress in
-            if progress.lines.first?.hasPrefix("Verifying") == true { job.cancel() }
+            guard progress.lines.first?.hasPrefix("Verifying") == true else {
+                return
+            }
+            reports.modify { $0 += 1 }
+            if reports.value == 2 { job.cancel() }
         }
         job.delegate = answers
         #expect(job.run().cancelled)
+    }
+
+    /// A target that turns out to be the source itself, once seen through, is never written over nor taken for a
+    /// second copy: refused before a write or an append, and a move keeps its source when it shows only afterwards.
+    @Test
+    internal func aTargetThatIsTheSourceItselfIsNeverWrittenOver() {
+        memory.addFile("/A/f.txt", "source")
+        disk.base.addDirectory("/V")
+        let source = memory.url("/A/f.txt")
+        disk.realPlaces.value = { path, _ in path == "/V/f.txt" ? source : nil }
+        let answers = CovFileOpsAnswers()
+        var job = FileJob(
+            kind: .copy,
+            sources: [source],
+            target: TargetSpec(directory: disk.base.url("/V")),
+            fileSystems: fileSystems
+        )
+        job.delegate = answers
+        _ = job.run()
+        #expect(answers.asked.value.contains { $0.hasPrefix("failed: f.txt") } && !disk.base.exists("/V/f.txt"))
+        disk.base.addFile("/V/f.txt", "old")
+        answers.conflicts.value = [.append]
+        job = FileJob(
+            kind: .copy,
+            sources: [source],
+            target: TargetSpec(directory: disk.base.url("/V")),
+            fileSystems: fileSystems
+        )
+        job.delegate = answers
+        _ = job.run()
+        #expect(disk.base.contents("/V/f.txt") == "old")
+        try? disk.base.remove(disk.base.url("/V/f.txt"))
+        disk.realAsks.value = [:]
+        // Seen through only after the move has written: the source stays.
+        disk.realPlaces.value = { path, count in path == "/V/f.txt" && count > 0 ? source : nil }
+        job = FileJob(
+            kind: .move,
+            sources: [source],
+            target: TargetSpec(directory: disk.base.url("/V")),
+            fileSystems: fileSystems
+        )
+        job.delegate = answers
+        _ = job.run()
+        #expect(memory.contents("/A/f.txt") == "source" && disk.base.contents("/V/f.txt") == "source")
     }
 }

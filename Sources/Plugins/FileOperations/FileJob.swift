@@ -1176,9 +1176,9 @@ public final class FileJob: @unchecked Sendable {
 
         case .rename(let destination):
             // The file under another spelling of its own name. Only a rename can do that; a
-            // copy would be written over the file and the move would then remove it.
-            let (from, to) = (try fileSystems.provider(for: item.url), try fileSystems.provider(for: destination))
-            guard from === to else { throw FileJobError.copyToItself }
+            // copy would be written over the file and the move would then remove it. (Both are
+            // places of the disk: the planner takes the file system of what it finds there.)
+            let from = try fileSystems.provider(for: item.url)
             do {
                 try from.move(item.url, to: destination, replacing: true, cancellation: cancellation)
             } catch FileSystemError.crossesVolumes {
@@ -1656,7 +1656,8 @@ public final class FileJob: @unchecked Sendable {
         let verb: OperationRecord.Verb = isMove ? .move : .copy
         // A folder that is another volume is not emptied by a move without somebody saying so.
         if isMove, try !mayEnter(folder, for: .move) {
-            add(isMove && predictedRenames.contains(source.locationKey) ? Measure(items: 1) : measuredBefore(folder))
+            // (Another volume is never taken for one rename.)
+            add(measuredBefore(folder))
             record(verb, source, destination, .skipped)
             return .skipped
         }
@@ -1684,7 +1685,8 @@ public final class FileJob: @unchecked Sendable {
                             replacing: true,
                             cancellation: self.cancellation
                         )
-                    self.add(predicted ? Measure(items: 1) : self.measuredBefore(folder))
+                    // (A folder whose name is taken, by itself, was not taken for one rename.)
+                    self.add(self.measuredBefore(folder))
                     movedWhole = true
                     self.record(.move, source, destination, .done)
                     return true
@@ -1769,7 +1771,7 @@ public final class FileJob: @unchecked Sendable {
         )
         // A folder that waited for its first file (a filter was in the way) is the job's too, if one came.
         let madeLate = createsLater && !createdHere && (try? entry(at: destination)) != nil
-        finishFolder(folder, at: destination, createdHere: createdHere || madeLate)
+        try finishFolder(folder, at: destination, createdHere: createdHere || madeLate)
         if isMove, outcome.emptied, defersRemovals {
             postponeRemoval(of: source, isFolder: true, tree: tree)
         } else if isMove, outcome.emptied {
@@ -1787,12 +1789,12 @@ public final class FileJob: @unchecked Sendable {
 
     /// A folder gets its attributes when everything is inside: before, a folder without write
     /// permission could not be filled, and filling it would change its date.
-    private func finishFolder(_ folder: FileItem, at destination: URL, createdHere: Bool) {
+    private func finishFolder(_ folder: FileItem, at destination: URL, createdHere: Bool) throws {
         let attributes = FileAttributes(
             modified: options.preservesFolderDates ? folder.modified : nil,
             permissions: createdHere && options.preservesAttributes ? folder.permissions : nil
         )
-        guard let to = try? fileSystems.provider(for: destination) else { return }
+        let to = try fileSystems.provider(for: destination)
         if attributes.modified != nil || attributes.permissions != nil {
             try? to.setAttributes(attributes, of: destination, cancellation: cancellation)
         }

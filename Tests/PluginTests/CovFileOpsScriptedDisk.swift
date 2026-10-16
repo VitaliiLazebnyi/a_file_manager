@@ -37,6 +37,12 @@ internal final class CovFileOpsScriptedDisk: FileSystemProvider, Sendable {
     internal let readsBeforeFailure = Shared<[String: Int]>([:])
     /// What moving to the Trash throws; nil moves the item into `/.Trash`.
     internal let trashError = Shared<(any Error)?>(nil)
+    /// Runs before a folder is listed, with its path.
+    internal let beforeList = Shared<(@Sendable (String) -> Void)?>(nil)
+    /// The real place behind a path, given how often it was asked before; nil for none.
+    internal let realPlaces = Shared<(@Sendable (String, Int) -> URL?)?>(nil)
+    /// How often the real place of a path was asked, by path.
+    internal let realAsks = Shared<[String: Int]>([:])
 
     /// `scripted`.
     internal var scheme: String { base.scheme }
@@ -53,9 +59,10 @@ internal final class CovFileOpsScriptedDisk: FileSystemProvider, Sendable {
         abilities.value
     }
 
-    /// The memory file system's listing.
+    /// Runs the hook of the folder, then lists it in the memory file system.
     internal func list(_ directory: URL, showHidden: Bool) throws -> [FileItem] {
-        try base.list(directory, showHidden: showHidden)
+        beforeList.value?(directory.path)
+        return try base.list(directory, showHidden: showHidden)
     }
 
     /// Runs the hook of the path, then asks the memory file system.
@@ -133,6 +140,17 @@ internal final class CovFileOpsScriptedDisk: FileSystemProvider, Sendable {
             throw error
         }
         try base.setAttributes(attributes, of: url)
+    }
+
+    /// The real place the test says.
+    internal func realLocation(of url: URL) -> URL? {
+        let path = url.path
+        var count = 0
+        realAsks.modify { counts in
+            count = counts[path, default: 0]
+            counts[path] = count + 1
+        }
+        return realPlaces.value?(path, count)
     }
 
     /// The order the test says.
