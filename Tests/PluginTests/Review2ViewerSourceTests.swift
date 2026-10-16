@@ -140,7 +140,7 @@ final class Review2HookProvider: FileSystemProvider, @unchecked Sendable {
             outcome.value = (try? ProviderByteSource.open(fifo, fileSystems: local())) == nil
         }
         worker.start()
-        #expect(worker.waitUntilFinished(timeout: 20) && outcome.value)
+        #expect(worker.waitUntilFinished() && outcome.value)
     }
 
     @Test func measuringAFileOfUnknownSizeStopsWithItsFlag() {
@@ -158,7 +158,7 @@ final class Review2HookProvider: FileSystemProvider, @unchecked Sendable {
         worker.start()
         usleep(30_000)
         flag.cancel()
-        #expect(worker.waitUntilFinished(timeout: 20))
+        #expect(worker.waitUntilFinished())
         if case .success? = outcome.value { Issue.record("The stream was opened") }
     }
 
@@ -181,7 +181,7 @@ final class Review2HookProvider: FileSystemProvider, @unchecked Sendable {
         let registry = FileSystemRegistry()
         registry.register(provider)
         let gate = DispatchSemaphore(value: 0)
-        provider.onClose = { _ = gate.wait(timeout: .now() + 20) }
+        provider.onClose = { _ = gate.wait(timeout: .now() + Wait.ceiling) }
         let source = try ProviderByteSource.open(URL(string: "hook:///a")!, fileSystems: registry)
         _ = try source.read(at: 0, count: 10)
         // The close of the reader blocks (a server that does not answer): `close` returns anyway.

@@ -7,7 +7,7 @@ import Testing
 
 extension LocalFileSystem {
     /// `places()` once the first read in the background has landed (it never waits itself).
-    func settledPlaces(timeout: TimeInterval = 30) -> [Place] {
+    func settledPlaces(timeout: TimeInterval = Wait.ceiling) -> [Place] {
         let end = Date().addingTimeInterval(timeout)
         var places = self.places()
         while !places.contains(where: { $0.url.path == "/" }), Date() < end {
@@ -20,7 +20,7 @@ extension LocalFileSystem {
 
 /// Runs `body` on a thread of its own and waits for it for a long time; false when it does not
 /// come back (a call that blocks must fail the test, not hang the run).
-private func finishes(within seconds: TimeInterval = 20, _ body: @escaping @Sendable () -> Void) -> Bool {
+private func finishes(within seconds: TimeInterval = Wait.ceiling, _ body: @escaping @Sendable () -> Void) -> Bool {
     let done = DispatchSemaphore(value: 0)
     Thread.detachNewThread {
         body()
@@ -156,7 +156,7 @@ private func status(_ url: URL) -> stat {
         Thread.sleep(forTimeInterval: 0.2)
         interruption.interrupt()
         // The thread comes back (it was blocked in the pipe, which nobody writes to).
-        let returned = done.wait(timeout: .now() + 20) == .success
+        let returned = done.wait(timeout: .now() + Wait.ceiling) == .success
         #expect(returned)
         #expect(outcome.withValue { $0 } == "interrupted")
         #expect(throws: (any Error).self) { try interruption.run { 0 } }
@@ -416,11 +416,8 @@ private func status(_ url: URL) -> stat {
         let again = LocalFileSystem()
         let own = ObjectIdentifier(again)
         func announcements() -> [Bool] { heard.withValue { $0.filter { $0.0 == own }.map(\.1) } }
-        var waited = 0
-        while waited < 120_000, announcements().isEmpty {
-            try await Task.sleep(nanoseconds: 10_000_000)
-            waited += 10
-        }
+        let patience = Date(timeIntervalSinceNow: Wait.ceiling)
+        while announcements().isEmpty, Date() < patience { try await Task.sleep(nanoseconds: 10_000_000) }
         // On the main thread, and at least once: other tests of the run attach and detach disk
         // images meanwhile, and each of those is a change of the places that is announced too
         // (seen once in a full run as two announcements where this expected exactly one).

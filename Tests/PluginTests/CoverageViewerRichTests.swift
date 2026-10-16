@@ -3,6 +3,7 @@ import AppKit
 import Foundation
 import PDFKit
 import Quartz
+import TestSupport
 import Testing
 import WebKit
 
@@ -23,7 +24,7 @@ internal struct CoverageViewerRichTests {
     }
 
     private static func wait(until condition: () -> Bool) async -> Bool {
-        let deadline = Date(timeIntervalSinceNow: 60)
+        let deadline = Date(timeIntervalSinceNow: Wait.ceiling)
         while !condition() {
             if Date() > deadline {
                 return false

@@ -264,9 +264,9 @@ internal struct CoverageViewerSourceTests {
         let flag = CancellationFlag()
         gate.submit(cancellation: flag) {
             started.signal()
-            _ = release.wait(timeout: .now() + 60)
+            _ = release.wait(timeout: .now() + Wait.ceiling)
         }
-        #expect(started.wait(timeout: .now() + 60) == .success)
+        #expect(started.wait(timeout: .now() + Wait.ceiling) == .success)
         flag.cancel()
         let ran = ViewerAdoptBox(false)
         gate.submit(cancellation: CancellationFlag()) { ran.value = true }

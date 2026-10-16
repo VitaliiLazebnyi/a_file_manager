@@ -39,7 +39,8 @@ import Testing
     }
 
     func settle(_ condition: () -> Bool) async {
-        for _ in 0..<5_000 where !condition() { try? await Task.sleep(nanoseconds: 2_000_000) }
+        let patience = Date(timeIntervalSinceNow: Wait.ceiling)
+        while !condition(), Date() < patience { try? await Task.sleep(nanoseconds: 2_000_000) }
     }
 
     @Test func theByteMatcherGivesTheAnswersOfTheCharacterMatcher() {
@@ -615,7 +616,7 @@ extension TreeNode {
             done.signal()
         }
         .start()
-        #expect(done.wait(timeout: .now() + 120) == .success)
+        #expect(done.wait(timeout: .now() + Wait.ceiling) == .success)
         let total = Date().timeIntervalSince(began)
         // Five pauses of 0.2 s lie between the first batch and the last.
         #expect((firstAt ?? total) < total - 0.5)
@@ -715,7 +716,7 @@ extension TreeNode {
                 done.signal()
             }
             .start()
-            #expect(done.wait(timeout: .now() + 60) == .success, "\(file)")
+            #expect(done.wait(timeout: .now() + Wait.ceiling) == .success, "\(file)")
         }
     }
 

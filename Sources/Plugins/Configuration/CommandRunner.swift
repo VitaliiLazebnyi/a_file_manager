@@ -25,6 +25,9 @@ final class CommandRunner {
     static let defaultListGrace: TimeInterval = 60
     /// The same for this runner (tests make it short).
     var listGrace = CommandRunner.defaultListGrace
+    /// How the end of a started program comes back to the main thread. Tests keep it for later,
+    /// to see what comes when the runner has gone meanwhile.
+    var backToMain: @Sendable (@escaping @MainActor @Sendable () -> Void) -> Void = { MainLoop.perform($0) }
     /// How deep user commands may call each other, and how many steps one run may take with
     /// everything it calls: a loop the name check does not see still ends.
     static let depthLimit = 16
@@ -552,13 +555,13 @@ final class CommandRunner {
         }
         let source = kernel.panels.source.model.directory
         let directory = folder ?? (source.isFileURL ? source.path : NSHomeDirectory())
-        let (grace, listURL, generation, children) = (
-            listGrace, chain.listURL, chain.call.generation, self.children
+        let (grace, listURL, generation, children, toMain) = (
+            listGrace, chain.listURL, chain.call.generation, self.children, self.backToMain
         )
         let program = DisplayText.oneLine(ShellWords.unquoted(ShellWords.firstWord(of: line).word), limit: 80)
         if waits { waiting += 1 }
         let finished: @Sendable (String?) -> Void = { [weak self] failure in
-            MainLoop.perform { [weak self] in
+            toMain { [weak self] in
                 guard let self else { return }
                 self.removeListFile(listURL, after: grace)
                 if let failure {

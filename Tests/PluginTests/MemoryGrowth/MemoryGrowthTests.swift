@@ -49,9 +49,9 @@ internal struct MemoryGrowthTests {
         }
     }
 
-    /// Waits until `condition` holds, for at most ten seconds, looking every few milliseconds.
+    /// Waits until `condition` holds, up to `Wait.ceiling`, looking every few milliseconds.
     private static func wait(until condition: () -> Bool) async -> Bool {
-        let deadline = Date().addingTimeInterval(10)
+        let deadline = Date().addingTimeInterval(Wait.ceiling)
         while !condition(), Date() < deadline {
             try? await Task.sleep(nanoseconds: 2_000_000)
         }

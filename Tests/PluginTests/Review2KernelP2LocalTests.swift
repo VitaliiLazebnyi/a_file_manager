@@ -6,7 +6,7 @@ import Testing
 @testable import LocalFileSystemPlugin
 
 /// Waits for a condition, not for a length of time; false only after a very long while.
-private func waitUntil(seconds: TimeInterval = 60, _ condition: () -> Bool) -> Bool {
+private func waitUntil(seconds: TimeInterval = Wait.ceiling, _ condition: () -> Bool) -> Bool {
     let end = Date(timeIntervalSinceNow: seconds)
     while !condition() {
         if Date() > end { return false }
@@ -38,7 +38,7 @@ private final class Running<Value>: @unchecked Sendable {
     }
 
     /// Nil when it did not end for a very long time: a hang, reported as a failure.
-    func wait(seconds: TimeInterval = 60) -> Result<Value, any Error>? {
+    func wait(seconds: TimeInterval = Wait.ceiling) -> Result<Value, any Error>? {
         let end = Date(timeIntervalSinceNow: seconds)
         condition.lock()
         defer { condition.unlock() }
@@ -620,16 +620,13 @@ private final class DeadVolume: @unchecked Sendable {
         }
         defer { NotificationCenter.default.removeObserver(observer) }
         dead.answer()
-        var waited = 0
         func wasHeard() -> Bool {
             heard.lock.lock()
             defer { heard.lock.unlock() }
             return heard.roots.contains(dead.root)
         }
-        while !wasHeard(), waited < 60_000 {
-            try await Task.sleep(nanoseconds: 5_000_000)
-            waited += 5
-        }
+        let patience = Date(timeIntervalSinceNow: Wait.ceiling)
+        while !wasHeard(), Date() < patience { try await Task.sleep(nanoseconds: 5_000_000) }
         #expect(wasHeard())
         #expect(
             waitUntil {

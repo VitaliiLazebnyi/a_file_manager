@@ -16,8 +16,8 @@ internal struct CovNetBackground {
             Background.run(lane: lane) {
                 // Nothing to do.
             }
-            guard Background.waitUntilIdle(lane: lane, timeout: 120),
-                Wait.until(seconds: 120, { Background.threadCount == 0 })
+            guard Background.waitUntilIdle(lane: lane, timeout: Wait.ceiling),
+                Wait.until(seconds: Wait.ceiling, { Background.threadCount == 0 })
             else { exit(1) }
             exit(0)
         }

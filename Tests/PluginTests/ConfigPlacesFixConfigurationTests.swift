@@ -22,7 +22,9 @@ import Testing
             left: PanelSnapshot(path: "/tmp/A dir/", cursorName: name, selection: []),
             right: PanelSnapshot(path: "/B/", cursorName: nil),
             environment: ["EVIL": "e'v\"il $x `y`", "PLAIN": "/Users/me"],
-            listFolder: URL(fileURLWithPath: "/tmp/lists"), listName: "t")
+            listFolder: URL(fileURLWithPath: "/tmp/lists"),
+            listName: "t"
+        )
     }
 
     /// The words /bin/zsh makes of `printf '%s\n' <line>`, separated by NUL for printing.
@@ -79,7 +81,8 @@ import Testing
         #expect(expand("%|PLAIN|/x", name: nil).text == "/Users/me/x")
         #expect(
             try argv(CommandLanguage.expandingEnvironment("a %EVIL% '%EVIL%' \"%EVIL%\"", ["EVIL": "e'v\"il $x `y`"]))
-                == ["a", "e'v\"il $x `y`", "e'v\"il $x `y`", "e'v\"il $x `y`"])
+                == ["a", "e'v\"il $x `y`", "e'v\"il $x `y`", "e'v\"il $x `y`"]
+        )
     }
 
     @Test func selectedNamesAreSeparateWords() throws {
@@ -93,7 +96,8 @@ import Testing
         #expect(expand("rm -rf %P%N", name: nil).missingName)
         #expect(
             expand("echo %V", name: nil).missingName && expand("%O.%E", name: nil).missingName
-                && expand("%M", name: "x").missingName)
+                && expand("%M", name: "x").missingName
+        )
         #expect(!expand("rm %P%N", name: "a").missingName && !expand("ls %P %S", name: nil).missingName)
     }
 }
@@ -118,7 +122,8 @@ import Testing
         #expect(commands.map(\.name) == ["em_a", "em_b", "em_c"])
         #expect(
             commands[0].action == CommandAction(command: "ls")
-                && commands[1].action == CommandAction(command: "ls", parameters: "p", startPath: "/"))
+                && commands[1].action == CommandAction(command: "ls", parameters: "p", startPath: "/")
+        )
         await Task.yield()
         // Two bad elements: the original is kept aside and the user told, before anything is saved over it.
         #expect(settings.data(forKey: "configuration.userCommands.unreadable") == Data(json.utf8))
@@ -135,7 +140,8 @@ import Testing
         await Task.yield()
         #expect(
             settings.data(forKey: "configuration.userCommands.unreadable") == Data("not json at all".utf8)
-                && told.count == 1)
+                && told.count == 1
+        )
         #expect(store.userCommands.map(\.name) == ["em_new"])
     }
 
@@ -172,17 +178,26 @@ import Testing
         try box.file("A/one.txt")
         try box.folder("B")
         plugin = ConfigurationPlugin(
-            launchesApplications: false, background: nil, listFolder: box.url("lists"), settingsKeys: { [] })
+            launchesApplications: false,
+            background: nil,
+            listFolder: box.url("lists"),
+            settingsKeys: { [] }
+        )
         bench = TestBench(
-            plugins: [NavigationPlugin(), SelectionPlugin(), plugin], fileSystems: [LocalFileSystem()],
-            left: box.url("A"), right: box.url("B"), settings: settings)
+            plugins: [NavigationPlugin(), SelectionPlugin(), plugin],
+            fileSystems: [LocalFileSystem()],
+            left: box.url("A"),
+            right: box.url("B"),
+            settings: settings
+        )
     }
 
     var center: ConfigurationCenter { plugin.center! }
 
     @Test func aCommandWithANameCodeDoesNotRunWithoutAName() {
         center.save(
-            UserCommand(name: "em_rm", title: "", action: CommandAction(command: "rm -rf", parameters: "%P%N")))
+            UserCommand(name: "em_rm", title: "", action: CommandAction(command: "rm -rf", parameters: "%P%N"))
+        )
         bench.left.moveCursor(toName: "one.txt")
         bench.commands.perform("em_rm")
         #expect(plugin.launched.count == 1)
@@ -226,15 +241,22 @@ import Testing
         try box.file("A/one.txt")
         try box.folder("B")
         plugin = ConfigurationPlugin(
-            launchesApplications: true, background: nil, listFolder: box.url("lists"), settingsKeys: { [] })
+            launchesApplications: true,
+            background: nil,
+            listFolder: box.url("lists"),
+            settingsKeys: { [] }
+        )
         bench = TestBench(
-            plugins: [NavigationPlugin(), SelectionPlugin(), plugin], fileSystems: [LocalFileSystem()],
-            left: box.url("A"), right: box.url("B"))
+            plugins: [NavigationPlugin(), SelectionPlugin(), plugin],
+            fileSystems: [LocalFileSystem()],
+            left: box.url("A"),
+            right: box.url("B")
+        )
     }
 
     /// Lets the main actor run, so what the runner hands back to the main thread arrives.
     func wait(until done: () -> Bool) async {
-        let deadline = Date().addingTimeInterval(20)
+        let deadline = Date().addingTimeInterval(Wait.ceiling)
         while !done(), Date() < deadline { try? await Task.sleep(nanoseconds: 50_000_000) }
     }
 
@@ -242,14 +264,16 @@ import Testing
         let marker = box.url("marker").path
         let center = plugin.center!
         center.save(
-            UserCommand(name: "em_build", title: "", action: CommandAction(command: "sleep 0.3; touch '\(marker)'")))
+            UserCommand(name: "em_build", title: "", action: CommandAction(command: "sleep 0.3; touch '\(marker)'"))
+        )
         // The next step looks for the file the program writes: it must exist by then.
         var existed: Bool?
         bench.commands.register(Command("cm_ConfigProbe", "Probe")) {
             existed = FileManager.default.fileExists(atPath: marker)
         }
         center.save(
-            UserCommand(name: "em_chain", title: "", action: CommandAction(command: "em_build, cm_ConfigProbe")))
+            UserCommand(name: "em_chain", title: "", action: CommandAction(command: "em_build, cm_ConfigProbe"))
+        )
         bench.commands.perform("em_chain")
         await wait { existed != nil }
         #expect(existed == true)
@@ -257,8 +281,10 @@ import Testing
 
     @Test func aLaunchIsNoJobAndNoHistoryEntry() async {
         let marker = box.url("marker2").path
-        plugin.center!.save(
-            UserCommand(name: "em_touch", title: "", action: CommandAction(command: "touch '\(marker)'")))
+        plugin.center!
+            .save(
+                UserCommand(name: "em_touch", title: "", action: CommandAction(command: "touch '\(marker)'"))
+            )
         bench.commands.perform("em_touch")
         #expect(!bench.jobService.titles.contains { $0.hasPrefix("Running") })
         await wait { FileManager.default.fileExists(atPath: marker) }
@@ -267,10 +293,14 @@ import Testing
     }
 
     @Test func aLaunchThatCannotStartIsReported() async {
-        plugin.center!.save(
-            UserCommand(
-                name: "em_nowhere", title: "",
-                action: CommandAction(command: "true", startPath: "/nonexistent-folder-afm")))
+        plugin.center!
+            .save(
+                UserCommand(
+                    name: "em_nowhere",
+                    title: "",
+                    action: CommandAction(command: "true", startPath: "/nonexistent-folder-afm")
+                )
+            )
         bench.commands.perform("em_nowhere")
         await wait { bench.interaction.log.contains { $0.hasPrefix("inform:") } }
         #expect(bench.interaction.log.contains { $0.hasPrefix("inform:") && $0.contains("cannot be started") })

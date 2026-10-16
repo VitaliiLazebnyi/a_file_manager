@@ -27,7 +27,10 @@ import Testing
 
     func run() -> ToolRun {
         ToolRun(
-            fileSystems: registry, cancellation: CancellationFlag(), report: { _ in }, askExisting: { _ in .overwrite }
+            fileSystems: registry,
+            cancellation: CancellationFlag(),
+            report: { _ in },
+            askExisting: { _ in .overwrite }
         )
     }
 
@@ -37,7 +40,7 @@ import Testing
         return try? Data(contentsOf: tests.appendingPathComponent("Fuzz/repro/tools/" + name))
     }
 
-    func waitOnMain(_ seconds: Double = 240, until condition: () -> Bool) async -> Bool {
+    func waitOnMain(_ seconds: Double = Wait.ceiling, until condition: () -> Bool) async -> Bool {
         let deadline = Date().addingTimeInterval(seconds)
         while !condition(), Date() < deadline { try? await Task.sleep(nanoseconds: 3_000_000) }
         return condition()
@@ -48,11 +51,13 @@ import Testing
     @Test func blake3SpreadsOverTheCoresOnlyWhileCoresAreLeftOver() {
         #expect(
             ChecksumRun.spreadsBLAKE3(filesInProgress: 0, cores: 8)
-                && ChecksumRun.spreadsBLAKE3(filesInProgress: 1, cores: 8))
+                && ChecksumRun.spreadsBLAKE3(filesInProgress: 1, cores: 8)
+        )
         #expect(ChecksumRun.spreadsBLAKE3(filesInProgress: 7, cores: 8))
         #expect(
             !ChecksumRun.spreadsBLAKE3(filesInProgress: 8, cores: 8)
-                && !ChecksumRun.spreadsBLAKE3(filesInProgress: 100, cores: 8))
+                && !ChecksumRun.spreadsBLAKE3(filesInProgress: 100, cores: 8)
+        )
         #expect(!ChecksumRun.spreadsBLAKE3(filesInProgress: 1, cores: 1))
     }
 
@@ -100,7 +105,8 @@ import Testing
                     let hasher = method.makeHasher()
                     hasher.update(data)
                     return hasher.finish()
-                })
+                }
+            )
         }
         let results = ChecksumRun.digests(of: files, run: run())
         for (number, result) in results.enumerated() {
@@ -146,13 +152,20 @@ import Testing
         for autoRename in [false, true] {
             let written =
                 (try? Decoder.decode(
-                    item("in/part001.uue"), into: box.url("out/target"), autoRename: autoRename, run: run())) ?? []
+                    item("in/part001.uue"),
+                    into: box.url("out/target"),
+                    autoRename: autoRename,
+                    run: run()
+                )) ?? []
             for url in written { #expect(url.deletingLastPathComponent().path == box.url("out/target").path) }
         }
         #expect(
-            ((try? FileManager.default.contentsOfDirectory(atPath: box.url("out").path)) ?? []).filter {
-                $0 != "target"
-            }.isEmpty)
+            ((try? FileManager.default.contentsOfDirectory(atPath: box.url("out").path)) ?? [])
+                .filter {
+                    $0 != "target"
+                }
+                .isEmpty
+        )
     }
 
     @Test func theLastWordOnADecodedNameIsTheKernelsCheck() {
@@ -167,11 +180,17 @@ import Testing
         let lines = (1...3_000).map { "line \($0)" }
         try box.file("A/big.txt", lines.joined(separator: "\n") + "\n")
         try box.file(
-            "B/big.txt", lines.map { $0.hasSuffix("7") ? $0 + " changed" : $0 }.joined(separator: "\n") + "\n")
+            "B/big.txt",
+            lines.map { $0.hasSuffix("7") ? $0 + " changed" : $0 }.joined(separator: "\n") + "\n"
+        )
         let plugin = CompareContentPlugin(opensWindows: false)
         let bench = TestBench(
-            plugins: [plugin], fileSystems: [LocalFileSystem()], left: box.url("A"), right: box.url("B"),
-            settings: MemorySettings())
+            plugins: [plugin],
+            fileSystems: [LocalFileSystem()],
+            left: box.url("A"),
+            right: box.url("B"),
+            settings: MemorySettings()
+        )
         bench.left.reload()
         bench.left.moveCursor(toName: "big.txt")
         bench.commands.perform(.compareByContent)
@@ -215,7 +234,10 @@ import Testing
                 var o = SyncRunOptions()
                 o.useTrash = false
                 return o
-            }(), fileSystems: registry, cancellation: flag)
+            }(),
+            fileSystems: registry,
+            cancellation: flag
+        )
         let finished = DispatchSemaphore(value: 0)
         let thread = Thread {
             _ = executor.run()
@@ -225,7 +247,7 @@ import Testing
         // The listing waits inside the file system (stalled); the cancel ends it quietly with nothing.
         Thread.sleep(forTimeInterval: 0.1)
         flag.cancel()
-        #expect(finished.wait(timeout: .now() + 30) == .success)
+        #expect(finished.wait(timeout: .now() + Wait.ceiling) == .success)
         #expect(memory.exists("/R/keep/inside.txt") && memory.exists("/R/keep"))
     }
 
@@ -233,8 +255,12 @@ import Testing
 
     func benchOf(_ memory: MemoryFileSystem, plugins: [any Plugin] = []) -> TestBench {
         TestBench(
-            plugins: plugins, fileSystems: [LocalFileSystem(), memory], left: memory.url("/A"), right: memory.url("/B"),
-            settings: MemorySettings())
+            plugins: plugins,
+            fileSystems: [LocalFileSystem(), memory],
+            left: memory.url("/A"),
+            right: memory.url("/B"),
+            settings: MemorySettings()
+        )
     }
 
     @Test func theNamesToSynchronizeAreReadFromTheMarksOnly() async {
