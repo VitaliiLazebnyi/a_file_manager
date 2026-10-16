@@ -28,14 +28,21 @@ enum StorageMedium {
     }
 
     /// Looks the device up in the I/O registry; the disk driver above it states its medium.
-    private static func mediumIsRotational(bsdName: String) -> Bool {
-        guard let matching = IOBSDNameMatching(kIOMainPortDefault, 0, bsdName) else { return false }
-        let service = IOServiceGetMatchingService(kIOMainPortDefault, matching)
-        guard service != 0 else { return false }
+    static func mediumIsRotational(bsdName: String) -> Bool {
+        guard let matching = IOBSDNameMatching(kIOMainPortDefault, 0, bsdName),
+            case let service = IOServiceGetMatchingService(kIOMainPortDefault, matching), service != 0
+        else {
+            return false
+        }
         defer { IOObjectRelease(service) }
         let options = IOOptionBits(kIORegistryIterateRecursively | kIORegistryIterateParents)
         let found = IORegistryEntrySearchCFProperty(
-            service, kIOServicePlane, "Device Characteristics" as CFString, kCFAllocatorDefault, options)
+            service,
+            kIOServicePlane,
+            "Device Characteristics" as CFString,
+            kCFAllocatorDefault,
+            options
+        )
         return ((found as? [String: Any])?["Medium Type"] as? String) == "Rotational"
     }
 }
