@@ -37,6 +37,8 @@ internal final class CovFileOpsScriptedDisk: FileSystemProvider, Sendable {
     internal let readsBeforeFailure = Shared<[String: Int]>([:])
     /// What moving to the Trash throws; nil moves the item into `/.Trash`.
     internal let trashError = Shared<(any Error)?>(nil)
+    /// What the folder above a path is said to be instead of the memory file system's answer.
+    internal let parents = Shared<[String: URL]>([:])
     /// Runs before a folder is listed, with its path.
     internal let beforeList = Shared<(@Sendable (String) -> Void)?>(nil)
     /// The real place behind a path, given how often it was asked before; nil for none.
@@ -77,9 +79,9 @@ internal final class CovFileOpsScriptedDisk: FileSystemProvider, Sendable {
         return seen.value[path] ?? base.item(at: url)
     }
 
-    /// The memory file system's answer.
+    /// The folder above, as the test says or as the memory file system answers.
     internal func parent(of directory: URL) -> URL? {
-        base.parent(of: directory)
+        parents.value[directory.path] ?? base.parent(of: directory)
     }
 
     /// The memory file system's reader, which fails where the test says.

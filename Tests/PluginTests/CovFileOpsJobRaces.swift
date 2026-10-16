@@ -218,4 +218,35 @@ internal struct CovFileOpsJobRaces {
         _ = job.run()
         #expect(memory.contents("/A/f.txt") == "source" && disk.base.contents("/V/f.txt") == "source")
     }
+
+    /// A view that says nothing of what it shows is still seen through by the folder above it that it answers: the
+    /// same path on another file system.
+    @Test
+    internal func aViewIsSeenThroughByItsParent() {
+        disk.parents.value = ["/V": memory.url("/V")]
+        #expect(RealLocation.resolve(disk.base.url("/V"), in: fileSystems) == memory.url("/V"))
+    }
+
+    /// A copy within one file system that fails is told; cancelled meanwhile, it is the cancel.
+    @Test
+    internal func aCopyWithinOneFileSystemThatFails() {
+        disk.base.addFile("/A/f.txt", "f")
+        disk.base.addDirectory("/B")
+        let held = Shared<FileJob?>(nil)
+        disk.copyRule.value = { _, _ in
+            held.value?.cancel()
+            return CocoaError(.fileWriteUnknown)
+        }
+        let job = FileJob(
+            kind: .copy,
+            sources: [disk.base.url("/A/f.txt")],
+            target: TargetSpec(directory: disk.base.url("/B")),
+            fileSystems: fileSystems
+        )
+        held.value = job
+        let answers = CovFileOpsAnswers()
+        job.delegate = answers
+        #expect(job.run().cancelled && !answers.asked.value.contains { $0.hasPrefix("failed") })
+        held.value = nil
+    }
 }
