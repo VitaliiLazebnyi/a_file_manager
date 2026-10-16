@@ -368,7 +368,7 @@ import Testing
         let presenter = StabilityPresenter()
         let windowWatch = StabilityWindows { $0.title.hasPrefix("Compare contents") }
         var effects = CompareWindowEffects.system
-        effects.present = { [presenter] in presenter.present($0) }
+        effects.present = { [weak presenter] in presenter?.present($0) }
         effects.beep = {}
         let plugin = CompareContentPlugin(opensWindows: true, effects: effects)
         defer {

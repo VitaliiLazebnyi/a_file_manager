@@ -123,13 +123,17 @@ internal struct CoverageCompareWindowKeys {
     /// A pane whose window has gone answers no key of its own.
     @Test
     internal func aPaneWhoseWindowHasGoneAnswersNoKey() throws {
-        // Made and let go of in a pool of its own, so that nothing keeps the window's controller.
-        let (table, scratch) = try autoreleasepool { () throws -> (NSTableView, CoverageCompareStage.Recorder) in
+        // Made and let go of in a pool of its own, so that nothing keeps the window's controller (its recorder,
+        // whose presenter holds it, goes too).
+        weak var gone: CompareWindowController?
+        let (table, beeps) = try autoreleasepool { () throws -> (NSTableView, Shared<Int>) in
             let stage = CoverageCompareStage(left: CoverageCompareWindow.left, right: CoverageCompareWindow.right)
             let table = try #require(stage.tables.first)
+            gone = stage.controller
             stage.close()
-            return (table, stage.recorder)
+            return (table, stage.recorder.beepCount)
         }
+        #expect(gone == nil)
         let event = try #require(
             NSEvent.keyEvent(
                 with: .keyDown,
@@ -145,6 +149,6 @@ internal struct CoverageCompareWindowKeys {
             )
         )
         table.keyDown(with: event)
-        #expect(scratch.beeps == 0)
+        #expect(beeps.value == 0)
     }
 }
